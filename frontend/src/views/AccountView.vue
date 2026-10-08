@@ -176,7 +176,7 @@
       :operation="operation"
       :online="online"
       @removed="onRemoved"
-      @transfer="transferDone"
+      @transfer="transferEnded"
     />
     <TransferSheet
       v-if="account"
@@ -184,7 +184,7 @@
       :from="account.id"
       :online="online"
       :spend-currency="account.currency"
-      @done="transferDone"
+      @done="transferEnded"
     />
   </AppScreen>
 </template>
@@ -214,6 +214,7 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import TransferSheet from '@/components/TransferSheet.vue'
+import type { TransferOutcome } from '@/components/TransferSheet.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import {
   canTransfer,
@@ -434,6 +435,8 @@ export default defineComponent({
 
     const removed = ref<(Removed & { stamp: number }) | null>(null)
     function onRemoved(value: Removed): void {
+      // One «Вернуть» at a time: the newer removal's strip takes the place of the older (С-6).
+      transferRemoved.value = null
       removed.value = { ...value, stamp: Date.now() }
     }
     function restoreSpending(): void {
@@ -459,12 +462,16 @@ export default defineComponent({
       done: transferDone,
       restore: restoreTransfer,
     } = useTransferOutcome()
+    function transferEnded(outcome: TransferOutcome): void {
+      if (outcome.kind === 'removed') removed.value = null
+      transferDone(outcome)
+    }
 
     return {
       transferable,
       transferOpen,
       transferRemoved,
-      transferDone,
+      transferEnded,
       restoreTransfer,
       t,
       phase,

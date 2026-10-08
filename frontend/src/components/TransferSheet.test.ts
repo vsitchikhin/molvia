@@ -1,3 +1,4 @@
+import { defineComponent, h } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
@@ -16,6 +17,9 @@ import type {
   TransferView,
 } from '@molvia/model'
 import TransferSheet from './TransferSheet.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
+import { useTransferOutcome } from '@/composables/useTransferOutcome'
+import type { TransferOutcomes } from '@/composables/useTransferOutcome'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import { useAccountsStore } from '@/stores/accounts'
@@ -25,6 +29,7 @@ const recordTransfer =
   vi.fn<(body: TransferBody) => Promise<{ transfer: TransferResponse; created: boolean }>>()
 const amendTransfer = vi.fn<(id: string, body: TransferAmendBody) => Promise<TransferResponse>>()
 const removeTransfer = vi.fn<(id: string) => Promise<MoneyAccountsResponse>>()
+const restoreTransfer = vi.fn<(id: string) => Promise<TransferResponse>>()
 const transfer = vi.fn<(id: string) => Promise<TransferView>>()
 const moneyAccounts = vi.fn<() => Promise<MoneyAccountsResponse>>()
 vi.mock('@/api', () => ({
@@ -32,6 +37,7 @@ vi.mock('@/api', () => ({
     recordTransfer: (body: TransferBody) => recordTransfer(body),
     amendTransfer: (id: string, body: TransferAmendBody) => amendTransfer(id, body),
     removeTransfer: (id: string) => removeTransfer(id),
+    restoreTransfer: (id: string) => restoreTransfer(id),
     transfer: (id: string) => transfer(id),
     moneyAccounts: () => moneyAccounts(),
   },
@@ -106,7 +112,14 @@ let clock = 0
 beforeEach(() => {
   localStorage.clear()
   sessionStorage.clear()
-  for (const mock of [recordTransfer, amendTransfer, removeTransfer, transfer, moneyAccounts]) {
+  for (const mock of [
+    recordTransfer,
+    amendTransfer,
+    removeTransfer,
+    restoreTransfer,
+    transfer,
+    moneyAccounts,
+  ]) {
     mock.mockReset()
   }
   vi.restoreAllMocks()
@@ -256,5 +269,152 @@ describe('TransferSheet (MOL-253)', () => {
     expect(view.emitted('done')?.[0]).toEqual([
       { kind: 'removed', transfer: written({ amendedAt: new Date('2026-10-08T10:00:00Z') }) },
     ])
+  })
+
+  describe('adversarial round 1', () => {
+    const offline = () => new ApiError(ERROR.INTERNAL, 'offline', false)
+    const settle = async () => {
+      await flushPromises()
+      clock += 1000
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      await flushPromises()
+    }
+
+    it('А3: a conflict of an amendment says what is recorded now, in a transfer’s words', async () => {
+      transfer
+        .mockResolvedValueOnce(written())
+        .mockResolvedValueOnce(written({ amount: parseMoney('2500', 'USD'), revision: 2 }))
+      amendTransfer
+        .mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 'conflict', true))
+        .mockResolvedValueOnce({
+          transfer: written({ revision: 3 }),
+          accounts: page([card, dollars]),
+        })
+      const view = await sheet({ editingId: TRANSFER }, withAccounts([card, dollars]))
+      await typeAmount(view, '2100')
+      await mainButton(view).trigger('click')
+      await settle()
+      const refusal = view.get('.refusal').text()
+      expect(refusal).toContain('The transfer was edited on another phone')
+      expect(refusal).toMatch(/Recorded now: \$2,500 → «Dollars» · fee \$20/)
+      expect(refusal).not.toMatch(/exchange|below/i)
+      expect((view.get('input.entry').element as HTMLInputElement).value).toBe('2100')
+      // «Сохранить» again goes over the version held now.
+      await mainButton(view).trigger('click')
+      await settle()
+      expect(amendTransfer.mock.calls[1]?.[1]).toMatchObject({
+        revision: 2,
+        amount: { minor: 210_000n },
+      })
+    })
+
+    it('А5: written already under its name with other figures — told so, and amended, never a second one', async () => {
+      recordTransfer
+        .mockRejectedValueOnce(offline())
+        .mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 'conflict', true))
+      transfer.mockResolvedValueOnce(written())
+      moneyAccounts.mockResolvedValue(page([card, dollars]))
+      amendTransfer.mockResolvedValueOnce({
+        transfer: written({ amount: parseMoney('2100', 'USD'), revision: 2 }),
+        accounts: page([card, dollars]),
+      })
+      const view = await sheet({ from: card.id }, withAccounts([card, dollars]))
+      await typeAmount(view, '2000')
+      await mainButton(view).trigger('click')
+      await settle()
+      await typeAmount(view, '2100')
+      await mainButton(view).trigger('click')
+      await settle()
+      const [first] = recordTransfer.mock.calls.map(([body]) => body)
+      expect(transfer).toHaveBeenCalledWith(first?.id)
+      expect(view.get('.refusal').text()).toContain('The transfer is already recorded')
+      expect(moneyAccounts).toHaveBeenCalled()
+      expect(mainButton(view).text()).toBe('Save')
+      await mainButton(view).trigger('click')
+      await settle()
+      expect(recordTransfer).toHaveBeenCalledTimes(2)
+      // The transfer as the server holds it, amended over its version — not a new one.
+      expect(amendTransfer).toHaveBeenCalledWith(
+        TRANSFER,
+        expect.objectContaining({ revision: 1, amount: { minor: 210_000n, currency: 'USD' } }),
+      )
+    })
+
+    it('А6: a row whose transfer the server did not give opens on «не ответил» with «Повторить»', async () => {
+      transfer.mockRejectedValueOnce(offline()).mockResolvedValueOnce(written())
+      const view = await sheet({ editingId: TRANSFER }, withAccounts([card, dollars]))
+      expect(view.emitted('update:open')).toBeUndefined()
+      expect(view.text()).toContain('The transfer didn’t open')
+      const retry = view.findAll('button').find((one) => one.text() === 'Try again')
+      await retry?.trigger('click')
+      await settle()
+      expect(mainButton(view).text()).toBe('Save')
+    })
+
+    describe('«Вернуть» (review С-3, А4)', () => {
+      function outcomesHost() {
+        let outcomes: TransferOutcomes | undefined
+        const Child = defineComponent({
+          setup() {
+            outcomes = useTransferOutcome()
+            return () => h('i')
+          },
+        })
+        const Host = defineComponent({
+          setup() {
+            const said = provideAnnouncer()
+            return () =>
+              h('div', [
+                h(
+                  'p',
+                  { class: 'said' },
+                  said.value.map((one) => one.text),
+                ),
+                h(Child),
+              ])
+          },
+        })
+        const view = mount(Host, {
+          attachTo: document.body,
+          global: { plugins: [withAccounts([card, dollars]), createAppI18n('en')] },
+        })
+        if (!outcomes) throw new Error('not mounted')
+        const said = async () => {
+          await new Promise((resolve) => setTimeout(resolve, 400))
+          await flushPromises()
+          return view.get('.said').text()
+        }
+        return { outcomes, said }
+      }
+
+      it('no answer puts the strip back and asks to tap again, in a transfer’s words', async () => {
+        restoreTransfer.mockRejectedValueOnce(offline())
+        const { outcomes, said } = outcomesHost()
+        outcomes.done({ kind: 'removed', transfer: written() })
+        await outcomes.restore()
+        expect(outcomes.removed.value?.id).toBe(TRANSFER)
+        expect(await said()).toContain('The transfer didn’t come back')
+      })
+
+      it('too late takes the strip away and says so', async () => {
+        restoreTransfer.mockRejectedValueOnce(new ApiError(ERROR.NOT_FOUND, 'gone', true))
+        const { outcomes, said } = outcomesHost()
+        outcomes.done({ kind: 'removed', transfer: written() })
+        await outcomes.restore()
+        expect(outcomes.removed.value).toBeNull()
+        expect(await said()).toContain('Too late')
+      })
+
+      it('a transfer written after the removal takes its «Вернуть» away: it is final on the server', () => {
+        const { outcomes } = outcomesHost()
+        outcomes.done({ kind: 'removed', transfer: written() })
+        outcomes.done({
+          kind: 'saved',
+          transfer: written({ id: '7d1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f' }),
+          created: true,
+        })
+        expect(outcomes.removed.value).toBeNull()
+      })
+    })
   })
 })

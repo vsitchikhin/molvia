@@ -1,6 +1,8 @@
 import { ref } from 'vue'
 import type { Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ApiError } from '@molvia/client'
+import { ERROR } from '@molvia/model'
 import type { TransferOutcome } from '@/components/TransferSheet.vue'
 import { asTyped } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
@@ -18,7 +20,8 @@ export interface TransferOutcomes {
 /**
  * What a screen does when the sheet of a transfer ends (MOL-253): a transfer written is said —
  * «Переведено: 2 000 $ на «Доллары»» — an amendment too, and a removal is offered back in the
- * screen's «Вернуть». Brought back by the answer, never by the tap, as an account is.
+ * screen's «Вернуть». Brought back by the answer, never by the tap, as an account is: too late is
+ * said and the strip goes, no answer puts the strip back — the server keeps the mark ten minutes.
  */
 export function useTransferOutcome(): TransferOutcomes {
   const { t, locale } = useI18n()
@@ -33,6 +36,8 @@ export function useTransferOutcome(): TransferOutcomes {
       removed.value = { id: outcome.transfer.id, stamp: Date.now() }
       return
     }
+    // A write makes the removal before it final on the server: its «Вернуть» goes (review С-3).
+    removed.value = null
     if (!outcome.created) {
       announce?.(t('transfer.saved'))
       return
@@ -54,9 +59,16 @@ export function useTransferOutcome(): TransferOutcomes {
       await transfers.restore(value.id)
       removed.value = null
       announce?.(t('transfer.restored'))
-    } catch {
-      removed.value = null
-      announce?.(t('accounts.sheet.failed'))
+    } catch (caught) {
+      const late = caught instanceof ApiError && caught.answered && caught.code === ERROR.NOT_FOUND
+      if (late) {
+        removed.value = null
+        announce?.(t('transfer.restore_late'))
+      } else {
+        // The strip anew, for another ten seconds: the server keeps the mark ten minutes (А4).
+        removed.value = { ...value, stamp: Date.now() }
+        announce?.(t('transfer.restore_failed'))
+      }
     } finally {
       restoring.value = false
     }

@@ -191,7 +191,7 @@
       :made="made"
       @add-category="newCategoryOpen = true"
       @saved="saved"
-      @removed="onRemoved"
+      @removed="spendingRemoved"
     />
     <NewCategorySheet
       v-model:open="newCategoryOpen"
@@ -205,7 +205,7 @@
       :editing-id="transferId"
       :online="online"
       :spend-currency="spendCurrency"
-      @done="transferDone"
+      @done="transferEnded"
     />
   </AppScreen>
 </template>
@@ -229,6 +229,8 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SpendingSheet from '@/components/SpendingSheet.vue'
 import TransferSheet from '@/components/TransferSheet.vue'
+import type { TransferOutcome } from '@/components/TransferSheet.vue'
+import type { Removed } from '@/components/spending'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import { journalRowProps } from '@/components/spending'
@@ -382,6 +384,15 @@ export default defineComponent({
       done: transferDone,
       restore: restoreTransfer,
     } = useTransferOutcome()
+    // One «Вернуть» at a time: the newer removal's strip takes the place of the older (review С-6).
+    function transferEnded(outcome: TransferOutcome): void {
+      if (outcome.kind === 'removed') screen.forgetRemoved()
+      transferDone(outcome)
+    }
+    function spendingRemoved(value: Removed): void {
+      transferRemoved.value = null
+      screen.onRemoved(value)
+    }
 
     /** A spending of another month takes «Траты» to its month, and its row into view (handoff 06). */
     function saved({ id, spentOn }: { id: string; spentOn: string }): void {
@@ -412,7 +423,8 @@ export default defineComponent({
       transferOpen,
       transferId,
       transferRemoved,
-      transferDone,
+      transferEnded,
+      spendingRemoved,
       restoreTransfer,
       ...screen,
       addButton,

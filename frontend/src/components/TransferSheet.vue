@@ -1,9 +1,27 @@
 <template>
   <BottomSheet :open="open" :back="back" @update:open="$emit('update:open', $event)">
-    <template #title>{{ t(editingId ? 'transfer.title_amend' : 'transfer.title') }}</template>
+    <template #title>{{
+      t(editingId || editing ? 'transfer.title_amend' : 'transfer.title')
+    }}</template>
     <template #meta>{{ t('transfer.meta') }}</template>
 
     <ScreenSkeleton v-if="loading" :groups="[72, 52, 52, 46]" />
+    <!-- The transfer could not be read: said here, never a sheet that rises and goes (А6). -->
+    <ScreenState
+      v-else-if="unread === 'offline'"
+      kind="offline"
+      tone="warn"
+      inline
+      :title="t('spending.offline.title')"
+      :body="t('transfer.offline')"
+    />
+    <ScreenState
+      v-else-if="unread === 'error'"
+      kind="error"
+      inline
+      :title="t('transfer.unavailable')"
+      @retry="load"
+    />
     <form v-else class="form" novalidate @submit.prevent="submit">
       <StatusStrip v-if="!online" kind="offline" :text="t('transfer.offline')" />
 
@@ -86,12 +104,12 @@
       </div>
     </form>
 
-    <template #footer>
+    <template v-if="!unread" #footer>
       <!-- Where the exchange's sheet says it: one place for every sheet (MOL-253, Р-7). -->
       <div v-if="failure" class="refusal" role="alert">
         <IconAlert class="refusal-icon" aria-hidden="true" />
         <div>
-          <p class="refusal-title">{{ t('transfer.failed') }}</p>
+          <p class="refusal-title">{{ failureTitle }}</p>
           <p class="refusal-body">{{ failureBody }}</p>
         </div>
       </div>
@@ -100,17 +118,17 @@
         block
         :inactive="reason !== null"
         :busy="sending"
-        :busy-label="t(editingId ? 'transfer.saving' : 'transfer.sending')"
+        :busy-label="t(editing ? 'transfer.saving' : 'transfer.sending')"
         @click="submit"
       >
         <template #icon>
           <IconCloudOff v-if="!online" />
-          <IconCheck v-else-if="editingId" />
+          <IconCheck v-else-if="editing" />
           <IconTransfer v-else />
         </template>
         {{ reason ?? mainWord }}
       </AppButton>
-      <template v-if="editingId && !loading">
+      <template v-if="editing && !loading">
         <AppButton
           variant="danger-ghost"
           block
@@ -178,12 +196,14 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import ScreenState from '@/components/ScreenState.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { pageOrder, shortDay } from '@/components/accounts'
 import { asTyped } from '@/components/spending'
 import { shown } from '@/composables/useItemDetails'
 import { useTransfers } from '@/composables/useTransfers'
 import { localDay } from '@/days'
+import { reportFailure } from '@/failures'
 import { newId } from '@/ids'
 import { useAccountsStore } from '@/stores/accounts'
 
@@ -219,6 +239,7 @@ export default defineComponent({
     IconTransfer,
     IconTrash,
     ScreenSkeleton,
+    ScreenState,
     StatusStrip,
   },
   props: {
@@ -252,12 +273,13 @@ export default defineComponent({
     const toId = ref<string | null>(null)
     const editing = ref<TransferView | null>(null)
     const loading = ref(false)
+    const unread = ref<'error' | 'offline' | null>(null)
     const amountBad = ref(false)
     const feeBad = ref(false)
     const dayBad = ref(false)
     const noteBad = ref(false)
     const toGone = ref(false)
-    const failure = ref<'failed' | 'gone' | 'conflict' | null>(null)
+    const failure = ref<'failed' | 'gone' | 'conflict' | 'written' | null>(null)
     const goneName = ref('')
     const sending = ref(false)
     const removing = ref(false)
@@ -317,22 +339,32 @@ export default defineComponent({
         failure.value = null
         pickerOpen.value = false
         transferId = newId()
-        const id = props.editingId
         fill(null)
-        if (id === null) return
-        loading.value = true
-        try {
-          const transfer = await transfers.load(id)
-          if (props.open && props.editingId === id) fill(transfer)
-        } catch {
-          // Gone on another phone, or no connection: nothing to amend here.
-          if (props.open && props.editingId === id) emit('update:open', false)
-        } finally {
-          loading.value = false
-        }
+        await load()
       },
       { immediate: true },
     )
+
+    /**
+     * The transfer a row opened, read from the server — it is amended only with a connection. Not
+     * read, the sheet says why where it stands (adversarial А6): offline is decided after the failure.
+     */
+    async function load(): Promise<void> {
+      const id = props.editingId
+      unread.value = null
+      if (id === null) return
+      loading.value = true
+      try {
+        const transfer = await transfers.load(id)
+        if (props.open && props.editingId === id) fill(transfer)
+      } catch (caught) {
+        reportFailure(caught, 'screen')
+        if (props.open && props.editingId === id)
+          unread.value = navigator.onLine ? 'error' : 'offline'
+      } finally {
+        loading.value = false
+      }
+    }
 
     const sign = computed(() =>
       source.value ? currencySign(source.value.currency, locale.value) : '',
@@ -395,9 +427,35 @@ export default defineComponent({
       return day.value === today.value ? t('transfer.today') : shortDay(day.value, locale.value)
     })
 
+    /** «2 500 $ → «Доллары» · комиссия 20 $ · 8 окт. · заметка» — what is recorded now. */
+    function currentOf(transfer: TransferView): string {
+      const to = byId(transfer.toAccountId)?.name ?? ''
+      return [
+        `${asTyped(transfer.amount, locale.value)} → «${to}»`,
+        ...(transfer.fee
+          ? [t('transfer.current_fee', { amount: asTyped(transfer.fee, locale.value) })]
+          : []),
+        shortDay(transfer.transferredOn, locale.value),
+        ...(transfer.note ? [transfer.note] : []),
+      ].join(' · ')
+    }
+
+    const failureTitle = computed(() => {
+      if (failure.value === 'conflict') return t('transfer.conflict_title')
+      if (failure.value === 'written') return t('transfer.written_title')
+      return t('transfer.failed')
+    })
+
     const failureBody = computed(() => {
+      const held = editing.value
       if (failure.value === 'gone') return t('transfer.gone', { name: goneName.value })
-      if (failure.value === 'conflict') return t('exchange.sheet.amend_conflict')
+      if (failure.value === 'conflict' && held)
+        return t('transfer.amend_conflict', { details: currentOf(held) })
+      if (failure.value === 'written' && held)
+        return t('transfer.written', {
+          amount: asTyped(held.amount, locale.value),
+          name: byId(held.toAccountId)?.name ?? '',
+        })
       return t('transfer.failed_retry')
     })
 
@@ -485,12 +543,16 @@ export default defineComponent({
           settleTarget()
         } else if (code === ERROR.TRANSFER_IN_FUTURE) {
           dayBad.value = true
-        } else if (code === ERROR.CONFLICT && editing.value) {
-          // Amended on another phone meanwhile: what is there now is shown, and saved over again.
-          failure.value = 'conflict'
+        } else if (code === ERROR.CONFLICT) {
+          // Amended on another phone meanwhile — or, for a new one, written already under this name
+          // with other figures, its answer lost (review С-1, adversarial А5): what is recorded now is
+          // said, the figures typed stay, and «Сохранить» writes them over it — never a second one.
+          const id = editing.value?.id ?? transferId
           try {
-            const now = await transfers.load(editing.value.id)
+            const now = await transfers.load(id)
+            failure.value = editing.value ? 'conflict' : 'written'
             editing.value = now
+            if (failure.value === 'written') void store.refresh()
           } catch {
             failure.value = 'failed'
           }
@@ -534,13 +596,17 @@ export default defineComponent({
       live,
       noPeer,
       loading,
+      unread,
+      load,
       amountBad,
       feeBad,
       dayBad,
       noteBad,
       toGone,
       failure,
+      failureTitle,
       failureBody,
+      editing,
       sending,
       removing,
       pickerOpen,
