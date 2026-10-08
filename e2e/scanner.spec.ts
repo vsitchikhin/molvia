@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 // DOM for the init script, which runs in the browser.
 import { expect, test } from '@playwright/test'
-import type { Locator, Page, Route } from '@playwright/test'
+import type { Locator, Page, Route, TestInfo } from '@playwright/test'
 import { randomInt } from 'node:crypto'
 import { BARCODE } from './barcode-video'
 import { asBrowser, open } from './session'
@@ -434,8 +434,20 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
    */
   test.describe('the focus through the code’s blocks', () => {
     // The first attempt's trace in CI (MOL-249): the flake of «an item full of codes» left nothing
-    // behind but «Received: ''», and the API's log had to tell what the screen had done.
-    if (process.env.CI) test.use({ trace: { mode: 'retain-on-first-failure', screenshots: false } })
+    // behind but «Received: ''», and the API's log had to tell what the screen had done. Started by
+    // hand: `test.use({ trace })` is refused in a describe, and for the whole file it would trace the
+    // camera's reads too. The retry is traced by the config (`on-first-retry`).
+    const traced = (info: TestInfo) => Boolean(process.env.CI) && info.retry === 0
+    test.beforeEach(async ({ context }, info) => {
+      if (traced(info)) await context.tracing.start({ snapshots: true, screenshots: false })
+    })
+    test.afterEach(async ({ context }, info) => {
+      if (!traced(info)) return
+      if (info.status === info.expectedStatus) return context.tracing.stop()
+      const path = info.outputPath('trace.zip')
+      await context.tracing.stop({ path })
+      await info.attach('trace', { path, contentType: 'application/zip' })
+    })
 
     const LINKS = '**/api/catalogue/items/*/barcodes'
     const LINK = /\/api\/catalogue\/items\/[^/]+\/barcodes$/
