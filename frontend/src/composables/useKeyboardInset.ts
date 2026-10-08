@@ -64,6 +64,8 @@ export function useKeyboardInset(
   // lets it go if they never do.
   let foreseen: number | null = null
   let late: ReturnType<typeof setTimeout> | undefined
+  // Which focus of the sheet is the last: a field left within two frames is not brought back.
+  let focusing = 0
 
   function measure(): void {
     const element = target.value
@@ -129,6 +131,22 @@ export function useKeyboardInset(
     measure()
   }
 
+  // A field focused under a pinned footer — Tab, or «∨» over the iOS keys stepping to the next field —
+  // is brought above it once the browser's own scroll is done: WebKit does not always honour
+  // `scroll-padding` there (CI, Linux), and the field stayed under the footer (MOL-182). Two frames,
+  // so the browser moves first; a field it already showed is not moved again. Without a footer the
+  // browser's scroll is the whole answer (adversarial А of MOL-135).
+  function focused(): void {
+    const element = target.value
+    if (!element || !typedIn(element) || footerEdge(element) === 0) return
+    const current = ++focusing
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (current === focusing && active.value && target.value) reveal(target.value)
+      })
+    })
+  }
+
   // The focus left before the keys came: the sheet is the screen's share again.
   function letGo(): void {
     if (foreseen === null) return
@@ -149,6 +167,7 @@ export function useKeyboardInset(
     window.addEventListener('resize', measure)
     window.addEventListener('scroll', measure, { passive: true })
     target.value?.addEventListener('focusin', foresee)
+    target.value?.addEventListener('focusin', focused)
     target.value?.addEventListener('focusout', letGo)
     measure()
     foresee()
@@ -160,6 +179,7 @@ export function useKeyboardInset(
     window.removeEventListener('resize', measure)
     window.removeEventListener('scroll', measure)
     target.value?.removeEventListener('focusin', foresee)
+    target.value?.removeEventListener('focusin', focused)
     target.value?.removeEventListener('focusout', letGo)
     target.value?.style.removeProperty('--keyboard-inset')
     target.value?.style.removeProperty('--viewport-height')
@@ -230,9 +250,8 @@ function reveal(sheet: HTMLElement): void {
   const field = typedIn(sheet)
   if (!field) return
   const box = sheet.getBoundingClientRect()
-  const style = getComputedStyle(sheet)
-  const top = box.top + padding(style.scrollPaddingTop)
-  const bottom = box.bottom - padding(style.scrollPaddingBottom)
+  const top = box.top + padding(getComputedStyle(sheet).scrollPaddingTop)
+  const bottom = box.bottom - footerEdge(sheet)
   const place = field.getBoundingClientRect()
   const above = top - place.top
   const below = place.bottom - bottom
@@ -241,6 +260,11 @@ function reveal(sheet: HTMLElement): void {
   // the edge — and rounded so that the field's top never goes past the sheet's.
   if (above > 0) sheet.scrollTop -= Math.ceil(above)
   else if (below > 0) sheet.scrollTop += Math.min(Math.ceil(below), Math.floor(-above))
+}
+
+/** How far a pinned footer covers the sheet's end: its `scroll-padding-bottom`. */
+function footerEdge(sheet: HTMLElement): number {
+  return padding(getComputedStyle(sheet).scrollPaddingBottom)
 }
 
 /** A `scroll-padding` in pixels; `auto`, or nothing laid out, is none. */

@@ -1045,7 +1045,11 @@ bottom: 0`), a sibling of the panel and as wide as the sheet — never a middle 
   **The edge of what is in sight is the footer's top**: its height (`useHeight`) is
   `--sheet-footer-height` on the dialog and its `scroll-padding-bottom`, which the browser's own focus
   goes by — a field reached by Tab stood under the footer without it — and `reveal` reads the same
-  padding, so one value is the edge for both. **A footer that grows over the field typed in** — an error,
+  padding, so one value is the edge for both. **WebKit does not always honour it on a focus** (CI,
+  Linux: the field stayed 11 px under the footer): a field typed in that is focused under the footer —
+  Tab, or «∨» over the iOS keys stepping to the next one — is brought above it two frames later, once
+  the browser's own scroll is done, and a field it already showed is not moved; only with a footer —
+  without one the browser's scroll is the whole answer (MOL-135, adversarial А). **A footer that grows over the field typed in** — an error,
   «Вернуть» — moves that edge up as a lower sheet would, and the field is brought back above it; only a
   field typed in, only in an open sheet. **Nothing of the sheet stands after the footer in the flow**:
   its live region, visually hidden after it, made a pixel more to scroll, and at the end the pinned

@@ -100,6 +100,19 @@ function fakeDvh(height: number) {
   return fakeLayout(height)
 }
 
+/** Two frames: what the sheet does once the browser's own scroll after a focus is done. */
+async function frames(): Promise<void> {
+  await new Promise<void>((done) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          done()
+        })
+      })
+    })
+  })
+}
+
 afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
@@ -410,6 +423,8 @@ describe('useKeyboardInset keeps the focused field in sight', () => {
     await nextTick()
     input.focus()
     expect(sheet.scrollTop).toBe(100)
+    await frames()
+    expect(sheet.scrollTop).toBe(100)
   })
 
   // The result of a check is focused for a screen reader, and read from its top (adversarial А).
@@ -524,6 +539,27 @@ describe('useKeyboardInset keeps the focused field above a pinned footer', () =>
     sheet.style.scrollPaddingBottom = '80px'
     edge.value = 80
     await nextTick()
+    expect(sheet.scrollTop).toBe(100)
+  })
+
+  // Tab, or «∨» over the iOS keys: WebKit's own scroll does not always stop at the footer (CI).
+  it('brings a field focused under the footer above it, once the browser’s scroll is done', async () => {
+    const { sheet } = await typing({ top: 421, bottom: 461 })
+    expect(sheet.scrollTop).toBe(100)
+    await frames()
+    expect(sheet.scrollTop).toBe(121)
+  })
+
+  it('must not fire: a field focused above the footer', async () => {
+    const { sheet } = await typing({ top: 380, bottom: 420 })
+    await frames()
+    expect(sheet.scrollTop).toBe(100)
+  })
+
+  it('must not fire: a field left within the two frames', async () => {
+    const { sheet, view } = await typing({ top: 421, bottom: 461 })
+    view.element.querySelector<HTMLElement>('[data-button]')?.focus()
+    await frames()
     expect(sheet.scrollTop).toBe(100)
   })
 

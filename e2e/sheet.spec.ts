@@ -662,6 +662,10 @@ test.describe('the sheet', () => {
       })
     }
 
+    /** How far the note reaches under the footer's top: nothing, once it is in sight. */
+    const under = ({ note: field, footer }: Awaited<ReturnType<typeof boxes>>) =>
+      field.bottom - footer.top
+
     test('stands at the bottom edge, the main action in sight, before any scroll', async ({
       page,
     }) => {
@@ -705,8 +709,8 @@ test.describe('the sheet', () => {
       expect(drawn.shadow).not.toBe('none')
     })
 
-    // The browser's own focus goes by the sheet's `scroll-padding`: without it, a field reached by
-    // Tab stood under the footer, at the sheet's edge.
+    // The browser's own focus goes by the sheet's `scroll-padding` — not always in WebKit, where the
+    // sheet brings the field up itself once that scroll is done (CI, Linux). Read until it settles.
     test('a field reached by Tab is brought above it, not under it', async ({ page }) => {
       await openLong(page)
       await longSheet(page)
@@ -716,9 +720,8 @@ test.describe('the sheet', () => {
         })
       await page.keyboard.press('Tab')
       await expect(note(page)).toBeFocused()
-      const { footer, note: field, scrollTop } = await boxes(page)
-      expect(scrollTop).toBeGreaterThan(0)
-      expect(field.bottom).toBeLessThanOrEqual(footer.top)
+      await expect.poll(async () => under(await boxes(page))).toBeLessThanOrEqual(0)
+      expect((await boxes(page)).scrollTop).toBeGreaterThan(0)
     })
 
     // The keys never come up in a test browser: the lift and the visible height are set by hand, as
@@ -749,6 +752,7 @@ test.describe('the sheet', () => {
       expect(
         await footerOf(page).evaluate((footer) => getComputedStyle(footer).paddingBottom),
       ).toBe('12px')
+      await expect.poll(async () => under(await boxes(page))).toBeLessThanOrEqual(0)
       const { sheet: box, footer, note: field } = await boxes(page)
       const screen = page.viewportSize()?.height ?? 0
       expect(box.bottom).toBeCloseTo(screen - 300, 0)
