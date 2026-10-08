@@ -325,6 +325,8 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
     expect(text).toMatch(/Удалите одну покупку — сразу уйдёт её строка/)
     // and the person's word on the line in the shop's memory (MOL-240, В-1 on adversarial А1)
     expect(text).toMatch(/уходит и ваше слово о строке в памяти магазина/)
+    // a word another purchase still says is that purchase's (MOL-240, round 3, Р3-1, Р3-2)
+    expect(text).toMatch(/слово снова берётся из неё — её товар, цена и день/)
     expect(text).toMatch(/Строки, которые вы не стали записывать, удаляются при записи/)
     expect(text).not.toMatch(/пока есть аккаунт|исправляем/)
   })

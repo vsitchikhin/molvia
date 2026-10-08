@@ -229,19 +229,27 @@ when. The item itself is shared on one word: «at this seller this article is mi
 (owner, 30.09.2026), and `match: memory` says no more than that someone recorded it there. Erasure leaves a word without its author, still counted, as an item outlives its author (MOL-58);
 the copy carries the person's own words.
 
-**A word goes with the last purchase that says it** (MOL-240, owner's В-1 «а» on adversarial А1): a
-purchase removed, or its trip removed for good, takes the person's word on its line — by every path that
-deletes them: «Удалить позицию», the minute timer, and the final removal «Начать» and a receipt's record
-make of a trip past its ten minutes (`forgetWordsOf`, before the delete, in its transaction). Only a word
-that still names the line's item, and that no other recorded line of the same person at the same seller
-says — a word is one row per person and key, and the second receipt of a shop stands behind it too; a
-line of a trip only marked removed still says it, since «Вернуть» may bring it back. Kept, the word was
-the person's own, first on the next review of that shop, and the one way to correct a purchase's item —
-remove it and enter it again — brought the wrong item back; and «what, where, for how much and when» lay
-under the person's id while /privacy says the record goes whole. The price: a trip removed as a
-duplicate forgets its words until that article is recorded again. **This is not erasure**: the erased
-leave their words without a name, still counted (MOL-58) — a person leaving is not a person taking a
-purchase back.
+**A person's word is what their last line still there says** (MOL-240, owner's В-1 «а» on adversarial
+А1, round 3): its item, its shelf price when it was recorded as read (`asRead`, recomputed from the line
+and its purchase) and the moment of its record — or no word once no line says it. A purchase removed, or
+its trip removed for good, settles the words of its line by every path that deletes them: «Удалить
+позицию», the minute timer, and the final removal «Начать» and a receipt's record make of a trip past its
+ten minutes (`forgetWordsOf`, before the delete, in its transaction). A line of a trip only marked removed
+still says its word, since «Вернуть» may bring it back. Kept as it was, the word was the person's own,
+first on the next review of that shop, and the one way to correct a purchase's item — remove it and enter
+it again — brought the wrong item back; and «what, where, for how much and when» lay under the person's id
+while /privacy says the record goes whole. **Deleted only when nothing says it, else written over**: a word
+is one row per person and key that every record writes over, so the line going may be the one that wrote
+it while an older one stands behind the key — left alone, the word carried the removed purchase's price
+and moment (Р3-1), and deleted, it lost the item the older purchase says (Р3-2). **Under the person's
+lock** (`store_memory`, per actor, taken last — after the trip's row or the owner's lock — and by
+`remember` too): two removals at once each saw the other's line, and the word outlived both (Р3-3).
+**Settled whole at the API's start** (`settleStoreMemory`, after `rekeyItems`): 0060 deleted the lines of
+purchases removed before it, and a text key is `toSearchKey`, which no migration can compute (Р3-4); it
+also settles what an image rolled back removed without settling. Settling never inserts a word. The price:
+a trip removed as a duplicate forgets its words until that article is recorded again. **This is not
+erasure**: the erased leave their words without a name, still counted (MOL-58) — a person leaving is not
+a person taking a purchase back.
 
 **There is no path for «a purchase's item changed later» yet** — a purchase's patch is its quantity and
 amount (`expensePatchSchema`). The memory is rewritten by the next receipt recorded at the shop; the
