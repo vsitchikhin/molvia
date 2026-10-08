@@ -2707,6 +2707,10 @@ export const receiptLines = pgTable(
     // The purchase the line was recorded as: a change of its item later teaches the memory (Р-2). The
     // purchase removed takes its line (MOL-240); a line not recorded goes at «Записать».
     expenseId: uuid('expense_id').references(() => expenses.id, { onDelete: 'cascade' }),
+    // «Записать» recorded the line as read — it added up, its quantity and sum unchanged (В-4): its price
+    // is the shelf's, what the person's word in the shops' memory carries (MOL-240, round 4, Р4-1). Judged
+    // once, at the record: a sum put right later is what was paid, never the shelf.
+    asRead: boolean('as_read').notNull().default(false),
   },
   (table) => [
     primaryKey({ columns: [table.receiptId, table.position] }),

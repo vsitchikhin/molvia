@@ -9,7 +9,7 @@ import { insertActor, insertItem, insertPlace, insertTrip } from './fixtures'
 import { storeMemoryWords } from '@molvia/model'
 import { MIGRATIONS } from '@/db/migrate'
 import * as schema from '@/db/schema'
-import { expenses, receiptLineImages, receiptLines, receipts, storeMemory } from '@/db/schema'
+import { expenses, receiptLineImages, receipts, storeMemory } from '@/db/schema'
 import { settleStoreMemory } from '@/db/store-memory-repository'
 
 /**
@@ -19,8 +19,8 @@ import { settleStoreMemory } from '@/db/store-memory-repository'
  * start — and nothing of a receipt still at work goes with them.
  *
  * Its own database, created and dropped here, as in `migration-0012.integration.test.ts`: the chain
- * has to be left one step short of 0060. The rows are written with the schema as it is now — 0060
- * changes no column, so its inserts are the same on the database before it.
+ * has to be left one step short of 0060. The rows are written with the schema as it is now, but for
+ * the lines: 0061 adds a column to them.
  */
 interface JournalEntry {
   readonly idx: number
@@ -127,15 +127,19 @@ describe('0060: what a removed trip or purchase left of its receipt', () => {
         receipt(orphan, null),
         { ...receipt(parsed, null), status: 'parsed', recordedAt: null },
       ])
-    await db
-      .insert(receiptLines)
-      .values([
-        line(working, 0, bought),
-        line(working, 1, null),
-        line(working, 2, null),
-        line(orphan, 0, null),
-        line(parsed, 0, null),
-      ])
+    // by hand: the schema of now has columns 0061 adds after this point
+    for (const one of [
+      line(working, 0, bought),
+      line(working, 1, null),
+      line(working, 2, null),
+      line(orphan, 0, null),
+      line(parsed, 0, null),
+    ]) {
+      await sql`
+        insert into receipt_lines (receipt_id, position, printed, price_minor, sum_minor, settled, expense_id)
+        values (${one.receiptId}, ${one.position}, ${one.printed}, ${String(one.priceMinor)},
+          ${String(one.sumMinor)}, ${one.settled}, ${one.expenseId})`
+    }
     await db
       .insert(receiptLineImages)
       .values([row(working, 0), row(working, 1), row(orphan, 0), row(parsed, 0)])
@@ -151,7 +155,13 @@ describe('0060: what a removed trip or purchase left of its receipt', () => {
     await db.insert(storeMemory).values([word(me, 0), word(me, 1), word(me, 2), word(null, 1)])
 
     await apply(sixty)
-    // what SQL cannot find goes at the API's start: a text key is `toSearchKey`
+    // what SQL cannot find goes once the API listens: a text key is `toSearchKey` — on the schema of
+    // the build that settles, every migration after 0060 applied
+    for (const entry of journal.entries.filter((one) => one.idx > 60)) await apply(entry)
+    // 0061: a line recorded before it is «as read» by its row confirmed (Р4-1): the purchase has no sum
+    expect(await sql`select as_read from receipt_lines where receipt_id = ${working}`).toEqual([
+      { as_read: true },
+    ])
     expect(await settleStoreMemory(db)).toBe(3)
     const words = await sql<{ actor_id: string | null; key: string }[]>`
       select actor_id, key from store_memory order by actor_id nulls last`

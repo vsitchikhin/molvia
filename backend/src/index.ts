@@ -61,16 +61,6 @@ try {
   process.exit(1)
 }
 
-// Each person's word in the shops' memory is what their last line still there says (MOL-240): after the
-// keys, which it reads, and before anyone writes — 0060 deleted lines whose words SQL cannot find.
-try {
-  const settled = await settleStoreMemory(getDb())
-  if (settled > 0) app.log.info({ settled }, 'store memory settled')
-} catch (error) {
-  app.log.error(describeMigrationFailure(error), 'store memory failed')
-  process.exit(1)
-}
-
 // After the migrations, so the first refresh finds its table. The trip never waits for it: it
 // reads the cache, and a cache still empty gives a trip without a rate (MOL-39, В-2). The market
 // comes after the official rate in the same hour, so today's figures are held against today's
@@ -139,7 +129,25 @@ if (http !== undefined && env.METRICS_PORT !== undefined) {
   })
 }
 
-app.listen({ port: env.API_PORT, host }).catch((error: unknown) => {
-  app.log.error(error)
-  process.exit(1)
-})
+app
+  .listen({ port: env.API_PORT, host })
+  .then(async () => {
+    // Each person's word in the shops' memory is what their last line still there says (MOL-240): 0060
+    // deleted lines whose words SQL cannot find, and an image rolled back deletes without settling. Once
+    // listening, a person at a time under their lock — never on the way to `listen` (round 4, Р4-2): the
+    // words of every person are no reason for the API not to start, and a failure is reported, not fatal.
+    try {
+      const settled = await settleStoreMemory(getDb())
+      if (settled > 0) app.log.info({ settled }, 'store memory settled')
+    } catch (error) {
+      apiFailureReporter(getDb, env.OWNER_TELEGRAM_ID ?? null, app.log).report(
+        error,
+        { source: 'api', route: 'job:store-memory' },
+        'store memory settle failed',
+      )
+    }
+  })
+  .catch((error: unknown) => {
+    app.log.error(error)
+    process.exit(1)
+  })

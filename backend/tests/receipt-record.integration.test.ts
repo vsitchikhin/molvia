@@ -19,6 +19,7 @@ import {
   storeMemory,
   trips,
 } from '@/db/schema'
+import { settleStoreMemory } from '@/db/store-memory-repository'
 import { createTripRepository } from '@/db/trips-repository'
 import { buildServer } from '@/server'
 import { connect, connectDrizzle } from './db'
@@ -810,6 +811,56 @@ describe('«Записать»', () => {
       expect(await remove(me, wrong)).toBe(true)
       expect((await wordsOf(me)).map((word) => word.itemId)).toEqual([milk, milk])
     })
+
+    // round 4, Р4-1: «as read» is judged at the record, never from the purchase as it is now
+    it('Р4-1: keeps the shelf price after the sum paid was put right', async () => {
+      const me = await insertActor(db)
+      const place = await insertPlace(db)
+      const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+      const bought = await recordMilk(me, place, milk, 370)
+      const cookie = await signIn(db, me)
+      const patched = await app.inject({
+        method: 'PATCH',
+        url: `/trips/${bought.tripId}/expenses/${bought.expenseId}`,
+        headers: { cookie },
+        payload: { amount: amount(350) },
+      })
+      expect(patched.statusCode).toBe(200)
+      await settleStoreMemory(db)
+      expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([37_000n, 37_000n])
+    })
+
+    // round 4, Р4-1б: the word and the record share one moment — settling right after moves nothing
+    it('Р4-1б: settles nothing a record has just written', async () => {
+      const me = await insertActor(db)
+      const place = await insertPlace(db)
+      const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+      await recordMilk(me, place, milk, 370)
+      await recordMilk(me, place, milk, 400)
+      expect(await settleStoreMemory(db)).toBe(0)
+    })
+
+    // round 4, Р4-2: a person at a time, by their id — thousands of sellers are no tree for the parser
+    it('Р4-2: settles a person with thousands of sellers', async () => {
+      const me = await insertActor(db)
+      const milk = await insertItem(db)
+      const sellers = Array.from({ length: 9_000 }, (_, n) => String(10_000_000 + n))
+      for (let at = 0; at < sellers.length; at += 1_000) {
+        await db.insert(storeMemory).values(
+          sellers.slice(at, at + 1_000).map((tin) => ({
+            id: randomUUID(),
+            tin,
+            kind: 'sku' as const,
+            key: '1163909',
+            actorId: me,
+            itemId: milk,
+          })),
+        )
+      }
+      // no line says any of them: every word goes
+      expect(await settleStoreMemory(db)).toBe(9_000)
+      expect(await wordsOf(me)).toEqual([])
+    }, 30_000)
 
     it('Р3-3: two removals at once leave no word behind', async () => {
       const me = await insertActor(db)

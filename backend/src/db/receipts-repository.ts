@@ -812,13 +812,25 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     async markRecorded(id, recorded) {
       await db
         .update(receipts)
-        .set({ status: 'recorded', recordedAt: sql`clock_timestamp()`, tripId: recorded.tripId })
+        .set({ status: 'recorded', recordedAt: sql`now()`, tripId: recorded.tripId })
         .where(eq(receipts.id, id))
       for (const { position, expenseId } of recorded.expenses) {
         await db
           .update(receiptLines)
           .set({ expenseId })
           .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, position)))
+      }
+      // the lines recorded as read: their price is the shelf's, as the memory's word says (MOL-240, Р4-1)
+      if (recorded.confirmed.length > 0) {
+        await db
+          .update(receiptLines)
+          .set({ asRead: true })
+          .where(
+            and(
+              eq(receiptLines.receiptId, id),
+              inArray(receiptLines.position, [...recorded.confirmed]),
+            ),
+          )
       }
       // a line not recorded is not kept (MOL-240, В-2): nobody sees it once the receipt is recorded,
       // and what it costs is counted below from the edits, not read back; its rows go with it

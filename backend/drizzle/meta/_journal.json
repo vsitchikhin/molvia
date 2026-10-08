@@ -428,6 +428,13 @@
       "when": 1791446118096,
       "tag": "0060_receipt_goes_with_trip",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1791471801913,
+      "tag": "0061_receipt_line_as_read",
+      "breakpoints": true
     }
   ]
 }
