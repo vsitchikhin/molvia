@@ -557,8 +557,8 @@ describe('useKeyboardInset keeps the focused field above a pinned footer', () =>
   })
 
   it('must not fire: a field left within the two frames', async () => {
-    const { sheet, view } = await typing({ top: 421, bottom: 461 })
-    view.element.querySelector<HTMLElement>('[data-button]')?.focus()
+    const { sheet } = await typing({ top: 421, bottom: 461 })
+    sheet.querySelector<HTMLElement>('[data-button]')?.focus()
     await frames()
     expect(sheet.scrollTop).toBe(100)
   })
