@@ -118,12 +118,19 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   so «Счета» kept on the phone before it still read. **«На счетах сейчас»** over the month's switcher
   on «Деньги» (Ф-27) shows them — «всего» and «можно тратить» — while a live account is, «now» and not
   the month's: it does not move as the months are turned and stands by the month's error and its
-  skeleton, an answer of its own. With none, or no answer of «Счета» and nothing kept, «Счета» is a
+  skeleton, an answer of its own — and «Повторить» of the month asks «Счета» again too (adversarial
+  А2). **Kept from before, it is not «now»** (А3): offline, or when «Счета» did not answer, it reads «На
+  счетах на 24 сент., 14:05» by `countedAt`, as «Счета» say it — the strip under the switcher dates the
+  month, which is read apart and may be days younger; kept while a read is on its way it stays «сейчас»,
+  or every opening would flicker an hour. A card that is a link, not a `NavRow`: the row holds no figure
+  of 28. With none, or no answer of «Счета» and nothing kept, «Счета» is a
   row among the ways out instead (С-10). Below zero is «плохо» (С-17); what is left out is said under
   the figures, as on «Счета», and in the link's name. The phone converts nothing. **The price, named:**
   it is drawn once «Счета» answered or the phone keeps them, never animated in (MOL-138), so the very
   first opening of «Деньги» on a phone, with nothing kept, moves the switcher down once by its height
-  as the answer comes; a placeholder would stand for a newcomer with no account and go again. The two currencies on «Счета» are MOL-193's.
+  as the answer comes, and in the same frame the row «Счета» goes from the ways out — the page grows by
+  the card and shortens by 52 at its foot, a growth all told (self-review Р2-4); a placeholder would
+  stand for a newcomer with no account and go again. The two currencies on «Счета» are MOL-193's.
 - **The month of «Деньги» reads the same balances for its «Остаток»** (MOL-134): `balancesOn` — the
   live accounts started by a day, their operations up to it — through `accountsCounted`, the one
   loading of accounts, operations and rates both screens share. A removed account is in neither.

@@ -252,7 +252,9 @@ nothing up.
   as the threshold of the usual month), a percent after; a month before with nothing in it is no
   comparison, its day still sent so the first days are named. **Nothing spent after the third is
   «−100 %»** (Р-5), as «Против обычного» says «not spent»; nothing spent by that day the month before
-  is no percent. A closed month is «+94 % к июлю», by `previousSpent`, as before; an answer kept
+  is no percent, **and nor is a zero something still waits behind** — a spending on its way, one waiting
+  a rate (adversarial А4): «−100 %» over «Ещё не учтено: 1» said two things, as «нет трат» over it did
+  in the ring. A closed month is «+94 % к июлю», by `previousSpent`, as before; an answer kept
   from before the field compares nothing until it is read again — never the running month against
   a whole one.
 - **The two figures the card derives are the model's**, `percentChange` and `shareOf`: a ratio

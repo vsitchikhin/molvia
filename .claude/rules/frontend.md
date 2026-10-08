@@ -684,8 +684,12 @@ The detail behind the frontend lines of `CLAUDE.md`.
   sum is the month's card of «Деньги»** (`MoneyMonthCard`, MOL-183): its caption's line, the figure
   at `--leading-tight` and «≈» at the same (`approx`), so its tiles come in where the plate stood —
   `e2e/kit-rows` holds it at 390 and 320, on a closed month whose comparison fits one line. **The
-  price, named:** a comparison that wraps — «−10 % к тому же дню сентября» on a card of 256 — stands the
-  card some 15 px lower than its bars; the page grows as the answer comes, never shrinks; the total of 77 v2 2a (`TripTotal`) is no card until
+  prices, named:** a comparison that wraps — «−10 % к тому же дню сентября» on a card of 256 — stands the
+  card some 15 px lower than its bars, and the page grows as the answer comes; a month with nothing
+  spent has no «≈» (handoff 157 v2, «Месяц без трат»), and its tiles come some 24 px higher than the
+  plate — the page shrinks by that much under the switcher, which MOL-138's hold keeps where it is
+  (adversarial А5). The «≈» line itself is the person's two currencies, as «Счета» last named them —
+  one currency has none in any month, and neither have the bars; the total of 77 v2 2a (`TripTotal`) is no card until
   MOL-206 makes it one, and the sums of «Счета», an account, «Обмен» and «Бюджет» still stand at the
   body's leading, some 8 px taller than the part — their tasks set the part against their answer. **The price:** a card adds its padding and
   edge, so a skeleton of `groups` is some 34 px taller than before — taller, not shorter, which the hold
