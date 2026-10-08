@@ -736,11 +736,23 @@ test.describe('the sheet', () => {
       expect(
         await footerOf(page).evaluate((footer) => getComputedStyle(footer).paddingBottom),
       ).toBe('46px')
-      await longSheet(page).evaluate((dialog) => {
+      // The edge moves with the footer in the same style change, before any render: measured whole,
+      // it lagged one behind and a field stood 34 over the footer (review С-8).
+      const edges = await longSheet(page).evaluate((dialog) => {
+        const footer = dialog.querySelector<HTMLElement>('.footer')
+        const edge = () => ({
+          padding: Number.parseFloat(getComputedStyle(dialog).scrollPaddingBottom),
+          footer: footer?.offsetHeight ?? Number.NaN,
+        })
+        const before = edge()
         dialog.style.setProperty('--viewport-height', '400px')
         dialog.style.setProperty('--keyboard-inset', '300px')
         document.documentElement.dataset.underKeys = ''
+        return { before, after: edge() }
       })
+      expect(edges.before.padding).toBeCloseTo(edges.before.footer, 0)
+      expect(edges.after.padding).toBeCloseTo(edges.after.footer, 0)
+      expect(edges.before.footer - edges.after.footer).toBe(34)
       await longSheet(page)
         .getByRole('button', { name: 'Row 15' })
         .evaluate((row: HTMLElement) => {

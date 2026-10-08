@@ -2,7 +2,7 @@
   <dialog
     ref="dialog"
     class="sheet"
-    :class="{ over: back, dragging }"
+    :class="{ over: back, dragging, footed: $slots.footer }"
     :style="{ '--sheet-footer-height': `${String(footerHeight)}px` }"
     :aria-labelledby="titleId"
     @cancel.prevent="close()"
@@ -40,7 +40,16 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
+import {
+  computed,
+  defineComponent,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  useId,
+  watch,
+} from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconBack from '~icons/mdi/chevron-left'
@@ -110,7 +119,17 @@ export default defineComponent({
     closeStateStrip()
     const dialog = ref<HTMLDialogElement | null>(null)
     const footer = ref<HTMLElement | null>(null)
-    const footerHeight = useHeight(footer)
+    const footerBox = useHeight(footer)
+    // Without its bottom padding, which the stylesheet adds to the edge itself: the keys coming up take
+    // the home indicator's 34 off it in the same style change that moves the footer down. Measured
+    // whole, the edge lagged a render behind, and a field brought into sight then stood 34 over the
+    // footer (review С-8).
+    const footerHeight = computed(() => {
+      const element = footer.value
+      if (!element || footerBox.value === 0) return 0
+      const bottom = Number.parseFloat(getComputedStyle(element).paddingBottom)
+      return footerBox.value - (Number.isFinite(bottom) ? bottom : 0)
+    })
     const titleId = useId()
 
     // Whether the sheet is open as far as the screen is concerned. Not `dialog.open`: the browser
@@ -369,9 +388,6 @@ export default defineComponent({
   padding: 0;
   overflow: auto;
   overscroll-behavior: contain;
-
-  /* What the browser and `reveal` bring into sight stops at the pinned footer's top, not under it. */
-  scroll-padding-bottom: var(--sheet-footer-height);
   border: none;
   border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
   background: var(--surface);
@@ -438,6 +454,16 @@ export default defineComponent({
     transform: translateY(100%);
     pointer-events: none;
     transition-property: transform;
+  }
+
+  /* What the browser and `reveal` bring into sight stops at the pinned footer's top, not under it:
+     the footer's height less its bottom padding, which is added here as the footer has it. */
+  &.footed {
+    scroll-padding-bottom: calc(var(--sheet-footer-height) + var(--space-3) + var(--safe-bottom));
+
+    html[data-under-keys] & {
+      scroll-padding-bottom: calc(var(--sheet-footer-height) + var(--space-3));
+    }
   }
 
   /* Under the finger: no transition, or the sheet would trail behind it. */

@@ -934,11 +934,6 @@ describe('BottomSheet', () => {
   })
 })
 
-/**
- * The page under a sheet, put back where it stood (MOL-63, adversarial В2–В4). happy-dom lays
- * nothing out, so where the opener stands on the screen, and the window's scroll, are the test's to
- * say.
- */
 // The main action stays at the sheet's bottom edge, and the content scrolls under it (MOL-182). The
 // pinning itself is layout, held end to end; here, what the layout is built from.
 describe('the pinned footer', () => {
@@ -1002,8 +997,34 @@ describe('the pinned footer', () => {
     await nextTick()
     expect(dialog().style.getPropertyValue('--sheet-footer-height')).toBe('120px')
   })
+
+  // The keys take the home indicator's 34 off the footer's bottom padding, and the stylesheet adds
+  // that padding to the edge itself, in the same style change: measured whole, the edge lagged a
+  // render behind and a field stood 34 over the footer (review С-8).
+  it('gives its height less its bottom padding, which the keys change and it does not', async () => {
+    const resized = observeByHand()
+    const { dialog } = await render({ footer: true })
+    const footer = dialog().querySelector<HTMLElement>('.footer')
+    if (!footer) throw new Error('no footer in the sheet')
+    let height = 110
+    Object.defineProperty(footer, 'offsetHeight', { get: () => height })
+    footer.style.paddingBottom = '46px'
+    resized()
+    await nextTick()
+    expect(dialog().style.getPropertyValue('--sheet-footer-height')).toBe('64px')
+    height = 76
+    footer.style.paddingBottom = '12px'
+    resized()
+    await nextTick()
+    expect(dialog().style.getPropertyValue('--sheet-footer-height')).toBe('64px')
+  })
 })
 
+/**
+ * The page under a sheet, put back where it stood (MOL-63, adversarial В2–В4). happy-dom lays
+ * nothing out, so where the opener stands on the screen, and the window's scroll, are the test's to
+ * say.
+ */
 describe('the page under the sheet', () => {
   function scrolledTo(top: number): void {
     Object.defineProperty(window, 'scrollY', { value: top, configurable: true })
