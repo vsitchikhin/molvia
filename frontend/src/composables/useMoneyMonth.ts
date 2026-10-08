@@ -25,6 +25,8 @@ export interface MoneyMonth {
   readonly month: ComputedRef<MoneyMonthView | null>
   readonly stale: ComputedRef<MoneyStale | null>
   readonly fetchedAt: ComputedRef<Date | null>
+  /** How many reads failed: a strip of «сервер не ответил» says its words again on a new one (C1). */
+  readonly attempt: ComputedRef<number>
   /** When the read of the month on screen set out (MOL-151, adversarial Б1). */
   readonly askedAt: ComputedRef<Date | null>
   /** The owner's categories: this month's answer's, or those of the newest month kept. */
@@ -136,6 +138,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
   const failure = ref<'offline' | 'error' | null>(null)
   const confirmed = ref(false)
   const more = ref<'idle' | 'loading' | 'failed'>('idle')
+  const failed = ref(0)
   /** How many pages the person had open, to read that many again after a write lands. */
   let pages = 1
 
@@ -172,7 +175,13 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
       // The first page is what is kept, as a first read answers it: the cursor of a later page
       // is the server's to work out, not the phone's.
       const firstAt = new Date()
-      if (actor.id === id) remember(id, first, firstAt, askedAt)
+      if (actor.id === id) {
+        remember(id, first, firstAt, askedAt)
+        // The categories are the owner's, not a month's: an answer of the month just left names them
+        // for the one now on screen too — read before it came, that one had none to write a spending
+        // into until it was read itself (MOL-183, e2e «a summary that did not load»).
+        kept.value = first.categories
+      }
       let answer = first
       for (let page = 1; page < wanted && answer.cursor; page++) {
         answer = mergePages(answer, await api.moneyMonth(month, answer.cursor))
@@ -193,6 +202,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
       if (actor.id !== id || selected.value !== month || mine !== latest) return
       // Decided after the failure, never before the request (MOL-19, A1).
       failure.value = navigator.onLine ? 'error' : 'offline'
+      failed.value += 1
     }
   }
 
@@ -270,6 +280,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
       return failure.value ?? 'loading'
     }),
     fetchedAt: computed(() => shown.value?.fetchedAt ?? null),
+    attempt: computed(() => failed.value),
     askedAt: computed(() => shown.value?.askedAt ?? shown.value?.fetchedAt ?? null),
     knownCategories: computed(() => shown.value?.answer.categories ?? kept.value),
     todayRate: computed(() =>

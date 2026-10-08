@@ -10,6 +10,7 @@ import {
   moneyMonth,
   moneyMonthViewOf,
   previousMonth,
+  previousToDay,
   spendingIn,
 } from '@molvia/model'
 import type {
@@ -325,7 +326,9 @@ export async function moneyMonthOf(
   // «−8 % к августу» needs an August: a month with nothing in it is no month to compare with.
   const previousSpent = before.days.length > 0 ? before.spent : null
   const budget = planned && budgetFigure(monthBudget(counted, planned, categories))
-  return moneyMonthViewOf(counted, previousSpent, categories, cursor, budget)
+  // «−10 % к тому же дню августа» (MOL-183): the running month against August to the same day.
+  const toDay = previousToDay(counted, before, today)
+  return moneyMonthViewOf(counted, previousSpent, categories, cursor, budget, toDay)
 }
 
 /** `GET /actors/me/salary-shift` (MOL-134, В-3): from which day a salary counts in the next month. */

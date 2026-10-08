@@ -360,3 +360,30 @@ for (const width of [390, 320])
     expect(widths).toHaveLength(2)
     for (const one of widths) expect(one).toBeGreaterThan(20)
   })
+
+// The card of the month on «Деньги» and the `figure` part (MOL-183, the tail of MOL-178): the sum stood
+// at the body's leading and «≈» at 17 under it, and the answer came some 8 px taller than its bars. The
+// caption's line, the figure at `--leading-tight` and «≈» at the same: the tiles come in exactly where
+// the plate stood, at both widths.
+for (const width of [390, 320])
+  test(`at ${String(width)} the month's tiles come in where the skeleton's plate stood`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 720 })
+    await open(page, '/_kit')
+    const pair = page.locator('[data-part="figure"]')
+    await expect(pair.locator('.tiles')).toBeVisible()
+    const tops = await pair.evaluate((root) => {
+      const below = (inner: string, outer: string) => {
+        const one = root.querySelector(inner)
+        const card = root.querySelector(outer)
+        if (!one || !card) throw new Error(`no ${inner} in ${outer}`)
+        return one.getBoundingClientRect().top - card.getBoundingClientRect().top
+      }
+      return {
+        answer: below('.spent .tiles', '.spent'),
+        bars: below('.sum-card .plate', '.sum-card'),
+      }
+    })
+    expect(tops.bars).toBeCloseTo(tops.answer, 0)
+  })

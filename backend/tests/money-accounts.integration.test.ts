@@ -916,6 +916,58 @@ describe('итоги (п. 8, Р-22)', () => {
       rate: { source: 'official' },
     })
   })
+
+  it('те же итоги в валюте дохода — для «На счетах сейчас» (MOL-183, В-19)', async () => {
+    const me = await owner()
+    await db.execute(sql`update actors set rate_preference = 'official' where id = ${me.id}`)
+    await rates.upsert([official('RUB', '4.5', today)])
+    await addAccount(me, { name: 'Наличные', start: amd('45000') })
+    await addAccount(me, { name: 'Карта ₽', currency: 'RUB', start: rub('1000'), savings: true })
+    // No rate for the dollar today: left out of both totals, never counted as zero.
+    await addAccount(me, {
+      name: 'Доллары дома',
+      currency: 'USD',
+      start: { amount: '100', currency: 'USD' },
+    })
+    const view = await overview(me)
+    expect(view.totals).toEqual({
+      total: { minor: 4_950_000n, currency: 'AMD' },
+      spendable: { minor: 4_500_000n, currency: 'AMD' },
+      savings: { minor: 450_000n, currency: 'AMD' },
+      uncounted: 1,
+    })
+    expect(view.incomeTotals).toEqual({
+      currency: 'RUB',
+      total: { minor: 1_100_000n, currency: 'RUB' },
+      spendable: { minor: 1_000_000n, currency: 'RUB' },
+      savings: { minor: 100_000n, currency: 'RUB' },
+      uncounted: 1,
+    })
+  })
+
+  it('валюта дохода та же, что трат, — итоги те же (MOL-183)', async () => {
+    const me = await owner()
+    await db.execute(sql`update actors set income_currency = 'AMD' where id = ${me.id}`)
+    await addAccount(me, { name: 'Наличные', start: amd('1200') })
+    await addAccount(me, { name: 'Копилка', start: amd('300'), savings: true })
+    const view = await overview(me)
+    expect(view.incomeTotals).toEqual({ currency: 'AMD', ...view.totals })
+    expect(view.totals.total).toEqual({ minor: 150_000n, currency: 'AMD' })
+  })
+
+  it('убранный счёт не входит и в итоги валюты дохода (Р-22, MOL-183)', async () => {
+    const me = await owner()
+    await db.execute(sql`update actors set rate_preference = 'official' where id = ${me.id}`)
+    await rates.upsert([official('RUB', '5', today)])
+    await addAccount(me, { name: 'Наличные', start: amd('500') })
+    const old = await addAccount(me, { name: 'Старая карта', start: amd('99999') })
+    await db.execute(sql`update money_accounts set archived_at = now() where id = ${old.id}`)
+    const view = await overview(me)
+    expect(view.incomeTotals).toMatchObject({
+      total: { minor: 10_000n, currency: 'RUB' },
+      uncounted: 0,
+    })
+  })
 })
 
 describe('после ревью (MOL-115, Р-3, Д1–Д6)', () => {

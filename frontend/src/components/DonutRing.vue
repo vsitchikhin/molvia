@@ -1,5 +1,8 @@
 <template>
   <svg class="ring" viewBox="-50 -50 100 100" aria-hidden="true" focusable="false">
+    <!-- Nothing to draw is «no data» (Ф-3): a dashed ring of `--graphic`, never a grey one — on
+         `--surface` the grey of `--surface-2` was not seen (MOL-183, С-13). -->
+    <circle v-if="arcs.length === 0" class="none" r="40" />
     <path
       v-for="sector in arcs"
       :key="sector.key"
@@ -35,7 +38,9 @@ const TURN = Math.PI * 2
 /**
  * The ring of a donut (MOL-156): clockwise from twelve o'clock in the order given. The geometry is
  * d3-shape's; the shares are the server's levels, so the phone divides nothing but a level into an
- * angle. Only a picture — what it says is said by the text beside it.
+ * angle. Only a picture — what it says is said by the text beside it. **No sector with a level is
+ * one look for every ring** (MOL-183, С-13): the dashed ring of «no data», on «Деньги» and
+ * «Графики» alike — two looks of «nothing here» would read as two things.
  */
 export default defineComponent({
   name: 'DonutRing',
@@ -78,6 +83,14 @@ export default defineComponent({
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* Of 2 and «4 5» of the hundred, as handoff MOL-157 v2 draws it: 2.16 px on the ring of 108. */
+.none {
+  fill: none;
+  stroke: var(--graphic);
+  stroke-dasharray: 4 5;
+  stroke-width: 2;
 }
 
 .arc {

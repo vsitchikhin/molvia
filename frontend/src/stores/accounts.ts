@@ -220,6 +220,11 @@ export const useAccountsStore = defineStore('accounts', () => {
     phase,
     overview: computed(() => shown.value),
     accounts: computed(() => shown.value?.accounts ?? []),
+    /**
+     * Why the last read failed, until an answer comes — unlike `stale`, an answer earlier in this
+     * session does not hide it: the page on screen is older than the read that failed (MOL-183, Б1).
+     */
+    failed: computed(() => failure.value),
     /** Why the page on screen is not an answer of this session, or null when it is. */
     stale: computed<'loading' | 'offline' | 'error' | null>(() => {
       if (!shown.value || confirmed.value) return null

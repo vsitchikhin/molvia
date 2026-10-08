@@ -121,6 +121,11 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   read every account with its whole history for nothing (self-review 3). A later page says `rest:
 null` beside the same «Потрачено», and the contract says that this is not «no accounts»
   (adversarial Ж).
+- **The phone shows «Остаток» of a closed month only** (MOL-183, owner's decision В-18 «б»): «На
+  счетах 31 авг.» beside «Пришло». In the running month it differs from what is on the accounts now
+  only by a spending dated tomorrow, and «На счетах сейчас» stands over the switcher (`money-accounts.md`),
+  so «Пришло» takes the whole width: one figure, one place. The server still counts it for every
+  month (Р-8) — one answer, and a third rollout to take it away would buy nothing.
 - **«Пришло» may take a salary into the next month** (MOL-134, В-2, В-3): with «Зарплата — в
   следующий месяц» on, a salary received on the chosen day or later counts in «Пришло» of the month
   after (`budgetMonthOf`), as the owner's sheet has it — the salary of the 25th pays for the next
@@ -152,9 +157,12 @@ nothing up.
 
 - **«Деньги» is the summary of the month, «Траты» its journal** (MOL-159, owner's decision В-8 of
   MOL-155, handoff MOL-157 01, 02, 06): the owner found one screen of accounts, totals, exchanges,
-  bars and the whole journal «очень сложно анализировать». The summary is the month, the card
-  «Потрачено / Пришло / Остаток», «Куда ушли», and six ways out — «Траты» and «Бюджет» (MOL-117) of
-  the month shown, then what is «now» and not the month's: «Счета», «Обмен денег», «Доходы», «Категории» — **each with one
+  bars and the whole journal «очень сложно анализировать». The summary is «На счетах сейчас» over the
+  month (MOL-183, `money-accounts.md`), the month, the card «Потрачено / Пришло / Остаток»,
+  «Куда ушли», and the ways out (`NavRow`) — «Траты» and «Бюджет» (MOL-117) of the month shown, then
+  what is «now» and not the month's: «Обмен денег», «Доходы», «Категории», and «Счета» only while «На
+  счетах сейчас» is not there (С-10: no live account, or no answer of «Счета» at all — the way to the
+  accounts never goes with the card) — **each with one
   figure from an answer the screen already has**: the rows of the journal and the incomes of
   «Пришло», counted by the server (`count`, `incomeCount`), the live accounts of the accounts' page,
   the person's own rate, the live categories. A figure not known yet is no figure, never a zero; the
@@ -234,6 +242,21 @@ nothing up.
   no figures of the server's to keep (review Т-4). The month is read again from the start
   whenever the queue has an answer — which also puts a spending moved to another day where it
   belongs (MOL-73, Е3) — keeping as many pages as were open.
+- **The running month is compared to the same day of the month before, a closed one to it whole**
+  (MOL-183, С-12, Ф-32): on the 2nd, «−97 % к сентябрю» against a whole September read as an alarm.
+  The server sends `previousToDay` — the day and what the month before had spent by its end — by
+  **the one rule of the day of comparison, `comparedDay`, that «Графики» compare by** (Р-6 of
+  MOL-158): today, or the last day spent on when it is later; a shorter month before is read whole
+  (the 31st of March against all of February). Only what a rate counted, as every sum of the month.
+  **To the third day the card says «Месяц только начался»** (`MONTH_STARTED_DAYS`, calendar days,
+  as the threshold of the usual month), a percent after; a month before with nothing in it is no
+  comparison, its day still sent so the first days are named. **Nothing spent after the third is
+  «−100 %»** (Р-5), as «Против обычного» says «not spent»; nothing spent by that day the month before
+  is no percent, **and nor is a zero something still waits behind**, in any month, closed too — a
+  spending on its way, one waiting a rate (adversarial А4, Б2): «−100 %» over «Ещё не учтено: 1» said two things, as «нет трат» over it did
+  in the ring. A closed month is «+94 % к июлю», by `previousSpent`, as before; an answer kept
+  from before the field compares nothing until it is read again — never the running month against
+  a whole one.
 - **The two figures the card derives are the model's**, `percentChange` and `shareOf`: a ratio
   of two sums the server gave, rounded as a person rounds. **«Включая 11 $ (≈ 4 290 ֏)» names no
   rate** (Р-2): `foreign` sums a currency over the month, and every spending in it had its own
@@ -300,7 +323,9 @@ nothing up.
   Armenia; the component tests run in UTC and hold the phone's day where it is not Yerevan's.
 - **The categories are the owner's, not a month's**, so the newest month kept names them for a
   month not read yet: «Добавить трату» stands while the month loads, when it failed and offline on
-  the first of a month (review Т-5, Т-6) — and does not, where no category is known at all. The row
+  the first of a month (review Т-5, Т-6) — and does not, where no category is known at all. **Any
+  answer that lands names them**, of a month left before it came too (MOL-183): turned a month back
+  before the running one answered, and that month failing, the screen had none and lost the strip. The row
   «Категории» stands before anything is spent too (Т-7). This month on the phone (MOL-121) is looked
   at again whenever the app comes back into view (adversarial З).
 - **«Пусто» is read off the answer** (Р-6): the running month empty, no income, nothing the month
@@ -335,11 +360,18 @@ nothing up.
   MOL-157 06), however old: the full ring of that month is there, with every category on its
   legend. Before MOL-158 it opened the period's bars on the ring's largest category (review 3 of
   MOL-156); the month tab is that question answered on the month itself. **An empty month keeps
-  the card, and the card keeps its ring — a grey one** (MOL-160, owner's decision В-4): with no
-  ring every new month was a caption over a hole until its first spending, the card drawn askew;
-  still the way into «Графики», where the year is (handoff 01, adversarial Г). Its «В этом месяце трат нет» is said
-  by the card itself since the journal went to «Траты» (MOL-159) — **unless a spending of the month
-  still waits on the phone**: «нет трат» over «Ещё не учтено: 1» said two things. A category the month
+  the card, of the same height, and the card keeps its ring — the dashed one of «no data»** (MOL-160
+  В-4; MOL-183, С-13, Ф-3): with no ring every new month was a caption over a hole until its first
+  spending, the card drawn askew; still the way into «Графики», where the year is (handoff 01,
+  adversarial Г). The grey ring of `--surface-2` MOL-160 drew was not seen on `--surface`; the dashed
+  one of `--graphic`, 2 of 100 in «4 5», is drawn by `DonutRing` itself wherever no sector has a
+  level — on «Графики» too, one look of «nothing here». «0 ֏» stands in it only where it is true:
+  nothing spent, nothing waiting a rate. Beside it the running month says «В октябре трат пока нет»
+  and that the shares come with the first spending, a closed one «В этом месяце трат нет» — said by
+  the card itself since the journal went to «Траты» (MOL-159) — and **while a spending of the month
+  waits on the phone, «Первая трата октября отправляется»**: «нет трат» over «Ещё не учтено: 1» said
+  two things. A refused one is said by its own card, and the ring says nothing beside it. **A
+  sector's name is whole, on as many lines as it takes** (Е-19): cut, two long names read as one. A category the month
   does not name is left out, never drawn as a second «Остальные» (review 7). **`slices` defaults to empty so that a month kept on the phone before the
   ring still reads through the strict codec** (review 6): lost, every month kept went with it
   offline. **The phone does not work the ring out for it** (review 9, owner's decision «а»): that

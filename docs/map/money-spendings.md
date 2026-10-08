@@ -12,7 +12,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `packages/model/src/entities/money-budget.ts` — The budget of a month (MOL-117): which plan holds from which month, a share of «Пришло» by the month's rate, rows against `byCategory`, «Без плана», the total, the savings target.
 - `packages/model/src/entities/money-month.ts` — The month of «Деньги» counted whole: months and budget month, journal entries and order, «Пришло», «Остаток», `percentChange`, `shareOf`.
 - `packages/model/src/entities/money-charts.ts` — What every chart shares: levels, the ring's sectors (`donutSlices`), months of a period, means and changes, and the exchanges by exchanger of «Обмен денег».
-- `packages/model/src/entities/money-chart-month.ts` — «Графики → Месяц» from counted months: the usual month of up to twelve closed ones from three, against the usual by category, the pace by day, the ring with «Остальные» named.
+- `packages/model/src/entities/money-chart-month.ts` — «Графики → Месяц» from counted months: the usual month of up to twelve closed ones from three, against the usual by category, the pace by day, the ring with «Остальные» named; the day of comparison (`comparedDay`) and the month before to it (`previousToDay`) of «Деньги» too.
 - `packages/model/src/entities/money-chart-year.ts` — «Графики → Год» from counted months: twelve months with what each is to the bars, the year's ring by each month's rate, the usual month of «Месяц» as its dashed line, «Разница» of the year, categories by month.
 - `packages/model/src/entities/spending-category.ts` — Spending category entity: the thirteen presets and their order, the trip's category, name limit, palette colour, chip order.
 - `packages/model/src/entities/spending.ts` — Spending entity: money spent outside a trip, its text limits, undo window and its amount in the spending currency.
@@ -52,15 +52,15 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `frontend/src/views/MoneyBudgetView.vue` — «Бюджет» screen (MOL-117): the month in the address by `replace`, what is left of the plan, the rows in the order of the chips, «Без плана», the savings target; four states.
 - `frontend/src/views/MoneyCategoriesView.vue` — «Деньги → Категории» screen: the owner's category list, «Убрать» and «Вернуть», through the queue.
 - `frontend/src/views/MoneyChartsView.vue` — «Графики» screen: «Месяц · Год», the month and the year in the address by `replace`, a bookmark of the old period opening the year.
-- `frontend/src/views/MoneyView.vue` — «Деньги» screen: the summary of one month counted by the server — spent, came in, «Остаток», «Куда ушли» — and five ways out with one figure each.
+- `frontend/src/views/MoneyView.vue` — «Деньги» screen: «На счетах сейчас» over the month, the summary of one month counted by the server — spent, came in, «Куда ушли» — and the ways out with one figure each; the four states.
 - `frontend/src/views/MoneySpendingsView.vue` — «Траты» screen (MOL-159): the journal of the month by day, a page at a time, queued rows marked, the server's count and sum on top.
 
 ## frontend · components
 
 - `frontend/src/components/BudgetPlanSheet.vue` — Sheet of a plan from the month on: a sum or a whole percent of «Пришло», the savings target a percent only, a category chosen for a new one; written online only.
-- `frontend/src/components/CategoryDonutCard.vue` — «Куда ушли» card on «Деньги»: the month's ring and its three largest sectors with share and sum, «Ещё N», the whole card one way into «Графики → Месяц» of the same month.
+- `frontend/src/components/CategoryDonutCard.vue` — «Куда ушли» card on «Деньги»: the month's ring and its three largest sectors with share and sum, «Ещё N», the whole card one way into «Графики → Месяц» of the same month; a month with nothing spent — the dashed ring, «0 ֏» and the month's words.
 - `frontend/src/components/BarChart.vue` — Bars of «Графики»: a reading above, radios for the keyboard, the whole area as the target, a bar not known drawn dashed.
-- `frontend/src/components/DonutRing.vue` — The ring of a donut: d3-shape arcs from the server's levels, clockwise from twelve, a gap between sectors, token colours, the chosen sector thicker and the rest dimmed.
+- `frontend/src/components/DonutRing.vue` — The ring of a donut: d3-shape arcs from the server's levels, clockwise from twelve, a gap between sectors, token colours, the chosen sector thicker and the rest dimmed; no sector with a level — the dashed ring of «no data».
 - `frontend/src/components/DonutChart.vue` — «Куда ушло» of «Графики → Месяц»: the full ring, the month in its centre, a legend that is a radio group, a sector chosen by a tap and let go by a second.
 - `frontend/src/components/DeviationBars.vue` — «Против обычного»: the categories furthest from their usual month, a bar and the usual's mark, ±% with an arrow in the text's colour, «новая», the card of too few months.
 - `frontend/src/components/PaceLine.vue` — «Темп месяца»: the month's running total solid against the usual dashed, a day chosen on lifting or sideways and by a native range.
@@ -68,7 +68,9 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `frontend/src/components/ChartsYear.vue` — «Графики → Год» (MOL-160): «‹ 2026 ›», the year's ring, twelve months against the usual, in and out with the year's «Разница», a category by month chosen by a sector of the ring too.
 - `frontend/src/components/CategoryChips.vue` — Category chips of a spending: a radio group in fixed order, nothing preselected, the last chip «+ Своя».
 - `frontend/src/components/ExchangeLosses.vue` — «Обмены против рынка» card on top of «Обмен денег» (MOL-152, MOL-159): exchangers worst first, a bar from the centre line, no «≈ ₽».
-- `frontend/src/components/MoneyEntries.vue` — The ways out of «Деньги»: «Траты» and «Бюджет» of the month, «Счета», «Обмен денег», «Доходы», «Категории», each with one figure or none until known.
+- `frontend/src/components/MoneyAccountsNow.vue` — «На счетах сейчас» over the switcher of «Деньги» (MOL-183): the live accounts now in the income currency, «можно тратить», the count, the one way into «Счета».
+- `frontend/src/components/MoneyEntries.vue` — The ways out of «Деньги», rows of `NavRow`: «Траты» and «Бюджет» of the month, «Счета» only without «На счетах сейчас», «Обмен денег», «Доходы», «Категории», each with one figure or none until known.
+- `frontend/src/components/MoneyMonthCard.vue` — The card of the month on «Деньги» (MOL-183): spent and the comparison — to the same day for the running month, whole for a closed one — «≈», «Пришло», a closed month's «На счетах 31 авг.», the rate.
 - `frontend/src/components/MonthSwitcher.vue` — «‹ Сентябрь 2026 ›» month switcher of «Деньги», or «‹ 2026 ›» of «Графики → Год»: no future, no swipe; the month with no lower bound, the year back to the first with data (MOL-160).
 - `frontend/src/components/NewCategorySheet.vue` — «Новая категория» sheet over the spending sheet: a name, made through the queue, a preset's name refused.
 - `frontend/src/components/SalaryShiftGroup.vue` — Settings group «Зарплата с … числа — в следующий месяц»: a switch and a day select, saved on the tap; neither while a change is unsure, the quiet line in their place (MOL-96).

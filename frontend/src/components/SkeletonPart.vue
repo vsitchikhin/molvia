@@ -33,7 +33,8 @@
     <AppCard class="sum-card">
       <span class="line caption-line"><span class="bar label"></span></span>
       <span class="line figure-line"><span class="bar sum"></span></span>
-      <span class="line small"><span class="bar note"></span></span>
+      <span v-if="approx" class="line approx-line"><span class="bar note"></span></span>
+      <span v-else class="line small"><span class="bar note"></span></span>
       <span v-if="plate" class="plate"></span>
     </AppCard>
   </div>
@@ -88,6 +89,8 @@ export function isWidths(value: unknown): boolean {
  *             short one (owner's В-3 «б»): a title and a meta of a line each; the line under the amount
  *             is the screen's to ask for, where it is the rule — an account in another currency;
  *   figure  — the card of a sum (handoff 77 v2 2a): a caption, the figure, a line, and a `plate`;
+ *             `approx`, the line is the sum in the other currency, «≈ 63 800 ₽» of «Деньги»
+ *             (MOL-183), at the headline's size;
  *   lines   — pairs of bars by `widths`, the line and the shorter one under it: what `groups` drew
  *             before there were parts — in a card, or bare (`card: false`) where a card is not the
  *             answer's shape, over the camera.
@@ -130,6 +133,8 @@ export default defineComponent({
     /** Left out, the circle's: `OperationRow` is the one row with a circle, and it always goes narrow. */
     narrow: { type: Boolean as PropType<boolean | undefined>, default: undefined },
     plate: { type: Boolean, default: false },
+    /** The figure's line is «≈» in the other currency, 17 at the figure's leading (MOL-183). */
+    approx: { type: Boolean, default: false },
     widths: {
       type: Array as PropType<number[]>,
       default: () => [62],
@@ -341,6 +346,11 @@ export default defineComponent({
 .figure-line {
   height: calc(1em * var(--leading-tight));
   font-size: var(--text-figure);
+}
+
+.approx-line {
+  height: calc(1em * var(--leading-tight));
+  font-size: var(--text-headline);
 }
 
 .label {

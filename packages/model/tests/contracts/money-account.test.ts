@@ -151,9 +151,33 @@ describe('the rest of the accounts contract', () => {
         savings: money(0n, 'AMD'),
         uncounted: 0,
       },
+      incomeTotals: {
+        currency: 'RUB',
+        total: money(-1_240_000n, 'RUB'),
+        spendable: money(-1_240_000n, 'RUB'),
+        savings: money(0n, 'RUB'),
+        uncounted: 0,
+      },
       unassigned: 0,
       countedAt: new Date('2026-09-26T10:05:00Z'),
     })
     expect(wire.accounts[0]?.balance).toEqual({ amount: '-12400.00', currency: 'RUB' })
+    expect(wire.incomeTotals?.total).toEqual({ amount: '-12400.00', currency: 'RUB' })
+  })
+
+  it('reads «Счета» kept before the totals in the income currency (MOL-183)', () => {
+    const kept = {
+      spendCurrency: 'AMD',
+      accounts: [],
+      totals: {
+        total: { amount: '0.00', currency: 'AMD' },
+        spendable: { amount: '0.00', currency: 'AMD' },
+        savings: { amount: '0.00', currency: 'AMD' },
+        uncounted: 0,
+      },
+      unassigned: 0,
+      countedAt: '2026-09-26T10:05:00.000Z',
+    }
+    expect(moneyAccountsCodec.parse(kept).incomeTotals).toBeNull()
   })
 })

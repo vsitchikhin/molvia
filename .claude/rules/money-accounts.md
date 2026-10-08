@@ -110,6 +110,29 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
 - **The totals are the live accounts in the spending currency by the rule of «Деньги», always «≈»**
   — «всего», «можно тратить» without the savings, «сбережения» — and an account nothing converts today
   is left out and counted as such, never as zero.
+- **The same totals come in the income currency too** (`incomeTotals`, MOL-183, owner's decision
+  В-19 «в»): the two currencies of the person's settings, one `totalsOf` for both. **The same
+  balances, never a second count** — those «Счета» add up, each converted today by the rule of
+  «Деньги», which is how the running month's «Остаток» converts — so «Счета» in ֏ and «Деньги» in ₽
+  speak of one money. The income currency the spending one — the same figures. Defaulted (`null`),
+  so «Счета» kept on the phone before it still read. **«На счетах сейчас»** over the month's switcher
+  on «Деньги» (Ф-27) shows them — «всего» and «можно тратить» — while a live account is, «now» and not
+  the month's: it does not move as the months are turned and stands by the month's error and its
+  skeleton, an answer of its own — and «Повторить» of the month, the error's and the strip's
+  «сервер не ответил», asks «Счета» again too (adversarial А2, self-review Р3-3). **Once the last read
+  failed, it is not «now»** (А3, Б1): offline, or when «Счета» did not answer — whether or not they
+  answered earlier in the app's life (`failed` of the store, not `stale`, which an answer of the
+  session hides) — it reads «На счетах на 24 сент., 14:05» by `countedAt`, as «Счета» say it — the strip under the switcher dates the
+  month, which is read apart and may be days younger; kept while a read is on its way it stays «сейчас»,
+  or every opening would flicker an hour. A card that is a link, not a `NavRow`: the row holds no figure
+  of 28. With none, or no answer of «Счета» and nothing kept, «Счета» is a
+  row among the ways out instead (С-10). Below zero is «плохо» (С-17); what is left out is said under
+  the figures, as on «Счета», and in the link's name. The phone converts nothing. **The price, named:**
+  it is drawn once «Счета» answered or the phone keeps them, never animated in (MOL-138), so the very
+  first opening of «Деньги» on a phone, with nothing kept, moves the switcher down once by its height
+  as the answer comes, and in the same frame the row «Счета» goes from the ways out — the page grows by
+  the card and shortens by 52 at its foot, a growth all told (self-review Р2-4); a placeholder would
+  stand for a newcomer with no account and go again. The two currencies on «Счета» are MOL-193's.
 - **The month of «Деньги» reads the same balances for its «Остаток»** (MOL-134): `balancesOn` — the
   live accounts started by a day, their operations up to it — through `accountsCounted`, the one
   loading of accounts, operations and rates both screens share. A removed account is in neither.
