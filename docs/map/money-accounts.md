@@ -13,11 +13,13 @@ Rules: `.claude/rules/money-accounts.md`. A test beside its source, or mirroring
 ## backend · routes
 
 - `backend/src/routes/money-accounts.ts` — HTTP of «Счета»: `/money/accounts` CRUD, restore, journal, checks, unassigned, held, and `PUT /trips/:tripId/payment`.
+- `backend/src/routes/transfers.ts` — HTTP of «Перевод» (MOL-253): `/transfers` write, read one, amend, remove and restore, answered `no-store`.
 
 ## backend · usecases
 
 - `backend/src/usecases/account-of.ts` — Use-case helpers: which accounts an operation may name, and the account side of a spending, income, exchange or trip payment.
 - `backend/src/usecases/money-accounts.ts` — Use cases of «Счета»: the counted page, journal, «не попали», the check, the held hint, add/amend/remove/restore, a trip's account. Tests: `backend/tests/money-accounts.integration.test.ts`.
+- `backend/src/usecases/transfers.ts` — Use cases of «Перевод» (MOL-253): write, amend, read, remove and restore a transfer, its fee in «Прочее» at the rate of its day. Tests: `backend/tests/erasure.integration.test.ts`.
 
 ## backend · db
 
