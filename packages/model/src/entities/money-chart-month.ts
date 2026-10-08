@@ -147,6 +147,48 @@ export function upTo(list: readonly bigint[] | undefined, length: number, day: n
   return list?.[Math.min(day, length)] ?? 0n
 }
 
+/**
+ * The day a month is compared to another by (Р-6): for the running month today, or the last day
+ * spent on when it is later — a rent dated the 15th is in the month's sum, and a comparison stopping
+ * at today left it out; any other month is read whole. «Графики» and «Деньги» read it here alone.
+ */
+export function comparedDay(month: MoneyMonth, today: string): number {
+  if (month.month !== monthOf(today)) return lengthOf(month.month)
+  const lastSpent = month.days.reduce(
+    (latest, day) => Math.max(latest, Number(day.day.slice(8, 10))),
+    0,
+  )
+  return Math.max(Number(today.slice(8, 10)), lastSpent)
+}
+
+/**
+ * «Месяц только начался» (MOL-183, Ф-32): to this day of the month a percent against the month before
+ * says more about the calendar than about the money — «−97 % к сентябрю» on the 1st. Calendar days,
+ * as the threshold of the usual month (Р-4).
+ */
+export const MONTH_STARTED_DAYS = 3
+
+/**
+ * «−10 % к тому же дню августа» (MOL-183, С-12): the running month's day of comparison and what the
+ * month before had spent by the end of it — of a shorter month, its whole. `spent` is null when the
+ * month before holds nothing: no month to compare with, as `previousSpent`. A month not running is
+ * compared whole, by `previousSpent`, so it has none.
+ */
+export function previousToDay(
+  month: MoneyMonth,
+  previous: MoneyMonth,
+  today: string,
+): { readonly day: number; readonly spent: Money | null } | null {
+  if (month.month !== monthOf(today)) return null
+  const day = comparedDay(month, today)
+  if (previous.days.length === 0) return { day, spent: null }
+  const running = runningOf(previous, undefined)
+  return {
+    day,
+    spent: { minor: upTo(running.total, running.length, day), currency: previous.spent.currency },
+  }
+}
+
 export interface MonthChartsInput {
   readonly selected: MoneyMonth
   /** Months before the selected one, oldest first — `USUAL_MONTHS` of them; the open one is left out. */
@@ -201,11 +243,7 @@ export function monthCharts(input: MonthChartsInput): MonthCharts {
   for (let step = 0; step < USUAL_MIN_CLOSED; step += 1) comparedFrom = nextMonth(comparedFrom)
 
   const mine = runningOf(selected, groceries)
-  const lastSpent = selected.days.reduce(
-    (latest, day) => Math.max(latest, Number(day.day.slice(8, 10))),
-    0,
-  )
-  const shownTo = running ? Math.max(Number(today.slice(8, 10)), lastSpent) : mine.length
+  const shownTo = comparedDay(selected, today)
   // The day the closed months are read to: the same day for the running month, else each whole.
   const cutoff = running ? shownTo : Number.POSITIVE_INFINITY
   const others = usedClosed.map((month) => ({ month, running: runningOf(month, groceries) }))

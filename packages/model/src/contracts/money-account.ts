@@ -90,16 +90,25 @@ export type MoneyAccountView = z.output<typeof moneyAccountViewCodec>
  * server's and not what is in hand — and how many operations with no account could still explain a
  * difference. `countedAt` is when this was counted: offline, the card says «на 14:05».
  */
+const accountTotalsCodec = z.strictObject({
+  total: signedMoneyCodec,
+  spendable: signedMoneyCodec,
+  savings: signedMoneyCodec,
+  /** Live accounts nothing converted today: left out of the totals rather than counted as zero. */
+  uncounted: z.int().min(0),
+})
+
 export const moneyAccountsCodec = z.strictObject({
   spendCurrency: currencySchema,
   accounts: z.array(moneyAccountViewCodec),
-  totals: z.strictObject({
-    total: signedMoneyCodec,
-    spendable: signedMoneyCodec,
-    savings: signedMoneyCodec,
-    /** Live accounts nothing converted today: left out of the totals rather than counted as zero. */
-    uncounted: z.int().min(0),
-  }),
+  totals: accountTotalsCodec,
+  /**
+   * The same totals in the income currency, the other currency of the person's settings (MOL-183,
+   * В-19): «На счетах сейчас» of «Деньги» — the same balances, never a second count of them, each
+   * converted today as the running month's «Остаток» converts. Defaulted, as the month's `budget`
+   * is: «Счета» kept on the phone before it, or an answer of a server before it, still read.
+   */
+  incomeTotals: accountTotalsCodec.extend({ currency: currencySchema }).nullable().default(null),
   unassigned: z.int().min(0),
   countedAt: isoDate,
 })

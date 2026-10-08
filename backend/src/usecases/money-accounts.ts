@@ -102,12 +102,20 @@ export async function accountsCounted(
   }
 }
 
-async function counting(repositories: Repositories, owner: Owner, now: Date): Promise<Counting> {
+/** `into` — the currencies every balance is converted into today: the spending one, unless named. */
+async function counting(
+  repositories: Repositories,
+  owner: Owner,
+  now: Date,
+  into: readonly Currency[] = [owner.spendCurrency],
+): Promise<Counting> {
   const today = todayOf(owner, now)
   const counted = await accountsCounted(repositories, owner, dayRates(repositories, owner), (all) =>
-    all
-      .filter((account) => account.currency !== owner.spendCurrency)
-      .map((account) => ({ from: account.currency, into: owner.spendCurrency, day: today })),
+    into.flatMap((currency) =>
+      all
+        .filter((account) => account.currency !== currency)
+        .map((account) => ({ from: account.currency, into: currency, day: today })),
+    ),
   )
   return { today, ...counted }
 }
@@ -144,31 +152,63 @@ function accountViewOf(
  * «Счета» whole (handoff 01, 02): every account with its balance, and the totals of the live ones
  * in the spending currency — «всего», «можно тратить» without the savings, «сбережения». A removed
  * account is in no total (Р-22). One nothing converts today is left out and counted as such.
+ * **The same totals in the income currency** (MOL-183, В-19) are «На счетах сейчас» of «Деньги»:
+ * the same balances, each converted today by the rule the running month's «Остаток» converts by.
  */
 export async function moneyAccountsOf(
   repositories: Repositories,
   owner: Owner,
   now: Date = new Date(),
 ): Promise<MoneyAccountsResponse> {
+  const income = owner.incomeCurrency
   const [counted, lastChecks, matched] = await Promise.all([
-    counting(repositories, owner, now),
+    counting(repositories, owner, now, [owner.spendCurrency, income]),
     repositories.moneyAccounts.lastChecks(owner.id, false),
     repositories.moneyAccounts.lastChecks(owner.id, true),
   ])
   const views = counted.accounts.map((account) =>
     accountViewOf(account, counted, owner.spendCurrency, lastChecks.get(account.id)),
   )
+  const totals = totalsOf(views, owner.spendCurrency, (view) =>
+    view.currency === owner.spendCurrency ? view.balance : view.inSpend,
+  )
+  const live = counted.accounts.filter((account) => account.archivedAt === null)
+  return {
+    spendCurrency: owner.spendCurrency,
+    accounts: views,
+    totals,
+    incomeTotals: {
+      currency: income,
+      ...(income === owner.spendCurrency
+        ? totals
+        : totalsOf(views, income, (view) => {
+            if (view.currency === income) return view.balance
+            const rate = counted.rateOf(view.currency, income, counted.today)
+            return rate === null ? null : convertSigned(view.balance, rate)
+          })),
+    },
+    unassigned: unassignedOperations(live, matched, counted.operations).length,
+    countedAt: now,
+  }
+}
+
+/** The live accounts added up in `currency`, each by `inCurrency`; null or too large is left out. */
+function totalsOf(
+  views: readonly MoneyAccountView[],
+  currency: Currency,
+  inCurrency: (view: MoneyAccountView) => Money | null,
+): MoneyAccountsResponse['totals'] {
   let spendable = 0n
   let savings = 0n
   let uncounted = 0
   for (const view of views) {
     if (view.archivedAt !== null) continue
-    const inSpend = view.currency === owner.spendCurrency ? view.balance : view.inSpend
-    const nextSpendable = view.savings ? spendable : spendable + (inSpend?.minor ?? 0n)
-    const nextSavings = view.savings ? savings + (inSpend?.minor ?? 0n) : savings
+    const converted = inCurrency(view)
+    const nextSpendable = view.savings ? spendable : spendable + (converted?.minor ?? 0n)
+    const nextSavings = view.savings ? savings + (converted?.minor ?? 0n) : savings
     // One no money can hold is left out, never a failed page — the one way to amend it (MOL-66).
     if (
-      inSpend === null ||
+      converted === null ||
       !holds(nextSpendable) ||
       !holds(nextSavings) ||
       !holds(nextSavings + nextSpendable)
@@ -179,19 +219,12 @@ export async function moneyAccountsOf(
     spendable = nextSpendable
     savings = nextSavings
   }
-  const live = counted.accounts.filter((account) => account.archivedAt === null)
-  const money = (minor: bigint): Money => ({ minor, currency: owner.spendCurrency })
+  const money = (minor: bigint): Money => ({ minor, currency })
   return {
-    spendCurrency: owner.spendCurrency,
-    accounts: views,
-    totals: {
-      total: money(spendable + savings),
-      spendable: money(spendable),
-      savings: money(savings),
-      uncounted,
-    },
-    unassigned: unassignedOperations(live, matched, counted.operations).length,
-    countedAt: now,
+    total: money(spendable + savings),
+    spendable: money(spendable),
+    savings: money(savings),
+    uncounted,
   }
 }
 

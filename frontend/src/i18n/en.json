@@ -538,6 +538,8 @@
     "year_next": "Next year",
     "spent": "Spent",
     "vs_previous": "{percent} vs {month}",
+    "vs_same_day": "{change} vs the same day of {month}",
+    "month_started": "The month has just started",
     "month_to": {
       "01": "January",
       "02": "February",
@@ -573,7 +575,6 @@
     "income_uncounted": "and {amounts} not counted",
     "income_shifted_in": "with the salary of {days}",
     "income_shifted_out": "the salary of {days} counts next month",
-    "rest": "Left on accounts",
     "rest_spendable": "without savings ≈ {amount}",
     "rest_uncounted": "not counted: {accounts}",
     "rest_operations": "{n} operation not counted | {n} operations not counted",
@@ -589,12 +590,23 @@
     "categories_title": "Where it went",
     "summary": {
       "charts": "Charts",
+      "accounts_now": "In accounts now",
+      "accounts_spendable": "free to spend ≈ {amount}",
+      "accounts_count": "{n} account | {n} accounts",
+      "accounts_now_label": "Accounts: in accounts now ≈ {amount}, free to spend ≈ {spendable}",
+      "accounts_then": "In accounts as of {when}",
+      "accounts_then_label": "Accounts: in accounts as of {when} ≈ {amount}, free to spend ≈ {spendable}",
       "donut_more": "{n} more slice in Charts | {n} more slices in Charts",
       "donut_label": "Where it went: {list}. Open charts",
       "donut_later": "Shares appear once the month is refreshed",
       "donut_uncounted": "Shares appear once the spending has a rate",
+      "donut_empty": "No spendings in {month} yet",
+      "donut_empty_body": "Shares appear with the first spending. The year is in Charts",
+      "donut_pending": "The first spending of {month} is on its way",
+      "donut_pending_body": "Shares appear once it arrives. The year is in Charts",
+      "donut_empty_label": "Where it went: no spendings in {month} yet. Open charts",
       "add": "Add spending",
-      "offline_strip": "No connection. Figures as of {when} — new spendings are kept on the phone and sent when you are back online",
+      "offline_strip": "Offline · figures as of {when}. New spendings are kept on the phone",
       "refused": "{n} spending not accepted | {n} spendings not accepted",
       "refused_body": "The server did not accept it — fix or remove it in Spendings",
       "refused_open": "Open Spendings"
@@ -718,7 +730,8 @@
     },
     "offline": {
       "title": "No connection",
-      "body": "Spending will appear when the internet is back. You can record a new one now"
+      "body": "Spending will appear when the internet is back. You can record a new one now",
+      "body_read": "Spending will appear when the internet is back"
     },
     "error_strip": "The server did not answer — spending as of {when}",
     "rejected_other": {

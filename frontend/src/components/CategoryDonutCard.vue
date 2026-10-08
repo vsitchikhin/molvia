@@ -1,10 +1,6 @@
 <template>
   <AppCard class="donut">
-    <RouterLink
-      class="open"
-      :to="{ name: 'money-charts', query }"
-      :aria-label="top.length > 0 ? label : undefined"
-    >
+    <RouterLink class="open" :to="{ name: 'money-charts', query }" :aria-label="label">
       <span class="heading">
         <SectionCaption as="span" inset>{{ t('spending.categories_title') }}</SectionCaption>
         <span class="charts-link">
@@ -12,7 +8,10 @@
         </span>
       </span>
       <span class="figure">
-        <DonutRing class="ring" :sectors="sectors" :thickness="16" />
+        <span class="ring-box">
+          <DonutRing class="ring" :sectors="sectors" :thickness="16" />
+          <span v-if="zero" class="zero">{{ zero }}</span>
+        </span>
         <span v-if="top.length > 0" class="named">
           <span v-for="row in top" :key="row.key" class="sector">
             <span class="dot" :style="{ background: row.colour }"></span>
@@ -27,7 +26,10 @@
         <span v-else-if="waiting === 'rate'" class="why">
           {{ t('spending.summary.donut_uncounted') }}
         </span>
-        <span v-else-if="empty" class="why">{{ t('spending.month_empty') }}</span>
+        <span v-else-if="nothing" class="why">
+          <span class="why-title">{{ nothing.title }}</span>
+          <span v-if="nothing.body" class="why-body">{{ nothing.body }}</span>
+        </span>
       </span>
       <span v-if="hidden > 0" class="rest">
         {{ t('spending.summary.donut_more', { n: hidden }, hidden) }}
@@ -41,7 +43,7 @@ import { computed, defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconChevron from '~icons/mdi/chevron-right'
-import { CHART_LEVEL, formatEstimate, shareOf } from '@molvia/model'
+import { formatEstimate, shareOf } from '@molvia/model'
 import type { MoneyMonthView, SpendingCategoryView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import DonutRing from '@/components/DonutRing.vue'
@@ -54,11 +56,14 @@ const NAMED = 3
 
 /**
  * «Куда ушли» on «Деньги» (MOL-156, handoff MOL-157 01): the month's ring and its three largest
- * sectors, the whole card one way into «Графики» — an empty month's too, a grey ring with «В этом
- * месяце трат нет» beside it (handoff MOL-157 01, MOL-160 В-4), unless a spending of it still waits
- * on the phone. A month spent in with no sectors says why beside its grey ring. The sectors and their levels are the
- * server's (`slices`) — the phone adds nothing up, not even for a month kept before the ring; the
- * share printed is the model's `shareOf`, as the bars before it printed.
+ * sectors, the whole card one way into «Графики». **A month with nothing spent keeps the card, of the
+ * same height** (MOL-183, С-13, handoff MOL-157 v2 «Месяц без трат»): the dashed ring of «no data»
+ * with «0 ֏» in it, and beside it the running month's «В октябре трат пока нет», «Первая трата
+ * октября отправляется» while one waits on the phone, a closed month's «В этом месяце трат нет» — no
+ * button and no colour: the one action is «Добавить трату» in the strip. A month spent in with no
+ * sectors says why beside the same ring. The sectors and their levels are the server's (`slices`) —
+ * the phone adds nothing up, not even for a month kept before the ring; the share printed is the
+ * model's `shareOf`, as the bars before it printed.
  */
 export default defineComponent({
   name: 'CategoryDonutCard',
@@ -69,11 +74,15 @@ export default defineComponent({
       type: Function as PropType<(category: SpendingCategoryView) => string>,
       required: true,
     },
+    /** Spendings of the month still on their way: «Первая трата октября отправляется». */
+    pending: { type: Number, default: 0 },
     /**
-     * Spendings of the month still on the phone, waiting or refused: the month is not «empty» while
-     * any of them is there to be sent or put right.
+     * Spendings of the month the server refused: the month is not «empty» while one is there to be
+     * put right, and it is said by its own card, not here.
      */
-    unsent: { type: Number, default: 0 },
+    refused: { type: Number, default: 0 },
+    /** The month on the card is the running one: «пока» — more may come. */
+    running: { type: Boolean, default: false },
   },
   setup(props) {
     const { t, locale } = useI18n()
@@ -111,24 +120,25 @@ export default defineComponent({
     )
     const rows = computed(() => all.value.filter((row) => row.named))
     /**
-     * A month with no sector drawn is a grey ring, as on «Графики» (MOL-160, owner's decision В-4):
-     * with none, the card of every new month was a caption over a hole until its first spending.
+     * A month with no sector drawn is still a ring, as on «Графики» (MOL-160 В-4, MOL-183 С-13): with
+     * none, the card of every new month was a caption over a hole until its first spending.
      */
     const sectors = computed<RingSector[]>(() =>
-      all.value.some(({ level }) => level > 0)
-        ? all.value.map(({ key, colour, level }) => ({ key, colour, level }))
-        : [{ key: 'empty', colour: 'var(--surface-2)', level: CHART_LEVEL }],
+      all.value.map(({ key, colour, level }) => ({ key, colour, level })),
     )
     const top = computed(() => rows.value.slice(0, NAMED))
     /** Sectors past the three that the ring draws: one of no level is on no ring (adversarial Б). */
     const hidden = computed(() => rows.value.slice(NAMED).filter((row) => row.level > 0).length)
     /** «Графики → Месяц» of the same month (MOL-158, handoff MOL-157 06): its full ring is there. */
     const query = computed(() => ({ month: props.month.month }))
-    const label = computed(() =>
-      t('spending.summary.donut_label', {
-        list: top.value.map((row) => `${row.name} ${row.share}`).join(', '),
-      }),
-    )
+    const monthPart = computed(() => props.month.month.slice(5))
+    const label = computed(() => {
+      if (top.value.length > 0)
+        return t('spending.summary.donut_label', {
+          list: top.value.map((row) => `${row.name} ${row.share}`).join(', '),
+        })
+      return nothing.value?.label
+    })
     /**
      * No sectors, and yet the month was spent in: said beside the grey ring, never left a caption over
      * nothing (adversarial round 2, Е, Ж). Categories and no sectors — a month kept before the ring,
@@ -140,9 +150,37 @@ export default defineComponent({
       if (props.month.byCategory.length > 0) return 'read'
       return props.month.uncounted.length > 0 ? 'rate' : null
     })
-    /** Nothing the server knows of, and nothing on its way to it: the journal moved to «Траты». */
-    const empty = computed(() => props.month.days.length === 0 && props.unsent === 0)
-    return { t, query, sectors, top, hidden, label, waiting, empty }
+    /**
+     * Nothing the server knows of: what is said beside the ring, and the card's name then. A refusal
+     * leaves it silent — its own card says it; «нет трат» over it said two things.
+     */
+    const nothing = computed(() => {
+      if (waiting.value !== null || props.month.days.length > 0) return null
+      const month = monthPart.value
+      if (props.pending > 0)
+        return {
+          title: t('spending.summary.donut_pending', { month: t(`spending.month_of.${month}`) }),
+          body: t('spending.summary.donut_pending_body'),
+          label: undefined,
+        }
+      if (props.refused > 0) return null
+      if (!props.running) return { title: t('spending.month_empty'), body: null, label: undefined }
+      const name = t(`spending.month_in.${month}`)
+      return {
+        title: t('spending.summary.donut_empty', { month: name }),
+        body: t('spending.summary.donut_empty_body'),
+        label: t('spending.summary.donut_empty_label', { month: name }),
+      }
+    })
+    /** «0 ֏» in the dashed ring — only where it is true: nothing spent and nothing waiting a rate. */
+    const zero = computed(() =>
+      props.month.spent.minor === 0n &&
+      waiting.value === null &&
+      sectors.value.every(({ level }) => level === 0)
+        ? formatEstimate(props.month.spent, locale.value)
+        : null,
+    )
+    return { t, query, sectors, top, hidden, label, waiting, nothing, zero }
   },
 })
 </script>
@@ -188,10 +226,31 @@ export default defineComponent({
   gap: var(--space-4);
 }
 
-.ring {
+/* The ring and, in its middle, «0 ֏» of a month with nothing spent. */
+.ring-box {
+  display: grid;
   flex: none;
+  place-items: center;
   width: 6.75rem;
   height: 6.75rem;
+}
+
+.ring,
+.zero {
+  grid-area: 1 / 1;
+}
+
+.ring {
+  width: 100%;
+  height: 100%;
+}
+
+.zero {
+  @include display-type;
+
+  color: var(--text-muted);
+  font-size: var(--text-headline);
+  font-variant-numeric: tabular-nums;
 }
 
 .named {
@@ -214,12 +273,11 @@ export default defineComponent({
   border-radius: var(--radius-pill);
 }
 
+/* The whole name, on as many lines as it takes (Е-19): cut, «Аренда и комм…» read as another. */
 .sector-name {
-  overflow: hidden;
   font-size: var(--text-callout);
   font-weight: var(--weight-medium);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .sector-share {
@@ -242,7 +300,15 @@ export default defineComponent({
 }
 
 .why {
+  display: grid;
   flex: 1;
+  gap: var(--space-1);
   min-width: 0;
+}
+
+.why-title {
+  color: var(--text);
+  font-size: var(--text-callout);
+  font-weight: var(--weight-medium);
 }
 </style>

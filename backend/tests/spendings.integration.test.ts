@@ -4,7 +4,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import {
   ERROR,
+  lastDayOf,
   latestDay,
+  previousMonth,
   SPENDING_PRESETS,
   journalCursorCodec,
   moneyMonthCodec,
@@ -436,6 +438,36 @@ describe('месяц «Денег» (MOL-73)', () => {
     expect(september).toMatchObject({ count: 1, incomeCount: 1 })
     expect(september.previousSpent).toEqual({ minor: 100000n, currency: 'AMD' })
     expect(september).toMatchObject({ rest: null, accountsFrom: null })
+  })
+
+  it('идущий месяц — к тому же дню прошлого, закрытый — без него (MOL-183, С-12)', async () => {
+    const me = await owner()
+    const current = today.slice(0, 7)
+    const before = previousMonth(current)
+    const day = Number(today.slice(8, 10))
+    const length = Number(lastDayOf(before).slice(8, 10))
+    // The same day of the month before is in, the day after it is out; a shorter month — whole.
+    const inside = `${before}-${String(Math.min(day, length)).padStart(2, '0')}`
+    await spend(me, { spentOn: inside, amount: { amount: '1000', currency: 'AMD' } })
+    if (day < length) {
+      const after = `${before}-${String(day + 1).padStart(2, '0')}`
+      await spend(me, { spentOn: after, amount: { amount: '7000', currency: 'AMD' } })
+    }
+    await spend(me, { spentOn: today, amount: { amount: '300', currency: 'AMD' } })
+    expect((await month(me, current)).previousToDay).toEqual({
+      day,
+      spent: { minor: 100000n, currency: 'AMD' },
+    })
+    expect((await month(me, before)).previousToDay).toBeNull()
+  })
+
+  it('идущий месяц без прошлого — день есть, суммы нет (MOL-183)', async () => {
+    const me = await owner()
+    await spend(me, { spentOn: today, amount: { amount: '300', currency: 'AMD' } })
+    expect((await month(me, today.slice(0, 7))).previousToDay).toEqual({
+      day: Number(today.slice(8, 10)),
+      spent: null,
+    })
   })
 
   it('чужие траты не видны; месяц, который не месяц, — 404', async () => {

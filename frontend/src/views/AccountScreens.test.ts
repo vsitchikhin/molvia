@@ -104,6 +104,7 @@ function page(accounts: MoneyAccountView[], countedAt = new Date()): MoneyAccoun
     spendCurrency: 'AMD',
     accounts,
     totals: { total: amd('0'), spendable: amd('0'), savings: amd('0'), uncounted: 0 },
+    incomeTotals: null,
     unassigned: 0,
     countedAt,
   }

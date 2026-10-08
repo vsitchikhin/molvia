@@ -496,7 +496,9 @@ function yerevanDay(days = 0): string {
   )
 }
 
-test('«Остаток» is the money on the accounts: a spending from one moves it (MOL-134)', async ({
+// «На счетах сейчас» (MOL-183, Ф-27): the money on the accounts now, in the income currency, over the
+// switcher — the same balances «Счета» add up, and «now», not the month's.
+test('«На счетах сейчас» is the money on the accounts: a spending from one moves it (MOL-134, MOL-183)', async ({
   page,
 }) => {
   await signedIn(page)
@@ -524,12 +526,58 @@ test('«Остаток» is the money on the accounts: a spending from one moves
     categoryId: categories.categories[0]?.id,
     accountId: account,
   })
-  // A newcomer's «Деньги» is an introduction with no month card: the rest is looked at once there
-  // is money to count (the tile with no account is a component test's).
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
-  const tile = page.locator('.tile.rest')
-  await expect(tile).toContainText(/≈\s*900\s*₽/)
-  await expect(tile).not.toContainText('курс')
+  const now = page.getByRole('link', { name: /^Счета: на счетах сейчас ≈\s*900\s*₽/ })
+  await expect(now).toBeVisible()
+  await expect(now).not.toContainText('курс')
+  const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
+  // Over the switcher, and one way to the accounts: no row «Счета» among the ways out (С-10).
+  const [card, switcher] = await Promise.all([now.boundingBox(), previous.boundingBox()])
+  expect((card?.y ?? 0) + (card?.height ?? 0)).toBeLessThan(switcher?.y ?? 0)
+  await expect(page.getByRole('navigation').getByRole('link', { name: /^Счета/ })).toHaveCount(0)
+
+  // «Now», not the month's: the month before shows it the same, and stays where it was.
+  await previous.click()
+  await expect(page).toHaveURL(/month=/)
+  await expect(now).toBeVisible()
+  await now.click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Счета')
+})
+
+// «Куда ушли» of a month with nothing spent (MOL-183, С-13): the same card of the same height, so the
+// first spending moves nothing under it — the dashed ring, «0 ֏» and the month's words.
+test('a month with nothing spent keeps «Куда ушли» as tall as with a spending', async ({
+  page,
+}) => {
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  const categories = (await (
+    await page.request.get('/api/spending-categories', { headers })
+  ).json()) as { categories: { id: string }[] }
+  // Last month spent in: this one is a month, not a newcomer's introduction.
+  const last = await page.request.post('/api/spendings', {
+    headers,
+    data: {
+      id: randomUUID(),
+      spentOn: lastMonthDay(),
+      amount: { amount: '2500', currency: 'AMD' },
+      categoryId: categories.categories[0]?.id,
+    },
+  })
+  expect(last.status(), await last.text()).toBe(201)
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  const card = page.locator('.donut')
+  await expect(card).toContainText(/трат пока нет/)
+  await expect(card.locator('circle.none')).toHaveCount(1)
+  await expect(card).toContainText(/0\s*֏/)
+  const empty = await card.boundingBox()
+
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  await writeSpending(page, '1500', 'Кафе и рестораны')
+  await expect(card.locator('.sector')).toHaveCount(1)
+  await expect(card.locator('circle.none')).toHaveCount(0)
+  const spent = await card.boundingBox()
+  expect(Math.round(spent?.height ?? 0)).toBe(Math.round(empty?.height ?? 0))
 })
 
 test('«зарплата — в следующий месяц»: the salary counts next month, and «Пришло» says so (MOL-134)', async ({

@@ -139,11 +139,9 @@ export default defineComponent({
         }
       }),
     )
-    /** A month with nothing counted is a grey ring, still a ring (handoff 03, «0 ֏»). */
+    /** A month with nothing counted is still a ring, the dashed one of «no data» (MOL-183, С-13). */
     const sectors = computed<RingSector[]>(() =>
-      rows.value.length > 0
-        ? rows.value.map(({ key, colour, level }) => ({ key, colour, level }))
-        : [{ key: 'empty', colour: 'var(--surface-2)', level: CHART_LEVEL }],
+      rows.value.map(({ key, colour, level }) => ({ key, colour, level })),
     )
     const chosenRow = computed(() => rows.value.find((row) => row.key === props.modelValue))
 

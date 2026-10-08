@@ -74,6 +74,7 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     rate: null,
     rateKind: 'live',
     previousSpent: null,
+    previousToDay: null,
     byCategory: [],
     slices: [],
     categories: [beauty],

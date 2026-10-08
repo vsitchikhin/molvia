@@ -283,7 +283,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   back, and let go whole by a change of the rule.
 - **«Остаток» is the money on the accounts on the evening of the month's last day** (MOL-134), in
   the income currency, everything and without the savings — never «пришло − потрачено», and never
-  frozen. **«Пришло» may take a salary from a chosen day into the next month** (the owner's 25th),
+  frozen; the phone shows it for a closed month only (MOL-183, В-18). **The running month is compared
+  to the same day of the one before** (`previousToDay`, by `comparedDay` — the rule «Графики» compare
+  by), a closed one whole. **«Пришло» may take a salary from a chosen day into the next month** (the owner's 25th),
   by the person's own setting, `actors.salary_shift_day`, kept beside the settings and never in the
   form of MOL-65.
 - **Removal is a mark, «Вернуть», final after ten minutes by the minute timer.**
@@ -312,6 +314,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 
 ### Money: accounts — `.claude/rules/money-accounts.md`
 
+- **«На счетах сейчас» is «Счета»'s own totals in the income currency** (`incomeTotals`, MOL-183,
+  В-19): the same balances, never a second count, «now» and not the month's.
 - **There is no rate on an account, ever**; the balance is counted, never stored: the start and
   every operation dated after its day — and, for an account made on its own start day, every
   operation of that day the server got after it (MOL-250). A trip is dated by the day it started.

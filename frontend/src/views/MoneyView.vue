@@ -4,156 +4,132 @@
 
     <div class="content">
       <template v-if="phase !== 'idle'">
-        <MonthSwitcher :month="selected" :current="currentMonth" @change="goMonth" />
+        <!-- «Now», not the month's (MOL-183, Ф-27): over the switcher, where turning the months does
+             not move it; drawn once «Счета» have answered or the phone keeps them, never animated in —
+             a height grown there takes the switcher from under the thumb (MOL-138). -->
+        <MoneyAccountsNow
+          v-if="accountsNow"
+          :totals="accountsNow.totals"
+          :live="accountsNow.live"
+          :as-of="accountsNow.asOf"
+        />
 
-        <!-- Under the switcher, not over it as handoff 04 and MOL-157's 1e drew them: they belong to
-             the month's answer and come and go with it, and over the switcher they took it from
-             under the thumb (MOL-138, owner's decision В-2). A refusal of the queue too: it is a
-             card here only while no row of the month carries it (adversarial round 3, Ж). -->
-        <p v-if="phase === 'ready' && !online && fetchedAt" class="strip">
-          <IconCloudOff class="strip-icon" aria-hidden="true" />
-          {{ t('spending.summary.offline_strip', { when: whenOf(fetchedAt) }) }}
-        </p>
-        <p v-else-if="phase === 'ready' && stale === 'error' && fetchedAt" class="strip">
-          {{ t('spending.error_strip', { when: whenOf(fetchedAt) }) }}
-        </p>
-        <AppReveal group>
-          <ScreenState
-            v-for="item in otherRefusals"
-            :key="item.key"
-            kind="attention"
-            inline
-            :title="t('spending.rejected_other.title')"
-            :body="reasonOf(item.code)"
+        <div class="month">
+          <MonthSwitcher :month="selected" :current="currentMonth" @change="goMonth" />
+
+          <!-- Under the switcher, not over it as handoff 04 and MOL-157's 1e drew them: they belong to
+               the month's answer and come and go with it, and over the switcher they took it from
+               under the thumb (MOL-138, owner's decision В-2). A refusal of the queue too: it is a
+               card here only while no row of the month carries it (adversarial round 3, Ж). -->
+          <StatusStrip
+            v-if="phase === 'ready' && !online && fetchedAt"
+            kind="offline"
+            :text="t('spending.summary.offline_strip', { when: whenOf(fetchedAt) })"
+          />
+          <StatusStrip
+            v-else-if="phase === 'ready' && stale === 'error' && fetchedAt"
+            kind="unanswered"
+            :text="t('spending.error_strip', { when: whenOf(fetchedAt) })"
+            :attempt="attempt"
           >
+            <!-- The strip holds «Добавить трату», so «Повторить» is here (К-5, MOL-181). -->
             <template #action>
-              <AppButton variant="ghost" @click="queue.dismiss(item)">
-                {{ t('spending.sheet.dismiss') }}
-              </AppButton>
+              <AppButton variant="ghost" @click="retryAll">{{ t('state.retry') }}</AppButton>
             </template>
-          </ScreenState>
-        </AppReveal>
-        <!-- A spending the server refused, of any month, is a row of «Не приняты» on top of «Траты»,
-             put right there; the summary has no rows, so it counts them and leads there (MOL-159). -->
-        <AppReveal>
+          </StatusStrip>
+          <AppReveal group>
+            <ScreenState
+              v-for="item in otherRefusals"
+              :key="item.key"
+              kind="attention"
+              inline
+              :title="t('spending.rejected_other.title')"
+              :body="reasonOf(item.code)"
+            >
+              <template #action>
+                <AppButton variant="ghost" @click="queue.dismiss(item)">
+                  {{ t('spending.sheet.dismiss') }}
+                </AppButton>
+              </template>
+            </ScreenState>
+          </AppReveal>
+          <!-- A spending the server refused, of any month, is a row of «Не приняты» on top of
+               «Траты», put right there; the summary has no rows, so it counts them and leads there
+               (MOL-159). -->
+          <AppReveal>
+            <ScreenState
+              v-if="refusals.length > 0"
+              kind="attention"
+              inline
+              :title="t('spending.summary.refused', { n: refusals.length }, refusals.length)"
+              :body="t('spending.summary.refused_body')"
+            >
+              <template #action>
+                <AppButton variant="ghost" @click="openSpendings">
+                  {{ t('spending.summary.refused_open') }}
+                </AppButton>
+              </template>
+            </ScreenState>
+          </AppReveal>
+
+          <!-- The answer's shape (MOL-178, MOL-183): the month's card — its figure where the
+               answer's stands, its tiles where the plate is — then «Куда ушли». -->
+          <ScreenSkeleton v-if="phase === 'loading'">
+            <SkeletonPart kind="figure" :approx="twoCurrencies" plate />
+            <!-- «Куда ушли» is the screen's own: a ring and three lines beside it. -->
+            <AppCard class="ghost-donut">
+              <span class="ghost-heading"><span class="ghost-bar ghost-caption"></span></span>
+              <span class="ghost-figure">
+                <span class="ghost-ring"></span>
+                <span class="ghost-lines">
+                  <span v-for="n in 3" :key="n" class="ghost-bar ghost-line"></span>
+                </span>
+              </span>
+            </AppCard>
+          </ScreenSkeleton>
+
+          <!-- A section's error, not the screen's: «Добавить трату» keeps the strip, since a
+               spending goes through the queue with the server down (157 v2, 1k/2e; MOL-180, В-1). -->
           <ScreenState
-            v-if="refusals.length > 0"
-            kind="attention"
+            v-else-if="phase === 'error'"
+            kind="error"
             inline
-            :title="t('spending.summary.refused', { n: refusals.length }, refusals.length)"
-            :body="t('spending.summary.refused_body')"
-          >
-            <template #action>
-              <AppButton variant="ghost" @click="openSpendings">
-                {{ t('spending.summary.refused_open') }}
-              </AppButton>
-            </template>
-          </ScreenState>
-        </AppReveal>
+            :title="t('spending.load_error.title')"
+            :body="t('spending.load_error.body')"
+            @retry="retryAll"
+          />
 
-        <ScreenSkeleton v-if="phase === 'loading'" :groups="[24, 58, 40, 100, 30, 70, 52]" />
+          <!-- «Можно записать и сейчас» only where the strip offers it (Е-7). -->
+          <ScreenState
+            v-else-if="phase === 'offline'"
+            kind="offline"
+            tone="warn"
+            :title="t('spending.offline.title')"
+            :body="t(canWrite ? 'spending.offline.body' : 'spending.offline.body_read')"
+          />
 
-        <!-- A section's error, not the screen's: «Добавить трату» keeps the strip, since a spending
-             goes through the queue with the server down (157 v2, 1k/2e; MOL-180, В-1). -->
-        <ScreenState
-          v-else-if="phase === 'error'"
-          kind="error"
-          inline
-          :title="t('spending.load_error.title')"
-          :body="t('spending.load_error.body')"
-          @retry="retry"
+          <ScreenState
+            v-else-if="newcomer"
+            kind="empty"
+            :icon="IconWallet"
+            :title="t('spending.empty.title')"
+            :body="t('spending.empty.body')"
+          />
+
+          <template v-else-if="month">
+            <MoneyMonthCard :month="month" :current="currentMonth" :unsent="unsent" />
+          </template>
+        </div>
+
+        <!-- An empty month keeps the card too: the way into «Графики» is there, the year is (Г). -->
+        <CategoryDonutCard
+          v-if="phase === 'ready' && month && !newcomer"
+          :month="month"
+          :name-of="nameOf"
+          :pending="unsent"
+          :refused="refusedHere"
+          :running="month.month === currentMonth"
         />
-
-        <!-- «Добавить трату» is the strip under the thumb in every state (handoff MOL-157 01). -->
-        <ScreenState
-          v-else-if="phase === 'offline'"
-          kind="offline"
-          tone="warn"
-          :title="t('spending.offline.title')"
-          :body="t('spending.offline.body')"
-        />
-
-        <ScreenState
-          v-else-if="newcomer"
-          kind="empty"
-          :icon="IconWallet"
-          :title="t('spending.empty.title')"
-          :body="t('spending.empty.body')"
-        />
-
-        <template v-else-if="month">
-          <AppCard class="spent">
-            <p class="spent-head">
-              <SectionCaption as="span" inset>{{ t('spending.spent') }}</SectionCaption>
-              <span v-if="change" class="change">{{ change }}</span>
-            </p>
-            <p class="figure">{{ whole(month.spent) }}</p>
-            <p v-if="month.spentIncome" class="approx">≈ {{ whole(month.spentIncome) }}</p>
-            <p v-for="line in foreign" :key="line" class="footnote">{{ line }}</p>
-            <p v-if="month.uncounted.length > 0" class="footnote">
-              {{ t('spending.uncounted', { amounts: list(month.uncounted) }) }}
-            </p>
-            <p v-if="unsent > 0" class="footnote unsent">
-              {{ t('spending.unsent', { n: unsent }, unsent) }}
-            </p>
-
-            <!-- Figures, not ways: «Доходы» and «Счета» are rows below — one way, one button
-                 (handoff MOL-157 01). -->
-            <div class="tiles">
-              <div class="tile">
-                <span class="tile-label">{{ t('spending.income') }}</span>
-                <span class="tile-figure">{{ whole(month.income) }}</span>
-                <span v-if="month.incomeUncounted.length > 0" class="tile-note">
-                  {{ t('spending.income_uncounted', { amounts: list(month.incomeUncounted) }) }}
-                </span>
-                <!-- Where a salary went, both ways (MOL-134, Н-2): the switch of months does not
-                     go past the running one, and a salary of the 26th would just be missing. -->
-                <span v-if="month.shiftedIn.length > 0" class="tile-note">
-                  {{ t('spending.income_shifted_in', { days: days(month.shiftedIn) }) }}
-                </span>
-                <span v-if="month.shiftedOut.length > 0" class="tile-note">
-                  {{ t('spending.income_shifted_out', { days: days(month.shiftedOut) }) }}
-                </span>
-              </div>
-              <!-- «Остаток» (MOL-134): the accounts at the end of the month, each figure with what
-                   it misses; «—» says why from the answer, never a rate that is not the reason. A
-                   closed month names its day: «На счетах 31 авг.». -->
-              <div class="tile rest">
-                <span class="tile-label">{{ restLabel }}</span>
-                <template v-if="month.rest">
-                  <span class="tile-figure" :class="{ negative: month.rest.total.minor < 0n }">
-                    ≈ {{ signed(month.rest.total) }}
-                  </span>
-                  <span v-for="line in restNotes.total" :key="line" class="tile-note">
-                    {{ line }}
-                  </span>
-                  <template v-if="restNotes.spendable">
-                    <span class="tile-sub" :class="{ negative: month.rest.spendable.minor < 0n }">
-                      {{ t('spending.rest_spendable', { amount: signed(month.rest.spendable) }) }}
-                    </span>
-                    <span v-for="line in restNotes.spendable" :key="line" class="tile-note">
-                      {{ line }}
-                    </span>
-                  </template>
-                </template>
-                <template v-else>
-                  <span class="tile-figure">—</span>
-                  <span v-if="month.accountsFrom" class="tile-note">
-                    {{ t('spending.rest_from', { day: shortDay(month.accountsFrom) }) }}
-                  </span>
-                  <RouterLink v-else class="tile-link" :to="{ name: 'money-accounts' }">
-                    {{ t(month.accountsRemoved ? 'spending.rest_removed' : 'spending.rest_add') }}
-                  </RouterLink>
-                </template>
-              </div>
-            </div>
-
-            <p class="footnote rate">{{ rateLine }}</p>
-          </AppCard>
-
-          <!-- An empty month keeps the card too: the way into «Графики» is there, the year is (Г). -->
-          <CategoryDonutCard :month="month" :name-of="nameOf" :unsent="unsent + refusedHere" />
-        </template>
 
         <!-- The ways out of the month, each with one figure: they stand by the error and under the
              skeleton too — a month that will not load must not close the way to the income that
@@ -164,6 +140,7 @@
           :month="selected === currentMonth ? null : selected"
           :values="entries"
           :spendings="!newcomer"
+          :accounts="!accountsNow"
         />
       </template>
     </div>
@@ -220,43 +197,44 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, watch } from 'vue'
+import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconPlus from '~icons/mdi/plus'
 import IconWallet from '~icons/mdi/wallet-outline'
-import { formatEstimate, formatRate, lastDayOf, percentChange, previousMonth } from '@molvia/model'
-import type { Money, MoneyMonthView } from '@molvia/model'
+import { formatRate } from '@molvia/model'
+import type { MoneyMonthView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import CategoryDonutCard from '@/components/CategoryDonutCard.vue'
+import MoneyAccountsNow from '@/components/MoneyAccountsNow.vue'
 import MoneyEntries from '@/components/MoneyEntries.vue'
 import type { EntryValues } from '@/components/MoneyEntries.vue'
+import MoneyMonthCard from '@/components/MoneyMonthCard.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import NewCategorySheet from '@/components/NewCategorySheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
-import SectionCaption from '@/components/SectionCaption.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import SpendingSheet from '@/components/SpendingSheet.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
-import { pageOrder } from '@/components/accounts'
-import { bankWords, budgetAmount, rateWords } from '@/components/spending'
+import { countedWhen, pageOrder } from '@/components/accounts'
+import { budgetAmount } from '@/components/spending'
 import { useMoneyScreen } from '@/composables/useMoneyScreen'
 import { useReconnect } from '@/composables/useReconnect'
-import { calendarDay } from '@/days'
 import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 import { useSpendingHandoffStore } from '@/stores/spendingHandoff'
 
 /**
- * «Деньги» (MOL-82, MOL-159, handoff MOL-157 01): the summary of one month, counted by the server —
- * what was spent and how it compares, what came in, what is on the accounts, where it went — and
- * the ways into everything else, each with one figure. The journal is «Траты»'s; the phone adds
- * nothing up. The month is in the address and moves by `replace`: looking at August is not a step
- * the system «back» should walk through.
+ * «Деньги» (MOL-82, MOL-159, MOL-183, handoff MOL-157 v2 01): what is on the accounts now, then the
+ * summary of one month, counted by the server — what was spent and how it compares, what came in,
+ * where it went — and the ways into everything else, each with one figure. The journal is «Траты»'s;
+ * the phone adds nothing up. The month is in the address and moves by `replace`: looking at August
+ * is not a step the system «back» should walk through.
  */
 export default defineComponent({
   name: 'MoneyView',
@@ -266,15 +244,17 @@ export default defineComponent({
     AppReveal,
     AppScreen,
     CategoryDonutCard,
-    IconCloudOff,
     IconPlus,
+    MoneyAccountsNow,
     MoneyEntries,
+    MoneyMonthCard,
     MonthSwitcher,
     NewCategorySheet,
     ScreenSkeleton,
     ScreenState,
-    SectionCaption,
+    SkeletonPart,
     SpendingSheet,
+    StatusStrip,
     TripUndoStrip,
     UndoStrip,
   },
@@ -285,11 +265,57 @@ export default defineComponent({
     // «Добавить трату», where the focus goes once «Вернуть» has done its work.
     const { addButton } = screen
 
-    // The number of accounts beside «Счета»: «now», not the month's, whatever month is open.
+    // «На счетах сейчас»: «now», not the month's, whatever month is open.
     const accounts = useAccountsStore()
     useAccountsOnScreen()
     onMounted(() => void accounts.refresh())
     useReconnect(() => void accounts.refresh())
+
+    /**
+     * «На счетах сейчас» (MOL-183, С-10): there while a live account is — answered or kept on the
+     * phone. With none, or no answer of «Счета» at all, «Счета» is a row among the ways out instead.
+     */
+    const accountsNow = computed(() => {
+      const overview = accounts.overview
+      const totals = overview?.incomeTotals
+      const live = overview ? pageOrder(accounts.accounts).length : 0
+      if (!overview || !totals || live === 0) return null
+      // Not «now» once the last read of «Счета» failed — offline, or the server did not answer —
+      // whether or not they answered earlier in this session: it names its hour, as «Счета» do
+      // (adversarial А3, Б1). Kept while a read is on its way is «now» yet.
+      return {
+        totals,
+        live,
+        asOf: accounts.failed ? countedWhen(overview.countedAt, locale.value) : null,
+      }
+    })
+
+    /**
+     * «≈ 63 800 ₽» under the figure is there only where the two currencies differ: the skeleton draws
+     * its line by the person's currencies, as «Счета» last said them (adversarial А5) — with nothing
+     * known, by the usual case, two (Б3). Taken as the skeleton comes and held while it stands: «Счета»
+     * answering meanwhile must not grow or shrink it under the switcher (Б3). The price, named in
+     * `frontend.md` (В1): a person of one currency with nothing kept gets the line once, and the page
+     * shrinks by it as the month comes.
+     */
+    const currencies = () => {
+      const overview = accounts.overview
+      if (!overview?.incomeTotals) return true
+      return overview.incomeTotals.currency !== overview.spendCurrency
+    }
+    const twoCurrencies = ref(currencies())
+    watch(
+      () => screen.phase.value,
+      (phase) => {
+        if (phase === 'loading') twoCurrencies.value = currencies()
+      },
+    )
+
+    /** «Повторить» asks «Счета» again too: the server that broke the month broke them as well (А2). */
+    function retryAll(): Promise<void> {
+      void accounts.refresh()
+      return screen.retry()
+    }
 
     /**
      * «Пусто» is somebody with nothing yet — no spending, no trip, no income (Р-6). The server
@@ -321,12 +347,10 @@ export default defineComponent({
     /** One figure a row, and none until it is known (handoff MOL-157 01). */
     const entries = computed<EntryValues>(() => {
       const value = month.value
-      const live = accounts.overview ? pageOrder(accounts.accounts).length : null
       const rate = screen.liveRate.value
       return {
         spendings: value?.count == null ? null : number(value.count),
         budget: budgetWords(value?.budget ?? null),
-        accounts: live === null ? null : number(live),
         rate: rate?.source === 'personal' ? formatRate(rate, locale.value) : null,
         incomes: value?.incomeCount == null ? null : number(value.incomeCount),
         categories:
@@ -346,90 +370,6 @@ export default defineComponent({
         ? t('budget.entry.over', { amount })
         : t('budget.entry.left', { amount })
     }
-
-    const whole = (value: Money) => formatEstimate(value, locale.value)
-    const signed = (value: Money) =>
-      value.minor < 0n
-        ? `−${formatEstimate({ ...value, minor: -value.minor }, locale.value)}`
-        : formatEstimate(value, locale.value)
-    const list = (values: readonly Money[]) => values.map(whole).join(', ')
-    const shortDay = (day: string) =>
-      calendarDay(day, locale.value, { day: 'numeric', month: 'short' })
-    const days = (values: readonly string[]) => values.map(shortDay).join(', ')
-
-    /** «Остаток на счетах», and of a closed month the day it is of: «На счетах 31 авг.». */
-    const restLabel = computed(() => {
-      const value = month.value
-      return value && value.month < currentMonth.value
-        ? t('spending.rest_on', { date: shortDay(lastDayOf(value.month)) })
-        : t('spending.rest')
-    })
-
-    // What each figure of «Остаток» misses, in the server's words (MOL-134, adversarial А, Б, З):
-    // «без сбережений» is drawn only where it says something «всего» does not.
-    const restNotes = computed(() => {
-      const rest = month.value?.rest
-      if (!rest) return { total: [], spendable: null }
-      const notes = (
-        accounts: readonly { name: string; balance: Money }[],
-        operations: number,
-      ): string[] => [
-        ...(accounts.length > 0
-          ? [
-              t('spending.rest_uncounted', {
-                accounts: accounts.map((one) => `${one.name} ${signed(one.balance)}`).join(', '),
-              }),
-            ]
-          : []),
-        ...(operations > 0 ? [t('spending.rest_operations', { n: operations }, operations)] : []),
-      ]
-      const total = notes(rest.uncounted.total, rest.operationsUncounted.total)
-      const spendable = notes(rest.uncounted.spendable, rest.operationsUncounted.spendable)
-      const same = rest.spendable.minor === rest.total.minor && spendable.join() === total.join()
-      return { total, spendable: same ? null : spendable }
-    })
-
-    const change = computed(() => {
-      const value = month.value
-      if (!value?.previousSpent) return null
-      const percent = percentChange(value.spent, value.previousSpent)
-      if (percent === null) return null
-      const text = new Intl.NumberFormat(locale.value, { style: 'percent' }).format(
-        Math.abs(percent) / 100,
-      )
-      const sign = percent < 0 ? '−' : percent > 0 ? '+' : ''
-      const previous = previousMonth(value.month).slice(5)
-      return t('spending.vs_previous', {
-        percent: `${sign}${text}`,
-        month: t(`spending.month_to.${previous}`),
-      })
-    })
-
-    const foreign = computed(() =>
-      (month.value?.foreign ?? []).map(({ amount, counted }) =>
-        t('spending.foreign_part', {
-          amount: formatEstimate(amount, locale.value),
-          counted: whole(counted),
-        }),
-      ),
-    )
-
-    const rateLine = computed(() => {
-      const value = month.value
-      if (!value?.rate) return t('spending.rate_none')
-      const rate = rateWords(value.rate, locale.value, t)
-      if (value.rateKind === 'frozen') {
-        const date = calendarDay(lastDayOf(value.month), locale.value)
-        return t('spending.rate_frozen', { date, rate })
-      }
-      if (value.rate.source === 'personal') return t('spending.rate_live_mine', { rate })
-      // A fallback is not the pair's bank, and the month does not say whose it is (MOL-110, review 1):
-      // the bank is named as the one that is silent, never as the source.
-      const bank = bankWords(value.rate.base, value.rate.quote, t)
-      return value.rate.source === 'fallback'
-        ? t('spending.rate_live_fallback', { rate, bank })
-        : t('spending.rate_live_official', { rate, bank })
-    })
 
     /**
      * A record with no purchases handed over from «Покупки» (MOL-78, В-1): the sheet opens on it
@@ -469,19 +409,12 @@ export default defineComponent({
       addButton,
       t,
       IconWallet,
+      accountsNow,
+      twoCurrencies,
+      retryAll,
       newcomer,
       refusedHere,
       entries,
-      whole,
-      signed,
-      list,
-      shortDay,
-      days,
-      restLabel,
-      restNotes,
-      change,
-      foreign,
-      rateLine,
       saved,
       openSpendings,
     }
@@ -490,146 +423,79 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* The field is `AppScreen`'s 16 (С-23): a padding here made it 32. 24 between the groups — the
+   accounts, the month with its strips, «Куда ушли», the ways out — and 8 inside one (Ф-10). */
 .content {
   display: flex;
   flex-direction: column;
   flex: 1;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-6);
 }
 
-.strip {
-  @include appear;
-
+.month {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
   gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--warn-tint);
-  color: var(--warn-ink);
-  font-size: var(--text-footnote);
 }
 
-.strip-icon {
-  @include icon;
-
-  font-size: var(--icon-sm);
-}
-
-.spent {
+/* «Куда ушли» while the month is coming: its card, the ring of 108 and three lines beside it. */
+.ghost-donut {
   display: grid;
-  gap: var(--space-1);
-  padding: var(--space-4);
-}
-
-.spent-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
   gap: var(--space-3);
-  margin: 0;
 }
 
-.change {
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-  font-weight: var(--weight-medium);
-}
-
-.figure {
-  @include display-type;
-
-  margin: 0;
-  font-size: var(--text-figure);
-  font-variant-numeric: tabular-nums;
-}
-
-.approx {
-  margin: 0;
-  font-size: var(--text-headline);
-  font-weight: var(--weight-medium);
-  font-variant-numeric: tabular-nums;
-}
-
-.footnote {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
-.unsent {
-  color: var(--warn-ink);
-}
-
-.rate {
-  margin-top: var(--space-2);
-}
-
-.tiles {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-
-.tile {
-  display: grid;
-  align-content: start;
-  gap: var(--space-1);
-  min-height: 4rem;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius);
-  background: var(--surface-2);
-}
-
-.tile-label {
+.ghost-heading {
   display: flex;
   align-items: center;
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
-.tile-figure {
-  font-size: var(--text-headline);
-  font-weight: var(--weight-bold);
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-
-  &.negative {
-    color: var(--bad-ink);
-  }
-}
-
-.tile-note {
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
-.tile-sub {
+  height: calc(1em * var(--leading-body));
   font-size: var(--text-callout);
-  font-weight: var(--weight-medium);
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-
-  &.negative {
-    color: var(--bad-ink);
-  }
 }
 
-.tile-link {
-  display: inline-flex;
+.ghost-bar {
+  @include skeleton-bar;
+
+  height: var(--skeleton-caption);
+}
+
+.ghost-caption {
+  width: 30%;
+}
+
+.ghost-figure {
+  display: flex;
   align-items: center;
-  min-height: var(--touch-target);
-  color: var(--accent-ink);
-  font-size: var(--text-footnote);
-  font-weight: var(--weight-medium);
+  gap: var(--space-4);
+}
+
+.ghost-ring {
+  @include skeleton-bar;
+
+  flex: none;
+  width: 6.75rem;
+  height: 6.75rem;
+  border-radius: 50%;
+  background: none;
+  box-shadow: inset 0 0 0 1.08rem var(--border-strong);
+}
+
+.ghost-lines {
+  display: grid;
+  flex: 1;
+  gap: var(--space-4);
+}
+
+.ghost-line:nth-child(2) {
+  width: 72%;
+}
+
+.ghost-line:nth-child(3) {
+  width: 54%;
 }
 
 /* The answer comes in where the skeleton stood, faded only: the screen keeps it in one block of its
    own, which `AppScreen` does not see, and nothing under the thumb may move (review №5, MOL-138). */
-.content > * {
+.content > :not(.month),
+.month > * {
   @include appear(0);
 }
 </style>
