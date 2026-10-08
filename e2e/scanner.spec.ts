@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 // DOM for the init script, which runs in the browser.
 import { expect, test } from '@playwright/test'
-import type { Locator, Page } from '@playwright/test'
+import type { Locator, Page, Route } from '@playwright/test'
 import { randomInt } from 'node:crypto'
 import { BARCODE } from './barcode-video'
 import { asBrowser, open } from './session'
@@ -433,7 +433,34 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
    * modal sheet where there was one. Keyboard and screen reader only; the finger does not see it.
    */
   test.describe('the focus through the code’s blocks', () => {
+    // The first attempt's trace in CI (MOL-249): the flake of «an item full of codes» left nothing
+    // behind but «Received: ''», and the API's log had to tell what the screen had done. Started by
+    // hand: `test.use({ trace })` is refused in a describe, and for the whole file it would trace the
+    // camera's reads too. The retry is traced by the config (`on-first-retry`).
+    // A run that traces the first attempt itself — `--trace on`, a config's `retain-on-first-failure`
+    // — has started it already: that trace is the run's to keep, and the block's own is not started
+    // (review Р2-А1: a second start threw in every test of the block).
+    let ownTrace = false
+    test.beforeEach(async ({ context }, info) => {
+      ownTrace = false
+      if (!process.env.CI || info.retry > 0) return
+      try {
+        await context.tracing.start({ snapshots: true, screenshots: false })
+        ownTrace = true
+      } catch (error) {
+        if (!String(error).includes('Tracing has been already started')) throw error
+      }
+    })
+    test.afterEach(async ({ context }, info) => {
+      if (!ownTrace) return
+      if (info.status === info.expectedStatus) return context.tracing.stop()
+      const path = info.outputPath('trace.zip')
+      await context.tracing.stop({ path })
+      await info.attach('trace', { path, contentType: 'application/zip' })
+    })
+
     const LINKS = '**/api/catalogue/items/*/barcodes'
+    const LINK = /\/api\/catalogue\/items\/[^/]+\/barcodes$/
 
     const focused = (page: Page) =>
       page.evaluate(() => ({
@@ -452,19 +479,67 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       return ((await created.json()) as { id: string }).id
     }
 
-    /** A miss, the item's name typed, its row tapped: the question, the focus on «Link and record». */
-    async function asked(page: Page, name: string, code: string): Promise<void> {
-      await open(page, '/purchases/manual/add')
-      await anItem(page, name)
-      await typeCode(page, code)
-      await expect(missingOf(page, code)).toBeVisible()
-      await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(name)
-      await page.getByRole('option', { name: new RegExp(name) }).click()
-      await expect(
-        page.locator('.not-found').getByText(`Link code ${code} to «${name}»?`),
-      ).toBeVisible()
-      await expect.poll(async () => (await focused(page)).text).toBe('Link and record')
+    /**
+     * A miss, the item's name typed, its row tapped: the question, the focus on «Link and record».
+     *
+     * The link's answer is laid before the page opens (MOL-249): laid on the open page right before
+     * Enter, a link once reached the server, and the screen went on to the purchase sheet. Nothing is
+     * linked before the test's own Enter — a link sent earlier is said so here, not as a lost focus:
+     * pressed early, «Link and record» moves the screen on, and the step that fails is the question's or
+     * the focus's, so the check stands in `finally` and its words replace theirs (review С-3).
+     */
+    async function asked(
+      page: Page,
+      name: string,
+      code: string,
+      link?: (route: Route) => Promise<void>,
+    ): Promise<void> {
+      if (link) await page.route(LINKS, link)
+      const linked: string[] = []
+      page.on('request', (request) => {
+        if (request.method() === 'POST' && LINK.test(new URL(request.url()).pathname)) {
+          linked.push(request.url())
+        }
+      })
+      try {
+        await open(page, '/purchases/manual/add')
+        await anItem(page, name)
+        await typeCode(page, code)
+        await expect(missingOf(page, code)).toBeVisible()
+        await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(name)
+        await page.getByRole('option', { name: new RegExp(name) }).click()
+        await expect(
+          page.locator('.not-found').getByText(`Link code ${code} to «${name}»?`),
+        ).toBeVisible()
+        await expect.poll(async () => (await focused(page)).text).toBe('Link and record')
+      } finally {
+        expect(linked, 'nothing is linked before Enter').toEqual([])
+      }
     }
+
+    test('a link sent before the test’s Enter is named by `asked`, never read as a lost focus (MOL-249)', async ({
+      page,
+    }) => {
+      // The second reading of the flake, made on purpose: the first «Link and record» drawn is pressed
+      // at once. The link reaches the server, the purchase sheet opens, and the focus `asked` waits for
+      // never comes — the very `Received: ''` the flake left behind, unless `asked` names the link.
+      await page.addInitScript(() => {
+        let pressed = false
+        new MutationObserver(() => {
+          if (pressed) return
+          for (const button of document.querySelectorAll('button')) {
+            if (button.textContent.trim() !== 'Link and record') continue
+            pressed = true
+            button.click()
+            return
+          }
+        }).observe(document, { subtree: true, childList: true })
+      })
+
+      await expect(asked(page, `Кефир ${tag} ф0`, freshCode())).rejects.toThrow(
+        'nothing is linked before Enter',
+      )
+    })
 
     test('a miss, a shop’s label: the scanner hands the focus back, never to the body', async ({
       page,
@@ -500,9 +575,8 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
     }) => {
       const code = freshCode()
       const name = `Кефир ${tag} ф1`
-      await asked(page, name, code)
       let calls = 0
-      await page.route(LINKS, async (route) => {
+      await asked(page, name, code, async (route) => {
         calls += 1
         if (calls === 1) return route.fulfill({ status: 502, body: 'Bad Gateway' })
         await new Promise((resolve) => setTimeout(resolve, 1500))
@@ -546,8 +620,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
     test('an item full of codes: the focus on «Record … without the code»', async ({ page }) => {
       const code = freshCode()
       const name = `Кефир ${tag} ф3`
-      await asked(page, name, code)
-      await page.route(LINKS, (route) =>
+      await asked(page, name, code, (route) =>
         route.fulfill({
           status: 409,
           contentType: 'application/json',
