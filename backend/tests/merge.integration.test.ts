@@ -602,13 +602,14 @@ describe('the night on the real database (adversarial А1, А6)', () => {
     failed: () => undefined,
   })
 
-  async function twoPairs(): Promise<void> {
+  async function twoPairs(): Promise<{ milk: string; milkPoint: string }> {
     const milk = await made('Молоко 3,2%', 'moloko 3 2', '2026-08-01')
     const milkPoint = await made('Молоко 3.2%', 'moloko 3 2', '2026-08-02')
     const kefir = await made('Кефир 1%', 'kefir 1', '2026-08-01')
     const kefirSpaced = await made('Кефир 1 %', 'kefir 1', '2026-08-02')
     for (const id of [milk, milkPoint]) await vector(id, 1, 0)
     for (const id of [kefir, kefirSpaced]) await vector(id, 0, 1)
+    return { milk, milkPoint }
   }
 
   beforeEach(() => {
@@ -630,15 +631,12 @@ describe('the night on the real database (adversarial А1, А6)', () => {
   })
 
   it('claims a night again an hour after it died, and names what it merged before', async () => {
-    await twoPairs()
-    // The first instance merged one pair and died: its day claimed, never finished.
+    const { milk, milkPoint } = await twoPairs()
+    // The first instance merged one pair — as the night would, the younger into the older — and died:
+    // its day claimed, never finished. By its ids: «Молоко 3,2%» is also `older` (adversarial MOL-252 А2).
     await db.execute(sql`
       insert into catalogue_merge_runs (day, mode, started_at) values ('2026-10-06', 'on', ${at('2026-10-06', '04:30').toISOString()}::timestamptz)`)
-    const [first] = await db.execute<{ a: string; b: string }>(sql`
-      select f.id as a, t.id as b from items f join items t on t.name = 'Молоко 3,2%'
-      where f.name = 'Молоко 3.2%'`)
-    if (!first) throw new Error('no pair')
-    numbered(await merges.mergeItems(first.a, first.b, NIGHT))
+    numbered(await merges.mergeItems(milkPoint, milk, NIGHT))
 
     await mergeTick(deps(), 'on', at('2026-10-06', '05:00'))
     expect(await db.execute(sql`select count(*)::int as n from catalogue_merges`)).toEqual([
