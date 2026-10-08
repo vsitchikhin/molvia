@@ -1042,10 +1042,13 @@ bottom: 0`), a sibling of the panel and as wide as the sheet — never a middle 
   margins of the screen's docked strip (К-9) — 12 over the indicator, **12 over the keys**, where the
   indicator lies under them (`html[data-under-keys] &` — never `:global()`, which in a scoped style
   replaces the whole selector and gave the rule to `html` itself). 24 between the content and the footer.
-  **The edge of what is in sight is the footer's top**: its height (`useHeight`) is
-  `--sheet-footer-height` on the dialog and its `scroll-padding-bottom`, which the browser's own focus
-  goes by — a field reached by Tab stood under the footer without it — and `reveal` reads the same
-  padding, so one value is the edge for both. **WebKit does not always honour it on a focus** (CI,
+  **The edge of what is in sight is the footer's top**: the sheet's `scroll-padding-bottom`, which the
+  browser's own focus goes by — a field reached by Tab stood under the footer without it — and `reveal`
+  reads, so one value is the edge for both. **The footer's height is measured less its bottom padding**
+  (`--sheet-footer-height`, `useHeight`), and the stylesheet adds that padding to the edge itself, with
+  the indicator or, over the keys, without it: the keys take the indicator's 34 off the footer and off
+  the edge in one style change. Measured whole, the edge lagged a render behind the footer, and
+  `reveal` called as the keys came set the field 34 over the footer (review С-8). **WebKit does not always honour it on a focus** (CI,
   Linux: the field stayed 11 px under the footer): a field typed in that is focused under the footer —
   Tab, or «∨» over the iOS keys stepping to the next one — is brought above it two frames later, once
   the browser's own scroll is done, and a field it already showed is not moved; only with a footer —
@@ -1056,7 +1059,11 @@ bottom: 0`), a sibling of the panel and as wide as the sheet — never a middle 
   footer stopped a pixel over the edge — the region is put at the top (`top: 0`). The header is not
   pinned (owner's В-1 «а», against 147): over the keys of an iPhone 13 a sheet has some 334 px, the
   footer takes 76, and a pinned header 76 more of what the fields need. What a footer holds is the
-  sheet's, each with its own spacing; the height stays 82 % (Р-20). `/_kit` «Длинная шторка» and
+  sheet's, each with its own spacing; the height stays 82 % (Р-20). **The price, named** (review С-9):
+  the second actions of a footer are pinned too — the edit of a spending holds «Сохранить» 52 and
+  «Удалить» 44, a footer of 121 over the keys and 155 over the indicator, which leaves some 213 of the
+  334 to the header and the fields; whether a second action stays in the pinned footer is a question of
+  the kit's, not of this rule. `/_kit` «Длинная шторка» and
   `e2e/sheet.spec` hold it on `phone` and `iphone`; the keys are set by hand, as for MOL-135.
 - **Over the iOS keyboard the sheet's height is a share of the visual viewport's own height**
   (`--viewport-height`, MOL-135), never worked out from the window. Measured on the owner's iPhone,
