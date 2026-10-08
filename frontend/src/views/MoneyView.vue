@@ -31,7 +31,12 @@
             kind="unanswered"
             :text="t('spending.error_strip', { when: whenOf(fetchedAt) })"
             :attempt="attempt"
-          />
+          >
+            <!-- The strip holds «Добавить трату», so «Повторить» is here (К-5, MOL-181). -->
+            <template #action>
+              <AppButton variant="ghost" @click="retryAll">{{ t('state.retry') }}</AppButton>
+            </template>
+          </StatusStrip>
           <AppReveal group>
             <ScreenState
               v-for="item in otherRefusals"
@@ -192,7 +197,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, watch } from 'vue'
+import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconPlus from '~icons/mdi/plus'
@@ -275,25 +280,34 @@ export default defineComponent({
       const totals = overview?.incomeTotals
       const live = overview ? pageOrder(accounts.accounts).length : 0
       if (!overview || !totals || live === 0) return null
-      // Not «now» while what is shown is kept from before — offline, or «Счета» did not answer: it
-      // names its hour, as «Счета» do (adversarial А3). Kept while a read is on its way is «now» yet.
-      const stale = accounts.stale === 'offline' || accounts.stale === 'error'
+      // Not «now» once the last read of «Счета» failed — offline, or the server did not answer —
+      // whether or not they answered earlier in this session: it names its hour, as «Счета» do
+      // (adversarial А3, Б1). Kept while a read is on its way is «now» yet.
       return {
         totals,
         live,
-        asOf: stale ? countedWhen(overview.countedAt, locale.value) : null,
+        asOf: accounts.failed ? countedWhen(overview.countedAt, locale.value) : null,
       }
     })
 
     /**
      * «≈ 63 800 ₽» under the figure is there only where the two currencies differ: the skeleton draws
      * its line by the person's currencies, as «Счета» last said them (adversarial А5) — with nothing
-     * kept, by the usual case.
+     * known, by the usual case, two (Б3). Taken as the skeleton comes and held while it stands: «Счета»
+     * answering meanwhile must not grow or shrink it under the switcher (Б3).
      */
-    const twoCurrencies = computed(() => {
+    const currencies = () => {
       const overview = accounts.overview
-      return overview?.incomeTotals?.currency !== overview?.spendCurrency
-    })
+      if (!overview?.incomeTotals) return true
+      return overview.incomeTotals.currency !== overview.spendCurrency
+    }
+    const twoCurrencies = ref(currencies())
+    watch(
+      () => screen.phase.value,
+      (phase) => {
+        if (phase === 'loading') twoCurrencies.value = currencies()
+      },
+    )
 
     /** «Повторить» asks «Счета» again too: the server that broke the month broke them as well (А2). */
     function retryAll(): Promise<void> {

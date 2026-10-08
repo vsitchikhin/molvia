@@ -17,6 +17,7 @@ import type {
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
+import { useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import MoneyView from './MoneyView.vue'
@@ -276,6 +277,21 @@ describe('MoneyView: the four states', () => {
     expect(document.querySelector('dialog[open]')?.textContent).toContain('Beauty and hygiene')
   })
 
+  // Self-review Р3-3: the strip «сервер не ответил» offers «Повторить» — the dock holds «Добавить
+  // трату» (К-5) — and it asks the month and «Счета» again, as the error's does.
+  it('a month kept and the server not answering: the strip offers «Повторить», and it asks again', async () => {
+    moneyMonth.mockResolvedValueOnce(month())
+    ;(await render()).unmount()
+    moneyMonth.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL)).mockResolvedValue(month())
+    const view = await render()
+    expect(view.text()).toContain('The server did not answer')
+    const asked = moneyAccounts.mock.calls.length
+    await view.get('.strip button').trigger('click')
+    await flushPromises()
+    expect(moneyAccounts.mock.calls.length).toBe(asked + 1)
+    expect(view.find('.strip').exists()).toBe(false)
+  })
+
   it('offline with a month kept shows it under a yellow strip', async () => {
     moneyMonth.mockResolvedValueOnce(month())
     const first = await render()
@@ -400,6 +416,22 @@ describe('MoneyView: the month', () => {
       await flushPromises()
       expect(view.text()).toContain('Not counted yet: 1 spending is being sent')
       expect(view.find('.change').exists()).toBe(false)
+    })
+
+    // Adversarial Б2: a closed month says «−100 %» no more than the running one over what waits.
+    it('must not fire: a closed month’s «−100 %» over a spending waiting a rate', async () => {
+      expect(
+        await change(
+          {
+            ...empty(),
+            month: '2026-08',
+            rateKind: 'frozen',
+            previousSpent: amd('20000'),
+            uncounted: [parseMoney('20', 'USD')],
+          },
+          '/money?month=2026-08',
+        ),
+      ).toBeNull()
     })
 
     it('must not fire: an answer kept from before the field says nothing, never «vs August» whole', async () => {
@@ -1107,6 +1139,23 @@ describe('MoneyView: «На счетах сейчас»', () => {
     expect(plain(offline.get('.now').text())).toContain('In accounts as of Sep 24')
   })
 
+  // Adversarial Б1: an answer earlier in the app's life does not make a failed read «now».
+  it('a read that failed after an answer of this session names the hour too', async () => {
+    moneyAccounts.mockResolvedValue(overview({ countedAt: new Date('2026-09-27T05:00:00Z') }))
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    expect(plain(view.get('.now').text())).toContain(en.spending.summary.accounts_now)
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    await useAccountsStore().refresh()
+    await flushPromises()
+    expect(plain(view.get('.now').text())).toContain('In accounts as of')
+    // The next answer is «now» again.
+    moneyAccounts.mockResolvedValue(overview())
+    await useAccountsStore().refresh()
+    await flushPromises()
+    expect(plain(view.get('.now').text())).toContain(en.spending.summary.accounts_now)
+  })
+
   it('must not fire: kept and being read again, it is still «now» — no hour flickers at every opening', async () => {
     moneyAccounts.mockResolvedValue(overview())
     moneyMonth.mockResolvedValue(month())
@@ -1131,8 +1180,13 @@ describe('MoneyView: «На счетах сейчас»', () => {
 
   // Adversarial А5: the skeleton's «≈» line is the two currencies' — one currency has none.
   it('the skeleton draws «≈» under the figure only where the two currencies differ', async () => {
+    // «Счета» kept from an opening before: the skeleton takes their currencies as it comes.
     const lines = async (accounts: MoneyAccountsResponse) => {
+      localStorage.clear()
       moneyAccounts.mockResolvedValue(accounts)
+      // The month failed: only «Счета» are kept, and the month comes under the skeleton.
+      moneyMonth.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+      ;(await render()).unmount()
       moneyMonth.mockReturnValue(new Promise(() => undefined))
       const view = await render()
       return view.find('.sum-card .approx-line').exists()
@@ -1153,6 +1207,30 @@ describe('MoneyView: «На счетах сейчас»', () => {
     ).toBe(false)
     // Nothing known of the accounts: the usual case, two currencies.
     expect(await lines(noAccounts())).toBe(true)
+  })
+
+  // Adversarial Б3: nothing known at all is two currencies, and «Счета» answering while the month
+  // loads does not change the skeleton under the switcher.
+  it('the skeleton with nothing known draws «≈», and keeps its shape as «Счета» answer', async () => {
+    let answer: (value: MoneyAccountsResponse) => void = () => undefined
+    moneyAccounts.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    moneyMonth.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    expect(view.find('.sum-card .approx-line').exists()).toBe(true)
+    answer(
+      overview({
+        incomeTotals: {
+          currency: 'AMD',
+          total: amd('1000'),
+          spendable: amd('1000'),
+          savings: amd('0'),
+          uncounted: 0,
+        },
+      }),
+    )
+    await flushPromises()
+    expect(view.find('.now').exists()).toBe(true)
+    expect(view.find('.sum-card .approx-line').exists()).toBe(true)
   })
 
   it('stands by the month’s error and its skeleton: it has an answer of its own', async () => {

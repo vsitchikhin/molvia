@@ -157,15 +157,15 @@ export default defineComponent({
     const change = computed(() => {
       const value = props.month
       const before = previousMonth(value.month).slice(5)
+      // «−100 %» says nothing was spent; a spending on its way or waiting a rate says it was — the
+      // two things «Куда ушли» stopped saying together (MOL-160), here as well, in any month (А4, Б2).
+      const waits = value.spent.minor === 0n && (props.unsent > 0 || value.uncounted.length > 0)
       if (running.value) {
         // An answer kept from before the comparison to the same day says nothing until it is read.
         const toDay = value.previousToDay
         if (!toDay) return null
         if (toDay.day <= MONTH_STARTED_DAYS) return t('spending.month_started')
-        // «−100 %» says nothing was spent; a spending on its way or waiting a rate says it was — the
-        // two things «Куда ушли» stopped saying together (MOL-160), here as well (adversarial А4).
-        if (value.spent.minor === 0n && (props.unsent > 0 || value.uncounted.length > 0))
-          return null
+        if (waits) return null
         const percent = toDay.spent ? percentChange(value.spent, toDay.spent) : null
         if (percent === null) return null
         return t('spending.vs_same_day', {
@@ -173,7 +173,7 @@ export default defineComponent({
           month: t(`spending.month_of.${before}`),
         })
       }
-      if (!value.previousSpent) return null
+      if (!value.previousSpent || waits) return null
       const percent = percentChange(value.spent, value.previousSpent)
       if (percent === null) return null
       return t('spending.vs_previous', {
