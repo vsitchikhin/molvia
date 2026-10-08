@@ -3,6 +3,7 @@ import {
   ERROR,
   ISSUE,
   RECEIPT_CODES_HEADER,
+  RECEIPT_READ_TOTAL_HEADER,
   TODAY_HEADER,
   VERSION_HEADER,
   ZONE_HEADER,
@@ -2121,8 +2122,8 @@ describe('сбои телефона (MOL-144)', () => {
   })
 })
 
-describe('a receipt’s review asks for its lines’ codes (MOL-234, adversarial А3)', () => {
-  it('names RECEIPT_CODES_HEADER, so the server sends a line’s `code` to this build only', async () => {
+describe('a receipt’s review asks for its lines’ codes and its total as read (MOL-234, MOL-244)', () => {
+  it('names both headers, so the server sends a line’s `code` and `readTotal` to this build only', async () => {
     const seen: Headers[] = []
     const fetch = (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       seen.push(new Headers(init?.headers))
@@ -2139,5 +2140,6 @@ describe('a receipt’s review asks for its lines’ codes (MOL-234, adversarial
       .receipt('cccccccc-0000-4000-8000-000000000001', { shown: true })
       .catch(() => undefined)
     expect(seen.map((headers) => headers.get(RECEIPT_CODES_HEADER))).toEqual(['1', '1'])
+    expect(seen.map((headers) => headers.get(RECEIPT_READ_TOTAL_HEADER))).toEqual(['1', '1'])
   })
 })

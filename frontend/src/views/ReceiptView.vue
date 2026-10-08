@@ -630,18 +630,22 @@ export default defineComponent({
 
     /**
      * Read in part (MOL-222, В-1): the model's own rule, of what the server read — never of the edits —
-     * said with what it read against the printed total, or how many lines added up without one.
+     * said with what it read against the printed total, or how many lines added up without one. A total
+     * read in one place is not shown, and still measures the lines, as «примерно» (MOL-244).
      */
     const partly = computed(() => {
       const one = detail.value
-      if (!one || one.lines.length === 0 || !readPartly(one.lines, one.receipt.total)) return null
-      const total = one.receipt.total
+      if (!one || one.lines.length === 0) return null
+      const total = one.receipt.total ?? one.readTotal ?? null
+      if (!readPartly(one.lines, total)) return null
       const covered = readCovered(one.lines, total)
       if (covered !== null && total !== null) {
-        return t('receipt.review.partly_total', {
-          lines: formatMoney(covered, locale.value),
-          total: formatMoney(total, locale.value),
-        })
+        return t(
+          one.receipt.total === null
+            ? 'receipt.review.partly_read_total'
+            : 'receipt.review.partly_total',
+          { lines: formatMoney(covered, locale.value), total: formatMoney(total, locale.value) },
+        )
       }
       return t('receipt.review.partly_lines', {
         n: one.lines.filter((line) => line.settled).length,
