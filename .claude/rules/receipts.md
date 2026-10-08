@@ -565,6 +565,41 @@ in «Деньги» and an account, never «0 позиций» (Р-6; review 1, 
 are two records** where the fiscal number was not read (Р-8, the price): «ԿՀ» is one and the same on both
 tills of one trader. End-to-end, the fake reader answers a square photo with such a receipt.
 
+## A total two sources vouch for (MOL-244)
+
+**A total is shown only where two sources vouch for it** (owner's В-1 «а», 09.10.2026; MOL-255's «неверно
+прочитанное хуже непрочитанного»): the lines of the reading chosen met it (`balanced`), or two places on the
+paper print it — the total, the payment and, on a receipt with no items, the section's sum — by one function
+for both kinds (`votedTotal`, MOL-227's vote moved out of `departmentReceipt`): the amount read in the most
+places, at least two, and the only one so. **Two readings of one row are one place**: they read one photo, and
+a digit of the tills' font misread is misread in both — every wrong total of the bench was so, «Ընդամենը
+2060.01» for 2050.01 in psm 4 and psm 6 alike (am-08, am-13, am-36). A total that wins the vote wins over the
+reading's own. **A sum with its thousands apart is read whole** — «6 331,07», never 331,07 in two places: the
+card's shelf total and a card payment print so where there is no discount. **A table's total is never
+«balanced»** (Dog City, `tableReceipt`): a blank row takes what the total leaves, so its lines meeting it vouch
+for nothing — its total stands by its payment «Կանխիկ».
+
+| On the bench, 69 readings with a truth  | right  | wrong | none   |
+| --------------------------------------- | ------ | ----- | ------ |
+| before: the reading's own «Ընդամենը»    | 20     | 8     | 41     |
+| the vote, else the reading's own        | 23     | 8     | 38     |
+| **the lines, else the vote, else none** | **21** | **3** | **45** |
+
+Not one line moved (96 of 228). The three wrong left are readings whose lines met the wrong total — a line
+and the total misread alike, which no vote sees. **The price, named:** two right totals are not shown (am-03,
+hand/am-01): «Ереван Сити» prints its payment as the cash handed over, so nothing vouches for its total; the
+person types it, and the measure counts that as a total put right. **The payment is never a total the lines
+are settled against** (В-2 «а»): tried on every reading of the bench it balanced one receipt, already right,
+and a blank line takes «what the total leaves» — 20 000 handed over in cash would have made its sum up.
+
+**What was read in one place is kept for «Прочитали не всё» alone** (`receipts.read_total_minor`,
+`readTotalHundredths`): hidden, the hint fell back to the share of lines that add up and went quiet on three
+receipts read in part (am-13L, hand/am-01, am-36). The server's `partly` and the review measure the lines by
+the total, else by it — «строки дают X из примерно Y». It is never the total shown, the trip's money or a
+line's recorded sum (`shownLines` reads the total). **On the wire only to a phone that asks**
+(`RECEIPT_READ_TOTAL_HEADER`, as `code`'s): an installed app of an earlier build reads the detail strictly.
+A receipt read before keeps none; its total is the one it was shown with. The copy carries it (version 18).
+
 ## A Serbian receipt by its link (MOL-232)
 
 **A Serbian receipt is not read off a photo: it is asked of the tax office** (MOL-223, `.scratch/tasks/research/MOL-223.md`).
