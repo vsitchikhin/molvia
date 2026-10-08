@@ -1,11 +1,13 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, nextTick, ref } from 'vue'
+import { defineComponent, h, nextTick, ref, watch } from 'vue'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import type { Router } from 'vue-router'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import BottomSheet from '@/components/BottomSheet.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
+import { provideAnnouncer, useAnnouncer } from '@/composables/useAnnouncer'
 import { pageAnchor } from '@/composables/useSheetHistory'
 import { routes } from '@/router'
 
@@ -1524,5 +1526,244 @@ describe('pulled down', () => {
     expect(dialog().open).toBe(true)
     expect(dialog().style.transform).toBe('')
     expect(dialog().style.getPropertyValue('--sheet-drag')).toBe('')
+  })
+})
+
+// The app's live region is outside the modal dialog, inert while the sheet is open: words said
+// there by a block inside the sheet were never read (MOL-181, feedback С-10).
+describe('words said inside the sheet', () => {
+  const OFFLINE = 'Без связи · остаток на 14:05'
+
+  // Long enough for words asked now to land (the region's delay is 100 ms).
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 150))
+
+  /**
+   * A screen as screens hold a sheet — mounted always and led by `open` — with the app's region
+   * beside it. `strip` puts the strip in the sheet; `restored` makes a block in the sheet say an
+   * event once, as «Восстановлено» is said; `screen` makes the screen beside the sheet say words.
+   */
+  async function renderSpeaking(options: { open?: boolean; strip?: boolean } = {}) {
+    const router: Router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/')
+    const open = ref(options.open ?? false)
+    const strip = ref(options.strip ?? false)
+    const restored = ref(false)
+    const screen = ref<string | null>(null)
+    const Restored = defineComponent({
+      setup() {
+        useAnnouncer()?.('Восстановлено')
+        return () => h('p', 'Восстановлено')
+      },
+    })
+    const Screen = defineComponent({
+      setup() {
+        const announce = useAnnouncer()
+        watch(screen, (words) => {
+          if (words) announce?.(words)
+        })
+        return () => null
+      },
+    })
+    const host = mount(
+      defineComponent({
+        setup() {
+          const app = provideAnnouncer()
+          return () => [
+            h(
+              'div',
+              { class: 'app-region' },
+              app.value.map((a) => h('p', { key: a.id }, a.text)),
+            ),
+            h(Screen),
+            h(
+              BottomSheet,
+              { open: open.value, 'onUpdate:open': (next: boolean) => (open.value = next) },
+              {
+                title: () => 'Сверка',
+                default: () => [
+                  strip.value
+                    ? h(StatusStrip, { kind: 'offline', text: OFFLINE })
+                    : h('p', 'Остаток'),
+                  restored.value ? h(Restored) : null,
+                ],
+              },
+            ),
+          ]
+        },
+      }),
+      { attachTo: document.body, global: { plugins: [router, createAppI18n('en')] } },
+    )
+    wait(1000)
+    await realTime()
+
+    // Every node added to the sheet's region, with whether the dialog was open as it came.
+    const dialog = host.get('dialog').element as HTMLDialogElement
+    const region = host.get('dialog .region')
+    const added: { text: string; open: boolean }[] = []
+    new MutationObserver((records) => {
+      for (const record of records)
+        for (const node of record.addedNodes)
+          added.push({ text: node.textContent?.trim() ?? '', open: dialog.open })
+    }).observe(region.element, { childList: true })
+
+    async function toggle(up: boolean): Promise<void> {
+      open.value = up
+      await nextTick()
+      if (!up) landed()
+      wait(1000)
+      await realTime()
+    }
+    return { host, region, dialog, added, strip, restored, screen, toggle }
+  }
+
+  it('has a region of its own, a status, empty until something speaks', async () => {
+    const { region } = await renderSpeaking({ open: true })
+    expect(region.attributes('role')).toBe('status')
+    expect(region.text()).toBe('')
+  })
+
+  it('says a block’s words in its own region, not in the app’s, with no role beside it', async () => {
+    const { host, region, strip } = await renderSpeaking({ open: true })
+    strip.value = true
+    await vi.waitFor(() => {
+      expect(region.text()).toBe(OFFLINE)
+    })
+    expect(host.get('.app-region').text()).toBe('')
+    expect(host.get('.strip').attributes('role')).toBeUndefined()
+  })
+
+  // A sheet is mounted closed with its screen: the strip came long before «Сверить». Said into a
+  // shut dialog its words reached no one, and the opening said nothing (review С-6, adversarial А1,
+  // А2). Now they wait, and are said a task after the opening — never a region shown holding words.
+  it('says what a block holds a task after it opens, not into the shut dialog', async () => {
+    const { host, region, added, toggle } = await renderSpeaking({ strip: true })
+    await settle()
+    expect(added).toEqual([])
+    expect(host.get('.app-region').text()).toBe('')
+
+    await toggle(true)
+    expect(region.text()).toBe('')
+    await settle()
+    expect(added).toEqual([{ text: OFFLINE, open: true }])
+  })
+
+  it('says them again each time it opens, and empties its region as it closes', async () => {
+    const { region, added, toggle } = await renderSpeaking({ strip: true })
+    await toggle(true)
+    await settle()
+    await toggle(false)
+    expect(region.text()).toBe('')
+    await toggle(true)
+    expect(region.text()).toBe('')
+    await settle()
+    expect(added.map((a) => a.text)).toEqual([OFFLINE, OFFLINE])
+  })
+
+  it('says nothing of a block gone before the opening', async () => {
+    const { added, strip, toggle } = await renderSpeaking({ strip: true })
+    strip.value = false
+    await nextTick()
+    await toggle(true)
+    await settle()
+    expect(added).toEqual([])
+  })
+
+  // An event — «Восстановлено» — is about a moment, not about what stands: in a shut sheet it is
+  // said nowhere, and the opening does not bring it back.
+  it('says an event of a shut sheet nowhere, then or at the opening', async () => {
+    const { host, added, restored, toggle } = await renderSpeaking()
+    restored.value = true
+    await settle()
+    await toggle(true)
+    await settle()
+    expect(added).toEqual([])
+    expect(host.get('.app-region').text()).toBe('')
+  })
+
+  // A picker over a sheet (MOL-123): the sheet under it is inert too, so the top one takes the words —
+  // and gives them back once it is down. The reason the open sheets are a list (review С-10).
+  it('gives the words of the sheet under it to the sheet over it, and back once that one is down', async () => {
+    const router: Router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/')
+    const under = ref(false)
+    const over = ref(false)
+    const words = ref<string | null>(null)
+    const InUnder = defineComponent({
+      setup() {
+        const announce = useAnnouncer()
+        watch(words, (now) => {
+          if (now) announce?.(now)
+        })
+        return () => h('p', 'Трата')
+      },
+    })
+    const host = mount(
+      defineComponent({
+        setup() {
+          provideAnnouncer()
+          return () => [
+            h(
+              BottomSheet,
+              {
+                open: under.value,
+                class: 'under',
+                'onUpdate:open': (next: boolean) => (under.value = next),
+              },
+              { title: () => 'Трата', default: () => h(InUnder) },
+            ),
+            h(
+              BottomSheet,
+              {
+                open: over.value,
+                back: true,
+                class: 'over',
+                'onUpdate:open': (next: boolean) => (over.value = next),
+              },
+              { title: () => 'Счёт', default: () => h('p', 'Наличные') },
+            ),
+          ]
+        },
+      }),
+      { attachTo: document.body, global: { plugins: [router, createAppI18n('en')] } },
+    )
+    const region = (sheet: string) => host.get(`dialog.${sheet} .region`).text()
+
+    under.value = true
+    await nextTick()
+    wait(1000)
+    await settle()
+    over.value = true
+    await nextTick()
+    wait(1000)
+    await settle()
+    words.value = 'Под выбором счёта'
+    await settle()
+    expect((host.get('dialog.under').element as HTMLDialogElement).open).toBe(true)
+    expect(region('over')).toBe('Под выбором счёта')
+    expect(region('under')).toBe('')
+
+    over.value = false
+    await nextTick()
+    landed()
+    await settle()
+    words.value = 'Снова наверху'
+    await settle()
+    expect(region('under')).toBe('Снова наверху')
+    expect(region('over')).toBe('')
+  })
+
+  // Under a modal sheet everything else is inert: a sheet's wrapper speaking from its own setup,
+  // above its BottomSheet, or the screen under it, is said in the sheet (adversarial А3).
+  it('says words from outside it in its own region while it is up, in the app’s once it is down', async () => {
+    const { host, region, screen, toggle } = await renderSpeaking({ open: true })
+    screen.value = 'За единицу: 800 ֏ за литр'
+    await settle()
+    expect(region.text()).toBe('За единицу: 800 ֏ за литр')
+    expect(host.get('.app-region').text()).toBe('')
+
+    await toggle(false)
+    screen.value = 'Восстановлено'
+    await settle()
+    expect(host.get('.app-region').text()).toBe('Восстановлено')
   })
 })

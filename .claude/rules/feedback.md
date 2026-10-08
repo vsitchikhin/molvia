@@ -296,5 +296,5 @@ against the code in `.scratch/tasks/status/MOL-118/v2-feedback.md` (С-1…С-12
   (review №8, adversarial Н3).
 - **Kept for the kit, not copied here** (С-2): the pinned footer, a filled segment, an inactive
   button without transparency and `StatusStrip` are the kit's tasks (MOL-170); the offline strip is a
-  line of the sheet in the meantime. The header is not pinned and the field has one height (С-3,
+  line of the sheet until the sheet's own task moves it onto `StatusStrip` (MOL-181). The header is not pinned and the field has one height (С-3,
   С-4): over the keyboard the sheet behaves as every other.

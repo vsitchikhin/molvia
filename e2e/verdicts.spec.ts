@@ -1,8 +1,13 @@
 import { actorCodec, settingsOf } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import { asBrowser, signedIn } from './session'
+import { asBrowser, goOffline, signedIn } from './session'
 import type { Page } from '@playwright/test'
+
+// The first attempt's trace in CI, the network and the DOM of each step with it: the flake of «…and the
+// app closed» failed four times there and left only its message, and the retry it passes is all
+// `on-first-retry` records (MOL-217). Here alone: for every spec it made the run 13.2–15.8 minutes.
+if (process.env.CI) test.use({ trace: { mode: 'retain-on-first-failure', screenshots: false } })
 
 interface Person {
   readonly id: string
@@ -164,14 +169,34 @@ test('7: rated without a connection and the app closed — sent when it is opene
   const who = await person(page)
   await bought(who, [`Творог ${tag}`, `Сметана ${tag}`])
 
+  // The card is drawn from `pending` while the question «who are we» may still be on its way, and a
+  // rating tapped then waits for its answer without a request (MOL-217, self-review С-5): cut off by
+  // the offline, that answer would leave nothing to fail, and `lost` would wait for good.
+  const known = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === '/api/actors/me' && response.ok(),
+  )
   await page.goto('/verdicts')
   await expect(question(page)).toContainText('Сметана')
+  // Its body too: the event comes with the headers, and a body cut off by the offline fails the
+  // answer just the same (self-review С-9).
+  await (await known).finished()
 
-  await context.setOffline(true)
+  // Offline with every request of the page refused before the network — `setOffline` alone let a PUT
+  // the page saw fail reach the server in CI (MOL-217) — and closed only once the rating has tried.
+  await goOffline(page)
+  const lost = page.waitForEvent(
+    'requestfailed',
+    (request) => request.method() === 'PUT' && request.url().includes('/api/verdicts/'),
+  )
   await rate(page, 3)
+  await lost
   await expect(page.getByRole('heading', { name: 'The rating is saved' })).toBeVisible()
-  await page.close()
+  // The app leaves before the page closes: `page.close()` takes the route and the offline off a page
+  // whose app still runs, and in CI it heard `online` and sent the draft — a `pending` and the `PUT`
+  // together, some 35 ms after the close, the `PUT` the page had been refused (run 37743449964).
+  await page.goto('about:blank')
   expect(await waiting(who)).toBe(2)
+  await page.close()
 
   // Opened again with the connection back: the app sends at start, the screen shows what is
   // left — and never the card that was rated, whichever answer lands first.
