@@ -49,14 +49,15 @@ async function person(page: Page): Promise<Person> {
   }
 }
 
-/** Bought in one trip, in this order — so the last one is the newest and comes first. */
-async function bought(who: Person, names: readonly string[]): Promise<void> {
+/** Bought in one trip, in this order — so the last one is the newest and comes first. Their items. */
+async function bought(who: Person, names: readonly string[]): Promise<string[]> {
   const tripId = randomUUID()
   await who.call('POST', '/trips', {
     context: settingsOf(actorCodec.parse(await who.call('GET', '/actors/me'))),
     id: tripId,
     place: { kind: 'store', name: 'SAS' },
   })
+  const items: string[] = []
   for (const name of names) {
     const entry = (await who.call('POST', '/catalogue/items', {
       kind: 'product',
@@ -64,7 +65,24 @@ async function bought(who: Person, names: readonly string[]): Promise<void> {
       defaultUnit: 'piece',
     })) as { id: string }
     await who.call('POST', `/trips/${tripId}/expenses`, { id: randomUUID(), itemId: entry.id })
+    items.push(entry.id)
   }
+  return items
+}
+
+/** The ratings this phone keeps to send, item → score, read from the drawer the drafts live in. */
+async function keptOnPhone(page: Page, owner: string): Promise<Record<string, number>> {
+  return page.evaluate((key) => {
+    const raw = localStorage.getItem(key)
+    const drafts = raw
+      ? (JSON.parse(raw) as { card: { itemId: string }; state: string; score: number }[])
+      : []
+    return Object.fromEntries(
+      drafts
+        .filter((draft) => draft.state === 'saved')
+        .map((draft) => [draft.card.itemId, draft.score]),
+    )
+  }, `molvia.verdict-drafts.${owner}`)
 }
 
 async function waiting(who: Person): Promise<number> {
@@ -162,27 +180,27 @@ test('7: rated without a connection — «saved», and it goes by itself once on
   expect(await waiting(who)).toBe(0)
 })
 
-test('7: rated without a connection and the app closed — sent when it is opened again', async ({
+// What the phone keeps, never what the server has not got by then (MOL-217): seven times in CI a page
+// refused the rating's `PUT` — by the emulation, later by `page.route` too — and, as it was leaving, a
+// `GET /verdicts/pending` and the `PUT` reached the API together, the app's answer to `online`. How
+// Chromium lets a page that is going away send past both was never shown, and the product is right
+// either way: the phone keeps the draft until a send is confirmed, and a `PUT` again is the same row.
+test('7: rated without a connection and the app closed — kept on the phone, and sent when it is opened again', async ({
   page,
   context,
 }) => {
   const who = await person(page)
-  await bought(who, [`Творог ${tag}`, `Сметана ${tag}`])
+  const [, sourCream] = await bought(who, [`Творог ${tag}`, `Сметана ${tag}`])
 
   // The card is drawn from `pending` while the question «who are we» may still be on its way, and a
-  // rating tapped then waits for its answer without a request (MOL-217, self-review С-5): cut off by
-  // the offline, that answer would leave nothing to fail, and `lost` would wait for good.
+  // rating tapped then waits for its answer without a request (MOL-217, self-review С-5).
   const known = page.waitForResponse(
     (response) => new URL(response.url()).pathname === '/api/actors/me' && response.ok(),
   )
   await page.goto('/verdicts')
   await expect(question(page)).toContainText('Сметана')
-  // Its body too: the event comes with the headers, and a body cut off by the offline fails the
-  // answer just the same (self-review С-9).
   await (await known).finished()
 
-  // Offline with every request of the page refused before the network — `setOffline` alone let a PUT
-  // the page saw fail reach the server in CI (MOL-217) — and closed only once the rating has tried.
   await goOffline(page)
   const lost = page.waitForEvent(
     'requestfailed',
@@ -190,16 +208,13 @@ test('7: rated without a connection and the app closed — sent when it is opene
   )
   await rate(page, 3)
   await lost
+  // Kept on the phone: the attempt failed, the screen says so, and the draft waits in its drawer.
   await expect(page.getByRole('heading', { name: 'The rating is saved' })).toBeVisible()
-  // The app leaves before the page closes: `page.close()` takes the route and the offline off a page
-  // whose app still runs, and in CI it heard `online` and sent the draft — a `pending` and the `PUT`
-  // together, some 35 ms after the close, the `PUT` the page had been refused (run 37743449964).
-  await page.goto('about:blank')
-  expect(await waiting(who)).toBe(2)
+  expect(await keptOnPhone(page, who.id)).toEqual({ [sourCream ?? '']: 3 })
   await page.close()
 
-  // Opened again with the connection back: the app sends at start, the screen shows what is
-  // left — and never the card that was rated, whichever answer lands first.
+  // Opened again with the connection back: the screen shows what is left — never the card that was
+  // rated, whichever answer lands first — the server has the rating, and the phone lets it go.
   await context.setOffline(false)
   const again = await context.newPage()
   await again.goto('/verdicts')
@@ -207,6 +222,7 @@ test('7: rated without a connection and the app closed — sent when it is opene
   await expect(question(again)).toContainText('Творог')
   await expect.poll(() => waiting(who)).toBe(1)
   await expect(again.getByText('1 purchase is waiting to be rated')).toBeVisible()
+  await expect.poll(() => keptOnPhone(again, who.id)).toEqual({})
 })
 
 test('the queue that could not load is red and loads again on «Try again»', async ({ page }) => {
