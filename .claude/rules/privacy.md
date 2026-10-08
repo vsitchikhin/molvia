@@ -275,7 +275,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   27.09 and 02.10.2026): Tesseract in `services/receipt-reader`, a container with no database, no
   disk and no log, asked over the compose network only — no third party sees a receipt. The photo
   carries a customer's name and goes once the receipt is recorded, a receipt not recorded goes whole
-  after 28 days, a recorded one with its trip and a line with its purchase (MOL-240), an item line cut
+  after 28 days, a recorded one with its trip and a line with its purchase — and the person's word on
+  it in the shops' memory, unless another purchase of theirs says it (MOL-240) — an item line cut
   out for retraining the reader goes 28 days after recording, and
   none of them ever enters the nightly copy (`pg_dump --exclude-table-data`, В-2) — a copy lives
   fourteen days, longer than the promise. The copy of one's data carries receipts and their lines,

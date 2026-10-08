@@ -49,7 +49,7 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 
 - `backend/src/db/receipts-repository.ts` — Repository of receipts: the receipt and its parts named by the phone, the summary and the lines, removal with «Вернуть», the timer's purge (10 minutes, 28 days, a recorded receipt's photo), and the queue — people in turn, claim, release, retry at the end, finish, a reading cut short begun again.
 
-- `backend/src/db/store-memory-repository.ts` — Repository of the shops' shared memory (MOL-126): `recall` — the person's own word, else the item most people said, the later on a tie; `remember` — the person's word on a key, written over their earlier one.
+- `backend/src/db/store-memory-repository.ts` — Repository of the shops' shared memory (MOL-126): `recall` — the person's own word, else the item most people said, the later on a tie; `remember` — the person's word on a key, written over their earlier one; `forgetWordsOf` — the person's words on lines going with their purchases, unless another of theirs says them (MOL-240).
 
 ## backend · tests
 

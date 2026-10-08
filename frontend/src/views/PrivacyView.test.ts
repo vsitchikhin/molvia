@@ -323,6 +323,8 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
     const text = ru.privacy.stored.receipts.text
     expect(text).toMatch(/удалите запись — через 10 минут уйдёт и чек со всеми строками/)
     expect(text).toMatch(/Удалите одну покупку — сразу уйдёт её строка/)
+    // and the person's word on the line in the shop's memory (MOL-240, В-1 on adversarial А1)
+    expect(text).toMatch(/уходит и ваше слово о строке в памяти магазина/)
     expect(text).toMatch(/Строки, которые вы не стали записывать, удаляются при записи/)
     expect(text).not.toMatch(/пока есть аккаунт|исправляем/)
   })
