@@ -39,8 +39,18 @@ beforeEach(async () => {
   await clearAll(db)
   // Counted by gate 0.2 across a merge (Т-6), so they consented to the statistics (MOL-236).
   owner = await insertCounted(db)
-  older = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3 2' })
-  younger = await insertItem(db, { name: 'Малоко 3,2%', searchKey: 'maloko 3 2' })
+  // An hour apart, after every `made` below: two inserts in a row may share a millisecond, and a tie goes
+  // to the lower id (MOL-252).
+  older = await insertItem(db, {
+    name: 'Молоко 3,2%',
+    searchKey: 'moloko 3 2',
+    createdAt: new Date('2026-10-01T10:00:00Z'),
+  })
+  younger = await insertItem(db, {
+    name: 'Малоко 3,2%',
+    searchKey: 'maloko 3 2',
+    createdAt: new Date('2026-10-01T11:00:00Z'),
+  })
 })
 
 afterAll(async () => {
