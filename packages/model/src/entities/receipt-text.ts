@@ -1560,9 +1560,9 @@ function withTwins(read: ReceiptText): ReceiptText {
 }
 
 /**
- * One reading laid out: `read` — its lines judged by its own printed total; `judge` — judged again by the
- * total `bestReading` shows, `null` leaving them as printed (MOL-244). The candidates of a line's figures
- * are found once, so judging again costs the judging alone: the parse's ceilings hold.
+ * One reading laid out: `read` — its lines judged by its own printed total; `judge(null)` — the same lines as
+ * printed, for a total `bestReading` does not show by them (MOL-244). The candidates of a line's figures are
+ * found once, so reading again costs the judging alone: the parse's ceilings hold.
  */
 interface Laid {
   readonly read: ReceiptText
@@ -1878,18 +1878,15 @@ export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptT
       : null
     : (voted ?? (asRead(false) ? own : null))
   if (total === own) return withTwins({ ...best, totalHundredths: total })
-  // The total shown is the lines' one judge (review 4, 7; adversarial В1, Г1). None shown leaves nothing of
-  // itself in them: the reading chosen is read again as printed. Two places shown judge every reading again,
-  // and the one that meets them is chosen — a row OCR lost takes what they leave, as under its own total.
-  if (total === null) {
-    const reread = laid[parsed.indexOf(best)]?.judge(null) ?? best
-    return withTwins({
-      ...reread,
-      totalHundredths: null,
-      readTotalHundredths: own,
-      balanced: false,
-    })
-  }
-  const byVote = laid.map((one) => one.judge(total)).sort(merit)[0] ?? best
-  return withTwins({ ...byVote, totalHundredths: total })
+  // A total the reading did not judge its lines by leaves nothing in them, and judges none (review 4, 7):
+  // the reading chosen is read again as printed. Two places shown are no judge either (В-2 «а»; round 5 Д1:
+  // a vote misread alike in two places made a lost row up to meet itself, and the review's «≠» was gone) —
+  // the lines are «balanced» only where, as printed, they add up to it; a row OCR lost stays empty (Г1).
+  const reread = laid[parsed.indexOf(best)]?.judge(null) ?? best
+  const sums = reread.lines.map((line) => line.sumHundredths)
+  const met =
+    total !== null &&
+    sums.every((sum) => sum !== null) &&
+    sums.reduce((all, sum) => all + sum, 0) === total
+  return withTwins({ ...reread, totalHundredths: total, readTotalHundredths: own, balanced: met })
 }

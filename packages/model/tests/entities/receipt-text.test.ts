@@ -499,8 +499,8 @@ describe('rows of junk by the hundred (review Р18)', () => {
   })
 
   it('cost no second search where the total shown is not the reading’s own (MOL-244)', () => {
-    // two places vouch for 9 000,00 against the reading's 10 000,00: both readings are judged again by
-    // it — their candidates found once, the judging alone repeated
+    // two places vouch for 9 000,00 against the reading's 10 000,00: the reading chosen is read again as
+    // printed — its candidates found once, the judging alone repeated
     const tail = [totalRow(1_000_000), 'Ընդամենը: 9 000,00', 'Վճարված է Առձեռն: 9 000,00']
     const text = `${junk(400)}\n${tail.join('\n')}`
     const started = performance.now()
@@ -1969,17 +1969,35 @@ describe('the total of a receipt with items: the lines that met it, or two place
     expect(got.lines[1]?.sumHundredths).toBeNull()
   })
 
-  it('judges a table by the total two places show, its own row unread by its pattern (adversarial Г1)', () => {
+  it('shows the total two places vouch for and leaves the table’s lines as printed (Г1, the price)', () => {
     const fixture = am04 as Fixture
     // «Ընդամենը` 9450.00», as OCR printed it on hand/am-04: the table's pattern takes «:» alone
     const ticked = fixture.readings.map((text) =>
       text.replace('Ընդամենը: 9450.00', 'Ընդամենը` 9450.00'),
     )
     const got = bestReading(ticked.map((text) => rowsOf(text, 0)))
-    expect(got.totalHundredths).toBe(945_000)
+    // shown, and no judge of the lines (В-2 «а»): the row OCR lost stays empty, the review's «≠» says so
+    expect([got.totalHundredths, got.balanced]).toEqual([945_000, false])
     expect(got.lines.map((line) => line.sumHundredths)).toEqual([
-      220_000, 220_000, 220_000, 135_000, 150_000,
+      220_000,
+      null,
+      220_000,
+      135_000,
+      150_000,
     ])
+  })
+
+  it('lets no vote make a lost row up to meet itself (round 5, Д1)', () => {
+    // the cheese's shelf price lost: no reading of its line; the till's «5» read «6» in both payments
+    // and one total — two places for 2 560,00 over lines that make 2 550,00
+    const cheese = ['3. Պանիր', '0406/1100001 1Հտ 500,00/0,00 777']
+    const paid = 'Վճարված է PosTerminal: 2 560,00'
+    const got = bestReading([
+      alone(...milk, ...bread, ...cheese, 'Ընդամենը 2550.00', paid),
+      alone(...milk, ...bread, ...cheese, 'Ընդամենը 2560.00', paid),
+    ])
+    expect([got.totalHundredths, got.balanced]).toEqual([256_000, false])
+    expect(got.lines.map((line) => line.sumHundredths)).toEqual([15_000, 190_000, 50_000])
   })
 
   it('gives a line with no reading nothing of a total not shown; with one line as read, its rest (А1в)', () => {
