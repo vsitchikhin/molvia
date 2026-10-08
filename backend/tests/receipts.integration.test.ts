@@ -15,6 +15,7 @@ import { createItemRepository } from '@/db/items-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
 import {
+  expenses,
   itemHeadings,
   itemNames,
   receiptDays,
@@ -735,11 +736,22 @@ describe('what lives how long (В-3)', () => {
     expect((await db.select().from(receipts)).map((r) => r.id)).toEqual([young])
   })
 
-  it('keeps a recorded receipt, drops its photo, and its cut-out lines 28 days after they were confirmed', async () => {
+  it('keeps a recorded receipt, drops its photo, its lines that are no purchase, and its cut-out lines 28 days after they were confirmed', async () => {
     const me = await owner()
     const id = await queued(me)
     await readAll(benchReader())
     const tripId = await insertTrip(db, { actorId: me.id, placeId: await insertPlace(db) })
+    // two lines recorded as purchases; the rest left as an image rolled back would leave them
+    // (MOL-240, adversarial А3б): its «Записать» kept the lines not recorded
+    const milk = await insertItem(db)
+    for (const position of [0, 1]) {
+      const expenseId = randomUUID()
+      await db.insert(expenses).values({ id: expenseId, tripId, itemId: milk })
+      await db
+        .update(receiptLines)
+        .set({ expenseId })
+        .where(sql`${receiptLines.receiptId} = ${id} and ${receiptLines.position} = ${position}`)
+    }
     await db
       .update(receipts)
       .set({
@@ -760,7 +772,8 @@ describe('what lives how long (В-3)', () => {
     await repository.purgeStale()
     expect((await db.select().from(receipts)).map((r) => r.id)).toEqual([id])
     expect(await db.select().from(receiptParts)).toEqual([])
-    expect(await db.select().from(receiptLines)).toHaveLength(13)
+    const lines = await db.select().from(receiptLines)
+    expect(lines.map((line) => line.position).sort()).toEqual([0, 1])
     const images = await db.select().from(receiptLineImages)
     expect(images.some((image) => image.position === 0)).toBe(false)
     expect(images.some((image) => image.position === 1)).toBe(true)

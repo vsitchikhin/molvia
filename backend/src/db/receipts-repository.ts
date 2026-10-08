@@ -211,7 +211,7 @@ export interface ReceiptToRecord {
   readonly printedTime: string | null
   readonly total: Money | null
   readonly city: ReceiptCity | null
-  /** The trip it was recorded as, until that trip is removed for good. */
+  /** The trip it was recorded as; `null` — not recorded: a trip removed for good takes it (MOL-240). */
   readonly tripId: string | null
   /** That trip is there and not marked removed. */
   readonly tripAlive: boolean
@@ -368,7 +368,8 @@ export interface ReceiptRepository {
   restore(actorId: string, id: string): Promise<boolean>
   /**
    * The minute timer's (П-8, В-3): a removal final after its ten minutes, a receipt not recorded
-   * 28 days after it arrived, a recorded one's photo, a line cut out 28 days after it was confirmed.
+   * 28 days after it arrived, a recorded one's photo and its lines that are no purchase (MOL-240), a
+   * line cut out 28 days after it was confirmed.
    */
   purgeStale(): Promise<void>
 
@@ -1040,6 +1041,13 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         .delete(receiptParts)
         .where(
           sql`${receiptParts.receiptId} in (select ${receipts.id} from ${receipts} where ${receipts.status} = 'recorded')`,
+        )
+      // nor a line that is no purchase (MOL-240, В-2): recording deletes it, and this holds the promise
+      // over what an image rolled back recorded — 0060 does not run twice (adversarial А3б)
+      await db
+        .delete(receiptLines)
+        .where(
+          sql`${receiptLines.expenseId} is null and ${receiptLines.receiptId} in (select ${receipts.id} from ${receipts} where ${receipts.status} = 'recorded')`,
         )
       await db
         .delete(receiptLineImages)

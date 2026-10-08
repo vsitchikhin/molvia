@@ -285,7 +285,13 @@ the server, unseen, until erasure. The paper is recorded again by a new shot: it
 trip. A trip only marked removed keeps its receipt whole, and «Вернуть» brings both back; until then
 «Записать» is a 409. **A line not recorded goes at «Записать»** (MOL-240, В-2): nobody sees it once the
 receipt is recorded, and what it costs is counted at that moment — so a recorded receipt's lines have
-gaps, and a line is found by its `position`, never its place in a list (`codesAgain`). «Удалить чек» reads the receipt under the row's lock «Записать»
+gaps, and a line is found by its `position`, never its place in a list (`codesAgain`; the wire carries
+no position, so a recorded receipt's `lines` are never read by their place). The minute timer deletes a
+recorded receipt's line that is no purchase too, as it does a photo (adversarial А3б): **an image rolled
+back** onto this schema records with every line kept, and 0060 does not run twice. The rest of a rollback
+is a named price, nothing written wrong: its erasure deletes the trips first, and the cascade takes a
+recorded receipt uncounted in the report (А3а); its repeat of «Записать» reads a code by the line's place
+and may name another line's code to the phone (А3в). «Удалить чек» reads the receipt under the row's lock «Записать»
 holds (round 2, Р2-В1): a record committed while it waited is seen. **One trip is one receipt's**
 (`receipts_trip_key`), and the recorded receipts are indexed by their seller (`receipts_recorded_tin_idx`):
 every look at a receipt reads its seller's place off them.
