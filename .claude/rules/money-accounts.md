@@ -176,7 +176,11 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   is written — and opens the transfer's sheet (Р-5: two rows, never one). **An amendment keeps the
   version before it** (`account_transfer_revisions`, the fee with it), over the version it was
   opened on; a removal is a mark with its fee, «Вернуть» on the server for ten minutes and in the strip
-  for its ten seconds (Р-8), one removal offered back at a time.
+  for its ten seconds (Р-8), one removal offered back at a time. **The fee's rate is a spending's**:
+  kept by an amendment while the fee keeps its day and currency and the snapshot still counts it —
+  taken anew, a corrected note moved a closed month by today's cache (adversarial А1). **A removal and
+  «Вернуть» take the owner's lock** an amendment holds: removed between an amendment's read and its
+  write, the transfer was marked and its fee written live beside it (А2).
 - **On the phone** (`TransferSheet`, handoff MOL-253): the way in is «Перевести» under «Сверить» on an
   account's screen and «Перевод между счетами» under the total of «Счета», only while some currency —
   the account's own there — has two live accounts (`canTransfer`). «Куда» offers only the source's
@@ -184,6 +188,13 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   a change of the source's currency empties it. «Перевести» says the first thing missing — the source,
   a second account, the sum, the target, the connection (Ф-6); a refusal stands over it, as the
   exchange's (Р-7), and an account gone on another phone empties its side, marked, the rest kept.
+  **A 409 on a new transfer is one already written under its name** — its answer lost, the figures
+  changed since: the sheet reads it and becomes its amendment, saying so, so «Сохранить» writes the
+  figures over it and never a second transfer (review С-1, А5); a conflict of an amendment says what
+  is recorded now (С-4). A transfer a row could not read is said in the sheet — «не ответил» with
+  «Повторить», or offline — never a sheet that rises and goes (А6). «Вернуть» is the answer's: too
+  late is said, no answer puts the strip back; any later write takes it away, the removal being final
+  then, and a newer removal's strip takes the older one's place (С-3, С-6).
   Every write answers with «Счета» whole, and `accounts.transfers` tells the journals and the month to
   read again. **The price, named:** one day for both halves — a transfer that arrives the next day is
   written on one; the fee only in the money's currency and only from the source; no list of
