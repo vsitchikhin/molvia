@@ -136,6 +136,23 @@ describe('mergeNight', () => {
     expect(w.sweeps()).toBe(1)
   })
 
+  it('merges the higher id into the lower of two made in one millisecond, either way round (MOL-252)', async () => {
+    const at = (ms: number) => new Date(Date.UTC(2026, 8, 1, 10, 0, 0, ms))
+    const tie = (a: TwinRow['a'], b: TwinRow['b']) => world({ pairs: [{ a, b, meaning: 0.97 }] })
+    const milk = { ...MILK, createdAt: at(123) }
+    const point = { ...MILK_POINT, createdAt: at(123) }
+    const given = tie(milk, point)
+    const turned = tie(point, milk)
+    await given.night('on')
+    await turned.night('on')
+    expect(given.merged.map(([from, into]) => [from, into])).toEqual([['a2', 'a1']])
+    expect(turned.merged.map(([from, into]) => [from, into])).toEqual([['a2', 'a1']])
+    // A millisecond apart is time again: the lower id, made later, is the one merged.
+    const later = tie({ ...MILK, createdAt: at(124) }, point)
+    await later.night('on')
+    expect(later.merged.map(([from, into]) => [from, into])).toEqual([['a1', 'a2']])
+  })
+
   it('merges nothing in the report mode, says what it would by the two ids, and still sweeps', async () => {
     const w = world({ pairs: [{ a: MILK, b: MILK_POINT, meaning: 0.97 }] })
     const report = await w.night('report')

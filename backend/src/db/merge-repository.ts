@@ -1033,6 +1033,7 @@ export function createMergeRepository(db: Conn): MergeRepository {
       return rows
         .filter((row) => !apart[row.subject].has(pairKey(row.a, row.b)))
         .map((row) => {
+          // The night's rule (`ordered` in merge-twins), written again: the two must agree (MOL-252).
           const aOlder =
             new Date(row.a_created).getTime() !== new Date(row.b_created).getTime()
               ? new Date(row.a_created) < new Date(row.b_created)
