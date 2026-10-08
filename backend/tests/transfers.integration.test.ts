@@ -564,6 +564,22 @@ describe('«Перевод» между своими счетами (MOL-253)', 
       )
     })
 
+    it('А7: запись, которой отказано, не делает прошлое удаление окончательным', async () => {
+      const { me, card, dollars } = await twoDollarAccounts()
+      const drams = await addAccount(me, 'Наличные ֏', amd('1000'))
+      const { transfer: written } = await transfer(me, transferBody(card, dollars))
+      await call(me, 'DELETE', `/transfers/${written.id}`)
+      // Refused: an account of another currency — nothing written, nothing made final.
+      const refused = await call(me, 'POST', '/transfers', transferBody(card, drams))
+      expect(refused.statusCode).toBe(409)
+      const restored = await call(me, 'POST', `/transfers/${written.id}/restore`)
+      expect(restored.statusCode, restored.body).toBe(200)
+      // A write that happened makes it final, as an exchange's does.
+      await call(me, 'DELETE', `/transfers/${written.id}`)
+      await transfer(me, transferBody(card, dollars, { amount: usd('1') }))
+      expect((await call(me, 'POST', `/transfers/${written.id}/restore`)).statusCode).toBe(404)
+    })
+
     it('удаление чужого ничего не трогает', async () => {
       const { me, card, dollars } = await twoDollarAccounts()
       const { transfer: written } = await transfer(me, transferBody(card, dollars))

@@ -68,9 +68,10 @@ export async function recordTransfer(
 ): Promise<{ response: TransferResponse; created: boolean }> {
   notAhead(body, now)
   const fee = await feeOf(repositories, owner, body)
-  // One removal is offered back at a time, as an exchange's is.
-  await repositories.transfers.purgeRemoved(owner.id)
   const { transfer, created } = await repositories.transfers.add(owner.id, body, fee)
+  // One removal is offered back at a time, as an exchange's is — made final only by a write that
+  // happened: a refused one left the phone's «Вернуть» standing over nothing (adversarial А7).
+  await repositories.transfers.purgeRemoved(owner.id)
   return {
     response: {
       transfer: transferViewOf(transfer),
@@ -91,8 +92,8 @@ export async function amendTransfer(
   notAhead(body, now)
   const held = await repositories.transfers.feeOf(owner.id, id)
   const fee = await feeOf(repositories, owner, body, held)
-  await repositories.transfers.purgeRemoved(owner.id)
   const { transfer } = await repositories.transfers.amend(owner.id, id, body, fee)
+  await repositories.transfers.purgeRemoved(owner.id)
   return {
     transfer: transferViewOf(transfer),
     accounts: await moneyAccountsOf(repositories, owner, now),
