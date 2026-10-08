@@ -41,11 +41,15 @@ function kind(url: URL): URL | 'file' {
   throw new Error(`${url.pathname}: neither a module nor a file the guard knows`)
 }
 
+/** Vite's own `resolve.extensions`, in its order: what a path without an extension may name. */
+const EXTENSIONS = ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json']
+
 /**
- * What a path written in `from` names, resolved as Vite resolves it — as written, with `.ts`, a
- * directory by its `index.ts`, or a `.js` written for its `.ts` as TypeScript writes ESM (adversarial
- * Р3-А4): a module of `src` to read; `'file'`, a file of `src` that is no module (JSON, a
- * stylesheet), with nothing to follow (adversarial Р2-А2); or null, a path that leaves `src`.
+ * What a path written in `from` names, resolved as Vite resolves it — as written, with each of its
+ * extensions, a directory by its `index` with each (adversarial Р4-А3), or a `.js` written for its
+ * `.ts` as TypeScript writes ESM (adversarial Р3-А4): a module of `src` to read; `'file'`, a file of
+ * `src` that is no module (JSON, a stylesheet), with nothing to follow (adversarial Р2-А2); or null,
+ * a path that leaves `src`.
  */
 function local(from: URL, path: string): URL | 'file' | null {
   let url: URL
@@ -53,19 +57,39 @@ function local(from: URL, path: string): URL | 'file' | null {
   else if (path.startsWith('.')) url = new URL(path, from)
   else return null
   const bare = url.href.replace(/\/$/, '')
-  const candidates = [url, new URL(`${bare}.ts`), new URL(`${bare}/index.ts`)]
+  const candidates = [
+    url,
+    ...EXTENSIONS.map((extension) => new URL(`${bare}${extension}`)),
+    ...EXTENSIONS.map((extension) => new URL(`${bare}/index${extension}`)),
+  ]
   if (/\.[cm]?jsx?$/.test(bare)) candidates.push(new URL(bare.replace(/js(x?)$/, 'ts$1')))
   for (const candidate of candidates)
     if (existsSync(candidate) && statSync(candidate).isFile()) return kind(candidate)
   throw new Error(`${path} from ${from.pathname} does not resolve`)
 }
 
+/** Where a pattern or a `base` of `import.meta.glob` starts: `src` by `@/`, the project's root by `/`. */
+function anchored(text: string, from: URL): [URL, string] {
+  if (text.startsWith('@/')) return [SRC, text.slice(2)]
+  if (text.startsWith('/')) return [ROOT, text.slice(1)]
+  return [from, text]
+}
+
+/** A string option of an object literal, or null. */
+function option(options: ts.ObjectLiteralExpression, name: string): ts.Expression | null {
+  for (const property of options.properties)
+    if (ts.isPropertyAssignment(property) && property.name.getText().replace(/['"]/g, '') === name)
+      return property.initializer
+  return null
+}
+
 /**
  * What an `import.meta.glob` names (adversarial Р2-А1), or null for any other node: the modules of
- * `src` under its patterns — from the file, from `src` by `@/`, from the project's root by `/`
- * (adversarial Р3-А1) — and the `query` it loads them with, which makes them workers when it is
- * `?worker` (adversarial Р3-А2) and assets when it is anything else. A negative pattern is left out:
- * the set read is the wider one, which can only ask for more in `include`.
+ * `src` under its patterns — from the file, or from its `base` (adversarial Р4-А1); from `src` by
+ * `@/`, from the project's root by `/` (adversarial Р3-А1) — and the query it loads them with: a
+ * string, an object of flags (`{ worker: true }`) or the older `as` (adversarial Р4-А2), which makes
+ * them workers when it is `worker` (adversarial Р3-А2) and assets when it is anything else. A negative
+ * pattern is left out: the set read is the wider one, which can only ask for more in `include`.
  */
 function globbed(node: ts.Node, from: URL): { modules: URL[]; query: string | null } | null {
   if (
@@ -76,29 +100,28 @@ function globbed(node: ts.Node, from: URL): { modules: URL[]; query: string | nu
     node.arguments[0] === undefined
   )
     return null
-  const [first, options] = node.arguments
+  const [first, given] = node.arguments
+  const options = given && ts.isObjectLiteralExpression(given) ? given : null
+  const written = options && option(options, 'base')
+  const [baseRoot, baseRest] =
+    written && ts.isStringLiteralLike(written) ? anchored(written.text, from) : [from, './']
+  const base = new URL(baseRest.endsWith('/') ? baseRest : `${baseRest}/`, new URL('./', baseRoot))
   const patterns = ts.isArrayLiteralExpression(first) ? [...first.elements] : [first]
   const modules = patterns.flatMap((pattern) => {
     if (!ts.isStringLiteralLike(pattern) || pattern.text.startsWith('!')) return []
-    const text = pattern.text
-    const [base, rest] = text.startsWith('@/')
-      ? [SRC, text.slice(2)]
-      : text.startsWith('/')
-        ? [ROOT, text.slice(1)]
-        : [new URL('./', from), text]
-    return globSync(rest, { cwd: base })
-      .map((file) => new URL(file, base))
+    const [root, rest] = anchored(pattern.text, base)
+    const cwd = root === base ? base : new URL('./', root)
+    return globSync(rest, { cwd })
+      .map((file) => new URL(file, cwd))
       .filter((url) => MODULE.test(url.pathname))
   })
   let query: string | null = null
-  if (options && ts.isObjectLiteralExpression(options))
-    for (const property of options.properties)
-      if (
-        ts.isPropertyAssignment(property) &&
-        property.name.getText() === 'query' &&
-        ts.isStringLiteralLike(property.initializer)
-      )
-        query = property.initializer.text
+  const asked = options && option(options, 'query')
+  if (asked && ts.isStringLiteralLike(asked)) query = asked.text
+  else if (asked && ts.isObjectLiteralExpression(asked))
+    query = `?${asked.properties.map((property) => property.name?.getText().replace(/['"]/g, '') ?? '').join('&')}`
+  const as = options && option(options, 'as')
+  if (query === null && as && ts.isStringLiteralLike(as)) query = `?${as.text}`
   return { modules, query }
 }
 
