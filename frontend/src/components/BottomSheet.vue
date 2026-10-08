@@ -9,6 +9,8 @@
     @close="closedNatively"
     @click.capture="holdWhileRising"
     @click="closeOnScrim"
+    @focusin="settleFooter"
+    @focusout="focusLeft"
   >
     <div class="panel" :class="{ footed: $slots.footer }">
       <header class="head" :class="{ over: back }">
@@ -57,7 +59,7 @@ import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
 import { provideSheetAnnouncer } from '@/composables/useAnnouncer'
 import { useHeight } from '@/composables/useCollapsed'
-import { useKeyboardInset } from '@/composables/useKeyboardInset'
+import { typedIn, useKeyboardInset } from '@/composables/useKeyboardInset'
 import { useSheetDrag } from '@/composables/useSheetDrag'
 import { closeStateStrip } from '@/composables/useStateStrip'
 import { pageAnchor, sheetOpener, useSheetHistory } from '@/composables/useSheetHistory'
@@ -86,7 +88,8 @@ export const DOUBLE_TAP = 300
  * own scroll, not a middle of its own between the header and the footer: the pull down, the lift
  * over the keys and `reveal` all go by the dialog's scroll, and stay as they were. What the sheet
  * brings into sight stops at the footer's top (`--sheet-footer-height` as its `scroll-padding`).
- * A footer taller than half the sheet — over the keys of a turned phone — is not pinned (`loose`).
+ * A footer that leaves no room for the field typed in — over the keys of a turned phone — is not
+ * pinned (`loose`).
  */
 export default defineComponent({
   name: 'BottomSheet',
@@ -131,27 +134,36 @@ export default defineComponent({
       const bottom = Number.parseFloat(getComputedStyle(element).paddingBottom)
       return footerBox.value - (Number.isFinite(bottom) ? bottom : 0)
     })
-    // A footer taller than half the sheet is not pinned: it would hide more than it shows. Over the
-    // keys of a turned phone the sheet has some 107 px and the edit of a spending a footer of 121 —
-    // pinned, it covered the whole sheet and the sum being typed with it (adversarial А1). Then it
-    // goes with the content, as before MOL-182, and the field is kept in the whole sheet. Read where
-    // they lie: the observer of the footer is not told of a padding the keys took off (С-8).
+    // A footer is let go only when it leaves no room for the field being typed in, in a sheet that
+    // scrolls. Over the keys of a turned phone the sheet has some 107 px and the edit of a spending a
+    // footer of 121 — pinned, it covered the sum being typed (adversarial А1); then the footer goes
+    // with the content, as before MOL-182, and the field is kept in the whole sheet. Not by a share of
+    // the sheet: half of it let go the footer of an account's edit over the keys upright (324 and 167),
+    // «Сохранить» with it — the very sheet the task began with — and an error come into a footer let it
+    // go under the finger (round 2, Р2-А1, Р2-А2); and a sheet that does not scroll hides nothing
+    // under its footer (С-11). Read where they lie, on every resize of either and every focus: the
+    // observer of the footer is not told of a padding the keys took off (С-8).
     const sheetBox = useHeight(dialog)
     const loose = ref(false)
-    watch(
-      [sheetBox, footerBox],
-      () => {
-        const sheet = dialog.value
-        const element = footer.value
-        loose.value = Boolean(
-          sheet &&
-          element &&
-          sheet.clientHeight > 0 &&
-          element.offsetHeight * 2 > sheet.clientHeight,
-        )
-      },
-      { flush: 'post' },
-    )
+    function settleFooter(): void {
+      const sheet = dialog.value
+      const element = footer.value
+      const field = sheet && typedIn(sheet)
+      loose.value = Boolean(
+        sheet &&
+        element &&
+        field &&
+        sheet.scrollHeight > sheet.clientHeight &&
+        sheet.clientHeight - element.offsetHeight < field.getBoundingClientRect().height,
+      )
+    }
+    watch([sheetBox, footerBox], settleFooter, { flush: 'post' })
+    // A focus moving from one field of the sheet to the next is settled once, by the field it lands on.
+    function focusLeft(event: FocusEvent): void {
+      const next = event.relatedTarget
+      if (next instanceof Node && dialog.value?.contains(next)) return
+      settleFooter()
+    }
     // What covers the sheet's end: the pinned footer, or nothing.
     const covered = computed(() => (loose.value ? 0 : footerHeight.value))
     const titleId = useId()
@@ -383,6 +395,8 @@ export default defineComponent({
       footer,
       footerHeight,
       loose,
+      settleFooter,
+      focusLeft,
       titleId,
       dragging: drag.dragging,
       close,

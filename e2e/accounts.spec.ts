@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
+import { fakeKeyboard } from './keyboard'
 import { asBrowser, open, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -387,4 +388,53 @@ test('связь пропала, пока «Сохранить» работае�
   await expect(busy).toHaveAttribute('aria-busy', 'true')
   await context.setOffline(false)
   release()
+})
+
+// The edit of an account over the keys held upright: a sheet of 324 and a footer of 167 —
+// «Сохранить», «Удалить счёт» and its note. Half the sheet let the footer go, «Сохранить» below the
+// edge as the name is typed — the very sheet MOL-182 began with (adversarial round 2, Р2-А1). The name
+// has room above it, and the footer stays pinned.
+test('the edit of an account keeps «Сохранить» pinned in sight over the keys (MOL-182)', async ({
+  page,
+}) => {
+  const keyboard = await fakeKeyboard(page)
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await openAccounts(page)
+  await page.getByRole('button', { name: 'Добавить счёт' }).click()
+  const sheet = page.locator('dialog[open]').last()
+  await expect(sheet).toContainText('Новый счёт')
+  await page.waitForTimeout(400)
+  await sheet.getByLabel('Имя').fill('Наличные')
+  await sheet.getByLabel('Остаток').fill('1000')
+  await sheet.getByLabel('На день').fill(yesterday())
+  await sheet.getByRole('button', { name: 'Сохранить' }).click()
+  await expect(sheet).toBeHidden()
+  await page.getByRole('link', { name: /Наличные/ }).click()
+  await page.getByRole('button', { name: 'Править' }).click()
+  await expect(sheet).toContainText('Удалить счёт')
+  await page.waitForTimeout(400)
+
+  await sheet.getByLabel('Имя').focus()
+  const window = page.viewportSize()?.height ?? 0
+  await keyboard(window - 395, window - 395)
+  await expect
+    .poll(() =>
+      sheet.evaluate((dialog) => {
+        const button = [...dialog.querySelectorAll('button')].find(
+          (one) => one.textContent.trim() === 'Сохранить',
+        )
+        const name = document.activeElement
+        if (!button || !(name instanceof HTMLInputElement))
+          throw new Error('no «Сохранить» or no name')
+        const box = dialog.getBoundingClientRect()
+        const sees = (rect: DOMRect) => rect.top >= box.top && rect.bottom <= box.bottom + 0.5
+        return {
+          pinned: dialog.classList.contains('pinned'),
+          save: sees(button.getBoundingClientRect()),
+          name: sees(name.getBoundingClientRect()),
+        }
+      }),
+    )
+    .toEqual({ pinned: true, save: true, name: true })
 })

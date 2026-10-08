@@ -662,6 +662,64 @@ test.describe('the sheet', () => {
       await expect.poll(() => price(page)).toEqual({ pinned: false, whole: true })
     })
 
+    // An error come into the footer under the finger must not let it go: a conflict of the edit of
+    // an exchange makes a footer of 168 on a sheet of 281 (an iPhone SE upright over the keys), more
+    // than half of it, and half let the footer go with the error and «Record» out of sight
+    // (adversarial round 2, Р2-А2). The field typed in still has room, and the footer stays pinned.
+    test('keeps the footer pinned, an error come into it and its action in sight', async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 647 })
+      const keyboard = await fakeKeyboard(page)
+      await openSheet(page)
+      await sheet(page).getByLabel('How much').focus()
+      await keyboard(647 - 343, 647 - 343)
+      await sheetElement(page).evaluate((dialog) => {
+        const block = document.createElement('div')
+        block.setAttribute('role', 'alert')
+        block.dataset.error = ''
+        // As `ExchangeSheet` draws it: `.failed` 13 in the bad ink, `.conflict`, `.current` at 600.
+        block.style.margin = '0 0 var(--space-3)'
+        block.style.color = 'var(--bad-ink)'
+        block.style.fontSize = 'var(--text-footnote)'
+        const lines = [
+          'This exchange was changed on another device — here is how it stands now. Change it again if you need to',
+          'Gave 20,000.00 ₽ · got 87,540.00 ֏ · 5 Oct',
+        ]
+        for (const [index, text] of lines.entries()) {
+          const line = document.createElement('p')
+          line.textContent = text
+          line.style.margin = index === 0 ? '0' : 'var(--space-1) 0 0'
+          if (index > 0) line.style.fontWeight = 'var(--weight-medium)'
+          block.append(line)
+        }
+        dialog.querySelector('.footer')?.prepend(block)
+      })
+      await expect
+        .poll(() =>
+          sheetElement(page).evaluate((dialog) => {
+            const box = dialog.getBoundingClientRect()
+            const footer = dialog.querySelector<HTMLElement>('.footer')
+            const error = dialog.querySelector('[data-error]')
+            const record = [...dialog.querySelectorAll('button')].find(
+              (one) => one.textContent.trim() === 'Record',
+            )
+            if (!footer || !error || !record) throw new Error('no footer, error or «Record»')
+            const sees = (element: Element) => {
+              const rect = element.getBoundingClientRect()
+              return rect.top >= box.top && rect.bottom <= box.bottom + 0.5
+            }
+            return {
+              pinned: dialog.classList.contains('pinned'),
+              half: footer.offsetHeight * 2 > box.height,
+              error: sees(error),
+              record: sees(record),
+            }
+          }),
+        )
+        .toEqual({ pinned: true, half: true, error: true, record: true })
+    })
+
     test('upright, keeps the footer pinned and the price whole above it', async ({ page }) => {
       await priceOverTheKeys(page, 395)
       await expect.poll(() => price(page)).toEqual({ pinned: true, whole: true })

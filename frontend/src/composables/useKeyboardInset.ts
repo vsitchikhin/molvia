@@ -233,7 +233,7 @@ const TYPED_IN = [
 ].join(', ')
 
 /** The field of the sheet being typed in, if any. */
-function typedIn(sheet: HTMLElement): HTMLElement | null {
+export function typedIn(sheet: HTMLElement): HTMLElement | null {
   const field = document.activeElement
   return field instanceof HTMLElement && sheet.contains(field) && field.matches(TYPED_IN)
     ? field
