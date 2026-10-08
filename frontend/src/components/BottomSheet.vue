@@ -471,13 +471,17 @@ export default defineComponent({
   background: var(--surface);
   box-shadow: var(--shadow-lg);
 
-  :global(html[data-under-keys]) & {
+  html[data-under-keys] & {
     padding-bottom: var(--space-3);
   }
 }
 
 .region {
   @include visually-hidden;
+
+  /* At the top, not where it stands after the footer: a pixel of it below the footer was a pixel
+     more to scroll, and at the end the pinned footer stopped a pixel over the edge. */
+  top: 0;
 }
 
 .head {
