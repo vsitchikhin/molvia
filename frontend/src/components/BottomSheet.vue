@@ -2,7 +2,7 @@
   <dialog
     ref="dialog"
     class="sheet"
-    :class="{ over: back, dragging, footed: $slots.footer }"
+    :class="{ over: back, dragging, pinned: $slots.footer && !loose }"
     :style="{ '--sheet-footer-height': `${String(footerHeight)}px` }"
     :aria-labelledby="titleId"
     @cancel.prevent="close()"
@@ -86,6 +86,7 @@ export const DOUBLE_TAP = 300
  * own scroll, not a middle of its own between the header and the footer: the pull down, the lift
  * over the keys and `reveal` all go by the dialog's scroll, and stay as they were. What the sheet
  * brings into sight stops at the footer's top (`--sheet-footer-height` as its `scroll-padding`).
+ * A footer taller than half the sheet — over the keys of a turned phone — is not pinned (`loose`).
  */
 export default defineComponent({
   name: 'BottomSheet',
@@ -130,6 +131,29 @@ export default defineComponent({
       const bottom = Number.parseFloat(getComputedStyle(element).paddingBottom)
       return footerBox.value - (Number.isFinite(bottom) ? bottom : 0)
     })
+    // A footer taller than half the sheet is not pinned: it would hide more than it shows. Over the
+    // keys of a turned phone the sheet has some 107 px and the edit of a spending a footer of 121 —
+    // pinned, it covered the whole sheet and the sum being typed with it (adversarial А1). Then it
+    // goes with the content, as before MOL-182, and the field is kept in the whole sheet. Read where
+    // they lie: the observer of the footer is not told of a padding the keys took off (С-8).
+    const sheetBox = useHeight(dialog)
+    const loose = ref(false)
+    watch(
+      [sheetBox, footerBox],
+      () => {
+        const sheet = dialog.value
+        const element = footer.value
+        loose.value = Boolean(
+          sheet &&
+          element &&
+          sheet.clientHeight > 0 &&
+          element.offsetHeight * 2 > sheet.clientHeight,
+        )
+      },
+      { flush: 'post' },
+    )
+    // What covers the sheet's end: the pinned footer, or nothing.
+    const covered = computed(() => (loose.value ? 0 : footerHeight.value))
     const titleId = useId()
 
     // Whether the sheet is open as far as the screen is concerned. Not `dialog.open`: the browser
@@ -309,8 +333,9 @@ export default defineComponent({
     }
 
     // A footer grown over the field being typed in — an error, «Вернуть» — is the sheet's edge
-    // moving up, and the field is brought back into sight above it.
-    useKeyboardInset(dialog, shown, footerHeight)
+    // moving up, and the field is brought back into sight above it; a footer let go or pinned again
+    // moves that edge too.
+    useKeyboardInset(dialog, shown, covered)
 
     // Heard on the document, not on the dialog (MOL-80). iOS hands a touch to the page only where
     // a listener of touches or of the pointer stands, and on the dialog that is the panel's box:
@@ -357,6 +382,7 @@ export default defineComponent({
       dialog,
       footer,
       footerHeight,
+      loose,
       titleId,
       dragging: drag.dragging,
       close,
@@ -458,7 +484,7 @@ export default defineComponent({
 
   /* What the browser and `reveal` bring into sight stops at the pinned footer's top, not under it:
      the footer's height less its bottom padding, which is added here as the footer has it. */
-  &.footed {
+  &.pinned {
     scroll-padding-bottom: calc(var(--sheet-footer-height) + var(--space-3) + var(--safe-bottom));
 
     html[data-under-keys] & {
@@ -488,17 +514,20 @@ export default defineComponent({
    margins of the screen's docked strip (К-9). Over the keys the home indicator is under them, and the
    footer stands 12 over the keys (147). */
 .footer {
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
   border-top: var(--hairline) solid var(--border);
   padding: var(--space-3) calc(var(--space-4) + var(--safe-right))
     calc(var(--space-3) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
   background: var(--surface);
-  box-shadow: var(--shadow-lg);
 
   html[data-under-keys] & {
     padding-bottom: var(--space-3);
+  }
+
+  .pinned > & {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    box-shadow: var(--shadow-lg);
   }
 }
 

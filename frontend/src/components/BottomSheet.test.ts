@@ -977,6 +977,7 @@ describe('the pinned footer', () => {
     const { dialog } = await render({ open: true })
     expect(dialog().querySelector('.footer')).toBeNull()
     expect(dialog().querySelector('.panel')?.classList.contains('footed')).toBe(false)
+    expect(dialog().classList.contains('pinned')).toBe(false)
     expect(dialog().style.getPropertyValue('--sheet-footer-height')).toBe('0px')
   })
 
@@ -996,6 +997,31 @@ describe('the pinned footer', () => {
     resized()
     await nextTick()
     expect(dialog().style.getPropertyValue('--sheet-footer-height')).toBe('120px')
+  })
+
+  // Over the keys of a turned phone the sheet has some 107 px: a footer of 77 pinned there covered
+  // the field being typed in (adversarial А1). Taller than half the sheet, it is let go; upright it is
+  // pinned again. Exactly half still pins.
+  it('is let go when it is taller than half the sheet, and pinned again when it is not', async () => {
+    const resized = observeByHand()
+    const { dialog } = await render({ footer: true })
+    const footer = dialog().querySelector<HTMLElement>('.footer')
+    if (!footer) throw new Error('no footer in the sheet')
+    let sheetHeight = 334
+    Object.defineProperty(dialog(), 'clientHeight', { get: () => sheetHeight })
+    Object.defineProperty(dialog(), 'offsetHeight', { get: () => sheetHeight })
+    Object.defineProperty(footer, 'offsetHeight', { get: () => 77 })
+    resized()
+    await nextTick()
+    expect(dialog().classList.contains('pinned')).toBe(true)
+    sheetHeight = 107
+    resized()
+    await nextTick()
+    expect(dialog().classList.contains('pinned')).toBe(false)
+    sheetHeight = 154
+    resized()
+    await nextTick()
+    expect(dialog().classList.contains('pinned')).toBe(true)
   })
 
   // The keys take the home indicator's 34 off the footer's bottom padding, and the stylesheet adds

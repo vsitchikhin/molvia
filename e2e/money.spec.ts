@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
+import { fakeKeyboard } from './keyboard'
 import { standAt, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 
@@ -597,60 +598,6 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
   })
 }
 
-/**
- * Stands in for the iOS keyboard, which no Playwright browser has: the visual viewport is replaced
- * before the app loads, and `keyboard(covered, pan)` moves it — the keys cover the bottom `covered`
- * px of the window, and the visible part is said to be `pan` px down it, as Safari says it on the
- * owner's iPhone (304 for keys of 304, MOL-135) while what a page draws stays where it was. Not all
- * of what Safari was measured doing: it also shrinks the window to the visible part and leaves
- * `dvh`, which a Chromium window cannot, since its `dvh` shrinks along. The same faults show in
- * this geometry: a sheet sized from `dvh` is taller than what is visible, and a lift less the
- * reported scroll leaves it under the keys (MOL-151). The measured numbers are held by
- * `useKeyboardInset.test`.
- */
-async function fakeKeyboard(page: Page): Promise<(covered: number, pan: number) => Promise<void>> {
-  await page.addInitScript(() => {
-    const events = new EventTarget()
-    const state = { covered: 0, pan: 0 }
-    const viewport = {
-      get height() {
-        return window.innerHeight - state.covered
-      },
-      get width() {
-        return window.innerWidth
-      },
-      get offsetTop() {
-        return state.pan
-      },
-      get pageTop() {
-        return window.scrollY + state.pan
-      },
-      offsetLeft: 0,
-      pageLeft: 0,
-      scale: 1,
-      addEventListener: events.addEventListener.bind(events),
-      removeEventListener: events.removeEventListener.bind(events),
-    }
-    Object.defineProperty(window, 'visualViewport', { get: () => viewport, configurable: true })
-    Object.assign(window, {
-      keyboard(covered: number, pan: number) {
-        state.covered = covered
-        state.pan = pan
-        events.dispatchEvent(new Event('resize'))
-        events.dispatchEvent(new Event('scroll'))
-      },
-    })
-  })
-  return async (covered, pan) => {
-    await page.evaluate(
-      ({ c, p }) => {
-        ;(window as unknown as { keyboard: (c: number, p: number) => void }).keyboard(c, p)
-      },
-      { c: covered, p: pan },
-    )
-  }
-}
-
 /** Where a locator stands against what the fake keyboard leaves visible. */
 async function within(page: Page, selector: string, covered: number) {
   return page.evaluate(
@@ -794,4 +741,58 @@ test('a summary that did not load is a quiet card, and the strip still adds a sp
   await page.unroute(last)
   await retry.click()
   await expect(page.getByText('Не удалось загрузить траты')).toHaveCount(0)
+})
+
+/**
+ * How much of a field of the open sheet stands in sight: between the sheet's top and whichever comes
+ * first, the sheet's bottom or the top of a pinned footer.
+ */
+async function inSight(page: Page, selector: string) {
+  return page.locator('dialog[open]').evaluate((dialog, css) => {
+    const field = dialog.querySelector(css)
+    const footer = dialog.querySelector('.footer')
+    if (!field || !footer) throw new Error('no field or no footer')
+    const box = dialog.getBoundingClientRect()
+    const place = field.getBoundingClientRect()
+    const edge = dialog.classList.contains('pinned')
+      ? Math.min(box.bottom, footer.getBoundingClientRect().top)
+      : box.bottom
+    return {
+      field: Math.round(place.height),
+      seen: Math.max(0, Math.round(Math.min(place.bottom, edge) - Math.max(place.top, box.top))),
+      focused: document.activeElement === field,
+    }
+  }, selector)
+}
+
+// Over the keys of a turned phone the sheet has some 107 px, and the edit of a spending a footer of
+// 121 — «Сохранить» and «Удалить». Pinned, it covered the whole sheet and the sum being typed with it
+// (MOL-182, adversarial А1); taller than half the sheet, it goes with the content, and the sum stands
+// in sight. Upright, it stays pinned.
+test('the sum being typed stands in sight over the keys of a turned phone (MOL-182)', async ({
+  page,
+}) => {
+  const keyboard = await fakeKeyboard(page)
+  await page.setViewportSize({ width: 844, height: 390 })
+  await openMoney(page)
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  const sheet = page.locator('dialog[open]')
+  await expect(sheet).toContainText('Новая трата')
+  await page.waitForTimeout(400)
+  await sheet.getByLabel('Сумма').fill('5000')
+  await sheet.getByRole('radio', { name: 'Красота и гигиена' }).check()
+  await sheet.getByLabel(/Что это/).fill('Барбер')
+  await sheet.getByRole('button', { name: 'Сохранить трату' }).click()
+  await expect(sheet).toBeHidden()
+  await openSpendings(page)
+  await page.getByRole('button', { name: /Открыть трату: Барбер/ }).click()
+  await page.waitForTimeout(400)
+  await expect(sheet.getByRole('button', { name: 'Удалить трату' })).toBeVisible()
+  await expect(sheet).toHaveClass(/pinned/)
+
+  const sum = 'input[inputmode="decimal"]'
+  await page.locator(`dialog[open] ${sum}`).focus()
+  await keyboard(260, 260)
+  await expect(sheet).not.toHaveClass(/pinned/)
+  await expect.poll(async () => inSight(page, sum)).toEqual({ field: 54, seen: 54, focused: true })
 })

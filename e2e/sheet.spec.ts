@@ -2,6 +2,7 @@
 // DOM for the code inside page.evaluate, which runs in the browser.
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { fakeKeyboard } from './keyboard'
 import { open, signedIn } from './session'
 
 /**
@@ -623,6 +624,48 @@ test.describe('the sheet', () => {
     await expect(page.locator('h1')).toBeHidden()
     await expect(sheet(page)).toBeVisible()
     await expect(field).toBeFocused()
+  })
+
+  // Over the keys of a turned phone the sheet has some 107 px, and a footer of 77 is taller than
+  // half of it: pinned, it left 29 px of the 44 the price is typed in (MOL-182, adversarial А1). It
+  // goes with the content then, and the price stands whole in sight; upright, it stays pinned.
+  test.describe('over the keys of a turned phone', () => {
+    /** The price focused, then the keys come up and leave `seen` px of the window in sight. */
+    async function priceOverTheKeys(page: Page, seen: number): Promise<void> {
+      const keyboard = await fakeKeyboard(page)
+      await openSheet(page)
+      await sheet(page).getByLabel('Price as on the tag').focus()
+      const window = page.viewportSize()?.height ?? 0
+      await keyboard(window - seen, window - seen)
+    }
+
+    /** Whether the footer is pinned, and whether the price stands whole above what covers the sheet. */
+    async function price(page: Page) {
+      return sheetElement(page).evaluate((dialog) => {
+        const field = document.activeElement
+        const footer = dialog.querySelector('.footer')
+        if (!(field instanceof HTMLInputElement) || !dialog.contains(field) || !footer) {
+          throw new Error('the price is not focused, or there is no footer')
+        }
+        const box = dialog.getBoundingClientRect()
+        const place = field.getBoundingClientRect()
+        const pinned = dialog.classList.contains('pinned')
+        const edge = pinned ? Math.min(box.bottom, footer.getBoundingClientRect().top) : box.bottom
+        const seen = Math.min(place.bottom, edge) - Math.max(place.top, box.top)
+        return { pinned, whole: Math.round(seen) >= Math.round(place.height) }
+      })
+    }
+
+    test('lets its footer go with the content, and the price stands whole', async ({ page }) => {
+      await page.setViewportSize({ width: 844, height: 390 })
+      await priceOverTheKeys(page, 130)
+      await expect.poll(() => price(page)).toEqual({ pinned: false, whole: true })
+    })
+
+    test('upright, keeps the footer pinned and the price whole above it', async ({ page }) => {
+      await priceOverTheKeys(page, 395)
+      await expect.poll(() => price(page)).toEqual({ pinned: true, whole: true })
+    })
   })
 
   // Taller than its share, the sheet keeps its main action at its bottom edge, the content scrolling
