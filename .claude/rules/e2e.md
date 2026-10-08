@@ -136,8 +136,12 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   that had taken the app away first). How Chromium lets a document that is going away send past both
   was never shown — not reproduced here, three causes named and refuted in turn. The product is right
   either way: told the write failed, the phone keeps its draft until a send is confirmed, and a `PUT`
-  again is the same row. So «…and the app closed» reads the drafts' drawer before it closes the page,
-  and after it opens again the server's queue and the drawer let go. So `goOffline` is
+  again is the same row. So «…and the app closed» reads the drafts' drawer before it closes the page —
+  the whole drawer, a refused send being a draft too — and after it opens again, that the server has
+  the rating and the drawer is empty; the send at the start is held whenever the rating was still in
+  the drawer as the app started, and a run where the leaving page already sent it has nothing left to
+  send — the price. It still takes `goOffline`: the drawer keeps the draft only when the send failed in
+  the page itself. `goOffline` itself is
   `setOffline` — the page's `navigator.onLine` and its states — **and `page.route` refusing every
   request of that page with `internetdisconnected`**: Playwright fails it before the network, and the
   page sees the same error — the route set before the offline, so nothing slips between them. That
