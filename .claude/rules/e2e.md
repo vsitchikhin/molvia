@@ -117,8 +117,10 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   `test.use({ trace: { mode: 'retain-on-first-failure', screenshots: false } })` under `CI`, as
   `verdicts.spec` does. A describe cannot say it — Playwright refuses `use({ trace })` there, since it
   would take a worker of its own — so the focus block of `scanner.spec` (MOL-249) starts the context's
-  tracing on the first attempt itself and keeps it only when the attempt failed; for the whole file it
-  would have traced the camera's reads as well. Not without the DOM of each step: Playwright records the network only with
+  tracing on the first attempt itself and keeps it only when the attempt failed — and steps aside when
+  the run already traces that attempt (`--trace on`, a config's `retain-on-first-failure`), whose
+  second start threw in every test of the block (review Р2-А1); for the whole file it would have traced
+  the camera's reads as well. Not without the DOM of each step: Playwright records the network only with
   those snapshots, and the network — which request left and how it ended — is what a flake's trace is
   for. Whatever there is goes up from `test-results/` when the job fails; the artifact used to be
   `playwright-report/`, which the `github` reporter never writes.

@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 // DOM for the init script, which runs in the browser.
 import { expect, test } from '@playwright/test'
-import type { Locator, Page, Route, TestInfo } from '@playwright/test'
+import type { Locator, Page, Route } from '@playwright/test'
 import { randomInt } from 'node:crypto'
 import { BARCODE } from './barcode-video'
 import { asBrowser, open } from './session'
@@ -437,12 +437,22 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
     // behind but «Received: ''», and the API's log had to tell what the screen had done. Started by
     // hand: `test.use({ trace })` is refused in a describe, and for the whole file it would trace the
     // camera's reads too. The retry is traced by the config (`on-first-retry`).
-    const traced = (info: TestInfo) => Boolean(process.env.CI) && info.retry === 0
+    // A run that traces the first attempt itself — `--trace on`, a config's `retain-on-first-failure`
+    // — has started it already: that trace is the run's to keep, and the block's own is not started
+    // (review Р2-А1: a second start threw in every test of the block).
+    let ownTrace = false
     test.beforeEach(async ({ context }, info) => {
-      if (traced(info)) await context.tracing.start({ snapshots: true, screenshots: false })
+      ownTrace = false
+      if (!process.env.CI || info.retry > 0) return
+      try {
+        await context.tracing.start({ snapshots: true, screenshots: false })
+        ownTrace = true
+      } catch (error) {
+        if (!String(error).includes('Tracing has been already started')) throw error
+      }
     })
     test.afterEach(async ({ context }, info) => {
-      if (!traced(info)) return
+      if (!ownTrace) return
       if (info.status === info.expectedStatus) return context.tracing.stop()
       const path = info.outputPath('trace.zip')
       await context.tracing.stop({ path })
