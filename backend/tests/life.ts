@@ -56,8 +56,9 @@ export async function aLife(
     addedBy: actorId,
   })
   const tripId = await insertTrip(db, { actorId, placeId: shared.placeId })
+  const boughtId = randomUUID()
   await db.insert(expenses).values([
-    { id: randomUUID(), tripId, itemId: shared.itemId },
+    { id: boughtId, tripId, itemId: shared.itemId },
     { id: randomUUID(), tripId, itemId: ownItem },
   ])
   await db.insert(verdicts).values([
@@ -139,8 +140,8 @@ export async function aLife(
     { id: spendingId, ...spending },
     { id: randomUUID(), ...spending, deletedAt: new Date() },
   ])
-  // Receipts photographed (MOL-125): one read and recorded — its photo, its lines, a line cut out —
-  // and one that failed and was removed.
+  // Receipts photographed (MOL-125): one read and recorded as the trip — its photo, its line, a line
+  // cut out — and one that failed and was removed.
   const receiptId = randomUUID()
   const at = new Date('2026-09-30T11:03:50Z')
   await db.insert(receipts).values([
@@ -166,6 +167,7 @@ export async function aLife(
       totalMinor: 74_000n,
       balanced: true,
       recordedAt: at,
+      tripId,
     },
     {
       id: randomUUID(),
@@ -200,6 +202,7 @@ export async function aLife(
     sumMinor: 74_000n,
     discountMinor: 0n,
     settled: true,
+    expenseId: boughtId,
   })
   await db.insert(receiptLineImages).values({
     receiptId,

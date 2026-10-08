@@ -196,6 +196,12 @@ export function createErasureRepository(db: Db): ErasureRepository {
             erased.feedback = await count(
               sql`delete from feedback where actor_id = ${actorId} returning 1`,
             )
+            // Receipts photographed (MOL-125), removed ones too: the photo, the lines read and the
+            // lines cut out for the reader's training go by the cascade — part of a receipt. Before
+            // the trips, whose cascade takes a recorded one uncounted (MOL-240).
+            erased.receipts = await count(
+              sql`delete from receipts where actor_id = ${actorId} returning 1`,
+            )
             // The cascade from `trips` would take these anyway; deleted first so they are counted.
             erased.expenses = await count(sql`
               delete from expenses
@@ -219,11 +225,6 @@ export function createErasureRepository(db: Db): ErasureRepository {
             // pointed at, and the rates the person's closed months were frozen at.
             erased.spendings = await count(
               sql`delete from spendings where actor_id = ${actorId} returning 1`,
-            )
-            // Receipts photographed (MOL-125), removed ones too: the photo, the lines read and the
-            // lines cut out for the reader's training go by the cascade — part of a receipt.
-            erased.receipts = await count(
-              sql`delete from receipts where actor_id = ${actorId} returning 1`,
             )
             // The plans of «Бюджет» (MOL-117) point at the categories, so they go before them.
             erased.budget_plans = await count(
