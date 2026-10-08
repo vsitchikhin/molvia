@@ -659,6 +659,90 @@ describe('«Записать»', () => {
     expect([trip.receiptId, trip.expenses.length]).toEqual([id, 1])
   })
 
+  // MOL-240, owner's В-1 «а» on adversarial А1: the person's word on a line goes with it — unless another
+  // purchase of theirs at the same seller still says it; nobody else's word moves
+  it('lets the person’s words on a line go with its purchase or its trip, and keeps a word still said', async () => {
+    const me = await insertActor(db)
+    const stranger = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+    const cheese = await insertItem(db, { name: 'Сыр Лори', searchKey: 'syr lori' })
+    const recordTwo = async (actorId: string) => {
+      const id = await parsedReceipt(actorId, LINES.slice(0, 2), {
+        receiptNo: String(Math.floor(Math.random() * 1e8)),
+      })
+      const tripId = randomUUID()
+      const answer = await record(actorId, id, {
+        tripId,
+        place: { id: place },
+        purchasedOn: '2026-09-26',
+        lines: [
+          {
+            position: 0,
+            skip: false,
+            item: { id: milk },
+            quantity: pieces(2),
+            amount: amount(740),
+          },
+          { position: 1, skip: false, item: { id: cheese }, quantity: null, amount: amount(1_450) },
+        ],
+      })
+      expect(answer.statusCode).toBe(200)
+      return tripId
+    }
+    const wordsOf = async (actorId: string) =>
+      (await db.select().from(storeMemory).where(eq(storeMemory.actorId, actorId)))
+        .map((word) => `${word.kind}:${word.itemId === milk ? 'milk' : 'cheese'}`)
+        .sort()
+    const all = ['sku:cheese', 'sku:milk', 'text:cheese', 'text:milk']
+    const first = await recordTwo(me)
+    const second = await recordTwo(me)
+    await recordTwo(stranger)
+    const cookie = await signIn(db, me)
+    const removeCheese = async (tripId: string) => {
+      const [bought] = await db
+        .select({ id: expenses.id })
+        .from(expenses)
+        .where(and(eq(expenses.tripId, tripId), eq(expenses.itemId, cheese)))
+      const removed = await app.inject({
+        method: 'DELETE',
+        url: `/trips/${tripId}/expenses/${bought?.id ?? ''}`,
+        headers: { cookie },
+      })
+      expect(removed.statusCode).toBe(200)
+    }
+
+    // the cheese of the first receipt removed: the second still says it, so the word stays
+    await removeCheese(first)
+    expect(await wordsOf(me)).toEqual(all)
+    // the cheese of the second removed too: nothing says it any more
+    await removeCheese(second)
+    expect(await wordsOf(me)).toEqual(['sku:milk', 'text:milk'])
+
+    // the first trip removed for good: the milk is still said by the second
+    expect(
+      (await app.inject({ method: 'DELETE', url: `/trips/${first}`, headers: { cookie } }))
+        .statusCode,
+    ).toBe(204)
+    const final = sql`clock_timestamp() - interval '11 minutes'`
+    await db.update(trips).set({ deletedAt: final }).where(eq(trips.id, first))
+    await createTripRepository(db).purgeStale()
+    expect(await wordsOf(me)).toEqual(['sku:milk', 'text:milk'])
+    // marked removed, the second may still come back with «Вернуть»: its words wait
+    expect(
+      (await app.inject({ method: 'DELETE', url: `/trips/${second}`, headers: { cookie } }))
+        .statusCode,
+    ).toBe(204)
+    await createTripRepository(db).purgeStale()
+    expect(await wordsOf(me)).toEqual(['sku:milk', 'text:milk'])
+    // removed for good: nothing of the person is left at this seller
+    await db.update(trips).set({ deletedAt: final }).where(eq(trips.id, second))
+    await createTripRepository(db).purgeStale()
+    expect(await wordsOf(me)).toEqual([])
+    // and nobody else's word moved
+    expect(await wordsOf(stranger)).toEqual(all)
+  })
+
   // MOL-222: the measure of 0.2 — what the person put right against what the review showed
   it('counts the lines put right against what the review showed, each line once', async () => {
     const me = await insertActor(db)

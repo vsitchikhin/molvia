@@ -16,6 +16,7 @@ import type { Conn } from './index'
 import { kindAt } from './kind-word'
 import { idOrNull, rowLimit } from './rows'
 import { expenses, identityOf, items, placeIdentity, places, trips, verdicts } from './schema'
+import { forgetWordsOf } from './store-memory-repository'
 import { liveItemId } from './trace'
 
 /** An expense to add, named by the device that adds it (MOL-21, В-2). */
@@ -681,6 +682,11 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
         return false
       }
 
+      // the line of a receipt goes with its purchase, and its words with it (MOL-240, В-1)
+      await forgetWordsOf(
+        db,
+        sql`l.expense_id = ${id} and e.trip_id = ${tripId} and r.actor_id = ${actorId}`,
+      )
       const removed = await db
         .delete(expenses)
         .where(and(eq(expenses.id, id), eq(expenses.tripId, tripId), ownedByActor(actorId)))

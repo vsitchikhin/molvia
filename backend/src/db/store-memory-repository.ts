@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
+import { storeMemoryWords } from '@molvia/model'
 import type { Currency, Money, StoreMemoryKind, StoreMemoryWord } from '@molvia/model'
 import type { Conn } from './index'
 import { storeMemory } from './schema'
@@ -43,6 +45,64 @@ export interface StoreMemoryRepository {
 }
 
 export const memoryKey = (word: StoreMemoryWord): string => `${word.kind}:${word.key}`
+
+/**
+ * The person's words the lines `going` taught go with them (MOL-240, owner's В-1 «а» on adversarial
+ * А1): a purchase removed, or its trip removed for good, leaves nothing of the line — the word was the
+ * person's, first on the next review of that shop, and kept «удалите и внесите заново» from correcting a
+ * wrong item. Only a word that still names the line's item, and that no other recorded line of the same
+ * person at the same seller still says — a word is one row per person and key, and another purchase may
+ * stand behind it. Called inside the transaction that deletes, before it does: `going` is a condition on
+ * `receipt_lines` aliased `l`. The erased keep their words without a name (MOL-126): erasure is not this.
+ */
+export async function forgetWordsOf(db: Conn, going: SQL): Promise<void> {
+  const spoken = (where: SQL) =>
+    db.execute<{
+      actor: string
+      tin: string
+      printed: string
+      sku: string | null
+      item: string
+      receipt: string
+      position: number
+    }>(sql`
+      select r.actor_id as actor, r.tin, l.printed, l.sku,
+        ${liveItemId(sql`e.item_id`)} as item, l.receipt_id as receipt, l.position
+      from receipt_lines l
+      join receipts r on r.id = l.receipt_id
+      join expenses e on e.id = l.expense_id
+      where r.status = 'recorded' and r.tin is not null and ${where}`)
+  const lines = await spoken(going)
+  if (lines.length === 0) return
+  const sameSpeaker = (line: { actor: string; tin: string; item: string }) =>
+    `${line.actor} ${line.tin} ${line.item}`
+  const leaving = new Set(lines.map((line) => `${line.receipt} ${String(line.position)}`))
+  const others = await spoken(
+    sql`(r.actor_id, r.tin) in (${sql.join(
+      lines.map((line) => sql`(${line.actor}::uuid, ${line.tin})`),
+      sql`, `,
+    )})`,
+  )
+  const said = new Set(
+    others
+      .filter((line) => !leaving.has(`${line.receipt} ${String(line.position)}`))
+      .flatMap((line) =>
+        storeMemoryWords(line).map((word) => `${sameSpeaker(line)} ${memoryKey(word)}`),
+      ),
+  )
+  const forgotten = lines.flatMap((line) =>
+    storeMemoryWords(line)
+      .filter((word) => !said.has(`${sameSpeaker(line)} ${memoryKey(word)}`))
+      .map(
+        (word) =>
+          sql`(${line.actor}::uuid, ${line.tin}, ${word.kind}, ${word.key}, ${line.item}::uuid)`,
+      ),
+  )
+  if (forgotten.length === 0) return
+  await db.execute(sql`
+    delete from ${storeMemory}
+    where (actor_id, tin, kind, key, item_id) in (${sql.join(forgotten, sql`, `)})`)
+}
 
 export function createStoreMemoryRepository(db: Conn): StoreMemoryRepository {
   return {
