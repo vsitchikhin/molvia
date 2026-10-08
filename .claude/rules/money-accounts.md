@@ -118,9 +118,11 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   so «Счета» kept on the phone before it still read. **«На счетах сейчас»** over the month's switcher
   on «Деньги» (Ф-27) shows them — «всего» and «можно тратить» — while a live account is, «now» and not
   the month's: it does not move as the months are turned and stands by the month's error and its
-  skeleton, an answer of its own — and «Повторить» of the month asks «Счета» again too (adversarial
-  А2). **Kept from before, it is not «now»** (А3): offline, or when «Счета» did not answer, it reads «На
-  счетах на 24 сент., 14:05» by `countedAt`, as «Счета» say it — the strip under the switcher dates the
+  skeleton, an answer of its own — and «Повторить» of the month, the error's and the strip's
+  «сервер не ответил», asks «Счета» again too (adversarial А2, self-review Р3-3). **Once the last read
+  failed, it is not «now»** (А3, Б1): offline, or when «Счета» did not answer — whether or not they
+  answered earlier in the app's life (`failed` of the store, not `stale`, which an answer of the
+  session hides) — it reads «На счетах на 24 сент., 14:05» by `countedAt`, as «Счета» say it — the strip under the switcher dates the
   month, which is read apart and may be days younger; kept while a read is on its way it stays «сейчас»,
   or every opening would flicker an hour. A card that is a link, not a `NavRow`: the row holds no figure
   of 28. With none, or no answer of «Счета» and nothing kept, «Счета» is a
