@@ -19,16 +19,17 @@ Rules: `.claude/rules/money-accounts.md`. A test beside its source, or mirroring
 
 - `backend/src/usecases/account-of.ts` — Use-case helpers: which accounts an operation may name, and the account side of a spending, income, exchange or trip payment.
 - `backend/src/usecases/money-accounts.ts` — Use cases of «Счета»: the counted page, journal, «не попали», the check, the held hint, add/amend/remove/restore, a trip's account. Tests: `backend/tests/money-accounts.integration.test.ts`.
-- `backend/src/usecases/transfers.ts` — Use cases of «Перевод» (MOL-253): write, amend, read, remove and restore a transfer, its fee in «Прочее» at the rate of its day. Tests: `backend/tests/erasure.integration.test.ts`.
+- `backend/src/usecases/transfers.ts` — Use cases of «Перевод» (MOL-253): write, amend, read, remove and restore a transfer, its fee in «Прочее» at the rate of its day. Tests: `backend/tests/transfers.integration.test.ts`.
 
 ## backend · db
 
 - `backend/src/db/money-accounts-repository.ts` — Repository of accounts: the accounts, operations of all five kinds in one shape, the checks and the account of a trip. Tests: `backend/tests/money-accounts.integration.test.ts`.
-- `backend/src/db/transfers-repository.ts` — Repository of transfers (MOL-253): add with repeat/conflict under the owner's lock, amend with versions, mark-remove and restore — each with its fee, a row of `spendings`. Tests: `backend/tests/erasure.integration.test.ts`.
+- `backend/src/db/transfers-repository.ts` — Repository of transfers (MOL-253): add with repeat/conflict under the owner's lock, amend with versions, mark-remove and restore — each with its fee, a row of `spendings`. Tests: `backend/tests/transfers.integration.test.ts`.
 
 ## backend · tests
 
 - `backend/tests/money-accounts.integration.test.ts` — Integration test: accounts over HTTP — ownership, balances from the start, trips and «списано», remove or «убрать», checks, journal, totals.
+- `backend/tests/transfers.integration.test.ts` — Integration test: «Перевод» over HTTP — two balances only, the month by the fee alone, the wallet untouched, savings in «Остаток», repeat and refusals, versions, removal with the fee, «Траты» refused the fee, erasure and copy.
 
 ## frontend · views
 
