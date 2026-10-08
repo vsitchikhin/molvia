@@ -6,6 +6,7 @@ import { ERROR, receiptRecordedCodec, tripHistoryCodec, tripViewCodec } from '@m
 import type { FastifyInstance } from 'fastify'
 import { createExpenseRepository } from '@/db/expenses-repository'
 import { createMoneyRepository } from '@/db/money-repository'
+import { createReceiptRepository } from '@/db/receipts-repository'
 import {
   expenses,
   items,
@@ -18,6 +19,8 @@ import {
   storeMemory,
   trips,
 } from '@/db/schema'
+import { settleStoreMemory } from '@/db/store-memory-repository'
+import { createTripRepository } from '@/db/trips-repository'
 import { buildServer } from '@/server'
 import { connect, connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtures'
@@ -220,7 +223,13 @@ describe('«Записать»', () => {
       .from(receiptLines)
       .where(eq(receiptLines.receiptId, id))
       .orderBy(asc(receiptLines.position))
-    expect(lines.map((line) => line.expenseId !== null)).toEqual([true, true, true, true, false])
+    // the bag was left out: its line is not kept (MOL-240, В-2)
+    expect(lines.map((line) => [line.position, line.expenseId !== null])).toEqual([
+      [0, true],
+      [1, true],
+      [2, true],
+      [3, true],
+    ])
     expect(await db.select().from(receiptParts).where(eq(receiptParts.receiptId, id))).toEqual([])
     // the lines recorded as read keep their rows; the chocolate's figures were corrected (890 ≠ 980
     // read), the bag was left out — theirs go
@@ -550,9 +559,10 @@ describe('«Записать»', () => {
     expect([overflow.statusCode, codeOf(overflow)]).toEqual([400, ERROR.INVALID_AMOUNT])
   })
 
-  // review 1, В1, В2, В7: the receipt row holds the trip's date on the accounts, «из чека» and the
-  // guard against a second record — it goes with its trip, never before it
-  it('keeps a recorded receipt while its trip is there, and lets it be recorded again once the trip is gone', async () => {
+  // review 1, В1, В2: the receipt row holds the trip's date on the accounts, «из чека» and the guard
+  // against a second record — it goes with its trip, never before it, and never after (MOL-240, А2 of
+  // the adversarial review of MOL-97): nobody sees a recorded receipt without its trip
+  it('keeps a recorded receipt while its trip is there, and lets it go with the trip removed for good', async () => {
     const me = await insertActor(db)
     const place = await insertPlace(db)
     const milk = await insertItem(db)
@@ -561,31 +571,372 @@ describe('«Записать»', () => {
       tripId: randomUUID(),
       place: { id: place },
       purchasedOn: '2026-09-26',
-      lines: [{ position: 0, skip: false, item: { id: milk }, quantity: null, amount: null }],
+      // as read: its row is kept for the reader's training, and must go with the receipt too
+      lines: [
+        { position: 0, skip: false, item: { id: milk }, quantity: pieces(2), amount: amount(740) },
+      ],
     })
     const first = body()
     expect((await record(me, id, first)).statusCode).toBe(200)
     const cookie = await signIn(db, me)
-    const removed = await app.inject({
-      method: 'DELETE',
-      url: `/receipts/${id}`,
-      headers: { cookie },
-    })
+    const call = (method: 'DELETE' | 'POST', url: string) =>
+      app.inject({ method, url, headers: { cookie } })
+    const removed = await call('DELETE', `/receipts/${id}`)
     expect([removed.statusCode, codeOf(removed)]).toEqual([409, ERROR.CONFLICT])
+    const kept = async () => ({
+      receipts: (await db.select().from(receipts).where(eq(receipts.id, id))).length,
+      lines: (await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id))).length,
+      rows: (await db.select().from(receiptLineImages).where(eq(receiptLineImages.receiptId, id)))
+        .length,
+    })
 
-    // the trip marked removed may still come back: neither the old trip nor a new one
-    await db.update(trips).set({ deletedAt: new Date() }).where(eq(trips.id, first.tripId))
+    // the trip marked removed may still come back: neither the old trip nor a new one, and
+    // «Вернуть» brings the receipt back whole
+    expect((await call('DELETE', `/trips/${first.tripId}`)).statusCode).toBe(204)
     expect((await record(me, id, first)).statusCode).toBe(409)
     expect((await record(me, id, body())).statusCode).toBe(409)
+    expect((await call('POST', `/trips/${first.tripId}/restore`)).statusCode).toBe(200)
+    expect(await kept()).toEqual({ receipts: 1, lines: 1, rows: 1 })
 
-    // removed for good: the receipt is recorded again, from its lines
-    await db.delete(trips).where(eq(trips.id, first.tripId))
-    const again = body()
-    expect((await record(me, id, again)).statusCode).toBe(200)
-    const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
-    expect([row?.status, row?.tripId]).toEqual(['recorded', again.tripId])
-    // the measure counts the receipt's first record only (MOL-222, review 7)
-    expect(await db.select().from(receiptDays)).toMatchObject([{ recorded: 1, lines: 1 }])
+    // removed for good by the minute timers of `server.ts`: the receipt, its lines and rows go too
+    expect((await call('DELETE', `/trips/${first.tripId}`)).statusCode).toBe(204)
+    await db
+      .update(trips)
+      .set({ deletedAt: sql`clock_timestamp() - interval '11 minutes'` })
+      .where(eq(trips.id, first.tripId))
+    await createTripRepository(db).purgeStale()
+    await createReceiptRepository(db).purgeStale()
+    expect(await kept()).toEqual({ receipts: 0, lines: 0, rows: 0 })
+
+    // the paper is recorded again by a new shot: its twin went with the trip, and it is counted
+    const shot = await parsedReceipt(me, LINES.slice(0, 1))
+    expect((await record(me, shot, body())).statusCode).toBe(200)
+    expect(await db.select().from(receiptDays)).toMatchObject([{ recorded: 2, lines: 2 }])
+  })
+
+  // MOL-240, Б2 of the adversarial review of MOL-97: a purchase removed at once took nothing of its
+  // receipt, and its line — what and for how much — lay on the server, unseen, until erasure
+  it('lets a line go with its purchase, and keeps the rest of the receipt with its trip', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+    const cheese = await insertItem(db, { name: 'Сыр Лори', searchKey: 'syr lori' })
+    const id = await parsedReceipt(me, LINES.slice(0, 2))
+    const tripId = randomUUID()
+    const recorded = await record(me, id, {
+      tripId,
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        { position: 0, skip: false, item: { id: milk }, quantity: pieces(2), amount: amount(740) },
+        { position: 1, skip: false, item: { id: cheese }, quantity: null, amount: amount(1_450) },
+      ],
+    })
+    expect(recorded.statusCode).toBe(200)
+    const [bought] = await db
+      .select({ id: expenses.id })
+      .from(expenses)
+      .where(and(eq(expenses.tripId, tripId), eq(expenses.itemId, cheese)))
+    const cookie = await signIn(db, me)
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: `/trips/${tripId}/expenses/${bought?.id ?? ''}`,
+      headers: { cookie },
+    })
+    expect(removed.statusCode).toBe(200)
+
+    const lines = await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id))
+    expect(lines.map((line) => line.position)).toEqual([0])
+    const rows = await db
+      .select()
+      .from(receiptLineImages)
+      .where(eq(receiptLineImages.receiptId, id))
+    expect(rows.map((row) => row.position)).toEqual([0])
+    // the receipt still dates its trip and names it «из чека»
+    const [receipt] = await db.select().from(receipts).where(eq(receipts.id, id))
+    expect(receipt).toMatchObject({ status: 'recorded', tripId, tin: TIN })
+    const view = await app.inject({ method: 'GET', url: `/trips/${tripId}`, headers: { cookie } })
+    const trip = tripViewCodec.parse(view.json())
+    expect([trip.receiptId, trip.expenses.length]).toEqual([id, 1])
+  })
+
+  // MOL-240, owner's В-1 «а» on adversarial А1: the person's word on a line goes with it — unless another
+  // purchase of theirs at the same seller still says it; nobody else's word moves
+  it('lets the person’s words on a line go with its purchase or its trip, and keeps a word still said', async () => {
+    const me = await insertActor(db)
+    const stranger = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+    const cheese = await insertItem(db, { name: 'Сыр Лори', searchKey: 'syr lori' })
+    const recordTwo = async (actorId: string) => {
+      const id = await parsedReceipt(actorId, LINES.slice(0, 2), {
+        receiptNo: String(Math.floor(Math.random() * 1e8)),
+      })
+      const tripId = randomUUID()
+      const answer = await record(actorId, id, {
+        tripId,
+        place: { id: place },
+        purchasedOn: '2026-09-26',
+        lines: [
+          {
+            position: 0,
+            skip: false,
+            item: { id: milk },
+            quantity: pieces(2),
+            amount: amount(740),
+          },
+          { position: 1, skip: false, item: { id: cheese }, quantity: null, amount: amount(1_450) },
+        ],
+      })
+      expect(answer.statusCode).toBe(200)
+      return tripId
+    }
+    const wordsOf = async (actorId: string) =>
+      (await db.select().from(storeMemory).where(eq(storeMemory.actorId, actorId)))
+        .map((word) => `${word.kind}:${word.itemId === milk ? 'milk' : 'cheese'}`)
+        .sort()
+    const all = ['sku:cheese', 'sku:milk', 'text:cheese', 'text:milk']
+    const first = await recordTwo(me)
+    const second = await recordTwo(me)
+    await recordTwo(stranger)
+    const cookie = await signIn(db, me)
+    const removeCheese = async (tripId: string) => {
+      const [bought] = await db
+        .select({ id: expenses.id })
+        .from(expenses)
+        .where(and(eq(expenses.tripId, tripId), eq(expenses.itemId, cheese)))
+      const removed = await app.inject({
+        method: 'DELETE',
+        url: `/trips/${tripId}/expenses/${bought?.id ?? ''}`,
+        headers: { cookie },
+      })
+      expect(removed.statusCode).toBe(200)
+    }
+
+    // the cheese of the first receipt removed: the second still says it, so the word stays
+    await removeCheese(first)
+    expect(await wordsOf(me)).toEqual(all)
+    // the cheese of the second removed too: nothing says it any more
+    await removeCheese(second)
+    expect(await wordsOf(me)).toEqual(['sku:milk', 'text:milk'])
+
+    // the first trip removed for good: the milk is still said by the second
+    expect(
+      (await app.inject({ method: 'DELETE', url: `/trips/${first}`, headers: { cookie } }))
+        .statusCode,
+    ).toBe(204)
+    const final = sql`clock_timestamp() - interval '11 minutes'`
+    await db.update(trips).set({ deletedAt: final }).where(eq(trips.id, first))
+    await createTripRepository(db).purgeStale()
+    expect(await wordsOf(me)).toEqual(['sku:milk', 'text:milk'])
+    // marked removed, the second may still come back with «Вернуть»: its words wait
+    expect(
+      (await app.inject({ method: 'DELETE', url: `/trips/${second}`, headers: { cookie } }))
+        .statusCode,
+    ).toBe(204)
+    await createTripRepository(db).purgeStale()
+    expect(await wordsOf(me)).toEqual(['sku:milk', 'text:milk'])
+    // removed for good: nothing of the person is left at this seller
+    await db.update(trips).set({ deletedAt: final }).where(eq(trips.id, second))
+    await createTripRepository(db).purgeStale()
+    expect(await wordsOf(me)).toEqual([])
+    // and nobody else's word moved
+    expect(await wordsOf(stranger)).toEqual(all)
+  })
+
+  // MOL-240, adversarial round 3: the word kept is what the last line still there says — its item,
+  // price and moment — and two removals at once leave no word behind either
+  describe('the person’s word after a purchase removed (round 3)', () => {
+    const MILK = { printed: 'Կաթ «Իգիթ» 3.2% 1լ', sku: '1163909' }
+    async function recordMilk(actorId: string, place: string, itemId: string, drams: number) {
+      const id = await parsedReceipt(actorId, [{ ...MILK, price: drams, sum: drams }], {
+        receiptNo: String(Math.floor(Math.random() * 1e8)),
+      })
+      const tripId = randomUUID()
+      const answer = await record(actorId, id, {
+        tripId,
+        place: { id: place },
+        purchasedOn: '2026-09-26',
+        lines: [
+          {
+            position: 0,
+            skip: false,
+            item: { id: itemId },
+            quantity: pieces(1),
+            amount: amount(drams),
+          },
+        ],
+      })
+      expect(answer.statusCode).toBe(200)
+      const [bought] = await db
+        .select({ id: expenses.id })
+        .from(expenses)
+        .where(eq(expenses.tripId, tripId))
+      const [receipt] = await db.select().from(receipts).where(eq(receipts.id, id))
+      return { tripId, expenseId: bought?.id ?? '', recordedAt: receipt?.recordedAt }
+    }
+    const remove = (actorId: string, bought: { tripId: string; expenseId: string }) =>
+      createExpenseRepository(db).remove(bought.expenseId, bought.tripId, actorId)
+    const wordsOf = (actorId: string) =>
+      db
+        .select()
+        .from(storeMemory)
+        .where(eq(storeMemory.actorId, actorId))
+        .orderBy(asc(storeMemory.kind))
+
+    it('Р3-1: keeps the older purchase’s price and moment, not the removed one’s', async () => {
+      const me = await insertActor(db)
+      const place = await insertPlace(db)
+      const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+      const older = await recordMilk(me, place, milk, 370)
+      const newer = await recordMilk(me, place, milk, 400)
+      expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([40_000n, 40_000n])
+      expect(await remove(me, newer)).toBe(true)
+      const words = await wordsOf(me)
+      expect(words.map((word) => [word.kind, word.itemId, word.priceMinor])).toEqual([
+        ['sku', milk, 37_000n],
+        ['text', milk, 37_000n],
+      ])
+      expect(words.map((word) => word.writtenAt)).toEqual([older.recordedAt, older.recordedAt])
+    })
+
+    it('Р3-2: a purchase of the line under another item removed gives the word back to the one still there', async () => {
+      const me = await insertActor(db)
+      const place = await insertPlace(db)
+      const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+      const kefir = await insertItem(db, { name: 'Кефир', searchKey: 'kefir' })
+      await recordMilk(me, place, milk, 370)
+      const wrong = await recordMilk(me, place, kefir, 370)
+      expect((await wordsOf(me)).map((word) => word.itemId)).toEqual([kefir, kefir])
+      expect(await remove(me, wrong)).toBe(true)
+      expect((await wordsOf(me)).map((word) => word.itemId)).toEqual([milk, milk])
+    })
+
+    // round 4, Р4-1: «as read» is judged at the record, never from the purchase as it is now
+    it('Р4-1: keeps the shelf price after the sum paid was put right', async () => {
+      const me = await insertActor(db)
+      const place = await insertPlace(db)
+      const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+      const bought = await recordMilk(me, place, milk, 370)
+      const cookie = await signIn(db, me)
+      const patched = await app.inject({
+        method: 'PATCH',
+        url: `/trips/${bought.tripId}/expenses/${bought.expenseId}`,
+        headers: { cookie },
+        payload: { amount: amount(350) },
+      })
+      expect(patched.statusCode).toBe(200)
+      await settleStoreMemory(db)
+      expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([37_000n, 37_000n])
+    })
+
+    // round 5, Р5-1: a line an image rolled back recorded was never judged, `as_read` null — its price
+    // stays while the purchase is as the line was read, and goes once the sum was put right
+    it('Р5-1: keeps the shelf price of a line an image rolled back recorded, while its purchase says it', async () => {
+      const me = await insertActor(db)
+      const place = await insertPlace(db)
+      const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+      const bought = await recordMilk(me, place, milk, 370)
+      await db
+        .update(receiptLines)
+        .set({ asRead: null })
+        .where(eq(receiptLines.expenseId, bought.expenseId))
+      await settleStoreMemory(db)
+      expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([37_000n, 37_000n])
+      // the control: put right after the record, nothing says the shelf any more
+      await db
+        .update(expenses)
+        .set({ amountMinor: 35_000n })
+        .where(eq(expenses.id, bought.expenseId))
+      await settleStoreMemory(db)
+      expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([null, null])
+    })
+
+    // round 6, Р6-1: a line «Записать» judged not as read keeps no price, whatever the purchase says later
+    it('Р6-1: gives no shelf price to a line recorded with its sum put right, once the purchase agrees', async () => {
+      const me = await insertActor(db)
+      const place = await insertPlace(db)
+      const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+      const id = await parsedReceipt(me, [{ ...MILK, price: 370, sum: 370 }])
+      const tripId = randomUUID()
+      const answer = await record(me, id, {
+        tripId,
+        place: { id: place },
+        purchasedOn: '2026-09-26',
+        lines: [
+          {
+            position: 0,
+            skip: false,
+            item: { id: milk },
+            quantity: pieces(1),
+            amount: amount(350),
+          },
+        ],
+      })
+      expect(answer.statusCode).toBe(200)
+      const [line] = await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id))
+      expect(line?.asRead).toBe(false)
+      // the purchase put back to the sum read: the record's judgement stands
+      await db.update(expenses).set({ amountMinor: 37_000n }).where(eq(expenses.tripId, tripId))
+      await settleStoreMemory(db)
+      expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([null, null])
+    })
+
+    // round 4, Р4-1б: the word and the record share one moment — settling right after moves nothing
+    it('Р4-1б: settles nothing a record has just written', async () => {
+      const me = await insertActor(db)
+      const place = await insertPlace(db)
+      const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+      // one record: a second would write the first's words over, and a new word is the case (round 5)
+      await recordMilk(me, place, milk, 370)
+      expect(await settleStoreMemory(db)).toBe(0)
+    })
+
+    // round 4, Р4-2: a person at a time, by their id — thousands of sellers are no tree for the parser
+    it('Р4-2: settles a person with thousands of sellers', async () => {
+      const me = await insertActor(db)
+      const milk = await insertItem(db)
+      const sellers = Array.from({ length: 9_000 }, (_, n) => String(10_000_000 + n))
+      for (let at = 0; at < sellers.length; at += 1_000) {
+        await db.insert(storeMemory).values(
+          sellers.slice(at, at + 1_000).map((tin) => ({
+            id: randomUUID(),
+            tin,
+            kind: 'sku' as const,
+            key: '1163909',
+            actorId: me,
+            itemId: milk,
+          })),
+        )
+      }
+      // no line says any of them: every word goes
+      expect(await settleStoreMemory(db)).toBe(9_000)
+      expect(await wordsOf(me)).toEqual([])
+    }, 30_000)
+
+    it('Р3-3: two removals at once leave no word behind', async () => {
+      const me = await insertActor(db)
+      const place = await insertPlace(db)
+      const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+      const first = await recordMilk(me, place, milk, 370)
+      const second = await recordMilk(me, place, milk, 380)
+      const other = connectDrizzle()
+      try {
+        let racing: Promise<boolean> | undefined
+        await db.transaction(async (tx) => {
+          expect(await createExpenseRepository(tx).remove(first.expenseId, first.tripId, me)).toBe(
+            true,
+          )
+          // another phone, while the first removal is still open: it waits for the person's lock
+          racing = createExpenseRepository(other.db).remove(second.expenseId, second.tripId, me)
+          await new Promise((resolve) => setTimeout(resolve, 200))
+        })
+        expect(await racing).toBe(true)
+      } finally {
+        await other.close()
+      }
+      expect(await wordsOf(me)).toEqual([])
+    })
   })
 
   // MOL-222: the measure of 0.2 — what the person put right against what the review showed

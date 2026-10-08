@@ -57,6 +57,11 @@ async function receipt(
   const read = status === 'parsed' || status === 'failed' || status === 'recorded'
   // by the database's clock, which the claim compares with — not this process's (review №4)
   const readAt = sql`clock_timestamp() - make_interval(secs => ${secondsAgo})`
+  // a recorded receipt is its trip's (MOL-240)
+  const trip =
+    status === 'recorded' && patch.tripId === undefined
+      ? { tripId: await insertTrip(db, { actorId, placeId: await insertPlace(db) }) }
+      : {}
   await db.insert(receipts).values({
     id,
     actorId,
@@ -69,6 +74,7 @@ async function receipt(
     capturedAt: new Date('2026-10-04T08:15:00.000Z'),
     queuedAt: status === 'uploading' ? null : readAt,
     readAt: read ? readAt : null,
+    ...trip,
     ...patch,
   })
   if (status !== 'failed' && lines > 0) {

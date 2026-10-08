@@ -146,11 +146,18 @@ export const receiptSummaryCodec = z.strictObject({
   total: moneyCodec.nullable(),
   /** The lines add up to the printed total. */
   balanced: z.boolean(),
+  /**
+   * Its lines: as read, before it is recorded; once recorded, only those that are purchases — a line not
+   * recorded goes at «Записать», and one whose purchase was removed with it (MOL-240).
+   */
   lineCount: z.int().min(0),
   /** Lines whose own arithmetic does not hold — highlighted, never refused (Р-3 of MOL-113). */
   unsettled: z.int().min(0),
   place: receiptPlaceCodec.nullable(),
-  /** The purchases it was recorded as (MOL-126); `null` before, and once they are removed for good. */
+  /**
+   * The purchases it was recorded as (MOL-126); `null` before. Never after: the trip removed for good takes
+   * the receipt with it (MOL-240).
+   */
   tripId: z.uuid().nullable(),
 })
 export type ReceiptSummary = z.output<typeof receiptSummaryCodec>
@@ -172,6 +179,11 @@ export const receiptDuplicateCodec = z.strictObject({
  */
 export const receiptDetailCodec = z.strictObject({
   receipt: receiptSummaryCodec,
+  /**
+   * A line's position is its place here — true of a receipt not recorded, the only one the phone draws.
+   * A recorded one keeps only the lines that are purchases (MOL-240), so its list has gaps no position
+   * names: never read a recorded receipt's line by its place, nor a code's `position` against it.
+   */
   lines: z.array(receiptReviewLineCodec),
   rate: rateCodec.nullable(),
   duplicateOf: receiptDuplicateCodec.nullable(),
@@ -265,8 +277,9 @@ export const receiptRecordedCodec = z.strictObject({
 export type ReceiptRecorded = z.output<typeof receiptRecordedCodec>
 
 /**
- * The trip the receipt was recorded as — until that trip is removed for good, so one only marked removed,
- * which «Вернуть» may still bring back, too — or none; read once no «Записать» of it is still running on
+ * The trip the receipt was recorded as — one only marked removed, which «Вернуть» may still bring back,
+ * too — or none: not recorded (a trip removed for good takes the receipt, MOL-240, and the answer is
+ * 404); read once no «Записать» of it is still running on
  * the server (MOL-169, adversarial Г1): what «Отменить запись» asks before it lets a begun record go,
  * and where the review goes when it is recorded (round 4, Д1; review 8).
  */
