@@ -123,6 +123,9 @@ export function provideSheetAnnouncer(shown: Ref<boolean>): Ref<Announcement[]> 
 
   function close(): void {
     hub.open = hub.open.filter((other) => other !== sheet)
+    // Its held words may stand in a sheet over it, where they landed while that one was up. Today
+    // the sheet under is never put away alone — its step back takes the one over it too (adversarial
+    // round 3, Н1) — so no test reaches this; it keeps a stack closed one by one honest.
     for (const entry of sheet.held) entry.unsay()
     sheet.announcements.value = []
   }
