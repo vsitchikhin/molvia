@@ -474,7 +474,9 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
      *
      * The link's answer is laid before the page opens (MOL-249): laid on the open page right before
      * Enter, a link once reached the server, and the screen went on to the purchase sheet. Nothing is
-     * linked before the test's own Enter — a link sent earlier is said so here, not as a lost focus.
+     * linked before the test's own Enter — a link sent earlier is said so here, not as a lost focus:
+     * pressed early, «Link and record» moves the screen on, and the step that fails is the question's or
+     * the focus's, so the check stands in `finally` and its words replace theirs (review С-3).
      */
     async function asked(
       page: Page,
@@ -489,18 +491,45 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
           linked.push(request.url())
         }
       })
-      await open(page, '/purchases/manual/add')
-      await anItem(page, name)
-      await typeCode(page, code)
-      await expect(missingOf(page, code)).toBeVisible()
-      await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(name)
-      await page.getByRole('option', { name: new RegExp(name) }).click()
-      await expect(
-        page.locator('.not-found').getByText(`Link code ${code} to «${name}»?`),
-      ).toBeVisible()
-      await expect.poll(async () => (await focused(page)).text).toBe('Link and record')
-      expect(linked, 'nothing is linked before Enter').toEqual([])
+      try {
+        await open(page, '/purchases/manual/add')
+        await anItem(page, name)
+        await typeCode(page, code)
+        await expect(missingOf(page, code)).toBeVisible()
+        await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(name)
+        await page.getByRole('option', { name: new RegExp(name) }).click()
+        await expect(
+          page.locator('.not-found').getByText(`Link code ${code} to «${name}»?`),
+        ).toBeVisible()
+        await expect.poll(async () => (await focused(page)).text).toBe('Link and record')
+      } finally {
+        expect(linked, 'nothing is linked before Enter').toEqual([])
+      }
     }
+
+    test('a link sent before the test’s Enter is named by `asked`, never read as a lost focus (MOL-249)', async ({
+      page,
+    }) => {
+      // The second reading of the flake, made on purpose: the first «Link and record» drawn is pressed
+      // at once. The link reaches the server, the purchase sheet opens, and the focus `asked` waits for
+      // never comes — the very `Received: ''` the flake left behind, unless `asked` names the link.
+      await page.addInitScript(() => {
+        let pressed = false
+        new MutationObserver(() => {
+          if (pressed) return
+          for (const button of document.querySelectorAll('button')) {
+            if (button.textContent.trim() !== 'Link and record') continue
+            pressed = true
+            button.click()
+            return
+          }
+        }).observe(document, { subtree: true, childList: true })
+      })
+
+      await expect(asked(page, `Кефир ${tag} ф0`, freshCode())).rejects.toThrow(
+        'nothing is linked before Enter',
+      )
+    })
 
     test('a miss, a shop’s label: the scanner hands the focus back, never to the body', async ({
       page,
