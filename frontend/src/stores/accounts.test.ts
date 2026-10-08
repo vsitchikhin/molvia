@@ -45,6 +45,7 @@ function page(balance: string, countedAt = '2026-09-27T10:05:00Z'): MoneyAccount
       },
     ],
     totals: { total: amd(balance), spendable: amd(balance), savings: amd('0'), uncounted: 0 },
+    incomeTotals: null,
     unassigned: 0,
     countedAt: new Date(countedAt),
   }

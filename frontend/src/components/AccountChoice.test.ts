@@ -67,6 +67,7 @@ function page(accounts: MoneyAccountView[]): MoneyAccountsResponse {
     spendCurrency: 'AMD',
     accounts,
     totals: { total: zero, spendable: zero, savings: zero, uncounted: 0 },
+    incomeTotals: null,
     unassigned: 0,
     countedAt: new Date(),
   }

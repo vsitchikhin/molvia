@@ -61,6 +61,7 @@ function page(days: [string, ReturnType<typeof entry>[]][], cursor: JournalKey |
     rate: null,
     rateKind: 'live',
     previousSpent: null,
+    previousToDay: null,
     byCategory: [],
     slices: [],
     categories: [{ id: BEAUTY, preset: 'beauty', name: null, colour: null, archived: false }],

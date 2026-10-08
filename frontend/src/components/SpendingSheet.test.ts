@@ -67,6 +67,7 @@ function month(spentOn: string): MoneyMonthView {
     rate: { base: 'RUB', quote: 'AMD', scaled: 4_620_000n, source: 'personal', asOf: new Date() },
     rateKind: 'live',
     previousSpent: amd('345620'),
+    previousToDay: null,
     byCategory: [{ categoryId: OTHER, amount: amd('1000') }],
     slices: [{ categoryId: OTHER, amount: amd('1000'), count: 1, level: 1000 }],
     categories: [{ id: OTHER, preset: 'other', name: null, colour: null, archived: false }],

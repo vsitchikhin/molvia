@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { DEVIATIONS_SHOWN, monthCharts, USUAL_MIN_CLOSED } from '#model/entities/money-chart-month'
+import {
+  comparedDay,
+  DEVIATIONS_SHOWN,
+  monthCharts,
+  previousToDay,
+  USUAL_MIN_CLOSED,
+} from '#model/entities/money-chart-month'
 import type { MonthChartsInput } from '#model/entities/money-chart-month'
 import { CHART_LEVEL } from '#model/entities/money-charts'
 import { moneyMonth } from '#model/entities/money-month'
@@ -418,5 +424,82 @@ describe('monthCharts — the ring', () => {
       income: money(140_000n, 'RUB'),
     })
     expect(slices[0]).toMatchObject({ members: [], income: money(200_000n, 'RUB') })
+  })
+})
+
+describe('the day of comparison and the month before to it (MOL-183)', () => {
+  it('reads the running month to today', () => {
+    expect(comparedDay(counted('2026-10', [spending(500, '2026-10-03')]), '2026-10-12')).toBe(12)
+  })
+
+  it('reads it to a later day spent on — a rent dated the 15th (Р-6)', () => {
+    const october = counted('2026-10', [spending(500, '2026-10-03'), spending(9000, '2026-10-15')])
+    expect(comparedDay(october, '2026-10-12')).toBe(15)
+  })
+
+  it('reads a closed month whole, a short one to its own last day', () => {
+    expect(comparedDay(counted('2026-09'), '2026-10-12')).toBe(30)
+    expect(comparedDay(counted('2026-02'), '2026-10-12')).toBe(28)
+  })
+
+  it('takes the month before to the same day, the day itself in, the next out', () => {
+    const september = counted('2026-09', [
+      spending(100, '2026-09-05'),
+      spending(200, '2026-09-12'),
+      spending(400, '2026-09-13'),
+    ])
+    expect(previousToDay(counted('2026-10'), september, '2026-10-12')).toEqual({
+      day: 12,
+      spent: money(30_000n, 'AMD'),
+    })
+  })
+
+  it('moves the day with a later spending of the running month', () => {
+    const september = counted('2026-09', [spending(200, '2026-09-12'), spending(400, '2026-09-13')])
+    const october = counted('2026-10', [spending(9000, '2026-10-15')])
+    expect(previousToDay(october, september, '2026-10-12')).toEqual({
+      day: 15,
+      spent: money(60_000n, 'AMD'),
+    })
+  })
+
+  it('reads a shorter month before whole — the 31st of March against all of February', () => {
+    const february = counted('2026-02', [spending(100, '2026-02-01'), spending(300, '2026-02-28')])
+    expect(previousToDay(counted('2026-03'), february, '2026-03-31')).toEqual({
+      day: 31,
+      spent: money(40_000n, 'AMD'),
+    })
+  })
+
+  it('counts only what a rate counted, as the month’s own sum does', () => {
+    const september = counted('2026-09', [
+      spending(100, '2026-09-02'),
+      spending(50, '2026-09-03', 'other', 'USD'),
+    ])
+    expect(september.uncounted).toHaveLength(1)
+    expect(previousToDay(counted('2026-10'), september, '2026-10-12')?.spent).toEqual(
+      september.spent,
+    )
+  })
+
+  it('names the day with no sum when the month before holds nothing', () => {
+    expect(previousToDay(counted('2026-10'), counted('2026-09'), '2026-10-02')).toEqual({
+      day: 2,
+      spent: null,
+    })
+  })
+
+  it('says nothing of a month not running — it is compared whole', () => {
+    const september = counted('2026-09', [spending(100, '2026-09-05')])
+    expect(previousToDay(counted('2026-08'), counted('2026-07'), '2026-10-12')).toBeNull()
+    expect(previousToDay(september, counted('2026-08'), '2026-10-12')).toBeNull()
+  })
+
+  it('keeps a zero to the day apart from no month at all', () => {
+    const september = counted('2026-09', [spending(100, '2026-09-20')])
+    expect(previousToDay(counted('2026-10'), september, '2026-10-12')).toEqual({
+      day: 12,
+      spent: money(0n, 'AMD'),
+    })
   })
 })

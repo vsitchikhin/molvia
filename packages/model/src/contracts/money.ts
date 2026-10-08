@@ -137,6 +137,16 @@ export const moneyMonthCodec = z.strictObject({
   rate: rateCodec.nullable(),
   rateKind: z.enum(['live', 'frozen']),
   previousSpent: moneyCodec.nullable(),
+  /**
+   * The running month against the one before to the same day (MOL-183, С-12): `previousToDay` of the
+   * domain — the day, and what the month before had spent by it, null when it holds nothing. Null
+   * for a month not running, compared whole by `previousSpent`. Defaulted, as `budget` is: a month
+   * kept before it, or an answer of a server before it, is a month with no comparison.
+   */
+  previousToDay: z
+    .strictObject({ day: z.int().min(1).max(31), spent: moneyCodec.nullable() })
+    .nullable()
+    .default(null),
   byCategory: z.array(z.strictObject({ categoryId: z.uuid(), amount: moneyCodec })),
   /**
    * The ring of «Куда ушли» (MOL-156): `donutSlices` of `byCategory` — six categories at most, the
@@ -210,6 +220,7 @@ export function moneyMonthViewOf(
   categories: readonly SpendingCategory[],
   after?: JournalKey,
   budget: MoneyMonthView['budget'] = null,
+  previousToDay: MoneyMonthView['previousToDay'] = null,
 ): MoneyMonthView {
   const all = month.days.flatMap((day) =>
     day.entries.map((entry) => ({ day, entry, key: journalKeyOf(entry) })),
@@ -255,6 +266,7 @@ export function moneyMonthViewOf(
     byCategory: [...month.byCategory],
     slices: donutSlices(month.byCategory),
     previousSpent,
+    previousToDay,
     categories: categoryOrder(categories).map(spendingCategoryViewOf),
     days,
     cursor: rest.length > 0 ? (page.at(-1)?.key ?? null) : null,
