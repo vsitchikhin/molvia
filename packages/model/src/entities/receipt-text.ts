@@ -1288,9 +1288,11 @@ const DEPARTMENT_MOMENT = new RegExp(DEPARTMENT_DATE.source)
 // «ՖԻՍԿԱԼ ՀԱՄԱՐ 04143299», in capitals as often as not.
 const DEPARTMENT_FISCAL = /Ֆիսկալ\S*\s+\S*\s*(\d{8})(?!\d)/iu
 const SECTION_TAX = /Շրջ|հար[կլ]/u
-// «Ընդամենը», «/չդամենը», «Կղդամեկը» — and not its discount, «Ընդամենը զեղչ»
-const DEPARTMENT_TOTAL = 'դամե'
-const DEPARTMENT_PAID = /ձեռն|ձեոն|ձեդն|Կանխիկ|Անկանխ|Վճար/u
+// The total's word as OCR reads it, «Ընդամենը», «/չդամենը», «Կղդամեկը» — and not its discount,
+// «Ընդամենը զեղչ»; and the payment's, in cash or by card. The words of any Armenian till.
+const TOTAL_WORD = 'դամե'
+const PAID_WORDS = /ձեռն|ձեոն|ձեդն|Կանխիկ|Անկանխ|Վճար/u
+const totalRow = (text: string): boolean => text.includes(TOTAL_WORD) && !text.includes('զեղչ')
 // An amount with its hundredths: «1700.00», «1800 00» — a figure that lost its point is no vote.
 const AMOUNT = /(?<![\d.,])(\d{1,7})[., ](\d{2})(?![\d.,])/g
 
@@ -1298,10 +1300,10 @@ const amountsOf = (text: string): number[] =>
   [...text.matchAll(AMOUNT)].map((m) => Number(m[1]) * 100 + Number(m[2])).filter((a) => a > 0)
 
 /**
- * The amounts of a reading by where they stand: the section's sum, the total, the payment — each printed
- * once on such a receipt, and each read on its own by OCR.
+ * The amounts of a reading by where they stand: the total, the payment and, on a receipt with no items,
+ * the section's sum — each a place of its own on the paper, read on its own by OCR.
  */
-function departmentAmounts(rows: readonly TextRow[]): Map<string, Set<number>> {
+function placedAmounts(rows: readonly TextRow[], withSection: boolean): Map<string, Set<number>> {
   const texts = rows.map((r) => r.text).filter((t) => t.trim() !== '')
   const found = new Map<string, Set<number>>([
     ['section', new Set()],
@@ -1312,17 +1314,39 @@ function departmentAmounts(rows: readonly TextRow[]): Map<string, Set<number>> {
     for (const amount of amounts) found.get(source)?.add(amount)
   }
   texts.forEach((text, i) => {
-    if (DEPARTMENT.test(text)) {
+    if (withSection && DEPARTMENT.test(text)) {
       add('section', amountsOf(text))
       // the turnover tax under it carries the section's sum
       for (const next of texts.slice(i + 1, i + 3)) {
         if (SECTION_TAX.test(next)) add('section', amountsOf(next))
       }
     }
-    if (text.includes(DEPARTMENT_TOTAL) && !text.includes('զեղչ')) add('total', amountsOf(text))
-    if (DEPARTMENT_PAID.test(text)) add('paid', amountsOf(text))
+    if (totalRow(text)) add('total', amountsOf(text))
+    if (PAID_WORDS.test(text)) add('paid', amountsOf(text))
   })
   return found
+}
+
+/**
+ * The total two places on the paper vouch for, across the readings (MOL-227, MOL-244): the amount read in
+ * the most of them, at least two, and the only one so — or null. One place read alike by both readings is
+ * one vote: they read one photo, and a digit of this font misread is misread in both («2060.01» for
+ * «2050.01»).
+ */
+function votedTotal(
+  readings: readonly (readonly TextRow[])[],
+  withSection: boolean,
+): number | null {
+  const votes = new Map<number, Set<string>>()
+  for (const rows of readings) {
+    for (const [source, amounts] of placedAmounts(rows, withSection)) {
+      for (const amount of amounts) votes.set(amount, (votes.get(amount) ?? new Set()).add(source))
+    }
+  }
+  const backed = [...votes].filter(([, sources]) => sources.size >= 2)
+  const most = Math.max(0, ...backed.map(([, sources]) => sources.size))
+  const totals = backed.filter(([, sources]) => sources.size === most)
+  return totals.length === 1 ? (totals[0]?.[0] ?? null) : null
 }
 
 /** A day of the calendar and a time a clock shows, or null: «64-10-26» or «76:36» is no reading at all. */
@@ -1354,15 +1378,6 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
   if (!readings.some((rows) => rows.some((row) => DEPARTMENT.test(row.text)))) return null
   if (readings.some((rows) => rows.some((row) => ITEM_MARK.test(row.text)))) return null
   const texts = readings.map(rowTexts)
-  const votes = new Map<number, Set<string>>()
-  for (const rows of readings) {
-    for (const [source, amounts] of departmentAmounts(rows)) {
-      for (const amount of amounts) votes.set(amount, (votes.get(amount) ?? new Set()).add(source))
-    }
-  }
-  const backed = [...votes].filter(([, sources]) => sources.size >= 2)
-  const most = Math.max(0, ...backed.map(([, sources]) => sources.size))
-  const totals = backed.filter(([, sources]) => sources.size === most)
   const moments = texts.map((rows) => [
     ...new Map(
       rows
@@ -1402,7 +1417,7 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
     (rows, i) =>
       (moments[i]?.length ?? 0) > 1 ||
       repeated(rows, fiscal) ||
-      repeated(rows, (text) => text.includes(DEPARTMENT_TOTAL) && !text.includes('զեղչ')) ||
+      repeated(rows, totalRow) ||
       headUnder(rows),
   )
   // a day or a time no calendar or clock has is no reading of it, and outvotes nothing (adversarial А3)
@@ -1448,7 +1463,7 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
             return moment >= 0 && moment < end ? firstOf(rows, DEPARTMENT_FISCAL) : null
           }),
         ),
-    totalHundredths: !several && totals.length === 1 ? (totals[0]?.[0] ?? null) : null,
+    totalHundredths: several ? null : votedTotal(readings, true),
     balanced: false,
     lines: [],
   }
