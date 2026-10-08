@@ -586,17 +586,19 @@ one — the text tells the two apart nowhere, so the person types the total. On 
 a wrong total; a reading whose lines the total changed every one of vouches for nothing (owner, adversarial
 А1: «хотя бы одна строка как прочитана»). **The price, named:** a misread total that changed one line while
 another stands as read is still shown (А1а, А1в — none on the bench); closing it cost four right totals (am-05,
-KFC on both prints), whose totals put one to three lines right. **The total shown is the lines' one judge**
-(review 4, 7; adversarial В1, Г1). **None shown leaves nothing of itself in them**: the reading chosen is
-judged again with no total — every line as read, no rest given to a line with no reading. Kept, a line put to
-160 by a total nobody sees went on to the trip's money (am-09; hand/am-08 got its right line back). **Two places
-shown judge every reading again**, and the one that meets them is chosen — a row OCR lost takes what they
-leave, as under its own total: Dog City's «Ընդամենը\` 9450.00», which the table's pattern does not take, left
-a row empty under a total shown. **A table with no total to judge — none read or none shown — reads as
-printed**: its total chose how «1,5 1 350» splits, so with none a row takes its own arithmetic, else its last
-figure as its sum — 1 350 at 900, never 2 025 at 1 350 — and a row whose figures OCR lost stays empty. **A
-line's candidates are found once** (`Laid`): judged again, a reading costs the judging alone, so the worst
-shape of the review — four hundred rows of junk in two readings — takes what it took before MOL-244. **A sum with its thousands apart is read whole** — «6 331,07», never 331,07 in two places: the
+KFC on both prints), whose totals put one to three lines right. **A total the reading did not judge its lines by
+judges none** (review 4, 7; adversarial В1, Г1; round 5 Д1). The reading chosen is read again as printed —
+every line as read, no rest given to a line with no reading — and is «balanced» only where those lines add up
+to the total shown. Kept, a line put to 160 by a total nobody sees went on to the trip's money (am-09; hand/am-08
+got its right line back). **Two places shown judge no line either** (В-2 «а»): a vote misread alike in two
+places made a lost row up to meet itself and the review's «≠» went quiet (Д1). **The price, named:** under a
+total two places show, a row OCR lost stays empty, and «≠» says by how much — Dog City's «Ընդամենը\`
+9450.00», which the table's pattern does not take (Г1). **A table with no total to judge — none read or none
+shown — reads as printed**: its total chose how «1,5 1 350» splits, so with none a row takes its own
+arithmetic, else its last figure as its sum — 1 350 at 900, never 2 025 at 1 350 — and a row whose figures OCR
+lost stays empty. **A line's candidates are found once** (`Laid`): read again, a reading costs the judging
+alone, so the worst shape of the review — four hundred rows of junk in two readings — takes what it took before
+MOL-244. **A sum with its thousands apart is read whole** — «6 331,07», never 331,07 in two places: the
 card's shelf total and a card payment print so where there is no discount. **A table's total is never
 «balanced»** (Dog City, `tableReceipt`): a blank row takes what the total leaves, so its lines meeting it vouch
 for nothing — its total stands by its payment «Կանխիկ».
@@ -617,7 +619,7 @@ hand/am-01): «Ереван Сити» prints its payment as the cash handed ove
 person types it, and the measure counts that as a total put right. **A payment alone is never a total the
 lines are settled against** (В-2 «а»): tried on every reading of the bench it balanced one receipt, already
 right, and a blank line takes «what the total leaves» — 20 000 handed over in cash would have made its sum up.
-Only a total two places agree on, the total shown, judges them.
+Nor does a total two places agree on (round 5): only the reading's own printed total, under the rules above.
 
 **What was read in one place is kept for «Прочитали не всё» alone** (`receipts.read_total_minor`,
 `readTotalHundredths`): hidden, the hint fell back to the share of lines that add up and went quiet on three
