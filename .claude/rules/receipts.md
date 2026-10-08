@@ -247,7 +247,7 @@ it while an older one stands behind the key — left alone, the word carried the
 and moment (Р3-1), and deleted, it lost the item the older purchase says (Р3-2). **Under the person's
 lock** (`store_memory`, per actor, taken last — after the trip's row or the owner's lock — and by
 `remember` too): two removals at once each saw the other's line, and the word outlived both (Р3-3).
-**Settled whole once the API listens** (`settleStoreMemory`): 0060 deleted the lines of purchases removed
+**Settled whole once the API listens** (`settleStoreMemory`): 0061 deleted the lines of purchases removed
 before it, and a text key is `toSearchKey`, which no migration can compute (Р3-4); it also settles what an
 image rolled back removed without settling. **Never on the way to `listen`** (round 4, Р4-2): every pair of
 person and seller in one `in (…)` overflowed the parser's stack from some 8 000 pairs, and the API did not
@@ -317,7 +317,7 @@ receipt is recorded, and what it costs is counted at that moment — so a record
 gaps, and a line is found by its `position`, never its place in a list (`codesAgain`; the wire carries
 no position, so a recorded receipt's `lines` are never read by their place). The minute timer deletes a
 recorded receipt's line that is no purchase too, as it does a photo (adversarial А3б): **an image rolled
-back** onto this schema records with every line kept, and 0060 does not run twice. The rest of a rollback
+back** onto this schema records with every line kept, and 0061 does not run twice. The rest of a rollback
 is a named price, nothing written wrong: its erasure deletes the trips first, and the cascade takes a
 recorded receipt uncounted in the report (А3а); its repeat of «Записать» reads a code by the line's place
 and may name another line's code to the phone (А3в). «Удалить чек» reads the receipt under the row's lock «Записать»

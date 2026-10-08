@@ -132,7 +132,7 @@ if (http !== undefined && env.METRICS_PORT !== undefined) {
 app
   .listen({ port: env.API_PORT, host })
   .then(async () => {
-    // Each person's word in the shops' memory is what their last line still there says (MOL-240): 0060
+    // Each person's word in the shops' memory is what their last line still there says (MOL-240): 0061
     // deleted lines whose words SQL cannot find, and an image rolled back deletes without settling. Once
     // listening, a person at a time under their lock — never on the way to `listen` (round 4, Р4-2): the
     // words of every person are no reason for the API not to start, and a failure is reported, not fatal.

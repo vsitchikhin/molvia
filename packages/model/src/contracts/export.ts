@@ -41,8 +41,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // `source`, `shopUnit`, `shop` and `nextAttemptAt` — a Serbian receipt by its link, its shop as the tax
 // office names it, and when it is asked of the tax office next (MOL-232). 16: a receipt's `via` and
 // `qrMissed`, how its link reached the phone, and a line's `gtin`, the package's code the tax office
-// gave it (MOL-234).
-export const EXPORT_VERSION = 16
+// gave it (MOL-234). 17: `transfers`, money moved between one's own accounts with its earlier versions,
+// and a spending's `transferId`, the transfer it is the fee of (MOL-253).
+export const EXPORT_VERSION = 17
 
 const day = z.iso.date()
 
@@ -277,10 +278,37 @@ const spendingSchema = z.strictObject({
   accountId: z.uuid().nullable(),
   debited: signedMoneyCodec.nullable(),
   accountSetAt: isoDate.nullable(),
+  transferId: z.uuid().nullable(),
   revision: z.int(),
   createdAt: isoDate,
   amendedAt: isoDate.nullable(),
   removedAt: isoDate.nullable(),
+})
+
+const transferFields = {
+  fromAccountId: z.uuid(),
+  toAccountId: z.uuid(),
+  amount: signedMoneyCodec,
+  transferredOn: day,
+  note: z.string().nullable(),
+}
+
+/** Money moved between one's own accounts (MOL-253); its fee is a spending naming it. */
+const transferSchema = z.strictObject({
+  id: z.uuid(),
+  ...transferFields,
+  revision: z.int(),
+  createdAt: isoDate,
+  amendedAt: isoDate.nullable(),
+  removedAt: isoDate.nullable(),
+  earlierVersions: z.array(
+    z.strictObject({
+      revision: z.int(),
+      ...transferFields,
+      fee: signedMoneyCodec.nullable(),
+      replacedAt: isoDate,
+    }),
+  ),
 })
 
 /**
@@ -498,6 +526,7 @@ export const exportContentCodec = z.strictObject({
   exchanges: z.array(exchangeSchema),
   incomes: z.array(incomeSchema),
   spendings: z.array(spendingSchema),
+  transfers: z.array(transferSchema),
   receipts: z.array(receiptSchema),
   spendingCategories: z.array(spendingCategorySchema),
   monthRates: z.array(monthRateSchema),

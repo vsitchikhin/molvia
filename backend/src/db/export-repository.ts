@@ -3,6 +3,8 @@ import type { Currency, ExportContent, Money } from '@molvia/model'
 import type { Db } from './index'
 import type { ErasedTable } from './erasure-repository'
 import {
+  accountTransferRevisions,
+  accountTransfers,
   actors,
   budgetPlans,
   events,
@@ -49,6 +51,7 @@ export const EXPORT_SECTION_OF: Readonly<Record<ErasedTable, keyof ExportContent
   exchanges: 'exchanges',
   incomes: 'incomes',
   spendings: 'spendings',
+  account_transfers: 'transfers',
   receipts: 'receipts',
   spending_categories: 'spendingCategories',
   budget_plans: 'budgetPlans',
@@ -72,6 +75,7 @@ export const EXPORT_COLUMNS: Readonly<
     | 'exchange_revisions'
     | 'catalogue_merge_moves'
     | 'income_revisions'
+    | 'account_transfer_revisions'
     | 'feedback_replies'
     | 'feedback_pictures'
     | 'feedback_picture_files'
@@ -278,12 +282,43 @@ export const EXPORT_COLUMNS: Readonly<
       'debited_minor',
       'debited_currency',
       'account_set_at',
+      'transfer_id',
       'revision',
       'created_at',
       'amended_at',
       'deleted_at',
     ],
     omitted: { actor_id: OWNER },
+  },
+  account_transfers: {
+    exported: [
+      'id',
+      'from_account_id',
+      'to_account_id',
+      'amount_minor',
+      'currency',
+      'transferred_on',
+      'note',
+      'revision',
+      'created_at',
+      'amended_at',
+      'deleted_at',
+    ],
+    omitted: { actor_id: OWNER },
+  },
+  account_transfer_revisions: {
+    exported: [
+      'transfer_id',
+      'revision',
+      'from_account_id',
+      'to_account_id',
+      'amount_minor',
+      'currency',
+      'fee_minor',
+      'transferred_on',
+      'note',
+      'replaced_at',
+    ],
   },
   receipts: {
     exported: [
@@ -638,6 +673,24 @@ export function createExportRepository(db: Db): ExportRepository {
             .from(spendings)
             .where(eq(spendings.actorId, actorId))
             .orderBy(asc(spendings.spentOn), asc(spendings.createdAt), asc(spendings.id))
+          const transferRows = await tx
+            .select()
+            .from(accountTransfers)
+            .where(eq(accountTransfers.actorId, actorId))
+            .orderBy(
+              asc(accountTransfers.transferredOn),
+              asc(accountTransfers.createdAt),
+              asc(accountTransfers.id),
+            )
+          const transferVersions = await tx
+            .select()
+            .from(accountTransferRevisions)
+            .innerJoin(
+              accountTransfers,
+              eq(accountTransfers.id, accountTransferRevisions.transferId),
+            )
+            .where(eq(accountTransfers.actorId, actorId))
+            .orderBy(asc(accountTransferRevisions.revision))
           const receiptRows = await tx
             .select()
             .from(receipts)
@@ -808,6 +861,10 @@ export function createExportRepository(db: Db): ExportRepository {
           const incomeVersionsOf = grouped(
             incomeVersions.map((row) => row.income_revisions),
             (version) => version.incomeId,
+          )
+          const transferVersionsOf = grouped(
+            transferVersions.map((row) => row.account_transfer_revisions),
+            (version) => version.transferId,
           )
           const barcodesOf = grouped(barcodeRows, (barcode) => barcode.itemId)
           const repliesOf = grouped(
@@ -1009,10 +1066,33 @@ export function createExportRepository(db: Db): ExportRepository {
               accountId: row.accountId,
               debited: cash(row.debitedMinor, row.debitedCurrency),
               accountSetAt: row.accountSetAt,
+              transferId: row.transferId,
               revision: row.revision,
               createdAt: row.createdAt,
               amendedAt: row.amendedAt,
               removedAt: row.deletedAt,
+            })),
+            transfers: transferRows.map((row) => ({
+              id: row.id,
+              fromAccountId: row.fromAccountId,
+              toAccountId: row.toAccountId,
+              amount: { minor: row.amountMinor, currency: row.currency },
+              transferredOn: row.transferredOn,
+              note: row.note,
+              revision: row.revision,
+              createdAt: row.createdAt,
+              amendedAt: row.amendedAt,
+              removedAt: row.deletedAt,
+              earlierVersions: (transferVersionsOf.get(row.id) ?? []).map((version) => ({
+                revision: version.revision,
+                fromAccountId: version.fromAccountId,
+                toAccountId: version.toAccountId,
+                amount: { minor: version.amountMinor, currency: version.currency },
+                fee: cash(version.feeMinor, version.currency),
+                transferredOn: version.transferredOn,
+                note: version.note,
+                replacedAt: version.replacedAt,
+              })),
             })),
             receipts: receiptRows.map((row) => ({
               id: row.id,

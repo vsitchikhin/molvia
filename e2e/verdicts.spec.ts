@@ -49,14 +49,15 @@ async function person(page: Page): Promise<Person> {
   }
 }
 
-/** Bought in one trip, in this order — so the last one is the newest and comes first. */
-async function bought(who: Person, names: readonly string[]): Promise<void> {
+/** Bought in one trip, in this order — so the last one is the newest and comes first. Their items. */
+async function bought(who: Person, names: readonly string[]): Promise<string[]> {
   const tripId = randomUUID()
   await who.call('POST', '/trips', {
     context: settingsOf(actorCodec.parse(await who.call('GET', '/actors/me'))),
     id: tripId,
     place: { kind: 'store', name: 'SAS' },
   })
+  const items: string[] = []
   for (const name of names) {
     const entry = (await who.call('POST', '/catalogue/items', {
       kind: 'product',
@@ -64,7 +65,44 @@ async function bought(who: Person, names: readonly string[]): Promise<void> {
       defaultUnit: 'piece',
     })) as { id: string }
     await who.call('POST', `/trips/${tripId}/expenses`, { id: randomUUID(), itemId: entry.id })
+    items.push(entry.id)
   }
+  return items
+}
+
+interface Kept {
+  readonly itemId: string
+  readonly state: string
+  readonly score: number | null
+}
+
+const DRAWER = (owner: string) => `molvia.verdict-drafts.${owner}`
+
+/**
+ * The whole drawer the drafts live in, whatever their state: a send the API refused puts its draft
+ * back as `typing` with the error, still the person's rating — read by `saved` alone, the drawer of a
+ * refused send looked empty (adversarial Р11-А1).
+ */
+async function drawer(page: Page, owner: string): Promise<Kept[]> {
+  return page.evaluate((key) => {
+    const raw = localStorage.getItem(key)
+    const drafts = raw
+      ? (JSON.parse(raw) as { card: { itemId: string }; state: string; score: number | null }[])
+      : []
+    return drafts.map((draft) => ({
+      itemId: draft.card.itemId,
+      state: draft.state,
+      score: draft.score,
+    }))
+  }, DRAWER(owner))
+}
+
+/** The person's own rating of an item as the server has it — what «Что брать» prints, or null. */
+async function ratedOnServer(who: Person, itemId: string): Promise<string | null> {
+  const advice = (await who.call('GET', '/advice')) as {
+    rows: { itemId: string; rating: string }[]
+  }
+  return advice.rows.find((row) => row.itemId === itemId)?.rating ?? null
 }
 
 async function waiting(who: Person): Promise<number> {
@@ -162,16 +200,22 @@ test('7: rated without a connection — «saved», and it goes by itself once on
   expect(await waiting(who)).toBe(0)
 })
 
-test('7: rated without a connection and the app closed — sent when it is opened again', async ({
+// What the phone keeps, never what the server has not got by then (MOL-217): seven times in CI a page
+// refused the rating's `PUT` — by the emulation, later by `page.route` too — and, as it was leaving, a
+// `GET /verdicts/pending` and the `PUT` reached the API together, the app's answer to `online`. How
+// Chromium lets a page that is going away send past both was never shown, and the product is right
+// either way: the phone keeps the draft until a send is confirmed, and a `PUT` again is the same row.
+test('7: rated without a connection and the app closed — kept on the phone, and on the server once it is opened again', async ({
   page,
   context,
 }) => {
   const who = await person(page)
-  await bought(who, [`Творог ${tag}`, `Сметана ${tag}`])
+  const [, sourCream] = await bought(who, [`Творог ${tag}`, `Сметана ${tag}`])
+  const rated = sourCream ?? ''
 
   // The card is drawn from `pending` while the question «who are we» may still be on its way, and a
-  // rating tapped then waits for its answer without a request (MOL-217, self-review С-5): cut off by
-  // the offline, that answer would leave nothing to fail, and `lost` would wait for good.
+  // rating tapped then waits for its answer without a request (self-review С-5): cut off by the
+  // offline, that answer would leave nothing to fail, and `lost` would wait for good.
   const known = page.waitForResponse(
     (response) => new URL(response.url()).pathname === '/api/actors/me' && response.ok(),
   )
@@ -181,8 +225,8 @@ test('7: rated without a connection and the app closed — sent when it is opene
   // answer just the same (self-review С-9).
   await (await known).finished()
 
-  // Offline with every request of the page refused before the network — `setOffline` alone let a PUT
-  // the page saw fail reach the server in CI (MOL-217) — and closed only once the rating has tried.
+  // Refused in the page itself, by the route as well as the emulation: the drawer keeps the draft only
+  // when the send failed there, and the emulation alone was seen letting one through (self-review С-20).
   await goOffline(page)
   const lost = page.waitForEvent(
     'requestfailed',
@@ -190,23 +234,41 @@ test('7: rated without a connection and the app closed — sent when it is opene
   )
   await rate(page, 3)
   await lost
+  // Kept on the phone: the attempt failed (`lost`), the screen says the rating is kept, and its draft
+  // waits in the drawer — the only one there.
   await expect(page.getByRole('heading', { name: 'The rating is saved' })).toBeVisible()
-  // The app leaves before the page closes: `page.close()` takes the route and the offline off a page
-  // whose app still runs, and in CI it heard `online` and sent the draft — a `pending` and the `PUT`
-  // together, some 35 ms after the close, the `PUT` the page had been refused (run 37743449964).
-  await page.goto('about:blank')
-  expect(await waiting(who)).toBe(2)
+  expect(await drawer(page, who.id)).toEqual([{ itemId: rated, state: 'saved', score: 3 }])
   await page.close()
 
-  // Opened again with the connection back: the app sends at start, the screen shows what is
-  // left — and never the card that was rated, whichever answer lands first.
+  // Opened again with the connection back. What the drawer holds as the app starts is taken before any
+  // script of the app runs: a page that went away may already have sent the draft (above), and then
+  // there is nothing left to send — but whenever the rating is still there, the new page must send it
+  // and be answered yes (adversarial Р11-А2).
   await context.setOffline(false)
   const again = await context.newPage()
+  await again.addInitScript((key) => {
+    ;(window as unknown as { heldAtStart: string | null }).heldAtStart = localStorage.getItem(key)
+  }, DRAWER(who.id))
+  const sent: number[] = []
+  again.on('response', (response) => {
+    const request = response.request()
+    if (request.method() === 'PUT' && request.url().includes(`/api/verdicts/${rated}`))
+      sent.push(response.status())
+  })
   await again.goto('/verdicts')
 
+  // The screen shows what is left — never the card that was rated, whichever answer lands first — the
+  // server has the rating, and the drawer is empty, a refused send included.
   await expect(question(again)).toContainText('Творог')
   await expect.poll(() => waiting(who)).toBe(1)
   await expect(again.getByText('1 purchase is waiting to be rated')).toBeVisible()
+  await expect.poll(() => drawer(again, who.id)).toEqual([])
+  // And the rating the person gave at the shelf, not merely some rating (adversarial Р12-А1).
+  expect(await ratedOnServer(who, rated)).toBe('3.0')
+  const heldAtStart = await again.evaluate(
+    () => (window as unknown as { heldAtStart: string | null }).heldAtStart,
+  )
+  if (heldAtStart?.includes(rated)) expect(sent.some((status) => status < 300)).toBe(true)
 })
 
 test('the queue that could not load is red and loads again on «Try again»', async ({ page }) => {

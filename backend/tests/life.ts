@@ -14,6 +14,8 @@ import {
   incomeRevisions,
   incomes,
   moneyAccountChecks,
+  accountTransferRevisions,
+  accountTransfers,
   moneyAccounts,
   moneyMonthRates,
   budgetPlans,
@@ -43,6 +45,7 @@ export async function aLife(
   spendingId: string
   accountId: string
   receiptId: string
+  transferId: string
 }> {
   const ownItem = await insertItem(db, {
     name: 'Рынок-сыр',
@@ -255,6 +258,36 @@ export async function aLife(
     .set({ receivedAccountId: accountId })
     .where(eq(exchanges.actorId, actorId))
   await db.update(trips).set({ accountId }).where(eq(trips.actorId, actorId))
+  // A transfer to a second account (MOL-253), amended once, its fee a spending of the first.
+  const savingsId = randomUUID()
+  await db.insert(moneyAccounts).values({
+    id: savingsId,
+    actorId,
+    name: 'Копилка ֏',
+    currency: 'AMD',
+    startMinor: 0n,
+    startOn: '2026-09-16',
+    createdOn: '2026-09-27',
+  })
+  const transferId = randomUUID()
+  const transfer = {
+    fromAccountId: accountId,
+    toAccountId: savingsId,
+    amountMinor: 1_000_000n,
+    currency: 'AMD',
+    transferredOn: '2026-09-21',
+  } as const
+  await db.insert(accountTransfers).values({ id: transferId, actorId, ...transfer, revision: 2 })
+  await db
+    .insert(accountTransferRevisions)
+    .values({ transferId, revision: 1, ...transfer, feeMinor: 50_000n })
+  await db.insert(spendings).values({
+    id: randomUUID(),
+    ...spending,
+    note: null,
+    accountId,
+    transferId,
+  })
   await insertSession(db, { actorId })
   await insertLoginRequest(db, { telegramUserId }) // confirmed, not yet collected
   await insertLoginRequest(db, { telegramUserId, consumedAt: new Date() })
@@ -309,5 +342,5 @@ export async function aLife(
     threadId: message.id,
     inReplyTo: reply?.id,
   })
-  return { ownItem, exchangeId, incomeId, spendingId, accountId, receiptId }
+  return { ownItem, exchangeId, incomeId, spendingId, accountId, receiptId, transferId }
 }

@@ -124,6 +124,7 @@ function spending(amount: string, on: string, rate: ExchangeRate | null = null):
     rate,
     accountId: null,
     debited: null,
+    transferId: null,
     revision: 1,
     createdAt: new Date(`${on}T10:00:00Z`),
     amendedAt: null,
@@ -479,6 +480,7 @@ describe('moneyMonthOf (MOL-73)', () => {
         place: null,
         source: null,
         counterpart: null,
+        transferId: null,
         items: null,
       },
     }

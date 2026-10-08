@@ -1,13 +1,13 @@
 ---
 paths:
-  - 'packages/model/src/{entities,contracts}/money-account.ts'
-  - 'packages/model/tests/{entities,contracts}/money-account.test.ts'
-  - 'backend/src/db/money-accounts-repository.ts'
-  - 'backend/src/usecases/{money-accounts,account-of}*.ts'
-  - 'backend/src/routes/money-accounts.ts'
-  - 'backend/tests/money-accounts*.ts'
-  - 'backend/drizzle/*money_accounts*.sql'
-  - 'frontend/src/**/*{Account,account}*'
+  - 'packages/model/src/{entities,contracts}/{money-account,transfer}.ts'
+  - 'packages/model/tests/{entities,contracts}/{money-account,transfer}.test.ts'
+  - 'backend/src/db/{money-accounts,transfers}-repository.ts'
+  - 'backend/src/usecases/{money-accounts,account-of,transfers}*.ts'
+  - 'backend/src/routes/{money-accounts,transfers}.ts'
+  - 'backend/tests/{money-accounts,transfers}*.ts'
+  - 'backend/drizzle/*{money_accounts,account_transfers}*.sql'
+  - 'frontend/src/**/*{Account,account,Transfer}*'
   - 'frontend/src/components/{ReconcileSheet,UnassignedSheet,ChargedField,HeldFromAccounts}.vue'
   - 'frontend/src/components/{OperationRow,OperationSheet,OperationIncomeSheet,OperationExchangeSheet}.vue'
   - 'e2e/accounts.spec.ts'
@@ -54,7 +54,7 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   while its trip does (a recorded receipt is not removed), so the date does not move later. The month of
   «Деньги» still dates it by the finish. **The price, named** (adversarial Е2): a trip continued on
   later days moves its account on its first day, and one begun before an account's start and
-  continued after it is history whole — the start line is drawn once, when the account is made. One loading of all four kinds (`operations`) feeds the balance,
+  continued after it is history whole — the start line is drawn once, when the account is made. One loading of all five kinds (`operations`) feeds the balance,
   the journal, the check and «не попали» alike, as one shape (`AccountOperation`).
 - **An account on an operation is optional** (MOL-43 В-2): a spending, an income, each half of an
   exchange, a trip. The screen puts the default in, the server never guesses. **The database holds
@@ -149,6 +149,65 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
 - **«Сколько было до обмена» from the accounts is a hint** (Р-9, Р-20): the balances of the currency
   at the end of the day, the exchange amended left out, and nothing when an account of it starts on
   that day or later. Put into the wallet in silence it would have re-priced the months (MOL-73 В-6).
+- **A transfer moves two balances and nothing else** (MOL-253, owner's case of 08.10.2026: «Папина
+  карта» −2 020 $, «Доллары» +2 000 $). Money moved between two of one's own accounts of **one
+  currency** — between two it is an exchange, which has a rate (Р-2). It is in no month of «Деньги»,
+  no «Бюджет», no «Графики», no «Траты», and no link of the wallet or the person's own rate: written as
+  a spending and an income it swelled «Пришло» and «Потрачено» by its sum and re-priced the currency
+  by the bank's rate of its day. Two halves of one `AccountOperation` kind `transfer`, as an exchange's
+  (`side`, `counterpart`); their key in a list is by side, the currency being one. **Both accounts are
+  required, the owner's, live and of the money's currency** — the keys hold whose and which currency,
+  the use case's lock the rest: **a transfer is written with a connection, never from a queue, so an
+  account it cannot be on is a refusal** (`error.transfer_account`, 409), the one exception to «без
+  счёта, never a refusal» — written without an account it would be no transfer at all. Decided under
+  the owner's lock, the one an account's removal takes, so a transfer never lands on an account marked
+  for deletion, and an account with a transfer is «убран», never deleted, its currency locked. A
+  removed («убран») account still takes one — an old transfer is amended over it — and is never
+  offered. So it is never a check's reason and never in «не попали». «Остаток» of the month keeps its
+  «всего» and moves «без сбережений» when one side is savings — money taken out of the piggy bank.
+- **Its fee is an ordinary spending** (Р-1): a row of `spendings` in «Прочее» of the source, on the
+  transfer's day, in its currency, at the rate of its day, pointing at it (`transfer_id`, one fee a
+  transfer) — so every reader of spendings counts it with no second count, and it is in the month.
+  Written, amended, removed and brought back by the transfer's use case alone, in one transaction, a
+  millisecond before the transfer so the journal shows it under it (handoff 03); `/spendings` refuses
+  to amend or remove it (`error.spending_of_transfer`) and does not bring it back, and the spendings'
+  timer leaves it to its transfer's. Its row says «Комиссия за перевод · Прочее · → Доллары» in the
+  journal and «Прочее · комиссия за перевод» in «Траты» by `transferId`, in either language — no note
+  is written — and opens the transfer's sheet (Р-5: two rows, never one). **An amendment keeps the
+  version before it** (`account_transfer_revisions`, the fee with it), over the version it was
+  opened on; a removal is a mark with its fee, «Вернуть» on the server for ten minutes and in the strip
+  for its ten seconds (Р-8), one removal offered back at a time. **The fee's rate is a spending's**:
+  kept by an amendment while the fee keeps its day and currency and the snapshot still counts it —
+  taken anew, a corrected note moved a closed month by today's cache (adversarial А1). **A removal and
+  «Вернуть» take the owner's lock** an amendment holds: removed between an amendment's read and its
+  write, the transfer was marked and its fee written live beside it (А2).
+- **On the phone** (`TransferSheet`, handoff MOL-253): the way in is «Перевести» under «Сверить» on an
+  account's screen and «Перевод между счетами» under the total of «Счета», only while some currency —
+  the account's own there — has two live accounts (`canTransfer`). «Куда» offers only the source's
+  currency without the source and without «Без счёта», and the one account it can be is put in (Р-6);
+  a change of the source's currency empties it. «Перевести» says the first thing missing — the source,
+  a second account, the sum, the target, the connection (Ф-6); a refusal stands over it, as the
+  exchange's (Р-7), and an account gone on another phone empties its side, marked, the rest kept.
+  **A 409 on a new transfer is one already written under its name** — its answer lost, the figures
+  changed since: the sheet reads it and becomes its amendment, saying so, so «Сохранить» writes the
+  figures over it and never a second transfer (review С-1, А5); a conflict of an amendment says what
+  is recorded now (С-4). A transfer a row could not read is said in the sheet — «не ответил» with
+  «Повторить», or offline — never a sheet that rises and goes (А6). «Вернуть» is the answer's: too
+  late is said, no answer puts the strip back; any later write takes it away, the removal being final
+  then, and a newer removal's strip takes the older one's place (С-3, С-6). **Only a write that happened
+  makes the removal before it final** — the server purges after `add` and `amend`, never before: a
+  refused write left the strip standing over a transfer already gone (adversarial А7). A transfer
+  removed answers its amendment 404, said with nothing to retry (А8) — and so does a row opened on it
+  (А11) — by the API's own word only, a bare 404 being a shop's portal (А10), and with no cause the
+  phone cannot know: removed on another phone and here a moment ago, which «Вернуть» still brings back,
+  are one 404 (А12); that, and
+  «already written», read «Счета» and move `accounts.transfers` like any write (Р2-1). Offline, a
+  transfer that did not open says it opens with the connection and reads itself then (Р2-2).
+  Every write answers with «Счета» whole, and `accounts.transfers` tells the journals and the month to
+  read again. **The price, named:** one day for both halves — a transfer that arrives the next day is
+  written on one; the fee only in the money's currency and only from the source; no list of
+  transfers of their own; and «Перевести» floats as a secondary button under «Сверить» until the
+  screen's actions go into its docked strip (MOL-194).
 - **The prices, named:** the balance of a view counts live operations while «удалить или убрать» asks
   of every row — a spending in its ten minutes of «Вернуть» makes an account «убран» rather than
   deleted; an operation naming a marked account is in no balance until the timer unlinks it; a check

@@ -102,8 +102,9 @@
       </template>
     </div>
 
-    <template v-if="removed" #undo>
+    <template v-if="removed || transferRemoved" #undo>
       <UndoStrip
+        v-if="removed"
         :key="removed.stamp"
         :text="t('spending.removed', removed)"
         :announcement="t('spending.removed_announced', removed)"
@@ -111,9 +112,19 @@
         @restore="restoreSpending"
         @expire="removed = null"
       />
+      <!-- A transfer and its fee, both rows gone at once and back at once (MOL-253). -->
+      <UndoStrip
+        v-else-if="transferRemoved"
+        :key="transferRemoved.stamp"
+        :text="t('transfer.removed')"
+        :announcement="t('transfer.removed_announced')"
+        :action="t('spending.restore')"
+        @restore="restoreTransfer"
+        @expire="transferRemoved = null"
+      />
     </template>
     <!-- Not under «Вернуть», as on «Счета», until its actions go into the docked strip (MOL-194). -->
-    <FloatingDock v-if="!removed && phase === 'ready' && account" class="float">
+    <FloatingDock v-if="!removed && !transferRemoved && phase === 'ready' && account" class="float">
       <AppButton
         v-if="account?.archivedAt"
         size="large"
@@ -125,10 +136,23 @@
         <template #icon><IconUndo /></template>
         {{ t('accounts.screen.restore') }}
       </AppButton>
-      <AppButton v-else size="large" @click="reconcileOpen = true">
-        <template #icon><IconScale /></template>
-        {{ t('accounts.account.reconcile') }}
-      </AppButton>
+      <template v-else>
+        <AppButton size="large" @click="reconcileOpen = true">
+          <template #icon><IconScale /></template>
+          {{ t('accounts.account.reconcile') }}
+        </AppButton>
+        <!-- The second action under the first: one main action a screen (Ф-15, Р-9). Floating over
+             the cards it needs a fill, so not the ghost of the docked strip until MOL-194. -->
+        <AppButton
+          v-if="transferable"
+          variant="secondary"
+          aria-haspopup="dialog"
+          @click="transferOpen = true"
+        >
+          <template #icon><IconTransfer /></template>
+          {{ t('accounts.account.transfer') }}
+        </AppButton>
+      </template>
     </FloatingDock>
 
     <AccountSheet
@@ -152,6 +176,15 @@
       :operation="operation"
       :online="online"
       @removed="onRemoved"
+      @transfer="transferEnded"
+    />
+    <TransferSheet
+      v-if="account"
+      v-model:open="transferOpen"
+      :from="account.id"
+      :online="online"
+      :spend-currency="account.currency"
+      @done="transferEnded"
     />
   </AppScreen>
 </template>
@@ -163,6 +196,7 @@ import { useRoute } from 'vue-router'
 import IconArchive from '~icons/mdi/archive-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconScale from '~icons/mdi/scale-balance'
+import IconTransfer from '~icons/mdi/bank-transfer'
 import IconUndo from '~icons/mdi/undo-variant'
 import type { AccountOperationView, Money } from '@molvia/model'
 import { api } from '@/api'
@@ -179,14 +213,23 @@ import ReconcileSheet from '@/components/ReconcileSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import TransferSheet from '@/components/TransferSheet.vue'
+import type { TransferOutcome } from '@/components/TransferSheet.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
-import { countedWhen, operationRowProps, shortDay, signedAmount } from '@/components/accounts'
+import {
+  canTransfer,
+  countedWhen,
+  operationRowProps,
+  shortDay,
+  signedAmount,
+} from '@/components/accounts'
 import type { Removed } from '@/components/spending'
 import { useAccountJournal } from '@/composables/useAccountJournal'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useOwnCategories } from '@/composables/useOwnCategories'
 import { useReconnect } from '@/composables/useReconnect'
+import { useTransferOutcome } from '@/composables/useTransferOutcome'
 import { calendarDay, shiftDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
@@ -211,6 +254,7 @@ export default defineComponent({
     IconArchive,
     IconCloudOff,
     IconScale,
+    IconTransfer,
     IconUndo,
     OperationRow,
     OperationSheet,
@@ -218,6 +262,7 @@ export default defineComponent({
     ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    TransferSheet,
     UndoStrip,
   },
   setup() {
@@ -390,6 +435,8 @@ export default defineComponent({
 
     const removed = ref<(Removed & { stamp: number }) | null>(null)
     function onRemoved(value: Removed): void {
+      // One «Вернуть» at a time: the newer removal's strip takes the place of the older (С-6).
+      transferRemoved.value = null
       removed.value = { ...value, stamp: Date.now() }
     }
     function restoreSpending(): void {
@@ -404,7 +451,28 @@ export default defineComponent({
       void goUp()
     }
 
+    // «Перевести» stands only where there is somewhere to transfer to (MOL-253, handoff 01).
+    const transferable = computed(() => {
+      const value = account.value
+      return !!value && value.archivedAt === null && canTransfer(store.accounts, value.currency)
+    })
+    const transferOpen = ref(false)
+    const {
+      removed: transferRemoved,
+      done: transferDone,
+      restore: restoreTransfer,
+    } = useTransferOutcome()
+    function transferEnded(outcome: TransferOutcome): void {
+      if (outcome.kind === 'removed') removed.value = null
+      transferDone(outcome)
+    }
+
     return {
+      transferable,
+      transferOpen,
+      transferRemoved,
+      transferEnded,
+      restoreTransfer,
       t,
       phase,
       journal,

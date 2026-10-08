@@ -13,13 +13,13 @@ import { expenses, receiptLineImages, receipts, storeMemory } from '@/db/schema'
 import { settleStoreMemory } from '@/db/store-memory-repository'
 
 /**
- * 0060 on a database that holds what `SET NULL` left behind (MOL-240): a recorded receipt whose trip
+ * 0061 on a database that holds what `SET NULL` left behind (MOL-240): a recorded receipt whose trip
  * was removed for good, a line whose purchase was removed, a line not recorded at «Записать», a
  * cut-out row of such a line. They go before the keys and the check are added — or the API does not
  * start — and nothing of a receipt still at work goes with them.
  *
  * Its own database, created and dropped here, as in `migration-0012.integration.test.ts`: the chain
- * has to be left one step short of 0060. The rows are written with the schema as it is now, but for
+ * has to be left one step short of 0061. The rows are written with the schema as it is now, but for
  * the lines: 0061 adds a column to them.
  */
 interface JournalEntry {
@@ -32,7 +32,7 @@ const journal = JSON.parse(readFileSync(`${MIGRATIONS}/meta/_journal.json`, 'utf
 }
 
 const url = new URL(testDatabaseUrl())
-const database = `${url.pathname.slice(1)}_0060`
+const database = `${url.pathname.slice(1)}_0061`
 const maintenance = new URL(url.toString())
 maintenance.pathname = '/postgres'
 const ownUrl = new URL(url.toString())
@@ -62,12 +62,12 @@ afterAll(async () => {
   await admin.end()
 })
 
-describe('0060: what a removed trip or purchase left of its receipt', () => {
+describe('0061: what a removed trip or purchase left of its receipt', () => {
   it('removes the orphans, then makes the receipt go with its trip and the line with its purchase', async () => {
-    const before = journal.entries.filter((entry) => entry.idx < 60)
-    const [sixty] = journal.entries.filter((entry) => entry.idx === 60)
-    if (sixty === undefined) throw new Error('0060 is not in the journal')
-    expect(sixty.tag).toBe('0060_receipt_goes_with_trip')
+    const before = journal.entries.filter((entry) => entry.idx < 61)
+    const [own] = journal.entries.filter((entry) => entry.idx === 61)
+    if (own === undefined) throw new Error('0061 is not in the journal')
+    expect(own.tag).toBe('0061_receipt_goes_with_trip')
     for (const entry of before) await apply(entry)
     const db = drizzle(sql, { schema })
 
@@ -154,10 +154,10 @@ describe('0060: what a removed trip or purchase left of its receipt', () => {
     }
     await db.insert(storeMemory).values([word(me, 0), word(me, 1), word(me, 2), word(null, 1)])
 
-    await apply(sixty)
+    await apply(own)
     // what SQL cannot find goes once the API listens: a text key is `toSearchKey` — on the schema of
-    // the build that settles, every migration after 0060 applied
-    for (const entry of journal.entries.filter((one) => one.idx > 60)) await apply(entry)
+    // the build that settles, every migration after 0061 applied
+    for (const entry of journal.entries.filter((one) => one.idx > 61)) await apply(entry)
     // 0061: a line recorded before it is «as read» by its row confirmed (Р4-1): the purchase has no sum
     expect(await sql`select as_read from receipt_lines where receipt_id = ${working}`).toEqual([
       { as_read: true },

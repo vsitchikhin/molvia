@@ -425,15 +425,15 @@
     {
       "idx": 60,
       "version": "7",
-      "when": 1791446118096,
-      "tag": "0060_receipt_goes_with_trip",
+      "when": 1791447383736,
+      "tag": "0060_account_transfers",
       "breakpoints": true
     },
     {
       "idx": 61,
       "version": "7",
-      "when": 1791471801913,
-      "tag": "0061_receipt_line_as_read",
+      "when": 1791474417902,
+      "tag": "0061_receipt_goes_with_trip",
       "breakpoints": true
     }
   ]

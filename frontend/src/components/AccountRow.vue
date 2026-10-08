@@ -1,14 +1,22 @@
 <template>
-  <button type="button" class="row" aria-haspopup="dialog" @click="$emit('open')">
+  <button
+    type="button"
+    class="row"
+    :class="{ inactive: disabled, invalid }"
+    aria-haspopup="dialog"
+    :aria-disabled="disabled ? 'true' : undefined"
+    :aria-invalid="invalid ? 'true' : undefined"
+    @click="press"
+  >
     <IconWallet class="icon" aria-hidden="true" />
     <span class="label"
       ><span class="hidden">{{ t('accounts.picker.row_open') }}</span
       >{{ label }}</span
     >
     <span class="value" :class="{ none: !account }">
-      {{ account?.name ?? t('accounts.picker.none') }}
+      {{ account?.name ?? empty ?? t('accounts.picker.none') }}
     </span>
-    <IconChevron class="chevron" aria-hidden="true" />
+    <IconChevron v-if="!disabled" class="chevron" aria-hidden="true" />
   </button>
 </template>
 
@@ -32,10 +40,22 @@ export default defineComponent({
   props: {
     label: { type: String, required: true },
     account: { type: Object as PropType<MoneyAccountView | null>, default: null },
+    /** What the row says with no account: «Без счёта» unless the sheet has no such choice. */
+    empty: { type: String as PropType<string | null>, default: null },
+    /**
+     * Not now (MOL-174): nothing to choose yet — «Куда» before «Откуда», or no second account of the
+     * currency (MOL-253). Still in focus, without a chevron, and it opens nothing.
+     */
+    disabled: { type: Boolean, default: false },
+    /** The account chosen was refused — gone on another phone (MOL-253, state 6). */
+    invalid: { type: Boolean, default: false },
   },
   emits: ['open'],
-  setup() {
-    return { t: useI18n().t }
+  setup(props, { emit }) {
+    function press(): void {
+      if (!props.disabled) emit('open')
+    }
+    return { t: useI18n().t, press }
   },
 })
 </script>
@@ -70,6 +90,26 @@ export default defineComponent({
 
   &:focus-visible {
     @include focus-ring(2px);
+  }
+
+  &.inactive {
+    cursor: default;
+
+    .value {
+      color: var(--text-muted);
+      font-weight: var(--weight-medium);
+    }
+
+    @media (hover: hover) {
+      &:hover {
+        background: var(--surface-2);
+      }
+    }
+  }
+
+  &.invalid {
+    border-color: var(--bad);
+    box-shadow: inset 0 0 0 var(--hairline) var(--bad);
   }
 }
 

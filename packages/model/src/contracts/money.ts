@@ -183,6 +183,7 @@ function spendingViewOf(spending: Spending) {
     rate: spending.rate,
     accountId: spending.accountId,
     debited: spending.debited,
+    transferId: spending.transferId,
     revision: spending.revision,
     amendedAt: spending.amendedAt,
   }

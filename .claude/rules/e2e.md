@@ -127,16 +127,21 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   of «…and the app closed» and was first taken for their cause; the fifth came without it (below).
   Locally the cache is warm, so it was never seen here; a run that wants to see it removes
   `frontend/node_modules/.vite/deps`.
-- **A page offline is closed only after the app has left it; where a spec then says what the server
-  did not get, the offline is `goOffline`** (`e2e/session.ts`, MOL-217). The traces of the first
-  attempts of the fifth and sixth failures (runs 37619569005, 37743449964 — the sixth with
-  `page.route` already refusing): the rating's `PUT` was refused in the page, and some 35 ms after
-  `page.close()` the API got a `GET /verdicts/pending` and the `PUT` together — what the app sends
-  when it hears `online`. So the close is the hole: it takes the route and the emulation off a page
-  whose app still runs, the page hears `online` and sends the draft past both. Read so from the logs
-  of all six failures (the pair stands in each), not reproduced here — the Mac closes a page too fast.
-  The spec takes the app away first, `page.goto('about:blank')` under the route, then counts, then
-  closes. The phone itself, told the write failed, keeps its draft as it should. So `goOffline` is
+- **Across a page that goes away, a spec says what the phone keeps, never what the server has not
+  got; while the page stays, «the server did not get it» needs `goOffline`** (`e2e/session.ts`,
+  MOL-217). Seven failures in CI: the rating's `PUT` refused in the page — by the emulation, from the
+  sixth on by `page.route` too — and, as the page was leaving, a `GET /verdicts/pending` and the `PUT`
+  reached the API together, the app's answer to `online`: some 35 ms after `page.close()` (runs
+  37619569005, 37743449964) and 5 ms after `page.goto('about:blank')` (37747326557, after the merge
+  that had taken the app away first). How Chromium lets a document that is going away send past both
+  was never shown — not reproduced here, three causes named and refuted in turn. The product is right
+  either way: told the write failed, the phone keeps its draft until a send is confirmed, and a `PUT`
+  again is the same row. So «…and the app closed» reads the drafts' drawer before it closes the page —
+  the whole drawer, a refused send being a draft too — and after it opens again, that the server has
+  the rating and the drawer is empty; the send at the start is held whenever the rating was still in
+  the drawer as the app started, and a run where the leaving page already sent it has nothing left to
+  send — the price. It still takes `goOffline`: the drawer keeps the draft only when the send failed in
+  the page itself. `goOffline` itself is
   `setOffline` — the page's `navigator.onLine` and its states — **and `page.route` refusing every
   request of that page with `internetdisconnected`**: Playwright fails it before the network, and the
   page sees the same error — the route set before the offline, so nothing slips between them. That
@@ -145,9 +150,10 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   it refusing. **Which specs take it was found by the mechanism itself** (adversarial round 8): every
   spec with `setOffline` run with writes let through to the API while the page is told they failed —
   only «…and the app closed» and the trip «started with no connection» (`trip.spec`) fell, both saying
-  what the server has not got, and both take `goOffline`; the rest assert the phone's own state or
-  what went once the connection came back, a write being safe to repeat. A new spec that says «the
-  server did not get it» takes it too; the harness is
+  what the server has not got — «…and the app closed» has since moved to the phone's side, the trip says
+  it while its page stays; the rest assert the phone's own state or what went once the connection came
+  back, a write being safe to repeat. A new spec that says «the server did not get it» takes it too, with
+  its page in place; the harness is
   `.scratch/tasks/selftests/MOL-217-adversarial-round-8-leak.cjs`. The readings of the four failures
   before, both refuted by the trace — `.scratch/tasks/status/MOL-217/readings.md`.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**

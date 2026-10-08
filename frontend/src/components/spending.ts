@@ -241,6 +241,7 @@ function localView(
     rate: null,
     accountId: accountId ?? null,
     debited: debited ?? null,
+    transferId: null,
     revision: 1,
     amendedAt: null,
   }
@@ -391,6 +392,7 @@ export function refusedRows(
           rate: null,
           accountId: body.accountId === undefined ? (held?.accountId ?? null) : body.accountId,
           debited: body.debited ?? null,
+          transferId: null,
           revision: held?.revision ?? body.revision,
           amendedAt: null,
         },
@@ -545,7 +547,10 @@ export function journalRowProps(
     verb: t(trip ? 'spending.row_open_trip' : 'spending.row_open', {}),
     title: trip
       ? t('spending.trip_row_title', { place: row.placeName })
-      : (row.spending.note ?? categoryName),
+      : row.spending.transferId !== null
+        ? // A transfer's fee says what it is (MOL-253, Р-1): «Прочее · комиссия за перевод».
+          t('transfer.fee_spending', {})
+        : (row.spending.note ?? categoryName),
     meta: [context.when, line].filter(Boolean).join(' · '),
     amount: asTyped(money, locale),
     sub,

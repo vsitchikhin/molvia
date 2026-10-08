@@ -102,6 +102,12 @@ export const useAccountsStore = defineStore('accounts', () => {
   const viewers = ref(0)
   /** The answer on screen came in this session, not from the phone's memory. */
   const confirmed = ref(false)
+  /**
+   * How many transfers this phone wrote, amended, removed or brought back (MOL-253): a transfer is
+   * written with a connection, never through a queue, so the journals and the month read again by
+   * this rather than by a queue's landing.
+   */
+  const transfers = ref(0)
 
   function adopt(): void {
     const id = actor.id
@@ -221,6 +227,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     }),
     removed,
     viewers,
+    transfers,
     refresh,
     accept,
     repeat,

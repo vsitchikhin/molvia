@@ -101,7 +101,7 @@ support types, the shared integration tests, the migrations.
 - `backend/tests/listings.integration.test.ts` — Integration test: repository reads — empty lists, order and limit, purchases awaiting a rating, where it is cheaper, ratings.
 - `backend/tests/migration-0010.integration.test.ts` — Integration test: migration 0010 merges places that the new identity makes one, so the API still starts.
 - `backend/tests/migration-0012.integration.test.ts` — Integration test: migration 0012 empties owners without a Telegram identity and keeps what must survive.
-- `backend/tests/migration-0060.integration.test.ts` — Integration test: migration 0060 removes what a removed trip or purchase left of its receipt, then makes the receipt go with its trip and the line with its purchase (MOL-240).
+- `backend/tests/migration-0061.integration.test.ts` — Integration test: migration 0061 removes what a removed trip or purchase left of its receipt, then makes the receipt go with its trip and the line with its purchase (MOL-240).
 - `backend/tests/migrations.integration.test.ts` — Integration test: the migration chain applies on a database that already holds rows from earlier steps.
 - `backend/tests/ownership.integration.test.ts` — Integration test: every repository read and write is scoped to its owner; someone else's row answers as a missing one.
 - `backend/tests/repositories.integration.test.ts` — Integration test: the core repositories — actors, catalogue, places, trips with purchases, verdicts — write and read back.

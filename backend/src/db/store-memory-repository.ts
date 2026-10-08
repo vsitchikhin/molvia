@@ -205,7 +205,7 @@ export async function forgetWordsOf(db: Conn, going: SQL): Promise<void> {
 }
 
 /**
- * Every person's word settled (MOL-240, round 3, Р3-4): 0060 deleted the lines of purchases removed before
+ * Every person's word settled (MOL-240, round 3, Р3-4): 0061 deleted the lines of purchases removed before
  * it and the receipts of trips removed for good, and the words they taught had no line left to be found
  * by — a text key is `toSearchKey`, which SQL cannot compute; an image rolled back onto this schema deletes
  * without settling too. Run once the API listens, never on its way there (round 4, Р4-2): a person at a

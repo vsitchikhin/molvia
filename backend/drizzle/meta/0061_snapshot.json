@@ -1,9 +1,277 @@
 {
-  "id": "944e6d23-032c-4d0b-b0ce-9a25e7a768a0",
-  "prevId": "82c6a0c7-0880-4eb4-85a9-fa27e657d9bf",
+  "id": "24669ae1-91f3-4520-a4d7-7bc5f015e985",
+  "prevId": "7c453156-90d1-48af-af43-9ba424fd342e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.account_transfer_revisions": {
+      "name": "account_transfer_revisions",
+      "schema": "",
+      "columns": {
+        "transfer_id": {
+          "name": "transfer_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "from_account_id": {
+          "name": "from_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "to_account_id": {
+          "name": "to_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_minor": {
+          "name": "amount_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "char(3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fee_minor": {
+          "name": "fee_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "transferred_on": {
+          "name": "transferred_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "replaced_at": {
+          "name": "replaced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "account_transfer_revisions_transfer_id_account_transfers_id_fk": {
+          "name": "account_transfer_revisions_transfer_id_account_transfers_id_fk",
+          "tableFrom": "account_transfer_revisions",
+          "tableTo": "account_transfers",
+          "columnsFrom": ["transfer_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "account_transfer_revisions_transfer_id_revision_pk": {
+          "name": "account_transfer_revisions_transfer_id_revision_pk",
+          "columns": ["transfer_id", "revision"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "account_transfer_revisions_amount_positive": {
+          "name": "account_transfer_revisions_amount_positive",
+          "value": "\"account_transfer_revisions\".\"amount_minor\" > 0"
+        },
+        "account_transfer_revisions_fee_positive": {
+          "name": "account_transfer_revisions_fee_positive",
+          "value": "\"account_transfer_revisions\".\"fee_minor\" is null or \"account_transfer_revisions\".\"fee_minor\" > 0"
+        },
+        "account_transfer_revisions_currency_known": {
+          "name": "account_transfer_revisions_currency_known",
+          "value": "\"account_transfer_revisions\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL', 'RSD')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.account_transfers": {
+      "name": "account_transfers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "from_account_id": {
+          "name": "from_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "to_account_id": {
+          "name": "to_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_minor": {
+          "name": "amount_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "char(3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transferred_on": {
+          "name": "transferred_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        },
+        "amended_at": {
+          "name": "amended_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "account_transfers_actor_day_idx": {
+          "name": "account_transfers_actor_day_idx",
+          "columns": [
+            {
+              "expression": "actor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "transferred_on",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "account_transfers_actor_id_actors_id_fk": {
+          "name": "account_transfers_actor_id_actors_id_fk",
+          "tableFrom": "account_transfers",
+          "tableTo": "actors",
+          "columnsFrom": ["actor_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "account_transfers_from_is_owners": {
+          "name": "account_transfers_from_is_owners",
+          "tableFrom": "account_transfers",
+          "tableTo": "money_accounts",
+          "columnsFrom": ["from_account_id", "actor_id", "currency"],
+          "columnsTo": ["id", "actor_id", "currency"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "account_transfers_to_is_owners": {
+          "name": "account_transfers_to_is_owners",
+          "tableFrom": "account_transfers",
+          "tableTo": "money_accounts",
+          "columnsFrom": ["to_account_id", "actor_id", "currency"],
+          "columnsTo": ["id", "actor_id", "currency"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "account_transfers_id_actor_unique": {
+          "name": "account_transfers_id_actor_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "actor_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "account_transfers_two_accounts": {
+          "name": "account_transfers_two_accounts",
+          "value": "\"account_transfers\".\"from_account_id\" <> \"account_transfers\".\"to_account_id\""
+        },
+        "account_transfers_amount_positive": {
+          "name": "account_transfers_amount_positive",
+          "value": "\"account_transfers\".\"amount_minor\" > 0"
+        },
+        "account_transfers_currency_known": {
+          "name": "account_transfers_currency_known",
+          "value": "\"account_transfers\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL', 'RSD')"
+        },
+        "account_transfers_revision_positive": {
+          "name": "account_transfers_revision_positive",
+          "value": "\"account_transfers\".\"revision\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.actors": {
       "name": "actors",
       "schema": "",
@@ -5347,6 +5615,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "transfer_id": {
+          "name": "transfer_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "revision": {
           "name": "revision",
           "type": "integer",
@@ -5422,6 +5696,15 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
+        "spendings_transfer_is_owners": {
+          "name": "spendings_transfer_is_owners",
+          "tableFrom": "spendings",
+          "tableTo": "account_transfers",
+          "columnsFrom": ["transfer_id", "actor_id"],
+          "columnsTo": ["id", "actor_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
         "spendings_account_is_owners": {
           "name": "spendings_account_is_owners",
           "tableFrom": "spendings",
@@ -5442,7 +5725,13 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "spendings_transfer_unique": {
+          "name": "spendings_transfer_unique",
+          "nullsNotDistinct": false,
+          "columns": ["transfer_id"]
+        }
+      },
       "policies": {},
       "checkConstraints": {
         "spendings_amount_positive": {

@@ -1055,7 +1055,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           sql`${receiptParts.receiptId} in (select ${receipts.id} from ${receipts} where ${receipts.status} = 'recorded')`,
         )
       // nor a line that is no purchase (MOL-240, В-2): recording deletes it, and this holds the promise
-      // over what an image rolled back recorded — 0060 does not run twice (adversarial А3б)
+      // over what an image rolled back recorded — 0061 does not run twice (adversarial А3б)
       await db
         .delete(receiptLines)
         .where(

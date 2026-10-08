@@ -46,6 +46,7 @@ function spending(id: string, spentOn: string, price: string, note: string | nul
     rate: null,
     accountId: null,
     debited: null,
+    transferId: null,
     revision: 2,
     amendedAt: null,
   }
@@ -410,6 +411,17 @@ describe('a line of the journal as its row says it', () => {
       manual({ spending: { ...spending(TAXI, '2026-09-27', '1800', 'Стрижка'), place: 'Барбер' } }),
     )
     expect([noted.title, noted.meta]).toEqual(['Стрижка', 'Красота · Барбер'])
+  })
+
+  it('a transfer’s fee says what it is: «Прочее · комиссия за перевод» (MOL-253, Р-1)', () => {
+    const fee = manual({
+      spending: {
+        ...spending(TAXI, '2026-09-27', '20'),
+        place: null,
+        transferId: 'eeeeeeee-0000-4000-8000-000000000001',
+      },
+    })
+    expect(row(fee).title).toBe('Прочее · комиссия за перевод')
   })
 
   it('puts the day first where rows of different days stand together', () => {

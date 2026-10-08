@@ -26,7 +26,7 @@ describe('exportMine', () => {
     const file = await exportMine(fake(content, calls), ACTOR, SESSION, NOW)
 
     expect(calls).toEqual([[ACTOR, SESSION]])
-    expect(file).toMatchObject({ format: 'molvia-export', version: 16, exportedAt: NOW, trips: [] })
+    expect(file).toMatchObject({ format: 'molvia-export', version: 17, exportedAt: NOW, trips: [] })
   })
 
   it('answers «no owner» when the owner was erased between the session and the read', async () => {
