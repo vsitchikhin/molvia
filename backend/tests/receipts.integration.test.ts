@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import {
   ERROR,
+  RECEIPT_READ_TOTAL_HEADER,
   receiptDetailCodec,
   receiptSummaryCodec,
   receiptsResponseCodec,
@@ -484,6 +485,41 @@ describe('the queue', () => {
     expect(report).toMatchObject({ kind: 'read', status: 'parsed', partly: true })
     expect(report?.kind === 'read' && report.lines).toBe(detail.lines.length)
     expect(await days()).toMatchObject([{ readPartly: 1, read: 0, reshoot: 0 }])
+    // the total stands in one place and the lines nowhere near it: not shown, and still what says
+    // «read in part» — to a phone that asks for it alone (MOL-244)
+    expect([detail.receipt.total, detail.readTotal]).toEqual([null, undefined])
+    const asked = receiptDetailCodec.parse(
+      (
+        await app.inject({
+          method: 'GET',
+          url: `/receipts/${id}`,
+          headers: { cookie: me.cookie, [RECEIPT_READ_TOTAL_HEADER]: '1' },
+        })
+      ).json(),
+    )
+    expect(asked.readTotal).toEqual({ minor: 1_000_000n, currency: 'AMD' })
+  })
+
+  it('shows the total the payment prints too, the lines short of it (MOL-244)', async () => {
+    const me = await owner()
+    const id = await queued(me)
+    const text = [
+      '1. Կաթ',
+      '0401/1163909 1Հտ 370/370',
+      '2. Հաց',
+      '1905/1078044 1Հտ 99,1/0,9 100',
+      'Ընդամենը 10000.00',
+      'Վճարված է Առձեռն: 10 000,00',
+    ].join('\n')
+    const paid: ReaderReading = {
+      text,
+      rows: text.split('\n').map((row, i) => ({ text: row, box: [0, i * 40, 600, 30] })),
+      version: 'v',
+    }
+    const [report] = await readAll(benchReader({ read: () => Promise.resolve(paid) }))
+    const detail = receiptDetailCodec.parse((await get(me, `/receipts/${id}`)).json())
+    expect(detail.receipt.total).toEqual({ minor: 1_000_000n, currency: 'AMD' })
+    expect(report).toMatchObject({ kind: 'read', partly: true })
   })
 
   it('counts a receipt read whole as read, by the day in Yerevan, with no id of anyone', async () => {

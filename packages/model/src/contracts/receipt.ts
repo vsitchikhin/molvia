@@ -187,6 +187,13 @@ export const receiptDetailCodec = z.strictObject({
   lines: z.array(receiptReviewLineCodec),
   rate: rateCodec.nullable(),
   duplicateOf: receiptDuplicateCodec.nullable(),
+  /**
+   * The total as the reader found it in one place, which no second source vouched for (MOL-244): never
+   * the receipt's total, only what «Прочитали не всё» measures the lines against. Sent only to a phone
+   * that asked by `RECEIPT_READ_TOTAL_HEADER` — an installed app of an earlier build reads the detail
+   * strictly, as with a line's `code`.
+   */
+  readTotal: moneyCodec.nullable().optional(),
 })
 export type ReceiptDetail = z.output<typeof receiptDetailCodec>
 
@@ -301,3 +308,6 @@ export const receiptReadQuerySchema = z.strictObject({ shown: z.literal('1').opt
  * refuses a query it does not know, and leaves a header alone.
  */
 export const RECEIPT_CODES_HEADER = 'X-Molvia-Receipt-Codes'
+
+/** A phone that knows the detail's `readTotal` says so by this header (MOL-244), as `RECEIPT_CODES_HEADER`. */
+export const RECEIPT_READ_TOTAL_HEADER = 'X-Molvia-Receipt-Read-Total'

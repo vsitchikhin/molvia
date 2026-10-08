@@ -83,6 +83,7 @@ function headOf(
     printedTime: receiptTimeOf(text),
     receiptNo: text.receiptNo,
     totalMinor: moneyOfHundredths(text.totalHundredths, currency)?.minor ?? null,
+    readTotalMinor: moneyOfHundredths(text.readTotalHundredths, currency)?.minor ?? null,
     balanced: text.balanced,
     layout: text.layout,
     city:
@@ -159,7 +160,9 @@ async function readOne(
   if (bindings.length !== lines.length) {
     bindings = lines.map(() => ({ itemId: null, match: 'new', translation: null }))
   }
-  const total = head.totalMinor === null ? null : { minor: head.totalMinor, currency }
+  // a total no second source vouched for is not shown, and still says the lines are too few (MOL-244)
+  const measured = head.totalMinor ?? head.readTotalMinor
+  const total = measured === null ? null : { minor: measured, currency }
   return {
     kind: 'parsed',
     readerVersion: version ?? '',

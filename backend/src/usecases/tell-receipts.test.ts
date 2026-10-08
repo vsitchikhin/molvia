@@ -30,6 +30,7 @@ function untold(patch: Partial<ReceiptSummary> = {}, telegramUserId = 4242): Unt
     shopUnit: null,
     source: 'photo',
     heard: 'bot',
+    readTotal: null,
     actor: { id: 'a1', telegramUserId, country: 'AM', city: 'Гюмри' },
   }
 }

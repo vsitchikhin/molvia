@@ -3,6 +3,7 @@ import {
   receiptReadQuerySchema,
   DomainError,
   RECEIPT_CODES_HEADER,
+  RECEIPT_READ_TOTAL_HEADER,
   ERROR,
   RECEIPT_PART_BYTES_MAX,
   receiptBodySchema,
@@ -33,9 +34,16 @@ export interface ReceiptsApi {
   list(actor: Actor, shown: boolean): Promise<ReceiptSummary[]>
   /**
    * The review reads the rate of the receipt's day, and «today» is the phone's (MOL-121). `codes` — the
-   * phone knows a line's `code` (`RECEIPT_CODES_HEADER`, MOL-234, adversarial А3).
+   * phone knows a line's `code` (`RECEIPT_CODES_HEADER`, MOL-234, adversarial А3); `readTotal` — the
+   * detail's `readTotal` (`RECEIPT_READ_TOTAL_HEADER`, MOL-244).
    */
-  one(actor: Actor & Today, id: string, shown: boolean, codes: boolean): Promise<ReceiptDetail>
+  one(
+    actor: Actor & Today,
+    id: string,
+    shown: boolean,
+    codes: boolean,
+    readTotal: boolean,
+  ): Promise<ReceiptDetail>
   remove(actorId: string, id: string): Promise<void>
   restore(actorId: string, id: string): Promise<ReceiptSummary>
   /** «Записать» (MOL-126): the receipt's day and «today» are the phone's (MOL-121). */
@@ -57,6 +65,11 @@ function shownOf(request: FastifyRequest): boolean {
 /** Whether the phone knows a review line's `code` (MOL-234, adversarial А3). */
 function codesOf(request: FastifyRequest): boolean {
   return request.headers[RECEIPT_CODES_HEADER.toLowerCase()] === '1'
+}
+
+/** Whether the phone knows the detail's `readTotal` (MOL-244). */
+function readTotalOf(request: FastifyRequest): boolean {
+  return request.headers[RECEIPT_READ_TOTAL_HEADER.toLowerCase()] === '1'
 }
 
 function ownerOf(request: FastifyRequest): string {
@@ -169,6 +182,7 @@ export function receiptRoutes(app: FastifyInstance, api: ReceiptsApi): void {
               request.params.receiptId,
               shownOf(request),
               codesOf(request),
+              readTotalOf(request),
             ),
           ),
         ),

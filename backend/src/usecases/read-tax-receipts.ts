@@ -169,6 +169,7 @@ async function outcomeOf(
       // the link's own: signed, read when the receipt was taken, and what a repeat is known by
       receiptNo: link.number,
       totalMinor: link.total.minor,
+      readTotalMinor: null,
       balanced,
       layout: null,
       city: serbianCityOf(answer.administrativeUnit, answer.city),

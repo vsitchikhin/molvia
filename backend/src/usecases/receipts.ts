@@ -238,6 +238,8 @@ export async function receiptOfOwner(
   shown: boolean,
   /** The phone knows a line's `code` (`RECEIPT_CODES_HEADER`, adversarial А3). */
   codes = false,
+  /** The phone knows the detail's `readTotal` (`RECEIPT_READ_TOTAL_HEADER`, MOL-244). */
+  readTotal = false,
 ): Promise<ReceiptDetail> {
   const found = await repositories.receipts.one(actor.id, id)
   if (found === null) throw new DomainError(ERROR.NOT_FOUND)
@@ -325,6 +327,7 @@ export async function receiptOfOwner(
     }),
     rate: snapshot?.rate ?? null,
     duplicateOf: twin,
+    ...(readTotal ? { readTotal: found.readTotal } : {}),
   }
 }
 
