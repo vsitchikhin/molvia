@@ -402,6 +402,32 @@ describe('TransferSheet (MOL-253)', () => {
       expect(mainButton(view).text()).toBe('Save')
     })
 
+    it('А10: a bare 404 — a shop’s portal — is no removal: the amendment stays, «try again»', async () => {
+      transfer.mockResolvedValueOnce(written())
+      amendTransfer.mockRejectedValueOnce(new ApiError(ERROR.NOT_FOUND, 'HTTP 404', false))
+      const pinia = withAccounts([card, dollars])
+      const view = await sheet({ editingId: TRANSFER }, pinia)
+      await typeAmount(view, '2100')
+      await mainButton(view).trigger('click')
+      await settle()
+      expect(view.get('.refusal').text()).toContain('Try again')
+      expect(view.get('.refusal').text()).not.toContain('deleted on another phone')
+      expect(mainButton(view).text()).toBe('Save')
+      expect(view.findAll('button').some((one) => one.text() === 'Delete transfer')).toBe(true)
+      expect(useAccountsStore(pinia).transfers).toBe(0)
+    })
+
+    it('А11: a row of a transfer removed on another phone opens on «удалили», no «Повторить», the journal read again', async () => {
+      transfer.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, 'gone', true))
+      moneyAccounts.mockResolvedValue(page([card, dollars]))
+      const pinia = withAccounts([card, dollars])
+      const view = await sheet({ editingId: TRANSFER }, pinia)
+      expect(view.text()).toContain('The transfer was deleted on another phone')
+      expect(view.findAll('button').some((one) => one.text() === 'Try again')).toBe(false)
+      expect(useAccountsStore(pinia).transfers).toBe(1)
+      expect(transfer).toHaveBeenCalledTimes(1)
+    })
+
     describe('«Вернуть» (review С-3, А4)', () => {
       function outcomesHost() {
         let outcomes: TransferOutcomes | undefined

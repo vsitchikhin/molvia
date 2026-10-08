@@ -16,6 +16,13 @@
       :body="t('transfer.unread_offline')"
     />
     <ScreenState
+      v-else-if="unread === 'gone'"
+      kind="attention"
+      inline
+      :title="t('transfer.vanished_title')"
+      :body="t('transfer.unread_gone')"
+    />
+    <ScreenState
       v-else-if="unread === 'error'"
       kind="error"
       inline
@@ -274,7 +281,7 @@ export default defineComponent({
     const toId = ref<string | null>(null)
     const editing = ref<TransferView | null>(null)
     const loading = ref(false)
-    const unread = ref<'error' | 'offline' | null>(null)
+    const unread = ref<'error' | 'offline' | 'gone' | null>(null)
     const amountBad = ref(false)
     const feeBad = ref(false)
     const dayBad = ref(false)
@@ -347,7 +354,7 @@ export default defineComponent({
     )
     // Back online, a transfer that did not open is read again by itself (review Р2-2, frontend.md).
     useReconnect(() => {
-      if (props.open && unread.value !== null) void load()
+      if (props.open && (unread.value === 'error' || unread.value === 'offline')) void load()
     })
 
     /**
@@ -363,9 +370,17 @@ export default defineComponent({
         const transfer = await transfers.load(id)
         if (props.open && props.editingId === id) fill(transfer)
       } catch (caught) {
-        reportFailure(caught, 'screen')
-        if (props.open && props.editingId === id)
+        if (props.open && props.editingId === id) {
+          // Removed on another phone while this journal was not read again: said as such, no
+          // «Повторить» that would get the same 404 for ever, and the journal read again (А11).
+          if (caught instanceof ApiError && caught.answered && caught.code === ERROR.NOT_FOUND) {
+            unread.value = 'gone'
+            void transfers.heard()
+            return
+          }
           unread.value = navigator.onLine ? 'error' : 'offline'
+        }
+        reportFailure(caught, 'screen')
       } finally {
         loading.value = false
       }
@@ -535,6 +550,9 @@ export default defineComponent({
         emit('update:open', false)
       } catch (caught) {
         const code = caught instanceof ApiError ? caught.code : null
+        // The API's own word, not a code inferred from a bare status — a shop's portal answers 404 too
+        // (transport.ts, adversarial А10).
+        const said = caught instanceof ApiError && caught.answered
         if (code === ERROR.TRANSFER_ACCOUNT) {
           // Gone or given another currency on another phone: the page says which, and that side is
           // chosen again — the sum, the fee and the note stay (state 6).
@@ -551,7 +569,7 @@ export default defineComponent({
           settleTarget()
         } else if (code === ERROR.TRANSFER_IN_FUTURE) {
           dayBad.value = true
-        } else if (code === ERROR.CONFLICT) {
+        } else if (code === ERROR.CONFLICT && said) {
           // Amended on another phone meanwhile — or, for a new one, written already under this name
           // with other figures, its answer lost (review С-1, adversarial А5): what is recorded now is
           // said, the figures typed stay, and «Сохранить» writes them over it — never a second one.
@@ -564,7 +582,7 @@ export default defineComponent({
           } catch {
             failure.value = 'failed'
           }
-        } else if (code === ERROR.NOT_FOUND && editing.value) {
+        } else if (code === ERROR.NOT_FOUND && said && editing.value) {
           // Removed on another phone: there is nothing to save, and saying «try again» would loop
           // for ever (adversarial А8). Its rows go from the journal under the sheet.
           failure.value = 'vanished'

@@ -2377,6 +2377,7 @@
     "current_fee": "fee {amount}",
     "unavailable": "The transfer didn’t open — the server didn’t answer",
     "unread_offline": "The transfer will open once you are online",
+    "unread_gone": "It is gone — its rows have left the account’s journal",
     "vanished_title": "The transfer was deleted on another phone",
     "vanished": "There is nothing to save — it is gone. Close the sheet",
     "vanished_button": "The transfer is gone",
