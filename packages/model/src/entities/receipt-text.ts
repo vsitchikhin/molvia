@@ -1304,7 +1304,8 @@ const SECTION_TAX = /Շրջ|հար[կլ]/u
 // «Ընդամենը զեղչ»; and the payment's, in cash or by card. The words of any Armenian till.
 const TOTAL_WORD = 'դամե'
 const PAID_WORDS = /ձեռն|ձեոն|ձեդն|Կանխիկ|Անկանխ|Վճար/u
-const totalRow = (text: string): boolean => text.includes(TOTAL_WORD) && !text.includes('զեղչ')
+// the discount however OCR spells its first letter — «զեղչ», «Զեղչ», «qեղչ» — as loosely as the total's word
+const totalRow = (text: string): boolean => text.includes(TOTAL_WORD) && !text.includes('եղչ')
 // An amount with its hundredths: «1700.00», «1800 00», and with its thousands apart before a point,
 // «2 050,01» — the card's payment, which read digit by digit was 50,01 in two places at once (MOL-244). A
 // figure that lost its point is no vote.
@@ -1330,6 +1331,7 @@ function placedAmounts(rows: readonly TextRow[], withSection: boolean): Map<stri
   const add = (source: string, amounts: number[]): void => {
     for (const amount of amounts) found.get(source)?.add(amount)
   }
+  // a row is one place, whatever words OCR put on it: «Ընդամենը Վճարված 2060.01» read twice is one vote
   texts.forEach((text, i) => {
     if (withSection && DEPARTMENT.test(text)) {
       add('section', amountsOf(text))
@@ -1337,9 +1339,8 @@ function placedAmounts(rows: readonly TextRow[], withSection: boolean): Map<stri
       for (const next of texts.slice(i + 1, i + 3)) {
         if (SECTION_TAX.test(next)) add('section', amountsOf(next))
       }
-    }
-    if (totalRow(text)) add('total', amountsOf(text))
-    if (PAID_WORDS.test(text)) add('paid', amountsOf(text))
+    } else if (totalRow(text)) add('total', amountsOf(text))
+    else if (PAID_WORDS.test(text)) add('paid', amountsOf(text))
   })
   return found
 }
@@ -1792,8 +1793,9 @@ export function mergeParts(parts: readonly (readonly TextRow[])[]): TextRow[] {
 /**
  * The receipt from its readings — Tesseract in two page modes, each with the parts merged: the
  * reading whose lines add up, else the one with more lines settled. The receipt's own arithmetic is
- * the judge; no truth is needed. Its total is one two sources vouch for (MOL-244, owner's В-1 «а»): the
- * lines that met it, else two places printed — the total and the payment (`votedTotal`) — else none.
+ * the judge; no truth is needed. Its total is one two sources vouch for (MOL-244, owner's В-1 «а»): two
+ * places printed — the total and the payment (`votedTotal`) — else the lines that met it, one of them as
+ * read, else none.
  * A total read in one place is a digit misread as often as not, the same in both readings (am-08, am-13,
  * am-36 on the bench), and a wrong sum on a trip is worse than none the person sees and types. What the
  * reading read stays `readTotalHundredths`, for «Прочитали не всё» alone.
@@ -1811,6 +1813,9 @@ export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptT
     const section = departmentReceipt(readings)
     if (section !== null) return section
   }
-  const total = best.balanced ? best.totalHundredths : votedTotal(readings, false)
+  // two places printed outrank the lines; and lines «meet» a total only with one of them as read — the
+  // total changes a line's digit to meet itself, or gives a line with no reading its rest (adversarial А1)
+  const linesVouch = best.balanced && best.lines.some((line) => line.settled)
+  const total = votedTotal(readings, false) ?? (linesVouch ? best.totalHundredths : null)
   return withTwins({ ...best, totalHundredths: total })
 }
