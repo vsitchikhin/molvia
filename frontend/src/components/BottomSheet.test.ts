@@ -1680,6 +1680,78 @@ describe('words said inside the sheet', () => {
     expect(host.get('.app-region').text()).toBe('')
   })
 
+  // A picker over a sheet (MOL-123): the sheet under it is inert too, so the top one takes the words —
+  // and gives them back once it is down. The reason the open sheets are a list (review С-10).
+  it('gives the words of the sheet under it to the sheet over it, and back once that one is down', async () => {
+    const router: Router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/')
+    const under = ref(false)
+    const over = ref(false)
+    const words = ref<string | null>(null)
+    const InUnder = defineComponent({
+      setup() {
+        const announce = useAnnouncer()
+        watch(words, (now) => {
+          if (now) announce?.(now)
+        })
+        return () => h('p', 'Трата')
+      },
+    })
+    const host = mount(
+      defineComponent({
+        setup() {
+          provideAnnouncer()
+          return () => [
+            h(
+              BottomSheet,
+              {
+                open: under.value,
+                class: 'under',
+                'onUpdate:open': (next: boolean) => (under.value = next),
+              },
+              { title: () => 'Трата', default: () => h(InUnder) },
+            ),
+            h(
+              BottomSheet,
+              {
+                open: over.value,
+                back: true,
+                class: 'over',
+                'onUpdate:open': (next: boolean) => (over.value = next),
+              },
+              { title: () => 'Счёт', default: () => h('p', 'Наличные') },
+            ),
+          ]
+        },
+      }),
+      { attachTo: document.body, global: { plugins: [router, createAppI18n('en')] } },
+    )
+    const region = (sheet: string) => host.get(`dialog.${sheet} .region`).text()
+
+    under.value = true
+    await nextTick()
+    wait(1000)
+    await settle()
+    over.value = true
+    await nextTick()
+    wait(1000)
+    await settle()
+    words.value = 'Под выбором счёта'
+    await settle()
+    expect((host.get('dialog.under').element as HTMLDialogElement).open).toBe(true)
+    expect(region('over')).toBe('Под выбором счёта')
+    expect(region('under')).toBe('')
+
+    over.value = false
+    await nextTick()
+    landed()
+    await settle()
+    words.value = 'Снова наверху'
+    await settle()
+    expect(region('under')).toBe('Снова наверху')
+    expect(region('over')).toBe('')
+  })
+
   // Under a modal sheet everything else is inert: a sheet's wrapper speaking from its own setup,
   // above its BottomSheet, or the screen under it, is said in the sheet (adversarial А3).
   it('says words from outside it in its own region while it is up, in the app’s once it is down', async () => {

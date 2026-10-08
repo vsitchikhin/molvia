@@ -93,9 +93,10 @@ function speak(hub: Hub, home: Sheet | null, text: string, held: boolean): () =>
 }
 
 /**
- * The app's one polite live region, there from the first frame and through every screen —
- * which is why it lives above the router, not in the screen: a region remounted with each
- * screen is born with that screen's first words.
+ * The app's polite live regions: its own, there from the first frame and through every screen —
+ * which is why it lives above the router, not in the screen: a region remounted with each screen
+ * is born with that screen's first words — and the hub the sheets give theirs to
+ * (`provideSheetAnnouncer`), so that while one is up the words land in it.
  *
  * Every announcement is a node of its own, added and later removed. An addition is what gets
  * read, so the same words said twice are read twice — «Try again» failing the same way is
@@ -144,7 +145,10 @@ export function provideSheetAnnouncer(shown: Ref<boolean>): Ref<Announcement[]> 
   return sheet.announcements
 }
 
-/** The app's live region, or nothing outside the app — then a block speaks for itself. */
+/**
+ * The nearest announcer — the app's, or a sheet's inside one; where the words land is chosen as they
+ * land (`regionFor`). Nothing outside the app — then a block speaks for itself.
+ */
 export function useAnnouncer(): Announce | undefined {
   return inject(announcerKey, undefined)
 }
