@@ -115,7 +115,7 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   screencast, 13.2 and 15.5 without) against a median of 9.6 and a spread of 9.3–12.8 before it — four
   runs of a runner that wanders, so a cost likely rather than measured; a spec that needs it says
   `test.use({ trace: { mode: 'retain-on-first-failure', screenshots: false } })` under `CI`, as
-  `verdicts.spec` does. Not without the DOM of each step: Playwright records the network only with
+  `verdicts.spec` and the focus block of `scanner.spec` (MOL-249) do. Not without the DOM of each step: Playwright records the network only with
   those snapshots, and the network — which request left and how it ended — is what a flake's trace is
   for. Whatever there is goes up from `test-results/` when the job fails; the artifact used to be
   `playwright-report/`, which the `github` reporter never writes.
@@ -156,6 +156,18 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   its page in place; the harness is
   `.scratch/tasks/selftests/MOL-217-adversarial-round-8-leak.cjs`. The readings of the four failures
   before, both refuted by the trace — `.scratch/tasks/status/MOL-217/readings.md`.
+- **A route a step relies on is laid before the page opens, never on the open page right before the
+  step** (MOL-249): `page.route` before `open()`; a route that matches nothing until the step costs
+  nothing. «An item full of codes» laid its `409` for the link on the open page, then pressed Enter;
+  once in some 830 runs of CI (run 37484398374) the server got the real `POST …/barcodes` and wrote
+  `201`, the screen went on to the purchase sheet, and the test read a focus in it — `Received: ''`.
+  How the request passed was never shown: laid first on a page, the route turns interception on in the
+  middle of the test, and a probe of exactly that — a route, then Enter, then `fetch` — let none through
+  in 960 tries under load (`.scratch/tasks/status/MOL-249/`); nor was anything found that pressed the
+  button before the route — the price, named. So the focus block of `scanner.spec` lays the link's
+  answer in `asked`, before `open()`, and `asked` says that nothing was linked before the test's own
+  Enter: should the cause be the second, the next failure names it. The other routes laid after
+  `open()` — some fifty — stay as they are until one of them fails so.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**
   (MOL-64). The app has one polite region, in `App.vue` above the router, and **eight things write
   to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the
