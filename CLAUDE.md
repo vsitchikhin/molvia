@@ -321,6 +321,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   change of a trip's money takes it off.
 - **A check looks for the reason before it offers to close the difference**; only a check that came
   out even is where the next one starts.
+- **A transfer moves two balances of one currency and nothing else** (MOL-253): no month, no wallet;
+  its fee is a spending of «Прочее» tied to it, written and removed only with it; both accounts are
+  required, so it is written with a connection and an account it cannot be on is refused.
 - **On the phone (MOL-123) every figure is the server's**: the default account is the screen's, a
   check recounts only once nothing put right still waits in either queue, and a difference above
   zero is written through the income's own sheet, with «сколько было до» (В-5).
