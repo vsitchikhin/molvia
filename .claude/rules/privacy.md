@@ -201,7 +201,7 @@ The detail behind the privacy lines of `CLAUDE.md`.
   whoever has not accepted `STATISTICS_CONSENT_EDITION` — `advice.md`. **The card and «что изменилось»
   are in the fingerprint** (А4): rewritten, they are the text agreed to; the step's buttons are not.
   **The day counters with no id are named, not gated** (owner's 1-а on adversarial Р2-А2):
-  `login_days`, `receipt_days` and `reminder_days` count everyone, the switch off or no consent — a
+  `login_days`, `receipt_days`, `tax_receipt_days` (MOL-234) and `reminder_days` count everyone, the switch off or no consent — a
   press under a reminder too — and «Статистика» says so in a paragraph of its own; the strict reading's
   price (counting is a use for another purpose) is in «Персональные данные», 2.1. **Telegram is named a
   transfer abroad** with its basis — the sign-in and the bot are Telegram (owner's 2-а on review С-3);
@@ -254,7 +254,9 @@ The detail behind the privacy lines of `CLAUDE.md`.
   sends it the receipt's link with `Molvia/<build> (<contact>)` (`PURS_CONTACT` of `.env`) — the link
   carries the total, the moment, the number and, for a receipt made out to a firm, the buyer's tax id,
   all of it the tax office's own. **Of its answer only the seller is read** — the tax number, the
-  premises and the town — with the journal laid out into lines; the cashier, the buyer and the
+  premises and the town — with the journal laid out into lines; the receipt's page and its specification
+  are asked by the same link, with that page's number and token, for the lines' codes alone (MOL-234) — a
+  package's code, nobody's; the cashier, the buyer and the
   payments are in the answer and never read, and the journal is not kept. **The link lives only until
   the tax office answered** (Р-4, stricter than «until recorded»): read, refused or given up after two
   days, its row is deleted in the same transaction — and no log, failure or metric ever carries it, nor
@@ -262,9 +264,12 @@ The detail behind the privacy lines of `CLAUDE.md`.
   (adversarial А4): a receipt waits up to two days, and in `receipts` the link went into a copy kept
   fourteen; a restore brings the table back empty, and a receipt left without its link fails as
   `unreadable`. **The person's copy of their data leaves it out** too, with that reason
-  (`EXPORT_COLUMNS`). `/privacy` says it under «Сербский чек по ссылке», a revision of edition 1: the
-  new recipient is named in the consent by edition 2 (MOL-236, owner's В-4 of MOL-232) — «Налоговая
-  Сербии» among the recipients and in «что изменилось». The record of processing (12091393) names Пореска управа among the third
+  (`EXPORT_COLUMNS`). How the link came (`receipts.via`, `qr_missed`, MOL-234) is the person's and goes
+  with them and into the copy; a line's code reaches the shared catalogue only by «Привязать и записать».
+  `/privacy` says it under «Сербский чек по ссылке», a revision of edition 1 and, for MOL-234, of
+  edition 2: the new recipient is named in the consent by edition 2 (MOL-236, owner's В-4 of MOL-232) —
+  «Налоговая Сербии» among the recipients and in «что изменилось». The record of processing (12091393)
+  names Пореска управа among the third
   parties.
 - **A receipt is read on our own server, and its photo lives days** (MOL-125, the owner's decisions of
   27.09 and 02.10.2026): Tesseract in `services/receipt-reader`, a container with no database, no

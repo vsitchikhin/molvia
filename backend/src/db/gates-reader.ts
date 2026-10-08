@@ -1,11 +1,11 @@
-import { sql } from 'drizzle-orm'
-import type { SQLWrapper } from 'drizzle-orm'
+import { getTableColumns, sql } from 'drizzle-orm'
+import type { SQL, SQLWrapper } from 'drizzle-orm'
 import { GATE_RATINGS, GATE_RATINGS_WINDOW_HOURS } from '@molvia/model'
 import type { CohortReturn } from './events-repository'
 import type { Conn, Db } from './index'
 import type { CohortReached } from './verdicts-repository'
 import { createEventRepository } from './events-repository'
-import { loginDays, receiptDays, reminderDays } from './schema'
+import { loginDays, receiptDays, reminderDays, taxReceiptDays } from './schema'
 import { createVerdictRepository } from './verdicts-repository'
 import { yerevanDay, yerevanWeek } from './yerevan-week'
 
@@ -25,6 +25,7 @@ export interface GatesReport {
   readonly logins: LoginsInWindow
   readonly reminders: RemindersInWindow
   readonly receipts: ReceiptsInWindow
+  readonly taxReceipts: TaxReceiptsInWindow
 }
 
 /**
@@ -112,6 +113,17 @@ export interface ReceiptsInWindow {
   readonly later: number
 }
 
+/**
+ * The receipts from the Serbian tax office (MOL-234) over the same days, summed from
+ * `tax_receipt_days`: how their links came — the risk of MOL-233 — how the tax office answered, and
+ * of the receipts recorded the lines people put right, which the matcher missed. No stop: the lines
+ * are the tax office's, and the reader's measure is the block above.
+ */
+export type TaxReceiptsInWindow = {
+  readonly firstDay: string
+  readonly lastDay: string
+} & Readonly<Record<Exclude<keyof typeof taxReceiptDays.$inferSelect, 'day'>, number>>
+
 export interface GatesReader {
   read(window: GatesWindow): Promise<GatesReport>
 }
@@ -146,6 +158,7 @@ export function createGatesReader(db: Db): GatesReader {
             logins: await loginsIn(tx, from, to),
             reminders: await remindersIn(tx, from, to),
             receipts: await receiptsIn(tx, from, to),
+            taxReceipts: await taxReceiptsIn(tx, from, to),
           }
         },
         { isolationLevel: 'repeatable read', accessMode: 'read only' },
@@ -276,4 +289,26 @@ async function receiptsIn(tx: Conn, from: Date, to: Date): Promise<ReceiptsInWin
     later: 0,
   }
   return { firstDay, lastDay, ...zero, ...sums }
+}
+
+async function taxReceiptsIn(tx: Conn, from: Date, to: Date): Promise<TaxReceiptsInWindow> {
+  const { firstDay, lastDay } = await daysOf(tx, from, to)
+  const { day, ...counted } = getTableColumns(taxReceiptDays)
+  const sums = Object.fromEntries(
+    Object.entries(counted).map(([key, column]) => [
+      key,
+      sql<number>`coalesce(sum(${column}), 0)::int`,
+    ]),
+  ) as Record<keyof typeof counted, SQL<number>>
+  const [row] = await tx
+    .select(sums)
+    .from(taxReceiptDays)
+    .where(sql`${day} between ${firstDay}::date and ${lastDay}::date`)
+  // a sum over no rows is still one row: `coalesce` makes every one of them a zero
+  return { firstDay, lastDay, ...theSums(row) }
+}
+
+function theSums<T>(row: T | undefined): T {
+  if (row === undefined) throw new Error('a sum over tax_receipt_days returned no row')
+  return row
 }

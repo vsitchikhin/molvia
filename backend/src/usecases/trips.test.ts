@@ -164,6 +164,7 @@ function fakeRepositories(
       createUnlessNamed: unexpected('items.createUnlessNamed'),
       search: unexpected('items.search'),
       byBarcode: unexpected('items.byBarcode'),
+      lockForRecord: () => Promise.resolve(),
       nodes: unexpected('items.nodes'),
       attachBarcode: unexpected('items.attachBarcode'),
       detachBarcode: unexpected('items.detachBarcode'),
@@ -289,6 +290,7 @@ function fakeRepositories(
       claimLink: unexpected('receipts.claimLink'),
       releaseLink: unexpected('receipts.releaseLink'),
       askLater: unexpected('receipts.askLater'),
+      recordedItems: unexpected('receipts.recordedItems'),
     },
     storeMemory: {
       recall: unexpected('storeMemory.recall'),

@@ -1,3 +1,4 @@
+import { writtenBarcode } from '#model/entities/barcode'
 import type { ReceiptTextLine } from '#model/entities/receipt-text'
 
 // MOL-232 — the lines of a Serbian receipt from its journal, the 40-column text the tax office
@@ -216,4 +217,32 @@ export function serbianCityOf(...names: readonly (string | null)[]): 'Белгр
     if (/^\s*(?:нови\s*сад|novi\s*sad)/u.test(text)) return 'Нови-Сад'
   }
   return null
+}
+
+/** A line of the tax office's specification of a receipt (MOL-234): what it was paid, and its code. */
+export interface SpecificationItem {
+  /** What the line was paid, in hundredths — the specification's own figure. */
+  readonly totalHundredths: number
+  /** The package's code as the shop passed it; empty when it passed none. */
+  readonly gtin: string
+}
+
+/**
+ * The codes of a receipt's lines from its specification (MOL-234, owner's В-1 «а»), by position, or
+ * `null` when the specification is not this journal's list: another number of lines, or a line paid
+ * otherwise. The lines stay the journal's; only a code is taken — and only one the catalogue would
+ * take (`writtenBarcode`: its check digit, never a shop's own), in the form it would be written in.
+ * A code on the wrong line is worse than none, so one line out of step takes every code (Р-7).
+ */
+export function specificationCodes(
+  items: readonly SpecificationItem[],
+  lines: readonly ReceiptTextLine[],
+): (string | null)[] | null {
+  if (items.length !== lines.length) return null
+  if (items.some((item, at) => item.totalHundredths !== lines[at]?.sumHundredths)) return null
+  return items.map((item) => {
+    if (item.gtin === '') return null
+    const written = writtenBarcode(item.gtin)
+    return written.ok ? written.code : null
+  })
 }

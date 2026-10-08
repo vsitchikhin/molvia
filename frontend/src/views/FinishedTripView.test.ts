@@ -163,3 +163,23 @@ describe('FinishedTripView: «Сумма по чеку» (MOL-78)', () => {
     expect(view.text()).toContain(ru.trip.receipt.edit)
   })
 })
+
+describe('FinishedTripView: код из чека уже у другой позиции (MOL-234)', () => {
+  it('называет код и позицию, у которой он есть, один раз — по приходу из чека', async () => {
+    trip.mockResolvedValue(finished)
+    window.history.replaceState(
+      { recorded: 2, codesHeld: [{ code: '8600000000004', holder: 'Печенье' }] },
+      '',
+    )
+    const view = await render()
+    expect(view.text()).toContain('Код 8600000000004 уже у «Печенье»')
+    expect(window.history.state).toMatchObject({ recorded: null, codesHeld: null })
+  })
+
+  it('без кодов в состоянии — ничего не говорит, и мусор в нём не роняет экран', async () => {
+    trip.mockResolvedValue(finished)
+    window.history.replaceState({ recorded: 1, codesHeld: 'garbage' }, '')
+    const view = await render()
+    expect(view.text()).not.toContain('уже у «')
+  })
+})

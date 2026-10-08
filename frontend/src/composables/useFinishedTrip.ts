@@ -3,9 +3,11 @@ import type { ComputedRef, Ref } from 'vue'
 import type { SelectedTrip } from './useSelectedTrip'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { z } from 'zod'
 import { currencySchema } from '@molvia/model'
 import type { CatalogueEntry, Currency, Money, TripExpenseView } from '@molvia/model'
 import type { TripRowView } from '@/components/tripRow'
+import type { CodeHeld } from '@/stores/receiptQueue'
 import { upTarget, useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
 import { useTripHistoryStore } from '@/stores/tripHistory'
@@ -27,6 +29,7 @@ interface FinishedTrip extends Omit<SelectedTrip, 'load'> {
   meta: ComputedRef<string>
   /** The purchases just written from a receipt, said once on arrival (MOL-127, 5o). */
   recorded: Ref<number | null>
+  codesHeld: Ref<CodeHeld[]>
   toVerdicts: () => void
   rows: ComputedRef<TripRowView[]>
   waiting: ComputedRef<number>
@@ -123,10 +126,22 @@ export function useFinishedTrip(): FinishedTrip {
       ? state.recorded
       : null,
   )
+  /**
+   * Codes the person asked to bind that another item holds (MOL-234): said with «Записали» — the
+   * purchases stand, the code went nowhere — and named by the item that has it, as MOL-100 says it.
+   */
+  const codesHeld = ref<CodeHeld[]>(
+    typeof state === 'object' && state !== null && 'codesHeld' in state
+      ? z
+          .array(z.object({ code: z.string(), holder: z.string() }))
+          .catch([])
+          .parse(state.codesHeld)
+      : [],
+  )
   // Taken off the entry once read: the browser keeps an entry's state across a reload and a step
   // back and forth, and the words came back each time (review 9, adversarial А6).
   if (recorded.value !== null && typeof state === 'object' && state !== null)
-    window.history.replaceState({ ...state, recorded: null }, '')
+    window.history.replaceState({ ...state, recorded: null, codesHeld: null }, '')
   const opened = ref<OpenedPurchase | null>(null)
   let opening = 0
   function amend(row: TripRowView): void {
@@ -194,6 +209,7 @@ export function useFinishedTrip(): FinishedTrip {
     name,
     meta,
     recorded,
+    codesHeld,
     toVerdicts: () => void goTab('verdicts'),
     rows,
     waiting,

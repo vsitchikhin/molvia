@@ -7,7 +7,7 @@ import { sql } from 'drizzle-orm'
 import { connectDrizzle } from './db'
 import { clearAll, insertCounted } from './fixtures'
 import { createGatesReader } from '@/db/gates-reader'
-import { erasures, loginDays, receiptDays, reminderDays } from '@/db/schema'
+import { erasures, loginDays, receiptDays, reminderDays, taxReceiptDays } from '@/db/schema'
 
 const { db, close } = connectDrizzle()
 const reader = createGatesReader(db)
@@ -174,12 +174,46 @@ describe('the gates reader', () => {
     })
   })
 
+  // MOL-234: the receipts from the tax office, over the same days and apart from the reader's
+  it('sums the tax office’s receipts apart, the reader’s block not moved by them', async () => {
+    const counts = { sentQr: 2, sentPasteMissed: 1, read: 3, recorded: 2, lines: 9, linesItem: 2 }
+    await db.insert(taxReceiptDays).values([
+      { day: '2026-10-06', ...counts }, // the day before
+      { day: '2026-10-07', ...counts, linesEdited: 2 },
+      { day: '2026-10-18', ...counts, missing: 1, specsOk: 1, specsFailed: 2, codesWritten: 1 },
+      { day: '2026-10-19', ...counts }, // the day after
+    ])
+    await db.insert(receiptDays).values({ day: '2026-10-07', read: 1, lines: 4, linesEdited: 1 })
+    const report = await reader.read({
+      from: new Date('2026-10-07T12:00:00+04:00'),
+      to: new Date('2026-10-19T00:00:00+04:00'),
+    })
+    expect(report.taxReceipts).toMatchObject({
+      firstDay: '2026-10-07',
+      lastDay: '2026-10-18',
+      sentQr: 4,
+      sentPasteMissed: 2,
+      sentPaste: 0,
+      read: 6,
+      missing: 1,
+      recorded: 4,
+      lines: 18,
+      linesEdited: 2,
+      linesItem: 4,
+      specsOk: 1,
+      specsFailed: 2,
+      codesWritten: 1,
+    })
+    expect(report.receipts).toMatchObject({ read: 1, lines: 4, linesEdited: 1, recorded: 0 })
+  })
+
   it('reads zeros for days without a receipt', async () => {
     const report = await reader.read({
       from: new Date('2026-10-07T00:00:00+04:00'),
       to: new Date('2026-10-08T00:00:00+04:00'),
     })
     expect(report.receipts).toMatchObject({ read: 0, recorded: 0, lines: 0, linesEdited: 0 })
+    expect(report.taxReceipts).toMatchObject({ sentQr: 0, read: 0, lines: 0, specsOk: 0 })
   })
 
   it('reads zeros for days without a reminder', async () => {

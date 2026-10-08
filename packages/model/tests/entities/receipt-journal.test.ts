@@ -5,6 +5,7 @@ import {
   serbianJournal,
   serbianServiceLine,
   serbianShopOf,
+  specificationCodes,
 } from '#model/entities/receipt-journal'
 import { madeUpJournal } from './serbian-receipt'
 
@@ -209,5 +210,61 @@ describe('serbianServiceLine', () => {
     for (const printed of ['SECER KRISTAL 1KG SUNOKO KOM', 'BANANA KG', 'Dostavljac igracka']) {
       expect(serbianServiceLine(printed), printed).toBe(false)
     }
+  })
+})
+
+describe('specificationCodes — GTIN of the lines (MOL-234)', () => {
+  const lines = serbianJournal(
+    madeUpJournal(
+      [
+        { name: 'Zitopek beli hleb /kom (Е)', price: '62,00', quantity: '1', sum: '62,00' },
+        {
+          name: 'Pionir medeno srce 150gr /kom (Ђ)',
+          price: '129,90',
+          quantity: '1',
+          sum: '129,90',
+        },
+        { name: 'BANANA KG (Е)', price: '199,99', quantity: '1,482', sum: '296,39' },
+      ],
+      '488,29',
+    ),
+  )?.lines
+  if (lines === undefined) throw new Error('the journal of the test is no list')
+  const spec = (gtins: readonly string[], totals = [6_200, 12_990, 29_639]) =>
+    totals.map((totalHundredths, at) => ({ totalHundredths, gtin: gtins[at] ?? '' }))
+
+  it('gives a line the code the shop passed, and the others none', () => {
+    expect(specificationCodes(spec(['', '8602300236022', '']), lines)).toEqual([
+      null,
+      '8602300236022',
+      null,
+    ])
+  })
+
+  it('takes no code from a specification out of step with the journal — any line (Р-7)', () => {
+    expect(specificationCodes(spec(['', '8602300236022', ''], [6_200, 12_990]), lines)).toBeNull()
+    expect(
+      specificationCodes(spec(['', '8602300236022', ''], [6_200, 12_990, 29_640]), lines),
+    ).toBeNull()
+    // the same sums in another order are another list
+    expect(
+      specificationCodes(spec(['8602300236022', '', ''], [12_990, 6_200, 29_639]), lines),
+    ).toBeNull()
+    expect(specificationCodes([], lines)).toBeNull()
+  })
+
+  it('takes only a code the catalogue would: never a shop’s own, never a wrong check digit', () => {
+    // a weighed banana with the shop's own label «21…», a code one digit off
+    expect(
+      specificationCodes(spec(['8602300236021', '8602300236022', '2100000000012']), lines),
+    ).toEqual([null, '8602300236022', null])
+  })
+
+  it('writes a code in the form the catalogue writes it: twelve digits are the thirteen', () => {
+    expect(specificationCodes(spec(['', '036000291452', '96385074']), lines)).toEqual([
+      null,
+      '0036000291452',
+      '96385074',
+    ])
   })
 })

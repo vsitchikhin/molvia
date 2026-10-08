@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ERROR, ISSUE, TODAY_HEADER, VERSION_HEADER, ZONE_HEADER } from '@molvia/model'
+import {
+  ERROR,
+  ISSUE,
+  RECEIPT_CODES_HEADER,
+  TODAY_HEADER,
+  VERSION_HEADER,
+  ZONE_HEADER,
+} from '@molvia/model'
 import { ApiError, createClient } from '#client/index'
 
 function clientAnswering(status: number, body: unknown) {
@@ -2057,5 +2064,26 @@ describe('сбои телефона (MOL-144)', () => {
     expect(await codeOf(client.reportClientErrors({ reports: [report] }))).toBe(
       ISSUE.RESPONSE_INVALID,
     )
+  })
+})
+
+describe('a receipt’s review asks for its lines’ codes (MOL-234, adversarial А3)', () => {
+  it('names RECEIPT_CODES_HEADER, so the server sends a line’s `code` to this build only', async () => {
+    const seen: Headers[] = []
+    const fetch = (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      seen.push(new Headers(init?.headers))
+      return Promise.resolve(
+        new Response(JSON.stringify({ code: ERROR.NOT_FOUND }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+    }
+    const client = createClient({ baseUrl: 'http://api', fetch })
+    await client.receipt('cccccccc-0000-4000-8000-000000000001').catch(() => undefined)
+    await client
+      .receipt('cccccccc-0000-4000-8000-000000000001', { shown: true })
+      .catch(() => undefined)
+    expect(seen.map((headers) => headers.get(RECEIPT_CODES_HEADER))).toEqual(['1', '1'])
   })
 })

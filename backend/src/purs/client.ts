@@ -1,14 +1,23 @@
+import type { SpecificationItem } from '@molvia/model'
 import { z } from 'zod'
 
 /**
  * The tax office's check of a Serbian receipt (MOL-232): the link of a receipt's QR code asked for
- * JSON — TAP's «Скенирање рачуна са JSON одговором», no authentication. The page and its undocumented
- * `/specifications` are not asked (В-1): the journal gives every line, and GTIN is MOL-234's.
+ * JSON — TAP's «Скенирање рачуна са JSON одговором», no authentication. The journal gives every line.
+ * The page and its undocumented `/specifications` are asked after it for the lines' codes alone
+ * (MOL-234, owner's В-1 «а»), and nothing waits on them: from production they answered `success:false`
+ * two times of three (MOL-223).
  */
 export const PURS_HOST = 'https://suf.purs.gov.rs'
 
 /** In the background, so not as short as a hint's: the check answered in 0.3–0.5 s (MOL-223). */
 export const PURS_TIMEOUT_MS = 10_000
+
+/**
+ * Both requests of a specification together (MOL-234, adversarial А4): the receipt is read already,
+ * but the next one in the round waits for it, and the codes are a gift — a page answers in half a second.
+ */
+export const PURS_SPECIFICATION_TIMEOUT_MS = 3_000
 
 /**
  * Asked at most this often a minute, a third of it by one person (`pursShare`, MOL-232, Р-3): the
@@ -70,9 +79,25 @@ export type PursAnswer =
   | { readonly kind: 'refused' }
   | { readonly kind: 'skipped' }
 
+/**
+ * - `found` — the specification's lines, each with what it was paid and its code;
+ * - `failed` — no specification: the page held no token, another receipt's number, or it answered
+ *   `success:false`, another shape, an error — never a failure of the receipt, which is read already;
+ * - `skipped` — not asked, over the limit: its two requests count as any others.
+ */
+export type PursSpecification =
+  | { readonly kind: 'found'; readonly items: readonly SpecificationItem[] }
+  | { readonly kind: 'failed' }
+  | { readonly kind: 'skipped' }
+
 export interface Purs {
   /** What the tax office says of the receipt at `link`. `who` is the person; it never leaves the server. */
   receipt(link: string, who: string): Promise<PursAnswer>
+  /**
+   * The specification of the receipt at `link` (MOL-234): its page for the token, then
+   * `/specifications`. `number` is the receipt's, signed in its link: a page of another one is none.
+   */
+  specification(link: string, number: string, who: string): Promise<PursSpecification>
 }
 
 export interface PursOptions {
@@ -88,6 +113,11 @@ export interface PursOptions {
    * a timeout is the weather and the log's alone. The error says its kind only, never the answer.
    */
   readonly onBroken?: (error: PursError) => void
+  /**
+   * Why a specification gave nothing (MOL-234, review 8): its own word, never the journal's — it
+   * refuses most asks from a server, and the journal's failures would drown in it.
+   */
+  readonly onSpecificationFailure?: (reason: string) => void
   readonly perMinute?: number
   readonly now?: () => number
 }
@@ -102,6 +132,23 @@ export class PursError extends Error {
     this.code = code
   }
 }
+
+/** The page's own script hands these to `/specifications` (MOL-223, `live-probe.sh`). */
+const PAGE_NUMBER = /viewModel\.InvoiceNumber\('([^']{1,100})'\)/u
+const PAGE_TOKEN = /viewModel\.Token\('([^']{1,200})'\)/u
+
+/** Only what is taken: a line's code and what it was paid — to know it is the journal's line. */
+const specificationSchema = z.object({
+  success: z.literal(true),
+  items: z
+    .array(
+      z.object({
+        gtin: z.string().max(20).nullable().optional(),
+        total: z.number().nonnegative().max(1e12),
+      }),
+    )
+    .max(1_000),
+})
 
 function reasonOf(error: unknown): string {
   if (error instanceof PursError) return error.message
@@ -124,13 +171,16 @@ export function purs(options: PursOptions): Purs {
     return moments
   }
 
-  function mayAsk(who: string): boolean {
+  /** Room for `asks` more this minute — the specification's two at once, never its page alone. */
+  function mayAsk(who: string, asks = 1): boolean {
     const at = now()
     if (at < pausedUntil) return false
     const mine = recent(askedBy.get(who) ?? [], at)
-    if (recent(asked, at).length >= perMinute || mine.length >= share) return false
-    asked.push(at)
-    mine.push(at)
+    if (recent(asked, at).length + asks > perMinute || mine.length + asks > share) return false
+    for (let n = 0; n < asks; n += 1) {
+      asked.push(at)
+      mine.push(at)
+    }
     askedBy.set(who, mine)
     for (const [person, moments] of askedBy) {
       if (recent(moments, at).length === 0) askedBy.delete(person)
@@ -177,10 +227,72 @@ export function purs(options: PursOptions): Purs {
     }
   }
 
+  /**
+   * Never pauses the queue and is never the owner's to hear of: an undocumented path that refuses
+   * most asks from a server is no failure of the service (Р-6). The log has its kind.
+   */
+  async function specify(link: string, number: string): Promise<PursSpecification> {
+    const { pathname, search } = new URL(link)
+    // one deadline for both: the page and the POST together never hold the round longer
+    const signal = AbortSignal.timeout(PURS_SPECIFICATION_TIMEOUT_MS)
+    try {
+      const page = await fetch(`${base}${pathname}${search}`, {
+        headers: { accept: 'text/html', 'user-agent': options.userAgent },
+        signal,
+      })
+      if (page.status !== 200) throw new PursError(`page HTTP ${String(page.status)}`, 'HTTP')
+      const html = await page.text()
+      const pageNumber = PAGE_NUMBER.exec(html)?.[1]
+      const token = PAGE_TOKEN.exec(html)?.[1]
+      if (pageNumber === undefined || token === undefined) {
+        throw new PursError('page without a token', 'UNKNOWN_ANSWER')
+      }
+      // a page of another receipt than the link signs is none of this one (as review 8 of MOL-232)
+      if (pageNumber !== number) throw new PursError('page of another receipt', 'UNKNOWN_ANSWER')
+      const response = await fetch(`${base}/specifications`, {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-requested-with': 'XMLHttpRequest',
+          'user-agent': options.userAgent,
+        },
+        body: new URLSearchParams({ invoiceNumber: pageNumber, token }).toString(),
+        signal,
+      })
+      if (response.status !== 200) {
+        throw new PursError(`specification HTTP ${String(response.status)}`, 'HTTP')
+      }
+      let json: unknown
+      try {
+        json = JSON.parse(await response.text())
+      } catch {
+        throw new PursError('specification not json', 'NOT_JSON')
+      }
+      const parsed = specificationSchema.safeParse(json)
+      if (!parsed.success) throw new PursError('specification refused', 'UNKNOWN_ANSWER')
+      return {
+        kind: 'found',
+        items: parsed.data.items.map((item) => ({
+          // a figure of a foreign answer, two decimals at most, only ever compared with the journal's
+          totalHundredths: Math.round(item.total * 100),
+          gtin: item.gtin ?? '',
+        })),
+      }
+    } catch (error) {
+      options.onSpecificationFailure?.(reasonOf(error))
+      return { kind: 'failed' }
+    }
+  }
+
   return {
     receipt(link, who) {
       if (!mayAsk(who)) return Promise.resolve({ kind: 'skipped' })
       return ask(link)
+    },
+    specification(link, number, who) {
+      if (!mayAsk(who, 2)) return Promise.resolve({ kind: 'skipped' })
+      return specify(link, number)
     },
   }
 }

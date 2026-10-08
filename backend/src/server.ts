@@ -392,6 +392,10 @@ function pursOf(log: FastifyBaseLogger, broken: (error: PursError) => void): Pur
     onFailure: (reason) => {
       log.warn({ reason }, 'tax office did not answer')
     },
+    // a gift that is refused more often than not from a server (MOL-223): the log's, at info
+    onSpecificationFailure: (reason) => {
+      log.info({ reason }, 'tax office gave no specification')
+    },
   })
 }
 
@@ -782,13 +786,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
             await readTaxReceipts({
               receipts,
               purs: taxOffice,
-              bind: (claimed, lines) =>
+              bind: (claimed, lines, codes) =>
                 bindReceiptLines(
                   { items: createItemRepository(db), embedder },
                   claimed.actorId,
                   claimed.country,
                   claimed.language,
                   lines,
+                  codes,
                 ),
               report: (event) => {
                 if (event.kind === 'read') {
@@ -1049,7 +1054,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           return receipt
         },
         list: (actor, shown) => receiptsOf(tripData, actor, shown),
-        one: (actor, id, shown) => receiptOfOwner(tripData, actor, id, shown),
+        one: (actor, id, shown, codes) => receiptOfOwner(tripData, actor, id, shown, codes),
         remove: (actorId, id) => removeReceipt(receipts, actorId, id),
         restore: (actorId, id) => restoreReceipt(receipts, actorId, id),
         record: (actor, id, body) => recordReceipt(transact, actor, id, body),

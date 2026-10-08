@@ -373,3 +373,81 @@ describe('the QR code read off the photo (MOL-233)', () => {
     expect(reportFailure).not.toHaveBeenCalled()
   })
 })
+
+describe('how the link came (MOL-234, owner’s В-3 «а» of MOL-233)', () => {
+  const found: ReceiptLinkOnPhoto = {
+    kind: 'link',
+    link: {
+      link: LINK,
+      total: { minor: 48_637n, currency: 'RSD' },
+      at: new Date('2026-10-05T10:15:00Z'),
+      number: 'TESTAAAA-TESTBBBB-1',
+    },
+  }
+  const sent = () => sendLink.mock.calls[0]?.[0]
+
+  it('a QR read at the first shot is `qr`, no miss', async () => {
+    onPhoto.mockResolvedValue(found)
+    const sheet = await render()
+    await shoot(sheet)
+    expect(sent()).toMatchObject({ via: 'qr', missed: false })
+  })
+
+  it('a QR read after a miss is `qr` with the miss', async () => {
+    const sheet = await render()
+    await shoot(sheet)
+    onPhoto.mockResolvedValue(found)
+    await shoot(sheet)
+    expect(sent()).toMatchObject({ via: 'qr', missed: true })
+  })
+
+  it('a link pasted after the camera missed is `paste` with the miss — the QR did not read', async () => {
+    const sheet = await render()
+    await shoot(sheet)
+    await button(sheet, en.receipt.qr.paste)?.trigger('click')
+    await flushPromises()
+    await field(sheet).setValue(LINK)
+    await send(sheet)?.trigger('click')
+    expect(sent()).toMatchObject({ via: 'paste', missed: true })
+  })
+
+  it('a link pasted with no shot is `paste`, no miss', async () => {
+    const sheet = await render()
+    await toPaste(sheet)
+    await field(sheet).setValue(LINK)
+    await send(sheet)?.trigger('click')
+    expect(sent()).toMatchObject({ via: 'paste', missed: false })
+  })
+
+  it('a refund read off the photo is no miss: the QR did read', async () => {
+    onPhoto.mockResolvedValue({ kind: 'refused', reason: 'refund' })
+    const sheet = await render()
+    await shoot(sheet)
+    onPhoto.mockResolvedValue(found)
+    await shoot(sheet)
+    expect(sent()).toMatchObject({ via: 'qr', missed: false })
+  })
+
+  it('a worker that failed is a miss: the QR was not read', async () => {
+    onPhoto.mockRejectedValueOnce(new ReaderFailed(new Error('unreachable')))
+    const sheet = await render()
+    await shoot(sheet)
+    onPhoto.mockResolvedValue(found)
+    await shoot(sheet)
+    expect(sent()).toMatchObject({ via: 'qr', missed: true })
+  })
+})
+
+describe('a photo that did not open is a miss too (adversarial А6)', () => {
+  it('a shot that does not decode, then the link pasted: `paste` with the miss', async () => {
+    photo = null
+    const sheet = await render()
+    await shoot(sheet)
+    expect(sheet.text()).toContain(en.receipt.capture.bad_file)
+    await button(sheet, en.receipt.qr.paste)?.trigger('click')
+    await flushPromises()
+    await field(sheet).setValue(LINK)
+    await send(sheet)?.trigger('click')
+    expect(sendLink.mock.calls[0]?.[0]).toMatchObject({ via: 'paste', missed: true })
+  })
+})

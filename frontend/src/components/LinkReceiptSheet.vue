@@ -152,7 +152,7 @@ import IconQrcode from '~icons/mdi/qrcode-scan'
 import IconQrcodeRemove from '~icons/mdi/qrcode-remove'
 import IconSun from '~icons/mdi/white-balance-sunny'
 import { LOCALES, serbianReceiptLink } from '@molvia/model'
-import type { ReceiptLinkRefusal } from '@molvia/model'
+import type { ReceiptLinkRefusal, ReceiptVia } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet, { DOUBLE_TAP } from '@/components/BottomSheet.vue'
@@ -221,6 +221,11 @@ export default defineComponent({
     const pressed = ref<'take' | 'pick' | null>(null)
     const outcome = ref<Outcome | null>(null)
     let sentOffline: boolean | null = null
+    /**
+     * The camera missed in this sheet before the link went (MOL-234, owner's В-3 «а»): a link pasted
+     * after a miss is a QR that did not read — the risk of MOL-233 — one pasted with no shot is a habit.
+     */
+    let missed = false
     /**
      * The shot being read; closing the sheet moves it on (review 1, adversarial А1). A sheet put away
      * while «Ищем QR…» is the person's «не надо»: the read that comes back — or the refusal of the
@@ -293,6 +298,8 @@ export default defineComponent({
         }
         if (!photo) {
           outcome.value = 'bad_file'
+          // a shot taken whose QR did not read, as much as a miss on it (adversarial А6)
+          missed = true
           return
         }
         let found: Awaited<ReturnType<typeof receiptLinkOnPhoto>> = { kind: 'none' }
@@ -308,9 +315,10 @@ export default defineComponent({
         if (!current(mine)) return
         if (found.kind === 'link') {
           outcome.value = null
-          if (await queued(found.link.link)) return
+          if (await queued(found.link.link, 'qr')) return
         } else {
           outcome.value = found.kind === 'refused' ? found.reason : 'missed'
+          if (found.kind !== 'refused') missed = true
         }
       } finally {
         reading.value = false
@@ -318,7 +326,7 @@ export default defineComponent({
     }
 
     /** The link into the receipts' queue; the sheet stays at work for a double tap, then goes. */
-    async function queued(link: string): Promise<boolean> {
+    async function queued(link: string, via: ReceiptVia): Promise<boolean> {
       const language = LOCALES.find((one) => one === locale.value) ?? 'ru'
       const kept = queue.sendLink({
         id: newId(),
@@ -326,6 +334,8 @@ export default defineComponent({
         country: 'RS',
         language,
         capturedAt: new Date(),
+        via,
+        missed,
       })
       if (!kept) {
         notKept.value = true
@@ -347,7 +357,7 @@ export default defineComponent({
       tried.value = true
       const link = read.value
       if (!link.ok) return
-      await queued(link.link)
+      await queued(link.link, 'paste')
     }
 
     /** «Вставить»: the field of MOL-232 in this sheet, focused — the paste is the next tap. */
