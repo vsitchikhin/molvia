@@ -478,9 +478,10 @@
         <SkeletonPart kind="rows" :count="1" lead="circle" tail under next />
       </div>
       <!-- The card of the month on «Деньги» and its part (MOL-183, the tail of MOL-178): the tiles
-           come in where the plate stood — the caption, the figure and «≈» the part's lines. -->
+           come in where the plate stood — the caption, the figure and «≈» the part's lines. A closed
+           month: its comparison is short enough not to wrap at 320; a wrap is the answer's own price. -->
       <div class="pair" data-part="figure">
-        <MoneyMonthCard :month="moneyMonth" :current="moneyMonth.month" />
+        <MoneyMonthCard :month="moneyMonth" current="2026-09" />
         <SkeletonPart kind="figure" approx plate />
       </div>
       <SkeletonPart kind="figure" plate />
@@ -644,9 +645,9 @@ export default defineComponent({
       }),
     )
     const [groceries, cafe, transport] = categories
-    // September of handoff MOL-157 v2 1a, as the server answers it: the card of the month.
+    // August of handoff MOL-157 v2 1b, as the server answers it: the card of a closed month.
     const moneyMonth: MoneyMonthView = {
-      month: '2026-09',
+      month: '2026-08',
       spendCurrency: 'AMD',
       incomeCurrency: 'RUB',
       spent: money(27452300n, 'AMD'),
@@ -664,9 +665,9 @@ export default defineComponent({
       accountsRemoved: false,
       budget: null,
       rate: null,
-      rateKind: 'live',
-      previousSpent: null,
-      previousToDay: { day: 12, spent: money(30502500n, 'AMD') },
+      rateKind: 'frozen',
+      previousSpent: money(14150000n, 'AMD'),
+      previousToDay: null,
       byCategory: [],
       slices: [],
       categories: [],

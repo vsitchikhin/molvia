@@ -683,7 +683,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   stillness under «reduce motion» are held on a bar (`advice.spec`, `item-search.spec`). **The card of a
   sum is the month's card of «Деньги»** (`MoneyMonthCard`, MOL-183): its caption's line, the figure
   at `--leading-tight` and «≈» at the same (`approx`), so its tiles come in where the plate stood —
-  `e2e/kit-rows` holds it at 390 and 320; the total of 77 v2 2a (`TripTotal`) is no card until
+  `e2e/kit-rows` holds it at 390 and 320, on a closed month whose comparison fits one line. **The
+  price, named:** a comparison that wraps — «−10 % к тому же дню сентября» on a card of 256 — stands the
+  card some 15 px lower than its bars; the page grows as the answer comes, never shrinks; the total of 77 v2 2a (`TripTotal`) is no card until
   MOL-206 makes it one, and the sums of «Счета», an account, «Обмен» and «Бюджет» still stand at the
   body's leading, some 8 px taller than the part — their tasks set the part against their answer. **The price:** a card adds its padding and
   edge, so a skeleton of `groups` is some 34 px taller than before — taller, not shorter, which the hold
