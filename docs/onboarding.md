@@ -2505,5 +2505,9 @@ two balances».
 старшую выбирал меньший uuid — в CI младшая. Правило не тронуто (В-1): ночь и `make merge --list`
 решают одинаково, а ничья по uuid задумана для сида. Момент получили обе пары older/younger —
 в `merge-command` и в `merge.integration`, после всех `made`, чтобы порядок остальных тестов не
-сдвинулся. Требования и план — `.scratch/tasks/{requirements,plans}/MOL-252.md`, артефакт —
-`.lavish/mol-252-plan.html`; правило — `.claude/rules/search.md`, «The older survives».
+сдвинулся. Ревью нашло, что ветку ничьей после этого не держал ни один тест, а правило записано дважды —
+`ordered` для ночи и `openCandidates` для `--list`: теперь их держат юнит и интеграция на одной паре в одной
+миллисекунде. Заодно «claims a night again» перестал склеивать старшую в младшую (пара бралась по имени).
+Требования и план — `.scratch/tasks/{requirements,plans}/MOL-252.md`, артефакт —
+`.lavish/mol-252-plan.html`, ревью — `.scratch/tasks/{selfreviews,selftests}/MOL-252*`; правило —
+`.claude/rules/search.md`, «The older survives».
