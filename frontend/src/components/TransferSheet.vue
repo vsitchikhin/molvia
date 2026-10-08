@@ -87,28 +87,26 @@
         <p :id="`${amountId}-fee`" class="hint">{{ feeHint }}</p>
       </div>
 
-      <div class="pair">
-        <AppField
-          v-model="day"
-          :label="t('transfer.day')"
-          kind="date"
-          min="2000-01-02"
-          :max="today"
-          :display="dayWords"
-          :readonly="sending"
-          :error-text="dayBad ? t('error.transfer_in_future') : null"
-          @update:model-value="dayBad = false"
-        />
-        <AppField
-          v-model="note"
-          :label="t('transfer.note')"
-          :placeholder="t('transfer.note_placeholder')"
-          :maxlength="noteMax"
-          :readonly="sending"
-          :error-text="noteBad ? t('exchange.sheet.bad_note') : null"
-          enterkeyhint="done"
-        />
-      </div>
+      <AppField
+        v-model="day"
+        :label="t('transfer.day')"
+        kind="date"
+        min="2000-01-02"
+        :max="today"
+        :display="dayWords"
+        :readonly="sending"
+        :error-text="dayBad ? t('error.transfer_in_future') : null"
+        @update:model-value="dayBad = false"
+      />
+      <AppField
+        v-model="note"
+        :label="t('transfer.note')"
+        :placeholder="t('transfer.note_placeholder')"
+        :maxlength="noteMax"
+        :readonly="sending"
+        :error-text="noteBad ? t('exchange.sheet.bad_note') : null"
+        enterkeyhint="done"
+      />
     </form>
 
     <template v-if="!unread" #footer>
@@ -747,12 +745,6 @@ export default defineComponent({
   background: var(--surface-2);
   color: var(--text-muted);
   font-size: var(--text-footnote);
-}
-
-.pair {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--space-3);
 }
 
 .refusal {
