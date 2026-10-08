@@ -1032,6 +1032,28 @@ The detail behind the frontend lines of `CLAUDE.md`.
   makes itself — a second Esc. **The sheet is the one exception to «only the
   page scrolls»**: a panel over the screen has no window of its own, so it scrolls itself and
   the page under it is held still.
+- **A sheet's footer is pinned to its bottom edge, and the content scrolls under it** (MOL-182, Н-20, Ф-17).
+  It had been the content's last row: under fifteen chips «Сохранить» stood below the edge, and in the edit
+  of an account the button was cut by it. **Sticky in the sheet's own scroll** (`position: sticky;
+bottom: 0`), a sibling of the panel and as wide as the sheet — never a middle of its own between a
+  header and the footer: the pull down reads the dialog's `scrollTop` (MOL-80), and the lift, the height
+  and `reveal` measure the dialog (MOL-135, MOL-151), so with sticky none of them changed. `--surface`, a
+  hairline over it and the sheet's shadow, always, a short sheet's too (every handoff draws it so); the
+  margins of the screen's docked strip (К-9) — 12 over the indicator, **12 over the keys**, where the
+  indicator lies under them (`html[data-under-keys] &` — never `:global()`, which in a scoped style
+  replaces the whole selector and gave the rule to `html` itself). 24 between the content and the footer.
+  **The edge of what is in sight is the footer's top**: its height (`useHeight`) is
+  `--sheet-footer-height` on the dialog and its `scroll-padding-bottom`, which the browser's own focus
+  goes by — a field reached by Tab stood under the footer without it — and `reveal` reads the same
+  padding, so one value is the edge for both. **A footer that grows over the field typed in** — an error,
+  «Вернуть» — moves that edge up as a lower sheet would, and the field is brought back above it; only a
+  field typed in, only in an open sheet. **Nothing of the sheet stands after the footer in the flow**:
+  its live region, visually hidden after it, made a pixel more to scroll, and at the end the pinned
+  footer stopped a pixel over the edge — the region is put at the top (`top: 0`). The header is not
+  pinned (owner's В-1 «а», against 147): over the keys of an iPhone 13 a sheet has some 334 px, the
+  footer takes 76, and a pinned header 76 more of what the fields need. What a footer holds is the
+  sheet's, each with its own spacing; the height stays 82 % (Р-20). `/_kit` «Длинная шторка» and
+  `e2e/sheet.spec` hold it on `phone` and `iphone`; the keys are set by hand, as for MOL-135.
 - **Over the iOS keyboard the sheet's height is a share of the visual viewport's own height**
   (`--viewport-height`, MOL-135), never worked out from the window. Measured on the owner's iPhone,
   Safari: with the keyboard up the window shrank to the visible part (`innerHeight` 699 → 395),

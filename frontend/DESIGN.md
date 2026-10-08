@@ -509,8 +509,10 @@ Every screen has four — loading, empty, error, offline — drawn by two blocks
 
 A native dialog rising from the bottom: `surface`, radius 24 on top, at most 82 % of what is visible
 above the keyboard. Closes by ×, the scrim, Esc, "back" and **a pull down** — no grabber is drawn.
-A sheet over a sheet has only "‹" on the left and no ×; one scrim. **(target)** The main action is
-pinned to the bottom edge over the content with the sheet shadow; the content scrolls under it.
+A sheet over a sheet has only "‹" on the left and no ×; one scrim. The footer — the main action —
+is pinned to the bottom edge, as wide as the sheet: `surface`, a hairline over it and the sheet shadow,
+12 / 16 / 12 over the home indicator (12 over the keyboard), 24 under the content, which scrolls under
+it; a field brought into sight stands above it. The header is not pinned.
 
 ### Navigation
 

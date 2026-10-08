@@ -558,6 +558,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   opened from (MOL-63, MOL-80). **Its press is heard on the document**: iOS hands a tap on the
   scrim only to a listener there (MOL-80). **Over the keyboard its height is a share of the visual
   viewport**, never of the window, and it scrolls itself to the field being typed in (MOL-135);
+  **its footer is pinned to its edge, sticky in its own scroll, and what it brings into sight stops at
+  the footer's top** (`scroll-padding`, MOL-182);
   **the lift is the pinned box less the visible height**, never `100dvh` or `innerHeight`, and
   **before the keys come it takes the height they left last time** (MOL-151).
 - **Nothing comes or goes in one frame** (MOL-151): `appear` fades in what is put in the page,
