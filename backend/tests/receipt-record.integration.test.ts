@@ -743,6 +743,99 @@ describe('«Записать»', () => {
     expect(await wordsOf(stranger)).toEqual(all)
   })
 
+  // MOL-240, adversarial round 3: the word kept is what the last line still there says — its item,
+  // price and moment — and two removals at once leave no word behind either
+  describe('the person’s word after a purchase removed (round 3)', () => {
+    const MILK = { printed: 'Կաթ «Իգիթ» 3.2% 1լ', sku: '1163909' }
+    async function recordMilk(actorId: string, place: string, itemId: string, drams: number) {
+      const id = await parsedReceipt(actorId, [{ ...MILK, price: drams, sum: drams }], {
+        receiptNo: String(Math.floor(Math.random() * 1e8)),
+      })
+      const tripId = randomUUID()
+      const answer = await record(actorId, id, {
+        tripId,
+        place: { id: place },
+        purchasedOn: '2026-09-26',
+        lines: [
+          {
+            position: 0,
+            skip: false,
+            item: { id: itemId },
+            quantity: pieces(1),
+            amount: amount(drams),
+          },
+        ],
+      })
+      expect(answer.statusCode).toBe(200)
+      const [bought] = await db
+        .select({ id: expenses.id })
+        .from(expenses)
+        .where(eq(expenses.tripId, tripId))
+      const [receipt] = await db.select().from(receipts).where(eq(receipts.id, id))
+      return { tripId, expenseId: bought?.id ?? '', recordedAt: receipt?.recordedAt }
+    }
+    const remove = (actorId: string, bought: { tripId: string; expenseId: string }) =>
+      createExpenseRepository(db).remove(bought.expenseId, bought.tripId, actorId)
+    const wordsOf = (actorId: string) =>
+      db
+        .select()
+        .from(storeMemory)
+        .where(eq(storeMemory.actorId, actorId))
+        .orderBy(asc(storeMemory.kind))
+
+    it('Р3-1: keeps the older purchase’s price and moment, not the removed one’s', async () => {
+      const me = await insertActor(db)
+      const place = await insertPlace(db)
+      const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+      const older = await recordMilk(me, place, milk, 370)
+      const newer = await recordMilk(me, place, milk, 400)
+      expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([40_000n, 40_000n])
+      expect(await remove(me, newer)).toBe(true)
+      const words = await wordsOf(me)
+      expect(words.map((word) => [word.kind, word.itemId, word.priceMinor])).toEqual([
+        ['sku', milk, 37_000n],
+        ['text', milk, 37_000n],
+      ])
+      expect(words.map((word) => word.writtenAt)).toEqual([older.recordedAt, older.recordedAt])
+    })
+
+    it('Р3-2: a purchase of the line under another item removed gives the word back to the one still there', async () => {
+      const me = await insertActor(db)
+      const place = await insertPlace(db)
+      const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+      const kefir = await insertItem(db, { name: 'Кефир', searchKey: 'kefir' })
+      await recordMilk(me, place, milk, 370)
+      const wrong = await recordMilk(me, place, kefir, 370)
+      expect((await wordsOf(me)).map((word) => word.itemId)).toEqual([kefir, kefir])
+      expect(await remove(me, wrong)).toBe(true)
+      expect((await wordsOf(me)).map((word) => word.itemId)).toEqual([milk, milk])
+    })
+
+    it('Р3-3: two removals at once leave no word behind', async () => {
+      const me = await insertActor(db)
+      const place = await insertPlace(db)
+      const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+      const first = await recordMilk(me, place, milk, 370)
+      const second = await recordMilk(me, place, milk, 380)
+      const other = connectDrizzle()
+      try {
+        let racing: Promise<boolean> | undefined
+        await db.transaction(async (tx) => {
+          expect(await createExpenseRepository(tx).remove(first.expenseId, first.tripId, me)).toBe(
+            true,
+          )
+          // another phone, while the first removal is still open: it waits for the person's lock
+          racing = createExpenseRepository(other.db).remove(second.expenseId, second.tripId, me)
+          await new Promise((resolve) => setTimeout(resolve, 200))
+        })
+        expect(await racing).toBe(true)
+      } finally {
+        await other.close()
+      }
+      expect(await wordsOf(me)).toEqual([])
+    })
+  })
+
   // MOL-222: the measure of 0.2 — what the person put right against what the review showed
   it('counts the lines put right against what the review showed, each line once', async () => {
     const me = await insertActor(db)

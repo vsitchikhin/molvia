@@ -47,61 +47,167 @@ export interface StoreMemoryRepository {
 export const memoryKey = (word: StoreMemoryWord): string => `${word.kind}:${word.key}`
 
 /**
- * The person's words the lines `going` taught go with them (MOL-240, owner's В-1 «а» on adversarial
- * А1): a purchase removed, or its trip removed for good, leaves nothing of the line — the word was the
- * person's, first on the next review of that shop, and kept «удалите и внесите заново» from correcting a
- * wrong item. Only a word that still names the line's item, and that no other recorded line of the same
- * person at the same seller still says — a word is one row per person and key, and another purchase may
- * stand behind it. Called inside the transaction that deletes, before it does: `going` is a condition on
- * `receipt_lines` aliased `l`. The erased keep their words without a name (MOL-126): erasure is not this.
+ * The lines that say a person's words: a recorded line of a purchase at a seller, with the item it went
+ * to, its shelf price when it was recorded as read — read, figures and sum unchanged, as «Записать»
+ * judged it (`asRead`) — and its order of saying, the order `remember` wrote them in.
  */
-export async function forgetWordsOf(db: Conn, going: SQL): Promise<void> {
-  const spoken = (where: SQL) =>
-    db.execute<{
-      actor: string
-      tin: string
-      printed: string
-      sku: string | null
-      item: string
-      receipt: string
-      position: number
-    }>(sql`
-      select r.actor_id as actor, r.tin, l.printed, l.sku,
-        ${liveItemId(sql`e.item_id`)} as item, l.receipt_id as receipt, l.position
-      from receipt_lines l
-      join receipts r on r.id = l.receipt_id
-      join expenses e on e.id = l.expense_id
-      where r.status = 'recorded' and r.tin is not null and ${where}`)
-  const lines = await spoken(going)
-  if (lines.length === 0) return
-  const sameSpeaker = (line: { actor: string; tin: string; item: string }) =>
-    `${line.actor} ${line.tin} ${line.item}`
-  const leaving = new Set(lines.map((line) => `${line.receipt} ${String(line.position)}`))
-  const others = await spoken(
+function spokenLines(db: Conn, where: SQL) {
+  return db.execute<{
+    actor: string
+    tin: string
+    printed: string
+    sku: string | null
+    item: string
+    price_minor: string | null
+    currency: Currency
+    recorded_at: Date
+    receipt: string
+    position: number
+  }>(sql`
+    select r.actor_id as actor, r.tin, l.printed, l.sku, ${liveItemId(sql`e.item_id`)} as item,
+      case when l.settled
+        and e.qty_milli is not distinct from l.qty_milli and e.qty_unit is not distinct from l.qty_unit
+        and e.amount_minor = l.sum_minor and e.amount_currency = r.currency
+      then l.price_minor end as price_minor,
+      r.currency, r.recorded_at, l.receipt_id as receipt, l.position
+    from receipt_lines l
+    join receipts r on r.id = l.receipt_id
+    join expenses e on e.id = l.expense_id
+    where r.status = 'recorded' and r.tin is not null and r.actor_id is not null and ${where}
+    order by r.recorded_at, l.receipt_id, l.position`)
+}
+
+/**
+ * The person's word on each key is what their last line still there says (MOL-240, adversarial А1 and
+ * round 3): its item, its shelf price and the moment of its record — or no word, once no line says it.
+ * A word is one row per person and key that every record writes over, so the line that goes may be the
+ * one that wrote it while an older one still stands behind the key: kept as it was, the word carried the
+ * removed purchase's item, price and moment (Р3-1, Р3-2). Only `keys` are settled; `leaving` — lines
+ * about to be deleted — say nothing. Never inserts: what no record taught, settling does not invent.
+ * Returns the words changed or removed.
+ */
+async function settleWords(
+  db: Conn,
+  keys: readonly {
+    readonly actor: string
+    readonly tin: string
+    readonly kind: string
+    readonly key: string
+  }[],
+  leaving: ReadonlySet<string>,
+): Promise<number> {
+  if (keys.length === 0) return 0
+  const wordOf = (actor: string, tin: string, kind: string, key: string) =>
+    `${actor} ${tin} ${kind}:${key}`
+  const pairs = [...new Map(keys.map((one) => [`${one.actor} ${one.tin}`, one])).values()]
+  const lines = await spokenLines(
+    db,
     sql`(r.actor_id, r.tin) in (${sql.join(
-      lines.map((line) => sql`(${line.actor}::uuid, ${line.tin})`),
+      pairs.map((one) => sql`(${one.actor}::uuid, ${one.tin})`),
       sql`, `,
     )})`,
   )
-  const said = new Set(
-    others
-      .filter((line) => !leaving.has(`${line.receipt} ${String(line.position)}`))
-      .flatMap((line) =>
-        storeMemoryWords(line).map((word) => `${sameSpeaker(line)} ${memoryKey(word)}`),
-      ),
+  // in the order said: the last line of a key is its word
+  const last = new Map<string, (typeof lines)[number]>()
+  for (const line of lines) {
+    if (leaving.has(`${line.receipt} ${String(line.position)}`)) continue
+    for (const word of storeMemoryWords(line)) {
+      last.set(wordOf(line.actor, line.tin, word.kind, word.key), line)
+    }
+  }
+  const words = await db.execute<{
+    actor: string
+    tin: string
+    kind: string
+    key: string
+    item: string
+    price_minor: string | null
+    written_at: Date
+  }>(sql`
+    select actor_id as actor, tin, kind, key, item_id as item, price_minor, written_at
+    from ${storeMemory}
+    where (actor_id, tin) in (${sql.join(
+      pairs.map((one) => sql`(${one.actor}::uuid, ${one.tin})`),
+      sql`, `,
+    )})`)
+  const now = new Map(
+    words.map((word) => [wordOf(word.actor, word.tin, word.kind, word.key), word]),
   )
-  const forgotten = lines.flatMap((line) =>
-    storeMemoryWords(line)
-      .filter((word) => !said.has(`${sameSpeaker(line)} ${memoryKey(word)}`))
-      .map(
-        (word) =>
-          sql`(${line.actor}::uuid, ${line.tin}, ${word.kind}, ${word.key}, ${line.item}::uuid)`,
-      ),
+  let settled = 0
+  for (const one of keys) {
+    const at = wordOf(one.actor, one.tin, one.kind, one.key)
+    const word = now.get(at)
+    if (word === undefined) continue
+    const line = last.get(at)
+    const which = sql`actor_id = ${one.actor}::uuid and tin = ${one.tin} and kind = ${one.kind} and key = ${one.key}`
+    if (line === undefined) {
+      await db.execute(sql`delete from ${storeMemory} where ${which}`)
+    } else if (
+      word.item !== line.item ||
+      word.price_minor !== line.price_minor ||
+      new Date(word.written_at).getTime() !== new Date(line.recorded_at).getTime()
+    ) {
+      await db.execute(sql`
+        update ${storeMemory} set
+          item_id = ${line.item}::uuid,
+          price_minor = ${line.price_minor}::bigint,
+          price_currency = ${line.price_minor === null ? null : line.currency},
+          written_at = ${new Date(line.recorded_at).toISOString()}::timestamptz
+        where ${which}`)
+    } else continue
+    settled += 1
+    now.delete(at)
+  }
+  return settled
+}
+
+/** One person's words are settled one at a time (MOL-240, round 3, Р3-3): a write skew otherwise. */
+async function lockWords(db: Conn, actors: readonly string[]): Promise<void> {
+  for (const actor of [...new Set(actors)].sort()) {
+    await db.execute(
+      sql`select pg_advisory_xact_lock(hashtext('store_memory'), hashtext(${actor}))`,
+    )
+  }
+}
+
+/**
+ * The lines `going` take the person's words they said with them (MOL-240, owner's В-1 «а» on
+ * adversarial А1): a purchase removed, or its trip removed for good. Kept, the word was the person's own,
+ * first on the next review of that shop, and «удалите и внесите заново» brought the wrong item back. A
+ * key another line of the same person at the same seller still says is written over from the last such
+ * line instead (`settleWords`). Called inside the transaction that deletes, before it does: `going` is a
+ * condition on `receipt_lines` aliased `l`. Under the person's lock, which «Записать» takes too
+ * (`remember`): two removals at once each saw the other's line still there, and the word outlived both
+ * (Р3-3). The erased keep their words without a name (MOL-126): erasure is not this.
+ */
+export async function forgetWordsOf(db: Conn, going: SQL): Promise<void> {
+  const lines = await spokenLines(db, going)
+  if (lines.length === 0) return
+  await lockWords(
+    db,
+    lines.map((line) => line.actor),
   )
-  if (forgotten.length === 0) return
-  await db.execute(sql`
-    delete from ${storeMemory}
-    where (actor_id, tin, kind, key, item_id) in (${sql.join(forgotten, sql`, `)})`)
+  const keys = lines.flatMap((line) =>
+    storeMemoryWords(line).map((word) => ({ actor: line.actor, tin: line.tin, ...word })),
+  )
+  await settleWords(
+    db,
+    keys,
+    new Set(lines.map((line) => `${line.receipt} ${String(line.position)}`)),
+  )
+}
+
+/**
+ * Every person's word settled at the API's start (MOL-240, round 3, Р3-4), as `rekeyItems` brings the
+ * keys: 0060 deleted the lines of purchases removed before it and the receipts of trips removed for good,
+ * and the words they taught had no line left to be found by — a text key is `toSearchKey`, which SQL
+ * cannot compute. It also settles what an image rolled back onto this schema removed without forgetting.
+ * Before the server listens, so no lock. Returns the words changed or removed.
+ */
+export async function settleStoreMemory(db: Conn): Promise<number> {
+  const keys = await db.execute<{ actor: string; tin: string; kind: string; key: string }>(sql`
+    select actor_id as actor, tin, kind, key from ${storeMemory} where actor_id is not null`)
+  return settleWords(db, keys, new Set())
 }
 
 export function createStoreMemoryRepository(db: Conn): StoreMemoryRepository {
@@ -172,6 +278,8 @@ export function createStoreMemoryRepository(db: Conn): StoreMemoryRepository {
       // one word per key, the last said: a receipt may print one article on two lines
       const last = [...new Map(words.map((word) => [memoryKey(word), word])).values()]
       if (last.length === 0) return
+      // the lock the removals settle the person's words under (MOL-240, round 3, Р3-3)
+      await lockWords(db, [actorId])
       await db
         .insert(storeMemory)
         .values(

@@ -5,6 +5,7 @@ import { describeMigrationFailure } from '@/db/failure'
 import { startEmbedder } from '@/embeddings/embedder'
 import { migrateToLatest } from '@/db/migrate'
 import { rekeyItems } from '@/db/rekey'
+import { settleStoreMemory } from '@/db/store-memory-repository'
 import { createMarketRateRepository } from '@/db/market-rates-repository'
 import { createRateRepository } from '@/db/rates-repository'
 import { cbaFeed } from '@/rates/cba'
@@ -57,6 +58,16 @@ try {
   if (rekeyed > 0) app.log.info({ rekeyed }, 'search keys recomputed')
 } catch (error) {
   app.log.error(describeMigrationFailure(error), 'search keys failed')
+  process.exit(1)
+}
+
+// Each person's word in the shops' memory is what their last line still there says (MOL-240): after the
+// keys, which it reads, and before anyone writes — 0060 deleted lines whose words SQL cannot find.
+try {
+  const settled = await settleStoreMemory(getDb())
+  if (settled > 0) app.log.info({ settled }, 'store memory settled')
+} catch (error) {
+  app.log.error(describeMigrationFailure(error), 'store memory failed')
   process.exit(1)
 }
 

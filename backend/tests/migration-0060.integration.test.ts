@@ -6,9 +6,11 @@ import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { testDatabaseUrl } from './db'
 import { insertActor, insertItem, insertPlace, insertTrip } from './fixtures'
+import { storeMemoryWords } from '@molvia/model'
 import { MIGRATIONS } from '@/db/migrate'
 import * as schema from '@/db/schema'
-import { expenses, receiptLineImages, receiptLines, receipts } from '@/db/schema'
+import { expenses, receiptLineImages, receiptLines, receipts, storeMemory } from '@/db/schema'
+import { settleStoreMemory } from '@/db/store-memory-repository'
 
 /**
  * 0060 on a database that holds what `SET NULL` left behind (MOL-240): a recorded receipt whose trip
@@ -138,7 +140,25 @@ describe('0060: what a removed trip or purchase left of its receipt', () => {
       .insert(receiptLineImages)
       .values([row(working, 0), row(working, 1), row(orphan, 0), row(parsed, 0)])
 
+    // the words those lines taught at «Записать» (MOL-240, round 3, Р3-4): the line bought, the line
+    // whose purchase was removed, the line not recorded; and an erased person's word on the same key,
+    // which nobody's lines settle
+    const word = (actorId: string | null, position: number) => {
+      const [said] = storeMemoryWords({ printed: `строка ${String(position)}`, sku: null })
+      if (said === undefined) throw new Error('a line with letters says a word')
+      return { id: randomUUID(), tin: '01282006', ...said, actorId, itemId: milk }
+    }
+    await db.insert(storeMemory).values([word(me, 0), word(me, 1), word(me, 2), word(null, 1)])
+
     await apply(sixty)
+    // what SQL cannot find goes at the API's start: a text key is `toSearchKey`
+    expect(await settleStoreMemory(db)).toBe(3)
+    const words = await sql<{ actor_id: string | null; key: string }[]>`
+      select actor_id, key from store_memory order by actor_id nulls last`
+    expect(words).toEqual([
+      { actor_id: me, key: word(me, 0).key },
+      { actor_id: null, key: word(null, 1).key },
+    ])
 
     const left = await sql<{ id: string }[]>`select id from receipts order by id`
     expect(left.map((one) => one.id).sort()).toEqual([working, parsed].sort())
