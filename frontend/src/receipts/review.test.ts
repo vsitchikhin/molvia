@@ -221,6 +221,13 @@ describe('what «Записать» sends', () => {
     expect(body?.lines[2]).toMatchObject({ skip: false, item: { name: 'Сыр Лори копчёный' } })
   })
 
+  it('the codes the person binds go by their lines’ positions, and none when nobody was asked (MOL-234)', () => {
+    const detail = receiptA()
+    const lines = reviewLines(detail, null)
+    expect(recordBody(detail, null, lines, TRIP, '2026-09-27')).not.toHaveProperty('barcodes')
+    expect(recordBody(detail, null, lines, TRIP, '2026-09-27', [2])?.barcodes).toEqual([2])
+  })
+
   it('a line left out goes as «не записываем»', () => {
     const detail = receiptA()
     const draft: ReceiptDraft = {

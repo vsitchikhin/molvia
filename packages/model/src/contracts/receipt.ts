@@ -8,6 +8,7 @@ import {
   receiptFailureSchema,
   receiptMatchSchema,
   receiptStatusSchema,
+  receiptViaSchema,
 } from '#model/entities/receipt'
 import { newItemSchema } from '#model/entities/item'
 import { serbianReceiptLink } from '#model/entities/receipt-link'
@@ -52,6 +53,13 @@ export const receiptLinkBodySchema = z.strictObject({
   country: linkReceiptCountrySchema,
   language: z.enum(LOCALES),
   capturedAt: isoDate,
+  /**
+   * How the link came, and whether the camera missed in the sheet before it (MOL-234). Optional: a
+   * body a phone of an earlier build left in its queue has neither, and a door refused is never sent
+   * again (Р-3) — such a receipt is counted as not named.
+   */
+  via: receiptViaSchema.optional(),
+  missed: z.boolean().optional(),
 })
 
 export const receiptBodySchema = z.union([receiptPhotoBodySchema, receiptLinkBodySchema])
@@ -112,6 +120,13 @@ export const receiptReviewLineCodec = z.strictObject({
   translation: z.string().nullable(),
   amount: moneyCodec.nullable(),
   rememberedPrice: moneyCodec.nullable(),
+  /**
+   * The package's code the Serbian tax office gave the line, which no item holds yet (MOL-234):
+   * «Привязать штрихкоды?» asks about it at «Записать», never in silence (MOL-100). Sent only when there
+   * is one, and only to a phone that asked by `RECEIPT_CODES_HEADER` — an installed app of an earlier
+   * build reads a line strictly (adversarial А3).
+   */
+  code: z.string().optional(),
 })
 export type ReceiptReviewLine = z.output<typeof receiptReviewLineCodec>
 
@@ -219,6 +234,11 @@ export const receiptRecordBodySchema = z.strictObject({
       figures: z.array(z.int().min(0)).max(500),
     })
     .optional(),
+  /**
+   * «Привязать и записать» (MOL-234, owner's В-2 «а»): the positions of the lines whose code the
+   * person binds to the item recorded — by the rules of MOL-100. Absent — no question was asked.
+   */
+  barcodes: z.array(z.int().min(0)).max(500).optional(),
 })
 export type ReceiptRecordBody = z.output<typeof receiptRecordBodySchema>
 
@@ -226,6 +246,21 @@ export type ReceiptRecordBody = z.output<typeof receiptRecordBodySchema>
 export const receiptRecordedCodec = z.strictObject({
   receipt: receiptSummaryCodec,
   tripId: z.uuid(),
+  /**
+   * What became of each code asked to be bound (MOL-234), only when some were: `written`; `there` —
+   * the item held it already; `held` — another item holds it, named, and nothing was written, as
+   * MOL-100's 409 says; `full` — the item holds twenty. The record stands whichever it was.
+   */
+  codes: z
+    .array(
+      z.strictObject({
+        position: z.int().min(0),
+        code: z.string(),
+        outcome: z.enum(['written', 'there', 'held', 'full']),
+        holder: z.string().optional(),
+      }),
+    )
+    .optional(),
 })
 export type ReceiptRecorded = z.output<typeof receiptRecordedCodec>
 
@@ -245,3 +280,11 @@ export type ReceiptSettled = z.output<typeof receiptSettledCodec>
  * nothing of the person, and leaves the bot to tell them.
  */
 export const receiptReadQuerySchema = z.strictObject({ shown: z.literal('1').optional() })
+
+/**
+ * A phone that knows a review line's `code` says so by this header on `GET /receipts/:id` (MOL-234,
+ * adversarial А3): a line with a code is refused by the strict codec of an installed app of an earlier
+ * build, so the code goes only to a build that asked. A header, not the query: a server rolled back
+ * refuses a query it does not know, and leaves a header alone.
+ */
+export const RECEIPT_CODES_HEADER = 'X-Molvia-Receipt-Codes'

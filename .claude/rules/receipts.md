@@ -401,6 +401,43 @@ that add up and «in part»: `lines: 0` of every «переснимите» sent
 lines under the old rule (am-06: 14): the price, named — before 0.2 only the owner is on production,
 and those receipts are taken again (Т-10).
 
+**A receipt from the tax office is counted beside it, never in it: `tax_receipt_days`** (MOL-234, owner's
+В-1…В-3 «а»). **A table of its own, not a `source` in that one's key** (Р-1): a key moved would break the
+`on conflict (day)` of the image a failed deploy puts back, and every reading would fail on it. The same
+shape and rules — by day in Yerevan, no id, in the transaction it counts — and its own columns: how the link
+came, counted **when the server takes the receipt** and only then (`sent_qr`, `sent_qr_missed`,
+`sent_paste_missed`, `sent_paste`, `sent_unnamed` — a repeat is the same receipt, Р-2); how the tax office
+answered (`read`, `missing` after 48 hours, `invalid`, `empty` — a journal with no list); **what failed on
+our side apart** (`unreadable` — a link lost in a restore, an answer we could not write: no answer of the
+tax office's, adversarial А7); the specification (`specs_ok`, `specs_failed`, `specs_skipped`) and the
+lines it gave a code (`lines_coded`); at «Записать» the lines put right by the
+same kinds as OCR's — what the matcher missed, the figures being the tax office's — the total, the codes
+bound (`codes_written`) and the time to the record. **`make gates` reads it as «0.2r · the Serbian tax
+office», under the reader's block and with no stop** (Р-5): its share is the matcher's (MOL-251), and the
+four ways a link came are the risk of MOL-233 — a link pasted after the camera missed is a QR that did not
+read; one pasted with no shot is a habit. **No count before MOL-234** (Р-4): the edits exist only at the
+moment of a record, and before 0.2 only the owner is on production. A miss after which the person gave up
+is counted nowhere — the phone sends only its defects (MOL-144).
+
+**A code from the receipt is bound by the person, at «Записать»** (MOL-234, owner's В-2 «а»): a line's code
+that no item holds in any of its forms goes on the review as `code` — the item shown holding it is nothing to
+ask, and another item holding it (the shop's memory put another on the line) is a question whose answer
+could only be «held» (review 3). **Only to a phone that asks for it** (`RECEIPT_CODES_HEADER`, adversarial
+А3): an installed app of an earlier build reads a line strictly and would not open the review; a header, not
+the query, since a server rolled back refuses a query it does not know. «Записать» asks once, «Привязать
+штрихкоды?», listing each code with the item it would go to: «Привязать и записать» sends the lines'
+positions (`barcodes`), «Записать без кодов» none; put away with no answer it records nothing. A new item
+made from a line is asked about too (Р-10). **The code is written by MOL-100's rules inside the record's
+transaction**, by the same `attachBarcode`, a savepoint of its own: written; there already; another item
+holds it — named, nothing written; twenty — none. **The record stands whichever it was**, and the answer
+carries each outcome (`codes`); «Записали N покупок» names a code another item holds, by that item.
+**Every item the record touches is locked first, in the order of the ids** (`lockForRecord`, adversarial
+А1): `FOR UPDATE` where a code goes, `FOR KEY SHARE` where a purchase points; taken as the record went —
+the purchase's key, then the code's update — two people binding a code to one item waited on each other,
+and one record was a 500. The codes are then bound in their own order, since each code's lock lasts the
+transaction. **A record sent again answers its codes again** (А2): told by who holds each code now — the
+line's item `written` (whether it held it before is not kept), another `held`, nobody `full`.
+
 ## A receipt with no items (MOL-227)
 
 **A sole trader's terminal prints no items at all**: its section «Բաժին 1», the turnover tax with the
@@ -497,9 +534,23 @@ training or an advance receipt is no purchase. It carries the signed total (in t
 half up to the para), the moment and the number `requestedBy-signedBy-counter` — the receipt's head as it
 is taken, and its key against a second record (with the seller's tax number, as an Armenian one).
 
-**Only the JSON of the link is asked** (owner's В-1 «а»): one request a receipt. The page and its
-`/specifications` gave the same lines plus GTIN, through an undocumented POST that answered
-`success:false` two times of three from production; GTIN is MOL-234's.
+**The lines are the JSON's journal; the page and its `/specifications` are asked after it for the codes
+alone** (MOL-232 В-1 «а», MOL-234 В-1 «а»). The specification is undocumented and answered `success:false`
+two times of three from production, so **it is waited on for 3 s at most** (`PURS_SPECIFICATION_TIMEOUT_MS`,
+adversarial А4 — it was the journal's 10 s, twice): asked after the journal and before the receipt is
+written, so **a receipt is never shown without its codes** (review 9, adversarial Б1). Written first and
+coded after, a review opened in that second had no `code` and a line on the search's item, never read again
+— the code lost and a twin of the item made — and at most three seconds bought that. One deadline for both
+requests — the page for `viewModel.Token`, then the POST — which are reserved in the
+limit together, never the page alone; a failure, another shape, a page of another receipt — no codes, no
+pause of the queue, no owner's notice, its own line in the log at info (review 8) and `specs_failed`.
+**The price, named** (А5): the person's share is four a minute, and a receipt takes three — so the second
+receipt of a minute has no room for its specification, is never asked again and has no codes;
+`specs_skipped` and the block's «not asked, over the limit» say how many. **A code is taken only from a
+specification in step with the journal** (`specificationCodes`, Р-7): as many lines, each paid the same, in
+order — one out of step takes every code, since a code on the wrong line is worse than none — and only a
+code the catalogue would take (`writtenBarcode`: its check digit, never a shop's own), in the form written.
+It lives on its line, `receipt_lines.gtin`. Measured on three live receipts: one line of twenty had one.
 
 **The tax office has a queue of its own** (`readTaxReceipts`, the embeddings' runner, nudged when a link
 arrives), never the reader's: `claimNext` takes photos only. **People in turn**, the one asked about least in
@@ -545,7 +596,9 @@ discounted** (adversarial А2): the journal prints no row for a discount — «P
 a fifth off — and the total is the sum of what was paid, so the difference is the line's discount and
 the line settles; «≠» never stands on a line of the tax office. A line paid more is not settled.
 
-**A line finds its item by the shop's memory, then by its name whole** (owner's В-3 «а»): `serbianItemName`
+**A line finds its item by the shop's memory, then by its code, then by its name whole** (owner's В-3 «а»;
+the code MOL-234, Р-9): a code an item holds — with its twins, as the scanner's (MOL-99) — binds the line to
+it, near; the memory is still laid over it on reading. Then `serbianItemName`
 — the printed name less its unit word and the till's article at either end (a GTIN or a chain's code
 opening it, «383841701269 KESICA…», «[528195] KASIKA…», adversarial А5), set as a sentence — searched
 with its meaning;
@@ -566,9 +619,10 @@ recorded at — whatever city, while a photo's stays by city. **A place still ke
 place is proposed by the shop's name; the city is the municipality's, Belgrade or Novi Sad, else the
 person's own — the price: a receipt of Niš proposes their city.
 
-**The measure of 0.2 is the reader's** (Р-5): a receipt by its link writes nothing to `receipt_days`,
-read, failed or recorded — by the row's `source`, never guessed from the country (review 7) — until MOL-234 gives it a line of its own — its lines have nothing to put right,
-and counted with OCR's they would thin the stop line.
+**The measure of 0.2 is the reader's** (Р-5 of MOL-232): a receipt by its link writes nothing to
+`receipt_days` — by the row's `source`, never guessed from the country (review 7): its lines have nothing
+to read wrong, and counted with OCR's they would thin the stop line. It is counted in `tax_receipt_days`
+(MOL-234, below).
 
 **On the phone the QR code is read off the photo, and only the link goes** (MOL-233, owner's В-1 «а»):
 a person whose country is Serbia gets «Сфотографировать чек» as anyone whose receipts are read, on «Что
@@ -597,7 +651,10 @@ refuses a link only with nobody signed in (`sendLink`), so that is what the shee
 space» (review 4). **The scanner of goods is untouched** (MOL-98): its worker and options stay retail
 codes only. The review says «Строки — из налоговой Сербии», names the ПИБ, and has nothing of a photo — no
 «Переснять», no «Прочитали не всё», no «Фото удалим»: «Переснять» is a photo country's (`photoCountry`).
-**How often the camera reads it is MOL-234's** (В-3 «а»): the body will say `via: qr | paste` there.
+**How the link came is the body's word** (MOL-234, В-3 «а» of MOL-233): `via` — `qr` read off the shot,
+`paste` from the field — and `missed`, whether the camera missed in this sheet before; a refusal read off the
+shot (a refund) is no miss, a worker that failed is one. Optional on the wire (Р-3): a body a phone of an
+earlier build left in its queue has neither, and a door refused is never sent again.
 
 ## The reader holds nothing
 

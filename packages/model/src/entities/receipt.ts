@@ -159,6 +159,14 @@ export function receiptSourceOf(country: ReceiptCountry): ReceiptSource {
 }
 
 /**
+ * How a receipt's link reached the phone (MOL-234, owner's В-3 «а» of MOL-233): `qr` — read off the
+ * photo by the app, `paste` — pasted by the person. The measure of the risk of MOL-233, whether a real
+ * receipt's QR code reads off a photo; beside it whether the camera missed in the sheet before.
+ */
+export const receiptViaSchema = z.enum(['qr', 'paste'])
+export type ReceiptVia = z.infer<typeof receiptViaSchema>
+
+/**
  * The cities a receipt names, as a word of its head, of the countries read: a person in Tbilisi
  * records an Armenian receipt in Gyumri or Yerevan (MOL-109, Р-5).
  */
