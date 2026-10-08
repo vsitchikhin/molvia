@@ -6,6 +6,7 @@ import { ERROR, receiptRecordedCodec, tripHistoryCodec, tripViewCodec } from '@m
 import type { FastifyInstance } from 'fastify'
 import { createExpenseRepository } from '@/db/expenses-repository'
 import { createMoneyRepository } from '@/db/money-repository'
+import { createReceiptRepository } from '@/db/receipts-repository'
 import {
   expenses,
   items,
@@ -18,6 +19,7 @@ import {
   storeMemory,
   trips,
 } from '@/db/schema'
+import { createTripRepository } from '@/db/trips-repository'
 import { buildServer } from '@/server'
 import { connect, connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtures'
@@ -220,7 +222,13 @@ describe('«Записать»', () => {
       .from(receiptLines)
       .where(eq(receiptLines.receiptId, id))
       .orderBy(asc(receiptLines.position))
-    expect(lines.map((line) => line.expenseId !== null)).toEqual([true, true, true, true, false])
+    // the bag was left out: its line is not kept (MOL-240, В-2)
+    expect(lines.map((line) => [line.position, line.expenseId !== null])).toEqual([
+      [0, true],
+      [1, true],
+      [2, true],
+      [3, true],
+    ])
     expect(await db.select().from(receiptParts).where(eq(receiptParts.receiptId, id))).toEqual([])
     // the lines recorded as read keep their rows; the chocolate's figures were corrected (890 ≠ 980
     // read), the bag was left out — theirs go
@@ -550,9 +558,10 @@ describe('«Записать»', () => {
     expect([overflow.statusCode, codeOf(overflow)]).toEqual([400, ERROR.INVALID_AMOUNT])
   })
 
-  // review 1, В1, В2, В7: the receipt row holds the trip's date on the accounts, «из чека» and the
-  // guard against a second record — it goes with its trip, never before it
-  it('keeps a recorded receipt while its trip is there, and lets it be recorded again once the trip is gone', async () => {
+  // review 1, В1, В2: the receipt row holds the trip's date on the accounts, «из чека» and the guard
+  // against a second record — it goes with its trip, never before it, and never after (MOL-240, А2 of
+  // the adversarial review of MOL-97): nobody sees a recorded receipt without its trip
+  it('keeps a recorded receipt while its trip is there, and lets it go with the trip removed for good', async () => {
     const me = await insertActor(db)
     const place = await insertPlace(db)
     const milk = await insertItem(db)
@@ -561,31 +570,93 @@ describe('«Записать»', () => {
       tripId: randomUUID(),
       place: { id: place },
       purchasedOn: '2026-09-26',
-      lines: [{ position: 0, skip: false, item: { id: milk }, quantity: null, amount: null }],
+      // as read: its row is kept for the reader's training, and must go with the receipt too
+      lines: [
+        { position: 0, skip: false, item: { id: milk }, quantity: pieces(2), amount: amount(740) },
+      ],
     })
     const first = body()
     expect((await record(me, id, first)).statusCode).toBe(200)
     const cookie = await signIn(db, me)
-    const removed = await app.inject({
-      method: 'DELETE',
-      url: `/receipts/${id}`,
-      headers: { cookie },
-    })
+    const call = (method: 'DELETE' | 'POST', url: string) =>
+      app.inject({ method, url, headers: { cookie } })
+    const removed = await call('DELETE', `/receipts/${id}`)
     expect([removed.statusCode, codeOf(removed)]).toEqual([409, ERROR.CONFLICT])
+    const kept = async () => ({
+      receipts: (await db.select().from(receipts).where(eq(receipts.id, id))).length,
+      lines: (await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id))).length,
+      rows: (await db.select().from(receiptLineImages).where(eq(receiptLineImages.receiptId, id)))
+        .length,
+    })
 
-    // the trip marked removed may still come back: neither the old trip nor a new one
-    await db.update(trips).set({ deletedAt: new Date() }).where(eq(trips.id, first.tripId))
+    // the trip marked removed may still come back: neither the old trip nor a new one, and
+    // «Вернуть» brings the receipt back whole
+    expect((await call('DELETE', `/trips/${first.tripId}`)).statusCode).toBe(204)
     expect((await record(me, id, first)).statusCode).toBe(409)
     expect((await record(me, id, body())).statusCode).toBe(409)
+    expect((await call('POST', `/trips/${first.tripId}/restore`)).statusCode).toBe(200)
+    expect(await kept()).toEqual({ receipts: 1, lines: 1, rows: 1 })
 
-    // removed for good: the receipt is recorded again, from its lines
-    await db.delete(trips).where(eq(trips.id, first.tripId))
-    const again = body()
-    expect((await record(me, id, again)).statusCode).toBe(200)
-    const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
-    expect([row?.status, row?.tripId]).toEqual(['recorded', again.tripId])
-    // the measure counts the receipt's first record only (MOL-222, review 7)
-    expect(await db.select().from(receiptDays)).toMatchObject([{ recorded: 1, lines: 1 }])
+    // removed for good by the minute timers of `server.ts`: the receipt, its lines and rows go too
+    expect((await call('DELETE', `/trips/${first.tripId}`)).statusCode).toBe(204)
+    await db
+      .update(trips)
+      .set({ deletedAt: sql`clock_timestamp() - interval '11 minutes'` })
+      .where(eq(trips.id, first.tripId))
+    await createTripRepository(db).purgeStale()
+    await createReceiptRepository(db).purgeStale()
+    expect(await kept()).toEqual({ receipts: 0, lines: 0, rows: 0 })
+
+    // the paper is recorded again by a new shot: its twin went with the trip, and it is counted
+    const shot = await parsedReceipt(me, LINES.slice(0, 1))
+    expect((await record(me, shot, body())).statusCode).toBe(200)
+    expect(await db.select().from(receiptDays)).toMatchObject([{ recorded: 2, lines: 2 }])
+  })
+
+  // MOL-240, Б2 of the adversarial review of MOL-97: a purchase removed at once took nothing of its
+  // receipt, and its line — what and for how much — lay on the server, unseen, until erasure
+  it('lets a line go with its purchase, and keeps the rest of the receipt with its trip', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+    const cheese = await insertItem(db, { name: 'Сыр Лори', searchKey: 'syr lori' })
+    const id = await parsedReceipt(me, LINES.slice(0, 2))
+    const tripId = randomUUID()
+    const recorded = await record(me, id, {
+      tripId,
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        { position: 0, skip: false, item: { id: milk }, quantity: pieces(2), amount: amount(740) },
+        { position: 1, skip: false, item: { id: cheese }, quantity: null, amount: amount(1_450) },
+      ],
+    })
+    expect(recorded.statusCode).toBe(200)
+    const [bought] = await db
+      .select({ id: expenses.id })
+      .from(expenses)
+      .where(and(eq(expenses.tripId, tripId), eq(expenses.itemId, cheese)))
+    const cookie = await signIn(db, me)
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: `/trips/${tripId}/expenses/${bought?.id ?? ''}`,
+      headers: { cookie },
+    })
+    expect(removed.statusCode).toBe(200)
+
+    const lines = await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id))
+    expect(lines.map((line) => line.position)).toEqual([0])
+    const rows = await db
+      .select()
+      .from(receiptLineImages)
+      .where(eq(receiptLineImages.receiptId, id))
+    expect(rows.map((row) => row.position)).toEqual([0])
+    // the receipt still dates its trip and names it «из чека»
+    const [receipt] = await db.select().from(receipts).where(eq(receipts.id, id))
+    expect(receipt).toMatchObject({ status: 'recorded', tripId, tin: TIN })
+    const view = await app.inject({ method: 'GET', url: `/trips/${tripId}`, headers: { cookie } })
+    const trip = tripViewCodec.parse(view.json())
+    expect([trip.receiptId, trip.expenses.length]).toEqual([id, 1])
   })
 
   // MOL-222: the measure of 0.2 — what the person put right against what the review showed

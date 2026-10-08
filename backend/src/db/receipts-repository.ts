@@ -225,13 +225,11 @@ export interface RecordedReceipt {
   readonly expenses: readonly { readonly position: number; readonly expenseId: string }[]
   /** Lines recorded as read: their cut-out rows are confirmed, every other one goes (В-4). */
   readonly confirmed: readonly number[]
-  /** What the person put right before recording, counted in `receipt_days` (MOL-222). */
-  readonly edits: ReceiptEdits
   /**
-   * Counted in `receipt_days` — or, of a receipt from the tax office, in `tax_receipt_days` (MOL-234):
-   * the first record of the receipt, never one after its trip went.
+   * What the person put right before recording, counted in `receipt_days` — or, of a receipt from the
+   * tax office, in `tax_receipt_days` (MOL-234).
    */
-  readonly counted: boolean
+  readonly edits: ReceiptEdits
   readonly source: ReceiptSource
   /** Codes of the lines bound to items at this record (MOL-234, В-2). */
   readonly codesWritten: number
@@ -345,7 +343,8 @@ export interface ReceiptRepository {
   lockForRecord(actorId: string, id: string): Promise<ReceiptToRecord | null>
   /**
    * The receipt recorded (MOL-126): its trip and purchases, its photo deleted (Т-9 of MOL-125), the
-   * rows cut out of the lines recorded as read confirmed with the text read, every other row deleted.
+   * rows cut out of the lines recorded as read confirmed with the text read, every other row deleted,
+   * and every line not recorded (MOL-240).
    */
   markRecorded(id: string, recorded: RecordedReceipt): Promise<void>
   /** The receipt a trip was recorded from, with each purchase's line as printed (MOL-126). */
@@ -391,7 +390,9 @@ export interface ReceiptRepository {
   /** Receipts by their link the last round did not finish asking about: queued again, the ask not counted. */
   requeueInterruptedLinks(): Promise<void>
   /** The item each recorded line of a receipt went to, by position (MOL-234, adversarial А2). */
-  recordedItems(id: string): Promise<ReadonlyMap<number, string>>
+  recordedItems(
+    id: string,
+  ): Promise<ReadonlyMap<number, { readonly itemId: string; readonly gtin: string | null }>>
   /**
    * The next receipt by its link whose ask is due, now `reading`; `null` for none. People in turn, the
    * one asked about least in the last hour first, as the reader's queue (MOL-232).
@@ -818,6 +819,11 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           .set({ expenseId })
           .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, position)))
       }
+      // a line not recorded is not kept (MOL-240, В-2): nobody sees it once the receipt is recorded,
+      // and what it costs is counted below from the edits, not read back; its rows go with it
+      await db
+        .delete(receiptLines)
+        .where(and(eq(receiptLines.receiptId, id), sql`${receiptLines.expenseId} is null`))
       await db.delete(receiptParts).where(eq(receiptParts.receiptId, id))
       const confirmed = sql`${receiptLineImages.position} in (${sql.join(
         [-1, ...recorded.confirmed].map((position) => sql`${position}`),
@@ -840,7 +846,6 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           ? sql`(${took} <= interval '${sql.raw(bound)}')::int`
           : sql`(${took} > interval '${sql.raw(below)}' and ${took} <= interval '${sql.raw(bound)}')::int`
       const { edits } = recorded
-      if (!recorded.counted) return
       const counts = {
         recorded: sql`1`,
         lines: sql`${edits.lines}::int`,
@@ -1235,11 +1240,15 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
 
     async recordedItems(id) {
       const rows = await db
-        .select({ position: receiptLines.position, itemId: expenses.itemId })
+        .select({
+          position: receiptLines.position,
+          itemId: expenses.itemId,
+          gtin: receiptLines.gtin,
+        })
         .from(receiptLines)
         .innerJoin(expenses, eq(expenses.id, receiptLines.expenseId))
         .where(eq(receiptLines.receiptId, id))
-      return new Map(rows.map((row) => [row.position, row.itemId]))
+      return new Map(rows.map((row) => [row.position, { itemId: row.itemId, gtin: row.gtin }]))
     },
 
     async requeueInterruptedLinks() {

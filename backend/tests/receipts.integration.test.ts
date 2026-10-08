@@ -30,7 +30,7 @@ import { readQueuedReceipts } from '@/usecases/read-receipts'
 import type { ReadReport } from '@/usecases/read-receipts'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, signIn } from './fixtures'
+import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
 const repository = createReceiptRepository(db)
@@ -739,12 +739,14 @@ describe('what lives how long (В-3)', () => {
     const me = await owner()
     const id = await queued(me)
     await readAll(benchReader())
+    const tripId = await insertTrip(db, { actorId: me.id, placeId: await insertPlace(db) })
     await db
       .update(receipts)
       .set({
         status: 'recorded',
         recordedAt: new Date(),
         createdAt: sql`clock_timestamp() - interval '60 days'`,
+        tripId,
       })
       .where(eq(receipts.id, id))
     await db

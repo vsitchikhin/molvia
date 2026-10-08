@@ -64,7 +64,8 @@ describe('0060: what a removed trip or purchase left of its receipt', () => {
   it('removes the orphans, then makes the receipt go with its trip and the line with its purchase', async () => {
     const before = journal.entries.filter((entry) => entry.idx < 60)
     const [sixty] = journal.entries.filter((entry) => entry.idx === 60)
-    expect(sixty?.tag).toBe('0060_receipt_goes_with_trip')
+    if (sixty === undefined) throw new Error('0060 is not in the journal')
+    expect(sixty.tag).toBe('0060_receipt_goes_with_trip')
     for (const entry of before) await apply(entry)
     const db = drizzle(sql, { schema })
 
@@ -94,7 +95,7 @@ describe('0060: what a removed trip or purchase left of its receipt', () => {
     const line = (receiptId: string, position: number, expenseId: string | null) => ({
       receiptId,
       position,
-      printed: `строка ${position}`,
+      printed: `строка ${String(position)}`,
       priceMinor: 37_000n,
       sumMinor: 37_000n,
       settled: true,
@@ -105,8 +106,8 @@ describe('0060: what a removed trip or purchase left of its receipt', () => {
       position,
       piece: 0,
       image: Buffer.from([0xff, 0xd8]),
-      readText: `строка ${position}`,
-      confirmedText: `строка ${position}`,
+      readText: `строка ${String(position)}`,
+      confirmedText: `строка ${String(position)}`,
       confirmedAt: new Date(),
     })
 
@@ -137,7 +138,7 @@ describe('0060: what a removed trip or purchase left of its receipt', () => {
       .insert(receiptLineImages)
       .values([row(working, 0), row(working, 1), row(orphan, 0), row(parsed, 0)])
 
-    await apply(sixty as JournalEntry)
+    await apply(sixty)
 
     const left = await sql<{ id: string }[]>`select id from receipts order by id`
     expect(left.map((one) => one.id).sort()).toEqual([working, parsed].sort())
