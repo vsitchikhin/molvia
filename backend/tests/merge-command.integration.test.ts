@@ -35,8 +35,17 @@ let younger: string
 
 beforeEach(async () => {
   await clearAll(db)
-  older = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3 2' })
-  younger = await insertItem(db, { name: 'Молоко 3.2%', searchKey: 'moloko 3 2' })
+  // An hour apart: two inserts in a row may share a millisecond, and a tie goes to the lower id (MOL-252).
+  older = await insertItem(db, {
+    name: 'Молоко 3,2%',
+    searchKey: 'moloko 3 2',
+    createdAt: new Date('2026-10-01T10:00:00Z'),
+  })
+  younger = await insertItem(db, {
+    name: 'Молоко 3.2%',
+    searchKey: 'moloko 3 2',
+    createdAt: new Date('2026-10-01T11:00:00Z'),
+  })
 })
 
 afterAll(async () => {

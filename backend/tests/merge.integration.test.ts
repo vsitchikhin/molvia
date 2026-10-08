@@ -39,8 +39,18 @@ beforeEach(async () => {
   await clearAll(db)
   // Counted by gate 0.2 across a merge (Т-6), so they consented to the statistics (MOL-236).
   owner = await insertCounted(db)
-  older = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3 2' })
-  younger = await insertItem(db, { name: 'Малоко 3,2%', searchKey: 'maloko 3 2' })
+  // An hour apart, after every `made` below: two inserts in a row may share a millisecond, and a tie goes
+  // to the lower id (MOL-252).
+  older = await insertItem(db, {
+    name: 'Молоко 3,2%',
+    searchKey: 'moloko 3 2',
+    createdAt: new Date('2026-10-01T10:00:00Z'),
+  })
+  younger = await insertItem(db, {
+    name: 'Малоко 3,2%',
+    searchKey: 'maloko 3 2',
+    createdAt: new Date('2026-10-01T11:00:00Z'),
+  })
 })
 
 afterAll(async () => {
@@ -592,13 +602,14 @@ describe('the night on the real database (adversarial А1, А6)', () => {
     failed: () => undefined,
   })
 
-  async function twoPairs(): Promise<void> {
+  async function twoPairs(): Promise<{ milk: string; milkPoint: string }> {
     const milk = await made('Молоко 3,2%', 'moloko 3 2', '2026-08-01')
     const milkPoint = await made('Молоко 3.2%', 'moloko 3 2', '2026-08-02')
     const kefir = await made('Кефир 1%', 'kefir 1', '2026-08-01')
     const kefirSpaced = await made('Кефир 1 %', 'kefir 1', '2026-08-02')
     for (const id of [milk, milkPoint]) await vector(id, 1, 0)
     for (const id of [kefir, kefirSpaced]) await vector(id, 0, 1)
+    return { milk, milkPoint }
   }
 
   beforeEach(() => {
@@ -620,15 +631,12 @@ describe('the night on the real database (adversarial А1, А6)', () => {
   })
 
   it('claims a night again an hour after it died, and names what it merged before', async () => {
-    await twoPairs()
-    // The first instance merged one pair and died: its day claimed, never finished.
+    const { milk, milkPoint } = await twoPairs()
+    // The first instance merged one pair — as the night would, the younger into the older — and died:
+    // its day claimed, never finished. By its ids: «Молоко 3,2%» is also `older` (adversarial MOL-252 А2).
     await db.execute(sql`
       insert into catalogue_merge_runs (day, mode, started_at) values ('2026-10-06', 'on', ${at('2026-10-06', '04:30').toISOString()}::timestamptz)`)
-    const [first] = await db.execute<{ a: string; b: string }>(sql`
-      select f.id as a, t.id as b from items f join items t on t.name = 'Молоко 3,2%'
-      where f.name = 'Молоко 3.2%'`)
-    if (!first) throw new Error('no pair')
-    numbered(await merges.mergeItems(first.a, first.b, NIGHT))
+    numbered(await merges.mergeItems(milkPoint, milk, NIGHT))
 
     await mergeTick(deps(), 'on', at('2026-10-06', '05:00'))
     expect(await db.execute(sql`select count(*)::int as n from catalogue_merges`)).toEqual([
@@ -886,5 +894,33 @@ describe('a fan where the later merge only withdrew (review №12, adversarial �
     )
     await merges.unmerge(numbered(await merges.mergeItems(a, b, NIGHT)))
     expect(await db.execute(sql`select item_id from item_names`)).toEqual([{ item_id: a }])
+  })
+})
+
+describe('a tie of age (MOL-252)', () => {
+  it('is one millisecond, the lower id the older, for the night and `make merge --list` alike', async () => {
+    const high = 'ffffffff-ffff-4fff-bfff-ffffffffffff'
+    const low = '00000000-0000-4000-8000-000000000001'
+    for (const id of [high, low])
+      await insertItem(db, { id, name: 'Кефир 1%', searchKey: 'kefir 1' })
+    // Eight hundred microseconds apart in one millisecond: to Postgres the higher id is the older (В-1).
+    await db.execute(sql`
+      update items set created_at = '2026-10-01T10:00:00.000100Z' where id = ${high}`)
+    await db.execute(sql`
+      update items set created_at = '2026-10-01T10:00:00.000900Z' where id = ${low}`)
+    const { report } = await mergeNight(
+      {
+        merges,
+        embedder: NO_EMBEDDER,
+        failed: (error) => {
+          throw error
+        },
+      },
+      'report',
+      '2026-10-07',
+    )
+    expect(report.candidatePairs.map((pair) => [pair.fromId, pair.intoId])).toEqual([[high, low]])
+    const listed = await merges.openCandidates()
+    expect(listed.map((pair) => [pair.fromId, pair.intoId])).toEqual([[high, low]])
   })
 })
