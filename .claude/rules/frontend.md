@@ -1068,9 +1068,13 @@ bottom: 0`), a sibling of the panel and as wide as the sheet — never a middle 
   its shadow on every phone (С-11). **The room asked for is the field's line** (round 3, Р3-А1): a
   field of one line whole — its height is the kit's, and its line plus padding is less (30 of the
   price's 44, which the turned phone of А1 then left 29 of) — and of a textarea or an editable block
-  one line with its padding and edge, where the caret is, since the browser keeps the caret in sight:
-  asked to stand whole, the five lines of «Написать разработчику» (147) let go the footer of a failure
-  to send on an iPhone SE (150 over 131), the failure and «Повторить» out of sight. The field is the
+  one line with its padding and edge: asked to stand whole, the five lines of «Написать разработчику»
+  (147) let go the footer of a failure to send on an iPhone SE (150 over 131), the failure and
+  «Повторить» out of sight. **A line, not the caret's line — the price, named** (review С-13): `reveal`
+  shows a field taller than the room from its top, and a caret at the end of a long message may stand
+  under the footer until a key is pressed; Chromium then brings it above by `scroll-padding`, WebKit,
+  which does not always honour it, may not. On the SE of Р3-А1 the last line goes 4 px under the
+  footer, its letters in sight; with less room the end of the field and its caret may go under it. The field is the
   one `typedIn` names, as for `reveal`; settled on
   every resize of the sheet or the footer, read where they lie, and on every focus that lands in the
   sheet or leaves it — a step from one field to the next is settled once, by the field it lands on.
