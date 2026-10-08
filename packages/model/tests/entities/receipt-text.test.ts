@@ -497,6 +497,17 @@ describe('rows of junk by the hundred (review Р18)', () => {
     // and against a fall back to seconds a row, with room for a slow runner
     expect(performance.now() - started).toBeLessThan(5_000)
   })
+
+  it('cost no second search where the total shown is not the reading’s own (MOL-244)', () => {
+    // two places vouch for 9 000,00 against the reading's 10 000,00: both readings are judged again by
+    // it — their candidates found once, the judging alone repeated
+    const tail = [totalRow(1_000_000), 'Ընդամենը: 9 000,00', 'Վճարված է Առձեռն: 9 000,00']
+    const text = `${junk(400)}\n${tail.join('\n')}`
+    const started = performance.now()
+    const got = bestReading([rowsOf(text, 0), rowsOf(text, 0)])
+    expect(got.totalHundredths).toBe(900_000)
+    expect(performance.now() - started).toBeLessThan(5_000)
+  })
 })
 
 describe('the name row of the first item, which has the head above it (review Р19)', () => {
@@ -1936,10 +1947,39 @@ describe('the total of a receipt with items: the lines that met it, or two place
     ])
     const frenki = got.lines[3]!
     expect([frenki.priceHundredths, frenki.sumHundredths]).toEqual([90_000, 135_000])
-    // a row whose figures OCR lost takes nothing of a total not shown
-    expect(
-      got.lines.some((line) => line.sumHundredths !== null && line.sumHundredths > 945_000),
-    ).toBe(false)
+    // a row whose figures OCR lost — the lavender — takes nothing of a total not shown (review 8)
+    expect(got.lines[1]?.sumHundredths).toBeNull()
+  })
+
+  it('reads a table whose total row OCR lost as printed too (review 7)', () => {
+    const fixture = am04 as Fixture
+    const bare = fixture.readings.map((text) =>
+      text
+        .split('\n')
+        .filter((row) => !/դամե|Կանխիկ|Վճար/u.test(row))
+        .join('\n'),
+    )
+    const got = bestReading(bare.map((text) => rowsOf(text, 0)))
+    expect([got.layout, got.totalHundredths, got.readTotalHundredths]).toEqual([
+      'table',
+      null,
+      null,
+    ])
+    expect([got.lines[3]?.priceHundredths, got.lines[3]?.sumHundredths]).toEqual([90_000, 135_000])
+    expect(got.lines[1]?.sumHundredths).toBeNull()
+  })
+
+  it('judges a table by the total two places show, its own row unread by its pattern (adversarial Г1)', () => {
+    const fixture = am04 as Fixture
+    // «Ընդամենը` 9450.00», as OCR printed it on hand/am-04: the table's pattern takes «:» alone
+    const ticked = fixture.readings.map((text) =>
+      text.replace('Ընդամենը: 9450.00', 'Ընդամենը` 9450.00'),
+    )
+    const got = bestReading(ticked.map((text) => rowsOf(text, 0)))
+    expect(got.totalHundredths).toBe(945_000)
+    expect(got.lines.map((line) => line.sumHundredths)).toEqual([
+      220_000, 220_000, 220_000, 135_000, 150_000,
+    ])
   })
 
   it('gives a line with no reading nothing of a total not shown; with one line as read, its rest (А1в)', () => {
