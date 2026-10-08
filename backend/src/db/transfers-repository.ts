@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { and, eq, gt, inArray, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm'
 import { DomainError, ERROR, TRANSFER_UNDO_MINUTES, transferSchema } from '@molvia/model'
-import type { ExchangeRate, Transfer, TransferAmendBody, TransferBody } from '@molvia/model'
+import type { ExchangeRate, Money, Transfer, TransferAmendBody, TransferBody } from '@molvia/model'
+import { rateFrom } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { lockOwner } from './money-accounts-repository'
@@ -53,6 +54,15 @@ export interface TransferRepository {
 
   /** The owner's live transfer, or null. */
   byId(actorId: string, id: string): Promise<Transfer | null>
+
+  /**
+   * The fee of the owner's live transfer as it was written — its day, its sum and the rate it was
+   * counted by — or null: what an amendment keeps the rate of, as a spending's does (Р-5).
+   */
+  feeOf(
+    actorId: string,
+    id: string,
+  ): Promise<{ spentOn: string; amount: Money; rate: ExchangeRate | null } | null>
 
   /** The owner's transfer and its fee, marked and gone from every reader; what was removed, or null. */
   remove(actorId: string, id: string): Promise<Transfer | null>
@@ -290,10 +300,36 @@ export function createTransferRepository(db: Conn): TransferRepository {
       return row ? toTransfer(row, await feeOf(db, row.id)) : null
     },
 
+    async feeOf(actorId, id) {
+      const own = idOrNull(id)
+      if (own === null) return null
+      const [row] = await db
+        .select({ fee: spendings })
+        .from(spendings)
+        .innerJoin(accountTransfers, eq(accountTransfers.id, spendings.transferId))
+        .where(
+          and(
+            eq(spendings.transferId, own),
+            eq(accountTransfers.actorId, actorId),
+            isNull(accountTransfers.deletedAt),
+          ),
+        )
+      if (!row) return null
+      const { fee } = row
+      return {
+        spentOn: fee.spentOn,
+        amount: { minor: fee.amountMinor, currency: fee.currency },
+        rate: rateFrom(fee),
+      }
+    },
+
     async remove(actorId, id) {
       const own = idOrNull(id)
       if (own === null) return null
       return db.transaction(async (tx) => {
+        // The lock an amendment holds: removed between its read and its write, the transfer took a
+        // fee written live beside it (adversarial А2).
+        await tx.execute(lockOwner(actorId))
         const [removed] = await tx
           .update(accountTransfers)
           .set({ deletedAt: sql`clock_timestamp()` })
@@ -319,6 +355,7 @@ export function createTransferRepository(db: Conn): TransferRepository {
       const own = idOrNull(id)
       if (own === null) return false
       return db.transaction(async (tx) => {
+        await tx.execute(lockOwner(actorId))
         const restored = await tx
           .update(accountTransfers)
           .set({ deletedAt: null })

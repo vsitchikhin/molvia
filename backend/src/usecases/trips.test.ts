@@ -264,6 +264,7 @@ function fakeRepositories(
       add: unexpected('transfers.add'),
       amend: unexpected('transfers.amend'),
       byId: unexpected('transfers.byId'),
+      feeOf: unexpected('transfers.feeOf'),
       remove: unexpected('transfers.remove'),
       restore: unexpected('transfers.restore'),
       purgeRemoved: unexpected('transfers.purgeRemoved'),

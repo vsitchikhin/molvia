@@ -82,8 +82,9 @@ export const ERROR = {
    */
   TRANSFER_ACCOUNT: 'error.transfer_account',
   /**
-   * An amendment, removal or «Вернуть» of a transfer's fee through «Траты» (MOL-253, Р-5): the fee is
-   * written, amended and removed with its transfer, in its sheet, or the two would tell two stories.
+   * An amendment or a removal of a transfer's fee through «Траты» (MOL-253, Р-5): the fee is written,
+   * amended and removed with its transfer, in its sheet, or the two would tell two stories. «Вернуть»
+   * of it there finds nothing — 404 — since a fee comes back only with its transfer.
    */
   SPENDING_OF_TRANSFER: 'error.spending_of_transfer',
   /** A code typed by hand not 8, 12 or 13 digits long — the lengths the scanner reads (MOL-98). */

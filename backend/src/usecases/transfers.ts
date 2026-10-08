@@ -1,6 +1,8 @@
-import { DomainError, ERROR, latestDay, transferViewOf } from '@molvia/model'
+import { DomainError, ERROR, latestDay, spendingIn, transferViewOf } from '@molvia/model'
 import type {
   Actor,
+  ExchangeRate,
+  Money,
   TransferAmendBody,
   TransferBody,
   TransferResponse,
@@ -28,16 +30,23 @@ async function feeOf(
   repositories: Repositories,
   owner: Owner,
   body: Pick<TransferBody, 'fee' | 'transferredOn'>,
+  held: { spentOn: string; amount: Money; rate: ExchangeRate | null } | null = null,
 ): Promise<FeeSpending | null> {
   if (body.fee === undefined) return null
   const categories = await repositories.spendingCategories.list(owner.id)
   const other = categories.find((category) => category.preset === 'other')
   // Every person is given the presets before the list answers; one missing is a defect, not a case.
   if (!other) throw new Error('the owner has no «Прочее» to write a transfer’s fee in')
-  const rate = await rateOfDay(repositories, owner, {
-    spentOn: body.transferredOn,
-    amount: body.fee,
-  })
+  // The rate is kept while the fee keeps its day and its currency and the snapshot still counts it,
+  // as a spending's is (Р-5): a corrected note must not move a closed month (adversarial А1).
+  const kept =
+    held !== null &&
+    held.spentOn === body.transferredOn &&
+    held.amount.currency === body.fee.currency &&
+    spendingIn(held, owner.spendCurrency) !== null
+  const rate = kept
+    ? held.rate
+    : await rateOfDay(repositories, owner, { spentOn: body.transferredOn, amount: body.fee })
   return { categoryId: other.id, rate }
 }
 
@@ -80,7 +89,8 @@ export async function amendTransfer(
   now: Date = new Date(),
 ): Promise<TransferResponse> {
   notAhead(body, now)
-  const fee = await feeOf(repositories, owner, body)
+  const held = await repositories.transfers.feeOf(owner.id, id)
+  const fee = await feeOf(repositories, owner, body, held)
   await repositories.transfers.purgeRemoved(owner.id)
   const { transfer } = await repositories.transfers.amend(owner.id, id, body, fee)
   return {

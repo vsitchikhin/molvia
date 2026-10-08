@@ -17,15 +17,18 @@ import {
   yerevanDate,
 } from '@molvia/model'
 import type { CachedRate, MoneyAccountsResponse } from '@molvia/model'
+import { drizzle } from 'drizzle-orm/postgres-js'
 import type { FastifyInstance } from 'fastify'
+import postgres from 'postgres'
 import { createErasureRepository } from '@/db/erasure-repository'
 import { createExportRepository } from '@/db/export-repository'
 import { createRateRepository } from '@/db/rates-repository'
 import { createSpendingRepository } from '@/db/spendings-repository'
 import { accountTransferRevisions, accountTransfers, actors, spendings } from '@/db/schema'
 import { createTransferRepository } from '@/db/transfers-repository'
+import * as schema from '@/db/schema'
 import { buildServer } from '@/server'
-import { connectDrizzle } from './db'
+import { connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
@@ -435,6 +438,87 @@ describe('«Перевод» между своими счетами (MOL-253)', 
     })
   })
 
+  describe('курс комиссии и гонка правки с удалением (адверсариальный раунд 1)', () => {
+    it('А1: правка одной заметки держит курс комиссии — «Потрачено» прошлого дня не сдвигается', async () => {
+      const { me, card, dollars } = await twoDollarAccounts()
+      const day = daysAgo(3)
+      await rates.upsert([official('USD', '390', day)])
+      const body = transferBody(card, dollars, { transferredOn: day })
+      await transfer(me, body)
+      const { id } = body
+      const feeRate = async () =>
+        (await db.select().from(spendings).where(eq(spendings.transferId, id)))[0]?.rateScaled
+      expect(await feeRate()).toBe(parseRate('390'))
+      // The bank corrected the day since.
+      await rates.upsert([official('USD', '395', day)])
+      const fields = without(body, 'id')
+      const noted = await call(me, 'PUT', `/transfers/${id}`, {
+        ...fields,
+        revision: 1,
+        note: 'папе',
+      })
+      expect(noted.statusCode, noted.body).toBe(200)
+      expect(await feeRate()).toBe(parseRate('390'))
+      // Another day is another fact: the rate of that day is taken.
+      await rates.upsert([official('USD', '400', daysAgo(2))])
+      const moved = await call(me, 'PUT', `/transfers/${id}`, {
+        ...fields,
+        revision: 2,
+        transferredOn: daysAgo(2),
+      })
+      expect(moved.statusCode, moved.body).toBe(200)
+      expect(await feeRate()).toBe(parseRate('400'))
+    })
+
+    it('А2: удаление ждёт правку, добавившую комиссию, и уносит комиссию с переводом', async () => {
+      // The app on a pool of its own, as in production: one connection would line the two phones up.
+      const pool = postgres(testDatabaseUrl(), { max: 4, onnotice: () => undefined })
+      const racing = buildServer({ db: drizzle(pool, { schema }) })
+      await racing.ready()
+      const { me, card, dollars } = await twoDollarAccounts()
+      const ask = (method: 'PUT' | 'DELETE', url: string, body?: unknown) =>
+        racing.inject({
+          method,
+          url,
+          headers: { cookie: me.cookie },
+          ...(body === undefined ? {} : { payload: body as Record<string, unknown> }),
+        })
+      const body = without(transferBody(card, dollars), 'fee')
+      await transfer(me, body)
+      const id = String(body.id)
+      // The window between the amendment's read and its write, widened.
+      await db.execute(
+        sql.raw(`create or replace function mol253_slow() returns trigger language plpgsql as $$
+          begin perform pg_sleep(1); return new; end $$`),
+      )
+      await db.execute(
+        sql.raw(`create trigger mol253_slow before insert on account_transfer_revisions
+          for each row execute function mol253_slow()`),
+      )
+      try {
+        const amending = ask('PUT', `/transfers/${id}`, {
+          ...without(body, 'id'),
+          revision: 1,
+          fee: usd('20'),
+        })
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        const removed = await ask('DELETE', `/transfers/${id}`)
+        expect(removed.statusCode).toBe(200)
+        expect((await amending).statusCode).toBe(200)
+      } finally {
+        await db.execute(
+          sql.raw('drop trigger if exists mol253_slow on account_transfer_revisions'),
+        )
+        await db.execute(sql.raw('drop function if exists mol253_slow()'))
+        await racing.close()
+        await pool.end()
+      }
+      const [fee] = await db.select().from(spendings).where(eq(spendings.transferId, id))
+      expect(fee?.deletedAt).not.toBeNull()
+      expect(await balanceOf(me, card)).toBe('314000 USD')
+    })
+  })
+
   describe('удаление и «Вернуть»', () => {
     it('уходит вместе с комиссией и возвращается вместе с ней', async () => {
       const { me, card, dollars } = await twoDollarAccounts()
@@ -513,7 +597,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
       })
     })
 
-    it('«Траты» не правят, не удаляют и не возвращают её отдельно — 409 error.spending_of_transfer', async () => {
+    it('«Траты» не правят и не удаляют её — 409 error.spending_of_transfer, а «Вернуть» — 404', async () => {
       const { me, card, dollars } = await twoDollarAccounts()
       const { transfer: written } = await transfer(me, transferBody(card, dollars))
       const fee = await feeOf(written.id)

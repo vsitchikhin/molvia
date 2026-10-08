@@ -77,7 +77,10 @@ export type Spending = z.infer<typeof spendingSchema>
  * drams says nothing of dollars after a move, and the month then counts the spending as it counts a
  * trip line (review Р-5, adversarial Д8). Null too when it comes to more than money holds.
  */
-export function spendingIn(spending: Spending, currency: Currency): Money | null {
+export function spendingIn(
+  spending: Pick<Spending, 'amount' | 'rate'>,
+  currency: Currency,
+): Money | null {
   const { amount, rate } = spending
   if (amount.currency === currency) return amount
   if (rate === null || (rate.base !== currency && rate.quote !== currency)) return null
