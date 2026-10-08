@@ -124,6 +124,7 @@ describe('an operation as its row says it', () => {
       place: null,
       source: null,
       counterpart: null,
+      transferId: null,
       ...patch,
     }
   }

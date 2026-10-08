@@ -50,6 +50,11 @@ export const spendingSchema = z
      * not the person's own rate: those drams were never in their hands.
      */
     debited: positiveMoneySchema.nullable(),
+    /**
+     * The transfer this spending is the fee of (MOL-253, Р-1): written, amended and removed with it,
+     * never through «Траты» on its own. Null for every spending the person wrote.
+     */
+    transferId: z.uuid().nullable(),
     revision: z.int().min(1),
     createdAt: z.date(),
     amendedAt: z.date().nullable(),

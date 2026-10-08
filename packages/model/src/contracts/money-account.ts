@@ -139,6 +139,11 @@ export const accountOperationViewCodec = z.strictObject({
   counterpart: z
     .strictObject({ accountId: z.uuid().nullable(), amount: signedMoneyCodec })
     .nullable(),
+  /**
+   * The transfer a spending is the fee of (MOL-253): its row opens the transfer's sheet. A default,
+   * so a page kept on the phone from before transfers still reads.
+   */
+  transferId: z.uuid().nullable().default(null),
 })
 export type AccountOperationView = z.output<typeof accountOperationViewCodec>
 
@@ -167,6 +172,7 @@ export function accountOperationViewOf(
     place: operation.details.place,
     source: operation.details.source,
     counterpart: operation.details.counterpart,
+    transferId: operation.details.transferId,
   }
 }
 

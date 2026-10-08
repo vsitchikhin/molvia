@@ -72,6 +72,20 @@ export const ERROR = {
   MONEY_ACCOUNT_CURRENCY: 'error.money_account_currency',
   /** The currency of an account that already has operations: they were counted in it (MOL-115). */
   MONEY_ACCOUNT_CURRENCY_LOCKED: 'error.money_account_currency_locked',
+  /** A transfer dated after the latest day anywhere on Earth (`latestDay`, MOL-253): the clock again. */
+  TRANSFER_IN_FUTURE: 'error.transfer_in_future',
+  /**
+   * A transfer that names an account it cannot move money on (MOL-253): not the owner's, marked for
+   * deletion, or of another currency than the money — given another on a second phone meanwhile. A
+   * transfer is written with a connection, never from a queue, so refusing loses nothing; written
+   * «без счёта», as an operation from the queue is (Р-28), it would be no transfer at all.
+   */
+  TRANSFER_ACCOUNT: 'error.transfer_account',
+  /**
+   * An amendment, removal or «Вернуть» of a transfer's fee through «Траты» (MOL-253, Р-5): the fee is
+   * written, amended and removed with its transfer, in its sheet, or the two would tell two stories.
+   */
+  SPENDING_OF_TRANSFER: 'error.spending_of_transfer',
   /** A code typed by hand not 8, 12 or 13 digits long — the lengths the scanner reads (MOL-98). */
   BARCODE_SHAPE: 'error.barcode_shape',
   /**
@@ -194,6 +208,10 @@ export const ISSUE = {
   ACCOUNT_START_NOT_OF_CURRENCY: 'issue.account_start_not_of_currency',
   /** «Списано со счёта» with no account to have been taken from (MOL-43 В-3). */
   DEBITED_WITHOUT_ACCOUNT: 'issue.debited_without_account',
+  /** A transfer from an account onto itself: nothing moved (MOL-253). */
+  TRANSFER_SAME_ACCOUNT: 'issue.transfer_same_account',
+  /** A transfer's fee in another currency than the money moved: it is taken from the source (MOL-253). */
+  TRANSFER_FEE_NOT_OF_CURRENCY: 'issue.transfer_fee_not_of_currency',
 } as const
 
 export type IssueCode = (typeof ISSUE)[keyof typeof ISSUE]

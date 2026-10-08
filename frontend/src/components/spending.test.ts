@@ -46,6 +46,7 @@ function spending(id: string, spentOn: string, price: string, note: string | nul
     rate: null,
     accountId: null,
     debited: null,
+    transferId: null,
     revision: 2,
     amendedAt: null,
   }

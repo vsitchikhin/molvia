@@ -651,6 +651,7 @@ export default defineComponent({
           rate: null,
           accountId: null,
           debited: null,
+          transferId: null,
           revision: 1,
           amendedAt: null,
         },
@@ -681,6 +682,7 @@ export default defineComponent({
             place: null,
             source: null,
             counterpart: null,
+            transferId: null,
             ...patch,
           },
           {

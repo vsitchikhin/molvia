@@ -53,6 +53,7 @@ function counted(month: string, groceries: bigint) {
         rate: null,
         accountId: null,
         debited: null,
+        transferId: null,
         revision: 1,
         createdAt: new Date(`${month}-10T10:00:00Z`),
         amendedAt: null,

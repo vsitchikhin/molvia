@@ -88,6 +88,7 @@ function month(spentOn: string): MoneyMonthView {
               rate: null,
               accountId: null,
               debited: null,
+              transferId: null,
               revision: 1,
               amendedAt: null,
             },

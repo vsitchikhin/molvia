@@ -131,6 +131,7 @@ export default defineComponent({
             rate: null,
             accountId: operation.accountId,
             debited: operation.debited,
+            transferId: operation.transferId,
             revision: operation.revision ?? 1,
             amendedAt: null,
           },

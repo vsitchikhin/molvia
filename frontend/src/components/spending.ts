@@ -241,6 +241,7 @@ function localView(
     rate: null,
     accountId: accountId ?? null,
     debited: debited ?? null,
+    transferId: null,
     revision: 1,
     amendedAt: null,
   }
@@ -391,6 +392,7 @@ export function refusedRows(
           rate: null,
           accountId: body.accountId === undefined ? (held?.accountId ?? null) : body.accountId,
           debited: body.debited ?? null,
+          transferId: null,
           revision: held?.revision ?? body.revision,
           amendedAt: null,
         },

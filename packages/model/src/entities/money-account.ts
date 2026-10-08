@@ -68,13 +68,21 @@ export interface MoneyAccountCheck {
   readonly createdAt: Date
 }
 
-export const ACCOUNT_OPERATION_KINDS = ['spending', 'income', 'exchange', 'trip'] as const
+export const ACCOUNT_OPERATION_KINDS = [
+  'spending',
+  'income',
+  'exchange',
+  'trip',
+  'transfer',
+] as const
 export type AccountOperationKind = (typeof ACCOUNT_OPERATION_KINDS)[number]
 
 /**
- * One movement of money as an account sees it. A spending, an income, one side of an exchange, or
- * a trip — each written by its own route and read here in one shape, so the balance, the journal,
- * the check and «не попали» read the same thing.
+ * One movement of money as an account sees it. A spending, an income, one side of an exchange, a
+ * trip, or one side of a transfer between one's own accounts (MOL-253) — each written by its own route
+ * and read here in one shape, so the balance, the journal, the check and «не попали» read the same
+ * thing. A transfer always has its account and its account's currency, so it is never a check's
+ * reason and never in «не попали»: it only moves the balance.
  *
  * `amounts` are signed, in the operation's own currencies: out is below zero. One for everything but
  * a trip, which moves a sum per currency its priced purchases were paid in, and none while nothing
@@ -85,7 +93,7 @@ export type AccountOperationKind = (typeof ACCOUNT_OPERATION_KINDS)[number]
 export interface AccountOperation {
   readonly kind: AccountOperationKind
   readonly id: string
-  /** Which half of an exchange this is; null for every other kind. */
+  /** Which half of an exchange or a transfer this is; null for every other kind. */
   readonly side: 'given' | 'received' | null
   /** A trip is dated by the day it started: the money left at the shelf (MOL-115, Р-29). */
   readonly day: string
@@ -133,8 +141,16 @@ export interface AccountOperationDetails {
   /** A spending's «где», a trip's shop. */
   readonly place: string | null
   readonly source: IncomeSource | null
-  /** The other half of an exchange: the account it came from or went to, and how much. */
+  /**
+   * The other half of an exchange or a transfer: the account it came from or went to, and how much.
+   * A transfer's fee names the account the transfer went to (MOL-253, handoff 03).
+   */
   readonly counterpart: { readonly accountId: string | null; readonly amount: Money } | null
+  /**
+   * The transfer a spending is the fee of (MOL-253, Р-1): its row says «Комиссия за перевод» and opens
+   * the transfer's sheet. Null for every other operation, and for a transfer itself, which is `id`.
+   */
+  readonly transferId: string | null
   /** A trip's purchases, priced or not. */
   readonly items: number | null
 }
@@ -359,11 +375,13 @@ export function operationKeyOf(operation: AccountOperation): JournalKey {
     day: operation.day,
     moment: operation.at.getTime(),
     // Both halves of an exchange may stand in one list — «не попали» — so each is named by its
-    // currency, as a trip's line of the month is.
+    // currency, as a trip's line of the month is; a transfer's halves share theirs, so by the side.
     id:
       operation.side === null || operation.amounts[0] === undefined
         ? operation.id
-        : `${operation.id}:${operation.amounts[0].currency}`,
+        : operation.kind === 'transfer'
+          ? `${operation.id}:${operation.side}`
+          : `${operation.id}:${operation.amounts[0].currency}`,
   }
 }
 

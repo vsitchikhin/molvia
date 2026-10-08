@@ -6,7 +6,9 @@ Rules: `.claude/rules/money-accounts.md`. A test beside its source, or mirroring
 ## packages/model
 
 - `packages/model/src/contracts/money-account.ts` — Wire schemas of «Счета»: account body and view, the page, journal and its cursor, «не попали», the check, the held hint, a trip's payment.
-- `packages/model/src/entities/money-account.ts` — Account entity and its counting: operations of four kinds, movement and «списано», balances, the check with its reasons, «не попали», held on a day.
+- `packages/model/src/contracts/transfer.ts` — Wire schemas of «Перевод» (MOL-253): the body and amendment — two accounts, the fee of the money's currency — one transfer's view, and the answer with «Счета» whole.
+- `packages/model/src/entities/money-account.ts` — Account entity and its counting: operations of five kinds — a transfer's two halves among them — movement and «списано», balances, the check with its reasons, «не попали», held on a day.
+- `packages/model/src/entities/transfer.ts` — Transfer entity (MOL-253): money moved between two of one's own accounts of one currency, its fee, its versions, the undo window.
 
 ## backend · routes
 

@@ -130,6 +130,7 @@ function spendingRow(id: string, amount: string, accountId: string | null): Acco
     place: null,
     source: null,
     counterpart: null,
+    transferId: null,
   }
 }
 

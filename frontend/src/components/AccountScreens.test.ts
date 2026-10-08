@@ -170,6 +170,7 @@ function taxi(): AccountOperationView {
     place: null,
     source: null,
     counterpart: null,
+    transferId: null,
   }
 }
 
