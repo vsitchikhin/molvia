@@ -5,7 +5,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 
 ## frontend · views
 
-- `frontend/src/views/KitView.vue` — Development-only kit page at `/_kit`: every kit component in its states, and a sheet in a real history for e2e.
+- `frontend/src/views/KitView.vue` — Development-only kit page at `/_kit`: every kit component in its states, and a sheet in a real history for e2e — a short one and one taller than its share, its footer pinned.
 
 ## frontend · components
 
@@ -17,7 +17,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/components/AppSwitch.vue` — Kit switch: a native checkbox read out as a switch, showing what the server holds and saying which way it was moved — for a setting saved on the tap; a ✓ on the knob when on, `inactive` focusable.
 - `frontend/src/components/AppTag.vue` — Kit tag in a row: a pill of 13/600, plain, warn or bad, with an optional icon of 14.
 - `frontend/src/components/AppScreen.vue` — The frame every screen sits in: pinned row, collapsing large title, back chevron with its label, docked strip with its margins, the one place of «Вернуть» (`#undo`), identity notice.
-- `frontend/src/components/BottomSheet.vue` — The sheet: a native modal `<dialog>` rising from the bottom, closed through its history entry; stacks with «‹» instead of ×; a live region of its own, where everything is said while it is up, since the app's is inert under it (MOL-181).
+- `frontend/src/components/BottomSheet.vue` — The sheet: a native modal `<dialog>` rising from the bottom, closed through its history entry; stacks with «‹» instead of ×; its footer pinned to its bottom edge, the content scrolling under it, its height less its bottom padding plus that padding in CSS the sheet's `scroll-padding`, let go with the content when it leaves no room for the field typed in (MOL-182); a live region of its own, where everything is said while it is up, since the app's is inert under it (MOL-181).
 - `frontend/src/components/FloatingDock.vue` — Floating spot for the main action of a «Деньги» screen not yet in the docked strip («Счёт», «Сверить», «Обмен», «Доход»); on its way out.
 - `frontend/src/components/ListRow.vue` — Kit row of a list, 64: icon (or in a circle of 40, `tint`), title, meta in two lines, a tag under it, a tail and the chevron of «opens something to go on with» (В-14); a button, a router link, a div or an `li` option of a list a field owns (no hover); destructive, inactive with words why, selected read out by its role, active under the keyboard; on the fill the meta is `text`.
 - `frontend/src/components/SearchField.vue` — Kit search field (MOL-177), the one for every search: a pill on `surface-2` with a magnifier, the screen's action or «Очистить» at the right, a hint under it; a combobox's role, `aria-*` and keys land on its input; `focus()` and `blur()` for its owner.
@@ -41,7 +41,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/composables/useBackLabel.ts` — Composable: which back label fits the row (parent's title, «Back», or the chevron alone), measured by a resize observer.
 - `frontend/src/composables/useCollapsed.ts` — Composable: whether the large title has scrolled past the pinned row (sentinel observer), and an element's live height.
 - `frontend/src/composables/useColorScheme.ts` — Composable: the scheme of this device (`molvia.scheme`) — kept, drawn on the root and in the status bar's theme colours, followed from other windows; the script in `index.html` reads it before the first paint (MOL-111).
-- `frontend/src/composables/useKeyboardInset.ts` — Composable: lifts an open sheet above the iOS on-screen keyboard from the box it is pinned in and sizes it by the visual viewport (`--keyboard-inset`, `--viewport-height`), taking the height the keys left last time before they come (`molvia.keyboard`); scrolls the sheet to the field typed in when the sheet moves; hides the page under the keys (`data-under-keys`).
+- `frontend/src/composables/useKeyboardInset.ts` — Composable: lifts an open sheet above the iOS on-screen keyboard from the box it is pinned in and sizes it by the visual viewport (`--keyboard-inset`, `--viewport-height`), taking the height the keys left last time before they come (`molvia.keyboard`); scrolls the sheet to the field typed in when the sheet moves, its pinned footer grows or a field is focused under it, above the footer (`scroll-padding`); hides the page under the keys (`data-under-keys`).
 - `frontend/src/composables/useLocalDay.ts` — Composable: the phone's today as a screen holds it, asked again when the app comes back into view or online (MOL-121).
 - `frontend/src/composables/useReconnect.ts` — Composable: calls a screen's retry when the connection may be back — `online` or the app coming into view.
 - `frontend/src/composables/useSheetDrag.ts` — Composable: a sheet pulled down from the top of its content follows the finger and closes past a quarter or on a flick.

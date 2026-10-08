@@ -1032,6 +1032,64 @@ The detail behind the frontend lines of `CLAUDE.md`.
   makes itself — a second Esc. **The sheet is the one exception to «only the
   page scrolls»**: a panel over the screen has no window of its own, so it scrolls itself and
   the page under it is held still.
+- **A sheet's footer is pinned to its bottom edge, and the content scrolls under it** (MOL-182, Н-20, Ф-17).
+  It had been the content's last row: under fifteen chips «Сохранить» stood below the edge, and in the edit
+  of an account the button was cut by it. **Sticky in the sheet's own scroll** (`position: sticky;
+bottom: 0`), a sibling of the panel and as wide as the sheet — never a middle of its own between a
+  header and the footer: the pull down reads the dialog's `scrollTop` (MOL-80), and the lift, the height
+  and `reveal` measure the dialog (MOL-135, MOL-151), so with sticky none of them changed. `--surface`, a
+  hairline over it and the sheet's shadow, always, a short sheet's too (every handoff draws it so); the
+  margins of the screen's docked strip (К-9) — 12 over the indicator, **12 over the keys**, where the
+  indicator lies under them (`html[data-under-keys] &` — never `:global()`, which in a scoped style
+  replaces the whole selector and gave the rule to `html` itself). 24 between the content and the footer.
+  **The edge of what is in sight is the footer's top**: the sheet's `scroll-padding-bottom`, which the
+  browser's own focus goes by — a field reached by Tab stood under the footer without it — and `reveal`
+  reads, so one value is the edge for both. **The footer's height is measured less its bottom padding**
+  (`--sheet-footer-height`, `useHeight`), and the stylesheet adds that padding to the edge itself, with
+  the indicator or, over the keys, without it: the keys take the indicator's 34 off the footer and off
+  the edge in one style change. Measured whole, the edge lagged a render behind the footer, and
+  `reveal` called as the keys came set the field 34 over the footer (review С-8). **WebKit does not always honour it on a focus** (CI,
+  Linux: the field stayed 11 px under the footer): a field typed in that is focused under the footer —
+  Tab, or «∨» over the iOS keys stepping to the next one — is brought above it two frames later, once
+  the browser's own scroll is done, and a field it already showed is not moved; only with a footer —
+  without one the browser's scroll is the whole answer (MOL-135, adversarial А). **A footer that grows over the field typed in** — an error,
+  «Вернуть» — moves that edge up as a lower sheet would, and the field is brought back above it; only a
+  field typed in, only in an open sheet. **A footer is let go only when it leaves no room for the field typed in, in a sheet that scrolls**
+  (`loose`, adversarial А1, round 2): over the keys of a turned phone the sheet has some 107 px, and
+  the edit of a spending a footer of 121 — pinned, it covered the whole sheet and the sum being typed
+  with it; the kit's one button, 77, left 29 px of a field of 44. Let go, it goes with the content as
+  before MOL-182, without its shadow, and the field is kept in the whole sheet; the edge `reveal` goes
+  by is then nothing, so a footer let go or pinned again brings the field typed in back into sight.
+  **Never by a share of the sheet**: half of it, the first answer, let go the footer of an account's
+  edit over the keys held upright (324 and 167) — «Сохранить» below the edge as the name is typed,
+  the very sheet the task began with — and an error come into a footer near half (a conflict of an
+  exchange, 168 of 281) let it go under the finger, the error and the button pressed out of sight
+  (Р2-А1, Р2-А2); and a short sheet that does not scroll hides nothing under its footer, which keeps
+  its shadow on every phone (С-11). **The room asked for is the field's line** (round 3, Р3-А1): a
+  field of one line whole — its height is the kit's, and its line plus padding is less (30 of the
+  price's 44, which the turned phone of А1 then left 29 of) — and of a textarea or an editable block
+  one line with its padding and edge: asked to stand whole, the five lines of «Написать разработчику»
+  (147) let go the footer of a failure to send on an iPhone SE (150 over 131), the failure and
+  «Повторить» out of sight. **A line, not the caret's line — the price, named** (review С-13): `reveal`
+  shows a field taller than the room from its top, and a caret at the end of a long message may stand
+  under the footer until a key is pressed; Chromium then brings it above by `scroll-padding`, WebKit,
+  which does not always honour it, may not. On the SE of Р3-А1 the last line goes 4 px under the
+  footer, its letters in sight; with less room the end of the field and its caret may go under it. The field is the
+  one `typedIn` names, as for `reveal`; settled on
+  every resize of the sheet or the footer, read where they lie, and on every focus that lands in the
+  sheet or leaves it — a step from one field to the next is settled once, by the field it lands on.
+  No field typed in, the footer stays pinned however little room it leaves: nobody is typing, and
+  the keys are down. **Nothing of the sheet stands after the footer in the flow**:
+  its live region, visually hidden after it, made a pixel more to scroll, and at the end the pinned
+  footer stopped a pixel over the edge — the region is put at the top (`top: 0`). The header is not
+  pinned (owner's В-1 «а», against 147): over the keys of an iPhone 13 a sheet has some 334 px, the
+  footer takes 76, and a pinned header 76 more of what the fields need. What a footer holds is the
+  sheet's, each with its own spacing; the height stays 82 % (Р-20). **The price, named** (review С-9):
+  the second actions of a footer are pinned too — the edit of a spending holds «Сохранить» 52 and
+  «Удалить» 44, a footer of 121 over the keys and 155 over the indicator, which leaves some 213 of the
+  334 to the header and the fields; whether a second action stays in the pinned footer is a question of
+  the kit's, not of this rule. `/_kit` «Длинная шторка» and
+  `e2e/sheet.spec` hold it on `phone` and `iphone`; the keys are set by hand, as for MOL-135.
 - **Over the iOS keyboard the sheet's height is a share of the visual viewport's own height**
   (`--viewport-height`, MOL-135), never worked out from the window. Measured on the owner's iPhone,
   Safari: with the keyboard up the window shrank to the visible part (`innerHeight` 699 → 395),
@@ -1060,7 +1118,7 @@ The detail behind the frontend lines of `CLAUDE.md`.
   Safari does not zoom in on a focus here (no field is under 16px), so it takes a pinch by hand while
   typing. With no keyboard, and on Android where `resizes-content` shrinks the window and `dvh`
   together, the height is what it was. Playwright has no iOS keyboard: e2e replaces `visualViewport`
-  before the app loads (`fakeKeyboard` in `money.spec.ts`) — keys over an unshrunk window, with the
+  before the app loads (`fakeKeyboard`, `e2e/keyboard.ts`) — keys over an unshrunk window, with the
   visible part said to be as far down as Safari says it, another geometry with the same faults, since
   a Chromium window cannot shrink without its `dvh`; the numbers measured on the iPhone are held by a
   unit test. On the device the spending sheet was checked; the

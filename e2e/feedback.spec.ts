@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { exportFileCodec } from '@molvia/model'
 import type { ExportFile } from '@molvia/model'
+import { fakeKeyboard } from './keyboard'
 import { asBrowser, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -310,4 +311,51 @@ test('a screenshot taken away before sending does not go', async ({ page }) => {
   await expect(sheet.getByText('Спасибо, прочитаем', { exact: true })).toBeVisible()
 
   expect(await written(page)).toMatchObject([{ text: 'Цены в рублях', pictures: [] }])
+})
+
+// A failure to send, the message still typed in over the keys of an iPhone SE: the footer grows from
+// 77 to 150 with the note and «Повторить», and leaves 131 over it. The message is five lines, 147 —
+// asked to stand whole, it let the footer go, the failure and «Повторить» out of sight (MOL-182,
+// adversarial round 3, Р3-А1). A line of it has room, and the footer stays pinned. iOS gives a tapped
+// button no focus, so the press is a script's: the message keeps the focus, as on the phone.
+test('a failure to send over the keys keeps the footer pinned, it and «Повторить» in sight (MOL-182)', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 647 })
+  const keyboard = await fakeKeyboard(page)
+  await signedIn(page, '/settings')
+  await page.getByRole('button', { name: 'Написать разработчику' }).click()
+  const sheet = page.getByRole('dialog')
+  await expect(sheet).toBeVisible()
+  await page.waitForTimeout(400)
+  await sheet.getByText('Идея', { exact: true }).click()
+  const message = sheet.getByLabel('Сообщение')
+  await message.fill('Список своих магазинов')
+  await message.focus()
+  await keyboard(647 - 343, 647 - 343)
+  await page.route('**/api/feedback', (route) => route.fulfill({ status: 500, body: '{}' }))
+  await sheet.getByRole('button', { name: 'Отправить' }).evaluate((button: HTMLElement) => {
+    button.click()
+  })
+  await expect(sheet.getByText('Не получилось отправить', { exact: true })).toBeAttached()
+  await expect
+    .poll(() =>
+      sheet.evaluate((dialog) => {
+        const box = dialog.getBoundingClientRect()
+        const note = dialog.querySelector('.footer [role="alert"]')
+        const button = dialog.querySelector('.footer button')
+        if (!note || !button) throw new Error('no failure or no button in the footer')
+        const sees = (element: Element) => {
+          const rect = element.getBoundingClientRect()
+          return rect.top >= box.top && rect.bottom <= box.bottom + 0.5
+        }
+        return {
+          typing: document.activeElement === dialog.querySelector('textarea'),
+          pinned: dialog.classList.contains('pinned'),
+          failure: sees(note),
+          retry: sees(button),
+        }
+      }),
+    )
+    .toEqual({ typing: true, pinned: true, failure: true, retry: true })
 })
