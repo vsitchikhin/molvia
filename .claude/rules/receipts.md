@@ -230,8 +230,11 @@ when. The item itself is shared on one word: «at this seller this article is mi
 the copy carries the person's own words.
 
 **A person's word is what their last line still there says** (MOL-240, owner's В-1 «а» on adversarial
-А1, round 3): its item, its shelf price when it was recorded as read (`asRead`, recomputed from the line
-and its purchase) and the moment of its record — or no word once no line says it. A purchase removed, or
+А1, round 3): its item, its shelf price when «Записать» recorded it as read (`receipt_lines.as_read`, judged
+once at the record — round 4, Р4-1: judged again from the purchase as it is now, a sum put right later,
+a discount at the till, wiped the shelf price at the next deploy) and the moment of its record — the
+record's transaction time, `now()`, both for `recorded_at` and the word's `written_at`, so a word
+settled from the very line that wrote it moves nothing (Р4-1б) — or no word once no line says it. A purchase removed, or
 its trip removed for good, settles the words of its line by every path that deletes them: «Удалить
 позицию», the minute timer, and the final removal «Начать» and a receipt's record make of a trip past its
 ten minutes (`forgetWordsOf`, before the delete, in its transaction). A line of a trip only marked removed
@@ -244,9 +247,13 @@ it while an older one stands behind the key — left alone, the word carried the
 and moment (Р3-1), and deleted, it lost the item the older purchase says (Р3-2). **Under the person's
 lock** (`store_memory`, per actor, taken last — after the trip's row or the owner's lock — and by
 `remember` too): two removals at once each saw the other's line, and the word outlived both (Р3-3).
-**Settled whole at the API's start** (`settleStoreMemory`, after `rekeyItems`): 0060 deleted the lines of
-purchases removed before it, and a text key is `toSearchKey`, which no migration can compute (Р3-4); it
-also settles what an image rolled back removed without settling. Settling never inserts a word. The price:
+**Settled whole once the API listens** (`settleStoreMemory`): 0060 deleted the lines of purchases removed
+before it, and a text key is `toSearchKey`, which no migration can compute (Р3-4); it also settles what an
+image rolled back removed without settling. **Never on the way to `listen`** (round 4, Р4-2): every pair of
+person and seller in one `in (…)` overflowed the parser's stack from some 8 000 pairs, and the API did not
+start at all — so a person at a time, by their id alone, each in a transaction of their own under their
+lock, beside whatever writes meanwhile; a failure is reported (`job:store-memory`), never fatal. A removal
+reads only the sellers of its lines. Settling never inserts a word. The price:
 a trip removed as a duplicate forgets its words until that article is recorded again. **This is not
 erasure**: the erased leave their words without a name, still counted (MOL-58) — a person leaving is not
 a person taking a purchase back.

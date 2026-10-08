@@ -598,7 +598,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
   people said, the later on a tie; the erased still count; nobody's word is shown as someone's, and
   another person's shelf price only with access and from three prices, their lower median. **A person's word
   is what their last line still there says** (MOL-240): settled on every path that deletes a purchase,
-  under the person's lock, and whole at the API's start.
+  under the person's lock, and whole once the API listens — never on its way there.
 - **A place keeps no tax number**: the place of a seller is where its receipts were recorded, read as
   the memory is; a recorded receipt is not removed while its trip is there — its row dates the trip.
 - **On the phone (MOL-127) a receipt is the country's version, never a flag** (Р-1); its photo is
