@@ -1054,7 +1054,14 @@ bottom: 0`), a sibling of the panel and as wide as the sheet — never a middle 
   the browser's own scroll is done, and a field it already showed is not moved; only with a footer —
   without one the browser's scroll is the whole answer (MOL-135, adversarial А). **A footer that grows over the field typed in** — an error,
   «Вернуть» — moves that edge up as a lower sheet would, and the field is brought back above it; only a
-  field typed in, only in an open sheet. **Nothing of the sheet stands after the footer in the flow**:
+  field typed in, only in an open sheet. **A footer taller than half the sheet is not pinned** (`loose`, adversarial А1): over the keys
+  of a turned phone the sheet has some 107 px, and the edit of a spending a footer of 121 — pinned, it
+  covered the whole sheet and the sum being typed with it; the kit's one button, 77, left 29 px of a
+  field of 44. Let go, it goes with the content as before MOL-182, without its shadow, and the field is
+  kept in the whole sheet; the edge `reveal` goes by is then nothing, so a footer let go or pinned again
+  brings the field typed in back into sight. Half, since a footer that covers more hides more than it
+  shows; read from the sheet and the footer where they lie, whenever either is resized — upright over
+  the keys (334 and 121) it stays pinned. **Nothing of the sheet stands after the footer in the flow**:
   its live region, visually hidden after it, made a pixel more to scroll, and at the end the pinned
   footer stopped a pixel over the edge — the region is put at the top (`top: 0`). The header is not
   pinned (owner's В-1 «а», against 147): over the keys of an iPhone 13 a sheet has some 334 px, the
@@ -1093,7 +1100,7 @@ bottom: 0`), a sibling of the panel and as wide as the sheet — never a middle 
   Safari does not zoom in on a focus here (no field is under 16px), so it takes a pinch by hand while
   typing. With no keyboard, and on Android where `resizes-content` shrinks the window and `dvh`
   together, the height is what it was. Playwright has no iOS keyboard: e2e replaces `visualViewport`
-  before the app loads (`fakeKeyboard` in `money.spec.ts`) — keys over an unshrunk window, with the
+  before the app loads (`fakeKeyboard`, `e2e/keyboard.ts`) — keys over an unshrunk window, with the
   visible part said to be as far down as Safari says it, another geometry with the same faults, since
   a Chromium window cannot shrink without its `dvh`; the numbers measured on the iPhone are held by a
   unit test. On the device the spending sheet was checked; the
