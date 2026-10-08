@@ -42,13 +42,13 @@ export const ERASED_TABLES = [
   'verdicts',
   'events',
   'feedback',
+  'receipts',
   'expenses',
   'trips',
   'exchanges',
   'incomes',
   'spendings',
   'account_transfers',
-  'receipts',
   'budget_plans',
   'spending_categories',
   'money_month_rates',
@@ -199,6 +199,12 @@ export function createErasureRepository(db: Db): ErasureRepository {
             erased.feedback = await count(
               sql`delete from feedback where actor_id = ${actorId} returning 1`,
             )
+            // Receipts photographed (MOL-125), removed ones too: the photo, the lines read and the
+            // lines cut out for the reader's training go by the cascade — part of a receipt. Before
+            // the trips, whose cascade takes a recorded one uncounted (MOL-240).
+            erased.receipts = await count(
+              sql`delete from receipts where actor_id = ${actorId} returning 1`,
+            )
             // The cascade from `trips` would take these anyway; deleted first so they are counted.
             erased.expenses = await count(sql`
               delete from expenses
@@ -227,11 +233,6 @@ export function createErasureRepository(db: Db): ErasureRepository {
             // fees, so those are counted as spendings; their versions go by the cascade.
             erased.account_transfers = await count(
               sql`delete from account_transfers where actor_id = ${actorId} returning 1`,
-            )
-            // Receipts photographed (MOL-125), removed ones too: the photo, the lines read and the
-            // lines cut out for the reader's training go by the cascade — part of a receipt.
-            erased.receipts = await count(
-              sql`delete from receipts where actor_id = ${actorId} returning 1`,
             )
             // The plans of «Бюджет» (MOL-117) point at the categories, so they go before them.
             erased.budget_plans = await count(
