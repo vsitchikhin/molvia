@@ -1,18 +1,15 @@
 <template>
   <nav :aria-label="t('spending.entries_label')">
     <AppCard list>
-      <RouterLink
+      <NavRow
         v-for="row in rows"
         :key="row.key"
-        class="entry"
         :to="row.to"
+        :label="row.name"
+        :value="row.value ?? ''"
+        :icon="row.icon"
         :aria-label="row.value ? t('spending.entry_value', row) : undefined"
-      >
-        <component :is="row.icon" class="entry-icon" aria-hidden="true" />
-        <span class="entry-label">{{ row.name }}</span>
-        <span v-if="row.value" class="entry-value" aria-hidden="true">{{ row.value }}</span>
-        <IconChevron class="entry-chevron" aria-hidden="true" />
-      </RouterLink>
+      />
     </AppCard>
   </nav>
 </template>
@@ -24,19 +21,18 @@ import type { RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import IconBank from '~icons/mdi/bank-outline'
 import IconCashPlus from '~icons/mdi/cash-plus'
-import IconChevron from '~icons/mdi/chevron-right'
 import IconList from '~icons/mdi/format-list-bulleted'
 import IconShape from '~icons/mdi/shape-outline'
 import IconSwap from '~icons/mdi/swap-horizontal'
 import IconTarget from '~icons/mdi/target'
 import AppCard from '@/components/AppCard.vue'
+import NavRow from '@/components/NavRow.vue'
 
 /** The one figure of each row, or null until it is known — the row is a way in either way. */
 export interface EntryValues {
   readonly spendings: string | null
   /** «осталось 118 700 ֏», «сверх плана …», «не задан» (MOL-117, В-3). */
   readonly budget: string | null
-  readonly accounts: string | null
   /** The person's own rate; the central bank's is not «my rate», so none says nothing (MOL-81). */
   readonly rate: string | null
   readonly incomes: string | null
@@ -46,7 +42,6 @@ export interface EntryValues {
 const NONE: EntryValues = {
   spendings: null,
   budget: null,
-  accounts: null,
   rate: null,
   incomes: null,
   categories: null,
@@ -54,18 +49,23 @@ const NONE: EntryValues = {
 
 /**
  * The ways out of «Деньги» (MOL-159, handoff MOL-157 01): «Траты» and «Бюджет» of the month shown
- * (MOL-117, В-3), then what is «now» and not the month's — «Счета», «Обмен денег», «Доходы»,
- * «Категории» — each with one figure, all of them from answers the screen already has. A newcomer
- * has no «Траты»: nothing to see there; «Бюджет» stands, since a plan may come before a spending.
+ * (MOL-117, В-3), then what is «now» and not the month's — «Обмен денег», «Доходы», «Категории» —
+ * each with one figure, all of them from answers the screen already has; rows of the kit (`NavRow`).
+ * A newcomer has no «Траты»: nothing to see there; «Бюджет» stands, since a plan may come before a
+ * spending. **«Счета» stands here only while «На счетах сейчас» does not** (MOL-183, С-10): with no
+ * live account, or no answer of «Счета» at all, that card is not there, and the way to the accounts
+ * must not go with it — one way, one button.
  */
 export default defineComponent({
   name: 'MoneyEntries',
-  components: { AppCard, IconChevron },
+  components: { AppCard, NavRow },
   props: {
     /** The month «Траты» open on, the one on screen; null — the running one. */
     month: { type: String as PropType<string | null>, default: null },
     values: { type: Object as PropType<EntryValues>, default: () => NONE },
     spendings: { type: Boolean, default: true },
+    /** «Счета» among the rows: «На счетах сейчас» is not over the switcher. */
+    accounts: { type: Boolean, default: false },
   },
   setup(props) {
     const { t } = useI18n()
@@ -97,7 +97,7 @@ export default defineComponent({
         {
           key: 'accounts',
           name: t('accounts.title'),
-          value: props.values.accounts,
+          value: null,
           icon: markRaw(IconBank),
           to: { name: 'money-accounts' },
         },
@@ -123,55 +123,13 @@ export default defineComponent({
           to: { name: 'money-categories' },
         },
       ]
-      return props.spendings ? all : all.filter((row) => row.key !== 'spendings')
+      return all.filter(
+        (row) =>
+          (props.spendings || row.key !== 'spendings') &&
+          (props.accounts || row.key !== 'accounts'),
+      )
     })
     return { t, rows }
   },
 })
 </script>
-
-<style scoped lang="scss">
-.entry {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--touch-target-lg);
-  padding: 0 var(--space-3) 0 var(--space-4);
-  color: inherit;
-  text-decoration: none;
-
-  &:hover {
-    background: var(--surface-2);
-  }
-
-  &:focus-visible {
-    @include focus-ring(-2px);
-  }
-}
-
-.entry-icon {
-  @include icon;
-
-  font-size: var(--icon-md);
-  color: var(--text-muted);
-}
-
-.entry-label {
-  flex: 1;
-  min-width: 0;
-}
-
-.entry-value {
-  color: var(--text-muted);
-  font-size: var(--text-callout);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.entry-chevron {
-  @include icon;
-
-  font-size: var(--icon);
-  color: var(--text-muted);
-}
-</style>

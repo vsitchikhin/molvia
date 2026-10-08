@@ -941,7 +941,7 @@ describe('MoneyChartsView (MOL-158): «Месяц»', () => {
     expect(view.find('.ring').exists()).toBe(false)
   })
 
-  it('a month before the first with data is a grey ring, not the offer to a newcomer (adversarial К)', async () => {
+  it('a month before the first with data is the dashed ring, not the offer to a newcomer (adversarial К)', async () => {
     moneyChartMonth.mockResolvedValue(
       monthCharts({
         month: '2026-05',
@@ -957,7 +957,8 @@ describe('MoneyChartsView (MOL-158): «Месяц»', () => {
     )
     const view = await render('/money/charts?month=2026-05')
     expect(view.text()).not.toContain(en.spending.charts.empty.title)
-    expect(view.findAll('.ring .arc')).toHaveLength(1)
+    expect(view.findAll('.ring .arc')).toHaveLength(0)
+    expect(view.findAll('.ring circle.none')).toHaveLength(1)
     expect(plain(view.text())).toContain('None is closed before May.')
   })
 
@@ -1066,13 +1067,14 @@ describe('MoneyChartsView (MOL-158): «Месяц»', () => {
     expect(moneyChartMonth).toHaveBeenCalledWith(localDay().slice(0, 7))
   })
 
-  it('a month with nothing spent, after months that were, is a grey ring of nothing', async () => {
+  it('a month with nothing spent, after months that were, is the dashed ring of nothing (MOL-183)', async () => {
     moneyChartMonth.mockResolvedValue(
       monthCharts({ spent: amd('0'), spentIncome: rub('0'), slices: [] }),
     )
     const view = await render(SEPTEMBER)
     expect(plain(view.find('.center').text())).toContain('֏0')
-    expect(view.findAll('.ring .arc')).toHaveLength(1)
+    expect(view.findAll('.ring .arc')).toHaveLength(0)
+    expect(view.findAll('.ring circle.none')).toHaveLength(1)
     expect(view.find('fieldset.legend').exists()).toBe(false)
   })
 

@@ -55,10 +55,19 @@ function card(value: string, slices = SEPTEMBER) {
   })
 }
 
-/** One sector of the whole ring, in the colour of an empty one. */
-function greyRing(wrapper: ReturnType<typeof card>): boolean {
-  const fills = wrapper.findAll('.ring path').map((path) => path.attributes('fill'))
-  return fills.length === 1 && fills[0] === 'var(--surface-2)'
+/** The dashed ring of «no data» (MOL-183, С-13): no sector drawn, the one circle in its place. */
+function noData(wrapper: { findAll: ReturnType<typeof card>['findAll'] }): boolean {
+  return (
+    wrapper.findAll('.ring path').length === 0 && wrapper.findAll('.ring circle.none').length === 1
+  )
+}
+
+function mounted(value: MoneyMonthView, props: Record<string, unknown> = {}) {
+  const router = createRouter({ history: createMemoryHistory(), routes })
+  return mount(CategoryDonutCard, {
+    props: { month: value, nameOf: () => '', ...props },
+    global: { plugins: [router, createAppI18n('ru')] },
+  })
 }
 
 beforeEach(() => {
@@ -95,6 +104,20 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
       'var(--cat-own-3)',
       'var(--border-strong)',
     ])
+  })
+
+  it('names a sector whole, on as many lines as it takes (Е-19)', () => {
+    const long = 'Аренда, коммунальные услуги и интернет'
+    const wrapper = mount(CategoryDonutCard, {
+      props: {
+        month: month('2026-09'),
+        nameOf: (category) => (category.id === TELECOM ? long : ''),
+      },
+      global: {
+        plugins: [createRouter({ history: createMemoryHistory(), routes }), createAppI18n('ru')],
+      },
+    })
+    expect(wrapper.find('.sector-name').text()).toBe(long)
   })
 
   it('leaves out a sector of no level, and has no «Ещё» for three or fewer', () => {
@@ -150,7 +173,7 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
     ])
   })
 
-  it('says beside a grey ring why there are no sectors when the month has categories (round 2, Е)', () => {
+  it('says beside the dashed ring why there are no sectors when the month has categories (round 2, Е)', () => {
     // A month kept before the ring, or an answer of a server older than it: the phone adds nothing up.
     const kept = {
       ...month('2026-09', []),
@@ -162,12 +185,12 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
       props: { month: kept, nameOf: () => '' },
       global: { plugins: [router, createAppI18n('ru')] },
     })
-    expect(greyRing(wrapper)).toBe(true)
+    expect(noData(wrapper)).toBe(true)
     expect(wrapper.find('.figure .why').text()).toBe('Доли появятся, когда месяц обновится')
     expect(wrapper.find('a').attributes('href')).toBe('/money/charts?month=2026-09')
   })
 
-  it('says beside a grey ring why there are no sectors when nothing was counted (round 2, Ж)', () => {
+  it('says beside the dashed ring why there are no sectors when nothing was counted (round 2, Ж)', () => {
     const coffee = {
       ...month('2026-09', []),
       byCategory: [],
@@ -178,38 +201,68 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
       props: { month: coffee, nameOf: () => '' },
       global: { plugins: [router, createAppI18n('ru')] },
     })
-    expect(greyRing(wrapper)).toBe(true)
+    expect(noData(wrapper)).toBe(true)
     expect(wrapper.find('.figure .why').text()).toBe('Доли появятся, когда у трат будет курс')
+    // Something was spent: «0 ֏» in the ring would not be true.
+    expect(wrapper.find('.zero').exists()).toBe(false)
   })
 
-  it('stays a way into «Графики» on an empty month, a grey ring (handoff 01, adversarial Г, MOL-160 В-4)', () => {
-    const empty = { ...month('2026-09', []), byCategory: [], uncounted: [], days: [], remaining: 0 }
-    const router = createRouter({ history: createMemoryHistory(), routes })
-    const wrapper = mount(CategoryDonutCard, {
-      props: { month: empty, nameOf: () => '' },
-      global: { plugins: [router, createAppI18n('ru')] },
+  // MOL-183, С-13, handoff MOL-157 v2 «Месяц без трат»: the same card, the dashed ring and «0 ֏».
+  describe('a month with nothing spent', () => {
+    const empty = () =>
+      ({
+        ...month('2026-10', []),
+        spent: amd('0'),
+        byCategory: [],
+        uncounted: [],
+        days: [],
+        remaining: 0,
+      }) as MoneyMonthView
+
+    it('the running one: «В октябре трат пока нет», and the card is named so', () => {
+      const wrapper = mounted(empty(), { running: true })
+      expect(wrapper.find('a').attributes('href')).toBe('/money/charts?month=2026-10')
+      // Every new month is empty until its first spending: a caption over a hole drew the card askew.
+      expect(noData(wrapper)).toBe(true)
+      expect(wrapper.find('.zero').text().replace(/\s/g, ' ')).toBe('0 ֏')
+      expect(wrapper.find('.why-title').text()).toBe('В октябре трат пока нет')
+      expect(wrapper.find('.why-body').text()).toBe(
+        'Доли появятся с первой тратой. Год — в «Графиках»',
+      )
+      expect(wrapper.find('a').attributes('aria-label')).toBe(
+        'Куда ушли: в октябре трат пока нет. Открыть графики',
+      )
+      expect(wrapper.find('.rest').exists()).toBe(false)
+      // No button and no colour inside: the one action is the strip's (Ф-16, Ф-28).
+      expect(wrapper.findAll('button')).toHaveLength(0)
     })
-    expect(wrapper.find('a').attributes('href')).toBe('/money/charts?month=2026-09')
-    // Every new month is empty until its first spending: a caption over a hole drew the card askew.
-    expect(greyRing(wrapper)).toBe(true)
-    // With the journal gone to «Траты», the card says it, once (MOL-159, handoff MOL-157 01).
-    expect(wrapper.find('.figure .why').text()).toBe('В этом месяце трат нет')
-    expect(wrapper.find('.rest').exists()).toBe(false)
-  })
 
-  it("keeps the grey ring and says nothing while the month's only spending waits on the phone", () => {
-    const waiting = { ...month('2026-09', []), byCategory: [], uncounted: [], days: [] }
-    const router = createRouter({ history: createMemoryHistory(), routes })
-    const wrapper = mount(CategoryDonutCard, {
-      props: { month: waiting, nameOf: () => '', unsent: 1 },
-      global: { plugins: [router, createAppI18n('ru')] },
+    it('a closed one keeps «В этом месяце трат нет» in the same ring', () => {
+      const wrapper = mounted({ ...empty(), month: '2026-08' })
+      expect(noData(wrapper)).toBe(true)
+      expect(wrapper.find('.zero').exists()).toBe(true)
+      expect(wrapper.find('.why-title').text()).toBe('В этом месяце трат нет')
+      expect(wrapper.find('.why-body').exists()).toBe(false)
     })
-    expect(greyRing(wrapper)).toBe(true)
-    expect(wrapper.find('.why').exists()).toBe(false)
+
+    it('its first spending on its way: «Первая трата октября отправляется»', () => {
+      const wrapper = mounted(empty(), { running: true, pending: 1 })
+      expect(noData(wrapper)).toBe(true)
+      expect(wrapper.find('.why-title').text()).toBe('Первая трата октября отправляется')
+      expect(wrapper.find('.why-body').text()).toBe(
+        'Доли появятся, когда она дойдёт. Год — в «Графиках»',
+      )
+    })
+
+    it('must not fire: a refused spending of it is said by its own card, not here', () => {
+      const wrapper = mounted(empty(), { running: true, refused: 1 })
+      expect(noData(wrapper)).toBe(true)
+      expect(wrapper.find('.why').exists()).toBe(false)
+    })
   })
 
-  it('draws a grey ring when every sector of the month has no level', () => {
+  it('draws the dashed ring when every sector of the month has no level', () => {
     const wrapper = card('2026-09', [{ categoryId: TELECOM, amount: amd('0'), count: 1, level: 0 }])
-    expect(greyRing(wrapper)).toBe(true)
+    expect(noData(wrapper)).toBe(true)
   })
 })

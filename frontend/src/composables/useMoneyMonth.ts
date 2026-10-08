@@ -25,6 +25,8 @@ export interface MoneyMonth {
   readonly month: ComputedRef<MoneyMonthView | null>
   readonly stale: ComputedRef<MoneyStale | null>
   readonly fetchedAt: ComputedRef<Date | null>
+  /** How many reads failed: a strip of «сервер не ответил» says its words again on a new one (C1). */
+  readonly attempt: ComputedRef<number>
   /** When the read of the month on screen set out (MOL-151, adversarial Б1). */
   readonly askedAt: ComputedRef<Date | null>
   /** The owner's categories: this month's answer's, or those of the newest month kept. */
@@ -136,6 +138,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
   const failure = ref<'offline' | 'error' | null>(null)
   const confirmed = ref(false)
   const more = ref<'idle' | 'loading' | 'failed'>('idle')
+  const failed = ref(0)
   /** How many pages the person had open, to read that many again after a write lands. */
   let pages = 1
 
@@ -193,6 +196,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
       if (actor.id !== id || selected.value !== month || mine !== latest) return
       // Decided after the failure, never before the request (MOL-19, A1).
       failure.value = navigator.onLine ? 'error' : 'offline'
+      failed.value += 1
     }
   }
 
@@ -270,6 +274,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
       return failure.value ?? 'loading'
     }),
     fetchedAt: computed(() => shown.value?.fetchedAt ?? null),
+    attempt: computed(() => failed.value),
     askedAt: computed(() => shown.value?.askedAt ?? shown.value?.fetchedAt ?? null),
     knownCategories: computed(() => shown.value?.answer.categories ?? kept.value),
     todayRate: computed(() =>
