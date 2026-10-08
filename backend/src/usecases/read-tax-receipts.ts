@@ -8,6 +8,7 @@ import {
   serbianJournal,
   serbianReceiptLink,
   serbianShopOf,
+  specificationCodes,
 } from '@molvia/model'
 import type { ReceiptLine } from '@molvia/model'
 import { z } from 'zod'
@@ -25,10 +26,11 @@ export interface ReadTaxReceiptsDeps {
     'requeueInterruptedLinks' | 'claimLink' | 'releaseLink' | 'askLater' | 'finish'
   >
   readonly purs: Purs
-  /** The lines to items: `bindReceiptLines`, one binding for each line in order. */
+  /** The lines to items: `bindReceiptLines`, one binding for each line in order, by its code first. */
   readonly bind: (
     claimed: ClaimedLink,
     lines: readonly ReceiptLine[],
+    codes: readonly (string | null)[],
   ) => Promise<readonly LineBinding[]>
   /** What happened, for the log: never the link, the seller or a line (MOL-58, MOL-232). */
   readonly report: (event: TaxReport) => void
@@ -47,11 +49,12 @@ export type TaxReport =
   | { readonly kind: 'bind_failed'; readonly error: unknown }
   | { readonly kind: 'error'; readonly error: unknown }
 
-const failed = (failure: 'invalid' | 'unreadable'): ReadOutcome => ({
+const failed = (failure: 'invalid' | 'unreadable', journalEmpty = false): ReadOutcome => ({
   kind: 'failed',
   failure,
   readerVersion: null,
   head: null,
+  ...(journalEmpty ? { journalEmpty } : {}),
 })
 
 /**
@@ -123,16 +126,25 @@ async function outcomeOf(
   if (!link.ok) return failed('invalid')
   // an answer about another receipt than the one the link signs is no answer about this one (review 8)
   if (answer.number !== link.number) return failed('invalid')
-  if (journal === null || journal.lines.length === 0) return failed('unreadable')
+  // the tax office's own answer with no list: counted apart from a failure of ours (adversarial А7)
+  if (journal === null || journal.lines.length === 0) return failed('unreadable', true)
 
   const currency = RECEIPT_CURRENCY[claimed.country]
   const lines = journal.lines.map((line) => receiptLineOf(line, currency))
   // the lines go out on the wire as the contract says, or the receipt is not read (Т-5 of MOL-125)
   if (!z.array(receiptLineCodec).safeEncode(lines).success) return failed('unreadable')
 
+  // the lines' codes, asked before the receipt is written (MOL-234, owner's В-1 «а»; review 9): the
+  // review is never read without its codes, and the wait is the specification's own deadline —
+  // `PURS_SPECIFICATION_TIMEOUT_MS`, never the journal's (adversarial А4). A specification that failed
+  // or is out of step with the journal gives none; with no room in the person's share it is not asked
+  const asked = await deps.purs.specification(claimed.link, link.number, claimed.actorId)
+  const found = asked.kind === 'found' ? specificationCodes(asked.items, journal.lines) : null
+  const codes = found ?? lines.map(() => null)
+
   let bindings: readonly LineBinding[] = []
   try {
-    bindings = await deps.bind(claimed, lines)
+    bindings = await deps.bind(claimed, lines, codes)
   } catch (error) {
     // what the lines are is the review's help, not the receipt: every line new
     deps.report({ kind: 'bind_failed', error })
@@ -167,5 +179,7 @@ async function outcomeOf(
     partly: false,
     bindings,
     images: [],
+    codes,
+    specification: asked.kind === 'skipped' ? 'skipped' : found === null ? 'failed' : 'ok',
   }
 }

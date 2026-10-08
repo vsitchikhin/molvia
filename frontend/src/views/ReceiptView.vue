@@ -227,7 +227,7 @@
           :busy="sending"
           :busy-label="t('receipt.review.record_busy')"
           :inactive="noItems ? shownTotal === null : balance.recorded === 0"
-          @click="record"
+          @click="record()"
         >
           {{ recordLabel }}
         </AppButton>
@@ -286,6 +286,13 @@
       :on-closed="placeClosed"
       @chosen="choosePlace"
     />
+    <ReceiptBarcodesSheet
+      v-if="detail && lineCodes.length > 0"
+      v-model:open="codesOpen"
+      :codes="lineCodes"
+      :on-closed="codesClosed"
+      @answered="codesAnswered"
+    />
     <ReceiptTotalSheet
       v-if="detail"
       v-model:open="totalOpen"
@@ -339,6 +346,7 @@ import CaptureSheet from '@/components/CaptureSheet.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
 import PurchaseRow from '@/components/PurchaseRow.vue'
 import ReceiptLineRow from '@/components/ReceiptLineRow.vue'
+import ReceiptBarcodesSheet from '@/components/ReceiptBarcodesSheet.vue'
 import ReceiptLineSheet from '@/components/ReceiptLineSheet.vue'
 import ReceiptPlaceSheet from '@/components/ReceiptPlaceSheet.vue'
 import ReceiptTotal from '@/components/ReceiptTotal.vue'
@@ -392,6 +400,7 @@ export default defineComponent({
     ManualEntryButton,
     PurchaseRow,
     ReceiptLineRow,
+    ReceiptBarcodesSheet,
     ReceiptLineSheet,
     ReceiptPlaceSheet,
     ReceiptTotal,
@@ -687,10 +696,36 @@ export default defineComponent({
       placeOpen.value = true
     }
 
-    async function record(): Promise<void> {
+    /**
+     * The codes the tax office gave the lines recorded, which their items do not hold (MOL-234):
+     * asked about once at «Записать», never written in silence (owner's В-2 «а»).
+     */
+    const lineCodes = computed(() =>
+      lines.value.flatMap((one) =>
+        !one.skip && one.line.code !== undefined
+          ? [{ position: one.position, code: one.line.code, name: one.name }]
+          : [],
+      ),
+    )
+    const codesOpen = ref(false)
+    let codesAnswer: boolean | null = null
+
+    /** `bind` — the person's answer to «Привязать штрихкоды?»; absent, not asked yet. */
+    async function record(bind?: boolean): Promise<void> {
       const one = detail.value
       if (!one || sending.value || recording.value) return
-      const body = recordBody(one, draft.value, lines.value, newId(), taken.value)
+      // the place first, then the codes: either sheet brings «Записать» back once it is away
+      if (!reviewPlace(one, draft.value)) {
+        askPlace(true)
+        return
+      }
+      if (bind === undefined && lineCodes.value.length > 0) {
+        codesAnswer = null
+        codesOpen.value = true
+        return
+      }
+      const barcodes = bind === true ? lineCodes.value.map((code) => code.position) : undefined
+      const body = recordBody(one, draft.value, lines.value, newId(), taken.value, barcodes)
       if (!body) {
         askPlace(true)
         return
@@ -712,7 +747,7 @@ export default defineComponent({
           await router.replace({
             name: 'purchase',
             params: { tripId: note.tripId },
-            state: { recorded: note.count },
+            state: { recorded: note.count, codesHeld: [...note.held] },
           })
           return
         }
@@ -823,6 +858,17 @@ export default defineComponent({
           // move made before the step lands is dropped as a second tap (review 34, as `retaken`).
           afterStep(() => void record())
         }
+      },
+      lineCodes,
+      codesOpen,
+      codesAnswered: (bind: boolean) => {
+        codesAnswer = bind
+      },
+      codesClosed: () => {
+        const bind = codesAnswer
+        codesAnswer = null
+        // put away with no answer — × or the scrim — is no record (as the place's sheet)
+        if (bind !== null) afterStep(() => void record(bind))
       },
       saveTotal: (total: Money | null) => {
         drafts.setTotal(id.value, total)

@@ -90,6 +90,13 @@ export interface ItemRepository {
    */
   byBarcode(codes: readonly string[]): Promise<Item | null>
   /**
+   * The rows a record of a receipt touches, locked up front in the order of their ids (MOL-234,
+   * adversarial А1): `update` — the items a code is bound to, as `attachBarcode` locks them; `share` —
+   * every other item a purchase points at, as its foreign key does. Taken one by one as the record went,
+   * two records of the same items in two orders waited on each other.
+   */
+  lockForRecord(update: readonly string[], share: readonly string[]): Promise<void>
+  /**
    * The items a receipt line can reach by name (MOL-126): those with names in the till's language,
    * with those names and their customs headings, ordered by name bytewise — the matcher takes the
    * first of a tie, so the order is the same on every database.
@@ -1001,6 +1008,19 @@ export function createItemRepository(db: Conn): ItemRepository {
     },
 
     byIds: load,
+
+    async lockForRecord(update, share) {
+      const modes = new Map<string, 'update' | 'key share'>()
+      for (const id of share) modes.set(id, 'key share')
+      for (const id of update) modes.set(id, 'update')
+      for (const id of [...modes.keys()].sort()) {
+        const row = db
+          .select({ id: items.id })
+          .from(items)
+          .where(sql`${items.id} = ${liveItemId(id)}`)
+        await row.for(modes.get(id) === 'update' ? 'update' : 'key share')
+      }
+    },
 
     async byBarcode(codes) {
       if (codes.length === 0) return null

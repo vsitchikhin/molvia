@@ -451,6 +451,15 @@ codes too, and a wrong one needs a way out (В-1, below).
 - **A code written is remembered for offline** as one found is: the item it went to goes into «Часто
   берёте» with it once it is added to a record.
 
+## A code from a Serbian receipt (MOL-234)
+
+The Serbian tax office's specification of a receipt gives some lines their package's code (`receipts.md`).
+**It is never written in silence**: a code the item of its line already holds binds the line to it, as a
+scan finds the item (MOL-99), and any other is asked about once at «Записать» — «Привязать штрихкоды?»,
+the words of «привязать?» — and written by this section's rules through the same `attachBarcode`: the check
+digit and never a shop's own before it is even kept, the item's lock then the forms', another item holding it
+named and nothing written, twenty the ceiling. The receipt is recorded whatever became of the code.
+
 ## A hint from Open Food Facts (MOL-162)
 
 After MOL-100 a code met for the first time is written to its item, but the item is still typed from

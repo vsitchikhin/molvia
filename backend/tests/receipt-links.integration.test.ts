@@ -4,6 +4,7 @@ import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import {
+  RECEIPT_CODES_HEADER,
   RECEIPT_LINK_WAIT_HOURS,
   receiptDetailCodec,
   toSearchKey,
@@ -15,9 +16,18 @@ import { madeUpJournal, madeUpSerbianLink } from '@molvia/model/testing/serbian-
 import type { FastifyInstance } from 'fastify'
 import { createItemRepository } from '@/db/items-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
-import { receiptDays, receiptLines, receiptLinks, receipts, storeMemory, trips } from '@/db/schema'
+import {
+  itemBarcodes,
+  receiptDays,
+  receiptLines,
+  receiptLinks,
+  receipts,
+  storeMemory,
+  taxReceiptDays,
+  trips,
+} from '@/db/schema'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
-import type { Purs, PursAnswer } from '@/purs/client'
+import type { Purs, PursAnswer, PursSpecification } from '@/purs/client'
 import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
 import { readTaxReceipts } from '@/usecases/read-tax-receipts'
 import { claimReceiptNotices } from '@/usecases/tell-receipts'
@@ -105,10 +115,22 @@ const found = (over: Partial<Extract<PursAnswer, { kind: 'found' }>> = {}): Purs
   ...over,
 })
 
-function office(...answers: PursAnswer[]): Purs & { asked: string[] } {
+/** The tax office; its specification is not asked unless a test hands it answers (MOL-234). */
+function office(...answers: PursAnswer[]): Purs & {
+  asked: string[]
+  specs: PursSpecification[]
+  specified: ReturnType<typeof vi.fn<Purs['specification']>>
+} {
   const asked: string[] = []
+  const specs: PursSpecification[] = []
+  const specification = vi.fn<Purs['specification']>(() =>
+    Promise.resolve(specs.shift() ?? { kind: 'skipped' }),
+  )
   return {
     asked,
+    specs,
+    specification,
+    specified: specification,
     receipt: vi.fn((url: string) => {
       asked.push(url)
       const answer = answers.shift() ?? found()
@@ -129,13 +151,14 @@ function round(purs: Purs): Promise<number> {
     receipts: repository,
     purs,
     report: (event) => reports.push(event),
-    bind: (claimed, lines) =>
+    bind: (claimed, lines, codes) =>
       bindReceiptLines(
         { items: createItemRepository(db), embedder: NO_EMBEDDER },
         claimed.actorId,
         claimed.country,
         claimed.language,
         lines,
+        codes,
       ),
   })
 }
@@ -148,6 +171,14 @@ const row = async (id: string) => {
   return { ...found, link: held?.link ?? null }
 }
 const days = () => db.select().from(receiptDays)
+/** The one day of `tax_receipt_days` a test wrote, its counts that are not zero (MOL-234). */
+async function taxDay(): Promise<Record<string, number>> {
+  const rows = await db.select().from(taxReceiptDays)
+  expect(rows).toHaveLength(1)
+  return Object.fromEntries(
+    Object.entries(rows[0] ?? {}).filter(([key, n]) => key !== 'day' && n !== 0),
+  ) as Record<string, number>
+}
 const due = (id: string) =>
   db
     .update(receipts)
@@ -298,13 +329,21 @@ describe('the tax office’s queue', () => {
     expect(detail.receipt.header).toMatchObject({ tin: TIN, shop: 'RODA MEGAMARKET 463' })
   })
 
-  it('counts nothing in receipt_days — reading or failing — until MOL-234 gives it a line', async () => {
+  it('counts nothing in receipt_days, reading or failing: its own table counts it (MOL-234)', async () => {
     const me = await serb()
     await taken(me)
     await taken(me)
     await taken(me)
     await round(office(found(), { kind: 'refused' }, found({ journal: 'no list' })))
     expect(await days()).toEqual([])
+    // a journal with no list is the tax office's answer, never a failure of ours (adversarial А7)
+    expect(await taxDay()).toEqual({
+      sentUnnamed: 3,
+      read: 1,
+      invalid: 1,
+      empty: 1,
+      specsSkipped: 1,
+    })
   })
 
   it('asks again a receipt the tax office does not show yet, the pause growing, then reads it', async () => {
@@ -369,6 +408,9 @@ describe('the tax office’s queue', () => {
     expect((await row(late))?.readAt).not.toBeNull()
     expect(await row(almost)).toMatchObject({ status: 'queued', failure: null })
     expect(await days()).toEqual([])
+    // given up is counted once, on the day it was; the receipt still asked is nothing yet
+    expect(await taxDay()).toMatchObject({ missing: 1 })
+    expect(await taxDay()).not.toHaveProperty('read')
   })
 
   it('fails as invalid what the tax office refuses, and as unreadable a journal with no list', async () => {
@@ -547,7 +589,7 @@ describe('«Записать» a receipt by its link', () => {
     ],
   })
 
-  it('writes a trip in dinars on Belgrade’s day, teaches the shop’s memory, counts nothing', async () => {
+  it('writes a trip in dinars on Belgrade’s day, teaches the shop’s memory, counts in its own table', async () => {
     const me = await serb()
     const id = await parsedLink(me)
     const payload = recordBody({ name: 'RODA MEGAMARKET 463', city: 'Белград' })
@@ -569,6 +611,38 @@ describe('«Записать» a receipt by its link', () => {
       toSearchKey('SECER KRISTAL 1KG SUNOKO KOM'),
     ])
     expect(await days()).toEqual([])
+    // a new item kept new under a name of the person's is no edit: the reading gave none to correct
+    expect(await taxDay()).toEqual({
+      sentUnnamed: 1,
+      read: 1,
+      specsSkipped: 1,
+      recorded: 1,
+      lines: 2,
+      within5m: 1,
+    })
+    // the same record again counts nothing
+    expect((await record(me, id, payload)).statusCode).toBe(200)
+    expect(await taxDay()).toMatchObject({ recorded: 1, lines: 2 })
+  })
+
+  it('counts what the person put right — the matcher’s misses — in its own table only', async () => {
+    const me = await serb()
+    const id = await parsedLink(me)
+    const whole = recordBody({ name: 'RODA MEGAMARKET 463', city: 'Белград' })
+    const payload = {
+      ...whole,
+      lines: [{ position: 0, skip: true }, ...whole.lines.slice(1)],
+      edited: { item: [1], figures: [] },
+    }
+    expect((await record(me, id, payload)).statusCode).toBe(200)
+    expect(await days()).toEqual([])
+    expect(await taxDay()).toMatchObject({
+      recorded: 1,
+      lines: 2,
+      linesEdited: 2,
+      linesSkipped: 1,
+      linesItem: 1,
+    })
   })
 
   it('proposes the place of the same premises, never another shop of the same chain', async () => {
@@ -651,5 +725,400 @@ describe('the server’s own queue', () => {
     } finally {
       await server.close()
     }
+  })
+})
+
+describe('how the link came (MOL-234, owner’s В-3 «а» of MOL-233)', () => {
+  it('counts each way it came when the server takes the receipt, on the receipt and in the day', async () => {
+    const me = await serb()
+    const ways = [
+      { via: 'qr' },
+      { via: 'qr', missed: false },
+      { via: 'qr', missed: true },
+      { via: 'paste', missed: true },
+      { via: 'paste' },
+      {},
+    ]
+    const ids: string[] = []
+    for (const way of ways) {
+      const payload = body(link(), way)
+      expect((await send(me, payload)).statusCode).toBe(201)
+      ids.push(payload.id)
+    }
+    expect(await taxDay()).toEqual({
+      sentQr: 2,
+      sentQrMissed: 1,
+      sentPasteMissed: 1,
+      sentPaste: 1,
+      sentUnnamed: 1,
+    })
+    const rows = await Promise.all(ids.map((id) => row(id)))
+    expect(rows.map((one) => [one?.via, one?.qrMissed])).toEqual([
+      ['qr', false],
+      ['qr', false],
+      ['qr', true],
+      ['paste', true],
+      ['paste', false],
+      [null, null],
+    ])
+    expect(await days()).toEqual([])
+  })
+
+  it('a repeat is the same receipt and counts nothing; another way under its id is a 409', async () => {
+    const me = await serb()
+    const payload = body(link(), { via: 'qr', missed: true })
+    expect((await send(me, payload)).statusCode).toBe(201)
+    expect((await send(me, payload)).statusCode).toBe(200)
+    expect((await send(me, { ...payload, via: 'paste' })).statusCode).toBe(409)
+    expect((await send(me, { ...payload, missed: false })).statusCode).toBe(409)
+    expect(await taxDay()).toEqual({ sentQrMissed: 1 })
+  })
+
+  it('a miss with no way named is not said: a body of a build that names neither stays unnamed', async () => {
+    const me = await serb()
+    const payload = body(link(), { missed: true })
+    expect((await send(me, payload)).statusCode).toBe(201)
+    expect(await row(payload.id)).toMatchObject({ via: null, qrMissed: null })
+    expect(await taxDay()).toEqual({ sentUnnamed: 1 })
+  })
+
+  it('refuses a way that is not one, at the door', async () => {
+    const me = await serb()
+    const response = await send(me, body(link(), { via: 'camera' }))
+    expect(response.statusCode).toBe(400)
+    expect(await db.select().from(taxReceiptDays)).toEqual([])
+  })
+
+  it('a photo names no way: the database holds it to the link alone', async () => {
+    const me = await serb()
+    const id = await taken(me)
+    await expect(
+      db.update(receipts).set({ source: 'photo', parts: 1, via: 'qr' }).where(eq(receipts.id, id)),
+    ).rejects.toThrow()
+  })
+})
+
+describe('the codes of the lines, from the specification (MOL-234, owner’s В-1 «а»)', () => {
+  const CODE = '8601234567899'
+  const spec = (gtins: readonly string[], totals = [18_998, 29_639]): PursSpecification => ({
+    kind: 'found',
+    items: totals.map((totalHundredths, at) => ({ totalHundredths, gtin: gtins[at] ?? '' })),
+  })
+  const codes = async (id: string) =>
+    (
+      await db
+        .select({ gtin: receiptLines.gtin })
+        .from(receiptLines)
+        .where(eq(receiptLines.receiptId, id))
+        .orderBy(receiptLines.position)
+    ).map((line) => line.gtin)
+
+  it('keeps the code the shop passed on its line, and counts the specification and the line', async () => {
+    const me = await serb()
+    const id = await taken(me)
+    const purs = office()
+    purs.specs.push(spec([CODE, '']))
+    await round(purs)
+    expect(await row(id)).toMatchObject({ status: 'parsed' })
+    expect(await codes(id)).toEqual([CODE, null])
+    expect(await taxDay()).toEqual({ sentUnnamed: 1, read: 1, specsOk: 1, linesCoded: 1 })
+  })
+
+  it('a specification refused or out of step gives no code, and the receipt is read all the same', async () => {
+    const me = await serb()
+    const refused = await taken(me)
+    const astray = await taken(me)
+    const purs = office()
+    purs.specs.push({ kind: 'failed' }, spec([CODE, ''], [18_998, 29_640]))
+    await round(purs)
+    expect(await row(refused)).toMatchObject({ status: 'parsed' })
+    expect(await row(astray)).toMatchObject({ status: 'parsed' })
+    expect(await codes(refused)).toEqual([null, null])
+    expect(await codes(astray)).toEqual([null, null])
+    expect(await taxDay()).toEqual({ sentUnnamed: 2, read: 2, specsFailed: 2 })
+  })
+
+  it('a shop’s own code and one that does not check are never kept', async () => {
+    const me = await serb()
+    const id = await taken(me)
+    const purs = office()
+    purs.specs.push(spec(['2100000000012', '8601234567891']))
+    await round(purs)
+    expect(await codes(id)).toEqual([null, null])
+    expect(await taxDay()).toMatchObject({ specsOk: 1 })
+    expect(await taxDay()).not.toHaveProperty('linesCoded')
+  })
+
+  it('a line whose code an item holds is bound to that item, before the search', async () => {
+    const me = await serb()
+    const sugar = await insertItem(db, {
+      name: 'Сахар Sunoko 1 кг',
+      searchKey: toSearchKey('Сахар Sunoko 1 кг'),
+    })
+    await db.insert(itemBarcodes).values({ code: CODE, itemId: sugar })
+    const id = await taken(me)
+    const purs = office()
+    purs.specs.push(spec([CODE, '']))
+    await round(purs)
+    const [first] = await db
+      .select({ itemId: receiptLines.itemId, match: receiptLines.match })
+      .from(receiptLines)
+      .where(eq(receiptLines.receiptId, id))
+      .orderBy(receiptLines.position)
+    expect(first).toEqual({ itemId: sugar, match: 'search' })
+  })
+
+  it('the receipt is written with its codes: a review read the moment it is read has them (review 9, Б1)', async () => {
+    const me = await serb()
+    const id = await taken(me)
+    const purs = office()
+    let answer: (value: PursSpecification) => void = () => undefined
+    purs.specified.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const running = round(purs)
+    await vi.waitFor(() => {
+      expect(purs.specified).toHaveBeenCalledOnce()
+    })
+    // while the specification is out the receipt is still being read — never shown without codes
+    expect(await row(id)).toMatchObject({ status: 'reading' })
+    answer(spec([CODE, '']))
+    await running
+    expect(await row(id)).toMatchObject({ status: 'parsed', link: null })
+    expect(await codes(id)).toEqual([CODE, null])
+  })
+
+  it('a specification over the person’s share is counted as not asked (adversarial А5)', async () => {
+    const me = await serb()
+    await taken(me)
+    const purs = office()
+    purs.specs.push({ kind: 'skipped' })
+    await round(purs)
+    expect(await taxDay()).toEqual({ sentUnnamed: 1, read: 1, specsSkipped: 1 })
+  })
+
+  it('the specification asked with the receipt’s own number and person', async () => {
+    const me = await serb()
+    const url = link()
+    await taken(me, url)
+    const purs = office()
+    await round(purs)
+    const signed = serbianReceiptLink(url)
+    expect(signed.ok && signed.number).toBeTruthy()
+    expect(purs.specified).toHaveBeenCalledWith(url, signed.ok ? signed.number : '', me.id)
+  })
+})
+
+describe('«Привязать штрихкоды?» at «Записать» (MOL-234, owner’s В-2 «а»)', () => {
+  const CODE = '8601234567899'
+  const coded: PursSpecification = {
+    kind: 'found',
+    items: [
+      { totalHundredths: 18_998, gtin: CODE },
+      { totalHundredths: 29_639, gtin: '' },
+    ],
+  }
+
+  async function codedReceipt(me: Owner): Promise<string> {
+    const id = await taken(me)
+    const purs = office()
+    purs.specs.push(coded)
+    await round(purs)
+    return id
+  }
+
+  /** As a phone of this build asks: it knows a line's `code` (adversarial А3). */
+  const review = async (me: Owner, id: string, codes = true) =>
+    receiptDetailCodec.parse(
+      (
+        await app.inject({
+          method: 'GET',
+          url: `/receipts/${id}`,
+          headers: { cookie: me.cookie, ...(codes ? { [RECEIPT_CODES_HEADER]: '1' } : {}) },
+        })
+      ).json(),
+    )
+
+  function record(me: Owner, id: string, payload: Record<string, unknown>) {
+    return app.inject({
+      method: 'POST',
+      url: `/receipts/${id}/record`,
+      headers: { cookie: me.cookie, 'x-molvia-today': '2025-07-20' },
+      payload,
+    })
+  }
+
+  const body = (sugar: Record<string, unknown>, over: Record<string, unknown> = {}) => ({
+    tripId: randomUUID(),
+    place: { name: 'RODA MEGAMARKET 463', city: 'Белград' },
+    purchasedOn: '2025-07-18',
+    lines: [
+      {
+        position: 0,
+        skip: false,
+        item: sugar,
+        quantity: { value: '2', unit: 'piece' },
+        amount: { amount: '189.98', currency: 'RSD' },
+      },
+      {
+        position: 1,
+        skip: false,
+        item: { name: 'Банан' },
+        quantity: { value: '1.482', unit: 'kg' },
+        amount: { amount: '296.39', currency: 'RSD' },
+      },
+    ],
+    ...over,
+  })
+
+  const holders = () =>
+    db
+      .select({
+        code: itemBarcodes.code,
+        itemId: itemBarcodes.itemId,
+        addedBy: itemBarcodes.addedBy,
+      })
+      .from(itemBarcodes)
+
+  async function item(name: string, codes: readonly string[] = []): Promise<string> {
+    const id = await insertItem(db, { name, searchKey: toSearchKey(name) })
+    if (codes.length > 0) {
+      await db.insert(itemBarcodes).values(codes.map((code) => ({ code, itemId: id })))
+    }
+    return id
+  }
+
+  it('shows the code on the review of the line whose item does not hold it, and no other', async () => {
+    const me = await serb()
+    const id = await codedReceipt(me)
+    const lines = (await review(me, id)).lines
+    expect(lines[0]?.code).toBe(CODE)
+    expect(lines[1]).not.toHaveProperty('code')
+  })
+
+  it('gives no code to a phone that did not ask: an earlier build reads a line strictly (А3)', async () => {
+    const me = await serb()
+    const id = await codedReceipt(me)
+    const lines = (await review(me, id, false)).lines
+    expect(lines.every((line) => !('code' in line))).toBe(true)
+  })
+
+  it('asks nothing when another item holds the code: its answer could only be «held» (review 3)', async () => {
+    const me = await serb()
+    const id = await codedReceipt(me)
+    // the code went to another item after the receipt was read — a scan, or another receipt recorded
+    const cookie = await item('Печенье', [CODE])
+    const [first] = (await review(me, id)).lines
+    expect(first?.itemId).not.toBe(cookie)
+    expect(first).not.toHaveProperty('code')
+  })
+
+  it('asks nothing of a line found by its code: the item holds it', async () => {
+    const me = await serb()
+    const sugar = await item('Сахар Sunoko 1 кг', [CODE])
+    const id = await codedReceipt(me)
+    const [first] = (await review(me, id)).lines
+    expect(first?.itemId).toBe(sugar)
+    expect(first).not.toHaveProperty('code')
+  })
+
+  it('binds the code to a new item recorded, by the person, and counts it', async () => {
+    const me = await serb()
+    const id = await codedReceipt(me)
+    const response = await record(me, id, body({ name: 'Сахар Sunoko' }, { barcodes: [0] }))
+    expect(response.statusCode).toBe(200)
+    const answer = receiptRecordedCodec.parse(response.json())
+    expect(answer.codes).toEqual([{ position: 0, code: CODE, outcome: 'written' }])
+    const [written] = await holders()
+    expect(written).toMatchObject({ code: CODE, addedBy: me.id })
+    expect(await taxDay()).toMatchObject({ recorded: 1, codesWritten: 1 })
+  })
+
+  it('binds it to an item of the catalogue the person chose', async () => {
+    const me = await serb()
+    const sugar = await item('Сахар')
+    const id = await codedReceipt(me)
+    const response = await record(me, id, body({ id: sugar }, { barcodes: [0] }))
+    expect(receiptRecordedCodec.parse(response.json()).codes).toEqual([
+      { position: 0, code: CODE, outcome: 'written' },
+    ])
+    expect(await holders()).toEqual([{ code: CODE, itemId: sugar, addedBy: me.id }])
+  })
+
+  it('writes nothing without the person’s yes — and answers no codes', async () => {
+    const me = await serb()
+    const id = await codedReceipt(me)
+    const response = await record(me, id, body({ name: 'Сахар Sunoko' }))
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).not.toHaveProperty('codes')
+    expect(await holders()).toEqual([])
+    expect(await taxDay()).toMatchObject({ recorded: 1 })
+    expect(await taxDay()).not.toHaveProperty('codesWritten')
+  })
+
+  it('a code another item holds is named and not written; the receipt is recorded all the same', async () => {
+    const me = await serb()
+    const other = await item('Печенье', [CODE])
+    const sugar = await item('Сахар')
+    const id = await taken(me)
+    const purs = office()
+    purs.specs.push(coded)
+    await round(purs)
+    const response = await record(me, id, body({ id: sugar }, { barcodes: [0] }))
+    expect(response.statusCode).toBe(200)
+    expect(receiptRecordedCodec.parse(response.json())).toMatchObject({
+      receipt: { status: 'recorded' },
+      codes: [{ position: 0, code: CODE, outcome: 'held', holder: 'Печенье' }],
+    })
+    expect(await holders()).toEqual([{ code: CODE, itemId: other, addedBy: null }])
+    expect(await taxDay()).not.toHaveProperty('codesWritten')
+  })
+
+  it('a record sent again answers its codes again — the first answer may be lost (adversarial А2)', async () => {
+    const me = await serb()
+    await item('Печенье', [CODE])
+    const sugar = await item('Сахар')
+    const id = await codedReceipt(me)
+    const payload = body({ id: sugar }, { barcodes: [0] })
+    const first = receiptRecordedCodec.parse((await record(me, id, payload)).json())
+    const again = receiptRecordedCodec.parse((await record(me, id, payload)).json())
+    expect(first.codes).toEqual([{ position: 0, code: CODE, outcome: 'held', holder: 'Печенье' }])
+    expect(again).toEqual(first)
+  })
+
+  it('a record sent again tells a code written as written', async () => {
+    const me = await serb()
+    const sugar = await item('Сахар')
+    const id = await codedReceipt(me)
+    const payload = body({ id: sugar }, { barcodes: [0] })
+    await record(me, id, payload)
+    const again = receiptRecordedCodec.parse((await record(me, id, payload)).json())
+    expect(again.codes).toEqual([{ position: 0, code: CODE, outcome: 'written' }])
+  })
+
+  it('an item holding twenty takes no more, and the record stands', async () => {
+    const me = await serb()
+    const full = Array.from({ length: 20 }, (_, n) => {
+      const twelve = `86099900${String(n).padStart(4, '0')}`
+      let sum = 0
+      for (let at = 0; at < 12; at += 1) sum += Number(twelve[11 - at]) * (at % 2 ? 1 : 3)
+      return `${twelve}${String((10 - (sum % 10)) % 10)}`
+    })
+    const sugar = await item('Сахар', full)
+    const id = await codedReceipt(me)
+    const response = await record(me, id, body({ id: sugar }, { barcodes: [0] }))
+    expect(response.statusCode).toBe(200)
+    expect(receiptRecordedCodec.parse(response.json()).codes).toEqual([
+      { position: 0, code: CODE, outcome: 'full' },
+    ])
+  })
+
+  it('a position with no code, or a line left out, binds nothing', async () => {
+    const me = await serb()
+    const id = await codedReceipt(me)
+    const skipped = body({ name: 'Сахар' }, { barcodes: [0, 1] })
+    skipped.lines = [{ position: 0, skip: true } as never, ...skipped.lines.slice(1)]
+    const response = await record(me, id, skipped)
+    expect(response.statusCode).toBe(200)
+    expect(receiptRecordedCodec.parse(response.json()).codes).toEqual([])
+    expect(await holders()).toEqual([])
   })
 })

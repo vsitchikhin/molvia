@@ -67,6 +67,14 @@ export interface ReceiptRecordedNote {
   readonly receiptId: string
   readonly tripId: string
   readonly count: number
+  /** Codes asked to be bound that another item holds (MOL-234): named on arrival, never written. */
+  readonly held: readonly CodeHeld[]
+}
+
+/** A line's code another item of the catalogue holds, and that item's name (MOL-100's 409). */
+export interface CodeHeld {
+  readonly code: string
+  readonly holder: string
 }
 
 interface Kept {
@@ -393,9 +401,14 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
       case 'record': {
         const answer = await api.recordReceipt(write.id, write.body)
         const count = write.body.lines.filter((line) => !line.skip).length
+        const held = (answer.codes ?? []).flatMap((one) =>
+          one.outcome === 'held' && one.holder !== undefined
+            ? [{ code: one.code, holder: one.holder }]
+            : [],
+        )
         recorded.value = [
           ...recorded.value.filter((note) => note.receiptId !== write.id),
-          { receiptId: write.id, tripId: answer.tripId, count },
+          { receiptId: write.id, tripId: answer.tripId, count, held },
         ]
         // The photo goes off the phone with the receipt it was (Т-4, MOL-126 Т-12).
         await photoShelf(owner).drop(write.id)

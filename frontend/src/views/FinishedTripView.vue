@@ -34,6 +34,10 @@
           </AppButton>
         </template>
       </ScreenState>
+      <!-- A code asked to be bound that another item holds (MOL-234): the purchases stand. -->
+      <p v-for="one in codesHeld" :key="one.code" class="held">
+        {{ t('receipt.codes.held', { code: one.code, name: one.holder }) }}
+      </p>
       <ScreenState
         v-if="trouble === 'error'"
         kind="error"
@@ -167,5 +171,10 @@ export default defineComponent({
 
 .add {
   margin-top: var(--space-4);
+}
+
+.held {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-callout);
 }
 </style>

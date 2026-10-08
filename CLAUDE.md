@@ -89,7 +89,9 @@ The log's writer, the cohort and both gate queries are pinned in `.claude/rules/
   put right — the phone's word (`edited`), since only it knows what its review showed — a total put
   right as the receipt's own edit, the first record only, and the time from the server taking the
   receipt — by day, no id; read as the block «0.2r» of `make gates`, stop above a third of the lines
-  after four weeks.
+  after four weeks. **A receipt from the tax office never counts there: `tax_receipt_days`** (MOL-234), a
+  table of its own — a key moved would break a rollback — with how its link came (`via`, a miss of the
+  camera before), its own block under «0.2r», no stop.
 - **The login's funnel is `login_days`** (MOL-68): counted in each step's own transaction, by the
   day the login began, with no id at all; a device's repeat says `again=1`, so «began» is people
   rather than taps; a second way in is filed above `LOGIN_SECOND_WAY_PERCENT` (25 %) lost, read as
@@ -607,7 +609,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   one function on both sides — MD5, a sale only; one JSON ask, the journal's lines; a queue of its own,
   people in turn, twelve a minute and four a person, a receipt not shown yet asked again for 48 hours;
   the link kept only until answered, in a table the nightly copy leaves out; a failure keeps the head
-  the link gave; nothing in `receipt_days` until MOL-234; the place by the premises.
+  the link gave; the place by the premises. **The specification after the journal, for codes alone**
+  (MOL-234): before the receipt is written, waited on 3 s at most; a code only from one in step with the
+  journal, sent only to a phone that asks (`RECEIPT_CODES_HEADER`), bound to an item only by «Привязать
+  штрихкоды?» at «Записать», by MOL-100's rules — never in silence, every item locked first in id order.
 - **«Записать» is the whole receipt in one transaction** (`recordReceipt`): a trip finished on the
   receipt's day at its rate, its money the total the phone sends, else the printed one not below the
   lines, else the lines; the owner's lock first; the same trip again is the

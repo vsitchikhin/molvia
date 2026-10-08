@@ -16,6 +16,7 @@ import type {
   LoginsInWindow,
   ReceiptsInWindow,
   RemindersInWindow,
+  TaxReceiptsInWindow,
 } from '@/db/gates-reader'
 
 export const GATES_USAGE =
@@ -162,6 +163,8 @@ function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
     ...reminderLines(report.reminders),
     '',
     ...receiptLines(report.receipts),
+    '',
+    ...taxReceiptLines(report.taxReceipts),
   ]
 }
 
@@ -196,6 +199,51 @@ function receiptLines(receipts: ReceiptsInWindow): string[] {
     row('  1 hour', [String(receipts.within1h), '']),
     row('  1 day', [String(receipts.within1d), '']),
     row('  later', [String(receipts.later), '']),
+  ]
+}
+
+/**
+ * The receipts from the Serbian tax office (MOL-234), apart from the reader's block: their lines are
+ * the tax office's, and counted there they would thin its stop line. No stop of their own. How the
+ * links came is the risk of MOL-233 — a link pasted after the camera missed is a QR that did not read;
+ * one pasted with no shot is the person's habit. The lines put right are what the matcher missed.
+ */
+function taxReceiptLines(tax: TaxReceiptsInWindow): string[] {
+  const { firstDay, lastDay } = tax
+  const span = firstDay === lastDay ? `the day ${firstDay}` : `days ${firstDay} … ${lastDay}`
+  const sent = tax.sentQr + tax.sentQrMissed + tax.sentPaste + tax.sentPasteMissed + tax.sentUnnamed
+  // what the tax office answered; a failure of ours is no answer of its (adversarial А7)
+  const asked = tax.read + tax.missing + tax.invalid + tax.empty
+  return [
+    `0.2r ${'· the Serbian tax office'.padEnd(47)}no stop: the lines are the tax office's`,
+    row('links sent', [String(sent), `${span} in Yerevan`]),
+    row('  QR read by the app', [String(tax.sentQr), '']),
+    row('  QR read after a miss', [String(tax.sentQrMissed), '']),
+    row('  pasted after the camera missed', [String(tax.sentPasteMissed), 'the QR did not read']),
+    row('  pasted with no shot', [String(tax.sentPaste), '']),
+    row('  not named', [String(tax.sentUnnamed), 'a phone of an earlier build']),
+    row('receipts asked', [String(asked), '']),
+    row('  with their lines', [String(tax.read), '']),
+    row('  not shown in 48 hours', [String(tax.missing), '']),
+    row('  refused by the tax office', [String(tax.invalid), '']),
+    row('  no list in the journal', [String(tax.empty), '']),
+    row('not read on our side', [String(tax.unreadable), 'a link lost, an answer not written']),
+    row('specification answered', share(tax.specsOk, tax.specsOk + tax.specsFailed)),
+    // the person's share went on the journals: such a receipt has no codes, for good (adversarial А5)
+    row('  not asked, over the limit', [String(tax.specsSkipped), 'no codes']),
+    row('  lines with a code', [String(tax.linesCoded), '']),
+    row('receipts recorded', [String(tax.recorded), '']),
+    row('lines put right', share(tax.linesEdited, tax.lines, 'up')),
+    row('  left out', [String(tax.linesSkipped), '']),
+    row('  another item', [String(tax.linesItem), 'the matcher missed']),
+    row('  quantity or sum', [String(tax.linesFigures), '']),
+    row('total put right', [String(tax.totalsCorrected), 'receipts']),
+    row('codes bound to items', [String(tax.codesWritten), '']),
+    row('sent to recorded, within 5 min', [String(tax.within5m), 'receipts']),
+    row('  15 min', [String(tax.within15m), '']),
+    row('  1 hour', [String(tax.within1h), '']),
+    row('  1 day', [String(tax.within1d), '']),
+    row('  later', [String(tax.later), '']),
   ]
 }
 
