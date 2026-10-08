@@ -69,4 +69,4 @@ Rules: `.claude/rules/money-accounts.md`. A test beside its source, or mirroring
 
 ## e2e
 
-- `e2e/accounts.spec.ts` — End-to-end: an account and a spending from it, a check that comes out even once an account is chosen or «Прочее · сверка» written, removal, offline.
+- `e2e/accounts.spec.ts` — End-to-end: an account and a spending from it, a check that comes out even once an account is chosen or «Прочее · сверка» written, removal, offline, a transfer with its fee and «Вернуть» (MOL-253).
