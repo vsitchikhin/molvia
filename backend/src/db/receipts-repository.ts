@@ -88,6 +88,11 @@ export interface ReceiptHead {
   readonly printedTime: string | null
   readonly receiptNo: string | null
   readonly totalMinor: bigint | null
+  /**
+   * The total as the reading found it in one place, vouched for or not (MOL-244): for «Прочитали не всё»
+   * alone. A receipt by its link has none — its total is the tax office's.
+   */
+  readonly readTotalMinor: bigint | null
   readonly balanced: boolean
   /** How a photo's lines were laid out; a receipt by its link has none. */
   readonly layout: ReceiptLayout | null
@@ -161,6 +166,8 @@ export interface StoredReceipt {
   readonly source: ReceiptSource
   /** How the person learned it was read (MOL-129); `null` — not yet, or not read. */
   readonly heard: ReceiptHeard | null
+  /** The total as the reading found it in one place (MOL-244): «Прочитали не всё» alone. */
+  readonly readTotal: Money | null
 }
 
 /**
@@ -485,6 +492,10 @@ function toStored(found: SummaryRow): StoredReceipt {
     shopUnit: found.row.shopUnit,
     source: found.row.source,
     heard: found.row.heard,
+    readTotal:
+      found.row.readTotalMinor === null
+        ? null
+        : { minor: found.row.readTotalMinor, currency: found.row.currency },
   }
 }
 
@@ -1175,6 +1186,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
                   printedTime: head.printedTime,
                   receiptNo: head.receiptNo,
                   totalMinor: head.totalMinor,
+                  readTotalMinor: head.readTotalMinor,
                   balanced: head.balanced,
                   city: head.city,
                   shopUnit: head.shopUnit ?? null,

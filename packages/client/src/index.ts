@@ -5,6 +5,7 @@ import {
   EXPORT_FORMAT,
   LOGIN_HEADER,
   RECEIPT_CODES_HEADER,
+  RECEIPT_READ_TOTAL_HEADER,
   loginStartedCodec,
   sessionsResponseCodec,
   loginPollCodec,
@@ -458,7 +459,8 @@ export interface MolviaClient {
   receipts(options?: { readonly shown?: boolean }): Promise<ReceiptsResponse>
   /**
    * One receipt with its lines; `error.not_found` for a missing, removed or someone else's one. Every
-   * build that reads a line's `code` asks for it (`RECEIPT_CODES_HEADER`, MOL-234, adversarial А3).
+   * build that reads a line's `code` asks for it (`RECEIPT_CODES_HEADER`, MOL-234, adversarial А3), and
+   * the total as read in one place likewise (`RECEIPT_READ_TOTAL_HEADER`, MOL-244).
    */
   receipt(id: string, options?: { readonly shown?: boolean }): Promise<ReceiptDetail>
   removeReceipt(id: string): Promise<void>
@@ -997,7 +999,7 @@ export function createClient(options: ClientOptions): MolviaClient {
 
     receipt: (id, options) =>
       request(`/receipts/${segment(id)}${options?.shown ? '?shown=1' : ''}`, receiptDetailCodec, {
-        headers: new Headers({ [RECEIPT_CODES_HEADER]: '1' }),
+        headers: new Headers({ [RECEIPT_CODES_HEADER]: '1', [RECEIPT_READ_TOTAL_HEADER]: '1' }),
       }),
     receiptSettled: (id) => request(`/receipts/${segment(id)}/settled`, receiptSettledCodec),
 

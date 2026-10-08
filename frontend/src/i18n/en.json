@@ -2209,6 +2209,7 @@
       "photo_note_sum": "We delete the photo after saving",
       "partly_total": "Not all of it was read: the lines make {lines} of {total}. If the print is faint, a retake will not help — correct the lines",
       "no_items": "This receipt lists no items — we will save its total. You can add the purchases later, in the record",
+      "partly_read_total": "Not all of it was read: the lines make {lines} of about {total}. If the print is faint, a retake will not help — correct the lines",
       "partly_lines": "Not all of it was read: {n} of {total} lines add up. If the print is faint, a retake will not help — correct the lines",
       "to_developer": "Send the receipt to the developer",
       "record": "Save {n} purchase | Save {n} purchases",

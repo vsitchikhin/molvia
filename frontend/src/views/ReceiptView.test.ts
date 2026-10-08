@@ -554,6 +554,18 @@ describe('ReceiptView (MOL-127)', () => {
     expect(record.attributes('aria-disabled')).not.toBe('true')
   })
 
+  it('read in part against a total read in one place: not shown, the lines «из примерно» it (MOL-244)', async () => {
+    const partial = detail()
+    receipt.mockResolvedValue({
+      ...partial,
+      receipt: { ...partial.receipt, total: null },
+      readTotal: amd('10000'),
+    })
+    const { view } = await render()
+    expect(view.get('.partly').text()).toContain('строки дают')
+    expect(view.get('.partly').text()).toContain('из примерно')
+  })
+
   it('read in part with no total: how many lines added up; half of them is enough', async () => {
     const one = detail()
     const first = line('ԿԱԹ', '500')

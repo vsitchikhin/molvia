@@ -435,6 +435,13 @@
       "when": 1791474417902,
       "tag": "0061_receipt_goes_with_trip",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1791492548756,
+      "tag": "0062_receipt_read_total",
+      "breakpoints": true
     }
   ]
 }

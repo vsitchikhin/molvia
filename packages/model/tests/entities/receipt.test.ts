@@ -36,6 +36,7 @@ const receipt = (lines: ReceiptTextLine[], totalHundredths: number | null = null
   time: null,
   receiptNo: null,
   totalHundredths,
+  readTotalHundredths: totalHundredths,
   balanced: false,
   lines,
 })

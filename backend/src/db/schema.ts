@@ -2615,8 +2615,12 @@ export const receipts = pgTable(
     printedOn: date('printed_on'),
     printedTime: text('printed_time'),
     receiptNo: text('receipt_no'),
-    // In the receipt's own currency.
+    // In the receipt's own currency: the total two sources vouch for — the lines that met it, or two
+    // places printed (MOL-244) — the review's and the trip's.
     totalMinor: bigint('total_minor', { mode: 'bigint' }),
+    // The total as the reading found it in one place, vouched for or not (MOL-244): only what «Прочитали
+    // не всё» measures the lines against, never a total shown or recorded.
+    readTotalMinor: bigint('read_total_minor', { mode: 'bigint' }),
     balanced: boolean('balanced').notNull().default(false),
     // The city of the settings its address prints (MOL-126, Р-6), where its place is looked for.
     city: text('city').$type<ReceiptCity>(),
@@ -2718,6 +2722,10 @@ export const receipts = pgTable(
     check(
       'receipts_total_non_negative',
       sql`${table.totalMinor} is null or ${table.totalMinor} >= 0`,
+    ),
+    check(
+      'receipts_read_total_non_negative',
+      sql`${table.readTotalMinor} is null or ${table.readTotalMinor} >= 0`,
     ),
   ],
 )

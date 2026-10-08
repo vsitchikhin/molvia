@@ -61,7 +61,16 @@ export interface ReceiptText {
   readonly date: string | null
   readonly time: string | null
   readonly receiptNo: string | null
+  /**
+   * The total two sources vouch for — the lines that met it, or two places printed (MOL-244) — else null:
+   * what the review shows and the trip's money may take.
+   */
   readonly totalHundredths: number | null
+  /**
+   * The total as the reading found it in one place, vouched for or not: only what «Прочитали не всё»
+   * measures the lines against (MOL-244), never a total shown or recorded.
+   */
+  readonly readTotalHundredths: number | null
   /** The lines add up to the printed total. */
   readonly balanced: boolean
   readonly lines: readonly ReceiptTextLine[]
@@ -583,7 +592,7 @@ function dateOf(text: string): { date: string | null; time: string | null } {
   return { date: `${year}-${month}-${day}`, time: `${hour}:${minute}` }
 }
 
-function cardReceipt(rows: readonly TextRow[]): ReceiptText {
+function cardReceipt(rows: readonly TextRow[]): Laid {
   const text = rows.map((r) => r.text).join('\n')
   const mapped = rows.map((r) => digits(r.text))
   const found: Found[] = []
@@ -643,42 +652,47 @@ function cardReceipt(rows: readonly TextRow[]): ReceiptText {
   const printedTotal = TOTAL.exec(text)
   const total = printedTotal?.[1] === undefined ? null : hundredthsOf(printedTotal[1])
   const budget: Budget = { left: READING_COMBINATIONS_MAX, floors: FLOOR_COMBINATIONS_MAX }
-  const { picks, balanced, blankSum, doubt } = judged(
-    found.map((f) =>
-      f.plain !== null
-        ? plainCandidates(budget, f)
-        : candidates(budget, f.qtyS, f.paidS, f.discS, f.priceS),
-    ),
-    total,
-    found.map((f) => (f.plain !== null ? f.plain.join('') : f.paidS).replace(/\D/g, '')),
+  const lists = found.map((f) =>
+    f.plain !== null
+      ? plainCandidates(budget, f)
+      : candidates(budget, f.qtyS, f.paidS, f.discS, f.priceS),
   )
-  const lines = found.map((f, i): ReceiptTextLine => {
-    const pick = picks[i] ?? null
-    return {
-      printed: f.head.trim(),
-      hs: f.hs.padStart(4, '0'),
-      sku: f.sku,
-      quantityMilli: finite(pick?.qty ?? milliOf(f.qtyS)),
-      unit: f.weighed ? 'kg' : 'piece',
-      priceHundredths: finite(pick?.price ?? (f.priceS === null ? null : hundredthsOf(f.priceS))),
-      sumHundredths: finite(pick?.paid ?? blankSum ?? hundredthsOf(f.paidS)),
-      discountHundredths: finite(pick?.disc ?? hundredthsOf(f.discS)),
-      // what the total changed or could not tell apart: highlighted for the person to check
-      settled: pick !== null && !doubt.has(i),
-      rows: f.rows,
-    }
-  })
-
   const tin = /(\d{8})\b/.exec(/ՀՎՀՀ.{0,4}:?\s*\S+|:\s*0\d{7}/.exec(text)?.[0] ?? '')?.[1] ?? null
-  return {
-    layout: 'card',
-    tin,
-    ...dateOf(text),
-    receiptNo: /Ֆիսկալ\s+\S+\s+(\d{6,})/.exec(text)?.[1] ?? null,
-    totalHundredths: total,
-    balanced,
-    lines,
+  const judge = (byTotal: boolean): ReceiptText => {
+    const { picks, balanced, blankSum, doubt } = judged(
+      lists,
+      byTotal ? total : null,
+      found.map((f) => (f.plain !== null ? f.plain.join('') : f.paidS).replace(/\D/g, '')),
+    )
+    const lines = found.map((f, i): ReceiptTextLine => {
+      const pick = picks[i] ?? null
+      return {
+        printed: f.head.trim(),
+        hs: f.hs.padStart(4, '0'),
+        sku: f.sku,
+        quantityMilli: finite(pick?.qty ?? milliOf(f.qtyS)),
+        unit: f.weighed ? 'kg' : 'piece',
+        priceHundredths: finite(pick?.price ?? (f.priceS === null ? null : hundredthsOf(f.priceS))),
+        sumHundredths: finite(pick?.paid ?? blankSum ?? hundredthsOf(f.paidS)),
+        discountHundredths: finite(pick?.disc ?? hundredthsOf(f.discS)),
+        // what the total changed or could not tell apart: highlighted for the person to check
+        settled: pick !== null && !doubt.has(i),
+        rows: f.rows,
+      }
+    })
+
+    return {
+      layout: 'card',
+      tin,
+      ...dateOf(text),
+      receiptNo: /Ֆիսկալ\s+\S+\s+(\d{6,})/.exec(text)?.[1] ?? null,
+      totalHundredths: total,
+      readTotalHundredths: total,
+      balanced,
+      lines,
+    }
   }
+  return { read: judge(true), asPrinted: () => judge(false) }
 }
 
 // Every way to read space-separated digit groups as numbers: «2 200» is one number or two. Values
@@ -706,6 +720,8 @@ interface TableOption {
   readonly price: number | null
   readonly sum: number | null
   readonly settled: boolean
+  /** The row's last figure is its sum, as a till prints it: what the row reads with no total (MOL-244). */
+  readonly asPrinted?: boolean
 }
 
 // Past this many combinations the total no longer chooses among the readings of a table: a long
@@ -716,7 +732,10 @@ const TABLE_COMBINATIONS_MAX = 100_000
 // «(3824) ՏՈՖՈՒ ՀՈՂ …» (Dog City). A row runs from one «(dddd)» to the next; the figures are the
 // numbers at the ends of its lines, and how «1 2 200 2 200» splits into qty, price and sum is
 // decided by qty × price = sum. A row whose figures OCR lost takes what the total leaves over.
-function tableLines(rows: readonly TextRow[]): { lines: ReceiptTextLine[]; total: number | null } {
+function tableLines(rows: readonly TextRow[]): {
+  total: number | null
+  judge: (byTotal: boolean) => ReceiptTextLine[]
+} {
   const text = rows.map((r) => r.text).join('\n')
   const items: { hs: string; words: string[]; rows: TextRow[] }[] = []
   for (const row of rows) {
@@ -762,6 +781,7 @@ function tableLines(rows: readonly TextRow[]): { lines: ReceiptTextLine[]; total
             price: Math.round((b * 100) / a),
             sum: Math.round(b / 10),
             settled: false,
+            asPrinted: true,
           })
         }
       }
@@ -779,59 +799,73 @@ function tableLines(rows: readonly TextRow[]): { lines: ReceiptTextLine[]; total
   // The receipt's total decides among the readings of rows OCR left short (one row may be blank and
   // takes what is left); among readings that add up, the one with rounder prices wins — a shop
   // prices in whole tens, 2 200 and 900, not 1 525.
-  let chosen: TableOption[] = options.map(
-    (o) => o.out[0] ?? { qty: null, price: null, sum: null, settled: false },
-  )
-  const round = (x: number | null): number => (x !== null && x % 1000 === 0 ? 1 : 0)
-  let bestScore = -Infinity
-  const pick = (i: number, acc: TableOption[]): void => {
-    if (total === null) return
-    if (i === options.length) {
-      const known = acc.filter((x) => x.sum !== null)
-      const rest = total - known.reduce((a, x) => a + (x.sum ?? 0), 0)
-      const blanks = acc.length - known.length
-      if (!((blanks === 0 && Math.abs(rest) <= 1) || (blanks === 1 && rest > 0))) return
-      const score =
-        -10 * blanks +
-        acc.filter((x) => x.settled).length +
-        acc.reduce((a, x) => a + round(x.price) + round(x.sum), 0) +
-        (blanks > 0 ? round(rest) * 2 : 0)
-      if (score > bestScore) {
-        bestScore = score
-        chosen = acc
+  // With no total to judge — none read, or none shown (MOL-244) — a row reads as printed: its own arithmetic
+  // first, else its last figure its sum — «1,5 1 350» is 1 350 at 900, never 2 025 at 1 350 (review 6, 7).
+  const judge = (byTotal: boolean): ReceiptTextLine[] => {
+    const judging = byTotal ? total : null
+    let chosen: TableOption[] = options.map(
+      (o) =>
+        (judging === null
+          ? (o.out.find((x) => x.settled) ?? o.out.find((x) => x.asPrinted))
+          : undefined) ??
+        o.out[0] ?? { qty: null, price: null, sum: null, settled: false },
+    )
+    const round = (x: number | null): number => (x !== null && x % 1000 === 0 ? 1 : 0)
+    let bestScore = -Infinity
+    const pick = (i: number, acc: TableOption[]): void => {
+      if (judging === null) return
+      if (i === options.length) {
+        const known = acc.filter((x) => x.sum !== null)
+        const rest = judging - known.reduce((a, x) => a + (x.sum ?? 0), 0)
+        const blanks = acc.length - known.length
+        if (!((blanks === 0 && Math.abs(rest) <= 1) || (blanks === 1 && rest > 0))) return
+        const score =
+          -10 * blanks +
+          acc.filter((x) => x.settled).length +
+          acc.reduce((a, x) => a + round(x.price) + round(x.sum), 0) +
+          (blanks > 0 ? round(rest) * 2 : 0)
+        if (score > bestScore) {
+          bestScore = score
+          chosen = acc
+        }
+        return
       }
-      return
+      for (const o of options[i]?.out ?? []) pick(i + 1, [...acc, o])
     }
-    for (const o of options[i]?.out ?? []) pick(i + 1, [...acc, o])
-  }
-  const combinations = options.reduce((n, o) => n * o.out.length, 1)
-  if (total !== null && combinations <= TABLE_COMBINATIONS_MAX) pick(0, [])
+    const combinations = options.reduce((n, o) => n * o.out.length, 1)
+    if (judging !== null && combinations <= TABLE_COMBINATIONS_MAX) pick(0, [])
 
-  const chosenSum = chosen.reduce((a, x) => a + (x.sum ?? 0), 0)
-  const lines = options.map((o, i): ReceiptTextLine => {
-    const c = chosen[i] ?? { qty: null, price: null, sum: null, settled: false }
-    let { sum, price } = c
-    if (sum === null && total !== null) {
-      sum = total - chosenSum
-      price = c.qty ? Math.round((sum * 1000) / c.qty) : null
-    }
-    return {
-      printed: o.name,
-      hs: o.item.hs,
-      sku: null,
-      quantityMilli: finite(c.qty),
-      unit: o.weighed ? 'kg' : 'piece',
-      priceHundredths: finite(price),
-      sumHundredths: finite(sum),
-      discountHundredths: null,
-      settled: c.settled,
-      rows: o.item.rows.slice(0, 1),
-    }
-  })
-  return { lines, total }
+    const chosenSum = chosen.reduce((a, x) => a + (x.sum ?? 0), 0)
+    const lines = options.map((o, i): ReceiptTextLine => {
+      const c = chosen[i] ?? { qty: null, price: null, sum: null, settled: false }
+      let { sum, price } = c
+      if (sum === null && judging !== null) {
+        sum = judging - chosenSum
+        price = c.qty ? Math.round((sum * 1000) / c.qty) : null
+      }
+      return {
+        printed: o.name,
+        hs: o.item.hs,
+        sku: null,
+        quantityMilli: finite(c.qty),
+        unit: o.weighed ? 'kg' : 'piece',
+        priceHundredths: finite(price),
+        sumHundredths: finite(sum),
+        discountHundredths: null,
+        settled: c.settled,
+        rows: o.item.rows.slice(0, 1),
+      }
+    })
+    return lines
+  }
+  return { total, judge }
 }
 
-function tableReceipt(rows: readonly TextRow[], table: ReturnType<typeof tableLines>): ReceiptText {
+function tableReceipt(
+  rows: readonly TextRow[],
+  total: number | null,
+  lines: ReceiptTextLine[],
+): ReceiptText {
   const text = rows.map((r) => r.text).join('\n')
   return {
     layout: 'table',
@@ -841,10 +875,11 @@ function tableReceipt(rows: readonly TextRow[], table: ReturnType<typeof tableLi
       /Ֆիսկալ\s*\S*\s+(\d{6,})/.exec(text)?.[1] ??
       /ԿՀ:?\s*(\d[\d ]{2,})/.exec(text)?.[1]?.replace(/\s/g, '') ??
       null,
-    totalHundredths: table.total,
+    totalHundredths: total,
+    readTotalHundredths: total,
     // the prototype's table reading never said whether its lines met the total
     balanced: false,
-    lines: table.lines,
+    lines,
   }
 }
 
@@ -1144,7 +1179,7 @@ export function classListStart(rows: readonly TextRow[]): number {
   return classList(rows).start
 }
 
-function classReceipt(rows: readonly TextRow[]): ReceiptText {
+function classReceipt(rows: readonly TextRow[]): Laid {
   const text = rows.map((r) => r.text).join('\n')
   const { mapped, anchorOf, start: first } = classList(rows)
   const end = first < 0 ? -1 : mapped.findIndex((row, i) => i > first && CLASS_END.test(row))
@@ -1220,37 +1255,42 @@ function classReceipt(rows: readonly TextRow[]): ReceiptText {
   const total = printedTotal === undefined ? null : hundredthsOf(printedTotal)
   const budget: Budget = { left: READING_COMBINATIONS_MAX, floors: FLOOR_COMBINATIONS_MAX }
   const guessed = new Set<Candidate>()
-  const { picks, balanced, blankSum, doubt } = judged(
-    items.map((item) => classCandidates(budget, item.figures, guessed)),
-    total,
-    items.map((item) => item.figures.sumS.replace(/\D/g, '')),
-  )
-  const lines = items.map((item, i): ReceiptTextLine => {
-    const pick = picks[i] ?? null
-    const f = item.figures
-    const sumAsRead = f.terminal ? (unpointed(f.sumS, 2)[0] ?? f.sumS) : f.sumS
+  const lists = items.map((item) => classCandidates(budget, item.figures, guessed))
+  const judge = (byTotal: boolean): ReceiptText => {
+    const { picks, balanced, blankSum, doubt } = judged(
+      lists,
+      byTotal ? total : null,
+      items.map((item) => item.figures.sumS.replace(/\D/g, '')),
+    )
+    const lines = items.map((item, i): ReceiptTextLine => {
+      const pick = picks[i] ?? null
+      const f = item.figures
+      const sumAsRead = f.terminal ? (unpointed(f.sumS, 2)[0] ?? f.sumS) : f.sumS
+      return {
+        printed: nameOf(names[i] ?? []),
+        hs: item.hs ?? lostHs,
+        sku: item.sku,
+        quantityMilli: finite(pick?.qty ?? (f.qtyS === null ? 1000 : milliOf(f.qtyS))),
+        unit: f.weighed ? 'kg' : 'piece',
+        priceHundredths: finite(pick?.price ?? (f.priceS === null ? null : hundredthsOf(f.priceS))),
+        sumHundredths: finite(pick?.paid ?? blankSum ?? hundredthsOf(sumAsRead)),
+        discountHundredths: 0,
+        settled: pick !== null && !guessed.has(pick) && !doubt.has(i),
+        rows: [rows[first + item.at]].filter((row): row is TextRow => row !== undefined),
+      }
+    })
     return {
-      printed: nameOf(names[i] ?? []),
-      hs: item.hs ?? lostHs,
-      sku: item.sku,
-      quantityMilli: finite(pick?.qty ?? (f.qtyS === null ? 1000 : milliOf(f.qtyS))),
-      unit: f.weighed ? 'kg' : 'piece',
-      priceHundredths: finite(pick?.price ?? (f.priceS === null ? null : hundredthsOf(f.priceS))),
-      sumHundredths: finite(pick?.paid ?? blankSum ?? hundredthsOf(sumAsRead)),
-      discountHundredths: 0,
-      settled: pick !== null && !guessed.has(pick) && !doubt.has(i),
-      rows: [rows[first + item.at]].filter((row): row is TextRow => row !== undefined),
+      layout: 'class',
+      tin: /ՀՎՀՀ\S{0,2}\s*(\d{8})(?!\d)/.exec(text)?.[1] ?? null,
+      ...dateOf(text),
+      receiptNo: /Ֆիսկալ\S*(?:\s+\S*համար\S*)?\s+(\d{6,})/.exec(text)?.[1] ?? null,
+      totalHundredths: total,
+      readTotalHundredths: total,
+      balanced,
+      lines,
     }
-  })
-  return {
-    layout: 'class',
-    tin: /ՀՎՀՀ\S{0,2}\s*(\d{8})(?!\d)/.exec(text)?.[1] ?? null,
-    ...dateOf(text),
-    receiptNo: /Ֆիսկալ\S*(?:\s+\S*համար\S*)?\s+(\d{6,})/.exec(text)?.[1] ?? null,
-    totalHundredths: total,
-    balanced,
-    lines,
   }
+  return { read: judge(true), asPrinted: () => judge(false) }
 }
 
 // MOL-227 — a sole trader's terminal prints no items at all: its section «Բաժին 1», the turnover tax,
@@ -1288,20 +1328,28 @@ const DEPARTMENT_MOMENT = new RegExp(DEPARTMENT_DATE.source)
 // «ՖԻՍԿԱԼ ՀԱՄԱՐ 04143299», in capitals as often as not.
 const DEPARTMENT_FISCAL = /Ֆիսկալ\S*\s+\S*\s*(\d{8})(?!\d)/iu
 const SECTION_TAX = /Շրջ|հար[կլ]/u
-// «Ընդամենը», «/չդամենը», «Կղդամեկը» — and not its discount, «Ընդամենը զեղչ»
-const DEPARTMENT_TOTAL = 'դամե'
-const DEPARTMENT_PAID = /ձեռն|ձեոն|ձեդն|Կանխիկ|Անկանխ|Վճար/u
-// An amount with its hundredths: «1700.00», «1800 00» — a figure that lost its point is no vote.
-const AMOUNT = /(?<![\d.,])(\d{1,7})[., ](\d{2})(?![\d.,])/g
+// The total's word as OCR reads it, «Ընդամենը», «/չդամենը», «Կղդամեկը» — and not its discount,
+// «Ընդամենը զեղչ»; and the payment's, in cash or by card. The words of any Armenian till.
+const TOTAL_WORD = 'դամե'
+const PAID_WORDS = /ձեռն|ձեոն|ձեդն|Կանխիկ|Անկանխ|Վճար/u
+// the discount however OCR spells its first letter — «զեղչ», «Զեղչ», «qեղչ» — as loosely as the total's word
+const totalRow = (text: string): boolean => text.includes(TOTAL_WORD) && !text.includes('եղչ')
+// An amount with its hundredths: «1700.00», «1800 00», and with its thousands apart before a point,
+// «2 050,01» — the card's payment, which read digit by digit was 50,01 in two places at once (MOL-244). A
+// figure that lost its point is no vote.
+const AMOUNT =
+  /(?<![\d.,])(\d{1,3}(?: \d{3})+(?=[.,]\d{2}(?![\d.,]))|\d{1,7})[., ](\d{2})(?![\d.,])/g
 
 const amountsOf = (text: string): number[] =>
-  [...text.matchAll(AMOUNT)].map((m) => Number(m[1]) * 100 + Number(m[2])).filter((a) => a > 0)
+  [...text.matchAll(AMOUNT)]
+    .map((m) => Number(m[1]?.replace(/ /g, '')) * 100 + Number(m[2]))
+    .filter((a) => a > 0)
 
 /**
- * The amounts of a reading by where they stand: the section's sum, the total, the payment — each printed
- * once on such a receipt, and each read on its own by OCR.
+ * The amounts of a reading by where they stand: the total, the payment and, on a receipt with no items,
+ * the section's sum — each a place of its own on the paper, read on its own by OCR.
  */
-function departmentAmounts(rows: readonly TextRow[]): Map<string, Set<number>> {
+function placedAmounts(rows: readonly TextRow[], withSection: boolean): Map<string, Set<number>> {
   const texts = rows.map((r) => r.text).filter((t) => t.trim() !== '')
   const found = new Map<string, Set<number>>([
     ['section', new Set()],
@@ -1311,18 +1359,45 @@ function departmentAmounts(rows: readonly TextRow[]): Map<string, Set<number>> {
   const add = (source: string, amounts: number[]): void => {
     for (const amount of amounts) found.get(source)?.add(amount)
   }
+  // a row is one place, whatever words OCR put on it: «Ընդամենը Վճարված 2060.01» read twice is one vote,
+  // and a row the section took as its tax is the section's alone (adversarial Б2)
+  const taken = new Set<number>()
   texts.forEach((text, i) => {
-    if (DEPARTMENT.test(text)) {
+    if (taken.has(i)) return
+    if (withSection && DEPARTMENT.test(text)) {
       add('section', amountsOf(text))
       // the turnover tax under it carries the section's sum
-      for (const next of texts.slice(i + 1, i + 3)) {
-        if (SECTION_TAX.test(next)) add('section', amountsOf(next))
+      for (const [k, next] of texts.slice(i + 1, i + 3).entries()) {
+        if (!SECTION_TAX.test(next)) continue
+        add('section', amountsOf(next))
+        taken.add(i + 1 + k)
       }
-    }
-    if (text.includes(DEPARTMENT_TOTAL) && !text.includes('զեղչ')) add('total', amountsOf(text))
-    if (DEPARTMENT_PAID.test(text)) add('paid', amountsOf(text))
+    } else if (totalRow(text)) add('total', amountsOf(text))
+    else if (PAID_WORDS.test(text)) add('paid', amountsOf(text))
   })
   return found
+}
+
+/**
+ * The total two places on the paper vouch for, across the readings (MOL-227, MOL-244): the amount read in
+ * the most of them, at least two, and the only one so — or null. One place read alike by both readings is
+ * one vote: they read one photo, and a digit of this font misread is misread in both («2060.01» for
+ * «2050.01»).
+ */
+function votedTotal(
+  readings: readonly (readonly TextRow[])[],
+  withSection: boolean,
+): number | null {
+  const votes = new Map<number, Set<string>>()
+  for (const rows of readings) {
+    for (const [source, amounts] of placedAmounts(rows, withSection)) {
+      for (const amount of amounts) votes.set(amount, (votes.get(amount) ?? new Set()).add(source))
+    }
+  }
+  const backed = [...votes].filter(([, sources]) => sources.size >= 2)
+  const most = Math.max(0, ...backed.map(([, sources]) => sources.size))
+  const totals = backed.filter(([, sources]) => sources.size === most)
+  return totals.length === 1 ? (totals[0]?.[0] ?? null) : null
 }
 
 /** A day of the calendar and a time a clock shows, or null: «64-10-26» or «76:36» is no reading at all. */
@@ -1354,15 +1429,6 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
   if (!readings.some((rows) => rows.some((row) => DEPARTMENT.test(row.text)))) return null
   if (readings.some((rows) => rows.some((row) => ITEM_MARK.test(row.text)))) return null
   const texts = readings.map(rowTexts)
-  const votes = new Map<number, Set<string>>()
-  for (const rows of readings) {
-    for (const [source, amounts] of departmentAmounts(rows)) {
-      for (const amount of amounts) votes.set(amount, (votes.get(amount) ?? new Set()).add(source))
-    }
-  }
-  const backed = [...votes].filter(([, sources]) => sources.size >= 2)
-  const most = Math.max(0, ...backed.map(([, sources]) => sources.size))
-  const totals = backed.filter(([, sources]) => sources.size === most)
   const moments = texts.map((rows) => [
     ...new Map(
       rows
@@ -1402,7 +1468,7 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
     (rows, i) =>
       (moments[i]?.length ?? 0) > 1 ||
       repeated(rows, fiscal) ||
-      repeated(rows, (text) => text.includes(DEPARTMENT_TOTAL) && !text.includes('զեղչ')) ||
+      repeated(rows, totalRow) ||
       headUnder(rows),
   )
   // a day or a time no calendar or clock has is no reading of it, and outvotes nothing (adversarial А3)
@@ -1448,7 +1514,8 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
             return moment >= 0 && moment < end ? firstOf(rows, DEPARTMENT_FISCAL) : null
           }),
         ),
-    totalHundredths: !several && totals.length === 1 ? (totals[0]?.[0] ?? null) : null,
+    totalHundredths: several ? null : votedTotal(readings, true),
+    readTotalHundredths: null,
     balanced: false,
     lines: [],
   }
@@ -1456,7 +1523,7 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
 
 /** One reading of a receipt — the rows of its parts, joined — into lines with figures. */
 export function parseReceiptText(rows: readonly TextRow[]): ReceiptText {
-  return withTwins(readingOf(rows))
+  return withTwins(readingOf(rows).read)
 }
 
 /**
@@ -1492,19 +1559,35 @@ function withTwins(read: ReceiptText): ReceiptText {
   }
 }
 
-function readingOf(rows: readonly TextRow[]): ReceiptText {
+/**
+ * One reading laid out: `read` — its lines judged by its own printed total; `asPrinted` — the same lines as
+ * printed, for a total `bestReading` does not show by them (MOL-244). The candidates of a line's figures are
+ * found once, so reading again costs the judging alone: the parse's ceilings hold.
+ */
+interface Laid {
+  readonly read: ReceiptText
+  readonly asPrinted: () => ReceiptText
+}
+
+function readingOf(rows: readonly TextRow[]): Laid {
   const card = cardReceipt(rows)
   const text = rows.map((r) => r.text).join('\n')
-  let read = card
+  let laid = card
   // a customs heading names its item after it, «(3824) ՏՈՖՈՒՀՈՂ»; «(0312) 5-12-34» is a phone in the head,
   // and read as Dog City's table it made one «line» of the whole head (MOL-227, adversarial А2)
   if (/\(\d{4}\)\s*\p{L}/u.test(text)) {
     const table = tableLines(rows)
-    if (table.lines.length > card.lines.length) read = tableReceipt(rows, table)
+    const lines = table.judge(true)
+    if (lines.length > card.read.lines.length) {
+      laid = {
+        read: tableReceipt(rows, table.total, lines),
+        asPrinted: () => tableReceipt(rows, table.total, table.judge(false)),
+      }
+    }
   }
   // the class code reads a till neither layout knows; where one of them reads, it keeps the receipt
   const coded = classReceipt(rows)
-  return coded.lines.length > read.lines.length ? coded : read
+  return coded.read.lines.length > laid.read.lines.length ? coded : laid
 }
 
 /** The rows of a part's text, numbered as the reader numbered them. */
@@ -1759,17 +1842,51 @@ export function mergeParts(parts: readonly (readonly TextRow[])[]): TextRow[] {
 /**
  * The receipt from its readings — Tesseract in two page modes, each with the parts merged: the
  * reading whose lines add up, else the one with more lines settled. The receipt's own arithmetic is
- * the judge; no truth is needed.
+ * the judge; no truth is needed. Its total is one two sources vouch for (MOL-244, owner's В-1 «а»): two
+ * places printed — the total and the payment (`votedTotal`) — else the lines that met it, one of them as
+ * read, else none.
+ * A total read in one place is a digit misread as often as not, the same in both readings (am-08, am-13,
+ * am-36 on the bench), and a wrong sum on a trip is worse than none the person sees and types. What the
+ * reading read stays `readTotalHundredths`, for «Прочитали не всё» alone.
  */
 export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptText {
-  const parsed = readings.map(readingOf)
+  const laid = readings.map(readingOf)
+  const parsed = laid.map((one) => one.read)
   const settledCount = (r: ReceiptText): number => r.lines.filter((l) => l.settled).length
-  const sorted = [...parsed].sort(
-    (a, b) => Number(b.balanced) - Number(a.balanced) || settledCount(b) - settledCount(a),
-  )
-  const best = sorted[0]
+  const merit = (a: ReceiptText, b: ReceiptText): number =>
+    Number(b.balanced) - Number(a.balanced) || settledCount(b) - settledCount(a)
+  const best = [...parsed].sort(merit)[0]
   if (best === undefined) throw new RangeError('a receipt needs at least one reading')
   // no reading found a line: a section with no items is read whole, not one to shoot again (MOL-227)
-  if (best.lines.length === 0) return departmentReceipt(readings) ?? best
-  return withTwins(best)
+  if (best.lines.length === 0) {
+    const section = departmentReceipt(readings)
+    if (section !== null) return section
+  }
+  // Lines «meet» a total only as read: the total changes a line's digit to meet itself, or gives a line
+  // with no reading its rest (adversarial А1). Every line as read — the lines vouch, unless two places print
+  // another sum (Б1, Ц1); else two places printed (А1б); else the lines with one of them as read (owner).
+  const asRead = (every: boolean): boolean =>
+    best.balanced &&
+    (every ? best.lines.every((l) => l.settled) : best.lines.some((l) => l.settled))
+  const own = best.totalHundredths
+  const voted = votedTotal(readings, false)
+  // the lines as read and two places naming two sums: either may be the font's slip, and nothing tells
+  // which (Б1 against its mirror, round 3 Ц1) — so no total (owner, 09.10.2026)
+  const total = asRead(true)
+    ? voted === null || voted === own
+      ? own
+      : null
+    : (voted ?? (asRead(false) ? own : null))
+  if (total === own) return withTwins({ ...best, totalHundredths: total })
+  // A total the reading did not judge its lines by leaves nothing in them, and judges none (review 4, 7):
+  // the reading chosen is read again as printed. Two places shown are no judge either (В-2 «а»; round 5 Д1:
+  // a vote misread alike in two places made a lost row up to meet itself, and the review's «≠» was gone) —
+  // the lines are «balanced» only where, as printed, they add up to it; a row OCR lost stays empty (Г1).
+  const reread = laid[parsed.indexOf(best)]?.asPrinted() ?? best
+  const sums = reread.lines.map((line) => line.sumHundredths)
+  const met =
+    total !== null &&
+    sums.every((sum) => sum !== null) &&
+    sums.reduce((all, sum) => all + sum, 0) === total
+  return withTwins({ ...reread, totalHundredths: total, readTotalHundredths: own, balanced: met })
 }
