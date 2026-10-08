@@ -294,7 +294,9 @@ export default defineComponent({
      * «≈ 63 800 ₽» under the figure is there only where the two currencies differ: the skeleton draws
      * its line by the person's currencies, as «Счета» last said them (adversarial А5) — with nothing
      * known, by the usual case, two (Б3). Taken as the skeleton comes and held while it stands: «Счета»
-     * answering meanwhile must not grow or shrink it under the switcher (Б3).
+     * answering meanwhile must not grow or shrink it under the switcher (Б3). The price, named in
+     * `frontend.md` (В1): a person of one currency with nothing kept gets the line once, and the page
+     * shrinks by it as the month comes.
      */
     const currencies = () => {
       const overview = accounts.overview
