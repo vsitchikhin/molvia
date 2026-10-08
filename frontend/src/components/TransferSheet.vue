@@ -13,7 +13,7 @@
       tone="warn"
       inline
       :title="t('spending.offline.title')"
-      :body="t('transfer.offline')"
+      :body="t('transfer.unread_offline')"
     />
     <ScreenState
       v-else-if="unread === 'error'"
@@ -128,7 +128,7 @@
         </template>
         {{ reason ?? mainWord }}
       </AppButton>
-      <template v-if="editing && !loading">
+      <template v-if="editing && !loading && failure !== 'vanished'">
         <AppButton
           variant="danger-ghost"
           block
@@ -201,6 +201,7 @@ import StatusStrip from '@/components/StatusStrip.vue'
 import { pageOrder, shortDay } from '@/components/accounts'
 import { asTyped } from '@/components/spending'
 import { shown } from '@/composables/useItemDetails'
+import { useReconnect } from '@/composables/useReconnect'
 import { useTransfers } from '@/composables/useTransfers'
 import { localDay } from '@/days'
 import { reportFailure } from '@/failures'
@@ -279,7 +280,7 @@ export default defineComponent({
     const dayBad = ref(false)
     const noteBad = ref(false)
     const toGone = ref(false)
-    const failure = ref<'failed' | 'gone' | 'conflict' | 'written' | null>(null)
+    const failure = ref<'failed' | 'gone' | 'conflict' | 'written' | 'vanished' | null>(null)
     const goneName = ref('')
     const sending = ref(false)
     const removing = ref(false)
@@ -344,6 +345,10 @@ export default defineComponent({
       },
       { immediate: true },
     )
+    // Back online, a transfer that did not open is read again by itself (review Р2-2, frontend.md).
+    useReconnect(() => {
+      if (props.open && unread.value !== null) void load()
+    })
 
     /**
      * The transfer a row opened, read from the server — it is amended only with a connection. Not
@@ -398,6 +403,7 @@ export default defineComponent({
 
     /** What «Перевести» still needs, the first missing in order (Ф-6); null when it can go. */
     const reason = computed<string | null>(() => {
+      if (failure.value === 'vanished') return t('transfer.vanished_button')
       if (!props.online)
         return t(editing.value ? 'transfer.wait_online_save' : 'transfer.wait_online')
       if (!source.value) return t('transfer.need_from')
@@ -443,12 +449,14 @@ export default defineComponent({
     const failureTitle = computed(() => {
       if (failure.value === 'conflict') return t('transfer.conflict_title')
       if (failure.value === 'written') return t('transfer.written_title')
+      if (failure.value === 'vanished') return t('transfer.vanished_title')
       return t('transfer.failed')
     })
 
     const failureBody = computed(() => {
       const held = editing.value
       if (failure.value === 'gone') return t('transfer.gone', { name: goneName.value })
+      if (failure.value === 'vanished') return t('transfer.vanished')
       if (failure.value === 'conflict' && held)
         return t('transfer.amend_conflict', { details: currentOf(held) })
       if (failure.value === 'written' && held)
@@ -552,10 +560,15 @@ export default defineComponent({
             const now = await transfers.load(id)
             failure.value = editing.value ? 'conflict' : 'written'
             editing.value = now
-            if (failure.value === 'written') void store.refresh()
+            if (failure.value === 'written') void transfers.heard()
           } catch {
             failure.value = 'failed'
           }
+        } else if (code === ERROR.NOT_FOUND && editing.value) {
+          // Removed on another phone: there is nothing to save, and saying «try again» would loop
+          // for ever (adversarial А8). Its rows go from the journal under the sheet.
+          failure.value = 'vanished'
+          void transfers.heard()
         } else {
           failure.value = 'failed'
         }

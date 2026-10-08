@@ -351,6 +351,57 @@ describe('TransferSheet (MOL-253)', () => {
       expect(mainButton(view).text()).toBe('Save')
     })
 
+    it('А8: an amendment of a transfer removed on another phone says so, and does not loop', async () => {
+      transfer.mockResolvedValueOnce(written())
+      amendTransfer.mockRejectedValueOnce(new ApiError(ERROR.NOT_FOUND, 'gone', true))
+      moneyAccounts.mockResolvedValue(page([card, dollars]))
+      const pinia = withAccounts([card, dollars])
+      const view = await sheet({ editingId: TRANSFER }, pinia)
+      await typeAmount(view, '2100')
+      await mainButton(view).trigger('click')
+      await settle()
+      expect(view.get('.refusal').text()).toContain('The transfer was deleted on another phone')
+      expect(mainButton(view).text()).toBe('The transfer is gone')
+      expect(mainButton(view).attributes('aria-disabled')).toBe('true')
+      await mainButton(view).trigger('click')
+      await settle()
+      expect(amendTransfer).toHaveBeenCalledTimes(1)
+      expect(view.findAll('button').some((one) => one.text() === 'Delete transfer')).toBe(false)
+      // The journal under the sheet is told to read again: its rows are gone.
+      expect(useAccountsStore(pinia).transfers).toBe(1)
+    })
+
+    it('А9, Р2-1: «already recorded» tells the journals and the month, closed or saved', async () => {
+      recordTransfer
+        .mockRejectedValueOnce(offline())
+        .mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 'conflict', true))
+      transfer.mockResolvedValueOnce(written())
+      moneyAccounts.mockResolvedValue(page([card, dollars]))
+      const pinia = withAccounts([card, dollars])
+      const view = await sheet({ from: card.id }, pinia)
+      await typeAmount(view, '2000')
+      await mainButton(view).trigger('click')
+      await settle()
+      await typeAmount(view, '2100')
+      await mainButton(view).trigger('click')
+      await settle()
+      expect(view.get('.refusal').text()).toContain('The transfer is already recorded')
+      expect(useAccountsStore(pinia).transfers).toBe(1)
+    })
+
+    it('Р2-2: offline, a transfer that did not open says it opens with the connection, and reads itself then', async () => {
+      const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      transfer.mockRejectedValueOnce(offline()).mockResolvedValueOnce(written())
+      const view = await sheet({ editingId: TRANSFER }, withAccounts([card, dollars]))
+      expect(view.text()).toContain('The transfer will open once you are online')
+      expect(view.findAll('button').some((one) => one.text() === 'Try again')).toBe(false)
+      onLine.mockReturnValue(true)
+      window.dispatchEvent(new Event('online'))
+      await settle()
+      expect(transfer).toHaveBeenCalledTimes(2)
+      expect(mainButton(view).text()).toBe('Save')
+    })
+
     describe('«Вернуть» (review С-3, А4)', () => {
       function outcomesHost() {
         let outcomes: TransferOutcomes | undefined

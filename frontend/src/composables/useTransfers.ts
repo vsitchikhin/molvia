@@ -10,6 +10,11 @@ export interface Transfers {
   readonly restore: (id: string) => Promise<TransferView>
   /** One transfer as its sheet opens it. */
   readonly load: (id: string) => Promise<TransferView>
+  /**
+   * A transfer changed with no answer of ours to say so — written already under its name, removed on
+   * another phone: «Счета» read again, and the journals and the month told to (review Р2-1, А8, А9).
+   */
+  readonly heard: () => Promise<void>
 }
 
 /**
@@ -46,5 +51,9 @@ export function useTransfers(): Transfers {
       return answer.transfer
     },
     load: (id) => api.transfer(id),
+    async heard() {
+      await accounts.refresh()
+      accounts.transfers += 1
+    },
   }
 }
