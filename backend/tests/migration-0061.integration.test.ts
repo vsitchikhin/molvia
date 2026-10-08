@@ -9,7 +9,7 @@ import { insertActor, insertItem, insertPlace, insertTrip } from './fixtures'
 import { storeMemoryWords } from '@molvia/model'
 import { MIGRATIONS } from '@/db/migrate'
 import * as schema from '@/db/schema'
-import { expenses, receiptLineImages, receipts, storeMemory } from '@/db/schema'
+import { expenses, receiptLineImages, storeMemory } from '@/db/schema'
 import { settleStoreMemory } from '@/db/store-memory-repository'
 
 /**
@@ -20,7 +20,7 @@ import { settleStoreMemory } from '@/db/store-memory-repository'
  *
  * Its own database, created and dropped here, as in `migration-0012.integration.test.ts`: the chain
  * has to be left one step short of 0061. The rows are written with the schema as it is now, but for
- * the lines: 0061 adds a column to them.
+ * the lines and the receipts: 0061 adds a column to the lines, 0062 to the receipts.
  */
 interface JournalEntry {
   readonly idx: number
@@ -120,13 +120,19 @@ describe('0061: what a removed trip or purchase left of its receipt', () => {
     const orphan = randomUUID()
     // not recorded yet: its lines have no purchase and must stay
     const parsed = randomUUID()
-    await db
-      .insert(receipts)
-      .values([
-        receipt(working, trip),
-        receipt(orphan, null),
-        { ...receipt(parsed, null), status: 'parsed', recordedAt: null },
-      ])
+    // by hand, as the lines below: the schema of now has columns later migrations add (0062, MOL-244)
+    for (const one of [
+      receipt(working, trip),
+      receipt(orphan, null),
+      { ...receipt(parsed, null), status: 'parsed' as const, recordedAt: null },
+    ]) {
+      await sql`
+        insert into receipts (id, actor_id, status, parts, country, language, currency, captured_at,
+          queued_at, tin, receipt_no, total_minor, trip_id, recorded_at)
+        values (${one.id}, ${one.actorId}, ${one.status}, ${one.parts}, ${one.country}, ${one.language},
+          ${one.currency}, ${one.capturedAt.toISOString()}, ${one.queuedAt.toISOString()}, ${one.tin}, ${one.receiptNo},
+          ${String(one.totalMinor)}, ${one.tripId}, ${one.recordedAt?.toISOString() ?? null})`
+    }
     // by hand: the schema of now has columns 0061 adds after this point
     for (const one of [
       line(working, 0, bought),
