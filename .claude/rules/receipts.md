@@ -232,8 +232,11 @@ the copy carries the person's own words.
 **A person's word is what their last line still there says** (MOL-240, owner's В-1 «а» on adversarial
 А1, round 3): its item, its shelf price when «Записать» recorded it as read (`receipt_lines.as_read`, judged
 once at the record — round 4, Р4-1: judged again from the purchase as it is now, a sum put right later,
-a discount at the till, wiped the shelf price at the next deploy) and the moment of its record — the
-record's transaction time, `now()`, both for `recorded_at` and the word's `written_at`, so a word
+a discount at the till, wiped the shelf price at the next deploy; a line an image rolled back recorded
+has it unset and keeps its price while its purchase is as the line was read, as 0061 judged the lines
+before it — round 5, Р5-1) and the moment of its record — the
+record's transaction time, `now()`, both for `recorded_at` and the word's `written_at` — a new word's
+too, not only one written over (round 5), so a word
 settled from the very line that wrote it moves nothing (Р4-1б) — or no word once no line says it. A purchase removed, or
 its trip removed for good, settles the words of its line by every path that deletes them: «Удалить
 позицию», the minute timer, and the final removal «Начать» and a receipt's record make of a trip past its

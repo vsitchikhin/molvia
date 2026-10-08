@@ -830,13 +830,35 @@ describe('«Записать»', () => {
       expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([37_000n, 37_000n])
     })
 
+    // round 5, Р5-1: a line an image rolled back recorded has `as_read` unset — its price stays while
+    // the purchase is as the line was read, and goes once the sum was put right
+    it('Р5-1: keeps the shelf price of a line an image rolled back recorded, while its purchase says it', async () => {
+      const me = await insertActor(db)
+      const place = await insertPlace(db)
+      const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+      const bought = await recordMilk(me, place, milk, 370)
+      await db
+        .update(receiptLines)
+        .set({ asRead: false })
+        .where(eq(receiptLines.expenseId, bought.expenseId))
+      await settleStoreMemory(db)
+      expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([37_000n, 37_000n])
+      // the control: put right after the record, nothing says the shelf any more
+      await db
+        .update(expenses)
+        .set({ amountMinor: 35_000n })
+        .where(eq(expenses.id, bought.expenseId))
+      await settleStoreMemory(db)
+      expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([null, null])
+    })
+
     // round 4, Р4-1б: the word and the record share one moment — settling right after moves nothing
     it('Р4-1б: settles nothing a record has just written', async () => {
       const me = await insertActor(db)
       const place = await insertPlace(db)
       const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+      // one record: a second would write the first's words over, and a new word is the case (round 5)
       await recordMilk(me, place, milk, 370)
-      await recordMilk(me, place, milk, 400)
       expect(await settleStoreMemory(db)).toBe(0)
     })
 

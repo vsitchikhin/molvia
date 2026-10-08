@@ -49,8 +49,9 @@ export const memoryKey = (word: StoreMemoryWord): string => `${word.kind}:${word
 /**
  * The lines that say a person's words: their recorded lines of purchases at a seller, with the item each
  * went to, its shelf price when «Записать» recorded it as read (`receipt_lines.as_read`, round 4, Р4-1:
- * never judged again from the purchase as it is now — a sum put right later is what was paid, not the
- * shelf), and its order of saying, the order `remember` wrote them in.
+ * never taken away by the purchase as it is now — a sum put right later is what was paid, not the
+ * shelf; a line left unmarked by an image rolled back keeps it while its purchase is as the line was
+ * read, round 5, Р5-1), and its order of saying, the order `remember` wrote them in.
  */
 function spokenLines(db: Conn, actor: string, where: SQL = sql`true`) {
   return db.execute<{
@@ -65,7 +66,13 @@ function spokenLines(db: Conn, actor: string, where: SQL = sql`true`) {
     position: number
   }>(sql`
     select r.tin, l.printed, l.sku, ${liveItemId(sql`e.item_id`)} as item,
-      case when l.as_read then l.price_minor end as price_minor,
+      case when l.as_read
+        -- a line an image rolled back recorded has no word on it (round 5, Р5-1): the one way left, as
+        -- 0061 judged the lines before it — the purchase still as the line was read
+        or (l.settled
+          and e.qty_milli is not distinct from l.qty_milli and e.qty_unit is not distinct from l.qty_unit
+          and e.amount_minor = l.sum_minor and e.amount_currency = r.currency)
+      then l.price_minor end as price_minor,
       r.currency, r.recorded_at, l.receipt_id as receipt, l.position
     from receipt_lines l
     join receipts r on r.id = l.receipt_id
@@ -308,6 +315,9 @@ export function createStoreMemoryRepository(db: Conn): StoreMemoryRepository {
             itemId: liveItemId(word.itemId),
             priceMinor: word.price?.minor ?? null,
             priceCurrency: word.price?.currency ?? null,
+            // a new word too, not only one written over (round 5, Р4-1б): the column's default is the
+            // clock, a moment after the record's `recorded_at`
+            writtenAt: sql`now()`,
           })),
         )
         .onConflictDoUpdate({
