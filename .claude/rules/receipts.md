@@ -568,21 +568,28 @@ tills of one trader. End-to-end, the fake reader answers a square photo with suc
 ## A total two sources vouch for (MOL-244)
 
 **A total is shown only where two sources vouch for it** (owner's В-1 «а», 09.10.2026; MOL-255's «неверно
-прочитанное хуже непрочитанного»): two places on the paper print it — the total, the payment and, on a
-receipt with no items, the section's sum — by one function for both kinds (`votedTotal`, MOL-227's vote moved
-out of `departmentReceipt`): the amount read in the most places, at least two, and the only one so; else the
-lines of the reading chosen met it **with one of them as read**. **Two readings of one row are one place**:
+прочитанное хуже непрочитанного»), in this order: the lines of the reading chosen met it **every one as
+read**; else two places on the paper print it — the total, the payment and, on a receipt with no items, the
+section's sum — by one function for both kinds (`votedTotal`, MOL-227's vote moved out of
+`departmentReceipt`): the amount read in the most places, at least two, and the only one so; else the lines met
+it **with one of them as read**. **Two readings of one row are one place**:
 they read one photo, and a digit of the tills' font misread is misread in both — every wrong total of the
 bench was so, «Ընդամենը 2060.01» for 2050.01 in psm 4 and psm 6 alike (am-08, am-13, am-36). **Nor is one row
 two places**, whatever words OCR put on it: a row is the section, else the total, else the payment
-(adversarial А2). **The discount is told by «եղչ»** — «զեղչ», «Զեղչ», OCR's «qեղչ» — as loosely as the total's
-«դամե» (А3). **The vote comes before the lines** (А1б): the total judges the lines, and makes them meet it — it
-swaps a digit of a line read right (150 → 160) or gives a line with no reading what it leaves — so «balanced»
-alone is the total vouching for itself. On the bench every line of am-09 and hand/am-08 was changed so, under
+(adversarial А2) — and a row the section took as its tax is the section's alone (round 2, Б2). **The discount is told by «եղչ»** — «զեղչ», «Զեղչ», OCR's «qեղչ» — as loosely as the total's
+«դամե» (А3). **The vote comes before lines the total changed** (А1б): the total judges the lines, and makes
+them meet it — it swaps a digit of a line read right (150 → 160) or gives a line with no reading what it
+leaves — so «balanced» alone is the total vouching for itself. **Lines that met it every one as read come
+before the vote** (round 2, Б1): the font's «5» read «6» in a card payment of both readings and in one reading's
+total is two places for a wrong sum, and the lines as read are the honest source. On the bench every line of am-09 and hand/am-08 was changed so, under
 a wrong total; a reading whose lines the total changed every one of vouches for nothing (owner, adversarial
 А1: «хотя бы одна строка как прочитана»). **The price, named:** a misread total that changed one line while
 another stands as read is still shown (А1а, А1в — none on the bench); closing it cost four right totals (am-05,
-KFC on both prints), whose totals put one to three lines right. **A sum with its thousands apart is read whole** — «6 331,07», never 331,07 in two places: the
+KFC on both prints), whose totals put one to three lines right. **A total not shown leaves nothing of
+itself in the lines** (review 4): the reading chosen is read again with no total to judge it — every line as
+read, no rest given to a line with no reading — and is «balanced» only where those lines add up to the total
+shown. Kept, a line put to 160 by a total nobody sees went on to the trip's money (am-09; hand/am-08 got its
+right line back). **A sum with its thousands apart is read whole** — «6 331,07», never 331,07 in two places: the
 card's shelf total and a card payment print so where there is no discount. **A table's total is never
 «balanced»** (Dog City, `tableReceipt`): a blank row takes what the total leaves, so its lines meeting it vouch
 for nothing — its total stands by its payment «Կանխիկ».

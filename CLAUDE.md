@@ -585,10 +585,12 @@ that are easiest to break; the file holds every rule of the area and the reason 
   receipt with no lines (`withoutItems`), its head the terminal's — the tax number after «ՀՎՀՀ» first,
   never the receipt's own «ԿՀ» — its total two sources of three, none where two receipts show (a head
   under a fiscal number among them); neither «Записать» nor «Убрать сумму» makes a finished trip empty.
-- **A total is shown only where two sources vouch for it** (MOL-244, В-1 «а»): two places printed — the
-  total, the payment, a section's sum — by one `votedTotal` for both kinds of receipt, else the lines that
-  met it with one of them as read; two readings of one row, or one row with two words, are one place. Read in one place it is `read_total_minor`, what «Прочитали
-  не всё» measures by alone, sent only to a phone that asks (`RECEIPT_READ_TOTAL_HEADER`).
+- **A total is shown only where two sources vouch for it** (MOL-244, В-1 «а»): the lines that met it every
+  one as read, else two places printed — the total, the payment, a section's sum — by one `votedTotal` for
+  both kinds of receipt, else the lines with one of them as read; a row is one place, both readings of it
+  too. A total not shown leaves nothing in the lines: they are read again as read. Read in one place it is
+  `read_total_minor`, what «Прочитали не всё» measures by alone, sent only to a phone that asks
+  (`RECEIPT_READ_TOTAL_HEADER`).
 - **The reader away leaves a receipt queued; a photo it drops goes to the end with its attempt
   counted; a photo it cannot read fails** — never lost, never read forever; people read in turn.
 - **The class code is a boundary, not a layout** (MOL-226): «Դաս. 56.10» opens an item on any fiscal till,
