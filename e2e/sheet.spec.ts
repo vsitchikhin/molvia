@@ -624,6 +624,191 @@ test.describe('the sheet', () => {
     await expect(sheet(page)).toBeVisible()
     await expect(field).toBeFocused()
   })
+
+  // Taller than its share, the sheet keeps its main action at its bottom edge, the content scrolling
+  // under it; what it brings into sight stops at the footer's top (MOL-182, Ф-17).
+  test.describe('taller than its share, its footer pinned', () => {
+    const longSheet = (page: Page) => page.getByRole('dialog', { name: 'A long sheet' })
+    const footerOf = (page: Page) => longSheet(page).locator('.footer')
+    const note = (page: Page) => longSheet(page).getByLabel('Note')
+
+    async function openLong(page: Page): Promise<void> {
+      await open(page, '/_kit')
+      await expect(heading(page)).toHaveText('Kit')
+      const opens = page.getByRole('button', { name: 'Open a long sheet' })
+      await opens.scrollIntoViewIfNeeded()
+      await opens.click()
+      await expect(longSheet(page)).toBeVisible()
+      await longSheet(page).evaluate(async (dialog) => {
+        await Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished))
+      })
+      await page.waitForTimeout(400)
+    }
+
+    /** The sheet's box, its footer's and the note's, where they stand on the screen now. */
+    async function boxes(page: Page) {
+      return longSheet(page).evaluate((dialog) => {
+        const box = (element: Element | null) => {
+          const rect = element?.getBoundingClientRect()
+          return { top: rect?.top ?? Number.NaN, bottom: rect?.bottom ?? Number.NaN }
+        }
+        return {
+          sheet: box(dialog),
+          footer: box(dialog.querySelector('.footer')),
+          note: box(dialog.querySelector('input')),
+          scrollTop: dialog.scrollTop,
+          scrolls: dialog.scrollHeight > dialog.clientHeight,
+        }
+      })
+    }
+
+    test('stands at the bottom edge, the main action in sight, before any scroll', async ({
+      page,
+    }) => {
+      await openLong(page)
+      const { sheet: box, footer, scrollTop, scrolls } = await boxes(page)
+      expect(scrolls).toBe(true)
+      expect(scrollTop).toBe(0)
+      expect(Math.abs(footer.bottom - box.bottom)).toBeLessThanOrEqual(1)
+      await expect(
+        longSheet(page).getByRole('button', { name: 'Record', exact: true }),
+      ).toBeInViewport({ ratio: 1 })
+    })
+
+    test('scrolled to the end, the last field stands whole above it', async ({ page }) => {
+      await openLong(page)
+      await longSheet(page).evaluate((dialog) => {
+        dialog.scrollTop = dialog.scrollHeight
+      })
+      const { sheet: box, footer, note: field } = await boxes(page)
+      expect(Math.abs(footer.bottom - box.bottom)).toBeLessThanOrEqual(1)
+      expect(field.bottom).toBeLessThanOrEqual(footer.top)
+    })
+
+    test('is drawn over the content: the sheet’s colour, a hairline, the sheet’s shadow', async ({
+      page,
+    }) => {
+      await openLong(page)
+      const drawn = await footerOf(page).evaluate((footer) => {
+        const style = getComputedStyle(footer)
+        return {
+          position: style.position,
+          background: style.backgroundColor,
+          sheet: getComputedStyle(footer.parentElement ?? footer).backgroundColor,
+          hairline: style.borderTopWidth,
+          shadow: style.boxShadow,
+        }
+      })
+      expect(drawn.position).toBe('sticky')
+      expect(drawn.background).toBe(drawn.sheet)
+      expect(drawn.hairline).toBe('1px')
+      expect(drawn.shadow).not.toBe('none')
+    })
+
+    // The browser's own focus goes by the sheet's `scroll-padding`: without it, a field reached by
+    // Tab stood under the footer, at the sheet's edge.
+    test('a field reached by Tab is brought above it, not under it', async ({ page }) => {
+      await openLong(page)
+      await longSheet(page)
+        .getByRole('button', { name: 'Row 15' })
+        .evaluate((row: HTMLElement) => {
+          row.focus({ preventScroll: true })
+        })
+      await page.keyboard.press('Tab')
+      await expect(note(page)).toBeFocused()
+      const { footer, note: field, scrollTop } = await boxes(page)
+      expect(scrollTop).toBeGreaterThan(0)
+      expect(field.bottom).toBeLessThanOrEqual(footer.top)
+    })
+
+    // The keys never come up in a test browser: the lift and the visible height are set by hand, as
+    // `useKeyboardInset` sets them, and the home indicator is given its 34.
+    test('over the keys stands at the lifted edge, 12 over them, the field typed in above it', async ({
+      page,
+    }) => {
+      await openLong(page)
+      await page.evaluate(() => {
+        document.documentElement.style.setProperty('--safe-bottom', '34px')
+      })
+      expect(
+        await footerOf(page).evaluate((footer) => getComputedStyle(footer).paddingBottom),
+      ).toBe('46px')
+      await longSheet(page).evaluate((dialog) => {
+        dialog.style.setProperty('--viewport-height', '400px')
+        dialog.style.setProperty('--keyboard-inset', '300px')
+        document.documentElement.dataset.underKeys = ''
+      })
+      await longSheet(page)
+        .getByRole('button', { name: 'Row 15' })
+        .evaluate((row: HTMLElement) => {
+          row.focus({ preventScroll: true })
+        })
+      await page.keyboard.press('Tab')
+      await expect(note(page)).toBeFocused()
+      await settled(page)
+      expect(
+        await footerOf(page).evaluate((footer) => getComputedStyle(footer).paddingBottom),
+      ).toBe('12px')
+      const { sheet: box, footer, note: field } = await boxes(page)
+      const screen = page.viewportSize()?.height ?? 0
+      expect(box.bottom).toBeCloseTo(screen - 300, 0)
+      expect(Math.abs(footer.bottom - box.bottom)).toBeLessThanOrEqual(1)
+      expect(field.top).toBeGreaterThanOrEqual(box.top)
+      expect(field.bottom).toBeLessThanOrEqual(footer.top)
+    })
+
+    // Pinned, the footer is still in the sheet's own scroll: a pull with the content scrolled down
+    // scrolls it back, from the footer as from anywhere, and presses nothing (MOL-80).
+    test('a pull down from it with the content scrolled scrolls, and keeps the sheet', async ({
+      page,
+      browserName,
+    }) => {
+      test.skip(browserName !== 'chromium', CDP_ONLY)
+      await openLong(page)
+      await longSheet(page).evaluate((dialog) => {
+        dialog.scrollTop = dialog.scrollHeight
+      })
+      const before = (await boxes(page)).scrollTop
+      const action = longSheet(page).getByRole('button', { name: 'Record', exact: true })
+      await action.evaluate((button) => {
+        const counted = window as unknown as { pressed: number }
+        counted.pressed = 0
+        button.addEventListener('click', () => (counted.pressed += 1))
+      })
+      const box = await action.boundingBox()
+      if (!box) throw new Error('no action')
+      await pull(page, { x: box.x + box.width / 2, y: box.y + box.height / 2 }, 200, {
+        steps: 12,
+        gap: 40,
+      })
+      await page.waitForTimeout(500)
+      await expect(longSheet(page)).toBeVisible()
+      expect(await longSheet(page).evaluate((dialog) => getComputedStyle(dialog).transform)).toBe(
+        'none',
+      )
+      expect((await boxes(page)).scrollTop).toBeLessThan(before)
+      expect(await page.evaluate(() => (window as unknown as { pressed: number }).pressed)).toBe(0)
+    })
+
+    test('a pull down from it with the content at the top closes it', async ({
+      page,
+      browserName,
+    }) => {
+      test.skip(browserName !== 'chromium', CDP_ONLY)
+      await openLong(page)
+      const box = await footerOf(page).boundingBox()
+      if (!box) throw new Error('no footer')
+      const height = await longSheet(page).evaluate(
+        (dialog) => dialog.getBoundingClientRect().height,
+      )
+      await pull(page, { x: box.x + box.width / 2, y: box.y + 4 }, height / 3, {
+        steps: 12,
+        gap: 40,
+      })
+      await expect(longSheet(page)).toBeHidden()
+      await expect(page).toHaveURL('/_kit')
+    })
+  })
 })
 
 // The segment looks as in the handoff and still answers a thumb over the whole 44px (review Р-3).
