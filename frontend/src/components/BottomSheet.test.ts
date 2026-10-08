@@ -52,7 +52,14 @@ afterEach(() => {
 })
 
 async function render(
-  options: { open?: boolean; at?: string; rising?: boolean; back?: boolean } = {},
+  options: {
+    open?: boolean
+    at?: string
+    rising?: boolean
+    back?: boolean
+    footer?: boolean
+    field?: boolean | 'lines'
+  } = {},
 ) {
   const router: Router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/')
@@ -76,7 +83,19 @@ async function render(
           {
             title: () => 'Milk «Ashkhar»',
             meta: () => 'UHT, 2.5%',
-            default: () => h('p', { class: 'content' }, 'Quantity and price'),
+            default: () =>
+              options.field
+                ? [
+                    h('p', { class: 'content' }, 'Quantity and price'),
+                    h(options.field === 'lines' ? 'textarea' : 'input', {
+                      class: 'price',
+                      'aria-label': 'Price',
+                    }),
+                  ]
+                : h('p', { class: 'content' }, 'Quantity and price'),
+            ...(options.footer === true && {
+              footer: () => h('button', { class: 'save', type: 'button' }, 'Save'),
+            }),
           },
         ),
     ),
@@ -928,6 +947,228 @@ describe('BottomSheet', () => {
     await vi.waitFor(() => {
       expect(router.currentRoute.value.fullPath).toBe('/')
     })
+  })
+})
+
+// The main action stays at the sheet's bottom edge, and the content scrolls under it (MOL-182). The
+// pinning itself is layout, held end to end; here, what the layout is built from.
+describe('the pinned footer', () => {
+  /** A `ResizeObserver` the test fires by hand: happy-dom lays nothing out and observes nothing. */
+  function observeByHand() {
+    const callbacks = new Set<() => void>()
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        callback: () => void
+        constructor(callback: () => void) {
+          this.callback = callback
+        }
+        observe() {
+          callbacks.add(this.callback)
+        }
+        disconnect() {
+          callbacks.delete(this.callback)
+        }
+      },
+    )
+    return () => {
+      for (const callback of callbacks) callback()
+    }
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('stands outside the content, the dialog’s own, after it', async () => {
+    const { dialog } = await render({ open: true, footer: true })
+    const footer = dialog().querySelector('.footer')
+    expect(footer?.parentElement).toBe(dialog())
+    expect(footer?.previousElementSibling?.classList.contains('panel')).toBe(true)
+    expect(footer?.textContent).toBe('Save')
+    expect(dialog().querySelector('.panel')?.classList.contains('footed')).toBe(true)
+  })
+
+  it('must not fire: no footer is drawn without one given', async () => {
+    const { dialog } = await render({ open: true })
+    expect(dialog().querySelector('.footer')).toBeNull()
+    expect(dialog().querySelector('.panel')?.classList.contains('footed')).toBe(false)
+    expect(dialog().classList.contains('pinned')).toBe(false)
+    expect(dialog().style.getPropertyValue('--sheet-footer-height')).toBe('0px')
+  })
+
+  // What the sheet scrolls into sight stops at the footer's top: its `scroll-padding` is the
+  // footer's height, kept as the footer grows — an error or «Вернуть» come into it.
+  it('gives the dialog its height, and follows it', async () => {
+    const resized = observeByHand()
+    const { dialog } = await render({ footer: true })
+    const footer = dialog().querySelector<HTMLElement>('.footer')
+    if (!footer) throw new Error('no footer in the sheet')
+    let height = 76
+    Object.defineProperty(footer, 'offsetHeight', { get: () => height })
+    resized()
+    await nextTick()
+    expect(dialog().style.getPropertyValue('--sheet-footer-height')).toBe('76px')
+    height = 120
+    resized()
+    await nextTick()
+    expect(dialog().style.getPropertyValue('--sheet-footer-height')).toBe('120px')
+  })
+
+  /**
+   * The sheet laid out by hand: its box, how far it scrolls, the footer's height and the field's.
+   * `layout` changes them and tells the observers, as a resize would.
+   */
+  async function laidOut(
+    box: { sheet: number; scrolls: number; footer: number; field: number },
+    lines = false,
+  ) {
+    const resized = observeByHand()
+    const { dialog } = await render({ open: true, footer: true, field: lines ? 'lines' : true })
+    const footer = dialog().querySelector<HTMLElement>('.footer')
+    const field = dialog().querySelector<HTMLElement>('.price')
+    if (!footer || !field) throw new Error('no footer or no field in the sheet')
+    Object.defineProperty(dialog(), 'clientHeight', { get: () => box.sheet })
+    Object.defineProperty(dialog(), 'offsetHeight', { get: () => box.sheet })
+    Object.defineProperty(dialog(), 'scrollHeight', { get: () => box.scrolls })
+    Object.defineProperty(footer, 'offsetHeight', { get: () => box.footer })
+    field.getBoundingClientRect = () => DOMRect.fromRect({ width: 300, height: box.field })
+    const layout = async (next: Partial<typeof box>) => {
+      Object.assign(box, next)
+      resized()
+      await nextTick()
+    }
+    return { dialog, field, layout }
+  }
+
+  // Over the keys of a turned phone the sheet has some 107 px: a footer of 77 pinned there left 29 px
+  // of the 44 the price is typed in (adversarial А1). It goes with the content then; held upright, it
+  // is pinned again.
+  it('is let go when it leaves no room for the field typed in, and pinned again when it does', async () => {
+    const { dialog, field, layout } = await laidOut({
+      sheet: 334,
+      scrolls: 600,
+      footer: 77,
+      field: 44,
+    })
+    field.focus()
+    await layout({})
+    expect(dialog().classList.contains('pinned')).toBe(true)
+    await layout({ sheet: 107 })
+    expect(dialog().classList.contains('pinned')).toBe(false)
+    await layout({ sheet: 121 })
+    expect(dialog().classList.contains('pinned')).toBe(true)
+  })
+
+  it('must not fire: no field typed in, however little room it leaves', async () => {
+    const { dialog, layout } = await laidOut({ sheet: 107, scrolls: 600, footer: 121, field: 54 })
+    await layout({})
+    expect(dialog().classList.contains('pinned')).toBe(true)
+  })
+
+  it('is pinned again when the field typed in is left', async () => {
+    const { dialog, field, layout } = await laidOut({
+      sheet: 107,
+      scrolls: 600,
+      footer: 77,
+      field: 44,
+    })
+    field.focus()
+    await layout({})
+    expect(dialog().classList.contains('pinned')).toBe(false)
+    field.blur()
+    await nextTick()
+    expect(dialog().classList.contains('pinned')).toBe(true)
+  })
+
+  // The edit of an account over the keys held upright: a footer more than half the sheet, room enough
+  // for the name. Half the sheet let it go, «Сохранить» with it (round 2, Р2-А1).
+  it('must not fire: a footer more than half the sheet that leaves room for the field', async () => {
+    const { dialog, field, layout } = await laidOut({
+      sheet: 324,
+      scrolls: 600,
+      footer: 167,
+      field: 54,
+    })
+    field.focus()
+    await layout({})
+    expect(dialog().classList.contains('pinned')).toBe(true)
+    // An error come into the footer under the finger (Р2-А2): still room for the field.
+    await layout({ sheet: 281, footer: 168, field: 44 })
+    expect(dialog().classList.contains('pinned')).toBe(true)
+  })
+
+  // A message of five lines, 147 px, over the keys of an iPhone SE: a failure to send grows the footer
+  // to 150 and leaves 131 over it. Asked to stand whole, the field let the footer go, the failure and
+  // «Повторить» out of sight (round 3, Р3-А1); a line of it, where the caret is, has room.
+  it('must not fire: room for a line of a tall field, not for all of it', async () => {
+    const { dialog, field, layout } = await laidOut(
+      { sheet: 281, scrolls: 600, footer: 77, field: 147 },
+      true,
+    )
+    Object.assign(field.style, {
+      lineHeight: '22px',
+      paddingTop: '12px',
+      paddingBottom: '12px',
+      border: '1px solid',
+    })
+    field.focus()
+    await layout({})
+    expect(dialog().classList.contains('pinned')).toBe(true)
+    await layout({ footer: 150 })
+    expect(dialog().classList.contains('pinned')).toBe(true)
+    // Less than a line over it: the turned phone of А1, and the footer goes.
+    await layout({ sheet: 107, footer: 77 })
+    expect(dialog().classList.contains('pinned')).toBe(false)
+  })
+
+  // A field of one line is its whole height, not its line's: the price of the kit is 44 high with a
+  // line of some 30, and over the keys of a turned phone 30 over the footer left 29 of it (А1).
+  it('asks room for all of a field of one line, whatever its line', async () => {
+    const { dialog, field, layout } = await laidOut({
+      sheet: 107,
+      scrolls: 600,
+      footer: 77,
+      field: 44,
+    })
+    Object.assign(field.style, { lineHeight: '22px', paddingTop: '4px', paddingBottom: '4px' })
+    field.focus()
+    await layout({})
+    expect(dialog().classList.contains('pinned')).toBe(false)
+  })
+
+  // A sheet that does not scroll hides nothing under its footer, which keeps its shadow (С-11).
+  it('must not fire: a sheet that does not scroll', async () => {
+    const { dialog, field, layout } = await laidOut({
+      sheet: 107,
+      scrolls: 107,
+      footer: 77,
+      field: 44,
+    })
+    field.focus()
+    await layout({})
+    expect(dialog().classList.contains('pinned')).toBe(true)
+  })
+
+  // The keys take the home indicator's 34 off the footer's bottom padding, and the stylesheet adds
+  // that padding to the edge itself, in the same style change: measured whole, the edge lagged a
+  // render behind and a field stood 34 over the footer (review С-8).
+  it('gives its height less its bottom padding, which the keys change and it does not', async () => {
+    const resized = observeByHand()
+    const { dialog } = await render({ footer: true })
+    const footer = dialog().querySelector<HTMLElement>('.footer')
+    if (!footer) throw new Error('no footer in the sheet')
+    let height = 110
+    Object.defineProperty(footer, 'offsetHeight', { get: () => height })
+    footer.style.paddingBottom = '46px'
+    resized()
+    await nextTick()
+    expect(dialog().style.getPropertyValue('--sheet-footer-height')).toBe('64px')
+    height = 76
+    footer.style.paddingBottom = '12px'
+    resized()
+    await nextTick()
+    expect(dialog().style.getPropertyValue('--sheet-footer-height')).toBe('64px')
   })
 })
 

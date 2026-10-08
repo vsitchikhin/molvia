@@ -2,6 +2,7 @@
 // DOM for the code inside page.evaluate, which runs in the browser.
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { fakeKeyboard } from './keyboard'
 import { open, signedIn } from './session'
 
 /**
@@ -623,6 +624,307 @@ test.describe('the sheet', () => {
     await expect(page.locator('h1')).toBeHidden()
     await expect(sheet(page)).toBeVisible()
     await expect(field).toBeFocused()
+  })
+
+  // Over the keys of a turned phone the sheet has some 107 px, and a footer of 77 is taller than
+  // half of it: pinned, it left 29 px of the 44 the price is typed in (MOL-182, adversarial А1). It
+  // goes with the content then, and the price stands whole in sight; upright, it stays pinned.
+  test.describe('over the keys of a turned phone', () => {
+    /** The price focused, then the keys come up and leave `seen` px of the window in sight. */
+    async function priceOverTheKeys(page: Page, seen: number): Promise<void> {
+      const keyboard = await fakeKeyboard(page)
+      await openSheet(page)
+      await sheet(page).getByLabel('Price as on the tag').focus()
+      const window = page.viewportSize()?.height ?? 0
+      await keyboard(window - seen, window - seen)
+    }
+
+    /** Whether the footer is pinned, and whether the price stands whole above what covers the sheet. */
+    async function price(page: Page) {
+      return sheetElement(page).evaluate((dialog) => {
+        const field = document.activeElement
+        const footer = dialog.querySelector('.footer')
+        if (!(field instanceof HTMLInputElement) || !dialog.contains(field) || !footer) {
+          throw new Error('the price is not focused, or there is no footer')
+        }
+        const box = dialog.getBoundingClientRect()
+        const place = field.getBoundingClientRect()
+        const pinned = dialog.classList.contains('pinned')
+        const edge = pinned ? Math.min(box.bottom, footer.getBoundingClientRect().top) : box.bottom
+        const seen = Math.min(place.bottom, edge) - Math.max(place.top, box.top)
+        return { pinned, whole: Math.round(seen) >= Math.round(place.height) }
+      })
+    }
+
+    test('lets its footer go with the content, and the price stands whole', async ({ page }) => {
+      await page.setViewportSize({ width: 844, height: 390 })
+      await priceOverTheKeys(page, 130)
+      await expect.poll(() => price(page)).toEqual({ pinned: false, whole: true })
+    })
+
+    // An error come into the footer under the finger must not let it go: a conflict of the edit of
+    // an exchange makes a footer of 168 on a sheet of 281 (an iPhone SE upright over the keys), more
+    // than half of it, and half let the footer go with the error and «Record» out of sight
+    // (adversarial round 2, Р2-А2). The field typed in still has room, and the footer stays pinned.
+    test('keeps the footer pinned, an error come into it and its action in sight', async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 647 })
+      const keyboard = await fakeKeyboard(page)
+      await openSheet(page)
+      await sheet(page).getByLabel('How much').focus()
+      await keyboard(647 - 343, 647 - 343)
+      await sheetElement(page).evaluate((dialog) => {
+        const block = document.createElement('div')
+        block.setAttribute('role', 'alert')
+        block.dataset.error = ''
+        // As `ExchangeSheet` draws it: `.failed` 13 in the bad ink, `.conflict`, `.current` at 600.
+        block.style.margin = '0 0 var(--space-3)'
+        block.style.color = 'var(--bad-ink)'
+        block.style.fontSize = 'var(--text-footnote)'
+        const lines = [
+          'This exchange was changed on another device — here is how it stands now. Change it again if you need to',
+          'Gave 20,000.00 ₽ · got 87,540.00 ֏ · 5 Oct',
+        ]
+        for (const [index, text] of lines.entries()) {
+          const line = document.createElement('p')
+          line.textContent = text
+          line.style.margin = index === 0 ? '0' : 'var(--space-1) 0 0'
+          if (index > 0) line.style.fontWeight = 'var(--weight-medium)'
+          block.append(line)
+        }
+        dialog.querySelector('.footer')?.prepend(block)
+      })
+      await expect
+        .poll(() =>
+          sheetElement(page).evaluate((dialog) => {
+            const box = dialog.getBoundingClientRect()
+            const footer = dialog.querySelector<HTMLElement>('.footer')
+            const error = dialog.querySelector('[data-error]')
+            const record = [...dialog.querySelectorAll('button')].find(
+              (one) => one.textContent.trim() === 'Record',
+            )
+            if (!footer || !error || !record) throw new Error('no footer, error or «Record»')
+            const sees = (element: Element) => {
+              const rect = element.getBoundingClientRect()
+              return rect.top >= box.top && rect.bottom <= box.bottom + 0.5
+            }
+            return {
+              pinned: dialog.classList.contains('pinned'),
+              half: footer.offsetHeight * 2 > box.height,
+              error: sees(error),
+              record: sees(record),
+            }
+          }),
+        )
+        .toEqual({ pinned: true, half: true, error: true, record: true })
+    })
+
+    test('upright, keeps the footer pinned and the price whole above it', async ({ page }) => {
+      await priceOverTheKeys(page, 395)
+      await expect.poll(() => price(page)).toEqual({ pinned: true, whole: true })
+    })
+  })
+
+  // Taller than its share, the sheet keeps its main action at its bottom edge, the content scrolling
+  // under it; what it brings into sight stops at the footer's top (MOL-182, Ф-17).
+  test.describe('taller than its share, its footer pinned', () => {
+    const longSheet = (page: Page) => page.getByRole('dialog', { name: 'A long sheet' })
+    const footerOf = (page: Page) => longSheet(page).locator('.footer')
+    const note = (page: Page) => longSheet(page).getByLabel('Note')
+
+    async function openLong(page: Page): Promise<void> {
+      await open(page, '/_kit')
+      await expect(heading(page)).toHaveText('Kit')
+      const opens = page.getByRole('button', { name: 'Open a long sheet' })
+      await opens.scrollIntoViewIfNeeded()
+      await opens.click()
+      await expect(longSheet(page)).toBeVisible()
+      await longSheet(page).evaluate(async (dialog) => {
+        await Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished))
+      })
+      await page.waitForTimeout(400)
+    }
+
+    /** The sheet's box, its footer's and the note's, where they stand on the screen now. */
+    async function boxes(page: Page) {
+      return longSheet(page).evaluate((dialog) => {
+        const box = (element: Element | null) => {
+          const rect = element?.getBoundingClientRect()
+          return { top: rect?.top ?? Number.NaN, bottom: rect?.bottom ?? Number.NaN }
+        }
+        return {
+          sheet: box(dialog),
+          footer: box(dialog.querySelector('.footer')),
+          note: box(dialog.querySelector('input')),
+          scrollTop: dialog.scrollTop,
+          scrolls: dialog.scrollHeight > dialog.clientHeight,
+        }
+      })
+    }
+
+    /** How far the note reaches under the footer's top: nothing, once it is in sight. */
+    const under = ({ note: field, footer }: Awaited<ReturnType<typeof boxes>>) =>
+      field.bottom - footer.top
+
+    test('stands at the bottom edge, the main action in sight, before any scroll', async ({
+      page,
+    }) => {
+      await openLong(page)
+      const { sheet: box, footer, scrollTop, scrolls } = await boxes(page)
+      expect(scrolls).toBe(true)
+      expect(scrollTop).toBe(0)
+      expect(Math.abs(footer.bottom - box.bottom)).toBeLessThanOrEqual(1)
+      await expect(
+        longSheet(page).getByRole('button', { name: 'Record', exact: true }),
+      ).toBeInViewport({ ratio: 1 })
+    })
+
+    test('scrolled to the end, the last field stands whole above it', async ({ page }) => {
+      await openLong(page)
+      await longSheet(page).evaluate((dialog) => {
+        dialog.scrollTop = dialog.scrollHeight
+      })
+      const { sheet: box, footer, note: field } = await boxes(page)
+      expect(Math.abs(footer.bottom - box.bottom)).toBeLessThanOrEqual(1)
+      expect(field.bottom).toBeLessThanOrEqual(footer.top)
+    })
+
+    test('is drawn over the content: the sheet’s colour, a hairline, the sheet’s shadow', async ({
+      page,
+    }) => {
+      await openLong(page)
+      const drawn = await footerOf(page).evaluate((footer) => {
+        const style = getComputedStyle(footer)
+        return {
+          position: style.position,
+          background: style.backgroundColor,
+          sheet: getComputedStyle(footer.parentElement ?? footer).backgroundColor,
+          hairline: style.borderTopWidth,
+          shadow: style.boxShadow,
+        }
+      })
+      expect(drawn.position).toBe('sticky')
+      expect(drawn.background).toBe(drawn.sheet)
+      expect(drawn.hairline).toBe('1px')
+      expect(drawn.shadow).not.toBe('none')
+    })
+
+    // The browser's own focus goes by the sheet's `scroll-padding` — not always in WebKit, where the
+    // sheet brings the field up itself once that scroll is done (CI, Linux). Read until it settles.
+    test('a field reached by Tab is brought above it, not under it', async ({ page }) => {
+      await openLong(page)
+      await longSheet(page)
+        .getByRole('button', { name: 'Row 15' })
+        .evaluate((row: HTMLElement) => {
+          row.focus({ preventScroll: true })
+        })
+      await page.keyboard.press('Tab')
+      await expect(note(page)).toBeFocused()
+      await expect.poll(async () => under(await boxes(page))).toBeLessThanOrEqual(0)
+      expect((await boxes(page)).scrollTop).toBeGreaterThan(0)
+    })
+
+    // The keys never come up in a test browser: the lift and the visible height are set by hand, as
+    // `useKeyboardInset` sets them, and the home indicator is given its 34.
+    test('over the keys stands at the lifted edge, 12 over them, the field typed in above it', async ({
+      page,
+    }) => {
+      await openLong(page)
+      await page.evaluate(() => {
+        document.documentElement.style.setProperty('--safe-bottom', '34px')
+      })
+      expect(
+        await footerOf(page).evaluate((footer) => getComputedStyle(footer).paddingBottom),
+      ).toBe('46px')
+      // The edge moves with the footer in the same style change, before any render: measured whole,
+      // it lagged one behind and a field stood 34 over the footer (review С-8).
+      const edges = await longSheet(page).evaluate((dialog) => {
+        const footer = dialog.querySelector<HTMLElement>('.footer')
+        const edge = () => ({
+          padding: Number.parseFloat(getComputedStyle(dialog).scrollPaddingBottom),
+          footer: footer?.offsetHeight ?? Number.NaN,
+        })
+        const before = edge()
+        dialog.style.setProperty('--viewport-height', '400px')
+        dialog.style.setProperty('--keyboard-inset', '300px')
+        document.documentElement.dataset.underKeys = ''
+        return { before, after: edge() }
+      })
+      expect(edges.before.padding).toBeCloseTo(edges.before.footer, 0)
+      expect(edges.after.padding).toBeCloseTo(edges.after.footer, 0)
+      expect(edges.before.footer - edges.after.footer).toBe(34)
+      await longSheet(page)
+        .getByRole('button', { name: 'Row 15' })
+        .evaluate((row: HTMLElement) => {
+          row.focus({ preventScroll: true })
+        })
+      await page.keyboard.press('Tab')
+      await expect(note(page)).toBeFocused()
+      await settled(page)
+      expect(
+        await footerOf(page).evaluate((footer) => getComputedStyle(footer).paddingBottom),
+      ).toBe('12px')
+      await expect.poll(async () => under(await boxes(page))).toBeLessThanOrEqual(0)
+      const { sheet: box, footer, note: field } = await boxes(page)
+      const screen = page.viewportSize()?.height ?? 0
+      expect(box.bottom).toBeCloseTo(screen - 300, 0)
+      expect(Math.abs(footer.bottom - box.bottom)).toBeLessThanOrEqual(1)
+      expect(field.top).toBeGreaterThanOrEqual(box.top)
+      expect(field.bottom).toBeLessThanOrEqual(footer.top)
+    })
+
+    // Pinned, the footer is still in the sheet's own scroll: a pull with the content scrolled down
+    // scrolls it back, from the footer as from anywhere, and presses nothing (MOL-80).
+    test('a pull down from it with the content scrolled scrolls, and keeps the sheet', async ({
+      page,
+      browserName,
+    }) => {
+      test.skip(browserName !== 'chromium', CDP_ONLY)
+      await openLong(page)
+      await longSheet(page).evaluate((dialog) => {
+        dialog.scrollTop = dialog.scrollHeight
+      })
+      const before = (await boxes(page)).scrollTop
+      const action = longSheet(page).getByRole('button', { name: 'Record', exact: true })
+      await action.evaluate((button) => {
+        const counted = window as unknown as { pressed: number }
+        counted.pressed = 0
+        button.addEventListener('click', () => (counted.pressed += 1))
+      })
+      const box = await action.boundingBox()
+      if (!box) throw new Error('no action')
+      await pull(page, { x: box.x + box.width / 2, y: box.y + box.height / 2 }, 200, {
+        steps: 12,
+        gap: 40,
+      })
+      await page.waitForTimeout(500)
+      await expect(longSheet(page)).toBeVisible()
+      expect(await longSheet(page).evaluate((dialog) => getComputedStyle(dialog).transform)).toBe(
+        'none',
+      )
+      expect((await boxes(page)).scrollTop).toBeLessThan(before)
+      expect(await page.evaluate(() => (window as unknown as { pressed: number }).pressed)).toBe(0)
+    })
+
+    test('a pull down from it with the content at the top closes it', async ({
+      page,
+      browserName,
+    }) => {
+      test.skip(browserName !== 'chromium', CDP_ONLY)
+      await openLong(page)
+      const box = await footerOf(page).boundingBox()
+      if (!box) throw new Error('no footer')
+      const height = await longSheet(page).evaluate(
+        (dialog) => dialog.getBoundingClientRect().height,
+      )
+      await pull(page, { x: box.x + box.width / 2, y: box.y + 4 }, height / 3, {
+        steps: 12,
+        gap: 40,
+      })
+      await expect(longSheet(page)).toBeHidden()
+      await expect(page).toHaveURL('/_kit')
+    })
   })
 })
 

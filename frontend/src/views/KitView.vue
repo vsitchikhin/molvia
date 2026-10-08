@@ -506,6 +506,23 @@
       </template>
     </BottomSheet>
 
+    <!-- Taller than its share: the footer pinned to its edge, the rows scrolling under it, a field at
+         the very end (MOL-182). -->
+    <AppButton block @click="longOpen = true">{{ t('dev.kit.open_long_sheet') }}</AppButton>
+
+    <BottomSheet v-model:open="longOpen">
+      <template #title>{{ t('dev.kit.long_sheet') }}</template>
+      <div class="pair">
+        <AppButton v-for="n in 15" :key="n" variant="secondary" block>
+          {{ t('dev.kit.long_row', { n }) }}
+        </AppButton>
+      </div>
+      <AppField v-model="longNote" :label="t('income.sheet.note')" />
+      <template #footer>
+        <AppButton size="large" block @click="longOpen = false">{{ t('item.save') }}</AppButton>
+      </template>
+    </BottomSheet>
+
     <!-- The scanner, until a screen opens it (MOL-99): for end-to-end and for a real phone. -->
     <section class="group">
       <AppButton block variant="secondary" @click="scannerOpen = true">
@@ -870,6 +887,8 @@ export default defineComponent({
       ),
       category: ref<string | null>('00000000-0000-4000-8000-000000000101'),
       sheetOpen: ref(false),
+      longOpen: ref(false),
+      longNote: ref(''),
       scannerOpen: ref(false),
       scanned: ref(''),
       // The verdict card blank, and as a refused draft comes back: a score, words, the error.

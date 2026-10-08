@@ -100,6 +100,19 @@ function fakeDvh(height: number) {
   return fakeLayout(height)
 }
 
+/** Two frames: what the sheet does once the browser's own scroll after a focus is done. */
+async function frames(): Promise<void> {
+  await new Promise<void>((done) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          done()
+        })
+      })
+    })
+  })
+}
+
 afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
@@ -410,6 +423,8 @@ describe('useKeyboardInset keeps the focused field in sight', () => {
     await nextTick()
     input.focus()
     expect(sheet.scrollTop).toBe(100)
+    await frames()
+    expect(sheet.scrollTop).toBe(100)
   })
 
   // The result of a check is focused for a screen reader, and read from its top (adversarial А).
@@ -468,6 +483,93 @@ describe('useKeyboardInset keeps the focused field in sight', () => {
     fakeViewport(500)
     await nextTick()
     input.focus()
+    expect(sheet.scrollTop).toBe(100)
+  })
+})
+
+// A pinned footer covers the sheet's end: what is under it is not in sight, and the sheet's own
+// `scroll-padding` says how far that is — the browser's focus goes by the same (MOL-182).
+describe('useKeyboardInset keeps the focused field above a pinned footer', () => {
+  function footed(footer = 60) {
+    const edge = ref(footer)
+    const view = host(false, (target, on) => {
+      useKeyboardInset(target, on, edge)
+    })
+    const sheet = view.view.element as HTMLElement
+    sheet.style.scrollPaddingBottom = `${String(footer)}px`
+    return { ...view, edge, sheet }
+  }
+
+  async function typing(field: Box, which = '[data-field]') {
+    const viewport = fakeViewport(800)
+    const view = footed()
+    const { input } = placed(view.view, { top: 300, bottom: 500 }, field, which)
+    view.on.value = true
+    await nextTick()
+    input.focus()
+    return { ...view, input, viewport }
+  }
+
+  it('scrolls a field under the footer to the footer’s top', async () => {
+    const { sheet, viewport } = await typing({ top: 421, bottom: 461 })
+    viewport.height = 500
+    viewport.fire('resize')
+    expect(sheet.scrollTop).toBe(121)
+  })
+
+  it('must not fire: a field whose end is the footer’s top', async () => {
+    const { sheet, viewport } = await typing({ top: 400, bottom: 440 })
+    viewport.height = 500
+    viewport.fire('resize')
+    expect(sheet.scrollTop).toBe(100)
+  })
+
+  // An error or «Вернуть» come into the footer move its top up as a lower sheet would.
+  it('brings the field back above a footer that grew over it', async () => {
+    const { sheet, edge } = await typing({ top: 390, bottom: 430 })
+    expect(sheet.scrollTop).toBe(100)
+    sheet.style.scrollPaddingBottom = '80px'
+    edge.value = 80
+    await nextTick()
+    expect(sheet.scrollTop).toBe(110)
+  })
+
+  it('must not fire: a footer that grew with no field typed in', async () => {
+    const { sheet, edge } = await typing({ top: 390, bottom: 430 }, '[data-button]')
+    sheet.style.scrollPaddingBottom = '80px'
+    edge.value = 80
+    await nextTick()
+    expect(sheet.scrollTop).toBe(100)
+  })
+
+  // Tab, or «∨» over the iOS keys: WebKit's own scroll does not always stop at the footer (CI).
+  it('brings a field focused under the footer above it, once the browser’s scroll is done', async () => {
+    const { sheet } = await typing({ top: 421, bottom: 461 })
+    expect(sheet.scrollTop).toBe(100)
+    await frames()
+    expect(sheet.scrollTop).toBe(121)
+  })
+
+  it('must not fire: a field focused above the footer', async () => {
+    const { sheet } = await typing({ top: 380, bottom: 420 })
+    await frames()
+    expect(sheet.scrollTop).toBe(100)
+  })
+
+  it('must not fire: a field left within the two frames', async () => {
+    const { sheet } = await typing({ top: 421, bottom: 461 })
+    sheet.querySelector<HTMLElement>('[data-button]')?.focus()
+    await frames()
+    expect(sheet.scrollTop).toBe(100)
+  })
+
+  it('must not fire: a footer that grew in a shut sheet', async () => {
+    const { sheet, edge, on } = await typing({ top: 390, bottom: 430 })
+    on.value = false
+    await nextTick()
+    sheet.style.scrollPaddingBottom = '80px'
+    edge.value = 80
+    await nextTick()
     expect(sheet.scrollTop).toBe(100)
   })
 })

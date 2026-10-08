@@ -2,14 +2,17 @@
   <dialog
     ref="dialog"
     class="sheet"
-    :class="{ over: back, dragging }"
+    :class="{ over: back, dragging, pinned: $slots.footer && !loose }"
+    :style="{ '--sheet-footer-height': `${String(footerHeight)}px` }"
     :aria-labelledby="titleId"
     @cancel.prevent="close()"
     @close="closedNatively"
     @click.capture="holdWhileRising"
     @click="closeOnScrim"
+    @focusin="settleFooter"
+    @focusout="focusLeft"
   >
-    <div class="panel">
+    <div class="panel" :class="{ footed: $slots.footer }">
       <header class="head" :class="{ over: back }">
         <AppButton v-if="back" variant="icon" :label="t('nav.back_label')" @click="close()">
           <IconBack />
@@ -24,35 +27,70 @@
       </header>
 
       <slot />
+    </div>
 
-      <div v-if="$slots.footer" class="footer">
-        <slot name="footer" />
-      </div>
+    <div v-if="$slots.footer" ref="footer" class="footer">
+      <slot name="footer" />
+    </div>
 
-      <div class="region" role="status">
-        <p v-for="announcement in announcements" :key="announcement.id">
-          {{ announcement.text }}
-        </p>
-      </div>
+    <div class="region" role="status">
+      <p v-for="announcement in announcements" :key="announcement.id">
+        {{ announcement.text }}
+      </p>
     </div>
   </dialog>
 </template>
 
 <script lang="ts">
-import { defineComponent, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
+import {
+  computed,
+  defineComponent,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  useId,
+  watch,
+} from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconBack from '~icons/mdi/chevron-left'
 import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
 import { provideSheetAnnouncer } from '@/composables/useAnnouncer'
-import { useKeyboardInset } from '@/composables/useKeyboardInset'
+import { useHeight } from '@/composables/useCollapsed'
+import { typedIn, useKeyboardInset } from '@/composables/useKeyboardInset'
 import { useSheetDrag } from '@/composables/useSheetDrag'
 import { closeStateStrip } from '@/composables/useStateStrip'
 import { pageAnchor, sheetOpener, useSheetHistory } from '@/composables/useSheetHistory'
 
 /** A double tap lands within this — a platform convention, not a design token. */
 export const DOUBLE_TAP = 300
+
+/**
+ * The room a field typed in needs above a pinned footer: a field of one line whole — its height is the
+ * kit's, not its line's — and of a field of many lines one line with its padding and edge. A line
+ * height of `normal` gives the field whole.
+ *
+ * A line, not the caret's line (review С-13): `reveal` shows a field taller than the room from its top,
+ * and a caret at the end of a long message may stand under the footer until a key is pressed — then
+ * Chromium brings it above by `scroll-padding`, WebKit, which does not always honour it, may not.
+ */
+function lineOf(field: HTMLElement): number {
+  const height = field.getBoundingClientRect().height
+  if (!(field instanceof HTMLTextAreaElement) && !field.isContentEditable) return height
+  const style = getComputedStyle(field)
+  const line = [
+    style.lineHeight,
+    style.paddingTop,
+    style.paddingBottom,
+    style.borderTopWidth,
+    style.borderBottomWidth,
+  ]
+    .map((value) => Number.parseFloat(value))
+    .reduce((sum, value) => sum + (Number.isFinite(value) ? value : Number.NaN), 0)
+  return Number.isFinite(line) ? Math.min(height, line) : height
+}
 
 /**
  * The sheet of 0.1: it rises from the bottom over the screen, which stays visible behind the
@@ -69,6 +107,14 @@ export const DOUBLE_TAP = 300
  *
  * The page under an open sheet does not scroll (main.scss). The sheet is the one place where a
  * container scrolls rather than the page: a panel over the screen has no window of its own.
+ *
+ * Its footer — the main action — is pinned to its bottom edge, and the content scrolls under it
+ * (MOL-182, Ф-17): under fifteen chips «Сохранить» had gone below the edge. Sticky in the sheet's
+ * own scroll, not a middle of its own between the header and the footer: the pull down, the lift
+ * over the keys and `reveal` all go by the dialog's scroll, and stay as they were. What the sheet
+ * brings into sight stops at the footer's top (`--sheet-footer-height` as its `scroll-padding`).
+ * A footer that leaves no room for a line of the field typed in — over the keys of a turned phone —
+ * is not pinned (`loose`).
  */
 export default defineComponent({
   name: 'BottomSheet',
@@ -101,6 +147,54 @@ export default defineComponent({
     // An error in the sheet keeps its buttons here: the strip under it is the screen's.
     closeStateStrip()
     const dialog = ref<HTMLDialogElement | null>(null)
+    const footer = ref<HTMLElement | null>(null)
+    const footerBox = useHeight(footer)
+    // Without its bottom padding, which the stylesheet adds to the edge itself: the keys coming up take
+    // the home indicator's 34 off it in the same style change that moves the footer down. Measured
+    // whole, the edge lagged a render behind, and a field brought into sight then stood 34 over the
+    // footer (review С-8).
+    const footerHeight = computed(() => {
+      const element = footer.value
+      if (!element || footerBox.value === 0) return 0
+      const bottom = Number.parseFloat(getComputedStyle(element).paddingBottom)
+      return footerBox.value - (Number.isFinite(bottom) ? bottom : 0)
+    })
+    // A footer is let go only when it leaves no room for the field being typed in, in a sheet that
+    // scrolls. Over the keys of a turned phone the sheet has some 107 px and the edit of a spending a
+    // footer of 121 — pinned, it covered the sum being typed (adversarial А1); then the footer goes
+    // with the content, as before MOL-182, and the field is kept in the whole sheet. Not by a share of
+    // the sheet: half of it let go the footer of an account's edit over the keys upright (324 and 167),
+    // «Сохранить» with it — the very sheet the task began with — and an error come into a footer let it
+    // go under the finger (round 2, Р2-А1, Р2-А2); and a sheet that does not scroll hides nothing
+    // under its footer (С-11). The room asked for is a line of the field, where the caret is: a field
+    // of one line is that line, a message of five is not — the browser keeps its caret in sight, and
+    // asked to stand whole (147 px) it let go the footer of a failure to send on an iPhone SE, the
+    // failure and «Повторить» out of sight (round 3, Р3-А1). Read where they lie, on every resize of
+    // either and every focus: the observer of the footer is not told of a padding the keys took off
+    // (С-8).
+    const sheetBox = useHeight(dialog)
+    const loose = ref(false)
+    function settleFooter(): void {
+      const sheet = dialog.value
+      const element = footer.value
+      const field = sheet && typedIn(sheet)
+      loose.value = Boolean(
+        sheet &&
+        element &&
+        field &&
+        sheet.scrollHeight > sheet.clientHeight &&
+        sheet.clientHeight - element.offsetHeight < lineOf(field),
+      )
+    }
+    watch([sheetBox, footerBox], settleFooter, { flush: 'post' })
+    // A focus moving from one field of the sheet to the next is settled once, by the field it lands on.
+    function focusLeft(event: FocusEvent): void {
+      const next = event.relatedTarget
+      if (next instanceof Node && dialog.value?.contains(next)) return
+      settleFooter()
+    }
+    // What covers the sheet's end: the pinned footer, or nothing.
+    const covered = computed(() => (loose.value ? 0 : footerHeight.value))
     const titleId = useId()
 
     // Whether the sheet is open as far as the screen is concerned. Not `dialog.open`: the browser
@@ -279,7 +373,10 @@ export default defineComponent({
       if (history.laid()) close()
     }
 
-    useKeyboardInset(dialog, shown)
+    // A footer grown over the field being typed in — an error, «Вернуть» — is the sheet's edge
+    // moving up, and the field is brought back into sight above it; a footer let go or pinned again
+    // moves that edge too.
+    useKeyboardInset(dialog, shown, covered)
 
     // Heard on the document, not on the dialog (MOL-80). iOS hands a touch to the page only where
     // a listener of touches or of the pointer stands, and on the dialog that is the panel's box:
@@ -324,6 +421,11 @@ export default defineComponent({
       t,
       announcements,
       dialog,
+      footer,
+      footerHeight,
+      loose,
+      settleFooter,
+      focusLeft,
       titleId,
       dragging: drag.dragging,
       close,
@@ -423,6 +525,16 @@ export default defineComponent({
     transition-property: transform;
   }
 
+  /* What the browser and `reveal` bring into sight stops at the pinned footer's top, not under it:
+     the footer's height less its bottom padding, which is added here as the footer has it. */
+  &.pinned {
+    scroll-padding-bottom: calc(var(--sheet-footer-height) + var(--space-3) + var(--safe-bottom));
+
+    html[data-under-keys] & {
+      scroll-padding-bottom: calc(var(--sheet-footer-height) + var(--space-3));
+    }
+  }
+
   /* Under the finger: no transition, or the sheet would trail behind it. */
   &.dragging,
   &.dragging::backdrop {
@@ -437,8 +549,37 @@ export default defineComponent({
     calc(var(--space-8) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
 }
 
+.panel.footed {
+  padding-bottom: var(--space-6);
+}
+
+/* Pinned to the sheet's bottom edge, as wide as the sheet, the content scrolling under it (Ф-17); the
+   margins of the screen's docked strip (К-9). Over the keys the home indicator is under them, and the
+   footer stands 12 over the keys (147). */
+.footer {
+  border-top: var(--hairline) solid var(--border);
+  padding: var(--space-3) calc(var(--space-4) + var(--safe-right))
+    calc(var(--space-3) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
+  background: var(--surface);
+
+  html[data-under-keys] & {
+    padding-bottom: var(--space-3);
+  }
+
+  .pinned > & {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    box-shadow: var(--shadow-lg);
+  }
+}
+
 .region {
   @include visually-hidden;
+
+  /* At the top, not where it stands after the footer: a pixel of it below the footer was a pixel
+     more to scroll, and at the end the pinned footer stopped a pixel over the edge. */
+  top: 0;
 }
 
 .head {
