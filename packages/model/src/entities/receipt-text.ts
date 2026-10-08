@@ -658,10 +658,10 @@ function cardReceipt(rows: readonly TextRow[]): Laid {
       : candidates(budget, f.qtyS, f.paidS, f.discS, f.priceS),
   )
   const tin = /(\d{8})\b/.exec(/ՀՎՀՀ.{0,4}:?\s*\S+|:\s*0\d{7}/.exec(text)?.[0] ?? '')?.[1] ?? null
-  const judge = (judgeBy?: number | null): ReceiptText => {
+  const judge = (byTotal: boolean): ReceiptText => {
     const { picks, balanced, blankSum, doubt } = judged(
       lists,
-      judgeBy === undefined ? total : judgeBy,
+      byTotal ? total : null,
       found.map((f) => (f.plain !== null ? f.plain.join('') : f.paidS).replace(/\D/g, '')),
     )
     const lines = found.map((f, i): ReceiptTextLine => {
@@ -692,7 +692,7 @@ function cardReceipt(rows: readonly TextRow[]): Laid {
       lines,
     }
   }
-  return { read: judge(), judge }
+  return { read: judge(true), asPrinted: () => judge(false) }
 }
 
 // Every way to read space-separated digit groups as numbers: «2 200» is one number or two. Values
@@ -734,7 +734,7 @@ const TABLE_COMBINATIONS_MAX = 100_000
 // decided by qty × price = sum. A row whose figures OCR lost takes what the total leaves over.
 function tableLines(rows: readonly TextRow[]): {
   total: number | null
-  judge: (judgeBy?: number | null) => ReceiptTextLine[]
+  judge: (byTotal: boolean) => ReceiptTextLine[]
 } {
   const text = rows.map((r) => r.text).join('\n')
   const items: { hs: string; words: string[]; rows: TextRow[] }[] = []
@@ -801,8 +801,8 @@ function tableLines(rows: readonly TextRow[]): {
   // prices in whole tens, 2 200 and 900, not 1 525.
   // With no total to judge — none read, or none shown (MOL-244) — a row reads as printed: its own arithmetic
   // first, else its last figure its sum — «1,5 1 350» is 1 350 at 900, never 2 025 at 1 350 (review 6, 7).
-  const judge = (judgeBy?: number | null): ReceiptTextLine[] => {
-    const judging = judgeBy === undefined ? total : judgeBy
+  const judge = (byTotal: boolean): ReceiptTextLine[] => {
+    const judging = byTotal ? total : null
     let chosen: TableOption[] = options.map(
       (o) =>
         (judging === null
@@ -1256,10 +1256,10 @@ function classReceipt(rows: readonly TextRow[]): Laid {
   const budget: Budget = { left: READING_COMBINATIONS_MAX, floors: FLOOR_COMBINATIONS_MAX }
   const guessed = new Set<Candidate>()
   const lists = items.map((item) => classCandidates(budget, item.figures, guessed))
-  const judge = (judgeBy?: number | null): ReceiptText => {
+  const judge = (byTotal: boolean): ReceiptText => {
     const { picks, balanced, blankSum, doubt } = judged(
       lists,
-      judgeBy === undefined ? total : judgeBy,
+      byTotal ? total : null,
       items.map((item) => item.figures.sumS.replace(/\D/g, '')),
     )
     const lines = items.map((item, i): ReceiptTextLine => {
@@ -1290,7 +1290,7 @@ function classReceipt(rows: readonly TextRow[]): Laid {
       lines,
     }
   }
-  return { read: judge(), judge }
+  return { read: judge(true), asPrinted: () => judge(false) }
 }
 
 // MOL-227 — a sole trader's terminal prints no items at all: its section «Բաժին 1», the turnover tax,
@@ -1560,13 +1560,13 @@ function withTwins(read: ReceiptText): ReceiptText {
 }
 
 /**
- * One reading laid out: `read` — its lines judged by its own printed total; `judge(null)` — the same lines as
+ * One reading laid out: `read` — its lines judged by its own printed total; `asPrinted` — the same lines as
  * printed, for a total `bestReading` does not show by them (MOL-244). The candidates of a line's figures are
  * found once, so reading again costs the judging alone: the parse's ceilings hold.
  */
 interface Laid {
   readonly read: ReceiptText
-  readonly judge: (judgeBy?: number | null) => ReceiptText
+  readonly asPrinted: () => ReceiptText
 }
 
 function readingOf(rows: readonly TextRow[]): Laid {
@@ -1577,11 +1577,11 @@ function readingOf(rows: readonly TextRow[]): Laid {
   // and read as Dog City's table it made one «line» of the whole head (MOL-227, adversarial А2)
   if (/\(\d{4}\)\s*\p{L}/u.test(text)) {
     const table = tableLines(rows)
-    const lines = table.judge()
+    const lines = table.judge(true)
     if (lines.length > card.read.lines.length) {
       laid = {
         read: tableReceipt(rows, table.total, lines),
-        judge: (judgeBy) => tableReceipt(rows, table.total, table.judge(judgeBy)),
+        asPrinted: () => tableReceipt(rows, table.total, table.judge(false)),
       }
     }
   }
@@ -1882,7 +1882,7 @@ export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptT
   // the reading chosen is read again as printed. Two places shown are no judge either (В-2 «а»; round 5 Д1:
   // a vote misread alike in two places made a lost row up to meet itself, and the review's «≠» was gone) —
   // the lines are «balanced» only where, as printed, they add up to it; a row OCR lost stays empty (Г1).
-  const reread = laid[parsed.indexOf(best)]?.judge(null) ?? best
+  const reread = laid[parsed.indexOf(best)]?.asPrinted() ?? best
   const sums = reread.lines.map((line) => line.sumHundredths)
   const met =
     total !== null &&
