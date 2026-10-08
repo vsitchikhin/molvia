@@ -1054,14 +1054,22 @@ bottom: 0`), a sibling of the panel and as wide as the sheet — never a middle 
   the browser's own scroll is done, and a field it already showed is not moved; only with a footer —
   without one the browser's scroll is the whole answer (MOL-135, adversarial А). **A footer that grows over the field typed in** — an error,
   «Вернуть» — moves that edge up as a lower sheet would, and the field is brought back above it; only a
-  field typed in, only in an open sheet. **A footer taller than half the sheet is not pinned** (`loose`, adversarial А1): over the keys
-  of a turned phone the sheet has some 107 px, and the edit of a spending a footer of 121 — pinned, it
-  covered the whole sheet and the sum being typed with it; the kit's one button, 77, left 29 px of a
-  field of 44. Let go, it goes with the content as before MOL-182, without its shadow, and the field is
-  kept in the whole sheet; the edge `reveal` goes by is then nothing, so a footer let go or pinned again
-  brings the field typed in back into sight. Half, since a footer that covers more hides more than it
-  shows; read from the sheet and the footer where they lie, whenever either is resized — upright over
-  the keys (334 and 121) it stays pinned. **Nothing of the sheet stands after the footer in the flow**:
+  field typed in, only in an open sheet. **A footer is let go only when it leaves no room for the field typed in, in a sheet that scrolls**
+  (`loose`, adversarial А1, round 2): over the keys of a turned phone the sheet has some 107 px, and
+  the edit of a spending a footer of 121 — pinned, it covered the whole sheet and the sum being typed
+  with it; the kit's one button, 77, left 29 px of a field of 44. Let go, it goes with the content as
+  before MOL-182, without its shadow, and the field is kept in the whole sheet; the edge `reveal` goes
+  by is then nothing, so a footer let go or pinned again brings the field typed in back into sight.
+  **Never by a share of the sheet**: half of it, the first answer, let go the footer of an account's
+  edit over the keys held upright (324 and 167) — «Сохранить» below the edge as the name is typed,
+  the very sheet the task began with — and an error come into a footer near half (a conflict of an
+  exchange, 168 of 281) let it go under the finger, the error and the button pressed out of sight
+  (Р2-А1, Р2-А2); and a short sheet that does not scroll hides nothing under its footer, which keeps
+  its shadow on every phone (С-11). The field is the one `typedIn` names, as for `reveal`; settled on
+  every resize of the sheet or the footer, read where they lie, and on every focus that lands in the
+  sheet or leaves it — a step from one field to the next is settled once, by the field it lands on.
+  No field typed in, the footer stays pinned however little room it leaves: nobody is typing, and
+  the keys are down. **Nothing of the sheet stands after the footer in the flow**:
   its live region, visually hidden after it, made a pixel more to scroll, and at the end the pinned
   footer stopped a pixel over the edge — the region is put at the top (`top: 0`). The header is not
   pinned (owner's В-1 «а», against 147): over the keys of an iPhone 13 a sheet has some 334 px, the
