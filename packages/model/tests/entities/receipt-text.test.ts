@@ -1901,14 +1901,45 @@ describe('the total of a receipt with items: the lines that met it, or two place
     ])
   })
 
-  it('keeps the total its lines met every one as read over two places misread alike (Б1)', () => {
-    // the till's «5» read «6» in the card payment of both readings, and in one reading's total
-    const paid = 'Վճարված է PosTerminal: 2 060,00'
-    const got = bestReading([
-      alone(...milk, ...bread, 'Ընդամենը 2050.00', paid),
-      alone(...milk, ...bread, 'Ընդամենը 2060.00', paid),
+  it('takes no total where the lines as read and two places name two sums — either may be the slip (Б1, Ц1)', () => {
+    // Б1: the till's «5» read «6» in the card payment of both readings, and in one reading's total
+    const misPaid = 'Վճարված է PosTerminal: 2 060,00'
+    const b1 = bestReading([
+      alone(...milk, ...bread, 'Ընդամենը 2050.00', misPaid),
+      alone(...milk, ...bread, 'Ընդամենը 2060.00', misPaid),
     ])
-    expect([got.totalHundredths, got.balanced]).toEqual([205_000, true])
+    // Ц1, its mirror: the milk read «160» as the total of one reading, the payment and the other right
+    const milk6 = ['1. Կաթ', '0401/1163909 1Հտ 160,00/0 160']
+    const paid = 'Վճարված է PosTerminal: 2 050,00'
+    const c1 = bestReading([
+      alone(...milk6, ...bread, 'Ընդամենը 2060.00', paid),
+      alone(...milk6, ...bread, 'Ընդամենը 2050.00', paid),
+    ])
+    expect([b1.totalHundredths, c1.totalHundredths]).toEqual([null, null])
+    expect(sums(b1)).toEqual([
+      [15_000, true],
+      [190_000, true],
+    ])
+  })
+
+  it('reads a table with no total as printed: «1,5 1 350» is 1 350 at 900 (review 6, В1)', () => {
+    const fixture = am04 as Fixture
+    // cash handed over above the total: the payment votes for nothing, and no total is shown
+    const handed = fixture.readings.map((text) =>
+      text.replace(/Կանխիկ \S+/g, 'Կանխիկ 10000.00').replace(/Վճարվում \S+/g, ''),
+    )
+    const got = bestReading(handed.map((text) => rowsOf(text, 0)))
+    expect([got.layout, got.totalHundredths, got.readTotalHundredths]).toEqual([
+      'table',
+      null,
+      945_000,
+    ])
+    const frenki = got.lines[3]!
+    expect([frenki.priceHundredths, frenki.sumHundredths]).toEqual([90_000, 135_000])
+    // a row whose figures OCR lost takes nothing of a total not shown
+    expect(
+      got.lines.some((line) => line.sumHundredths !== null && line.sumHundredths > 945_000),
+    ).toBe(false)
   })
 
   it('gives a line with no reading nothing of a total not shown; with one line as read, its rest (А1в)', () => {

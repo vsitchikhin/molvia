@@ -716,6 +716,8 @@ interface TableOption {
   readonly price: number | null
   readonly sum: number | null
   readonly settled: boolean
+  /** The row's last figure is its sum, as a till prints it: what the row reads with no total (MOL-244). */
+  readonly asPrinted?: boolean
 }
 
 // Past this many combinations the total no longer chooses among the readings of a table: a long
@@ -775,6 +777,7 @@ function tableLines(
             price: Math.round((b * 100) / a),
             sum: Math.round(b / 10),
             settled: false,
+            asPrinted: true,
           })
         }
       }
@@ -792,8 +795,12 @@ function tableLines(
   // The receipt's total decides among the readings of rows OCR left short (one row may be blank and
   // takes what is left); among readings that add up, the one with rounder prices wins — a shop
   // prices in whole tens, 2 200 and 900, not 1 525.
+  // With no total to judge, a row reads as printed: its own arithmetic first, else its last figure its sum —
+  // «1,5 1 350» is 1 350 at 900, never 2 025 at 1 350 (review 6, adversarial В1).
   let chosen: TableOption[] = options.map(
-    (o) => o.out[0] ?? { qty: null, price: null, sum: null, settled: false },
+    (o) =>
+      (judge ? undefined : (o.out.find((x) => x.settled) ?? o.out.find((x) => x.asPrinted))) ??
+      o.out[0] ?? { qty: null, price: null, sum: null, settled: false },
   )
   const round = (x: number | null): number => (x !== null && x % 1000 === 0 ? 1 : 0)
   let bestScore = -Infinity
@@ -1827,13 +1834,20 @@ export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptT
     if (section !== null) return section
   }
   // Lines «meet» a total only as read: the total changes a line's digit to meet itself, or gives a line
-  // with no reading its rest (adversarial А1). Every line as read — the lines vouch, before any vote (Б1);
-  // else two places printed (А1б); else the lines with one of them as read (owner); else none.
+  // with no reading its rest (adversarial А1). Every line as read — the lines vouch, unless two places print
+  // another sum (Б1, Ц1); else two places printed (А1б); else the lines with one of them as read (owner).
   const asRead = (every: boolean): boolean =>
     best.balanced &&
     (every ? best.lines.every((l) => l.settled) : best.lines.some((l) => l.settled))
   const own = best.totalHundredths
-  const total = asRead(true) ? own : (votedTotal(readings, false) ?? (asRead(false) ? own : null))
+  const voted = votedTotal(readings, false)
+  // the lines as read and two places naming two sums: either may be the font's slip, and nothing tells
+  // which (Б1 against its mirror, round 3 Ц1) — so no total (owner, 09.10.2026)
+  const total = asRead(true)
+    ? voted === null || voted === own
+      ? own
+      : null
+    : (voted ?? (asRead(false) ? own : null))
   if (total === own) return withTwins({ ...best, totalHundredths: total })
   // a total not shown leaves nothing of itself in the lines: they are read again as read, and add up to
   // the total shown or not (review 4)
