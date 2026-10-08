@@ -61,7 +61,16 @@ export interface ReceiptText {
   readonly date: string | null
   readonly time: string | null
   readonly receiptNo: string | null
+  /**
+   * The total two sources vouch for — the lines that met it, or two places printed (MOL-244) — else null:
+   * what the review shows and the trip's money may take.
+   */
   readonly totalHundredths: number | null
+  /**
+   * The total as the reading found it in one place, vouched for or not: only what «Прочитали не всё»
+   * measures the lines against (MOL-244), never a total shown or recorded.
+   */
+  readonly readTotalHundredths: number | null
   /** The lines add up to the printed total. */
   readonly balanced: boolean
   readonly lines: readonly ReceiptTextLine[]
@@ -676,6 +685,7 @@ function cardReceipt(rows: readonly TextRow[]): ReceiptText {
     ...dateOf(text),
     receiptNo: /Ֆիսկալ\s+\S+\s+(\d{6,})/.exec(text)?.[1] ?? null,
     totalHundredths: total,
+    readTotalHundredths: total,
     balanced,
     lines,
   }
@@ -842,6 +852,7 @@ function tableReceipt(rows: readonly TextRow[], table: ReturnType<typeof tableLi
       /ԿՀ:?\s*(\d[\d ]{2,})/.exec(text)?.[1]?.replace(/\s/g, '') ??
       null,
     totalHundredths: table.total,
+    readTotalHundredths: table.total,
     // the prototype's table reading never said whether its lines met the total
     balanced: false,
     lines: table.lines,
@@ -1248,6 +1259,7 @@ function classReceipt(rows: readonly TextRow[]): ReceiptText {
     ...dateOf(text),
     receiptNo: /Ֆիսկալ\S*(?:\s+\S*համար\S*)?\s+(\d{6,})/.exec(text)?.[1] ?? null,
     totalHundredths: total,
+    readTotalHundredths: total,
     balanced,
     lines,
   }
@@ -1293,11 +1305,16 @@ const SECTION_TAX = /Շրջ|հար[կլ]/u
 const TOTAL_WORD = 'դամե'
 const PAID_WORDS = /ձեռն|ձեոն|ձեդն|Կանխիկ|Անկանխ|Վճար/u
 const totalRow = (text: string): boolean => text.includes(TOTAL_WORD) && !text.includes('զեղչ')
-// An amount with its hundredths: «1700.00», «1800 00» — a figure that lost its point is no vote.
-const AMOUNT = /(?<![\d.,])(\d{1,7})[., ](\d{2})(?![\d.,])/g
+// An amount with its hundredths: «1700.00», «1800 00», and with its thousands apart before a point,
+// «2 050,01» — the card's payment, which read digit by digit was 50,01 in two places at once (MOL-244). A
+// figure that lost its point is no vote.
+const AMOUNT =
+  /(?<![\d.,])(\d{1,3}(?: \d{3})+(?=[.,]\d{2}(?![\d.,]))|\d{1,7})[., ](\d{2})(?![\d.,])/g
 
 const amountsOf = (text: string): number[] =>
-  [...text.matchAll(AMOUNT)].map((m) => Number(m[1]) * 100 + Number(m[2])).filter((a) => a > 0)
+  [...text.matchAll(AMOUNT)]
+    .map((m) => Number(m[1]?.replace(/ /g, '')) * 100 + Number(m[2]))
+    .filter((a) => a > 0)
 
 /**
  * The amounts of a reading by where they stand: the total, the payment and, on a receipt with no items,
@@ -1464,6 +1481,7 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
           }),
         ),
     totalHundredths: several ? null : votedTotal(readings, true),
+    readTotalHundredths: null,
     balanced: false,
     lines: [],
   }
@@ -1774,7 +1792,11 @@ export function mergeParts(parts: readonly (readonly TextRow[])[]): TextRow[] {
 /**
  * The receipt from its readings — Tesseract in two page modes, each with the parts merged: the
  * reading whose lines add up, else the one with more lines settled. The receipt's own arithmetic is
- * the judge; no truth is needed.
+ * the judge; no truth is needed. Its total is one two sources vouch for (MOL-244, owner's В-1 «а»): the
+ * lines that met it, else two places printed — the total and the payment (`votedTotal`) — else none.
+ * A total read in one place is a digit misread as often as not, the same in both readings (am-08, am-13,
+ * am-36 on the bench), and a wrong sum on a trip is worse than none the person sees and types. What the
+ * reading read stays `readTotalHundredths`, for «Прочитали не всё» alone.
  */
 export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptText {
   const parsed = readings.map(readingOf)
@@ -1785,6 +1807,10 @@ export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptT
   const best = sorted[0]
   if (best === undefined) throw new RangeError('a receipt needs at least one reading')
   // no reading found a line: a section with no items is read whole, not one to shoot again (MOL-227)
-  if (best.lines.length === 0) return departmentReceipt(readings) ?? best
-  return withTwins(best)
+  if (best.lines.length === 0) {
+    const section = departmentReceipt(readings)
+    if (section !== null) return section
+  }
+  const total = best.balanced ? best.totalHundredths : votedTotal(readings, false)
+  return withTwins({ ...best, totalHundredths: total })
 }
