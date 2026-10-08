@@ -589,7 +589,11 @@ report.
   out as such — what the seed may come to hold is named like anything else.
 - **The older survives** (`created_at`, the lower id on a tie), as places did in `0007` and `0010`: on
   production the seed is older than anything a person types. The price: a typo proposed first is the
-  canon's name, and the undo does not rename.
+  canon's name, and the undo does not rename. **A tie is one millisecond**, as a `Date` reads
+  `created_at` — the night (`ordered`) and `make merge --list` (`openCandidates`) alike, two copies of
+  one rule that a test holds to one answer on a tie; the seed's one transaction is one instant. Two
+  inserts in a row may share that millisecond, so a test that names an older and a younger gives each its
+  moment (MOL-252: the list's command came out reversed on CI).
 - **The merged item stays as a trace** (`items.merged_into`, `places.merged_into`), never deleted. The
   one column does four things: the trace's name is the survivor's **second name** — the search finds it
   by its key and its vector and answers the survivor once, at the better place, the limit after the

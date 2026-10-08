@@ -40,7 +40,11 @@ interface Judged {
   readonly meaning: number | null
 }
 
-/** The older of two: the one that has been there longer, the lower id of two made in one instant. */
+/**
+ * The older of two: the one that has been there longer, the lower id of two made in one millisecond, as
+ * a `Date` holds it — the seed's one transaction is one instant (MOL-252). `openCandidates` writes the
+ * same rule again for `make merge --list`, and a test holds the two to one answer.
+ */
 function ordered<T extends { readonly id: string; readonly createdAt: Date }>(a: T, b: T): [T, T] {
   const older =
     a.createdAt.getTime() !== b.createdAt.getTime() ? a.createdAt < b.createdAt : a.id < b.id
