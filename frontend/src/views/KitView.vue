@@ -477,6 +477,12 @@
         </AppCard>
         <SkeletonPart kind="rows" :count="1" lead="circle" tail under next />
       </div>
+      <!-- The card of the month on «Деньги» and its part (MOL-183, the tail of MOL-178): the tiles
+           come in where the plate stood — the caption, the figure and «≈» the part's lines. -->
+      <div class="pair" data-part="figure">
+        <MoneyMonthCard :month="moneyMonth" :current="moneyMonth.month" />
+        <SkeletonPart kind="figure" approx plate />
+      </div>
       <SkeletonPart kind="figure" plate />
       <SkeletonPart kind="lines" :widths="[64, 78]" />
     </section>
@@ -545,7 +551,7 @@ import {
   money,
   COUNTRY_CITIES,
 } from '@molvia/model'
-import type { AccountOperationView, SpendingCategoryView } from '@molvia/model'
+import type { AccountOperationView, MoneyMonthView, SpendingCategoryView } from '@molvia/model'
 import IconAlert from '~icons/mdi/alert-outline'
 import IconBarcode from '~icons/mdi/barcode-scan'
 import IconCart from '~icons/mdi/cart-outline'
@@ -570,6 +576,7 @@ import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import CategoryChips from '@/components/CategoryChips.vue'
 import ListRow from '@/components/ListRow.vue'
+import MoneyMonthCard from '@/components/MoneyMonthCard.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import NavRow from '@/components/NavRow.vue'
 import OperationRow from '@/components/OperationRow.vue'
@@ -612,6 +619,7 @@ export default defineComponent({
     IconRefresh,
     IconShape,
     ListRow,
+    MoneyMonthCard,
     MonthSwitcher,
     NavRow,
     OperationRow,
@@ -636,6 +644,38 @@ export default defineComponent({
       }),
     )
     const [groceries, cafe, transport] = categories
+    // September of handoff MOL-157 v2 1a, as the server answers it: the card of the month.
+    const moneyMonth: MoneyMonthView = {
+      month: '2026-09',
+      spendCurrency: 'AMD',
+      incomeCurrency: 'RUB',
+      spent: money(27452300n, 'AMD'),
+      uncounted: [],
+      foreign: [],
+      spentIncome: money(6380000n, 'RUB'),
+      income: money(12000000n, 'RUB'),
+      incomeUncounted: [],
+      count: 43,
+      incomeCount: 2,
+      shiftedIn: [],
+      shiftedOut: [],
+      rest: null,
+      accountsFrom: null,
+      accountsRemoved: false,
+      budget: null,
+      rate: null,
+      rateKind: 'live',
+      previousSpent: null,
+      previousToDay: { day: 12, spent: money(30502500n, 'AMD') },
+      byCategory: [],
+      slices: [],
+      categories: [],
+      days: [],
+      cursor: null,
+      remaining: 0,
+      remainingFrom: null,
+      remainingTo: null,
+    }
     const categoryName = (category: SpendingCategoryView) =>
       t(`spending.category.${category.preset ?? 'other'}`)
 
@@ -822,6 +862,7 @@ export default defineComponent({
         'icon-tab': 27,
       },
       units,
+      moneyMonth,
       // The handoff's real receipt, through the formatters: the sign belongs to the currency.
       figures: {
         balance: formatMoney(money(4230000n, 'AMD')),
