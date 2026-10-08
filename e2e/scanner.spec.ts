@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 // DOM for the init script, which runs in the browser.
 import { expect, test } from '@playwright/test'
-import type { Locator, Page } from '@playwright/test'
+import type { Locator, Page, Route } from '@playwright/test'
 import { randomInt } from 'node:crypto'
 import { BARCODE } from './barcode-video'
 import { asBrowser, open } from './session'
@@ -434,6 +434,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
    */
   test.describe('the focus through the code’s blocks', () => {
     const LINKS = '**/api/catalogue/items/*/barcodes'
+    const LINK = /\/api\/catalogue\/items\/[^/]+\/barcodes$/
 
     const focused = (page: Page) =>
       page.evaluate(() => ({
@@ -452,8 +453,26 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       return ((await created.json()) as { id: string }).id
     }
 
-    /** A miss, the item's name typed, its row tapped: the question, the focus on «Link and record». */
-    async function asked(page: Page, name: string, code: string): Promise<void> {
+    /**
+     * A miss, the item's name typed, its row tapped: the question, the focus on «Link and record».
+     *
+     * The link's answer is laid before the page opens (MOL-249): laid on the open page right before
+     * Enter, a link once reached the server, and the screen went on to the purchase sheet. Nothing is
+     * linked before the test's own Enter — a link sent earlier is said so here, not as a lost focus.
+     */
+    async function asked(
+      page: Page,
+      name: string,
+      code: string,
+      link?: (route: Route) => Promise<void>,
+    ): Promise<void> {
+      if (link) await page.route(LINKS, link)
+      const linked: string[] = []
+      page.on('request', (request) => {
+        if (request.method() === 'POST' && LINK.test(new URL(request.url()).pathname)) {
+          linked.push(request.url())
+        }
+      })
       await open(page, '/purchases/manual/add')
       await anItem(page, name)
       await typeCode(page, code)
@@ -464,6 +483,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
         page.locator('.not-found').getByText(`Link code ${code} to «${name}»?`),
       ).toBeVisible()
       await expect.poll(async () => (await focused(page)).text).toBe('Link and record')
+      expect(linked, 'nothing is linked before Enter').toEqual([])
     }
 
     test('a miss, a shop’s label: the scanner hands the focus back, never to the body', async ({
@@ -500,9 +520,8 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
     }) => {
       const code = freshCode()
       const name = `Кефир ${tag} ф1`
-      await asked(page, name, code)
       let calls = 0
-      await page.route(LINKS, async (route) => {
+      await asked(page, name, code, async (route) => {
         calls += 1
         if (calls === 1) return route.fulfill({ status: 502, body: 'Bad Gateway' })
         await new Promise((resolve) => setTimeout(resolve, 1500))
@@ -546,8 +565,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
     test('an item full of codes: the focus on «Record … without the code»', async ({ page }) => {
       const code = freshCode()
       const name = `Кефир ${tag} ф3`
-      await asked(page, name, code)
-      await page.route(LINKS, (route) =>
+      await asked(page, name, code, (route) =>
         route.fulfill({
           status: 409,
           contentType: 'application/json',
