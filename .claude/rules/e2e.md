@@ -127,13 +127,16 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   of «…and the app closed» and was first taken for their cause; the fifth came without it (below).
   Locally the cache is warm, so it was never seen here; a run that wants to see it removes
   `frontend/node_modules/.vite/deps`.
-- **`setOffline` does not keep a request from the server; where a spec then says what the server did
-  not get, the offline is `goOffline`** (`e2e/session.ts`, MOL-217). The first attempt's trace of the
-  fifth failure (run 37619569005, no optimizer in it) showed it: the page had met the offline — a
-  request of its own failed and never reached the API — and 350 ms later the rating's `PUT` failed in
-  the page with `ERR_INTERNET_DISCONNECTED` in 5 ms, and the same `PUT` was written by the API, `201`.
-  Chromium's emulation on the runner, not the app: nothing else sends it, and the phone, told it
-  failed, keeps its draft as it should. Not reproduced in nine probes here. So `goOffline` is
+- **A page offline is closed only after the app has left it; where a spec then says what the server
+  did not get, the offline is `goOffline`** (`e2e/session.ts`, MOL-217). The traces of the first
+  attempts of the fifth and sixth failures (runs 37619569005, 37743449964 — the sixth with
+  `page.route` already refusing): the rating's `PUT` was refused in the page, and some 35 ms after
+  `page.close()` the API got a `GET /verdicts/pending` and the `PUT` together — what the app sends
+  when it hears `online`. So the close is the hole: it takes the route and the emulation off a page
+  whose app still runs, the page hears `online` and sends the draft past both. Read so from the logs
+  of all six failures (the pair stands in each), not reproduced here — the Mac closes a page too fast.
+  The spec takes the app away first, `page.goto('about:blank')` under the route, then counts, then
+  closes. The phone itself, told the write failed, keeps its draft as it should. So `goOffline` is
   `setOffline` — the page's `navigator.onLine` and its states — **and `page.route` refusing every
   request of that page with `internetdisconnected`**: Playwright fails it before the network, and the
   page sees the same error — the route set before the offline, so nothing slips between them. That

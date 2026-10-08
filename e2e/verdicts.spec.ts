@@ -191,8 +191,12 @@ test('7: rated without a connection and the app closed — sent when it is opene
   await rate(page, 3)
   await lost
   await expect(page.getByRole('heading', { name: 'The rating is saved' })).toBeVisible()
-  await page.close()
+  // The app leaves before the page closes: `page.close()` takes the route and the offline off a page
+  // whose app still runs, and in CI it heard `online` and sent the draft — a `pending` and the `PUT`
+  // together, some 35 ms after the close, the `PUT` the page had been refused (run 37743449964).
+  await page.goto('about:blank')
   expect(await waiting(who)).toBe(2)
+  await page.close()
 
   // Opened again with the connection back: the app sends at start, the screen shows what is
   // left — and never the card that was rated, whichever answer lands first.
