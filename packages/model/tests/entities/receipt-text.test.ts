@@ -1872,24 +1872,60 @@ describe('the total of a receipt with items: the lines that met it, or two place
   // adversarial А1: the total itself makes the lines meet it — a digit swapped in a line read right
   const milk = ['1. Կաթ', '0401/1163909 1Հտ 150,00/0 150']
   const bread = ['2. Հաց', '1905/1078044 1Հտ 1900,00/0 1900']
+  const alone = (...rows: string[]): TextRow[] => rowsOf(rows.join('\n'), 0)
 
-  it('takes no total whose lines met it only as it changed them (am-09 on the bench)', () => {
+  const sums = (got: ReceiptText) => got.lines.map((line) => [line.sumHundredths, line.settled])
+
+  it('takes no total whose lines met it only as it changed them, and leaves the lines as read (am-09)', () => {
     const tail = 'Ընդամենը 160.00'
-    const got = bestReading([
-      rowsOf([...milk, tail].join('\n'), 0),
-      rowsOf([...milk, tail].join('\n'), 0),
+    const got = bestReading([alone(...milk, tail), alone(...milk, tail)])
+    // the total not shown leaves nothing of itself in the line: 150 as read, never its 160 (review 4)
+    expect([got.totalHundredths, got.balanced, got.readTotalHundredths]).toEqual([
+      null,
+      false,
+      16_000,
     ])
-    expect([got.balanced, got.lines[0]?.settled, got.totalHundredths]).toEqual([true, false, null])
-    expect(got.readTotalHundredths).toBe(16_000)
+    expect(sums(got)).toEqual([[15_000, true]])
   })
 
-  it('takes two places over a reading whose lines the total changed (adversarial А1б)', () => {
+  it('takes two places over a reading whose lines the total changed, the lines as read (А1б)', () => {
     const paid = 'Վճարված է PosTerminal: 2 050,00'
     const got = bestReading([
-      rowsOf([...milk, ...bread, 'Ընդամենը 2060.00', paid].join('\n'), 0),
-      rowsOf([...milk, 'Ընդամենը 2050.00', paid].join('\n'), 0),
+      alone(...milk, ...bread, 'Ընդամենը 2060.00', paid),
+      alone(...milk, 'Ընդամենը 2050.00', paid),
     ])
-    expect(got.totalHundredths).toBe(205_000)
+    expect([got.totalHundredths, got.balanced]).toEqual([205_000, true])
+    expect(sums(got)).toEqual([
+      [15_000, true],
+      [190_000, true],
+    ])
+  })
+
+  it('keeps the total its lines met every one as read over two places misread alike (Б1)', () => {
+    // the till's «5» read «6» in the card payment of both readings, and in one reading's total
+    const paid = 'Վճարված է PosTerminal: 2 060,00'
+    const got = bestReading([
+      alone(...milk, ...bread, 'Ընդամենը 2050.00', paid),
+      alone(...milk, ...bread, 'Ընդամենը 2060.00', paid),
+    ])
+    expect([got.totalHundredths, got.balanced]).toEqual([205_000, true])
+  })
+
+  it('gives a line with no reading nothing of a total not shown; with one line as read, its rest (А1в)', () => {
+    const lost = ['2. Հաց', '1905/1078044 1Հտ 1900,00/0,00 1777']
+    const tail = 'Ընդամենը 2060.00'
+    const none = bestReading([alone(...lost, tail), alone(...lost, tail)])
+    expect(none.totalHundredths).toBeNull()
+    expect(none.lines[0]?.sumHundredths).not.toBe(206_000)
+    // the named price of the owner's choice: the milk as read vouches, and the bread takes the rest
+    const once = bestReading([alone(...milk, ...lost, tail), alone(...milk, ...lost, tail)])
+    expect([once.totalHundredths, once.lines[1]?.sumHundredths]).toEqual([206_000, 191_000])
+  })
+
+  it('counts a row the section took as its tax once, the total’s word on it or not (Б2)', () => {
+    const section = ['ՀՎՀՀ 12345678 4/2 87654321', 'Բաժին 1', 'Ընդամենը հարկով 1700.00']
+    const got = bestReading([alone(...section), alone(...section)])
+    expect([got.layout, got.totalHundredths]).toEqual(['department', null])
   })
 
   it('takes the amount two places agree on over the one the reading read', () => {
