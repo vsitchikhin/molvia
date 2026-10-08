@@ -49,12 +49,17 @@ export default defineComponent({
   setup(props) {
     const { t, locale } = useI18n()
     const signed = (value: Money) => signedAmount(value, locale.value, { estimate: true })
-    const label = computed(() =>
-      t('spending.summary.accounts_now_label', {
+    // The name the link is read by: what it leaves out too — heard without it, the figure sounded whole.
+    const label = computed(() => {
+      const words = t('spending.summary.accounts_now_label', {
         amount: signed(props.totals.total),
         spendable: signed(props.totals.spendable),
-      }),
-    )
+      })
+      const missing = props.totals.uncounted
+      return missing > 0
+        ? `${words}. ${t('accounts.screen.uncounted', { n: missing }, missing)}`
+        : words
+    })
     return { t, signed, label }
   },
 })

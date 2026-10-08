@@ -1026,6 +1026,8 @@ describe('MoneyView: «На счетах сейчас»', () => {
     const view = await render()
     const text = plain(view.get('.now').text())
     expect(text).toContain('1 account not counted — no rate')
+    // Read out too: the link's name is all a screen reader hears of the card.
+    expect(view.get('.now a').attributes('aria-label')).toContain('1 account not counted — no rate')
     expect(text).toContain('free to spend ≈ −₽500')
     expect(view.get('.now .spendable').classes()).toContain('negative')
     expect(view.get('.now .figure').classes()).not.toContain('negative')

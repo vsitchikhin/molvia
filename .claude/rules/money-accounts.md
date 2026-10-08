@@ -120,7 +120,10 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   the month's: it does not move as the months are turned and stands by the month's error and its
   skeleton, an answer of its own. With none, or no answer of «Счета» and nothing kept, «Счета» is a
   row among the ways out instead (С-10). Below zero is «плохо» (С-17); what is left out is said under
-  the figures, as on «Счета». The phone converts nothing. The two currencies on «Счета» are MOL-193's.
+  the figures, as on «Счета», and in the link's name. The phone converts nothing. **The price, named:**
+  it is drawn once «Счета» answered or the phone keeps them, never animated in (MOL-138), so the very
+  first opening of «Деньги» on a phone, with nothing kept, moves the switcher down once by its height
+  as the answer comes; a placeholder would stand for a newcomer with no account and go again. The two currencies on «Счета» are MOL-193's.
 - **The month of «Деньги» reads the same balances for its «Остаток»** (MOL-134): `balancesOn` — the
   live accounts started by a day, their operations up to it — through `accountsCounted`, the one
   loading of accounts, operations and rates both screens share. A removed account is in neither.
