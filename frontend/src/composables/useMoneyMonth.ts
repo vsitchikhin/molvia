@@ -175,7 +175,13 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
       // The first page is what is kept, as a first read answers it: the cursor of a later page
       // is the server's to work out, not the phone's.
       const firstAt = new Date()
-      if (actor.id === id) remember(id, first, firstAt, askedAt)
+      if (actor.id === id) {
+        remember(id, first, firstAt, askedAt)
+        // The categories are the owner's, not a month's: an answer of the month just left names them
+        // for the one now on screen too — read before it came, that one had none to write a spending
+        // into until it was read itself (MOL-183, e2e «a summary that did not load»).
+        kept.value = first.categories
+      }
       let answer = first
       for (let page = 1; page < wanted && answer.cursor; page++) {
         answer = mergePages(answer, await api.moneyMonth(month, answer.cursor))
