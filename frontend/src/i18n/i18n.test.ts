@@ -479,6 +479,7 @@ describe('словарь: плюральные формы', () => {
       'verdict.pending_count',
       'spending.unsent',
       'spending.rest_operations',
+      'spending.summary.accounts_count',
       'spending.summary.donut_more',
       'spending.summary.refused',
       'spending.charts.year_center',
