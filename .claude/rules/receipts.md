@@ -229,6 +229,39 @@ when. The item itself is shared on one word: «at this seller this article is mi
 (owner, 30.09.2026), and `match: memory` says no more than that someone recorded it there. Erasure leaves a word without its author, still counted, as an item outlives its author (MOL-58);
 the copy carries the person's own words.
 
+**A person's word is what their last line still there says** (MOL-240, owner's В-1 «а» on adversarial
+А1, round 3): its item, its shelf price when «Записать» recorded it as read (`receipt_lines.as_read`, judged
+once at the record — round 4, Р4-1: judged again from the purchase as it is now, a sum put right later,
+a discount at the till, wiped the shelf price at the next deploy; a line an image rolled back recorded
+was never judged, `null`, and keeps its price while its purchase is as the line was read, as 0061 judged
+the lines before it — round 5, Р5-1; a line «Записать» judged not as read is `false` and never gets one,
+whatever the purchase says later — round 6, Р6-1) and the moment of its record — the
+record's transaction time, `now()`, both for `recorded_at` and the word's `written_at` — a new word's
+too, not only one written over (round 5), so a word
+settled from the very line that wrote it moves nothing (Р4-1б) — or no word once no line says it. A purchase removed, or
+its trip removed for good, settles the words of its line by every path that deletes them: «Удалить
+позицию», the minute timer, and the final removal «Начать» and a receipt's record make of a trip past its
+ten minutes (`forgetWordsOf`, before the delete, in its transaction). A line of a trip only marked removed
+still says its word, since «Вернуть» may bring it back. Kept as it was, the word was the person's own,
+first on the next review of that shop, and the one way to correct a purchase's item — remove it and enter
+it again — brought the wrong item back; and «what, where, for how much and when» lay under the person's id
+while /privacy says the record goes whole. **Deleted only when nothing says it, else written over**: a word
+is one row per person and key that every record writes over, so the line going may be the one that wrote
+it while an older one stands behind the key — left alone, the word carried the removed purchase's price
+and moment (Р3-1), and deleted, it lost the item the older purchase says (Р3-2). **Under the person's
+lock** (`store_memory`, per actor, taken last — after the trip's row or the owner's lock — and by
+`remember` too): two removals at once each saw the other's line, and the word outlived both (Р3-3).
+**Settled whole once the API listens** (`settleStoreMemory`): 0061 deleted the lines of purchases removed
+before it, and a text key is `toSearchKey`, which no migration can compute (Р3-4); it also settles what an
+image rolled back removed without settling. **Never on the way to `listen`** (round 4, Р4-2): every pair of
+person and seller in one `in (…)` overflowed the parser's stack from some 8 000 pairs, and the API did not
+start at all — so a person at a time, by their id alone, each in a transaction of their own under their
+lock, beside whatever writes meanwhile; a failure is reported (`job:store-memory`), never fatal. A removal
+reads only the sellers of its lines. Settling never inserts a word. The price:
+a trip removed as a duplicate forgets its words until that article is recorded again. **This is not
+erasure**: the erased leave their words without a name, still counted (MOL-58) — a person leaving is not
+a person taking a purchase back.
+
 **There is no path for «a purchase's item changed later» yet** — a purchase's patch is its quantity and
 amount (`expensePatchSchema`). The memory is rewritten by the next receipt recorded at the shop; the
 change of an item, when it comes, writes the person's word as recording does.
@@ -270,14 +303,28 @@ receipt of a week ago is a purchase of a week ago.
 **The same trip sent again is the same answer, another trip a 409** — the phone names the trip, as every
 write offline (MOL-24). **The same receipt recorded before is refused** (Т-11,
 `error.receipt_recorded_before`): its seller's tax number and number, the person's, while its purchases
-are there — a trip removed lets it be recorded again. A receipt with no number is held by its id alone.
+are there — a trip removed lets a new shot of it be recorded. A receipt with no number is held by its id
+alone.
 
 **A recorded receipt is not removed while its trip is there** (review 1, В1, В2): its row dates the trip
 on the accounts, names it «из чека», names its seller's place and guards against a second record —
-removed, the trip moved a week on its account and the same receipt was recorded twice. It goes with
-its trip: once the trip is removed for good (`trip_id` nulled), the receipt is recorded again from its
-lines (В7) — the photo is gone, the lines are not; a trip only marked removed may come back with
-«Вернуть», so until then it is a 409. «Удалить чек» reads the receipt under the row's lock «Записать»
+removed, the trip moved a week on its account and the same receipt was recorded twice. **It goes with
+its trip, and a line with its purchase** (MOL-240, adversarial А2 and Б2 of MOL-97): `trip_id` and
+`expense_id` are `ON DELETE CASCADE`, a cut-out row goes with its line by the key
+`(receipt_id, position)`, and `receipts_recorded_with_trip` refuses a recorded receipt without a trip.
+They were `SET NULL`, so that a receipt whose trip was removed for good could be recorded again from its
+lines (В7) — but the phone draws no recorded receipt, so nobody could, and what a person removed lay on
+the server, unseen, until erasure. The paper is recorded again by a new shot: its twin went with the
+trip. A trip only marked removed keeps its receipt whole, and «Вернуть» brings both back; until then
+«Записать» is a 409. **A line not recorded goes at «Записать»** (MOL-240, В-2): nobody sees it once the
+receipt is recorded, and what it costs is counted at that moment — so a recorded receipt's lines have
+gaps, and a line is found by its `position`, never its place in a list (`codesAgain`; the wire carries
+no position, so a recorded receipt's `lines` are never read by their place). The minute timer deletes a
+recorded receipt's line that is no purchase too, as it does a photo (adversarial А3б): **an image rolled
+back** onto this schema records with every line kept, and 0061 does not run twice. The rest of a rollback
+is a named price, nothing written wrong: its erasure deletes the trips first, and the cascade takes a
+recorded receipt uncounted in the report (А3а); its repeat of «Записать» reads a code by the line's place
+and may name another line's code to the phone (А3в). «Удалить чек» reads the receipt under the row's lock «Записать»
 holds (round 2, Р2-В1): a record committed while it waited is seen. **One trip is one receipt's**
 (`receipts_trip_key`), and the recorded receipts are indexed by their seller (`receipts_recorded_tin_idx`):
 every look at a receipt reads its seller's place off them.
@@ -389,8 +436,8 @@ it now (`shownLines`, the review's own function) under the total the phone sends
 named:** for those builds a record made after another one taught the memory counts against the new
 memory. A new item kept new under another name is no edit either way: the reading gave no name to
 correct. Written in the transaction it counts, the last statement of it; a repeat of «Записать»
-counts nothing, and **a receipt recorded again once its trip was removed for good counts nothing
-either** (review 7). Erasure does not reach it, and an erased person's corrections still count.
+counts nothing — and a new shot of a receipt whose trip was removed counts as the new receipt it is
+(MOL-240). Erasure does not reach it, and an erased person's corrections still count.
 **`make gates` reads it as the block «0.2r»** with its stop line — more than a third of the lines put
 right after four weeks brings the question of the reader back (`RECEIPT_EDITS_STOP_PERCENT`, owner,
 04.10.2026) — beside the share the readings that never reached a record, since the share is of
@@ -716,12 +763,14 @@ not would otherwise be refused for good. Whether the data decodes is the reader'
 
 ## What lives how long
 
-| What                   | How long                                                                                        |
-| ---------------------- | ----------------------------------------------------------------------------------------------- |
-| A removed receipt      | ten minutes of «Вернуть», then the minute timer (П-8, as MOL-73)                                |
-| A receipt not recorded | 28 days after it arrived, whole (В-3) — by the server's clock, not the phone's                  |
-| The photo              | until the receipt is recorded: recording deletes it; the timer holds the promise if it does not |
-| An item line cut out   | 28 days after the receipt is recorded, and only a line recorded as read (В-4)                   |
+| What                   | How long                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------ |
+| A removed receipt      | ten minutes of «Вернуть», then the minute timer (П-8, as MOL-73)                                 |
+| A receipt not recorded | 28 days after it arrived, whole (В-3) — by the server's clock, not the phone's                   |
+| The photo              | until the receipt is recorded: recording deletes it; the timer holds the promise if it does not  |
+| An item line cut out   | 28 days after the receipt is recorded, and only a line recorded as read (В-4) — or with its line |
+| A recorded receipt     | while its trip is there: the trip removed for good takes it (MOL-240)                            |
+| A line of it           | while its purchase is there; a line not recorded goes at «Записать» (MOL-240, В-2)               |
 
 **Cut-out lines are item rows only** — a line's figures, and its name row only between two items:
 right below the figures of the one before, and with the item's number read on it — one or two digits

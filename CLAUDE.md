@@ -598,13 +598,16 @@ that are easiest to break; the file holds every rule of the area and the reason 
   total's (`*_COMBINATIONS_*`, `RECONCILE_*`): it runs in the API's process; half a second at worst.
 - **A photo lives until the receipt is recorded, a receipt not recorded 28 days, a cut-out item line
   28 days after recording, of a line recorded as read only** (В-3, В-4); **photos never enter the
-  nightly copy** (В-2), never the log.
+  nightly copy** (В-2), never the log. **A recorded receipt goes with its trip, a line with its
+  purchase, a line not recorded at «Записать»** (MOL-240): by the keys, never a timer.
 - **A line finds its item: the shop's memory by article, by the line, the country's names with the
   heading, the search by the gloss, else new** (MOL-126); names and search once in the queue, the memory
   on every reading. The matcher is MOL-114's `dict-match.mjs`, held to the bench.
 - **The shops' memory is shared** (owner, 30.09.2026): the person's own word first, else the item most
   people said, the later on a tie; the erased still count; nobody's word is shown as someone's, and
-  another person's shelf price only with access and from three prices, their lower median.
+  another person's shelf price only with access and from three prices, their lower median. **A person's word
+  is what their last line still there says** (MOL-240): settled on every path that deletes a purchase,
+  under the person's lock, and whole once the API listens — never on its way there.
 - **A place keeps no tax number**: the place of a seller is where its receipts were recorded, read as
   the memory is; a recorded receipt is not removed while its trip is there — its row dates the trip.
 - **On the phone (MOL-127) a receipt is the country's version, never a flag** (Р-1); its photo is

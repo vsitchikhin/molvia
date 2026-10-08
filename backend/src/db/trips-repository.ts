@@ -1,4 +1,5 @@
 import { and, desc, eq, gt, inArray, isNull, isNotNull, lte, or, sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import {
   DomainError,
   ERROR,
@@ -23,6 +24,7 @@ import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit, theRow } from './rows'
 import { expenses, trips, places } from './schema'
+import { forgetWordsOf } from './store-memory-repository'
 import { tripMoneyRows } from './trip-money'
 import type { TripMoneyRow } from './trip-money'
 
@@ -226,6 +228,14 @@ function undoFrom() {
 }
 
 /** Per owner: a start, a removal and a «Вернуть» see one another's open trip (MOL-21, MOL-76). */
+/**
+ * The lines of trips `which` (on `trips` aliased `t`) whose removal is final: what `forgetWordsOf` takes
+ * before they are deleted, and their receipts with them (MOL-240).
+ */
+function removedForGood(which: SQL) {
+  return sql`e.trip_id in (select t.id from trips t where t.deleted_at <= ${undoFrom()} and ${which})`
+}
+
 function ownerLock(tx: Conn, actorId: string) {
   return tx.execute(sql`select pg_advisory_xact_lock(hashtext('trips'), hashtext(${actorId}))`)
 }
@@ -287,6 +297,10 @@ export function createTripRepository(db: Conn): TripRepository {
           await ownerLock(tx, actorId)
 
           // Past its ten minutes a removal is final, and the same name is a new trip (MOL-76).
+          await forgetWordsOf(
+            tx,
+            removedForGood(sql`t.id = ${input.id} and t.actor_id = ${actorId}`),
+          )
           await tx
             .delete(trips)
             .where(
@@ -343,6 +357,10 @@ export function createTripRepository(db: Conn): TripRepository {
       return translateFailures(async () =>
         db.transaction(async (tx) => {
           await ownerLock(tx, actorId)
+          await forgetWordsOf(
+            tx,
+            removedForGood(sql`t.id = ${input.id} and t.actor_id = ${actorId}`),
+          )
           await tx
             .delete(trips)
             .where(
@@ -606,9 +624,12 @@ export function createTripRepository(db: Conn): TripRepository {
     },
 
     async purgeStale() {
-      await db
-        .delete(trips)
-        .where(and(isNotNull(trips.deletedAt), lte(trips.deletedAt, undoFrom())))
+      await db.transaction(async (tx) => {
+        await forgetWordsOf(tx, removedForGood(sql`true`))
+        await tx
+          .delete(trips)
+          .where(and(isNotNull(trips.deletedAt), lte(trips.deletedAt, undoFrom())))
+      })
     },
   }
 }

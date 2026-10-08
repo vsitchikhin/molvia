@@ -164,7 +164,7 @@ it('says the consent is kept — the edition and when — and nothing of the age
   expect(view.text()).toContain(ru.privacy.stored.consent.text)
   expect(ru.privacy.stored.consent.text).toMatch(/Возраст и дату рождения мы не храним/)
   // The subtitle is the revision written in code, not a sentence of the dictionary.
-  expect(view.text()).toContain('Редакция 2 от 7 октября 2026')
+  expect(view.text()).toContain('Редакция 2 от 8 октября 2026')
 })
 
 describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for (MOL-236)', () => {
@@ -318,10 +318,17 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
     expect(ru.privacy.serbian_receipts.text).not.toMatch(/выписан на фирму/)
   })
 
-  it('names MOL-240 as it is until it is fixed (В-3)', () => {
-    expect(ru.privacy.stored.receipts.text).toMatch(
-      /записанный чек из «Покупок» или одну покупку из него, сам чек и его строки пока остаются у нас/,
-    )
+  // MOL-240: named as a defect by edition 2 (В-3) until fixed; a narrower processing is a revision
+  it('says a recorded receipt goes with its record and a line with its purchase', () => {
+    const text = ru.privacy.stored.receipts.text
+    expect(text).toMatch(/удалите запись — через 10 минут уйдёт и чек со всеми строками/)
+    expect(text).toMatch(/Удалите одну покупку — сразу уйдёт её строка/)
+    // and the person's word on the line in the shop's memory (MOL-240, В-1 on adversarial А1)
+    expect(text).toMatch(/уходит и ваше слово о строке в памяти магазина/)
+    // a word another purchase still says is that purchase's (MOL-240, round 3, Р3-1, Р3-2)
+    expect(text).toMatch(/слово снова берётся из неё — её товар, цена и день/)
+    expect(text).toMatch(/Строки, которые вы не стали записывать, удаляются при записи/)
+    expect(text).not.toMatch(/пока есть аккаунт|исправляем/)
   })
 
   it('draws no notice of a breach while the dictionary has none', async () => {

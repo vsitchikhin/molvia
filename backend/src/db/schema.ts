@@ -2568,7 +2568,8 @@ export const feedbackPictureFiles = pgTable(
  * total — sits on the row; the lines are `receipt_lines`.
  *
  * What lives how long (В-3): a receipt not recorded goes whole 28 days after it arrived, a removed
- * one after the ten minutes of «Вернуть», as everything of «Деньги» (П-8, MOL-73).
+ * one after the ten minutes of «Вернуть», as everything of «Деньги» (П-8, MOL-73), a recorded one
+ * with its trip removed for good (MOL-240).
  */
 export const receipts = pgTable(
   'receipts',
@@ -2624,8 +2625,9 @@ export const receipts = pgTable(
     // whichever came first. «Чек разобран» goes only to whoever was not handed it.
     heard: text('heard').$type<ReceiptHeard>(),
     heardAt: timestamp('heard_at', { withTimezone: true }),
-    // The purchases it was recorded as (MOL-126); gone with the trip's final removal.
-    tripId: uuid('trip_id').references(() => trips.id, { onDelete: 'set null' }),
+    // The purchases it was recorded as (MOL-126). The trip removed for good takes the receipt with it
+    // (MOL-240): nobody sees a recorded receipt without its trip, so nothing else would ever remove it.
+    tripId: uuid('trip_id').references(() => trips.id, { onDelete: 'cascade' }),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (table) => [
@@ -2695,6 +2697,11 @@ export const receipts = pgTable(
       sql`${table.status} = 'uploading' or ${table.queuedAt} is not null`,
     ),
     check('receipts_attempts_non_negative', sql`${table.attempts} >= 0`),
+    // A recorded receipt is its trip's (MOL-240): one without would lie on the server unseen.
+    check(
+      'receipts_recorded_with_trip',
+      sql`${table.status} <> 'recorded' or ${table.tripId} is not null`,
+    ),
     check(
       'receipts_city_known',
       sql`${table.city} is null or ${oneOf(table.city, RECEIPT_CITIES)}`,
@@ -2793,8 +2800,14 @@ export const receiptLines = pgTable(
     // The package's code the Serbian tax office's specification gave the line (MOL-234): only one the
     // catalogue would take (`writtenBarcode`), never a shop's own. Written to an item only by the person.
     gtin: text('gtin'),
-    // The purchase the line was recorded as: a change of its item later teaches the memory (Р-2).
-    expenseId: uuid('expense_id').references(() => expenses.id, { onDelete: 'set null' }),
+    // The purchase the line was recorded as: a change of its item later teaches the memory (Р-2). The
+    // purchase removed takes its line (MOL-240); a line not recorded goes at «Записать».
+    expenseId: uuid('expense_id').references(() => expenses.id, { onDelete: 'cascade' }),
+    // «Записать» recorded the line as read — it added up, its quantity and sum unchanged (В-4): its price
+    // is the shelf's, what the person's word in the shops' memory carries (MOL-240, round 4, Р4-1). Judged
+    // once, at the record: a sum put right later is what was paid, never the shelf. `null` — no record of
+    // this build judged it: read and not recorded, or recorded by an image rolled back (round 6, Р6-1).
+    asRead: boolean('as_read'),
   },
   (table) => [
     primaryKey({ columns: [table.receiptId, table.position] }),
@@ -2832,7 +2845,8 @@ export const receiptLines = pgTable(
  * The item lines of a receipt cut out of its photo, row by row — the name and the figures, never
  * the head with the customer's name nor the total — for retraining the reader (MOL-169, owner,
  * 02.10.2026). Cut when the receipt is read; recording it (MOL-126) writes the text a person
- * confirmed, and from then on a row lives 28 days. Never in the nightly copy (В-2).
+ * confirmed, and from then on a row lives 28 days — or until its line goes (MOL-240). Never in the
+ * nightly copy (В-2).
  */
 export const receiptLineImages = pgTable(
   'receipt_line_images',
@@ -2854,6 +2868,12 @@ export const receiptLineImages = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.receiptId, table.position, table.piece] }),
+    // A row is a picture of its line, and goes with it (MOL-240): the positions are the lines'.
+    foreignKey({
+      name: 'receipt_line_images_line',
+      columns: [table.receiptId, table.position],
+      foreignColumns: [receiptLines.receiptId, receiptLines.position],
+    }).onDelete('cascade'),
     index('receipt_line_images_confirmed_idx').on(table.confirmedAt),
     check('receipt_line_images_piece_range', sql`${table.piece} between 0 and 3`),
     check(
