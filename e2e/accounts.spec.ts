@@ -198,6 +198,64 @@ test('счёт без операций удаляется с «Вернуть»,
   await expect(page.getByRole('link', { name: /Лишний/ })).toBeVisible()
 })
 
+test('перевод между своими счетами: два остатка, комиссия отдельной строкой, «Вернуть» (MOL-253)', async ({
+  page,
+}) => {
+  await openMoney(page)
+  await openAccounts(page)
+  // One account a currency is nowhere to transfer to: no way in yet.
+  await page.getByRole('button', { name: 'Добавить счёт' }).click()
+  await addAccount(page, 'Карта ֏', '10000')
+  await expect(page.getByRole('button', { name: /Перевод между счетами/ })).toHaveCount(0)
+  // With an account there, «Добавить счёт» floats as «Счёт».
+  await page.getByRole('button', { name: 'Счёт', exact: true }).click()
+  await addAccount(page, 'Копилка ֏', '0')
+
+  await page.getByRole('button', { name: /Перевод между счетами/ }).click()
+  const sheet = topSheet(page)
+  await expect(sheet).toContainText('Между своими счетами одной валюты')
+  await page.waitForTimeout(400)
+  await expect(sheet.getByRole('button', { name: 'Выберите, откуда' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
+  await sheet.getByRole('button', { name: /Откуда/ }).click()
+  await expect(topSheet(page)).toContainText('Остатки — на сейчас')
+  await page.waitForTimeout(400)
+  await topSheet(page)
+    .getByRole('radio', { name: /Карта ֏/ })
+    .click()
+  // The one account it can go to is put in by the screen (Р-6).
+  await expect(sheet.getByRole('button', { name: /Куда/ })).toContainText('Копилка ֏')
+  await sheet.getByLabel('Сумма').fill('3000')
+  await sheet.getByLabel(/Комиссия/).fill('100')
+  await expect(sheet).toContainText(/всего уйдёт 3\s100\s֏/)
+  await sheet.getByRole('button', { name: /Перевести 3\s000\s֏/ }).click()
+  await expect(sheet).toBeHidden()
+
+  await expect(page.getByRole('link', { name: /Карта ֏/ })).toContainText(/6\s900\s֏/)
+  await expect(page.getByRole('link', { name: /Копилка ֏/ })).toContainText(/3\s000\s֏/)
+
+  // In the source's journal the transfer and its fee stand apart, both opening the transfer.
+  await page.getByRole('link', { name: /Карта ֏/ }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Карта ֏')
+  const moved = page.getByRole('button', { name: /операцию: → Копилка ֏/ })
+  await expect(moved).toContainText(/−3\s000\s֏/)
+  await expect(page.getByRole('button', { name: /Комиссия за перевод/ })).toContainText(/−100\s֏/)
+  await moved.click()
+  const amend = topSheet(page)
+  await expect(amend).toContainText('Правка перевода')
+  await page.waitForTimeout(400)
+  await amend.getByRole('button', { name: 'Удалить перевод' }).click()
+  await expect(amend).toBeHidden()
+  await expect(page.locator('.undo-strip .text')).toHaveText('Перевод удалён')
+  await expect(moved).toHaveCount(0)
+  await page.waitForTimeout(1000)
+  await page.getByRole('button', { name: 'Вернуть' }).click()
+  await expect(moved).toBeVisible()
+  await expect(page.getByRole('button', { name: /Комиссия за перевод/ })).toBeVisible()
+})
+
 test('без связи счета не красные, а шторка счёта ждёт связь', async ({ page, context }) => {
   await openMoney(page)
   await openAccounts(page)

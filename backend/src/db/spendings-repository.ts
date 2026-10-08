@@ -139,6 +139,7 @@ function toSpending(row: Row): Spending {
       row.debitedMinor === null || row.debitedCurrency === null
         ? null
         : { minor: row.debitedMinor, currency: row.debitedCurrency },
+    transferId: row.transferId,
     revision: row.revision,
     createdAt: row.createdAt,
     amendedAt: row.amendedAt,
@@ -253,6 +254,8 @@ export function createSpendingRepository(db: Conn): SpendingRepository {
           and(
             eq(spendings.id, own),
             eq(spendings.actorId, actorId),
+            // A transfer's fee comes back with its transfer, never on its own (MOL-253).
+            isNull(spendings.transferId),
             // Past its time a removal is final even before the timer comes round.
             or(isNull(spendings.deletedAt), gt(spendings.deletedAt, undoFrom())),
           ),
@@ -262,9 +265,16 @@ export function createSpendingRepository(db: Conn): SpendingRepository {
     },
 
     async purgeStale() {
+      // A transfer's fee goes with its transfer, by the key, and comes back with it until then.
       await db
         .delete(spendings)
-        .where(and(isNotNull(spendings.deletedAt), lte(spendings.deletedAt, undoFrom())))
+        .where(
+          and(
+            isNotNull(spendings.deletedAt),
+            lte(spendings.deletedAt, undoFrom()),
+            isNull(spendings.transferId),
+          ),
+        )
     },
 
     async between(actorId, from, to) {

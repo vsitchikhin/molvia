@@ -1824,6 +1824,60 @@ describe('«Счета» (MOL-123)', () => {
     expect(calls[0]?.body).toMatchObject({ revision: 1 })
   })
 
+  it('writes a transfer with its fee, tells a repeat, and keeps every path in its segment (MOL-253)', async () => {
+    const TRANSFER = '6c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f'
+    const OTHER = '1f2e3d4c-5b6a-4978-8a9b-0c1d2e3f4a5b'
+    const transferWire = {
+      id: TRANSFER,
+      fromAccountId: ACCOUNT,
+      toAccountId: OTHER,
+      amount: { amount: '2000.00', currency: 'USD' },
+      fee: { amount: '20.00', currency: 'USD' },
+      transferredOn: '2026-10-08',
+      note: null,
+      revision: 1,
+      amendedAt: null,
+    }
+    const fields = {
+      fromAccountId: ACCOUNT,
+      toAccountId: OTHER,
+      amount: { minor: 200_000n, currency: 'USD' as const },
+      fee: { minor: 2_000n, currency: 'USD' as const },
+      transferredOn: '2026-10-08',
+    }
+    const fresh = clientReplying(201, { transfer: transferWire, accounts: overviewWire })
+    const written = await fresh.client.recordTransfer({ id: TRANSFER, ...fields })
+    expect(written.created).toBe(true)
+    expect(written.transfer.transfer.fee).toEqual({ minor: 2_000n, currency: 'USD' })
+    expect(fresh.calls[0]).toMatchObject({
+      method: 'POST',
+      body: { id: TRANSFER, amount: { amount: '2000.00', currency: 'USD' } },
+    })
+    const repeat = clientReplying(200, { transfer: transferWire, accounts: overviewWire })
+    expect((await repeat.client.recordTransfer({ id: TRANSFER, ...fields })).created).toBe(false)
+
+    const one = clientReplying(200, transferWire)
+    expect((await one.client.transfer(TRANSFER)).amount).toEqual({
+      minor: 200_000n,
+      currency: 'USD',
+    })
+    const writes = clientReplying(200, { transfer: transferWire, accounts: overviewWire })
+    await writes.client.amendTransfer(TRANSFER, { revision: 1, ...fields })
+    await writes.client.restoreTransfer('../actors/me')
+    const removal = clientReplying(200, overviewWire)
+    await removal.client.removeTransfer(TRANSFER)
+    expect(
+      [...one.calls, ...writes.calls, ...removal.calls].map(
+        ({ method, url }) => `${method} ${new URL(url).pathname}`,
+      ),
+    ).toEqual([
+      `GET /transfers/${TRANSFER}`,
+      `PUT /transfers/${TRANSFER}`,
+      'POST /transfers/..%2Factors%2Fme/restore',
+      `DELETE /transfers/${TRANSFER}`,
+    ])
+  })
+
   it('reads a journal by the key of the last row, and «не попали»', async () => {
     const journal = clientReplying(200, { account: accountWire, rows: [rowWire], cursor: null })
     const page = await journal.client.accountJournal(ACCOUNT, {

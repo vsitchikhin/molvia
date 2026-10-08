@@ -20,13 +20,21 @@ import { moneyFrom, rateFrom } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, theRow } from './rows'
-import { exchanges, incomes, moneyAccountChecks, moneyAccounts, spendings, trips } from './schema'
+import {
+  accountTransfers,
+  exchanges,
+  incomes,
+  moneyAccountChecks,
+  moneyAccounts,
+  spendings,
+  trips,
+} from './schema'
 import { tripMoneyRows } from './trip-money'
 import type { TripMoneyRow } from './trip-money'
 
 /**
  * The owner's accounts (MOL-115) and everything an account is counted from: the operations of all
- * four kinds in one shape, the checks, the account of a trip. Every rule of writing is one's money's
+ * five kinds in one shape, the checks, the account of a trip. Every rule of writing is one's money's
  * rule — named by the device, a repeat is the same answer, another body under the name a conflict,
  * an amendment names its version, a removal is a mark offered back for ten minutes.
  */
@@ -76,8 +84,8 @@ export interface MoneyAccountRepository {
 
   /**
    * Every live operation of the owner, as accounts see it: spendings, incomes, both halves of every
-   * exchange, and every trip — open ones too, the money is already gone — with what its priced
-   * purchases came to per currency.
+   * exchange and every transfer (MOL-253), and every trip — open ones too, the money is already gone —
+   * with what its priced purchases came to per currency.
    */
   operations(actorId: string): Promise<readonly AccountOperation[]>
 
@@ -123,7 +131,7 @@ export interface MoneyAccountRepository {
 type Row = typeof moneyAccounts.$inferSelect
 
 /** One owner's names are decided one at a time: a check and its write are one step (MOL-73, Д7). */
-function lockOwner(actorId: string) {
+export function lockOwner(actorId: string): SQL {
   return sql`select pg_advisory_xact_lock(hashtext('money_accounts'), hashtext(${actorId}))`
 }
 
@@ -206,6 +214,7 @@ const NO_DETAILS = {
   place: null,
   source: null,
   counterpart: null,
+  transferId: null,
   items: null,
 } as const
 
@@ -268,6 +277,8 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           or exists (select 1 from exchanges where actor_id = ${actorId}
                        and (given_account_id = ${id} or received_account_id = ${id}))
           or exists (select 1 from trips where actor_id = ${actorId} and account_id = ${id})
+          or exists (select 1 from account_transfers where actor_id = ${actorId}
+                       and (from_account_id = ${id} or to_account_id = ${id}))
           as used
     `)
     return row?.used === true
@@ -408,7 +419,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
     },
 
     async operations(actorId) {
-      const [spent, received, exchanged, tripRows, tripSums] = await Promise.all([
+      const [spent, received, exchanged, moved, tripRows, tripSums] = await Promise.all([
         db
           .select()
           .from(spendings)
@@ -421,6 +432,10 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           .select()
           .from(exchanges)
           .where(and(eq(exchanges.actorId, actorId), isNull(exchanges.deletedAt))),
+        db
+          .select()
+          .from(accountTransfers)
+          .where(and(eq(accountTransfers.actorId, actorId), isNull(accountTransfers.deletedAt))),
         db.execute<TripRow>(sql`
           select t.id, p.name as place_name, t.currency, t.started_at,
                  -- The phone's side of the start where the server's is later: a trip begun
@@ -465,7 +480,10 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
       ])
 
       const operations: AccountOperation[] = []
+      const transfers = new Map(moved.map((row) => [row.id, row]))
       for (const row of spent) {
+        // A transfer's fee says where the transfer went (MOL-253, handoff 03).
+        const of = row.transferId === null ? undefined : transfers.get(row.transferId)
         operations.push({
           kind: 'spending',
           id: row.id,
@@ -486,6 +504,13 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
             categoryId: row.categoryId,
             note: row.note,
             place: row.place,
+            transferId: row.transferId,
+            counterpart: of
+              ? {
+                  accountId: of.toAccountId,
+                  amount: { minor: of.amountMinor, currency: of.currency },
+                }
+              : null,
           },
         })
       }
@@ -544,6 +569,44 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
             ...NO_DETAILS,
             note: row.note,
             counterpart: { accountId: row.givenAccountId, amount: given },
+          },
+        })
+      }
+      for (const row of moved) {
+        const sum = { minor: row.amountMinor, currency: row.currency }
+        const half = {
+          kind: 'transfer' as const,
+          id: row.id,
+          day: row.transferredOn,
+          at: row.createdAt,
+          writtenAt: row.createdAt,
+          seenAt: latest(row.createdAt, row.amendedAt),
+          currency: row.currency,
+          debited: null,
+          rate: null,
+          unpriced: 0,
+          revision: row.revision,
+        }
+        operations.push({
+          ...half,
+          side: 'given',
+          accountId: row.fromAccountId,
+          amounts: [{ minor: -row.amountMinor, currency: row.currency }],
+          details: {
+            ...NO_DETAILS,
+            note: row.note,
+            counterpart: { accountId: row.toAccountId, amount: sum },
+          },
+        })
+        operations.push({
+          ...half,
+          side: 'received',
+          accountId: row.toAccountId,
+          amounts: [sum],
+          details: {
+            ...NO_DETAILS,
+            note: row.note,
+            counterpart: { accountId: row.fromAccountId, amount: { ...sum, minor: -sum.minor } },
           },
         })
       }

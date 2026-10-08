@@ -36,7 +36,11 @@ export default defineComponent({
   left: calc(var(--space-4) + var(--safe-left));
   z-index: 1;
   display: flex;
-  justify-content: flex-end;
+
+  // A second action stands under the first, at the same right edge (MOL-253, handoff 01).
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-end;
   pointer-events: none;
 
   &.bare {

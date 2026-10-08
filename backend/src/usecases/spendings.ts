@@ -37,6 +37,7 @@ export function spendingViewOf(spending: Spending): SpendingView {
     rate: spending.rate,
     accountId: spending.accountId,
     debited: spending.debited,
+    transferId: spending.transferId,
     revision: spending.revision,
     amendedAt: spending.amendedAt,
   }
@@ -67,8 +68,8 @@ async function checked(
  * central bank's, fresh for that day. Taken when it is written and never again (CLAUDE.md, «The rate
  * is stored with the transaction»).
  */
-async function rateOfDay(
-  repositories: Repositories,
+export async function rateOfDay(
+  repositories: Pick<Repositories, 'exchanges' | 'incomes' | 'rates'>,
   owner: Owner,
   body: Pick<SpendingBody, 'spentOn' | 'amount'>,
 ): Promise<ExchangeRate | null> {
@@ -114,6 +115,8 @@ export async function amendSpending(
   // Found first: someone else's spending is one answer whatever the body says about it.
   const held = await repositories.spendings.byId(owner.id, id)
   if (!held) throw new DomainError(ERROR.NOT_FOUND)
+  // A transfer's fee is amended with its transfer, in its sheet (MOL-253, Р-5).
+  if (held.transferId !== null) throw new DomainError(ERROR.SPENDING_OF_TRANSFER)
   await checked(repositories, owner, body, now)
   const same =
     held.spentOn === body.spentOn &&
@@ -135,13 +138,15 @@ export async function amendSpending(
 /**
  * «Удалить трату»: marked and gone from every reader, offered back for ten minutes on the server
  * (В-4) — whatever else is written meanwhile, from this phone or another (adversarial Д6). Made
- * final by the minute timer alone.
+ * final by the minute timer alone. A transfer's fee goes only with its transfer (MOL-253).
  */
 export async function removeSpending(
   repositories: Pick<Repositories, 'spendings'>,
   owner: Owner,
   id: string,
 ): Promise<void> {
+  const held = await repositories.spendings.byId(owner.id, id)
+  if (held !== null && held.transferId !== null) throw new DomainError(ERROR.SPENDING_OF_TRANSFER)
   await repositories.spendings.remove(owner.id, id)
 }
 

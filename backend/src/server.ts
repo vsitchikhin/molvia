@@ -120,6 +120,7 @@ import {
 } from '@/usecases/incomes'
 import { incomeRoutes } from '@/routes/incomes'
 import { createIncomeRepository } from '@/db/incomes-repository'
+import { createTransferRepository } from '@/db/transfers-repository'
 import {
   addSpendingCategory,
   amendSpending,
@@ -150,7 +151,15 @@ import {
   restoreMoneyAccount,
   unassignedOf,
 } from '@/usecases/money-accounts'
+import {
+  amendTransfer,
+  recordTransfer,
+  removeTransfer,
+  restoreTransfer,
+  transferOfOwner,
+} from '@/usecases/transfers'
 import { moneyAccountRoutes } from '@/routes/money-accounts'
+import { transferRoutes } from '@/routes/transfers'
 import { createMoneyAccountRepository } from '@/db/money-accounts-repository'
 import { createSettingsRepository } from '@/db/settings-repository'
 import { saveSettings } from '@/usecases/save-settings'
@@ -213,6 +222,10 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   // already counted operations in it: the request is well formed, the state refuses it.
   [ERROR.MONEY_ACCOUNT_TAKEN]: 409,
   [ERROR.MONEY_ACCOUNT_CURRENCY_LOCKED]: 409,
+  // A transfer onto an account gone or given another currency on another phone, and a transfer's
+  // fee sent through «Траты» (MOL-253): well formed, the state refuses it.
+  [ERROR.TRANSFER_ACCOUNT]: 409,
+  [ERROR.SPENDING_OF_TRANSFER]: 409,
   // Also well formed: another trip of the same person is still open, and which of the two goes
   // on is the person's choice (MOL-21). The screen reads the code, the status only groups it.
   [ERROR.TRIP_OPEN]: 409,
@@ -571,6 +584,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const removedSpendings = createSpendingRepository(db)
     const removedTrips = createTripRepository(db)
     const removedAccounts = createMoneyAccountRepository(db)
+    const removedTransfers = createTransferRepository(db)
     const receipts = createReceiptRepository(db)
     const reader = options.receiptReader ?? null
     const taxOffice =
@@ -589,6 +603,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     let stopSpendingCleanup: (() => Promise<void>) | undefined
     let stopTripCleanup: (() => Promise<void>) | undefined
     let stopAccountCleanup: (() => Promise<void>) | undefined
+    let stopTransferCleanup: (() => Promise<void>) | undefined
     let stopSessionCleanup: (() => Promise<void>) | undefined
     let stopFeedbackCleanup: (() => Promise<void>) | undefined
     let stopFailureCleanup: (() => Promise<void>) | undefined
@@ -638,6 +653,13 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         () => removedAccounts.purgeStale(),
         (error) => {
           failures.report(error, job('account-cleanup'), 'removed account cleanup failed')
+        },
+      )
+      // And for transfers between one's own accounts (MOL-253): a transfer is final with its fee.
+      stopTransferCleanup = startLoginCleanup(
+        () => removedTransfers.purgeStale(),
+        (error) => {
+          failures.report(error, job('transfer-cleanup'), 'removed transfer cleanup failed')
         },
       )
       // An expired session has no reader, and it kept a device name for good while the privacy
@@ -833,6 +855,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopIncomeCleanup?.()
       await stopSpendingCleanup?.()
       await stopTripCleanup?.()
+      await stopTransferCleanup?.()
       await stopAccountCleanup?.()
       await stopSessionCleanup?.()
       await stopFeedbackCleanup?.()
@@ -1089,6 +1112,13 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         check: (actor, id, body) => checkAccount(tripData, actor, id, body),
         held: (actor, query) => accountsHeld(tripData, actor, query),
         payTrip: (actor, tripId, body) => payTrip(tripData, actor, tripId, body),
+      })
+      transferRoutes(guarded, {
+        record: (actor, body) => recordTransfer(tripData, actor, body),
+        one: (actor, id) => transferOfOwner(tripData, actor, id),
+        amend: (actor, id, body) => amendTransfer(tripData, actor, id, body),
+        remove: (actor, id) => removeTransfer(tripData, actor, id),
+        restore: (actor, id) => restoreTransfer(tripData, actor, id),
       })
       adviceRoutes(guarded, {
         advice: ({ actorId, ...phone }) =>

@@ -148,6 +148,7 @@ describe('словарь: повторяющиеся тексты', () => {
         'item.save_edit',
         'receipt.line.save',
         'settings.save',
+        'transfer.save',
         'trip.receipt.sheet.save',
       ],
       // Цена Р-2: одно состояние, написанное для трёх экранов, и у просмотра чека своё (MOL-127).
@@ -185,10 +186,11 @@ describe('словарь: повторяющиеся тексты', () => {
         'error.income_in_future',
         'error.money_account_in_future',
         'error.spending_in_future',
+        'error.transfer_in_future',
       ],
       // Цена Р-2 у двух экранов одной денежной модели: доходы пишутся, правятся, удаляются и
       // возвращаются по правилам обменов (MOL-66, Р-2), и слова о тех же действиях — те же.
-      'исправлен {date}': ['exchange.amended', 'income.amended'],
+      'исправлен {date}': ['exchange.amended', 'income.amended', 'transfer.amended'],
       Вернуть: [
         'accounts.screen.restore',
         'exchange.restore',
@@ -223,6 +225,7 @@ describe('словарь: повторяющиеся тексты', () => {
         'budget.sheet.kind_amount',
         'income.sheet.amount',
         'spending.sheet.amount',
+        'transfer.amount',
         'trip.receipt.sheet.label',
       ],
       // Название экрана и пункт страницы приватности о том же (MOL-58, MOL-66).
@@ -256,17 +259,27 @@ describe('словарь: повторяющиеся тексты', () => {
         'accounts.sheet.deleting',
         'erase.confirm_busy',
         'exchange.remove_sheet.confirm_busy',
+        'transfer.removing',
       ],
       'Сохраняем…': [
         'accounts.sheet.saving',
         'budget.sheet.saving',
         'consent.accept_busy',
         'settings.saving',
+        'transfer.saving',
         'trip.rate.saving',
       ],
       'Возвращаем…': ['accounts.screen.restoring', 'exchange.restoring', 'income.restoring'],
       // «Показать ещё» за работой и загрузка экрана — одно слово, ключи разные (MOL-225).
       'Загружаем…': ['state.loading', 'trip.history.loading'],
+      // Перевод (MOL-253): шторка говорит словами соседних — «Заметка» и «Откуда» дохода, «Сохраним,
+      // когда будет связь» счёта, «Попробуйте ещё раз» настроек; заголовок шторки и подпись строки
+      // журнала — одно слово о том же переводе.
+      Заметка: ['income.sheet.note', 'transfer.note'],
+      Откуда: ['income.sheet.source', 'transfer.from'],
+      Перевод: ['transfer.row_meta', 'transfer.title'],
+      'Попробуйте ещё раз': ['settings.load_error.body', 'transfer.failed_retry'],
+      'Сохраним, когда будет связь': ['accounts.sheet.wait_online', 'transfer.wait_online_save'],
     })
   })
 
@@ -308,6 +321,7 @@ describe('словарь: повторяющиеся тексты', () => {
         'accounts.sheet.deleting',
         'erase.confirm_busy',
         'exchange.remove_sheet.confirm_busy',
+        'transfer.removing',
       ],
       'Saving…': [
         'accounts.sheet.saving',
@@ -315,6 +329,7 @@ describe('словарь: повторяющиеся тексты', () => {
         'consent.accept_busy',
         'receipt.review.record_busy',
         'settings.saving',
+        'transfer.saving',
         'trip.rate.saving',
       ],
       'Bringing back…': ['exchange.restoring', 'income.restoring'],
@@ -350,6 +365,7 @@ describe('словарь: повторяющиеся тексты', () => {
         'item.save_edit',
         'receipt.line.save',
         'settings.save',
+        'transfer.save',
         'trip.receipt.sheet.save',
       ],
       'No connection': [
@@ -382,7 +398,12 @@ describe('словарь: повторяющиеся тексты', () => {
       'Now recorded: {details}': ['exchange.sheet.current', 'income.sheet.current'],
       Categories: ['spending.categories.title', 'spending.categories_link'],
       Other: ['feedback.kinds.other', 'income.source.other', 'spending.category.other'],
-      Amount: ['income.sheet.amount', 'spending.sheet.amount', 'trip.receipt.sheet.label'],
+      Amount: [
+        'income.sheet.amount',
+        'spending.sheet.amount',
+        'transfer.amount',
+        'trip.receipt.sheet.label',
+      ],
       // English has one word where Russian says «было до обмена» and «было до поступления».
       'held before {amount}': ['exchange.sheet.current_held', 'income.sheet.current_held'],
       // One English word for the screen, its sheet and the privacy entry; Russian has «Доход».
@@ -405,6 +426,12 @@ describe('словарь: повторяющиеся тексты', () => {
       // The period of the rate chart: its switch says it in the words of «Графики» (MOL-168).
       Month: ['exchange.rate_chart.period_option.1', 'spending.charts.mode_month'],
       Period: ['exchange.rate_chart.period', 'spending.charts.mode'],
+      // A transfer (MOL-253) speaks in its neighbours' words, as in Russian; its title, its row and
+      // the button of an account's screen are one word in English.
+      From: ['income.sheet.source', 'transfer.from'],
+      Note: ['income.sheet.note', 'transfer.note'],
+      Transfer: ['accounts.account.transfer', 'transfer.row_meta', 'transfer.title'],
+      'Try again': ['state.retry', 'transfer.failed_retry'],
     })
   })
 })

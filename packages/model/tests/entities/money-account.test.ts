@@ -88,6 +88,7 @@ function operation(
       place: null,
       source: null,
       counterpart: null,
+      transferId: null,
       items: null,
     },
     ...patch,
@@ -558,5 +559,95 @@ describe('an account made on its own start day starts when it was made (MOL-250)
     const before = operation('spending', ['-5 AMD'], '2026-10-06', null, written(after(-30)))
     const later = operation('spending', ['-7 AMD'], '2026-10-06', null, written(after(30)))
     expect(unassignedOperations([cash], new Map(), [before, later])).toEqual([later])
+  })
+})
+
+describe('a transfer between one’s own accounts (MOL-253)', () => {
+  /** Both halves of one transfer: out of `from`, into `to`, under one id — as the repository reads it. */
+  function transfer(from: MoneyAccount, to: MoneyAccount, amount: string, day: string) {
+    const id = nextId()
+    const sum = toMoney(amount)
+    const out = operation('transfer', [`-${amount}`], day, from, {
+      id,
+      side: 'given',
+      details: {
+        categoryId: null,
+        note: null,
+        place: null,
+        source: null,
+        counterpart: { accountId: to.id, amount: sum },
+        transferId: null,
+        items: null,
+      },
+    })
+    const into = operation('transfer', [amount], day, to, {
+      id,
+      side: 'received',
+      details: {
+        ...out.details,
+        counterpart: { accountId: from.id, amount: money(-sum.minor, sum.currency) },
+      },
+    })
+    return [out, into] as const
+  }
+
+  it('moves the two balances by the sum, exactly, and nothing else', () => {
+    const card = account('Папина карта', '3140 USD')
+    const dollars = account('Доллары', '4400 USD')
+    const cash = account('Наличные', '1000 USD')
+    const halves = transfer(card, dollars, '2000 USD', '2026-10-08')
+    expect(accountBalance(card, halves, noRates)).toEqual({
+      balance: toMoney('1140 USD'),
+      approximate: false,
+      uncounted: 0,
+    })
+    expect(accountBalance(dollars, halves, noRates).balance).toEqual(toMoney('6400 USD'))
+    expect(accountBalance(cash, halves, noRates).balance).toEqual(toMoney('1000 USD'))
+  })
+
+  it('takes the fee as an ordinary spending of the source, beside the transfer', () => {
+    const card = account('Папина карта', '3140 USD')
+    const dollars = account('Доллары', '4400 USD')
+    const [out, into] = transfer(card, dollars, '2000 USD', '2026-10-08')
+    const fee = operation('spending', ['-20 USD'], '2026-10-08', card, {
+      details: { ...out.details, transferId: out.id },
+    })
+    expect(accountBalance(card, [out, into, fee], noRates).balance).toEqual(toMoney('1120 USD'))
+  })
+
+  it('is never a reason of a check, nor in «не попали»: it has its accounts and their currency', () => {
+    const card = account('Папина карта', '3140 USD')
+    const dollars = account('Доллары', '4400 USD')
+    const halves = transfer(card, dollars, '2000 USD', '2026-10-08')
+    for (const which of [card, dollars]) {
+      const counted = accountBalance(which, halves, noRates).balance
+      expect(accountCheck(which, halves, null, counted, noRates).reasons).toEqual([])
+    }
+    expect(unassignedOperations([card, dollars], new Map(), halves)).toEqual([])
+  })
+
+  it('is history before an account’s start, as every operation is', () => {
+    const card = account('Папина карта', '3140 USD', '2026-10-08')
+    const dollars = account('Доллары', '4400 USD', '2026-10-01')
+    const halves = transfer(card, dollars, '2000 USD', '2026-10-08')
+    expect(accountBalance(card, halves, noRates).balance).toEqual(toMoney('3140 USD'))
+    expect(accountBalance(dollars, halves, noRates).balance).toEqual(toMoney('6400 USD'))
+  })
+
+  it('leaves the sum of the currency’s accounts — «сколько было до» — where it was', () => {
+    const card = account('Папина карта', '3140 USD')
+    const dollars = account('Доллары', '4400 USD')
+    const halves = transfer(card, dollars, '2000 USD', '2026-10-08')
+    expect(heldOn([card, dollars], halves, 'USD', '2026-10-08', noRates)?.held).toEqual(
+      toMoney('7540 USD'),
+    )
+  })
+
+  it('names its two halves apart, though both are of one currency', () => {
+    const card = account('Папина карта', '3140 USD')
+    const dollars = account('Доллары', '4400 USD')
+    const [out, into] = transfer(card, dollars, '2000 USD', '2026-10-08')
+    expect(operationKeyOf(out).id).toBe(`${out.id}:given`)
+    expect(operationKeyOf(into).id).toBe(`${out.id}:received`)
   })
 })

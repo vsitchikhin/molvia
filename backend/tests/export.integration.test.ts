@@ -7,6 +7,8 @@ import type { EventPayload, EventType } from '@molvia/model'
 import { ACTOR_REFERENCES, ERASED_TABLES, createErasureRepository } from '@/db/erasure-repository'
 import { EXPORT_COLUMNS, EXPORT_SECTION_OF, createExportRepository } from '@/db/export-repository'
 import {
+  accountTransferRevisions,
+  accountTransfers,
   actors,
   budgetPlans,
   events,
@@ -144,6 +146,7 @@ async function aFullLife(actorId: string, telegramUserId: number) {
   const cash = randomUUID()
   const dollars = randomUUID()
   const card = randomUUID()
+  const piggy = randomUUID()
   await db.insert(moneyAccounts).values([
     {
       id: cash,
@@ -175,7 +178,39 @@ async function aFullLife(actorId: string, telegramUserId: number) {
       startOn: '2026-09-01',
       createdOn: '2026-09-27',
     },
+    {
+      id: piggy,
+      actorId,
+      name: 'Копилка ֏',
+      currency: 'AMD',
+      startMinor: 0n,
+      startOn: '2026-09-01',
+      createdOn: '2026-09-27',
+    },
   ])
+  // A transfer between the person's accounts (MOL-253), amended once and removed; its fee is the
+  // spending below.
+  const transferId = randomUUID()
+  const transfer = {
+    fromAccountId: cash,
+    toAccountId: piggy,
+    amountMinor: 300_000n,
+    currency: 'AMD',
+    transferredOn: '2026-09-21',
+    note: 'в копилку',
+  } as const
+  await db.insert(accountTransfers).values({
+    id: transferId,
+    actorId,
+    ...transfer,
+    revision: 2,
+    createdAt: at(30),
+    amendedAt: at(31),
+    deletedAt: at(32),
+  })
+  await db
+    .insert(accountTransferRevisions)
+    .values({ transferId, revision: 1, ...transfer, feeMinor: 1_000n, replacedAt: at(31) })
   await db.insert(moneyAccountChecks).values({
     id: randomUUID(),
     actorId,
@@ -311,6 +346,7 @@ async function aFullLife(actorId: string, telegramUserId: number) {
     debitedMinor: 240_000n,
     debitedCurrency: 'AMD',
     accountSetAt: at(18),
+    transferId,
     revision: 2,
     amendedAt: at(19),
     deletedAt: at(20),
@@ -497,6 +533,9 @@ describe('состав экспорта — один источник правд
       accountId: accounts,
       givenAccountId: accounts,
       receivedAccountId: accounts,
+      fromAccountId: accounts,
+      toAccountId: accounts,
+      transferId: ids(wire.transfers),
     }
     const references = referencesIn(wire)
     expect(new Set(references.map(({ key }) => key))).toEqual(new Set(Object.keys(within)))

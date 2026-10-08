@@ -109,7 +109,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
     const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
-    const { exchangeId, incomeId, spendingId, accountId, receiptId } = await aLife(
+    const { exchangeId, incomeId, spendingId, accountId, receiptId, transferId } = await aLife(
       db,
       anna,
       tg,
@@ -131,13 +131,14 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
         trips: 1,
         exchanges: 2,
         incomes: 2,
-        spendings: 2,
+        spendings: 3,
+        account_transfers: 1,
         receipts: 2,
         budget_plans: 1,
         spending_categories: 1,
         money_month_rates: 1,
         money_account_checks: 1,
-        money_accounts: 1,
+        money_accounts: 2,
         login_requests: 2,
         actors: 1,
       },
@@ -154,6 +155,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     expect(await rowsMentioning(String(tg), true)).toEqual([])
     expect(await rowsMentioning(exchangeId)).toEqual([])
     expect(await rowsMentioning(incomeId)).toEqual([])
+    expect(await rowsMentioning(transferId)).toEqual([])
   })
 
   it('товар, который человек завёл, остаётся в справочнике без автора', async () => {

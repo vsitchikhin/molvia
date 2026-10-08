@@ -32,6 +32,16 @@
       @saved="$emit('saved')"
       @unavailable="unavailable"
     />
+    <!-- A transfer and its fee open the transfer: they are amended together (MOL-253, Р-5). -->
+    <TransferSheet
+      v-else-if="transferId"
+      :open="open"
+      :back="back"
+      :editing-id="transferId"
+      :online="online"
+      @update:open="$emit('update:open', $event)"
+      @done="$emit('transfer', $event)"
+    />
     <OperationExchangeSheet
       v-else-if="operation.kind === 'exchange'"
       :id="operation.id"
@@ -53,6 +63,8 @@ import NewCategorySheet from '@/components/NewCategorySheet.vue'
 import OperationExchangeSheet from '@/components/OperationExchangeSheet.vue'
 import OperationIncomeSheet from '@/components/OperationIncomeSheet.vue'
 import SpendingSheet from '@/components/SpendingSheet.vue'
+import TransferSheet from '@/components/TransferSheet.vue'
+import type { TransferOutcome } from '@/components/TransferSheet.vue'
 import type { Removed, SpendingTarget } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useOwnCategories } from '@/composables/useOwnCategories'
@@ -61,12 +73,18 @@ import { useActorStore } from '@/stores/actor'
 /**
  * The operation of a row of an account's journal, «не попали» or a check, opened in its own sheet —
  * the same one everywhere (MOL-123, handoff 04): a spending in «Трата», a trip in its summary, an
- * income and an exchange in theirs. That is also where its account is chosen. Over another sheet it
- * has «‹» back, and no × (В-4).
+ * income and an exchange in theirs, a transfer and its fee in the transfer's (MOL-253). That is also
+ * where its account is chosen. Over another sheet it has «‹» back, and no × (В-4).
  */
 export default defineComponent({
   name: 'OperationSheet',
-  components: { NewCategorySheet, OperationExchangeSheet, OperationIncomeSheet, SpendingSheet },
+  components: {
+    NewCategorySheet,
+    OperationExchangeSheet,
+    OperationIncomeSheet,
+    SpendingSheet,
+    TransferSheet,
+  },
   props: {
     open: { type: Boolean, required: true },
     operation: { type: Object as PropType<AccountOperationView | null>, default: null },
@@ -77,6 +95,7 @@ export default defineComponent({
     'update:open': (open: boolean) => typeof open === 'boolean',
     saved: () => true,
     removed: (removed: Removed) => typeof removed === 'object',
+    transfer: (outcome: TransferOutcome) => typeof outcome === 'object',
   },
   setup(props, { emit }) {
     const { t } = useI18n()
@@ -115,7 +134,8 @@ export default defineComponent({
             counted: null,
           },
         }
-      if (operation.kind !== 'spending' || !operation.categoryId) return null
+      if (operation.kind !== 'spending' || !operation.categoryId || operation.transferId !== null)
+        return null
       return {
         kind: 'manual',
         row: {
@@ -131,6 +151,7 @@ export default defineComponent({
             rate: null,
             accountId: operation.accountId,
             debited: operation.debited,
+            transferId: operation.transferId,
             revision: operation.revision ?? 1,
             amendedAt: null,
           },
@@ -149,7 +170,23 @@ export default defineComponent({
       emit('update:open', false)
     }
 
-    return { categories, nameOf, spendCurrency, newCategoryOpen, made, target, unavailable }
+    /** The transfer a row opens: its own, or the one a fee was taken for. */
+    const transferId = computed(() => {
+      const operation = props.operation
+      if (!operation) return null
+      return operation.kind === 'transfer' ? operation.id : operation.transferId
+    })
+
+    return {
+      categories,
+      nameOf,
+      spendCurrency,
+      newCategoryOpen,
+      made,
+      target,
+      transferId,
+      unavailable,
+    }
   },
 })
 </script>

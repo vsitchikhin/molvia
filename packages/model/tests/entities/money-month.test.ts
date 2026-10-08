@@ -80,6 +80,7 @@ function spending(
     rate: snapshot,
     accountId: null,
     debited: null,
+    transferId: null,
     revision: 1,
     createdAt: new Date(at),
     amendedAt: null,
@@ -638,6 +639,7 @@ describe('what the accounts held at the end of a day (MOL-134)', () => {
       place: null,
       source: null,
       counterpart: null,
+      transferId: null,
       items: null,
     },
   })

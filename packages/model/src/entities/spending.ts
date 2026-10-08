@@ -50,6 +50,11 @@ export const spendingSchema = z
      * not the person's own rate: those drams were never in their hands.
      */
     debited: positiveMoneySchema.nullable(),
+    /**
+     * The transfer this spending is the fee of (MOL-253, Р-1): written, amended and removed with it,
+     * never through «Траты» on its own. Null for every spending the person wrote.
+     */
+    transferId: z.uuid().nullable(),
     revision: z.int().min(1),
     createdAt: z.date(),
     amendedAt: z.date().nullable(),
@@ -72,7 +77,10 @@ export type Spending = z.infer<typeof spendingSchema>
  * drams says nothing of dollars after a move, and the month then counts the spending as it counts a
  * trip line (review Р-5, adversarial Д8). Null too when it comes to more than money holds.
  */
-export function spendingIn(spending: Spending, currency: Currency): Money | null {
+export function spendingIn(
+  spending: Pick<Spending, 'amount' | 'rate'>,
+  currency: Currency,
+): Money | null {
   const { amount, rate } = spending
   if (amount.currency === currency) return amount
   if (rate === null || (rate.base !== currency && rate.quote !== currency)) return null
