@@ -896,3 +896,31 @@ describe('a fan where the later merge only withdrew (review №12, adversarial �
     expect(await db.execute(sql`select item_id from item_names`)).toEqual([{ item_id: a }])
   })
 })
+
+describe('a tie of age (MOL-252)', () => {
+  it('is one millisecond, the lower id the older, for the night and `make merge --list` alike', async () => {
+    const high = 'ffffffff-ffff-4fff-bfff-ffffffffffff'
+    const low = '00000000-0000-4000-8000-000000000001'
+    for (const id of [high, low])
+      await insertItem(db, { id, name: 'Кефир 1%', searchKey: 'kefir 1' })
+    // Eight hundred microseconds apart in one millisecond: to Postgres the higher id is the older (В-1).
+    await db.execute(sql`
+      update items set created_at = '2026-10-01T10:00:00.000100Z' where id = ${high}`)
+    await db.execute(sql`
+      update items set created_at = '2026-10-01T10:00:00.000900Z' where id = ${low}`)
+    const { report } = await mergeNight(
+      {
+        merges,
+        embedder: NO_EMBEDDER,
+        failed: (error) => {
+          throw error
+        },
+      },
+      'report',
+      '2026-10-07',
+    )
+    expect(report.candidatePairs.map((pair) => [pair.fromId, pair.intoId])).toEqual([[high, low]])
+    const listed = await merges.openCandidates()
+    expect(listed.map((pair) => [pair.fromId, pair.intoId])).toEqual([[high, low]])
+  })
+})
