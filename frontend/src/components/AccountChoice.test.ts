@@ -372,3 +372,31 @@ describe('AccountPickerSheet', () => {
     expect(view.get('[aria-checked="true"]').text()).toContain('Cash ֏')
   })
 })
+
+describe('the picker of a transfer (MOL-253, handoff 02)', () => {
+  const dollars = account('Dollars', 'USD')
+  const papa = account('Dad’s card', 'USD')
+
+  async function picker(props: Record<string, unknown>): Promise<VueWrapper> {
+    return mounted(
+      AccountPickerSheet,
+      { open: true, title: 'To', accounts: [cash, card, old, dollars, papa], ...props },
+      withAccounts([]),
+    )
+  }
+  const names = () =>
+    [...document.body.querySelectorAll('button[role="radio"] .name')].map((one) =>
+      one.textContent.trim(),
+    )
+
+  it('«Куда»: only the source’s currency, without the source and without «Без счёта»', async () => {
+    await picker({ currency: 'USD', strict: true, allowNone: false, exclude: [papa.id] })
+    expect(names()).toEqual(['Dollars'])
+  })
+
+  it('«Откуда»: every currency in a group of its own, the current one first, no «Без счёта»', async () => {
+    await picker({ currency: 'USD', groupAll: true, allowNone: false, note: 'Another currency' })
+    expect(names()).toEqual(['Dollars', 'Dad’s card', 'Cash ֏', 'Card ₽'])
+    expect(document.body.textContent).toContain('Another currency')
+  })
+})

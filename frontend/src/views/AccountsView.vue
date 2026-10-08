@@ -82,6 +82,18 @@
             </p>
           </AppCard>
 
+          <!-- A transfer between one's own accounts, while some currency has two (MOL-253). -->
+          <AppCard v-if="transferable" as="ul" list>
+            <li>
+              <NavRow
+                :icon="IconTransfer"
+                :label="t('accounts.screen.transfer')"
+                aria-haspopup="dialog"
+                @click="transferOpen = true"
+              />
+            </li>
+          </AppCard>
+
           <!-- What went into no balance, under the total it is missing from — moved here from the
                card «Деньги» had over the month (MOL-159, handoff MOL-157 07). -->
           <AppCard v-if="overview.unassigned > 0" list>
@@ -181,6 +193,12 @@
       @done="done"
     />
     <UnassignedSheet v-model:open="unassignedOpen" :online="online" />
+    <TransferSheet
+      v-model:open="transferOpen"
+      :online="online"
+      :spend-currency="spendCurrency"
+      @done="transferDone"
+    />
   </AppScreen>
 </template>
 
@@ -194,6 +212,7 @@ import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconDown from '~icons/mdi/chevron-down'
 import IconInfo from '~icons/mdi/information-outline'
 import IconPlus from '~icons/mdi/plus'
+import IconTransfer from '~icons/mdi/bank-transfer'
 import IconUndo from '~icons/mdi/undo-variant'
 import IconWallet from '~icons/mdi/wallet-outline'
 import type { Currency, ExchangeRate, Money, MoneyAccountView } from '@molvia/model'
@@ -208,15 +227,25 @@ import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import FloatingDock from '@/components/FloatingDock.vue'
+import NavRow from '@/components/NavRow.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import TransferSheet from '@/components/TransferSheet.vue'
 import UnassignedSheet from '@/components/UnassignedSheet.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
-import { countedWhen, pageOrder, removedOf, shortDay, signedAmount } from '@/components/accounts'
+import {
+  canTransfer,
+  countedWhen,
+  pageOrder,
+  removedOf,
+  shortDay,
+  signedAmount,
+} from '@/components/accounts'
 import { bankWords, rateWords } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useReconnect } from '@/composables/useReconnect'
+import { useTransferOutcome } from '@/composables/useTransferOutcome'
 import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 
@@ -239,6 +268,7 @@ export default defineComponent({
     AppReveal,
     AppScreen,
     FloatingDock,
+    NavRow,
     IconArchive,
     IconChevron,
     IconCloudOff,
@@ -249,6 +279,7 @@ export default defineComponent({
     ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    TransferSheet,
     UnassignedSheet,
     UndoStrip,
   },
@@ -260,6 +291,10 @@ export default defineComponent({
     const announce = useAnnouncer()
 
     const online = ref(navigator.onLine)
+    // «Перевод между счетами» stands only where some currency has two live accounts (MOL-253).
+    const transferable = computed(() => canTransfer(store.accounts))
+    const transferOpen = ref(false)
+    const { done: transferDone } = useTransferOutcome()
     const onLine = () => (online.value = true)
     const offLine = () => (online.value = false)
     onMounted(() => {
@@ -402,6 +437,10 @@ export default defineComponent({
     const showsAdd = computed(() => phase.value === 'ready' && live.value.length > 0)
 
     return {
+      IconTransfer,
+      transferable,
+      transferOpen,
+      transferDone,
       unassignedOpen,
       t,
       IconWallet,

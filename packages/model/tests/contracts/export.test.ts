@@ -166,10 +166,37 @@ const file: ExportFile = {
       accountId: null,
       debited: null,
       accountSetAt: null,
+      transferId: id(70),
       revision: 1,
       createdAt: at,
       amendedAt: null,
       removedAt: null,
+    },
+  ],
+  transfers: [
+    {
+      id: id(70),
+      fromAccountId: id(71),
+      toAccountId: id(72),
+      amount: money(200_000n, 'USD'),
+      transferredOn: '2026-10-08',
+      note: null,
+      revision: 2,
+      createdAt: at,
+      amendedAt: at,
+      removedAt: null,
+      earlierVersions: [
+        {
+          revision: 1,
+          fromAccountId: id(71),
+          toAccountId: id(72),
+          amount: money(150_000n, 'USD'),
+          fee: money(2_000n, 'USD'),
+          transferredOn: '2026-10-08',
+          note: null,
+          replacedAt: at,
+        },
+      ],
     },
   ],
   receipts: [
@@ -360,7 +387,7 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(16)
+    expect(wire.version).toBe(17)
     expect(wire.account.consentedAt).toBe('2026-09-20T10:00:00.000Z')
     expect(wire.account.analyticsOnAt).toBe('2026-09-20T10:00:00.000Z')
     expect(wire.receipts[0]?.lines[0]?.quantity).toEqual({ value: '2.000', unit: 'piece' })

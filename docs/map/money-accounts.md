@@ -6,24 +6,30 @@ Rules: `.claude/rules/money-accounts.md`. A test beside its source, or mirroring
 ## packages/model
 
 - `packages/model/src/contracts/money-account.ts` — Wire schemas of «Счета»: account body and view, the page, journal and its cursor, «не попали», the check, the held hint, a trip's payment.
-- `packages/model/src/entities/money-account.ts` — Account entity and its counting: operations of four kinds, movement and «списано», balances, the check with its reasons, «не попали», held on a day.
+- `packages/model/src/contracts/transfer.ts` — Wire schemas of «Перевод» (MOL-253): the body and amendment — two accounts, the fee of the money's currency — one transfer's view, and the answer with «Счета» whole.
+- `packages/model/src/entities/money-account.ts` — Account entity and its counting: operations of five kinds — a transfer's two halves among them — movement and «списано», balances, the check with its reasons, «не попали», held on a day.
+- `packages/model/src/entities/transfer.ts` — Transfer entity (MOL-253): money moved between two of one's own accounts of one currency, its fee, its versions, the undo window.
 
 ## backend · routes
 
 - `backend/src/routes/money-accounts.ts` — HTTP of «Счета»: `/money/accounts` CRUD, restore, journal, checks, unassigned, held, and `PUT /trips/:tripId/payment`.
+- `backend/src/routes/transfers.ts` — HTTP of «Перевод» (MOL-253): `/transfers` write, read one, amend, remove and restore, answered `no-store`.
 
 ## backend · usecases
 
 - `backend/src/usecases/account-of.ts` — Use-case helpers: which accounts an operation may name, and the account side of a spending, income, exchange or trip payment.
 - `backend/src/usecases/money-accounts.ts` — Use cases of «Счета»: the counted page, journal, «не попали», the check, the held hint, add/amend/remove/restore, a trip's account. Tests: `backend/tests/money-accounts.integration.test.ts`.
+- `backend/src/usecases/transfers.ts` — Use cases of «Перевод» (MOL-253): write, amend, read, remove and restore a transfer, its fee in «Прочее» at the rate of its day. Tests: `backend/tests/transfers.integration.test.ts`.
 
 ## backend · db
 
-- `backend/src/db/money-accounts-repository.ts` — Repository of accounts: the accounts, operations of all four kinds in one shape, the checks and the account of a trip. Tests: `backend/tests/money-accounts.integration.test.ts`.
+- `backend/src/db/money-accounts-repository.ts` — Repository of accounts: the accounts, operations of all five kinds in one shape, the checks and the account of a trip. Tests: `backend/tests/money-accounts.integration.test.ts`.
+- `backend/src/db/transfers-repository.ts` — Repository of transfers (MOL-253): add with repeat/conflict under the owner's lock, amend with versions, mark-remove and restore — each with its fee, a row of `spendings`. Tests: `backend/tests/transfers.integration.test.ts`.
 
 ## backend · tests
 
 - `backend/tests/money-accounts.integration.test.ts` — Integration test: accounts over HTTP — ownership, balances from the start, trips and «списано», remove or «убрать», checks, journal, totals.
+- `backend/tests/transfers.integration.test.ts` — Integration test: «Перевод» over HTTP — two balances only, the month by the fee alone, the wallet untouched, savings in «Остаток», repeat and refusals, versions, removal with the fee, «Траты» refused the fee, erasure and copy.
 
 ## frontend · views
 
@@ -43,15 +49,18 @@ Rules: `.claude/rules/money-accounts.md`. A test beside its source, or mirroring
 - `frontend/src/components/HeldFromAccounts.vue` — «По счетам на …: … · Подставить» hint under «сколько было до» of an exchange or income, filled only on tap.
 - `frontend/src/components/OperationExchangeSheet.vue` — An exchange opened from an account's journal, «не попали» or a check, read from «Обмен денег» and amended in its sheet.
 - `frontend/src/components/OperationIncomeSheet.vue` — An income opened from an account's journal, «не попали» or a check, read from «Доходы» and amended in its sheet.
-- `frontend/src/components/OperationSheet.vue` — Dispatcher that opens a journal row's operation in its own sheet — spending, trip summary, income or exchange — with «‹» back.
+- `frontend/src/components/OperationSheet.vue` — Dispatcher that opens a journal row's operation in its own sheet — spending, trip summary, income, exchange, or a transfer and its fee — with «‹» back.
+- `frontend/src/components/TransferSheet.vue` — «Перевод» sheet (MOL-253): sum, «Откуда», «Куда» of the same currency, optional fee in «Прочее», day and note; written with a connection, amended and removed with its fee.
 - `frontend/src/components/ReconcileSheet.vue` — «Сверка» sheet: the fact first, then the server's difference and its reasons, each fixed in its sheet, and «Записать разницу».
 - `frontend/src/components/UnassignedSheet.vue` — «Не попали в остатки» sheet: the server's list of operations with no account; a row opens its sheet to choose one.
-- `frontend/src/components/accounts.ts` — Helpers of the account screens: signed amounts with U+2212, short days, «на 14:05», page order, the default account, picker groups.
+- `frontend/src/components/accounts.ts` — Helpers of the account screens: signed amounts with U+2212, short days, «на 14:05», page order, the default account, picker groups, whether a transfer can be made, the words of a journal row.
 
 ## frontend · composables
 
 - `frontend/src/composables/useAccountChoice.ts` — Composable: the account of one side of an operation in its sheet, defaulting to the first live one of its currency until chosen.
 - `frontend/src/composables/useAccountJournal.ts` — Composable: one account's journal from the server, page by page, with its phase including `missing`.
+- `frontend/src/composables/useTransferOutcome.ts` — Composable: what a screen does when a transfer's sheet ends — the transfer said, its removal offered back by «Вернуть».
+- `frontend/src/composables/useTransfers.ts` — Composable: a transfer's writes through the API (MOL-253), the page taken into the store and the journals and the month told to read again.
 - `frontend/src/composables/useOwnCategories.ts` — Composable: the owner's spending categories outside the month — remembered, queued and the server's — with names by id.
 
 ## frontend · stores
@@ -60,4 +69,4 @@ Rules: `.claude/rules/money-accounts.md`. A test beside its source, or mirroring
 
 ## e2e
 
-- `e2e/accounts.spec.ts` — End-to-end: an account and a spending from it, a check that comes out even once an account is chosen or «Прочее · сверка» written, removal, offline.
+- `e2e/accounts.spec.ts` — End-to-end: an account and a spending from it, a check that comes out even once an account is chosen or «Прочее · сверка» written, removal, offline, a transfer with its fee and «Вернуть» (MOL-253).

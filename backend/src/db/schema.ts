@@ -1580,6 +1580,93 @@ export const incomeRevisions = pgTable(
 )
 
 /**
+ * Money moved between two of one's own accounts of one currency (MOL-253): «Папина карта $» →
+ * «Доллары $». It moves the two balances and nothing else — no month, no wallet. Private as an
+ * exchange, and gone with its owner. Both accounts are the owner's and of the money's currency, held
+ * by the keys; a transfer with no account is nothing at all, so neither is ever null. Its fee is a row
+ * of `spendings` pointing here (`transfer_id`): a real spending, counted where every spending is.
+ */
+export const accountTransfers = pgTable(
+  'account_transfers',
+  {
+    // Named by the device once per opening of the sheet: a tap sent twice is one transfer.
+    id: uuid('id').primaryKey(),
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id, { onDelete: 'cascade' }),
+    fromAccountId: uuid('from_account_id').notNull(),
+    toAccountId: uuid('to_account_id').notNull(),
+    amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
+    currency: char('currency', { length: 3 }).$type<Currency>().notNull(),
+    transferredOn: date('transferred_on').notNull(),
+    note: text('note'),
+    revision: integer('revision').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+    amendedAt: timestamp('amended_at', { withTimezone: true }),
+    // Removed and offered back for ten minutes, its fee with it, as an exchange is (MOL-73, В-4).
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('account_transfers_actor_day_idx').on(
+      table.actorId,
+      table.transferredOn,
+      table.createdAt,
+    ),
+    // What its fee points at: a spending of the same owner.
+    unique('account_transfers_id_actor_unique').on(table.id, table.actorId),
+    foreignKey({
+      name: 'account_transfers_from_is_owners',
+      columns: [table.fromAccountId, table.actorId, table.currency],
+      foreignColumns: [moneyAccounts.id, moneyAccounts.actorId, moneyAccounts.currency],
+    }),
+    foreignKey({
+      name: 'account_transfers_to_is_owners',
+      columns: [table.toAccountId, table.actorId, table.currency],
+      foreignColumns: [moneyAccounts.id, moneyAccounts.actorId, moneyAccounts.currency],
+    }),
+    check('account_transfers_two_accounts', sql`${table.fromAccountId} <> ${table.toAccountId}`),
+    check('account_transfers_amount_positive', sql`${table.amountMinor} > 0`),
+    check('account_transfers_currency_known', oneOf(table.currency, currencySchema.options)),
+    check('account_transfers_revision_positive', sql`${table.revision} > 0`),
+  ],
+)
+
+/** The versions a transfer had before it was amended, its fee with each (MOL-42 В-3). */
+export const accountTransferRevisions = pgTable(
+  'account_transfer_revisions',
+  {
+    transferId: uuid('transfer_id')
+      .notNull()
+      .references(() => accountTransfers.id, { onDelete: 'cascade' }),
+    revision: integer('revision').notNull(),
+    fromAccountId: uuid('from_account_id').notNull(),
+    toAccountId: uuid('to_account_id').notNull(),
+    amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
+    currency: char('currency', { length: 3 }).$type<Currency>().notNull(),
+    feeMinor: bigint('fee_minor', { mode: 'bigint' }),
+    transferredOn: date('transferred_on').notNull(),
+    note: text('note'),
+    replacedAt: timestamp('replaced_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    primaryKey({ columns: [table.transferId, table.revision] }),
+    check('account_transfer_revisions_amount_positive', sql`${table.amountMinor} > 0`),
+    check(
+      'account_transfer_revisions_fee_positive',
+      sql`${table.feeMinor} is null or ${table.feeMinor} > 0`,
+    ),
+    check(
+      'account_transfer_revisions_currency_known',
+      oneOf(table.currency, currencySchema.options),
+    ),
+  ],
+)
+
+/**
  * A person's spending categories (MOL-73, В-3): the presets every account is given and the ones they
  * made. Each account has its own list, because people's categories differ. Removing one is
  * `archived_at`, never a delete: the spendings in it keep it, and past months keep their sums.
@@ -1655,6 +1742,8 @@ export const spendings = pgTable(
     debitedCurrency: char('debited_currency', { length: 3 }).$type<Currency>(),
     // When they last changed: a check's window is the server's moment, not the phone's (Д1б).
     accountSetAt: timestamp('account_set_at', { withTimezone: true }),
+    // The transfer this is the fee of (MOL-253, Р-1): written and removed with it, one fee a transfer.
+    transferId: uuid('transfer_id'),
     revision: integer('revision').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -1672,6 +1761,13 @@ export const spendings = pgTable(
       columns: [table.categoryId, table.actorId],
       foreignColumns: [spendingCategories.id, spendingCategories.actorId],
     }),
+    // A fee is the same owner's transfer's, and goes with it.
+    foreignKey({
+      name: 'spendings_transfer_is_owners',
+      columns: [table.transferId, table.actorId],
+      foreignColumns: [accountTransfers.id, accountTransfers.actorId],
+    }).onDelete('cascade'),
+    unique('spendings_transfer_unique').on(table.transferId),
     check('spendings_amount_positive', sql`${table.amountMinor} > 0`),
     check('spendings_currency_known', oneOf(table.currency, currencySchema.options)),
     check('spendings_revision_positive', sql`${table.revision} > 0`),

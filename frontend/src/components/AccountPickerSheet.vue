@@ -27,7 +27,7 @@
           </li>
         </ul>
       </section>
-      <ul class="card">
+      <ul v-if="allowNone" class="card">
         <li>
           <button
             type="button"
@@ -76,6 +76,14 @@ export default defineComponent({
     /** An income and an exchange take only accounts of their own currency. */
     strict: { type: Boolean, default: false },
     selected: { type: String as PropType<string | null>, default: null },
+    /** Accounts never offered — the source, for «Куда» of a transfer (MOL-253). */
+    exclude: { type: Array as PropType<readonly string[]>, default: () => [] },
+    /** «Без счёта» among the choices; a transfer has none (MOL-253). */
+    allowNone: { type: Boolean, default: true },
+    /** Every currency, a group each, `currency` first — «Откуда» of a transfer (MOL-253). */
+    groupAll: { type: Boolean, default: false },
+    /** The footnote, when the sheet has its own words for it. */
+    note: { type: String as PropType<string | null>, default: null },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
@@ -83,18 +91,30 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const { t, locale } = useI18n()
-    const groups = computed(() => pickerGroups(props.accounts, props.currency, props.strict))
+    const offered = computed(() =>
+      props.accounts.filter((account) => !props.exclude.includes(account.id)),
+    )
+    const groups = computed(() => pickerGroups(offered.value, props.currency, props.strict))
+    const sectionOf = (currency: Currency, accounts: MoneyAccountView[]) => ({
+      key: currency,
+      title: t('accounts.picker.group_same', { currency: t(`accounts.currency_in.${currency}`) }),
+      accounts,
+    })
     const sections = computed(() =>
-      [
-        {
-          key: 'own',
-          title: t('accounts.picker.group_same', {
-            currency: t(`accounts.currency_in.${props.currency}`),
-          }),
-          accounts: groups.value.own,
-        },
-        { key: 'other', title: t('accounts.picker.group_other'), accounts: groups.value.other },
-      ].filter((section) => section.accounts.length > 0),
+      props.groupAll
+        ? [props.currency, ...new Set(groups.value.other.map(({ currency }) => currency))]
+            .map((currency) => sectionOf(currency, pickerGroups(offered.value, currency, true).own))
+            .filter((section) => section.accounts.length > 0)
+        : [
+            {
+              key: 'own',
+              title: t('accounts.picker.group_same', {
+                currency: t(`accounts.currency_in.${props.currency}`),
+              }),
+              accounts: groups.value.own,
+            },
+            { key: 'other', title: t('accounts.picker.group_other'), accounts: groups.value.other },
+          ].filter((section) => section.accounts.length > 0),
     )
     const subOf = (account: MoneyAccountView) =>
       account.savings
@@ -102,6 +122,7 @@ export default defineComponent({
         : account.currency
     const balanceOf = (account: MoneyAccountView) => signedAmount(account.balance, locale.value)
     const footnote = computed(() => {
+      if (props.note !== null) return props.note
       if (!props.strict) return t('accounts.picker.note_loose')
       const currency = t(`accounts.currency_in.${props.currency}`)
       return groups.value.own.length > 0

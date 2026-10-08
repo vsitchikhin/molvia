@@ -46,7 +46,9 @@ describe('GET /actors/me/export (MOL-93)', () => {
       `attachment; filename="molvia-${yerevanDate(file.exportedAt)}.json"`,
     )
     expect(file.account.id).toBe(anna)
-    expect(file.spendings).toHaveLength(2)
+    // Two spendings of the person's own and the fee of their transfer (MOL-253).
+    expect(file.spendings).toHaveLength(3)
+    expect(file.transfers).toHaveLength(1)
     // The session this request came with is marked; the one `aLife` wrote beside it is not.
     expect(file.sessions.map((session) => session.current).sort()).toEqual([false, true])
   })

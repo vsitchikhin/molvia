@@ -41,6 +41,10 @@ import {
   moneyAccountAmendBodySchema,
   moneyAccountBodySchema,
   moneyAccountsCodec,
+  transferAmendBodySchema,
+  transferBodySchema,
+  transferResponseCodec,
+  transferViewCodec,
   tripPaymentBodySchema,
   tripReceiptBodySchema,
   unassignedOperationsCodec,
@@ -125,6 +129,10 @@ import type {
   MoneyAccountAmendBody,
   MoneyAccountBody,
   MoneyAccountsResponse,
+  TransferAmendBody,
+  TransferBody,
+  TransferResponse,
+  TransferView,
   TripPaymentBody,
   TripReceiptBody,
   UnassignedOperationsResponse,
@@ -489,6 +497,20 @@ export interface MolviaClient {
   accountsHeld(query: AccountsHeldQuery): Promise<AccountsHeldResponse>
   /** The account of a trip and «списано», whole each time — safe for the queue to send twice. */
   payTrip(tripId: string, body: TripPaymentBody): Promise<TripView>
+  /**
+   * «Перевести» between one's own accounts (MOL-253), named by the device once per opening of the
+   * sheet: `created` is `false` for the same one again; `error.transfer_account` when an account is
+   * gone or of another currency. Every write answers with «Счета» whole.
+   */
+  recordTransfer(body: TransferBody): Promise<{ transfer: TransferResponse; created: boolean }>
+  /** One transfer as its sheet opens it. */
+  transfer(id: string): Promise<TransferView>
+  /** Whole, over the version shown, its fee with it: `error.conflict` when it moved on elsewhere. */
+  amendTransfer(id: string, body: TransferAmendBody): Promise<TransferResponse>
+  /** «Удалить перевод», its fee with it: ten minutes of «Вернуть». */
+  removeTransfer(id: string): Promise<MoneyAccountsResponse>
+  /** «Вернуть» the transfer and its fee. */
+  restoreTransfer(id: string): Promise<TransferResponse>
   /** The owner's categories in the order of the chips, the removed ones marked. */
   spendingCategories(): Promise<SpendingCategoriesResponse>
   /** «Добавить категорию», named by the device: `error.spending_category_taken` for a live name. */
@@ -1022,6 +1044,28 @@ export function createClient(options: ClientOptions): MolviaClient {
     },
 
     unassignedOperations: () => request('/money/accounts/unassigned', unassignedOperationsCodec),
+
+    recordTransfer: async (body) => {
+      const { status, data } = await exchange('/transfers', transferResponseCodec, {
+        method: 'POST',
+        body: encode(transferBodySchema, body),
+      })
+      return { transfer: data, created: status === 201 }
+    },
+
+    transfer: (id) => request(`/transfers/${segment(id)}`, transferViewCodec),
+
+    amendTransfer: async (id, body) =>
+      request(`/transfers/${segment(id)}`, transferResponseCodec, {
+        method: 'PUT',
+        body: encode(transferAmendBodySchema, body),
+      }),
+
+    removeTransfer: async (id) =>
+      request(`/transfers/${segment(id)}`, moneyAccountsCodec, { method: 'DELETE' }),
+
+    restoreTransfer: async (id) =>
+      request(`/transfers/${segment(id)}/restore`, transferResponseCodec, { method: 'POST' }),
 
     checkAccount: async (id, body) =>
       request(`/money/accounts/${segment(id)}/checks`, accountCheckCodec, {

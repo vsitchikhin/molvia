@@ -7,6 +7,7 @@ import { mergePages } from '@/components/spending'
 import { useReconnect } from '@/composables/useReconnect'
 import { localDay } from '@/days'
 import { isRecord } from '@/stores/queueing'
+import { useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -129,6 +130,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
   const actor = useActorStore()
   const queue = useSpendingQueueStore()
   const trips = useTripQueueStore()
+  const accounts = useAccountsStore()
 
   const shown = ref<Remembered | null>(null)
   const failure = ref<'offline' | 'error' | null>(null)
@@ -245,9 +247,10 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
     adopt()
     void load()
   })
-  // A trip removed or brought back has moved the month too (MOL-76).
+  // A trip removed or brought back has moved the month too (MOL-76), and so has a transfer's fee
+  // (MOL-253), written beside no queue.
   watch(
-    () => [queue.landed, trips.landed],
+    () => [queue.landed, trips.landed, accounts.transfers],
     () => void load(),
   )
   onMounted(() => void load())

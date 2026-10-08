@@ -78,6 +78,8 @@ export const spendingViewCodec = z.strictObject({
   // Defaults, so an answer of a server older than accounts still reads (MOL-115).
   accountId: z.uuid().nullable().default(null),
   debited: moneyCodec.nullable().default(null),
+  /** The transfer it is the fee of (MOL-253): its row opens the transfer's sheet, not a spending's. */
+  transferId: z.uuid().nullable().default(null),
   revision: z.int().min(1),
   amendedAt: isoDate.nullable(),
 })
