@@ -377,7 +377,11 @@ export const EXPORT_COLUMNS: Readonly<
       'gtin',
       'expense_id',
     ],
-    omitted: { receipt_id: 'the receipt it is nested in' },
+    omitted: {
+      receipt_id: 'the receipt it is nested in',
+      as_read:
+        'judged at «Записать» from the line’s figures and its purchase, both exported; the shelf price it lets the shops’ memory keep is exported with the word (MOL-240)',
+    },
   },
   // Taken by erasure with their receipt; never in the file — bytes of a picture, kept days (В-3).
   receipt_links: {

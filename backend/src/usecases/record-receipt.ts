@@ -175,7 +175,8 @@ export async function recordReceipt(
       return { receipt: found.receipt, tripId }
     }
     // recorded: the same trip again is the same answer while it is there; a trip marked removed may
-    // still come back with «Вернуть»; one removed for good leaves the receipt to be recorded again
+    // still come back with «Вернуть». One removed for good takes the receipt with it (MOL-240): the
+    // paper is recorded again by a new shot, its twin gone with the trip
     if (held.tripId !== null) {
       if (held.tripId === body.tripId && held.tripAlive) {
         const again = await answer(body.tripId)
@@ -185,9 +186,7 @@ export async function recordReceipt(
       }
       throw new DomainError(ERROR.CONFLICT)
     }
-    if (held.status !== 'parsed' && held.status !== 'recorded') {
-      throw new DomainError(ERROR.RECEIPT_NOT_READY)
-    }
+    if (held.status !== 'parsed') throw new DomainError(ERROR.RECEIPT_NOT_READY)
     if (held.tin !== null && held.receiptNo !== null) {
       const twin = await receipts.recordedTwin(actor.id, held.tin, held.receiptNo, held.id)
       if (twin !== null) throw new DomainError(ERROR.RECEIPT_RECORDED_BEFORE)
@@ -350,9 +349,7 @@ export async function recordReceipt(
       expenses: written,
       confirmed,
       edits: editsOf(body, held.lines, shown, held.total),
-      // recorded again once its trip was removed for good: counted the first time only (review 7);
       // a receipt from the tax office in a table of its own, its lines being no reading (MOL-234)
-      counted: held.status !== 'recorded',
       source: held.source,
       codesWritten: codes.filter((one) => one.outcome === 'written').length,
     })
@@ -374,12 +371,15 @@ async function codesAgain(
   held: ReceiptToRecord,
   barcodes: readonly number[],
 ): Promise<CodeOutcome[]> {
+  // by position, never by the place in `held.lines`: a recorded receipt keeps only the lines that
+  // are purchases, so its list has gaps (MOL-240)
   const recorded = await repositories.receipts.recordedItems(held.id)
   const codes: CodeOutcome[] = []
   for (const position of [...new Set(barcodes)].sort((a, b) => a - b)) {
-    const code = held.lines[position]?.gtin ?? null
-    const itemId = recorded.get(position)
-    if (code === null || itemId === undefined) continue
+    const line = recorded.get(position)
+    const code = line?.gtin ?? null
+    if (line === undefined || code === null) continue
+    const { itemId } = line
     const holder = await findByBarcode(repositories.items, code)
     codes.push(
       holder === null

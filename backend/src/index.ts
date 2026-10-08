@@ -5,6 +5,7 @@ import { describeMigrationFailure } from '@/db/failure'
 import { startEmbedder } from '@/embeddings/embedder'
 import { migrateToLatest } from '@/db/migrate'
 import { rekeyItems } from '@/db/rekey'
+import { settleStoreMemory } from '@/db/store-memory-repository'
 import { createMarketRateRepository } from '@/db/market-rates-repository'
 import { createRateRepository } from '@/db/rates-repository'
 import { cbaFeed } from '@/rates/cba'
@@ -128,7 +129,25 @@ if (http !== undefined && env.METRICS_PORT !== undefined) {
   })
 }
 
-app.listen({ port: env.API_PORT, host }).catch((error: unknown) => {
-  app.log.error(error)
-  process.exit(1)
-})
+app
+  .listen({ port: env.API_PORT, host })
+  .then(async () => {
+    // Each person's word in the shops' memory is what their last line still there says (MOL-240): 0061
+    // deleted lines whose words SQL cannot find, and an image rolled back deletes without settling. Once
+    // listening, a person at a time under their lock — never on the way to `listen` (round 4, Р4-2): the
+    // words of every person are no reason for the API not to start, and a failure is reported, not fatal.
+    try {
+      const settled = await settleStoreMemory(getDb())
+      if (settled > 0) app.log.info({ settled }, 'store memory settled')
+    } catch (error) {
+      apiFailureReporter(getDb, env.OWNER_TELEGRAM_ID ?? null, app.log).report(
+        error,
+        { source: 'api', route: 'job:store-memory' },
+        'store memory settle failed',
+      )
+    }
+  })
+  .catch((error: unknown) => {
+    app.log.error(error)
+    process.exit(1)
+  })

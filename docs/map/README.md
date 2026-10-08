@@ -84,7 +84,7 @@ support types, the shared integration tests, the migrations.
 ### backend · other
 
 - `backend/src/env.ts` — The API's environment: loads the copy's `.env`, validates ports — the metrics' too (MOL-145) — database, rate refresh, build version and login configuration.
-- `backend/src/index.ts` — The API process's entry: migrations at boot, the search keys recomputed after them (MOL-109), the scheduled official-rate refresh, then listening — and, where `METRICS_PORT` is set, the metrics' own port (MOL-145).
+- `backend/src/index.ts` — The API process's entry: migrations at boot, the search keys recomputed after them (MOL-109), the shops' memory settled once it listens (MOL-240), the scheduled official-rate refresh, then listening — and, where `METRICS_PORT` is set, the metrics' own port (MOL-145).
 - `backend/src/parse.ts` — The parse seam for body, query and path, shared by routes and use cases; `InvalidBody` and the resource-id parse.
 - `backend/src/server.ts` — `buildServer`, the API's composition point: the request log of method and path, the central error handler, `no-store` on auth paths, the build on every answer, all routes and timers wired.
 
@@ -101,6 +101,7 @@ support types, the shared integration tests, the migrations.
 - `backend/tests/listings.integration.test.ts` — Integration test: repository reads — empty lists, order and limit, purchases awaiting a rating, where it is cheaper, ratings.
 - `backend/tests/migration-0010.integration.test.ts` — Integration test: migration 0010 merges places that the new identity makes one, so the API still starts.
 - `backend/tests/migration-0012.integration.test.ts` — Integration test: migration 0012 empties owners without a Telegram identity and keeps what must survive.
+- `backend/tests/migration-0061.integration.test.ts` — Integration test: migration 0061 removes what a removed trip or purchase left of its receipt, then makes the receipt go with its trip and the line with its purchase (MOL-240).
 - `backend/tests/migrations.integration.test.ts` — Integration test: the migration chain applies on a database that already holds rows from earlier steps.
 - `backend/tests/ownership.integration.test.ts` — Integration test: every repository read and write is scoped to its owner; someone else's row answers as a missing one.
 - `backend/tests/repositories.integration.test.ts` — Integration test: the core repositories — actors, catalogue, places, trips with purchases, verdicts — write and read back.

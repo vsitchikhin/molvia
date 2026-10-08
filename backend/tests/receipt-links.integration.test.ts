@@ -1084,6 +1084,42 @@ describe('«Привязать штрихкоды?» at «Записать» (MO
     expect(again).toEqual(first)
   })
 
+  // MOL-240: the line not recorded goes at «Записать», so the recorded lines have a gap before this one
+  it('a record sent again finds a code by its line’s position, past a line not recorded', async () => {
+    const me = await serb()
+    const sugar = await item('Сахар')
+    const id = await taken(me)
+    const purs = office()
+    purs.specs.push({
+      kind: 'found',
+      items: [
+        { totalHundredths: 18_998, gtin: '' },
+        { totalHundredths: 29_639, gtin: CODE },
+      ],
+    })
+    await round(purs)
+    const payload = body(
+      {},
+      {
+        lines: [
+          { position: 0, skip: true },
+          {
+            position: 1,
+            skip: false,
+            item: { id: sugar },
+            quantity: { value: '1.482', unit: 'kg' },
+            amount: { amount: '296.39', currency: 'RSD' },
+          },
+        ],
+        barcodes: [1],
+      },
+    )
+    const first = receiptRecordedCodec.parse((await record(me, id, payload)).json())
+    expect(first.codes).toEqual([{ position: 1, code: CODE, outcome: 'written' }])
+    const again = receiptRecordedCodec.parse((await record(me, id, payload)).json())
+    expect(again.codes).toEqual(first.codes)
+  })
+
   it('a record sent again tells a code written as written', async () => {
     const me = await serb()
     const sugar = await item('Сахар')
