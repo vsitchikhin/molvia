@@ -97,6 +97,14 @@ async function drawer(page: Page, owner: string): Promise<Kept[]> {
   }, DRAWER(owner))
 }
 
+/** The person's own rating of an item as the server has it — what «Что брать» prints, or null. */
+async function ratedOnServer(who: Person, itemId: string): Promise<string | null> {
+  const advice = (await who.call('GET', '/advice')) as {
+    rows: { itemId: string; rating: string }[]
+  }
+  return advice.rows.find((row) => row.itemId === itemId)?.rating ?? null
+}
+
 async function waiting(who: Person): Promise<number> {
   return ((await who.call('GET', '/verdicts/pending')) as { total: number }).total
 }
@@ -255,6 +263,8 @@ test('7: rated without a connection and the app closed — kept on the phone, an
   await expect.poll(() => waiting(who)).toBe(1)
   await expect(again.getByText('1 purchase is waiting to be rated')).toBeVisible()
   await expect.poll(() => drawer(again, who.id)).toEqual([])
+  // And the rating the person gave at the shelf, not merely some rating (adversarial Р12-А1).
+  expect(await ratedOnServer(who, rated)).toBe('3.0')
   const heldAtStart = await again.evaluate(
     () => (window as unknown as { heldAtStart: string | null }).heldAtStart,
   )
