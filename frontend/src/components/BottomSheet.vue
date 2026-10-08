@@ -68,29 +68,26 @@ import { pageAnchor, sheetOpener, useSheetHistory } from '@/composables/useSheet
 export const DOUBLE_TAP = 300
 
 /**
- * The sheet of 0.1: it rises from the bottom over the screen, which stays visible behind the
- * scrim. A native modal `<dialog>` — the focus trap, the inert page, the backdrop and Esc come
- * from the platform, and focus goes back to whatever opened it when it closes.
- *
- * Six ways to close it, one way it closes. The ×, a tap on the scrim, a pull down (`useSheetDrag`,
- * MOL-80), Esc, Android's «back» (which Chrome delivers to a modal dialog as `cancel`) and the
- * browser's «back» or the iOS edge swipe (a pop) — the first five step back off the sheet's entry
- * in the history, and the pop that follows is what closes it (`useSheetHistory`). A screen that
- * must close the sheet and itself at once — «Add to trip» over the search — calls `close(2)`.
- *
- * No grab handle on top, though the sheet can be pulled down: the owner's decision (MOL-80, В-5).
- *
- * The page under an open sheet does not scroll (main.scss). The sheet is the one place where a
- * container scrolls rather than the page: a panel over the screen has no window of its own.
- *
- * Its footer — the main action — is pinned to its bottom edge, and the content scrolls under it
- * (MOL-182, Ф-17): under fifteen chips «Сохранить» had gone below the edge. Sticky in the sheet's
- * own scroll, not a middle of its own between the header and the footer: the pull down, the lift
- * over the keys and `reveal` all go by the dialog's scroll, and stay as they were. What the sheet
- * brings into sight stops at the footer's top (`--sheet-footer-height` as its `scroll-padding`).
- * A footer that leaves no room for the field typed in — over the keys of a turned phone — is not
- * pinned (`loose`).
+ * The room a field typed in needs above a pinned footer: a field of one line whole — its height is the
+ * kit's, not its line's — and of a field of many lines one line with its padding and edge, where the
+ * caret is. A line height of `normal` gives the field whole.
  */
+function lineOf(field: HTMLElement): number {
+  const height = field.getBoundingClientRect().height
+  if (!(field instanceof HTMLTextAreaElement) && !field.isContentEditable) return height
+  const style = getComputedStyle(field)
+  const line = [
+    style.lineHeight,
+    style.paddingTop,
+    style.paddingBottom,
+    style.borderTopWidth,
+    style.borderBottomWidth,
+  ]
+    .map((value) => Number.parseFloat(value))
+    .reduce((sum, value) => sum + (Number.isFinite(value) ? value : Number.NaN), 0)
+  return Number.isFinite(line) ? Math.min(height, line) : height
+}
+
 export default defineComponent({
   name: 'BottomSheet',
   components: { AppButton, IconBack, IconClose },
@@ -141,8 +138,12 @@ export default defineComponent({
     // the sheet: half of it let go the footer of an account's edit over the keys upright (324 and 167),
     // «Сохранить» with it — the very sheet the task began with — and an error come into a footer let it
     // go under the finger (round 2, Р2-А1, Р2-А2); and a sheet that does not scroll hides nothing
-    // under its footer (С-11). Read where they lie, on every resize of either and every focus: the
-    // observer of the footer is not told of a padding the keys took off (С-8).
+    // under its footer (С-11). The room asked for is a line of the field, where the caret is: a field
+    // of one line is that line, a message of five is not — the browser keeps its caret in sight, and
+    // asked to stand whole (147 px) it let go the footer of a failure to send on an iPhone SE, the
+    // failure and «Повторить» out of sight (round 3, Р3-А1). Read where they lie, on every resize of
+    // either and every focus: the observer of the footer is not told of a padding the keys took off
+    // (С-8).
     const sheetBox = useHeight(dialog)
     const loose = ref(false)
     function settleFooter(): void {
@@ -154,7 +155,7 @@ export default defineComponent({
         element &&
         field &&
         sheet.scrollHeight > sheet.clientHeight &&
-        sheet.clientHeight - element.offsetHeight < field.getBoundingClientRect().height,
+        sheet.clientHeight - element.offsetHeight < lineOf(field),
       )
     }
     watch([sheetBox, footerBox], settleFooter, { flush: 'post' })

@@ -58,7 +58,7 @@ async function render(
     rising?: boolean
     back?: boolean
     footer?: boolean
-    field?: boolean
+    field?: boolean | 'lines'
   } = {},
 ) {
   const router: Router = createRouter({ history: createMemoryHistory(), routes })
@@ -84,10 +84,13 @@ async function render(
             title: () => 'Milk «Ashkhar»',
             meta: () => 'UHT, 2.5%',
             default: () =>
-              options.field === true
+              options.field
                 ? [
                     h('p', { class: 'content' }, 'Quantity and price'),
-                    h('input', { class: 'price', 'aria-label': 'Price' }),
+                    h(options.field === 'lines' ? 'textarea' : 'input', {
+                      class: 'price',
+                      'aria-label': 'Price',
+                    }),
                   ]
                 : h('p', { class: 'content' }, 'Quantity and price'),
             ...(options.footer === true && {
@@ -1016,9 +1019,12 @@ describe('the pinned footer', () => {
    * The sheet laid out by hand: its box, how far it scrolls, the footer's height and the field's.
    * `layout` changes them and tells the observers, as a resize would.
    */
-  async function laidOut(box: { sheet: number; scrolls: number; footer: number; field: number }) {
+  async function laidOut(
+    box: { sheet: number; scrolls: number; footer: number; field: number },
+    lines = false,
+  ) {
     const resized = observeByHand()
-    const { dialog } = await render({ open: true, footer: true, field: true })
+    const { dialog } = await render({ open: true, footer: true, field: lines ? 'lines' : true })
     const footer = dialog().querySelector<HTMLElement>('.footer')
     const field = dialog().querySelector<HTMLElement>('.price')
     if (!footer || !field) throw new Error('no footer or no field in the sheet')
@@ -1090,6 +1096,45 @@ describe('the pinned footer', () => {
     // An error come into the footer under the finger (Р2-А2): still room for the field.
     await layout({ sheet: 281, footer: 168, field: 44 })
     expect(dialog().classList.contains('pinned')).toBe(true)
+  })
+
+  // A message of five lines, 147 px, over the keys of an iPhone SE: a failure to send grows the footer
+  // to 150 and leaves 131 over it. Asked to stand whole, the field let the footer go, the failure and
+  // «Повторить» out of sight (round 3, Р3-А1); a line of it, where the caret is, has room.
+  it('must not fire: room for a line of a tall field, not for all of it', async () => {
+    const { dialog, field, layout } = await laidOut(
+      { sheet: 281, scrolls: 600, footer: 77, field: 147 },
+      true,
+    )
+    Object.assign(field.style, {
+      lineHeight: '22px',
+      paddingTop: '12px',
+      paddingBottom: '12px',
+      border: '1px solid',
+    })
+    field.focus()
+    await layout({})
+    expect(dialog().classList.contains('pinned')).toBe(true)
+    await layout({ footer: 150 })
+    expect(dialog().classList.contains('pinned')).toBe(true)
+    // Less than a line over it: the turned phone of А1, and the footer goes.
+    await layout({ sheet: 107, footer: 77 })
+    expect(dialog().classList.contains('pinned')).toBe(false)
+  })
+
+  // A field of one line is its whole height, not its line's: the price of the kit is 44 high with a
+  // line of some 30, and over the keys of a turned phone 30 over the footer left 29 of it (А1).
+  it('asks room for all of a field of one line, whatever its line', async () => {
+    const { dialog, field, layout } = await laidOut({
+      sheet: 107,
+      scrolls: 600,
+      footer: 77,
+      field: 44,
+    })
+    Object.assign(field.style, { lineHeight: '22px', paddingTop: '4px', paddingBottom: '4px' })
+    field.focus()
+    await layout({})
+    expect(dialog().classList.contains('pinned')).toBe(false)
   })
 
   // A sheet that does not scroll hides nothing under its footer, which keeps its shadow (С-11).
