@@ -194,7 +194,12 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   is recorded now (С-4). A transfer a row could not read is said in the sheet — «не ответил» with
   «Повторить», or offline — never a sheet that rises and goes (А6). «Вернуть» is the answer's: too
   late is said, no answer puts the strip back; any later write takes it away, the removal being final
-  then, and a newer removal's strip takes the older one's place (С-3, С-6).
+  then, and a newer removal's strip takes the older one's place (С-3, С-6). **Only a write that happened
+  makes the removal before it final** — the server purges after `add` and `amend`, never before: a
+  refused write left the strip standing over a transfer already gone (adversarial А7). A transfer
+  removed on another phone answers its amendment 404, said as such with nothing to retry (А8); that, and
+  «already written», read «Счета» and move `accounts.transfers` like any write (Р2-1). Offline, a
+  transfer that did not open says it opens with the connection and reads itself then (Р2-2).
   Every write answers with «Счета» whole, and `accounts.transfers` tells the journals and the month to
   read again. **The price, named:** one day for both halves — a transfer that arrives the next day is
   written on one; the fee only in the money's currency and only from the source; no list of
