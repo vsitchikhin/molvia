@@ -186,6 +186,10 @@
      `AppScreen` sets it — and what floats over the list rises above it (MOL-132). */
   --dock-height: 0px;
 
+  /* How tall a sheet's pinned footer is. Zero until a sheet has one — `BottomSheet` sets it on the
+     dialog — and the sheet scrolls what it brings into sight above it, not under it (MOL-182). */
+  --sheet-footer-height: 0px;
+
   /* How tall the page is held while a change of the query redraws the screen: down to the bottom of
      the window, so that a shorter version does not bring the scroll up (MOL-138). Zero until such a
      move — `installHeightHold` in transitions.ts sets it and takes it away. */

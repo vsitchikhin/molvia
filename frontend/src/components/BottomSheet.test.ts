@@ -52,7 +52,7 @@ afterEach(() => {
 })
 
 async function render(
-  options: { open?: boolean; at?: string; rising?: boolean; back?: boolean } = {},
+  options: { open?: boolean; at?: string; rising?: boolean; back?: boolean; footer?: boolean } = {},
 ) {
   const router: Router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/')
@@ -77,6 +77,9 @@ async function render(
             title: () => 'Milk «Ashkhar»',
             meta: () => 'UHT, 2.5%',
             default: () => h('p', { class: 'content' }, 'Quantity and price'),
+            ...(options.footer === true && {
+              footer: () => h('button', { class: 'save', type: 'button' }, 'Save'),
+            }),
           },
         ),
     ),
@@ -936,6 +939,71 @@ describe('BottomSheet', () => {
  * nothing out, so where the opener stands on the screen, and the window's scroll, are the test's to
  * say.
  */
+// The main action stays at the sheet's bottom edge, and the content scrolls under it (MOL-182). The
+// pinning itself is layout, held end to end; here, what the layout is built from.
+describe('the pinned footer', () => {
+  /** A `ResizeObserver` the test fires by hand: happy-dom lays nothing out and observes nothing. */
+  function observeByHand() {
+    const callbacks = new Set<() => void>()
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        callback: () => void
+        constructor(callback: () => void) {
+          this.callback = callback
+        }
+        observe() {
+          callbacks.add(this.callback)
+        }
+        disconnect() {
+          callbacks.delete(this.callback)
+        }
+      },
+    )
+    return () => {
+      for (const callback of callbacks) callback()
+    }
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('stands outside the content, the dialog’s own, after it', async () => {
+    const { dialog } = await render({ open: true, footer: true })
+    const footer = dialog().querySelector('.footer')
+    expect(footer?.parentElement).toBe(dialog())
+    expect(footer?.previousElementSibling?.classList.contains('panel')).toBe(true)
+    expect(footer?.textContent).toBe('Save')
+    expect(dialog().querySelector('.panel')?.classList.contains('footed')).toBe(true)
+  })
+
+  it('must not fire: no footer is drawn without one given', async () => {
+    const { dialog } = await render({ open: true })
+    expect(dialog().querySelector('.footer')).toBeNull()
+    expect(dialog().querySelector('.panel')?.classList.contains('footed')).toBe(false)
+    expect(dialog().style.getPropertyValue('--sheet-footer-height')).toBe('0px')
+  })
+
+  // What the sheet scrolls into sight stops at the footer's top: its `scroll-padding` is the
+  // footer's height, kept as the footer grows — an error or «Вернуть» come into it.
+  it('gives the dialog its height, and follows it', async () => {
+    const resized = observeByHand()
+    const { dialog } = await render({ footer: true })
+    const footer = dialog().querySelector<HTMLElement>('.footer')
+    if (!footer) throw new Error('no footer in the sheet')
+    let height = 76
+    Object.defineProperty(footer, 'offsetHeight', { get: () => height })
+    resized()
+    await nextTick()
+    expect(dialog().style.getPropertyValue('--sheet-footer-height')).toBe('76px')
+    height = 120
+    resized()
+    await nextTick()
+    expect(dialog().style.getPropertyValue('--sheet-footer-height')).toBe('120px')
+  })
+})
+
 describe('the page under the sheet', () => {
   function scrolledTo(top: number): void {
     Object.defineProperty(window, 'scrollY', { value: top, configurable: true })

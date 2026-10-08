@@ -3,13 +3,14 @@
     ref="dialog"
     class="sheet"
     :class="{ over: back, dragging }"
+    :style="{ '--sheet-footer-height': `${String(footerHeight)}px` }"
     :aria-labelledby="titleId"
     @cancel.prevent="close()"
     @close="closedNatively"
     @click.capture="holdWhileRising"
     @click="closeOnScrim"
   >
-    <div class="panel">
+    <div class="panel" :class="{ footed: $slots.footer }">
       <header class="head" :class="{ over: back }">
         <AppButton v-if="back" variant="icon" :label="t('nav.back_label')" @click="close()">
           <IconBack />
@@ -24,16 +25,16 @@
       </header>
 
       <slot />
+    </div>
 
-      <div v-if="$slots.footer" class="footer">
-        <slot name="footer" />
-      </div>
+    <div v-if="$slots.footer" ref="footer" class="footer">
+      <slot name="footer" />
+    </div>
 
-      <div class="region" role="status">
-        <p v-for="announcement in announcements" :key="announcement.id">
-          {{ announcement.text }}
-        </p>
-      </div>
+    <div class="region" role="status">
+      <p v-for="announcement in announcements" :key="announcement.id">
+        {{ announcement.text }}
+      </p>
     </div>
   </dialog>
 </template>
@@ -46,6 +47,7 @@ import IconBack from '~icons/mdi/chevron-left'
 import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
 import { provideSheetAnnouncer } from '@/composables/useAnnouncer'
+import { useHeight } from '@/composables/useCollapsed'
 import { useKeyboardInset } from '@/composables/useKeyboardInset'
 import { useSheetDrag } from '@/composables/useSheetDrag'
 import { closeStateStrip } from '@/composables/useStateStrip'
@@ -69,6 +71,12 @@ export const DOUBLE_TAP = 300
  *
  * The page under an open sheet does not scroll (main.scss). The sheet is the one place where a
  * container scrolls rather than the page: a panel over the screen has no window of its own.
+ *
+ * Its footer — the main action — is pinned to its bottom edge, and the content scrolls under it
+ * (MOL-182, Ф-17): under fifteen chips «Сохранить» had gone below the edge. Sticky in the sheet's
+ * own scroll, not a middle of its own between the header and the footer: the pull down, the lift
+ * over the keys and `reveal` all go by the dialog's scroll, and stay as they were. What the sheet
+ * brings into sight stops at the footer's top (`--sheet-footer-height` as its `scroll-padding`).
  */
 export default defineComponent({
   name: 'BottomSheet',
@@ -101,6 +109,8 @@ export default defineComponent({
     // An error in the sheet keeps its buttons here: the strip under it is the screen's.
     closeStateStrip()
     const dialog = ref<HTMLDialogElement | null>(null)
+    const footer = ref<HTMLElement | null>(null)
+    const footerHeight = useHeight(footer)
     const titleId = useId()
 
     // Whether the sheet is open as far as the screen is concerned. Not `dialog.open`: the browser
@@ -279,7 +289,9 @@ export default defineComponent({
       if (history.laid()) close()
     }
 
-    useKeyboardInset(dialog, shown)
+    // A footer grown over the field being typed in — an error, «Вернуть» — is the sheet's edge
+    // moving up, and the field is brought back into sight above it.
+    useKeyboardInset(dialog, shown, footerHeight)
 
     // Heard on the document, not on the dialog (MOL-80). iOS hands a touch to the page only where
     // a listener of touches or of the pointer stands, and on the dialog that is the panel's box:
@@ -324,6 +336,8 @@ export default defineComponent({
       t,
       announcements,
       dialog,
+      footer,
+      footerHeight,
       titleId,
       dragging: drag.dragging,
       close,
@@ -355,6 +369,9 @@ export default defineComponent({
   padding: 0;
   overflow: auto;
   overscroll-behavior: contain;
+
+  /* What the browser and `reveal` bring into sight stops at the pinned footer's top, not under it. */
+  scroll-padding-bottom: var(--sheet-footer-height);
   border: none;
   border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
   background: var(--surface);
@@ -435,6 +452,28 @@ export default defineComponent({
   gap: var(--space-4);
   padding: var(--space-4) calc(var(--space-4) + var(--safe-right))
     calc(var(--space-8) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
+}
+
+.panel.footed {
+  padding-bottom: var(--space-6);
+}
+
+/* Pinned to the sheet's bottom edge, as wide as the sheet, the content scrolling under it (Ф-17); the
+   margins of the screen's docked strip (К-9). Over the keys the home indicator is under them, and the
+   footer stands 12 over the keys (147). */
+.footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  border-top: var(--hairline) solid var(--border);
+  padding: var(--space-3) calc(var(--space-4) + var(--safe-right))
+    calc(var(--space-3) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+
+  :global(html[data-under-keys]) & {
+    padding-bottom: var(--space-3);
+  }
 }
 
 .region {
