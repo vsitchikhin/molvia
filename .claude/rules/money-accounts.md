@@ -110,6 +110,17 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
 - **The totals are the live accounts in the spending currency by the rule of «Деньги», always «≈»**
   — «всего», «можно тратить» without the savings, «сбережения» — and an account nothing converts today
   is left out and counted as such, never as zero.
+- **The same totals come in the income currency too** (`incomeTotals`, MOL-183, owner's decision
+  В-19 «в»): the two currencies of the person's settings, one `totalsOf` for both. **The same
+  balances, never a second count** — those «Счета» add up, each converted today by the rule of
+  «Деньги», which is how the running month's «Остаток» converts — so «Счета» in ֏ and «Деньги» in ₽
+  speak of one money. The income currency the spending one — the same figures. Defaulted (`null`),
+  so «Счета» kept on the phone before it still read. **«На счетах сейчас»** over the month's switcher
+  on «Деньги» (Ф-27) shows them — «всего» and «можно тратить» — while a live account is, «now» and not
+  the month's: it does not move as the months are turned and stands by the month's error and its
+  skeleton, an answer of its own. With none, or no answer of «Счета» and nothing kept, «Счета» is a
+  row among the ways out instead (С-10). Below zero is «плохо» (С-17); what is left out is said under
+  the figures, as on «Счета». The phone converts nothing. The two currencies on «Счета» are MOL-193's.
 - **The month of «Деньги» reads the same balances for its «Остаток»** (MOL-134): `balancesOn` — the
   live accounts started by a day, their operations up to it — through `accountsCounted`, the one
   loading of accounts, operations and rates both screens share. A removed account is in neither.

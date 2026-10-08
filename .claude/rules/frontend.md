@@ -681,10 +681,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   their heights — the well, a caption, a row of `ListRow` with its amount, a row of `OperationRow` with a
   line under its amount — and where each amount ends, at 390 and 320 in both engines; the breath and its
   stillness under «reduce motion» are held on a bar (`advice.spec`, `item-search.spec`). **The card of a
-  sum is held by nothing yet**: its shape is the total of 77 v2 2a (`TripTotal`, figure 28 at
-  `--leading-tight`), which is no card until MOL-206 makes it one; the sums of «Деньги», «Счета», an
-  account, «Обмен» and «Бюджет» stand at the body's leading, some 8 px taller than the part — their
-  tasks (MOL-183 first) set the part against their answer. **The price:** a card adds its padding and
+  sum is the month's card of «Деньги»** (`MoneyMonthCard`, MOL-183): its caption's line, the figure
+  at `--leading-tight` and «≈» at the same (`approx`), so its tiles come in where the plate stood —
+  `e2e/kit-rows` holds it at 390 and 320; the total of 77 v2 2a (`TripTotal`) is no card until
+  MOL-206 makes it one, and the sums of «Счета», an account, «Обмен» and «Бюджет» still stand at the
+  body's leading, some 8 px taller than the part — their tasks set the part against their answer. **The price:** a card adds its padding and
   edge, so a skeleton of `groups` is some 34 px taller than before — taller, not shorter, which the hold
   of MOL-138 needs.
 - **An installed app takes a new version only when nobody can lose anything to it: hidden, and
