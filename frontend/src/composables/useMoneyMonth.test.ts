@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h, ref } from 'vue'
+import type { Ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { donutSlices, parseMoney } from '@molvia/model'
 import type { JournalKey, MoneyMonthView } from '@molvia/model'
@@ -74,11 +75,14 @@ function page(days: [string, ReturnType<typeof entry>[]][], cursor: JournalKey |
 }
 
 /** Mounts a component that uses the composable, and hands back what it returned. */
-function host(pinia: ReturnType<typeof createPinia>, month = '2026-09'): MoneyMonth {
+function host(
+  pinia: ReturnType<typeof createPinia>,
+  month: string | Ref<string> = '2026-09',
+): MoneyMonth {
   const holder: { month?: MoneyMonth } = {}
   const Host = defineComponent({
     setup() {
-      holder.month = useMoneyMonth(ref(month))
+      holder.month = useMoneyMonth(typeof month === 'string' ? ref(month) : month)
       return () => h('div')
     },
   })
@@ -172,27 +176,18 @@ describe('useMoneyMonth', () => {
       .mockImplementationOnce(() => new Promise((resolve) => (give = resolve)))
       .mockImplementationOnce(() => new Promise((_, reject) => (fail = reject)))
     const selected = ref('2026-09')
-    const holder: { month?: MoneyMonth } = {}
-    mount(
-      defineComponent({
-        setup() {
-          holder.month = useMoneyMonth(selected)
-          return () => h('div')
-        },
-      }),
-      { global: { plugins: [pinia] } },
-    )
+    const month = host(pinia, selected)
     await flushPromises()
     selected.value = '2026-08'
     await flushPromises()
     // Nothing kept on this phone: the month on screen has no categories of its own yet.
-    expect(holder.month?.knownCategories.value).toEqual([])
+    expect(month.knownCategories.value).toEqual([])
     give(page([], null))
     await flushPromises()
     fail(new TypeError('500'))
     await flushPromises()
-    expect(holder.month?.phase.value).toBe('error')
-    expect(holder.month?.knownCategories.value.map((one) => one.id)).toEqual([BEAUTY])
+    expect(month.phase.value).toBe('error')
+    expect(month.knownCategories.value.map((one) => one.id)).toEqual([BEAUTY])
   })
 
   it('a month kept before the ring reads offline, its categories whole and no ring (MOL-156, review 9)', async () => {
