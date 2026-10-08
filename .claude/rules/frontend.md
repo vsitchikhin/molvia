@@ -594,6 +594,45 @@ The detail behind the frontend lines of `CLAUDE.md`.
   second full error while the first holds the strip is drawn as the quiet card (А4); the same error
   turning a section's where it stands gives its focus back to «Повторить» (А2); and the error says
   the version out loud in the row's place (`useUpdateAnnouncement`, А3).
+- **The connection is one line, `StatusStrip`** (MOL-181, Ф-14, Н-7). «Без связи», «из памяти» and
+  «сервер не ответил» were drawn five ways — a strip copied into seventeen files, a card of
+  `ScreenState` over the screen, a note in a sheet — two or three on one screen, and a strip shared
+  by the screens said «покупки» on «Графики». Now: **once a screen**, under the header, under what
+  chooses the answer (the month, the search field — never above it, the rule below) or first in a
+  sheet; **in the screen's words, whole**, the time inside them — where «на 14:05» stands in the
+  sentence is the screen's and the language's, and a prop of time would have the kit glue a sentence
+  of pieces; where a memory keeps no time, the key has none. **Two kinds, and the kit draws the
+  glyph:** `offline`, the cloud; `unanswered` — the server did not answer and the last answer is shown
+  — the circle of frame 6h (owner's В-1 «а»): the form says «the server's error», the yellow says
+  «what is shown still holds»; never red. The kind is required — offline or error is the screen's,
+  decided after the failure. **«Повторить» only in `unanswered`'s `#action`** (К-5), a ghost, and only
+  where the screen's strip does not hold one: without a connection there is nothing to try, so an
+  offline strip draws no slot whatever it is given; the button takes the strip's padding, and the
+  strip grows to 44, not 60. **It speaks through the live region, never a role of its own** (К-14) —
+  on coming and on new words, taken back when it goes. Drawn again with the same words it says
+  nothing new; **a retry that failed the same way is still an answer** (C1, review С-7, adversarial
+  А4): the screen counts its failed answers in `attempt`, and a new one says the same words again —
+  the strip stays through the retry, so nothing else would. «From
+  memory» has two forms only: `ScreenState` when there is no answer, the strip when an old one is
+  shown. One per screen is held by the screens' tests, not a linter: two strips in a template are
+  often `v-if` and `v-else`. `AppNote` stays the note — the «i», 400, no voice. The seventeen copies
+  move onto it in their screens' tasks, with their words.
+- **A sheet has a live region of its own, and while it is up everything is said there** (MOL-181,
+  owner's В-2 «а»). The app's region is outside the modal `<dialog>`, inert while it is open, and
+  nothing said there is read (feedback С-10). `BottomSheet` gives its region to the app's announcer
+  (`provideSheetAnnouncer`), which chooses where words land as they land: the top open sheet's region,
+  whoever speaks — a block inside, a sheet's wrapper speaking from its own setup above its
+  `BottomSheet` (the unit price of `ItemDetailsSheet`, «восстановлено» of `ReconcileSheet` — adversarial
+  А3), the screen under it; with no sheet up, the app's. **A sheet is mounted closed with its screen**,
+  so a block in it speaks long before it opens (review С-6, adversarial А1, А2: «Нет связи» of «Где
+  вы?» and the strip of «Сверить» were said into the shut dialog and the opening said nothing). Now a
+  block inside a closed sheet is said nowhere; **words of what stands**, said with `held` —
+  `ScreenState`, the skeleton, the strip — are said a task after every opening, for as long as the
+  block holds them, and the region is emptied on closing, so it is never shown holding words. **An
+  event** («восстановлено», «записано») is not held: said in a shut sheet it reaches no one, and the
+  opening does not bring it back. The region's class is `.region`, not `.announcer`: the end-to-end
+  tests find the app's region by that name. `FeedbackSheet` keeps the region of its answer (its own
+  rule, feedback.md).
 - **The skeleton is the answer's shape, drawn in the kit's parts** (MOL-178, Ф-13, Н-5). Its bars were
   `surface-2` on the page's ground — 1.06:1 in the light scheme, next to nothing — with no card, no
   rows and no search field, so the screen jumped as the answer came. **`ScreenSkeleton` is the frame**:

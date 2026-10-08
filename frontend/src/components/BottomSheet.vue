@@ -28,6 +28,12 @@
       <div v-if="$slots.footer" class="footer">
         <slot name="footer" />
       </div>
+
+      <div class="region" role="status">
+        <p v-for="announcement in announcements" :key="announcement.id">
+          {{ announcement.text }}
+        </p>
+      </div>
     </div>
   </dialog>
 </template>
@@ -39,6 +45,7 @@ import { useI18n } from 'vue-i18n'
 import IconBack from '~icons/mdi/chevron-left'
 import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
+import { provideSheetAnnouncer } from '@/composables/useAnnouncer'
 import { useKeyboardInset } from '@/composables/useKeyboardInset'
 import { useSheetDrag } from '@/composables/useSheetDrag'
 import { closeStateStrip } from '@/composables/useStateStrip'
@@ -100,6 +107,9 @@ export default defineComponent({
     // may close the dialog on its own (a second Esc), and the sheet is still to be put away —
     // its entry taken, the screen told — exactly once.
     const shown = ref(false)
+    // While the sheet is up, words are said in its own region: the app's is outside the modal
+    // dialog, inert, and nothing in it is read (MOL-181, feedback С-10).
+    const announcements = provideSheetAnnouncer(shown)
     // A step back is on its way and the pop has not come yet.
     let closing = false
     // The screen asked for the sheet again while it was closing — «save and next». Honoured once
@@ -312,6 +322,7 @@ export default defineComponent({
     expose({ close })
     return {
       t,
+      announcements,
       dialog,
       titleId,
       dragging: drag.dragging,
@@ -424,6 +435,10 @@ export default defineComponent({
   gap: var(--space-4);
   padding: var(--space-4) calc(var(--space-4) + var(--safe-right))
     calc(var(--space-8) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
+}
+
+.region {
+  @include visually-hidden;
 }
 
 .head {

@@ -53,7 +53,7 @@ export default defineComponent({
     const announce = useAnnouncer()
     let withdraw: (() => void) | undefined
     onMounted(() => {
-      withdraw = announce?.(t('state.loading'))
+      withdraw = announce?.(t('state.loading'), { held: true })
       if (bars.value?.childElementCount === 0) warn('ScreenSkeleton has nothing to draw')
     })
     onBeforeUnmount(() => withdraw?.())
