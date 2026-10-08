@@ -479,3 +479,41 @@ describe('the phone’s day on the accounts (MOL-121)', () => {
     expect(view.text()).toContain('Yesterday · September 28')
   })
 })
+
+describe('the ways into «Перевод» (MOL-253, handoff 01)', () => {
+  const second = cash({ id: '22222222-0000-4000-8000-000000000002', name: 'Card ֏' })
+  const dollars = cash({
+    id: '33333333-0000-4000-8000-000000000003',
+    name: 'Dollars',
+    currency: 'USD',
+  })
+
+  it('«Счета» offers it under the total while some currency has two live accounts', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([cash(), second]))
+    const view = await open(AccountsView, '/money/accounts', pinia)
+    const row = button(view, /Transfer between accounts/)
+    expect(row?.attributes('aria-haspopup')).toBe('dialog')
+  })
+
+  it('must not fire: one account a currency, or the second one removed — no way in', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(
+      page([cash(), dollars, { ...second, archivedAt: new Date('2026-10-01') }]),
+    )
+    const view = await open(AccountsView, '/money/accounts', pinia)
+    expect(button(view, /Transfer between accounts/)).toBeUndefined()
+  })
+
+  it('an account’s screen offers «Перевести» under «Сверить» only with a second of its currency', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([cash(), second, dollars]))
+    accountJournal.mockResolvedValue(journal(cash(), []))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    expect(button(view, 'Transfer')).toBeDefined()
+
+    moneyAccounts.mockResolvedValue(page([cash(), dollars]))
+    const alone = await open(AccountView, `/money/accounts/${CASH}`, session())
+    expect(button(alone, 'Transfer')).toBeUndefined()
+  })
+})

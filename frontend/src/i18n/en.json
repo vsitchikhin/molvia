@@ -1844,7 +1844,8 @@
       "rate_mixed": "At the day’s rates: {rates}",
       "restore_late": "Too late: “{name}” is deleted for good",
       "restore_failed": "The account didn’t come back — check the connection and tap “Undo” again",
-      "rate_banks_and": " and "
+      "rate_banks_and": " and ",
+      "transfer": "Transfer between accounts"
     },
     "account": {
       "edit": "Edit",
@@ -1871,7 +1872,8 @@
         "title": "Couldn't load the account"
       },
       "row_open": "Open entry:",
-      "archived": "Taken out of the choice on {date}. Its history and balance stay"
+      "archived": "Taken out of the choice on {date}. Its history and balance stay",
+      "transfer": "Transfer"
     },
     "sheet": {
       "title_add": "New account",
@@ -1962,7 +1964,9 @@
       "note_strict": "Only accounts {currency}: money comes and goes in the account's currency",
       "note_strict_none": "No accounts {currency} — the entry will have no account",
       "trip_saved": "Purchases account: {name}",
-      "trip_saved_none": "Purchases account: none"
+      "trip_saved_none": "Purchases account: none",
+      "note_transfer_to": "Only accounts {currency}, except «{name}». Moving to another currency is an «Exchange»",
+      "note_transfer_from": "An account in another currency — «To» will need choosing again"
     },
     "charged": {
       "label": "Charged to account, {sign}",
@@ -2321,5 +2325,55 @@
       "offline": "No connection — the link from the QR code goes by itself once there is one",
       "not_kept": "The link wasn’t kept: you are signed out. Sign in again and send the receipt once more"
     }
+  },
+  "transfer": {
+    "title": "Transfer",
+    "title_amend": "Edit transfer",
+    "meta": "Between your own accounts in one currency. Not counted in the month's spending",
+    "amount": "Amount",
+    "from": "From",
+    "to": "To",
+    "pick": "Choose an account",
+    "no_peer_value": "No {sign} account",
+    "no_peer": "No other account {currency}",
+    "fee": "Fee",
+    "fee_hint": "Spending «Other» from «{name}»",
+    "fee_hint_none": "Spending «Other» from the account you transfer from",
+    "fee_total": "{amount} leaves in all",
+    "day": "Day",
+    "today": "Today",
+    "note": "Note",
+    "note_placeholder": "Optional",
+    "amended": "edited {date}",
+    "send": "Transfer {amount}",
+    "sending": "Transferring…",
+    "save": "Save",
+    "saving": "Saving…",
+    "need_from": "Choose where from",
+    "need_peer": "Needs a second account {currency}",
+    "need_amount": "Enter the amount",
+    "need_to": "Choose where to",
+    "wait_online": "We'll transfer once online",
+    "wait_online_save": "We'll save once online",
+    "offline": "No connection. You can transfer once online — what you've entered stays here",
+    "failed": "The transfer didn't go through",
+    "failed_retry": "Try again",
+    "gone": "«{name}» was deleted on another phone. Choose another — the amount, fee and note are still here",
+    "done": "Transferred: {amount} to «{name}»",
+    "saved": "Transfer saved",
+    "remove": "Delete transfer",
+    "removing": "Deleting…",
+    "remove_wait": "We'll delete once online",
+    "remove_note": "Together with the fee. You can undo it right after",
+    "removed": "Transfer deleted",
+    "removed_sub": "Together with the fee",
+    "restored": "Transfer restored",
+    "removed_announced": "Transfer deleted with its fee. You can undo it",
+    "row_out": "→ {name}",
+    "row_in": "← {name}",
+    "row_meta": "Transfer",
+    "fee_row": "Transfer fee",
+    "fee_row_meta": "Other · → {name}",
+    "fee_spending": "Other · transfer fee"
   }
 }

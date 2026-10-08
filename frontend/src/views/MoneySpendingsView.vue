@@ -144,7 +144,7 @@
     </div>
 
     <!-- «Вернуть» stands whatever the screen became under it (adversarial Г), over the strip. -->
-    <template v-if="removed || tripRemoved" #undo>
+    <template v-if="removed || tripRemoved || transferRemoved" #undo>
       <UndoStrip
         v-if="removed"
         :key="removed.stamp"
@@ -158,6 +158,16 @@
         @restore="restore"
         @tick="keepLeft"
         @expire="forgetRemoved"
+      />
+      <!-- A transfer removed from its fee's row comes back here, with the fee (MOL-253). -->
+      <UndoStrip
+        v-else-if="transferRemoved"
+        :key="transferRemoved.stamp"
+        :text="t('transfer.removed')"
+        :announcement="t('transfer.removed_announced')"
+        :action="t('spending.restore')"
+        @restore="restoreTransfer"
+        @expire="transferRemoved = null"
       />
       <!-- A trip opened from here and removed comes back here, with its «Вернуть» (MOL-76). -->
       <TripUndoStrip v-else />
@@ -189,6 +199,14 @@
       :categories="categories"
       @created="made = $event"
     />
+    <!-- A transfer's fee opens its transfer: the two are amended together (MOL-253, Р-5). -->
+    <TransferSheet
+      v-model:open="transferOpen"
+      :editing-id="transferId"
+      :online="online"
+      :spend-currency="spendCurrency"
+      @done="transferDone"
+    />
   </AppScreen>
 </template>
 
@@ -210,11 +228,13 @@ import OperationRow from '@/components/OperationRow.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SpendingSheet from '@/components/SpendingSheet.vue'
+import TransferSheet from '@/components/TransferSheet.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import { journalRowProps } from '@/components/spending'
 import type { JournalRow, OperationRowProps } from '@/components/spending'
 import { useMoneyScreen } from '@/composables/useMoneyScreen'
+import { useTransferOutcome } from '@/composables/useTransferOutcome'
 import { calendarDay, shiftDay } from '@/days'
 
 /**
@@ -237,6 +257,7 @@ export default defineComponent({
     ScreenSkeleton,
     ScreenState,
     SpendingSheet,
+    TransferSheet,
     TripUndoStrip,
     UndoStrip,
   },
@@ -346,8 +367,21 @@ export default defineComponent({
     }
     function open(row: JournalRow, day: string): void {
       toShow.value = null
+      const of = row.kind === 'manual' ? row.spending.transferId : null
+      if (of !== null) {
+        transferId.value = of
+        transferOpen.value = true
+        return
+      }
       screen.openRow(row, day)
     }
+    const transferOpen = ref(false)
+    const transferId = ref<string | null>(null)
+    const {
+      removed: transferRemoved,
+      done: transferDone,
+      restore: restoreTransfer,
+    } = useTransferOutcome()
 
     /** A spending of another month takes «Траты» to its month, and its row into view (handoff 06). */
     function saved({ id, spentOn }: { id: string; spentOn: string }): void {
@@ -375,6 +409,11 @@ export default defineComponent({
     )
 
     return {
+      transferOpen,
+      transferId,
+      transferRemoved,
+      transferDone,
+      restoreTransfer,
       ...screen,
       addButton,
       t,

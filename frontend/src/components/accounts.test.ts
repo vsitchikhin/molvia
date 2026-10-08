@@ -7,6 +7,7 @@ import type {
   SpendingCategoryView,
 } from '@molvia/model'
 import {
+  canTransfer,
   defaultAccount,
   operationRowProps,
   pageOrder,
@@ -83,6 +84,19 @@ describe('accounts in the order of the page', () => {
  * A row of an account's journal, «не попали» and a check (MOL-176): the words the component drew by
  * itself until the kit took the row, every rule of them read here.
  */
+describe('where a transfer can be made (MOL-253)', () => {
+  it('needs two live accounts of one currency — of the one named, or of any', () => {
+    expect(canTransfer(all, 'RUB')).toBe(true)
+    expect(canTransfer(all, 'AMD')).toBe(false)
+    expect(canTransfer(all)).toBe(true)
+  })
+
+  it('must not fire: a removed account is not the second one', () => {
+    expect(canTransfer([cardRub, oldCard], 'RUB')).toBe(false)
+    expect(canTransfer([cardRub, oldCard, cashAmd, dollarsHome])).toBe(false)
+  })
+})
+
 describe('an operation as its row says it', () => {
   const OTHER = 'aaaaaaaa-0000-4000-8000-000000000001'
   const CAFE = 'aaaaaaaa-0000-4000-8000-000000000002'
@@ -277,6 +291,47 @@ describe('an operation as its row says it', () => {
         'Обмен',
         'muted',
       ])
+    })
+  })
+
+  describe('a transfer (MOL-253, handoff 03)', () => {
+    const half = (side: 'given' | 'received') =>
+      operation({
+        kind: 'transfer',
+        side,
+        categoryId: null,
+        amounts: [money(side === 'given' ? '-2000' : '2000', 'USD')],
+        moved: money(side === 'given' ? '-2000' : '2000', 'USD'),
+        counterpart: { accountId: CARD, amount: money(side === 'given' ? '2000' : '-2000', 'USD') },
+      })
+
+    it('names the other account with an arrow the way the money went, «Перевод» under it', () => {
+      expect([row(half('given')).title, row(half('given')).meta]).toEqual(['→ Карта', 'Перевод'])
+      expect([row(half('received')).title, row(half('received')).meta]).toEqual([
+        '← Карта',
+        'Перевод',
+      ])
+    })
+
+    it('carries its sign and no colour — it is not a spending (Ф-4)', () => {
+      expect(plain(row(half('given')).amount ?? '')).toBe('−2 000 $')
+      expect(plain(row(half('received')).amount ?? '')).toBe('+2 000 $')
+      expect(row(half('given')).tint).toBe('muted')
+    })
+
+    it('says its note beside «Перевод»', () => {
+      expect(row(operation({ ...half('given'), note: 'на вклад' })).meta).toBe('Перевод · на вклад')
+    })
+
+    it('its fee is «Комиссия за перевод» in «Прочее», saying where the transfer went', () => {
+      const fee = operation({
+        categoryId: OTHER,
+        amounts: [money('-20', 'USD')],
+        moved: money('-20', 'USD'),
+        transferId: 'eeeeeeee-0000-4000-8000-000000000001',
+        counterpart: { accountId: CARD, amount: money('2000', 'USD') },
+      })
+      expect([row(fee).title, row(fee).meta]).toEqual(['Комиссия за перевод', 'Прочее · → Карта'])
     })
   })
 

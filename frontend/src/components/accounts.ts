@@ -1,6 +1,8 @@
 import { markRaw } from 'vue'
 import IconCashPlus from '~icons/mdi/cash-plus'
 import IconSwap from '~icons/mdi/swap-horizontal'
+import IconTransferIn from '~icons/mdi/bank-transfer-in'
+import IconTransferOut from '~icons/mdi/bank-transfer-out'
 import { formatEstimate, parseMoney } from '@molvia/model'
 import type {
   AccountOperationView,
@@ -76,6 +78,20 @@ export function pageOrder(accounts: readonly MoneyAccountView[]): MoneyAccountVi
     ...live.filter((account) => !account.savings),
     ...live.filter((account) => account.savings),
   ]
+}
+
+/**
+ * Whether a transfer can be made (MOL-253, handoff 01): two live accounts of one currency — of
+ * `currency` when it is named (an account's own screen), of any otherwise («Счета»). A removed
+ * account is not counted: it is on no list of choice.
+ */
+export function canTransfer(accounts: readonly MoneyAccountView[], currency?: Currency): boolean {
+  const counts = new Map<Currency, number>()
+  for (const account of pageOrder(accounts)) {
+    counts.set(account.currency, (counts.get(account.currency) ?? 0) + 1)
+  }
+  if (currency !== undefined) return (counts.get(currency) ?? 0) >= 2
+  return [...counts.values()].some((count) => count >= 2)
 }
 
 /** The removed ones, for «Убранные (N)» — in the order they were added, as everything else. */
@@ -160,12 +176,18 @@ export function operationRowProps(
   if (kind === 'trip') look = { icon: tripIcon, tint: tripTint(groceries) }
   else if (kind === 'income') look = { icon: markRaw(IconCashPlus), tint: 'muted' }
   else if (kind === 'exchange') look = { icon: markRaw(IconSwap), tint: 'muted' }
+  // Not a spending: the circle of an exchange or an income, never a category's (MOL-253, Ф-4).
+  else if (kind === 'transfer')
+    look = {
+      icon: markRaw(operation.side === 'received' ? IconTransferIn : IconTransferOut),
+      tint: 'muted',
+    }
   else look = spendingLook(category)
 
   return {
     ...look,
     verb: t('accounts.account.row_open', {}),
-    title: titleOf(operation, reconciled, categoryName, t),
+    title: titleOf(operation, reconciled, categoryName, t, context.accountName),
     meta: metaOf(operation, reconciled, categoryName, context),
     amount: amountOf(operation, context),
     sub: subOf(operation, context),
@@ -178,8 +200,10 @@ function titleOf(
   reconciled: boolean,
   categoryName: string,
   t: Translate,
+  accountName: (id: string) => string | null,
 ): string {
   if (reconciled) return t('accounts.account.reconcile_row', {})
+  if (operation.transferId !== null) return t('transfer.fee_row', {})
   switch (operation.kind) {
     case 'trip':
       return t('spending.trip_row_title', { place: operation.place ?? '' })
@@ -187,9 +211,22 @@ function titleOf(
       return t(`income.source.${operation.source ?? 'other'}`, {})
     case 'exchange':
       return t('accounts.account.exchange', {})
+    case 'transfer':
+      return t(operation.side === 'received' ? 'transfer.row_in' : 'transfer.row_out', {
+        name: counterpartName(operation, accountName),
+      })
     default:
       return operation.note ?? categoryName
   }
+}
+
+/** The other account of a transfer, or the one a fee's transfer went to: its name as it is. */
+function counterpartName(
+  operation: AccountOperationView,
+  accountName: (id: string) => string | null,
+): string {
+  const id = operation.counterpart?.accountId ?? null
+  return id === null ? '' : (accountName(id) ?? '')
 }
 
 function metaOf(
@@ -206,6 +243,10 @@ function metaOf(
         : 'accounts.account.reconcile_out',
       {},
     )
+  if (operation.transferId !== null)
+    return t('transfer.fee_row_meta', {
+      name: counterpartName(operation, context.accountName),
+    })
   switch (operation.kind) {
     case 'trip': {
       const items = operation.items ?? 0
@@ -220,6 +261,8 @@ function metaOf(
     }
     case 'income':
       return [t('income.fab', {}), operation.note].filter(Boolean).join(' · ')
+    case 'transfer':
+      return [t('transfer.row_meta', {}), operation.note].filter(Boolean).join(' · ')
     case 'exchange': {
       const other = operation.counterpart
       if (!other) return ''

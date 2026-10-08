@@ -49,15 +49,18 @@ Rules: `.claude/rules/money-accounts.md`. A test beside its source, or mirroring
 - `frontend/src/components/HeldFromAccounts.vue` — «По счетам на …: … · Подставить» hint under «сколько было до» of an exchange or income, filled only on tap.
 - `frontend/src/components/OperationExchangeSheet.vue` — An exchange opened from an account's journal, «не попали» or a check, read from «Обмен денег» and amended in its sheet.
 - `frontend/src/components/OperationIncomeSheet.vue` — An income opened from an account's journal, «не попали» or a check, read from «Доходы» and amended in its sheet.
-- `frontend/src/components/OperationSheet.vue` — Dispatcher that opens a journal row's operation in its own sheet — spending, trip summary, income or exchange — with «‹» back.
+- `frontend/src/components/OperationSheet.vue` — Dispatcher that opens a journal row's operation in its own sheet — spending, trip summary, income, exchange, or a transfer and its fee — with «‹» back.
+- `frontend/src/components/TransferSheet.vue` — «Перевод» sheet (MOL-253): sum, «Откуда», «Куда» of the same currency, optional fee in «Прочее», day and note; written with a connection, amended and removed with its fee.
 - `frontend/src/components/ReconcileSheet.vue` — «Сверка» sheet: the fact first, then the server's difference and its reasons, each fixed in its sheet, and «Записать разницу».
 - `frontend/src/components/UnassignedSheet.vue` — «Не попали в остатки» sheet: the server's list of operations with no account; a row opens its sheet to choose one.
-- `frontend/src/components/accounts.ts` — Helpers of the account screens: signed amounts with U+2212, short days, «на 14:05», page order, the default account, picker groups.
+- `frontend/src/components/accounts.ts` — Helpers of the account screens: signed amounts with U+2212, short days, «на 14:05», page order, the default account, picker groups, whether a transfer can be made, the words of a journal row.
 
 ## frontend · composables
 
 - `frontend/src/composables/useAccountChoice.ts` — Composable: the account of one side of an operation in its sheet, defaulting to the first live one of its currency until chosen.
 - `frontend/src/composables/useAccountJournal.ts` — Composable: one account's journal from the server, page by page, with its phase including `missing`.
+- `frontend/src/composables/useTransferOutcome.ts` — Composable: what a screen does when a transfer's sheet ends — the transfer said, its removal offered back by «Вернуть».
+- `frontend/src/composables/useTransfers.ts` — Composable: a transfer's writes through the API (MOL-253), the page taken into the store and the journals and the month told to read again.
 - `frontend/src/composables/useOwnCategories.ts` — Composable: the owner's spending categories outside the month — remembered, queued and the server's — with names by id.
 
 ## frontend · stores

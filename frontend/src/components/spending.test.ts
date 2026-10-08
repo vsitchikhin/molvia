@@ -413,6 +413,17 @@ describe('a line of the journal as its row says it', () => {
     expect([noted.title, noted.meta]).toEqual(['Стрижка', 'Красота · Барбер'])
   })
 
+  it('a transfer’s fee says what it is: «Прочее · комиссия за перевод» (MOL-253, Р-1)', () => {
+    const fee = manual({
+      spending: {
+        ...spending(TAXI, '2026-09-27', '20'),
+        place: null,
+        transferId: 'eeeeeeee-0000-4000-8000-000000000001',
+      },
+    })
+    expect(row(fee).title).toBe('Прочее · комиссия за перевод')
+  })
+
   it('puts the day first where rows of different days stand together', () => {
     expect(row(manual(), beauty, 'Вчера').meta).toBe('Вчера · Кофеман')
   })

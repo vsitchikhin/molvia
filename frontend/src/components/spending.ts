@@ -547,7 +547,10 @@ export function journalRowProps(
     verb: t(trip ? 'spending.row_open_trip' : 'spending.row_open', {}),
     title: trip
       ? t('spending.trip_row_title', { place: row.placeName })
-      : (row.spending.note ?? categoryName),
+      : row.spending.transferId !== null
+        ? // A transfer's fee says what it is (MOL-253, Р-1): «Прочее · комиссия за перевод».
+          t('transfer.fee_spending', {})
+        : (row.spending.note ?? categoryName),
     meta: [context.when, line].filter(Boolean).join(' · '),
     amount: asTyped(money, locale),
     sub,

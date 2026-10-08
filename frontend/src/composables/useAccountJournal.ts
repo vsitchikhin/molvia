@@ -114,7 +114,7 @@ export function useAccountJournal(accountId: Ref<string>): AccountJournal {
     void load()
   })
   watch(
-    () => [spendings.landed, trips.wrote],
+    () => [spendings.landed, trips.wrote, accounts.transfers],
     () => void load(),
   )
   // A write of the account itself answers with the page, not the journal: its start may have moved.

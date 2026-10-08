@@ -1,5 +1,10 @@
 <template>
-  <BottomSheet :open="open" :on-closed="afterClose" @update:open="$emit('update:open', $event)">
+  <BottomSheet
+    :open="open"
+    :back="back"
+    :on-closed="afterClose"
+    @update:open="$emit('update:open', $event)"
+  >
     <template #title>{{
       t(account ? 'accounts.sheet.title_edit' : 'accounts.sheet.title_add')
     }}</template>
@@ -149,7 +154,7 @@ type Kind = 'spending' | 'savings'
 
 /** What the sheet hands the screen once it has closed: which of the three it was. */
 export type AccountOutcome =
-  | { readonly kind: 'added'; readonly name: string }
+  | { readonly kind: 'added'; readonly id: string; readonly name: string }
   | { readonly kind: 'saved'; readonly name: string }
   | { readonly kind: 'deleted'; readonly id: string; readonly name: string }
   | { readonly kind: 'archived'; readonly id: string; readonly name: string }
@@ -182,6 +187,8 @@ export default defineComponent({
     /** A new account starts in the currency purchases are written in (handoff 03). */
     spendCurrency: { type: String as PropType<Currency>, required: true },
     online: { type: Boolean, default: true },
+    /** Opened over another sheet — «Завести счёт» of a transfer (MOL-253): «‹» back, no ×. */
+    back: { type: Boolean, default: false },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
@@ -377,7 +384,11 @@ export default defineComponent({
           answer = await addOrAmend(fields)
         }
         store.accept(answer)
-        finished({ kind: held ? 'saved' : 'added', name: typedName })
+        finished(
+          held
+            ? { kind: 'saved', name: typedName }
+            : { kind: 'added', id: accountId, name: typedName },
+        )
       } catch (caught) {
         const code = caught instanceof ApiError ? caught.code : null
         if (code === ERROR.MONEY_ACCOUNT_TAKEN) {
