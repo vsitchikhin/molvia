@@ -820,18 +820,17 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           .set({ expenseId })
           .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, position)))
       }
-      // the lines recorded as read: their price is the shelf's, as the memory's word says (MOL-240, Р4-1)
-      if (recorded.confirmed.length > 0) {
-        await db
-          .update(receiptLines)
-          .set({ asRead: true })
-          .where(
-            and(
-              eq(receiptLines.receiptId, id),
-              inArray(receiptLines.position, [...recorded.confirmed]),
-            ),
-          )
-      }
+      // every line recorded judged once: as read — its price is the shelf's, as the memory's word says —
+      // or not (MOL-240, Р4-1); `false` is a judgement, never «not judged», which is `null` (Р6-1)
+      await db
+        .update(receiptLines)
+        .set({
+          asRead: sql`${receiptLines.position} in (${sql.join(
+            [-1, ...recorded.confirmed].map((position) => sql`${position}`),
+            sql`, `,
+          )})`,
+        })
+        .where(and(eq(receiptLines.receiptId, id), sql`${receiptLines.expenseId} is not null`))
       // a line not recorded is not kept (MOL-240, В-2): nobody sees it once the receipt is recorded,
       // and what it costs is counted below from the edits, not read back; its rows go with it
       await db

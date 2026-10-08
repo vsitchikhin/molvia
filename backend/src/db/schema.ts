@@ -2805,8 +2805,9 @@ export const receiptLines = pgTable(
     expenseId: uuid('expense_id').references(() => expenses.id, { onDelete: 'cascade' }),
     // «Записать» recorded the line as read — it added up, its quantity and sum unchanged (В-4): its price
     // is the shelf's, what the person's word in the shops' memory carries (MOL-240, round 4, Р4-1). Judged
-    // once, at the record: a sum put right later is what was paid, never the shelf.
-    asRead: boolean('as_read').notNull().default(false),
+    // once, at the record: a sum put right later is what was paid, never the shelf. `null` — no record of
+    // this build judged it: read and not recorded, or recorded by an image rolled back (round 6, Р6-1).
+    asRead: boolean('as_read'),
   },
   (table) => [
     primaryKey({ columns: [table.receiptId, table.position] }),

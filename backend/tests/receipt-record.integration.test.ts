@@ -830,8 +830,8 @@ describe('«Записать»', () => {
       expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([37_000n, 37_000n])
     })
 
-    // round 5, Р5-1: a line an image rolled back recorded has `as_read` unset — its price stays while
-    // the purchase is as the line was read, and goes once the sum was put right
+    // round 5, Р5-1: a line an image rolled back recorded was never judged, `as_read` null — its price
+    // stays while the purchase is as the line was read, and goes once the sum was put right
     it('Р5-1: keeps the shelf price of a line an image rolled back recorded, while its purchase says it', async () => {
       const me = await insertActor(db)
       const place = await insertPlace(db)
@@ -839,7 +839,7 @@ describe('«Записать»', () => {
       const bought = await recordMilk(me, place, milk, 370)
       await db
         .update(receiptLines)
-        .set({ asRead: false })
+        .set({ asRead: null })
         .where(eq(receiptLines.expenseId, bought.expenseId))
       await settleStoreMemory(db)
       expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([37_000n, 37_000n])
@@ -848,6 +848,36 @@ describe('«Записать»', () => {
         .update(expenses)
         .set({ amountMinor: 35_000n })
         .where(eq(expenses.id, bought.expenseId))
+      await settleStoreMemory(db)
+      expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([null, null])
+    })
+
+    // round 6, Р6-1: a line «Записать» judged not as read keeps no price, whatever the purchase says later
+    it('Р6-1: gives no shelf price to a line recorded with its sum put right, once the purchase agrees', async () => {
+      const me = await insertActor(db)
+      const place = await insertPlace(db)
+      const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+      const id = await parsedReceipt(me, [{ ...MILK, price: 370, sum: 370 }])
+      const tripId = randomUUID()
+      const answer = await record(me, id, {
+        tripId,
+        place: { id: place },
+        purchasedOn: '2026-09-26',
+        lines: [
+          {
+            position: 0,
+            skip: false,
+            item: { id: milk },
+            quantity: pieces(1),
+            amount: amount(350),
+          },
+        ],
+      })
+      expect(answer.statusCode).toBe(200)
+      const [line] = await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id))
+      expect(line?.asRead).toBe(false)
+      // the purchase put back to the sum read: the record's judgement stands
+      await db.update(expenses).set({ amountMinor: 37_000n }).where(eq(expenses.tripId, tripId))
       await settleStoreMemory(db)
       expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([null, null])
     })

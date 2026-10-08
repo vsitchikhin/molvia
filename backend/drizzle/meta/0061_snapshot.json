@@ -4485,8 +4485,7 @@
           "name": "as_read",
           "type": "boolean",
           "primaryKey": false,
-          "notNull": true,
-          "default": false
+          "notNull": false
         }
       },
       "indexes": {

@@ -162,6 +162,10 @@ describe('0061: what a removed trip or purchase left of its receipt', () => {
     expect(await sql`select as_read from receipt_lines where receipt_id = ${working}`).toEqual([
       { as_read: true },
     ])
+    // and a line no record judged — the receipt not recorded yet — stays null (Р6-1)
+    expect(await sql`select as_read from receipt_lines where receipt_id = ${parsed}`).toEqual([
+      { as_read: null },
+    ])
     expect(await settleStoreMemory(db)).toBe(3)
     const words = await sql<{ actor_id: string | null; key: string }[]>`
       select actor_id, key from store_memory order by actor_id nulls last`

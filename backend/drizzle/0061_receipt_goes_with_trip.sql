@@ -15,7 +15,7 @@ ALTER TABLE "receipt_lines" DROP CONSTRAINT "receipt_lines_expense_id_expenses_i
 --> statement-breakpoint
 ALTER TABLE "receipts" DROP CONSTRAINT "receipts_trip_id_trips_id_fk";
 --> statement-breakpoint
-ALTER TABLE "receipt_lines" ADD COLUMN "as_read" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "receipt_lines" ADD COLUMN "as_read" boolean;--> statement-breakpoint
 ALTER TABLE "receipt_line_images" ADD CONSTRAINT "receipt_line_images_line" FOREIGN KEY ("receipt_id","position") REFERENCES "public"."receipt_lines"("receipt_id","position") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "receipt_lines" ADD CONSTRAINT "receipt_lines_expense_id_expenses_id_fk" FOREIGN KEY ("expense_id") REFERENCES "public"."expenses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "receipts" ADD CONSTRAINT "receipts_trip_id_trips_id_fk" FOREIGN KEY ("trip_id") REFERENCES "public"."trips"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -24,22 +24,23 @@ ALTER TABLE "receipts" ADD CONSTRAINT "receipts_recorded_with_trip" CHECK ("rece
 -- shelf price from it when a word is settled, never from the purchase as it is now. The lines recorded
 -- before it are judged the one way left: a row cut out of the line confirmed (recording confirms only the
 -- lines recorded as read, В-4), else the purchase still as the line was read — a sum put right since
--- reads as not read, the price named.
-UPDATE "receipt_lines" "line" SET "as_read" = true
+-- reads as not read, the price named. Every recorded line is judged here; `null` is left to a line no
+-- «Записать» of this build judged — read, not recorded yet, or recorded by an image rolled back (Р6-1).
+UPDATE "receipt_lines" "line" SET "as_read" = (
+  EXISTS (
+    SELECT 1 FROM "receipt_line_images" "row"
+    WHERE "row"."receipt_id" = "line"."receipt_id" AND "row"."position" = "line"."position"
+      AND "row"."confirmed_at" IS NOT NULL
+  )
+  OR (
+    "line"."settled"
+    AND "bought"."qty_milli" IS NOT DISTINCT FROM "line"."qty_milli"
+    AND "bought"."qty_unit" IS NOT DISTINCT FROM "line"."qty_unit"
+    AND "bought"."amount_minor" IS NOT DISTINCT FROM "line"."sum_minor"
+    AND "bought"."amount_currency" IS NOT DISTINCT FROM "receipt"."currency"
+    AND "bought"."amount_minor" IS NOT NULL
+  )
+)
 FROM "receipts" "receipt", "expenses" "bought"
 WHERE "receipt"."id" = "line"."receipt_id" AND "receipt"."status" = 'recorded'
-  AND "bought"."id" = "line"."expense_id"
-  AND (
-    EXISTS (
-      SELECT 1 FROM "receipt_line_images" "row"
-      WHERE "row"."receipt_id" = "line"."receipt_id" AND "row"."position" = "line"."position"
-        AND "row"."confirmed_at" IS NOT NULL
-    )
-    OR (
-      "line"."settled"
-      AND "bought"."qty_milli" IS NOT DISTINCT FROM "line"."qty_milli"
-      AND "bought"."qty_unit" IS NOT DISTINCT FROM "line"."qty_unit"
-      AND "bought"."amount_minor" = "line"."sum_minor"
-      AND "bought"."amount_currency" = "receipt"."currency"
-    )
-  );
+  AND "bought"."id" = "line"."expense_id";
