@@ -472,6 +472,72 @@ describe('useKeyboardInset keeps the focused field in sight', () => {
   })
 })
 
+// A pinned footer covers the sheet's end: what is under it is not in sight, and the sheet's own
+// `scroll-padding` says how far that is — the browser's focus goes by the same (MOL-182).
+describe('useKeyboardInset keeps the focused field above a pinned footer', () => {
+  function footed(footer = 60) {
+    const edge = ref(footer)
+    const view = host(false, (target, on) => {
+      useKeyboardInset(target, on, edge)
+    })
+    const sheet = view.view.element as HTMLElement
+    sheet.style.scrollPaddingBottom = `${String(footer)}px`
+    return { ...view, edge, sheet }
+  }
+
+  async function typing(field: Box, which = '[data-field]') {
+    const viewport = fakeViewport(800)
+    const view = footed()
+    const { input } = placed(view.view, { top: 300, bottom: 500 }, field, which)
+    view.on.value = true
+    await nextTick()
+    input.focus()
+    return { ...view, input, viewport }
+  }
+
+  it('scrolls a field under the footer to the footer’s top', async () => {
+    const { sheet, viewport } = await typing({ top: 421, bottom: 461 })
+    viewport.height = 500
+    viewport.fire('resize')
+    expect(sheet.scrollTop).toBe(121)
+  })
+
+  it('must not fire: a field whose end is the footer’s top', async () => {
+    const { sheet, viewport } = await typing({ top: 400, bottom: 440 })
+    viewport.height = 500
+    viewport.fire('resize')
+    expect(sheet.scrollTop).toBe(100)
+  })
+
+  // An error or «Вернуть» come into the footer move its top up as a lower sheet would.
+  it('brings the field back above a footer that grew over it', async () => {
+    const { sheet, edge } = await typing({ top: 390, bottom: 430 })
+    expect(sheet.scrollTop).toBe(100)
+    sheet.style.scrollPaddingBottom = '80px'
+    edge.value = 80
+    await nextTick()
+    expect(sheet.scrollTop).toBe(110)
+  })
+
+  it('must not fire: a footer that grew with no field typed in', async () => {
+    const { sheet, edge } = await typing({ top: 390, bottom: 430 }, '[data-button]')
+    sheet.style.scrollPaddingBottom = '80px'
+    edge.value = 80
+    await nextTick()
+    expect(sheet.scrollTop).toBe(100)
+  })
+
+  it('must not fire: a footer that grew in a shut sheet', async () => {
+    const { sheet, edge, on } = await typing({ top: 390, bottom: 430 })
+    on.value = false
+    await nextTick()
+    sheet.style.scrollPaddingBottom = '80px'
+    edge.value = 80
+    await nextTick()
+    expect(sheet.scrollTop).toBe(100)
+  })
+})
+
 // The first keyboard of a page came 300–800 ms after the focus on the owner's iPhone, the page drew
 // nothing meanwhile, and iOS slid the last picture up with the keys — the sheet in it still the
 // screen's share, its top off the screen (MOL-151, М-1). The height they left is remembered and

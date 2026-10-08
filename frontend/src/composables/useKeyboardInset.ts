@@ -45,10 +45,19 @@ import { read, write } from '@/stores/storage'
  * С-1). Only a field typed in: a block focused for a screen reader — the result of a check — is
  * read from its top, which the browser's own focus already shows (adversarial А).
  *
+ * The edge is where the sheet's `scroll-padding` says, the browser's own focus going by the same:
+ * a pinned footer covers the sheet's end, and a field under it is no field in sight (MOL-182). A
+ * footer that grows (`edge`) — an error, «Вернуть» — moves that edge up as a lower sheet would, and
+ * the field typed in is brought back above it.
+ *
  * Window events, not touches: nothing is taken from the browser's gestures. Listened to only
  * while the sheet is open.
  */
-export function useKeyboardInset(target: Ref<HTMLElement | null>, active: Ref<boolean>): void {
+export function useKeyboardInset(
+  target: Ref<HTMLElement | null>,
+  active: Ref<boolean>,
+  edge?: Ref<number>,
+): void {
   // What the sheet was last set to: a field is revealed only when this changes.
   let placed = ''
   // The height the keys left visible last time, set before they come (MOL-151), and the timer that
@@ -159,6 +168,16 @@ export function useKeyboardInset(target: Ref<HTMLElement | null>, active: Ref<bo
     placed = ''
   }
 
+  if (edge) {
+    watch(
+      edge,
+      () => {
+        if (active.value && target.value) reveal(target.value)
+      },
+      { flush: 'post' },
+    )
+  }
+
   // After the render, so the sheet being measured is in the page.
   watch(
     active,
@@ -203,21 +222,31 @@ function typedIn(sheet: HTMLElement): HTMLElement | null {
 
 /**
  * Scrolls the sheet — not the window — just far enough for the field typed in to be seen, its top
- * first. A field taller than the sheet is left where it is: the browser keeps its caret in sight.
- * Done once more, it moves nothing (adversarial А3).
+ * first, between the edges its `scroll-padding` leaves: a pinned footer covers the end (MOL-182).
+ * A field taller than that is left where it is: the browser keeps its caret in sight. Done once
+ * more, it moves nothing (adversarial А3).
  */
 function reveal(sheet: HTMLElement): void {
   const field = typedIn(sheet)
   if (!field) return
   const box = sheet.getBoundingClientRect()
+  const style = getComputedStyle(sheet)
+  const top = box.top + padding(style.scrollPaddingTop)
+  const bottom = box.bottom - padding(style.scrollPaddingBottom)
   const place = field.getBoundingClientRect()
-  const above = box.top - place.top
-  const below = place.bottom - box.bottom
+  const above = top - place.top
+  const below = place.bottom - bottom
   if (above > 0 && below > 0) return
   // A scroll lands on whole pixels, a field does not: rounded outwards, or a fraction stays under
   // the edge — and rounded so that the field's top never goes past the sheet's.
   if (above > 0) sheet.scrollTop -= Math.ceil(above)
   else if (below > 0) sheet.scrollTop += Math.min(Math.ceil(below), Math.floor(-above))
+}
+
+/** A `scroll-padding` in pixels; `auto`, or nothing laid out, is none. */
+function padding(value: string): number {
+  const pixels = Number.parseFloat(value)
+  return Number.isFinite(pixels) ? pixels : 0
 }
 
 /**
