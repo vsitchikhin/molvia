@@ -191,8 +191,10 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
   })
 
   it('says beside the dashed ring why there are no sectors when nothing was counted (round 2, Ж)', () => {
+    // As the server answers it: what no rate counted is not in `spent` (adversarial А1).
     const coffee = {
       ...month('2026-09', []),
+      spent: amd('0'),
       byCategory: [],
       uncounted: [parseMoney('11', 'USD')],
     } as MoneyMonthView

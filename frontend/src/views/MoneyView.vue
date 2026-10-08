@@ -11,6 +11,7 @@
           v-if="accountsNow"
           :totals="accountsNow.totals"
           :live="accountsNow.live"
+          :as-of="accountsNow.asOf"
         />
 
         <div class="month">
@@ -69,7 +70,7 @@
           <!-- The answer's shape (MOL-178, MOL-183): the month's card — its figure where the
                answer's stands, its tiles where the plate is — then «Куда ушли». -->
           <ScreenSkeleton v-if="phase === 'loading'">
-            <SkeletonPart kind="figure" approx plate />
+            <SkeletonPart kind="figure" :approx="twoCurrencies" plate />
             <!-- «Куда ушли» is the screen's own: a ring and three lines beside it. -->
             <AppCard class="ghost-donut">
               <span class="ghost-heading"><span class="ghost-bar ghost-caption"></span></span>
@@ -90,7 +91,7 @@
             inline
             :title="t('spending.load_error.title')"
             :body="t('spending.load_error.body')"
-            @retry="retry"
+            @retry="retryAll"
           />
 
           <!-- «Можно записать и сейчас» only where the strip offers it (Е-7). -->
@@ -216,7 +217,7 @@ import SpendingSheet from '@/components/SpendingSheet.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
-import { pageOrder } from '@/components/accounts'
+import { countedWhen, pageOrder } from '@/components/accounts'
 import { budgetAmount } from '@/components/spending'
 import { useMoneyScreen } from '@/composables/useMoneyScreen'
 import { useReconnect } from '@/composables/useReconnect'
@@ -270,10 +271,35 @@ export default defineComponent({
      * phone. With none, or no answer of «Счета» at all, «Счета» is a row among the ways out instead.
      */
     const accountsNow = computed(() => {
-      const totals = accounts.overview?.incomeTotals
-      const live = accounts.overview ? pageOrder(accounts.accounts).length : 0
-      return totals && live > 0 ? { totals, live } : null
+      const overview = accounts.overview
+      const totals = overview?.incomeTotals
+      const live = overview ? pageOrder(accounts.accounts).length : 0
+      if (!overview || !totals || live === 0) return null
+      // Not «now» while what is shown is kept from before — offline, or «Счета» did not answer: it
+      // names its hour, as «Счета» do (adversarial А3). Kept while a read is on its way is «now» yet.
+      const stale = accounts.stale === 'offline' || accounts.stale === 'error'
+      return {
+        totals,
+        live,
+        asOf: stale ? countedWhen(overview.countedAt, locale.value) : null,
+      }
     })
+
+    /**
+     * «≈ 63 800 ₽» under the figure is there only where the two currencies differ: the skeleton draws
+     * its line by the person's currencies, as «Счета» last said them (adversarial А5) — with nothing
+     * kept, by the usual case.
+     */
+    const twoCurrencies = computed(() => {
+      const overview = accounts.overview
+      return overview?.incomeTotals?.currency !== overview?.spendCurrency
+    })
+
+    /** «Повторить» asks «Счета» again too: the server that broke the month broke them as well (А2). */
+    function retryAll(): Promise<void> {
+      void accounts.refresh()
+      return screen.retry()
+    }
 
     /**
      * «Пусто» is somebody with nothing yet — no spending, no trip, no income (Р-6). The server
@@ -368,6 +394,8 @@ export default defineComponent({
       t,
       IconWallet,
       accountsNow,
+      twoCurrencies,
+      retryAll,
       newcomer,
       refusedHere,
       entries,

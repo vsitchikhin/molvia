@@ -594,6 +594,8 @@
       "accounts_spendable": "можно тратить ≈ {amount}",
       "accounts_count": "{n} счёт | {n} счёта | {n} счетов",
       "accounts_now_label": "Счета: на счетах сейчас ≈ {amount}, можно тратить ≈ {spendable}",
+      "accounts_then": "На счетах на {when}",
+      "accounts_then_label": "Счета: на счетах на {when} ≈ {amount}, можно тратить ≈ {spendable}",
       "donut_more": "Ещё {n} сектор — в «Графиках» | Ещё {n} сектора — в «Графиках» | Ещё {n} секторов — в «Графиках»",
       "donut_label": "Куда ушли: {list}. Открыть графики",
       "donut_later": "Доли появятся, когда месяц обновится",

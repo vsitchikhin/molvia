@@ -594,6 +594,8 @@
       "accounts_spendable": "free to spend ≈ {amount}",
       "accounts_count": "{n} account | {n} accounts",
       "accounts_now_label": "Accounts: in accounts now ≈ {amount}, free to spend ≈ {spendable}",
+      "accounts_then": "In accounts as of {when}",
+      "accounts_then_label": "Accounts: in accounts as of {when} ≈ {amount}, free to spend ≈ {spendable}",
       "donut_more": "{n} more slice in Charts | {n} more slices in Charts",
       "donut_label": "Where it went: {list}. Open charts",
       "donut_later": "Shares appear once the month is refreshed",

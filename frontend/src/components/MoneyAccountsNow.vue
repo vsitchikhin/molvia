@@ -2,7 +2,7 @@
   <AppCard class="now">
     <RouterLink class="open" :to="{ name: 'money-accounts' }" :aria-label="label">
       <span class="words">
-        <span class="caption">{{ t('spending.summary.accounts_now') }}</span>
+        <span class="caption">{{ caption }}</span>
         <span class="figure" :class="{ negative: totals.total.minor < 0n }">
           ≈ {{ signed(totals.total) }}
         </span>
@@ -36,7 +36,11 @@ type IncomeTotals = NonNullable<MoneyAccountsResponse['incomeTotals']>
  * the one way into «Счета». «Now», not the month's: it does not move as the months are turned. The
  * figures are the server's (`incomeTotals`, В-19), the same balances «Счета» add up in the spending
  * currency; an account nothing converts today is left out and said under them, as on «Счета». Below
- * zero is «плохо» (С-17, MOL-116).
+ * zero is «плохо» (С-17, MOL-116). Kept from before — offline, or «Счета» did not answer — it names
+ * the hour they were counted at instead of «сейчас» (adversarial А3).
+ *
+ * **A card that is a link, as «Куда ушли», not a `NavRow`** (self-review Р2-3): the row is 52 high
+ * with a label and a value, and the figure of 28 with a line under it is no row.
  */
 export default defineComponent({
   name: 'MoneyAccountsNow',
@@ -45,22 +49,35 @@ export default defineComponent({
     totals: { type: Object as PropType<IncomeTotals>, required: true },
     /** How many live accounts there are: «5 счетов». */
     live: { type: Number, required: true },
+    /**
+     * When the figures were counted, if they are kept from before — offline, or «Счета» did not
+     * answer: «На счетах на 24 сент., 14:05», never «сейчас» (adversarial А3). Null — they are now.
+     */
+    asOf: { type: String as PropType<string | null>, default: null },
   },
   setup(props) {
     const { t, locale } = useI18n()
     const signed = (value: Money) => signedAmount(value, locale.value, { estimate: true })
     // The name the link is read by: what it leaves out too — heard without it, the figure sounded whole.
     const label = computed(() => {
-      const words = t('spending.summary.accounts_now_label', {
+      const figures = {
         amount: signed(props.totals.total),
         spendable: signed(props.totals.spendable),
-      })
+      }
+      const words = props.asOf
+        ? t('spending.summary.accounts_then_label', { ...figures, when: props.asOf })
+        : t('spending.summary.accounts_now_label', figures)
       const missing = props.totals.uncounted
       return missing > 0
         ? `${words}. ${t('accounts.screen.uncounted', { n: missing }, missing)}`
         : words
     })
-    return { t, signed, label }
+    const caption = computed(() =>
+      props.asOf
+        ? t('spending.summary.accounts_then', { when: props.asOf })
+        : t('spending.summary.accounts_now'),
+    )
+    return { t, signed, label, caption }
   },
 })
 </script>

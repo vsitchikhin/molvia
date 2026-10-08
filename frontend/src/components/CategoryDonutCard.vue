@@ -174,7 +174,9 @@ export default defineComponent({
     })
     /** «0 ֏» in the dashed ring — only where it is true: nothing spent and nothing waiting a rate. */
     const zero = computed(() =>
-      props.month.spent.minor === 0n && sectors.value.every(({ level }) => level === 0)
+      props.month.spent.minor === 0n &&
+      waiting.value === null &&
+      sectors.value.every(({ level }) => level === 0)
         ? formatEstimate(props.month.spent, locale.value)
         : null,
     )

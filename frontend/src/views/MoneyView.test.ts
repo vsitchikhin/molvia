@@ -377,6 +377,31 @@ describe('MoneyView: the month', () => {
       ).toBe('−100% vs the same day of August')
     })
 
+    // Adversarial А4: «−100 %» says nothing was spent, and the ring beside it says something was.
+    it('must not fire: «−100 %» over a spending on its way or one waiting a rate', async () => {
+      const zero = {
+        ...empty(),
+        previousSpent: amd('20000'),
+        previousToDay: { day: 15, spent: amd('20000') },
+      }
+      expect(await change({ ...zero, uncounted: [parseMoney('11', 'USD')] })).toBeNull()
+
+      moneyMonth.mockResolvedValue(month(zero))
+      recordSpending.mockReturnValue(new Promise(() => undefined))
+      const view = await render()
+      expect(plain(view.get('.change').text())).toBe('−100% vs the same day of August')
+      useSpendingQueueStore().record({
+        id: 'eeeeeeee-0000-4000-8000-00000000000e',
+        spentOn: '2026-09-27',
+        amount: amd('1500'),
+        categoryId: BEAUTY,
+        note: 'Taxi',
+      })
+      await flushPromises()
+      expect(view.text()).toContain('Not counted yet: 1 spending is being sent')
+      expect(view.find('.change').exists()).toBe(false)
+    })
+
     it('must not fire: an answer kept from before the field says nothing, never «vs August» whole', async () => {
       expect(await change({ previousToDay: null })).toBeNull()
     })
@@ -1057,6 +1082,77 @@ describe('MoneyView: «На счетах сейчас»', () => {
     const view = await render()
     expect(view.find('.now').exists()).toBe(false)
     expect(ways(view)).toContain('/money/accounts')
+  })
+
+  // Adversarial А3: kept from before, the figures name their hour, as «Счета» do — never «сейчас».
+  it('kept from before, it names the hour «Счета» answered at: the server failed, or offline', async () => {
+    vi.setSystemTime(new Date('2026-09-24T08:00:00Z'))
+    moneyAccounts.mockResolvedValue(overview({ countedAt: new Date('2026-09-24T08:00:00Z') }))
+    moneyMonth.mockResolvedValue(month())
+    ;(await render()).unmount()
+
+    vi.setSystemTime(new Date('2026-09-27T08:00:00Z'))
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const failing = await render()
+    const card = plain(failing.get('.now').text())
+    expect(card).toContain('In accounts as of Sep 24')
+    expect(card).not.toContain(en.spending.summary.accounts_now)
+    expect(failing.get('.now a').attributes('aria-label')).toContain('in accounts as of Sep 24')
+    failing.unmount()
+
+    online(false)
+    moneyAccounts.mockRejectedValue(new TypeError('network'))
+    moneyMonth.mockRejectedValue(new TypeError('network'))
+    const offline = await render()
+    expect(plain(offline.get('.now').text())).toContain('In accounts as of Sep 24')
+  })
+
+  it('must not fire: kept and being read again, it is still «now» — no hour flickers at every opening', async () => {
+    moneyAccounts.mockResolvedValue(overview())
+    moneyMonth.mockResolvedValue(month())
+    ;(await render()).unmount()
+    moneyAccounts.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    expect(plain(view.get('.now').text())).toContain(en.spending.summary.accounts_now)
+  })
+
+  // Adversarial А2: the server that broke the month broke «Счета» too, and «Повторить» asks both.
+  it('«Повторить» of the month asks «Счета» again too', async () => {
+    moneyAccounts.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL)).mockResolvedValue(overview())
+    moneyMonth.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL)).mockResolvedValue(month())
+    const view = await render()
+    expect(view.find('.now').exists()).toBe(false)
+    await button(view, en.state.retry).trigger('click')
+    await flushPromises()
+    expect(moneyAccounts).toHaveBeenCalledTimes(2)
+    expect(view.find('.now').exists()).toBe(true)
+    expect(ways(view)).not.toContain('/money/accounts')
+  })
+
+  // Adversarial А5: the skeleton's «≈» line is the two currencies' — one currency has none.
+  it('the skeleton draws «≈» under the figure only where the two currencies differ', async () => {
+    const lines = async (accounts: MoneyAccountsResponse) => {
+      moneyAccounts.mockResolvedValue(accounts)
+      moneyMonth.mockReturnValue(new Promise(() => undefined))
+      const view = await render()
+      return view.find('.sum-card .approx-line').exists()
+    }
+    expect(await lines(overview())).toBe(true)
+    expect(
+      await lines(
+        overview({
+          incomeTotals: {
+            currency: 'AMD',
+            total: amd('1000'),
+            spendable: amd('1000'),
+            savings: amd('0'),
+            uncounted: 0,
+          },
+        }),
+      ),
+    ).toBe(false)
+    // Nothing known of the accounts: the usual case, two currencies.
+    expect(await lines(noAccounts())).toBe(true)
   })
 
   it('stands by the month’s error and its skeleton: it has an answer of its own', async () => {
