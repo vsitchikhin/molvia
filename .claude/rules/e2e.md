@@ -3,6 +3,7 @@ paths:
   - 'e2e/**'
   - 'playwright.config.ts'
   - 'bin/e2e-database.mjs'
+  - 'frontend/vite.config.ts'
 ---
 
 # End-to-end: where it runs, its database, its ports, the login seam, the camera, traces, the live region
@@ -107,7 +108,48 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   retries to write one. It is recorded for every test and dropped when it passes, which costs
   12–22 % of a full local run (measured in four pairs); and under an overload that times a test
   out, the trace may still be lost: it is saved while the context is torn down, and that teardown
-  shares the test's timeout.
+  shares the test's timeout. **In CI the retry's, and the first attempt's only where a spec asks
+  for it** (MOL-217, owner's choice on review С-6): `on-first-retry` records the retry, which a flake
+  passes, and the failure itself leaves only its message — `verdicts.spec` failed four times so.
+  Recorded for every test, the first attempt's ran 13.2 to 15.8 minutes (15.6 and 15.8 with the
+  screencast, 13.2 and 15.5 without) against a median of 9.6 and a spread of 9.3–12.8 before it — four
+  runs of a runner that wanders, so a cost likely rather than measured; a spec that needs it says
+  `test.use({ trace: { mode: 'retain-on-first-failure', screenshots: false } })` under `CI`, as
+  `verdicts.spec` does. Not without the DOM of each step: Playwright records the network only with
+  those snapshots, and the network — which request left and how it ended — is what a flake's trace is
+  for. Whatever there is goes up from `test-results/` when the job fails; the artifact used to be
+  `playwright-report/`, which the `github` reporter never writes.
+- **The dev server optimizes every package on its start, never in the middle of a run** (MOL-217):
+  what only a worker imports stands in `optimizeDeps.include` of `vite.config.ts`, held by
+  `optimizeDeps.test.ts`. Vite's first crawl reads the pages and never a worker, so `zxing-wasm` was
+  found when the first spec of `camera` opened the scanner — while the last file of `phone` was running
+  beside it — and the pages loading then waited on the optimizer. It stood seconds before four failures
+  of «…and the app closed» and was first taken for their cause; the fifth came without it (below).
+  Locally the cache is warm, so it was never seen here; a run that wants to see it removes
+  `frontend/node_modules/.vite/deps`.
+- **A page offline is closed only after the app has left it; where a spec then says what the server
+  did not get, the offline is `goOffline`** (`e2e/session.ts`, MOL-217). The traces of the first
+  attempts of the fifth and sixth failures (runs 37619569005, 37743449964 — the sixth with
+  `page.route` already refusing): the rating's `PUT` was refused in the page, and some 35 ms after
+  `page.close()` the API got a `GET /verdicts/pending` and the `PUT` together — what the app sends
+  when it hears `online`. So the close is the hole: it takes the route and the emulation off a page
+  whose app still runs, the page hears `online` and sends the draft past both. Read so from the logs
+  of all six failures (the pair stands in each), not reproduced here — the Mac closes a page too fast.
+  The spec takes the app away first, `page.goto('about:blank')` under the route, then counts, then
+  closes. The phone itself, told the write failed, keeps its draft as it should. So `goOffline` is
+  `setOffline` — the page's `navigator.onLine` and its states — **and `page.route` refusing every
+  request of that page with `internetdisconnected`**: Playwright fails it before the network, and the
+  page sees the same error — the route set before the offline, so nothing slips between them. That
+  page only: a new one of the context is online when the context is; on the same page the connection
+  comes back only by the function `goOffline` returns, the route off first — `setOffline(false)` leaves
+  it refusing. **Which specs take it was found by the mechanism itself** (adversarial round 8): every
+  spec with `setOffline` run with writes let through to the API while the page is told they failed —
+  only «…and the app closed» and the trip «started with no connection» (`trip.spec`) fell, both saying
+  what the server has not got, and both take `goOffline`; the rest assert the phone's own state or
+  what went once the connection came back, a write being safe to repeat. A new spec that says «the
+  server did not get it» takes it too; the harness is
+  `.scratch/tasks/selftests/MOL-217-adversarial-round-8-leak.cjs`. The readings of the four failures
+  before, both refuted by the trace — `.scratch/tasks/status/MOL-217/readings.md`.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**
   (MOL-64). The app has one polite region, in `App.vue` above the router, and **eight things write
   to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { POLICY_VERSION, SESSION_COOKIE } from '@molvia/model'
-import type { Page, Request, Response } from '@playwright/test'
+import type { Page, Request, Response, Route } from '@playwright/test'
 
 /**
  * Как тест ходит в API от лица той же личности, что и страница (MOL-53).
@@ -169,4 +169,28 @@ export async function asBrowser(page: Page): Promise<Record<string, string>> {
   const session = cookies.find((cookie) => cookie.name === SESSION_COOKIE)
   expect(session, 'браузер не вошёл: cookie сессии нет').toBeDefined()
   return { cookie: `${SESSION_COOKIE}=${session?.value ?? ''}` }
+}
+
+/**
+ * Связь пропала — и ни один запрос страницы не уйдёт (MOL-217). Отдаёт возврат связи на ту же страницу.
+ *
+ * `setOffline` даёт странице `navigator.onLine === false` и отказы — но одной эмуляции спека «сервер не
+ * получил» не держится, поэтому каждому запросу этой страницы отказывает ещё и сам Playwright, до сети,
+ * той же ошибкой; маршрут встаёт раньше офлайна, чтобы и между ними ничего не ушло (ревью С-15).
+ * **Закрывать такую страницу — только уведя приложение (`about:blank`)**: `page.close()` снимает с ещё
+ * живой страницы и маршрут, и офлайн, и в CI она услышала `online` и отправила черновик (прогоны
+ * 37619569005, 37743449964 — пара `pending` + `PUT` через ~35 мс после закрытия). Только эта
+ * страница: новая из того же контекста — уже со связью, когда её вернут. Брать там, где спека дальше
+ * утверждает, чего сервер не получил; связь на этой странице возвращает только отданная функция —
+ * `setOffline(false)` маршрута не снимет (ревью С-16).
+ */
+export async function goOffline(page: Page): Promise<() => Promise<void>> {
+  const refuse = (route: Route) => route.abort('internetdisconnected')
+  await page.route('**/*', refuse)
+  await page.context().setOffline(true)
+  return async () => {
+    // Сначала маршрут: услышав `online`, страница шлёт свои очереди, и они должны дойти до сети.
+    await page.unroute('**/*', refuse)
+    await page.context().setOffline(false)
+  }
 }
