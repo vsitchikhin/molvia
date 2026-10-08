@@ -120,6 +120,7 @@ describe('the night on the seed', () => {
     expect(report.merged).toBe(TWINS.length + SAME_PLACE.length)
   })
 
+  // Four nights with the real model: 3–4 s on a CI runner, past vitest's 5 s on a busy one.
   it('names what the model cannot judge, ten a morning, and merges none of it', async () => {
     // Ten a morning, the rest on the mornings after (review №2): read them all, as the owner would.
     const merges = createMergeRepository(db)
@@ -141,7 +142,7 @@ describe('the night on the seed', () => {
     ]) {
       expect(pairs).not.toContain(pair.sort().join(' ~ '))
     }
-  })
+  }, 60_000)
 
   it('never merges two sizes the search key would fold into one', async () => {
     const merged = await db.execute<{ name: string }>(sql`
