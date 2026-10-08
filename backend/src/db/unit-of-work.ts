@@ -29,6 +29,8 @@ import { createReceiptRepository } from './receipts-repository'
 import type { ReceiptRepository } from './receipts-repository'
 import { createStoreMemoryRepository } from './store-memory-repository'
 import type { StoreMemoryRepository } from './store-memory-repository'
+import { createTransferRepository } from './transfers-repository'
+import type { TransferRepository } from './transfers-repository'
 import { createTripRepository } from './trips-repository'
 import type { TripRepository } from './trips-repository'
 
@@ -57,6 +59,8 @@ export interface TripRepositories {
   readonly money: MoneyRepository
   /** Where the money lies (MOL-115): the accounts, their operations and checks. */
   readonly moneyAccounts: MoneyAccountRepository
+  /** Money moved between two of the person's accounts of one currency, with its fee (MOL-253). */
+  readonly transfers: TransferRepository
   /** What the person plans a month at (MOL-117): «Бюджет», counted against the month above. */
   readonly budgetPlans: BudgetPlanRepository
   /** Receipts read on our server (MOL-125), recorded as a trip in one go (MOL-126). */
@@ -80,6 +84,7 @@ export function tripRepositories(conn: Conn): TripRepositories {
     spendingCategories: createSpendingCategoryRepository(conn),
     money: createMoneyRepository(conn),
     moneyAccounts: createMoneyAccountRepository(conn),
+    transfers: createTransferRepository(conn),
     budgetPlans: createBudgetPlanRepository(conn),
     receipts: createReceiptRepository(conn),
     storeMemory: createStoreMemoryRepository(conn),

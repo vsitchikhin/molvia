@@ -421,6 +421,13 @@
       "when": 1791390153241,
       "tag": "0059_tax_receipt_days",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1791447383736,
+      "tag": "0060_account_transfers",
+      "breakpoints": true
     }
   ]
 }

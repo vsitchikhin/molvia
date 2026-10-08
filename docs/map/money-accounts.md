@@ -21,7 +21,8 @@ Rules: `.claude/rules/money-accounts.md`. A test beside its source, or mirroring
 
 ## backend · db
 
-- `backend/src/db/money-accounts-repository.ts` — Repository of accounts: the accounts, operations of all four kinds in one shape, the checks and the account of a trip. Tests: `backend/tests/money-accounts.integration.test.ts`.
+- `backend/src/db/money-accounts-repository.ts` — Repository of accounts: the accounts, operations of all five kinds in one shape, the checks and the account of a trip. Tests: `backend/tests/money-accounts.integration.test.ts`.
+- `backend/src/db/transfers-repository.ts` — Repository of transfers (MOL-253): add with repeat/conflict under the owner's lock, amend with versions, mark-remove and restore — each with its fee, a row of `spendings`. Tests: `backend/tests/erasure.integration.test.ts`.
 
 ## backend · tests
 

@@ -11,6 +11,7 @@ import { yerevanWeek } from './yerevan-week'
  * table that references an owner cannot join the schema without joining erasure too.
  */
 export const ACTOR_REFERENCES = [
+  'account_transfers.actor_id',
   'budget_plans.actor_id',
   'catalogue_merge_moves.actor_id',
   'events.actor_id',
@@ -46,6 +47,7 @@ export const ERASED_TABLES = [
   'exchanges',
   'incomes',
   'spendings',
+  'account_transfers',
   'receipts',
   'budget_plans',
   'spending_categories',
@@ -144,6 +146,7 @@ export function createErasureRepository(db: Db): ErasureRepository {
             exchanges: 0,
             incomes: 0,
             spendings: 0,
+            account_transfers: 0,
             receipts: 0,
             budget_plans: 0,
             spending_categories: 0,
@@ -219,6 +222,11 @@ export function createErasureRepository(db: Db): ErasureRepository {
             // pointed at, and the rates the person's closed months were frozen at.
             erased.spendings = await count(
               sql`delete from spendings where actor_id = ${actorId} returning 1`,
+            )
+            // Transfers between the person's accounts (MOL-253), after the spendings that were their
+            // fees, so those are counted as spendings; their versions go by the cascade.
+            erased.account_transfers = await count(
+              sql`delete from account_transfers where actor_id = ${actorId} returning 1`,
             )
             // Receipts photographed (MOL-125), removed ones too: the photo, the lines read and the
             // lines cut out for the reader's training go by the cascade — part of a receipt.
