@@ -2496,3 +2496,14 @@ two balances».
 отпускал подвал вместе с ошибкой и «Повторить». В ките — «Длинная
 шторка», e2e на `phone` и `iphone`. Требования и план — `.scratch/tasks/{requirements,plans}/MOL-182.md`, артефакт —
 `.lavish/mol-182-plan.html`; правило — `.claude/rules/frontend.md`, «A sheet's footer is pinned».
+
+## Старшая и младшая в одну миллисекунду (MOL-252)
+
+**Флейк `merge-command` «lists every candidate…» — тест не давал позициям момента** (баг, 1 SP; решения
+владельца 08.10.2026). Две вставки подряд ставили `created_at` через `now()`, а склейка читает его как
+`Date` JS — с точностью до миллисекунды; попав в одну, пара считалась созданной в одно мгновение, и
+старшую выбирал меньший uuid — в CI младшая. Правило не тронуто (В-1): ночь и `make merge --list`
+решают одинаково, а ничья по uuid задумана для сида. Момент получили обе пары older/younger —
+в `merge-command` и в `merge.integration`, после всех `made`, чтобы порядок остальных тестов не
+сдвинулся. Требования и план — `.scratch/tasks/{requirements,plans}/MOL-252.md`, артефакт —
+`.lavish/mol-252-plan.html`; правило — `.claude/rules/search.md`, «The older survives».
