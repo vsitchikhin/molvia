@@ -197,8 +197,10 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   then, and a newer removal's strip takes the older one's place (С-3, С-6). **Only a write that happened
   makes the removal before it final** — the server purges after `add` and `amend`, never before: a
   refused write left the strip standing over a transfer already gone (adversarial А7). A transfer
-  removed on another phone answers its amendment 404, said as such with nothing to retry (А8) — and so
-  does a row opened on it (А11) — by the API's own word only: a bare 404 is a shop's portal (А10); that, and
+  removed answers its amendment 404, said with nothing to retry (А8) — and so does a row opened on it
+  (А11) — by the API's own word only, a bare 404 being a shop's portal (А10), and with no cause the
+  phone cannot know: removed on another phone and here a moment ago, which «Вернуть» still brings back,
+  are one 404 (А12); that, and
   «already written», read «Счета» and move `accounts.transfers` like any write (Р2-1). Offline, a
   transfer that did not open says it opens with the connection and reads itself then (Р2-2).
   Every write answers with «Счета» whole, and `accounts.transfers` tells the journals and the month to

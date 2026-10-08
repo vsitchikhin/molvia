@@ -371,8 +371,8 @@ export default defineComponent({
         if (props.open && props.editingId === id) fill(transfer)
       } catch (caught) {
         if (props.open && props.editingId === id) {
-          // Removed on another phone while this journal was not read again: said as such, no
-          // «Повторить» that would get the same 404 for ever, and the journal read again (А11).
+          // Removed while this journal was not read again — said with no cause it cannot know (А12),
+          // no «Повторить» that would get the same 404 for ever, and the journal read again (А11).
           if (caught instanceof ApiError && caught.answered && caught.code === ERROR.NOT_FOUND) {
             unread.value = 'gone'
             void transfers.heard()
@@ -583,8 +583,8 @@ export default defineComponent({
             failure.value = 'failed'
           }
         } else if (code === ERROR.NOT_FOUND && said && editing.value) {
-          // Removed on another phone: there is nothing to save, and saying «try again» would loop
-          // for ever (adversarial А8). Its rows go from the journal under the sheet.
+          // Removed — on another phone, or here a moment ago, which no 404 tells apart (А12): there is
+          // nothing to save, and «try again» would loop for ever (А8). Its rows go from the journal.
           failure.value = 'vanished'
           void transfers.heard()
         } else {
