@@ -2139,6 +2139,27 @@ describe('a sign OCR read as a digit (MOL-246)', () => {
     },
   )
 
+  it('names the last resort’s price: a way without slices shuts the right slice out (review Е1)', () => {
+    // 1 000 + 760 + 6 200 = 7 960 in two places, «=760,00» read «2760,00»: the cheese read right is bent
+    // by two swaps to 5 200,00 so the bread’s rest, 1 760,00, looks like «276000» — as master reads it,
+    // both lines one look; the slice, 760,00 beside the cheese as read, is never tried
+    const text = cheese(
+      '2760,00/0,00 760',
+      '6200,00/0,00 6200',
+      'Ընդամենը 7960.00',
+      'Կանխիկ 7960.00',
+    )
+    expect(shown(bestReading([rowsOf(text, 0), rowsOf(text, 0)]))).toEqual([
+      [
+        [100_000, true],
+        [176_000, false],
+        [520_000, false],
+      ],
+      796_000,
+      true,
+    ])
+  })
+
   it('must not rank a reading met only by its slice above one read right (review Д2)', () => {
     const misread = cheese('3119,00/0,00 119', null, 'Ընդամենը 1119.00')
     const right = cheese('3119,00/0,00 3119', null, 'Ընդամենը 1119.00')
