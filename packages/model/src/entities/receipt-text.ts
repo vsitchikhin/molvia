@@ -119,17 +119,11 @@ function variants(text: string, depth = 2): string[] {
   return [...out]
 }
 
-// A till prints «=» before an amount and « 1» after a price, and OCR reads the sign as a digit:
-// «=119.00» as «2119.00», «119.00 1» as «119.001» (MOL-228, H9). An amount is tried without it too, at
-// the cost of one swap and with no other swap in it; never a count — «0,342» is a weight. An amount
-// never starts with a zero, so «10.00» gives no «0.00».
-function amountVariants(text: string): string[] {
-  const out = variants(text)
-  const front = /^\d([1-9]\d*[.,]\d{2})$/.exec(text)
-  if (front?.[1] !== undefined) out.push(front[1])
-  const back = /^(\d+[.,]\d{2})\d$/.exec(text)
-  if (back?.[1] !== undefined) out.push(back[1])
-  return [...new Set(out)]
+// A till prints «=» before an amount, and OCR reads the sign as a digit: «=119.00» as «2119.00»
+// (MOL-228, H9). The amount without it, if it is one: never nothing, a line's sum is never zero.
+function signless(text: string): string | null {
+  const rest = /^\d(\d+[.,]\d{2})$/.exec(text)?.[1]
+  return rest === undefined || hundredthsOf(rest) === 0 ? null : rest
 }
 
 const diff = (a: string, b: string): number =>
@@ -157,21 +151,21 @@ const TOLERANCE_HUNDREDTHS = 3
  * Past this many combinations a line's figures are taken as read, with no reading tried: the
  * search grows as a power of the digits OCR can confuse in every field, and it runs in the API's
  * process — twelve glued twelve-digit figures held it for half a minute (review, MOL-125). The
- * bench's worst line has 56 628 (am-03), a quarter of it.
+ * bench's worst line has 55 176 (am-03), a quarter of it.
  */
 export const LINE_COMBINATIONS_MAX = 200_000
 
 /**
  * And past this many over one reading the lines left are taken as read: a line under the ceiling
  * still costs a tenth of a second, and twelve of them stalled every request of the API for one. The
- * bench's busiest reading tries 132 520 (am-03).
+ * bench's busiest reading tries 122 161 (am-03).
  */
 export const READING_COMBINATIONS_MAX = 300_000
 
 /**
  * What every line may try whatever the reading has spent (review Р15): rows of an item's shape above
  * the list — a stamp, a code, a smudge — would otherwise drain the budget before the first item, and
- * every real line would keep its confusions. A real line tries a few thousand (am-05: 1 848 at most).
+ * every real line would keep its confusions. A real line tries a few thousand (am-05: 1 694 at most).
  * The floors draw on a budget of their own (review Р18), or four hundred rows of junk under it would
  * buy seconds again.
  */
@@ -198,6 +192,9 @@ function afford(budget: Budget, combinations: number): boolean {
   return false
 }
 
+const holds = (qty: number, paid: number, disc: number, price: number): boolean =>
+  Math.abs(paid + disc - Math.round((qty * price) / 1000)) <= TOLERANCE_HUNDREDTHS
+
 // One pass over the figures of a line: every combination that satisfies paid + discount =
 // quantity × price is a candidate; the receipt's own discount rate then picks among them (a card
 // discount is one percentage), and after it the fewest swaps.
@@ -210,9 +207,9 @@ function candidates(
 ): Candidate[] {
   const out: Candidate[] = []
   const qtys = variants(qtyS)
-  const paids = [paidS, ...dropGroup(paidS)].map((p0) => ({ p0, all: amountVariants(p0) }))
-  const discs = amountVariants(discS)
-  const prices = priceS === null ? [null] : amountVariants(priceS)
+  const paids = [paidS, ...dropGroup(paidS)].map((p0) => ({ p0, all: variants(p0) }))
+  const discs = variants(discS)
+  const prices = priceS === null ? [null] : variants(priceS)
   const combinations =
     qtys.length * paids.reduce((n, p) => n + p.all.length, 0) * discs.length * prices.length
   if (!afford(budget, combinations)) return out
@@ -232,7 +229,7 @@ function candidates(
               diff(pr ?? '', priceS ?? '') +
               (p0 !== paidS ? 1 : 0) +
               (pr === null ? 1 : 0)
-            if (Math.abs(paid + disc - Math.round((qty * price) / 1000)) <= TOLERANCE_HUNDREDTHS) {
+            if (holds(qty, paid, disc, price)) {
               out.push({ qty, paid, disc, price, swaps, rate: disc / (paid + disc) })
             }
           }
@@ -242,6 +239,35 @@ function candidates(
   }
   return out
 }
+
+/**
+ * The line's sum or its price read without the sign before it (MOL-246), every other figure as read:
+ * tried only where no reading of the line holds (review, MOL-246). Beside the swaps, a price that lost
+ * a digit beat the sum's own swap at the same cost — 1500 × 3 read «=1500» became 500 × 3 — and with
+ * swaps of the other figures it «fixed» all three of one line.
+ */
+function sliced(
+  budget: Budget,
+  qtyS: string,
+  paidS: string,
+  discS: string,
+  priceS: string | null,
+): Candidate[] {
+  if (priceS === null) return []
+  const tries = [
+    [signless(paidS), priceS],
+    [paidS, signless(priceS)],
+  ].filter((t): t is [string, string] => t[0] !== null && t[1] !== null)
+  if (!afford(budget, tries.length)) return []
+  const [qty, disc] = [milliOf(qtyS), hundredthsOf(discS)]
+  return tries
+    .map(([p, pr]) => ({ paid: hundredthsOf(p), price: hundredthsOf(pr) }))
+    .filter(({ paid, price }) => holds(qty, paid, disc, price))
+    .map(({ paid, price }) => ({ qty, paid, disc, price, swaps: 1, rate: disc / (paid + disc) }))
+}
+
+// What a reading may still spend: a search it paid for spent some, one past its ceiling none.
+const funds = (budget: Budget): number => budget.left + budget.floors
 
 function mode(values: readonly number[]): number | null {
   const counts = new Map<number, number>()
@@ -538,8 +564,8 @@ interface Found {
 // comes out in whole grams — at a cost of two swaps, so a readable weight always wins.
 function byWeight(budget: Budget, paidS: string, priceS: string): Candidate[] {
   const out: Candidate[] = []
-  const paids = amountVariants(paidS)
-  const prices = amountVariants(priceS)
+  const paids = variants(paidS)
+  const prices = variants(priceS)
   if (!afford(budget, paids.length * prices.length)) return out
   for (const p of paids) {
     for (const pr of prices) {
@@ -665,11 +691,14 @@ function cardReceipt(rows: readonly TextRow[]): Laid {
   const printedTotal = TOTAL.exec(text)
   const total = printedTotal?.[1] === undefined ? null : hundredthsOf(printedTotal[1])
   const budget: Budget = { left: READING_COMBINATIONS_MAX, floors: FLOOR_COMBINATIONS_MAX }
-  const lists = found.map((f) =>
-    f.plain !== null
-      ? plainCandidates(budget, f)
-      : candidates(budget, f.qtyS, f.paidS, f.discS, f.priceS),
-  )
+  const lists = found.map((f) => {
+    if (f.plain !== null) return plainCandidates(budget, f)
+    const before = funds(budget)
+    const out = candidates(budget, f.qtyS, f.paidS, f.discS, f.priceS)
+    return out.length === 0 && funds(budget) < before
+      ? sliced(budget, f.qtyS, f.paidS, f.discS, f.priceS)
+      : out
+  })
   const tin = /(\d{8})\b/.exec(/ՀՎՀՀ.{0,4}:?\s*\S+|:\s*0\d{7}/.exec(text)?.[0] ?? '')?.[1] ?? null
   const judge = (byTotal: boolean): ReceiptText => {
     const { picks, balanced, blankSum, doubt } = judged(
@@ -1041,16 +1070,23 @@ function classCandidates(budget: Budget, f: ClassFigures, guessed: Set<Candidate
     f.qtyS === null
       ? Array.from({ length: 20 }, (_, q) => ({ text: String(q + 1), cost: 0 }))
       : read(f.qtyS, f.weighed ? 3 : 1, false).filter((q) => f.terminal || q.cost === 0)
-  const out: Candidate[] = []
-  for (const sum of sums) {
-    for (const price of prices) {
-      for (const qty of qtys) {
-        for (const x of candidates(budget, qty.text, sum.text, '0', price.text)) {
-          out.push({ ...x, swaps: x.swaps + sum.cost + price.cost + qty.cost })
+  const every = (find: typeof candidates): Candidate[] => {
+    const found: Candidate[] = []
+    for (const sum of sums) {
+      for (const price of prices) {
+        for (const qty of qtys) {
+          for (const x of find(budget, qty.text, sum.text, '0', price.text)) {
+            found.push({ ...x, swaps: x.swaps + sum.cost + price.cost + qty.cost })
+          }
         }
       }
     }
+    return found
   }
+  const before = funds(budget)
+  const out = every(candidates)
+  // only where no reading holds, a sign read as a digit (MOL-246)
+  if (out.length === 0 && funds(budget) < before) out.push(...every(sliced))
   // no price read, or none that fits: the sum alone, at the count read — a line, not its arithmetic
   const sum = sums[0]
   if (out.length === 0 && sum !== undefined && (f.priceS === null || f.terminal)) {
