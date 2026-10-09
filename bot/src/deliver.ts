@@ -24,11 +24,13 @@ export class Flooded extends Error {}
 
 /**
  * What became of one message: sent, the person blocked the bot, refused for good (`failed` — the chat
- * is not there), or given up for now (`again` — the network, Telegram's own failure, a revoked token, a
- * second 429, a stop cutting the wait: it may well go later). The reminders and «чек разобран» lose
- * either; the message about a leak stops its batch on `again` and sends it the next minute (MOL-237).
+ * is not there), refused by Telegram as a request (`refused` — another 4xx: about this chat or about
+ * the message itself, which only the next person can tell), or given up for now (`again` — the
+ * network, Telegram's own failure, a revoked token, a second 429, a stop cutting the wait: it may well
+ * go later). The reminders and «чек разобран» lose all three; the message about a leak decides by
+ * them where its cursor may go (MOL-237).
  */
-export type Delivered = 'sent' | 'blocked' | 'failed' | 'again'
+export type Delivered = 'sent' | 'blocked' | 'failed' | 'refused' | 'again'
 
 /** A refusal that names the chat itself as gone: repeating it would be refused the same way. */
 function refusedForGood(error: unknown): boolean {
@@ -36,6 +38,19 @@ function refusedForGood(error: unknown): boolean {
     error instanceof GrammyError &&
     error.error_code === 400 &&
     /chat not found|user not found/i.test(error.description)
+  )
+}
+
+/**
+ * Telegram refused the request itself — a 4xx but the token's (401), a block (403) and the pace (429):
+ * it will be refused again, though whether for this chat or for every one is not said.
+ */
+function refusedRequest(error: unknown): boolean {
+  return (
+    error instanceof GrammyError &&
+    error.error_code >= 400 &&
+    error.error_code < 500 &&
+    ![401, 403, 429].includes(error.error_code)
   )
 }
 
@@ -74,7 +89,8 @@ export async function deliver(
       await blocked(api, telegramUserId, label)
       return 'blocked'
     }
-    return refusedForGood(error) ? 'failed' : 'again'
+    if (refusedForGood(error)) return 'failed'
+    return refusedRequest(error) ? 'refused' : 'again'
   }
 }
 

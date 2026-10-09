@@ -4,6 +4,7 @@ import type { Transformer } from 'grammy'
 import type { UserFromGetMe } from 'grammy/types'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
+import { BROADCAST_BATCH } from '@molvia/model'
 import type { DueBroadcast } from '@molvia/model'
 import { BROADCAST_GAP_MS, broadcastDue, startBroadcasts } from './broadcast'
 import { RETRY_AFTER_CAP_SECONDS } from './deliver'
@@ -171,7 +172,6 @@ describe('broadcastDue — рассылка об утечке (MOL-237)', () => 
     ['сеть', 'network'],
     ['Telegram 502', 502],
     ['отозванный токен 401', 401],
-    ['иной 400', 400],
   ] as const)(
     '%s на третьем — слово о двух первых, остаток со следующей минутой',
     async (_, refusal) => {
@@ -196,6 +196,87 @@ describe('broadcastDue — рассылка об утечке (MOL-237)', () => 
       )
     },
   )
+
+  // Adversarial Р2-А1: another 4xx is the chat's or the message's, and the next person tells which.
+  it('иной 400 на третьем, четвёртому ушло — третий «не дошло» навсегда, рассылка идёт дальше', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2, 3, 4]), batch(1, [5])])
+    const tg = telegram({ 3: 400 })
+    await broadcastDue(asClient(api), tg.api, noWait)
+    expect(api.broadcastDone.mock.calls.map(([report]) => report)).toEqual([
+      { id: 1, through: position(4), sent: 3, blocked: 0, failed: 1 },
+      { id: 1, through: position(5), sent: 1, blocked: 0, failed: 0 },
+    ])
+    expect(api.switchReminders).not.toHaveBeenCalled()
+  })
+
+  it('иной 400 у двоих подряд — это само сообщение: стоп до первого из них', async () => {
+    const { error } = quiet()
+    const api = client([batch(1, [1, 2, 3, 4, 5])])
+    const tg = telegram({ 3: 400, 4: 400 })
+    await broadcastDue(asClient(api), tg.api, noWait)
+    expect(tg.sentTo()).toEqual([1, 2, 3, 4])
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: position(2),
+      sent: 2,
+      blocked: 0,
+      failed: 0,
+    })
+    expect(error).toHaveBeenCalledWith(
+      '[molvia] broadcast: Telegram refused two in a row — the message itself, the rest goes with the next minute',
+    )
+  })
+
+  it('иной 400 у первого же и у второго — ничего не ушло, аренда отпущена', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2, 3])])
+    await broadcastDue(asClient(api), telegram({ 1: 400, 2: 400 }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ through: null, failed: 0 }),
+    )
+  })
+
+  it('иной 400 у последнего в рассылке (короткая пачка, проба себе) — «не дошло», рассылка кончается', async () => {
+    quiet()
+    const api = client([batch(1, [1])])
+    await broadcastDue(asClient(api), telegram({ 1: 400 }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: position(1),
+      sent: 0,
+      blocked: 0,
+      failed: 1,
+    })
+    expect(api.claimBroadcast).toHaveBeenCalledTimes(2)
+  })
+
+  it('иной 400 у последнего в полной пачке — он первым в следующей, где есть кому рассудить', async () => {
+    quiet()
+    const chats = Array.from({ length: BROADCAST_BATCH }, (_, index) => index + 1)
+    const api = client([batch(1, chats)])
+    await broadcastDue(asClient(api), telegram({ [BROADCAST_BATCH]: 400 }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledWith({
+      id: 1,
+      through: position(BROADCAST_BATCH - 1),
+      sent: BROADCAST_BATCH - 1,
+      blocked: 0,
+      failed: 0,
+    })
+  })
+
+  it('иной 400, за ним сбой, который пройдёт, — отказанный не судится: стоп до него', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2, 3, 4])])
+    await broadcastDue(asClient(api), telegram({ 2: 400, 3: 502 }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: position(1),
+      sent: 1,
+      blocked: 0,
+      failed: 0,
+    })
+  })
 
   it('сбой на первом — ни одного исхода: аренда отпущена, пачка уйдёт со следующей минутой', async () => {
     quiet()

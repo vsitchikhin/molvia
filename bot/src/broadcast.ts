@@ -1,6 +1,7 @@
 import type { Api } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
+import { BROADCAST_BATCH } from '@molvia/model'
 import type { DueBroadcast } from '@molvia/model'
 import { reportDefect } from './failure'
 import { Flooded, deliver, sleep } from './deliver'
@@ -27,18 +28,29 @@ const codeOf = (error: unknown): string =>
 const STOPPED_BY = {
   flood: '429 flood',
   again: 'a failure that may pass',
+  refused: 'Telegram refused two in a row — the message itself',
   stop: 'the bot stopping',
 } as const
 
 /**
  * One batch, in its order, then the word on it: everybody up to the last one done — sent, blocked
- * (`deliver` marks the block, MOL-103) or refused for good, the chat gone. **Nothing else moves the
- * cursor past a person** (adversarial А1): a failure that may pass — the network, Telegram's 5xx, a
- * revoked token, a second 429 — Telegram's flood control and the bot stopping each end the batch
- * there, the word covers the part that went, and the rest goes with the next minute; with nothing
- * gone the word only lets the lease go. A stop sends nothing more, so no volley without the pauses
- * meets a 429 it cannot wait out. `false` when the run stops here; a word that never arrives leaves
- * the batch to go again after its lease — better twice than never.
+ * (`deliver` marks the block, MOL-103) or not delivered for good. **Nothing else moves the cursor past a
+ * person** (adversarial А1): a failure that may pass — the network, Telegram's 5xx, a revoked token, a
+ * second 429 — Telegram's flood control and the bot stopping each end the batch there, the word covers
+ * the part that went, and the rest goes with the next minute; with nothing gone the word only lets the
+ * lease go. A stop sends nothing more, so no volley without the pauses meets a 429 it cannot wait out.
+ *
+ * **A request Telegram refuses (`refused`, another 4xx) is judged by the next person** (adversarial
+ * Р2-А1): it is about that one chat or about the message itself, and Telegram does not say which. The
+ * next one goes — it was the chat's, so that person is «не дошло» for good and the broadcast goes on;
+ * the next one is refused too — it is the message's, and the batch stops before the first of them, as
+ * it would for every one after. The last person of the broadcast has nobody after them — a batch
+ * shorter than a whole one is its end — and is not delivered for good: one refused request is not
+ * worth holding a finished broadcast for, nor the owner's try, which goes before the people's. A whole
+ * batch ending on one leaves them first in the next batch, where their next one is.
+ *
+ * `false` when the run stops here; a word that never arrives leaves the batch to go again after its
+ * lease — better twice than never.
  */
 async function sendBatch(
   api: MolviaBotClient,
@@ -49,6 +61,8 @@ async function sendBatch(
 ): Promise<boolean> {
   const counts = { sent: 0, blocked: 0, failed: 0 }
   let through: string | null = null
+  // a refused person whose verdict waits for the next one
+  let held: string | null = null
   let stopped: keyof typeof STOPPED_BY | null = null
   for (const [index, recipient] of batch.recipients.entries()) {
     // after the pause: a stop comes while waiting more often than not
@@ -73,8 +87,24 @@ async function sendBatch(
       stopped = 'again'
       break
     }
+    if (outcome === 'refused') {
+      if (held !== null) {
+        stopped = 'refused'
+        break
+      }
+      held = recipient.position
+      continue
+    }
+    if (held !== null) {
+      counts.failed += 1
+      held = null
+    }
     counts[outcome] += 1
     through = recipient.position
+  }
+  if (held !== null && stopped === null && batch.recipients.length < BROADCAST_BATCH) {
+    counts.failed += 1
+    through = held
   }
   try {
     await api.broadcastDone({ id: batch.id, through, ...counts })
