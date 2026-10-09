@@ -75,11 +75,15 @@ export interface BroadcastRepository {
   claim(owner: TelegramUserId | null, limit: number): Promise<ClaimedBatch | null>
   /**
    * The bot's word on a batch: everybody up to `through` is done, with these outcomes. Moves the
-   * cursor only forwards, so a late or repeated word changes nothing; lets the lease go.
+   * cursor only forwards, so a late or repeated word changes nothing; lets the lease go — and only
+   * that when nothing of the batch went (`through: null`), so it goes again the next minute.
    */
   done(report: BroadcastDone): Promise<void>
-  /** The latest broadcast, or `null` when there never was one. */
-  status(owner: TelegramUserId | null): Promise<BroadcastStatus | null>
+  /**
+   * The latest broadcast to people, and the owner's try after it when there is a newer one — a try
+   * queued while people are written to must not hide how far that got. Empty when there never was one.
+   */
+  status(owner: TelegramUserId | null): Promise<readonly BroadcastStatus[]>
   /** Stops every broadcast going: nothing more is handed. How many were stopped. */
   cancel(): Promise<number>
 }
@@ -230,34 +234,62 @@ export function createBroadcastRepository(db: Conn): BroadcastRepository {
     },
 
     async done({ id, through, sent, blocked, failed }) {
-      await db.execute(sql`
-        update broadcasts
-        set cursor = ${cursorAtOrBelow(sql`${through}::uuid`)},
-            sent = sent + ${sent}, blocked = blocked + ${blocked}, failed = failed + ${failed},
-            lease_until = null
-        where id = ${id} and cursor < ${through}::uuid`)
+      if (through === null) {
+        await db.execute(sql`update broadcasts set lease_until = null where id = ${id}`)
+        return
+      }
+      // The row first, then the cursor in a statement of its own (adversarial А2): erasure locks the
+      // row before it deletes the person, so whichever comes second sees the other committed — an
+      // `update` waiting for the row would have computed the cursor from before the erasure and
+      // written the erased id back. Read committed: the second statement takes a fresh snapshot.
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`select 1 from broadcasts where id = ${id} for update`)
+        await tx.execute(sql`
+          update broadcasts
+          set cursor = ${cursorAtOrBelow(sql`${through}::uuid`)},
+              sent = sent + ${sent}, blocked = blocked + ${blocked}, failed = failed + ${failed},
+              lease_until = null
+          where id = ${id} and cursor < ${through}::uuid`)
+      })
     },
 
     async status(owner) {
-      const [row] = await db.select().from(broadcasts).orderBy(desc(broadcasts.id)).limit(1)
-      if (!row) return null
-      const [left] = await db.execute<{ n: number }>(sql`
-        select count(*)::int as n from actors a, broadcasts b
-        where b.id = ${row.id} and ${stillDue(owner)}`)
-      return {
-        id: row.id,
-        ownerOnly: row.ownerOnly,
-        countries: row.countries,
-        createdAt: row.createdAt,
-        total: row.total,
-        blockedAtStart: row.blockedAtStart,
-        sent: row.sent,
-        blocked: row.blocked,
-        failed: row.failed,
-        left: row.finishedAt === null ? (left?.n ?? 0) : 0,
-        finishedAt: row.finishedAt,
-        cancelledAt: row.cancelledAt,
-      }
+      const [people] = await db
+        .select()
+        .from(broadcasts)
+        .where(sql`not ${broadcasts.ownerOnly}`)
+        .orderBy(desc(broadcasts.id))
+        .limit(1)
+      const [tried] = await db
+        .select()
+        .from(broadcasts)
+        .where(sql`${broadcasts.ownerOnly}`)
+        .orderBy(desc(broadcasts.id))
+        .limit(1)
+      const rows = [people, tried && (!people || tried.id > people.id) ? tried : undefined].filter(
+        (row) => row !== undefined,
+      )
+      return Promise.all(
+        rows.map(async (row) => {
+          const [left] = await db.execute<{ n: number }>(sql`
+            select count(*)::int as n from actors a, broadcasts b
+            where b.id = ${row.id} and ${stillDue(owner)}`)
+          return {
+            id: row.id,
+            ownerOnly: row.ownerOnly,
+            countries: row.countries,
+            createdAt: row.createdAt,
+            total: row.total,
+            blockedAtStart: row.blockedAtStart,
+            sent: row.sent,
+            blocked: row.blocked,
+            failed: row.failed,
+            left: row.finishedAt === null ? (left?.n ?? 0) : 0,
+            finishedAt: row.finishedAt,
+            cancelledAt: row.cancelledAt,
+          }
+        }),
+      )
     },
 
     async cancel() {

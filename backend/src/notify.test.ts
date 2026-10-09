@@ -16,7 +16,7 @@ const COUNTS: readonly AudienceCount[] = [
 
 function repository(
   queued: QueuedBroadcast | 'going' | 'nobody' = { id: 2, total: 47, blockedAtStart: 3 },
-  status: BroadcastStatus | null = null,
+  status: readonly BroadcastStatus[] = [],
 ) {
   const mocks = {
     count: vi.fn<BroadcastRepository['count']>(() => Promise.resolve(COUNTS)),
@@ -186,7 +186,7 @@ describe('notify — ход и отмена', () => {
   it('--status: счётчики последней, без чтения входа', async () => {
     const input = vi.fn(() => Promise.resolve(null))
     const lines: string[] = []
-    const exit = await notify(['--status'], repository(undefined, status), input, OWNER, (line) =>
+    const exit = await notify(['--status'], repository(undefined, [status]), input, OWNER, (line) =>
       lines.push(line),
     )
     expect(exit).toBe(0)
@@ -201,10 +201,29 @@ describe('notify — ход и отмена', () => {
 
   it('--status: отменённая — «not sent»; рассылок не было — так и сказано', async () => {
     const cancelled = { ...status, cancelledAt: new Date('2026-10-09T19:45:00.000Z'), left: 12 }
-    const { lines } = await run(['--status'], { repo: repository(undefined, cancelled) })
+    const { lines } = await run(['--status'], { repo: repository(undefined, [cancelled]) })
     expect(lines[0]).toMatch(/: cancelled 2026-10-09T19:45:00.000Z$/)
     expect(lines[2]).toMatch(/not sent 12$/)
     expect((await run(['--status'])).lines).toEqual(['no broadcast yet.'])
+  })
+
+  it('--status: рассылка людям и пробная после неё — обе, по очереди', async () => {
+    const tried = {
+      ...status,
+      id: 4,
+      ownerOnly: true,
+      total: 1,
+      blockedAtStart: 0,
+      sent: 1,
+      blocked: 0,
+      left: 0,
+      finishedAt: new Date('2026-10-09T19:43:00.000Z'),
+    }
+    const { lines } = await run(['--status'], { repo: repository(undefined, [status, tried]) })
+    expect(lines.filter((line) => line.startsWith('broadcast #'))).toEqual([
+      'broadcast #3 to everybody, queued 2026-10-09T19:41:00.000Z: going',
+      'broadcast #4 to the owner alone, queued 2026-10-09T19:41:00.000Z: finished 2026-10-09T19:43:00.000Z',
+    ])
   })
 
   it('--cancel останавливает', async () => {

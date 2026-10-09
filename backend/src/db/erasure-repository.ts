@@ -270,6 +270,13 @@ export function createErasureRepository(db: Db): ErasureRepository {
                 from actors where id = ${actorId}
                 on conflict (appeared_week) do update set erased = erasures.erased + 1
                 returning 1`)) > 0
+            // The broadcasts whose cursor may come to this person, locked before the person goes
+            // (MOL-237, adversarial А2): a word of the bot in flight then either lands first and is
+            // moved below, or comes after and no longer sees them. Their cursor only moves forwards,
+            // so one past this person never comes back to them.
+            await tx.execute(
+              sql`select 1 from broadcasts where cursor <= ${actorId}::uuid order by id for update`,
+            )
             // `items.created_by`, `item_barcodes.added_by` and `store_memory.actor_id` are `ON DELETE
             // SET NULL`: the catalogue keeps what was added, the codes written to it, and the shops'
             // memory the words it was given (MOL-126).

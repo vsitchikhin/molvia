@@ -41,7 +41,9 @@ export async function notify(
   }
   try {
     if (command.kind === 'status') {
-      for (const line of statusLines(await broadcasts.status(owner))) write(line)
+      const statuses = await broadcasts.status(owner)
+      if (statuses.length === 0) write('no broadcast yet.')
+      for (const status of statuses) for (const line of statusLines(status)) write(line)
       return 0
     }
     if (command.kind === 'cancel') {
@@ -189,8 +191,7 @@ function audienceLines(audience: BroadcastAudience, counts: readonly AudienceCou
   ]
 }
 
-function statusLines(status: BroadcastStatus | null): string[] {
-  if (status === null) return ['no broadcast yet.']
+function statusLines(status: BroadcastStatus): string[] {
   const state =
     status.cancelledAt !== null
       ? `cancelled ${status.cancelledAt.toISOString()}`
