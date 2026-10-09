@@ -120,7 +120,7 @@ describe('the night on the seed', () => {
     expect(report.merged).toBe(TWINS.length + SAME_PLACE.length)
   })
 
-  // Four nights with the real model: 3–4 s on a CI runner, past vitest's 5 s on a busy one.
+  // Four nights with the real model: 2–6 s on a CI runner, past vitest's 5 s on a busy one.
   it('names what the model cannot judge, ten a morning, and merges none of it', async () => {
     // Ten a morning, the rest on the mornings after (review №2): read them all, as the owner would.
     const merges = createMergeRepository(db)
