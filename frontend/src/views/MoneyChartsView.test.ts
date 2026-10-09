@@ -9,6 +9,7 @@ import { ApiError } from '@molvia/client'
 import { ERROR, parseMoney } from '@molvia/model'
 import type { MoneyChartMonthView, MoneyChartYearView } from '@molvia/model'
 import ScreenState from '@/components/ScreenState.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
@@ -265,6 +266,8 @@ describe('MoneyChartsView (MOL-160): «Год», the four states', () => {
     const view = await render()
     expect(view.find('.ghost-ring').exists()).toBe(true)
     expect(view.findAll('.ghost-column')).toHaveLength(12)
+    // The reading over the bars in the kit's lines (MOL-178, adversarial А5).
+    expect(view.findAllComponents(SkeletonPart)).toHaveLength(1)
   })
 
   it('the server failing with the year kept: the year under a strip that says so, one «Try again»', async () => {
@@ -337,6 +340,40 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     await charts(view)[0]?.findAll('input[type="radio"]')[0]?.setValue(true)
     expect(plain(charts(view)[0]?.text() ?? '')).toContain('≈ ₽71,387 · +73% against the average')
     expect(plain(charts(view)[1]?.text() ?? '')).toContain('Difference · Sep')
+  })
+
+  // С-16, review Р1-6: spending past what came in is no error — «Разница» says it by its sign, in the
+  // colour of the text; `--bad-ink` back on it is what this holds.
+  it('«Разница» below zero keeps its minus and the colour of the text, never red', async () => {
+    const charted = yearCharts()
+    moneyChartYear.mockResolvedValue({
+      ...charted,
+      months: charted.months.map((one) =>
+        one.month === '2026-09' ? { ...one, difference: { ...rub('5400'), minor: -540000n } } : one,
+      ),
+    })
+    const value = charts(await render())[1]?.findAll('.column .value')[2]
+    expect(plain(value?.text() ?? '')).toContain('−₽5,400')
+    expect(value?.classes()).toEqual(['value'])
+  })
+
+  // Adversarial А7: the running month's words take two lines where a closed one's take one, and the
+  // bars under the thumb jumped by a line. Two lines are held, and the line is there with no words.
+  it('the reading over the bars holds two lines of words, an empty one too (А7)', async () => {
+    const charted = yearCharts()
+    moneyChartYear.mockResolvedValue({
+      ...charted,
+      categories: charted.categories.map((one) => ({
+        ...one,
+        average: null,
+        points: one.points.map((point) => ({ ...point, change: null })),
+      })),
+    })
+    const [spent, , category] = charts(await render())
+    expect(spent?.find('.detail.held').text()).not.toBe('')
+    const held = category?.find('.detail.held')
+    expect(held?.exists()).toBe(true)
+    expect(held?.text()).toBe('')
   })
 
   // MOL-184, adversarial В1, В2: «≈» of «Ушло» and «Разница» only where a rate converted something.
@@ -969,9 +1006,11 @@ describe('MoneyChartsView (MOL-158): «Месяц»', () => {
     moneyChartMonth.mockReturnValue(new Promise(() => undefined))
     const view = await render('/money/charts')
     expect(view.find('.skeleton').exists()).toBe(true)
-    // The answer's shape (MOL-186): the ring, then the lines of «Против обычного» — no bars of a year.
+    // The answer's shape (MOL-186): the ring, then «Против обычного» in the kit's lines (MOL-178,
+    // adversarial А5) — no bars of a year.
     expect(view.find('.ghost-ring').exists()).toBe(true)
-    expect(view.findAll('.ghost-line')).toHaveLength(4)
+    expect(view.findAllComponents(SkeletonPart)).toHaveLength(1)
+    expect(view.findAll('.skeleton-lines .group')).toHaveLength(4)
     expect(view.find('.ghost-column').exists()).toBe(false)
     expect(moneyChartMonth).toHaveBeenCalledWith(localDay().slice(0, 7))
     expect(moneyChartYear).not.toHaveBeenCalled()
@@ -1103,6 +1142,26 @@ describe('MoneyChartsView (MOL-158): «Месяц»', () => {
     expect(view.findAll('.ring .arc')).toHaveLength(0)
     expect(view.findAll('.ring circle.none')).toHaveLength(1)
     expect(plain(view.text())).toContain('None is closed before May.')
+  })
+
+  // Adversarial А6: the 1st of a running month draws one day — nothing to move to, so no slider, and
+  // no «Ведите ползунок» under the chart.
+  it('one day drawn: no slider and no word of one; two days: both', async () => {
+    const days = monthCharts().pace.days
+    moneyChartMonth.mockResolvedValue(
+      monthCharts({ pace: { days: days.slice(0, 1), usual: null }, usual: null }),
+    )
+    const one = await render(SEPTEMBER)
+    expect(one.find('input[type="range"]').exists()).toBe(false)
+    expect(one.text()).not.toContain(en.spending.charts.pace_move)
+    one.unmount()
+
+    moneyChartMonth.mockResolvedValue(
+      monthCharts({ pace: { days: days.slice(0, 2), usual: null }, usual: null }),
+    )
+    const two = await render(SEPTEMBER)
+    expect(two.find('input[type="range"]').exists()).toBe(true)
+    expect(two.text()).toContain(en.spending.charts.pace_move)
   })
 
   it('with a usual and no dashed line says why, never that it comes (adversarial И)', async () => {

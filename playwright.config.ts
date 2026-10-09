@@ -110,8 +110,9 @@ export default defineConfig({
   // an iPhone's engine as well (MOL-80): Safari does not focus a tapped button, and only WebKit
   // shows what the sheet gives focus back to — and «not now» of the kit (MOL-174), held by what the
   // engine sends for an arrow, Space and a tap; and the error's buttons moved into the strip and back
-  // with the focus on them (MOL-180). The rest of the suite stays on one engine — a second
-  // run of everything would double the wait at every push for differences no other screen has.
+  // with the focus on them (MOL-180); and the legend and the slider of «Графики» (MOL-186). The rest
+  // of the suite stays on one engine — a second run of everything would double the wait at every push
+  // for differences no other screen has.
   projects: [
     {
       name: 'phone',
@@ -131,7 +132,7 @@ export default defineConfig({
     {
       name: 'iphone',
       use: { ...devices['iPhone 14'] },
-      testMatch: /(sheet|kit-inactive|kit-rows|state-strip)\.spec\.ts$/,
+      testMatch: /(sheet|kit-inactive|kit-rows|kit-charts|state-strip)\.spec\.ts$/,
     },
   ],
 

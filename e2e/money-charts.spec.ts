@@ -433,3 +433,47 @@ test('the server failing: one «Повторить», in the strip over the tab 
   await expect(strip).toBeHidden()
   await expect(page.getByRole('button', { name: 'Повторить' })).toHaveCount(0)
 })
+
+// Adversarial А7 of MOL-186: the reading over the bars in a column (Е-11) took two lines of words for
+// the running month — «… к обычному к 9 октября · в среднем 180 000 ֏» — and one for a closed month, so
+// the bars under the thumb jumped by a line as the month changed (MOL-151). Two lines are held now.
+for (const width of [390, 320]) {
+  test(`at ${String(width)}, the bars of a category stay under the thumb from the running month to a closed one`, async ({
+    page,
+  }) => {
+    // The year's usual needs three closed months of this year: from April on.
+    test.skip(
+      Number(yerevanDay().slice(5, 7)) < 4,
+      'the usual of the year needs three closed months',
+    )
+    await page.setViewportSize({ width, height: 800 })
+    await seed(page, async (spend) => {
+      // On the 1st: the running month is compared with the usual to this day, and a rent of the 15th
+      // is not in it before the 15th.
+      for (const back of [1, 2, 3])
+        await spend('180000', `${monthsAgoDay(back).slice(0, 7)}-01`, 'rent')
+    })
+    await page.goto('/money/charts?mode=year')
+    const card = page.getByRole('region', { name: 'Категория по месяцам' })
+    await page.getByRole('combobox', { name: 'Категория' }).selectOption({ label: 'Аренда жилья' })
+    const reading = card.locator('.reading')
+    await expect(reading).toContainText('к обычному к')
+    await card.locator('.area').scrollIntoViewIfNeeded()
+    // Where the bars stand in the page, and how tall the words over them are: Chromium's scroll
+    // anchoring holds the bars in the window by scrolling the page, so the window alone says nothing —
+    // Safari has none, and the words above move either way.
+    const place = async () => ({
+      reading: (await reading.boundingBox())?.height,
+      bars: await card
+        .locator('.area')
+        .evaluate((node) => Math.round(node.getBoundingClientRect().top + window.scrollY)),
+    })
+    const running = await place()
+
+    // The month before, chosen by the keys as a finger does by a tap: its words take one line.
+    await card.locator('input[type="radio"]:checked').focus()
+    await page.keyboard.press('ArrowLeft')
+    await expect(reading).toContainText('к среднему')
+    expect(await place()).toEqual(running)
+  })
+}
