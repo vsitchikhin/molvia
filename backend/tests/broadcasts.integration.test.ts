@@ -1,9 +1,13 @@
+import { randomBytes } from 'node:crypto'
 import { eq, sql } from 'drizzle-orm'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import type { FastifyInstance } from 'fastify'
+import { dueBroadcastSchema } from '@molvia/model'
 import { createBroadcastRepository } from '@/db/broadcasts-repository'
 import type { BroadcastAudience } from '@/db/broadcasts-repository'
 import { createErasureRepository } from '@/db/erasure-repository'
 import { BROADCAST_START, actors, broadcasts } from '@/db/schema'
+import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, telegramId } from './fixtures'
 
@@ -374,5 +378,86 @@ describe('broadcasts — ход', () => {
     })
     await drain()
     expect(await broadcastsOf.status(null)).toMatchObject({ sent: 3, left: 0 })
+  })
+})
+
+describe('broadcasts — внутренние адреса бота', () => {
+  const botSecret = randomBytes(32).toString('base64url')
+  const OWNER = 7_000_000_001
+  let app: FastifyInstance
+
+  beforeAll(async () => {
+    app = buildServer({
+      db,
+      receiptReader: null,
+      login: { username: 'molvia_bot', botSecret },
+      owner: OWNER,
+    })
+    await app.ready()
+  })
+  afterAll(async () => {
+    await app.close()
+  })
+
+  function post(url: string, payload?: unknown, authorization = `Bearer ${botSecret}`) {
+    return app.inject({
+      method: 'POST',
+      url,
+      headers: { authorization },
+      ...(payload === undefined ? {} : { payload: payload as Record<string, unknown> }),
+    })
+  }
+
+  it('без секрета — 401; с ним — пачка по контракту, отчёт — 204', async () => {
+    const one = await person(1)
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+
+    expect((await post('/internal/broadcasts/claim', undefined, 'Bearer wrong')).statusCode).toBe(
+      401,
+    )
+    const claimed = await post('/internal/broadcasts/claim')
+    expect(claimed.statusCode).toBe(200)
+    expect(claimed.headers['cache-control']).toBe('no-store')
+    const batch = dueBroadcastSchema.parse(claimed.json())
+    expect(batch.broadcast).toEqual({
+      id: (await row()).id,
+      text: TEXT,
+      recipients: [{ telegramUserId: one.tg, position: one.id }],
+    })
+
+    const done = await post('/internal/broadcasts/done', {
+      id: batch.broadcast?.id,
+      through: one.id,
+      sent: 1,
+      blocked: 0,
+      failed: 0,
+    })
+    expect(done.statusCode).toBe(204)
+    expect(await row()).toMatchObject({ sent: 1, cursor: one.id })
+    expect((await post('/internal/broadcasts/claim')).json()).toEqual({ broadcast: null })
+  })
+
+  it('claim с телом и отчёт без исхода — отказ, ничего не тронуто', async () => {
+    await person(1)
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+    expect((await post('/internal/broadcasts/claim', { limit: 1000 })).statusCode).toBe(400)
+    expect((await row()).leaseUntil).toBeNull()
+    const refused = await post('/internal/broadcasts/done', {
+      id: (await row()).id,
+      through: idOf(1),
+      sent: 0,
+      blocked: 0,
+      failed: 0,
+    })
+    expect(refused.statusCode).toBe(400)
+    expect((await row()).cursor).toBe(BROADCAST_START)
+  })
+
+  it('пробная — на владельца из окружения API', async () => {
+    await person(1)
+    const owner = await person(2, { telegramUserId: OWNER })
+    await broadcastsOf.queue(TEXT, { to: 'owner', owner: OWNER })
+    const batch = dueBroadcastSchema.parse((await post('/internal/broadcasts/claim')).json())
+    expect(batch.broadcast?.recipients).toEqual([{ telegramUserId: OWNER, position: owner.id }])
   })
 })

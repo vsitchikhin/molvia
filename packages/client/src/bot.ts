@@ -4,7 +4,9 @@ import {
   ISSUE,
   botApiSecretSchema,
   botFailureSchema,
+  broadcastDoneSchema,
   confirmLoginSchema,
+  dueBroadcastSchema,
   dueReceiptNoticesSchema,
   dueRemindersSchema,
   eraseMeSchema,
@@ -22,6 +24,8 @@ import {
 } from '@molvia/model'
 import type {
   BotFailure,
+  BroadcastDone,
+  DueBroadcast,
   DueReceiptNotices,
   DueReminders,
   FeedbackFromBot,
@@ -88,6 +92,13 @@ export interface MolviaBotClient {
     position: number,
     signal?: AbortSignal,
   ): Promise<FeedbackPicture | null>
+  /**
+   * The next batch of the message to people about a leak (MOL-237), or none: the API has decided
+   * who, and hands it again unless `broadcastDone` is said for it within its lease.
+   */
+  claimBroadcast(): Promise<DueBroadcast>
+  /** The bot went through a batch up to `through`, with these outcomes. Repeats change nothing. */
+  broadcastDone(report: BroadcastDone): Promise<void>
 }
 
 /** An internal client has no session and cannot attach its secret to an arbitrary API path. */
@@ -190,5 +201,12 @@ export function createBotClient({ secret, ...options }: BotClientOptions): Molvi
         method: 'POST',
         ...(signal === undefined ? {} : { signal }),
       }),
+    claimBroadcast: async () =>
+      request('/internal/broadcasts/claim', dueBroadcastSchema, { method: 'POST' }),
+    broadcastDone: async (report) => {
+      const body = broadcastDoneSchema.safeParse(report)
+      if (!body.success) throw new ApiError(ISSUE.BODY_INVALID, 'report')
+      await request('/internal/broadcasts/done', z.undefined(), { method: 'POST', body: body.data })
+    },
   }
 }

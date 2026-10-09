@@ -5,7 +5,9 @@ import {
   ERROR,
   FEEDBACK_PICTURES_MAX,
   botFailureSchema,
+  broadcastDoneSchema,
   confirmLoginSchema,
+  dueBroadcastSchema,
   dueReceiptNoticesSchema,
   dueRemindersSchema,
   eraseMeSchema,
@@ -21,6 +23,8 @@ import {
 } from '@molvia/model'
 import type {
   BotFailure,
+  BroadcastDone,
+  DueBroadcast,
   DueReceiptNotices,
   DueReminders,
   FeedbackFromBot,
@@ -62,6 +66,8 @@ export function internalAuthRoutes(
     feedbackFromBot(body: FeedbackFromBot): Promise<FeedbackFromBotAnswer>
     replyDelivered(body: ReplyDelivered): Promise<void>
     feedbackPicture(number: number, position: number): Promise<FeedbackPicture | null>
+    claimBroadcast(): Promise<DueBroadcast>
+    broadcastDone(body: BroadcastDone): Promise<void>
   },
 ): void {
   const digest = (value: string): Buffer => createHash('sha256').update(value).digest()
@@ -180,6 +186,17 @@ export function internalAuthRoutes(
         return feedbackPictureSchema.parse(picture)
       },
     )
+    // The message to people about a leak (MOL-237): a batch at a time, the API deciding who; the
+    // bot's word on a batch is what moves it on, so a batch never reported goes out again.
+    scope.post('/internal/broadcasts/claim', { onRequest: refuseAnyBody }, async (request) => {
+      parseQuery(z.strictObject({}), request.query)
+      return dueBroadcastSchema.parse(await api.claimBroadcast())
+    })
+    scope.post('/internal/broadcasts/done', async (request, reply) => {
+      parseQuery(z.strictObject({}), request.query)
+      await api.broadcastDone(parseBody(broadcastDoneSchema, request.body))
+      return reply.code(204).send()
+    })
     done()
   })
 }

@@ -21,6 +21,7 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 - `backend/src/usecases/reminders-switch.ts` — Use cases of the switch (MOL-103): read it, choose it in the settings, and the bot's change — a button, a block, an unblock.
 - `backend/src/usecases/rate-from-bot.ts` — Use case of a press of 1–5 under a reminder: the owner by the Telegram account that pressed, then `rateItem`; a new verdict is counted.
 - `backend/src/usecases/tell-receipts.ts` — Use case «Чек разобран» (MOL-129): the receipts read that no phone was handed, marked as told, worded with the place the review shows, the receipt's day and the night of the person's zone; a notice the contract refuses is said as a failure; the person's switch of these messages, read and chosen.
+- `backend/src/usecases/broadcast.ts` — Use cases of the message to people about a leak (MOL-237): the next batch handed to the bot — the owner's try to `OWNER_TELEGRAM_ID` — and the bot's word on it.
 - `backend/src/usecases/remind-ratings.ts` — Use case «Напомнить об оценке»: whose evening it is in their zone, which step `planReminder` says, and what the claim hands the bot.
 - `backend/tests/broadcasts.integration.test.ts` — Integration test of the message to people about a leak (MOL-237): the count, one broadcast at a time, batches in order, the lease and a batch going again, a late word, the audience, the owner's try, cancel, erasure leaving no id in the cursor.
 - `backend/tests/notify-bundle.integration.test.ts` — Integration test: the bundled `dist/notify.js` runs from the bundle alone with the text on standard input, and `make notify` takes `FILE` as one name and `YES`, `OWNER`, `STATUS`, `CANCEL` only from its own command line.
@@ -30,7 +31,7 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 
 ## packages/client
 
-- `packages/client/src/bot.ts` — The bot's API client: preview, confirm and decline a login, erase a person, claim the rating reminders due, rate by a press (MOL-101) and switch them (MOL-103), report a failure of its own and claim the owner's notices (MOL-143), hand over a text written as a reply, say what became of a reply sent and which notices went (MOL-148), fetch a message's picture for the owner (MOL-167), over the internal channel with the bot secret. Tests: `packages/client/src/auth.test.ts`.
+- `packages/client/src/bot.ts` — The bot's API client: preview, confirm and decline a login, erase a person, claim the rating reminders due, rate by a press (MOL-101) and switch them (MOL-103), report a failure of its own and claim the owner's notices (MOL-143), hand over a text written as a reply, say what became of a reply sent and which notices went (MOL-148), fetch a message's picture for the owner (MOL-167), claim a batch of the message about a leak and say what became of it (MOL-237), over the internal channel with the bot secret. Tests: `packages/client/src/auth.test.ts`.
 
 ## bot
 
