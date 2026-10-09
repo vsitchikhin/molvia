@@ -51,15 +51,18 @@
             vector-effect="non-scaling-stroke"
           />
         </template>
-        <line
-          v-if="chosenAt !== null"
-          class="dot"
-          :x1="xOf(modelValue)"
-          :y1="yOf(chosenAt)"
-          :x2="xOf(modelValue)"
-          :y2="yOf(chosenAt)"
-          vector-effect="non-scaling-stroke"
-        />
+        <template v-if="chosenAt !== null">
+          <line
+            v-for="part in ['dot-edge', 'dot']"
+            :key="part"
+            :class="part"
+            :x1="xOf(modelValue)"
+            :y1="yOf(chosenAt)"
+            :x2="xOf(modelValue)"
+            :y2="yOf(chosenAt)"
+            vector-effect="non-scaling-stroke"
+          />
+        </template>
       </svg>
       <input
         v-if="days.length > 0"
@@ -189,13 +192,14 @@ export default defineComponent({
 }
 
 .cursor {
-  stroke: var(--border-strong);
+  stroke: var(--accent);
   stroke-width: 1.5;
 }
 
+/* The series is data, in the ink of the text; the accent is only the day chosen (Ф-4, MOL-186). */
 .line {
   fill: none;
-  stroke: var(--accent);
+  stroke: var(--text);
   stroke-width: 3;
   stroke-linejoin: round;
   stroke-linecap: round;
@@ -203,13 +207,20 @@ export default defineComponent({
 
 .usual {
   fill: none;
-  stroke: var(--text-muted);
+  stroke: var(--graphic);
   stroke-width: 2;
   stroke-dasharray: 5 4;
   stroke-linejoin: round;
 }
 
-/* A dot is a zero-length round-capped line: stretched with the plot, it stays a circle. */
+/* A dot is a zero-length round-capped line: stretched with the plot, it stays a circle. Its edge of
+   the card's own colour parts it from the line it sits on (handoff MOL-157 v2 03). */
+.dot-edge {
+  stroke: var(--surface);
+  stroke-width: 15;
+  stroke-linecap: round;
+}
+
 .dot {
   stroke: var(--accent);
   stroke-width: 11;
@@ -218,7 +229,7 @@ export default defineComponent({
 
 .ring,
 .hole {
-  stroke: var(--text-muted);
+  stroke: var(--graphic);
   stroke-width: 9;
   stroke-linecap: round;
 }

@@ -117,13 +117,8 @@
                     })
                   }}
                 </span>
-                <span
-                  class="value"
-                  :class="{
-                    negative: (flowMonth.difference?.minor ?? 0n) < 0n,
-                    words: flowMonth.difference === null,
-                  }"
-                >
+                <!-- Never red: spending past what came in is no error, and its sign says it (С-16). -->
+                <span class="value" :class="{ words: flowMonth.difference === null }">
                   {{ differenceOf(flowMonth) }}
                 </span>
               </p>
@@ -706,12 +701,13 @@ export default defineComponent({
   margin-left: var(--space-2);
   border-radius: var(--radius-mark);
 
+  /* The series as they stand unchosen: the accent is the month chosen, not a series (Р-7). */
   &.outline {
-    box-shadow: inset 0 0 0 2px var(--text-muted);
+    box-shadow: inset 0 0 0 2px var(--graphic);
   }
 
   &.filled {
-    background: var(--accent);
+    background: var(--graphic);
   }
 }
 
@@ -754,7 +750,7 @@ export default defineComponent({
     display: inline-block;
     width: 1rem;
     margin-right: var(--space-2);
-    border-top: 2px dashed var(--text-muted);
+    border-top: 2px dashed var(--text);
     content: '';
     vertical-align: middle;
   }
@@ -782,10 +778,6 @@ export default defineComponent({
   font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-
-  &.negative {
-    color: var(--bad-ink);
-  }
 
   /* «нет курса месяца» is words, not a sum: in a third of the card it ran into the next column. */
   &.words {

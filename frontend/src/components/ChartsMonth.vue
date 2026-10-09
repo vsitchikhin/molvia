@@ -336,7 +336,8 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
-/* The two series are told apart by their stroke, not their colour alone (handoff 03). */
+/* The two series are told apart by their stroke, not their colour alone (handoff 03); both are data,
+   so neither is the accent (Ф-4, MOL-186). */
 .key {
   display: inline-block;
   width: 1rem;
@@ -345,11 +346,11 @@ export default defineComponent({
   &.solid {
     height: 3px;
     border-radius: var(--radius-mark);
-    background: var(--accent);
+    background: var(--text);
   }
 
   &.dashed {
-    border-top: 2px dashed var(--text-muted);
+    border-top: 2px dashed var(--graphic);
   }
 }
 

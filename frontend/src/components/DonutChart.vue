@@ -130,7 +130,7 @@ export default defineComponent({
         return {
           key: slice.categoryId ?? REST,
           name: category ? props.nameOf(category) : t('spending.charts.rest'),
-          colour: category ? categoryColour(category) : 'var(--border-strong)',
+          colour: category ? categoryColour(category) : 'var(--graphic)',
           level: slice.level,
           amount: whole(slice.amount),
           income: slice.income,
