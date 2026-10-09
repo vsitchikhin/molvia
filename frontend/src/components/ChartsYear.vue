@@ -165,13 +165,13 @@
           :average="series.averageLevel"
           short
         >
-          <div v-if="categoryPoint" class="split">
-            <p>
-              <span class="month">{{ monthLabel(categoryPoint.month) }}</span>
-              <span class="figure small">{{ whole(categoryPoint.amount) }}</span>
-            </p>
-            <p v-if="categoryDetail" class="detail right">{{ categoryDetail }}</p>
-          </div>
+          <!-- In a column, as «Расходы по месяцам»: beside the words, «Октябрь 2026 · идёт» broke in two
+               (Е-11, handoff 157 v2 `year-category`). -->
+          <template v-if="categoryPoint">
+            <p class="month">{{ monthLabel(categoryPoint.month) }}</p>
+            <p class="figure small">{{ whole(categoryPoint.amount) }}</p>
+            <p v-if="categoryDetail" class="detail">{{ categoryDetail }}</p>
+          </template>
         </BarChart>
         <p v-if="series.average" class="hint">{{ t('spending.charts.category_avg') }}</p>
       </AppCard>
@@ -790,21 +790,6 @@ export default defineComponent({
   width: 10px;
   height: 10px;
   border-radius: 50%;
-}
-
-.split {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-2);
-
-  p {
-    margin: 0;
-  }
-}
-
-.right {
-  margin-top: var(--space-2);
-  text-align: right;
 }
 
 /* What stands in the answer's place — the skeleton, a state — stands where its first card would. */
