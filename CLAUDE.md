@@ -991,8 +991,9 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
   10 s, and so is a duration a test asserts itself: its bound at least five times its worst there,
   and below the test's timeout, or vitest judges it instead of the test. So a clock catches only a
   fivefold slowdown or worse; a bound that must catch less — «no second search», twice the work — is
-  held by the work, never a clock. Bringing the tests that stood past it up to it is MOL-266 and
-  MOL-265; their lists are a window's, and grow with it.
+  held by the work, never a clock. A clock bound stays only where the breakage it guards, made on
+  purpose, crosses it. Bringing the tests that stood past it up to it is MOL-266 and MOL-265; their
+  lists are a window's, and grow with it.
 - **Maximize corner cases.** Mandatory checklist:
   - NULL / legacy — the field is empty but the entity still falls under the rule
   - alternative write path — the same outcome reached by a different route
