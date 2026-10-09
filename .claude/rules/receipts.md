@@ -62,8 +62,8 @@ costs about half a second at most, and the bench reads the same.
 
 | Ceiling                                                              | What it bounds                                                                                                                                                          | The bench uses                          |
 | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| `LINE_COMBINATIONS_MAX` 200 000                                      | the readings tried for one line's figures                                                                                                                               | 56 628 (am-03)                          |
-| `READING_COMBINATIONS_MAX` 300 000                                   | all lines of a reading                                                                                                                                                  | 132 520 (am-03)                         |
+| `LINE_COMBINATIONS_MAX` 200 000                                      | the readings tried for one line's figures                                                                                                                               | 55 176 (am-03)                          |
+| `READING_COMBINATIONS_MAX` 300 000                                   | all lines of a reading                                                                                                                                                  | 122 161 (am-03)                         |
 | `LINE_COMBINATIONS_FLOOR` 10 000 of `FLOOR_COMBINATIONS_MAX` 200 000 | what a line may try once the reading's budget is spent — junk above the list drains it (Р15) without buying seconds with hundreds of rows (Р18)                         | —                                       |
 | `RECONCILE_STATES_MAX` 300                                           | the readings the search against the total carries from line to line: the cheapest, and at one cost the one whose sum with the lines ahead lands nearest the total (П11) | 9 732 carried, the same answer with 300 |
 | `RECONCILE_STEPS_MAX` 500 000                                        | the search against the total; past it the lines keep their first reading                                                                                                | 94 445 (am-03)                          |
@@ -72,16 +72,20 @@ A till that prints no shelf price lets every swap of a line fit the line, so onl
 fifteen ordinary lines held the API for 52 s before the beam (Р14), ninety now balance in a third of a
 second. A line past its ceiling is taken as read, unsettled.
 
-**A sign read as a digit is one swap more, on an amount only** (MOL-246, H9 of MOL-228): a till prints «=»
-before an amount and « 1» after a price, and OCR reads the sign as a digit — «=119.00» as «2119.00»,
-«119.00 1» as «119.001». An amount is tried without its first digit and without its last at the price of
-one swap, with no other swap in the same figure (`amountVariants`). Never a count: «0,342» is a weight,
-and «1.005» cut to «1.00» would hold. An amount never starts with a zero, so «10.00» gives no «0.00» —
-without that, «10.00 × 1 = 20.00» held as 0 × 1 = 0 at two swaps, the cheapest reading of the line. On
-the bench: not one line lost or changed; KFC's terminal print reads 8 of 8 as they add up (one was its
-sum alone), its «1» before «480.32» a bracket; the worst line tries 56 628 instead of 55 176. The Russian
-tills of MOL-228 gain eleven lines with it, and the Armenian terminal prints the same «=». The pharmacy's
-«»», «-», «:», «Օ» for the terminal's signs are its own rules, MOL-258 (owner, В-1 «а»).
+**A sign read as a digit is the last resort, and alone** (MOL-246, H9 of MOL-228): a till prints «=» before
+an amount and OCR reads the sign as a digit — «=119.00» as «2119.00». The line's sum or its price is tried
+without its first digit (`signless`, `sliced`) only where no reading of the line holds with its swaps, and
+then with every other figure as read; the terminal's lost point, put back outside, still counts (KFC's
+«148032:1.0»). Both halves were measured wrong first (review, round 1): beside the swaps, a price that lost
+a digit beat the sum's own swap at the same cost — 1500.00 × 3 = 4500.00 read «=1500.00» became
+500.00 × 3 = 1500.00, settled, and a total misread alike was vouched for — and with swaps of the other
+figures it «fixed» all three of one line. Never a count (a weight's three decimals), never the discount,
+never a figure with no decimals, never to zero: a slice that leaves 0 is no amount, while «=0.50» read
+«20.50» is one. The half «119.00 1» read «119.001» is not done: `hundredthsOf` already rounds the third
+decimal away, so the line holds as read. On the bench: not one line lost or changed, the search as on
+master; KFC's terminal print reads 8 of 8 as they add up (one was its sum alone), its «1» before «480.32»
+a bracket. The Russian tills of MOL-228 gain eleven lines with H9, and the Armenian terminal prints the
+same «=». The pharmacy's «»», «-», «:», «Օ» for the terminal's signs are MOL-258 (owner, В-1 «а»).
 
 **Where only the total judges, the rate the lines share helps it** (review Р20): such a till has no
 line read with no swap, so the receipt's discount rate is taken from the lines as read, and a
