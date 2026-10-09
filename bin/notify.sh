@@ -1,28 +1,25 @@
 #!/usr/bin/env bash
 # Пишет людям ботом об утечке (MOL-237) — в базе этой рабочей копии; разносит бот этой копии.
 #
-#   bin/notify.sh <файл> [<страны>] [--owner] [--yes]   без --yes — сухой прогон: текст и сколько получат
-#   bin/notify.sh "" --status                             как идёт последняя рассылка
-#   bin/notify.sh "" --cancel                             остановить: больше ничего не уйдёт
+#   bin/notify.sh <файл> [--country=AM,GE] [--owner] [--yes]   без --yes — сухой прогон
+#   bin/notify.sh "" --status                                   как идёт последняя рассылка
+#   bin/notify.sh "" --cancel                                   остановить: больше ничего не уйдёт
 #
-# <страны> — коды через запятую (AM,GE); без них — все. --owner — пробная, одному владельцу
+# --country= — коды через запятую (AM,GE); пустой или без него — все. --owner — пробная, одному владельцу
 # (OWNER_TELEGRAM_ID). --yes — поставить в очередь. На проде исходников нет, там тот же код лежит в
 # образе API, а текст едет по ssh на стандартный ввод:
 #   ssh molvia 'cd ~/molvia && docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T backend node dist/notify.js [--yes]' < notice.txt
 
 set -euo pipefail
 
-# The countries are the second word unless it is a flag: `bin/notify.sh <файл>` alone is a dry run
-# for everybody, and `bin/notify.sh <файл> --yes` does not take `--yes` for countries (adversarial А3).
+# Everything after the file goes to `notify` as it is, but an empty `--country=` — what `make notify`
+# sends without COUNTRY (adversarial Р2-А2: a positional country word let COUNTRY=--yes queue).
 file="${1:-}"
 [ $# -gt 0 ] && shift
-countries=""
-if [ $# -gt 0 ] && [[ "$1" != --* ]]; then
-  countries="$1"
-  shift
-fi
-args=("$@")
-if [ -n "$countries" ]; then args+=("--country=$countries"); fi
+args=()
+for argument in "$@"; do
+  [ "$argument" = "--country=" ] || args+=("$argument")
+done
 
 # The file is opened here, before the move to the root, so a path is the caller's.
 if [ -n "$file" ]; then

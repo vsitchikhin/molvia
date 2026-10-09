@@ -88,9 +88,10 @@ forget: ## Erase a person by Telegram id: make forget TG=<id> [YES=1] (dry run w
 # The file and the countries reach the script through the environment, never pasted into the recipe,
 # and only a value typed on this command line counts — as for `forget` (MOL-58, П-3; adversarial Е).
 # It queues only for YES=1 typed here, and the file goes to the script's standard input (MOL-237).
+# The countries go glued to `--country=`, so no value of COUNTRY is ever a flag (adversarial Р2-А2).
 notify: ## Write to people about a leak: make notify FILE=<text> [COUNTRY=AM,GE] [OWNER=1] [YES=1] | STATUS=1 | CANCEL=1
 	$(NEED_SCAFFOLD)
-	$(if $(filter command line,$(origin FILE)),,unset FILE;) $(if $(filter command line,$(origin COUNTRY)),,unset COUNTRY;) ./bin/notify.sh "$${FILE:-}" "$${COUNTRY:-}" $(if $(and $(filter command line,$(origin OWNER)),$(filter 1,$(OWNER))),--owner) $(if $(and $(filter command line,$(origin STATUS)),$(filter 1,$(STATUS))),--status) $(if $(and $(filter command line,$(origin CANCEL)),$(filter 1,$(CANCEL))),--cancel) $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
+	$(if $(filter command line,$(origin FILE)),,unset FILE;) $(if $(filter command line,$(origin COUNTRY)),,unset COUNTRY;) ./bin/notify.sh "$${FILE:-}" "--country=$${COUNTRY:-}" $(if $(and $(filter command line,$(origin OWNER)),$(filter 1,$(OWNER))),--owner) $(if $(and $(filter command line,$(origin STATUS)),$(filter 1,$(STATUS))),--status) $(if $(and $(filter command line,$(origin CANCEL)),$(filter 1,$(CANCEL))),--cancel) $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
 
 # No value from a person reaches the recipe, so unlike `forget` it needs no wrapper script. It
 # writes only for YES=1 typed on this command line: `$(if $(YES),…)` read YES=0 as yes, and took a

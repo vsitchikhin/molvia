@@ -130,6 +130,25 @@ describe('make notify', () => {
     },
   )
 
+  // Adversarial Р2-А2: COUNTRY is glued to `--country=`, so no value of it is ever a flag.
+  it.each(['--yes', '--owner', '--status'])(
+    'COUNTRY=%s — не флаг: отказ, ничего не поставлено',
+    async (country) => {
+      await insertActor(db)
+      const file = join(mkdtempSync(join(tmpdir(), 'notify-')), 'notice.txt')
+      writeFileSync(file, TEXT)
+      const run = spawnSync(
+        'make',
+        ['--no-print-directory', 'notify', `FILE=${file}`, `COUNTRY=${country}`],
+        { cwd: root, encoding: 'utf8', env: { ...process.env, DATABASE_URL: testDatabaseUrl() } },
+      )
+      expect(run.status).not.toBe(0)
+      expect(run.stdout).toContain('usage: notify')
+      expect(await db.select().from(broadcasts)).toEqual([])
+    },
+    60_000,
+  )
+
   // `-n` prints the recipe and runs nothing.
   function recipe(args: string[], env: NodeJS.ProcessEnv = process.env): string {
     return spawnSync('make', ['-n', '--no-print-directory', 'notify', ...args], {
