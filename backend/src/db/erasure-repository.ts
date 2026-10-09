@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { telegramUserIdSchema } from '@molvia/model'
 import type { TelegramUserId } from '@molvia/model'
+import { cursorAtOrBelow } from './broadcasts-repository'
 import type { Db } from './index'
 import { lockTelegramAccount } from './telegram-lock'
 import { yerevanWeek } from './yerevan-week'
@@ -273,6 +274,11 @@ export function createErasureRepository(db: Db): ErasureRepository {
             // SET NULL`: the catalogue keeps what was added, the codes written to it, and the shops'
             // memory the words it was given (MOL-126).
             erased.actors = await count(sql`delete from actors where id = ${actorId} returning 1`)
+            // A broadcast that has got to this person keeps its place without their id (MOL-237):
+            // the nearest live id below leaves the same people after it.
+            await tx.execute(sql`
+              update broadcasts set cursor = ${cursorAtOrBelow(sql`${actorId}::uuid`)}
+              where cursor = ${actorId}::uuid`)
           }
 
           const report: ErasureReport = {

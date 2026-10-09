@@ -1,0 +1,378 @@
+import { eq, sql } from 'drizzle-orm'
+import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { createBroadcastRepository } from '@/db/broadcasts-repository'
+import type { BroadcastAudience } from '@/db/broadcasts-repository'
+import { createErasureRepository } from '@/db/erasure-repository'
+import { BROADCAST_START, actors, broadcasts } from '@/db/schema'
+import { connectDrizzle } from './db'
+import { clearAll, insertActor, telegramId } from './fixtures'
+
+// The message to people about a leak (MOL-237): queued by `make notify`, handed to the bot in
+// batches after a cursor, the cursor moved only by the bot's word — better twice than never.
+
+const { db, close } = connectDrizzle()
+const broadcastsOf = createBroadcastRepository(db)
+const EVERYBODY: BroadcastAudience = { to: 'everybody' }
+const TEXT = 'Molvia: тест.\n\nMolvia: a test.'
+
+beforeEach(async () => {
+  await clearAll(db)
+})
+afterAll(async () => {
+  await clearAll(db)
+  await close()
+})
+
+/** A person whose place in the order of `actors.id` is `n`. */
+function idOf(n: number): string {
+  return `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+}
+
+async function person(
+  n: number,
+  patch: Partial<typeof actors.$inferInsert> = {},
+): Promise<{ id: string; tg: number }> {
+  const tg = telegramId()
+  await insertActor(db, { id: idOf(n), telegramUserId: tg, ...patch })
+  return { id: idOf(n), tg }
+}
+
+async function row() {
+  const [stored] = await db.select().from(broadcasts)
+  if (!stored) throw new Error('no broadcast')
+  return stored
+}
+
+/** Everybody the bot would be handed, batch after batch, each reported as sent. */
+async function drain(owner: number | null = null, limit = 2): Promise<number[]> {
+  const handed: number[] = []
+  for (;;) {
+    const batch = await broadcastsOf.claim(owner, limit)
+    if (!batch) return handed
+    handed.push(...batch.recipients.map((recipient) => recipient.telegramUserId))
+    const last = batch.recipients.at(-1)
+    if (!last) throw new Error('an empty batch')
+    await broadcastsOf.done({
+      id: batch.id,
+      through: last.position,
+      sent: batch.recipients.length,
+      blocked: 0,
+      failed: 0,
+    })
+  }
+}
+
+describe('broadcasts — сколько получат', () => {
+  it('по странам: получат и с заблокированным ботом; страна без людей — нулём', async () => {
+    await person(1, { country: 'AM' })
+    await person(2, { country: 'AM', botBlockedAt: new Date() })
+    await person(3, { country: 'GE' })
+
+    expect(await broadcastsOf.count(EVERYBODY)).toEqual([
+      { country: 'AM', recipients: 1, blocked: 1 },
+      { country: 'GE', recipients: 1, blocked: 0 },
+    ])
+    expect(await broadcastsOf.count({ to: 'countries', countries: ['GE', 'RS'] })).toEqual([
+      { country: 'GE', recipients: 1, blocked: 0 },
+      { country: 'RS', recipients: 0, blocked: 0 },
+    ])
+  })
+
+  it('пробная — только владелец', async () => {
+    const owner = await person(1)
+    await person(2)
+    expect(await broadcastsOf.count({ to: 'owner', owner: owner.tg })).toEqual([
+      { country: 'AM', recipients: 1, blocked: 0 },
+    ])
+  })
+})
+
+describe('broadcasts — постановка', () => {
+  it('пишет, сколько получат и скольких пропустит блокировка', async () => {
+    await person(1)
+    await person(2, { botBlockedAt: new Date() })
+    const queued = await broadcastsOf.queue(TEXT, EVERYBODY)
+    expect(queued).toMatchObject({ total: 1, blockedAtStart: 1 })
+    expect(await row()).toMatchObject({ text: TEXT, countries: null, ownerOnly: false })
+  })
+
+  it('вторая, пока идёт первая, — отказ; пробная себе не мешает; после отмены — можно', async () => {
+    const owner = await person(1)
+    expect(await broadcastsOf.queue(TEXT, EVERYBODY)).toMatchObject({ total: 1 })
+    expect(await broadcastsOf.queue(TEXT, EVERYBODY)).toBe('going')
+    expect(await broadcastsOf.queue(TEXT, { to: 'countries', countries: ['AM'] })).toBe('going')
+    expect(await broadcastsOf.queue(TEXT, { to: 'owner', owner: owner.tg })).toMatchObject({
+      total: 1,
+    })
+    expect(await broadcastsOf.cancel()).toBe(2)
+    expect(await broadcastsOf.queue(TEXT, EVERYBODY)).toMatchObject({ total: 1 })
+  })
+
+  it('две постановки одновременно — одна', async () => {
+    await person(1)
+    const both = await Promise.all([
+      broadcastsOf.queue(TEXT, EVERYBODY),
+      broadcastsOf.queue(TEXT, EVERYBODY),
+    ])
+    expect(both.filter((answer) => answer === 'going')).toHaveLength(1)
+    expect(await db.select().from(broadcasts)).toHaveLength(1)
+  })
+
+  it('некому — ничего не поставлено', async () => {
+    await person(1, { botBlockedAt: new Date() })
+    expect(await broadcastsOf.queue(TEXT, EVERYBODY)).toBe('nobody')
+    expect(await broadcastsOf.queue(TEXT, { to: 'countries', countries: ['RS'] })).toBe('nobody')
+    expect(await db.select().from(broadcasts)).toEqual([])
+  })
+
+  it('после конца — можно снова', async () => {
+    await person(1)
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+    await drain()
+    expect(await broadcastsOf.claim(null, 2)).toBeNull()
+    expect(await broadcastsOf.queue(TEXT, EVERYBODY)).toMatchObject({ total: 1 })
+  })
+})
+
+describe('broadcasts — раздача', () => {
+  it('всем по порядку пачками, каждому один раз, и рассылка кончается', async () => {
+    const people = await Promise.all([1, 2, 3, 4, 5].map((n) => person(n)))
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+
+    expect(await drain(null, 2)).toEqual(people.map((one) => one.tg))
+    expect(await row()).toMatchObject({ sent: 5, blocked: 0, failed: 0, leaseUntil: null })
+    expect((await row()).finishedAt).not.toBeNull()
+  })
+
+  it('пачка в аренде не выдаётся второй раз, пока бот её шлёт', async () => {
+    await person(1)
+    await person(2)
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+    expect(await broadcastsOf.claim(null, 1)).not.toBeNull()
+    expect(await broadcastsOf.claim(null, 1)).toBeNull()
+  })
+
+  it('бот не отчитался — после аренды та же пачка снова: двойное лучше потерянного', async () => {
+    const first = await person(1)
+    await person(2)
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+    const lost = await broadcastsOf.claim(null, 1)
+    await db.update(broadcasts).set({ leaseUntil: sql`clock_timestamp() - interval '1 second'` })
+    const again = await broadcastsOf.claim(null, 1)
+    expect(again?.recipients).toEqual(lost?.recipients)
+    expect(again?.recipients.map((recipient) => recipient.telegramUserId)).toEqual([first.tg])
+  })
+
+  it('отчёт о части пачки (флуд) — остаток уходит следующей', async () => {
+    const people = await Promise.all([1, 2, 3].map((n) => person(n)))
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+    const batch = await broadcastsOf.claim(null, 3)
+    await broadcastsOf.done({
+      id: batch?.id ?? 0,
+      through: idOf(1),
+      sent: 1,
+      blocked: 0,
+      failed: 0,
+    })
+    const rest = await broadcastsOf.claim(null, 3)
+    expect(rest?.recipients.map((recipient) => recipient.telegramUserId)).toEqual([
+      people[1]?.tg,
+      people[2]?.tg,
+    ])
+  })
+
+  it('повторный или запоздалый отчёт ничего не меняет', async () => {
+    await Promise.all([1, 2].map((n) => person(n)))
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+    const batch = await broadcastsOf.claim(null, 2)
+    const report = { id: batch?.id ?? 0, through: idOf(2), sent: 2, blocked: 0, failed: 0 }
+    await broadcastsOf.done(report)
+    await broadcastsOf.done(report)
+    await broadcastsOf.done({ ...report, through: idOf(1), sent: 1 })
+    expect(await row()).toMatchObject({ sent: 2, cursor: idOf(2) })
+  })
+
+  it('счётчики исходов складываются', async () => {
+    await Promise.all([1, 2, 3].map((n) => person(n)))
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+    const batch = await broadcastsOf.claim(null, 3)
+    await broadcastsOf.done({
+      id: batch?.id ?? 0,
+      through: idOf(3),
+      sent: 1,
+      blocked: 1,
+      failed: 1,
+    })
+    expect(await row()).toMatchObject({ sent: 1, blocked: 1, failed: 1 })
+  })
+
+  it('пришедший после постановки не получает; заблокировавший до своей очереди — пропущен', async () => {
+    const early = await person(1)
+    const blocker = await person(2)
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+    await person(3)
+    await db.update(actors).set({ botBlockedAt: new Date() }).where(eq(actors.id, blocker.id))
+    expect(await drain()).toEqual([early.tg])
+  })
+
+  it('напоминания выключены человеком — сообщение об утечке всё равно идёт', async () => {
+    const quiet = await person(1, { remindersOff: 'chosen', receiptNoticesOff: true })
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+    expect(await drain()).toEqual([quiet.tg])
+  })
+
+  it('только своим странам', async () => {
+    await person(1, { country: 'AM' })
+    const georgian = await person(2, { country: 'GE' })
+    const serbian = await person(3, { country: 'RS' })
+    await broadcastsOf.queue(TEXT, { to: 'countries', countries: ['GE', 'RS'] })
+    expect(await drain()).toEqual([georgian.tg, serbian.tg])
+  })
+
+  it('пробная — владельцу, и раньше рассылки всем', async () => {
+    const owner = await person(2)
+    const other = await person(1)
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+    await broadcastsOf.queue(TEXT, { to: 'owner', owner: owner.tg })
+    const first = await broadcastsOf.claim(owner.tg, 25)
+    expect(first?.recipients.map((recipient) => recipient.telegramUserId)).toEqual([owner.tg])
+    await broadcastsOf.done({
+      id: first?.id ?? 0,
+      through: owner.id,
+      sent: 1,
+      blocked: 0,
+      failed: 0,
+    })
+    expect(await drain(owner.tg, 25)).toEqual([other.tg, owner.tg])
+  })
+
+  it('пробная без владельца в окружении — никому, и кончается', async () => {
+    const owner = await person(1)
+    await broadcastsOf.queue(TEXT, { to: 'owner', owner: owner.tg })
+    expect(await broadcastsOf.claim(null, 25)).toBeNull()
+    expect((await row()).finishedAt).not.toBeNull()
+  })
+
+  it('отменённая больше ничего не выдаёт', async () => {
+    await Promise.all([1, 2].map((n) => person(n)))
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+    const batch = await broadcastsOf.claim(null, 1)
+    expect(await broadcastsOf.cancel()).toBe(1)
+    await broadcastsOf.done({
+      id: batch?.id ?? 0,
+      through: idOf(1),
+      sent: 1,
+      blocked: 0,
+      failed: 0,
+    })
+    expect(await broadcastsOf.claim(null, 1)).toBeNull()
+    expect(await broadcastsOf.status(null)).toMatchObject({ sent: 1, left: 1 })
+  })
+})
+
+describe('broadcasts — удаление человека не оставляет его id', () => {
+  const erasure = createErasureRepository(db)
+
+  it('стёрт тот, на ком курсор, — курсор на ближайшем живом ниже, следующие не потеряны', async () => {
+    await person(1)
+    const second = await person(2)
+    const third = await person(3)
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+    const batch = await broadcastsOf.claim(null, 2)
+    await broadcastsOf.done({
+      id: batch?.id ?? 0,
+      through: idOf(2),
+      sent: 2,
+      blocked: 0,
+      failed: 0,
+    })
+
+    await erasure.erase(second.tg, { dryRun: false })
+
+    expect((await row()).cursor).toBe(idOf(1))
+    expect(await drain()).toEqual([third.tg])
+  })
+
+  it('стёрт первый — курсор в начале', async () => {
+    const first = await person(1)
+    const second = await person(2)
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+    const batch = await broadcastsOf.claim(null, 1)
+    await broadcastsOf.done({
+      id: batch?.id ?? 0,
+      through: idOf(1),
+      sent: 1,
+      blocked: 0,
+      failed: 0,
+    })
+
+    await erasure.erase(first.tg, { dryRun: false })
+
+    expect((await row()).cursor).toBe(BROADCAST_START)
+    expect(await drain()).toEqual([second.tg])
+  })
+
+  it('стёрт между выдачей и отчётом — отчёт ставит курсор на живого', async () => {
+    await person(1)
+    const second = await person(2)
+    const third = await person(3)
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+    const batch = await broadcastsOf.claim(null, 2)
+    await erasure.erase(second.tg, { dryRun: false })
+    await broadcastsOf.done({
+      id: batch?.id ?? 0,
+      through: idOf(2),
+      sent: 2,
+      blocked: 0,
+      failed: 0,
+    })
+
+    expect((await row()).cursor).toBe(idOf(1))
+    expect(await drain()).toEqual([third.tg])
+  })
+
+  it('сухой прогон стирания курсор не трогает', async () => {
+    const first = await person(1)
+    await person(2)
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+    const batch = await broadcastsOf.claim(null, 1)
+    await broadcastsOf.done({
+      id: batch?.id ?? 0,
+      through: idOf(1),
+      sent: 1,
+      blocked: 0,
+      failed: 0,
+    })
+    await erasure.erase(first.tg, { dryRun: true })
+    expect((await row()).cursor).toBe(idOf(1))
+  })
+})
+
+describe('broadcasts — ход', () => {
+  it('последняя рассылка: счётчики и сколько осталось', async () => {
+    await Promise.all([1, 2, 3].map((n) => person(n)))
+    await person(4, { botBlockedAt: new Date() })
+    expect(await broadcastsOf.status(null)).toBeNull()
+    await broadcastsOf.queue(TEXT, EVERYBODY)
+    const batch = await broadcastsOf.claim(null, 1)
+    await broadcastsOf.done({
+      id: batch?.id ?? 0,
+      through: idOf(1),
+      sent: 1,
+      blocked: 0,
+      failed: 0,
+    })
+    expect(await broadcastsOf.status(null)).toMatchObject({
+      ownerOnly: false,
+      countries: null,
+      total: 3,
+      blockedAtStart: 1,
+      sent: 1,
+      left: 2,
+      finishedAt: null,
+      cancelledAt: null,
+    })
+    await drain()
+    expect(await broadcastsOf.status(null)).toMatchObject({ sent: 3, left: 0 })
+  })
+})
