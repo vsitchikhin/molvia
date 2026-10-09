@@ -350,6 +350,13 @@ export default defineComponent({
   width: 0.75rem;
   height: 0.75rem;
   border-radius: 50%;
+
+  /* On the tint a category's dot fell under 3:1 — ten light and four dark, «Остальные» 2.50 in the
+     dark (MOL-172: marks 3:1). It stands on a ring of the card's own colour, where every mark holds
+     3:1 (`tokens.test.ts`), as the day's dot of «Темп» does (MOL-186, review Р1-3, adversarial А2). */
+  .chosen & {
+    box-shadow: 0 0 0 2px var(--surface);
+  }
 }
 
 .name,

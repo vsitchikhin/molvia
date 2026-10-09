@@ -107,7 +107,8 @@ export default defineComponent({
               ? 'var(--border)'
               : category
                 ? categoryColour(category)
-                : 'var(--border-strong)',
+                : // The same «Остальные» as on «Графики», 3:1 (MOL-186, adversarial А1).
+                  'var(--graphic)',
           level: slice.level,
           amount: formatEstimate(slice.amount, locale.value),
           share: share?.tiny
