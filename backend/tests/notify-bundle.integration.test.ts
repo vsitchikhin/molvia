@@ -97,13 +97,17 @@ describe('bin/notify.sh', () => {
     await insertActor(db)
     const file = join(mkdtempSync(join(tmpdir(), 'notify-')), 'notice.txt')
     writeFileSync(file, TEXT)
-    const alone = spawnSync(`${root}bin/notify.sh`, [file], { cwd: root, encoding: 'utf8' })
+    // the test database, not the copy's: `.env` never overrides what the environment already says
+    const env = { ...process.env, DATABASE_URL: testDatabaseUrl() }
+    const alone = spawnSync(`${root}bin/notify.sh`, [file], { cwd: root, encoding: 'utf8', env })
     expect(alone.status).toBe(0)
     expect(alone.stdout).toContain('to everybody:')
+    expect(alone.stdout).toContain('in all: 1 get it')
     expect(alone.stdout).toContain('dry run: nothing queued')
     const owner = spawnSync(`${root}bin/notify.sh`, [file, '--owner'], {
       cwd: root,
       encoding: 'utf8',
+      env,
     })
     expect(owner.stdout).not.toContain('usage: notify')
   }, 60_000)
