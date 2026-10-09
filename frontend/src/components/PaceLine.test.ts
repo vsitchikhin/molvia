@@ -64,9 +64,21 @@ describe('PaceLine (MOL-158)', () => {
   it('the arrows move the day, and the range says the day', async () => {
     const { view } = line()
     const range = view.find('input[type="range"]')
-    expect(range.attributes('max')).toBe('11')
     expect(range.attributes('aria-valuetext')).toBe('12 сентября')
     await range.setValue('3')
     expect(view.emitted('update:modelValue')?.at(-1)).toEqual([3])
+  })
+
+  it('the slider spans the month, as the axis does; past the last day drawn it goes back to it', async () => {
+    const { view } = line()
+    const range = view.find<HTMLInputElement>('input[type="range"]')
+    // Thirty days, as the axis: the thumb of the 12th stands under the 12th, not at the right end.
+    expect(range.attributes('max')).toBe('29')
+    await range.setValue('3')
+    await view.setProps({ modelValue: 3 })
+    // The 20th of a month drawn to the 12th: the 12th, and the thumb is put back on it.
+    await range.setValue('19')
+    expect(view.emitted('update:modelValue')?.at(-1)).toEqual([11])
+    expect(range.element.value).toBe('11')
   })
 })

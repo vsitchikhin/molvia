@@ -82,7 +82,7 @@
       class="range"
       type="range"
       min="0"
-      :max="days.length - 1"
+      :max="length - 1"
       step="1"
       :value="modelValue"
       :aria-label="legend"
@@ -155,8 +155,18 @@ export default defineComponent({
       if (last >= 0) choose(Math.min(last, Math.round(fraction * (props.length - 1))))
     })
 
+    /**
+     * The slider spans the whole month, as the axis above it does, so its thumb stands under the day
+     * chosen; a day past the last one drawn — the future of a running month — is the last one, and the
+     * thumb goes back to it (MOL-186): spanning only the days drawn, it stood at the right end over the
+     * 9th of 31.
+     */
     function typed(event: Event): void {
-      choose(Number((event.target as HTMLInputElement).value))
+      const range = event.target as HTMLInputElement
+      const asked = Number(range.value)
+      const day = Math.min(asked, props.days.length - 1)
+      if (day !== asked) range.value = String(day)
+      choose(day)
     }
 
     return { area, xOf, yOf, dayPoints, usualPoints, chosenAt, usualAt, ticks, pointer, typed }
