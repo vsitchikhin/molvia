@@ -77,8 +77,8 @@ prints «=» before an amount and OCR reads the sign as a digit — «=119.00» 
 price without its first digit (`signless`, `sliced`) is offered only where no reading of the line holds with
 its swaps, with every other figure as read, and only to the printed total: a line with nothing but a slice
 takes the rest of the total or the slice, whichever meets it, and with no total that meets it stays as read,
-unsettled (`sliced` candidates are never a line's own first reading). A slice is the total's one answer as the blank's rest is, at its price (`ANSWER_COST`), and a receipt has one: two lines with none of their own share no total, and a slice never buys itself with swaps of another line (review В1, В2). A slice the total took is no change of a reading under Р27, so the line is settled — the price of it is Б4 (3 × 500,00 for 7 500,00 where the total is misread as the sum is), the owner's to decide. The terminal's lost point, put back
-outside, still counts (KFC's «148032:1.0»). Card lines and class-code lines with a count read; never the
+unsettled (`sliced` candidates are never a line's own first reading). A slice is the total's one answer as the blank's rest is, at its price (`ANSWER_COST`), and a receipt has one: two lines with none of their own share no total, and a slice never buys itself with swaps of another line (review В1, В2). A slice the total took is the total's answer as the blank's rest is: one look of the person's, never a line «as read», and a total met through a slice is shown only where two places print it, never by the lines (review Г1; MOL-244, В-1 «а») — else a total misread in one place vouched for itself through the slice it chose. A slice whose sum the line reads of its own spends no answer (review 12), and at one cost and one sum the blank's rest comes first (13). So H9 reads only receipts that print the total twice: on the bench not one line moves. The terminal's lost point, put back
+outside, still counts («148032:1.0» for 480.32). Card lines and class-code lines with a count read; never the
 weight by money nor the plain layout (their search is past the floor of Р15 with it, review А3), never a
 class row whose count is not printed (twenty counts made up let the slice choose one, Б1). Each half was
 measured wrong first (reviews, rounds 1–2): beside the swaps a price that lost a digit beat the sum's own
@@ -87,8 +87,7 @@ three figures of a line; as a line's own reading it took the blank's place — �
 total said 2 119,00 — and made a reading that misread a line tie one that read it right. Never a count, the
 discount or a figure with no decimals, never to zero; «=0.50» read «20.50» is read. The half «119.00 1» read
 «119.001» is not done: `hundredthsOf` rounds the third decimal away. On the bench: not one line lost or
-changed, the search as on master; KFC's terminal print reads 8 of 8 as they add up, its total taking the
-slice. The pharmacy's «»», «-», «:», «Օ» are MOL-258 (owner, В-1 «а»).
+changed, the search as on master. The pharmacy's «»», «-», «:», «Օ» are MOL-258 (owner, В-1 «а»).
 
 **Where only the total judges, the rate the lines share helps it** (review Р20): such a till has no
 line read with no swap, so the receipt's discount rate is taken from the lines as read, and a
