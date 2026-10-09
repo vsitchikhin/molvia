@@ -271,11 +271,16 @@ export default defineComponent({
      */
     const paceNote = computed(() => {
       const shown = charts.value
-      if (shown?.pace.usual) return t('spending.charts.pace_note')
-      if (shown?.usual) return t('spending.charts.pace_uncounted')
-      return shown?.comparedFrom
-        ? t('spending.charts.pace_few', { month: monthGenitive(shown.comparedFrom, t) })
-        : t('spending.charts.pace_few_none')
+      const line = shown?.pace.usual
+        ? t('spending.charts.pace_note')
+        : shown?.usual
+          ? t('spending.charts.pace_uncounted')
+          : shown?.comparedFrom
+            ? t('spending.charts.pace_few', { month: monthGenitive(shown.comparedFrom, t) })
+            : t('spending.charts.pace_few_none')
+      // «Ведите ползунок» only over a slider: the 1st of a running month has one day and none
+      // (adversarial А6).
+      return (shown?.pace.days.length ?? 0) > 1 ? `${line} ${t('spending.charts.pace_move')}` : line
     })
 
     return {

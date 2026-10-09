@@ -69,6 +69,20 @@ describe('PaceLine (MOL-158)', () => {
     expect(view.emitted('update:modelValue')?.at(-1)).toEqual([3])
   })
 
+  it('one day drawn — the 1st of a running month — has no slider: nothing to move to (А6)', () => {
+    const view = mount(PaceLine, {
+      props: {
+        days: [{ level: 1000, spoken: '1 октября' }],
+        usual: null,
+        length: 31,
+        modelValue: 0,
+        legend: 'Темп месяца',
+      },
+    })
+    expect(view.find('input[type="range"]').exists()).toBe(false)
+    expect(view.find('.dot').exists()).toBe(true)
+  })
+
   it('the slider spans the month, as the axis does; past the last day drawn it goes back to it', async () => {
     const { view } = line()
     const range = view.find<HTMLInputElement>('input[type="range"]')

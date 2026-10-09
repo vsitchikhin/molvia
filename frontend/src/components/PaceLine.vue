@@ -76,9 +76,10 @@
       </span>
     </div>
     <!-- In sight under the axis (С-14, Д-5): a finger on the chart chooses too, but a slider says it can
-         be moved before anyone tries. -->
+         be moved before anyone tries. One day drawn — the 1st of a running month — has nothing to move
+         to, and no slider (adversarial А6). -->
     <input
-      v-if="days.length > 0"
+      v-if="days.length > 1"
       class="range"
       type="range"
       min="0"
@@ -114,7 +115,9 @@ const MARGIN = 50
  * the two told apart by their stroke, not their colour alone. The day is chosen as a bar is — on
  * lifting the finger or once it goes sideways, anywhere on the card, never by a scroll — and by the
  * slider in sight under the axis (С-14): a native range, whose arrows move the day and which says the
- * day and both sums to a screen reader. Every height is the server's.
+ * day and both sums to a screen reader. **Only its thumb takes a touch** (owner's decision on review
+ * Р1-1, «а»): Blink sets a range's value where the finger lands on the track, and a scroll started there
+ * changed the day as the page went up. Every height is the server's.
  */
 export default defineComponent({
   name: 'PaceLine',
@@ -157,7 +160,8 @@ export default defineComponent({
 
     /**
      * The slider spans the whole month, as the axis above it does, so its thumb stands under the day
-     * chosen; a day past the last one drawn — the future of a running month — is the last one, and the
+     * chosen — to within half a thumb at the ends, where a native thumb stops short of the track's edge
+     * (review Р1-4); a day past the last one drawn — the future of a running month — is the last one, and the
      * thumb goes back to it (MOL-186): spanning only the days drawn, it stood at the right end over the
      * 9th of 31.
      */
@@ -256,7 +260,21 @@ export default defineComponent({
   min-height: var(--touch-target);
   margin: var(--space-1) 0 0;
   accent-color: var(--accent);
-  cursor: pointer;
+
+  /* Only the thumb takes a touch (owner's «а» on review Р1-1): Blink sets the value where a finger
+     lands on the track — a scroll started there moved the day from the 2nd to the 23rd. The track lets
+     the touch through to the page; the keys are the input's, untouched. */
+  pointer-events: none;
+
+  &::-webkit-slider-thumb {
+    cursor: pointer;
+    pointer-events: auto;
+  }
+
+  &::-moz-range-thumb {
+    cursor: pointer;
+    pointer-events: auto;
+  }
 
   &:focus-visible {
     @include focus-ring;
