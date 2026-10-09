@@ -289,7 +289,8 @@ nothing up.
   (`spentEstimated`, `incomeEstimated` of the year, defaulted to «≈» for a year kept before them): not
   over nothing counted, not over the exact drams of one who earns and spends in drams, but over them once
   a spending in dollars came in by its day's rate, and «Разница» once an income did (adversarial В1, В2,
-  Г1, Г2). A guess from the currencies took «≈» off a converted figure, which is worse than one too many. **A long day's sum breaks
+  Г1, Г2); the year's «Разница» under the card is «≈» where some month's is (Д1). A guess from the
+  currencies took «≈» off a converted figure, which is worse than one too many. **A long day's sum breaks
   only after its «+»**, right-aligned in at most 60 % of the day's head: on one line, drams and three
   currencies with their cents put the page at 400 px on a phone of 320 (round 2 of the adversarial
   review) — and never narrower than its widest figure, so in a large system font the day's words give

@@ -317,7 +317,7 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
   })
 
   it('«Пришло и ушло» of one who earns and spends in drams: no «≈» over exact drams (В2)', async () => {
-    const charted = yearCharts({ incomeCurrency: 'AMD' })
+    const charted = yearCharts({ incomeCurrency: 'AMD', differenceTotal: amd('95000') })
     moneyChartYear.mockResolvedValue({
       ...charted,
       months: charted.months.map((one) =>
@@ -330,13 +330,17 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
               difference: amd('95000'),
               spentEstimated: false,
             }
-          : one,
+          : { ...one, spentEstimated: false },
       ),
     })
-    const text = plain(charts(await render())[1]?.text() ?? '')
+    const view = await render()
+    const text = plain(charts(view)[1]?.text() ?? '')
     expect(text).toContain('֏5,000')
     expect(text).toContain('+֏95,000')
     expect(text).not.toContain('≈')
+    // The year's «Разница» under the card is the same exact drams (adversarial Д1).
+    expect(plain(view.text())).toContain('Difference for 2026 +֏')
+    expect(plain(view.text())).not.toContain('Difference for 2026 ≈')
   })
 
   // Adversarial Г1, Г2: one currency, and still a rate converted something — the server says so.

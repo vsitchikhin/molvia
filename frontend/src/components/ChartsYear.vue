@@ -484,10 +484,18 @@ export default defineComponent({
       const shown = charts.value
       const currency = t(`spending.charts.currency_in.${shown?.incomeCurrency ?? 'RUB'}`)
       if (shown?.differenceTotal) {
-        // The words carry their own «≈».
+        // «≈» where a rate converted something of a month, as each month's «Разница» says it — not over
+        // the exact drams of one who earns and spends in drams (MOL-184, adversarial Д1).
+        const estimated = shown.months.some(
+          (month) => month.spentEstimated || month.incomeEstimated,
+        )
+        const amount = signedAmount(shown.differenceTotal, locale.value, {
+          plus: true,
+          estimate: true,
+        })
         return t('spending.charts.year_flow_note', {
           year: props.year,
-          amount: signedAmount(shown.differenceTotal, locale.value, { plus: true, estimate: true }),
+          amount: estimated ? `≈ ${amount}` : amount,
           currency,
         })
       }

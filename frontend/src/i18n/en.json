@@ -666,7 +666,7 @@
       "year_avg_short": "Too few closed months for an average: {n} of 3",
       "year_avg_uncounted": "No average: every closed month has spending with no rate",
       "year_avg_beyond": "No average: the months add up to more than can be counted",
-      "year_flow_note": "Difference for {year} ≈ {amount}. All in {currency}, the income currency",
+      "year_flow_note": "Difference for {year} {amount}. All in {currency}, the income currency",
       "year_flow_missing": "The difference for {year} can't be counted: not everything converted — {months}. All in {currency}, the income currency",
       "category_months_title": "Category by month",
       "category_avg": "Dashed line: the average of closed months",
