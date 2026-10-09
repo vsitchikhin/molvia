@@ -248,8 +248,14 @@ laptop, where `notice.txt` is:
    minute. Read it in Telegram.
 3. The same with `--yes` writes to everybody (`--country=AM,GE` — the people of those countries
    only). The bot starts within a minute, 25 messages a second.
-4. `… node dist/notify.js --status` says how far it got; `--cancel` stops what is left (a typo seen
-   after the start). A second `--yes` while one goes is refused — it would write to everybody twice.
+4. `… node dist/notify.js --status` says how far it got — and the try on yourself beside it, if newer;
+   `--cancel` stops what is left (a typo seen after the start). A second `--yes` while one goes is
+   refused — it would write to everybody twice. «left» not moving for minutes is somebody the bot cannot
+   reach for now — Telegram down, the bot's token revoked and not yet replaced: it tries again every
+   minute and never skips them.
+
+A command run with the file forgotten does not wait for it: two seconds without a byte on its input,
+and it says the message comes on standard input.
 
 In a working copy the same thing is `make notify FILE=notice.txt [COUNTRY=AM,GE] [OWNER=1] [YES=1]`,
 `make notify STATUS=1` and `make notify CANCEL=1`; the copy's bot sends, if it has a token.

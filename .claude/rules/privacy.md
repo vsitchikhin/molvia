@@ -232,7 +232,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   **People are told by the bot, `make notify`** (MOL-237, `bot.md`): a broadcast keeps nobody —
   `broadcasts` has no key to `actors`, so erasure and the copy do not change — and its cursor never
   keeps an erased id: erasure moves it to the nearest live id below, which leaves the same people
-  after it.
+  after it. Erasure locks those broadcasts after the owner, the last of its locks, and the bot's word
+  takes nothing but the broadcast's row — so the one order holds (adversarial А2).
 - **No third-party trackers or analytics, and so no cookie banner** (MOL-58). There are two
   cookies, both strictly necessary: the session and the five-minute one of a login in progress
   (MOL-54); what the phone keeps in its storage is the queue and the drafts the app needs to work.

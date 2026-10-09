@@ -557,17 +557,31 @@ plan in `.scratch/tasks/plans/MOL-237.md`.
   cursor moves only by the bot's word on a batch (`POST /internal/broadcasts/done`), a batch is leased
   for five minutes (`BROADCAST_LEASE_SECONDS` — 25 messages each waiting out a 429 to the cap), and a
   batch never reported goes out again: a bot killed mid-batch writes to up to 25 people twice. A late
-  or repeated word changes nothing (`cursor < through`). Telegram's flood control stops a batch: the
-  word covers the part that went, the rest goes the next minute. A stop finishes the batch in hand,
-  its waits cut short, and claims no other.
+  or repeated word changes nothing (`cursor < through`).
+- **Only sent, blocked and «the chat is gone» move the cursor past a person** (adversarial А1).
+  `deliver` tells `failed` — refused for good, a 400 naming the chat as not found — from `again`: the
+  network, Telegram's 5xx, a revoked token's 401, any other 400, a 429 twice, a 429 whose wait a stop
+  cut short. The reminders lose either, by their own rule; a broadcast ends its batch at `again`, at
+  Telegram's flood control and at the bot stopping — a stop sends nothing more, so no volley without
+  the pauses meets a 429 — the word covers the part that went, and the rest goes the next minute.
+  With nothing gone the word is `through: null`, which only lets the lease go, so a batch stopped on
+  its first message is not held five minutes. **The price, named:** a person whose every message
+  fails in a way that may pass holds the broadcast at them, a try a minute — `STATUS=1` shows «left»
+  not moving, and `CANCEL=1` stops it; the step's log says why, by its code.
 - **One broadcast to people at a time**: a second `YES=1` while one goes is refused — a repeat would
   write to everybody twice — by a lock on queueing and a partial unique index; the owner's try is not
-  one of them. `CANCEL=1` stops what is going (a typo seen after the start), `STATUS=1` says how far it
-  got. **25 a second** (`BROADCAST_GAP_MS`), under Telegram's 30 for a bot.
+  one of them. `CANCEL=1` stops what is going (a typo seen after the start), `STATUS=1` says how far
+  the latest broadcast to people got, and an owner's try after it beside it — a try must not hide it.
+  **A message forgotten on the way in is said, not waited for** (adversarial А4): over `ssh … exec -T`
+  the input is a pipe that never ends, so two seconds without a byte is «the message comes on standard
+  input». **25 a second** (`BROADCAST_GAP_MS`), under Telegram's 30 for a bot.
 - **The table holds nobody** (`privacy.md`): the text, the audience, the counts and a cursor in the
   order of `actors.id`. The cursor always names a live person or nobody (`BROADCAST_START`, the nil
   uuid): the bot's word and erasure both put it on the nearest live id at or below, which leaves the
-  same people after it — so erasure and the copy do not change, and no erased id stays. What
+  same people after it — so erasure and the copy do not change, and no erased id stays. **The two take
+  turns on the broadcast's row** (adversarial А2): the word locks it and only then computes the cursor,
+  in a statement of its own, and erasure locks every broadcast whose cursor may come to the person
+  before deleting them — a word computed from before the erasure wrote the erased id back. What
   `make notify` and the bot print is the text and counts, never anyone.
 - **The privacy page names it** among the bot's messages under «Telegram» — a revision of edition 2,
   since «Если данные утекут» already promised it.
