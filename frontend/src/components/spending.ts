@@ -211,6 +211,8 @@ export interface JournalDay {
   /** The server's total, or null for a day only the phone knows of — it has no figure yet. */
   readonly total: Money | null
   readonly estimated: boolean
+  /** What of the day had no rate, in its own currencies — the server's, whole like `total`. */
+  readonly uncounted: readonly Money[]
   readonly rows: JournalRow[]
 }
 
@@ -277,6 +279,7 @@ export function journalOf(
     day: day.day,
     total: day.total,
     estimated: day.estimated,
+    uncounted: day.uncounted,
     rows: day.entries.flatMap((entry): JournalRow[] => {
       if (entry.kind === 'trip')
         return removedTrips.has(entry.tripId)
@@ -330,7 +333,13 @@ export function journalOf(
     const same = days[at]
     if (same?.day === spending.spentOn) same.rows.unshift(row)
     else {
-      const day: JournalDay = { day: spending.spentOn, total: null, estimated: false, rows: [row] }
+      const day: JournalDay = {
+        day: spending.spentOn,
+        total: null,
+        estimated: false,
+        uncounted: [],
+        rows: [row],
+      }
       if (at === -1) days.push(day)
       else days.splice(at, 0, day)
     }

@@ -96,6 +96,7 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
         day: '2026-09-26',
         total: amd('5000'),
         estimated: false,
+        uncounted: [],
         entries: [
           {
             kind: 'manual',

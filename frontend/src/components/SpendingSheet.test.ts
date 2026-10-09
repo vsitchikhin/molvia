@@ -76,6 +76,7 @@ function month(spentOn: string): MoneyMonthView {
         day: spentOn,
         total: amd('1000'),
         estimated: false,
+        uncounted: [],
         entries: [
           {
             kind: 'manual',

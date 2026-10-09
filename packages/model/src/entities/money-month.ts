@@ -92,6 +92,12 @@ export interface MonthDay {
   readonly total: Money
   /** Something of the day was converted, or could not be: the screen prints «≈». */
   readonly estimated: boolean
+  /**
+   * What of the day could not be counted, by currency (MOL-184, В-1): the day's sum is `total` and
+   * these, so a day of one $50 with no rate is «50 $», not «≈ 0 ֏». Whole like `total`, whatever page
+   * the day's rows come on.
+   */
+  readonly uncounted: readonly Money[]
   readonly entries: readonly MonthEntry[]
 }
 
@@ -228,6 +234,13 @@ export interface MoneyMonthInput {
 
 function add(sums: Map<Currency, bigint>, { minor, currency }: Money): void {
   sums.set(currency, (sums.get(currency) ?? 0n) + minor)
+}
+
+/** What of these rows was not counted, summed by currency. */
+function uncountedOf(entries: readonly MonthEntry[]): Money[] {
+  const sums = new Map<Currency, bigint>()
+  for (const entry of entries) if (entry.counted === null) add(sums, amountOf(entry))
+  return listOf(sums)
 }
 
 /** The days incomes came in on, each once, earliest first. */
@@ -482,6 +495,7 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
         currency: spend,
       },
       estimated: list.some((entry) => amountOf(entry).currency !== spend),
+      uncounted: uncountedOf(list),
       entries: list,
     })),
   }
