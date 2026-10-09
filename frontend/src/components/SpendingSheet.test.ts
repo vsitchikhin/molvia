@@ -294,3 +294,89 @@ describe('SpendingSheet: a record with no purchases handed over (MOL-78, В-1)',
     expect(document.querySelector('dialog[open]')).toBeNull()
   })
 })
+
+/**
+ * Е-10 (MOL-184): one spending, one «≈». A spending in roubles written on the 20th keeps the rate of
+ * its day, 4,30 ֏; the running month's is 4,62. The journal counts it by its own — so must its sheet.
+ */
+describe('SpendingSheet: the «≈» of a spending written is its own day’s (MOL-184, Е-10)', () => {
+  const kept = {
+    base: 'RUB',
+    quote: 'AMD',
+    scaled: 4_300_000n,
+    source: 'official',
+    asOf: new Date(),
+  } as const
+
+  function inRoubles(rate: typeof kept | null): MoneyMonthView {
+    const base = month('2026-09-20')
+    const [day] = base.days
+    const [entry] = day?.entries ?? []
+    if (!day || entry?.kind !== 'manual') throw new Error('no row')
+    return {
+      ...base,
+      days: [
+        {
+          ...day,
+          entries: [
+            {
+              ...entry,
+              spending: { ...entry.spending, amount: rub('3500'), rate },
+              counted: rate ? amd('15050') : null,
+            },
+          ],
+        },
+      ],
+    }
+  }
+
+  async function opened(view: VueWrapper): Promise<HTMLDialogElement> {
+    await view.find('.list-row').trigger('click')
+    await risen()
+    const dialog = document.querySelector<HTMLDialogElement>('dialog[open]')
+    if (!dialog) throw new Error('no sheet')
+    return dialog
+  }
+  const conversion = (dialog: HTMLDialogElement) =>
+    (dialog.querySelector('.conversion')?.textContent ?? '').replace(/\s/g, ' ').trim()
+  async function type(dialog: HTMLDialogElement, selector: string, value: string): Promise<void> {
+    const field = dialog.querySelector<HTMLInputElement>(selector)
+    if (!field) throw new Error(`no ${selector}`)
+    field.value = value
+    field.dispatchEvent(new Event('input'))
+    await flushPromises()
+  }
+
+  it('untouched, it is the journal’s «≈», by the rate of its day — not the running month’s', async () => {
+    moneyMonth.mockResolvedValue(inRoubles(kept))
+    const view = await render(undefined, '/money/spendings')
+    expect(view.get('.list-row').text()).toContain('15,050')
+    const dialog = await opened(view)
+    expect(conversion(dialog)).toBe(
+      '≈ ֏15,050 at the Central Bank of Armenia rate of 4.30 ֏ per 1 ₽',
+    )
+  })
+
+  it('an amount put right is counted by the same rate: the server keeps it for the same day', async () => {
+    moneyMonth.mockResolvedValue(inRoubles(kept))
+    const dialog = await opened(await render(undefined, '/money/spendings'))
+    await type(dialog, 'input[inputmode="decimal"]', '1000')
+    expect(conversion(dialog)).toContain('≈ ֏4,300')
+  })
+
+  it('must not fire: a day moved is another fact — counted as one typed anew', async () => {
+    moneyMonth.mockResolvedValue(inRoubles(kept))
+    const dialog = await opened(await render(undefined, '/money/spendings'))
+    dayField().value = '2026-09-21'
+    dayField().dispatchEvent(new Event('input'))
+    dayField().dispatchEvent(new Event('change'))
+    await flushPromises()
+    expect(conversion(dialog)).toBe('≈ ֏16,170 at my rate of 4.62 ֏ per 1 ₽')
+  })
+
+  it('no rate that day: the server takes one anew, and the sheet says so instead of guessing', async () => {
+    moneyMonth.mockResolvedValue(inRoubles(null))
+    const dialog = await opened(await render(undefined, '/money/spendings'))
+    expect(conversion(dialog)).toBe(en.spending.sheet.conversion_later)
+  })
+})
