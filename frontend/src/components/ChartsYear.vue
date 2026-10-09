@@ -26,10 +26,11 @@
     </template>
   </StatusStrip>
 
-  <ChartsSkeleton v-if="phase === 'loading'" year />
+  <ChartsSkeleton v-if="phase === 'loading'" class="spaced" year />
 
   <ScreenState
     v-else-if="phase === 'error'"
+    class="spaced"
     kind="error"
     :title="t('spending.charts.load_error.title')"
     :body="t('spending.charts.load_error.body')"
@@ -38,6 +39,7 @@
 
   <ScreenState
     v-else-if="phase === 'offline'"
+    class="spaced"
     kind="offline"
     tone="warn"
     :title="t('spending.offline.title')"
@@ -47,6 +49,7 @@
   <template v-else-if="charts">
     <ScreenState
       v-if="charts.firstMonth === null"
+      class="spaced"
       kind="empty"
       :icon="IconDonut"
       :title="t('spending.charts.empty.title')"
@@ -804,11 +807,19 @@ export default defineComponent({
   text-align: right;
 }
 
+/* What stands in the answer's place — the skeleton, a state — stands where its first card would. */
+.spaced {
+  margin-top: var(--space-4);
+}
+
 /* The answer comes in where the skeleton stood, faded only: nothing under the thumb may move
    (MOL-151, review №5 and №7, MOL-138). Here and not on the screen: a component of several roots
-   takes no scope of the screen's. */
+   takes no scope of the screen's. 24 between the cards and above the first, with the screen's 8
+   (Ф-10). */
 .chart-card,
 .answer {
   @include appear(0);
+
+  margin-top: var(--space-4);
 }
 </style>
