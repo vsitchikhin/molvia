@@ -351,6 +351,8 @@ interface State {
   readonly pick: Candidate | null
   readonly prev: State | null
   readonly blank: number
+  // the total's one answer is given: the blank line's rest, or a slice (MOL-246, review В1)
+  readonly answered: boolean
   // another reading of the same cost reached the same sum: the total cannot tell which (review Р20)
   readonly tied: boolean
 }
@@ -371,6 +373,9 @@ export const RECONCILE_STEPS_MAX = 500_000
  * settled against their total in a tenth of a second, ninety in under a third.
  */
 export const RECONCILE_STATES_MAX = 300
+
+// What the total's one answer costs — the blank line's rest or a slice: dearer than any line's own reading.
+const ANSWER_COST = 4
 
 function picksOf(state: State): (Candidate | null)[] {
   const picks: (Candidate | null)[] = []
@@ -397,14 +402,22 @@ function reconcile(
   // what the lines after each one come to as first read: a reading whose sum with them lands nearer
   // the total is kept before another of the same cost when the beam is full (review П11)
   const ahead = lists.map((_, i) => first.slice(i + 1).reduce((sum, x) => sum + (x?.paid ?? 0), 0))
-  const start: State = { sum: 0, cost: 0, pick: null, prev: null, blank: -1, tied: false }
-  let states = new Map<string, State>([['0|false', start]])
+  const start: State = {
+    sum: 0,
+    cost: 0,
+    pick: null,
+    prev: null,
+    blank: -1,
+    answered: false,
+    tied: false,
+  }
+  let states = new Map<string, State>([['0|false|false', start]])
   let steps = 0
   for (const [i, list] of lists.entries()) {
     const next = new Map<string, State>()
     const put = (state: State): void => {
       steps += 1
-      const key = `${String(state.sum)}|${String(state.blank >= 0)}`
+      const key = `${String(state.sum)}|${String(state.blank >= 0)}|${String(state.answered)}`
       const was = next.get(key)
       if (was === undefined || state.cost < was.cost) next.set(key, state)
       else if (state.cost === was.cost && !was.tied) next.set(key, { ...was, tied: true })
@@ -413,13 +426,14 @@ function reconcile(
       if (steps > RECONCILE_STEPS_MAX) break
       // a line with no reading of its own takes the rest of the total, or a slice (MOL-246)
       if (list.every((x) => x.sliced === true)) {
-        if (state.blank < 0) {
+        if (!state.answered) {
           put({
             sum: state.sum,
-            cost: state.cost + 4,
+            cost: state.cost + ANSWER_COST,
             pick: null,
             prev: state,
             blank: i,
+            answered: true,
             tied: state.tied,
           })
         }
@@ -431,6 +445,23 @@ function reconcile(
         seen.add(x.paid)
         const sum = state.sum + x.paid
         if (sum > total) continue
+        // a slice is the total's answer as the blank's rest is, at its price, and the receipt has one
+        // (review В1, В2): two lines with none of their own could share the total between a slice and
+        // a rest, and a slice at the price of a swap beat a right rest with two swaps elsewhere
+        if (x.sliced === true) {
+          if (!state.answered) {
+            put({
+              sum,
+              cost: state.cost + ANSWER_COST,
+              pick: x,
+              prev: state,
+              blank: state.blank,
+              answered: true,
+              tied: state.tied,
+            })
+          }
+          continue
+        }
         put({
           sum,
           cost:
@@ -441,6 +472,7 @@ function reconcile(
           pick: x,
           prev: state,
           blank: state.blank,
+          answered: state.answered,
           tied: state.tied,
         })
       }

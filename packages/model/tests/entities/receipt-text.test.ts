@@ -2117,6 +2117,62 @@ describe('a sign OCR read as a digit (MOL-246)', () => {
     ]).toEqual([true, 211_900, false])
   })
 
+  // review В1, В2: a slice is the total's one answer, as the blank's rest is, and at its price
+  const three = (bread: string, cheese: string, ...tail: string[]) =>
+    bestReading(
+      [0, 1].map(() =>
+        rowsOf(
+          [
+            '1. Կաթ',
+            '0401/1163909 1Հտ 100,00/0,00 100',
+            '2. Հաց',
+            `0402/1163901 1Հտ ${bread}`,
+            '3. Պանիր',
+            `0403/1163902 1Հտ ${cheese}`,
+            ...tail,
+          ].join('\n'),
+          0,
+        ),
+      ),
+    )
+  const shown = (got: ReceiptText) => [
+    got.lines.map((l) => [l.sumHundredths, l.settled]),
+    got.totalHundredths,
+    got.balanced,
+  ]
+
+  it('must not share the total between a slice and another line’s rest (review В1)', () => {
+    // 100,00 + 2 119,00 + 1 500,00: the bread’s price lost its «2», the cheese’s misread — two lines with
+    // no reading of their own, and the total has one answer to give
+    expect(shown(three('2119,00/0,00 119', '1500,00/0,00 1700', 'Ընդամենը 3719.00'))).toEqual([
+      [
+        [10_000, true],
+        [211_900, false],
+        [150_000, false],
+      ],
+      null,
+      false,
+    ])
+  })
+
+  it.each([
+    ['1119,00/0,00 119', '5200,00/0,00 5200', '6419.00', 111_900, 520_000],
+    ['3119,00/0,00 119', '1200,00/0,00 1200', '4419.00', 311_900, 120_000],
+  ])(
+    'must not buy a slice with two swaps of a right line: %s, %s (review В2)',
+    (bread, cheese, total, rest, read) => {
+      expect(shown(three(bread, cheese, `Ընդամենը ${total}`))).toEqual([
+        [
+          [10_000, true],
+          [rest, false],
+          [read, true],
+        ],
+        Math.round(Number(total) * 100),
+        true,
+      ])
+    },
+  )
+
   it('must not make a misread reading tie a right one: the reading as printed wins (review Б3)', () => {
     const misread = rowsOf(terminal('2119.00x1.0 հատ=119.00դրամ', 'Ընդամենը: 2119.00'), 0)
     const right = rowsOf(terminal('2119.00x1.0 հատ=2119.00դրամ', 'Ընդամենը: 2119.00'), 0)
