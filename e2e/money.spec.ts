@@ -245,13 +245,17 @@ test('«Траты» stand in the field of 16, the days 24 apart and 8 over thei
     const box = (node: Element | null | undefined) => node?.getBoundingClientRect()
     return {
       left: box(first?.querySelector('.card'))?.left ?? Number.NaN,
+      // The total heads the column, 24 over its first day (review Р2-3).
+      underTotal:
+        (box(first)?.top ?? Number.NaN) -
+        (box(document.querySelector('.content > .total'))?.bottom ?? Number.NaN),
       between: (box(second)?.top ?? Number.NaN) - (box(first)?.bottom ?? Number.NaN),
       overCard:
         (box(first?.querySelector('.card'))?.top ?? Number.NaN) -
         (box(first?.querySelector('.day-head'))?.bottom ?? Number.NaN),
     }
   })
-  expect(measured).toEqual({ left: 16, between: 24, overCard: 8 })
+  expect(measured).toEqual({ left: 16, underTotal: 24, between: 24, overCard: 8 })
 })
 
 // A day of one spending in dollars with no rate of its day (MOL-184, В-1, В-2): the end-to-end API
@@ -424,6 +428,18 @@ test('a refused spending moves nothing as the month changes: its row stands in e
   await expect(row).toBeVisible()
   await expect(group).toBeVisible()
   await expect(card).toHaveCount(0)
+  // «Не приняты» is a group of its own: 24 from the switcher over it and the total under it
+  // (MOL-184, review Р2-3).
+  const around = await page.locator('section.refused').evaluate((section) => ({
+    over:
+      section.getBoundingClientRect().top -
+      (document.querySelector('.content > .switcher')?.getBoundingClientRect().bottom ??
+        Number.NaN),
+    under:
+      (document.querySelector('.content > .total')?.getBoundingClientRect().top ?? Number.NaN) -
+      section.getBoundingClientRect().bottom,
+  }))
+  expect(around).toEqual({ over: 24, under: 24 })
 
   const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
   await standAt(previous, 100)

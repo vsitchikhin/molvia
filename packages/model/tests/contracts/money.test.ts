@@ -103,8 +103,9 @@ describe('a month on the wire', () => {
     }
     const wire = z.encode(moneyMonthCodec, first)
     expect(moneyMonthCodec.parse(wire).days[0]?.uncounted).toEqual([money(5000n, 'USD')])
-    const older = { ...wire, days: wire.days.map(({ uncounted: _, ...day }) => day) }
-    expect(moneyMonthCodec.parse(older).days[0]?.uncounted).toEqual([])
+    const days = wire.days.map((day): Record<string, unknown> => ({ ...day }))
+    for (const day of days) delete day.uncounted
+    expect(moneyMonthCodec.parse({ ...wire, days }).days[0]?.uncounted).toEqual([])
   })
 
   it('starts the next page after the last row shown, whatever was written or removed above (Д3)', () => {
