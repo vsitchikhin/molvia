@@ -490,9 +490,9 @@ export default defineComponent({
 }
 
 /* 24 between the days and above the first (157 v2 02 п. 4, Ф-10); 8 from a day's words to its card.
-   The field is `AppScreen`'s 16 (С-23): a padding here made it 32. «Не приняты» is a group of its own,
-   24 on both sides. */
-/* A flex column, not a grid: a day removed takes the column's gap with it (`AppReveal`, А2). */
+   The field is `AppScreen`'s 16 (С-23): a padding here made it 32. A flex column, not a grid: a day
+   removed takes the column's gap with it (`AppReveal`, А2). «Не приняты» is a group of its own, 24 on
+   both sides. */
 .days {
   display: flex;
   flex-direction: column;
