@@ -106,7 +106,7 @@
               <p class="column">
                 <span class="label">{{ t('spending.charts.spent_legend') }}</span>
                 <span class="value" :class="{ words: flowMonth.spentIncome === null }">
-                  {{ approx(flowMonth.spentIncome) }}
+                  {{ outOf(flowMonth) }}
                 </span>
               </p>
               <p class="column">
@@ -267,6 +267,14 @@ export default defineComponent({
     const nameOf = (category: SpendingCategoryView) =>
       category.preset ? t(`spending.category.${category.preset}`) : (category.name ?? '')
     const both = computed(() => charts.value?.spendCurrency !== charts.value?.incomeCurrency)
+    /**
+     * «Ушло» of «Пришло и ушло» in the income currency: «≈» only where a rate converted something — not
+     * over exact drams of one who earns and spends in drams, nor over «0» with «не посчитано: 50 $»
+     * under it (MOL-184, adversarial В1, В2: the rule of `spentApprox` on «Деньги» and «Траты»).
+     */
+    const converted = (month: YearMonth) => both.value && month.spent.minor !== 0n
+    const outOf = (month: YearMonth) =>
+      month.spentIncome && !converted(month) ? whole(month.spentIncome) : approx(month.spentIncome)
 
     /**
      * The first year with anything in it, as the freshest answer on the phone names it — the one
@@ -397,7 +405,7 @@ export default defineComponent({
       if (!month) return ''
       // No «≈ 0 ₽» over nothing counted, and what had no rate as written (MOL-184, adversarial Б1, Б2).
       const parts = [
-        both.value && month.spent.minor !== 0n ? approx(month.spentIncome) : null,
+        converted(month) ? approx(month.spentIncome) : null,
         changeWords(month.month, month.change),
         month.uncounted.length > 0
           ? t('spending.charts.uncounted', { amounts: written(month.uncounted) })
@@ -435,7 +443,7 @@ export default defineComponent({
         spoken: t('spending.charts.pair_label', {
           month: longMonth(month.month, locale.value),
           income: whole(month.income),
-          spent: approx(month.spentIncome),
+          spent: outOf(month),
         }),
         level: month.spentIncomeLevel,
         outline: month.incomeLevel,
@@ -450,7 +458,9 @@ export default defineComponent({
     /** «Разница» of a month, or why there is none: no rate of the month, or something not counted. */
     const differenceOf = (month: YearMonth) =>
       month.difference
-        ? signedApprox(month.difference)
+        ? converted(month)
+          ? signedApprox(month.difference)
+          : signedAmount(month.difference, locale.value, { plus: true, estimate: true })
         : month.spentIncome === null
           ? t('spending.charts.no_rate')
           : t('spending.charts.difference_uncounted')
@@ -599,6 +609,7 @@ export default defineComponent({
       when,
       whole,
       approx,
+      outOf,
       both,
       nameOf,
       ring,

@@ -288,6 +288,52 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     expect(plain(charts(view)[1]?.text() ?? '')).toContain('Difference · Sep')
   })
 
+  // MOL-184, adversarial В1, В2: «≈» of «Ушло» and «Разница» only where a rate converted something.
+  it('«Пришло и ушло»: no «≈ 0» over nothing counted, the uncounted as written (В1)', async () => {
+    const charted = yearCharts()
+    moneyChartYear.mockResolvedValue({
+      ...charted,
+      months: charted.months.map((one) =>
+        one.month === '2026-09'
+          ? {
+              ...one,
+              spent: amd('0'),
+              spentIncome: rub('0'),
+              uncounted: [parseMoney('50.50', 'USD')],
+              difference: rub('120000'),
+            }
+          : one,
+      ),
+    })
+    const text = plain(charts(await render())[1]?.text() ?? '')
+    expect(text).not.toContain('≈')
+    expect(text).toContain('₽0')
+    expect(text).toContain('+₽120,000')
+    expect(text).toContain('$50.50')
+  })
+
+  it('«Пришло и ушло» of one who earns and spends in drams: no «≈» over exact drams (В2)', async () => {
+    const charted = yearCharts({ incomeCurrency: 'AMD' })
+    moneyChartYear.mockResolvedValue({
+      ...charted,
+      months: charted.months.map((one) =>
+        one.month === '2026-09'
+          ? {
+              ...one,
+              spent: amd('5000'),
+              spentIncome: amd('5000'),
+              income: amd('100000'),
+              difference: amd('95000'),
+            }
+          : one,
+      ),
+    })
+    const text = plain(charts(await render())[1]?.text() ?? '')
+    expect(text).toContain('֏5,000')
+    expect(text).toContain('+֏95,000')
+    expect(text).not.toContain('≈')
+  })
+
   it('says when the average comes, and the dashed line with its months once it has', async () => {
     moneyChartYear.mockResolvedValue(yearCharts())
     const few = await render()
