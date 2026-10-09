@@ -851,7 +851,7 @@
       "refused_below": "{n} marked in the journal below — show | {n} marked in the journal below — show",
       "count": "{n} spending | {n} spendings",
       "unsent": "{n} spending not counted yet | {n} spendings not counted yet",
-      "offline_strip": "No connection. Spendings as of {when}. New ones are kept on the phone and sent when you are back online",
+      "offline_strip": "Offline · spendings as of {when}. New ones are kept on the phone",
       "empty": {
         "title": "No spendings in {month}",
         "body": "Add a spending or record purchases in Purchases — they will show up here by themselves"
