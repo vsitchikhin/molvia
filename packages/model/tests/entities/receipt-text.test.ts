@@ -2109,6 +2109,49 @@ describe('a sign OCR read as a digit (MOL-246)', () => {
     expect(line('1480.32x1.0 հատ=480.32դրամ', 'Ընդամենը: 480.32').settled).toBe(false)
   })
 
+  // review Д1, Д2: slices only where no way without them meets the total, and a reading met only by its
+  // slice has no balance to rank by
+  const cheese = (bread: string, cheeseRow: string | null, ...tail: string[]) =>
+    [
+      '1. Կաթ',
+      '0401/1163909 1Հտ 1000,00/0,00 1000',
+      '2. Հաց',
+      `0402/1163901 1Հտ ${bread}`,
+      ...(cheeseRow === null ? [] : ['3. Պանիր', `0403/1163902 1Հտ ${cheeseRow}`]),
+      ...tail,
+    ].join('\n')
+
+  it.each([[[]], [['Կանխիկ 5319.00']]])(
+    'must not let a slice absorb another line’s misread (review Д1), payment %j',
+    (pay) => {
+      // 1 000 + 3 119 + 1 200 = 5 319: the bread’s price lost its «3», the cheese’s 1 read 4 in both
+      // columns — the blank and the cheese’s own swaps meet the total, so no slice is offered
+      const text = cheese('3119,00/0,00 119', '4200,00/0,00 4200', 'Ընդամենը 5319.00', ...pay)
+      expect(shown(bestReading([rowsOf(text, 0), rowsOf(text, 0)]))).toEqual([
+        [
+          [100_000, true],
+          [311_900, false],
+          [120_000, false],
+        ],
+        531_900,
+        true,
+      ])
+    },
+  )
+
+  it('must not rank a reading met only by its slice above one read right (review Д2)', () => {
+    const misread = cheese('3119,00/0,00 119', null, 'Ընդամենը 1119.00')
+    const right = cheese('3119,00/0,00 3119', null, 'Ընդամենը 1119.00')
+    expect(shown(bestReading([rowsOf(misread, 0), rowsOf(right, 0)]))).toEqual([
+      [
+        [100_000, true],
+        [311_900, true],
+      ],
+      null,
+      false,
+    ])
+  })
+
   it('leaves the total’s answer to a line with none when a slice only signs a sum read (review 12)', () => {
     const got = parseReceiptText(
       rowsOf(

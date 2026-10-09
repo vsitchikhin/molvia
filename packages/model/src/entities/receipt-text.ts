@@ -534,7 +534,13 @@ function judged(
   // the shared rate counts in the total's choice only where `settle` had none to order by
   const own = lists.map((list) => list.filter((x) => x.sliced !== true))
   const shared = own.some((list) => list.some((x) => x.swaps === 0)) ? null : asReadRate(own)
-  const { picks, balanced, tied } = reconcile(lists, total, printed, shared)
+  // slices only where no way without them meets the total (review Д1): beside a blank and another line's
+  // swaps, a wrong slice met it cheaper by leaving that line's misread as read
+  const plain = reconcile(own, total, printed, shared)
+  const { picks, balanced, tied } =
+    plain.balanced || own.every((list, i) => list.length === lists[i]?.length)
+      ? plain
+      : reconcile(lists, total, printed, shared)
   // what the total leaves goes to the one line with no reading only when the lines met the total —
   // otherwise «the rest» is a guess, and a line that took it would cover a receipt barely read
   // (review Р6)
@@ -1977,10 +1983,14 @@ export function mergeParts(parts: readonly (readonly TextRow[])[]): TextRow[] {
 export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptText {
   const laid = readings.map(readingOf)
   const parsed = laid.map((one) => one.read)
-  const settledCount = (r: ReceiptText): number => r.lines.filter((l) => l.settled).length
-  const merit = (a: ReceiptText, b: ReceiptText): number =>
-    Number(b.balanced) - Number(a.balanced) || settledCount(b) - settledCount(a)
-  const best = [...parsed].sort(merit)[0]
+  const settledAt = (i: number): number => parsed[i]?.lines.filter((l) => l.settled).length ?? 0
+  // a reading that met its total through a slice met its own choice (MOL-246): no balance to rank by
+  // (review Д2)
+  const metAt = (i: number): boolean => parsed[i]?.balanced === true && laid[i]?.sliced !== true
+  const order = parsed
+    .map((_, i) => i)
+    .sort((a, b) => Number(metAt(b)) - Number(metAt(a)) || settledAt(b) - settledAt(a))
+  const best = parsed[order[0] ?? 0]
   if (best === undefined) throw new RangeError('a receipt needs at least one reading')
   // no reading found a line: a section with no items is read whole, not one to shoot again (MOL-227)
   if (best.lines.length === 0) {
