@@ -199,6 +199,54 @@ describe('the month of «Деньги»', () => {
     ])
   })
 
+  it('names what of a day had no rate, so a day of one $50 is not «≈ 0 ֏» (MOL-184, В-1)', () => {
+    const result = month({
+      spendings: [
+        // Counted whole.
+        spending('11 USD', '2026-09-20', 'telecom', rate('USD', 'AMD', '400')),
+        spending('900 AMD', '2026-09-20'),
+        // In part: two dollars and a euro of no rate beside drams.
+        spending('5000 AMD', '2026-09-12'),
+        spending('30 USD', '2026-09-12'),
+        spending('20 USD', '2026-09-12'),
+        spending('5.50 EUR', '2026-09-12'),
+        // Nothing counted.
+        spending('50 USD', '2026-09-03'),
+      ],
+      // A trip with no rate of its day is a row of the day as well.
+      trips: [trip('10 EUR', '2026-09-03')],
+    })
+    expect(
+      result.days.map(({ day, total, estimated, uncounted }) => ({
+        day,
+        total,
+        estimated,
+        uncounted,
+      })),
+    ).toEqual([
+      { day: '2026-09-20', total: toMoney('5300 AMD'), estimated: true, uncounted: [] },
+      // Drams exact beside what had no rate: no «≈» over them.
+      {
+        day: '2026-09-12',
+        total: toMoney('5000 AMD'),
+        estimated: false,
+        uncounted: [toMoney('5.50 EUR'), toMoney('50 USD')],
+      },
+      {
+        day: '2026-09-03',
+        total: toMoney('0 AMD'),
+        estimated: false,
+        uncounted: [toMoney('10 EUR'), toMoney('50 USD')],
+      },
+    ])
+    // «Must not fire»: a day of drams alone is not «≈» and leaves nothing uncounted. (Drams are a day's
+    // uncounted only past what money holds — MOL-73, Д5 — and are said so: adversarial А6.)
+    expect(month({ spendings: [spending('900 AMD', '2026-09-12')] }).days[0]).toMatchObject({
+      estimated: false,
+      uncounted: [],
+    })
+  })
+
   it('names the categories whose sums are short: a spending and a trip with no rate (d9 round 3, В3)', () => {
     const result = month({
       spendings: [

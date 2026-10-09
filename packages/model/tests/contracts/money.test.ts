@@ -88,6 +88,26 @@ describe('a month on the wire', () => {
     expect(next).toMatchObject({ cursor: null, remaining: 0, remainingFrom: null })
   })
 
+  it('says what of a day had no rate on every page of it, and reads an answer older than it (MOL-184)', () => {
+    // 45 rows of one day; the first, written last, is the only one in dollars, with no rate.
+    const list = spendings(45, () => '2026-09-20').map((row, index) =>
+      index === 0 ? { ...row, amount: money(5000n, 'USD') } : row,
+    )
+    const first = moneyMonthViewOf(monthOf(list), null, categories)
+    const next = moneyMonthViewOf(monthOf(list), null, categories, first.cursor ?? undefined)
+    for (const page of [first, next]) {
+      expect(page.days[0]).toMatchObject({
+        total: money(4400n, 'AMD'),
+        uncounted: [money(5000n, 'USD')],
+      })
+    }
+    const wire = z.encode(moneyMonthCodec, first)
+    expect(moneyMonthCodec.parse(wire).days[0]?.uncounted).toEqual([money(5000n, 'USD')])
+    const days = wire.days.map((day): Record<string, unknown> => ({ ...day }))
+    for (const day of days) delete day.uncounted
+    expect(moneyMonthCodec.parse({ ...wire, days }).days[0]?.uncounted).toEqual([])
+  })
+
   it('starts the next page after the last row shown, whatever was written or removed above (Д3)', () => {
     const list = spendings(45, () => '2026-09-20')
     const first = moneyMonthViewOf(monthOf(list), null, categories)

@@ -600,6 +600,30 @@ describe('курсы «Денег» (ревью MOL-73: Р-1…Р-5, адвер�
     ])
   })
 
+  it('день называет, что в нём без курса, на каждой своей странице (MOL-184, В-1)', async () => {
+    const me = await owner()
+    // Written first, the dollars are the oldest row of the day: on the second page.
+    await spend(me, { spentOn: today, amount: { amount: '50', currency: 'USD' } })
+    const beauty = await presetId(me, 'beauty')
+    for (let index = 0; index < 40; index += 1) {
+      await call(me, 'POST', '/spendings', {
+        id: randomUUID(),
+        spentOn: today,
+        amount: { amount: '100', currency: 'AMD' },
+        categoryId: beauty,
+      })
+    }
+    const first = await month(me, today.slice(0, 7))
+    const next = await month(me, today.slice(0, 7), first.cursor ?? undefined)
+    for (const page of [first, next]) {
+      expect(page.days[0]).toMatchObject({
+        total: { minor: 400000n, currency: 'AMD' },
+        estimated: false,
+        uncounted: [{ minor: 5000n, currency: 'USD' }],
+      })
+    }
+  })
+
   it('официальный курс — только свежий: трата в $ с курсом трёхнедельной давности не посчитана (Р-4)', async () => {
     const me = await owner()
     await rates.upsert([official('USD', '390', daysAgo(25))])

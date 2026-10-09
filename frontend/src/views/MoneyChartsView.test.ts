@@ -44,6 +44,9 @@ function yearMonth(month: string, data?: Partial<YearMonth>): YearMonth {
     spentIncome: null,
     income: rub('0'),
     incomeUncounted: [],
+    // Drams spent, roubles come in: what went out is a conversion wherever there is data.
+    spentEstimated: Boolean(data),
+    incomeEstimated: false,
     difference: null,
     change: null,
     spentLevel: 0,
@@ -286,6 +289,94 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     await charts(view)[0]?.findAll('input[type="radio"]')[0]?.setValue(true)
     expect(plain(charts(view)[0]?.text() ?? '')).toContain('≈ ₽71,387 · +73% against the average')
     expect(plain(charts(view)[1]?.text() ?? '')).toContain('Difference · Sep')
+  })
+
+  // MOL-184, adversarial В1, В2: «≈» of «Ушло» and «Разница» only where a rate converted something.
+  it('«Пришло и ушло»: no «≈ 0» over nothing counted, the uncounted as written (В1)', async () => {
+    const charted = yearCharts()
+    moneyChartYear.mockResolvedValue({
+      ...charted,
+      months: charted.months.map((one) =>
+        one.month === '2026-09'
+          ? {
+              ...one,
+              spent: amd('0'),
+              spentIncome: rub('0'),
+              uncounted: [parseMoney('50.50', 'USD')],
+              difference: rub('120000'),
+              spentEstimated: false,
+            }
+          : one,
+      ),
+    })
+    const text = plain(charts(await render())[1]?.text() ?? '')
+    expect(text).not.toContain('≈')
+    expect(text).toContain('₽0')
+    expect(text).toContain('+₽120,000')
+    expect(text).toContain('$50.50')
+  })
+
+  it('«Пришло и ушло» of one who earns and spends in drams: no «≈» over exact drams (В2)', async () => {
+    const charted = yearCharts({ incomeCurrency: 'AMD', differenceTotal: amd('95000') })
+    moneyChartYear.mockResolvedValue({
+      ...charted,
+      months: charted.months.map((one) =>
+        one.month === '2026-09'
+          ? {
+              ...one,
+              spent: amd('5000'),
+              spentIncome: amd('5000'),
+              income: amd('100000'),
+              difference: amd('95000'),
+              spentEstimated: false,
+            }
+          : { ...one, spentEstimated: false },
+      ),
+    })
+    const view = await render()
+    const text = plain(charts(view)[1]?.text() ?? '')
+    expect(text).toContain('֏5,000')
+    expect(text).toContain('+֏95,000')
+    expect(text).not.toContain('≈')
+    // The year's «Разница» under the card is the same exact drams (adversarial Д1).
+    expect(plain(view.text())).toContain('Difference for 2026 +֏')
+    expect(plain(view.text())).not.toContain('Difference for 2026 ≈')
+  })
+
+  // Adversarial Г1, Г2: one currency, and still a rate converted something — the server says so.
+  it('«Пришло и ушло» in one currency keeps «≈» where a rate converted a spending or an income (Г1, Г2)', async () => {
+    const drams = (patch: Partial<YearMonth>) => {
+      const charted = yearCharts({ incomeCurrency: 'AMD' })
+      return {
+        ...charted,
+        months: charted.months.map((one) =>
+          one.month === '2026-09'
+            ? {
+                ...one,
+                spent: amd('9290'),
+                spentIncome: amd('9290'),
+                income: amd('100000'),
+                difference: amd('90710'),
+                spentEstimated: false,
+                incomeEstimated: false,
+                ...patch,
+              }
+            : one,
+        ),
+      }
+    }
+    // 11 $ by the rate of their day among the drams.
+    moneyChartYear.mockResolvedValue(drams({ spentEstimated: true }))
+    const spent = await render()
+    const out = plain(charts(spent)[1]?.text() ?? '')
+    expect(out).toContain('≈ ֏9,290')
+    expect(out).toContain('≈ +֏90,710')
+    spent.unmount()
+    // A salary of 300 $ by the official rate of its day: «Пришло» converted, «Ушло» exact.
+    moneyChartYear.mockResolvedValue(drams({ incomeEstimated: true }))
+    const came = plain(charts(await render())[1]?.text() ?? '')
+    expect(came).toContain('≈ +֏90,710')
+    expect(came).not.toContain('≈ ֏9,290')
   })
 
   it('says when the average comes, and the dashed line with its months once it has', async () => {

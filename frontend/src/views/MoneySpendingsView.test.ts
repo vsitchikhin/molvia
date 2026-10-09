@@ -5,7 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import type { Router } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
-import { ERROR, parseMoney } from '@molvia/model'
+import { ERROR, moneyAccountsCodec, parseMoney } from '@molvia/model'
 import type { JournalKey, MoneyMonthView, SpendingBody, TripView } from '@molvia/model'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
@@ -87,6 +87,7 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
         day: '2026-09-26',
         total: amd('5000'),
         estimated: false,
+        uncounted: [],
         entries: [
           {
             kind: 'manual',
@@ -461,7 +462,7 @@ describe('MoneySpendingsView: the journal of the month (MOL-159)', () => {
     online(false)
     moneyMonth.mockRejectedValue(new TypeError('network'))
     const view = await render()
-    expect(view.text()).toContain('No connection. Spendings as of')
+    expect(view.text()).toContain('Offline · spendings as of')
     expect(view.text()).toContain('Barber')
   })
 
@@ -740,5 +741,140 @@ describe('MoneySpendingsView: what round 2 of the review of MOL-159 found', () =
       undo: { id: BARBER },
       title: 'Barber',
     })
+  })
+})
+
+describe('MoneySpendingsView: the kit’s states, the rhythm and the day’s sum (MOL-184)', () => {
+  it('a month kept and the server not answering: the strip says when, and «Retry» asks again', async () => {
+    moneyMonth.mockResolvedValueOnce(month())
+    ;(await render()).unmount()
+    moneyMonth.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL)).mockResolvedValue(month())
+    const view = await render()
+    expect(view.get('.strip').text()).toContain('The server did not answer — spending as of')
+    expect(view.text()).toContain('Barber')
+    const asked = moneyMonth.mock.calls.length
+    await view.get('.strip button').trigger('click')
+    await flushPromises()
+    expect(moneyMonth.mock.calls.length).toBe(asked + 1)
+    expect(view.find('.strip').exists()).toBe(false)
+  })
+
+  it('must not fire: offline there is no «Retry» — nothing to try until the connection is back', async () => {
+    moneyMonth.mockResolvedValueOnce(month())
+    ;(await render()).unmount()
+    online(false)
+    moneyMonth.mockRejectedValue(new TypeError('network'))
+    const view = await render()
+    expect(view.get('.strip').text()).toContain('Offline · spendings as of')
+    expect(view.find('.strip button').exists()).toBe(false)
+  })
+
+  it('loads as the answer stands: the total, a day’s caption and three rows of the journal', async () => {
+    moneyMonth.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    const skeleton = view.get('.skeleton')
+    expect(skeleton.find('.total .ghost-figure').exists()).toBe(true)
+    expect(skeleton.find('.skeleton-caption').exists()).toBe(true)
+    expect(skeleton.findAll('.skeleton-rows li')).toHaveLength(3)
+    expect(skeleton.find('.skeleton-lines').exists()).toBe(false)
+  })
+
+  it('the skeleton draws «≈» under the total only where the two currencies differ', async () => {
+    const lines = async (incomeCurrency: 'AMD' | 'RUB' | null) => {
+      localStorage.clear()
+      if (incomeCurrency)
+        localStorage.setItem(
+          `molvia.accounts.${ACTOR}`,
+          JSON.stringify({
+            overview: moneyAccountsCodec.encode({
+              spendCurrency: 'AMD',
+              accounts: [],
+              totals: { total: amd('0'), spendable: amd('0'), savings: amd('0'), uncounted: 0 },
+              incomeTotals: {
+                currency: incomeCurrency,
+                total: parseMoney('0', incomeCurrency),
+                spendable: parseMoney('0', incomeCurrency),
+                savings: parseMoney('0', incomeCurrency),
+                uncounted: 0,
+              },
+              unassigned: 0,
+              countedAt: new Date(),
+            }),
+          }),
+        )
+      moneyMonth.mockReturnValue(new Promise(() => undefined))
+      const view = await render()
+      const drawn = view.find('.skeleton .ghost-approx').exists()
+      view.unmount()
+      return drawn
+    }
+    expect(await lines('RUB')).toBe(true)
+    expect(await lines('AMD')).toBe(false)
+    // Nothing known of the accounts: the usual case, two currencies.
+    expect(await lines(null)).toBe(true)
+  })
+
+  it('a day with no rate is its sum in its own currency, never «≈ 0 ֏», and the total names it', async () => {
+    const dollars = parseMoney('50', 'USD')
+    const [barber] = month().days
+    if (!barber) throw new Error('no day')
+    const row = barber.entries
+    moneyMonth.mockResolvedValue(
+      month({
+        uncounted: [dollars],
+        days: [
+          {
+            day: '2026-09-26',
+            total: amd('5000'),
+            estimated: false,
+            uncounted: [dollars],
+            entries: row,
+          },
+          {
+            day: '2026-09-25',
+            total: amd('0'),
+            estimated: false,
+            uncounted: [dollars],
+            entries: row,
+          },
+        ],
+      }),
+    )
+    const view = await render()
+    const sums = view.findAll('.day-total').map((one) => plain(one.text()))
+    expect(sums).toEqual(['֏5,000 + $50', '$50'])
+    expect(plain(view.get('.total').text())).toContain('Not counted: $50 — no rate for that day')
+  })
+
+  it('no «≈» under exact drams for one who earns and spends in drams (adversarial А4)', async () => {
+    moneyMonth.mockResolvedValue(
+      month({ incomeCurrency: 'AMD', spentIncome: amd('317800'), rate: null }),
+    )
+    const view = await render()
+    expect(plain(view.get('.total').text())).toContain('317,800')
+    expect(view.get('.total').text()).not.toContain('≈')
+  })
+
+  it('nothing counted: the total says what it leaves out, never «≈ 0» over it (adversarial А3)', async () => {
+    const dollars = parseMoney('50', 'USD')
+    moneyMonth.mockResolvedValue(
+      month({
+        spent: amd('0'),
+        spentIncome: rub('0'),
+        uncounted: [parseMoney('5.50', 'EUR'), dollars],
+      }),
+    )
+    const view = await render()
+    const total = plain(view.get('.total').text())
+    expect(total).not.toContain('≈')
+    // As written, never rounded: «€5.50», not «€6» (adversarial А2).
+    expect(total).toContain('Not counted: €5.50, $50 — no rate for that day')
+  })
+
+  it('must not fire: a month with everything counted says nothing of what was not', async () => {
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    expect(view.get('.total').text()).not.toContain('Not counted')
+    expect(plain(view.get('.day-total').text())).toBe('֏5,000')
   })
 })
