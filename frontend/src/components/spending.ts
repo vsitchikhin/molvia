@@ -169,6 +169,40 @@ export function mergePages(first: MoneyMonthView, next: MoneyMonthView): MoneyMo
 }
 
 /**
+ * The month's spending in the income currency, «≈ 63 800 ₽» under «274 523 ֏» — one rule for «Деньги»
+ * and «Траты» (MOL-184): only in another currency, since one who earns and spends in drams was told
+ * «≈ 5 000 ֏» under exact drams (adversarial А4); and never under nothing counted, where «≈ 0 ₽» stood
+ * over a spending of $50 with no rate (А3, handoff 157 v2 «Месяц без трат»).
+ */
+export function spentApprox(month: MoneyMonthView): Money | null {
+  const { spent, spentIncome } = month
+  return spentIncome && spent.minor !== 0n && spentIncome.currency !== spent.currency
+    ? spentIncome
+    : null
+}
+
+/**
+ * The day's sum over its rows (MOL-184, В-1): what was counted — «≈» where a rate converted some of
+ * it — and beside it what had no rate, in its own currency: «≈ 5 000 ֏ + 50 $», and «50 $» where
+ * nothing was counted. A day of one $50 with no rate read «≈ 0 ֏» — nothing spent. Every figure is
+ * the server's; the phone adds none up. A day only the phone knows of has none yet.
+ */
+export function dayTotalText(
+  day: Pick<JournalDay, 'total' | 'estimated' | 'uncounted'>,
+  locale: string,
+): string | null {
+  if (!day.total) return null
+  const counted = day.total.minor !== 0n || day.uncounted.length === 0
+  // A long sum breaks only after its «+»: «≈» stays with its figure, «+» never starts a line, and `Intl`
+  // binds a figure to its sign already (MOL-184, round 2 at 320 px).
+  return [
+    ...(counted ? [(day.estimated ? '≈\u00a0' : '') + formatEstimate(day.total, locale)] : []),
+    // As written, never rounded: there is no «≈» before it (adversarial А2 — «€6» over «€5.50»).
+    ...day.uncounted.map((amount) => asTyped(amount, locale)),
+  ].join('\u00a0+ ')
+}
+
+/**
  * The spendings a waiting removal takes away: the last of «Удалить» and «Вернуть» about each is a
  * removal. One brought back with «Вернуть» behind a removal already tried is on screen again, as
  * the person was told (round 2, Н2).
@@ -211,6 +245,8 @@ export interface JournalDay {
   /** The server's total, or null for a day only the phone knows of — it has no figure yet. */
   readonly total: Money | null
   readonly estimated: boolean
+  /** What of the day had no rate, in its own currencies — the server's, whole like `total`. */
+  readonly uncounted: readonly Money[]
   readonly rows: JournalRow[]
 }
 
@@ -277,6 +313,7 @@ export function journalOf(
     day: day.day,
     total: day.total,
     estimated: day.estimated,
+    uncounted: day.uncounted,
     rows: day.entries.flatMap((entry): JournalRow[] => {
       if (entry.kind === 'trip')
         return removedTrips.has(entry.tripId)
@@ -330,7 +367,13 @@ export function journalOf(
     const same = days[at]
     if (same?.day === spending.spentOn) same.rows.unshift(row)
     else {
-      const day: JournalDay = { day: spending.spentOn, total: null, estimated: false, rows: [row] }
+      const day: JournalDay = {
+        day: spending.spentOn,
+        total: null,
+        estimated: false,
+        uncounted: [],
+        rows: [row],
+      }
       if (at === -1) days.push(day)
       else days.splice(at, 0, day)
     }

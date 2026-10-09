@@ -230,6 +230,136 @@ for (const width of [412, 320])
     expect(edges.lines).toBe(1)
   })
 
+// The rhythm of 157 v2 02 (MOL-184, Ф-10): the field is `AppScreen`'s 16, not 32; 24 between the
+// days, 8 from a day's words to its card.
+test('«Траты» stand in the field of 16, the days 24 apart and 8 over their cards (MOL-184)', async ({
+  page,
+}) => {
+  // This month's twelve open «Траты»; the two days measured are last month's, on any day of this one.
+  const fifteenth = lastMonthDay()
+  await twelveADay(page, [yerevanDay(), fifteenth, `${fifteenth.slice(0, 8)}14`])
+  await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
+  await expect(page.locator('.days section.day')).toHaveCount(2)
+  const measured = await page.locator('.days').evaluate((root) => {
+    const [first, second] = [...root.querySelectorAll(':scope section.day')]
+    const box = (node: Element | null | undefined) => node?.getBoundingClientRect()
+    return {
+      left: box(first?.querySelector('.card'))?.left ?? Number.NaN,
+      // The total heads the column, 24 over its first day (review Р2-3).
+      underTotal:
+        (box(first)?.top ?? Number.NaN) -
+        (box(document.querySelector('.content > .total'))?.bottom ?? Number.NaN),
+      between: (box(second)?.top ?? Number.NaN) - (box(first)?.bottom ?? Number.NaN),
+      overCard:
+        (box(first?.querySelector('.card'))?.top ?? Number.NaN) -
+        (box(first?.querySelector('.day-head'))?.bottom ?? Number.NaN),
+    }
+  })
+  expect(measured).toEqual({ left: 16, underTotal: 24, between: 24, overCard: 8 })
+})
+
+// A day of one spending in dollars with no rate of its day (MOL-184, В-1, В-2): the end-to-end API
+// keeps no rate, so the dollars are «не посчитано» — the day says them, never «≈ 0 ֏».
+test('a day with no rate says its dollars, and the month’s total names them', async ({ page }) => {
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  const { categories } = (await (
+    await page.request.get('/api/spending-categories', { headers })
+  ).json()) as { categories: { id: string }[] }
+  const response = await page.request.post('/api/spendings', {
+    headers,
+    data: {
+      id: randomUUID(),
+      spentOn: yerevanDay(),
+      amount: { amount: '50', currency: 'USD' },
+      categoryId: categories[0]?.id,
+    },
+  })
+  expect(response.status(), await response.text()).toBe(201)
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await openSpendings(page)
+  await expect(page.locator('.day-total')).toHaveText(/^50\s\$$/)
+  await expect(page.locator('.total')).toContainText(/Не посчитано: 50\s\$ — курса того дня нет/)
+})
+
+// The longest head a person makes: drams and three currencies with their cents, none with a rate
+// (adversarial round 2 of MOL-184, «не атаковано»). On 320 the day's words give way and the sum stays
+// in the column of the rows' amounts, inside its card.
+test('at 320 a day’s sum of four currencies stays in the column, inside the card', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 840 })
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  const { categories } = (await (
+    await page.request.get('/api/spending-categories', { headers })
+  ).json()) as { categories: { id: string }[] }
+  for (const [amount, currency] of [
+    // A figure wider than 60 % of the head once the font is doubled (review Р4-1).
+    ['5000012400', 'AMD'],
+    ['1234.56', 'RUB'],
+    ['10.50', 'EUR'],
+    ['0.40', 'USD'],
+  ]) {
+    const response = await page.request.post('/api/spendings', {
+      headers,
+      data: {
+        id: randomUUID(),
+        spentOn: yerevanDay(),
+        amount: { amount, currency },
+        categoryId: categories[0]?.id,
+      },
+    })
+    expect(response.status(), await response.text()).toBe(201)
+  }
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await openSpendings(page)
+  const total = page.locator('.day-total')
+  await expect(total).toHaveText(/^5\s000\s012\s400\s֏\s\+ 10,50\s€\s\+ 1\s234,56\s₽\s\+ 0,40\s\$$/)
+  const edges = await page
+    .locator('section.day')
+    .first()
+    .evaluate((root) => ({
+      total: root.querySelector('.day-total')?.getBoundingClientRect().right ?? Number.NaN,
+      card: root.querySelector('.card')?.getBoundingClientRect().right ?? Number.NaN,
+      amounts: [...root.querySelectorAll('.list-row .amount')].map(
+        (one) => one.getBoundingClientRect().right,
+      ),
+      page: document.documentElement.scrollWidth,
+    }))
+  for (const amount of edges.amounts) expect(amount).toBeCloseTo(edges.total, 1)
+  expect(edges.total).toBeLessThanOrEqual(edges.card)
+  expect(edges.page).toBe(320)
+
+  // A large system font: a figure wider than 60 % of the head takes the room from the day's words,
+  // never stands past the column (MOL-184, adversarial round 3).
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '200%'
+  })
+  const large = await page
+    .locator('section.day')
+    .first()
+    .evaluate((root) => {
+      const total = root.querySelector('.day-total')
+      const head = root.querySelector('.day-head')
+      const style = head ? getComputedStyle(head) : null
+      const room =
+        (head?.clientWidth ?? Infinity) -
+        Number.parseFloat(style?.paddingLeft ?? '0') -
+        Number.parseFloat(style?.paddingRight ?? '0')
+      return {
+        // «5 000 012 400 ֏ +» is wider than 60 % of the head's room: without `min-content` it stood
+        // past its box.
+        wider: (total?.scrollWidth ?? 0) > 0.6 * room,
+        overflow: (total?.scrollWidth ?? 0) - (total?.clientWidth ?? 0),
+        inside:
+          (total?.getBoundingClientRect().right ?? Infinity) <=
+          (root.querySelector('.card')?.getBoundingClientRect().right ?? 0),
+      }
+    })
+  expect(large).toEqual({ wider: true, overflow: 0, inside: true })
+})
+
 test('changing the month keeps the switcher where it was on the screen, under the skeleton too', async ({
   page,
 }) => {
@@ -246,7 +376,7 @@ test('changing the month keeps the switcher where it was on the screen, under th
   })
 
   const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
-  await standAt(previous, 120)
+  await standAt(previous, 100)
   const scrolled = await page.evaluate(() => window.scrollY)
   expect(scrolled).toBeGreaterThan(0)
   const before = await topOf(previous)
@@ -283,17 +413,17 @@ test('changing the month keeps the switcher where it was on the screen, under th
 test('an empty month after a full one keeps the switcher where it was', async ({ page }) => {
   await twelveADay(page, [yerevanDay()])
   const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
-  await standAt(previous, 120)
+  await standAt(previous, 100)
   const scrolled = await page.evaluate(() => window.scrollY)
   expect(scrolled).toBeGreaterThan(0)
 
   await previous.click()
   await expect(page.getByRole('heading', { name: /трат нет/ })).toBeVisible()
-  expect(await topOf(previous)).toBe(120)
+  expect(await topOf(previous)).toBe(100)
   expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
 })
 
-// The strip «Нет связи» belongs to the month's answer and comes and goes with it: it stands under
+// The strip «Без связи» belongs to the month's answer and comes and goes with it: it stands under
 // the switcher, so neither its going nor its coming back moves the switcher (MOL-138, В-2).
 test('offline, a month not read keeps the switcher where it was, at the top of the page too', async ({
   page,
@@ -302,7 +432,7 @@ test('offline, a month not read keeps the switcher where it was, at the top of t
   await twelveADay(page, [yerevanDay(), lastMonthDay()])
   await context.setOffline(true)
   await page.evaluate(() => window.dispatchEvent(new Event('offline')))
-  const strip = page.getByText(/Нет связи. Траты на/)
+  const strip = page.locator('.strip', { hasText: /Без связи · траты на/ })
   await expect(strip).toBeVisible()
 
   // Not scrolled at all: where «Траты» open, and where nothing can be made up by the scroll
@@ -336,20 +466,20 @@ test('offline, between two months the phone keeps, the switcher stays over the s
 
   await context.setOffline(true)
   await page.evaluate(() => window.dispatchEvent(new Event('offline')))
-  const strip = page.getByText(/Нет связи. Траты на/)
+  const strip = page.locator('.strip', { hasText: /Без связи · траты на/ })
   await expect(strip).toBeVisible()
-  await standAt(previous, 120)
+  await standAt(previous, 100)
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
 
   await previous.click()
   await expect(page).toHaveURL(/month=/)
   await expect(strip).toBeVisible()
   await expect(rows).toHaveCount(12)
-  expect(await topOf(previous)).toBe(120)
+  expect(await topOf(previous)).toBe(100)
   await next.click()
   await expect(page).not.toHaveURL(/month=/)
   await expect(strip).toBeVisible()
-  expect(await topOf(next)).toBe(120)
+  expect(await topOf(next)).toBe(100)
 })
 
 // A refused spending is a row of «Не приняты» on top of «Траты» in every month (MOL-159), never a
@@ -376,21 +506,33 @@ test('a refused spending moves nothing as the month changes: its row stands in e
   await expect(row).toBeVisible()
   await expect(group).toBeVisible()
   await expect(card).toHaveCount(0)
+  // «Не приняты» is a group of its own: 24 from the switcher over it and the total under it
+  // (MOL-184, review Р2-3).
+  const around = await page.locator('section.refused').evaluate((section) => ({
+    over:
+      section.getBoundingClientRect().top -
+      (document.querySelector('.content > .switcher')?.getBoundingClientRect().bottom ??
+        Number.NaN),
+    under:
+      (document.querySelector('.content > .total')?.getBoundingClientRect().top ?? Number.NaN) -
+      section.getBoundingClientRect().bottom,
+  }))
+  expect(around).toEqual({ over: 24, under: 24 })
 
   const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
-  await standAt(previous, 120)
+  await standAt(previous, 100)
   await previous.click()
   await expect(page).toHaveURL(/month=/)
   await expect(row).toBeVisible()
   await expect(card).toHaveCount(0)
-  expect(await topOf(previous)).toBe(120)
+  expect(await topOf(previous)).toBe(100)
 
   const next = page.getByRole('button', { name: 'Следующий месяц' })
   await next.click()
   await expect(page).not.toHaveURL(/month=/)
   await expect(row).toBeVisible()
   await expect(card).toHaveCount(0)
-  expect(await topOf(next)).toBe(120)
+  expect(await topOf(next)).toBe(100)
 })
 
 // The login takes the place of the screen with no move of the router: the page held for the month
@@ -401,7 +543,7 @@ test('the session over under a changed month: the login stands from the top', as
 }) => {
   await twelveADay(page, [yerevanDay(), lastMonthDay()])
   const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
-  await standAt(previous, 120)
+  await standAt(previous, 100)
   await previous.click()
   await expect(page).toHaveURL(/month=/)
   await expect(page.getByRole('button', { name: /Открыть трату/ })).toHaveCount(12)

@@ -197,7 +197,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, ref, watch } from 'vue'
+import { computed, defineComponent, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconPlus from '~icons/mdi/plus'
@@ -289,27 +289,6 @@ export default defineComponent({
         asOf: accounts.failed ? countedWhen(overview.countedAt, locale.value) : null,
       }
     })
-
-    /**
-     * «≈ 63 800 ₽» under the figure is there only where the two currencies differ: the skeleton draws
-     * its line by the person's currencies, as «Счета» last said them (adversarial А5) — with nothing
-     * known, by the usual case, two (Б3). Taken as the skeleton comes and held while it stands: «Счета»
-     * answering meanwhile must not grow or shrink it under the switcher (Б3). The price, named in
-     * `frontend.md` (В1): a person of one currency with nothing kept gets the line once, and the page
-     * shrinks by it as the month comes.
-     */
-    const currencies = () => {
-      const overview = accounts.overview
-      if (!overview?.incomeTotals) return true
-      return overview.incomeTotals.currency !== overview.spendCurrency
-    }
-    const twoCurrencies = ref(currencies())
-    watch(
-      () => screen.phase.value,
-      (phase) => {
-        if (phase === 'loading') twoCurrencies.value = currencies()
-      },
-    )
 
     /** «Повторить» asks «Счета» again too: the server that broke the month broke them as well (А2). */
     function retryAll(): Promise<void> {
@@ -410,7 +389,6 @@ export default defineComponent({
       t,
       IconWallet,
       accountsNow,
-      twoCurrencies,
       retryAll,
       newcomer,
       refusedHere,

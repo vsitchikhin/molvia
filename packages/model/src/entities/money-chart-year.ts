@@ -30,6 +30,13 @@ export interface YearMonth {
   readonly spentIncome: Money | null
   readonly income: Money
   readonly incomeUncounted: readonly Money[]
+  /**
+   * A rate converted something of `spentIncome` — two currencies, or one and a spending in a third — or
+   * of `income`: «Ушло» and «Разница» of «Пришло и ушло» carry «≈» by these, never by a guess from the
+   * currencies (MOL-184, adversarial Г1, Г2).
+   */
+  readonly spentEstimated: boolean
+  readonly incomeEstimated: boolean
   /** «Разница» of MOL-74: null when either side is not whole. */
   readonly difference: Money | null
   /**
@@ -284,6 +291,8 @@ export function yearCharts(input: YearChartsInput): YearCharts {
         spentIncome: null,
         income: ZERO(income),
         incomeUncounted: [],
+        spentEstimated: false,
+        incomeEstimated: false,
         difference: null,
         change: null,
         spentLevel: 0,
@@ -299,6 +308,11 @@ export function yearCharts(input: YearChartsInput): YearCharts {
       spentIncome: one.spentIncome,
       income: one.income,
       incomeUncounted: one.incomeUncounted,
+      spentEstimated:
+        one.spentIncome !== null &&
+        one.spent.minor !== 0n &&
+        (one.spendCurrency !== one.incomeCurrency || one.foreign.length > 0),
+      incomeEstimated: one.incomeConverted,
       difference: differenceOf(one),
       change: changeAgainst(month, one.spent, average, usualToDay, one.uncounted.length > 0),
       spentLevel: levelOf(one.spent.minor, spentTallest),

@@ -5,10 +5,8 @@
       <span v-if="change" class="change">{{ change }}</span>
     </p>
     <p class="figure">{{ whole(month.spent) }}</p>
-    <!-- «≈ 0 ₽» says nothing beside «0 ֏» (handoff MOL-157 v2, «Месяц без трат»). -->
-    <p v-if="month.spentIncome && month.spent.minor !== 0n" class="approx">
-      ≈ {{ whole(month.spentIncome) }}
-    </p>
+    <!-- Only in another currency, never «≈ 0 ₽» beside «0 ֏» (`spentApprox`, MOL-184). -->
+    <p v-if="approx" class="approx">≈ {{ whole(approx) }}</p>
     <p v-for="line in foreign" :key="line" class="footnote">{{ line }}</p>
     <p v-if="month.uncounted.length > 0" class="footnote">
       {{ t('spending.uncounted', { amounts: list(month.uncounted) }) }}
@@ -88,7 +86,7 @@ import AppCard from '@/components/AppCard.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import { signedAmount } from '@/components/accounts'
 import { signedPercent } from '@/components/charts'
-import { bankWords, rateWords } from '@/components/spending'
+import { asTyped, bankWords, rateWords, spentApprox } from '@/components/spending'
 import { calendarDay } from '@/days'
 
 /**
@@ -119,8 +117,11 @@ export default defineComponent({
     const running = computed(() => props.month.month === props.current)
 
     const whole = (value: Money) => formatEstimate(value, locale.value)
+    const approx = computed(() => spentApprox(props.month))
     const signed = (value: Money) => signedAmount(value, locale.value, { estimate: true })
-    const list = (values: readonly Money[]) => values.map(whole).join(', ')
+    // What no rate counted is money as written, with no «≈» before it: never rounded (MOL-184, А2).
+    const list = (values: readonly Money[]) =>
+      values.map((value) => asTyped(value, locale.value)).join(', ')
     const shortDay = (day: string) =>
       calendarDay(day, locale.value, { day: 'numeric', month: 'short' })
     const days = (values: readonly string[]) => values.map(shortDay).join(', ')
@@ -211,6 +212,7 @@ export default defineComponent({
     return {
       t,
       running,
+      approx,
       whole,
       signed,
       list,

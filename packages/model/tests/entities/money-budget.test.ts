@@ -55,6 +55,7 @@ function month(overrides: Partial<MoneyMonth> = {}): MoneyMonth {
     spentIncome: cash('0 RUB'),
     income: cash('180000 RUB'),
     incomeUncounted: [],
+    incomeConverted: false,
     incomeCount: 1,
     shiftedIn: [],
     shiftedOut: [],

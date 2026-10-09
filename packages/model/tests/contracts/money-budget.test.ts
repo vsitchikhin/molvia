@@ -35,6 +35,7 @@ const october: MoneyMonth = {
   spentIncome: money(6_046_512n, 'RUB'),
   income: money(18_000_000n, 'RUB'),
   incomeUncounted: [],
+  incomeConverted: false,
   incomeCount: 1,
   shiftedIn: [],
   shiftedOut: [],
