@@ -119,6 +119,13 @@ function variants(text: string, depth = 2): string[] {
   return [...out]
 }
 
+// A till prints «=» before an amount, and OCR reads the sign as a digit: «=119.00» as «2119.00»
+// (MOL-228, H9). The amount without it, if it is one: never nothing, a line's sum is never zero.
+function signless(text: string): string | null {
+  const rest = /^\d(\d+[.,]\d{2})$/.exec(text)?.[1]
+  return rest === undefined || hundredthsOf(rest) === 0 ? null : rest
+}
+
 const diff = (a: string, b: string): number =>
   a.length !== b.length ? 1 : Array.from(a).filter((c, i) => c !== b.charAt(i)).length
 
@@ -135,6 +142,8 @@ interface Candidate {
   readonly price: number
   readonly swaps: number
   readonly rate: number
+  /** A sign read as a digit taken off (MOL-246): the total's to take, never a line's own reading. */
+  readonly sliced?: true
 }
 
 // The till rounds to a few luma: 609,97 paid for 610.
@@ -185,6 +194,9 @@ function afford(budget: Budget, combinations: number): boolean {
   return false
 }
 
+const holds = (qty: number, paid: number, disc: number, price: number): boolean =>
+  Math.abs(paid + disc - Math.round((qty * price) / 1000)) <= TOLERANCE_HUNDREDTHS
+
 // One pass over the figures of a line: every combination that satisfies paid + discount =
 // quantity × price is a candidate; the receipt's own discount rate then picks among them (a card
 // discount is one percentage), and after it the fewest swaps.
@@ -219,7 +231,7 @@ function candidates(
               diff(pr ?? '', priceS ?? '') +
               (p0 !== paidS ? 1 : 0) +
               (pr === null ? 1 : 0)
-            if (Math.abs(paid + disc - Math.round((qty * price) / 1000)) <= TOLERANCE_HUNDREDTHS) {
+            if (holds(qty, paid, disc, price)) {
               out.push({ qty, paid, disc, price, swaps, rate: disc / (paid + disc) })
             }
           }
@@ -229,6 +241,45 @@ function candidates(
   }
   return out
 }
+
+/**
+ * The line's sum or its price read without the sign before it (MOL-246), every other figure as read:
+ * tried only where no reading of the line holds, and only the printed total takes it (review, MOL-246).
+ * Beside the swaps, a price that lost a digit beat the sum's own swap at the same cost — 1500 × 3 read
+ * «=1500» became 500 × 3; with swaps of the other figures it «fixed» all three of one line; and taken
+ * as the line's own it read «2119,00» as 119,00 where the total said 2 119,00, and tied a reading that
+ * misread the line with one that read it right. Without a total that meets it the line stays as read.
+ */
+function sliced(
+  budget: Budget,
+  qtyS: string,
+  paidS: string,
+  discS: string,
+  priceS: string | null,
+): Candidate[] {
+  if (priceS === null) return []
+  const tries = [
+    [signless(paidS), priceS],
+    [paidS, signless(priceS)],
+  ].filter((t): t is [string, string] => t[0] !== null && t[1] !== null)
+  if (!afford(budget, tries.length)) return []
+  const [qty, disc] = [milliOf(qtyS), hundredthsOf(discS)]
+  return tries
+    .map(([p, pr]) => ({ paid: hundredthsOf(p), price: hundredthsOf(pr) }))
+    .filter(({ paid, price }) => holds(qty, paid, disc, price))
+    .map(({ paid, price }) => ({
+      qty,
+      paid,
+      disc,
+      price,
+      swaps: 1,
+      rate: disc / (paid + disc),
+      sliced: true as const,
+    }))
+}
+
+// What a reading may still spend: a search it paid for spent some, one past its ceiling none.
+const funds = (budget: Budget): number => budget.left + budget.floors
 
 function mode(values: readonly number[]): number | null {
   const counts = new Map<number, number>()
@@ -300,6 +351,8 @@ interface State {
   readonly pick: Candidate | null
   readonly prev: State | null
   readonly blank: number
+  // the total's one answer is given: the blank line's rest, or a slice (MOL-246, review В1)
+  readonly answered: boolean
   // another reading of the same cost reached the same sum: the total cannot tell which (review Р20)
   readonly tied: boolean
 }
@@ -321,6 +374,9 @@ export const RECONCILE_STEPS_MAX = 500_000
  */
 export const RECONCILE_STATES_MAX = 300
 
+// What the total's one answer costs — the blank line's rest or a slice: dearer than any line's own reading.
+const ANSWER_COST = 4
+
 function picksOf(state: State): (Candidate | null)[] {
   const picks: (Candidate | null)[] = []
   // every state but the start made a pick: the start is the one with nothing before it
@@ -338,48 +394,82 @@ function reconcile(
   printed: readonly string[],
   rate: number | null,
 ): { picks: (Candidate | null)[]; balanced: boolean; tied: boolean } {
-  const first = lists.map((list) => list[0] ?? null)
+  // a line's first reading of its own: a slice is never one (MOL-246)
+  const first = lists.map((list) => list.find((x) => x.sliced !== true) ?? null)
   if (total === null || !Number.isFinite(total))
     return { picks: first, balanced: false, tied: false }
 
   // what the lines after each one come to as first read: a reading whose sum with them lands nearer
   // the total is kept before another of the same cost when the beam is full (review П11)
-  const ahead = lists.map((_, i) =>
-    lists.slice(i + 1).reduce((sum, list) => sum + (list[0]?.paid ?? 0), 0),
+  const ahead = lists.map((_, i) => first.slice(i + 1).reduce((sum, x) => sum + (x?.paid ?? 0), 0))
+  const start: State = {
+    sum: 0,
+    cost: 0,
+    pick: null,
+    prev: null,
+    blank: -1,
+    answered: false,
+    tied: false,
+  }
+  let states = new Map<string, State>([['0|false|false', start]])
+  const owned = lists.map(
+    (list) => new Set(list.filter((x) => x.sliced !== true).map((x) => x.paid)),
   )
-  const start: State = { sum: 0, cost: 0, pick: null, prev: null, blank: -1, tied: false }
-  let states = new Map<string, State>([['0|false', start]])
   let steps = 0
   for (const [i, list] of lists.entries()) {
     const next = new Map<string, State>()
     const put = (state: State): void => {
       steps += 1
-      const key = `${String(state.sum)}|${String(state.blank >= 0)}`
+      const key = `${String(state.sum)}|${String(state.blank >= 0)}|${String(state.answered)}`
       const was = next.get(key)
       if (was === undefined || state.cost < was.cost) next.set(key, state)
       else if (state.cost === was.cost && !was.tied) next.set(key, { ...was, tied: true })
     }
     for (const state of states.values()) {
       if (steps > RECONCILE_STEPS_MAX) break
-      if (list.length === 0) {
-        if (state.blank < 0) {
+      // a line with no reading of its own takes the rest of the total, or a slice (MOL-246); at one
+      // cost and one sum the rest, put first, wins: the sum is the same, and the person looks either way
+      // (review 13)
+      if (list.every((x) => x.sliced === true)) {
+        if (!state.answered) {
           put({
             sum: state.sum,
-            cost: state.cost + 4,
+            cost: state.cost + ANSWER_COST,
             pick: null,
             prev: state,
             blank: i,
+            answered: true,
             tied: state.tied,
           })
         }
-        continue
+        if (list.length === 0) continue
       }
       const seen = new Set<number>()
       for (const [k, x] of list.entries()) {
+        // a slice whose sum the line reads of its own changes no sum: the line's own reading stands,
+        // and the total's one answer is left to a line that has none (review 12)
+        if (x.sliced === true && owned[i]?.has(x.paid) === true) continue
         if (seen.has(x.paid)) continue
         seen.add(x.paid)
         const sum = state.sum + x.paid
         if (sum > total) continue
+        // a slice is the total's answer as the blank's rest is, at its price, and the receipt has one
+        // (review В1, В2): two lines with none of their own could share the total between a slice and
+        // a rest, and a slice at the price of a swap beat a right rest with two swaps elsewhere
+        if (x.sliced === true) {
+          if (!state.answered) {
+            put({
+              sum,
+              cost: state.cost + ANSWER_COST,
+              pick: x,
+              prev: state,
+              blank: state.blank,
+              answered: true,
+              tied: state.tied,
+            })
+          }
+          continue
+        }
         put({
           sum,
           cost:
@@ -390,6 +480,7 @@ function reconcile(
           pick: x,
           prev: state,
           blank: state.blank,
+          answered: state.answered,
           tied: state.tied,
         })
       }
@@ -437,11 +528,19 @@ function judged(
   balanced: boolean
   blankSum: number | null
   doubt: ReadonlySet<number>
+  sliced: boolean
 } {
   const lists = settle(found)
   // the shared rate counts in the total's choice only where `settle` had none to order by
-  const shared = lists.some((list) => list.some((x) => x.swaps === 0)) ? null : asReadRate(lists)
-  const { picks, balanced, tied } = reconcile(lists, total, printed, shared)
+  const own = lists.map((list) => list.filter((x) => x.sliced !== true))
+  const shared = own.some((list) => list.some((x) => x.swaps === 0)) ? null : asReadRate(own)
+  // slices only where no way without them meets the total (review Д1): beside a blank and another line's
+  // swaps, a wrong slice met it cheaper by leaving that line's misread as read
+  const plain = reconcile(own, total, printed, shared)
+  const { picks, balanced, tied } =
+    plain.balanced || own.every((list, i) => list.length === lists[i]?.length)
+      ? plain
+      : reconcile(lists, total, printed, shared)
   // what the total leaves goes to the one line with no reading only when the lines met the total —
   // otherwise «the rest» is a guess, and a line that took it would cover a receipt barely read
   // (review Р6)
@@ -455,14 +554,20 @@ function judged(
   // the person's. In a tie the total could have made its change in another line just as well: every
   // line with a reading of its own that differs by the same amount is in doubt too (review Р20, Р24).
   const moves = picks.flatMap((pick, i) => {
-    const first = lists[i]?.[0]
-    return pick !== null && first !== undefined && pick !== first
+    const first = own[i]?.[0]
+    return pick !== null && pick.sliced !== true && first !== undefined && pick !== first
       ? [[i, pick.paid - first.paid]]
       : []
   })
   const doubt = new Set<number>(moves.map(([i]) => i ?? -1))
+  // a slice the total took is the total's answer, as the blank's rest is: one look of the person's, never
+  // a line «as read» — or a total read wrong in one place would vouch for itself through the slice it chose
+  // (review Г1; MOL-244, В-1 «а»)
+  picks.forEach((pick, i) => {
+    if (pick?.sliced === true) doubt.add(i)
+  })
   if (tied) {
-    lists.forEach((list, j) => {
+    own.forEach((list, j) => {
       const first = list[0]
       if (first === undefined || doubt.has(j)) return
       if (moves.some(([, move]) => list.some((x) => x !== first && x.paid - first.paid === move))) {
@@ -470,7 +575,7 @@ function judged(
       }
     })
   }
-  return { picks, balanced, blankSum, doubt }
+  return { picks, balanced, blankSum, doubt, sliced: picks.some((pick) => pick?.sliced === true) }
 }
 
 const ITEM = /^\s*(\d{1,2})\s*[.,]?\s*(\S.*)$/
@@ -652,18 +757,24 @@ function cardReceipt(rows: readonly TextRow[]): Laid {
   const printedTotal = TOTAL.exec(text)
   const total = printedTotal?.[1] === undefined ? null : hundredthsOf(printedTotal[1])
   const budget: Budget = { left: READING_COMBINATIONS_MAX, floors: FLOOR_COMBINATIONS_MAX }
-  const lists = found.map((f) =>
-    f.plain !== null
-      ? plainCandidates(budget, f)
-      : candidates(budget, f.qtyS, f.paidS, f.discS, f.priceS),
-  )
+  const lists = found.map((f) => {
+    if (f.plain !== null) return plainCandidates(budget, f)
+    const before = funds(budget)
+    const out = candidates(budget, f.qtyS, f.paidS, f.discS, f.priceS)
+    return out.length === 0 && funds(budget) < before
+      ? sliced(budget, f.qtyS, f.paidS, f.discS, f.priceS)
+      : out
+  })
   const tin = /(\d{8})\b/.exec(/ՀՎՀՀ.{0,4}:?\s*\S+|:\s*0\d{7}/.exec(text)?.[0] ?? '')?.[1] ?? null
+  // whether the reading by its own total took a slice (MOL-246): `bestReading` lets no such total vouch
+  let tookSlice = false
   const judge = (byTotal: boolean): ReceiptText => {
-    const { picks, balanced, blankSum, doubt } = judged(
+    const { picks, balanced, blankSum, doubt, sliced } = judged(
       lists,
       byTotal ? total : null,
       found.map((f) => (f.plain !== null ? f.plain.join('') : f.paidS).replace(/\D/g, '')),
     )
+    if (byTotal) tookSlice = sliced
     const lines = found.map((f, i): ReceiptTextLine => {
       const pick = picks[i] ?? null
       return {
@@ -692,7 +803,8 @@ function cardReceipt(rows: readonly TextRow[]): Laid {
       lines,
     }
   }
-  return { read: judge(true), asPrinted: () => judge(false) }
+  const read = judge(true)
+  return { read, asPrinted: () => judge(false), sliced: tookSlice }
 }
 
 // Every way to read space-separated digit groups as numbers: «2 200» is one number or two. Values
@@ -1028,19 +1140,31 @@ function classCandidates(budget: Budget, f: ClassFigures, guessed: Set<Candidate
     f.qtyS === null
       ? Array.from({ length: 20 }, (_, q) => ({ text: String(q + 1), cost: 0 }))
       : read(f.qtyS, f.weighed ? 3 : 1, false).filter((q) => f.terminal || q.cost === 0)
-  const out: Candidate[] = []
-  for (const sum of sums) {
-    for (const price of prices) {
-      for (const qty of qtys) {
-        for (const x of candidates(budget, qty.text, sum.text, '0', price.text)) {
-          out.push({ ...x, swaps: x.swaps + sum.cost + price.cost + qty.cost })
+  const every = (find: typeof candidates): Candidate[] => {
+    const found: Candidate[] = []
+    for (const sum of sums) {
+      for (const price of prices) {
+        for (const qty of qtys) {
+          for (const x of find(budget, qty.text, sum.text, '0', price.text)) {
+            found.push({ ...x, swaps: x.swaps + sum.cost + price.cost + qty.cost })
+          }
         }
       }
     }
+    return found
   }
+  const before = funds(budget)
+  const out = every(candidates)
+  // only where no reading holds, a sign read as a digit (MOL-246) — never beside a count not printed:
+  // twenty counts made up would let it choose one (review Б1)
+  if (out.length === 0 && f.qtyS !== null && funds(budget) < before) out.push(...every(sliced))
   // no price read, or none that fits: the sum alone, at the count read — a line, not its arithmetic
   const sum = sums[0]
-  if (out.length === 0 && sum !== undefined && (f.priceS === null || f.terminal)) {
+  if (
+    out.every((x) => x.sliced === true) &&
+    sum !== undefined &&
+    (f.priceS === null || f.terminal)
+  ) {
     const qty = f.qtyS === null ? 1000 : milliOf(qtys[qtys.length - 1]?.text ?? f.qtyS)
     const paid = hundredthsOf(sum.text)
     if (Number.isFinite(paid) && paid > 0 && qty > 0) {
@@ -1256,12 +1380,15 @@ function classReceipt(rows: readonly TextRow[]): Laid {
   const budget: Budget = { left: READING_COMBINATIONS_MAX, floors: FLOOR_COMBINATIONS_MAX }
   const guessed = new Set<Candidate>()
   const lists = items.map((item) => classCandidates(budget, item.figures, guessed))
+  // whether the reading by its own total took a slice (MOL-246): `bestReading` lets no such total vouch
+  let tookSlice = false
   const judge = (byTotal: boolean): ReceiptText => {
-    const { picks, balanced, blankSum, doubt } = judged(
+    const { picks, balanced, blankSum, doubt, sliced } = judged(
       lists,
       byTotal ? total : null,
       items.map((item) => item.figures.sumS.replace(/\D/g, '')),
     )
+    if (byTotal) tookSlice = sliced
     const lines = items.map((item, i): ReceiptTextLine => {
       const pick = picks[i] ?? null
       const f = item.figures
@@ -1290,7 +1417,8 @@ function classReceipt(rows: readonly TextRow[]): Laid {
       lines,
     }
   }
-  return { read: judge(true), asPrinted: () => judge(false) }
+  const read = judge(true)
+  return { read, asPrinted: () => judge(false), sliced: tookSlice }
 }
 
 // MOL-227 — a sole trader's terminal prints no items at all: its section «Բաժին 1», the turnover tax,
@@ -1567,6 +1695,8 @@ function withTwins(read: ReceiptText): ReceiptText {
 interface Laid {
   readonly read: ReceiptText
   readonly asPrinted: () => ReceiptText
+  /** `read` met its total through a slice (MOL-246): the total's own choice, which vouches for nothing. */
+  readonly sliced: boolean
 }
 
 function readingOf(rows: readonly TextRow[]): Laid {
@@ -1582,6 +1712,7 @@ function readingOf(rows: readonly TextRow[]): Laid {
       laid = {
         read: tableReceipt(rows, table.total, lines),
         asPrinted: () => tableReceipt(rows, table.total, table.judge(false)),
+        sliced: false,
       }
     }
   }
@@ -1852,10 +1983,14 @@ export function mergeParts(parts: readonly (readonly TextRow[])[]): TextRow[] {
 export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptText {
   const laid = readings.map(readingOf)
   const parsed = laid.map((one) => one.read)
-  const settledCount = (r: ReceiptText): number => r.lines.filter((l) => l.settled).length
-  const merit = (a: ReceiptText, b: ReceiptText): number =>
-    Number(b.balanced) - Number(a.balanced) || settledCount(b) - settledCount(a)
-  const best = [...parsed].sort(merit)[0]
+  const settledAt = (i: number): number => parsed[i]?.lines.filter((l) => l.settled).length ?? 0
+  // a reading that met its total through a slice met its own choice (MOL-246): no balance to rank by
+  // (review Д2)
+  const metAt = (i: number): boolean => parsed[i]?.balanced === true && laid[i]?.sliced !== true
+  const order = parsed
+    .map((_, i) => i)
+    .sort((a, b) => Number(metAt(b)) - Number(metAt(a)) || settledAt(b) - settledAt(a))
+  const best = parsed[order[0] ?? 0]
   if (best === undefined) throw new RangeError('a receipt needs at least one reading')
   // no reading found a line: a section with no items is read whole, not one to shoot again (MOL-227)
   if (best.lines.length === 0) {
@@ -1865,8 +2000,11 @@ export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptT
   // Lines «meet» a total only as read: the total changes a line's digit to meet itself, or gives a line
   // with no reading its rest (adversarial А1). Every line as read — the lines vouch, unless two places print
   // another sum (Б1, Ц1); else two places printed (А1б); else the lines with one of them as read (owner).
+  // a total met through a slice met its own choice (MOL-246, review Г1): only two places vouch for it
+  const tookSlice = laid[parsed.indexOf(best)]?.sliced === true
   const asRead = (every: boolean): boolean =>
     best.balanced &&
+    !tookSlice &&
     (every ? best.lines.every((l) => l.settled) : best.lines.some((l) => l.settled))
   const own = best.totalHundredths
   const voted = votedTotal(readings, false)
