@@ -295,7 +295,8 @@ test('at 320 a day’s sum of four currencies stays in the column, inside the ca
     await page.request.get('/api/spending-categories', { headers })
   ).json()) as { categories: { id: string }[] }
   for (const [amount, currency] of [
-    ['12400', 'AMD'],
+    // A figure wider than 60 % of the head once the font is doubled (review Р4-1).
+    ['5000012400', 'AMD'],
     ['1234.56', 'RUB'],
     ['10.50', 'EUR'],
     ['0.40', 'USD'],
@@ -314,7 +315,7 @@ test('at 320 a day’s sum of four currencies stays in the column, inside the ca
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
   await openSpendings(page)
   const total = page.locator('.day-total')
-  await expect(total).toHaveText(/^12\s400\s֏\s\+ 10,50\s€\s\+ 1\s234,56\s₽\s\+ 0,40\s\$$/)
+  await expect(total).toHaveText(/^5\s000\s012\s400\s֏\s\+ 10,50\s€\s\+ 1\s234,56\s₽\s\+ 0,40\s\$$/)
   const edges = await page
     .locator('section.day')
     .first()
@@ -340,16 +341,23 @@ test('at 320 a day’s sum of four currencies stays in the column, inside the ca
     .first()
     .evaluate((root) => {
       const total = root.querySelector('.day-total')
-      const widest = Math.max(...[...(total?.getClientRects() ?? [])].map((line) => line.width))
+      const head = root.querySelector('.day-head')
+      const style = head ? getComputedStyle(head) : null
+      const room =
+        (head?.clientWidth ?? Infinity) -
+        Number.parseFloat(style?.paddingLeft ?? '0') -
+        Number.parseFloat(style?.paddingRight ?? '0')
       return {
+        // «5 000 012 400 ֏ +» is wider than 60 % of the head's room: without `min-content` it stood
+        // past its box.
+        wider: (total?.scrollWidth ?? 0) > 0.6 * room,
         overflow: (total?.scrollWidth ?? 0) - (total?.clientWidth ?? 0),
         inside:
           (total?.getBoundingClientRect().right ?? Infinity) <=
           (root.querySelector('.card')?.getBoundingClientRect().right ?? 0),
-        widest: widest > 0,
       }
     })
-  expect(large).toEqual({ overflow: 0, inside: true, widest: true })
+  expect(large).toEqual({ wider: true, overflow: 0, inside: true })
 })
 
 test('changing the month keeps the switcher where it was on the screen, under the skeleton too', async ({
