@@ -300,7 +300,7 @@ export default defineComponent({
 .center-figure {
   @include display-type;
 
-  font-size: var(--text-title);
+  font-size: var(--text-card-figure);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -329,13 +329,21 @@ export default defineComponent({
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 
+  /* Chosen is a fill and a ring, as a chosen row of the kit, never a weight: at 700 the row grew wider
+     under the thumb, and `--surface-2` told it by a shade alone (Ф-5, MOL-186). */
   &.chosen {
-    background: var(--surface-2);
-    font-weight: var(--weight-bold);
+    background: var(--accent-tint);
+    box-shadow: inset 0 0 0 2px var(--accent);
   }
 
   &:has(.radio:focus-visible) {
     @include focus-ring;
+  }
+
+  /* On a chosen row the focus stands inside its ring, the fill between them, as `ListRow` draws it: on
+     the ring it was the same 2 px of the same colour (MOL-175, adversarial А1). */
+  &.chosen:has(.radio:focus-visible) {
+    @include focus-ring(-6px);
   }
 }
 
@@ -349,10 +357,6 @@ export default defineComponent({
 .amount {
   font-size: var(--text-callout);
   font-weight: var(--weight-medium);
-
-  .chosen & {
-    font-weight: var(--weight-bold);
-  }
 }
 
 .name {
@@ -371,6 +375,11 @@ export default defineComponent({
   font-size: var(--text-footnote);
   font-variant-numeric: tabular-nums;
   text-align: right;
+
+  /* `--text-muted` on a tint stands under 4.5:1 in both schemes (MOL-172): on the chosen row, `--text`. */
+  .chosen & {
+    color: var(--text);
+  }
 }
 
 .note {
