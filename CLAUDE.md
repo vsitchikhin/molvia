@@ -984,11 +984,12 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
   machine's history.
 - **A test whose work takes over a second on CI — a fifth of vitest's 5 s — takes its own
   timeout, at least five times its worst there** (MOL-243): a busy runner nearly triples a test's
-  time (`merge-corpus`, 2.2–6.1 s on the same code), and a red only a retry turns green fails CI. The
-  real model over the seed, the whole seed and a subprocess are what take that long; a wait the
-  test sets itself is not work. A hook is held the same way against its 10 s. A duration a test
-  asserts itself stays below its timeout, or vitest judges it instead of the test. The tests past
-  it when it was written are MOL-266 and MOL-265.
+  time (`merge-corpus`, 2.2–6.1 s on the same code) and now and then lifts a test of 300 ms past a
+  second, and a red only a retry turns green fails CI. Any work may take that long — a loop of
+  writes to the database, a parse, a mount, a subprocess, the real model; a wait the test sets
+  itself is not work. A hook is held the same way against its 10 s. A duration a test asserts
+  itself stays below its timeout, or vitest judges it instead of the test. Bringing the tests that
+  stood past it up to it is MOL-266 and MOL-265; their lists are a window's, and grow with it.
 - **Maximize corner cases.** Mandatory checklist:
   - NULL / legacy — the field is empty but the entity still falls under the rule
   - alternative write path — the same outcome reached by a different route
