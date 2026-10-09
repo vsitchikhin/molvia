@@ -666,7 +666,7 @@
       "year_avg_short": "Too few closed months for an average: {n} of 3",
       "year_avg_uncounted": "No average: every closed month has spending with no rate",
       "year_avg_beyond": "No average: the months add up to more than can be counted",
-      "year_flow_note": "Difference for {year} ≈ {amount}. All in {currency}, the income currency",
+      "year_flow_note": "Difference for {year} {amount}. All in {currency}, the income currency",
       "year_flow_missing": "The difference for {year} can't be counted: not everything converted — {months}. All in {currency}, the income currency",
       "category_months_title": "Category by month",
       "category_avg": "Dashed line: the average of closed months",
@@ -772,6 +772,7 @@
       "conversion_official": "≈ {amount} at the {bank} rate of {rate}",
       "conversion_fallback": "≈ {amount} at {rate}, not a rate of the {bank}",
       "conversion_later": "Counted at the rate of the day",
+      "conversion_counted": "≈ {amount} at the rate of the day",
       "category": "Category",
       "add_category": "Own",
       "date": "When",
@@ -851,7 +852,7 @@
       "refused_below": "{n} marked in the journal below — show | {n} marked in the journal below — show",
       "count": "{n} spending | {n} spendings",
       "unsent": "{n} spending not counted yet | {n} spendings not counted yet",
-      "offline_strip": "No connection. Spendings as of {when}. New ones are kept on the phone and sent when you are back online",
+      "offline_strip": "Offline · spendings as of {when}. New ones are kept on the phone",
       "empty": {
         "title": "No spendings in {month}",
         "body": "Add a spending or record purchases in Purchases — they will show up here by themselves"

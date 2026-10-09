@@ -90,8 +90,18 @@ export interface MonthDay {
   readonly day: string
   /** The day's spending in the spending currency — what could be counted. */
   readonly total: Money
-  /** Something of the day was converted, or could not be: the screen prints «≈». */
+  /**
+   * Something counted in the day was converted: the screen prints «≈» before `total`. What could not
+   * be is `uncounted`, said beside it in its own currency (MOL-184) — not a «≈» over drams that are
+   * exact.
+   */
   readonly estimated: boolean
+  /**
+   * What of the day could not be counted, by currency (MOL-184, В-1): the day's sum is `total` and
+   * these, so a day of one $50 with no rate is «50 $», not «≈ 0 ֏». Whole like `total`, whatever page
+   * the day's rows come on.
+   */
+  readonly uncounted: readonly Money[]
   readonly entries: readonly MonthEntry[]
 }
 
@@ -115,6 +125,8 @@ export interface MoneyMonth {
   /** What came in, in the income currency, each income by the official rate of its own day (MOL-66). */
   readonly income: Money
   readonly incomeUncounted: readonly Money[]
+  /** Some income in another currency was counted into `income` by a rate: it is «≈» (MOL-184, Г2). */
+  readonly incomeConverted: boolean
   /**
    * How many incomes «Пришло» is of — counted or not, a salary moved in by `budgetMonthOf` and not
    * one moved out: the figure beside «Доходы» on «Деньгах» speaks of the same money (MOL-159, Р-2).
@@ -228,6 +240,13 @@ export interface MoneyMonthInput {
 
 function add(sums: Map<Currency, bigint>, { minor, currency }: Money): void {
   sums.set(currency, (sums.get(currency) ?? 0n) + minor)
+}
+
+/** What of these rows was not counted, summed by currency. */
+function uncountedOf(entries: readonly MonthEntry[]): Money[] {
+  const sums = new Map<Currency, bigint>()
+  for (const entry of entries) if (entry.counted === null) add(sums, amountOf(entry))
+  return listOf(sums)
 }
 
 /** The days incomes came in on, each once, earliest first. */
@@ -417,6 +436,7 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
       budgetMonthOf(income, input.salaryShiftDay) !== input.month,
   )
   let incomeMinor = 0n
+  let incomeConverted = false
   const incomeUncounted = new Map<Currency, bigint>()
   for (const income of ofMonth) {
     const counted =
@@ -425,7 +445,10 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
         : input.incomeInIncome(income.amount, income.receivedOn)
     if (counted === null || incomeMinor + counted.minor > INT8_MAX)
       add(incomeUncounted, income.amount)
-    else incomeMinor += counted.minor
+    else {
+      incomeMinor += counted.minor
+      if (income.amount.currency !== incomeCurrency) incomeConverted = true
+    }
   }
 
   const spent: Money = { minor: spentMinor, currency: spend }
@@ -456,6 +479,7 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
     spentIncome,
     income,
     incomeUncounted: listOf(incomeUncounted),
+    incomeConverted,
     incomeCount: ofMonth.length,
     shiftedIn: daysOf(ofMonth.filter((income) => monthOf(income.receivedOn) !== input.month)),
     shiftedOut: daysOf(shiftedOut),
@@ -481,7 +505,8 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
         minor: list.reduce((sum, entry) => sum + (entry.counted?.minor ?? 0n), 0n),
         currency: spend,
       },
-      estimated: list.some((entry) => amountOf(entry).currency !== spend),
+      estimated: list.some((entry) => entry.counted !== null && amountOf(entry).currency !== spend),
+      uncounted: uncountedOf(list),
       entries: list,
     })),
   }
