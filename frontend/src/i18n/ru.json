@@ -772,6 +772,7 @@
       "conversion_official": "≈ {amount} по курсу {bank} {rate}",
       "conversion_fallback": "≈ {amount} по курсу {rate}, не от {bank}",
       "conversion_later": "Посчитаем по курсу дня траты",
+      "conversion_counted": "≈ {amount} по курсу дня траты",
       "category": "Категория",
       "add_category": "Своя",
       "date": "Когда",

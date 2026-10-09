@@ -772,6 +772,7 @@
       "conversion_official": "≈ {amount} at the {bank} rate of {rate}",
       "conversion_fallback": "≈ {amount} at {rate}, not a rate of the {bank}",
       "conversion_later": "Counted at the rate of the day",
+      "conversion_counted": "≈ {amount} at the rate of the day",
       "category": "Category",
       "add_category": "Own",
       "date": "When",

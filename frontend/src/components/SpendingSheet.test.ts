@@ -308,7 +308,10 @@ describe('SpendingSheet: the «≈» of a spending written is its own day’s (M
     asOf: new Date(),
   } as const
 
-  function inRoubles(rate: typeof kept | null): MoneyMonthView {
+  function inRoubles(
+    rate: typeof kept | null,
+    counted = rate ? amd('15050') : null,
+  ): MoneyMonthView {
     const base = month('2026-09-20')
     const [day] = base.days
     const [entry] = day?.entries ?? []
@@ -322,7 +325,7 @@ describe('SpendingSheet: the «≈» of a spending written is its own day’s (M
             {
               ...entry,
               spending: { ...entry.spending, amount: rub('3500'), rate },
-              counted: rate ? amd('15050') : null,
+              counted,
             },
           ],
         },
@@ -374,8 +377,26 @@ describe('SpendingSheet: the «≈» of a spending written is its own day’s (M
     expect(conversion(dialog)).toBe('≈ ֏16,170 at my rate of 4.62 ֏ per 1 ₽')
   })
 
-  it('no rate that day: the server takes one anew, and the sheet says so instead of guessing', async () => {
-    moneyMonth.mockResolvedValue(inRoubles(null))
+  // No snapshot that counts — none known when it was written: the server counts the row by the rate
+  // of its day as it reads the month and takes that rate on «Сохранить», but does not send it (owner's
+  // «а» of review Р2-2, adversarial А1).
+  it('no snapshot, the row counted: untouched, the sheet says the row’s figure', async () => {
+    moneyMonth.mockResolvedValue(inRoubles(null, amd('15050')))
+    const view = await render(undefined, '/money/spendings')
+    expect(view.get('.list-row').text()).toContain('15,050')
+    const dialog = await opened(view)
+    expect(conversion(dialog)).toBe('≈ ֏15,050 at the rate of the day')
+  })
+
+  it('no snapshot, the amount put right: the figure is the server’s to count', async () => {
+    moneyMonth.mockResolvedValue(inRoubles(null, amd('15050')))
+    const dialog = await opened(await render(undefined, '/money/spendings'))
+    await type(dialog, 'input[inputmode="decimal"]', '1000')
+    expect(conversion(dialog)).toBe(en.spending.sheet.conversion_later)
+  })
+
+  it('no rate of its day at all: the row is «не посчитано», and the sheet does not guess', async () => {
+    moneyMonth.mockResolvedValue(inRoubles(null, null))
     const dialog = await opened(await render(undefined, '/money/spendings'))
     expect(conversion(dialog)).toBe(en.spending.sheet.conversion_later)
   })

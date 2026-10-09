@@ -617,10 +617,13 @@ export default defineComponent({
      * A spending the server holds keeps the rate of its own day while its day and currency stay —
      * the server keeps it so on «Сохранить» (`amendSpending`, Р-5 of MOL-73). So its «≈» is that
      * rate's, by the rule the row's «≈» is counted by, `spendingIn` (Е-10, MOL-184): the running
-     * month's rate made one spending «≈ 15 051 ֏» in the journal and «≈ 15 077 ֏» here. A rate that
-     * counts nothing — none was known that day, or it is from before a move — is taken anew by the
-     * server. `undefined` where it is not that spending: one still on the phone, one in the spending
-     * currency, a day or a currency changed — counted as one typed anew.
+     * month's rate made one spending «≈ 15 051 ֏» in the journal and «≈ 15 077 ֏» here. With no
+     * snapshot that counts — none was known when it was written, or one from before a move — the
+     * server counts the row by the rate of its day as it reads the month, and takes that same rate on
+     * «Сохранить»; it does not send the rate, so the sheet says the row's figure while the amount is
+     * untouched, and «Посчитаем по курсу дня траты» once it is put right (owner's «а», review Р2-2,
+     * adversarial А1). `undefined` where it is not that spending: one still on the phone, one in the
+     * spending currency, a day or a currency changed — counted as one typed anew.
      */
     function keptRate(value: Money): string | null | undefined {
       const row = manual.value
@@ -634,8 +637,11 @@ export default defineComponent({
         return undefined
       const into =
         spending.rate && spendingIn({ amount: value, rate: spending.rate }, props.spendCurrency)
-      return into && spending.rate
-        ? conversionWords(into, spending.rate)
+      if (into && spending.rate) return conversionWords(into, spending.rate)
+      return row?.counted && value.minor === spending.amount.minor
+        ? t('spending.sheet.conversion_counted', {
+            amount: formatEstimate(row.counted, locale.value),
+          })
         : t('spending.sheet.conversion_later')
     }
 
