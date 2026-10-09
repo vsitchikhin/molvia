@@ -253,6 +253,28 @@ test('against the usual comes with three closed months, and says when before (ha
   await expect(pace.locator('.reading')).toContainText(/^К 1 /)
 })
 
+test('the day of «Темп» is a slider in sight: the arrows move it and it says the day', async ({
+  page,
+}) => {
+  await seed(page)
+  await toCharts(page)
+  // Last month is whole, so its line has a day after the first whatever today is.
+  await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
+  const pace = page.getByRole('region', { name: 'Темп месяца' })
+  const slider = pace.getByRole('slider', { name: 'Темп месяца' })
+  await expect(slider).toBeVisible()
+  // Under the axis at a thumb's size, not a pixel hidden for the keyboard alone (С-14, MOL-186).
+  const box = await slider.boundingBox()
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
+
+  await slider.focus()
+  await page.keyboard.press('Home')
+  await expect(pace.locator('.reading')).toContainText(/^К 1 /)
+  await page.keyboard.press('ArrowRight')
+  await expect(pace.locator('.reading')).toContainText(/^К 2 /)
+  await expect(slider).toHaveAttribute('aria-valuetext', /^2 /)
+})
+
 // The category card of «Год» is the third: a choice that took the page to the top took the chart away
 // from the person who asked for it (MOL-136). Where the card stands on the screen is what the eye sees.
 /** Scrolls to the very end of the page, where the category card stands when it is the last one. */

@@ -64,18 +64,6 @@
           />
         </template>
       </svg>
-      <input
-        v-if="days.length > 0"
-        class="range"
-        type="range"
-        min="0"
-        :max="days.length - 1"
-        step="1"
-        :value="modelValue"
-        :aria-label="legend"
-        :aria-valuetext="days[modelValue]?.spoken"
-        @input="typed"
-      />
     </div>
     <div class="labels" aria-hidden="true">
       <span
@@ -87,6 +75,20 @@
         {{ tick }}
       </span>
     </div>
+    <!-- In sight under the axis (С-14, Д-5): a finger on the chart chooses too, but a slider says it can
+         be moved before anyone tries. -->
+    <input
+      v-if="days.length > 0"
+      class="range"
+      type="range"
+      min="0"
+      :max="days.length - 1"
+      step="1"
+      :value="modelValue"
+      :aria-label="legend"
+      :aria-valuetext="days[modelValue]?.spoken"
+      @input="typed"
+    />
   </div>
 </template>
 
@@ -111,8 +113,8 @@ const MARGIN = 50
  * day — a solid line to the last day shown — against the usual month, dashed to the month's end:
  * the two told apart by their stroke, not their colour alone. The day is chosen as a bar is — on
  * lifting the finger or once it goes sideways, anywhere on the card, never by a scroll — and by the
- * arrows of a native range, which also says the day and both sums to a screen reader. Every height
- * is the server's.
+ * slider in sight under the axis (С-14): a native range, whose arrows move the day and which says the
+ * day and both sums to a screen reader. Every height is the server's.
  */
 export default defineComponent({
   name: 'PaceLine',
@@ -173,10 +175,6 @@ export default defineComponent({
   margin-top: var(--space-3);
   border-radius: var(--radius-sm);
   touch-action: pan-y;
-
-  &:has(.range:focus-visible) {
-    @include focus-ring;
-  }
 }
 
 .plot {
@@ -240,8 +238,21 @@ export default defineComponent({
   stroke-width: 5;
 }
 
+/* A native range in the accent, the one thing on the card that is pressed (Ф-4): its own track and
+   thumb, as each platform draws them — a second control of our own would be one more to keep. */
 .range {
-  @include visually-hidden;
+  display: block;
+  width: 100%;
+  min-height: var(--touch-target);
+  margin: var(--space-1) 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+
+  &:focus-visible {
+    @include focus-ring;
+
+    border-radius: var(--radius-sm);
+  }
 }
 
 .labels {
