@@ -4,19 +4,22 @@ paths:
   - 'packages/client/src/bot.ts'
   - 'backend/src/routes/internal-auth.ts'
   - 'backend/src/usecases/bot-login.ts'
-  - 'backend/src/usecases/{remind-ratings,rate-from-bot,reminders-switch,tell-receipts}.ts'
+  - 'backend/src/usecases/{remind-ratings,rate-from-bot,reminders-switch,tell-receipts,broadcast}.ts'
   - 'backend/src/routes/{reminders,receipt-notices}.ts'
-  - 'backend/src/db/reminders-repository.ts'
+  - 'backend/src/db/{reminders,broadcasts}-repository.ts'
+  - 'backend/src/{notify,notify-cli}.ts'
+  - 'backend/tests/{broadcasts,notify-bundle}.integration.test.ts'
+  - 'bin/notify.sh'
   - 'backend/tests/reminders*.ts'
   - 'packages/model/src/{entities,contracts}/reminder.ts'
-  - 'packages/model/src/contracts/receipt-notice.ts'
+  - 'packages/model/src/contracts/{receipt-notice,broadcast}.ts'
   - 'backend/tests/receipt-notices*'
   - 'frontend/src/views/BotView*'
   - 'frontend/src/components/BotSwitchRow*'
   - 'frontend/src/composables/{useReminders,useReceiptNotices}*'
 ---
 
-# The bot, and what it is allowed to know (MOL-55, MOL-58, MOL-101, MOL-129)
+# The bot, and what it is allowed to know (MOL-55, MOL-58, MOL-101, MOL-129, MOL-237)
 
 The bot did two things in 0.1, and 0.2 gives it a third — the rating reminder, below. It is the
 second half of the login: the one place a person is shown **which device** they are letting in and
@@ -518,3 +521,53 @@ handoff 08 (`design_handoff_mol_127_128_129_v2`).
   connection is said once too, under the switches** (review №5), each naming it by `aria-describedby`.
 - **In the copy**: a receipt's `heard` and `heardAt`, the account's `receiptNoticesOff` and
   `botBlockedAt` (version 13).
+
+## The message to people about a leak (MOL-237)
+
+«Порядок при утечке персональных данных» (Confluence 12124161, MOL-97, owner's В-3 of 05.10.2026)
+promises to write personally to everybody concerned by any leak of what was not encrypted — Georgia
+(art. 30) and Serbia (art. 53) ask it at a high risk, ours is any. Before this the bot wrote to one
+person on one event only, and the promise had nothing to stand on. Owner's decisions 09.10.2026, the
+plan in `.scratch/tasks/plans/MOL-237.md`.
+
+- **The API queues it, the bot sends it — the way of the rating reminders** (В-1). `make notify` in
+  a copy and `dist/notify.js` in the API's image write a row of `broadcasts`; every minute the bot
+  claims a batch (`POST /internal/broadcasts/claim`) and sends it through `deliver`. Who gets it is
+  the API's — the audience, the moment it was queued, a blocked bot — so the bot repeats no rule. Not
+  the other way, a script with the bot's token: the token lives in the bot's container alone, and it
+  is exactly what step 2 of the procedure revokes through BotFather in the first hour of a leak; the
+  script would need the new one typed in, and a second implementation of 429 and 403 in the API.
+- **One message, Russian then English, the owner's file as it is** (В-2): nobody's language is kept
+  (`actors` holds none, the bot keeps no Telegram language), and the first market is Russian-speaking
+  in three countries. **It is the one message of the bot that is not an i18n key**: its words are the
+  incident's, written on the day by the template of 12124161. Plain text with no `parse_mode` — an
+  escape missed in the middle of an incident would refuse the message — and no link preview. What the
+  dry run printed is what goes. The file comes on standard input, so on production it travels over
+  ssh and is never put on the server. **Its length is held in UTF-16 units** (`broadcastTextSchema`):
+  Telegram counts an emoji as two, zod's `max` as one.
+- **Everybody, or the people of some countries, and a try on the owner alone first** (В-3):
+  `COUNTRY=AM,GE`, `OWNER=1` — one message to `OWNER_TELEGRAM_ID` of the API's environment, to see the
+  text in Telegram before everybody; it goes before a broadcast to people, and none goes in a copy
+  without that variable. **Created after the broadcast — not concerned; the bot blocked — skipped and
+  counted** (`blocked_at_start`), and a 403 on the way marks the block as the reminders do (MOL-103).
+  **The reminders off, the consent not accepted, the statistics off are no reason to stay silent**: it
+  is not a reminder, it is a duty. A list of the people concerned by Telegram id is a task of its own
+  when a leak touches a few.
+- **Better twice than never** (the owner's notice of a message, MOL-148, is the precedent): the
+  cursor moves only by the bot's word on a batch (`POST /internal/broadcasts/done`), a batch is leased
+  for five minutes (`BROADCAST_LEASE_SECONDS` — 25 messages each waiting out a 429 to the cap), and a
+  batch never reported goes out again: a bot killed mid-batch writes to up to 25 people twice. A late
+  or repeated word changes nothing (`cursor < through`). Telegram's flood control stops a batch: the
+  word covers the part that went, the rest goes the next minute. A stop finishes the batch in hand,
+  its waits cut short, and claims no other.
+- **One broadcast to people at a time**: a second `YES=1` while one goes is refused — a repeat would
+  write to everybody twice — by a lock on queueing and a partial unique index; the owner's try is not
+  one of them. `CANCEL=1` stops what is going (a typo seen after the start), `STATUS=1` says how far it
+  got. **25 a second** (`BROADCAST_GAP_MS`), under Telegram's 30 for a bot.
+- **The table holds nobody** (`privacy.md`): the text, the audience, the counts and a cursor in the
+  order of `actors.id`. The cursor always names a live person or nobody (`BROADCAST_START`, the nil
+  uuid): the bot's word and erasure both put it on the nearest live id at or below, which leaves the
+  same people after it — so erasure and the copy do not change, and no erased id stays. What
+  `make notify` and the bot print is the text and counts, never anyone.
+- **The privacy page names it** among the bot's messages under «Telegram» — a revision of edition 2,
+  since «Если данные утекут» already promised it.

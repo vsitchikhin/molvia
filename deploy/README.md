@@ -229,6 +229,31 @@ sessions, login requests and the owner. What stays: catalogue items the person a
 author, and every place — and one more to the count of people who erased themselves among those
 who appeared in the same week (`erasures`, MOL-91), with no id, which the gates print.
 
+## Writing to people about a leak (MOL-237)
+
+Step 4 of «Порядок при утечке персональных данных» (Confluence 12124161): everybody concerned is told
+personally by the bot. The text is written by the template there — Russian, then English, in one
+file, as it will go — and comes on standard input, so it never has to be put on the server. From the
+laptop, where `notice.txt` is:
+
+1. Look — without `--yes` nothing is queued; it prints the message as it will go and, by country, how
+   many get it and how many have the bot blocked:
+
+   ```bash
+   ssh molvia 'cd ~/molvia && docker compose -f docker-compose.prod.yml --env-file .env.prod \
+     exec -T backend node dist/notify.js' < notice.txt
+   ```
+
+2. Try it on yourself: the same with `--owner --yes` — one message to `OWNER_TELEGRAM_ID`, within a
+   minute. Read it in Telegram.
+3. The same with `--yes` writes to everybody (`--country=AM,GE` — the people of those countries
+   only). The bot starts within a minute, 25 messages a second.
+4. `… node dist/notify.js --status` says how far it got; `--cancel` stops what is left (a typo seen
+   after the start). A second `--yes` while one goes is refused — it would write to everybody twice.
+
+In a working copy the same thing is `make notify FILE=notice.txt [COUNTRY=AM,GE] [OWNER=1] [YES=1]`,
+`make notify STATUS=1` and `make notify CANCEL=1`; the copy's bot sends, if it has a token.
+
 ## Seeding the catalogue (MOL-112)
 
 `backend/src/catalogue-seed.ts` is some six hundred common names — «Молоко», «Говядина», «Хлеб» —

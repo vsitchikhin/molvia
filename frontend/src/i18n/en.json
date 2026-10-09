@@ -1649,7 +1649,7 @@
       },
       "telegram": {
         "term": "Telegram",
-        "text": "The bot’s messages to you — sign-in, reminders, “receipt read”, the developer’s replies — and your messages to the developer with their screenshots. Telegram is a company abroad; this has to go to it because Molvia’s sign-in and bot work through Telegram — a channel you chose yourself by signing in."
+        "text": "The bot’s messages to you — sign-in, reminders, “receipt read”, the developer’s replies, a notice of a data breach — and your messages to the developer with their screenshots. Telegram is a company abroad; this has to go to it because Molvia’s sign-in and bot work through Telegram — a channel you chose yourself by signing in."
       },
       "contabo": {
         "term": "Contabo, Germany",
