@@ -982,6 +982,10 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
   match the behaviour. A test proves the app works, not the other way round. And **never by
   making it tolerate leftovers**: that hides the cause and leaves the suite depending on the
   machine's history.
+- **A test of the real model, the whole seed or a subprocess takes its own timeout** from a CI
+  measure, at least five times the worst (MOL-243): vitest's 5 s is crossed on a busy runner, and
+  a red only a retry turns green fails CI. A clock checked inside a test stays below its limit, or
+  vitest checks it instead of the test.
 - **Maximize corner cases.** Mandatory checklist:
   - NULL / legacy — the field is empty but the entity still falls under the rule
   - alternative write path — the same outcome reached by a different route
