@@ -278,6 +278,62 @@ describe('broadcastDue — рассылка об утечке (MOL-237)', () => 
     })
   })
 
+  // Review №8: a block or a gone chat says nothing of the message — only a message sent judges.
+  it('иной 400, за ним заблокировавший, потом ушло — оба засчитаны, рассылка дальше', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2, 3, 4, 5])])
+    await broadcastDue(asClient(api), telegram({ 2: 400, 3: 403 }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledWith({
+      id: 1,
+      through: position(5),
+      sent: 3,
+      blocked: 1,
+      failed: 1,
+    })
+  })
+
+  it('иной 400, заблокировавший, снова иной 400 — само сообщение: стоп до первого отказа', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2, 3, 4, 5])])
+    await broadcastDue(asClient(api), telegram({ 2: 400, 3: 403, 4: 400 }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: position(1),
+      sent: 1,
+      blocked: 0,
+      failed: 0,
+    })
+    // the block itself is marked, so the claim never hands that person again
+    expect(api.switchReminders).toHaveBeenCalledWith(3, 'blocked')
+  })
+
+  it('иной 400 и чата нет у следующего в конце рассылки — оба «не дошло», рассылка кончается', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2, 3])])
+    await broadcastDue(asClient(api), telegram({ 2: 400, 3: 'gone' }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: position(3),
+      sent: 1,
+      blocked: 0,
+      failed: 2,
+    })
+  })
+
+  // Adversarial Р3-А1: 404 is a token of the wrong shape, not a refusal of the chat or the text.
+  it('404 у последнего в рассылке (проба себе) — не «не дошло»: аренда отпущена, ждёт токена', async () => {
+    quiet()
+    const api = client([batch(1, [1])])
+    await broadcastDue(asClient(api), telegram({ 1: 404 }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: null,
+      sent: 0,
+      blocked: 0,
+      failed: 0,
+    })
+  })
+
   it('сбой на первом — ни одного исхода: аренда отпущена, пачка уйдёт со следующей минутой', async () => {
     quiet()
     const api = client([batch(1, [1, 2])])

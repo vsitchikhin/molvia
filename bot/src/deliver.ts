@@ -26,7 +26,7 @@ export class Flooded extends Error {}
  * What became of one message: sent, the person blocked the bot, refused for good (`failed` — the chat
  * is not there), refused by Telegram as a request (`refused` — another 4xx: about this chat or about
  * the message itself, which only the next person can tell), or given up for now (`again` — the
- * network, Telegram's own failure, a revoked token, a second 429, a stop cutting the wait: it may well
+ * network, Telegram's own failure, a revoked or mistyped token, a second 429, a stop cutting the wait: it may well
  * go later). The reminders and «чек разобран» lose all three; the message about a leak decides by
  * them where its cursor may go (MOL-237).
  */
@@ -42,15 +42,16 @@ function refusedForGood(error: unknown): boolean {
 }
 
 /**
- * Telegram refused the request itself — a 4xx but the token's (401), a block (403) and the pace (429):
- * it will be refused again, though whether for this chat or for every one is not said.
+ * Telegram refused the request itself — a 4xx but the token's (401 revoked, 404 the address of a token
+ * of the wrong shape: a pasted new one with a character lost, adversarial Р3-А1), a block (403) and the
+ * pace (429): it will be refused again, though whether for this chat or for every one is not said.
  */
 function refusedRequest(error: unknown): boolean {
   return (
     error instanceof GrammyError &&
     error.error_code >= 400 &&
     error.error_code < 500 &&
-    ![401, 403, 429].includes(error.error_code)
+    ![401, 403, 404, 429].includes(error.error_code)
   )
 }
 

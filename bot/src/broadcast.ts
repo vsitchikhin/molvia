@@ -40,14 +40,16 @@ const STOPPED_BY = {
  * the part that went, and the rest goes with the next minute; with nothing gone the word only lets the
  * lease go. A stop sends nothing more, so no volley without the pauses meets a 429 it cannot wait out.
  *
- * **A request Telegram refuses (`refused`, another 4xx) is judged by the next person** (adversarial
- * Р2-А1): it is about that one chat or about the message itself, and Telegram does not say which. The
- * next one goes — it was the chat's, so that person is «не дошло» for good and the broadcast goes on;
- * the next one is refused too — it is the message's, and the batch stops before the first of them, as
- * it would for every one after. The last person of the broadcast has nobody after them — a batch
- * shorter than a whole one is its end — and is not delivered for good: one refused request is not
- * worth holding a finished broadcast for, nor the owner's try, which goes before the people's. A whole
- * batch ending on one leaves them first in the next batch, where their next one is.
+ * **A request Telegram refuses (`refused`, another 4xx) is judged by the next one it goes to**
+ * (adversarial Р2-А1, review №8): it is about that one chat or about the message itself, and Telegram
+ * does not say which. Only a message sent says the message is fine: then the refused person is «не
+ * дошло» for good and the broadcast goes on. A block or a gone chat in between says nothing of the
+ * message, so they wait with the refused person for that word; another refusal before it is the
+ * message's, and the batch stops before the first refused — the ones waiting go again, a block among
+ * them already marked and never handed again. The end of the broadcast — a batch shorter than a whole
+ * one — has nobody after it: the waiting are closed as they are, the refused «не дошло», since one
+ * refused request is not worth holding a finished broadcast for, nor the owner's try, which goes before
+ * the people's. A whole batch ending on them leaves them first in the next.
  *
  * `false` when the run stops here; a word that never arrives leaves the batch to go again after its
  * lease — better twice than never.
@@ -61,8 +63,8 @@ async function sendBatch(
 ): Promise<boolean> {
   const counts = { sent: 0, blocked: 0, failed: 0 }
   let through: string | null = null
-  // a refused person whose verdict waits for the next one
-  let held: string | null = null
+  // a refused person, and the blocked and gone after them, waiting for a message that goes
+  let held: { readonly counts: typeof counts; last: string } | null = null
   let stopped: keyof typeof STOPPED_BY | null = null
   for (const [index, recipient] of batch.recipients.entries()) {
     // after the pause: a stop comes while waiting more often than not
@@ -92,19 +94,24 @@ async function sendBatch(
         stopped = 'refused'
         break
       }
-      held = recipient.position
+      held = { counts: { sent: 0, blocked: 0, failed: 1 }, last: recipient.position }
+      continue
+    }
+    if (held !== null && outcome !== 'sent') {
+      held.counts[outcome] += 1
+      held.last = recipient.position
       continue
     }
     if (held !== null) {
-      counts.failed += 1
+      for (const kind of ['sent', 'blocked', 'failed'] as const) counts[kind] += held.counts[kind]
       held = null
     }
     counts[outcome] += 1
     through = recipient.position
   }
   if (held !== null && stopped === null && batch.recipients.length < BROADCAST_BATCH) {
-    counts.failed += 1
-    through = held
+    for (const kind of ['sent', 'blocked', 'failed'] as const) counts[kind] += held.counts[kind]
+    through = held.last
   }
   try {
     await api.broadcastDone({ id: batch.id, through, ...counts })
