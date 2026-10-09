@@ -245,14 +245,16 @@ laptop, where `notice.txt` is:
    ```
 
 2. Try it on yourself: the same with `--owner --yes` — one message to `OWNER_TELEGRAM_ID`, within a
-   minute. Read it in Telegram.
+   minute. Read it in Telegram. No message and `--status` says `failed 1`: Telegram refused the text
+   itself — fix the file before writing to everybody.
 3. The same with `--yes` writes to everybody (`--country=AM,GE` — the people of those countries
    only). The bot starts within a minute, 25 messages a second.
 4. `… node dist/notify.js --status` says how far it got — and the try on yourself beside it, if newer;
    `--cancel` stops what is left (a typo seen after the start). A second `--yes` while one goes is
    refused — it would write to everybody twice. «left» not moving for minutes is somebody the bot cannot
    reach for now — Telegram down, the bot's token revoked and not yet replaced: it tries again every
-   minute and never skips them.
+   minute and never skips them — or a text Telegram refuses for everybody, which the try on yourself
+   shows first. The bot's log names which (`journalctl`, `[molvia] broadcast: …`).
 
 A command run with the file forgotten does not wait for it: two seconds without a byte on its input,
 and it says the message comes on standard input.

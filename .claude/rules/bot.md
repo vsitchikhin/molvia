@@ -565,9 +565,17 @@ plan in `.scratch/tasks/plans/MOL-237.md`.
   Telegram's flood control and at the bot stopping — a stop sends nothing more, so no volley without
   the pauses meets a 429 — the word covers the part that went, and the rest goes the next minute.
   With nothing gone the word is `through: null`, which only lets the lease go, so a batch stopped on
-  its first message is not held five minutes. **The price, named:** a person whose every message
-  fails in a way that may pass holds the broadcast at them, a try a minute — `STATUS=1` shows «left»
-  not moving, and `CANCEL=1` stops it; the step's log says why, by its code.
+  its first message is not held five minutes.
+- **Another 4xx is judged by the next person** (`refused`, adversarial Р2-А1): Telegram does not say
+  whether a refused request is about that chat or about the message. The next one goes — it was the
+  chat's: «не дошло» for good, and the broadcast goes on. The next one is refused too — it is the
+  message's: the batch stops before the first of them. The last person of the broadcast (a batch
+  shorter than a whole one) has nobody after them and is «не дошло»; a whole batch ending on one leaves
+  them first in the next. So the owner's try, a batch of one, ends «failed 1» on a text Telegram
+  refuses — **that is what the try is for** — and never holds the people's broadcast behind it.
+  **The prices, named:** a failure that may pass holds the broadcast at that person, a try a minute —
+  `STATUS=1` shows «left» not moving, and `CANCEL=1` stops it; a message Telegram refuses holds it at
+  the first two, and so do two broken chats side by side in the order of `actors.id`.
 - **One broadcast to people at a time**: a second `YES=1` while one goes is refused — a repeat would
   write to everybody twice — by a lock on queueing and a partial unique index; the owner's try is not
   one of them. `CANCEL=1` stops what is going (a typo seen after the start), `STATUS=1` says how far
