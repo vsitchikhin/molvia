@@ -72,20 +72,23 @@ A till that prints no shelf price lets every swap of a line fit the line, so onl
 fifteen ordinary lines held the API for 52 s before the beam (Р14), ninety now balance in a third of a
 second. A line past its ceiling is taken as read, unsettled.
 
-**A sign read as a digit is the last resort, and alone** (MOL-246, H9 of MOL-228): a till prints «=» before
-an amount and OCR reads the sign as a digit — «=119.00» as «2119.00». The line's sum or its price is tried
-without its first digit (`signless`, `sliced`) only where no reading of the line holds with its swaps, and
-then with every other figure as read; the terminal's lost point, put back outside, still counts (KFC's
-«148032:1.0»). Both halves were measured wrong first (review, round 1): beside the swaps, a price that lost
-a digit beat the sum's own swap at the same cost — 1500.00 × 3 = 4500.00 read «=1500.00» became
-500.00 × 3 = 1500.00, settled, and a total misread alike was vouched for — and with swaps of the other
-figures it «fixed» all three of one line. Never a count (a weight's three decimals), never the discount,
-never a figure with no decimals, never to zero: a slice that leaves 0 is no amount, while «=0.50» read
-«20.50» is one. The half «119.00 1» read «119.001» is not done: `hundredthsOf` already rounds the third
-decimal away, so the line holds as read. On the bench: not one line lost or changed, the search as on
-master; KFC's terminal print reads 8 of 8 as they add up (one was its sum alone), its «1» before «480.32»
-a bracket. The Russian tills of MOL-228 gain eleven lines with H9, and the Armenian terminal prints the
-same «=». The pharmacy's «»», «-», «:», «Օ» for the terminal's signs are MOL-258 (owner, В-1 «а»).
+**A sign read as a digit is the total's to take, the last resort, and alone** (MOL-246, H9 of MOL-228): a till
+prints «=» before an amount and OCR reads the sign as a digit — «=119.00» as «2119.00». The line's sum or its
+price without its first digit (`signless`, `sliced`) is offered only where no reading of the line holds with
+its swaps, with every other figure as read, and only to the printed total: a line with nothing but a slice
+takes the rest of the total or the slice, whichever meets it, and with no total that meets it stays as read,
+unsettled (`sliced` candidates are never a line's own first reading). The terminal's lost point, put back
+outside, still counts (KFC's «148032:1.0»). Card lines and class-code lines with a count read; never the
+weight by money nor the plain layout (their search is past the floor of Р15 with it, review А3), never a
+class row whose count is not printed (twenty counts made up let the slice choose one, Б1). Each half was
+measured wrong first (reviews, rounds 1–2): beside the swaps a price that lost a digit beat the sum's own
+swap — 1500.00 × 3 = 4500.00 read «=1500.00» became 500.00 × 3; with swaps of the other figures it «fixed»
+three figures of a line; as a line's own reading it took the blank's place — «2119,00» read 119,00 where the
+total said 2 119,00 — and made a reading that misread a line tie one that read it right. Never a count, the
+discount or a figure with no decimals, never to zero; «=0.50» read «20.50» is read. The half «119.00 1» read
+«119.001» is not done: `hundredthsOf` rounds the third decimal away. On the bench: not one line lost or
+changed, the search as on master; KFC's terminal print reads 8 of 8 as they add up, its total taking the
+slice. The pharmacy's «»», «-», «:», «Օ» are MOL-258 (owner, В-1 «а»).
 
 **Where only the total judges, the rate the lines share helps it** (review Р20): such a till has no
 line read with no swap, so the receipt's discount rate is taken from the lines as read, and a
