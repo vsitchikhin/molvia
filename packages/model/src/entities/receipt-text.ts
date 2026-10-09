@@ -412,6 +412,9 @@ function reconcile(
     tied: false,
   }
   let states = new Map<string, State>([['0|false|false', start]])
+  const owned = lists.map(
+    (list) => new Set(list.filter((x) => x.sliced !== true).map((x) => x.paid)),
+  )
   let steps = 0
   for (const [i, list] of lists.entries()) {
     const next = new Map<string, State>()
@@ -424,7 +427,9 @@ function reconcile(
     }
     for (const state of states.values()) {
       if (steps > RECONCILE_STEPS_MAX) break
-      // a line with no reading of its own takes the rest of the total, or a slice (MOL-246)
+      // a line with no reading of its own takes the rest of the total, or a slice (MOL-246); at one
+      // cost and one sum the rest, put first, wins: the sum is the same, and the person looks either way
+      // (review 13)
       if (list.every((x) => x.sliced === true)) {
         if (!state.answered) {
           put({
@@ -441,6 +446,9 @@ function reconcile(
       }
       const seen = new Set<number>()
       for (const [k, x] of list.entries()) {
+        // a slice whose sum the line reads of its own changes no sum: the line's own reading stands,
+        // and the total's one answer is left to a line that has none (review 12)
+        if (x.sliced === true && owned[i]?.has(x.paid) === true) continue
         if (seen.has(x.paid)) continue
         seen.add(x.paid)
         const sum = state.sum + x.paid
@@ -520,6 +528,7 @@ function judged(
   balanced: boolean
   blankSum: number | null
   doubt: ReadonlySet<number>
+  sliced: boolean
 } {
   const lists = settle(found)
   // the shared rate counts in the total's choice only where `settle` had none to order by
@@ -538,7 +547,6 @@ function judged(
   // at a seam included — so «balanced» is «balanced as read», and a change by the total is one look of
   // the person's. In a tie the total could have made its change in another line just as well: every
   // line with a reading of its own that differs by the same amount is in doubt too (review Р20, Р24).
-  // a slice the total took is no change of a reading: it is none, and the total vouches for it
   const moves = picks.flatMap((pick, i) => {
     const first = own[i]?.[0]
     return pick !== null && pick.sliced !== true && first !== undefined && pick !== first
@@ -546,6 +554,12 @@ function judged(
       : []
   })
   const doubt = new Set<number>(moves.map(([i]) => i ?? -1))
+  // a slice the total took is the total's answer, as the blank's rest is: one look of the person's, never
+  // a line «as read» — or a total read wrong in one place would vouch for itself through the slice it chose
+  // (review Г1; MOL-244, В-1 «а»)
+  picks.forEach((pick, i) => {
+    if (pick?.sliced === true) doubt.add(i)
+  })
   if (tied) {
     own.forEach((list, j) => {
       const first = list[0]
@@ -555,7 +569,7 @@ function judged(
       }
     })
   }
-  return { picks, balanced, blankSum, doubt }
+  return { picks, balanced, blankSum, doubt, sliced: picks.some((pick) => pick?.sliced === true) }
 }
 
 const ITEM = /^\s*(\d{1,2})\s*[.,]?\s*(\S.*)$/
@@ -746,12 +760,15 @@ function cardReceipt(rows: readonly TextRow[]): Laid {
       : out
   })
   const tin = /(\d{8})\b/.exec(/ՀՎՀՀ.{0,4}:?\s*\S+|:\s*0\d{7}/.exec(text)?.[0] ?? '')?.[1] ?? null
+  // whether the reading by its own total took a slice (MOL-246): `bestReading` lets no such total vouch
+  let tookSlice = false
   const judge = (byTotal: boolean): ReceiptText => {
-    const { picks, balanced, blankSum, doubt } = judged(
+    const { picks, balanced, blankSum, doubt, sliced } = judged(
       lists,
       byTotal ? total : null,
       found.map((f) => (f.plain !== null ? f.plain.join('') : f.paidS).replace(/\D/g, '')),
     )
+    if (byTotal) tookSlice = sliced
     const lines = found.map((f, i): ReceiptTextLine => {
       const pick = picks[i] ?? null
       return {
@@ -780,7 +797,8 @@ function cardReceipt(rows: readonly TextRow[]): Laid {
       lines,
     }
   }
-  return { read: judge(true), asPrinted: () => judge(false) }
+  const read = judge(true)
+  return { read, asPrinted: () => judge(false), sliced: tookSlice }
 }
 
 // Every way to read space-separated digit groups as numbers: «2 200» is one number or two. Values
@@ -1356,12 +1374,15 @@ function classReceipt(rows: readonly TextRow[]): Laid {
   const budget: Budget = { left: READING_COMBINATIONS_MAX, floors: FLOOR_COMBINATIONS_MAX }
   const guessed = new Set<Candidate>()
   const lists = items.map((item) => classCandidates(budget, item.figures, guessed))
+  // whether the reading by its own total took a slice (MOL-246): `bestReading` lets no such total vouch
+  let tookSlice = false
   const judge = (byTotal: boolean): ReceiptText => {
-    const { picks, balanced, blankSum, doubt } = judged(
+    const { picks, balanced, blankSum, doubt, sliced } = judged(
       lists,
       byTotal ? total : null,
       items.map((item) => item.figures.sumS.replace(/\D/g, '')),
     )
+    if (byTotal) tookSlice = sliced
     const lines = items.map((item, i): ReceiptTextLine => {
       const pick = picks[i] ?? null
       const f = item.figures
@@ -1390,7 +1411,8 @@ function classReceipt(rows: readonly TextRow[]): Laid {
       lines,
     }
   }
-  return { read: judge(true), asPrinted: () => judge(false) }
+  const read = judge(true)
+  return { read, asPrinted: () => judge(false), sliced: tookSlice }
 }
 
 // MOL-227 — a sole trader's terminal prints no items at all: its section «Բաժին 1», the turnover tax,
@@ -1667,6 +1689,8 @@ function withTwins(read: ReceiptText): ReceiptText {
 interface Laid {
   readonly read: ReceiptText
   readonly asPrinted: () => ReceiptText
+  /** `read` met its total through a slice (MOL-246): the total's own choice, which vouches for nothing. */
+  readonly sliced: boolean
 }
 
 function readingOf(rows: readonly TextRow[]): Laid {
@@ -1682,6 +1706,7 @@ function readingOf(rows: readonly TextRow[]): Laid {
       laid = {
         read: tableReceipt(rows, table.total, lines),
         asPrinted: () => tableReceipt(rows, table.total, table.judge(false)),
+        sliced: false,
       }
     }
   }
@@ -1965,8 +1990,11 @@ export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptT
   // Lines «meet» a total only as read: the total changes a line's digit to meet itself, or gives a line
   // with no reading its rest (adversarial А1). Every line as read — the lines vouch, unless two places print
   // another sum (Б1, Ц1); else two places printed (А1б); else the lines with one of them as read (owner).
+  // a total met through a slice met its own choice (MOL-246, review Г1): only two places vouch for it
+  const tookSlice = laid[parsed.indexOf(best)]?.sliced === true
   const asRead = (every: boolean): boolean =>
     best.balanced &&
+    !tookSlice &&
     (every ? best.lines.every((l) => l.settled) : best.lines.some((l) => l.settled))
   const own = best.totalHundredths
   const voted = votedTotal(readings, false)
