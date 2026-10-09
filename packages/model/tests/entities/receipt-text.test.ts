@@ -2040,3 +2040,321 @@ describe('the total of a receipt with items: the lines that met it, or two place
     expect(both(...tail).totalHundredths).toBeNull()
   })
 })
+
+// MOL-246: a till prints «=» before an amount, and OCR reads the sign as a digit (MOL-228, H9). Tried
+// last and alone — only where no reading of the line holds, every other figure as read (review, round
+// 1) — and only the printed total takes it: without a total that meets it the line stays as read (round 2).
+// A slice the total took is one look, as the blank's rest is, and never a line «as read» (round 4, Г1).
+describe('a sign OCR read as a digit (MOL-246)', () => {
+  const milk = '1.Կաթ «Իգիթ» 3.2% 1լ'
+  const card = (...rows: string[]) => parseReceiptText(rowsOf([milk, ...rows].join('\n'), 0))
+  const terminal = (...rows: string[]) => ['Դաս՝ 56.10', 'Թվիստեր', ...rows].join('\n')
+  const line = (...rows: string[]) => parseReceiptText(rowsOf(terminal(...rows), 0)).lines[0]!
+  const best = (...rows: string[]) =>
+    bestReading([rowsOf(terminal(...rows), 0), rowsOf(terminal(...rows), 0)])
+  const figures = (l: ReceiptText['lines'][number]) => [
+    l.quantityMilli,
+    l.priceHundredths,
+    l.sumHundredths,
+    l.settled,
+  ]
+
+  it('drops a digit read in front of a till’s paid where two places print the total: one look', () => {
+    const got = card('0401/1163909 1Հտ 2760,75/89,25 850', 'Ընդամենը 760.75', 'Կանխիկ 760.75')
+    expect([...figures(got.lines[0]!), got.lines[0]!.discountHundredths, got.balanced]).toEqual([
+      1_000,
+      85_000,
+      76_075,
+      false,
+      8_925,
+      true,
+    ])
+  })
+
+  it('reads an amount under one where two places print it: «=0.50» read «20.50»', () => {
+    const got = best('0.50x1.0 հատ=20.50դրամ', 'Ընդամենը: 0.50', 'Կանխիկ 0.50')
+    expect([...figures(got.lines[0]!), got.totalHundredths]).toEqual([1_000, 50, 50, false, 50])
+  })
+
+  // review Г1: the slice is the total's own choice, so a total read in one place never vouches for
+  // itself through it (MOL-244, В-1 «а»)
+  it('must not let a total read in one place vouch for itself through its slice (review Г1)', () => {
+    const two = (other: string, bread: string, total: string) =>
+      bestReading(
+        [0, 1].map(() =>
+          rowsOf(
+            [
+              '1. Կաթ',
+              `0401/1163909 1Հտ ${other}`,
+              '2. Հաց',
+              `0402/1163901 1Հտ ${bread}`,
+              total,
+            ].join('\n'),
+            0,
+          ),
+        ),
+      )
+    // 1 000 + 3 119 = 4 119 with the total’s 4 read as 1; 3 000 + 5 119 = 8 119 with its 8 read as 3
+    for (const [other, bread, total, asRead] of [
+      ['1000,00/0,00 1000', '3119,00/0,00 119', 'Ընդամենը 1119.00', 311_900],
+      ['3000,00/0,00 3000', '5119,00/0,00 119', 'Ընդամենը 3119.00', 511_900],
+    ] as const) {
+      const got = two(other, bread, total)
+      expect([got.lines[1]!.sumHundredths, got.lines[1]!.settled, got.totalHundredths]).toEqual([
+        asRead,
+        false,
+        null,
+      ])
+    }
+    expect(line('1480.32x1.0 հատ=480.32դրամ', 'Ընդամենը: 480.32').settled).toBe(false)
+  })
+
+  // review Д1, Д2: slices only where no way without them meets the total, and a reading met only by its
+  // slice has no balance to rank by
+  const cheese = (bread: string, cheeseRow: string | null, ...tail: string[]) =>
+    [
+      '1. Կաթ',
+      '0401/1163909 1Հտ 1000,00/0,00 1000',
+      '2. Հաց',
+      `0402/1163901 1Հտ ${bread}`,
+      ...(cheeseRow === null ? [] : ['3. Պանիր', `0403/1163902 1Հտ ${cheeseRow}`]),
+      ...tail,
+    ].join('\n')
+
+  it.each([[[]], [['Կանխիկ 5319.00']]])(
+    'must not let a slice absorb another line’s misread (review Д1), payment %j',
+    (pay) => {
+      // 1 000 + 3 119 + 1 200 = 5 319: the bread’s price lost its «3», the cheese’s 1 read 4 in both
+      // columns — the blank and the cheese’s own swaps meet the total, so no slice is offered
+      const text = cheese('3119,00/0,00 119', '4200,00/0,00 4200', 'Ընդամենը 5319.00', ...pay)
+      expect(shown(bestReading([rowsOf(text, 0), rowsOf(text, 0)]))).toEqual([
+        [
+          [100_000, true],
+          [311_900, false],
+          [120_000, false],
+        ],
+        531_900,
+        true,
+      ])
+    },
+  )
+
+  it('names the last resort’s price: a way without slices shuts the right slice out (review Е1)', () => {
+    // 1 000 + 760 + 6 200 = 7 960 in two places, «=760,00» read «2760,00»: the cheese read right is bent
+    // by two swaps to 5 200,00 so the bread’s rest, 1 760,00, looks like «276000» — as master reads it,
+    // both lines one look; the slice, 760,00 beside the cheese as read, is never tried
+    const text = cheese(
+      '2760,00/0,00 760',
+      '6200,00/0,00 6200',
+      'Ընդամենը 7960.00',
+      'Կանխիկ 7960.00',
+    )
+    expect(shown(bestReading([rowsOf(text, 0), rowsOf(text, 0)]))).toEqual([
+      [
+        [100_000, true],
+        [176_000, false],
+        [520_000, false],
+      ],
+      796_000,
+      true,
+    ])
+  })
+
+  it('must not rank a reading met only by its slice above one read right (review Д2)', () => {
+    const misread = cheese('3119,00/0,00 119', null, 'Ընդամենը 1119.00')
+    const right = cheese('3119,00/0,00 3119', null, 'Ընդամենը 1119.00')
+    expect(shown(bestReading([rowsOf(misread, 0), rowsOf(right, 0)]))).toEqual([
+      [
+        [100_000, true],
+        [311_900, true],
+      ],
+      null,
+      false,
+    ])
+  })
+
+  it('leaves the total’s answer to a line with none when a slice only signs a sum read (review 12)', () => {
+    const got = parseReceiptText(
+      rowsOf(
+        [
+          ...terminal('1480.32x1.0 հատ=480.32դրամ').split('\n'),
+          'Դաս՝ 56.10',
+          'Կոլա 1հատ 700.00 200.00',
+          'Ընդամենը: 680.32',
+        ].join('\n'),
+        0,
+      ),
+    )
+    expect([got.lines.map((l) => l.sumHundredths), got.balanced]).toEqual([[48_032, 20_000], true])
+  })
+
+  it('gives the blank’s rest before a slice of one sum and one cost (review 13)', () => {
+    const got = parseReceiptText(
+      rowsOf(['Դաս՝ 56.10', 'Թվիստեր 1հատ 1480.32 480.32', 'Ընդամենը: 480.32'].join('\n'), 0),
+    )
+    expect(figures(got.lines[0]!)).toEqual([1_000, 148_032, 48_032, false])
+  })
+
+  it('must not fire with no total: the line stays as read, not settled', () => {
+    const got = card('0401/1163909 1Հտ 2760,75/89,25 850').lines[0]!
+    expect(figures(got)).toEqual([1_000, 85_000, 276_075, false])
+    // review Б4: 2500 × 3 = 7500 with the 7 read as 1 — no 500 × 3 of its own
+    expect(line('2500.00x3.0 հատ=1500.00դրամ').settled).toBe(false)
+  })
+
+  it('must not take the blank’s place: the total’s rest is 2 119,00, not a slice of 119,00 (review Б2)', () => {
+    const got = card(
+      '0401/1163909 1Հտ 99,10/0,90 100',
+      '2.Հաց',
+      '1905/1078044 1Հտ 2119,00/0,00 119',
+    )
+    expect(got.lines.map((l) => l.sumHundredths)).toEqual([9_910, 211_900])
+    const totalled = card(
+      '0401/1163909 1Հտ 99,10/0,90 100',
+      '2.Հաց',
+      '1905/1078044 1Հտ 2119,00/0,00 119',
+      'Ընդամենը 2218.10',
+    )
+    expect([
+      totalled.balanced,
+      totalled.lines[1]!.sumHundredths,
+      totalled.lines[1]!.settled,
+    ]).toEqual([true, 211_900, false])
+  })
+
+  // review В1, В2: a slice is the total's one answer, as the blank's rest is, and at its price
+  const three = (bread: string, cheese: string, ...tail: string[]) =>
+    bestReading(
+      [0, 1].map(() =>
+        rowsOf(
+          [
+            '1. Կաթ',
+            '0401/1163909 1Հտ 100,00/0,00 100',
+            '2. Հաց',
+            `0402/1163901 1Հտ ${bread}`,
+            '3. Պանիր',
+            `0403/1163902 1Հտ ${cheese}`,
+            ...tail,
+          ].join('\n'),
+          0,
+        ),
+      ),
+    )
+  const shown = (got: ReceiptText) => [
+    got.lines.map((l) => [l.sumHundredths, l.settled]),
+    got.totalHundredths,
+    got.balanced,
+  ]
+
+  it('must not share the total between a slice and another line’s rest (review В1)', () => {
+    // 100,00 + 2 119,00 + 1 500,00: the bread’s price lost its «2», the cheese’s misread — two lines with
+    // no reading of their own, and the total has one answer to give
+    expect(shown(three('2119,00/0,00 119', '1500,00/0,00 1700', 'Ընդամենը 3719.00'))).toEqual([
+      [
+        [10_000, true],
+        [211_900, false],
+        [150_000, false],
+      ],
+      null,
+      false,
+    ])
+  })
+
+  it.each([
+    ['1119,00/0,00 119', '5200,00/0,00 5200', '6419.00', 111_900, 520_000],
+    ['3119,00/0,00 119', '1200,00/0,00 1200', '4419.00', 311_900, 120_000],
+  ])(
+    'must not buy a slice with two swaps of a right line: %s, %s (review В2)',
+    (bread, cheese, total, rest, read) => {
+      expect(shown(three(bread, cheese, `Ընդամենը ${total}`))).toEqual([
+        [
+          [10_000, true],
+          [rest, false],
+          [read, true],
+        ],
+        Math.round(Number(total) * 100),
+        true,
+      ])
+    },
+  )
+
+  it('must not make a misread reading tie a right one: the reading as printed wins (review Б3)', () => {
+    const misread = rowsOf(terminal('2119.00x1.0 հատ=119.00դրամ', 'Ընդամենը: 2119.00'), 0)
+    const right = rowsOf(terminal('2119.00x1.0 հատ=2119.00դրամ', 'Ընդամենը: 2119.00'), 0)
+    expect(figures(bestReading([misread, right]).lines[0]!)).toEqual([
+      1_000,
+      211_900,
+      211_900,
+      true,
+    ])
+  })
+
+  it('must not fire on a class row with no count printed: twenty made up are not read (review Б1)', () => {
+    const row = (figures: string) =>
+      parseReceiptText(rowsOf(['Դաս՝ 56.10', `Կոլա ${figures}`, 'Ընդամենը: 1750.00'].join('\n'), 0))
+        .lines[0]!
+    expect(row('1250.00 1750.00').quantityMilli).not.toBe(7_000)
+    expect(row('1250.00 1750.00').settled).toBe(false)
+  })
+
+  it('must not fire where the line holds as read', () => {
+    expect(figures(line('1480.32x1.0 հատ=1480.32դրամ'))).toEqual([1_000, 148_032, 148_032, true])
+  })
+
+  // adversarial А1: 1500.00 × 3 = 4500.00 with the sum’s 4 read as 1 — the sum’s own swap, never
+  // a price that lost a digit, 500.00 × 3 = 1500.00
+  it.each([
+    ['1500.00x3.0 հատ=1500.00դրամ', [3_000, 150_000, 450_000, true]],
+    ['1700.00x5.0 հատ=3500.00դրամ', [5_000, 170_000, 850_000, true]],
+    ['2800.00x1.500 կգ=1200.00դրամ', [1_500, 280_000, 420_000, true]],
+  ])('must not fire where a swap of the line holds: %s', (row, want) => {
+    expect(figures(line(row))).toEqual(want)
+  })
+
+  it('must not fire on a class row with no «x» that a swap holds (А1г)', () => {
+    const got = parseReceiptText(
+      rowsOf(['Դաս՝ 56.10', 'Թվիստեր 3հատ 1500.00 1500.00'].join('\n'), 0),
+    )
+    expect(figures(got.lines[0]!)).toEqual([3_000, 150_000, 450_000, true])
+  })
+
+  it('keeps the right total the lines meet, and no total read with the sum’s error (А1д, А1е)', () => {
+    const right = best('1500.00x3.0 հատ=1500.00դրամ', 'Ընդամենը: 4500.00')
+    expect([right.lines[0]!.sumHundredths, right.totalHundredths, right.balanced]).toEqual([
+      450_000,
+      450_000,
+      true,
+    ])
+    const wrong = best('1500.00x3.0 հատ=1500.00դրամ', 'Ընդամենը: 1500.00')
+    expect([wrong.totalHundredths, wrong.balanced]).toEqual([null, false])
+  })
+
+  it('must not fire beside swaps of the other figures: «2119,00/20,00 119» stays as read', () => {
+    // a price 119 → 140 and a discount 20,00 → 20,99 would make it hold: five changes, three figures
+    const got = card('0401/1163909 1Հտ 2119,00/20,00 119', 'Ընդամենը 119.00').lines[0]!
+    expect([...figures(got), got.discountHundredths]).toEqual([
+      1_000,
+      11_900,
+      211_900,
+      false,
+      2_000,
+    ])
+  })
+
+  it('must not fire beside a swap of the same figure: «2146.00» is not 116.00', () => {
+    expect(best('2146.00x1.0 հատ=116.00դրամ', 'Ընդամենը: 116.00').lines[0]!.settled).toBe(false)
+  })
+
+  it('must not fire on an amount with no decimals: «2119»', () => {
+    expect(best('2119x3.0 հատ=357.00դրամ', 'Ընդամենը: 357.00').lines[0]!.settled).toBe(false)
+  })
+
+  it('must not fire on a count: its three decimals are a weight, never a sign', () => {
+    // «1.005» cut to «1.00» would hold; the count is not an amount
+    expect(line('100.00x1.005 հատ=100.00դրամ').quantityMilli).not.toBe(1_000)
+  })
+
+  it('never makes a price of zero: «=0.00» beside «50.00» is not 0 × 1 = 0', () => {
+    expect(figures(best('50.00x1.0 հատ=0.00դրամ', 'Ընդամենը: 0.00').lines[0]!)[3]).toBe(false)
+  })
+})
