@@ -413,7 +413,9 @@ nothing up.
   the card itself since the journal went to «Траты» (MOL-159) — and **while a spending of the month
   waits on the phone, «Первая трата октября отправляется»**: «нет трат» over «Ещё не учтено: 1» said
   two things. A refused one is said by its own card, and the ring says nothing beside it. **A
-  sector's name is whole, on as many lines as it takes** (Е-19): cut, two long names read as one. A category the month
+  sector's name is whole, on as many lines as it takes** (Е-19): cut, two long names read as one.
+  **One ring, one name, one key**: «Графики» call theirs `spending.categories_title`, the month's and
+  the year's alike (Е-16, MOL-186) — two keys for one text would part at the first edit. A category the month
   does not name is left out, never drawn as a second «Остальные» (review 7). **`slices` defaults to empty so that a month kept on the phone before the
   ring still reads through the strict codec** (review 6): lost, every month kept went with it
   offline. **The phone does not work the ring out for it** (review 9, owner's decision «а»): that
@@ -553,6 +555,18 @@ MOL-74's unless they name MOL-160, and hold for the year.
   chooses nothing. **The bars are radios and the weeks a native range**, so arrows move the choice
   and each says its month or week with its figure — **which is why the reading is not a live
   region**: the control already says it, and a drag would chatter.
+- **The data of a chart is `--text` or `--graphic`; the accent is only what is chosen and the cursor**
+  (MOL-186, С-15, Ф-3, Ф-4; DESIGN.md «The Graphic Is Data Rule»). Unchosen bars, «Остальные», a bar
+  with no rate, the usual's dashed line on «Темп», the outline of «Пришло» and the fill of «Ушло» are
+  `--graphic`, 3:1 on `--surface` where `--border-strong` stood at 1.8:1; the month's line on «Темп» and
+  the dashed average over the bars are `--text`; the chosen bar, sector, legend row, the day's cursor
+  and dot and the slider are the accent — before, the month's line was terracotta, the colour of «press
+  here». **A chosen row of the legend is a fill and a ring** (`--accent-tint`, 2 of `--accent`, Ф-5),
+  every row at 600: at 700 the row grew under the thumb; the label of a chosen month darkens and keeps
+  its weight («Chosen is a fill or a form», MOL-179). **«Разница» of «Пришло и ушло» is never red**
+  (С-16): spending past what came in is no error, and its sign says it. Categories keep their own
+  colours, and the unchosen are dimmed (0,3 on the ring, 0,42 on a category's bars). Still told apart by
+  more than colour: thickness, dimming, a fill against an outline, solid against dashed.
 - **A finger chooses on lifting, or once it goes sideways** (`useChartPointer`, review): chosen on
   touching, every scroll that started on a chart changed the reading under the thumb; a mouse or a pen
   chooses on press. **A new answer of the same year keeps the bar chosen** while it has one; another
@@ -657,7 +671,11 @@ MOL-158); since, it is the calendar year above. Requirements and plan in
   closed months' totals to d — one scale for both lines. The usual's point is a ring and the month's a
   dot, the usual dashed and the month solid: told apart by more than colour. **The day is a native
   range**, as the weeks of the rate are, not a radio for each of thirty-one days (handoff 03 asked for
-  radios); it says the day and both sums. The day on arrival is today in a running month, else the
+  radios); it says the day and both sums. **Since MOL-186 it is in sight under the axis** (С-14, Д-5),
+  44 to the thumb, and a finger on the chart chooses too: a slider says it can be moved before anyone
+  tries. **It spans the whole month, as the axis does**, so its thumb stands under the day chosen; a day
+  past the last one drawn is the last one, and the thumb goes back to it — spanning only the days drawn,
+  it stood at the right end over the 9th of 31. The day on arrival is today in a running month, else the
   last (Р-7) — **worked out for every answer, and «running» by the phone's calendar** (adversarial
   round 2, Н1, Н2): taken as a choice, the day of an answer kept from yesterday stood over today's,
   and a September kept from when it ran opened on the 1st on the 1st of October. **Every word of «идёт», «на сегодня» and «сегодня» reads the same
