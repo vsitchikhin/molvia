@@ -2478,6 +2478,65 @@ export const ownerNotices = pgTable(
   ],
 )
 
+/** Where a broadcast starts: the nil uuid, before every `actors.id`. */
+export const BROADCAST_START = '00000000-0000-0000-0000-000000000000'
+
+/**
+ * The message to people about a leak (MOL-237), queued by `make notify` and taken by the bot in
+ * batches, the way the rating reminders are (В-1): whom it goes to and how far it has got, and nothing
+ * of anyone — so no key to `actors`, nothing for erasure or the person's copy. Who gets it is decided
+ * at each claim from `actors`: created before the broadcast, of its countries, the bot not blocked.
+ *
+ * `cursor` is where the bot has got to in the order of `actors.id`: everybody up to it is done. It
+ * moves only by the bot's report, so a batch never reported goes out again (better twice than never),
+ * and it always names a live person or nobody (`BROADCAST_START`, before everyone) — the report and
+ * erasure both put it on the nearest live id at or below, which leaves the same people after it, so no
+ * erased id stays here. `lease_until` keeps a handed batch from going out twice while it is sent.
+ */
+export const broadcasts = pgTable(
+  'broadcasts',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    text: text('text').notNull(),
+    /** The people of these countries only; empty — everybody. */
+    countries: char('countries', { length: 2 }).array(),
+    /** A try on the owner alone (`OWNER_TELEGRAM_ID` of the API), before everybody (В-3). */
+    ownerOnly: boolean('owner_only').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    /** How many people it was going to when queued, and how many had the bot blocked then. */
+    total: integer('total').notNull(),
+    blockedAtStart: integer('blocked_at_start').notNull(),
+    cursor: uuid('cursor').notNull().default(BROADCAST_START),
+    leaseUntil: timestamp('lease_until', { withTimezone: true }),
+    sent: integer('sent').notNull().default(0),
+    /** Telegram answered 403 — blocked since it was queued — and the person was marked so (MOL-103). */
+    blocked: integer('blocked').notNull().default(0),
+    failed: integer('failed').notNull().default(0),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  },
+  (table) => [
+    check('broadcasts_text_present', sql`char_length(${table.text}) between 1 and 4096`),
+    check(
+      'broadcasts_audience_one',
+      sql`${table.countries} is null
+          or (cardinality(${table.countries}) >= 1 and not ${table.ownerOnly})`,
+    ),
+    check(
+      'broadcasts_counts_non_negative',
+      sql`${table.total} >= 0 and ${table.blockedAtStart} >= 0
+          and ${table.sent} >= 0 and ${table.blocked} >= 0 and ${table.failed} >= 0`,
+    ),
+    // One broadcast to people at a time: a second `--yes` would write to everybody twice. The try
+    // on the owner alone is not one of them.
+    uniqueIndex('broadcasts_one_going')
+      .on(table.ownerOnly)
+      .where(
+        sql`${table.finishedAt} is null and ${table.cancelledAt} is null and not ${table.ownerOnly}`,
+      ),
+  ],
+)
+
 /** Bytes as Postgres keeps them: a receipt's photo and its cut-out lines (MOL-125). */
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' })
 

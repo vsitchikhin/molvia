@@ -1,0 +1,488 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Bot, HttpError } from 'grammy'
+import type { Transformer } from 'grammy'
+import type { UserFromGetMe } from 'grammy/types'
+import { ApiError } from '@molvia/client'
+import type { MolviaBotClient } from '@molvia/client'
+import { BROADCAST_BATCH } from '@molvia/model'
+import type { DueBroadcast } from '@molvia/model'
+import { BROADCAST_GAP_MS, broadcastDue, startBroadcasts } from './broadcast'
+import { RETRY_AFTER_CAP_SECONDS } from './deliver'
+
+const TEXT = 'Molvia: 12 октября …\n\nMolvia: on October 12 …'
+
+const position = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+
+/** A batch of the chats `chats`, each at the position of its number. */
+function batch(id: number, chats: readonly number[]): DueBroadcast {
+  return {
+    broadcast: {
+      id,
+      text: TEXT,
+      recipients: chats.map((chat) => ({ telegramUserId: chat, position: position(chat) })),
+    },
+  }
+}
+
+interface Call {
+  readonly method: string
+  readonly payload: Record<string, unknown>
+}
+
+/** How a chat refuses: Telegram's code, the chat gone (400 «chat not found»), or the network. */
+type Refusal = number | 'gone' | 'network'
+
+/**
+ * Telegram, faked: every call recorded; the chats in `refused` refuse every time, and a chat in
+ * `throttle` answers 429 the first time with its `retry_after`.
+ */
+function telegram(
+  refused: Readonly<Record<number, Refusal>> = {},
+  throttle: Readonly<Record<number, number>> = {},
+) {
+  const calls: Call[] = []
+  const throttled = new Set<number>()
+  const bot = new Bot('42:TEST', { botInfo: { id: 42 } as UserFromGetMe })
+  const transformer: Transformer = (_prev, method, payload) => {
+    calls.push({ method, payload })
+    const chat = (payload as { readonly chat_id?: number }).chat_id ?? 0
+    const retryAfter = throttle[chat]
+    if (retryAfter !== undefined && !throttled.has(chat)) {
+      throttled.add(chat)
+      return Promise.resolve({
+        ok: false,
+        error_code: 429,
+        description: 'Too Many Requests',
+        parameters: { retry_after: retryAfter },
+      }) as never
+    }
+    const refusal = refused[chat]
+    if (refusal === 'network') {
+      throw new HttpError("Network request for 'sendMessage' failed!", new Error('ECONNRESET'))
+    }
+    if (refusal === 'gone') {
+      return Promise.resolve({
+        ok: false,
+        error_code: 400,
+        description: 'Bad Request: chat not found',
+      }) as never
+    }
+    if (refusal !== undefined) {
+      return Promise.resolve({ ok: false, error_code: refusal, description: 'refused' }) as never
+    }
+    return Promise.resolve({ ok: true, result: { message_id: 1 } }) as never
+  }
+  bot.api.config.use(transformer)
+  const sentTo = () =>
+    calls
+      .filter((call) => call.method === 'sendMessage')
+      .map((call) => call.payload.chat_id as number)
+  return { api: bot.api, calls, sentTo }
+}
+
+function client(answers: readonly (DueBroadcast | Error)[]) {
+  const queue = [...answers]
+  return {
+    claimBroadcast: vi.fn(() => {
+      const next = queue.shift() ?? { broadcast: null }
+      return next instanceof Error ? Promise.reject(next) : Promise.resolve(next)
+    }),
+    broadcastDone: vi.fn<MolviaBotClient['broadcastDone']>(() => Promise.resolve()),
+    switchReminders: vi.fn(() => Promise.resolve()),
+    reportFailure: vi.fn(() => Promise.resolve()),
+  }
+}
+
+const asClient = (fake: ReturnType<typeof client>) => fake as unknown as MolviaBotClient
+
+function quiet() {
+  return {
+    log: vi.spyOn(console, 'log').mockImplementation(() => undefined),
+    error: vi.spyOn(console, 'error').mockImplementation(() => undefined),
+  }
+}
+
+const noWait = vi.fn(() => Promise.resolve(true))
+
+afterEach(() => {
+  vi.restoreAllMocks()
+  noWait.mockClear()
+})
+
+describe('broadcastDue — рассылка об утечке (MOL-237)', () => {
+  it('пачку за пачкой, по порядку, текст как есть, без превью; слово о каждой пачке', async () => {
+    quiet()
+    const api = client([batch(7, [1, 2]), batch(7, [3])])
+    const tg = telegram()
+
+    await broadcastDue(asClient(api), tg.api, noWait)
+
+    expect(tg.sentTo()).toEqual([1, 2, 3])
+    expect(tg.calls[0]?.payload).toMatchObject({
+      text: TEXT,
+      link_preview_options: { is_disabled: true },
+    })
+    expect(tg.calls[0]?.payload).not.toHaveProperty('parse_mode')
+    expect(api.broadcastDone.mock.calls.map(([report]) => report)).toEqual([
+      { id: 7, through: position(2), sent: 2, blocked: 0, failed: 0 },
+      { id: 7, through: position(3), sent: 1, blocked: 0, failed: 0 },
+    ])
+    expect(api.claimBroadcast).toHaveBeenCalledTimes(3)
+  })
+
+  it('не быстрее 25 в секунду: пауза между сообщениями, не перед первым', async () => {
+    quiet()
+    await broadcastDue(asClient(client([batch(1, [1, 2, 3])])), telegram().api, noWait)
+    expect(noWait.mock.calls).toEqual([[BROADCAST_GAP_MS], [BROADCAST_GAP_MS]])
+  })
+
+  it('403 — заблокировали: отмечено как у напоминаний, посчитано, рассылка идёт дальше', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2, 3])])
+    const tg = telegram({ 2: 403 })
+
+    await broadcastDue(asClient(api), tg.api, noWait)
+
+    expect(api.switchReminders).toHaveBeenCalledWith(2, 'blocked')
+    expect(api.broadcastDone).toHaveBeenCalledWith({
+      id: 1,
+      through: position(3),
+      sent: 2,
+      blocked: 1,
+      failed: 0,
+    })
+  })
+
+  it('чата больше нет (400 «chat not found») — «не дошло» навсегда, рассылка идёт дальше', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2])])
+    await broadcastDue(asClient(api), telegram({ 1: 'gone' }).api, noWait)
+    expect(api.switchReminders).not.toHaveBeenCalled()
+    expect(api.broadcastDone).toHaveBeenCalledWith({
+      id: 1,
+      through: position(2),
+      sent: 1,
+      blocked: 0,
+      failed: 1,
+    })
+  })
+
+  // Adversarial А1: a failure that may pass never moves the cursor past the person.
+  it.each([
+    ['сеть', 'network'],
+    ['Telegram 502', 502],
+    ['отозванный токен 401', 401],
+  ] as const)(
+    '%s на третьем — слово о двух первых, остаток со следующей минутой',
+    async (_, refusal) => {
+      const { error } = quiet()
+      const api = client([batch(1, [1, 2, 3, 4]), batch(1, [5])])
+      const tg = telegram({ 3: refusal })
+
+      await broadcastDue(asClient(api), tg.api, noWait)
+
+      expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+        id: 1,
+        through: position(2),
+        sent: 2,
+        blocked: 0,
+        failed: 0,
+      })
+      expect(tg.sentTo()).toEqual([1, 2, 3])
+      expect(api.claimBroadcast).toHaveBeenCalledTimes(1)
+      expect(api.switchReminders).not.toHaveBeenCalled()
+      expect(error).toHaveBeenCalledWith(
+        '[molvia] broadcast: a failure that may pass, the rest goes with the next minute',
+      )
+    },
+  )
+
+  // Adversarial Р2-А1: another 4xx is the chat's or the message's, and the next person tells which.
+  it('иной 400 на третьем, четвёртому ушло — третий «не дошло» навсегда, рассылка идёт дальше', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2, 3, 4]), batch(1, [5])])
+    const tg = telegram({ 3: 400 })
+    await broadcastDue(asClient(api), tg.api, noWait)
+    expect(api.broadcastDone.mock.calls.map(([report]) => report)).toEqual([
+      { id: 1, through: position(4), sent: 3, blocked: 0, failed: 1 },
+      { id: 1, through: position(5), sent: 1, blocked: 0, failed: 0 },
+    ])
+    expect(api.switchReminders).not.toHaveBeenCalled()
+  })
+
+  it('иной 400 у двоих подряд — это само сообщение: стоп до первого из них', async () => {
+    const { error } = quiet()
+    const api = client([batch(1, [1, 2, 3, 4, 5])])
+    const tg = telegram({ 3: 400, 4: 400 })
+    await broadcastDue(asClient(api), tg.api, noWait)
+    expect(tg.sentTo()).toEqual([1, 2, 3, 4])
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: position(2),
+      sent: 2,
+      blocked: 0,
+      failed: 0,
+    })
+    expect(error).toHaveBeenCalledWith(
+      '[molvia] broadcast: Telegram refused two in a row — the message itself, the rest goes with the next minute',
+    )
+  })
+
+  it('иной 400 у первого же и у второго — ничего не ушло, аренда отпущена', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2, 3])])
+    await broadcastDue(asClient(api), telegram({ 1: 400, 2: 400 }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ through: null, failed: 0 }),
+    )
+  })
+
+  it('иной 400 у последнего в рассылке (короткая пачка, проба себе) — «не дошло», рассылка кончается', async () => {
+    quiet()
+    const api = client([batch(1, [1])])
+    await broadcastDue(asClient(api), telegram({ 1: 400 }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: position(1),
+      sent: 0,
+      blocked: 0,
+      failed: 1,
+    })
+    expect(api.claimBroadcast).toHaveBeenCalledTimes(2)
+  })
+
+  it('иной 400 у последнего в полной пачке — он первым в следующей, где есть кому рассудить', async () => {
+    quiet()
+    const chats = Array.from({ length: BROADCAST_BATCH }, (_, index) => index + 1)
+    const api = client([batch(1, chats)])
+    await broadcastDue(asClient(api), telegram({ [BROADCAST_BATCH]: 400 }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledWith({
+      id: 1,
+      through: position(BROADCAST_BATCH - 1),
+      sent: BROADCAST_BATCH - 1,
+      blocked: 0,
+      failed: 0,
+    })
+  })
+
+  it('иной 400, за ним сбой, который пройдёт, — отказанный не судится: стоп до него', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2, 3, 4])])
+    await broadcastDue(asClient(api), telegram({ 2: 400, 3: 502 }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: position(1),
+      sent: 1,
+      blocked: 0,
+      failed: 0,
+    })
+  })
+
+  // Review №8: a block or a gone chat says nothing of the message — only a message sent judges.
+  it('иной 400, за ним заблокировавший, потом ушло — оба засчитаны, рассылка дальше', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2, 3, 4, 5])])
+    await broadcastDue(asClient(api), telegram({ 2: 400, 3: 403 }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledWith({
+      id: 1,
+      through: position(5),
+      sent: 3,
+      blocked: 1,
+      failed: 1,
+    })
+  })
+
+  it('иной 400, заблокировавший, снова иной 400 — само сообщение: стоп до первого отказа', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2, 3, 4, 5])])
+    await broadcastDue(asClient(api), telegram({ 2: 400, 3: 403, 4: 400 }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: position(1),
+      sent: 1,
+      blocked: 0,
+      failed: 0,
+    })
+    // the block itself is marked, so the claim never hands that person again
+    expect(api.switchReminders).toHaveBeenCalledWith(3, 'blocked')
+  })
+
+  it('иной 400 и чата нет у следующего в конце рассылки — оба «не дошло», рассылка кончается', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2, 3])])
+    await broadcastDue(asClient(api), telegram({ 2: 400, 3: 'gone' }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: position(3),
+      sent: 1,
+      blocked: 0,
+      failed: 2,
+    })
+  })
+
+  // Adversarial Р3-А1: 404 is a token of the wrong shape, not a refusal of the chat or the text.
+  it('404 у последнего в рассылке (проба себе) — не «не дошло»: аренда отпущена, ждёт токена', async () => {
+    quiet()
+    const api = client([batch(1, [1])])
+    await broadcastDue(asClient(api), telegram({ 1: 404 }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: null,
+      sent: 0,
+      blocked: 0,
+      failed: 0,
+    })
+  })
+
+  it('сбой на первом — ни одного исхода: аренда отпущена, пачка уйдёт со следующей минутой', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2])])
+    await broadcastDue(asClient(api), telegram({ 1: 502 }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: null,
+      sent: 0,
+      blocked: 0,
+      failed: 0,
+    })
+  })
+
+  it('429 и снова 429 на повторе — не «не дошло», а остаток со следующей минутой', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2])])
+    const tg = telegram({ 1: 429 }, { 1: 1 })
+    await broadcastDue(asClient(api), tg.api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ through: null, failed: 0 }),
+    )
+  })
+
+  it('429 в пределах — выждан и отправлен', async () => {
+    quiet()
+    const api = client([batch(1, [1])])
+    const tg = telegram({}, { 1: 3 })
+    await broadcastDue(asClient(api), tg.api, noWait)
+    expect(noWait).toHaveBeenCalledWith(3000)
+    expect(tg.sentTo()).toEqual([1, 1])
+    expect(api.broadcastDone).toHaveBeenCalledWith(expect.objectContaining({ sent: 1 }))
+  })
+
+  it('флуд на третьем — слово о двух первых, остаток со следующей минутой', async () => {
+    const { error } = quiet()
+    const api = client([batch(1, [1, 2, 3, 4]), batch(1, [5])])
+    const tg = telegram({}, { 3: RETRY_AFTER_CAP_SECONDS + 1 })
+
+    await broadcastDue(asClient(api), tg.api, noWait)
+
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: position(2),
+      sent: 2,
+      blocked: 0,
+      failed: 0,
+    })
+    expect(tg.sentTo()).toEqual([1, 2, 3])
+    expect(api.claimBroadcast).toHaveBeenCalledTimes(1)
+    expect(error).toHaveBeenCalledWith(
+      '[molvia] broadcast: 429 flood, the rest goes with the next minute',
+    )
+  })
+
+  it('флуд на первом — аренда отпущена: пачка уйдёт со следующей минутой, не через пять', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2])])
+    await broadcastDue(asClient(api), telegram({}, { 1: RETRY_AFTER_CAP_SECONDS + 1 }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: null,
+      sent: 0,
+      blocked: 0,
+      failed: 0,
+    })
+    expect(api.claimBroadcast).toHaveBeenCalledTimes(1)
+  })
+
+  it('API не приняло слово — дальше не просит, отказ — по коду', async () => {
+    const { error } = quiet()
+    const api = client([batch(1, [1]), batch(1, [2])])
+    api.broadcastDone.mockRejectedValueOnce(new ApiError('error.internal'))
+    await broadcastDue(asClient(api), telegram().api, noWait)
+    expect(api.claimBroadcast).toHaveBeenCalledTimes(1)
+    expect(error).toHaveBeenCalledWith('[molvia] broadcast done: error.internal')
+    // the API's answer is the API's failure, recorded there — not a defect of the bot's (MOL-143)
+    expect(api.reportFailure).not.toHaveBeenCalled()
+  })
+
+  it('API не выдало пачку — отказ по коду, ничего не отправлено', async () => {
+    const { error } = quiet()
+    const api = client([new ApiError('error.internal')])
+    const tg = telegram()
+    await broadcastDue(asClient(api), tg.api, noWait)
+    expect(tg.calls).toEqual([])
+    expect(error).toHaveBeenCalledWith('[molvia] broadcast claim: error.internal')
+  })
+
+  it('в лог — только счётчики пачки, ни одного чата', async () => {
+    const { log } = quiet()
+    await broadcastDue(asClient(client([batch(9, [4242])])), telegram().api, noWait)
+    expect(log.mock.calls).toEqual([['[molvia] broadcast #9: sent 1, blocked 0, failed 0']])
+  })
+
+  it('остановка посреди пачки — дальше ни одного сообщения, слово о том, что ушло', async () => {
+    quiet()
+    let stopping = false
+    const api = client([batch(1, [1, 2, 3]), batch(1, [4])])
+    const tg = telegram()
+    // the deploy's SIGTERM comes right after the first message went
+    const wait = vi.fn(() => {
+      stopping = true
+      return Promise.resolve(false)
+    })
+    await broadcastDue(asClient(api), tg.api, wait, () => stopping)
+    expect(tg.sentTo()).toEqual([1])
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: position(1),
+      sent: 1,
+      blocked: 0,
+      failed: 0,
+    })
+    expect(api.claimBroadcast).toHaveBeenCalledTimes(1)
+  })
+
+  it('остановка во время выжидания 429 — человек не «не дошло», а следующей минутой', async () => {
+    quiet()
+    let stopping = false
+    const api = client([batch(1, [1, 2])])
+    const tg = telegram({}, { 1: 3 })
+    const wait = vi.fn(() => {
+      stopping = true
+      return Promise.resolve(false)
+    })
+    await broadcastDue(asClient(api), tg.api, wait, () => stopping)
+    expect(tg.sentTo()).toEqual([1])
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ through: null, failed: 0 }),
+    )
+  })
+})
+
+describe('startBroadcasts', () => {
+  it('просит сразу и раз в минуту, без второго прогона поверх идущего; остановка ждёт пачку', async () => {
+    quiet()
+    vi.useFakeTimers()
+    try {
+      const api = client([batch(1, [1, 2])])
+      const tg = telegram()
+      const stop = startBroadcasts(asClient(api), tg.api, 60_000)
+      await vi.advanceTimersByTimeAsync(60_000)
+      await stop()
+      expect(tg.sentTo()).toEqual([1, 2])
+      expect(api.claimBroadcast).toHaveBeenCalledTimes(3)
+      await vi.advanceTimersByTimeAsync(120_000)
+      expect(api.claimBroadcast).toHaveBeenCalledTimes(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
