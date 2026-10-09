@@ -561,12 +561,27 @@ MOL-74's unless they name MOL-160, and hold for the year.
   `--graphic`, 3:1 on `--surface` where `--border-strong` stood at 1.8:1; the month's line on «Темп» and
   the dashed average over the bars are `--text`; the chosen bar, sector, legend row, the day's cursor
   and dot and the slider are the accent — before, the month's line was terracotta, the colour of «press
-  here». **A chosen row of the legend is a fill and a ring** (`--accent-tint`, 2 of `--accent`, Ф-5),
-  every row at 600: at 700 the row grew under the thumb; the label of a chosen month darkens and keeps
-  its weight («Chosen is a fill or a form», MOL-179). **«Разница» of «Пришло и ушло» is never red**
+  here». **«Остальные» is `--graphic` on «Деньги» too** (adversarial А1): one ring under one name, two
+  greys of it. **A chosen row of the legend is a fill and a ring** (`--accent-tint`, 2 of `--accent`,
+  Ф-5), every row at 600: at 700 the row grew under the thumb. **Its dot stands on a ring of `--surface`**
+  (review Р1-3, adversarial А2): on the tint ten light categories and four dark — «Остальные» 2.50 among
+  them — fell under the 3:1 of a mark (MOL-172); on the card's colour each holds it, as `tokens.test.ts`
+  checks, the way the day's dot of «Темп» stands on its edge. **The label of a chosen month darkens and
+  keeps its weight** («Chosen is a fill or a form», MOL-179). **The price, named** (adversarial А4): on
+  «Расходы по месяцам» and «Пришло и ушло», which dim nothing, the chosen bar is `--accent` against
+  `--graphic`, 1.29:1 in lightness in the light scheme and 1.74:1 in the dark — an eye that reads no hue
+  tells them by the reading above, which names the month in words, and by the label's ink alone.
+  **«Разница» of «Пришло и ушло» is never red**
   (С-16): spending past what came in is no error, and its sign says it. Categories keep their own
   colours, and the unchosen are dimmed (0,3 on the ring, 0,42 on a category's bars). Still told apart by
   more than colour: thickness, dimming, a fill against an outline, solid against dashed.
+- **The reading over the bars of «Год» holds two lines of words** (`.held`, adversarial А7): the running
+  month's — «−100 % к обычному к 9 октября · в среднем 180 000 ֏» — takes two where a closed one's takes
+  one, and since Е-11 put the words under the figure the bars jumped by that line as the month changed
+  (13 px on «Категория по месяцам», 19 at 320 on «Расходы»; MOL-151). The line stands with no words too.
+  Chromium's scroll anchoring holds the bars in the window by scrolling the page, so an e2e measures them
+  in the page, not the window. **The price:** a third line — a long «не посчитано» at 320 — still moves
+  them.
 - **A finger chooses on lifting, or once it goes sideways** (`useChartPointer`, review): chosen on
   touching, every scroll that started on a chart changed the reading under the thumb; a mouse or a pen
   chooses on press. **A new answer of the same year keeps the bar chosen** while it has one; another
@@ -673,9 +688,18 @@ MOL-158); since, it is the calendar year above. Requirements and plan in
   range**, as the weeks of the rate are, not a radio for each of thirty-one days (handoff 03 asked for
   radios); it says the day and both sums. **Since MOL-186 it is in sight under the axis** (С-14, Д-5),
   44 to the thumb, and a finger on the chart chooses too: a slider says it can be moved before anyone
-  tries. **It spans the whole month, as the axis does**, so its thumb stands under the day chosen; a day
-  past the last one drawn is the last one, and the thumb goes back to it — spanning only the days drawn,
-  it stood at the right end over the 9th of 31. The day on arrival is today in a running month, else the
+  tries. **It spans the whole month, as the axis does**, so its thumb stands under the day chosen — to
+  within half a thumb at the ends, where a native thumb stops its own half short of the track's edge
+  (review Р1-4); a day past the last one drawn is the last one, and the thumb goes back to it — spanning
+  only the days drawn, it stood at the right end over the 9th of 31. Dragged past today it stays on
+  today: the value is put back in the same `input` the drag fired, before the frame is drawn (probe of
+  review Р1-5, Blink: 6, 8, 8, 8… against a finger going on). **Only its thumb takes a touch** (owner's
+  decision «а» on review Р1-1): Blink sets a range's value where the finger lands on the track, and a
+  scroll started there moved the day from the 2nd to the 23rd as the page went up. The range takes
+  no touch (`pointer-events: none`) and its thumb takes them (`auto`): a press on the track chooses
+  nothing, the keys are the input's (e2e `kit-charts`, Chromium and WebKit). **One day drawn — the 1st of
+  a running month — has no slider** and no «Ведите ползунок» (`pace_move`, adversarial А6): nothing to
+  move to. The day on arrival is today in a running month, else the
   last (Р-7) — **worked out for every answer, and «running» by the phone's calendar** (adversarial
   round 2, Н1, Н2): taken as a choice, the day of an answer kept from yesterday stood over today's,
   and a September kept from when it ran opened on the 1st on the 1st of October. **Every word of «идёт», «на сегодня» and «сегодня» reads the same

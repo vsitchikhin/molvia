@@ -531,12 +531,16 @@ lift of the finger or as soon as it moves sideways; the selected bar is `accent`
   day's cursor and dot, and the slider. Tone (`bad`/`good`) only for the difference with the market,
   with its sign and a word — never «Разница» of a month.
 - **Not by colour only:** a selected sector is thicker and the rest dimmed; a selected legend row is
-  the `accent-tint` fill with a 2 `accent` ring, at the weight of every row; an outline against a fill,
-  a solid line against a dash.
+  the `accent-tint` fill with a 2 `accent` ring, at the weight of every row, its category's dot on a 2
+  ring of `surface` (a mark on the tint falls under 3:1); an outline against a fill, a solid line
+  against a dash.
 - **The donut:** 212, the band 12 of the hundred, the centre's sum `text-card-figure` 20/800; one name,
   "Куда ушли", wherever it stands.
 - **«Темп»'s day is a slider in sight** under the axis, 44 to the thumb, spanning the month as the
-  axis does; a finger on the line chooses too.
+  axis does; only its thumb takes a touch — a scroll that starts on the track must not change the day;
+  none with one day drawn. A finger on the line chooses too.
+- **The reading over bars** holds as many lines as its longest month takes — two — so the bars never
+  move under the thumb as another month is chosen.
 - **Words:** axis labels 11/600, sentences from 13; a target from 44.
 
 ## Do's and Don'ts
