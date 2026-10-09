@@ -346,6 +346,18 @@ describe('MoneyView: the month', () => {
     expect(view.find('.spent .approx').exists()).toBe(false)
   })
 
+  it('what no rate counted, spent or come in, is as written — never rounded (MOL-184, А2, review Р3-1)', async () => {
+    moneyMonth.mockResolvedValue(
+      month({
+        uncounted: [parseMoney('5.50', 'EUR')],
+        incomeUncounted: [parseMoney('1000.50', 'USD')],
+      }),
+    )
+    const text = plain((await render()).text())
+    expect(text).toContain('Not counted: €5.50 — no rate for that day')
+    expect(text).toContain('and $1,000.50 not counted')
+  })
+
   // MOL-183, С-12: the running month against the one before to the same day, a closed one whole.
   describe('the comparison', () => {
     const change = async (patch: Partial<MoneyMonthView>, path = '/money') => {

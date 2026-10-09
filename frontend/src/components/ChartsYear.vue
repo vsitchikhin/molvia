@@ -204,7 +204,7 @@ import {
   shortMonth,
   signedPercent,
 } from '@/components/charts'
-import { categoryColour } from '@/components/spending'
+import { asTyped, categoryColour } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useMoneyChartYear } from '@/composables/useMoneyCharts'
@@ -256,6 +256,9 @@ export default defineComponent({
     const { phase, charts, stale, fetchedAt, kept, retry } = useMoneyChartYear(toRef(props, 'year'))
 
     const whole = (value: Money) => formatEstimate(value, locale.value)
+    /** What no rate counted, as written: no «≈» stands before it (MOL-184, adversarial Б1). */
+    const written = (amounts: readonly Money[]) =>
+      amounts.map((amount) => asTyped(amount, locale.value)).join(', ')
     const approx = (value: Money | null) =>
       value ? `≈ ${whole(value)}` : t('spending.charts.no_rate')
     const signedApprox = (value: Money) =>
@@ -392,13 +395,12 @@ export default defineComponent({
     const spentDetail = computed(() => {
       const month = spentMonth.value
       if (!month) return ''
+      // No «≈ 0 ₽» over nothing counted, and what had no rate as written (MOL-184, adversarial Б1, Б2).
       const parts = [
-        both.value ? approx(month.spentIncome) : null,
+        both.value && month.spent.minor !== 0n ? approx(month.spentIncome) : null,
         changeWords(month.month, month.change),
         month.uncounted.length > 0
-          ? t('spending.charts.uncounted', {
-              amounts: month.uncounted.map((amount) => whole(amount)).join(', '),
-            })
+          ? t('spending.charts.uncounted', { amounts: written(month.uncounted) })
           : null,
       ]
       return parts.filter((part) => part !== null).join(' · ')
@@ -456,13 +458,12 @@ export default defineComponent({
     const flowUncounted = computed(() => {
       const month = flowMonth.value
       if (!month) return []
-      const list = (amounts: readonly Money[]) => amounts.map((amount) => whole(amount)).join(', ')
       return [
         ...(month.incomeUncounted.length > 0
-          ? [t('spending.charts.income_uncounted', { amounts: list(month.incomeUncounted) })]
+          ? [t('spending.charts.income_uncounted', { amounts: written(month.incomeUncounted) })]
           : []),
         ...(month.uncounted.length > 0
-          ? [t('spending.charts.spent_uncounted', { amounts: list(month.uncounted) })]
+          ? [t('spending.charts.spent_uncounted', { amounts: written(month.uncounted) })]
           : []),
       ]
     })

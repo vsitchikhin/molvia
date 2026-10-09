@@ -52,7 +52,7 @@ import type { Currency, Money, MoneyChartMonthView, SpendingCategoryView } from 
 import AppCard from '@/components/AppCard.vue'
 import DonutRing, { CHOSEN_THICKER } from '@/components/DonutRing.vue'
 import type { RingSector } from '@/components/DonutRing.vue'
-import { categoryColour } from '@/components/spending'
+import { asTyped, categoryColour } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
 
 /**
@@ -158,12 +158,13 @@ export default defineComponent({
         }
       }
       const spent = props.charts.spent
-      // No sum is no «≈» and no rate to blame (adversarial М): «нет курса» under «—» was untrue.
+      // No sum is no «≈» and no rate to blame (adversarial М): «нет курса» under «—» was untrue. Nor is
+      // nothing counted — «0 ֏ · ≈ 0 ₽» stood over «не посчитано: 50 $» (MOL-184, adversarial Б2).
       return {
         label: props.label,
         figure: spent ? whole(spent) : '—',
         sub:
-          both.value && spent
+          both.value && spent && spent.minor !== 0n
             ? (approx(props.charts.spentIncome) ?? props.noRate ?? t('spending.charts.no_rate'))
             : null,
       }
@@ -172,7 +173,10 @@ export default defineComponent({
     const uncounted = computed(() =>
       props.charts.uncounted.length > 0
         ? t('spending.charts.uncounted', {
-            amounts: props.charts.uncounted.map((amount) => whole(amount)).join(', '),
+            // As written, never rounded: no «≈» stands before it (MOL-184, adversarial Б1).
+            amounts: props.charts.uncounted
+              .map((amount) => asTyped(amount, locale.value))
+              .join(', '),
           })
         : null,
     )
