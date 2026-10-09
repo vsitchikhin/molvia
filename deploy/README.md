@@ -246,7 +246,8 @@ laptop, where `notice.txt` is:
 
 2. Try it on yourself: the same with `--owner --yes` — one message to `OWNER_TELEGRAM_ID`, within a
    minute. Read it in Telegram. No message and `--status` says `failed 1`: Telegram refused the text
-   itself — fix the file before writing to everybody.
+   itself — fix the file before writing to everybody. No message and `failed 0`, «left 1» not moving:
+   the bot cannot reach Telegram at all — its log says why, a revoked or mistyped token among them.
 3. The same with `--yes` writes to everybody (`--country=AM,GE` — the people of those countries
    only). The bot starts within a minute, 25 messages a second.
 4. `… node dist/notify.js --status` says how far it got — and the try on yourself beside it, if newer;

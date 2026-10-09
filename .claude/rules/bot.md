@@ -566,13 +566,18 @@ plan in `.scratch/tasks/plans/MOL-237.md`.
   the pauses meets a 429 — the word covers the part that went, and the rest goes the next minute.
   With nothing gone the word is `through: null`, which only lets the lease go, so a batch stopped on
   its first message is not held five minutes.
-- **Another 4xx is judged by the next person** (`refused`, adversarial Р2-А1): Telegram does not say
-  whether a refused request is about that chat or about the message. The next one goes — it was the
-  chat's: «не дошло» for good, and the broadcast goes on. The next one is refused too — it is the
-  message's: the batch stops before the first of them. The last person of the broadcast (a batch
-  shorter than a whole one) has nobody after them and is «не дошло»; a whole batch ending on one leaves
-  them first in the next. So the owner's try, a batch of one, ends «failed 1» on a text Telegram
-  refuses — **that is what the try is for** — and never holds the people's broadcast behind it.
+- **Another 4xx is judged by the next one it goes to** (`refused`, adversarial Р2-А1, review №8):
+  Telegram does not say whether a refused request is about that chat or about the message. Only a
+  message sent says the message is fine: then the refused person is «не дошло» for good, and the
+  broadcast goes on. A block or a gone chat says nothing of the message, so it waits with the refused
+  person for that word; another refusal first — it is the message's: the batch stops before the first
+  refused, and the block among the waiting is marked already and never handed again. The end of the
+  broadcast (a batch shorter than a whole one) closes the waiting as they are, the refused «не дошло»;
+  a whole batch ending on them leaves them first in the next. So the owner's try, a batch of one, ends
+  «failed 1» on a text Telegram refuses — **that is what the try is for** — and never holds the
+  people's broadcast behind it. **The token's own failures are not refusals**: 401 (revoked) and 404
+  (a token of the wrong shape, a character lost when pasting the new one at step 2 of the procedure,
+  adversarial Р3-А1) are `again`, so nobody is «не дошло» for them.
   **The prices, named:** a failure that may pass holds the broadcast at that person, a try a minute —
   `STATUS=1` shows «left» not moving, and `CANCEL=1` stops it; a message Telegram refuses holds it at
   the first two, and so do two broken chats side by side in the order of `actors.id`.
