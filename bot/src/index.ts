@@ -5,6 +5,7 @@ import { createPulse, hearTelegram } from './pulse'
 import { REMIND_EVERY_MS, startReminders } from './remind'
 import { startOwnerNotices } from './owner'
 import { startReceiptNotices } from './receipt'
+import { startBroadcasts } from './broadcast'
 import { botToken, readEnvironment, refusedNames } from './env'
 import type { RunnerHandle } from '@grammyjs/runner'
 import type { BotEnvironment } from './env'
@@ -97,6 +98,9 @@ const stopOwnerNotices = startOwnerNotices(claims, bot.api)
 // «Чек разобран» (MOL-129): receipts read that no phone was handed, claimed every minute the same way.
 const stopReceiptNotices = startReceiptNotices(claims, bot.api, environment.appBaseUrl)
 
+// The message to people about a leak (MOL-237): `make notify` queued it, batches claimed every minute.
+const stopBroadcasts = startBroadcasts(claims, bot.api)
+
 // The runner keeps fetching updates until it is told to stop, and a kill without this leaves
 // whatever it is holding half-handled. Compose sends SIGTERM on every deploy. A stop that comes
 // while the bot still asks Telegram who it is cuts that short, and the runner never starts.
@@ -107,7 +111,13 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     stopping.abort()
     // Side by side, not one after the other (adversarial З): the runner stops taking updates while
     // the evening's last messages go out, and neither waits for the other inside the grace period.
-    void Promise.all([stopReminders(), stopOwnerNotices(), stopReceiptNotices(), runner?.stop()])
+    void Promise.all([
+      stopReminders(),
+      stopOwnerNotices(),
+      stopReceiptNotices(),
+      stopBroadcasts(),
+      runner?.stop(),
+    ])
   })
 }
 

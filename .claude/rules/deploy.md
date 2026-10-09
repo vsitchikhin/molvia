@@ -23,9 +23,10 @@ The shape worth knowing here:
   runtime image carries no `node_modules` at all: nothing to audit and nothing that can
   drift from the lockfile it was built with. It also sidesteps the fact that the workspace
   packages export TypeScript source, which a runtime image could not read. The API's image
-  carries three more files, `dist/forget.js` — the owner's fallback for erasure (MOL-58) —,
-  `dist/seed-catalogue.js` (MOL-112) and `dist/gates.js` (MOL-91), since the machine has neither
-  the source nor a published database port.
+  carries the owner's tools beside it, `dist/forget.js` — the fallback for erasure (MOL-58) —,
+  `dist/seed-catalogue.js` (MOL-112), `dist/gates.js` (MOL-91), `dist/failures.js` (MOL-143),
+  `dist/merge.js` (MOL-106) and `dist/notify.js` (MOL-237), since the machine has neither the source
+  nor a published database port.
   **One module beside the file, and the model** (MOL-105, owner's decision В-1): onnxruntime's
   native library cannot be bundled, so `bin/bundle.mjs` leaves `onnxruntime-node` out and the image
   copies it — its JavaScript, `onnxruntime-common`, and the native build of the image's machine

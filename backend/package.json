@@ -12,6 +12,7 @@
     "gates": "tsx src/gates-cli.ts",
     "failures": "tsx src/failures-cli.ts",
     "merge": "tsx src/merge-cli.ts",
+    "notify": "tsx src/notify-cli.ts",
     "bundle": "node ../bin/bundle.mjs backend",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

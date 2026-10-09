@@ -155,6 +155,36 @@ describe('login clients', () => {
     )
   })
 
+  it('a broadcast: the claim reads a batch, a word on it is checked before it leaves (MOL-237)', async () => {
+    const position = '10000000-0000-4000-8000-000000000001'
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            broadcast: {
+              id: 1,
+              text: 'Molvia',
+              recipients: [{ telegramUserId: 4242, position }],
+            },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    const bot = createBotClient({ baseUrl: 'http://backend', fetch, secret })
+    expect((await bot.claimBroadcast()).broadcast?.recipients).toEqual([
+      { telegramUserId: 4242, position },
+    ])
+    await bot.broadcastDone({ id: 1, through: position, sent: 1, blocked: 0, failed: 0 })
+    await expect(
+      bot.broadcastDone({ id: 1, through: position, sent: 0, blocked: 0, failed: 0 }),
+    ).rejects.toMatchObject({ code: ISSUE.BODY_INVALID })
+    expect(fetch.mock.calls.map(([url, options]) => [url, options?.method])).toEqual([
+      ['http://backend/internal/broadcasts/claim', 'POST'],
+      ['http://backend/internal/broadcasts/done', 'POST'],
+    ])
+  })
+
   it("the owner's claim hears the caller's signal: the bot's stop has a deadline (MOL-143)", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>(
       async (_url, init) =>
