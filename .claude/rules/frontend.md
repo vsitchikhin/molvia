@@ -688,7 +688,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   card some 15 px lower than its bars, and the page grows as the answer comes; a month with nothing
   spent has no «≈» (handoff 157 v2, «Месяц без трат»), and its tiles come some 24 px higher than the
   plate — the page shrinks by that much under the switcher, which MOL-138's hold keeps where it is
-  (adversarial А5). The «≈» line itself is the person's two currencies, as «Счета» last named them —
+  (adversarial А5). The «≈» line itself — of «Деньги» and of the total of «Траты», one rule in
+  `useMoneyScreen` (MOL-184) — is the person's two currencies, as «Счета» last named them —
   one currency has none in any month, and neither have the bars once «Счета» are known; with nothing
   known it is two, the usual case, and it is taken as the skeleton comes and held while it stands, so
   «Счета» answering meanwhile neither grow nor shrink it under the switcher (Б3). **The price of that,

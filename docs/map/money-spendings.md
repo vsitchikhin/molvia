@@ -76,11 +76,11 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `frontend/src/components/SalaryShiftGroup.vue` — Settings group «Зарплата с … числа — в следующий месяц»: a switch and a day select, saved on the tap; neither while a change is unsure, the quiet line in their place (MOL-96).
 - `frontend/src/components/SpendingSheet.vue` — Spending sheet: «Новая трата», amending one's own, or reading a trip's line; writes go to the queue and it closes at once.
 - `frontend/src/components/charts.ts` — Words of «Графики»: the month long, in three letters and by name, «после октября», a span of months, the closed ones named, a signed percent, «−8 % к августу».
-- `frontend/src/components/spending.ts` — Helpers of «Деньги» drawing: category icon and colour, rate words, journal rows from the month and the queue, page merge, a figure of «Бюджет» (`budgetAmount`).
+- `frontend/src/components/spending.ts` — Helpers of «Деньги» drawing: category icon and colour, rate words, journal rows from the month and the queue, page merge, a day's sum with what had no rate (`dayTotalText`), a figure of «Бюджет» (`budgetAmount`).
 
 ## frontend · composables
 
-- `frontend/src/composables/useMoneyScreen.ts` — Composable: what «Деньги» and «Траты» share — the month in the address by `replace`, the journal and refusals, the spending sheet, «Вернуть».
+- `frontend/src/composables/useMoneyScreen.ts` — Composable: what «Деньги» and «Траты» share — the month in the address by `replace`, the journal and refusals, the spending sheet, «Вернуть», the skeleton's «≈» line.
 - `frontend/src/composables/useMoneyMonth.ts` — Composable: one month of «Деньги» from the server, its later pages, re-read when the queue lands; remembered categories.
 - `frontend/src/composables/useChartPointer.ts` — Composable: a choice made on a chart by the whole area — a mouse on press, a finger on lifting or going sideways, a scroll never.
 - `frontend/src/composables/useMoneyBudget.ts` — Composable: «Бюджет» of a month from the server through `useKeptAnswer`, the last three months kept per owner.

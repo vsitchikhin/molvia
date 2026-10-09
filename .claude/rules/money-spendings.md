@@ -176,7 +176,10 @@ nothing up.
   one button: «Доходы» is a row; a closed month's rest is «На счетах 31 авг.». **«Траты»**
   (`/money/spendings`, `meta.parent: 'money'`) is the journal moved whole, not copied — the queue's
   rows, the pages, «Вернуть», the row of a saved spending brought into view — with the server's count
-  and sum on top, «· N ещё не учтена» beside them. **The two share `useMoneyScreen`**: the month in
+  and sum on top, «· N ещё не учтена» beside them; since MOL-184 in the field of `AppScreen`, the days
+  a column of 24 — a flex column, which `AppReveal` takes a removed day's gap from — the connection a
+  `StatusStrip` with «Повторить» when the server did not answer, and the skeleton the answer's shape:
+  the total on the ground, a day's caption, three rows. **The two share `useMoneyScreen`**: the month in
   the address, the sheet, the journal and the refusals. **«Добавить трату» is the strip under the
   thumb** (`#docked`, as «Сфотографировать чек», MOL-128) on both, in every state where a category is
   known; «Вернуть» floats over it. **A spending of another month moves «Траты» to it, never the
@@ -262,7 +265,21 @@ nothing up.
   rate** (Р-2): `foreign` sums a currency over the month, and every spending in it had its own
   day's rate. The sheet converts while typing by `convertAcross` — MOL-24's exception — and only
   between the two currencies the running month's rate joins; a third says «Посчитаем по курсу дня
-  траты» (Р-5).
+  траты» (Р-5). **A spending the server holds is converted by the rate of its own day while its day
+  and currency stay** (Е-10, MOL-184): the server keeps that rate on «Сохранить» (`amendSpending`),
+  so the sheet's «≈» is `spendingIn` over it — the rule the row's «≈» is counted by. By the running
+  month's rate one spending was «≈ 15 051 ֏» in the journal and «≈ 15 077 ֏» in its sheet. A rate
+  that counts nothing — none was known that day, or it is from before a move — is taken anew by the
+  server, and the sheet says «Посчитаем по курсу дня траты»; a day or a currency changed, a spending
+  still on the phone, one in the spending currency — counted as one typed anew.
+- **A day's sum is what was counted and, beside it, what had no rate, in its own currency** (MOL-184,
+  owner's decision В-1 «а»): «≈ 5 000 ֏ + 50 $», «50 $» where nothing was counted — a day of one
+  $50 with no rate read «≈ 0 ֏», nothing spent. The server names it (`uncounted` of the day, whole
+  whatever page its rows come on, defaulted for a month kept before it): the phone cannot tell it from
+  the rows of a day cut by the page, and adds nothing up (`dayTotalText`). **A day's «≈» is only a
+  counted row's conversion** (`estimated`): over exact drams beside dollars of no rate it said the
+  drams were a guess. **«Траты» say under the month's total what it leaves out** (В-2 «а»), the
+  summary card's own line, `spending.uncounted`.
 - **Removal asks nothing; `UndoStrip` gives ten seconds** over the strip «Добавить трату», and
   stands still while a finger or the person's focus is on it — not the focus it puts on «Вернуть» itself, or
   the count would never run for a touch. **It stands whatever the screen becomes under it**: the
