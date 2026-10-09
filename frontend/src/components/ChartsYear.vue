@@ -81,7 +81,7 @@
           <template v-if="spentMonth">
             <p class="month">{{ monthLabel(spentMonth.month) }}</p>
             <p class="figure">{{ whole(spentMonth.spent) }}</p>
-            <p class="detail">{{ spentDetail }}</p>
+            <p class="detail held">{{ spentDetail }}</p>
           </template>
         </BarChart>
         <p class="hint" :class="{ dashed: charts.average }">{{ averageNote }}</p>
@@ -170,7 +170,7 @@
           <template v-if="categoryPoint">
             <p class="month">{{ monthLabel(categoryPoint.month) }}</p>
             <p class="figure small">{{ whole(categoryPoint.amount) }}</p>
-            <p v-if="categoryDetail" class="detail">{{ categoryDetail }}</p>
+            <p class="detail held">{{ categoryDetail }}</p>
           </template>
         </BarChart>
         <p v-if="series.average" class="hint">{{ t('spending.charts.category_avg') }}</p>
@@ -779,6 +779,14 @@ export default defineComponent({
 
 .missing {
   margin-top: var(--space-2);
+}
+
+/* Two lines held whatever the month says: the running month's words — «к обычному к 9 октября» — take
+   two where a closed one's take one, and the bars under the thumb jumped by a line as the month changed
+   (adversarial А7 of MOL-186: 13 px on «Категория по месяцам», 19 at 320 on «Расходы»; MOL-151). A third
+   line, past two, still moves them — a price, named in the rule. */
+.held {
+  min-height: 2lh;
 }
 
 .category {
