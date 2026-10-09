@@ -17,7 +17,7 @@ NEED_SCAFFOLD = @test -f package.json || { echo "no scaffold yet (package.json i
 # The heavy checks of every copy on this machine take turns, the push's among them (MOL-139).
 ONE_AT_A_TIME = ./bin/one-at-a-time.sh "make $@"
 
-.PHONY: help setup hooks up down reup ps logs psql migrate forget seed gates failures merge unmerge apart merge-night merge-candidates db-reset dev format lint typecheck test e2e check prod-build watcher certs icons ports
+.PHONY: help setup hooks up down reup ps logs psql migrate forget notify seed gates failures merge unmerge apart merge-night merge-candidates db-reset dev format lint typecheck test e2e check prod-build watcher certs icons ports
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -84,6 +84,13 @@ migrate: ## Apply migrations
 forget: ## Erase a person by Telegram id: make forget TG=<id> [YES=1] (dry run without YES=1)
 	$(NEED_SCAFFOLD)
 	$(if $(filter command line,$(origin TG)),,unset TG;) ./bin/forget-actor.sh "$${TG:-}" $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
+
+# The file and the countries reach the script through the environment, never pasted into the recipe,
+# and only a value typed on this command line counts — as for `forget` (MOL-58, П-3; adversarial Е).
+# It queues only for YES=1 typed here, and the file goes to the script's standard input (MOL-237).
+notify: ## Write to people about a leak: make notify FILE=<text> [COUNTRY=AM,GE] [OWNER=1] [YES=1] | STATUS=1 | CANCEL=1
+	$(NEED_SCAFFOLD)
+	$(if $(filter command line,$(origin FILE)),,unset FILE;) $(if $(filter command line,$(origin COUNTRY)),,unset COUNTRY;) ./bin/notify.sh "$${FILE:-}" "$${COUNTRY:-}" $(if $(and $(filter command line,$(origin OWNER)),$(filter 1,$(OWNER))),--owner) $(if $(and $(filter command line,$(origin STATUS)),$(filter 1,$(STATUS))),--status) $(if $(and $(filter command line,$(origin CANCEL)),$(filter 1,$(CANCEL))),--cancel) $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
 
 # No value from a person reaches the recipe, so unlike `forget` it needs no wrapper script. It
 # writes only for YES=1 typed on this command line: `$(if $(YES),…)` read YES=0 as yes, and took a

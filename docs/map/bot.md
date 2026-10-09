@@ -13,6 +13,8 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 ## backend
 
 - `backend/src/db/broadcasts-repository.ts` — Repository of the message to people about a leak (MOL-237): the count of an audience by country, a broadcast queued under one lock and refused while another goes, the claim of a leased batch after the cursor, the bot's word moving the cursor only forwards and only to a live id, the latest broadcast's progress, cancel.
+- `backend/src/notify.ts` — The owner's message to people about a leak (MOL-237): a dry run unless `--yes` — the text as it will go, by country how many get it and how many have the bot blocked — `--country=`, `--owner` for a try on the owner alone, `--status`, `--cancel`; prints the text and counts, never anyone.
+- `backend/src/notify-cli.ts` — Entry of `dist/notify.js` in the API image: runs `notify` against the database, the text from standard input, the owner from `OWNER_TELEGRAM_ID`. Tests: `backend/tests/notify-bundle.integration.test.ts`.
 - `backend/src/db/reminders-repository.ts` — Repository of the rating reminder (MOL-101): everyone reminded with their ladder, the claim that moves the ladder only if it still stands where it was found, the switch under the owner's row with the ladder gone on «on» (MOL-103), and the counters of `reminder_days`.
 - `backend/src/routes/receipt-notices.ts` — Routes `GET`/`PUT /actors/me/receipt-notices` (MOL-129, В-2): «Сообщать, что чек разобран», saved on the tap on the page «Бот».
 - `backend/src/routes/reminders.ts` — Routes `GET`/`PUT /actors/me/reminders` (MOL-103): «Напоминать об оценке в Telegram», saved on the tap beside the settings.
@@ -21,6 +23,7 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 - `backend/src/usecases/tell-receipts.ts` — Use case «Чек разобран» (MOL-129): the receipts read that no phone was handed, marked as told, worded with the place the review shows, the receipt's day and the night of the person's zone; a notice the contract refuses is said as a failure; the person's switch of these messages, read and chosen.
 - `backend/src/usecases/remind-ratings.ts` — Use case «Напомнить об оценке»: whose evening it is in their zone, which step `planReminder` says, and what the claim hands the bot.
 - `backend/tests/broadcasts.integration.test.ts` — Integration test of the message to people about a leak (MOL-237): the count, one broadcast at a time, batches in order, the lease and a batch going again, a late word, the audience, the owner's try, cancel, erasure leaving no id in the cursor.
+- `backend/tests/notify-bundle.integration.test.ts` — Integration test: the bundled `dist/notify.js` runs from the bundle alone with the text on standard input, and `make notify` takes `FILE` as one name and `YES`, `OWNER`, `STATUS`, `CANCEL` only from its own command line.
 - `backend/tests/receipt-notices.integration.test.ts` — Integration test of «чек разобран» (MOL-129): heard in the app only on a list or review asked in view, the claim's window, place, day, language and duplicate, a block over «chosen», the switch and its address.
 - `backend/tests/reminders-switch.integration.test.ts` — Integration test of the switch (MOL-103): off is off, «on» starts the ladder over, `blocked` and `chosen`, the counters, the app's and the bot's routes.
 - `backend/tests/reminders.integration.test.ts` — Integration test: the evening's hour and day, the ladder with the owner's example, MOL-29, the counters, and the bot's two internal routes.
@@ -49,6 +52,10 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 - `bot/src/remind.ts` — The rating reminder (MOL-101): the minute timer that claims what is due, tells the pulse a claim went through, a message an item with the scale 1–5, only the first one ringing, «Не напоминать» under the last; a 403 turns the reminders off (MOL-103); the keyboard and the outcomes read back off the message.
 - `bot/src/login.ts` — The bot's half of the login: `/start` with a code asks «Впустить это устройство в ваш аккаунт Molvia?»; «Войти» and «Это не я» confirm or decline.
 - `bot/src/when.ts` — `timeAgo`: the age of a login request in words («2 минуты назад») for the bot's question.
+
+## repository
+
+- `bin/notify.sh` — Script behind `make notify` (MOL-237): the message file as standard input, the countries as `--country=`, against this copy's database.
 
 ## frontend
 
