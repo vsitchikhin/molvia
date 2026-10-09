@@ -77,7 +77,7 @@ prints «=» before an amount and OCR reads the sign as a digit — «=119.00» 
 price without its first digit (`signless`, `sliced`) is offered only where no reading of the line holds with
 its swaps, with every other figure as read, and only to the printed total: a line with nothing but a slice
 takes the rest of the total or the slice, whichever meets it, and with no total that meets it stays as read,
-unsettled (`sliced` candidates are never a line's own first reading). The terminal's lost point, put back
+unsettled (`sliced` candidates are never a line's own first reading). A slice is the total's one answer as the blank's rest is, at its price (`ANSWER_COST`), and a receipt has one: two lines with none of their own share no total, and a slice never buys itself with swaps of another line (review В1, В2). A slice the total took is no change of a reading under Р27, so the line is settled — the price of it is Б4 (3 × 500,00 for 7 500,00 where the total is misread as the sum is), the owner's to decide. The terminal's lost point, put back
 outside, still counts (KFC's «148032:1.0»). Card lines and class-code lines with a count read; never the
 weight by money nor the plain layout (their search is past the floor of Р15 with it, review А3), never a
 class row whose count is not printed (twenty counts made up let the slice choose one, Б1). Each half was
