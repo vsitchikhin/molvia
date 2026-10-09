@@ -12,20 +12,19 @@
         </span>
       </span>
     </AppCard>
-    <!-- The card after it: «Против обычного» of a month, the bars of «Расходы по месяцам» of a year. -->
-    <AppCard class="ghost-next">
+    <!-- The card after it: the bars of «Расходы по месяцам» of a year — the reading above them in the
+         kit's lines, the twelve bars the chart's own — or «Против обычного» of a month, the kit's card of
+         lines (MOL-178: the kit's parts, and between them what is the screen's own). -->
+    <AppCard v-if="year" class="ghost-next ghost-card">
       <span class="ghost-heading"><span class="ghost-bar ghost-caption"></span></span>
-      <template v-if="year">
-        <span class="ghost-bar ghost-label"></span>
-        <span class="ghost-bar ghost-figure"></span>
-        <span class="ghost-bars">
-          <span v-for="n in 12" :key="n" class="ghost-column"></span>
-        </span>
-      </template>
-      <span v-else class="ghost-lines">
-        <span v-for="n in 4" :key="n" class="ghost-bar ghost-line"></span>
+      <SkeletonPart kind="lines" :card="false" :widths="[46]" />
+      <span class="ghost-bars">
+        <span v-for="n in 12" :key="n" class="ghost-column"></span>
       </span>
     </AppCard>
+    <div v-else class="ghost-next">
+      <SkeletonPart kind="lines" :widths="[100, 72, 86, 54]" />
+    </div>
   </ScreenSkeleton>
 </template>
 
@@ -33,15 +32,17 @@
 import { defineComponent } from 'vue'
 import AppCard from '@/components/AppCard.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 
 /**
  * Loading of «Графики» in the shape of its answer (Ф-13, MOL-178, handoff MOL-157 v2 5a): the card of
  * the ring, as large as the ring that comes, and the card that stands after it — the lines of «Против
- * обычного» on «Месяц», twelve bars on «Год». Bars of `skeleton-bar`, as every screen's own part.
+ * обычного» on «Месяц», twelve bars on «Год». The kit's `SkeletonPart` wherever the kit has the shape;
+ * the ring, the legend's rows beside it and the bars are the chart's own, in bars of `skeleton-bar`.
  */
 export default defineComponent({
   name: 'ChartsSkeleton',
-  components: { AppCard, ScreenSkeleton },
+  components: { AppCard, ScreenSkeleton, SkeletonPart },
   props: {
     /** «Год»: the card after the ring is twelve bars, not lines. */
     year: { type: Boolean, default: false },
@@ -51,7 +52,7 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .ghost-donut,
-.ghost-next {
+.ghost-card {
   display: grid;
   gap: var(--space-3);
   padding: var(--space-4);
@@ -121,37 +122,6 @@ export default defineComponent({
   width: 22%;
   height: var(--skeleton-line);
   margin-left: auto;
-}
-
-.ghost-lines {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.ghost-line {
-  height: var(--skeleton-line);
-
-  &:nth-child(2) {
-    width: 72%;
-  }
-
-  &:nth-child(3) {
-    width: 86%;
-  }
-
-  &:nth-child(4) {
-    width: 54%;
-  }
-}
-
-.ghost-label {
-  width: 28%;
-  height: var(--skeleton-line);
-}
-
-.ghost-figure {
-  width: 46%;
-  height: var(--skeleton-figure);
 }
 
 .ghost-bars {
