@@ -574,9 +574,12 @@ export default defineComponent({
 /* The day's words give way on a narrow phone, never a figure of its sum: broken, «≈» stood over
    «125 403 ֏» and the figure left the column (review Р3-1). A sum of several currencies breaks only after
    its «+» (`dayTotalText` binds the rest), right-aligned in at most 60 % of the head: unbroken, drams and
-   three currencies with their cents put the page at 400 px on a phone of 320 (MOL-184, round 2). */
+   three currencies with their cents put the page at 400 px on a phone of 320 (MOL-184, round 2). Never
+   narrower than its widest figure: a figure wider than 60 % — «≈ 50 000 000 ֏» in a large system font —
+   takes the room from the day's words rather than standing past the column (round 3). */
 .day-total {
   flex: none;
+  min-width: min-content;
   max-width: 60%;
   font-weight: var(--weight-regular);
   font-variant-numeric: tabular-nums;

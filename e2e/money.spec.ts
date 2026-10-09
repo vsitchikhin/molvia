@@ -329,6 +329,27 @@ test('at 320 a day’s sum of four currencies stays in the column, inside the ca
   for (const amount of edges.amounts) expect(amount).toBeCloseTo(edges.total, 1)
   expect(edges.total).toBeLessThanOrEqual(edges.card)
   expect(edges.page).toBe(320)
+
+  // A large system font: a figure wider than 60 % of the head takes the room from the day's words,
+  // never stands past the column (MOL-184, adversarial round 3).
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '200%'
+  })
+  const large = await page
+    .locator('section.day')
+    .first()
+    .evaluate((root) => {
+      const total = root.querySelector('.day-total')
+      const widest = Math.max(...[...(total?.getClientRects() ?? [])].map((line) => line.width))
+      return {
+        overflow: (total?.scrollWidth ?? 0) - (total?.clientWidth ?? 0),
+        inside:
+          (total?.getBoundingClientRect().right ?? Infinity) <=
+          (root.querySelector('.card')?.getBoundingClientRect().right ?? 0),
+        widest: widest > 0,
+      }
+    })
+  expect(large).toEqual({ overflow: 0, inside: true, widest: true })
 })
 
 test('changing the month keeps the switcher where it was on the screen, under the skeleton too', async ({
