@@ -268,18 +268,30 @@ nothing up.
   траты» (Р-5). **A spending the server holds is converted by the rate of its own day while its day
   and currency stay** (Е-10, MOL-184): the server keeps that rate on «Сохранить» (`amendSpending`),
   so the sheet's «≈» is `spendingIn` over it — the rule the row's «≈» is counted by. By the running
-  month's rate one spending was «≈ 15 051 ֏» in the journal and «≈ 15 077 ֏» in its sheet. A rate
-  that counts nothing — none was known that day, or it is from before a move — is taken anew by the
-  server, and the sheet says «Посчитаем по курсу дня траты»; a day or a currency changed, a spending
-  still on the phone, one in the spending currency — counted as one typed anew.
+  month's rate one spending was «≈ 15 051 ֏» in the journal and «≈ 15 077 ֏» in its sheet. **With no
+  snapshot that counts** — none was known when it was written, or one from before a move — the
+  server counts the row by the rate of its day as it reads the month and takes that same rate on
+  «Сохранить», but does not send it: **the sheet says the row's own figure while the amount is
+  untouched** («≈ 19 500 ֏ по курсу дня траты»), and «Посчитаем по курсу дня траты» once it is put
+  right (owner's decision «а» of review Р2-2, adversarial А1) — never a second figure. A row no rate
+  counted at all says the same words. A day or a currency changed, a spending still on the phone, one
+  in the spending currency — counted as one typed anew.
 - **A day's sum is what was counted and, beside it, what had no rate, in its own currency** (MOL-184,
   owner's decision В-1 «а»): «≈ 5 000 ֏ + 50 $», «50 $» where nothing was counted — a day of one
-  $50 with no rate read «≈ 0 ֏», nothing spent. The server names it (`uncounted` of the day, whole
+  $50 with no rate read «≈ 0 ֏», nothing spent. **What had no rate is printed as written**
+  (`asTyped`, adversarial А2), never rounded — no «≈» stands before it: «5,50 €», not «6 €» over a
+  row of «5,50 €», and a day of one 0,40 $ is not «0 $»; so are the lines «Не посчитано: …» of the
+  month on both screens. The server names it (`uncounted` of the day, whole
   whatever page its rows come on, defaulted for a month kept before it): the phone cannot tell it from
   the rows of a day cut by the page, and adds nothing up (`dayTotalText`). **A day's «≈» is only a
   counted row's conversion** (`estimated`): over exact drams beside dollars of no rate it said the
   drams were a guess. **«Траты» say under the month's total what it leaves out** (В-2 «а»), the
-  summary card's own line, `spending.uncounted`.
+  summary card's own line, `spending.uncounted`. **«≈» of the month in the income currency is one
+  rule for both screens** (`spentApprox`): only in another currency — one who earns and spends in
+  drams was told «≈ 5 000 ֏» under exact drams (adversarial А4) — and never over nothing counted,
+  where «0 ֏ · ≈ 0 ₽» stood over a day of «50 $» (А3). **The price, named** (А6): a row past what
+  money holds is «не посчитано» in drams too (Д5 of MOL-73), and its day reads «… ֏ + … ֏» — at sums no
+  person types.
 - **Removal asks nothing; `UndoStrip` gives ten seconds** over the strip «Добавить трату», and
   stands still while a finger or the person's focus is on it — not the focus it puts on «Вернуть» itself, or
   the count would never run for a touch. **It stands whatever the screen becomes under it**: the

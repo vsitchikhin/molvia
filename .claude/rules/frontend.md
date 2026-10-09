@@ -698,7 +698,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   answer, and the page shrinks by it under the switcher once; from then on «Счета» kept decide it. **The
   bars draw no line of what a month left uncounted** (MOL-184, review Р2-4): the total of «Траты» says
   «Не посчитано: 50 $ — …» under its «≈» only where a spending had no rate, and the page grows by that
-  line as the answer comes — taller, which MOL-138's hold allows. The total of 77 v2 2a (`TripTotal`) is no card until
+  line as the answer comes — taller, which MOL-138's hold allows. **And a month with no rate between
+  the two currencies** — a new pair, a closed month with none frozen — has no «≈» (`spentApprox`)
+  while the bars, which cannot know it before the answer, drew one: the page shrinks by that line
+  under the switcher, as for the empty month above (adversarial А4 of MOL-184). The total of 77 v2 2a (`TripTotal`) is no card until
   MOL-206 makes it one, and the sums of «Счета», an account, «Обмен» and «Бюджет» still stand at the
   body's leading, some 8 px taller than the part — their tasks set the part against their answer. **The price:** a card adds its padding and
   edge, so a skeleton of `groups` is some 34 px taller than before — taller, not shorter, which the hold

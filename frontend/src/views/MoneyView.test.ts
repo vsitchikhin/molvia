@@ -337,6 +337,15 @@ describe('MoneyView: the month', () => {
     expect(text).toContain('At my rate of 4.62 ֏ per 1 ₽ today')
   })
 
+  it('no «≈» under exact drams for one who earns and spends in drams (MOL-184, adversarial А4)', async () => {
+    moneyMonth.mockResolvedValue(
+      month({ incomeCurrency: 'AMD', spentIncome: amd('317800'), rate: null }),
+    )
+    const view = await render()
+    expect(plain(view.get('.spent .figure').text())).toContain('317,800')
+    expect(view.find('.spent .approx').exists()).toBe(false)
+  })
+
   // MOL-183, С-12: the running month against the one before to the same day, a closed one whole.
   describe('the comparison', () => {
     const change = async (patch: Partial<MoneyMonthView>, path = '/money') => {

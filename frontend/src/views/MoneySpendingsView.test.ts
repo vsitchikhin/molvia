@@ -846,6 +846,31 @@ describe('MoneySpendingsView: the kit’s states, the rhythm and the day’s sum
     expect(plain(view.get('.total').text())).toContain('Not counted: $50 — no rate for that day')
   })
 
+  it('no «≈» under exact drams for one who earns and spends in drams (adversarial А4)', async () => {
+    moneyMonth.mockResolvedValue(
+      month({ incomeCurrency: 'AMD', spentIncome: amd('317800'), rate: null }),
+    )
+    const view = await render()
+    expect(plain(view.get('.total').text())).toContain('317,800')
+    expect(view.get('.total').text()).not.toContain('≈')
+  })
+
+  it('nothing counted: the total says what it leaves out, never «≈ 0» over it (adversarial А3)', async () => {
+    const dollars = parseMoney('50', 'USD')
+    moneyMonth.mockResolvedValue(
+      month({
+        spent: amd('0'),
+        spentIncome: rub('0'),
+        uncounted: [parseMoney('5.50', 'EUR'), dollars],
+      }),
+    )
+    const view = await render()
+    const total = plain(view.get('.total').text())
+    expect(total).not.toContain('≈')
+    // As written, never rounded: «€5.50», not «€6» (adversarial А2).
+    expect(total).toContain('Not counted: €5.50, $50 — no rate for that day')
+  })
+
   it('must not fire: a month with everything counted says nothing of what was not', async () => {
     moneyMonth.mockResolvedValue(month())
     const view = await render()

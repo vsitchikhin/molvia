@@ -169,6 +169,19 @@ export function mergePages(first: MoneyMonthView, next: MoneyMonthView): MoneyMo
 }
 
 /**
+ * The month's spending in the income currency, «≈ 63 800 ₽» under «274 523 ֏» — one rule for «Деньги»
+ * and «Траты» (MOL-184): only in another currency, since one who earns and spends in drams was told
+ * «≈ 5 000 ֏» under exact drams (adversarial А4); and never under nothing counted, where «≈ 0 ₽» stood
+ * over a spending of $50 with no rate (А3, handoff 157 v2 «Месяц без трат»).
+ */
+export function spentApprox(month: MoneyMonthView): Money | null {
+  const { spent, spentIncome } = month
+  return spentIncome && spent.minor !== 0n && spentIncome.currency !== spent.currency
+    ? spentIncome
+    : null
+}
+
+/**
  * The day's sum over its rows (MOL-184, В-1): what was counted — «≈» where a rate converted some of
  * it — and beside it what had no rate, in its own currency: «≈ 5 000 ֏ + 50 $», and «50 $» where
  * nothing was counted. A day of one $50 with no rate read «≈ 0 ֏» — nothing spent. Every figure is
@@ -182,7 +195,8 @@ export function dayTotalText(
   const counted = day.total.minor !== 0n || day.uncounted.length === 0
   return [
     ...(counted ? [(day.estimated ? '≈ ' : '') + formatEstimate(day.total, locale)] : []),
-    ...day.uncounted.map((amount) => formatEstimate(amount, locale)),
+    // As written, never rounded: there is no «≈» before it (adversarial А2 — «€6» over «€5.50»).
+    ...day.uncounted.map((amount) => asTyped(amount, locale)),
   ].join(' + ')
 }
 

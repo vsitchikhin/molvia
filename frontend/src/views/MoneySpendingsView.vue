@@ -131,7 +131,7 @@
               <span v-if="approx" class="approx">{{ approx }}</span>
               <!-- The month's figure says what it leaves out, as on «Деньгах» (MOL-184, В-2). -->
               <span v-if="month.uncounted.length > 0" class="approx">
-                {{ t('spending.uncounted', { amounts: month.uncounted.map(whole).join(', ') }) }}
+                {{ t('spending.uncounted', { amounts: uncountedOf(month) }) }}
               </span>
             </span>
           </div>
@@ -265,7 +265,7 @@ import type { TransferOutcome } from '@/components/TransferSheet.vue'
 import type { Removed } from '@/components/spending'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
-import { dayTotalText, journalRowProps } from '@/components/spending'
+import { asTyped, dayTotalText, journalRowProps, spentApprox } from '@/components/spending'
 import type { JournalRow, OperationRowProps } from '@/components/spending'
 import { useMoneyScreen } from '@/composables/useMoneyScreen'
 import { useTransferOutcome } from '@/composables/useTransferOutcome'
@@ -313,13 +313,18 @@ export default defineComponent({
       const value = month.value
       if (!value) return ''
       const unsent = screen.unsent.value
+      const inIncome = spentApprox(value)
       return [
-        value.spentIncome ? `≈ ${whole(value.spentIncome)}` : null,
+        inIncome ? `≈ ${whole(inIncome)}` : null,
         unsent > 0 ? t('spending.list.unsent', { n: unsent }, unsent) : null,
       ]
         .filter((part) => part !== null)
         .join(' · ')
     })
+
+    /** What no rate counted, as written: no «≈» stands before it (adversarial А2). */
+    const uncountedOf = (value: MoneyMonthView) =>
+      value.uncounted.map((amount) => asTyped(amount, locale.value)).join(', ')
 
     const groceries = computed(
       () => categories.value.find((category) => category.preset === 'groceries') ?? null,
@@ -467,6 +472,7 @@ export default defineComponent({
       month,
       whole,
       dayTotalText,
+      uncountedOf,
       approx,
       rowOf,
       dayTitle,

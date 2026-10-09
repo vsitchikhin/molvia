@@ -239,7 +239,8 @@ describe('the month of «Деньги»', () => {
         uncounted: [toMoney('10 EUR'), toMoney('50 USD')],
       },
     ])
-    // «Must not fire»: drams are never a day's uncounted, and a day of drams alone is not «≈».
+    // «Must not fire»: a day of drams alone is not «≈» and leaves nothing uncounted. (Drams are a day's
+    // uncounted only past what money holds — MOL-73, Д5 — and are said so: adversarial А6.)
     expect(month({ spendings: [spending('900 AMD', '2026-09-12')] }).days[0]).toMatchObject({
       estimated: false,
       uncounted: [],
