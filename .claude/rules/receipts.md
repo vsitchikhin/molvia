@@ -87,7 +87,7 @@ three figures of a line; as a line's own reading it took the blank's place — �
 total said 2 119,00 — and made a reading that misread a line tie one that read it right. Never a count, the
 discount or a figure with no decimals, never to zero; «=0.50» read «20.50» is read. The half «119.00 1» read
 «119.001» is not done: `hundredthsOf` rounds the third decimal away. On the bench: not one line lost or
-changed, the search as on master. The pharmacy's «»», «-», «:», «Օ» are MOL-258 (owner, В-1 «а»).
+changed, the search as on master. Measured on no set as shipped: MOL-228's eleven Russian lines were the prototype's H9, a swap of one price with none of these conditions, and the product's parse reads no Russian receipt. The pharmacy's «»», «-», «:», «Օ» are MOL-258 (owner, В-1 «а»).
 
 **Where only the total judges, the rate the lines share helps it** (review Р20): such a till has no
 line read with no swap, so the receipt's discount rate is taken from the lines as read, and a
