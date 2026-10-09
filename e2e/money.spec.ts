@@ -282,6 +282,55 @@ test('a day with no rate says its dollars, and the month’s total names them', 
   await expect(page.locator('.total')).toContainText(/Не посчитано: 50\s\$ — курса того дня нет/)
 })
 
+// The longest head a person makes: drams and three currencies with their cents, none with a rate
+// (adversarial round 2 of MOL-184, «не атаковано»). On 320 the day's words give way and the sum stays
+// in the column of the rows' amounts, inside its card.
+test('at 320 a day’s sum of four currencies stays in the column, inside the card', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 840 })
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  const { categories } = (await (
+    await page.request.get('/api/spending-categories', { headers })
+  ).json()) as { categories: { id: string }[] }
+  for (const [amount, currency] of [
+    ['12400', 'AMD'],
+    ['1234.56', 'RUB'],
+    ['10.50', 'EUR'],
+    ['0.40', 'USD'],
+  ]) {
+    const response = await page.request.post('/api/spendings', {
+      headers,
+      data: {
+        id: randomUUID(),
+        spentOn: yerevanDay(),
+        amount: { amount, currency },
+        categoryId: categories[0]?.id,
+      },
+    })
+    expect(response.status(), await response.text()).toBe(201)
+  }
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await openSpendings(page)
+  const total = page.locator('.day-total')
+  await expect(total).toHaveText(/^12\s400\s֏\s\+ 10,50\s€\s\+ 1\s234,56\s₽\s\+ 0,40\s\$$/)
+  const edges = await page
+    .locator('section.day')
+    .first()
+    .evaluate((root) => ({
+      total: root.querySelector('.day-total')?.getBoundingClientRect().right ?? Number.NaN,
+      card: root.querySelector('.card')?.getBoundingClientRect().right ?? Number.NaN,
+      amounts: [...root.querySelectorAll('.list-row .amount')].map(
+        (one) => one.getBoundingClientRect().right,
+      ),
+      page: document.documentElement.scrollWidth,
+    }))
+  for (const amount of edges.amounts) expect(amount).toBeCloseTo(edges.total, 1)
+  expect(edges.total).toBeLessThanOrEqual(edges.card)
+  expect(edges.page).toBe(320)
+})
+
 test('changing the month keeps the switcher where it was on the screen, under the skeleton too', async ({
   page,
 }) => {

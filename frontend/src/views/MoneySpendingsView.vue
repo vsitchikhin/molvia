@@ -571,13 +571,16 @@ export default defineComponent({
   justify-self: start;
 }
 
-/* The day's words give way on a narrow phone, never its sum: broken, «≈» stood over «125 403 ֏» and the
-   figure left the column (review Р3-1). */
+/* The day's words give way on a narrow phone, never a figure of its sum: broken, «≈» stood over
+   «125 403 ֏» and the figure left the column (review Р3-1). A sum of several currencies breaks only after
+   its «+» (`dayTotalText` binds the rest), right-aligned in at most 60 % of the head: unbroken, drams and
+   three currencies with their cents put the page at 400 px on a phone of 320 (MOL-184, round 2). */
 .day-total {
   flex: none;
+  max-width: 60%;
   font-weight: var(--weight-regular);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  text-align: right;
 }
 
 /* The total while the month is coming: its own lines, at the answer's sizes and leading, so the

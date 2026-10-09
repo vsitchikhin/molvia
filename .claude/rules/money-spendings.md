@@ -280,8 +280,14 @@ nothing up.
   owner's decision В-1 «а»): «≈ 5 000 ֏ + 50 $», «50 $» where nothing was counted — a day of one
   $50 with no rate read «≈ 0 ֏», nothing spent. **What had no rate is printed as written**
   (`asTyped`, adversarial А2), never rounded — no «≈» stands before it: «5,50 €», not «6 €» over a
-  row of «5,50 €», and a day of one 0,40 $ is not «0 $»; so are the lines «Не посчитано: …» of the
-  month on both screens. The server names it (`uncounted` of the day, whole
+  row of «5,50 €», and a day of one 0,40 $ is not «0 $»; so is every line of the month that names
+  what no rate counted — «Не посчитано: …» of «Деньги» and «Траты», «и … не посчитано» under
+  «Пришло» (review Р3-1), and the notes of «Графики», the month's ring and the year's bars (adversarial
+  Б1): one sum, said one way on every screen. **And no «≈» over nothing counted on «Графики» either**
+  (Б2): the centre of the ring and the reading of a bar say «0 ֏» alone. **A long day's sum breaks
+  only after its «+»**, right-aligned in at most 60 % of the day's head: on one line, drams and three
+  currencies with their cents put the page at 400 px on a phone of 320 (round 2 of the adversarial
+  review). The server names it (`uncounted` of the day, whole
   whatever page its rows come on, defaulted for a month kept before it): the phone cannot tell it from
   the rows of a day cut by the page, and adds nothing up (`dayTotalText`). **A day's «≈» is only a
   counted row's conversion** (`estimated`): over exact drams beside dollars of no rate it said the

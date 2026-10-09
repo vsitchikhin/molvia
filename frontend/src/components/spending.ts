@@ -193,11 +193,13 @@ export function dayTotalText(
 ): string | null {
   if (!day.total) return null
   const counted = day.total.minor !== 0n || day.uncounted.length === 0
+  // A long sum breaks only after its «+»: «≈» stays with its figure, «+» never starts a line, and `Intl`
+  // binds a figure to its sign already (MOL-184, round 2 at 320 px).
   return [
-    ...(counted ? [(day.estimated ? '≈ ' : '') + formatEstimate(day.total, locale)] : []),
+    ...(counted ? [(day.estimated ? '≈\u00a0' : '') + formatEstimate(day.total, locale)] : []),
     // As written, never rounded: there is no «≈» before it (adversarial А2 — «€6» over «€5.50»).
     ...day.uncounted.map((amount) => asTyped(amount, locale)),
-  ].join(' + ')
+  ].join('\u00a0+ ')
 }
 
 /**
