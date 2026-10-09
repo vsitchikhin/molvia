@@ -75,7 +75,7 @@ const REST = 'rest'
 const THICKNESS = 12
 
 /**
- * «Куда ушло» of «Графики» (MOL-158, MOL-160, handoff MOL-157 03 and 04): the ring of a month or a
+ * «Куда ушли» of «Графики» (MOL-158, MOL-160, handoff MOL-157 03 and 04): the ring of a month or a
  * year at full size, its total in the centre under the words the screen gives, and a legend that is a
  * radio group. A tap on a sector or a row
  * chooses it — thicker, the others dimmed, its row on a ground of its own, so the choice is seen by
@@ -90,8 +90,6 @@ export default defineComponent({
     charts: { type: Object as PropType<DonutData>, required: true },
     /** Over the total in the centre: «Сентябрь · идёт», «2026 · 9 месяцев». */
     label: { type: String, required: true },
-    /** The card's caption; «Куда ушло» unless named. */
-    title: { type: String as PropType<string | null>, default: null },
     /** A last line under the legend — «Каждый месяц — по курсу того месяца». */
     note: { type: String as PropType<string | null>, default: null },
     /**
@@ -230,7 +228,8 @@ export default defineComponent({
       }
     }
 
-    const heading = computed(() => props.title ?? t('spending.charts.where_title'))
+    // One ring, one name — the month's and the year's, and the one key of the ring on «Деньги» (Е-16, Д-5).
+    const heading = computed(() => t('spending.categories_title'))
 
     return {
       t,

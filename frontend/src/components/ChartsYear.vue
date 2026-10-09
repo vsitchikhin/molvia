@@ -54,7 +54,6 @@
         v-model="sector"
         class="answer"
         :charts="ring"
-        :title="t('spending.charts.where_year_title')"
         :label="centreLabel"
         :note="both ? t('spending.charts.year_rate_note') : null"
         :no-rate="noRate"

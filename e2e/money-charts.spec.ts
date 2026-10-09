@@ -75,7 +75,7 @@ test('the ring of «Куда ушли» opens «Месяц» of the same month; 
     .click()
   await expect(page).toHaveURL(new RegExp(`month=${yerevanDay().slice(0, 7)}`))
 
-  const where = page.getByRole('region', { name: 'Куда ушло' })
+  const where = page.getByRole('region', { name: 'Куда ушли' })
   const centre = where.locator('.center')
   await expect(centre).toContainText('идёт')
   await expect(centre).toContainText(/30\s000\s֏/)
@@ -95,7 +95,7 @@ test('the ring of «Куда ушли» opens «Месяц» of the same month; 
 test('the month and the tab move by replace: «назад» from them is «Деньги»', async ({ page }) => {
   await seed(page)
   await toCharts(page)
-  const centre = page.getByRole('region', { name: 'Куда ушло' }).locator('.center')
+  const centre = page.getByRole('region', { name: 'Куда ушли' }).locator('.center')
   await expect(centre).toContainText(/30\s000\s֏/)
 
   await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
@@ -148,7 +148,7 @@ test('«Год» moves by replace to the year before, as far back as there is an
   await page.getByRole('button', { name: 'Предыдущий год' }).click()
   await expect(page).toHaveURL(new RegExp(`year=${String(year - 1)}`))
   await expect(page.locator('.switcher .month')).toHaveText(String(year - 1))
-  await expect(page.getByRole('region', { name: 'Куда ушло за год' })).toContainText(/7\s000\s֏/)
+  await expect(page.getByRole('region', { name: 'Куда ушли' })).toContainText(/7\s000\s֏/)
   // The first year with anything in it: no further back.
   await expect(page.getByRole('button', { name: 'Предыдущий год' })).toHaveAttribute(
     'aria-disabled',
@@ -203,7 +203,7 @@ test('a sector of the year’s ring chooses its category below, with no scroll (
   const scrolled = await page.evaluate(() => window.scrollY)
 
   await page
-    .getByRole('region', { name: 'Куда ушло за год' })
+    .getByRole('region', { name: 'Куда ушли' })
     .locator('.legend .row', { hasText: 'Кафе и рестораны' })
     .click()
   await expect(page).toHaveURL(/category=/)
@@ -333,7 +333,7 @@ test('a month read for the first time keeps the switcher where it was under the 
   expect(await page.evaluate(() => window.scrollY)).toBe(down)
 
   answer()
-  await expect(page.getByRole('region', { name: 'Куда ушло' })).toContainText(/220\s000\s֏/)
+  await expect(page.getByRole('region', { name: 'Куда ушли' })).toContainText(/220\s000\s֏/)
   expect(await topOf(previous)).toBe(at)
 })
 
@@ -367,7 +367,7 @@ test('offline, the month is the last one read under a strip that is not red, and
 }) => {
   await seed(page)
   await toCharts(page)
-  const centre = page.getByRole('region', { name: 'Куда ушло' }).locator('.center')
+  const centre = page.getByRole('region', { name: 'Куда ушли' }).locator('.center')
   await expect(centre).toContainText(/30\s000\s֏/)
   await page.goBack()
 

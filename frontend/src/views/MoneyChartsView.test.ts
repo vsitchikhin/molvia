@@ -266,7 +266,7 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     expect(ring).toContain('2026 · 2 months')
     expect(ring).toContain('֏586,483')
     expect(ring).toContain('≈ ₽135,187')
-    expect(view.text()).toContain(en.spending.charts.where_year_title)
+    expect(view.text()).toContain(en.spending.categories_title)
     expect(view.text()).toContain(en.spending.charts.year_rate_note)
   })
 
