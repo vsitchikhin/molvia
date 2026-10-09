@@ -644,8 +644,9 @@
         "title": "Couldn't load the charts",
         "body": "The server didn't answer. Your spending and income are safe — try again"
       },
+      "error_strip": "The server did not answer — charts as of {when}",
       "offline": {
-        "strip": "No connection. Charts as of {when} — they update when the internet is back",
+        "strip": "Offline · charts as of {when}",
         "body": "Charts appear when the internet is back"
       },
       "rest": "Others",

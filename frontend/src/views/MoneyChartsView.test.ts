@@ -4,9 +4,12 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import type { Router } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import IconDonut from '~icons/mdi/chart-donut'
 import { ApiError } from '@molvia/client'
 import { ERROR, parseMoney } from '@molvia/model'
 import type { MoneyChartMonthView, MoneyChartYearView } from '@molvia/model'
+import ScreenState from '@/components/ScreenState.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -241,7 +244,7 @@ describe('MoneyChartsView (MOL-160): «Год», the four states', () => {
     online(false)
     moneyChartYear.mockRejectedValue(new TypeError('network'))
     const view = await render()
-    expect(view.find('.strip').text()).toContain('No connection. Charts as of')
+    expect(view.find('.strip').text()).toContain('Offline · charts as of')
     expect(plain(view.text())).toContain('֏274,523')
     expect(view.find('.state.bad').exists()).toBe(false)
   })
@@ -253,6 +256,51 @@ describe('MoneyChartsView (MOL-160): «Год», the four states', () => {
     const view = await render()
     expect(view.text()).toContain(en.spending.charts.empty.title)
     expect(view.text()).not.toContain(en.spending.charts.spent_title)
+    // The month's icon: the states of «Год» are the month's (handoff 157 v2 04, Р-6).
+    expect(view.findComponent(ScreenState).props('icon')).toBe(IconDonut)
+  })
+
+  it('the skeleton is the shape of the answer: the ring, then twelve bars (MOL-186)', async () => {
+    moneyChartYear.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    expect(view.find('.ghost-ring').exists()).toBe(true)
+    expect(view.findAll('.ghost-column')).toHaveLength(12)
+  })
+
+  it('the server failing with the year kept: the year under a strip that says so, one «Try again»', async () => {
+    moneyChartYear.mockResolvedValueOnce(yearCharts())
+    ;(await render()).unmount()
+    moneyChartYear.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render()
+    const strip = view.findComponent(StatusStrip)
+    expect(strip.props('kind')).toBe('unanswered')
+    expect(strip.text()).toContain('The server did not answer — charts as of')
+    expect(plain(view.text())).toContain('֏274,523')
+    expect(view.find('.state.bad').exists()).toBe(false)
+    const retries = view.findAll('button').filter((one) => one.text() === en.state.retry)
+    expect(retries).toHaveLength(1)
+
+    // A retry that failed the same way is still an answer: the strip says its words again (MOL-181, C1).
+    expect(strip.props('attempt')).toBe(1)
+    await retries[0]?.trigger('click')
+    await flushPromises()
+    expect(view.findComponent(StatusStrip).props('attempt')).toBe(2)
+  })
+
+  it('must not fire: a retry that answers takes the strip away', async () => {
+    moneyChartYear.mockResolvedValueOnce(yearCharts())
+    ;(await render()).unmount()
+    moneyChartYear
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockResolvedValue(yearCharts({ spent: amd('999999') }))
+    const view = await render()
+    await view
+      .findAll('button')
+      .find((one) => one.text() === en.state.retry)
+      ?.trigger('click')
+    await flushPromises()
+    expect(view.findComponent(StatusStrip).exists()).toBe(false)
+    expect(plain(view.text())).toContain('֏999,999')
   })
 })
 
@@ -613,7 +661,7 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     await back?.trigger('click')
     await flushPromises()
     expect(view.find('.switcher .month').text()).toBe('2025')
-    expect(view.find('.strip').text()).toContain('No connection. Charts as of')
+    expect(view.find('.strip').text()).toContain('Offline · charts as of')
   })
 
   it('the server failing, the arrow back still reaches the years kept on the phone (adversarial Ж′)', async () => {
@@ -774,7 +822,7 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     await flushPromises()
     expect(plain(view.text())).toContain('֏274,523')
     expect(localStorage.getItem(`molvia.chartyears.${ACTOR}`)).not.toBeNull()
-    expect(view.find('.strip').text()).toContain('No connection. Charts as of')
+    expect(view.find('.strip').text()).toContain('Offline · charts as of')
   })
 
   it('must not fire: a later read that answers takes the strip away', async () => {
@@ -921,6 +969,10 @@ describe('MoneyChartsView (MOL-158): «Месяц»', () => {
     moneyChartMonth.mockReturnValue(new Promise(() => undefined))
     const view = await render('/money/charts')
     expect(view.find('.skeleton').exists()).toBe(true)
+    // The answer's shape (MOL-186): the ring, then the lines of «Против обычного» — no bars of a year.
+    expect(view.find('.ghost-ring').exists()).toBe(true)
+    expect(view.findAll('.ghost-line')).toHaveLength(4)
+    expect(view.find('.ghost-column').exists()).toBe(false)
     expect(moneyChartMonth).toHaveBeenCalledWith(localDay().slice(0, 7))
     expect(moneyChartYear).not.toHaveBeenCalled()
   })
@@ -1175,7 +1227,7 @@ describe('MoneyChartsView (MOL-158): «Месяц»', () => {
     online(false)
     moneyChartMonth.mockRejectedValue(new TypeError('network'))
     const view = await render(SEPTEMBER)
-    expect(view.find('.strip').text()).toContain('No connection. Charts as of')
+    expect(view.find('.strip').text()).toContain('Offline · charts as of')
     expect(plain(view.text())).toContain('֏274,523')
     expect(view.find('.state.bad').exists()).toBe(false)
   })

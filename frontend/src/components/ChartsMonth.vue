@@ -1,20 +1,25 @@
 <template>
   <!-- Under the switchers: they are about the month chosen, and over them they came and went with
        its answer and took it from under the thumb (MOL-138, owner's В-2). -->
-  <p v-if="stale === 'offline' && fetchedAt" class="strip">
-    <IconCloudOff class="strip-icon" aria-hidden="true" />
-    {{ t('spending.charts.offline.strip', { when: when(fetchedAt) }) }}
-  </p>
-  <ScreenState
-    v-else-if="stale === 'error'"
-    kind="error"
-    inline
-    :title="t('spending.charts.load_error.title')"
-    :body="t('spending.charts.load_error.body')"
-    @retry="retry"
+  <StatusStrip
+    v-if="stale === 'offline' && fetchedAt"
+    kind="offline"
+    :text="t('spending.charts.offline.strip', { when: when(fetchedAt) })"
   />
+  <StatusStrip
+    v-else-if="stale === 'error' && fetchedAt"
+    kind="unanswered"
+    :text="t('spending.charts.error_strip', { when: when(fetchedAt) })"
+    :attempt="attempt"
+  >
+    <!-- The charts have no action of their own in the strip over the tab bar, so «Повторить» is the
+         strip's (MOL-181, Р-1). -->
+    <template #action>
+      <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+    </template>
+  </StatusStrip>
 
-  <ScreenSkeleton v-if="phase === 'loading'" :groups="[28, 100, 62, 70, 54, 34, 80, 66]" />
+  <ChartsSkeleton v-if="phase === 'loading'" />
 
   <ScreenState
     v-else-if="phase === 'error'"
@@ -84,18 +89,19 @@
 import { computed, defineComponent, ref, toRef, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconDonut from '~icons/mdi/chart-donut'
-import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import { formatEstimate, lastDayOf, percentChange } from '@molvia/model'
 import type { Money, SpendingCategoryView } from '@molvia/model'
+import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import ChartsSkeleton from '@/components/ChartsSkeleton.vue'
 import DeviationBars from '@/components/DeviationBars.vue'
 import DonutChart from '@/components/DonutChart.vue'
 import PaceLine from '@/components/PaceLine.vue'
-import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { countedWhen } from '@/components/accounts'
 import { longMonth, monthGenitive, signedPercent } from '@/components/charts'
 import SectionCaption from '@/components/SectionCaption.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { useMoneyChartMonth } from '@/composables/useMoneyCharts'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { calendarDay } from '@/days'
@@ -110,21 +116,24 @@ import { calendarDay } from '@/days'
 export default defineComponent({
   name: 'ChartsMonth',
   components: {
+    AppButton,
     AppCard,
+    ChartsSkeleton,
     DeviationBars,
     DonutChart,
-    IconCloudOff,
     PaceLine,
-    ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    StatusStrip,
   },
   props: {
     month: { type: String, required: true },
   },
   setup(props) {
     const { t, locale } = useI18n()
-    const { phase, charts, stale, fetchedAt, retry } = useMoneyChartMonth(toRef(props, 'month'))
+    const { phase, charts, stale, fetchedAt, attempt, retry } = useMoneyChartMonth(
+      toRef(props, 'month'),
+    )
     const today = useLocalDay()
     /**
      * The answer as the screen says it: whether the month runs is the phone's calendar's to say, not
@@ -275,6 +284,7 @@ export default defineComponent({
       onScreen,
       stale,
       fetchedAt,
+      attempt,
       retry,
       when,
       nameOf,
@@ -294,26 +304,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.strip {
-  @include appear;
-
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--warn-tint);
-  color: var(--warn-ink);
-  font-size: var(--text-footnote);
-}
-
-.strip-icon {
-  @include icon;
-
-  font-size: var(--icon-sm);
-}
-
 .card {
   display: grid;
   gap: var(--space-1);

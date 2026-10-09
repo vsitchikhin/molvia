@@ -8,20 +8,25 @@
   />
   <!-- Under the switcher: it is about the year chosen, and over it they came and went with its
        answer and took it from under the thumb (MOL-138, owner's В-2). -->
-  <p v-if="stale === 'offline' && fetchedAt" class="strip">
-    <IconCloudOff class="strip-icon" aria-hidden="true" />
-    {{ t('spending.charts.offline.strip', { when: when(fetchedAt) }) }}
-  </p>
-  <ScreenState
-    v-else-if="stale === 'error'"
-    kind="error"
-    inline
-    :title="t('spending.charts.load_error.title')"
-    :body="t('spending.charts.load_error.body')"
-    @retry="retry"
+  <StatusStrip
+    v-if="stale === 'offline' && fetchedAt"
+    kind="offline"
+    :text="t('spending.charts.offline.strip', { when: when(fetchedAt) })"
   />
+  <StatusStrip
+    v-else-if="stale === 'error' && fetchedAt"
+    kind="unanswered"
+    :text="t('spending.charts.error_strip', { when: when(fetchedAt) })"
+    :attempt="attempt"
+  >
+    <!-- The charts have no action of their own in the strip over the tab bar, so «Повторить» is the
+         strip's (MOL-181, Р-1). -->
+    <template #action>
+      <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+    </template>
+  </StatusStrip>
 
-  <ScreenSkeleton v-if="phase === 'loading'" :groups="[28, 100, 62, 40, 28, 90, 40, 28, 90]" />
+  <ChartsSkeleton v-if="phase === 'loading'" year />
 
   <ScreenState
     v-else-if="phase === 'error'"
@@ -43,7 +48,7 @@
     <ScreenState
       v-if="charts.firstMonth === null"
       kind="empty"
-      :icon="IconChart"
+      :icon="IconDonut"
       :title="t('spending.charts.empty.title')"
       :body="t('spending.charts.empty.body')"
     />
@@ -176,18 +181,18 @@ import { computed, defineComponent, ref, toRef, useId, watch } from 'vue'
 import type { Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import IconChart from '~icons/mdi/chart-bar'
-import IconCloudOff from '~icons/mdi/cloud-off-outline'
+import IconDonut from '~icons/mdi/chart-donut'
 import { formatEstimate, previousMonth } from '@molvia/model'
 import type { Money, MoneyChartYearView, SpendingCategoryView } from '@molvia/model'
+import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
 import BarChart from '@/components/BarChart.vue'
 import type { ChartBar } from '@/components/BarChart.vue'
+import ChartsSkeleton from '@/components/ChartsSkeleton.vue'
 import DonutChart from '@/components/DonutChart.vue'
 import type { DonutData } from '@/components/DonutChart.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
-import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { countedWhen, signedAmount } from '@/components/accounts'
 import {
@@ -200,6 +205,7 @@ import {
 } from '@/components/charts'
 import { asTyped, categoryColour } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useMoneyChartYear } from '@/composables/useMoneyCharts'
 import { calendarDay } from '@/days'
@@ -224,15 +230,16 @@ let lastCategory: string | null = null
 export default defineComponent({
   name: 'ChartsYear',
   components: {
+    AppButton,
     AppCard,
     AppField,
     BarChart,
+    ChartsSkeleton,
     DonutChart,
-    IconCloudOff,
     MonthSwitcher,
-    ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    StatusStrip,
   },
   props: {
     year: { type: String, required: true },
@@ -247,7 +254,9 @@ export default defineComponent({
     const route = useRoute()
     const router = useRouter()
     const today = useLocalDay()
-    const { phase, charts, stale, fetchedAt, kept, retry } = useMoneyChartYear(toRef(props, 'year'))
+    const { phase, charts, stale, fetchedAt, attempt, kept, retry } = useMoneyChartYear(
+      toRef(props, 'year'),
+    )
 
     const whole = (value: Money) => formatEstimate(value, locale.value)
     /** What no rate counted, as written: no «≈» stands before it (MOL-184, adversarial Б1). */
@@ -603,11 +612,12 @@ export default defineComponent({
       t,
       locale,
       id: useId(),
-      IconChart,
+      IconDonut,
       phase,
       charts,
       stale,
       fetchedAt,
+      attempt,
       retry,
       first,
       when,
@@ -649,26 +659,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.strip {
-  @include appear;
-
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--warn-tint);
-  color: var(--warn-ink);
-  font-size: var(--text-footnote);
-}
-
-.strip-icon {
-  @include icon;
-
-  font-size: var(--icon-sm);
-}
-
 /* Not `.card`: a scoped class of this component reaches the root of a child's too, and the root of
    `MonthSwitcher` is an `AppCard` — its pill was laid out as a grid of a chart's card. */
 .chart-card {

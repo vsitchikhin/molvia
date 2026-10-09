@@ -373,7 +373,8 @@ test('offline, the month is the last one read under a strip that is not red, and
 
   await context.setOffline(true)
   await page.getByRole('link', { name: /Открыть графики/ }).click()
-  const strip = page.getByText(/Нет связи. Графики на/)
+  // The strip's own node: its words are said in the live region too (MOL-181).
+  const strip = page.locator('.strip', { hasText: /Без связи · графики на/ })
   await expect(strip).toBeVisible()
   await expect(centre).toContainText(/30\s000\s֏/)
   await expect(page.getByRole('button', { name: 'Повторить' })).toHaveCount(0)
@@ -392,4 +393,37 @@ test('offline, the month is the last one read under a strip that is not red, and
   await expect(strip).toBeVisible()
   expect(await topOf(previous)).toBe(at)
   await context.setOffline(false)
+})
+
+// One «Повторить» whatever failed (Ф-15, MOL-186): a month never read is the full error, its button in
+// the strip over the tab bar; a month kept is shown under «Сервер не ответил», the button in that line.
+test('the server failing: one «Повторить», in the strip over the tab bar or in the line over the month', async ({
+  page,
+}) => {
+  let failing = false
+  // Laid before the page opens (MOL-249): the step relies on it.
+  await page.route('**/api/money/months/*/charts', async (route) => {
+    if (failing) await route.fulfill({ status: 500, body: '{}' })
+    else await route.continue()
+  })
+  await seed(page)
+  await toCharts(page)
+  const centre = page.getByRole('region', { name: 'Куда ушли' }).locator('.center')
+  await expect(centre).toContainText(/30\s000\s֏/)
+
+  failing = true
+  await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
+  await expect(page.getByRole('heading', { name: 'Не удалось загрузить графики' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Повторить' })).toHaveCount(1)
+
+  await page.getByRole('button', { name: 'Следующий месяц' }).click()
+  const strip = page.locator('.strip', { hasText: /Сервер не ответил — графики на/ })
+  await expect(strip).toBeVisible()
+  await expect(centre).toContainText(/30\s000\s֏/)
+  await expect(page.getByRole('button', { name: 'Повторить' })).toHaveCount(1)
+
+  failing = false
+  await strip.getByRole('button', { name: 'Повторить' }).click()
+  await expect(strip).toBeHidden()
+  await expect(page.getByRole('button', { name: 'Повторить' })).toHaveCount(0)
 })
