@@ -159,8 +159,11 @@ export default defineComponent({
   min-height: 4.875rem;
 }
 
+/* A stacking context of its own: the average's z-index lifts it over the bars, and without one it
+   rose over the screen's pinned header too, drawn through «‹ Деньги» as the page scrolled under it. */
 .area {
   position: relative;
+  isolation: isolate;
   display: flex;
   align-items: flex-end;
   gap: var(--space-2);
