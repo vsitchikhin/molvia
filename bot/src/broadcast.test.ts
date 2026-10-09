@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Bot } from 'grammy'
+import { Bot, HttpError } from 'grammy'
 import type { Transformer } from 'grammy'
 import type { UserFromGetMe } from 'grammy/types'
 import { ApiError } from '@molvia/client'
@@ -28,12 +28,15 @@ interface Call {
   readonly payload: Record<string, unknown>
 }
 
+/** How a chat refuses: Telegram's code, the chat gone (400 «chat not found»), or the network. */
+type Refusal = number | 'gone' | 'network'
+
 /**
- * Telegram, faked: every call recorded; the chats in `refused` answer with their code, and a chat in
+ * Telegram, faked: every call recorded; the chats in `refused` refuse every time, and a chat in
  * `throttle` answers 429 the first time with its `retry_after`.
  */
 function telegram(
-  refused: Readonly<Record<number, number>> = {},
+  refused: Readonly<Record<number, Refusal>> = {},
   throttle: Readonly<Record<number, number>> = {},
 ) {
   const calls: Call[] = []
@@ -52,9 +55,19 @@ function telegram(
         parameters: { retry_after: retryAfter },
       }) as never
     }
-    const code = refused[chat]
-    if (code !== undefined) {
-      return Promise.resolve({ ok: false, error_code: code, description: 'refused' }) as never
+    const refusal = refused[chat]
+    if (refusal === 'network') {
+      throw new HttpError("Network request for 'sendMessage' failed!", new Error('ECONNRESET'))
+    }
+    if (refusal === 'gone') {
+      return Promise.resolve({
+        ok: false,
+        error_code: 400,
+        description: 'Bad Request: chat not found',
+      }) as never
+    }
+    if (refusal !== undefined) {
+      return Promise.resolve({ ok: false, error_code: refusal, description: 'refused' }) as never
     }
     return Promise.resolve({ ok: true, result: { message_id: 1 } }) as never
   }
@@ -139,10 +152,10 @@ describe('broadcastDue — рассылка об утечке (MOL-237)', () => 
     })
   })
 
-  it('иной отказ Telegram — «не дошло», без отметки блокировки', async () => {
+  it('чата больше нет (400 «chat not found») — «не дошло» навсегда, рассылка идёт дальше', async () => {
     quiet()
     const api = client([batch(1, [1, 2])])
-    await broadcastDue(asClient(api), telegram({ 1: 400 }).api, noWait)
+    await broadcastDue(asClient(api), telegram({ 1: 'gone' }).api, noWait)
     expect(api.switchReminders).not.toHaveBeenCalled()
     expect(api.broadcastDone).toHaveBeenCalledWith({
       id: 1,
@@ -151,6 +164,60 @@ describe('broadcastDue — рассылка об утечке (MOL-237)', () => 
       blocked: 0,
       failed: 1,
     })
+  })
+
+  // Adversarial А1: a failure that may pass never moves the cursor past the person.
+  it.each([
+    ['сеть', 'network'],
+    ['Telegram 502', 502],
+    ['отозванный токен 401', 401],
+    ['иной 400', 400],
+  ] as const)(
+    '%s на третьем — слово о двух первых, остаток со следующей минутой',
+    async (_, refusal) => {
+      const { error } = quiet()
+      const api = client([batch(1, [1, 2, 3, 4]), batch(1, [5])])
+      const tg = telegram({ 3: refusal })
+
+      await broadcastDue(asClient(api), tg.api, noWait)
+
+      expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+        id: 1,
+        through: position(2),
+        sent: 2,
+        blocked: 0,
+        failed: 0,
+      })
+      expect(tg.sentTo()).toEqual([1, 2, 3])
+      expect(api.claimBroadcast).toHaveBeenCalledTimes(1)
+      expect(api.switchReminders).not.toHaveBeenCalled()
+      expect(error).toHaveBeenCalledWith(
+        '[molvia] broadcast: a failure that may pass, the rest goes with the next minute',
+      )
+    },
+  )
+
+  it('сбой на первом — ни одного исхода: аренда отпущена, пачка уйдёт со следующей минутой', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2])])
+    await broadcastDue(asClient(api), telegram({ 1: 502 }).api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: null,
+      sent: 0,
+      blocked: 0,
+      failed: 0,
+    })
+  })
+
+  it('429 и снова 429 на повторе — не «не дошло», а остаток со следующей минутой', async () => {
+    quiet()
+    const api = client([batch(1, [1, 2])])
+    const tg = telegram({ 1: 429 }, { 1: 1 })
+    await broadcastDue(asClient(api), tg.api, noWait)
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ through: null, failed: 0 }),
+    )
   })
 
   it('429 в пределах — выждан и отправлен', async () => {
@@ -184,11 +251,17 @@ describe('broadcastDue — рассылка об утечке (MOL-237)', () => 
     )
   })
 
-  it('флуд на первом — ни слова: пачка вернётся по аренде', async () => {
+  it('флуд на первом — аренда отпущена: пачка уйдёт со следующей минутой, не через пять', async () => {
     quiet()
     const api = client([batch(1, [1, 2])])
     await broadcastDue(asClient(api), telegram({}, { 1: RETRY_AFTER_CAP_SECONDS + 1 }).api, noWait)
-    expect(api.broadcastDone).not.toHaveBeenCalled()
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: null,
+      sent: 0,
+      blocked: 0,
+      failed: 0,
+    })
     expect(api.claimBroadcast).toHaveBeenCalledTimes(1)
   })
 
@@ -218,18 +291,42 @@ describe('broadcastDue — рассылка об утечке (MOL-237)', () => 
     expect(log.mock.calls).toEqual([['[molvia] broadcast #9: sent 1, blocked 0, failed 0']])
   })
 
-  it('остановка — пачка в руках доходит, новой не просит', async () => {
+  it('остановка посреди пачки — дальше ни одного сообщения, слово о том, что ушло', async () => {
     quiet()
     let stopping = false
-    const api = client([batch(1, [1, 2]), batch(1, [3])])
-    api.broadcastDone.mockImplementation(() => {
-      stopping = true
-      return Promise.resolve()
-    })
+    const api = client([batch(1, [1, 2, 3]), batch(1, [4])])
     const tg = telegram()
-    await broadcastDue(asClient(api), tg.api, noWait, () => stopping)
-    expect(tg.sentTo()).toEqual([1, 2])
+    // the deploy's SIGTERM comes right after the first message went
+    const wait = vi.fn(() => {
+      stopping = true
+      return Promise.resolve(false)
+    })
+    await broadcastDue(asClient(api), tg.api, wait, () => stopping)
+    expect(tg.sentTo()).toEqual([1])
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith({
+      id: 1,
+      through: position(1),
+      sent: 1,
+      blocked: 0,
+      failed: 0,
+    })
     expect(api.claimBroadcast).toHaveBeenCalledTimes(1)
+  })
+
+  it('остановка во время выжидания 429 — человек не «не дошло», а следующей минутой', async () => {
+    quiet()
+    let stopping = false
+    const api = client([batch(1, [1, 2])])
+    const tg = telegram({}, { 1: 3 })
+    const wait = vi.fn(() => {
+      stopping = true
+      return Promise.resolve(false)
+    })
+    await broadcastDue(asClient(api), tg.api, wait, () => stopping)
+    expect(tg.sentTo()).toEqual([1])
+    expect(api.broadcastDone).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ through: null, failed: 0 }),
+    )
   })
 })
 

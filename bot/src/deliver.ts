@@ -22,8 +22,22 @@ export type Wait = (ms: number) => Promise<boolean>
 /** Telegram asked for longer than we wait: every message after this one would be refused too. */
 export class Flooded extends Error {}
 
-/** What became of one message: sent, the person blocked the bot, or given up and logged. */
-export type Delivered = 'sent' | 'blocked' | 'failed'
+/**
+ * What became of one message: sent, the person blocked the bot, refused for good (`failed` — the chat
+ * is not there), or given up for now (`again` — the network, Telegram's own failure, a revoked token, a
+ * second 429, a stop cutting the wait: it may well go later). The reminders and «чек разобран» lose
+ * either; the message about a leak stops its batch on `again` and sends it the next minute (MOL-237).
+ */
+export type Delivered = 'sent' | 'blocked' | 'failed' | 'again'
+
+/** A refusal that names the chat itself as gone: repeating it would be refused the same way. */
+function refusedForGood(error: unknown): boolean {
+  return (
+    error instanceof GrammyError &&
+    error.error_code === 400 &&
+    /chat not found|user not found/i.test(error.description)
+  )
+}
 
 /**
  * One message. **Too Many Requests (429) is waited out once**, as Telegram asks, since at 19:00
@@ -60,7 +74,7 @@ export async function deliver(
       await blocked(api, telegramUserId, label)
       return 'blocked'
     }
-    return 'failed'
+    return refusedForGood(error) ? 'failed' : 'again'
   }
 }
 

@@ -42,21 +42,22 @@ export type DueBroadcast = z.infer<typeof dueBroadcastSchema>
 
 /**
  * `POST /internal/broadcasts/done`: the bot went through the batch up to `through` — everybody
- * before it in the batch included — and this is what became of them. A part of a batch, when
- * Telegram's flood control stopped it.
+ * before it in the batch included — and this is what became of them; a part of a batch when it
+ * stopped — Telegram's flood control, a failure that may pass, the bot stopping. `through: null` with
+ * no outcome is a batch nothing of which went: its lease is let go, so it goes again the next minute.
  */
 export const broadcastDoneSchema = z
   .strictObject({
     id: z.int().positive(),
-    through: z.uuid(),
+    through: z.uuid().nullable(),
     sent: z.int().min(0).max(BROADCAST_BATCH),
     blocked: z.int().min(0).max(BROADCAST_BATCH),
     failed: z.int().min(0).max(BROADCAST_BATCH),
   })
   .refine(
-    ({ sent, blocked, failed }) => {
+    ({ through, sent, blocked, failed }) => {
       const total = sent + blocked + failed
-      return total >= 1 && total <= BROADCAST_BATCH
+      return through === null ? total === 0 : total >= 1 && total <= BROADCAST_BATCH
     },
     { error: ISSUE.BODY_INVALID },
   )

@@ -65,6 +65,13 @@ describe('broadcastDoneSchema', () => {
     ).toBe(false)
   })
 
+  it('ничего не ушло — through null и ни одного исхода; иначе отказ', () => {
+    const nothing = { id: 1, through: null, sent: 0, blocked: 0, failed: 0 }
+    expect(broadcastDoneSchema.safeParse(nothing).success).toBe(true)
+    expect(broadcastDoneSchema.safeParse({ ...nothing, sent: 1 }).success).toBe(false)
+    expect(broadcastDoneSchema.safeParse({ ...done, through: undefined }).success).toBe(false)
+  })
+
   it('лишнее поле — отказ', () => {
     expect(broadcastDoneSchema.safeParse({ ...done, telegramUserId: 1 }).success).toBe(false)
   })
