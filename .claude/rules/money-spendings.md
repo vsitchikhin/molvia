@@ -285,8 +285,11 @@ nothing up.
   «Пришло» (review Р3-1), and the notes of «Графики», the month's ring and the year's bars (adversarial
   Б1): one sum, said one way on every screen. **And no «≈» over nothing counted on «Графики» either**
   (Б2): the centre of the ring and the reading of a bar say «0 ֏» alone, and «Ушло» and «Разница» of
-  «Пришло и ушло» carry «≈» only where a rate converted something — not over nothing counted, not over
-  the exact drams of one who earns and spends in drams (adversarial В1, В2). **A long day's sum breaks
+  «Пришло и ушло» carry «≈» only where a rate converted something — **the server says so per month**
+  (`spentEstimated`, `incomeEstimated` of the year, defaulted to «≈» for a year kept before them): not
+  over nothing counted, not over the exact drams of one who earns and spends in drams, but over them once
+  a spending in dollars came in by its day's rate, and «Разница» once an income did (adversarial В1, В2,
+  Г1, Г2). A guess from the currencies took «≈» off a converted figure, which is worse than one too many. **A long day's sum breaks
   only after its «+»**, right-aligned in at most 60 % of the day's head: on one line, drams and three
   currencies with their cents put the page at 400 px on a phone of 320 (round 2 of the adversarial
   review) — and never narrower than its widest figure, so in a large system font the day's words give

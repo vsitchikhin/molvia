@@ -125,6 +125,8 @@ export interface MoneyMonth {
   /** What came in, in the income currency, each income by the official rate of its own day (MOL-66). */
   readonly income: Money
   readonly incomeUncounted: readonly Money[]
+  /** Some income in another currency was counted into `income` by a rate: it is «≈» (MOL-184, Г2). */
+  readonly incomeConverted: boolean
   /**
    * How many incomes «Пришло» is of — counted or not, a salary moved in by `budgetMonthOf` and not
    * one moved out: the figure beside «Доходы» on «Деньгах» speaks of the same money (MOL-159, Р-2).
@@ -434,6 +436,7 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
       budgetMonthOf(income, input.salaryShiftDay) !== input.month,
   )
   let incomeMinor = 0n
+  let incomeConverted = false
   const incomeUncounted = new Map<Currency, bigint>()
   for (const income of ofMonth) {
     const counted =
@@ -442,7 +445,10 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
         : input.incomeInIncome(income.amount, income.receivedOn)
     if (counted === null || incomeMinor + counted.minor > INT8_MAX)
       add(incomeUncounted, income.amount)
-    else incomeMinor += counted.minor
+    else {
+      incomeMinor += counted.minor
+      if (income.amount.currency !== incomeCurrency) incomeConverted = true
+    }
   }
 
   const spent: Money = { minor: spentMinor, currency: spend }
@@ -473,6 +479,7 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
     spentIncome,
     income,
     incomeUncounted: listOf(incomeUncounted),
+    incomeConverted,
     incomeCount: ofMonth.length,
     shiftedIn: daysOf(ofMonth.filter((income) => monthOf(income.receivedOn) !== input.month)),
     shiftedOut: daysOf(shiftedOut),
