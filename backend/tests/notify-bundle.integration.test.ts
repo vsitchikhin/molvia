@@ -1,5 +1,8 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { broadcasts } from '@/db/schema'
@@ -63,6 +66,47 @@ describe('dist/notify.js', () => {
     expect(wrong.status).toBe(2)
     expect(wrong.stdout).toContain('usage: notify')
   })
+})
+
+describe('dist/notify.js — вход', () => {
+  // Adversarial А4: over `ssh … exec -T` with the file forgotten, the input is a pipe that never ends.
+  it('открытая труба без сообщения — через пару секунд подсказка и код 2, а не молчание', async () => {
+    const child = spawn('node', [`${root}backend/dist/notify.js`], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: {
+        PATH: process.env.PATH,
+        DATABASE_URL: testDatabaseUrl(),
+        TELEGRAM_BOT_USERNAME: 'molvia_test_bot',
+        BOT_API_SECRET: randomBytes(32).toString('base64url'),
+      },
+    })
+    let output = ''
+    child.stdout.on('data', (chunk: Buffer) => (output += chunk.toString()))
+    const exited = new Promise<number | null>((resolve) => child.on('exit', resolve))
+    const started = Date.now()
+    expect(await exited).toBe(2)
+    expect(Date.now() - started).toBeLessThan(10_000)
+    expect(output).toContain('the message comes on standard input')
+    child.stdin.end()
+  }, 20_000)
+})
+
+describe('bin/notify.sh', () => {
+  // Adversarial А3: the header's first form, the file alone.
+  it('файл без стран — сухой прогон всем; файл и --yes — --yes не страны', async () => {
+    await insertActor(db)
+    const file = join(mkdtempSync(join(tmpdir(), 'notify-')), 'notice.txt')
+    writeFileSync(file, TEXT)
+    const alone = spawnSync(`${root}bin/notify.sh`, [file], { cwd: root, encoding: 'utf8' })
+    expect(alone.status).toBe(0)
+    expect(alone.stdout).toContain('to everybody:')
+    expect(alone.stdout).toContain('dry run: nothing queued')
+    const owner = spawnSync(`${root}bin/notify.sh`, [file, '--owner'], {
+      cwd: root,
+      encoding: 'utf8',
+    })
+    expect(owner.stdout).not.toContain('usage: notify')
+  }, 60_000)
 })
 
 describe('make notify', () => {

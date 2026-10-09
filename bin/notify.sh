@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Пишет людям ботом об утечке (MOL-237) — в базе этой рабочей копии; разносит бот этой копии.
 #
-#   bin/notify.sh <файл> [<страны>] [--owner] [--yes]   сухой прогон: текст и сколько получат по странам
-#   bin/notify.sh "" "" --status                          как идёт последняя рассылка
-#   bin/notify.sh "" "" --cancel                          остановить: больше ничего не уйдёт
+#   bin/notify.sh <файл> [<страны>] [--owner] [--yes]   без --yes — сухой прогон: текст и сколько получат
+#   bin/notify.sh "" --status                             как идёт последняя рассылка
+#   bin/notify.sh "" --cancel                             остановить: больше ничего не уйдёт
 #
 # <страны> — коды через запятую (AM,GE); без них — все. --owner — пробная, одному владельцу
 # (OWNER_TELEGRAM_ID). --yes — поставить в очередь. На проде исходников нет, там тот же код лежит в
@@ -12,9 +12,15 @@
 
 set -euo pipefail
 
+# The countries are the second word unless it is a flag: `bin/notify.sh <файл>` alone is a dry run
+# for everybody, and `bin/notify.sh <файл> --yes` does not take `--yes` for countries (adversarial А3).
 file="${1:-}"
-countries="${2:-}"
-shift 2 || true
+[ $# -gt 0 ] && shift
+countries=""
+if [ $# -gt 0 ] && [[ "$1" != --* ]]; then
+  countries="$1"
+  shift
+fi
 args=("$@")
 if [ -n "$countries" ]; then args+=("--country=$countries"); fi
 
