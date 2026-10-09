@@ -618,7 +618,7 @@ describe('курсы «Денег» (ревью MOL-73: Р-1…Р-5, адвер�
     for (const page of [first, next]) {
       expect(page.days[0]).toMatchObject({
         total: { minor: 400000n, currency: 'AMD' },
-        estimated: true,
+        estimated: false,
         uncounted: [{ minor: 5000n, currency: 'USD' }],
       })
     }

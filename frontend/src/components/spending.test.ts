@@ -4,6 +4,7 @@ import type { MoneyMonthView, SpendingCategoryView } from '@molvia/model'
 import {
   asTyped,
   categoriesWith,
+  dayTotalText,
   journalOf,
   journalRowProps,
   mergePages,
@@ -287,6 +288,20 @@ describe('what the screen prints', () => {
       asOf: new Date(),
     } as const
     expect(plain(rateWords(rate, 'ru-RU', t))).toBe('spending.rate_value:4,62 ֏|₽')
+  })
+
+  it('a day’s sum names what had no rate beside what was counted, never «≈ 0 ֏» (MOL-184, В-1)', () => {
+    const usd = (text: string) => parseMoney(text, 'USD')
+    const day = (total: string, estimated: boolean, uncounted = [] as ReturnType<typeof usd>[]) =>
+      plain(dayTotalText({ total: amd(total), estimated, uncounted }, 'ru-RU') ?? '')
+    expect(day('5000', false)).toBe('5 000 ֏')
+    expect(day('4400', true)).toBe('≈ 4 400 ֏')
+    expect(day('5000', false, [usd('50')])).toBe('5 000 ֏ + 50 $')
+    expect(day('4400', true, [parseMoney('10', 'EUR'), usd('50')])).toBe('≈ 4 400 ֏ + 10 € + 50 $')
+    expect(day('0', false, [usd('50')])).toBe('50 $')
+    // «Must not fire»: a day of nothing but drams is its sum, and a day only the phone knows has none.
+    expect(day('0', false)).toBe('0 ֏')
+    expect(dayTotalText({ total: null, estimated: false, uncounted: [] }, 'ru-RU')).toBeNull()
   })
 })
 

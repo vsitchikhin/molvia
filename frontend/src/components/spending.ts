@@ -169,6 +169,24 @@ export function mergePages(first: MoneyMonthView, next: MoneyMonthView): MoneyMo
 }
 
 /**
+ * The day's sum over its rows (MOL-184, В-1): what was counted — «≈» where a rate converted some of
+ * it — and beside it what had no rate, in its own currency: «≈ 5 000 ֏ + 50 $», and «50 $» where
+ * nothing was counted. A day of one $50 with no rate read «≈ 0 ֏» — nothing spent. Every figure is
+ * the server's; the phone adds none up. A day only the phone knows of has none yet.
+ */
+export function dayTotalText(
+  day: Pick<JournalDay, 'total' | 'estimated' | 'uncounted'>,
+  locale: string,
+): string | null {
+  if (!day.total) return null
+  const counted = day.total.minor !== 0n || day.uncounted.length === 0
+  return [
+    ...(counted ? [(day.estimated ? '≈ ' : '') + formatEstimate(day.total, locale)] : []),
+    ...day.uncounted.map((amount) => formatEstimate(amount, locale)),
+  ].join(' + ')
+}
+
+/**
  * The spendings a waiting removal takes away: the last of «Удалить» and «Вернуть» about each is a
  * removal. One brought back with «Вернуть» behind a removal already tried is on screen again, as
  * the person was told (round 2, Н2).

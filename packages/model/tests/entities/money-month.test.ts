@@ -216,16 +216,26 @@ describe('the month of «Деньги»', () => {
       // A trip with no rate of its day is a row of the day as well.
       trips: [trip('10 EUR', '2026-09-03')],
     })
-    expect(result.days.map(({ day, total, uncounted }) => ({ day, total, uncounted }))).toEqual([
-      { day: '2026-09-20', total: toMoney('5300 AMD'), uncounted: [] },
+    expect(
+      result.days.map(({ day, total, estimated, uncounted }) => ({
+        day,
+        total,
+        estimated,
+        uncounted,
+      })),
+    ).toEqual([
+      { day: '2026-09-20', total: toMoney('5300 AMD'), estimated: true, uncounted: [] },
+      // Drams exact beside what had no rate: no «≈» over them.
       {
         day: '2026-09-12',
         total: toMoney('5000 AMD'),
+        estimated: false,
         uncounted: [toMoney('5.50 EUR'), toMoney('50 USD')],
       },
       {
         day: '2026-09-03',
         total: toMoney('0 AMD'),
+        estimated: false,
         uncounted: [toMoney('10 EUR'), toMoney('50 USD')],
       },
     ])

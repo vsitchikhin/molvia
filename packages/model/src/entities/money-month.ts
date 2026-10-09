@@ -90,7 +90,11 @@ export interface MonthDay {
   readonly day: string
   /** The day's spending in the spending currency — what could be counted. */
   readonly total: Money
-  /** Something of the day was converted, or could not be: the screen prints «≈». */
+  /**
+   * Something counted in the day was converted: the screen prints «≈» before `total`. What could not
+   * be is `uncounted`, said beside it in its own currency (MOL-184) — not a «≈» over drams that are
+   * exact.
+   */
   readonly estimated: boolean
   /**
    * What of the day could not be counted, by currency (MOL-184, В-1): the day's sum is `total` and
@@ -494,7 +498,7 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
         minor: list.reduce((sum, entry) => sum + (entry.counted?.minor ?? 0n), 0n),
         currency: spend,
       },
-      estimated: list.some((entry) => amountOf(entry).currency !== spend),
+      estimated: list.some((entry) => entry.counted !== null && amountOf(entry).currency !== spend),
       uncounted: uncountedOf(list),
       entries: list,
     })),
