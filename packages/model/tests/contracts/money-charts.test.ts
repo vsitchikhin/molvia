@@ -125,6 +125,19 @@ describe('moneyChartYearCodec (MOL-160)', () => {
     expect(moneyChartYearCodec.safeParse({ ...wire, comparedTo: '2026-09' }).success).toBe(false)
   })
 
+  it('reads a year kept before the flags of conversion as «≈», as it was drawn (MOL-184)', () => {
+    const wire = z.encode(moneyChartYearCodec, view())
+    const months = wire.months.map((month): Record<string, unknown> => ({ ...month }))
+    for (const month of months) {
+      delete month.spentEstimated
+      delete month.incomeEstimated
+    }
+    expect(moneyChartYearCodec.parse({ ...wire, months }).months[0]).toMatchObject({
+      spentEstimated: true,
+      incomeEstimated: true,
+    })
+  })
+
   it('refuses a year of eleven months and a field the phone does not know', () => {
     const wire = z.encode(moneyChartYearCodec, view())
     expect(moneyChartYearCodec.safeParse({ ...wire, months: wire.months.slice(1) }).success).toBe(

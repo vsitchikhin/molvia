@@ -4,11 +4,13 @@ import type { MoneyMonthView, SpendingCategoryView } from '@molvia/model'
 import {
   asTyped,
   categoriesWith,
+  dayTotalText,
   journalOf,
   journalRowProps,
   mergePages,
   rateWords,
   refusedRows,
+  spentApprox,
   unbroken,
   unsentIn,
 } from '@/components/spending'
@@ -83,6 +85,7 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
         day: '2026-09-26',
         total: amd('5000'),
         estimated: false,
+        uncounted: [],
         entries: [
           {
             kind: 'manual',
@@ -95,6 +98,7 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
         day: '2026-09-24',
         total: amd('168940'),
         estimated: false,
+        uncounted: [],
         entries: [
           {
             kind: 'manual',
@@ -285,6 +289,34 @@ describe('what the screen prints', () => {
       asOf: new Date(),
     } as const
     expect(plain(rateWords(rate, 'ru-RU', t))).toBe('spending.rate_value:4,62 ֏|₽')
+  })
+
+  it('a day’s sum names what had no rate beside what was counted, never «≈ 0 ֏» (MOL-184, В-1)', () => {
+    const usd = (text: string) => parseMoney(text, 'USD')
+    const day = (total: string, estimated: boolean, uncounted = [] as ReturnType<typeof usd>[]) =>
+      plain(dayTotalText({ total: amd(total), estimated, uncounted }, 'ru-RU') ?? '')
+    expect(day('5000', false)).toBe('5 000 ֏')
+    expect(day('4400', true)).toBe('≈ 4 400 ֏')
+    expect(day('5000', false, [usd('50')])).toBe('5 000 ֏ + 50 $')
+    expect(day('4400', true, [parseMoney('10', 'EUR'), usd('50')])).toBe('≈ 4 400 ֏ + 10 € + 50 $')
+    expect(day('0', false, [usd('50')])).toBe('50 $')
+    // What had no rate is as written, never rounded: no «6 €» over «5,50 €», no «0 $» (adversarial А2).
+    expect(day('5000', false, [parseMoney('5.50', 'EUR')])).toBe('5 000 ֏ + 5,50 €')
+    expect(day('0', false, [usd('0.40')])).toBe('0,40 $')
+    // «Must not fire»: a day of nothing but drams is its sum, and a day only the phone knows has none.
+    expect(day('0', false)).toBe('0 ֏')
+    expect(dayTotalText({ total: null, estimated: false, uncounted: [] }, 'ru-RU')).toBeNull()
+  })
+
+  it('«≈» of the month only in another currency and over something counted (MOL-184, А3, А4)', () => {
+    const rub = parseMoney('68788', 'RUB')
+    expect(spentApprox(month({ spent: amd('317800'), spentIncome: rub }))).toEqual(rub)
+    // One who earns and spends in drams: no «≈ 5 000 ֏» under exact drams.
+    expect(spentApprox(month({ spent: amd('5000'), spentIncome: amd('5000') }))).toBeNull()
+    // Nothing counted — $50 with no rate: no «≈ 0 ₽» over it.
+    const nothing = month({ spent: amd('0'), spentIncome: parseMoney('0', 'RUB') })
+    expect(spentApprox(nothing)).toBeNull()
+    expect(spentApprox(month({ spentIncome: null }))).toBeNull()
   })
 })
 

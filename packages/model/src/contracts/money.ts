@@ -170,6 +170,8 @@ export const moneyMonthCodec = z.strictObject({
       day: exchangeDaySchema,
       total: moneyCodec,
       estimated: z.boolean(),
+      /** What of the day had no rate, by currency (MOL-184, В-1); a remembered answer has none. */
+      uncounted: z.array(moneyCodec).default([]),
       entries: z.array(entryCodec),
     }),
   ),
@@ -233,7 +235,7 @@ export function moneyMonthViewOf(
   for (const { day, entry } of page) {
     const last = days.at(-1)
     if (last?.day === day.day) last.entries.push(entryViewOf(entry))
-    else days.push({ ...day, entries: [entryViewOf(entry)] })
+    else days.push({ ...day, uncounted: [...day.uncounted], entries: [entryViewOf(entry)] })
   }
 
   return {

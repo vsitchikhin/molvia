@@ -4,6 +4,7 @@ import type { YearChartsInput } from '#model/entities/money-chart-year'
 import { CHART_LEVEL, chartMonths } from '#model/entities/money-charts'
 import { moneyMonth, previousMonth } from '#model/entities/money-month'
 import type { ConvertOn, MoneyMonth } from '#model/entities/money-month'
+import type { Income } from '#model/entities/income'
 import type { Spending } from '#model/entities/spending'
 import { SPENDING_PRESETS } from '#model/entities/spending-category'
 import type { SpendingCategory } from '#model/entities/spending-category'
@@ -371,6 +372,71 @@ describe('yearCharts — «Графики → Год» (MOL-160)', () => {
     const charts = year('2026', months, '2026-03-20', '2026-01')
     expect(charts.differenceTotal).toBeNull()
     expect(charts.differenceMissing).toEqual(['2026-02'])
+  })
+
+  // «≈» of «Пришло и ушло» by what a rate did, never by the currencies (MOL-184, adversarial Г1, Г2).
+  it('says whether a rate converted what went out or what came in', () => {
+    const dollars = {
+      base: 'USD',
+      quote: 'AMD',
+      scaled: parseRate('390'),
+      source: 'official',
+      asOf: yerevanMidnight('2026-08-10'),
+    } as const
+    const income = (major: number, currency: Currency, on: string): Income => ({
+      id: nextId(),
+      actorId: OWNER,
+      amount: money(BigInt(major) * 100n, currency),
+      receivedOn: on,
+      heldBefore: null,
+      source: 'salary',
+      note: null,
+      accountId: null,
+      revision: 1,
+      createdAt: new Date(`${on}T09:00:00Z`),
+      amendedAt: null,
+    })
+    // Drams in, drams out — and in August a spending in dollars, in September a salary in dollars.
+    const inDrams = (month: string, spendings: Spending[], incomes: Income[]) =>
+      moneyMonth({
+        month,
+        spendCurrency: 'AMD',
+        incomeCurrency: 'AMD',
+        spendings,
+        trips: [],
+        incomes,
+        salaryShiftDay: null,
+        categories: presets,
+        rate: null,
+        rateKind: 'frozen',
+        inSpend: never,
+        incomeInIncome: (amount) =>
+          amount.currency === 'USD' ? money(amount.minor * 390n, 'AMD') : null,
+      })
+    const months = [
+      inDrams('2026-07', [spending(5000, '2026-07-10')], [income(100000, 'AMD', '2026-07-01')]),
+      inDrams(
+        '2026-08',
+        [
+          spending(5000, '2026-08-10'),
+          { ...spending(11, '2026-08-10', 'other', 'USD'), rate: dollars },
+        ],
+        [income(100000, 'AMD', '2026-08-01')],
+      ),
+      inDrams('2026-09', [spending(5000, '2026-09-10')], [income(300, 'USD', '2026-09-01')]),
+    ]
+    const flags = year('2026', months, '2026-09-30', '2026-07').months.map(
+      ({ month, spentEstimated, incomeEstimated }) => ({ month, spentEstimated, incomeEstimated }),
+    )
+    expect(flags.slice(6, 9)).toEqual([
+      { month: '2026-07', spentEstimated: false, incomeEstimated: false },
+      { month: '2026-08', spentEstimated: true, incomeEstimated: false },
+      { month: '2026-09', spentEstimated: false, incomeEstimated: true },
+    ])
+    // Two currencies: what went out is always a conversion; a quiet month says nothing.
+    const two = year('2026', run('2026-08', '2026-09', monthly(5000)), '2026-09-30', '2026-08')
+    expect(two.months[8]).toMatchObject({ spentEstimated: true, incomeEstimated: false })
+    expect(two.months[0]).toMatchObject({ spentEstimated: false, incomeEstimated: false })
   })
 
   it('carries a year past what money holds as no sum, never a failed answer', () => {

@@ -195,8 +195,9 @@ test('a day removed takes the gap of the column with it: its neighbour does not 
     const neighbour = [...container.querySelectorAll<HTMLElement>(':scope > section.day')].find(
       (day) => day !== target,
     )
-    // The line of the month's count and sum heads the days on «Траты» (MOL-159).
-    const caption = container.querySelector<HTMLElement>(':scope > .total')
+    // The line of the month's count and sum heads the days on «Траты» (MOL-159), over their column
+    // (MOL-184).
+    const caption = document.querySelector<HTMLElement>('.content > .total')
     if (!neighbour || !caption) throw new Error('no neighbouring day or caption')
     window.scrollTo(0, 0)
     const leftHeight = target.getBoundingClientRect().height
@@ -213,7 +214,7 @@ test('a day removed takes the gap of the column with it: its neighbour does not 
   })
   expect(jump.leftHeight).toBeLessThan(1)
   expect(jump.removed).toBe(true)
-  expect(jump.gap).toBe('12px')
+  expect(jump.gap).toBe('24px')
   expect(Math.abs(jump.moved)).toBeLessThan(1)
 })
 

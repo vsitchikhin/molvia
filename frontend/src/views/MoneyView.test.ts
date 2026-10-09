@@ -96,6 +96,7 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
         day: '2026-09-26',
         total: amd('5000'),
         estimated: false,
+        uncounted: [],
         entries: [
           {
             kind: 'manual',
@@ -334,6 +335,27 @@ describe('MoneyView: the month', () => {
     expect(text).toContain('−8% vs the same day of August')
     expect(text).toContain('Including $11 (≈ ֏4,290)')
     expect(text).toContain('At my rate of 4.62 ֏ per 1 ₽ today')
+  })
+
+  it('no «≈» under exact drams for one who earns and spends in drams (MOL-184, adversarial А4)', async () => {
+    moneyMonth.mockResolvedValue(
+      month({ incomeCurrency: 'AMD', spentIncome: amd('317800'), rate: null }),
+    )
+    const view = await render()
+    expect(plain(view.get('.spent .figure').text())).toContain('317,800')
+    expect(view.find('.spent .approx').exists()).toBe(false)
+  })
+
+  it('what no rate counted, spent or come in, is as written — never rounded (MOL-184, А2, review Р3-1)', async () => {
+    moneyMonth.mockResolvedValue(
+      month({
+        uncounted: [parseMoney('5.50', 'EUR')],
+        incomeUncounted: [parseMoney('1000.50', 'USD')],
+      }),
+    )
+    const text = plain((await render()).text())
+    expect(text).toContain('Not counted: €5.50 — no rate for that day')
+    expect(text).toContain('and $1,000.50 not counted')
   })
 
   // MOL-183, С-12: the running month against the one before to the same day, a closed one whole.

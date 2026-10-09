@@ -688,13 +688,20 @@ The detail behind the frontend lines of `CLAUDE.md`.
   card some 15 px lower than its bars, and the page grows as the answer comes; a month with nothing
   spent has no «≈» (handoff 157 v2, «Месяц без трат»), and its tiles come some 24 px higher than the
   plate — the page shrinks by that much under the switcher, which MOL-138's hold keeps where it is
-  (adversarial А5). The «≈» line itself is the person's two currencies, as «Счета» last named them —
+  (adversarial А5). The «≈» line itself — of «Деньги» and of the total of «Траты», one rule in
+  `useMoneyScreen` (MOL-184) — is the person's two currencies, as «Счета» last named them —
   one currency has none in any month, and neither have the bars once «Счета» are known; with nothing
   known it is two, the usual case, and it is taken as the skeleton comes and held while it stands, so
   «Счета» answering meanwhile neither grow nor shrink it under the switcher (Б3). **The price of that,
   named** (adversarial В1): a person of one currency, opening «Деньги» with nothing kept — the very first
   time on a phone, or «Счета» not answering and nothing kept — gets the line in the bars and none in the
-  answer, and the page shrinks by it under the switcher once; from then on «Счета» kept decide it; the total of 77 v2 2a (`TripTotal`) is no card until
+  answer, and the page shrinks by it under the switcher once; from then on «Счета» kept decide it. **The
+  bars draw no line of what a month left uncounted** (MOL-184, review Р2-4): the total of «Траты» says
+  «Не посчитано: 50 $ — …» under its «≈» only where a spending had no rate, and the page grows by that
+  line as the answer comes — taller, which MOL-138's hold allows. **And a month with no rate between
+  the two currencies** — a new pair, a closed month with none frozen — has no «≈» (`spentApprox`)
+  while the bars, which cannot know it before the answer, drew one: the page shrinks by that line
+  under the switcher, as for the empty month above (adversarial А4 of MOL-184). The total of 77 v2 2a (`TripTotal`) is no card until
   MOL-206 makes it one, and the sums of «Счета», an account, «Обмен» and «Бюджет» still stand at the
   body's leading, some 8 px taller than the part — their tasks set the part against their answer. **The price:** a card adds its padding and
   edge, so a skeleton of `groups` is some 34 px taller than before — taller, not shorter, which the hold

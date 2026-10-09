@@ -233,6 +233,7 @@ import {
   formatQuantity,
   isWireCode,
   parseMoney,
+  spendingIn,
   spendingTextSchema,
   isRateDay,
 } from '@molvia/model'
@@ -602,12 +603,49 @@ export default defineComponent({
     const conversion = computed(() => {
       const value = parsed()
       if (!value) return null
+      const held = keptRate(value)
+      if (held !== undefined) return held
       const rate = props.rate
       if (value.currency === props.spendCurrency && !rate) return null
       if (!rate || (value.currency !== rate.base && value.currency !== rate.quote))
         return t('spending.sheet.conversion_later')
       const into = convertAcross(value, rate)
-      if (!into) return null
+      return into ? conversionWords(into, rate) : null
+    })
+
+    /**
+     * A spending the server holds keeps the rate of its own day while its day and currency stay —
+     * the server keeps it so on «Сохранить» (`amendSpending`, Р-5 of MOL-73). So its «≈» is that
+     * rate's, by the rule the row's «≈» is counted by, `spendingIn` (Е-10, MOL-184): the running
+     * month's rate made one spending «≈ 15 051 ֏» in the journal and «≈ 15 077 ֏» here. With no
+     * snapshot that counts — none was known when it was written, or one from before a move — the
+     * server counts the row by the rate of its day as it reads the month, and takes that same rate on
+     * «Сохранить»; it does not send the rate, so the sheet says the row's figure while the amount is
+     * untouched, and «Посчитаем по курсу дня траты» once it is put right (owner's «а», review Р2-2,
+     * adversarial А1). `undefined` where it is not that spending: one still on the phone, one in the
+     * spending currency, a day or a currency changed — counted as one typed anew.
+     */
+    function keptRate(value: Money): string | null | undefined {
+      const row = manual.value
+      const spending = row && !row.local ? row.spending : null
+      if (
+        !spending ||
+        spending.amount.currency === props.spendCurrency ||
+        value.currency !== spending.amount.currency ||
+        day.value !== spending.spentOn
+      )
+        return undefined
+      const into =
+        spending.rate && spendingIn({ amount: value, rate: spending.rate }, props.spendCurrency)
+      if (into && spending.rate) return conversionWords(into, spending.rate)
+      return row?.counted && value.minor === spending.amount.minor
+        ? t('spending.sheet.conversion_counted', {
+            amount: formatEstimate(row.counted, locale.value),
+          })
+        : t('spending.sheet.conversion_later')
+    }
+
+    function conversionWords(into: Money, rate: ExchangeRate): string {
       const words = {
         amount: formatEstimate(into, locale.value),
         rate: rateWords(rate, locale.value, t),
@@ -618,7 +656,7 @@ export default defineComponent({
       return rate.source === 'fallback'
         ? t('spending.sheet.conversion_fallback', { ...words, bank })
         : t('spending.sheet.conversion_official', { ...words, bank })
-    })
+    }
 
     /** «≈ 2 140,91 ₽» — what the server would count, where the account's rate joins the two. */
     const chargedEstimate = computed(() => {

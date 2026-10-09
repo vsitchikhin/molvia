@@ -5,13 +5,22 @@
         <MonthSwitcher :month="selected" :current="currentMonth" @change="goMonth" />
 
         <!-- Under the switcher, as on «Деньгах»: they come and go with the answer (MOL-138). -->
-        <p v-if="phase === 'ready' && !online && fetchedAt" class="strip">
-          <IconCloudOff class="strip-icon" aria-hidden="true" />
-          {{ t('spending.list.offline_strip', { when: whenOf(fetchedAt) }) }}
-        </p>
-        <p v-else-if="phase === 'ready' && stale === 'error' && fetchedAt" class="strip">
-          {{ t('spending.error_strip', { when: whenOf(fetchedAt) }) }}
-        </p>
+        <StatusStrip
+          v-if="phase === 'ready' && !online && fetchedAt"
+          kind="offline"
+          :text="t('spending.list.offline_strip', { when: whenOf(fetchedAt) })"
+        />
+        <StatusStrip
+          v-else-if="phase === 'ready' && stale === 'error' && fetchedAt"
+          kind="unanswered"
+          :text="t('spending.error_strip', { when: whenOf(fetchedAt) })"
+          :attempt="attempt"
+        >
+          <!-- The strip holds «Добавить трату», so «Повторить» is here (К-5, MOL-181). -->
+          <template #action>
+            <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+          </template>
+        </StatusStrip>
         <AppReveal group>
           <ScreenState
             v-for="item in otherRefusals"
@@ -32,7 +41,7 @@
         <!-- Every spending the server refused, of any month, whatever the month shown and its pages:
              opened, it is what was typed — to fix and save again, or to drop (MOL-159). -->
         <AppReveal>
-          <section v-if="refusals.length > 0" class="day">
+          <section v-if="refusals.length > 0" class="day refused">
             <h2 class="day-head">{{ t('spending.list.refused') }}</h2>
             <AppCard v-if="refused.length > 0" as="ul" list>
               <AppReveal group>
@@ -63,7 +72,25 @@
           </section>
         </AppReveal>
 
-        <ScreenSkeleton v-if="phase === 'loading'" :groups="[46, 64, 38, 52, 30, 60, 44]" />
+        <!-- The answer's shape (MOL-178, 2g): the total on the ground, as it stands — 2g drew it a
+             card — then a day's caption and its rows. -->
+        <ScreenSkeleton v-if="phase === 'loading'">
+          <span class="total">
+            <span class="count">
+              <span class="ghost-line"><span class="ghost-bar ghost-count"></span></span>
+            </span>
+            <span class="sum">
+              <span class="figure">
+                <span class="ghost-line"><span class="ghost-bar ghost-figure"></span></span>
+              </span>
+              <span v-if="twoCurrencies" class="approx">
+                <span class="ghost-line"><span class="ghost-bar ghost-approx"></span></span>
+              </span>
+            </span>
+          </span>
+          <SkeletonPart kind="caption" :width="46" />
+          <SkeletonPart kind="rows" :count="3" lead="circle" meta tail next />
+        </ScreenSkeleton>
 
         <!-- A section's error, not the screen's: «Добавить трату» keeps the strip, since a spending
              goes through the queue with the server down (157 v2, 1k/2e; MOL-180, В-1). -->
@@ -102,32 +129,36 @@
             <span class="sum">
               <span class="figure">{{ whole(month.spent) }}</span>
               <span v-if="approx" class="approx">{{ approx }}</span>
+              <!-- The month's figure says what it leaves out, as on «Деньгах» (MOL-184, В-2). -->
+              <span v-if="month.uncounted.length > 0" class="approx">
+                {{ t('spending.uncounted', { amounts: uncountedOf(month) }) }}
+              </span>
             </span>
           </div>
 
           <!-- Another month is another answer, not days come and gone: it is just there (MOL-136,
                MOL-151 adversarial А1). -->
-          <AppReveal :key="month.month" group>
-            <section v-for="day in journal" :key="day.day" class="day">
-              <h2 class="day-head">
-                <span>{{ dayTitle(day.day) }}</span>
-                <span v-if="day.total" class="day-total">
-                  {{ day.estimated ? `≈\u00a0${whole(day.total)}` : whole(day.total) }}
-                </span>
-              </h2>
-              <AppCard as="ul" list>
-                <AppReveal group>
-                  <OperationRow
-                    v-for="row in day.rows"
-                    :key="row.key"
-                    v-bind="rowOf(row, month.spendCurrency)"
-                    :data-row="row.key"
-                    @open="open(row, day.day)"
-                  />
-                </AppReveal>
-              </AppCard>
-            </section>
-          </AppReveal>
+          <div class="days">
+            <AppReveal :key="month.month" group>
+              <section v-for="day in journal" :key="day.day" class="day">
+                <h2 class="day-head">
+                  <span>{{ dayTitle(day.day) }}</span>
+                  <span v-if="day.total" class="day-total">{{ dayTotalText(day, locale) }}</span>
+                </h2>
+                <AppCard as="ul" list>
+                  <AppReveal group>
+                    <OperationRow
+                      v-for="row in day.rows"
+                      :key="row.key"
+                      v-bind="rowOf(row, month.spendCurrency)"
+                      :data-row="row.key"
+                      @open="open(row, day.day)"
+                    />
+                  </AppReveal>
+                </AppCard>
+              </section>
+            </AppReveal>
+          </div>
 
           <div v-if="month.remaining > 0" ref="sentinel" class="more">
             <p class="footnote">
@@ -213,7 +244,6 @@
 <script lang="ts">
 import { computed, defineComponent, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconPlus from '~icons/mdi/plus'
 import IconWallet from '~icons/mdi/wallet-outline'
 import { formatEstimate, monthOf as monthOfDay } from '@molvia/model'
@@ -227,13 +257,15 @@ import NewCategorySheet from '@/components/NewCategorySheet.vue'
 import OperationRow from '@/components/OperationRow.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import SpendingSheet from '@/components/SpendingSheet.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import TransferSheet from '@/components/TransferSheet.vue'
 import type { TransferOutcome } from '@/components/TransferSheet.vue'
 import type { Removed } from '@/components/spending'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
-import { journalRowProps } from '@/components/spending'
+import { asTyped, dayTotalText, journalRowProps, spentApprox } from '@/components/spending'
 import type { JournalRow, OperationRowProps } from '@/components/spending'
 import { useMoneyScreen } from '@/composables/useMoneyScreen'
 import { useTransferOutcome } from '@/composables/useTransferOutcome'
@@ -251,14 +283,15 @@ export default defineComponent({
     AppCard,
     AppReveal,
     AppScreen,
-    IconCloudOff,
     IconPlus,
     MonthSwitcher,
     NewCategorySheet,
     OperationRow,
     ScreenSkeleton,
     ScreenState,
+    SkeletonPart,
     SpendingSheet,
+    StatusStrip,
     TransferSheet,
     TripUndoStrip,
     UndoStrip,
@@ -280,13 +313,18 @@ export default defineComponent({
       const value = month.value
       if (!value) return ''
       const unsent = screen.unsent.value
+      const inIncome = spentApprox(value)
       return [
-        value.spentIncome ? `≈ ${whole(value.spentIncome)}` : null,
+        inIncome ? `≈ ${whole(inIncome)}` : null,
         unsent > 0 ? t('spending.list.unsent', { n: unsent }, unsent) : null,
       ]
         .filter((part) => part !== null)
         .join(' · ')
     })
+
+    /** What no rate counted, as written: no «≈» stands before it (adversarial А2). */
+    const uncountedOf = (value: MoneyMonthView) =>
+      value.uncounted.map((amount) => asTyped(amount, locale.value)).join(', ')
 
     const groceries = computed(
       () => categories.value.find((category) => category.preset === 'groceries') ?? null,
@@ -429,9 +467,12 @@ export default defineComponent({
       ...screen,
       addButton,
       t,
+      locale,
       IconWallet,
       month,
       whole,
+      dayTotalText,
+      uncountedOf,
       approx,
       rowOf,
       dayTitle,
@@ -451,28 +492,22 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   flex: 1;
-  gap: var(--space-3);
-  padding: var(--space-4);
-}
-
-.strip {
-  @include appear;
-
-  display: flex;
-  align-items: flex-start;
   gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--warn-tint);
-  color: var(--warn-ink);
-  font-size: var(--text-footnote);
 }
 
-.strip-icon {
-  @include icon;
+/* 24 between the days and above the first (157 v2 02 п. 4, Ф-10); 8 from a day's words to its card.
+   The field is `AppScreen`'s 16 (С-23): a padding here made it 32. A flex column, not a grid: a day
+   removed takes the column's gap with it (`AppReveal`, А2). «Не приняты» is a group of its own, 24 on
+   both sides. */
+.days {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin-top: var(--space-4);
+}
 
-  font-size: var(--icon-sm);
+.refused {
+  margin-block: var(--space-4);
 }
 
 .total {
@@ -536,13 +571,46 @@ export default defineComponent({
   justify-self: start;
 }
 
-/* The day's words give way on a narrow phone, never its sum: broken, «≈» stood over «125 403 ֏» and the
-   figure left the column (review Р3-1). */
+/* The day's words give way on a narrow phone, never a figure of its sum: broken, «≈» stood over
+   «125 403 ֏» and the figure left the column (review Р3-1). A sum of several currencies breaks only after
+   its «+» (`dayTotalText` binds the rest), right-aligned in at most 60 % of the head: unbroken, drams and
+   three currencies with their cents put the page at 400 px on a phone of 320 (MOL-184, round 2). Never
+   narrower than its widest figure: a figure wider than 60 % — «≈ 50 000 000 ֏» in a large system font —
+   takes the room from the day's words rather than standing past the column (round 3). */
 .day-total {
   flex: none;
+  min-width: min-content;
+  max-width: 60%;
   font-weight: var(--weight-regular);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  text-align: right;
+}
+
+/* The total while the month is coming: its own lines, at the answer's sizes and leading, so the
+   days come in where the caption and the rows stood (MOL-178). */
+.ghost-line {
+  display: flex;
+  align-items: center;
+  height: calc(1em * var(--leading-body));
+}
+
+.ghost-bar {
+  @include skeleton-bar;
+
+  height: var(--skeleton-caption);
+}
+
+.ghost-count {
+  width: 4.5rem;
+}
+
+.ghost-figure {
+  width: 8rem;
+  height: var(--skeleton-figure);
+}
+
+.ghost-approx {
+  width: 5rem;
 }
 
 .more {

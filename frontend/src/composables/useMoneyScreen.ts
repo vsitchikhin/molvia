@@ -11,6 +11,7 @@ import { useLocalDay } from '@/composables/useLocalDay'
 import { useMoneyMonth } from '@/composables/useMoneyMonth'
 import type { MoneyMonth } from '@/composables/useMoneyMonth'
 import { localDay, purchaseDay, timeOfDay } from '@/days'
+import { useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 import type { SpendingPrefill } from '@/stores/spendingHandoff'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
@@ -28,6 +29,8 @@ export interface MoneyScreen extends MoneyMonth {
   readonly currentMonth: ComputedRef<string>
   /** The month of the address — never one still to come. */
   readonly selected: ComputedRef<string>
+  /** Whether the skeleton draws the line «≈ 63 800 ₽» under the month's figure (MOL-183, А5, Б3). */
+  readonly twoCurrencies: Ref<boolean>
   goMonth(next: string): void
   readonly online: Ref<boolean>
   readonly categories: ComputedRef<SpendingCategoryView[]>
@@ -107,6 +110,28 @@ export function useMoneyScreen(): MoneyScreen {
       : currentMonth.value
   })
   const money = useMoneyMonth(selected)
+
+  /**
+   * «≈ 63 800 ₽» under the figure is there only where the two currencies differ: the skeleton draws
+   * its line by the person's currencies, as «Счета» last said them (adversarial А5 of MOL-183) — with
+   * nothing known, by the usual case, two (Б3). Taken as the skeleton comes and held while it stands:
+   * «Счета» answering meanwhile must not grow or shrink it under the switcher (Б3). The price, named in
+   * `frontend.md` (В1): a person of one currency with nothing kept gets the line once, and the page
+   * shrinks by it as the month comes. One rule for «Деньги» and «Траты» (MOL-184).
+   */
+  const accounts = useAccountsStore()
+  const currencies = () => {
+    const overview = accounts.overview
+    if (!overview?.incomeTotals) return true
+    return overview.incomeTotals.currency !== overview.spendCurrency
+  }
+  const twoCurrencies = ref(currencies())
+  watch(
+    () => money.phase.value,
+    (phase) => {
+      if (phase === 'loading') twoCurrencies.value = currencies()
+    },
+  )
 
   function goMonth(next: string): void {
     void router.replace({
@@ -282,6 +307,7 @@ export function useMoneyScreen(): MoneyScreen {
     lookAtToday,
     currentMonth,
     selected,
+    twoCurrencies,
     goMonth,
     online,
     categories,

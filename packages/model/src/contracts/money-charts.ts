@@ -126,6 +126,9 @@ export const moneyChartYearCodec = z.strictObject({
         spentIncome: moneyCodec.nullable(),
         income: moneyCodec,
         incomeUncounted: z.array(moneyCodec),
+        /** A rate converted something of «Ушло» or «Пришло» (MOL-184); a year kept before them is «≈». */
+        spentEstimated: z.boolean().default(true),
+        incomeEstimated: z.boolean().default(true),
         difference: signedMoneyCodec.nullable(),
         change: z.int().nullable(),
         spentLevel: level,
