@@ -81,8 +81,14 @@ test('the ring of «Куда ушли» opens «Месяц» of the same month; 
   await expect(centre).toContainText(/30\s000\s֏/)
   // The row is tapped, as a thumb does; its radio is what a screen reader reads.
   const row = where.locator('.legend .row', { hasText: 'Кафе и рестораны' })
+  // The amount's column is as wide as its figure (the name's takes what is left, whatever its weight).
+  const amount = row.locator('.amount')
+  const unchosen = (await amount.boundingBox())?.width
   await row.click()
   await expect(where.getByRole('radio', { name: /Кафе и рестораны/ })).toBeChecked()
+  // Chosen by a fill and a ring, at the weight of every row: the words do not grow (Ф-5, MOL-186).
+  await expect(row).toHaveClass(/chosen/)
+  expect((await amount.boundingBox())?.width).toBe(unchosen)
   await expect(centre).toContainText('Кафе и рестораны')
   await expect(centre).toContainText('100')
   await row.click()
