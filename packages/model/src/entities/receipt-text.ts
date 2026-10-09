@@ -119,6 +119,19 @@ function variants(text: string, depth = 2): string[] {
   return [...out]
 }
 
+// A till prints «=» before an amount and « 1» after a price, and OCR reads the sign as a digit:
+// «=119.00» as «2119.00», «119.00 1» as «119.001» (MOL-228, H9). An amount is tried without it too, at
+// the cost of one swap and with no other swap in it; never a count — «0,342» is a weight. An amount
+// never starts with a zero, so «10.00» gives no «0.00».
+function amountVariants(text: string): string[] {
+  const out = variants(text)
+  const front = /^\d([1-9]\d*[.,]\d{2})$/.exec(text)
+  if (front?.[1] !== undefined) out.push(front[1])
+  const back = /^(\d+[.,]\d{2})\d$/.exec(text)
+  if (back?.[1] !== undefined) out.push(back[1])
+  return [...new Set(out)]
+}
+
 const diff = (a: string, b: string): number =>
   a.length !== b.length ? 1 : Array.from(a).filter((c, i) => c !== b.charAt(i)).length
 
@@ -144,21 +157,21 @@ const TOLERANCE_HUNDREDTHS = 3
  * Past this many combinations a line's figures are taken as read, with no reading tried: the
  * search grows as a power of the digits OCR can confuse in every field, and it runs in the API's
  * process — twelve glued twelve-digit figures held it for half a minute (review, MOL-125). The
- * bench's worst line has 55 176 (am-03), a quarter of it.
+ * bench's worst line has 56 628 (am-03), a quarter of it.
  */
 export const LINE_COMBINATIONS_MAX = 200_000
 
 /**
  * And past this many over one reading the lines left are taken as read: a line under the ceiling
  * still costs a tenth of a second, and twelve of them stalled every request of the API for one. The
- * bench's busiest reading tries 122 161 (am-03).
+ * bench's busiest reading tries 132 520 (am-03).
  */
 export const READING_COMBINATIONS_MAX = 300_000
 
 /**
  * What every line may try whatever the reading has spent (review Р15): rows of an item's shape above
  * the list — a stamp, a code, a smudge — would otherwise drain the budget before the first item, and
- * every real line would keep its confusions. A real line tries a few thousand (am-05: 1 694 at most).
+ * every real line would keep its confusions. A real line tries a few thousand (am-05: 1 848 at most).
  * The floors draw on a budget of their own (review Р18), or four hundred rows of junk under it would
  * buy seconds again.
  */
@@ -197,9 +210,9 @@ function candidates(
 ): Candidate[] {
   const out: Candidate[] = []
   const qtys = variants(qtyS)
-  const paids = [paidS, ...dropGroup(paidS)].map((p0) => ({ p0, all: variants(p0) }))
-  const discs = variants(discS)
-  const prices = priceS === null ? [null] : variants(priceS)
+  const paids = [paidS, ...dropGroup(paidS)].map((p0) => ({ p0, all: amountVariants(p0) }))
+  const discs = amountVariants(discS)
+  const prices = priceS === null ? [null] : amountVariants(priceS)
   const combinations =
     qtys.length * paids.reduce((n, p) => n + p.all.length, 0) * discs.length * prices.length
   if (!afford(budget, combinations)) return out
@@ -525,8 +538,8 @@ interface Found {
 // comes out in whole grams — at a cost of two swaps, so a readable weight always wins.
 function byWeight(budget: Budget, paidS: string, priceS: string): Candidate[] {
   const out: Candidate[] = []
-  const paids = variants(paidS)
-  const prices = variants(priceS)
+  const paids = amountVariants(paidS)
+  const prices = amountVariants(priceS)
   if (!afford(budget, paids.length * prices.length)) return out
   for (const p of paids) {
     for (const pr of prices) {

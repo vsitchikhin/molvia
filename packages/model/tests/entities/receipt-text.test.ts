@@ -2040,3 +2040,74 @@ describe('the total of a receipt with items: the lines that met it, or two place
     expect(both(...tail).totalHundredths).toBeNull()
   })
 })
+
+// MOL-246: a till prints «=» before an amount and « 1» after a price, and OCR reads the sign as a digit
+// (MOL-228, H9) — one swap more, on an amount only.
+describe('a sign OCR read as a digit (MOL-246)', () => {
+  const card = (figures: string) =>
+    parseReceiptText(rowsOf(['1.Կաթ «Իգիթ» 3.2% 1լ', figures].join('\n'), 0)).lines[0]!
+  const terminal = (figures: string) =>
+    parseReceiptText(rowsOf(['Դաս՝ 56.10', 'Թվիստեր', figures].join('\n'), 0)).lines[0]!
+  const figures = (line: ReceiptText['lines'][number]) => [
+    line.quantityMilli,
+    line.priceHundredths,
+    line.sumHundredths,
+    line.settled,
+  ]
+
+  it('drops a digit read in front of an amount: «=760,75» read «2760,75»', () => {
+    const line = card('0401/1163909 1Հտ 2760,75/89,25 850')
+    expect([...figures(line), line.discountHundredths]).toEqual([
+      1_000,
+      85_000,
+      76_075,
+      true,
+      8_925,
+    ])
+  })
+
+  it('drops it in front of the terminal’s price: «1480.32x1.0» for 480.32', () => {
+    expect(figures(terminal('1480.32x1.0 հատ=480.32դրամ'))).toEqual([1_000, 48_032, 48_032, true])
+  })
+
+  it('drops a digit read after an amount: «119.00 1» read «119.001»', () => {
+    expect(figures(terminal('119.00x1.0 հատ=119.001դրամ'))).toEqual([1_000, 11_900, 11_900, true])
+  })
+
+  it('drops it in front of a till’s paid: «=119,00» read «2119,00»', () => {
+    expect(figures(card('0401/1163909 1Հտ 2119,00/0,00 119'))).toEqual([
+      1_000,
+      11_900,
+      11_900,
+      true,
+    ])
+  })
+
+  it('takes the shortest amount it can: «15.00» for 5.00', () => {
+    expect(figures(terminal('15.00x1.0 հատ=5.00դրամ'))).toEqual([1_000, 500, 500, true])
+  })
+
+  it('must not fire where the line holds as read', () => {
+    expect(figures(terminal('1480.32x1.0 հատ=1480.32դրամ'))).toEqual([
+      1_000,
+      148_032,
+      148_032,
+      true,
+    ])
+  })
+
+  it('must not fire on a count: its three decimals are a weight, never a sign', () => {
+    // «1.005» cut to «1.00» would hold at one swap; the count is not an amount
+    expect(terminal('100.00x1.005 հատ=100.00դրամ').quantityMilli).not.toBe(1_000)
+  })
+
+  it('never makes an amount of zero: «10.00» gives no «0.00»', () => {
+    // with it, «0.00 × 1 = 0.00» would hold at two swaps, the cheapest reading of the line
+    expect(terminal('10.00x1.0 հատ=20.00դրամ').sumHundredths).toBeGreaterThan(0)
+  })
+
+  it('reads every line of KFC’s terminal print as it adds up (am-14t)', () => {
+    const got = bestReading(am14t.readings.map((text) => rowsOf(text, 0)))
+    expect(got.lines.map((l) => l.settled)).toEqual(Array.from({ length: 8 }, () => true))
+  })
+})
