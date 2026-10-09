@@ -24,6 +24,7 @@ import { apiFailureReporter } from '@/failure-reporter'
 import type { HttpMetrics } from '@/metrics'
 import { botFailure, phoneReportLimit, takePhoneFailures } from '@/usecases/record-failure'
 import { claimOwnerNotices } from '@/usecases/owner-notices'
+import { broadcastDone, claimBroadcast } from '@/usecases/broadcast'
 import {
   chooseReceiptNotices,
   claimReceiptNotices,
@@ -34,6 +35,7 @@ import { analyticsOf, chooseAnalytics } from '@/usecases/analytics'
 import { createFailureRepository } from '@/db/failures-repository'
 import { createMergeRepository } from '@/db/merge-repository'
 import { createOwnerNoticeRepository } from '@/db/owner-notices-repository'
+import { createBroadcastRepository } from '@/db/broadcasts-repository'
 import { healthRoutes } from '@/routes/health'
 import { internalAuthRoutes } from '@/routes/internal-auth'
 import { withActor } from '@/routes/actor'
@@ -940,6 +942,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       feedbackFromBot: (body) => feedbackFromBot(messages, owner, body, VERSION),
       replyDelivered: (body) => messages.markDelivered(body),
       feedbackPicture: (number, position) => messages.picture(number, position),
+      claimBroadcast: () => claimBroadcast(createBroadcastRepository(db), owner),
+      broadcastDone: (body) => broadcastDone(createBroadcastRepository(db), body),
     })
 
     // The phone's failures (MOL-144): no session, a limit in memory, the page's own build.

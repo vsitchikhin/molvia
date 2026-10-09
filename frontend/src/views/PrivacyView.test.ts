@@ -164,7 +164,7 @@ it('says the consent is kept — the edition and when — and nothing of the age
   expect(view.text()).toContain(ru.privacy.stored.consent.text)
   expect(ru.privacy.stored.consent.text).toMatch(/Возраст и дату рождения мы не храним/)
   // The subtitle is the revision written in code, not a sentence of the dictionary.
-  expect(view.text()).toContain('Редакция 2 от 8 октября 2026')
+  expect(view.text()).toContain('Редакция 2 от 9 октября 2026')
 })
 
 describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for (MOL-236)', () => {

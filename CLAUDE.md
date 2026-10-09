@@ -495,6 +495,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   page «Бот» (`/settings/bot`), never the rating reminders'; **a block is `actors.bot_blocked_at`**,
   which «chosen» in `reminders_off` cannot hide.
 - **Telegram updates are never logged whole.**
+- **The message about a leak is queued by `make notify` and sent by the bot** (MOL-237): the API
+  decides who — created before it, of its countries, the bot not blocked — in batches after a cursor
+  only the bot's word moves, so better twice than never; one to people at a time, the owner's try
+  first; the owner's text as it is, Russian then English, the one message that is not an i18n key;
+  `broadcasts` holds nobody, its cursor only ever a live id.
 
 ### Frontend — `.claude/rules/frontend.md`
 

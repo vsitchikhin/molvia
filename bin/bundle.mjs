@@ -7,11 +7,12 @@
 //   node bin/bundle.mjs backend
 //   node bin/bundle.mjs bot
 //
-// The API ships four more files beside its server: `dist/forget.js`, the owner's fallback for
-// erasing a person by hand (MOL-58), `dist/seed-catalogue.js`, which puts the common names into
-// the catalogue (MOL-112), `dist/gates.js`, which reads gates 0.2 and 0.3 (MOL-91), and
-// `dist/failures.js`, which reads the table of failures (MOL-143). The
-// production machine has neither the source nor a published database port, so the image it
+// The API ships the owner's tools beside its server: `dist/forget.js`, the fallback for erasing a
+// person by hand (MOL-58), `dist/seed-catalogue.js`, which puts the common names into the catalogue
+// (MOL-112), `dist/gates.js`, which reads gates 0.2 and 0.3 (MOL-91), `dist/failures.js`, which reads
+// the table of failures (MOL-143), `dist/merge.js`, the merge of twins by hand (MOL-106), and
+// `dist/notify.js`, which writes to people about a leak (MOL-237). The production machine has
+// neither the source nor a published database port, so the image it
 // already runs is the only place such a tool can live.
 
 import process from 'node:process'
@@ -34,6 +35,7 @@ const entries = {
     gates: 'src/gates-cli.ts',
     failures: 'src/failures-cli.ts',
     merge: 'src/merge-cli.ts',
+    notify: 'src/notify-cli.ts',
   },
   bot: { index: 'src/index.ts' },
 }
