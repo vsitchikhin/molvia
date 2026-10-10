@@ -120,12 +120,19 @@
                 </span>
               </p>
               <p class="column">
-                <span class="label">
-                  {{
-                    t('spending.charts.difference', {
-                      month: shortMonth(flowMonth.month, locale),
-                    })
-                  }}
+                <!-- «Разница · май» is wider than «Разница · авг»: where a third of the card falls between
+                     them, one month's took two lines and the bars moved (adversarial В1 of MOL-186). Every
+                     month's label of the year stands in the same cell, unseen, so the cell is as tall as
+                     the tallest of them. -->
+                <span class="label stack">
+                  <span
+                    v-for="ghost in flowHeld.labels"
+                    :key="ghost"
+                    class="ghost"
+                    aria-hidden="true"
+                    >{{ ghost }}</span
+                  >
+                  <span>{{ differenceLabel(flowMonth) }}</span>
                 </span>
                 <!-- Never red: spending past what came in is no error, and its sign says it (С-16). -->
                 <span class="value" :class="{ words: flowMonth.difference === null }">
@@ -490,10 +497,16 @@ export default defineComponent({
           : []),
       ]
     })
-    /** What the longest reading of the year takes: words in a column, and lines of the uncounted. */
+    const differenceLabel = (month: YearMonth) =>
+      t('spending.charts.difference', { month: shortMonth(month.month, locale.value) })
+    /**
+     * What the longest reading of the year takes: words in a column, every label of «Разница», and
+     * lines of the uncounted.
+     */
     const flowHeld = computed(() => {
       const shown = months.value.filter((month) => !quiet(month))
       return {
+        labels: [...new Set(shown.map(differenceLabel))],
         words: shown.some((month) => month.spentIncome === null || month.difference === null),
         lines: Math.max(
           0,
@@ -666,6 +679,7 @@ export default defineComponent({
       differenceOf,
       flowUncounted,
       flowHeld,
+      differenceLabel,
       flowNote,
       series,
       categoryOptions,
@@ -783,6 +797,19 @@ export default defineComponent({
 .label {
   color: var(--text-muted);
   font-size: var(--text-footnote);
+}
+
+/* The labels of every month in one cell: the tallest decides, the one shown is the month chosen. */
+.stack {
+  display: grid;
+
+  > * {
+    grid-area: 1 / 1;
+  }
+}
+
+.ghost {
+  visibility: hidden;
 }
 
 .value {

@@ -535,3 +535,46 @@ test('at 320, the slider of «Темп» stays under the thumb as the day’s wo
   expect(await linesOf(reading.locator('.detail'))).toBe(2)
   expect(await place()).toEqual(early)
 })
+
+// Adversarial В1 of round 3 of MOL-186: «Разница · июл» is wider than «Разница · авг», and where a third of
+// the card falls between them — 327…342 in Russian as the app draws them, a phone with its page zoomed —
+// July's label took two lines where August's took one, and the bars went down under the thumb (MOL-151).
+// Every month's label stands in the cell unseen now, and the tallest decides.
+test('at 338, the bars of «Пришло и ушло» stay as August gives way to July', async ({ page }) => {
+  // A third of the card: (338 − 2 × 16 − 2 × 16 − 2 × 8) / 3 ≈ 86 — over August's 82.3, under July's 87.3.
+  await page.setViewportSize({ width: 338, height: 800 })
+  const year = Number(yerevanDay().slice(0, 4)) - 1
+  await seed(page, async (spend) => {
+    for (const month of ['07', '08']) await spend('40000', `${String(year)}-${month}-15`, 'cafe')
+  })
+  await page.goto(`/money/charts?mode=year&year=${String(year)}`)
+  const flow = page.getByRole('region', { name: 'Пришло и ушло' })
+  const reading = flow.locator('.reading')
+  const label = flow.locator('.stack > :not(.ghost)')
+  const august = flow.getByRole('radio', { name: /^август/i })
+  await august.focus()
+  await page.keyboard.press('Space')
+  await expect(label).toHaveText('Разница · авг')
+  await flow.locator('.area').scrollIntoViewIfNeeded()
+  const place = async () => ({
+    reading: Math.round((await reading.boundingBox())?.height ?? 0),
+    bars: await flow
+      .locator('.area')
+      .evaluate((node) => Math.round(node.getBoundingClientRect().top + window.scrollY)),
+  })
+  /** How many lines the words of a node take: the line boxes of its text, by where each stands. */
+  const linesOf = (node: Locator) =>
+    node.evaluate((element) => {
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size
+    })
+  // Control: August's own words take one line, and the cell stands as tall as July's two.
+  expect(await linesOf(label)).toBe(1)
+  const before = await place()
+
+  await page.keyboard.press('ArrowLeft')
+  await expect(label).toHaveText('Разница · июл')
+  expect(await linesOf(label)).toBe(2)
+  expect(await place()).toEqual(before)
+})

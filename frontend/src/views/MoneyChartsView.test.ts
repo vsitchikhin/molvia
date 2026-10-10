@@ -339,7 +339,7 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     const view = await render()
     await charts(view)[0]?.findAll('input[type="radio"]')[0]?.setValue(true)
     expect(plain(charts(view)[0]?.text() ?? '')).toContain('≈ ₽71,387 · +73% against the average')
-    expect(plain(charts(view)[1]?.text() ?? '')).toContain('Difference · Sep')
+    expect(charts(view)[1]?.find('.stack > :not(.ghost)').text()).toBe('Difference · Sep')
   })
 
   // С-16, review Р1-6: spending past what came in is no error — «Разница» says it by its sign, in the
@@ -408,6 +408,27 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     expect(reading()?.find('.columns').classes()).toContain('tall')
     expect(reading()?.find('.uncounted').classes()).toContain('two')
     expect(reading()?.findAll('.uncounted .detail')).toHaveLength(0)
+  })
+
+  // Adversarial В1 of round 3: «Difference · May» is wider than «Difference · Jul», and where a third
+  // of the card falls between them (321…347 in English) one month's label took two lines and the bars
+  // moved under the thumb. Every month's label with a bar stands in the cell unseen; the tallest decides.
+  it('«Разница» stands over every label of the year’s months, unseen; the chosen one is shown (В1)', async () => {
+    moneyChartYear.mockResolvedValue(yearCharts())
+    const flow = charts(await render())[1]
+    const ghosts = () => flow?.findAll('.stack .ghost').map((ghost) => ghost.text())
+    const shown = () => flow?.find('.stack > :not(.ghost)').text()
+    // The months with a bar, and none of those before the data or to come.
+    expect(ghosts()).toEqual(['Difference · Aug', 'Difference · Sep'])
+    expect(
+      flow?.findAll('.stack .ghost').every((ghost) => ghost.attributes('aria-hidden') === 'true'),
+    ).toBe(true)
+    expect(shown()).toBe('Difference · Sep')
+
+    await flow?.findAll('.bar:not(.quiet)')[0]?.find('input').setValue(true)
+    await flushPromises()
+    expect(shown()).toBe('Difference · Aug')
+    expect(ghosts()).toEqual(['Difference · Aug', 'Difference · Sep'])
   })
 
   it('«Пришло и ушло» of a year where every month counted holds nothing (Б2, must not fire)', async () => {
