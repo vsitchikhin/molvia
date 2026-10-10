@@ -537,12 +537,12 @@ test('at 320, the slider of «Темп» stays under the thumb as the day’s wo
 })
 
 // Adversarial В1 of round 3 of MOL-186: «Разница · июл» is wider than «Разница · авг», and where a third of
-// the card falls between them — 327…342 in Russian as the app draws them, a phone with its page zoomed —
-// July's label took two lines where August's took one, and the bars went down under the thumb (MOL-151).
-// Every month's label stands in the cell unseen now, and the tallest decides.
-test('at 338, the bars of «Пришло и ушло» stay as August gives way to July', async ({ page }) => {
-  // A third of the card: (338 − 2 × 16 − 2 × 16 − 2 × 8) / 3 ≈ 86 — over August's 82.3, under July's 87.3.
-  await page.setViewportSize({ width: 338, height: 800 })
+// the card falls between them — a phone with its page zoomed — July's label took two lines where August's
+// took one, and the bars went down under the thumb (MOL-151). Every month's label stands in the cell
+// unseen now, and the tallest decides.
+test('between the widths of two labels, the bars of «Пришло и ушло» stay as August gives way to July', async ({
+  page,
+}) => {
   const year = Number(yerevanDay().slice(0, 4)) - 1
   await seed(page, async (spend) => {
     for (const month of ['07', '08']) await spend('40000', `${String(year)}-${month}-15`, 'cafe')
@@ -551,6 +551,36 @@ test('at 338, the bars of «Пришло и ушло» stay as August gives way 
   const flow = page.getByRole('region', { name: 'Пришло и ушло' })
   const reading = flow.locator('.reading')
   const label = flow.locator('.stack > :not(.ghost)')
+  const column = flow.locator('.columns .column').nth(2)
+  await expect(label).toBeVisible()
+
+  // Where a third of the card falls between the two labels depends on how the engine sets Onest: 327…342
+  // on a Mac, wider on CI's Linux. So both are measured on one line in the cell itself, and the window
+  // is set to put the column halfway between them — it grows by a third of what the window does.
+  const widths = await column.evaluate((cell) => {
+    const width = (text: string) => {
+      const probe = document.createElement('span')
+      probe.textContent = text
+      probe.style.whiteSpace = 'nowrap'
+      probe.style.position = 'absolute'
+      cell.querySelector('.stack')?.append(probe)
+      const measured = probe.getBoundingClientRect().width
+      probe.remove()
+      return measured
+    }
+    return {
+      cell: cell.getBoundingClientRect().width,
+      august: width('Разница · авг'),
+      july: width('Разница · июл'),
+    }
+  })
+  const viewport = page.viewportSize()?.width ?? 0
+  const target = (widths.august + widths.july) / 2
+  await page.setViewportSize({
+    width: Math.round(viewport + 3 * (target - widths.cell)),
+    height: 800,
+  })
+
   const august = flow.getByRole('radio', { name: /^август/i })
   await august.focus()
   await page.keyboard.press('Space')
