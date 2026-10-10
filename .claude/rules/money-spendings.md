@@ -587,7 +587,11 @@ MOL-74's unless they name MOL-160, and hold for the year.
   nothing. **«Пришло и ушло» holds what the year's longest month takes** (`flowHeld`, Б2): two lines
   of a value in a year where a month's «Разница» or «Ушло» is words, a line for income and one for
   spending not counted where a month has them — about 24 px at 390 jumped otherwise — and nothing in a
-  year where every month counted.
+  year where every month counted. **The label of «Разница» is held by every month's label of the year,
+  unseen in its cell** (`.stack`, adversarial В1 of round 3): «Разница · июл» is 87 px of Onest and
+  «… · авг» 82, so at 327…342 — a phone with its page zoomed — July's took two lines where August's
+  took one, and the bars moved by 12 px. **The price, named:** a line of what was not counted that
+  wraps by itself at 320 still moves the bars, in any year that holds such lines.
 - **A finger chooses on lifting, or once it goes sideways** (`useChartPointer`, review): chosen on
   touching, every scroll that started on a chart changed the reading under the thumb; a mouse or a pen
   chooses on press. **A new answer of the same year keeps the bar chosen** while it has one; another

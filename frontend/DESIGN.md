@@ -543,7 +543,8 @@ lift of the finger or as soon as it moves sideways; the selected bar is `accent`
 - **The reading over a chart** holds as many lines as its longest month or day takes, so the chart and
   the slider never move under the thumb as another is chosen: two lines of words over bars and over
   «Темп», and «Пришло и ушло» what the year's longest month takes — words for «Разница» two lines, a
-  line for each kind not counted — and nothing in a year with none.
+  line for each kind not counted, the tallest of every month's label «Разница · май» — and nothing in a
+  year with none.
 - **Words:** axis labels 11/600, sentences from 13; a target from 44.
 
 ## Do's and Don'ts
