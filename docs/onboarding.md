@@ -2696,9 +2696,10 @@ income currency too»).
 **Раунд 3:** показание «Темпа» держит две строки подписи — при 320 «обычно к этому дню 10 001 000 ֏ · +1 900 %»
 уходила на вторую, и график с ползунком съезжали на 13 px под пальцем. «Пришло и ушло» держит то, что берёт
 самый длинный месяц года: «Разница» словами и строки непосчитанного сдвигали столбцы на ~24 px. Год, где всё
-посчитано, не держит ничего.
+посчитано, не держит ничего. **Раунд 4:** подпись «Разница · {месяц}» держит самую высокую из подписей года —
+все они стоят в ячейке невидимо: при 327…342 «июл» переносилась, а «авг» нет, и столбцы съезжали на 12 px.
 
 Требования и план — `.scratch/tasks/{requirements,plans}/MOL-186.md`, артефакт — `.lavish/mol-186-plan.html`;
 кадры до и после — `.scratch/tasks/status/MOL-186/{before,after}/`; ревью —
-`.scratch/tasks/selfreviews/MOL-186.md`, `.scratch/tasks/selftests/MOL-186-adversarial{,-round-2}.md`; правила —
+`.scratch/tasks/selfreviews/MOL-186.md`, `.scratch/tasks/selftests/MOL-186-adversarial{,-round-2,-round-3}.md`; правила —
 `.claude/rules/money-spendings.md`, стиль — `frontend/DESIGN.md` › Charts.
