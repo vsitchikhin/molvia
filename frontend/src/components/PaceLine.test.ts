@@ -64,9 +64,70 @@ describe('PaceLine (MOL-158)', () => {
   it('the arrows move the day, and the range says the day', async () => {
     const { view } = line()
     const range = view.find('input[type="range"]')
-    expect(range.attributes('max')).toBe('11')
     expect(range.attributes('aria-valuetext')).toBe('12 сентября')
     await range.setValue('3')
     expect(view.emitted('update:modelValue')?.at(-1)).toEqual([3])
+  })
+
+  // Owner's «в» on review Р2-1: the thumb alone was a target of some 16 px; the strip of 44 under the
+  // axis chooses as the chart does — on lifting or sideways, never by a scroll — and leaves the thumb's
+  // own drag to the range.
+  describe('the strip of the slider', () => {
+    function strip() {
+      const { view } = line()
+      const track = view.find('.track').element
+      track.getBoundingClientRect = () => ({ left: 0, top: 0, width: 290, height: 44 }) as DOMRect
+      return { view, track, range: view.find('input[type="range"]').element }
+    }
+
+    it('a finger lifted where it touched chooses the day under it, as on the axis', () => {
+      const { view, track } = strip()
+      track.dispatchEvent(touch('pointerdown', 50, 20))
+      track.dispatchEvent(touch('pointerup', 50, 20))
+      expect(view.emitted('update:modelValue')?.at(-1)).toEqual([5])
+    })
+
+    it('must not fire: a scroll that started on the strip chooses nothing', () => {
+      const { view, track } = strip()
+      track.dispatchEvent(touch('pointerdown', 50, 20))
+      track.dispatchEvent(touch('pointermove', 52, 90))
+      track.dispatchEvent(new PointerEvent('pointercancel', { pointerType: 'touch' }))
+      track.dispatchEvent(touch('pointerup', 52, 90))
+      expect(view.emitted('update:modelValue')).toBeUndefined()
+    })
+
+    it('must not fire: a press on the thumb is the range’s own drag, not the strip’s', () => {
+      const { view, range } = strip()
+      range.dispatchEvent(touch('pointerdown', 50, 20))
+      range.dispatchEvent(touch('pointerup', 50, 20))
+      expect(view.emitted('update:modelValue')).toBeUndefined()
+    })
+  })
+
+  it('one day drawn — the 1st of a running month — has no slider: nothing to move to (А6)', () => {
+    const view = mount(PaceLine, {
+      props: {
+        days: [{ level: 1000, spoken: '1 октября' }],
+        usual: null,
+        length: 31,
+        modelValue: 0,
+        legend: 'Темп месяца',
+      },
+    })
+    expect(view.find('input[type="range"]').exists()).toBe(false)
+    expect(view.find('.dot').exists()).toBe(true)
+  })
+
+  it('the slider spans the month, as the axis does; past the last day drawn it goes back to it', async () => {
+    const { view } = line()
+    const range = view.find<HTMLInputElement>('input[type="range"]')
+    // Thirty days, as the axis: the thumb of the 12th stands under the 12th, not at the right end.
+    expect(range.attributes('max')).toBe('29')
+    await range.setValue('3')
+    await view.setProps({ modelValue: 3 })
+    // The 20th of a month drawn to the 12th: the 12th, and the thumb is put back on it.
+    await range.setValue('19')
+    expect(view.emitted('update:modelValue')?.at(-1)).toEqual([11])
+    expect(range.element.value).toBe('11')
   })
 })

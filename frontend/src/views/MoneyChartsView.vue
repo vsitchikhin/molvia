@@ -107,11 +107,12 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* The field is `AppScreen`'s 16 (С-23): a padding here made it 32. 8 between the controls and what
+   stands under them (Ф-10); the cards of the answer add their own 16, so they stand 24 apart. */
 .content {
   display: flex;
   flex-direction: column;
   flex: 1;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-2);
 }
 </style>

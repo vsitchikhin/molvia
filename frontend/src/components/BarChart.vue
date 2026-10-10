@@ -159,8 +159,11 @@ export default defineComponent({
   min-height: 4.875rem;
 }
 
+/* A stacking context of its own: the average's z-index lifts it over the bars, and without one it
+   rose over the screen's pinned header too, drawn through «‹ Деньги» as the page scrolled under it. */
 .area {
   position: relative;
+  isolation: isolate;
   display: flex;
   align-items: flex-end;
   gap: var(--space-2);
@@ -183,7 +186,7 @@ export default defineComponent({
   right: 0;
   bottom: 0;
   left: 0;
-  border-top: 2px dashed var(--text-muted);
+  border-top: 2px dashed var(--text);
   pointer-events: none;
   transition: height var(--dur) var(--ease);
 }
@@ -215,7 +218,7 @@ export default defineComponent({
   max-width: 2.25rem;
   min-height: 2px;
   border-radius: var(--radius-sm) var(--radius-sm) var(--radius-mark) var(--radius-mark);
-  background: var(--border-strong);
+  background: var(--graphic);
 
   /* A new answer — another period, another category — grows the bars where they stand (MOL-151):
      the area keeps its height, so nothing around it moves. */
@@ -240,7 +243,7 @@ export default defineComponent({
 .fill.unknown {
   background: none;
   box-shadow: none;
-  outline: 1.5px dashed var(--border-strong);
+  outline: 1.5px dashed var(--graphic);
   outline-offset: -1.5px;
   opacity: 1;
 }
@@ -253,7 +256,7 @@ export default defineComponent({
 
 .outline {
   background: none;
-  box-shadow: inset 0 0 0 2px var(--text-muted);
+  box-shadow: inset 0 0 0 2px var(--graphic);
 
   .chosen & {
     background: none;
@@ -281,9 +284,9 @@ export default defineComponent({
   text-align: center;
   white-space: nowrap;
 
+  /* Chosen is the bar's fill; the label only darkens, at the same weight (MOL-179, MOL-186 Р-2). */
   &.chosen {
     color: var(--text);
-    font-weight: var(--weight-bold);
   }
 }
 

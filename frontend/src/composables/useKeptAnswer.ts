@@ -20,6 +20,11 @@ export interface KeptAnswer<T> {
   readonly stale: ComputedRef<'loading' | 'offline' | 'error' | null>
   readonly fetchedAt: ComputedRef<Date | null>
   /**
+   * How many reads failed while this page was open: a retry that failed the same way leaves the same
+   * words on the strip, and a new count says them again (MOL-181, C1).
+   */
+  readonly attempt: ComputedRef<number>
+  /**
    * Every answer kept on this phone for the owner, of any subject, with when it was read — what the
    * device knows beyond the subject shown (MOL-160, adversarial Ж′), and how fresh (adversarial Л).
    */
@@ -121,6 +126,7 @@ export function useKeptAnswer<T>(options: KeptAnswerOptions<T>): KeptAnswer<T> {
       : []
   }
   const failure = ref<'offline' | 'error' | null>(null)
+  const failures = ref(0)
   const confirmed = ref(false)
   let latest = 0
   /** The latest read of each subject that came back with an answer, and that came back with none. */
@@ -164,6 +170,7 @@ export function useKeptAnswer<T>(options: KeptAnswerOptions<T>): KeptAnswer<T> {
       failed.set(asked, Math.max(mine, failed.get(asked) ?? 0))
       if (actor.id !== id || subject.value !== asked || mine !== latest) return
       failure.value = navigator.onLine ? 'error' : 'offline'
+      failures.value++
     }
   }
 
@@ -212,6 +219,7 @@ export function useKeptAnswer<T>(options: KeptAnswerOptions<T>): KeptAnswer<T> {
       return failure.value ?? 'loading'
     }),
     fetchedAt: computed(() => shown.value?.fetchedAt ?? null),
+    attempt: computed(() => failures.value),
     kept: computed(() => stored.value),
     retry: load,
     write: written,

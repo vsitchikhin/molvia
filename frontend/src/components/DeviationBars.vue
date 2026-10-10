@@ -115,7 +115,7 @@ export default defineComponent({
         return {
           key: row.categoryId,
           name,
-          colour: category ? categoryColour(category) : 'var(--border-strong)',
+          colour: category ? categoryColour(category) : 'var(--graphic)',
           change,
           direction:
             row.change === null || row.change === 0 ? null : row.change > 0 ? 'up' : 'down',

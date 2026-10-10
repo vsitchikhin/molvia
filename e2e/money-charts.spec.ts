@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import { actorCodec, settingsOf } from '@molvia/model'
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { standAt, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 
@@ -75,14 +76,20 @@ test('the ring of «Куда ушли» opens «Месяц» of the same month; 
     .click()
   await expect(page).toHaveURL(new RegExp(`month=${yerevanDay().slice(0, 7)}`))
 
-  const where = page.getByRole('region', { name: 'Куда ушло' })
+  const where = page.getByRole('region', { name: 'Куда ушли' })
   const centre = where.locator('.center')
   await expect(centre).toContainText('идёт')
   await expect(centre).toContainText(/30\s000\s֏/)
   // The row is tapped, as a thumb does; its radio is what a screen reader reads.
   const row = where.locator('.legend .row', { hasText: 'Кафе и рестораны' })
+  // The amount's column is as wide as its figure (the name's takes what is left, whatever its weight).
+  const amount = row.locator('.amount')
+  const unchosen = (await amount.boundingBox())?.width
   await row.click()
   await expect(where.getByRole('radio', { name: /Кафе и рестораны/ })).toBeChecked()
+  // Chosen by a fill and a ring, at the weight of every row: the words do not grow (Ф-5, MOL-186).
+  await expect(row).toHaveClass(/chosen/)
+  expect((await amount.boundingBox())?.width).toBe(unchosen)
   await expect(centre).toContainText('Кафе и рестораны')
   await expect(centre).toContainText('100')
   await row.click()
@@ -95,7 +102,7 @@ test('the ring of «Куда ушли» opens «Месяц» of the same month; 
 test('the month and the tab move by replace: «назад» from them is «Деньги»', async ({ page }) => {
   await seed(page)
   await toCharts(page)
-  const centre = page.getByRole('region', { name: 'Куда ушло' }).locator('.center')
+  const centre = page.getByRole('region', { name: 'Куда ушли' }).locator('.center')
   await expect(centre).toContainText(/30\s000\s֏/)
 
   await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
@@ -148,7 +155,7 @@ test('«Год» moves by replace to the year before, as far back as there is an
   await page.getByRole('button', { name: 'Предыдущий год' }).click()
   await expect(page).toHaveURL(new RegExp(`year=${String(year - 1)}`))
   await expect(page.locator('.switcher .month')).toHaveText(String(year - 1))
-  await expect(page.getByRole('region', { name: 'Куда ушло за год' })).toContainText(/7\s000\s֏/)
+  await expect(page.getByRole('region', { name: 'Куда ушли' })).toContainText(/7\s000\s֏/)
   // The first year with anything in it: no further back.
   await expect(page.getByRole('button', { name: 'Предыдущий год' })).toHaveAttribute(
     'aria-disabled',
@@ -203,7 +210,7 @@ test('a sector of the year’s ring chooses its category below, with no scroll (
   const scrolled = await page.evaluate(() => window.scrollY)
 
   await page
-    .getByRole('region', { name: 'Куда ушло за год' })
+    .getByRole('region', { name: 'Куда ушли' })
     .locator('.legend .row', { hasText: 'Кафе и рестораны' })
     .click()
   await expect(page).toHaveURL(/category=/)
@@ -251,6 +258,29 @@ test('against the usual comes with three closed months, and says when before (ha
   // A tap on the pace chooses the day under it: the first of the month at its left edge.
   await pace.locator('.area').click({ position: { x: 1, y: 60 } })
   await expect(pace.locator('.reading')).toContainText(/^К 1 /)
+})
+
+test('the day of «Темп» is a slider in sight: the arrows move it and it says the day', async ({
+  page,
+}) => {
+  await seed(page)
+  await toCharts(page)
+  // Last month is whole, so its line has a day after the first whatever today is.
+  await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
+  const pace = page.getByRole('region', { name: 'Темп месяца' })
+  const slider = pace.getByRole('slider', { name: 'Темп месяца' })
+  await expect(slider).toBeVisible()
+  // Under the axis at a thumb's size, not a pixel hidden for the keyboard alone (С-14, MOL-186): the
+  // strip around it is what a finger takes (Р2-1).
+  const box = await pace.locator('.track').boundingBox()
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
+
+  await slider.focus()
+  await page.keyboard.press('Home')
+  await expect(pace.locator('.reading')).toContainText(/^К 1 /)
+  await page.keyboard.press('ArrowRight')
+  await expect(pace.locator('.reading')).toContainText(/^К 2 /)
+  await expect(slider).toHaveAttribute('aria-valuetext', /^2 /)
 })
 
 // The category card of «Год» is the third: a choice that took the page to the top took the chart away
@@ -311,7 +341,7 @@ test('a month read for the first time keeps the switcher where it was under the 
   expect(await page.evaluate(() => window.scrollY)).toBe(down)
 
   answer()
-  await expect(page.getByRole('region', { name: 'Куда ушло' })).toContainText(/220\s000\s֏/)
+  await expect(page.getByRole('region', { name: 'Куда ушли' })).toContainText(/220\s000\s֏/)
   expect(await topOf(previous)).toBe(at)
 })
 
@@ -345,13 +375,14 @@ test('offline, the month is the last one read under a strip that is not red, and
 }) => {
   await seed(page)
   await toCharts(page)
-  const centre = page.getByRole('region', { name: 'Куда ушло' }).locator('.center')
+  const centre = page.getByRole('region', { name: 'Куда ушли' }).locator('.center')
   await expect(centre).toContainText(/30\s000\s֏/)
   await page.goBack()
 
   await context.setOffline(true)
   await page.getByRole('link', { name: /Открыть графики/ }).click()
-  const strip = page.getByText(/Нет связи. Графики на/)
+  // The strip's own node: its words are said in the live region too (MOL-181).
+  const strip = page.locator('.strip', { hasText: /Без связи · графики на/ })
   await expect(strip).toBeVisible()
   await expect(centre).toContainText(/30\s000\s֏/)
   await expect(page.getByRole('button', { name: 'Повторить' })).toHaveCount(0)
@@ -370,4 +401,307 @@ test('offline, the month is the last one read under a strip that is not red, and
   await expect(strip).toBeVisible()
   expect(await topOf(previous)).toBe(at)
   await context.setOffline(false)
+})
+
+// One «Повторить» whatever failed (Ф-15, MOL-186): a month never read is the full error, its button in
+// the strip over the tab bar; a month kept is shown under «Сервер не ответил», the button in that line.
+test('the server failing: one «Повторить», in the strip over the tab bar or in the line over the month', async ({
+  page,
+}) => {
+  let failing = false
+  // Laid before the page opens (MOL-249): the step relies on it.
+  await page.route('**/api/money/months/*/charts', async (route) => {
+    if (failing) await route.fulfill({ status: 500, body: '{}' })
+    else await route.continue()
+  })
+  await seed(page)
+  await toCharts(page)
+  const centre = page.getByRole('region', { name: 'Куда ушли' }).locator('.center')
+  await expect(centre).toContainText(/30\s000\s֏/)
+
+  failing = true
+  await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
+  await expect(page.getByRole('heading', { name: 'Не удалось загрузить графики' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Повторить' })).toHaveCount(1)
+
+  await page.getByRole('button', { name: 'Следующий месяц' }).click()
+  const strip = page.locator('.strip', { hasText: /Сервер не ответил — графики на/ })
+  await expect(strip).toBeVisible()
+  await expect(centre).toContainText(/30\s000\s֏/)
+  await expect(page.getByRole('button', { name: 'Повторить' })).toHaveCount(1)
+
+  failing = false
+  await strip.getByRole('button', { name: 'Повторить' }).click()
+  await expect(strip).toBeHidden()
+  await expect(page.getByRole('button', { name: 'Повторить' })).toHaveCount(0)
+})
+
+// Adversarial А7 of MOL-186: the reading over the bars in a column (Е-11) took two lines of words for
+// the running month — «… к обычному к 9 октября · в среднем 180 000 ֏» — and one for a closed month, so
+// the bars under the thumb jumped by a line as the month changed (MOL-151). Two lines are held now.
+for (const width of [390, 320]) {
+  test(`at ${String(width)}, the bars of a category stay under the thumb from the running month to a closed one`, async ({
+    page,
+  }) => {
+    // The year's usual needs three closed months of this year: from April on.
+    test.skip(
+      Number(yerevanDay().slice(5, 7)) < 4,
+      'the usual of the year needs three closed months',
+    )
+    await page.setViewportSize({ width, height: 800 })
+    await seed(page, async (spend) => {
+      // On the 1st: the running month is compared with the usual to this day, and a rent of the 15th
+      // is not in it before the 15th.
+      for (const back of [1, 2, 3])
+        await spend('180000', `${monthsAgoDay(back).slice(0, 7)}-01`, 'rent')
+    })
+    await page.goto('/money/charts?mode=year')
+    const card = page.getByRole('region', { name: 'Категория по месяцам' })
+    await page.getByRole('combobox', { name: 'Категория' }).selectOption({ label: 'Аренда жилья' })
+    const reading = card.locator('.reading')
+    await expect(reading).toContainText('к обычному к')
+    await card.locator('.area').scrollIntoViewIfNeeded()
+    // Where the bars stand in the page, and how tall the words over them are: Chromium's scroll
+    // anchoring holds the bars in the window by scrolling the page, so the window alone says nothing —
+    // Safari has none, and the words above move either way.
+    const place = async () => ({
+      reading: (await reading.boundingBox())?.height,
+      bars: await card
+        .locator('.area')
+        .evaluate((node) => Math.round(node.getBoundingClientRect().top + window.scrollY)),
+    })
+    const running = await place()
+
+    // The month before, chosen by the keys as a finger does by a tap: its words take one line.
+    await card.locator('input[type="radio"]:checked').focus()
+    await page.keyboard.press('ArrowLeft')
+    await expect(reading).toContainText('к среднему')
+    expect(await place()).toEqual(running)
+  })
+}
+
+// Adversarial Б1 of round 2 of MOL-186: at 320 the day's words — «обычно к этому дню 10 001 000 ֏ ·
+// +1 900 %» — take a second line where an early day's take one, and the line and the slider under it
+// went down under the thumb moving the day (MOL-151). Two lines are held now.
+test('at 320, the slider of «Темп» stays under the thumb as the day’s words take a second line', async ({
+  page,
+}) => {
+  test.skip(Number(yerevanDay().slice(8, 10)) < 6, 'the running month needs its 6th drawn')
+  await page.setViewportSize({ width: 320, height: 800 })
+  // The usual is 1 000 ֏ to the 4th and 10 001 000 ֏ from the 5th; this month — 200 001 000 ֏ by then.
+  await seed(page, async (spend) => {
+    for (const back of [1, 2, 3]) {
+      const month = monthsAgoDay(back).slice(0, 7)
+      await spend('1000', `${month}-01`, 'cafe')
+      await spend('10000000', `${month}-05`, 'cafe')
+    }
+    await spend('1000', `${yerevanDay().slice(0, 7)}-01`, 'cafe')
+    await spend('200000000', `${yerevanDay().slice(0, 7)}-05`, 'cafe')
+  })
+  await page.goto('/money/charts')
+  const pace = page.getByRole('region', { name: 'Темп месяца' })
+  const slider = pace.getByRole('slider', { name: 'Темп месяца' })
+  const reading = pace.locator('.reading')
+  const strip = pace.locator('.track')
+  await expect(reading).toContainText('обычно к этому дню')
+  await strip.scrollIntoViewIfNeeded()
+  // In the page, not the window: Chromium's scroll anchoring would hold the strip in the window.
+  const place = async () => ({
+    reading: Math.round((await reading.boundingBox())?.height ?? 0),
+    strip: await strip.evaluate((node) =>
+      Math.round(node.getBoundingClientRect().top + window.scrollY),
+    ),
+  })
+
+  /** How many lines the words of a node take: the line boxes of its text, by where each stands. */
+  const linesOf = (node: Locator) =>
+    node.evaluate((element) => {
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size
+    })
+
+  await slider.focus()
+  await page.keyboard.press('Home')
+  await page.keyboard.press('ArrowRight')
+  await expect(reading).toContainText(/^К 2 /)
+  await expect(reading).toContainText(/обычно к этому дню 1\s000\s֏/)
+  expect(await linesOf(reading.locator('.detail'))).toBe(1)
+  const early = await place()
+
+  for (let step = 0; step < 4; step++) await page.keyboard.press('ArrowRight')
+  await expect(reading).toContainText(/^К 6 /)
+  await expect(reading).toContainText(/10\s001\s000\s֏/)
+  // Control: the words do take two lines here and one on the 2nd — the held line is filled, not grown.
+  expect(await linesOf(reading.locator('.detail'))).toBe(2)
+  expect(await place()).toEqual(early)
+})
+
+// Adversarial В1 of round 3 of MOL-186: «Разница · июл» is wider than «Разница · авг», and where a third of
+// the card falls between them — a phone with its page zoomed — July's label took two lines where August's
+// took one, and the bars went down under the thumb (MOL-151). Every month's label stands in the cell
+// unseen now, and the tallest decides.
+test('between the widths of two labels, the bars of «Пришло и ушло» stay as August gives way to July', async ({
+  page,
+}) => {
+  const year = Number(yerevanDay().slice(0, 4)) - 1
+  await seed(page, async (spend) => {
+    for (const month of ['07', '08']) await spend('40000', `${String(year)}-${month}-15`, 'cafe')
+  })
+  await page.goto(`/money/charts?mode=year&year=${String(year)}`)
+  const flow = page.getByRole('region', { name: 'Пришло и ушло' })
+  const reading = flow.locator('.reading')
+  const label = flow.locator('.label.stack > :not(.ghost)')
+  const column = flow.locator('.columns .column').nth(2)
+  await expect(label).toBeVisible()
+
+  // Where a third of the card falls between the two labels depends on how the engine sets Onest: 327…342
+  // on a Mac, wider on CI's Linux. So both are measured on one line in the cell itself, and the window
+  // is set to put the column halfway between them — it grows by a third of what the window does.
+  const widths = await column.evaluate((cell) => {
+    const width = (text: string) => {
+      const probe = document.createElement('span')
+      probe.textContent = text
+      probe.style.whiteSpace = 'nowrap'
+      probe.style.position = 'absolute'
+      cell.querySelector('.label.stack')?.append(probe)
+      const measured = probe.getBoundingClientRect().width
+      probe.remove()
+      return measured
+    }
+    return {
+      cell: cell.getBoundingClientRect().width,
+      august: width('Разница · авг'),
+      july: width('Разница · июл'),
+    }
+  })
+  const viewport = page.viewportSize()?.width ?? 0
+  const target = (widths.august + widths.july) / 2
+  await page.setViewportSize({
+    width: Math.round(viewport + 3 * (target - widths.cell)),
+    height: 800,
+  })
+
+  const august = flow.getByRole('radio', { name: /^август/i })
+  await august.focus()
+  await page.keyboard.press('Space')
+  await expect(label).toHaveText('Разница · авг')
+  await flow.locator('.area').scrollIntoViewIfNeeded()
+  const place = async () => ({
+    reading: Math.round((await reading.boundingBox())?.height ?? 0),
+    bars: await flow
+      .locator('.area')
+      .evaluate((node) => Math.round(node.getBoundingClientRect().top + window.scrollY)),
+  })
+  /** How many lines the words of a node take: the line boxes of its text, by where each stands. */
+  const linesOf = (node: Locator) =>
+    node.evaluate((element) => {
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size
+    })
+  // Control: August's own words take one line, and the cell stands as tall as July's two.
+  expect(await linesOf(label)).toBe(1)
+  const before = await place()
+
+  await page.keyboard.press('ArrowLeft')
+  await expect(label).toHaveText('Разница · июл')
+  expect(await linesOf(label)).toBe(2)
+  expect(await place()).toEqual(before)
+})
+
+// Adversarial Д1 of round 5 of MOL-186: the words held over a value wrapped in the track of their column,
+// and a figure never wraps — one wider than the third of the card widened the track, so the labels stood
+// on one line over August's «−2 000 000 ֏» and on two over July's «−4 000 ֏», and the bars moved by
+// ~19 px at 320 with no zoom. The track is the third of the card now, whatever the figure.
+test('at 320, a figure wider than its third leaves the labels of «Пришло и ушло» and the bars where they were', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 })
+  const year = Number(yerevanDay().slice(0, 4)) - 1
+  await seed(page, async (spend) => {
+    for (const [month, amount] of [
+      ['07', '4000'],
+      ['08', '2000000'],
+    ] as const)
+      await spend(amount, `${String(year)}-${month}-15`, 'cafe')
+  })
+  // One who earns and spends in drams: no rate is needed, and the figures are exact.
+  const headers = await asBrowser(page)
+  const previous = settingsOf(
+    actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
+  )
+  const moved = await page.request.put('/api/actors/me/settings', {
+    headers,
+    data: { previous, settings: { ...previous, spendCurrency: 'AMD', incomeCurrency: 'AMD' } },
+  })
+  expect(moved.ok(), await moved.text()).toBe(true)
+
+  await page.goto(`/money/charts?mode=year&year=${String(year)}`)
+  const flow = page.getByRole('region', { name: 'Пришло и ушло' })
+  const reading = flow.locator('.reading')
+  const label = flow.locator('.label.stack > :not(.ghost)')
+  const column = flow.locator('.columns .column').nth(2)
+  const figure = column.locator('.value.stack > :not(.ghost)')
+  await expect(label).toBeVisible()
+
+  /** The words on one line in the cell's own font, the figure, the cell and the labels' track. */
+  const widths = () =>
+    column.evaluate((cell) => {
+      const width = (text: string, into: Element | null) => {
+        const probe = document.createElement('span')
+        probe.textContent = text
+        probe.style.whiteSpace = 'nowrap'
+        probe.style.position = 'absolute'
+        into?.append(probe)
+        const measured = probe.getBoundingClientRect().width
+        probe.remove()
+        return measured
+      }
+      const labels = cell.querySelector('.label.stack')
+      const value = cell.querySelector('.value.stack')
+      return {
+        cell: cell.getBoundingClientRect().width,
+        track: labels?.getBoundingClientRect().width ?? 0,
+        labels: Math.min(width('Разница · июл', labels), width('Разница · авг', labels)),
+        figure: width(value?.lastElementChild?.textContent ?? '', value),
+      }
+    })
+  const place = async () => ({
+    reading: Math.round((await reading.boundingBox())?.height ?? 0),
+    bars: await flow
+      .locator('.area')
+      .evaluate((node) => Math.round(node.getBoundingClientRect().top + window.scrollY)),
+  })
+  /** How many lines the words of a node take: the line boxes of its text, by where each stands. */
+  const linesOf = (node: Locator) =>
+    node.evaluate((element) => {
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size
+    })
+
+  // July, chosen by the keys: its figure fits, and both labels are wider than the cell — two lines.
+  await flow.getByRole('radio', { name: /^август/i }).focus()
+  await page.keyboard.press('Space')
+  await page.keyboard.press('ArrowLeft')
+  await expect(label).toHaveText('Разница · июл')
+  await expect(figure).toHaveText(/^−4\s000\s֏$/)
+  const july = await widths()
+  expect(july.figure).toBeLessThan(july.cell)
+  expect(july.labels).toBeGreaterThan(july.cell)
+  expect(await linesOf(label)).toBe(2)
+  await flow.locator('.area').scrollIntoViewIfNeeded()
+  const before = await place()
+
+  // August: the figure is wider than the cell and than either label (the control), and the track stays
+  // the cell's — the labels keep their two lines, and nothing under them moves.
+  await page.keyboard.press('ArrowRight')
+  await expect(label).toHaveText('Разница · авг')
+  await expect(figure).toHaveText(/^−2\s000\s000\s֏$/)
+  const august = await widths()
+  expect(august.figure).toBeGreaterThan(Math.max(august.cell, august.labels))
+  expect(Math.round(august.track)).toBe(Math.round(august.cell))
+  expect(await linesOf(label)).toBe(2)
+  expect(await place()).toEqual(before)
 })
