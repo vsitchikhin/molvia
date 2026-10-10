@@ -550,7 +550,7 @@ test('between the widths of two labels, the bars of «Пришло и ушло»
   await page.goto(`/money/charts?mode=year&year=${String(year)}`)
   const flow = page.getByRole('region', { name: 'Пришло и ушло' })
   const reading = flow.locator('.reading')
-  const label = flow.locator('.stack > :not(.ghost)')
+  const label = flow.locator('.label.stack > :not(.ghost)')
   const column = flow.locator('.columns .column').nth(2)
   await expect(label).toBeVisible()
 
@@ -563,7 +563,7 @@ test('between the widths of two labels, the bars of «Пришло и ушло»
       probe.textContent = text
       probe.style.whiteSpace = 'nowrap'
       probe.style.position = 'absolute'
-      cell.querySelector('.stack')?.append(probe)
+      cell.querySelector('.label.stack')?.append(probe)
       const measured = probe.getBoundingClientRect().width
       probe.remove()
       return measured

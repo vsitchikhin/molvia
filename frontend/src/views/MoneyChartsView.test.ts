@@ -339,7 +339,7 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     const view = await render()
     await charts(view)[0]?.findAll('input[type="radio"]')[0]?.setValue(true)
     expect(plain(charts(view)[0]?.text() ?? '')).toContain('≈ ₽71,387 · +73% against the average')
-    expect(charts(view)[1]?.find('.stack > :not(.ghost)').text()).toBe('Difference · Sep')
+    expect(charts(view)[1]?.find('.label.stack > :not(.ghost)').text()).toBe('Difference · Sep')
   })
 
   // С-16, review Р1-6: spending past what came in is no error — «Разница» says it by its sign, in the
@@ -354,7 +354,7 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     })
     const value = charts(await render())[1]?.findAll('.column .value')[2]
     expect(plain(value?.text() ?? '')).toContain('−₽5,400')
-    expect(value?.classes()).toEqual(['value'])
+    expect(value?.classes()).toEqual(['value', 'stack'])
   })
 
   // Adversarial А7: the running month's words take two lines where a closed one's take one, and the
@@ -396,16 +396,25 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     })
     const flow = charts(await render())[1]
     const reading = () => flow?.find('.reading')
-    expect(reading()?.text()).toContain(en.spending.charts.difference_uncounted)
-    expect(reading()?.find('.columns').classes()).toContain('tall')
+    const difference = () => reading()?.findAll('.column .value')[2]
+    const held = () =>
+      difference()
+        ?.findAll('.ghost')
+        .map((ghost) => ghost.text())
+    expect(difference()?.find(':scope > :not(.ghost)').text()).toBe(
+      en.spending.charts.difference_uncounted,
+    )
+    expect(held()).toEqual([en.spending.charts.difference_uncounted])
     expect(reading()?.find('.uncounted').classes()).toContain('two')
     expect(reading()?.findAll('.uncounted .detail')).toHaveLength(2)
 
-    // August, chosen as a finger does: nothing to say, and the same lines held.
+    // August, chosen as a finger does: a figure, over September's words unseen, and the same lines held.
     await flow?.findAll('.bar:not(.quiet)')[0]?.find('input').setValue(true)
     await flushPromises()
-    expect(reading()?.text()).not.toContain(en.spending.charts.difference_uncounted)
-    expect(reading()?.find('.columns').classes()).toContain('tall')
+    expect(difference()?.find(':scope > :not(.ghost)').text()).not.toBe(
+      en.spending.charts.difference_uncounted,
+    )
+    expect(held()).toEqual([en.spending.charts.difference_uncounted])
     expect(reading()?.find('.uncounted').classes()).toContain('two')
     expect(reading()?.findAll('.uncounted .detail')).toHaveLength(0)
   })
@@ -416,12 +425,14 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
   it('«Разница» stands over every label of the year’s months, unseen; the chosen one is shown (В1)', async () => {
     moneyChartYear.mockResolvedValue(yearCharts())
     const flow = charts(await render())[1]
-    const ghosts = () => flow?.findAll('.stack .ghost').map((ghost) => ghost.text())
-    const shown = () => flow?.find('.stack > :not(.ghost)').text()
+    const ghosts = () => flow?.findAll('.label.stack .ghost').map((ghost) => ghost.text())
+    const shown = () => flow?.find('.label.stack > :not(.ghost)').text()
     // The months with a bar, and none of those before the data or to come.
     expect(ghosts()).toEqual(['Difference · Aug', 'Difference · Sep'])
     expect(
-      flow?.findAll('.stack .ghost').every((ghost) => ghost.attributes('aria-hidden') === 'true'),
+      flow
+        ?.findAll('.label.stack .ghost')
+        .every((ghost) => ghost.attributes('aria-hidden') === 'true'),
     ).toBe(true)
     expect(shown()).toBe('Difference · Sep')
 
@@ -431,10 +442,50 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     expect(ghosts()).toEqual(['Difference · Aug', 'Difference · Sep'])
   })
 
+  // Adversarial Г1 of round 4: two lines were held for words in place of a sum, and «no rate for the
+  // month» takes three under 310 — the bars moved by a line as a neighbour with figures was chosen. Every
+  // month's words of a column stand in its cell unseen, as the label's do; the tallest decides.
+  it('«Ушло» and «Разница» stand over every month’s words of the year, unseen (Г1)', async () => {
+    const charted = yearCharts()
+    moneyChartYear.mockResolvedValue({
+      ...charted,
+      months: charted.months.map((one) =>
+        one.month === '2026-09'
+          ? { ...one, spentIncome: null, difference: null, spentIncomeLevel: null }
+          : one.month === '2026-08'
+            ? { ...one, uncounted: [parseMoney('50', 'USD')], difference: null }
+            : one,
+      ),
+    })
+    const flow = charts(await render())[1]
+    const values = () => flow?.findAll('.column .value') ?? []
+    const ghosts = (at: number) => values()[at]?.findAll('.ghost') ?? []
+    const shown = (at: number) => values()[at]?.find(':scope > :not(.ghost)').text()
+    const { no_rate: noRate, difference_uncounted: uncounted } = en.spending.charts
+    // «Пришло» is never words, and holds nothing.
+    expect(ghosts(0)).toHaveLength(0)
+    // «Ушло»: September's words only; «Разница»: both months' words, each once, in the year's order.
+    expect(ghosts(1).map((ghost) => ghost.text())).toEqual([noRate])
+    expect(ghosts(2).map((ghost) => ghost.text())).toEqual([uncounted, noRate])
+    expect(
+      [...ghosts(1), ...ghosts(2)].every((ghost) => ghost.attributes('aria-hidden') === 'true'),
+    ).toBe(true)
+    expect([shown(1), shown(2)]).toEqual([noRate, noRate])
+
+    // August, chosen as a finger does: a figure out, its own words for «Разница», the same held.
+    await flow?.findAll('.bar:not(.quiet)')[0]?.find('input').setValue(true)
+    await flushPromises()
+    expect(shown(1)).not.toBe(noRate)
+    expect(values()[1]?.classes()).not.toContain('words')
+    expect(shown(2)).toBe(uncounted)
+    expect(ghosts(1).map((ghost) => ghost.text())).toEqual([noRate])
+    expect(ghosts(2).map((ghost) => ghost.text())).toEqual([uncounted, noRate])
+  })
+
   it('«Пришло и ушло» of a year where every month counted holds nothing (Б2, must not fire)', async () => {
     moneyChartYear.mockResolvedValue(yearCharts())
     const flow = charts(await render())[1]
-    expect(flow?.find('.columns').classes()).not.toContain('tall')
+    expect(flow?.find('.value .ghost').exists()).toBe(false)
     expect(flow?.find('.uncounted').exists()).toBe(false)
   })
 
@@ -451,7 +502,7 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     expect(flow?.find('.uncounted').exists()).toBe(true)
     expect(flow?.find('.uncounted').classes()).not.toContain('two')
     expect(flow?.findAll('.uncounted .detail')).toHaveLength(0)
-    expect(flow?.find('.columns').classes()).not.toContain('tall')
+    expect(flow?.find('.value .ghost').exists()).toBe(false)
   })
 
   // MOL-184, adversarial В1, В2: «≈» of «Ушло» and «Разница» only where a rate converted something.

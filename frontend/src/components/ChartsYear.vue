@@ -107,16 +107,27 @@
           <template v-if="flowMonth">
             <!-- Held at what the year's longest month takes (adversarial Б2 of MOL-186): words for a
                  «Разница» take two lines in a third of the card and each currency no rate counted one
-                 more, and the bars under the thumb moved by them as a neighbour was chosen. -->
-            <div class="columns" :class="{ tall: flowHeld.words }">
+                 more, and the bars under the thumb moved by them as a neighbour was chosen. The words
+                 are held by the cells below, the currencies by `.uncounted`. -->
+            <div class="columns">
               <p class="column">
                 <span class="label">{{ t('spending.income') }}</span>
                 <span class="value">{{ whole(flowMonth.income) }}</span>
               </p>
               <p class="column">
                 <span class="label">{{ t('spending.charts.spent_legend') }}</span>
-                <span class="value" :class="{ words: flowMonth.spentIncome === null }">
-                  {{ outOf(flowMonth) }}
+                <!-- The words of the year's months stand in the cell unseen, as the label's do: two
+                     lines were held, and «no rate for the month» takes three under 310 (adversarial Г1
+                     of MOL-186). -->
+                <span class="value stack" :class="{ words: flowMonth.spentIncome === null }">
+                  <span
+                    v-for="ghost in flowHeld.out"
+                    :key="ghost"
+                    class="ghost"
+                    aria-hidden="true"
+                    >{{ ghost }}</span
+                  >
+                  <span>{{ outOf(flowMonth) }}</span>
                 </span>
               </p>
               <p class="column">
@@ -135,8 +146,15 @@
                   <span>{{ differenceLabel(flowMonth) }}</span>
                 </span>
                 <!-- Never red: spending past what came in is no error, and its sign says it (С-16). -->
-                <span class="value" :class="{ words: flowMonth.difference === null }">
-                  {{ differenceOf(flowMonth) }}
+                <span class="value stack" :class="{ words: flowMonth.difference === null }">
+                  <span
+                    v-for="ghost in flowHeld.difference"
+                    :key="ghost"
+                    class="ghost"
+                    aria-hidden="true"
+                    >{{ ghost }}</span
+                  >
+                  <span>{{ differenceOf(flowMonth) }}</span>
                 </span>
               </p>
             </div>
@@ -500,14 +518,18 @@ export default defineComponent({
     const differenceLabel = (month: YearMonth) =>
       t('spending.charts.difference', { month: shortMonth(month.month, locale.value) })
     /**
-     * What the longest reading of the year takes: words in a column, every label of «Разница», and
-     * lines of the uncounted.
+     * What the longest reading of the year takes: every label of «Разница», every month's words in
+     * place of «Ушло» and «Разница», and lines of the uncounted.
      */
     const flowHeld = computed(() => {
       const shown = months.value.filter((month) => !quiet(month))
+      const words = (of: (month: YearMonth) => string, worded: (month: YearMonth) => boolean) => [
+        ...new Set(shown.filter(worded).map(of)),
+      ]
       return {
         labels: [...new Set(shown.map(differenceLabel))],
-        words: shown.some((month) => month.spentIncome === null || month.difference === null),
+        out: words(outOf, (month) => month.spentIncome === null),
+        difference: words(differenceOf, (month) => month.difference === null),
         lines: Math.max(
           0,
           ...shown.map(
@@ -799,7 +821,7 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
-/* The labels of every month in one cell: the tallest decides, the one shown is the month chosen. */
+/* The words of every month in one cell: the tallest decides, the one shown is the month chosen. */
 .stack {
   display: grid;
 
@@ -819,7 +841,8 @@ export default defineComponent({
   white-space: nowrap;
 
   /* «нет курса месяца» is words, not a sum: in a third of the card it ran into the next column. */
-  &.words {
+  &.words,
+  .ghost {
     white-space: normal;
   }
 }
@@ -836,12 +859,8 @@ export default defineComponent({
   min-height: 2lh;
 }
 
-/* «Пришло и ушло» holds what the year's longest month takes, and nothing in a year with nothing to
-   hold (adversarial Б2 of MOL-186). */
-.columns.tall .value {
-  min-height: 2lh;
-}
-
+/* A line for each kind no rate counted in the year's longest month, and none in a year with none
+   (adversarial Б2 of MOL-186). */
 .uncounted {
   min-height: 1lh;
   font-size: var(--text-footnote);
