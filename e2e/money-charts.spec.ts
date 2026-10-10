@@ -269,8 +269,9 @@ test('the day of «Темп» is a slider in sight: the arrows move it and it sa
   const pace = page.getByRole('region', { name: 'Темп месяца' })
   const slider = pace.getByRole('slider', { name: 'Темп месяца' })
   await expect(slider).toBeVisible()
-  // Under the axis at a thumb's size, not a pixel hidden for the keyboard alone (С-14, MOL-186).
-  const box = await slider.boundingBox()
+  // Under the axis at a thumb's size, not a pixel hidden for the keyboard alone (С-14, MOL-186): the
+  // strip around it is what a finger takes (Р2-1).
+  const box = await pace.locator('.track').boundingBox()
   expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
 
   await slider.focus()

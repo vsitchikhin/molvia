@@ -77,19 +77,29 @@
     </div>
     <!-- In sight under the axis (С-14, Д-5): a finger on the chart chooses too, but a slider says it can
          be moved before anyone tries. One day drawn — the 1st of a running month — has nothing to move
-         to, and no slider (adversarial А6). -->
-    <input
+         to, and no slider (adversarial А6). The strip around it, 44 high and as wide as the axis, is the
+         target, chosen as the chart is (owner's «в» on review Р2-1); the range's own thumb drags. -->
+    <div
       v-if="days.length > 1"
-      class="range"
-      type="range"
-      min="0"
-      :max="length - 1"
-      step="1"
-      :value="modelValue"
-      :aria-label="legend"
-      :aria-valuetext="days[modelValue]?.spoken"
-      @input="typed"
-    />
+      ref="track"
+      class="track"
+      @pointerdown="strip.down"
+      @pointermove="strip.move"
+      @pointerup="strip.up"
+      @pointercancel="strip.cancel"
+    >
+      <input
+        class="range"
+        type="range"
+        min="0"
+        :max="length - 1"
+        step="1"
+        :value="modelValue"
+        :aria-label="legend"
+        :aria-valuetext="days[modelValue]?.spoken"
+        @input="typed"
+      />
+    </div>
   </div>
 </template>
 
@@ -115,9 +125,10 @@ const MARGIN = 50
  * the two told apart by their stroke, not their colour alone. The day is chosen as a bar is — on
  * lifting the finger or once it goes sideways, anywhere on the card, never by a scroll — and by the
  * slider in sight under the axis (С-14): a native range, whose arrows move the day and which says the
- * day and both sums to a screen reader. **Only its thumb takes a touch** (owner's decision on review
- * Р1-1, «а»): Blink sets a range's value where the finger lands on the track, and a scroll started there
- * changed the day as the page went up. Every height is the server's.
+ * day and both sums to a screen reader. **The range takes no touch, its thumb does, and the strip around
+ * it chooses as the chart does** (owner's «а» on review Р1-1, «в» on Р2-1): Blink sets a range's value
+ * where the finger lands on the track, and a scroll started there changed the day as the page went up;
+ * the thumb alone was a target of some 16 px. Every height is the server's.
  */
 export default defineComponent({
   name: 'PaceLine',
@@ -153,10 +164,35 @@ export default defineComponent({
     }
 
     /** The nearest day, never one past the last drawn — the future of a running month. */
-    const pointer = useChartPointer(area, (fraction) => {
+    /** The nearest day, never one past the last drawn — the future of a running month. */
+    function pick(fraction: number): void {
       const last = props.days.length - 1
       if (last >= 0) choose(Math.min(last, Math.round(fraction * (props.length - 1))))
-    })
+    }
+    const pointer = useChartPointer(area, pick)
+
+    /**
+     * The strip of the slider chooses as the chart does (owner's «в» on review Р2-1): only the thumb took
+     * a touch after Р1-1 «а», a target of some 16 px. Its width is the axis's, so a place on it is the
+     * day under it on the line; a press that lands on the thumb is the native drag's, and the strip
+     * leaves it be — the two would set the day twice, half a thumb apart.
+     */
+    const track = ref<HTMLElement | null>(null)
+    const onStrip = useChartPointer(track, pick)
+    const fromThumb = (event: PointerEvent) => event.target instanceof HTMLInputElement
+    const strip = {
+      down: (event: PointerEvent) => {
+        if (!fromThumb(event)) onStrip.down(event)
+      },
+      move: (event: PointerEvent) => {
+        if (!fromThumb(event)) onStrip.move(event)
+      },
+      up: (event: PointerEvent) => {
+        if (fromThumb(event)) onStrip.cancel()
+        else onStrip.up(event)
+      },
+      cancel: onStrip.cancel,
+    }
 
     /**
      * The slider spans the whole month, as the axis above it does, so its thumb stands under the day
@@ -173,7 +209,20 @@ export default defineComponent({
       choose(day)
     }
 
-    return { area, xOf, yOf, dayPoints, usualPoints, chosenAt, usualAt, ticks, pointer, typed }
+    return {
+      area,
+      track,
+      xOf,
+      yOf,
+      dayPoints,
+      usualPoints,
+      chosenAt,
+      usualAt,
+      ticks,
+      pointer,
+      strip,
+      typed,
+    }
   },
 })
 </script>
@@ -252,18 +301,26 @@ export default defineComponent({
   stroke-width: 5;
 }
 
+/* The strip of the slider: as wide as the axis, 44 high, the target a finger has (owner's «в» on
+   review Р2-1); a scroll started on it leaves the page its scroll, as the chart does. */
+.track {
+  margin-top: var(--space-1);
+  cursor: pointer;
+  touch-action: pan-y;
+}
+
 /* A native range in the accent, the one thing on the card that is pressed (Ф-4): its own track and
    thumb, as each platform draws them — a second control of our own would be one more to keep. */
 .range {
   display: block;
   width: 100%;
   min-height: var(--touch-target);
-  margin: var(--space-1) 0 0;
+  margin: 0;
   accent-color: var(--accent);
 
-  /* Only the thumb takes a touch (owner's «а» on review Р1-1): Blink sets the value where a finger
-     lands on the track — a scroll started there moved the day from the 2nd to the 23rd. The track lets
-     the touch through to the page; the keys are the input's, untouched. */
+  /* The range takes no touch (owner's «а» on review Р1-1): Blink sets the value where a finger lands
+     on the track — a scroll started there moved the day from the 2nd to the 23rd. The strip around it
+     chooses instead, on lifting or sideways; the thumb drags, and the keys are the input's. */
   pointer-events: none;
 
   &::-webkit-slider-thumb {

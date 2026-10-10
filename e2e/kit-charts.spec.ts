@@ -37,39 +37,72 @@ test('a chosen legend row keeps its width, and its dot stands on a ring of the c
   expect(ring.shadow).toMatch(/0px 0px 0px 2px/)
 })
 
-// The slider of «Темп» in sight (С-14): as tall as a thumb, moved by the keys, and only its thumb
-// takes a press (owner's «а» on review Р1-1) — a press on the track chose the day under it.
-test('the slider of «Темп» is in sight, the keys move it, a press on its track chooses nothing', async ({
+// The slider of «Темп» in sight (С-14): its strip is the target, 44 high and as wide as the axis, and
+// chooses as the chart does (owner's «в» on review Р2-1) — a mouse on press; the thumb drags on its own,
+// and the keys move the day. The range itself takes no press (owner's «а» on review Р1-1).
+test('the slider of «Темп» is in sight: its strip chooses the day, the thumb drags, the keys move it', async ({
   page,
 }) => {
   await open(page, '/_kit')
   const slider = page.getByRole('slider', { name: 'Month pace' })
-  await slider.scrollIntoViewIfNeeded()
+  const strip = page.locator('.track', { has: slider })
+  await strip.scrollIntoViewIfNeeded()
   await expect(slider).toBeVisible()
-  const box = await slider.boundingBox()
-  expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
+  const box = await strip.boundingBox()
+  if (!box) throw new Error('no strip')
+  expect(box.height).toBeGreaterThanOrEqual(44)
   const reading = page.getByText(/^By September \d+$/)
   await expect(reading).toHaveText('By September 2')
 
-  // Far from the thumb, on the 20th of the track: nothing.
-  if (!box) throw new Error('no slider')
-  await page.mouse.click(box.x + box.width * 0.7, box.y + box.height / 2)
-  await expect(slider).toHaveValue('1')
-  await expect(reading).toHaveText('By September 2')
+  // A quarter of the way along — the 8th of a month of thirty, as on the axis above.
+  await page.mouse.click(box.x + box.width * 0.25, box.y + box.height / 2)
+  await expect(reading).toHaveText('By September 8')
+  // Past the last day drawn — the 12th — the 12th.
+  await page.mouse.click(box.x + box.width * 0.9, box.y + box.height / 2)
+  await expect(reading).toHaveText('By September 12')
+
+  // The thumb, on the 12th, dragged left: the range's own drag, which the strip leaves alone.
+  const centre = box.x + 8 + ((box.width - 16) * 11) / 29
+  await page.mouse.move(centre, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(centre - 60, box.y + box.height / 2, { steps: 6 })
+  await page.mouse.up()
+  expect(Number(await slider.inputValue())).toBeLessThan(11)
 
   await slider.focus()
+  await page.keyboard.press('Home')
+  await expect(reading).toHaveText('By September 1')
   await page.keyboard.press('ArrowRight')
-  await expect(reading).toHaveText('By September 3')
-  // Past the last day drawn — the 12th of a month of thirty — the slider stays on the 12th.
+  await expect(reading).toHaveText('By September 2')
   await page.keyboard.press('End')
   await expect(reading).toHaveText('By September 12')
   await expect(slider).toHaveValue('11')
 })
 
-// The touch a thumb makes when it scrolls the page from the slider's track (review Р1-1): Blink set the
-// day where the finger landed, and the scroll moved the day from the 2nd to the 23rd. CDP is
+// A finger lifted where it touched the strip chooses the day under it, as on the chart (Р2-1). CDP is
 // Chromium's alone (e2e.md); WebKit is held by the press above.
-test('a scroll that starts on the track of «Темп» leaves the day where it was', async ({
+test('a finger lifted on the strip of «Темп» chooses the day under it', async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'touches through CDP are Chromium’s alone')
+  await open(page, '/_kit')
+  const slider = page.getByRole('slider', { name: 'Month pace' })
+  const strip = page.locator('.track', { has: slider })
+  await strip.scrollIntoViewIfNeeded()
+  const box = await strip.boundingBox()
+  if (!box) throw new Error('no strip')
+  const cdp = await page.context().newCDPSession(page)
+  const at = { x: box.x + box.width * 0.25, y: box.y + box.height / 2 }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [at] })
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await expect(page.getByText(/^By September \d+$/)).toHaveText('By September 8')
+})
+
+// The touch a thumb makes when it scrolls the page from the slider's strip (review Р1-1): Blink set the
+// day where the finger landed, and the scroll moved the day from the 2nd to the 23rd; the strip, as the
+// chart, lets a scroll be a scroll (Р2-1). CDP is Chromium's alone (e2e.md).
+test('a scroll that starts on the strip of «Темп» leaves the day where it was', async ({
   page,
   browserName,
 }) => {
