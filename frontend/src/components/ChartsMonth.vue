@@ -79,7 +79,11 @@
           <template v-if="reading">
             <p class="month">{{ reading.label }}</p>
             <p class="figure">{{ reading.figure }}</p>
-            <p v-if="reading.sub" class="detail">{{ reading.sub }}</p>
+            <!-- Two lines held: at 320 a large usual and its percent take a second, and the line and the
+                 slider under it went down under the thumb moving them (adversarial Б1 of MOL-186,
+                 MOL-151). A month has a sub on every day or on none, so a month without one holds
+                 nothing. -->
+            <p v-if="reading.sub" class="detail held">{{ reading.sub }}</p>
           </template>
         </PaceLine>
         <p class="hint">{{ paceNote }}</p>
@@ -375,6 +379,10 @@ export default defineComponent({
 
 .hint {
   margin-top: var(--space-3);
+}
+
+.held {
+  min-height: 2lh;
 }
 
 /* What stands in the answer's place — the skeleton, a state — stands where its first card would. */

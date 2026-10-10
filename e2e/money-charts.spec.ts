@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { standAt, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 
@@ -478,3 +478,60 @@ for (const width of [390, 320]) {
     expect(await place()).toEqual(running)
   })
 }
+
+// Adversarial Б1 of round 2 of MOL-186: at 320 the day's words — «обычно к этому дню 10 001 000 ֏ ·
+// +1 900 %» — take a second line where an early day's take one, and the line and the slider under it
+// went down under the thumb moving the day (MOL-151). Two lines are held now.
+test('at 320, the slider of «Темп» stays under the thumb as the day’s words take a second line', async ({
+  page,
+}) => {
+  test.skip(Number(yerevanDay().slice(8, 10)) < 6, 'the running month needs its 6th drawn')
+  await page.setViewportSize({ width: 320, height: 800 })
+  // The usual is 1 000 ֏ to the 4th and 10 001 000 ֏ from the 5th; this month — 200 001 000 ֏ by then.
+  await seed(page, async (spend) => {
+    for (const back of [1, 2, 3]) {
+      const month = monthsAgoDay(back).slice(0, 7)
+      await spend('1000', `${month}-01`, 'cafe')
+      await spend('10000000', `${month}-05`, 'cafe')
+    }
+    await spend('1000', `${yerevanDay().slice(0, 7)}-01`, 'cafe')
+    await spend('200000000', `${yerevanDay().slice(0, 7)}-05`, 'cafe')
+  })
+  await page.goto('/money/charts')
+  const pace = page.getByRole('region', { name: 'Темп месяца' })
+  const slider = pace.getByRole('slider', { name: 'Темп месяца' })
+  const reading = pace.locator('.reading')
+  const strip = pace.locator('.track')
+  await expect(reading).toContainText('обычно к этому дню')
+  await strip.scrollIntoViewIfNeeded()
+  // In the page, not the window: Chromium's scroll anchoring would hold the strip in the window.
+  const place = async () => ({
+    reading: Math.round((await reading.boundingBox())?.height ?? 0),
+    strip: await strip.evaluate((node) =>
+      Math.round(node.getBoundingClientRect().top + window.scrollY),
+    ),
+  })
+
+  /** How many lines the words of a node take: the line boxes of its text, by where each stands. */
+  const linesOf = (node: Locator) =>
+    node.evaluate((element) => {
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size
+    })
+
+  await slider.focus()
+  await page.keyboard.press('Home')
+  await page.keyboard.press('ArrowRight')
+  await expect(reading).toContainText(/^К 2 /)
+  await expect(reading).toContainText(/обычно к этому дню 1\s000\s֏/)
+  expect(await linesOf(reading.locator('.detail'))).toBe(1)
+  const early = await place()
+
+  for (let step = 0; step < 4; step++) await page.keyboard.press('ArrowRight')
+  await expect(reading).toContainText(/^К 6 /)
+  await expect(reading).toContainText(/10\s001\s000\s֏/)
+  // Control: the words do take two lines here and one on the 2nd — the held line is filled, not grown.
+  expect(await linesOf(reading.locator('.detail'))).toBe(2)
+  expect(await place()).toEqual(early)
+})

@@ -376,6 +376,63 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     expect(held?.text()).toBe('')
   })
 
+  // Adversarial Б2 of round 2: «Разница» in words takes two lines in a third of the card, and each kind
+  // not counted one more — the bars under the thumb moved as a neighbour was chosen. The reading holds
+  // what the year's longest month takes, on every month, and nothing in a year with nothing to hold.
+  it('«Пришло и ушло» holds what its longest month takes, on every month (Б2)', async () => {
+    const charted = yearCharts()
+    moneyChartYear.mockResolvedValue({
+      ...charted,
+      months: charted.months.map((one) =>
+        one.month === '2026-09'
+          ? {
+              ...one,
+              uncounted: [parseMoney('50', 'USD')],
+              incomeUncounted: [parseMoney('20', 'EUR')],
+              difference: null,
+            }
+          : one,
+      ),
+    })
+    const flow = charts(await render())[1]
+    const reading = () => flow?.find('.reading')
+    expect(reading()?.text()).toContain(en.spending.charts.difference_uncounted)
+    expect(reading()?.find('.columns').classes()).toContain('tall')
+    expect(reading()?.find('.uncounted').classes()).toContain('two')
+    expect(reading()?.findAll('.uncounted .detail')).toHaveLength(2)
+
+    // August, chosen as a finger does: nothing to say, and the same lines held.
+    await flow?.findAll('.bar:not(.quiet)')[0]?.find('input').setValue(true)
+    await flushPromises()
+    expect(reading()?.text()).not.toContain(en.spending.charts.difference_uncounted)
+    expect(reading()?.find('.columns').classes()).toContain('tall')
+    expect(reading()?.find('.uncounted').classes()).toContain('two')
+    expect(reading()?.findAll('.uncounted .detail')).toHaveLength(0)
+  })
+
+  it('«Пришло и ушло» of a year where every month counted holds nothing (Б2, must not fire)', async () => {
+    moneyChartYear.mockResolvedValue(yearCharts())
+    const flow = charts(await render())[1]
+    expect(flow?.find('.columns').classes()).not.toContain('tall')
+    expect(flow?.find('.uncounted').exists()).toBe(false)
+  })
+
+  it('«Пришло и ушло» with one kind not counted in the year holds one line (Б2, boundary)', async () => {
+    const charted = yearCharts()
+    moneyChartYear.mockResolvedValue({
+      ...charted,
+      months: charted.months.map((one) =>
+        one.month === '2026-08' ? { ...one, uncounted: [parseMoney('50', 'USD')] } : one,
+      ),
+    })
+    const flow = charts(await render())[1]
+    // September, on arrival: August's line is held over it.
+    expect(flow?.find('.uncounted').exists()).toBe(true)
+    expect(flow?.find('.uncounted').classes()).not.toContain('two')
+    expect(flow?.findAll('.uncounted .detail')).toHaveLength(0)
+    expect(flow?.find('.columns').classes()).not.toContain('tall')
+  })
+
   // MOL-184, adversarial В1, В2: «≈» of «Ушло» and «Разница» only where a rate converted something.
   it('«Пришло и ушло»: no «≈ 0» over nothing counted, the uncounted as written (В1)', async () => {
     const charted = yearCharts()
@@ -1162,6 +1219,27 @@ describe('MoneyChartsView (MOL-158): «Месяц»', () => {
     const two = await render(SEPTEMBER)
     expect(two.find('input[type="range"]').exists()).toBe(true)
     expect(two.text()).toContain(en.spending.charts.pace_move)
+  })
+
+  // Adversarial Б1 of round 2: at 320 a usual of eight digits and a percent of four took a second line,
+  // and the line and the slider under it went down under the thumb. A month has the words on every day
+  // or on none: two lines held where it has them, nothing where it has none.
+  it('the words of a day hold two lines, and a month without them holds none (Б1)', async () => {
+    moneyChartMonth.mockResolvedValue(monthCharts())
+    const held = (await render(SEPTEMBER)).find('.pace .reading .detail.held')
+    expect(held.exists()).toBe(true)
+    expect(held.text()).not.toBe('')
+
+    moneyChartMonth.mockResolvedValue(
+      monthCharts({
+        spendCurrency: 'RUB',
+        pace: { days: monthCharts().pace.days, usual: null },
+        usual: null,
+      }),
+    )
+    const none = await render(SEPTEMBER)
+    expect(none.find('.pace .reading .figure').exists()).toBe(true)
+    expect(none.find('.pace .reading .held').exists()).toBe(false)
   })
 
   it('with a usual and no dashed line says why, never that it comes (adversarial И)', async () => {

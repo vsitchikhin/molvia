@@ -105,7 +105,10 @@
           paired
         >
           <template v-if="flowMonth">
-            <div class="columns">
+            <!-- Held at what the year's longest month takes (adversarial Б2 of MOL-186): words for a
+                 «Разница» take two lines in a third of the card and each currency no rate counted one
+                 more, and the bars under the thumb moved by them as a neighbour was chosen. -->
+            <div class="columns" :class="{ tall: flowHeld.words }">
               <p class="column">
                 <span class="label">{{ t('spending.income') }}</span>
                 <span class="value">{{ whole(flowMonth.income) }}</span>
@@ -130,7 +133,9 @@
                 </span>
               </p>
             </div>
-            <p v-for="line in flowUncounted" :key="line" class="detail">{{ line }}</p>
+            <div v-if="flowHeld.lines > 0" class="uncounted" :class="{ two: flowHeld.lines > 1 }">
+              <p v-for="line in flowUncounted" :key="line" class="detail">{{ line }}</p>
+            </div>
           </template>
         </BarChart>
         <p class="hint">{{ flowNote }}</p>
@@ -485,6 +490,20 @@ export default defineComponent({
           : []),
       ]
     })
+    /** What the longest reading of the year takes: words in a column, and lines of the uncounted. */
+    const flowHeld = computed(() => {
+      const shown = months.value.filter((month) => !quiet(month))
+      return {
+        words: shown.some((month) => month.spentIncome === null || month.difference === null),
+        lines: Math.max(
+          0,
+          ...shown.map(
+            (month) =>
+              Number(month.incomeUncounted.length > 0) + Number(month.uncounted.length > 0),
+          ),
+        ),
+      }
+    })
     /** «За 2026 год разница ≈ +695 969 ₽», or which months keep it from being counted (Р-7). */
     const flowNote = computed(() => {
       const shown = charts.value
@@ -646,6 +665,7 @@ export default defineComponent({
       flowMonth,
       differenceOf,
       flowUncounted,
+      flowHeld,
       flowNote,
       series,
       categoryOptions,
@@ -787,6 +807,21 @@ export default defineComponent({
    line, past two, still moves them — a price, named in the rule. */
 .held {
   min-height: 2lh;
+}
+
+/* «Пришло и ушло» holds what the year's longest month takes, and nothing in a year with nothing to
+   hold (adversarial Б2 of MOL-186). */
+.columns.tall .value {
+  min-height: 2lh;
+}
+
+.uncounted {
+  min-height: 1lh;
+  font-size: var(--text-footnote);
+
+  &.two {
+    min-height: 2lh;
+  }
 }
 
 .category {

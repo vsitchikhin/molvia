@@ -164,7 +164,6 @@ export default defineComponent({
     }
 
     /** The nearest day, never one past the last drawn — the future of a running month. */
-    /** The nearest day, never one past the last drawn — the future of a running month. */
     function pick(fraction: number): void {
       const last = props.days.length - 1
       if (last >= 0) choose(Math.min(last, Math.round(fraction * (props.length - 1))))
