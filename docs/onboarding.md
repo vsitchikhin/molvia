@@ -2700,8 +2700,10 @@ income currency too»).
 все они стоят в ячейке невидимо: при 327…342 «июл» переносилась, а «авг» нет, и столбцы съезжали на 12 px.
 **Раунд 5:** так же держатся слова вместо суммы у «Ушло» и «Разница» — вместо двух строк. «no rate for the
 month» при окне уже 310 (страница с увеличением) занимает три, и соседний месяц с цифрами сдвигал столбцы на ~22 px.
+**Раунд 6:** дорожка колонки — треть карточки, а не ширина цифры. Цифра не переносится, и «−2 000 000 ֏» при 320
+расширяла дорожку: подписи над ней вставали в строку, а над «−4 000 ֏» в две, и столбцы прыгали на 19 px без масштаба.
 
 Требования и план — `.scratch/tasks/{requirements,plans}/MOL-186.md`, артефакт — `.lavish/mol-186-plan.html`;
 кадры до и после — `.scratch/tasks/status/MOL-186/{before,after}/`; ревью —
-`.scratch/tasks/selfreviews/MOL-186.md`, `.scratch/tasks/selftests/MOL-186-adversarial{,-round-2,-round-3,-round-4}.md`; правила —
+`.scratch/tasks/selfreviews/MOL-186.md`, `.scratch/tasks/selftests/MOL-186-adversarial{,-round-2,-round-3,-round-4,-round-5}.md`; правила —
 `.claude/rules/money-spendings.md`, стиль — `frontend/DESIGN.md` › Charts.
