@@ -540,8 +540,10 @@ lift of the finger or as soon as it moves sideways; the selected bar is `accent`
   44 high takes the finger as the chart does — on lifting or sideways, never by a scroll — the native
   thumb drags, the range itself takes no touch; none with one day drawn. A finger on the line chooses
   too.
-- **The reading over bars** holds as many lines as its longest month takes — two — so the bars never
-  move under the thumb as another month is chosen.
+- **The reading over a chart** holds as many lines as its longest month or day takes, so the chart and
+  the slider never move under the thumb as another is chosen: two lines of words over bars and over
+  «Темп», and «Пришло и ушло» what the year's longest month takes — words for «Разница» two lines, a
+  line for each kind not counted — and nothing in a year with none.
 - **Words:** axis labels 11/600, sentences from 13; a target from 44.
 
 ## Do's and Don'ts

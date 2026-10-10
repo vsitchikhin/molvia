@@ -581,7 +581,13 @@ MOL-74's unless they name MOL-160, and hold for the year.
   (13 px on «Категория по месяцам», 19 at 320 on «Расходы»; MOL-151). The line stands with no words too.
   Chromium's scroll anchoring holds the bars in the window by scrolling the page, so an e2e measures them
   in the page, not the window. **The price:** a third line — a long «не посчитано» at 320 — still moves
-  them.
+  them. **«Темп» holds two lines of its day's words** too (adversarial Б1 of round 2): at 320 a usual
+  of eight digits and a percent of four take a second line, and the line and the slider under it went
+  down under the thumb moving it; a month has words on every day or on none, so one with none holds
+  nothing. **«Пришло и ушло» holds what the year's longest month takes** (`flowHeld`, Б2): two lines
+  of a value in a year where a month's «Разница» or «Ушло» is words, a line for income and one for
+  spending not counted where a month has them — about 24 px at 390 jumped otherwise — and nothing in a
+  year where every month counted.
 - **A finger chooses on lifting, or once it goes sideways** (`useChartPointer`, review): chosen on
   touching, every scroll that started on a chart changed the reading under the thumb; a mouse or a pen
   chooses on press. **A new answer of the same year keeps the bar chosen** while it has one; another
