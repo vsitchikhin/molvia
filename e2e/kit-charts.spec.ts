@@ -66,10 +66,10 @@ test('the slider of «Темп» is in sight: its strip chooses the day, the thu
   // the thumb, the strip beside it (adversarial round 2, an observation).
   const centre = box.x + 8 + ((box.width - 16) * 11) / 29
   const under = (x: number) =>
-    page.evaluate(
-      ([atX, atY]) => document.elementFromPoint(atX, atY)?.className,
-      [x, box.y + box.height / 2],
-    )
+    page.evaluate(({ atX, atY }) => document.elementFromPoint(atX, atY)?.className, {
+      atX: x,
+      atY: box.y + box.height / 2,
+    })
   expect(await under(centre)).toBe('range')
   expect(await under(box.x + box.width * 0.25)).toBe('track')
   await page.mouse.move(centre, box.y + box.height / 2)
