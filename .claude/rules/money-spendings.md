@@ -592,7 +592,12 @@ MOL-74's unless they name MOL-160, and hold for the year.
   Onest and «… · авг» 82 on a Mac (wider on Linux), so at 327…342, a phone with its page zoomed,
   July's took two lines where August's took one and the bars moved by 12 px; the e2e sets its window
   between the two widths it measures — and the words in place of «Ушло» and «Разница» (Г1 of round 4):
-  two lines were held, and «no rate for the month» takes three under 310, «нет курса месяца» under 299. Never a fixed number of lines where the words are known: the cell holds what they take. **The
+  two lines were held, and «no rate for the month» takes three under 310, «нет курса месяца» under 299. Never a fixed number of lines where the words are known: the cell holds what they take.
+  **The words wrap in the third of the card, never in what the figure makes of it** (`.column` and
+  `.stack` are `minmax(0, 1fr)`, Д1 of round 5): a figure never wraps, and one wider than the third —
+  «−2 000 000 ֏» at 320 — widened its column's track, so the labels over it stood on one line where
+  July's «−4 000 ֏» left them two, and the bars moved by 19 px with no zoom at all; the e2e holds it at
+  320 in drams. A figure wider than its third still runs past it, as it did before. **The
   price, named:** a line of what was not counted that wraps by itself at 320 still moves the bars, in
   any year that holds such lines.
 - **A finger chooses on lifting, or once it goes sideways** (`useChartPointer`, review): chosen on
