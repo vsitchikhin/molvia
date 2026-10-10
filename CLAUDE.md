@@ -987,6 +987,18 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
   match the behaviour. A test proves the app works, not the other way round. And **never by
   making it tolerate leftovers**: that hides the cause and leaves the suite depending on the
   machine's history.
+- **A test whose work takes over a second on CI — a fifth of vitest's 5 s — takes its own
+  timeout, at least five times its worst there** (MOL-243): a busy runner nearly triples a test of
+  seconds (`merge-corpus`, 2.2–6.1 s on the same code) and a short one more (`feedback-bot`, under
+  300 ms in 296 of the 301 runs it ran in, once 1.2 s), and a red only a retry turns green fails CI.
+  Any work may take that long — a loop of writes to the database, a parse, a mount, a subprocess,
+  the real model; a wait the test sets itself is not work. A hook is held the same way against its
+  10 s, and so is a duration a test asserts itself, whoever measured it: its bound at least five
+  times its worst there, and below the test's timeout, or vitest judges it instead of the test. So a
+  clock catches only a fivefold slowdown or worse; a bound that must catch less — «no second search»,
+  twice the work — is held by the work, never a clock. A clock bound stays only where each breakage
+  it guards, made on purpose and no wider, crosses it. Bringing the tests that stood past it up to it
+  is MOL-266 and MOL-265; their lists are a window's, and grow with it.
 - **Maximize corner cases.** Mandatory checklist:
   - NULL / legacy — the field is empty but the entity still falls under the rule
   - alternative write path — the same outcome reached by a different route
