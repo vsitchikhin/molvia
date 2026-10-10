@@ -1,23 +1,29 @@
 <template>
   <!-- Under the switchers: they are about the month chosen, and over them they came and went with
        its answer and took it from under the thumb (MOL-138, owner's В-2). -->
-  <p v-if="stale === 'offline' && fetchedAt" class="strip">
-    <IconCloudOff class="strip-icon" aria-hidden="true" />
-    {{ t('spending.charts.offline.strip', { when: when(fetchedAt) }) }}
-  </p>
-  <ScreenState
-    v-else-if="stale === 'error'"
-    kind="error"
-    inline
-    :title="t('spending.charts.load_error.title')"
-    :body="t('spending.charts.load_error.body')"
-    @retry="retry"
+  <StatusStrip
+    v-if="stale === 'offline' && fetchedAt"
+    kind="offline"
+    :text="t('spending.charts.offline.strip', { when: when(fetchedAt) })"
   />
+  <StatusStrip
+    v-else-if="stale === 'error' && fetchedAt"
+    kind="unanswered"
+    :text="t('spending.charts.error_strip', { when: when(fetchedAt) })"
+    :attempt="attempt"
+  >
+    <!-- The charts have no action of their own in the strip over the tab bar, so «Повторить» is the
+         strip's (MOL-181, Р-1). -->
+    <template #action>
+      <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+    </template>
+  </StatusStrip>
 
-  <ScreenSkeleton v-if="phase === 'loading'" :groups="[28, 100, 62, 70, 54, 34, 80, 66]" />
+  <ChartsSkeleton v-if="phase === 'loading'" class="spaced" />
 
   <ScreenState
     v-else-if="phase === 'error'"
+    class="spaced"
     kind="error"
     :title="t('spending.charts.load_error.title')"
     :body="t('spending.charts.load_error.body')"
@@ -26,6 +32,7 @@
 
   <ScreenState
     v-else-if="phase === 'offline'"
+    class="spaced"
     kind="offline"
     tone="warn"
     :title="t('spending.offline.title')"
@@ -35,6 +42,7 @@
   <template v-else-if="charts">
     <ScreenState
       v-if="empty"
+      class="spaced"
       kind="empty"
       :icon="IconDonut"
       :title="t('spending.charts.empty.title')"
@@ -71,7 +79,11 @@
           <template v-if="reading">
             <p class="month">{{ reading.label }}</p>
             <p class="figure">{{ reading.figure }}</p>
-            <p v-if="reading.sub" class="detail">{{ reading.sub }}</p>
+            <!-- Two lines held: at 320 a large usual and its percent take a second, and the line and the
+                 slider under it went down under the thumb moving them (adversarial Б1 of MOL-186,
+                 MOL-151). A month has a sub on every day or on none, so a month without one holds
+                 nothing. -->
+            <p v-if="reading.sub" class="detail held">{{ reading.sub }}</p>
           </template>
         </PaceLine>
         <p class="hint">{{ paceNote }}</p>
@@ -84,18 +96,19 @@
 import { computed, defineComponent, ref, toRef, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconDonut from '~icons/mdi/chart-donut'
-import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import { formatEstimate, lastDayOf, percentChange } from '@molvia/model'
 import type { Money, SpendingCategoryView } from '@molvia/model'
+import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import ChartsSkeleton from '@/components/ChartsSkeleton.vue'
 import DeviationBars from '@/components/DeviationBars.vue'
 import DonutChart from '@/components/DonutChart.vue'
 import PaceLine from '@/components/PaceLine.vue'
-import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { countedWhen } from '@/components/accounts'
 import { longMonth, monthGenitive, signedPercent } from '@/components/charts'
 import SectionCaption from '@/components/SectionCaption.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { useMoneyChartMonth } from '@/composables/useMoneyCharts'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { calendarDay } from '@/days'
@@ -110,21 +123,24 @@ import { calendarDay } from '@/days'
 export default defineComponent({
   name: 'ChartsMonth',
   components: {
+    AppButton,
     AppCard,
+    ChartsSkeleton,
     DeviationBars,
     DonutChart,
-    IconCloudOff,
     PaceLine,
-    ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    StatusStrip,
   },
   props: {
     month: { type: String, required: true },
   },
   setup(props) {
     const { t, locale } = useI18n()
-    const { phase, charts, stale, fetchedAt, retry } = useMoneyChartMonth(toRef(props, 'month'))
+    const { phase, charts, stale, fetchedAt, attempt, retry } = useMoneyChartMonth(
+      toRef(props, 'month'),
+    )
     const today = useLocalDay()
     /**
      * The answer as the screen says it: whether the month runs is the phone's calendar's to say, not
@@ -259,11 +275,16 @@ export default defineComponent({
      */
     const paceNote = computed(() => {
       const shown = charts.value
-      if (shown?.pace.usual) return t('spending.charts.pace_note')
-      if (shown?.usual) return t('spending.charts.pace_uncounted')
-      return shown?.comparedFrom
-        ? t('spending.charts.pace_few', { month: monthGenitive(shown.comparedFrom, t) })
-        : t('spending.charts.pace_few_none')
+      const line = shown?.pace.usual
+        ? t('spending.charts.pace_note')
+        : shown?.usual
+          ? t('spending.charts.pace_uncounted')
+          : shown?.comparedFrom
+            ? t('spending.charts.pace_few', { month: monthGenitive(shown.comparedFrom, t) })
+            : t('spending.charts.pace_few_none')
+      // «Ведите ползунок» only over a slider: the 1st of a running month has one day and none
+      // (adversarial А6).
+      return (shown?.pace.days.length ?? 0) > 1 ? `${line} ${t('spending.charts.pace_move')}` : line
     })
 
     return {
@@ -275,6 +296,7 @@ export default defineComponent({
       onScreen,
       stale,
       fetchedAt,
+      attempt,
       retry,
       when,
       nameOf,
@@ -294,26 +316,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.strip {
-  @include appear;
-
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--warn-tint);
-  color: var(--warn-ink);
-  font-size: var(--text-footnote);
-}
-
-.strip-icon {
-  @include icon;
-
-  font-size: var(--icon-sm);
-}
-
 .card {
   display: grid;
   gap: var(--space-1);
@@ -336,7 +338,8 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
-/* The two series are told apart by their stroke, not their colour alone (handoff 03). */
+/* The two series are told apart by their stroke, not their colour alone (handoff 03); both are data,
+   so neither is the accent (Ф-4, MOL-186). */
 .key {
   display: inline-block;
   width: 1rem;
@@ -345,11 +348,11 @@ export default defineComponent({
   &.solid {
     height: 3px;
     border-radius: var(--radius-mark);
-    background: var(--accent);
+    background: var(--text);
   }
 
   &.dashed {
-    border-top: 2px dashed var(--text-muted);
+    border-top: 2px dashed var(--graphic);
   }
 }
 
@@ -378,11 +381,23 @@ export default defineComponent({
   margin-top: var(--space-3);
 }
 
+.held {
+  min-height: 2lh;
+}
+
+/* What stands in the answer's place — the skeleton, a state — stands where its first card would. */
+.spaced {
+  margin-top: var(--space-4);
+}
+
 /* The answer comes in where the skeleton stood, faded only: nothing under the thumb may move
    (MOL-151, review №5 and №7, MOL-138). Here and not on the screen: a component of several roots
-   takes no scope of the screen's. */
+   takes no scope of the screen's. 24 between the cards and above the first, with the screen's 8
+   (Ф-10). */
 .card,
 .answer {
   @include appear(0);
+
+  margin-top: var(--space-4);
 }
 </style>

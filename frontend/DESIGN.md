@@ -525,6 +525,28 @@ Four kinds only: donut, bars, line, horizontal bars — no areas, stacks or seco
 lift of the finger or as soon as it moves sideways; the selected bar is `accent`, the others
 `graphic`. A donut's sectors and "Остальные" come from the server; the centre is not a live region.
 
+- **Colour:** categories are `cat-*`; the unselected, "Остальные", a bar with no rate, the usual
+  month's dash and the outline of "Пришло" are `graphic`; a series of its own — the month's line, the
+  average's dash over the bars — is `text`; `accent` is the selected bar, sector and legend row, the
+  day's cursor and dot, and the slider. Tone (`bad`/`good`) only for the difference with the market,
+  with its sign and a word — never «Разница» of a month.
+- **Not by colour only:** a selected sector is thicker and the rest dimmed; a selected legend row is
+  the `accent-tint` fill with a 2 `accent` ring, at the weight of every row, its category's dot on a 2
+  ring of `surface` (a mark on the tint falls under 3:1); an outline against a fill, a solid line
+  against a dash.
+- **The donut:** 212, the band 12 of the hundred, the centre's sum `text-card-figure` 20/800; one name,
+  "Куда ушли", wherever it stands.
+- **«Темп»'s day is a slider in sight** under the axis, spanning the month as the axis does: a strip
+  44 high takes the finger as the chart does — on lifting or sideways, never by a scroll — the native
+  thumb drags, the range itself takes no touch; none with one day drawn. A finger on the line chooses
+  too.
+- **The reading over a chart** holds as many lines as its longest month or day takes, so the chart and
+  the slider never move under the thumb as another is chosen: two lines of words over bars and over
+  «Темп», and «Пришло и ушло» what the year's longest month takes — the tallest of every month's words
+  in place of a sum and of every month's label «Разница · май», a line for each kind not counted — and
+  nothing in a year with none.
+- **Words:** axis labels 11/600, sentences from 13; a target from 44.
+
 ## Do's and Don'ts
 
 ### Do:

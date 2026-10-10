@@ -92,7 +92,7 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
     expect(wrapper.find('.rest').text()).toBe('Ещё 3 сектора — в «Графиках»')
   })
 
-  it('draws a sector for each, coloured by tokens only, «Остальные» the strong border', () => {
+  it('draws a sector for each, coloured by tokens only, «Остальные» --graphic as on «Графики»', () => {
     const fills = card('2026-09')
       .findAll('.ring path')
       .map((path) => path.attributes('fill'))
@@ -102,7 +102,8 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
       'var(--cat-other)',
       'var(--cat-home)',
       'var(--cat-own-3)',
-      'var(--border-strong)',
+      // One ring, one «Остальные»: 3:1 on the card, as on «Графики» (MOL-186, adversarial А1).
+      'var(--graphic)',
     ])
   })
 

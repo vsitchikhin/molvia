@@ -413,7 +413,9 @@ nothing up.
   the card itself since the journal went to «Траты» (MOL-159) — and **while a spending of the month
   waits on the phone, «Первая трата октября отправляется»**: «нет трат» over «Ещё не учтено: 1» said
   two things. A refused one is said by its own card, and the ring says nothing beside it. **A
-  sector's name is whole, on as many lines as it takes** (Е-19): cut, two long names read as one. A category the month
+  sector's name is whole, on as many lines as it takes** (Е-19): cut, two long names read as one.
+  **One ring, one name, one key**: «Графики» call theirs `spending.categories_title`, the month's and
+  the year's alike (Е-16, MOL-186) — two keys for one text would part at the first edit. A category the month
   does not name is left out, never drawn as a second «Остальные» (review 7). **`slices` defaults to empty so that a month kept on the phone before the
   ring still reads through the strict codec** (review 6): lost, every month kept went with it
   offline. **The phone does not work the ring out for it** (review 9, owner's decision «а»): that
@@ -553,6 +555,51 @@ MOL-74's unless they name MOL-160, and hold for the year.
   chooses nothing. **The bars are radios and the weeks a native range**, so arrows move the choice
   and each says its month or week with its figure — **which is why the reading is not a live
   region**: the control already says it, and a drag would chatter.
+- **The data of a chart is `--text` or `--graphic`; the accent is only what is chosen and the cursor**
+  (MOL-186, С-15, Ф-3, Ф-4; DESIGN.md «The Graphic Is Data Rule»). Unchosen bars, «Остальные», a bar
+  with no rate, the usual's dashed line on «Темп», the outline of «Пришло» and the fill of «Ушло» are
+  `--graphic`, 3:1 on `--surface` where `--border-strong` stood at 1.8:1; the month's line on «Темп» and
+  the dashed average over the bars are `--text`; the chosen bar, sector, legend row, the day's cursor
+  and dot and the slider are the accent — before, the month's line was terracotta, the colour of «press
+  here». **«Остальные» is `--graphic` on «Деньги» too** (adversarial А1): one ring under one name, two
+  greys of it. **A chosen row of the legend is a fill and a ring** (`--accent-tint`, 2 of `--accent`,
+  Ф-5), every row at 600: at 700 the row grew under the thumb. **Its dot stands on a ring of `--surface`**
+  (review Р1-3, adversarial А2): on the tint ten light categories and four dark — «Остальные» 2.50 among
+  them — fell under the 3:1 of a mark (MOL-172); on the card's colour each holds it, as `tokens.test.ts`
+  checks, the way the day's dot of «Темп» stands on its edge. **The label of a chosen month darkens and
+  keeps its weight** («Chosen is a fill or a form», MOL-179). **The price, named** (adversarial А4): on
+  «Расходы по месяцам» and «Пришло и ушло», which dim nothing, the chosen bar is `--accent` against
+  `--graphic`, 1.29:1 in lightness in the light scheme and 1.74:1 in the dark — an eye that reads no hue
+  tells them by the reading above, which names the month in words, and by the label's ink alone.
+  **«Разница» of «Пришло и ушло» is never red**
+  (С-16): spending past what came in is no error, and its sign says it. Categories keep their own
+  colours, and the unchosen are dimmed (0,3 on the ring, 0,42 on a category's bars). Still told apart by
+  more than colour: thickness, dimming, a fill against an outline, solid against dashed.
+- **The reading over the bars of «Год» holds two lines of words** (`.held`, adversarial А7): the running
+  month's — «−100 % к обычному к 9 октября · в среднем 180 000 ֏» — takes two where a closed one's takes
+  one, and since Е-11 put the words under the figure the bars jumped by that line as the month changed
+  (13 px on «Категория по месяцам», 19 at 320 on «Расходы»; MOL-151). The line stands with no words too.
+  Chromium's scroll anchoring holds the bars in the window by scrolling the page, so an e2e measures them
+  in the page, not the window. **The price:** a third line — a long «не посчитано» at 320 — still moves
+  them. **«Темп» holds two lines of its day's words** too (adversarial Б1 of round 2): at 320 a usual
+  of eight digits and a percent of four take a second line, and the line and the slider under it went
+  down under the thumb moving it; a month has words on every day or on none, so one with none holds
+  nothing. **«Пришло и ушло» holds what the year's longest month takes** (`flowHeld`, Б2): the words
+  of a month's «Разница» or «Ушло», a line for income and one for spending not counted where a month
+  has them — about 24 px at 390 jumped otherwise — and nothing in a year where every month counted.
+  **Words that change with the month are held by every month's words of the year, unseen in their
+  cell** (`.stack`): the label of «Разница» (adversarial В1 of round 3) — «Разница · июл» is 87 px of
+  Onest and «… · авг» 82 on a Mac (wider on Linux), so at 327…342, a phone with its page zoomed,
+  July's took two lines where August's took one and the bars moved by 12 px; the e2e sets its window
+  between the two widths it measures — and the words in place of «Ушло» and «Разница» (Г1 of round 4):
+  two lines were held, and «no rate for the month» takes three under 310, «нет курса месяца» under 299. Never a fixed number of lines where the words are known: the cell holds what they take.
+  **The words wrap in the third of the card, never in what the figure makes of it** (`.column` and
+  `.stack` are `minmax(0, 1fr)`, Д1 of round 5): a figure never wraps, and one wider than the third —
+  «−2 000 000 ֏» at 320 — widened its column's track, so the labels over it stood on one line where
+  July's «−4 000 ֏» left them two, and the bars moved by 19 px with no zoom at all; the e2e holds it at
+  320 in drams. A figure wider than its third still runs past it, as it did before. **The
+  price, named:** a line of what was not counted that wraps by itself at 320 still moves the bars, in
+  any year that holds such lines.
 - **A finger chooses on lifting, or once it goes sideways** (`useChartPointer`, review): chosen on
   touching, every scroll that started on a chart changed the reading under the thumb; a mouse or a pen
   chooses on press. **A new answer of the same year keeps the bar chosen** while it has one; another
@@ -657,7 +704,27 @@ MOL-158); since, it is the calendar year above. Requirements and plan in
   closed months' totals to d — one scale for both lines. The usual's point is a ring and the month's a
   dot, the usual dashed and the month solid: told apart by more than colour. **The day is a native
   range**, as the weeks of the rate are, not a radio for each of thirty-one days (handoff 03 asked for
-  radios); it says the day and both sums. The day on arrival is today in a running month, else the
+  radios); it says the day and both sums. **Since MOL-186 it is in sight under the axis** (С-14, Д-5),
+  in a strip 44 high, and a finger on the chart chooses too: a slider says it can be moved before anyone
+  tries. **It spans the whole month, as the axis does**, so its thumb stands under the day chosen — to
+  within half a thumb at the ends, where a native thumb stops its own half short of the track's edge
+  (review Р1-4); a day past the last one drawn is the last one, and the thumb goes back to it — spanning
+  only the days drawn, it stood at the right end over the 9th of 31. Dragged past today it stays on
+  today: the value is put back in the same `input` the drag fired, before the frame is drawn (probe of
+  review Р1-5, Blink: 6, 8, 8, 8… against a finger going on). **The range takes no touch; the strip
+  around it chooses as the chart does, and its thumb drags** (owner's «а» on review Р1-1, «в» on
+  Р2-1): Blink sets a range's value
+  where the finger lands on the track, and a scroll started there moved the day from the 2nd to the
+  23rd as the page went up — so the range has `pointer-events: none` and its thumb `auto`; the thumb
+  alone was then a target of some 16 px, so the strip, as wide as the axis, takes the finger by
+  `useChartPointer` — on lifting or sideways, never by a scroll, a mouse on press — and leaves a press
+  that lands on the thumb to the native drag. The keys are the input's. Firefox's thumb under
+  `pointer-events` was never seen (review Р2-2): whatever it does, the strip chooses there too (e2e
+  `kit-charts`, Chromium and WebKit). **The price, named** (adversarial round 2): a screen reader's
+  double tap is sent to the middle of the range, which takes no touch, so the strip under it may choose
+  the middle day of the month; the slider is adjusted by swiping up and down, and the double tap was
+  never tried with a live reader. **One day drawn — the 1st of a running month — has no slider** and no «Ведите ползунок» (`pace_move`, adversarial А6): nothing to
+  move to. The day on arrival is today in a running month, else the
   last (Р-7) — **worked out for every answer, and «running» by the phone's calendar** (adversarial
   round 2, Н1, Н2): taken as a choice, the day of an answer kept from yesterday stood over today's,
   and a September kept from when it ran opened on the 1st on the 1st of October. **Every word of «идёт», «на сегодня» and «сегодня» reads the same

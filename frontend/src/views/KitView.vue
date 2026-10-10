@@ -488,6 +488,30 @@
       <SkeletonPart kind="lines" :widths="[64, 78]" />
     </section>
 
+    <!-- «Графики» (MOL-186): the ring's legend with a row to choose, and «Темп» with its slider — what a
+         real engine draws of them, held by e2e `kit-charts` in Chromium and WebKit: the chosen row's
+         width and its dot's ring, the slider's height, and that only its thumb takes a press. -->
+    <section class="group">
+      <SectionCaption class="caption">{{ t('spending.charts.title') }}</SectionCaption>
+      <DonutChart
+        v-model="chartSector"
+        :charts="chartMonth"
+        :label="t('spending.charts.mode_month')"
+        :name-of="categoryName"
+      />
+      <AppCard>
+        <PaceLine
+          v-model="paceDay"
+          :days="paceDays"
+          :usual="null"
+          :length="30"
+          :legend="t('spending.charts.pace_title')"
+        >
+          <p>{{ paceDays[paceDay]?.spoken }}</p>
+        </PaceLine>
+      </AppCard>
+    </section>
+
     <section class="group">
       <SectionCaption class="caption">{{ t('dev.kit.cards') }}</SectionCaption>
       <AppCard as="section" tone="take">
@@ -576,11 +600,14 @@ import AppTag from '@/components/AppTag.vue'
 import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import CategoryChips from '@/components/CategoryChips.vue'
+import DonutChart from '@/components/DonutChart.vue'
+import type { DonutData } from '@/components/DonutChart.vue'
 import ListRow from '@/components/ListRow.vue'
 import MoneyMonthCard from '@/components/MoneyMonthCard.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import NavRow from '@/components/NavRow.vue'
 import OperationRow from '@/components/OperationRow.vue'
+import PaceLine from '@/components/PaceLine.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SearchField from '@/components/SearchField.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
@@ -614,6 +641,7 @@ export default defineComponent({
     BarcodeScannerSheet,
     BottomSheet,
     CategoryChips,
+    DonutChart,
     IconBarcode,
     IconClose,
     IconPlus,
@@ -624,6 +652,7 @@ export default defineComponent({
     MonthSwitcher,
     NavRow,
     OperationRow,
+    PaceLine,
     ScreenState,
     SearchField,
     SectionCaption,
@@ -677,6 +706,66 @@ export default defineComponent({
       remainingFrom: null,
       remainingTo: null,
     }
+    /** A month of «Графики» (MOL-186): two categories and «Остальные», a sector to choose. */
+    const chartCategories: SpendingCategoryView[] = [
+      {
+        id: 'ffffffff-0000-4000-8000-0000000000c1',
+        preset: 'groceries',
+        name: null,
+        colour: null,
+        archived: false,
+      },
+      {
+        id: 'ffffffff-0000-4000-8000-0000000000c2',
+        preset: 'cafe',
+        name: null,
+        colour: null,
+        archived: false,
+      },
+    ]
+    const amd = (minor: bigint) => money(minor, 'AMD')
+    const chartMonth: DonutData = {
+      spendCurrency: 'AMD',
+      incomeCurrency: 'AMD',
+      spent: amd(10000000n),
+      spentIncome: amd(10000000n),
+      uncounted: [],
+      slices: [
+        {
+          categoryId: chartCategories[0]?.id ?? null,
+          amount: amd(5000000n),
+          income: amd(5000000n),
+          count: 9,
+          level: 500,
+          members: [],
+        },
+        {
+          categoryId: chartCategories[1]?.id ?? null,
+          amount: amd(3000000n),
+          income: amd(3000000n),
+          count: 4,
+          level: 300,
+          members: [],
+        },
+        {
+          categoryId: null,
+          amount: amd(2000000n),
+          income: amd(2000000n),
+          count: 6,
+          level: 200,
+          members: [],
+        },
+      ],
+      categories: chartCategories,
+    }
+    const chartSector = ref<string | null>(null)
+    /** Twelve days of a month of thirty, as the 12th of a running month draws them. */
+    const paceDays = Array.from({ length: 12 }, (_, index) => ({
+      level: (index + 1) * 80,
+      spoken: t('dev.kit.pace_day', { day: index + 1 }),
+    }))
+    const paceDay = ref(1)
+
     const categoryName = (category: SpendingCategoryView) =>
       t(`spending.category.${category.preset ?? 'other'}`)
 
@@ -864,6 +953,10 @@ export default defineComponent({
       },
       units,
       moneyMonth,
+      chartMonth,
+      chartSector,
+      paceDays,
+      paceDay,
       // The handoff's real receipt, through the formatters: the sign belongs to the currency.
       figures: {
         balance: formatMoney(money(4230000n, 'AMD')),

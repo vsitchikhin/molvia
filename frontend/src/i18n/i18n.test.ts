@@ -339,8 +339,6 @@ describe('словарь: повторяющиеся тексты', () => {
       Charts: ['spending.charts.title', 'spending.summary.charts'],
       // The city of the settings and of «Where was it?» for another country's receipt, as in Russian.
       City: ['receipt.place.city', 'settings.city'],
-      // «Куда ушли» on «Деньги» and «Куда ушло» on «Графики» (MOL-158): one phrase in English.
-      'Where it went': ['spending.categories_title', 'spending.charts.where_title'],
       // A month after «после», after «к» and after «в»: three cases in Russian, one name in
       // English (MOL-158, MOL-159).
       ...Object.fromEntries(

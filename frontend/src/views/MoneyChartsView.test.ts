@@ -4,9 +4,13 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import type { Router } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import IconDonut from '~icons/mdi/chart-donut'
 import { ApiError } from '@molvia/client'
 import { ERROR, parseMoney } from '@molvia/model'
 import type { MoneyChartMonthView, MoneyChartYearView } from '@molvia/model'
+import ScreenState from '@/components/ScreenState.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -241,7 +245,7 @@ describe('MoneyChartsView (MOL-160): «Год», the four states', () => {
     online(false)
     moneyChartYear.mockRejectedValue(new TypeError('network'))
     const view = await render()
-    expect(view.find('.strip').text()).toContain('No connection. Charts as of')
+    expect(view.find('.strip').text()).toContain('Offline · charts as of')
     expect(plain(view.text())).toContain('֏274,523')
     expect(view.find('.state.bad').exists()).toBe(false)
   })
@@ -253,6 +257,53 @@ describe('MoneyChartsView (MOL-160): «Год», the four states', () => {
     const view = await render()
     expect(view.text()).toContain(en.spending.charts.empty.title)
     expect(view.text()).not.toContain(en.spending.charts.spent_title)
+    // The month's icon: the states of «Год» are the month's (handoff 157 v2 04, Р-6).
+    expect(view.findComponent(ScreenState).props('icon')).toBe(IconDonut)
+  })
+
+  it('the skeleton is the shape of the answer: the ring, then twelve bars (MOL-186)', async () => {
+    moneyChartYear.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    expect(view.find('.ghost-ring').exists()).toBe(true)
+    expect(view.findAll('.ghost-column')).toHaveLength(12)
+    // The reading over the bars in the kit's lines (MOL-178, adversarial А5).
+    expect(view.findAllComponents(SkeletonPart)).toHaveLength(1)
+  })
+
+  it('the server failing with the year kept: the year under a strip that says so, one «Try again»', async () => {
+    moneyChartYear.mockResolvedValueOnce(yearCharts())
+    ;(await render()).unmount()
+    moneyChartYear.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render()
+    const strip = view.findComponent(StatusStrip)
+    expect(strip.props('kind')).toBe('unanswered')
+    expect(strip.text()).toContain('The server did not answer — charts as of')
+    expect(plain(view.text())).toContain('֏274,523')
+    expect(view.find('.state.bad').exists()).toBe(false)
+    const retries = view.findAll('button').filter((one) => one.text() === en.state.retry)
+    expect(retries).toHaveLength(1)
+
+    // A retry that failed the same way is still an answer: the strip says its words again (MOL-181, C1).
+    expect(strip.props('attempt')).toBe(1)
+    await retries[0]?.trigger('click')
+    await flushPromises()
+    expect(view.findComponent(StatusStrip).props('attempt')).toBe(2)
+  })
+
+  it('must not fire: a retry that answers takes the strip away', async () => {
+    moneyChartYear.mockResolvedValueOnce(yearCharts())
+    ;(await render()).unmount()
+    moneyChartYear
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockResolvedValue(yearCharts({ spent: amd('999999') }))
+    const view = await render()
+    await view
+      .findAll('button')
+      .find((one) => one.text() === en.state.retry)
+      ?.trigger('click')
+    await flushPromises()
+    expect(view.findComponent(StatusStrip).exists()).toBe(false)
+    expect(plain(view.text())).toContain('֏999,999')
   })
 })
 
@@ -266,7 +317,7 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     expect(ring).toContain('2026 · 2 months')
     expect(ring).toContain('֏586,483')
     expect(ring).toContain('≈ ₽135,187')
-    expect(view.text()).toContain(en.spending.charts.where_year_title)
+    expect(view.text()).toContain(en.spending.categories_title)
     expect(view.text()).toContain(en.spending.charts.year_rate_note)
   })
 
@@ -288,7 +339,170 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     const view = await render()
     await charts(view)[0]?.findAll('input[type="radio"]')[0]?.setValue(true)
     expect(plain(charts(view)[0]?.text() ?? '')).toContain('≈ ₽71,387 · +73% against the average')
-    expect(plain(charts(view)[1]?.text() ?? '')).toContain('Difference · Sep')
+    expect(charts(view)[1]?.find('.label.stack > :not(.ghost)').text()).toBe('Difference · Sep')
+  })
+
+  // С-16, review Р1-6: spending past what came in is no error — «Разница» says it by its sign, in the
+  // colour of the text; `--bad-ink` back on it is what this holds.
+  it('«Разница» below zero keeps its minus and the colour of the text, never red', async () => {
+    const charted = yearCharts()
+    moneyChartYear.mockResolvedValue({
+      ...charted,
+      months: charted.months.map((one) =>
+        one.month === '2026-09' ? { ...one, difference: { ...rub('5400'), minor: -540000n } } : one,
+      ),
+    })
+    const value = charts(await render())[1]?.findAll('.column .value')[2]
+    expect(plain(value?.text() ?? '')).toContain('−₽5,400')
+    expect(value?.classes()).toEqual(['value', 'stack'])
+  })
+
+  // Adversarial А7: the running month's words take two lines where a closed one's take one, and the
+  // bars under the thumb jumped by a line. Two lines are held, and the line is there with no words.
+  it('the reading over the bars holds two lines of words, an empty one too (А7)', async () => {
+    const charted = yearCharts()
+    moneyChartYear.mockResolvedValue({
+      ...charted,
+      categories: charted.categories.map((one) => ({
+        ...one,
+        average: null,
+        points: one.points.map((point) => ({ ...point, change: null })),
+      })),
+    })
+    const [spent, , category] = charts(await render())
+    expect(spent?.find('.detail.held').text()).not.toBe('')
+    const held = category?.find('.detail.held')
+    expect(held?.exists()).toBe(true)
+    expect(held?.text()).toBe('')
+  })
+
+  // Adversarial Б2 of round 2: «Разница» in words takes two lines in a third of the card, and each kind
+  // not counted one more — the bars under the thumb moved as a neighbour was chosen. The reading holds
+  // what the year's longest month takes, on every month, and nothing in a year with nothing to hold.
+  it('«Пришло и ушло» holds what its longest month takes, on every month (Б2)', async () => {
+    const charted = yearCharts()
+    moneyChartYear.mockResolvedValue({
+      ...charted,
+      months: charted.months.map((one) =>
+        one.month === '2026-09'
+          ? {
+              ...one,
+              uncounted: [parseMoney('50', 'USD')],
+              incomeUncounted: [parseMoney('20', 'EUR')],
+              difference: null,
+            }
+          : one,
+      ),
+    })
+    const flow = charts(await render())[1]
+    const reading = () => flow?.find('.reading')
+    const difference = () => reading()?.findAll('.column .value')[2]
+    const held = () =>
+      difference()
+        ?.findAll('.ghost')
+        .map((ghost) => ghost.text())
+    expect(difference()?.find(':scope > :not(.ghost)').text()).toBe(
+      en.spending.charts.difference_uncounted,
+    )
+    expect(held()).toEqual([en.spending.charts.difference_uncounted])
+    expect(reading()?.find('.uncounted').classes()).toContain('two')
+    expect(reading()?.findAll('.uncounted .detail')).toHaveLength(2)
+
+    // August, chosen as a finger does: a figure, over September's words unseen, and the same lines held.
+    await flow?.findAll('.bar:not(.quiet)')[0]?.find('input').setValue(true)
+    await flushPromises()
+    expect(difference()?.find(':scope > :not(.ghost)').text()).not.toBe(
+      en.spending.charts.difference_uncounted,
+    )
+    expect(held()).toEqual([en.spending.charts.difference_uncounted])
+    expect(reading()?.find('.uncounted').classes()).toContain('two')
+    expect(reading()?.findAll('.uncounted .detail')).toHaveLength(0)
+  })
+
+  // Adversarial В1 of round 3: «Difference · May» is wider than «Difference · Jul», and where a third
+  // of the card falls between them (321…347 in English) one month's label took two lines and the bars
+  // moved under the thumb. Every month's label with a bar stands in the cell unseen; the tallest decides.
+  it('«Разница» stands over every label of the year’s months, unseen; the chosen one is shown (В1)', async () => {
+    moneyChartYear.mockResolvedValue(yearCharts())
+    const flow = charts(await render())[1]
+    const ghosts = () => flow?.findAll('.label.stack .ghost').map((ghost) => ghost.text())
+    const shown = () => flow?.find('.label.stack > :not(.ghost)').text()
+    // The months with a bar, and none of those before the data or to come.
+    expect(ghosts()).toEqual(['Difference · Aug', 'Difference · Sep'])
+    expect(
+      flow
+        ?.findAll('.label.stack .ghost')
+        .every((ghost) => ghost.attributes('aria-hidden') === 'true'),
+    ).toBe(true)
+    expect(shown()).toBe('Difference · Sep')
+
+    await flow?.findAll('.bar:not(.quiet)')[0]?.find('input').setValue(true)
+    await flushPromises()
+    expect(shown()).toBe('Difference · Aug')
+    expect(ghosts()).toEqual(['Difference · Aug', 'Difference · Sep'])
+  })
+
+  // Adversarial Г1 of round 4: two lines were held for words in place of a sum, and «no rate for the
+  // month» takes three under 310 — the bars moved by a line as a neighbour with figures was chosen. Every
+  // month's words of a column stand in its cell unseen, as the label's do; the tallest decides.
+  it('«Ушло» and «Разница» stand over every month’s words of the year, unseen (Г1)', async () => {
+    const charted = yearCharts()
+    moneyChartYear.mockResolvedValue({
+      ...charted,
+      months: charted.months.map((one) =>
+        one.month === '2026-09'
+          ? { ...one, spentIncome: null, difference: null, spentIncomeLevel: null }
+          : one.month === '2026-08'
+            ? { ...one, uncounted: [parseMoney('50', 'USD')], difference: null }
+            : one,
+      ),
+    })
+    const flow = charts(await render())[1]
+    const values = () => flow?.findAll('.column .value') ?? []
+    const ghosts = (at: number) => values()[at]?.findAll('.ghost') ?? []
+    const shown = (at: number) => values()[at]?.find(':scope > :not(.ghost)').text()
+    const { no_rate: noRate, difference_uncounted: uncounted } = en.spending.charts
+    // «Пришло» is never words, and holds nothing.
+    expect(ghosts(0)).toHaveLength(0)
+    // «Ушло»: September's words only; «Разница»: both months' words, each once, in the year's order.
+    expect(ghosts(1).map((ghost) => ghost.text())).toEqual([noRate])
+    expect(ghosts(2).map((ghost) => ghost.text())).toEqual([uncounted, noRate])
+    expect(
+      [...ghosts(1), ...ghosts(2)].every((ghost) => ghost.attributes('aria-hidden') === 'true'),
+    ).toBe(true)
+    expect([shown(1), shown(2)]).toEqual([noRate, noRate])
+
+    // August, chosen as a finger does: a figure out, its own words for «Разница», the same held.
+    await flow?.findAll('.bar:not(.quiet)')[0]?.find('input').setValue(true)
+    await flushPromises()
+    expect(shown(1)).not.toBe(noRate)
+    expect(values()[1]?.classes()).not.toContain('words')
+    expect(shown(2)).toBe(uncounted)
+    expect(ghosts(1).map((ghost) => ghost.text())).toEqual([noRate])
+    expect(ghosts(2).map((ghost) => ghost.text())).toEqual([uncounted, noRate])
+  })
+
+  it('«Пришло и ушло» of a year where every month counted holds nothing (Б2, must not fire)', async () => {
+    moneyChartYear.mockResolvedValue(yearCharts())
+    const flow = charts(await render())[1]
+    expect(flow?.find('.value .ghost').exists()).toBe(false)
+    expect(flow?.find('.uncounted').exists()).toBe(false)
+  })
+
+  it('«Пришло и ушло» with one kind not counted in the year holds one line (Б2, boundary)', async () => {
+    const charted = yearCharts()
+    moneyChartYear.mockResolvedValue({
+      ...charted,
+      months: charted.months.map((one) =>
+        one.month === '2026-08' ? { ...one, uncounted: [parseMoney('50', 'USD')] } : one,
+      ),
+    })
+    const flow = charts(await render())[1]
+    // September, on arrival: August's line is held over it.
+    expect(flow?.find('.uncounted').exists()).toBe(true)
+    expect(flow?.find('.uncounted').classes()).not.toContain('two')
+    expect(flow?.findAll('.uncounted .detail')).toHaveLength(0)
+    expect(flow?.find('.value .ghost').exists()).toBe(false)
   })
 
   // MOL-184, adversarial В1, В2: «≈» of «Ушло» and «Разница» only where a rate converted something.
@@ -613,7 +827,7 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     await back?.trigger('click')
     await flushPromises()
     expect(view.find('.switcher .month').text()).toBe('2025')
-    expect(view.find('.strip').text()).toContain('No connection. Charts as of')
+    expect(view.find('.strip').text()).toContain('Offline · charts as of')
   })
 
   it('the server failing, the arrow back still reaches the years kept on the phone (adversarial Ж′)', async () => {
@@ -774,7 +988,7 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     await flushPromises()
     expect(plain(view.text())).toContain('֏274,523')
     expect(localStorage.getItem(`molvia.chartyears.${ACTOR}`)).not.toBeNull()
-    expect(view.find('.strip').text()).toContain('No connection. Charts as of')
+    expect(view.find('.strip').text()).toContain('Offline · charts as of')
   })
 
   it('must not fire: a later read that answers takes the strip away', async () => {
@@ -921,6 +1135,12 @@ describe('MoneyChartsView (MOL-158): «Месяц»', () => {
     moneyChartMonth.mockReturnValue(new Promise(() => undefined))
     const view = await render('/money/charts')
     expect(view.find('.skeleton').exists()).toBe(true)
+    // The answer's shape (MOL-186): the ring, then «Против обычного» in the kit's lines (MOL-178,
+    // adversarial А5) — no bars of a year.
+    expect(view.find('.ghost-ring').exists()).toBe(true)
+    expect(view.findAllComponents(SkeletonPart)).toHaveLength(1)
+    expect(view.findAll('.skeleton-lines .group')).toHaveLength(4)
+    expect(view.find('.ghost-column').exists()).toBe(false)
     expect(moneyChartMonth).toHaveBeenCalledWith(localDay().slice(0, 7))
     expect(moneyChartYear).not.toHaveBeenCalled()
   })
@@ -1053,6 +1273,47 @@ describe('MoneyChartsView (MOL-158): «Месяц»', () => {
     expect(plain(view.text())).toContain('None is closed before May.')
   })
 
+  // Adversarial А6: the 1st of a running month draws one day — nothing to move to, so no slider, and
+  // no «Ведите ползунок» under the chart.
+  it('one day drawn: no slider and no word of one; two days: both', async () => {
+    const days = monthCharts().pace.days
+    moneyChartMonth.mockResolvedValue(
+      monthCharts({ pace: { days: days.slice(0, 1), usual: null }, usual: null }),
+    )
+    const one = await render(SEPTEMBER)
+    expect(one.find('input[type="range"]').exists()).toBe(false)
+    expect(one.text()).not.toContain(en.spending.charts.pace_move)
+    one.unmount()
+
+    moneyChartMonth.mockResolvedValue(
+      monthCharts({ pace: { days: days.slice(0, 2), usual: null }, usual: null }),
+    )
+    const two = await render(SEPTEMBER)
+    expect(two.find('input[type="range"]').exists()).toBe(true)
+    expect(two.text()).toContain(en.spending.charts.pace_move)
+  })
+
+  // Adversarial Б1 of round 2: at 320 a usual of eight digits and a percent of four took a second line,
+  // and the line and the slider under it went down under the thumb. A month has the words on every day
+  // or on none: two lines held where it has them, nothing where it has none.
+  it('the words of a day hold two lines, and a month without them holds none (Б1)', async () => {
+    moneyChartMonth.mockResolvedValue(monthCharts())
+    const held = (await render(SEPTEMBER)).find('.pace .reading .detail.held')
+    expect(held.exists()).toBe(true)
+    expect(held.text()).not.toBe('')
+
+    moneyChartMonth.mockResolvedValue(
+      monthCharts({
+        spendCurrency: 'RUB',
+        pace: { days: monthCharts().pace.days, usual: null },
+        usual: null,
+      }),
+    )
+    const none = await render(SEPTEMBER)
+    expect(none.find('.pace .reading .figure').exists()).toBe(true)
+    expect(none.find('.pace .reading .held').exists()).toBe(false)
+  })
+
   it('with a usual and no dashed line says why, never that it comes (adversarial И)', async () => {
     moneyChartMonth.mockResolvedValue(
       monthCharts({ pace: { days: monthCharts().pace.days, usual: null } }),
@@ -1175,7 +1436,7 @@ describe('MoneyChartsView (MOL-158): «Месяц»', () => {
     online(false)
     moneyChartMonth.mockRejectedValue(new TypeError('network'))
     const view = await render(SEPTEMBER)
-    expect(view.find('.strip').text()).toContain('No connection. Charts as of')
+    expect(view.find('.strip').text()).toContain('Offline · charts as of')
     expect(plain(view.text())).toContain('֏274,523')
     expect(view.find('.state.bad').exists()).toBe(false)
   })

@@ -12,6 +12,7 @@ export interface MoneyChartMonthState {
   readonly charts: ComputedRef<MoneyChartMonthView | null>
   readonly stale: ComputedRef<'loading' | 'offline' | 'error' | null>
   readonly fetchedAt: ComputedRef<Date | null>
+  readonly attempt: ComputedRef<number>
   readonly retry: () => Promise<void>
 }
 
@@ -35,6 +36,7 @@ export interface MoneyChartYearState {
   readonly charts: ComputedRef<MoneyChartYearView | null>
   readonly stale: ComputedRef<'loading' | 'offline' | 'error' | null>
   readonly fetchedAt: ComputedRef<Date | null>
+  readonly attempt: ComputedRef<number>
   /** Every year kept on the phone, with when it was read: the first year is known before this one answers. */
   readonly kept: ComputedRef<readonly Remembered<MoneyChartYearView>[]>
   readonly retry: () => Promise<void>

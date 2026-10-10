@@ -8,23 +8,29 @@
   />
   <!-- Under the switcher: it is about the year chosen, and over it they came and went with its
        answer and took it from under the thumb (MOL-138, owner's В-2). -->
-  <p v-if="stale === 'offline' && fetchedAt" class="strip">
-    <IconCloudOff class="strip-icon" aria-hidden="true" />
-    {{ t('spending.charts.offline.strip', { when: when(fetchedAt) }) }}
-  </p>
-  <ScreenState
-    v-else-if="stale === 'error'"
-    kind="error"
-    inline
-    :title="t('spending.charts.load_error.title')"
-    :body="t('spending.charts.load_error.body')"
-    @retry="retry"
+  <StatusStrip
+    v-if="stale === 'offline' && fetchedAt"
+    kind="offline"
+    :text="t('spending.charts.offline.strip', { when: when(fetchedAt) })"
   />
+  <StatusStrip
+    v-else-if="stale === 'error' && fetchedAt"
+    kind="unanswered"
+    :text="t('spending.charts.error_strip', { when: when(fetchedAt) })"
+    :attempt="attempt"
+  >
+    <!-- The charts have no action of their own in the strip over the tab bar, so «Повторить» is the
+         strip's (MOL-181, Р-1). -->
+    <template #action>
+      <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+    </template>
+  </StatusStrip>
 
-  <ScreenSkeleton v-if="phase === 'loading'" :groups="[28, 100, 62, 40, 28, 90, 40, 28, 90]" />
+  <ChartsSkeleton v-if="phase === 'loading'" class="spaced" year />
 
   <ScreenState
     v-else-if="phase === 'error'"
+    class="spaced"
     kind="error"
     :title="t('spending.charts.load_error.title')"
     :body="t('spending.charts.load_error.body')"
@@ -33,6 +39,7 @@
 
   <ScreenState
     v-else-if="phase === 'offline'"
+    class="spaced"
     kind="offline"
     tone="warn"
     :title="t('spending.offline.title')"
@@ -42,8 +49,9 @@
   <template v-else-if="charts">
     <ScreenState
       v-if="charts.firstMonth === null"
+      class="spaced"
       kind="empty"
-      :icon="IconChart"
+      :icon="IconDonut"
       :title="t('spending.charts.empty.title')"
       :body="t('spending.charts.empty.body')"
     />
@@ -54,7 +62,6 @@
         v-model="sector"
         class="answer"
         :charts="ring"
-        :title="t('spending.charts.where_year_title')"
         :label="centreLabel"
         :note="both ? t('spending.charts.year_rate_note') : null"
         :no-rate="noRate"
@@ -74,7 +81,7 @@
           <template v-if="spentMonth">
             <p class="month">{{ monthLabel(spentMonth.month) }}</p>
             <p class="figure">{{ whole(spentMonth.spent) }}</p>
-            <p class="detail">{{ spentDetail }}</p>
+            <p class="detail held">{{ spentDetail }}</p>
           </template>
         </BarChart>
         <p class="hint" :class="{ dashed: charts.average }">{{ averageNote }}</p>
@@ -98,6 +105,10 @@
           paired
         >
           <template v-if="flowMonth">
+            <!-- Held at what the year's longest month takes (adversarial Б2 of MOL-186): words for a
+                 «Разница» take two lines in a third of the card and each currency no rate counted one
+                 more, and the bars under the thumb moved by them as a neighbour was chosen. The words
+                 are held by the cells below, the currencies by `.uncounted`. -->
             <div class="columns">
               <p class="column">
                 <span class="label">{{ t('spending.income') }}</span>
@@ -105,30 +116,51 @@
               </p>
               <p class="column">
                 <span class="label">{{ t('spending.charts.spent_legend') }}</span>
-                <span class="value" :class="{ words: flowMonth.spentIncome === null }">
-                  {{ outOf(flowMonth) }}
+                <!-- The words of the year's months stand in the cell unseen, as the label's do: two
+                     lines were held, and «no rate for the month» takes three under 310 (adversarial Г1
+                     of MOL-186). -->
+                <span class="value stack" :class="{ words: flowMonth.spentIncome === null }">
+                  <span
+                    v-for="ghost in flowHeld.out"
+                    :key="ghost"
+                    class="ghost"
+                    aria-hidden="true"
+                    >{{ ghost }}</span
+                  >
+                  <span>{{ outOf(flowMonth) }}</span>
                 </span>
               </p>
               <p class="column">
-                <span class="label">
-                  {{
-                    t('spending.charts.difference', {
-                      month: shortMonth(flowMonth.month, locale),
-                    })
-                  }}
+                <!-- «Разница · май» is wider than «Разница · авг»: where a third of the card falls between
+                     them, one month's took two lines and the bars moved (adversarial В1 of MOL-186). Every
+                     month's label of the year stands in the same cell, unseen, so the cell is as tall as
+                     the tallest of them. -->
+                <span class="label stack">
+                  <span
+                    v-for="ghost in flowHeld.labels"
+                    :key="ghost"
+                    class="ghost"
+                    aria-hidden="true"
+                    >{{ ghost }}</span
+                  >
+                  <span>{{ differenceLabel(flowMonth) }}</span>
                 </span>
-                <span
-                  class="value"
-                  :class="{
-                    negative: (flowMonth.difference?.minor ?? 0n) < 0n,
-                    words: flowMonth.difference === null,
-                  }"
-                >
-                  {{ differenceOf(flowMonth) }}
+                <!-- Never red: spending past what came in is no error, and its sign says it (С-16). -->
+                <span class="value stack" :class="{ words: flowMonth.difference === null }">
+                  <span
+                    v-for="ghost in flowHeld.difference"
+                    :key="ghost"
+                    class="ghost"
+                    aria-hidden="true"
+                    >{{ ghost }}</span
+                  >
+                  <span>{{ differenceOf(flowMonth) }}</span>
                 </span>
               </p>
             </div>
-            <p v-for="line in flowUncounted" :key="line" class="detail">{{ line }}</p>
+            <div v-if="flowHeld.lines > 0" class="uncounted" :class="{ two: flowHeld.lines > 1 }">
+              <p v-for="line in flowUncounted" :key="line" class="detail">{{ line }}</p>
+            </div>
           </template>
         </BarChart>
         <p class="hint">{{ flowNote }}</p>
@@ -163,13 +195,13 @@
           :average="series.averageLevel"
           short
         >
-          <div v-if="categoryPoint" class="split">
-            <p>
-              <span class="month">{{ monthLabel(categoryPoint.month) }}</span>
-              <span class="figure small">{{ whole(categoryPoint.amount) }}</span>
-            </p>
-            <p v-if="categoryDetail" class="detail right">{{ categoryDetail }}</p>
-          </div>
+          <!-- In a column, as «Расходы по месяцам»: beside the words, «Октябрь 2026 · идёт» broke in two
+               (Е-11, handoff 157 v2 `year-category`). -->
+          <template v-if="categoryPoint">
+            <p class="month">{{ monthLabel(categoryPoint.month) }}</p>
+            <p class="figure small">{{ whole(categoryPoint.amount) }}</p>
+            <p class="detail held">{{ categoryDetail }}</p>
+          </template>
         </BarChart>
         <p v-if="series.average" class="hint">{{ t('spending.charts.category_avg') }}</p>
       </AppCard>
@@ -182,18 +214,18 @@ import { computed, defineComponent, ref, toRef, useId, watch } from 'vue'
 import type { Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import IconChart from '~icons/mdi/chart-bar'
-import IconCloudOff from '~icons/mdi/cloud-off-outline'
+import IconDonut from '~icons/mdi/chart-donut'
 import { formatEstimate, previousMonth } from '@molvia/model'
 import type { Money, MoneyChartYearView, SpendingCategoryView } from '@molvia/model'
+import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
 import BarChart from '@/components/BarChart.vue'
 import type { ChartBar } from '@/components/BarChart.vue'
+import ChartsSkeleton from '@/components/ChartsSkeleton.vue'
 import DonutChart from '@/components/DonutChart.vue'
 import type { DonutData } from '@/components/DonutChart.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
-import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { countedWhen, signedAmount } from '@/components/accounts'
 import {
@@ -206,6 +238,7 @@ import {
 } from '@/components/charts'
 import { asTyped, categoryColour } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useMoneyChartYear } from '@/composables/useMoneyCharts'
 import { calendarDay } from '@/days'
@@ -230,15 +263,16 @@ let lastCategory: string | null = null
 export default defineComponent({
   name: 'ChartsYear',
   components: {
+    AppButton,
     AppCard,
     AppField,
     BarChart,
+    ChartsSkeleton,
     DonutChart,
-    IconCloudOff,
     MonthSwitcher,
-    ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    StatusStrip,
   },
   props: {
     year: { type: String, required: true },
@@ -253,7 +287,9 @@ export default defineComponent({
     const route = useRoute()
     const router = useRouter()
     const today = useLocalDay()
-    const { phase, charts, stale, fetchedAt, kept, retry } = useMoneyChartYear(toRef(props, 'year'))
+    const { phase, charts, stale, fetchedAt, attempt, kept, retry } = useMoneyChartYear(
+      toRef(props, 'year'),
+    )
 
     const whole = (value: Money) => formatEstimate(value, locale.value)
     /** What no rate counted, as written: no «≈» stands before it (MOL-184, adversarial Б1). */
@@ -479,6 +515,30 @@ export default defineComponent({
           : []),
       ]
     })
+    const differenceLabel = (month: YearMonth) =>
+      t('spending.charts.difference', { month: shortMonth(month.month, locale.value) })
+    /**
+     * What the longest reading of the year takes: every label of «Разница», every month's words in
+     * place of «Ушло» and «Разница», and lines of the uncounted.
+     */
+    const flowHeld = computed(() => {
+      const shown = months.value.filter((month) => !quiet(month))
+      const words = (of: (month: YearMonth) => string, worded: (month: YearMonth) => boolean) => [
+        ...new Set(shown.filter(worded).map(of)),
+      ]
+      return {
+        labels: [...new Set(shown.map(differenceLabel))],
+        out: words(outOf, (month) => month.spentIncome === null),
+        difference: words(differenceOf, (month) => month.difference === null),
+        lines: Math.max(
+          0,
+          ...shown.map(
+            (month) =>
+              Number(month.incomeUncounted.length > 0) + Number(month.uncounted.length > 0),
+          ),
+        ),
+      }
+    })
     /** «За 2026 год разница ≈ +695 969 ₽», or which months keep it from being counted (Р-7). */
     const flowNote = computed(() => {
       const shown = charts.value
@@ -609,11 +669,12 @@ export default defineComponent({
       t,
       locale,
       id: useId(),
-      IconChart,
+      IconDonut,
       phase,
       charts,
       stale,
       fetchedAt,
+      attempt,
       retry,
       first,
       when,
@@ -639,6 +700,8 @@ export default defineComponent({
       flowMonth,
       differenceOf,
       flowUncounted,
+      flowHeld,
+      differenceLabel,
       flowNote,
       series,
       categoryOptions,
@@ -655,26 +718,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.strip {
-  @include appear;
-
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--warn-tint);
-  color: var(--warn-ink);
-  font-size: var(--text-footnote);
-}
-
-.strip-icon {
-  @include icon;
-
-  font-size: var(--icon-sm);
-}
-
 /* Not `.card`: a scoped class of this component reaches the root of a child's too, and the root of
    `MonthSwitcher` is an `AppCard` — its pill was laid out as a grid of a chart's card. */
 .chart-card {
@@ -706,12 +749,13 @@ export default defineComponent({
   margin-left: var(--space-2);
   border-radius: var(--radius-mark);
 
+  /* The series as they stand unchosen: the accent is the month chosen, not a series (Р-7). */
   &.outline {
-    box-shadow: inset 0 0 0 2px var(--text-muted);
+    box-shadow: inset 0 0 0 2px var(--graphic);
   }
 
   &.filled {
-    background: var(--accent);
+    background: var(--graphic);
   }
 }
 
@@ -754,7 +798,7 @@ export default defineComponent({
     display: inline-block;
     width: 1rem;
     margin-right: var(--space-2);
-    border-top: 2px dashed var(--text-muted);
+    border-top: 2px dashed var(--text);
     content: '';
     vertical-align: middle;
   }
@@ -767,8 +811,12 @@ export default defineComponent({
   padding-top: var(--space-2);
 }
 
+/* The track is the third of the card, never what is in it: a figure never wraps, and one wider than
+   the third widened the track, so the words held over it wrapped there in fewer lines — the cell's
+   height was the figure's month's, and the bars moved (adversarial Д1 of MOL-186). */
 .column {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   margin: 0;
 }
 
@@ -777,24 +825,54 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
+/* The words of every month in one cell: the tallest decides, the one shown is the month chosen. */
+.stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+
+  > * {
+    grid-area: 1 / 1;
+  }
+}
+
+.ghost {
+  visibility: hidden;
+}
+
 .value {
   font-size: var(--text-callout);
   font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 
-  &.negative {
-    color: var(--bad-ink);
-  }
-
   /* «нет курса месяца» is words, not a sum: in a third of the card it ran into the next column. */
-  &.words {
+  &.words,
+  .ghost {
     white-space: normal;
   }
 }
 
 .missing {
   margin-top: var(--space-2);
+}
+
+/* Two lines held whatever the month says: the running month's words — «к обычному к 9 октября» — take
+   two where a closed one's take one, and the bars under the thumb jumped by a line as the month changed
+   (adversarial А7 of MOL-186: 13 px on «Категория по месяцам», 19 at 320 on «Расходы»; MOL-151). A third
+   line, past two, still moves them — a price, named in the rule. */
+.held {
+  min-height: 2lh;
+}
+
+/* A line for each kind no rate counted in the year's longest month, and none in a year with none
+   (adversarial Б2 of MOL-186). */
+.uncounted {
+  min-height: 1lh;
+  font-size: var(--text-footnote);
+
+  &.two {
+    min-height: 2lh;
+  }
 }
 
 .category {
@@ -808,26 +886,19 @@ export default defineComponent({
   border-radius: 50%;
 }
 
-.split {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-2);
-
-  p {
-    margin: 0;
-  }
-}
-
-.right {
-  margin-top: var(--space-2);
-  text-align: right;
+/* What stands in the answer's place — the skeleton, a state — stands where its first card would. */
+.spaced {
+  margin-top: var(--space-4);
 }
 
 /* The answer comes in where the skeleton stood, faded only: nothing under the thumb may move
    (MOL-151, review №5 and №7, MOL-138). Here and not on the screen: a component of several roots
-   takes no scope of the screen's. */
+   takes no scope of the screen's. 24 between the cards and above the first, with the screen's 8
+   (Ф-10). */
 .chart-card,
 .answer {
   @include appear(0);
+
+  margin-top: var(--space-4);
 }
 </style>
