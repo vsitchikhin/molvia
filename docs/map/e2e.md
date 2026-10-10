@@ -22,7 +22,7 @@ that area's map; here are the shell's own specs and what every run stands on.
 - `e2e/sheet.spec.ts` — Spec: the sheet on the kit page — one history entry, every way to close, focus trap, page kept in place, taps while it rises.
 - `e2e/kit-inactive.spec.ts` — Spec in `phone` and `iphone`: «not now» of the kit on `/_kit` — an inactive segmented control walks the focus without choosing, an inactive switch holds against Space and a tap on its words, an inactive button takes the focus and does not light up (MOL-174); an inactive row is followed by neither Enter, a middle click nor a tap (MOL-175).
 - `e2e/kit-rows.spec.ts` — Spec in `phone` and `iphone`: the kit's rows on `/_kit` — a chosen row shows the keyboard's focus inside its ring, the fill between them, and keeps the card's hairline above it straight (MOL-175).
-- `e2e/kit-charts.spec.ts` — Spec in `phone` and `iphone`: the charts of `/_kit` — a chosen legend row keeps its width and its dot's ring of the card, the slider of «Темп» is 44 tall, moved by the keys, and only its thumb takes a press or a touch (MOL-186).
+- `e2e/kit-charts.spec.ts` — Spec in `phone` and `iphone`: the charts of `/_kit` — a chosen legend row keeps its width and its dot's ring of the card, the strip of «Темп»'s slider is 44 tall and chooses as the chart does, its thumb drags, the keys move it, a scroll from it chooses nothing (MOL-186).
 - `e2e/state-strip.spec.ts` — Spec in `phone` and `iphone`: on `/_kit`, an error of the whole screen draws «Try again» in the strip and only there, and the focus on it goes with it between the strip and the block (MOL-180, А2).
 
 ## repository

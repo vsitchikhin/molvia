@@ -687,18 +687,22 @@ MOL-158); since, it is the calendar year above. Requirements and plan in
   dot, the usual dashed and the month solid: told apart by more than colour. **The day is a native
   range**, as the weeks of the rate are, not a radio for each of thirty-one days (handoff 03 asked for
   radios); it says the day and both sums. **Since MOL-186 it is in sight under the axis** (С-14, Д-5),
-  44 to the thumb, and a finger on the chart chooses too: a slider says it can be moved before anyone
+  in a strip 44 high, and a finger on the chart chooses too: a slider says it can be moved before anyone
   tries. **It spans the whole month, as the axis does**, so its thumb stands under the day chosen — to
   within half a thumb at the ends, where a native thumb stops its own half short of the track's edge
   (review Р1-4); a day past the last one drawn is the last one, and the thumb goes back to it — spanning
   only the days drawn, it stood at the right end over the 9th of 31. Dragged past today it stays on
   today: the value is put back in the same `input` the drag fired, before the frame is drawn (probe of
-  review Р1-5, Blink: 6, 8, 8, 8… against a finger going on). **Only its thumb takes a touch** (owner's
-  decision «а» on review Р1-1): Blink sets a range's value where the finger lands on the track, and a
-  scroll started there moved the day from the 2nd to the 23rd as the page went up. The range takes
-  no touch (`pointer-events: none`) and its thumb takes them (`auto`): a press on the track chooses
-  nothing, the keys are the input's (e2e `kit-charts`, Chromium and WebKit). **One day drawn — the 1st of
-  a running month — has no slider** and no «Ведите ползунок» (`pace_move`, adversarial А6): nothing to
+  review Р1-5, Blink: 6, 8, 8, 8… against a finger going on). **The range takes no touch; the strip
+  around it chooses as the chart does, and its thumb drags** (owner's «а» on review Р1-1, «в» on
+  Р2-1): Blink sets a range's value
+  where the finger lands on the track, and a scroll started there moved the day from the 2nd to the
+  23rd as the page went up — so the range has `pointer-events: none` and its thumb `auto`; the thumb
+  alone was then a target of some 16 px, so the strip, as wide as the axis, takes the finger by
+  `useChartPointer` — on lifting or sideways, never by a scroll, a mouse on press — and leaves a press
+  that lands on the thumb to the native drag. The keys are the input's. Firefox's thumb under
+  `pointer-events` was never seen (review Р2-2): whatever it does, the strip chooses there too (e2e
+  `kit-charts`, Chromium and WebKit). **One day drawn — the 1st of a running month — has no slider** and no «Ведите ползунок» (`pace_move`, adversarial А6): nothing to
   move to. The day on arrival is today in a running month, else the
   last (Р-7) — **worked out for every answer, and «running» by the phone's calendar** (adversarial
   round 2, Н1, Н2): taken as a choice, the day of an answer kept from yesterday stood over today's,

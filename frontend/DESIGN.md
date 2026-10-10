@@ -536,9 +536,10 @@ lift of the finger or as soon as it moves sideways; the selected bar is `accent`
   against a dash.
 - **The donut:** 212, the band 12 of the hundred, the centre's sum `text-card-figure` 20/800; one name,
   "Куда ушли", wherever it stands.
-- **«Темп»'s day is a slider in sight** under the axis, 44 to the thumb, spanning the month as the
-  axis does; only its thumb takes a touch — a scroll that starts on the track must not change the day;
-  none with one day drawn. A finger on the line chooses too.
+- **«Темп»'s day is a slider in sight** under the axis, spanning the month as the axis does: a strip
+  44 high takes the finger as the chart does — on lifting or sideways, never by a scroll — the native
+  thumb drags, the range itself takes no touch; none with one day drawn. A finger on the line chooses
+  too.
 - **The reading over bars** holds as many lines as its longest month takes — two — so the bars never
   move under the thumb as another month is chosen.
 - **Words:** axis labels 11/600, sentences from 13; a target from 44.
