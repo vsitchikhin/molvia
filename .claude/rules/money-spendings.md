@@ -720,7 +720,10 @@ MOL-158); since, it is the calendar year above. Requirements and plan in
   `useChartPointer` — on lifting or sideways, never by a scroll, a mouse on press — and leaves a press
   that lands on the thumb to the native drag. The keys are the input's. Firefox's thumb under
   `pointer-events` was never seen (review Р2-2): whatever it does, the strip chooses there too (e2e
-  `kit-charts`, Chromium and WebKit). **One day drawn — the 1st of a running month — has no slider** and no «Ведите ползунок» (`pace_move`, adversarial А6): nothing to
+  `kit-charts`, Chromium and WebKit). **The price, named** (adversarial round 2): a screen reader's
+  double tap is sent to the middle of the range, which takes no touch, so the strip under it may choose
+  the middle day of the month; the slider is adjusted by swiping up and down, and the double tap was
+  never tried with a live reader. **One day drawn — the 1st of a running month — has no slider** and no «Ведите ползунок» (`pace_move`, adversarial А6): nothing to
   move to. The day on arrival is today in a running month, else the
   last (Р-7) — **worked out for every answer, and «running» by the phone's calendar** (adversarial
   round 2, Н1, Н2): taken as a choice, the day of an answer kept from yesterday stood over today's,
