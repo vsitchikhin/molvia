@@ -811,8 +811,12 @@ export default defineComponent({
   padding-top: var(--space-2);
 }
 
+/* The track is the third of the card, never what is in it: a figure never wraps, and one wider than
+   the third widened the track, so the words held over it wrapped there in fewer lines — the cell's
+   height was the figure's month's, and the bars moved (adversarial Д1 of MOL-186). */
 .column {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   margin: 0;
 }
 
@@ -824,6 +828,7 @@ export default defineComponent({
 /* The words of every month in one cell: the tallest decides, the one shown is the month chosen. */
 .stack {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
 
   > * {
     grid-area: 1 / 1;
