@@ -9,6 +9,9 @@ paths:
   - '.editorconfig'
   - 'bin/check-code-map.mjs'
   - 'bin/one-at-a-time.sh'
+  - 'bin/test-time-reporter*'
+  - 'bin/check-clock-bounds*'
+  - 'packages/model/tests/support/clock*'
   - '.githooks/**'
   - 'Makefile'
   - 'docs/map/**'
@@ -152,3 +155,43 @@ copied from it on the worker's first file — the files of one worker still run 
 database, exactly as all of them did. Measured under the lock on 01.10.2026: 61 s against 164 s
 in turn, all 1686 green. The production bundle, which three files test, is built once in the global
 setup: built by each of them, it was rewritten under a neighbour reading it.
+
+## The rule of time, held by CI (MOL-266)
+
+**The rule is `CLAUDE.md` › Testing (MOL-243); this is how it holds without a list.** MOL-243 wrote it
+beside a list of the tests past it, and fourteen rounds of review chased the list: it grew with the window
+of the measure and with every test merged. So CI checks every run instead (owner's В-1 «а», 14.10.2026).
+
+- **The reporter is in the root run only** (`vitest.config.ts`): CI and `make check` run the whole suite
+  there, and a module's own `npm run test -w` stays as it was. **Red on CI, a warning here** — the
+  machine runs several copies at once, and its times say nothing of CI's. On GitHub each breach is also an
+  annotation on its file.
+- **A test is held by its whole time**, `beforeEach` and a wait it sets included: the reporter cannot tell
+  a wait from work, so `navigation` and `metrics`, whose time is their own wait, carry a limit too — it
+  costs nothing. **A hook by the worker's own marks on the runner's tasks** (`experimental_getRunnerTask`):
+  a suite's start to its first child's is its `beforeAll`, its last child's end to its own its `afterAll`.
+  The reporter's hook events come in batches, 100–200 ms late (measured: 276 ms for a hook of 400). The
+  marks are an experimental door of vitest, so the reporter's test runs vitest on a fixture of hooks with
+  set waits, and a version that moves them turns that red. A hook's own timeout is not in the API — it is
+  read from the file by parsing.
+- **A limit is ten times the worst on CI, up to whole 5 s** — five times exactly would turn the run red on
+  the first run a little slower than the worst. **The worst is of the runs where the test's file was as it
+  is now** (the blob in each run's commit): the measure of 14.10 found 6 291 ms for a test on its first
+  branch that runs under 300 ms now. **The limit is a number, the third argument** — Prettier keeps a
+  test's body where it is only for a numeric literal there; a constant or `{ timeout }` re-indents the
+  whole test.
+- **A bound on a duration is `expectWithin`** (`packages/model/tests/support/clock.ts`, served as
+  `@molvia/model/testing/clock`): it asserts and keeps the duration in the test's meta, which is how the
+  reporter sees how far below its bound each one stood. **`bin/check-clock-bounds.mjs` refuses any other
+  upper bound on a duration**, found by parsing: a subtraction of two readings of the clock, through a
+  name, a helper of the file, a mention of it, an object the duration is put in. A pattern of a line
+  missed three of eighteen (review of MOL-243, Р10-А1). The age of a stamp — the clock against a moment a
+  row holds — has one side that is not the clock and is left alone. **The price, named:** a duration the
+  code under test measures has no clock in the test to be found by.
+- **A test of the testing exports may live beside its source**: `TEST_DATA` keeps a package's testing
+  export out of `src`, which ships, and leaves `src/**/*.test.ts` alone (`TESTS_BESIDE_SOURCE`) — a
+  test never ships.
+- **Where a clock cannot hold, the domain keeps a count for the tests** — `candidateSearches` in the
+  parse of receipts (MOL-265), `normalisations` in `support/text.ts`: «found once», «refused before the
+  normalisation». Twice the work, or a hundred times a third of a millisecond, is under any bound a clock
+  keeps on CI. A count is no rule of the domain and no state anyone reads but a test.

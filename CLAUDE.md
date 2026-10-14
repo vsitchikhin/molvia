@@ -998,8 +998,13 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
   age of a stamp is not such a duration — `lastSeenAt` within the hour says when, not how fast. So a
   clock catches only a fivefold slowdown or worse; a bound that must catch less — «no second
   search», twice the work — is held by the work, never a clock. A clock bound stays only where each
-  breakage it guards, made on purpose and no wider, crosses it. Bringing the tests that stood past
-  it up to it is MOL-266 and MOL-265; their lists are a window's, and grow with it.
+  breakage it guards, made on purpose and no wider, crosses it. **CI holds it on every run**
+  (MOL-266): `bin/test-time-reporter.ts` turns the run red where a test, a hook or a bound on the
+  clock, five times over, passes its limit — its whole time, a wait included — and prints what it
+  measured; a limit is ten times the worst, so it speaks on a run twice as slow as any seen. A bound
+  on a duration goes only through `expectWithin` (`@molvia/model/testing/clock`) —
+  `bin/check-clock-bounds.mjs` in `npm run lint` refuses any other, found by parsing; one the code
+  under test measures (`metrics`' lag) has no clock to be found by, and goes there by review.
 - **Maximize corner cases.** Mandatory checklist:
   - NULL / legacy — the field is empty but the entity still falls under the rule
   - alternative write path — the same outcome reached by a different route
