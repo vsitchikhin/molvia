@@ -224,7 +224,7 @@ import type {
   RatePreference,
   WalletBasis,
 } from '@molvia/model'
-import IconCheck from '~icons/mdi/check-bold'
+import IconCheck from '~icons/mdi/check'
 import IconPlus from '~icons/mdi/plus'
 import IconSwap from '~icons/mdi/swap-horizontal'
 import AppButton from '@/components/AppButton.vue'
@@ -506,13 +506,23 @@ export default defineComponent({
 .frozen,
 .notice {
   @include appear;
+}
 
+// Strips over the answer stand 16 apart; the groups of the answer 24 (Ф-10), and «Мой курс» with
+// the note under it is one group, 8 apart.
+.notice,
+.status {
   margin-bottom: var(--space-4);
 }
 
-// The kit's strip fades in by itself.
-.status {
-  margin-bottom: var(--space-4);
+.losses,
+.rate-chart,
+.frozen {
+  margin-bottom: var(--space-6);
+}
+
+.rate {
+  margin-bottom: var(--space-2);
 }
 
 .rate-caption {
@@ -560,9 +570,10 @@ export default defineComponent({
   }
 }
 
+// A note, not «хорошо»: nothing good is reported here (Ф-4).
 .frozen {
-  background: var(--good-tint);
-  color: var(--good-ink);
+  background: var(--surface-2);
+  color: var(--text-muted);
 }
 
 .notice {
@@ -595,7 +606,7 @@ export default defineComponent({
 .cards {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
