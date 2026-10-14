@@ -1,7 +1,6 @@
 ---
 paths:
   - '**/*.test.ts'
-  - '**/*.spec.ts'
   - '**/vitest*.config.ts'
 ---
 
