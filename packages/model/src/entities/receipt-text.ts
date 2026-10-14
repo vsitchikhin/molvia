@@ -12,6 +12,7 @@
 // currency after a sum — and the digits OCR confuses are the country's card (MOL-247): every pattern
 // with a word in it is built from the card, once a card. The tills' layouts stay the parse's own.
 
+import { PARSED_FRACTION_DIGITS } from '#model/entities/receipt-card'
 import type { PhotoReading } from '#model/entities/receipt-card'
 
 /** One row of a reading: its text and where it stands on the photo of its part. */
@@ -113,7 +114,8 @@ interface Lexicon {
   readonly classTin: RegExp
   readonly classNo: RegExp
   readonly classHead: RegExp
-  readonly kg: string
+  readonly kg: RegExp
+  readonly kgWhole: RegExp
   readonly terminalSum: RegExp
   readonly terminalUnit: RegExp
   readonly tillWords: RegExp
@@ -138,12 +140,33 @@ const lexicons = new WeakMap<PhotoReading, Lexicon>()
 function lexiconOf(reading: PhotoReading): Lexicon {
   const known = lexicons.get(reading)
   if (known !== undefined) return known
+  // a card names only formats of numbers the parse reads: amounts are hundredths throughout, and three
+  // decimals read as two would be every sum wrong (MOL-248 adds the third with the reading of it)
+  const unread = reading.numbers.find((f) => !PARSED_FRACTION_DIGITS.includes(f.fractionDigits))
+  if (reading.numbers.length === 0 || unread !== undefined) {
+    throw new RangeError(
+      `a card's formats of numbers are not the parse's: ${JSON.stringify(reading.numbers)}`,
+    )
+  }
   const w = reading.words
   const u = w.units
-  const any = (words: readonly string[]): string => words.join('|')
-  // «[կԿ][գԳ]» — a word in either case, letter by letter, as the table prints its unit in brackets
-  const caseless = (word: string): string =>
-    Array.from(word, (c) => `[${c}${c.toUpperCase()}]`).join('')
+  // a word that captures moves the figures the parse reads after it by their groups: the total read as the
+  // word, NaN (adversarial А1) — refused, as a format it cannot read is
+  const fragments = [
+    ...[w.total, w.totalKept, w.discountKept, w.control, w.fiscalSign, w.tin, w.fiscal],
+    ...[w.fiscalNumber, w.receiptNumber, w.sumSign, ...w.paid, ...w.sectionTax, ...w.tinMisread],
+    ...[...w.head, ...w.currency, ...Object.values(u)],
+  ]
+  const captures = fragments.find(
+    (fragment) => (new RegExp(`(?:${fragment})|`, 'u').exec('')?.length ?? 1) > 1,
+  )
+  if (captures !== undefined) throw new RangeError(`a card's word captures: ${captures}`)
+  // A word is a fragment as OCR reads it, so it goes in a group of its own (adversarial А1): a form after
+  // «|» would otherwise take the rest of the pattern for its own and find the word with no sum after it.
+  const word = (fragment: string): string => `(?:${fragment})`
+  const any = (forms: readonly string[]): string => word(forms.join('|'))
+  // characters set into a class: the four a class reads as its own syntax are escaped (adversarial А4)
+  const inClass = (chars: string): string => chars.replace(/[\\\]^-]/g, '\\$&')
   // What OCR keeps of «Դաս» — «Դաս.», «աս,», «հաս ‘» — and the class after it: «56.10», «56 10», «5610».
   // «աս» is the word «Դաս»: «Դ», «դ» or «հ» before it, or no letter — never inside a name, «Կվաս». And the
   // class is no figure that goes on (reviews 1, 2): not an amount after it — «1 հաս 1300 1300», «Բաքեթ
@@ -157,9 +180,9 @@ function lexiconOf(reading: PhotoReading): Lexicon {
     // the same figure again — a price and its sum, «1 հաս 1300 1300», «Բաքեթ 5610 5610» — or a figure
     // before «x»: the «class» was the line's price. Anything else after it is the code's own junk, «19»,
     // «20-», or a count before its unit, «56.10 1 հատ» (reviews 3, 4)
-    `|\\s+\\1\\s?[.,]?\\s?\\2(?:[.,]\\d{1,2})?(?![\\d.,])(?!\\s*(?:${u.piece}|${u.kg}))`,
+    `|\\s+\\1\\s?[.,]?\\s?\\2(?:[.,]\\d{1,2})?(?![\\d.,])(?!\\s*${any([u.piece, u.kg])})`,
     '|\\s+\\d{1,4}(?:[.,]\\d+)?\\s*[xх×*]',
-    `|\\s*(?:${u.ml}|${u.litre}|${u.gram}|${u.kg})(?!\\p{L}))`,
+    `|\\s*${any([u.ml, u.litre, u.gram, u.kg])}(?!\\p{L}))`,
   ].join('')
   // «Դաս», «հաս», «աս», and «Դ» misread as its look-alikes «Գ», «Ղ» (review 4) — a letter glued before
   // the word stays, «րԴաս» (review 3); «Կվաս» is a name
@@ -170,32 +193,42 @@ function lexiconOf(reading: PhotoReading): Lexicon {
   const lexicon: Lexicon = {
     swaps: reading.swaps,
     digitLike: reading.digitLike,
-    digitLikeAt: new RegExp(`[${Object.keys(reading.digitLike).join('')}](?=[\\d,.])`, 'g'),
-    cardTotal: new RegExp(`${w.total}\\s+(\\d[\\d ]*\\.\\d{1,2})\\b`),
-    cardTin: new RegExp(`${w.tin}.{0,4}:?\\s*\\S+|:\\s*0\\d{7}`),
-    cardNo: new RegExp(`${w.fiscal}\\s+\\S+\\s+(\\d{6,})`),
-    tableEnd: new RegExp(`${w.total}|${w.control}|${w.fiscalSign}`),
-    tableTotal: new RegExp(`${w.total}:?\\s+(\\d[\\d ]*[.,]\\d{2})`),
-    tableWeighed: new RegExp(`${caseless(u.kg)}\\)`),
-    tableTin: new RegExp(`(?:${any([w.tin, ...w.tinMisread])})\\S{0,2}\\s*(\\d{8})`),
-    tableNo: new RegExp(`${w.fiscal}\\s*\\S*\\s+(\\d{6,})`),
-    tableReceiptNo: new RegExp(`${w.receiptNumber}:?\\s*(\\d[\\d ]{2,})`),
+    digitLikeAt: new RegExp(
+      `[${inClass(Object.keys(reading.digitLike).join(''))}](?=[\\d,.])`,
+      'g',
+    ),
+    cardTotal: new RegExp(`${word(w.total)}\\s+(\\d[\\d ]*\\.\\d{1,2})\\b`),
+    cardTin: new RegExp(`${word(w.tin)}.{0,4}:?\\s*\\S+|:\\s*0\\d{7}`),
+    cardNo: new RegExp(`${word(w.fiscal)}\\s+\\S+\\s+(\\d{6,})`),
+    tableEnd: new RegExp(any([w.total, w.control, w.fiscalSign])),
+    tableTotal: new RegExp(`${word(w.total)}:?\\s+(\\d[\\d ]*[.,]\\d{2})`),
+    // the table prints its unit in brackets, in either case: «20կգ(Կգ)», «կԳ(ԿԳ)»
+    tableWeighed: new RegExp(`${word(u.kg)}\\)`, 'iu'),
+    tableTin: new RegExp(`${any([w.tin, ...w.tinMisread])}\\S{0,2}\\s*(\\d{8})`),
+    tableNo: new RegExp(`${word(w.fiscal)}\\s*\\S*\\s+(\\d{6,})`),
+    tableReceiptNo: new RegExp(`${word(w.receiptNumber)}:?\\s*(\\d[\\d ]{2,})`),
     classTail,
     classMark,
-    classEnd: new RegExp(`${w.control}|${w.total}`),
-    classTotal: new RegExp(`${w.total}:?\\s+(\\d[\\d ]*(?:[.,]\\d{1,2})?)(?![\\d.,])`),
+    classEnd: new RegExp(any([w.control, w.total])),
+    classTotal: new RegExp(`${word(w.total)}:?\\s+(\\d[\\d ]*(?:[.,]\\d{1,2})?)(?![\\d.,])`),
     // a count before its unit: «1հատ», «4 հատ», «0.742 կգ»
-    classUnit: new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*(${u.piece}|${u.kg})`, 'u'),
-    classTin: new RegExp(`${w.tin}\\S{0,2}\\s*(\\d{8})(?!\\d)`),
-    classNo: new RegExp(`${w.fiscal}\\S*(?:\\s+\\S*${w.fiscalNumber}\\S*)?\\s+(\\d{6,})`),
-    // words of a fiscal head that are no dish: the cashier, the section, the fiscal mark, the address
-    classHead: new RegExp(any(w.head), 'u'),
-    kg: u.kg,
+    classUnit: new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*(${word(u.piece)}|${word(u.kg)})`, 'u'),
+    classTin: new RegExp(`${word(w.tin)}\\S{0,2}\\s*(\\d{8})(?!\\d)`),
+    classNo: new RegExp(
+      `${word(w.fiscal)}\\S*(?:\\s+\\S*${word(w.fiscalNumber)}\\S*)?\\s+(\\d{6,})`,
+    ),
+    // words of a fiscal head that are no dish: the fiscal mark, the tax number, the cashier, the section,
+    // the address, the till
+    classHead: new RegExp(any([w.fiscal, w.tin, ...w.head]), 'u'),
+    // a kilogram, read as the card's fragment wherever a line is weighed (adversarial А2)
+    kg: new RegExp(word(u.kg), 'u'),
+    kgWhole: new RegExp(`^${word(u.kg)}$`, 'u'),
     // the terminal's figures: «price x qty unit = sum դրամ»; OCR reads «=» as «-»
-    terminalSum: new RegExp(`[-=—–]\\s*(\\d+(?:[.,]\\d+| \\d{2})?)\\s*${w.sumSign}`, 'u'),
-    terminalUnit: new RegExp(`\\s*(?:${u.pieceCut}|${u.kg})\\s*$`, 'u'),
-    tillWords: new RegExp(`(?:${any([u.piece, u.kg, ...w.currency])})(?=\\s|$)`, 'gu'),
-    oneLetterUnit: new RegExp(`^(?:${u.litre}|${u.gram})$`, 'u'),
+    terminalSum: new RegExp(`[-=—–]\\s*(\\d+(?:[.,]\\d+| \\d{2})?)\\s*${word(w.sumSign)}`, 'u'),
+    terminalUnit: new RegExp(`\\s*${any([u.pieceCut, u.kg])}\\s*$`, 'u'),
+    tillWords: new RegExp(`${any([u.piece, u.kg, ...w.currency])}(?=\\s|$)`, 'gu'),
+    oneLetterUnit: new RegExp(`^${any([u.litre, u.gram])}$`, 'u'),
+    // the letters are ranges of a class, as the card names them
     letter: new RegExp(`[${w.letters.any}]`, 'u'),
     capitals: new RegExp(`[${w.letters.capital}]{3}`, 'u'),
     small: new RegExp(`[${w.letters.small}]`, 'u'),
@@ -211,13 +244,13 @@ function lexiconOf(reading: PhotoReading): Lexicon {
       'u',
     ),
     // the tax number after its word, anywhere — never the receipt's own number «ԿՀ: 00000049»
-    tinWord: new RegExp(`${w.tin}\\S{0,2}\\s*(\\d{8})(?!\\d)`, 'u'),
-    fiscal: new RegExp(w.fiscal, 'iu'),
+    tinWord: new RegExp(`${word(w.tin)}\\S{0,2}\\s*(\\d{8})(?!\\d)`, 'u'),
+    fiscal: new RegExp(word(w.fiscal), 'iu'),
     // «ՖԻՍԿԱԼ ՀԱՄԱՐ 04143299», in capitals as often as not
-    fiscalNo: new RegExp(`${w.fiscal}\\S*\\s+\\S*\\s*(\\d{8})(?!\\d)`, 'iu'),
+    fiscalNo: new RegExp(`${word(w.fiscal)}\\S*\\s+\\S*\\s*(\\d{8})(?!\\d)`, 'iu'),
     sectionTax: new RegExp(any(w.sectionTax), 'u'),
-    totalKept: new RegExp(w.totalKept, 'u'),
-    discountKept: new RegExp(w.discountKept, 'u'),
+    totalKept: new RegExp(word(w.totalKept), 'u'),
+    discountKept: new RegExp(word(w.discountKept), 'u'),
     paid: new RegExp(any(w.paid), 'u'),
   }
   lexicons.set(reading, lexicon)
@@ -1199,7 +1232,7 @@ function classFigures(row: string, lx: Lexicon): ClassFigures | null {
       qtyS: times?.[2] === undefined ? null : pointed(times[2]),
       priceS: times?.[1] === undefined ? null : pointed(times[1]),
       sumS: pointed(sum[1]),
-      weighed: row.slice(0, sum.index).includes(lx.kg),
+      weighed: lx.kg.test(row.slice(0, sum.index)),
       terminal: true,
       words: wordsOf(row.slice(0, times?.index ?? sum.index), lx),
     }
@@ -1215,7 +1248,7 @@ function classFigures(row: string, lx: Lexicon): ClassFigures | null {
     qtyS: unit?.[1] ?? null,
     priceS: numbers.length > 1 ? (numbers.at(-2) ?? null) : null,
     sumS,
-    weighed: unit?.[2] === lx.kg,
+    weighed: unit?.[2] !== undefined && lx.kgWhole.test(unit[2]),
     terminal: false,
     words: wordsOf(unit === null ? row.replace(/[\d\s.,]+$/, '') : row.slice(0, unit.index), lx),
   }

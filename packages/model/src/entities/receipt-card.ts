@@ -12,8 +12,9 @@ import type { ItemNameLanguage, ReceiptCountry } from '#model/entities/receipt'
 
 /**
  * How a country's tills print an amount. The parse counts in hundredths throughout (`hundredthsOf`), so
- * a card names only formats it reads (`PARSED_FRACTION_DIGITS`, held by a test): Georgia's pharmacies
- * print three decimals, «23.868 ლარი», and come with the parse that reads them (MOL-248).
+ * a card names only formats it reads (`PARSED_FRACTION_DIGITS`): the parse refuses a card with none or
+ * with another, rather than read every sum of it wrong. Georgia's pharmacies print three decimals,
+ * «23.868 ლარი», and come with the parse that reads them (MOL-248).
  */
 export interface NumberFormat {
   readonly fractionDigits: number
@@ -24,8 +25,11 @@ export const PARSED_FRACTION_DIGITS: readonly number[] = [2]
 
 /**
  * The words of a country's receipts as OCR reads them — each a fragment of a regular expression, since a
- * word is read in more forms than it is printed in («Ընդամենը» as «/չդամենը», «Կղդամեկը»). A layout reads
- * the forms it reads; a form one layout alone reads (`tinMisread`) is named apart.
+ * word is read in more forms than it is printed in («Ընդամենը» as «/չդամենը», «Կղդամեկը»). A fragment is
+ * set in a group of its own, so its forms may be alternatives («A|B»); it captures nothing, since the parse
+ * reads the figures after it by their groups (a test holds it). A layout reads the forms it reads; a form
+ * one layout alone reads (`tinMisread`) is named apart. `letters` alone are no fragments but ranges of a
+ * character class.
  */
 export interface ReceiptWords {
   /** The total, as printed: what a layout reads its total after. */
@@ -50,14 +54,18 @@ export interface ReceiptWords {
   readonly fiscalNumber: string
   /** The receipt's own number — never a tax number. */
   readonly receiptNumber: string
-  /** Words of a fiscal head that name no item: the cashier, the section, the address, the till. */
+  /**
+   * Words of a fiscal head that name no item beside the fiscal mark and the tax number, which are read
+   * from their own fields: the cashier, the section, the address, the till.
+   */
   readonly head: readonly string[]
   /** What follows an amount: the currency's word as OCR cuts it, the terminal's sum first. */
   readonly sumSign: string
   readonly currency: readonly string[]
   /**
    * The units a till prints after a count: a piece — and the terminal's piece cut short before its
-   * «=» — a kilogram, a millilitre, and a litre and a gram of one letter.
+   * «=» — a kilogram, a millilitre, and a litre and a gram of one letter. A line is weighed wherever its
+   * unit is the kilogram's fragment; the table prints it in either case.
    */
   readonly units: {
     readonly piece: string
@@ -117,7 +125,7 @@ export const ARMENIAN_RECEIPTS: PhotoReading = {
     fiscal: 'Ֆիսկալ',
     fiscalNumber: 'համար',
     receiptNumber: 'ԿՀ',
-    head: ['Գանձապահ', 'Բաժին', 'Ֆիսկալ', 'Հասցե', 'ՀՎՀՀ', 'ՀԴՄ'],
+    head: ['Գանձապահ', 'Բաժին', 'Հասցե', 'ՀԴՄ'],
     sumSign: 'դր',
     currency: ['դրամ', 'դրա'],
     units: { piece: 'հ\\S?տ', pieceCut: 'հ\\S{1,2}', kg: 'կգ', ml: 'մլ', litre: 'լ', gram: 'գ' },

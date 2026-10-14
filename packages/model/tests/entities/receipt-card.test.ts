@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { PARSED_FRACTION_DIGITS, RECEIPT_CARDS, receiptCard } from '#model/entities/receipt-card'
 import type { ReceiptWords } from '#model/entities/receipt-card'
 import { receiptCountrySchema, receiptSourceOf } from '#model/entities/receipt'
+import { parseReceiptText, rowsOf } from '#model/entities/receipt-text'
 
 const countries = receiptCountrySchema.options
 const photoCards = countries.flatMap((country) => {
@@ -9,9 +10,10 @@ const photoCards = countries.flatMap((country) => {
   return photo === null ? [] : [{ country, photo }]
 })
 
-/** Every word of a card, each fragment by its field's name. */
+/** Every word of a card, each fragment by its field's name — `letters` are a class's ranges, no fragment. */
 function fragments(words: ReceiptWords): [string, string][] {
   return Object.entries(words).flatMap(([field, value]): [string, string][] => {
+    if (field === 'letters') return []
     if (typeof value === 'string') return [[field, value]]
     if (Array.isArray(value)) return value.map((one: string) => [field, one])
     return Object.entries(value as Record<string, string>).map(([k, v]) => [`${field}.${k}`, v])
@@ -61,13 +63,24 @@ describe('a country’s card (MOL-247)', () => {
     }
   })
 
-  it('every word is a fragment that compiles and finds something', () => {
+  it('every word is a fragment that captures nothing and never finds an empty word', () => {
     for (const { country, photo } of photoCards) {
       for (const [field, fragment] of fragments(photo.words)) {
-        const pattern = new RegExp(`(?:${fragment})`, 'u')
+        const name = `${country}.${field} «${fragment}»`
         // a fragment that matches nothing at all would find a word in every row
-        expect(pattern.test(''), `${country}.${field} «${fragment}»`).toBe(false)
+        expect(new RegExp(`(?:${fragment})`, 'u').test(''), name).toBe(false)
+        // a group of its own would move the figures the parse reads after the word (adversarial А1)
+        expect(new RegExp(`(?:${fragment})|`, 'u').exec('')?.length, name).toBe(1)
       }
+    }
+  })
+
+  it('every card builds the parse’s patterns, its letters’ ranges and its digit-like letters too', () => {
+    for (const { country, photo } of photoCards) {
+      expect(
+        () => parseReceiptText(photo, rowsOf('1. —\n0401/1163909 1 1,00/0,00 1', 0)),
+        country,
+      ).not.toThrow()
     }
   })
 })

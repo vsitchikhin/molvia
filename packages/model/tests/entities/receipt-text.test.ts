@@ -2445,4 +2445,56 @@ describe('the parse reads the country’s card, never words of its own (MOL-247)
     // must not: a card whose font confuses 1 and 7 only leaves the line as read
     expect(read(probe({}, { 1: '7', 7: '1' }))).toEqual([[16_000, false]])
   })
+
+  // adversarial А1: a word's forms are alternatives in a group of their own
+  it('reads every form of a word written as alternatives, the total, the tax number and the number', () => {
+    const forms = probe({ total: 'Ընդամենը|Ընդամեն', tin: 'ՀՎՀՀ|ՀՎՀ', fiscal: 'Ֆիսկալ|ՖԻՍԿԱԼ' })
+    const head = ['ՀՎՀՀ 12345678', 'Ֆիսկալ համար 12345678']
+    const got = card(forms, ...head, 'Ընդամենը 150.00')
+    expect([got.totalHundredths, got.tin, got.receiptNo]).toEqual([15_000, '12345678', '12345678'])
+    // must not: a word that captures would move the sum after it — the parse refuses the card instead
+    expect(() => card(probe({ total: '(Ընդամենը)' }), 'Ընդամենը 150.00')).toThrow(RangeError)
+    const coded = parseReceiptText(
+      forms,
+      rowsOf(
+        [...head, 'Դաս՝ 56.10', 'Կոլա 1հատ 1750.00 1750.00', 'Ընդամենը: 1750.00'].join('\n'),
+        0,
+      ),
+    )
+    expect([coded.totalHundredths, coded.tin, coded.receiptNo]).toEqual([
+      175_000,
+      '12345678',
+      '12345678',
+    ])
+  })
+
+  // adversarial А2: the kilogram is one fragment wherever a line is weighed
+  it('weighs a line by the card’s kilogram, written as a fragment, in every layout', () => {
+    const kg = probe({ units: { ...AM.words.units, kg: 'կ[գq]' } })
+    const unit = (reading: PhotoReading, ...rows: string[]) =>
+      parseReceiptText(reading, rowsOf(rows.join('\n'), 0)).lines[0]?.unit
+    const terminal = (sign: string) => ['Դաս՝ 0406', 'Պանիր', `1290.00x0.742 ${sign}=957.18դրամ`]
+    expect(unit(kg, ...terminal('կգ'))).toBe('kg')
+    expect(unit(kg, ...terminal('կq'))).toBe('kg')
+    expect(unit(kg, 'Դաս՝ 0406', 'Պանիր 0.742կգ 1290.00 957.18')).toBe('kg')
+    // the table prints it in brackets, in either case (Dog City, am-04)
+    const table = bestReading(
+      kg,
+      am04.readings.map((text) => rowsOf(text, 0)),
+    )
+    expect(table.lines.some((line) => line.unit === 'kg')).toBe(true)
+  })
+
+  // adversarial А3: the parse reads the card's formats — it refuses one it would read wrong
+  it('refuses a card with no format of numbers, or one the parse does not read', () => {
+    expect(() => card({ ...AM, numbers: [] })).toThrow(RangeError)
+    expect(() => card({ ...AM, numbers: [{ fractionDigits: 3 }] })).toThrow(RangeError)
+    expect(card({ ...AM, numbers: [{ fractionDigits: 2 }] }).lines).toHaveLength(1)
+  })
+
+  // adversarial А4: a letter read for a digit is a character of a class, escaped
+  it('puts back a letter read for a digit even where it is a class’s own sign', () => {
+    const signs = { ...AM, digitLike: { ...AM.digitLike, '-': '1', '\\': '1', ']': '1', '^': '1' } }
+    expect(card(signs).lines.map((line) => line.sumHundredths)).toEqual([15_000])
+  })
 })
