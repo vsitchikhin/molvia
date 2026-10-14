@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { expectWithin } from '@molvia/model/testing/clock'
 import {
   ERROR,
   FEEDBACK_PICTURE_BYTES_MAX,
@@ -244,7 +245,7 @@ describe('потолок разбора (адверсариальное А3)', (
     }
     // The fastest of five: other copies' load on this machine only ever adds time. The base64 of two
     // megabytes is most of what is left.
-    expect(Math.min(...Array.from({ length: 5 }, timed))).toBeLessThan(15)
+    expectWithin(Math.min(...Array.from({ length: 5 }, timed)), 15)
   })
 })
 
@@ -295,7 +296,7 @@ describe('раунд 2 MOL-167', () => {
       )
       return performance.now() - started
     }
-    expect(Math.min(...Array.from({ length: 5 }, timed))).toBeLessThan(15)
+    expectWithin(Math.min(...Array.from({ length: 5 }, timed)), 15)
   })
 
   it('APP14 Adobe с цветовым преобразованием остаётся, иной APP14 — вон (ревью 9)', () => {

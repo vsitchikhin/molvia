@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { expectWithin } from '@molvia/model/testing/clock'
 import { ISSUE } from '#model/support/errors'
 import { drawsNothing, pastedLine, tidyText, visibleLine, visibleText } from '#model/support/text'
 
@@ -91,11 +92,11 @@ describe('visibleText', () => {
     // Blank lines of an invisible glyph survive `trim`, so they meet the length first.
     let started = Date.now()
     expect(review.safeParse(`${'\u2800\n'.repeat(200_000)}a`).success).toBe(false)
-    expect(Date.now() - started).toBeLessThan(100)
+    expectWithin(Date.now() - started, 100)
     // Plain line breaks are whitespace: `trim` drops them, linearly, and what is left is «a».
     started = Date.now()
     expect(review.parse(`${'\n'.repeat(400_000)}a`)).toBe('a')
-    expect(Date.now() - started).toBeLessThan(100)
+    expectWithin(Date.now() - started, 100)
     // Twice the bound still passes when what remains fits.
     expect(review.parse(`${'\u200b\r\n'.repeat(160)}${'а'.repeat(500)}`)).toBe('а'.repeat(500))
   })

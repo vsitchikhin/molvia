@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { expectWithin } from '@molvia/model/testing/clock'
 import am01 from './receipt-text.am-01.json'
 import am03 from './receipt-text.am-03.json'
 import am04 from './receipt-text.am-04.json'
@@ -194,7 +195,7 @@ describe('a reading OCR glued into long figures', () => {
       const started = performance.now()
       const got = parseReceiptText(rowsOf(glued(digits), 0))
       expect(got.lines).toHaveLength(12)
-      expect(performance.now() - started).toBeLessThan(5_000)
+      expectWithin(performance.now() - started, 5_000)
     },
   )
 })
@@ -315,7 +316,7 @@ describe('a till that prints no shelf price, settled against its total (review �
     const started = performance.now()
     const got = parse(receipt(count))
     expect([got.lines.length, got.balanced]).toEqual([count, true])
-    expect(performance.now() - started).toBeLessThan(5_000)
+    expectWithin(performance.now() - started, 5_000)
   })
 })
 
@@ -495,7 +496,7 @@ describe('rows of junk by the hundred (review Р18)', () => {
     expect(got.lines).toHaveLength(400)
     expect(got.lines.filter((line) => line.settled).length).toBeLessThan(100)
     // and against a fall back to seconds a row, with room for a slow runner
-    expect(performance.now() - started).toBeLessThan(5_000)
+    expectWithin(performance.now() - started, 5_000)
   })
 
   it('cost no second search where the total shown is not the reading’s own (MOL-244)', () => {
@@ -506,7 +507,7 @@ describe('rows of junk by the hundred (review Р18)', () => {
     const started = performance.now()
     const got = bestReading([rowsOf(text, 0), rowsOf(text, 0)])
     expect(got.totalHundredths).toBe(900_000)
-    expect(performance.now() - started).toBeLessThan(5_000)
+    expectWithin(performance.now() - started, 5_000)
   })
 })
 
@@ -667,7 +668,7 @@ describe('rows of a thousand letters after the articles (review Р22)', () => {
     const started = performance.now()
     mergeParts([rowsOf(part1, 0), rowsOf(part2, 1)])
     // a backstop as loose as its neighbours': CI's machine is slower than any laptop
-    expect(performance.now() - started).toBeLessThan(5_000)
+    expectWithin(performance.now() - started, 5_000)
   })
 })
 
@@ -1083,7 +1084,7 @@ describe('a fiscal till read by its class code (MOL-226)', () => {
     const started = performance.now()
     const got = receipt(...rows, 'Ընդամենը 99999.99')
     expect(got.lines).toHaveLength(200)
-    expect(performance.now() - started).toBeLessThan(5_000)
+    expectWithin(performance.now() - started, 5_000)
   })
 })
 

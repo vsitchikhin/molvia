@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { expectWithin } from '@molvia/model/testing/clock'
 import { eq } from 'drizzle-orm'
 import {
   ERROR,
@@ -743,7 +744,7 @@ describe('тела со снимками считаются до чтения (�
     const past = await send(heavy, cookie)
     expect(past.statusCode).toBe(429)
     expect(past.json()).toEqual({ code: ERROR.FEEDBACK_RATE_LIMITED })
-    expect(performance.now() - started).toBeLessThan(200)
+    expectWithin(performance.now() - started, 200)
 
     expect((await send(message(), cookie)).statusCode).toBe(201)
     const other = await signIn(db, await insertActor(db))

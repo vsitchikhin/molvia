@@ -11,7 +11,11 @@ export default defineConfig({
       'bot',
       'deploy/watch',
       'frontend',
+      // The repository's own tools (MOL-266): the time reporter below and the check of the clocks.
+      { test: { name: 'bin', include: ['bin/*.test.ts'], environment: 'node' } },
     ],
+    // The rule of MOL-243 on every run of the whole suite: CI's and `make check`'s, never a module's own.
+    reporters: ['default', ['./bin/test-time-reporter.ts', { fail: false }]],
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'html'],

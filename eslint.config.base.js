@@ -51,6 +51,7 @@ export function base({ tsconfigRootDir, browser = false }) {
     },
     {
       files: ['src/**/*.{ts,vue}'],
+      ignores: TESTS_BESIDE_SOURCE,
       rules: { 'no-restricted-imports': ['error', { patterns: [...IMPORT_SHAPE, TEST_DATA] }] },
     },
 
@@ -90,6 +91,13 @@ export const TEST_DATA = {
   group: ['@molvia/*/testing', '@molvia/*/testing/*'],
   message: "A package's testing export is for tests only; src holds only what ships.",
 }
+
+/**
+ * A test beside its source lives in `src` and never ships, so `TEST_DATA` does not reach it: the
+ * clock's `expectWithin` (MOL-266) is a testing export every module's tests take, wherever they are.
+ * A module's own `deny` block over `src` leaves them out the same way.
+ */
+export const TESTS_BESIDE_SOURCE = ['src/**/*.test.ts']
 
 /**
  * Deny a group of import specifiers with the reason the boundary exists. Meant for `src`

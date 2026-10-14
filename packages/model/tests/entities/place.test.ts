@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { expectWithin } from '@molvia/model/testing/clock'
 import { newPlaceSchema, placeSchema } from '#model/entities/place'
 
 const place = {
@@ -100,7 +101,7 @@ describe('newPlaceSchema: the ends, round three (MOL-21, adversarial round 3)', 
   it('А: a megabyte of tags is refused before any trimming, and fast', () => {
     const started = performance.now()
     expect(parse(`Рынок${'\u{e0020}'.repeat(260_000)}`).success).toBe(false)
-    expect(performance.now() - started).toBeLessThan(200)
+    expectWithin(performance.now() - started, 200)
   })
 
   it('boundary: twice the limit is let in to be trimmed, one more is not', () => {

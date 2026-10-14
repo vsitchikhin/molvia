@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
  * numbers in the test names are the corners of the requirements, `requirements/MOL-27.md` §6.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { expectWithin } from '@molvia/model/testing/clock'
 import { eq, sql } from 'drizzle-orm'
 import { ERROR, ISSUE, verdictCardCodec } from '@molvia/model'
 import type { VerdictCard } from '@molvia/model'
@@ -202,7 +203,7 @@ describe('PUT — поставить оценку', () => {
     const reply = await rate(actor, itemId, { score: 3, review: `${'\u2800\n'.repeat(200_000)}a` })
 
     expect(reply.status).toBe(400)
-    expect(Date.now() - started).toBeLessThan(2000)
+    expectWithin(Date.now() - started, 2000)
     expect(await rows(itemId)).toHaveLength(0)
   })
 

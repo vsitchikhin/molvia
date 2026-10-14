@@ -1,5 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { afterEach, describe, expect, it } from 'vitest'
+import { expectWithin } from '@molvia/model/testing/clock'
 import { DURATION_BUCKETS, httpMetrics, processMetrics } from './metrics'
 import type { ProcessMetrics } from './metrics'
 
@@ -156,7 +157,7 @@ describe('processMetrics', () => {
     holdTheLoop(150)
     await sleep(400)
 
-    expect(gauge(running.render(), 'nodejs_eventloop_lag_max_seconds')).toBeLessThan(0.1)
+    expectWithin(gauge(running.render(), 'nodejs_eventloop_lag_max_seconds') * 1000, 100)
   })
 
   it('reads an idle loop as on time, not as its timer’s resolution (adversarial А3)', async () => {
@@ -165,6 +166,6 @@ describe('processMetrics', () => {
     running = processMetrics({ tickMs: 200, windowMs: 5000 })
     await sleep(1100)
 
-    expect(gauge(running.render(), 'nodejs_eventloop_lag_p99_seconds')).toBeLessThan(0.15)
+    expectWithin(gauge(running.render(), 'nodejs_eventloop_lag_p99_seconds') * 1000, 150)
   })
 })

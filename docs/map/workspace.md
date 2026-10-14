@@ -68,6 +68,8 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `bin/init-env.sh` — Generates this copy's `.env` from its index: ports — the receipt reader's too — databases, compose project; keeps bot settings across `--force`.
 - `bin/fetch-model.mjs` — Fetches the pinned embedding model (MOL-105) into `.models/` or a given directory, file by file against its sha256, with the notice of its terms; `make model`, CI and the API's image.
 - `bin/link-shared.sh` — Points `.scratch`, `.lavish` and `.models` at the directory shared by all working copies; idempotent.
+- `bin/test-time-reporter.ts` — The time reporter of the root run (MOL-266): a test, a `beforeAll`/`afterAll` or a bound on the clock whose time, five times over, passes its limit, by the rule of MOL-243; prints what it measures for the next measure.
+- `bin/test-time-reporter.fixture.ts` — A test file the reporter's test runs through vitest itself: hooks that wait set times, a test with its own timeout, two bounds on the clock.
 - `bin/one-at-a-time.sh` — Runs a command under the one lock all copies share, so the heavy checks of several copies take turns; gives the command no terminal so vitest does not watch by default, refuses a vitest told to watch and Playwright's UI and debugger, names the waited copy by its root.
 - `docker-compose.yml` — Development stack: this copy's Postgres on the loopback, named by the copy's index; the receipt reader only under the `receipts` profile (`make reader`).
 - `eslint.config.base.js` — Shared lint preset every module opts into: type-aware rules, the alias-or-sibling import shape, the `deny` helper.
@@ -75,5 +77,5 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `package.json` — Root workspace: the module list, the outside watch among them (MOL-221), and the repository-wide dev, lint, format, typecheck, test and e2e scripts, shared dev tools.
 - `services/README.md` — What `services/` is: non-TypeScript services, outside the workspaces and never reaching the database — the receipt reader the API calls.
 - `tsconfig.base.json` — Shared strict TypeScript options every module extends.
-- `tsconfig.json` — Root TypeScript config: type-checks `e2e/` and the root config files.
-- `vitest.config.ts` — Root Vitest run: gathers the modules' projects, coverage with a threshold on the domain only.
+- `tsconfig.json` — Root TypeScript config: type-checks `e2e/`, the root config files and the TypeScript of `bin/`.
+- `vitest.config.ts` — Root Vitest run: gathers the modules' projects and `bin`'s own tests, the time reporter beside the default, coverage with a threshold on the domain only.

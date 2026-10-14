@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { expectWithin } from '@molvia/model/testing/clock'
 import { INT8_MAX } from '#model/support/decimal'
 import { ERROR, ISSUE } from '#model/support/errors'
 import {
@@ -402,7 +403,7 @@ describe('a long chain (Ж1)', () => {
     })
     const started = performance.now()
     const wallet = walletRate(chain, 'RUB', 'AMD', '2030-01-01')
-    expect(performance.now() - started).toBeLessThan(1000)
+    expectWithin(performance.now() - started, 1000)
     expect(wallet?.basis).toBe('weighted')
   })
 

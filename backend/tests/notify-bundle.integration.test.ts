@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { expectWithin } from '@molvia/model/testing/clock'
 import { broadcasts } from '@/db/schema'
 import { connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertActor } from './fixtures'
@@ -85,7 +86,7 @@ describe('dist/notify.js — вход', () => {
     const exited = new Promise<number | null>((resolve) => child.on('exit', resolve))
     const started = Date.now()
     expect(await exited).toBe(2)
-    expect(Date.now() - started).toBeLessThan(10_000)
+    expectWithin(Date.now() - started, 10_000)
     expect(output).toContain('the message comes on standard input')
     child.stdin.end()
   }, 20_000)

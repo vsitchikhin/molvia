@@ -1,5 +1,6 @@
 import { format } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { expectWithin } from '@molvia/model/testing/clock'
 import { Bot, HttpError } from 'grammy'
 import type { Transformer } from 'grammy'
 import type { Update, UserFromGetMe } from 'grammy/types'
@@ -111,7 +112,7 @@ describe('как бот разбирает апдейты', () => {
     // апдейт, и коды в хвосте очереди истекают, не дойдя до обработчика.
     const lag = await lagBetween([start(1, 1001, 'a'.repeat(43)), start(2, 1002, 'b'.repeat(43))])
 
-    expect(lag).toBeLessThan(HELD_MS / 2)
+    expectWithin(lag, HELD_MS / 2)
   })
 
   it('а два нажатия одного человека — по порядку', async () => {

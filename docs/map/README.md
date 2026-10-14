@@ -59,6 +59,7 @@ support types, the shared integration tests, the migrations.
 
 ### packages/model · tests
 
+- `packages/model/tests/support/clock.ts` — `expectWithin`, the one way a test bounds a duration from above: asserts it and keeps it in the test's meta for the time reporter; served as `@molvia/model/testing/clock` to every module's tests.
 - `packages/model/tests/adversarial.test.ts` — Test: every scenario an adversarial pass found in the model — parsing, money, units, patches, verdicts, wire — pinned by name.
 
 ### packages/client

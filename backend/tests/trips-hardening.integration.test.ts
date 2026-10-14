@@ -6,6 +6,7 @@
  */
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { expectWithin } from '@molvia/model/testing/clock'
 import { eq, sql } from 'drizzle-orm'
 import { ERROR, recentPlacesResponseSchema, tripViewCodec } from '@molvia/model'
 import type { TripView } from '@molvia/model'
@@ -436,7 +437,7 @@ describe('заход 3: вид и тождество места — разные
     })
 
     expect(reply.status).toBe(400)
-    expect(performance.now() - started).toBeLessThan(1_000)
+    expectWithin(performance.now() - started, 1_000)
     expect(await db.select().from(places)).toEqual([])
   })
 

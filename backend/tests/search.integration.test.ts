@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { expectWithin } from '@molvia/model/testing/clock'
 import { newItemSchema, toSearchKey } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { sql as raw } from 'drizzle-orm'
@@ -739,7 +740,7 @@ describe('search — edges', () => {
     expect(await names(query)).toEqual(['Молоко Ашхар'])
     // Generous on purpose: the answer above already proves the cut; the time only guards
     // against the unbounded cost, and a slow runner must not fail a correct build.
-    expect(performance.now() - started).toBeLessThan(5000)
+    expectWithin(performance.now() - started, 5000)
   })
 
   it('survives an unfinished last word longer than 255 against a longer name word', async () => {
