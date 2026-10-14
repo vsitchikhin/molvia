@@ -506,8 +506,12 @@ rate exactly as before.
   the difference says nothing about why. «Обмены против рынка» does the same — the total, a place's
   percent and amount both ways, «хуже / лучше рынка» under the total and in each place's line — **one
   sign a row, the money's** (Р-4): the percent is rounded to hundredths and may read 0,00 % over a
-  difference that is not nothing; nothing is no tone and no word. The tone is the phone's by the
-  server's sign; no figure is worked out for it.
+  difference that is not nothing; nothing is no tone and no word. **An amount is whole units unless
+  that prints a nought for money that is there** (`roundsToNought`, adversarial А1, as «Бюджет»
+  prints it): «−0 ֏» in red under «хуже рынка» stood beside the same «0 ֏» of an exact zero with no
+  tone, while the card of that exchange printed «−0,30 ֏ · хуже, чем …» — a bank's own rate rounded
+  to the dram lands there. The tone is the phone's by the server's sign; no figure is worked out for
+  it.
 - **«Обмены против рынка» sums each exchange as its card measures it** (MOL-152, folded into
   MOL-159, owner's decisions В-1 «в», В-2 «а», В-3 «а»): the twelve months to today — from the day
   after the same day a year back (MOL-168, В-1 «б»), one window with the year of the line below — by
