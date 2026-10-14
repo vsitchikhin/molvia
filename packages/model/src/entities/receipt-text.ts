@@ -197,6 +197,13 @@ function afford(budget: Budget, combinations: number): boolean {
 const holds = (qty: number, paid: number, disc: number, price: number): boolean =>
   Math.abs(paid + disc - Math.round((qty * price) / 1000)) <= TOLERANCE_HUNDREDTHS
 
+/**
+ * The searches of a line's candidates made in this process — read by tests alone (MOL-265). «A line's
+ * candidates are found once» (`Laid`, MOL-244) is held by this count: a second search is twice the work,
+ * and no bound on a clock tells twice from once on CI.
+ */
+export const candidateSearches = { count: 0 }
+
 // One pass over the figures of a line: every combination that satisfies paid + discount =
 // quantity × price is a candidate; the receipt's own discount rate then picks among them (a card
 // discount is one percentage), and after it the fewest swaps.
@@ -207,6 +214,7 @@ function candidates(
   discS: string,
   priceS: string | null,
 ): Candidate[] {
+  candidateSearches.count += 1
   const out: Candidate[] = []
   const qtys = variants(qtyS)
   const paids = [paidS, ...dropGroup(paidS)].map((p0) => ({ p0, all: variants(p0) }))
