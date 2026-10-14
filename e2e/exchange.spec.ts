@@ -203,6 +203,70 @@ test('the card of an exchange holds long amounts on this phone and on a 320 px o
 })
 
 /**
+ * «Записать обмен» is the strip's over the tab bar, not a button floating over the list (MOL-187,
+ * Ф-28): at the end of the scroll the last card ends above the strip, and without a connection the
+ * button stays, not now, saying why on itself, beside the strip of the connection (Ф-6, Р-1).
+ */
+test('«Записать обмен» stands in the strip: the last card ends above it, offline it says why', async ({
+  page,
+  context,
+}) => {
+  await page.setViewportSize({ width: 390, height: 640 })
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('link', { name: 'Обмен денег' }).click()
+  await expect(page.getByRole('heading', { name: 'Обменов пока нет' })).toBeVisible()
+  // The empty screen offers it in the strip too, and nowhere else (Ф-16).
+  const record = page.locator('.dock').getByRole('button', { name: 'Записать обмен', exact: true })
+  await expect(record).toBeVisible()
+  await expect(page.getByRole('button', { name: /Записать обмен/ })).toHaveCount(1)
+
+  const sheet = page.locator('dialog[open]')
+  for (const [given, received] of [
+    ['20000', '95000'],
+    ['10000', '47000'],
+    ['30000', '141000'],
+  ] as const) {
+    await record.click()
+    await expect(sheet).toContainText('Сколько отдали и сколько получили')
+    await page.waitForTimeout(400)
+    await sheet.getByLabel('Отдал').fill(given)
+    await sheet.getByLabel('Получил').fill(received)
+    await sheet.getByRole('button', { name: 'Сохранить обмен' }).click()
+    await expect(sheet).toBeHidden()
+  }
+  await expect(page.locator('article')).toHaveCount(3)
+
+  await page.evaluate(() => {
+    window.scrollTo(0, document.documentElement.scrollHeight)
+  })
+  await page.waitForTimeout(300)
+  const [last, dock] = await Promise.all([
+    page.locator('article').last().boundingBox(),
+    page.locator('.dock').boundingBox(),
+  ])
+  expect((last?.y ?? 0) + (last?.height ?? 0)).toBeLessThanOrEqual(dock?.y ?? 0)
+
+  await context.setOffline(true)
+  const strip = page.getByText(
+    /^Без связи · обмены на .+\d:\d\d\. Записать обмен и поменять курс можно со связью$/,
+  )
+  await expect(strip).toBeVisible()
+  const offline = page
+    .locator('.dock')
+    .getByRole('button', { name: 'Записать обмен можно со связью' })
+  await expect(offline).toHaveAttribute('aria-disabled', 'true')
+  await offline.click()
+  await page.waitForTimeout(400)
+  await expect(sheet).toHaveCount(0)
+
+  await context.setOffline(false)
+  await expect(record).toBeVisible()
+  await expect(record).not.toHaveAttribute('aria-disabled', 'true')
+  await expect(strip).toBeHidden()
+})
+
+/**
  * «Как меняли» (MOL-137, В-1): the channel goes with the exchange, the next one starts from it, and
  * an amendment keeps or clears it. The market it is measured against is not in an end-to-end run —
  * the refresh is off here and the cache stays empty — so the card keeps the central bank's line as
