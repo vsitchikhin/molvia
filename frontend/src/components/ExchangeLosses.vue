@@ -3,7 +3,7 @@
     <div class="head">
       <SectionCaption :id="headingId" inset>{{ t('exchange.vs_market.title') }}</SectionCaption>
       <p class="total" :class="toneOf(losses.total)">
-        {{ signedAmount(losses.total, locale, { plus: true, estimate: true }) }}
+        {{ amountOf(losses.total) }}
       </p>
       <p v-if="toneOf(losses.total)" class="word" :class="toneOf(losses.total)">
         {{ wordOf(losses.total) }}
@@ -21,7 +21,7 @@
         </span>
         <span class="meta">{{ metaOf(group) }}</span>
         <span class="amount" :class="toneOf(group.difference)">
-          {{ signedAmount(group.difference, locale, { plus: true, estimate: true }) }}
+          {{ amountOf(group.difference) }}
         </span>
         <span class="bar" aria-hidden="true">
           <span class="half before">
@@ -53,6 +53,7 @@ import type { ExchangeLossesView, Money } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import { signedAmount } from '@/components/accounts'
 import { signedPercent } from '@/components/charts'
+import { roundsToNought } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
 
 /**
@@ -64,7 +65,9 @@ import SectionCaption from '@/components/SectionCaption.vue'
  * and the amount take the tone both ways, and the words «хуже / лучше рынка» stand beside them — a
  * colour never alone (Ф-30, В-11). One sign a row: the money's — the percent, rounded to
  * hundredths, may read 0,00 % over a difference that is not nothing (Р-4); nothing is no tone and
- * no word. A bar grows from the centre line, minus to the left. The rows are not buttons.
+ * no word. The amounts are whole units unless that prints a nought for money that is there: «−0,30 ֏
+ * · хуже рынка», as the card of the exchange prints it, never «−0 ֏» under a verdict (adversarial
+ * А1). A bar grows from the centre line, minus to the left. The rows are not buttons.
  */
 export default defineComponent({
   name: 'ExchangeLosses',
@@ -87,6 +90,8 @@ export default defineComponent({
       const word = wordOf(group.difference)
       return word ? t('exchange.vs_market.count_word', { count, word }) : count
     }
+    const amountOf = (money: Money) =>
+      signedAmount(money, locale.value, { plus: true, estimate: !roundsToNought(money) })
     const widthOf = (level: number) => `${String((Math.abs(level) * 100) / CHART_LEVEL)}%`
     return {
       t,
@@ -95,8 +100,8 @@ export default defineComponent({
       toneOf,
       wordOf,
       metaOf,
+      amountOf,
       widthOf,
-      signedAmount,
       signedPercent,
     }
   },

@@ -889,7 +889,9 @@
     "remove": "Delete the exchange {amounts}",
     "amended": "amended {date}",
     "amend_conflict": "This exchange was already amended on another device — here it is as it stands now. Amend it again if you need to",
+    "amend_conflict_stale": "This exchange was already amended on another device. It will show as it stands now once the server answers",
     "vanished": "This exchange is gone — it was removed. The list is up to date",
+    "vanished_stale": "This exchange is gone — it was removed. The list will be updated once the server answers",
     "remove_sheet": {
       "title": "Delete the exchange?",
       "body": "A deleted exchange no longer counts in the rate of new purchases. Past purchases do not change",
@@ -902,6 +904,7 @@
     "restored": "The exchange is back",
     "restore_gone": "The exchange can no longer be brought back — the removal is final. If it was needed, record it again",
     "conflict": "This exchange is already recorded — the list shows it as it stands now. If the amounts are wrong, tap it in the list and amend it",
+    "conflict_stale": "This exchange is already recorded — do not record it again. It will show once the server answers",
     "empty": {
       "title": "No exchanges yet",
       "body": "Record what you gave and what you got — the rate is worked out for you. Until you have a rate of your own, purchases count by the {bank} rate"
@@ -909,7 +912,8 @@
     "offline": {
       "title": "No connection",
       "body": "The exchanges will be shown when the connection is back",
-      "strip": "Offline · exchanges as of {when}. Recording an exchange and changing the rate need a connection"
+      "strip": "Offline · exchanges as of {when}. Recording an exchange and changing the rate need a connection",
+      "strip_record": "Offline · exchanges as of {when}. Recording an exchange needs a connection"
     },
     "load_error": {
       "title": "Could not load the exchanges",

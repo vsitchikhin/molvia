@@ -5,11 +5,17 @@
            must still be there (В-5). -->
       <!-- The connection in one line, with the time of the answer shown (MOL-181, Ф-14). Nothing is
            kept on the phone, but an app stays open for days: «на 14:05» of yesterday would be untrue. -->
+      <!-- The switch of the rate is named only where it stands: on the empty screen and with one
+           currency there is nothing but «Записать обмен» that waits for the connection. -->
       <StatusStrip
         v-if="!online && fetchedAt"
         class="status"
         kind="offline"
-        :text="t('exchange.offline.strip', { when: whenOf(fetchedAt) })"
+        :text="
+          phase === 'ready' && overview.pair
+            ? t('exchange.offline.strip', { when: whenOf(fetchedAt) })
+            : t('exchange.offline.strip_record', { when: whenOf(fetchedAt) })
+        "
       />
       <!-- The list read again after a write's answer — a conflict, a vanished exchange, a late
            «Вернуть» — did not come: what is shown may no longer be what the server holds. The strip
@@ -26,9 +32,17 @@
         </template>
       </StatusStrip>
       <p v-if="failed" class="notice failed" role="alert">{{ t('exchange.failed') }}</p>
-      <p v-if="conflicted" class="notice" role="alert">{{ t('exchange.conflict') }}</p>
-      <p v-if="amendConflicted" class="notice" role="alert">{{ t('exchange.amend_conflict') }}</p>
-      <p v-if="vanished" class="notice" role="alert">{{ t('exchange.vanished') }}</p>
+      <!-- Read again and not answered, the list is the one from before the write: «показываем, как он
+           записан» over it would be untrue, and the strip is all that says the exchange is there. -->
+      <p v-if="conflicted" class="notice" role="alert">
+        {{ stale ? t('exchange.conflict_stale') : t('exchange.conflict') }}
+      </p>
+      <p v-if="amendConflicted" class="notice" role="alert">
+        {{ stale ? t('exchange.amend_conflict_stale') : t('exchange.amend_conflict') }}
+      </p>
+      <p v-if="vanished" class="notice" role="alert">
+        {{ stale ? t('exchange.vanished_stale') : t('exchange.vanished') }}
+      </p>
       <p v-if="gone" class="notice" role="alert">{{ t('exchange.restore_gone') }}</p>
       <div v-if="removed" ref="removedStrip" class="notice removed">
         <span class="removed-text">{{
@@ -47,9 +61,16 @@
     </template>
 
     <!-- The shape of what is coming, in the order it will stand (Ф-13): «Обмены против рынка», the
-         card of the rate with its switch, «Обмены» and the cards of exchanges. -->
+         line of the rate, the card of the rate with its switch, «Обмены» and the cards of exchanges. -->
     <ScreenSkeleton v-if="phase === 'loading'">
       <SkeletonPart kind="figure" />
+      <!-- The line of the rate is the screen's own: its caption, the period, the reading, the area. -->
+      <AppCard class="ghost-chart">
+        <span class="ghost-heading"><span class="ghost-bar ghost-caption"></span></span>
+        <span class="ghost-bar ghost-control"></span>
+        <span class="ghost-bar ghost-figure"></span>
+        <span class="ghost-bar ghost-area"></span>
+      </AppCard>
       <SkeletonPart kind="figure" plate />
       <SkeletonPart kind="caption" :width="20" />
       <OperationSkeleton />
@@ -162,7 +183,7 @@
 
         <p class="frozen"><IconCheck aria-hidden="true" />{{ t('money.rate_frozen') }}</p>
 
-        <MarketRatesCard :rows="overview.marketToday" />
+        <MarketRatesCard class="market-rates" :rows="overview.marketToday" />
 
         <!-- Incomes alone can make the rate (MOL-66): then there is the card, and no list. -->
         <section v-if="overview.exchanges.length > 0" class="exchanges">
@@ -255,7 +276,7 @@ import type { AmendOutcome } from '@/composables/useExchanges'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 import { bankWords } from '@/components/spending'
-import { purchaseDay, timeOfDay } from '@/days'
+import { answeredAt } from '@/days'
 
 /**
  * «Обмен денег» (MOL-40), under «Деньги» since MOL-81: the person's own rate, which rate new trips take, and
@@ -386,9 +407,9 @@ export default defineComponent({
       { value: 'official', label: t('exchange.preference_official', { bank: bank.value }) },
     ])
 
-    // «14 окт., 14:05» — the answer's day and time, as «Деньги» and «Траты» print it.
-    const whenOf = (at: Date): string =>
-      `${purchaseDay(at, locale.value)}, ${timeOfDay(at, locale.value)}`
+    // «14 окт., 14:05» — the answer's day and time, as «Деньги» and «Траты» print it; by the day
+    // the screen holds, so a night offline turns «сегодня» into «вчера» (adversarial А2).
+    const whenOf = (at: Date): string => answeredAt(at, locale.value, today.value)
     // The day a rate is dated by, as a calendar day of Yerevan (adversarial Ж).
     const dayOf = (when: Date): string => day(yerevanDate(when))
     const pairSigns = (pair: { base: Currency; quote: Currency }) => ({
@@ -516,14 +537,19 @@ export default defineComponent({
 
 // Strips over the answer stand 16 apart; the groups of the answer 24 (Ф-10), and «Мой курс» with
 // the note under it is one group, 8 apart.
+// `margin`, not its bottom alone: a notice and the note are paragraphs, and the browser's 1em above
+// them stood on top of the 16 and the 8.
 .notice,
 .status {
-  margin-bottom: var(--space-4);
+  margin: 0 0 var(--space-4);
 }
 
+// Each space has one owner, the group above it: with no rates of the central bank a margin of
+// «Обмены» on top of the note's made 48.
 .losses,
 .rate-chart,
-.frozen {
+.frozen,
+.market-rates {
   margin-bottom: var(--space-6);
 }
 
@@ -578,6 +604,7 @@ export default defineComponent({
 
 // A note, not «хорошо»: nothing good is reported here (Ф-4).
 .frozen {
+  margin-top: 0;
   background: var(--surface-2);
   color: var(--text-muted);
 }
@@ -603,10 +630,42 @@ export default defineComponent({
   color: var(--bad-ink);
 }
 
-/* Not `.list`: a scoped class of this screen lands on the root of a child card too, and `AppCard
-   list` took this one's padding for «Обмен» (MOL-159). */
-.exchanges {
-  margin-top: var(--space-6);
+/* The line of the rate while the screen is coming: as tall as its caption, period, reading and area. */
+.ghost-chart {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.ghost-heading {
+  display: flex;
+  align-items: center;
+  height: calc(1em * var(--leading-body));
+  font-size: var(--text-callout);
+}
+
+.ghost-bar {
+  @include skeleton-bar;
+
+  height: var(--skeleton-caption);
+}
+
+.ghost-caption {
+  width: 40%;
+}
+
+.ghost-control {
+  height: var(--touch-target);
+  border-radius: var(--radius);
+}
+
+.ghost-figure {
+  width: 36%;
+  height: var(--skeleton-figure);
+}
+
+.ghost-area {
+  height: 11.25rem;
+  border-radius: var(--radius-sm);
 }
 
 .cards {
