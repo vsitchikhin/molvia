@@ -26,31 +26,35 @@ not work: `navigation` «a step that never moved…» waits 2.1 s on purpose, `m
 
 **Ten times the worst, because a busy runner multiplies a test of seconds nearly fivefold.**
 `merge-corpus` «names what the model cannot judge…» went past 5 s (5005–5037 ms) on other people's
-pull requests and twice on master, and was given 60 s by #173. On byte-identical code — the night, the
-seed, the model, the test, the configs and the lockfile, `git diff` empty — it ran 1590–7655 ms in
-22 runs of 09–14.10.2026: ×4.8. The twenty runs after #173 alone gave 2200–6086 ms, ×2.8, and the
-first wording built «five times» on that «nearly triples». A worst taken in a window no busy runner
-fell in is then the calm one: five times it leaves ~1.04 against the first busy run, ten times ~2.
-So the test now has 90 s. A short test swings more: `feedback-bot` ran under 300 ms in 296 of the
-301 runs to 09.10, and once 1169 ms. The window of a measure is written beside it.
+pull requests and twice on master, and was given 60 s by #173. On byte-identical code — the night,
+the seed, the model, the test, the configs and the lockfile, `git diff` empty — it ran 1590–7655 ms
+in 22 runs of 09–14.10.2026: ×4.8. «Five times» was chosen when a busy runner had been seen to slow
+it 1.7× (3.0 → 5.0 s); the twenty runs after #173 and the pull request's own then gave 2200–6086 ms,
+×2.8, and the rule read «nearly triples» — each the spread of a window, not of the code. A worst
+taken in a window without the busiest runner is a calm one: five times it leaves ~1.04 against a run
+4.8× slower, ten times ~2. So the test now has 90 s. A short test swings as far: `feedback-bot` ran
+under 300 ms in 296 of the 301 runs of 03–09.10, and once 1169 ms — ×3.9 at least. The window of a
+measure is written beside it.
 
-**A hook is held the same way against its 10 s.** The CI log prints a test's time but not a hook's,
-so a hook is measured by a reporter (MOL-266).
+**A hook is held the same way against its 10 s.** The CI log prints a test's time only past 300 ms,
+and never a hook's, so the hooks and the short tests are measured by a reporter — MOL-266 brings
+one.
 
 ## A duration a test asserts itself
 
 **Its bound is at least ten times its worst on CI, and below the test's timeout** — otherwise
 vitest's «Test timed out» judges it before the test does. Bounds equal to vitest's 5 s stood in the
-suite when the rule was written (MOL-265, MOL-266).
+suite when the rule was written (MOL-266).
 
 **So a clock catches only a tenfold slowdown or worse.** A bound that must catch less — «no second
 search», twice the work — is held by the work: count it, never time it.
 
 **Whether a clock bound holds is decided by a breakage made on purpose, and no wider.** The bound
 stays only where each breakage it guards crosses it. «429 without a parse» in `feedback` holds the
-refusal before the body is read by 200 ms, and a mutant that parses a megabyte answers in ~6 ms: the
-clock does not hold it. `metrics` bounds the loop's lag at 0.1 and 0.15 s, and the mutants answer 140
-and 204 ms: the clock holds it, while its worst on CI stays far below — 0–6 ms measured.
+refusal before the body is read by 200 ms, and a mutant that parses a megabyte answers in ~6 ms on a
+Mac: the clock does not hold it. `metrics` bounds the loop's lag at 0.1 and 0.15 s, and the mutants
+answer 140 and 204 ms on a Mac: the clock holds it while its worst on CI stays below 10 and 15 ms —
+0–6 ms by the test's time in the CI runs read by round 12 of MOL-243's review (11.10).
 
 **Whoever measured the duration**: the test subtracting two readings of the clock, a helper
 (`picture`, `bot/assemble`'s `lagBetween`), or the code itself (`metrics`' loop lag). Where the
@@ -62,8 +66,8 @@ written, not how fast; the slowdown that would cross it is an hour.
 
 ## Finding them
 
-**By parsing the TypeScript, never by a line's pattern.** The pattern `expect(now() - started)` missed
-the durations a helper measures, and subtracting readings missed the ones the code measures — each
-time the hand count was short. **The list of the tests outside the rule is not kept here**: it grows
-with the window of the measure and with every new test, and lives in MOL-266 and MOL-265, as does
-the question of a guard in CI that would hold it.
+**By parsing the TypeScript, never by a line's pattern.** The pattern `expect(now() - started)`
+missed the durations a helper measures, and subtracting readings missed the ones the code measures —
+each time the hand count was short. **The list of the tests outside the rule is not kept here**: it
+grows with the window of the measure and with every new test, and lives in MOL-266 (MOL-265 merged
+into it), as does the guard in CI that holds it.
