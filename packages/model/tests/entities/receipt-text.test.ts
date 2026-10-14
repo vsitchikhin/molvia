@@ -2468,6 +2468,38 @@ describe('the parse reads the country’s card, never words of its own (MOL-247)
     ])
   })
 
+  // adversarial round 2, Б1: a word is read with the flag it is checked with, in every layout
+  it('reads a word with a class of Unicode letters alike in every layout', () => {
+    const letters = probe({ total: 'Ընդամեն\\p{L}', tin: 'ՀՎՀ\\p{Lu}', fiscal: 'Ֆիսկ\\p{L}+' })
+    const head = ['ՀՎՀՀ 12345678', 'Ֆիսկալ համար 12345678']
+    const fields = (got: ReceiptText) => [got.totalHundredths, got.tin, got.receiptNo]
+    expect(fields(card(letters, ...head, 'Ընդամենը 150.00'))).toEqual([
+      15_000,
+      '12345678',
+      '12345678',
+    ])
+    const coded = parseReceiptText(
+      letters,
+      rowsOf(
+        [...head, 'Դաս՝ 56.10', 'Կոլա 1հատ 1750.00 1750.00', 'Ընդամենը: 1750.00'].join('\n'),
+        0,
+      ),
+    )
+    expect(fields(coded)).toEqual([175_000, '12345678', '12345678'])
+    const table = bestReading(
+      letters,
+      am04.readings.map((text) => rowsOf(text, 0)),
+    )
+    const dogCity = bestReading(
+      AM,
+      am04.readings.map((text) => rowsOf(text, 0)),
+    )
+    expect([table.readTotalHundredths, table.receiptNo]).toEqual([
+      dogCity.readTotalHundredths,
+      dogCity.receiptNo,
+    ])
+  })
+
   // adversarial А2: the kilogram is one fragment wherever a line is weighed
   it('weighs a line by the card’s kilogram, written as a fragment, in every layout', () => {
     const kg = probe({ units: { ...AM.words.units, kg: 'կ[գq]' } })

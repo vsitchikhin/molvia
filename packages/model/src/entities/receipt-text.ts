@@ -162,7 +162,9 @@ function lexiconOf(reading: PhotoReading): Lexicon {
   )
   if (captures !== undefined) throw new RangeError(`a card's word captures: ${captures}`)
   // A word is a fragment as OCR reads it, so it goes in a group of its own (adversarial А1): a form after
-  // «|» would otherwise take the rest of the pattern for its own and find the word with no sum after it.
+  // «|» would otherwise take the rest of the pattern for its own and find the word with no sum after it. And
+  // every pattern a word goes into is read with `u`, as the word is checked: without it «\p{L}» is the
+  // letters «p{L}», and a word the card's test admits was lost by half the layouts (round 2, Б1).
   const word = (fragment: string): string => `(?:${fragment})`
   const any = (forms: readonly string[]): string => word(forms.join('|'))
   // characters set into a class: the four a class reads as its own syntax are escaped (adversarial А4)
@@ -195,27 +197,28 @@ function lexiconOf(reading: PhotoReading): Lexicon {
     digitLike: reading.digitLike,
     digitLikeAt: new RegExp(
       `[${inClass(Object.keys(reading.digitLike).join(''))}](?=[\\d,.])`,
-      'g',
+      'gu',
     ),
-    cardTotal: new RegExp(`${word(w.total)}\\s+(\\d[\\d ]*\\.\\d{1,2})\\b`),
-    cardTin: new RegExp(`${word(w.tin)}.{0,4}:?\\s*\\S+|:\\s*0\\d{7}`),
-    cardNo: new RegExp(`${word(w.fiscal)}\\s+\\S+\\s+(\\d{6,})`),
-    tableEnd: new RegExp(any([w.total, w.control, w.fiscalSign])),
-    tableTotal: new RegExp(`${word(w.total)}:?\\s+(\\d[\\d ]*[.,]\\d{2})`),
+    cardTotal: new RegExp(`${word(w.total)}\\s+(\\d[\\d ]*\\.\\d{1,2})\\b`, 'u'),
+    cardTin: new RegExp(`${word(w.tin)}.{0,4}:?\\s*\\S+|:\\s*0\\d{7}`, 'u'),
+    cardNo: new RegExp(`${word(w.fiscal)}\\s+\\S+\\s+(\\d{6,})`, 'u'),
+    tableEnd: new RegExp(any([w.total, w.control, w.fiscalSign]), 'u'),
+    tableTotal: new RegExp(`${word(w.total)}:?\\s+(\\d[\\d ]*[.,]\\d{2})`, 'u'),
     // the table prints its unit in brackets, in either case: «20կգ(Կգ)», «կԳ(ԿԳ)»
     tableWeighed: new RegExp(`${word(u.kg)}\\)`, 'iu'),
-    tableTin: new RegExp(`${any([w.tin, ...w.tinMisread])}\\S{0,2}\\s*(\\d{8})`),
-    tableNo: new RegExp(`${word(w.fiscal)}\\s*\\S*\\s+(\\d{6,})`),
-    tableReceiptNo: new RegExp(`${word(w.receiptNumber)}:?\\s*(\\d[\\d ]{2,})`),
+    tableTin: new RegExp(`${any([w.tin, ...w.tinMisread])}\\S{0,2}\\s*(\\d{8})`, 'u'),
+    tableNo: new RegExp(`${word(w.fiscal)}\\s*\\S*\\s+(\\d{6,})`, 'u'),
+    tableReceiptNo: new RegExp(`${word(w.receiptNumber)}:?\\s*(\\d[\\d ]{2,})`, 'u'),
     classTail,
     classMark,
-    classEnd: new RegExp(any([w.control, w.total])),
-    classTotal: new RegExp(`${word(w.total)}:?\\s+(\\d[\\d ]*(?:[.,]\\d{1,2})?)(?![\\d.,])`),
+    classEnd: new RegExp(any([w.control, w.total]), 'u'),
+    classTotal: new RegExp(`${word(w.total)}:?\\s+(\\d[\\d ]*(?:[.,]\\d{1,2})?)(?![\\d.,])`, 'u'),
     // a count before its unit: «1հատ», «4 հատ», «0.742 կգ»
     classUnit: new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*(${word(u.piece)}|${word(u.kg)})`, 'u'),
-    classTin: new RegExp(`${word(w.tin)}\\S{0,2}\\s*(\\d{8})(?!\\d)`),
+    classTin: new RegExp(`${word(w.tin)}\\S{0,2}\\s*(\\d{8})(?!\\d)`, 'u'),
     classNo: new RegExp(
       `${word(w.fiscal)}\\S*(?:\\s+\\S*${word(w.fiscalNumber)}\\S*)?\\s+(\\d{6,})`,
+      'u',
     ),
     // words of a fiscal head that are no dish: the fiscal mark, the tax number, the cashier, the section,
     // the address, the till
