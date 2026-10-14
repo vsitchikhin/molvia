@@ -63,12 +63,15 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `.prettierignore` — What Prettier leaves alone: builds, the lockfile, the shared links, hooks, recorded rate-provider responses.
 - `.prettierrc.json` — Prettier settings: no semicolons, single quotes, width 100, trailing commas.
 - `Makefile` — The canonical entry point: setup, stack, the receipt reader, database, migrate, forget, seed, gates, dev, format, lint, typecheck, test, check, the outside watch to Cloudflare (`watcher`), certs, icons.
+- `bin/check-clock-bounds.mjs` — Refuses a bound on a duration a test asserts other than through `expectWithin` (MOL-266), found by parsing — a subtraction of two readings of the clock, through names and helpers; run by `npm run lint`.
+- `bin/check-clock-bounds.d.mts` — Types of the clock check for its test: the check is plain JS.
+- `bin/check-clock-bounds.test.ts` — Test: a bound on a duration found written any way — a name, a helper of the file and a mention of it, an object it is put in, `expect(d < n)`; a lower bound, `expectWithin`, the age of a stamp and a fake clock's equality left alone.
 - `bin/check-code-map.mjs` — Refuses a code map that lies: a file it does not cover, a path that does not exist, a file with two homes; run by `npm run lint`.
 - `bin/design-md.mjs` — The token block of `frontend/DESIGN.md` from `_tokens.scss`, through Prettier: `--write` in `npm run format`, `--check` in `npm run lint`.
 - `bin/init-env.sh` — Generates this copy's `.env` from its index: ports — the receipt reader's too — databases, compose project; keeps bot settings across `--force`.
 - `bin/fetch-model.mjs` — Fetches the pinned embedding model (MOL-105) into `.models/` or a given directory, file by file against its sha256, with the notice of its terms; `make model`, CI and the API's image.
 - `bin/link-shared.sh` — Points `.scratch`, `.lavish` and `.models` at the directory shared by all working copies; idempotent.
-- `bin/test-time-reporter.ts` — The time reporter of the root run (MOL-266): a test, a `beforeAll`/`afterAll` or a bound on the clock whose time, five times over, passes its limit, by the rule of MOL-243; prints what it measures for the next measure.
+- `bin/test-time-reporter.ts` — The time reporter of the root run (MOL-266): a test, a `beforeAll`/`afterAll` or a bound on the clock whose time, five times over, passes its limit, by the rule of MOL-243 — red on CI, a warning here; prints what it measures for the next measure.
 - `bin/test-time-reporter.fixture.ts` — A test file the reporter's test runs through vitest itself: hooks that wait set times, a test with its own timeout, two bounds on the clock.
 - `bin/one-at-a-time.sh` — Runs a command under the one lock all copies share, so the heavy checks of several copies take turns; gives the command no terminal so vitest does not watch by default, refuses a vitest told to watch and Playwright's UI and debugger, names the waited copy by its root.
 - `docker-compose.yml` — Development stack: this copy's Postgres on the loopback, named by the copy's index; the receipt reader only under the `receipts` profile (`make reader`).

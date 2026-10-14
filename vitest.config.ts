@@ -15,7 +15,8 @@ export default defineConfig({
       { test: { name: 'bin', include: ['bin/*.test.ts'], environment: 'node' } },
     ],
     // The rule of MOL-243 on every run of the whole suite: CI's and `make check`'s, never a module's own.
-    reporters: ['default', ['./bin/test-time-reporter.ts', { fail: false }]],
+    // Red only on CI: here the machine is shared by every copy, and a run there is the one that counts.
+    reporters: ['default', ['./bin/test-time-reporter.ts', { fail: Boolean(process.env.CI) }]],
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'html'],

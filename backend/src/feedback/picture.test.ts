@@ -244,8 +244,9 @@ describe('потолок разбора (адверсариальное А3)', (
       return performance.now() - started
     }
     // The fastest of five: other copies' load on this machine only ever adds time. The base64 of two
-    // megabytes is most of what is left.
-    expectWithin(Math.min(...Array.from({ length: 5 }, timed)), 15)
+    // megabytes is most of what is left. 25 ms: five times CI's worst, 2 ms, and under the walk of the
+    // whole file, 44–94 ms (MOL-266)
+    expectWithin(Math.min(...Array.from({ length: 5 }, timed)), 25)
   })
 })
 
@@ -281,7 +282,7 @@ describe('раунд 2 MOL-167', () => {
     expect(withoutMetadata(tems(260))).toBeNull()
   })
 
-  it('два мегабайта TEM — «не подошёл» быстрее 15 мс (Б1)', () => {
+  it('два мегабайта TEM — «не подошёл» быстрее 25 мс (Б1)', () => {
     const tail = [...sof, ...sos, 0x55, 0xff, 0xd9]
     const count = Math.floor((FEEDBACK_PICTURE_BYTES_MAX - 2 - tail.length) / 2)
     const bytes = Buffer.alloc(2 + count * 2 + tail.length)
@@ -296,7 +297,7 @@ describe('раунд 2 MOL-167', () => {
       )
       return performance.now() - started
     }
-    expectWithin(Math.min(...Array.from({ length: 5 }, timed)), 15)
+    expectWithin(Math.min(...Array.from({ length: 5 }, timed)), 25)
   })
 
   it('APP14 Adobe с цветовым преобразованием остаётся, иной APP14 — вон (ревью 9)', () => {
