@@ -18,9 +18,9 @@ import {
 } from '#model/entities/receipt-text'
 import type { ReceiptText, TextRow } from '#model/entities/receipt-text'
 
-// The 2 tests here past a second on CI carry a timeout of 15 s: the slowest took 1 374 ms there
-// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
-// only on a run twice as slow as any yet seen.
+// The 3 tests here past a second on CI carry a timeout of their own, ten times their worst there (MOL-266),
+// so the time reporter names one only on a run twice as slow as any yet seen: 15 s for 1 374 ms and
+// below, 30 s for «cost no second search» — 2 666 ms, two readings of four hundred rows.
 
 /**
  * The fixtures are the owner's receipts as Tesseract read them on the server (MOL-114) — the item
@@ -520,7 +520,7 @@ describe('rows of junk by the hundred (review Р18)', () => {
     let got: ReceiptText | undefined
     expect(searches(() => (got = bestReading([rowsOf(text, 0), rowsOf(text, 0)])))).toBe(2 * once)
     expect(got?.totalHundredths).toBe(900_000)
-  })
+  }, 30_000)
 })
 
 describe('the name row of the first item, which has the head above it (review Р19)', () => {
