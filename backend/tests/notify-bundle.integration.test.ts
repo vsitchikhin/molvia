@@ -73,6 +73,8 @@ describe('dist/notify.js', () => {
   }, 15_000)
 })
 
+const SILENT_MS = 15_000
+
 describe('dist/notify.js — вход', () => {
   // Adversarial А4: over `ssh … exec -T` with the file forgotten, the input is a pipe that never ends.
   it('открытая труба без сообщения — через пару секунд подсказка и код 2, а не молчание', async () => {
@@ -88,12 +90,18 @@ describe('dist/notify.js — вход', () => {
     let output = ''
     child.stdout.on('data', (chunk: Buffer) => (output += chunk.toString()))
     const exited = new Promise<number | null>((resolve) => child.on('exit', resolve))
+    // The command waits two seconds of its own (`FIRST_BYTES_MS`) and took 2 311 ms on CI at worst
+    // (MOL-266): the test waits five times that and more, then puts it out — silence is this test's
+    // red, never the timeout of vitest, twice the wait
     const started = Date.now()
-    expect(await exited).toBe(2)
-    expectWithin(Date.now() - started, 10_000)
+    const silent = setTimeout(() => child.kill(), SILENT_MS)
+    const code = await exited
+    clearTimeout(silent)
+    expectWithin(Date.now() - started, SILENT_MS)
+    expect(code).toBe(2)
     expect(output).toContain('the message comes on standard input')
     child.stdin.end()
-  }, 20_000)
+  }, 30_000)
 })
 
 describe('bin/notify.sh', () => {
