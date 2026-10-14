@@ -28,6 +28,10 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 import ItemSearchView from '@/views/ItemSearchView.vue'
 import { holdsTyping } from '@/pwaUpdate'
 
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 035 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 /** Rows alone are a near answer — or an empty one; a far answer is given whole (MOL-46). */
 const searchCatalogue =
   vi.fn<(query: string) => Promise<CatalogueEntry[] | CatalogueSearchResponse>>()
@@ -304,7 +308,7 @@ describe('«What did you pick up?»', () => {
       expect(view.get('.live').text()).toBe('Found 1 item')
     })
     expect(names(view)).toEqual([marianna.name])
-  })
+  }, 15_000)
 
   it('names the query nothing was found for', async () => {
     searchCatalogue.mockResolvedValue([])

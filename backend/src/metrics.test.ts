@@ -4,6 +4,10 @@ import { expectWithin } from '@molvia/model/testing/clock'
 import { DURATION_BUCKETS, httpMetrics, processMetrics } from './metrics'
 import type { ProcessMetrics } from './metrics'
 
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 109 ms there
+// (MOL-266), its own wait, the sleep the loop is read after. Not work, so the rule of MOL-243 asks
+// no timeout of it — the time reporter does, as it tells no wait from work. Ten times it.
+
 /** The lines of a rendering that carry a figure, comments left out. */
 function figures(text: string): string[] {
   return text.split('\n').filter((line) => line !== '' && !line.startsWith('#'))
@@ -167,5 +171,5 @@ describe('processMetrics', () => {
     await sleep(1100)
 
     expectWithin(gauge(running.render(), 'nodejs_eventloop_lag_p99_seconds') * 1000, 150)
-  })
+  }, 15_000)
 })

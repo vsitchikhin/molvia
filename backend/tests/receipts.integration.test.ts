@@ -34,6 +34,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 078 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 const { db, close } = connectDrizzle()
 const repository = createReceiptRepository(db)
 let app: FastifyInstance
@@ -537,7 +541,7 @@ describe('the queue', () => {
     const columns = await db.execute<{ column_name: string; data_type: string }>(sql`
       select column_name, data_type from information_schema.columns where table_name = 'receipt_days'`)
     expect(columns.every((c) => c.data_type === 'integer' || c.column_name === 'day')).toBe(true)
-  })
+  }, 15_000)
 
   it('fails a photo the reader cannot read, and reads the next one', async () => {
     const me = await owner()

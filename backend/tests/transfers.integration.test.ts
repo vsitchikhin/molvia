@@ -31,6 +31,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
 
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 409 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
 let app: FastifyInstance
@@ -516,7 +520,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
       const [fee] = await db.select().from(spendings).where(eq(spendings.transferId, id))
       expect(fee?.deletedAt).not.toBeNull()
       expect(await balanceOf(me, card)).toBe('314000 USD')
-    })
+    }, 15_000)
   })
 
   describe('удаление и «Вернуть»', () => {

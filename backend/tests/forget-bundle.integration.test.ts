@@ -5,6 +5,10 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { connectDrizzle, testDatabaseUrl } from './db'
 import { insertActor, telegramId } from './fixtures'
 
+// The test here past a second on CI carries a timeout of 25 s: the slowest took 2 118 ms there
+// (MOL-266), a process of its own, past a fifth of vitest's 5 s. Ten times that, so the time
+// reporter names it only on a run twice as slow as any yet seen.
+
 /**
  * The owner's fallback for erasure is only worth anything if it runs where it is needed: in the
  * production image, which holds one bundled file per entry and no `node_modules` (MOL-58). So the
@@ -58,6 +62,7 @@ describe('make forget', () => {
       expect(run.stdout).toContain('usage: forget')
       expect(run.stdout).not.toContain('PWNED')
     },
+    25_000,
   )
 
   // MOL-112, adversarial Е: only YES=1 typed on the command line erases. `-n` prints the recipe

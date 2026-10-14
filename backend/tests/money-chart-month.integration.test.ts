@@ -323,18 +323,22 @@ describe('«Графики → Месяц» (MOL-158)', () => {
     HEAVY_MS,
   )
 
-  it('убранная категория без трат в месяце в «Против обычного» не попадает', async () => {
-    const me = await owner()
-    for (const one of [m4, m3, m2]) await spend(me, '50000', 'AMD', `${one}-01`, 'rent')
-    await spend(me, '1000', 'AMD', `${m1}-01`, 'cafe')
-    const before = await chartMonth(me, m1)
-    expect(before.deviations.map((row) => row.change)).toEqual([-100, null])
-    expect(
-      (await call(me, 'DELETE', `/spending-categories/${await presetId(me, 'rent')}`)).statusCode,
-    ).toBe(200)
-    const after = await chartMonth(me, m1)
-    expect(after.deviations.map((row) => row.categoryId)).toEqual([await presetId(me, 'cafe')])
-  })
+  it(
+    'убранная категория без трат в месяце в «Против обычного» не попадает',
+    async () => {
+      const me = await owner()
+      for (const one of [m4, m3, m2]) await spend(me, '50000', 'AMD', `${one}-01`, 'rent')
+      await spend(me, '1000', 'AMD', `${m1}-01`, 'cafe')
+      const before = await chartMonth(me, m1)
+      expect(before.deviations.map((row) => row.change)).toEqual([-100, null])
+      expect(
+        (await call(me, 'DELETE', `/spending-categories/${await presetId(me, 'rent')}`)).statusCode,
+      ).toBe(200)
+      const after = await chartMonth(me, m1)
+      expect(after.deviations.map((row) => row.categoryId)).toEqual([await presetId(me, 'cafe')])
+    },
+    HEAVY_MS,
+  )
 
   it('чужие траты не видны; без сессии — 401; не месяц — 404; лишний параметр — 400', async () => {
     const me = await owner()

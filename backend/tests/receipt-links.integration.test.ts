@@ -36,6 +36,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, signIn } from './fixtures'
 
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 092 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 // MOL-232 — a Serbian receipt by the link of its QR code: taken at the door, asked of the tax office
 // in a queue of its own, read from its journal, reviewed and recorded as a photo's receipt is.
 
@@ -1128,7 +1132,7 @@ describe('«Привязать штрихкоды?» at «Записать» (MO
     await record(me, id, payload)
     const again = receiptRecordedCodec.parse((await record(me, id, payload)).json())
     expect(again.codes).toEqual([{ position: 0, code: CODE, outcome: 'written' }])
-  })
+  }, 15_000)
 
   it('an item holding twenty takes no more, and the record stands', async () => {
     const me = await serb()

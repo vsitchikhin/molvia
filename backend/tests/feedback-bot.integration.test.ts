@@ -19,6 +19,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { aScreenshot, clearAll, insertActor, signIn } from './fixtures'
 
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 169 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 // MOL-148: the bot's half of «Написать разработчику» — the owner's notice, the reply, a thread
 // continued — through a real server and a real Postgres.
 
@@ -568,7 +572,7 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
     expect((await word(9032)).json()).toEqual({ outcome: 'continued' })
     expect((await word(9033)).json()).toEqual({ outcome: 'limited' })
     expect((await send(app, cookie, message({ text: 'ещё' }))).statusCode).toBe(429)
-  })
+  }, 15_000)
 
   it('длиннее 2000 — too_long; пустые строки подряд — invisible; ничего не записано', async () => {
     const app = await serverFor(OWNER)

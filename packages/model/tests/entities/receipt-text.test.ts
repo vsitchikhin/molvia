@@ -17,6 +17,10 @@ import {
 } from '#model/entities/receipt-text'
 import type { ReceiptText, TextRow } from '#model/entities/receipt-text'
 
+// The 2 tests here past a second on CI carry a timeout of 15 s: the slowest took 1 374 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 /**
  * The fixtures are the owner's receipts as Tesseract read them on the server (MOL-114) — the item
  * rows and the total line only, under a made-up header (В-7): the repository is public. On am-03 and
@@ -332,7 +336,7 @@ describe('rows of an item’s shape above the list (review Р15)', () => {
     )
     const yoghurt = parse(text).lines.find((line) => line.sku === '1160033')!
     expect([yoghurt.sumHundredths, yoghurt.settled]).toEqual([29_000, true])
-  })
+  }, 15_000)
 })
 
 describe('a line printed with no discount among discounted ones (review Р5)', () => {
@@ -497,7 +501,7 @@ describe('rows of junk by the hundred (review Р18)', () => {
     expect(got.lines.filter((line) => line.settled).length).toBeLessThan(100)
     // and against a fall back to seconds a row, with room for a slow runner
     expectWithin(performance.now() - started, 5_000)
-  })
+  }, 15_000)
 
   it('cost no second search where the total shown is not the reading’s own (MOL-244)', () => {
     // two places vouch for 9 000,00 against the reading's 10 000,00: the reading chosen is read again as

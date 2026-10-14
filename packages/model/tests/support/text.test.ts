@@ -3,6 +3,10 @@ import { expectWithin } from '@molvia/model/testing/clock'
 import { ISSUE } from '#model/support/errors'
 import { drawsNothing, pastedLine, tidyText, visibleLine, visibleText } from '#model/support/text'
 
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 415 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 const review = visibleText(500)
 
 function refusal(text: string): string | undefined {
@@ -186,7 +190,7 @@ describe('pastedLine', () => {
       if (!name.safeParse(pastedLine(text)).success) missed.push(code.toString(16))
     }
     expect(missed).toEqual([])
-  })
+  }, 15_000)
 
   it('turns a break into one space and drops the direction marks', () => {
     const tab = String.fromCodePoint(9)

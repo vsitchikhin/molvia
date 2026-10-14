@@ -27,6 +27,10 @@ import {
 import { connectDrizzle } from './db'
 import { clearAll } from './fixtures'
 
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 101 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 const { db, close } = connectDrizzle()
 const OWNER = 4242
 
@@ -283,7 +287,7 @@ describe('поток выдуманных сбоев не топит канал 
     const rows = await recorded()
     expect(rows.map((row) => row.errorName)).toContain('RealDefect')
     expect(rows.find((row) => row.errorName === 'Liar0')?.count).toBe(2)
-  })
+  }, 15_000)
 
   it('волна одного сбоя у абонентов одного оператора — все отпечатки в таблице (Г1)', async () => {
     const wave = ['advice', 'purchases', 'verdicts', 'money', 'settings', 'exchange'].flatMap(

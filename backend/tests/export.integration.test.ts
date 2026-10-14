@@ -46,6 +46,10 @@ import {
 } from './fixtures'
 import { aLife } from './life'
 
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 091 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 const { db, close } = connectDrizzle()
 const repository = createExportRepository(db)
 const erasure = createErasureRepository(db)
@@ -540,7 +544,7 @@ describe('состав экспорта — один источник правд
     const references = referencesIn(wire)
     expect(new Set(references.map(({ key }) => key))).toEqual(new Set(Object.keys(within)))
     expect(references.filter(({ key, id }) => !within[key]?.has(id))).toEqual([])
-  })
+  }, 15_000)
 
   it('строк в каждом разделе столько же, сколько насчитает сухой прогон стирания', async () => {
     const { tg, actorId } = await someone()

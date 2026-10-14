@@ -12,6 +12,10 @@ import { clearAll, insertActor, insertItem, insertPlace } from './fixtures'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { verdicts as verdictsTable } from '@/db/schema'
 
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 484 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 const { db, close } = connectDrizzle()
 const verdicts = createVerdictRepository(db)
 
@@ -359,5 +363,5 @@ describe('порядок и предел', () => {
 
     expect(expectedNever).toEqual(['Ровно 2,4'])
     expect(protectedRows.map((row) => row.name)).toEqual(expectedNever)
-  })
+  }, 15_000)
 })

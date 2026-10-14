@@ -23,6 +23,10 @@ import type { QuietToday } from '@/usecases/remind-ratings'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, telegramId } from './fixtures'
 
+// The test here past a second on CI carries a timeout of 25 s: the slowest took 2 371 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 const { db, close } = connectDrizzle()
 const reminders = createReminderRepository(db)
 const botSecret = randomBytes(32).toString('base64url')
@@ -253,7 +257,7 @@ describe('ступень 1 — вечером следующего дня', () =
 
     expect((await evening('2026-07-14', '19:00')).reminders).toHaveLength(REMINDERS_PER_CLAIM)
     expect((await evening('2026-07-14', '19:01')).reminders).toHaveLength(1)
-  })
+  }, 25_000)
 })
 
 describe('лестница владельца: 1 → 3 дня → 7 дней → полгода', () => {

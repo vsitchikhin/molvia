@@ -10,6 +10,10 @@ import { broadcasts } from '@/db/schema'
 import { connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertActor } from './fixtures'
 
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 265 ms there
+// (MOL-266), a process of its own, past a fifth of vitest's 5 s. Ten times that, so the time
+// reporter names it only on a run twice as slow as any yet seen.
+
 /**
  * The message about a leak is only worth anything if it can be sent where it is needed: from the
  * production image, one bundled file per entry and no `node_modules`, with the text on standard input
@@ -66,7 +70,7 @@ describe('dist/notify.js', () => {
     const wrong = notify(TEXT, '--force')
     expect(wrong.status).toBe(2)
     expect(wrong.stdout).toContain('usage: notify')
-  })
+  }, 15_000)
 })
 
 describe('dist/notify.js — вход', () => {

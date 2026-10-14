@@ -15,6 +15,10 @@ import { clearAll, insertActor, insertCounted, insertItem } from './fixtures'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { actors, verdicts as verdictsTable } from '@/db/schema'
 
+// The 3 tests here past a second on CI carry a timeout of 15 s: the slowest took 1 263 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 const { db, close } = connectDrizzle()
 const verdicts = createVerdictRepository(db)
 
@@ -410,7 +414,7 @@ describe('gate 0.2: no consent to the statistics (MOL-236)', () => {
       withoutConsent: 2,
       optedOut: 0,
     })
-  })
+  }, 15_000)
 
   it('counts the verdicts already there once edition 2 is accepted: the count is done at reading', async () => {
     const actorId = await insertActor(db, { createdAt: daysAgo(30) })
@@ -422,7 +426,7 @@ describe('gate 0.2: no consent to the statistics (MOL-236)', () => {
       .set({ consentVersion: STATISTICS_CONSENT_EDITION, consentedAt: new Date() })
       .where(eq(actors.id, actorId))
     await expect(gate()).resolves.toMatchObject({ cohortSize: 1, reached: 1, withoutConsent: 0 })
-  })
+  }, 15_000)
 
   it('time first: one without consent inside their window is waiting, not «no consent»', async () => {
     await insertActor(db, { createdAt: daysAgo(5) })
@@ -457,7 +461,7 @@ describe('gate 0.2: an objection to being counted (MOL-96, В-2)', () => {
       withoutConsent: 0,
       optedOut: 2,
     })
-  })
+  }, 15_000)
 
   it('names someone off inside their window as waiting: time first', async () => {
     await insertCounted(db, { createdAt: daysAgo(5), analyticsOffAt: new Date() })

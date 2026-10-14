@@ -8,6 +8,10 @@ import { startLogin } from '@/usecases/start-login'
 import { connectDrizzle } from './db'
 import { clearAll } from './fixtures'
 
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 268 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 const first = connectDrizzle()
 const second = connectDrizzle()
 const requests = createLoginRequestRepository(first.db)
@@ -54,7 +58,7 @@ describe('login quota and lifetime', () => {
     })
     await first.db.update(loginRequests).set({ createdAt: sql`now() - interval '60 seconds'` })
     await expect(requests.createLimited(randomUUID(), mint(), mint(), null)).resolves.toBeTruthy()
-  })
+  }, 15_000)
 
   it('deletes expired rows, including consumed ones, and retains live requests', async () => {
     await requests.createLimited(randomUUID(), mint(), mint(), null)

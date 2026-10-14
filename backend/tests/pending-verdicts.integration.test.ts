@@ -12,6 +12,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
+// The test here past a second on CI carries a timeout of 20 s: the slowest took 1 633 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 const { db, close } = connectDrizzle()
 
 let app: FastifyInstance
@@ -183,7 +187,7 @@ describe('GET /verdicts/pending', () => {
     // The newest first, so the one that did not fit is the oldest.
     expect(over.items[0]?.name).toBe(`Позиция ${String(PENDING_VERDICTS_LIMIT + 1)}`)
     expect(over.items.map((card) => card.name)).not.toContain('Позиция 1')
-  })
+  }, 20_000)
 
   it('B1: дописанное в закрытый поход куплено не позже его закрытия, а не «сегодня»', async () => {
     const actor = await insertActor(db)

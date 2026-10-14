@@ -4,6 +4,10 @@ import { ERROR } from '@molvia/model'
 import type * as Api from '@/api'
 import type * as Navigation from '@/navigation'
 
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 154 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 // The first route of the start throws: a guard with a bug, a route that cannot load (adversarial Б2).
 vi.mock('@/navigation', async (original) => ({
   ...(await original<typeof Navigation>()),
@@ -47,5 +51,5 @@ describe('первый маршрут старта не встал (MOL-144, а�
       const root = document.querySelector<Element & { __vue_app__?: unknown }>('#app')
       expect(root?.__vue_app__).toBeDefined()
     })
-  })
+  }, 15_000)
 })

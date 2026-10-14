@@ -18,6 +18,10 @@ import {
 } from './fixtures'
 import { aLife } from './life'
 
+// The 2 tests here past a second on CI carry a timeout of 20 s: the slowest took 1 848 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 const { db, close } = connectDrizzle()
 const botSecret = randomBytes(32).toString('base64url')
 const app = buildServer({ db, login: { username: 'molvia_bot', botSecret } })
@@ -132,7 +136,7 @@ describe('DELETE /actors/me — «Удалить мои данные» в нас
       expect(Object.values(left.erased).every((n) => n === 0)).toBe(true)
     }
     expect((await db.select().from(erasures)).map((row) => row.erased)).toEqual([2])
-  })
+  }, 20_000)
 
   it('первый запрос дня: срок сдвинут и тут же погашен — одна строка Set-Cookie (ревью 3)', async () => {
     const anna = await insertActor(db)
@@ -200,7 +204,7 @@ describe('DELETE /actors/me — «Удалить мои данные» в нас
       headers: { cookie: borisCookie },
     })
     expect(own.statusCode).toBe(200)
-  })
+  }, 20_000)
 
   it('повтор после потерянного ответа и запрос без сессии — 401 no_actor, никто не стёрт', async () => {
     const anna = await insertActor(db)

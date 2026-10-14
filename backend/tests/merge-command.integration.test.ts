@@ -11,6 +11,10 @@ import { items } from '@/db/schema'
 import { connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertItem } from './fixtures'
 
+// The 5 tests here past a second on CI carry a timeout of 20 s: the slowest took 1 506 ms there
+// (MOL-266), a process of its own, past a fifth of vitest's 5 s. Ten times that, so the time
+// reporter names it only on a run twice as slow as any yet seen.
+
 const { db, close } = connectDrizzle()
 const root = fileURLToPath(new URL('../..', import.meta.url))
 
@@ -72,7 +76,7 @@ describe('dist/merge.js', () => {
     const undone = merge('unmerge', number, '--yes')
     expect([undone.status, undone.stdout]).toEqual([0, expect.stringContaining('apart again')])
     expect(await mergedInto(younger)).toBeNull()
-  })
+  }, 20_000)
 
   it('says why a pair was refused, and nothing changes', async () => {
     const dish = await insertItem(db, { kind: 'dish', name: 'Хаш', searchKey: 'hash' })
@@ -92,7 +96,7 @@ describe('dist/merge.js', () => {
       const wrong = merge(...args)
       expect([wrong.status, wrong.stdout]).toEqual([2, expect.stringContaining('usage: merge')])
     }
-  })
+  }, 20_000)
 
   it('refuses the first step of a chain, naming the one to undo first', async () => {
     const third = await insertItem(db, { name: 'Молоко 3.20%', searchKey: 'moloko 3 20' })
@@ -103,7 +107,7 @@ describe('dist/merge.js', () => {
       1,
       expect.stringContaining(`undo #${second} first`),
     ])
-  })
+  }, 20_000)
 
   it('lists every candidate named and still apart, with its command (review №9)', async () => {
     const [a, b] = [older, younger].sort()
@@ -116,7 +120,7 @@ describe('dist/merge.js', () => {
     expect(listed.stdout).toContain('1 candidates named and still apart')
     merge('merge', younger, older, '--yes')
     expect(merge('candidates').stdout).toContain('0 candidates named and still apart')
-  })
+  }, 20_000)
 
   it('says two things apart, a dry run without --yes', async () => {
     expect(merge('apart', younger, older).stdout).toContain('dry run: nothing changed')
@@ -127,7 +131,7 @@ describe('dist/merge.js', () => {
       expect.stringContaining('never merges or names'),
     ])
     expect(merge('apart', older, younger, '--yes').stdout).toContain('apart already')
-  })
+  }, 20_000)
 
   it('prints every pair of a night, with its command (adversarial В2)', async () => {
     expect(merge('night', '2026-10-06').status).toBe(1)

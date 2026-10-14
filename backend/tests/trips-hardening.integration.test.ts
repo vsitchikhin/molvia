@@ -17,6 +17,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, signIn, tripContext } from './fixtures'
 
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 052 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 const { db, close } = connectDrizzle()
 // The test pool holds one connection, so a second server needs its own to run beside the first,
 // and a third holds locks the way a concurrent request would.
@@ -346,19 +350,23 @@ describe('Д. невидимый знак по краю имени — то же
     ['U+00AD soft hyphen', '\u00ad'],
     ['U+2800 braille blank', '\u2800'],
     ['U+3164 hangul filler', '\u3164'],
-  ])('%s в начале и в конце — то же место', async (_label, mark) => {
-    const actor = await insertActor(db)
-    const first = await startAndFinish(actor, 'Ереван Сити')
+  ])(
+    '%s в начале и в конце — то же место',
+    async (_label, mark) => {
+      const actor = await insertActor(db)
+      const first = await startAndFinish(actor, 'Ереван Сити')
 
-    expect(await startAndFinish(actor, `Ереван Сити${mark}`)).toBe(first)
-    expect(await startAndFinish(actor, `${mark}Ереван Сити`)).toBe(first)
+      expect(await startAndFinish(actor, `Ереван Сити${mark}`)).toBe(first)
+      expect(await startAndFinish(actor, `${mark}Ереван Сити`)).toBe(first)
 
-    const recent = recentPlacesResponseSchema.parse(
-      (await call(app, 'GET', '/places/recent', actor)).body,
-    )
-    expect(recent.places.map((place) => place.name)).toEqual(['Ереван Сити'])
-    expect(await db.select().from(places)).toHaveLength(1)
-  })
+      const recent = recentPlacesResponseSchema.parse(
+        (await call(app, 'GET', '/places/recent', actor)).body,
+      )
+      expect(recent.places.map((place) => place.name)).toEqual(['Ереван Сити'])
+      expect(await db.select().from(places)).toHaveLength(1)
+    },
+    15_000,
+  )
 
   it('не должно сработать: знак внутри имени остаётся — это уже другое имя', async () => {
     const actor = await insertActor(db)
