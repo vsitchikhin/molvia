@@ -531,7 +531,25 @@ describe('ExchangeView: the rate and the list', () => {
     const view = await render()
     await view.get('input[value="official"]').setValue(true)
     await flushPromises()
-    expect(view.get('fieldset').attributes('disabled')).toBeDefined()
+    // Not now and still in the focus order (MOL-174): every radio says so, none is disabled.
+    const fieldset = view.get('fieldset.preference')
+    expect(fieldset.attributes('disabled')).toBeUndefined()
+    expect(fieldset.classes()).toContain('inactive')
+    for (const radio of fieldset.findAll('input[type="radio"]')) {
+      expect(radio.attributes('aria-disabled')).toBe('true')
+    }
+  })
+
+  it('offline, the preference is not now but stays in the focus order (Ф-6)', async () => {
+    exchanges.mockResolvedValue(overview())
+    const view = await render()
+    online(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+    const fieldset = view.get('fieldset.preference')
+    expect(fieldset.attributes('disabled')).toBeUndefined()
+    expect(fieldset.get('input[value="personal"]').attributes('aria-disabled')).toBe('true')
+    expect(chooseRatePreference).not.toHaveBeenCalled()
   })
 
   it('the bin asks first, naming the exchange, and removes nothing until confirmed (В-5)', async () => {
@@ -697,6 +715,39 @@ describe('ExchangeView: the rate and the list', () => {
     expect(document.querySelector('dialog[open]')).toBeNull()
   })
 
+  it('the list read again after a conflict did not come: «the server did not answer», and «Try again»', async () => {
+    exchanges
+      .mockResolvedValueOnce(overview())
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockResolvedValue(overview())
+    recordExchange.mockRejectedValue(new ApiError(ERROR.CONFLICT))
+    const view = await render()
+    expect(view.find('.status').exists()).toBe(false)
+
+    await recordThroughSheet(view)
+    const strip = view.get('.status')
+    expect(strip.text()).toContain(en.exchange.error_strip.split('{when}')[0])
+    expect(strip.text()).not.toContain('{when}')
+    // One «Try again»: the strip over the tab bar holds «Record an exchange» (К-5).
+    const retries = view.findAll('button').filter((button) => button.text() === en.state.retry)
+    expect(retries).toHaveLength(1)
+    expect(recordButton(view)?.text()).toBe(en.exchange.record)
+
+    // Failed again: the same strip, a new attempt said again (C1).
+    await retries[0]?.trigger('click')
+    await flushPromises()
+    expect(view.get('.status').text()).toContain(en.exchange.error_strip.split('{when}')[0])
+
+    await view
+      .findAll('button')
+      .find((button) => button.text() === en.state.retry)
+      ?.trigger('click')
+    await flushPromises()
+    expect(view.find('.status').exists()).toBe(false)
+    expect(exchanges).toHaveBeenCalledTimes(4)
+  })
+
   it('a failure said once goes when the next write succeeds — a new exchange included (Г2)', async () => {
     exchanges.mockResolvedValue(overview())
     removeExchange.mockRejectedValue(new ApiError(ERROR.INTERNAL))
@@ -731,7 +782,11 @@ describe('ExchangeView: the rate and the list', () => {
     window.dispatchEvent(new Event('offline'))
     await flushPromises()
 
-    expect(view.text()).toContain(en.exchange.offline.strip)
+    // One line, with the time of the answer on screen (MOL-181); never red, nothing to retry.
+    const strip = view.get('.status')
+    expect(strip.text()).toContain(en.exchange.offline.strip.split('{when}')[0])
+    expect(strip.text()).toMatch(/\d{1,2}:\d{2}/)
+    expect(strip.text()).not.toContain(en.state.retry)
     expect(view.get('button.remove').attributes('disabled')).toBeDefined()
     // «Записать обмен» stays in the strip, not now, saying why, and a tap on it opens nothing (Ф-6).
     const record = recordButton(view)

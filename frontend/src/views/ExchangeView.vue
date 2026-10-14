@@ -3,15 +3,34 @@
     <template v-if="overview && phase !== 'loading'">
       <!-- Above every branch: removing the last exchange leaves the empty state, and «Вернуть»
            must still be there (В-5). -->
-      <p v-if="!online" class="strip">
-        <IconCloud aria-hidden="true" />{{ t('exchange.offline.strip') }}
-      </p>
-      <p v-if="failed" class="strip failed" role="alert">{{ t('exchange.failed') }}</p>
-      <p v-if="conflicted" class="strip" role="alert">{{ t('exchange.conflict') }}</p>
-      <p v-if="amendConflicted" class="strip" role="alert">{{ t('exchange.amend_conflict') }}</p>
-      <p v-if="vanished" class="strip" role="alert">{{ t('exchange.vanished') }}</p>
-      <p v-if="gone" class="strip" role="alert">{{ t('exchange.restore_gone') }}</p>
-      <div v-if="removed" ref="removedStrip" class="strip removed">
+      <!-- The connection in one line, with the time of the answer shown (MOL-181, Ф-14). Nothing is
+           kept on the phone, but an app stays open for days: «на 14:05» of yesterday would be untrue. -->
+      <StatusStrip
+        v-if="!online && fetchedAt"
+        class="status"
+        kind="offline"
+        :text="t('exchange.offline.strip', { when: whenOf(fetchedAt) })"
+      />
+      <!-- The list read again after a write's answer — a conflict, a vanished exchange, a late
+           «Вернуть» — did not come: what is shown may no longer be what the server holds. The strip
+           over the tab bar holds «Записать обмен», so «Повторить» is here (К-5). -->
+      <StatusStrip
+        v-else-if="stale && fetchedAt"
+        class="status"
+        kind="unanswered"
+        :text="t('exchange.error_strip', { when: whenOf(fetchedAt) })"
+        :attempt="attempt"
+      >
+        <template #action>
+          <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+        </template>
+      </StatusStrip>
+      <p v-if="failed" class="notice failed" role="alert">{{ t('exchange.failed') }}</p>
+      <p v-if="conflicted" class="notice" role="alert">{{ t('exchange.conflict') }}</p>
+      <p v-if="amendConflicted" class="notice" role="alert">{{ t('exchange.amend_conflict') }}</p>
+      <p v-if="vanished" class="notice" role="alert">{{ t('exchange.vanished') }}</p>
+      <p v-if="gone" class="notice" role="alert">{{ t('exchange.restore_gone') }}</p>
+      <div v-if="removed" ref="removedStrip" class="notice removed">
         <span class="removed-text">{{
           t('exchange.removed', { amounts: amountsOf(removed) })
         }}</span>
@@ -131,7 +150,7 @@
             :model-value="overview.preference"
             :options="preferenceOptions"
             :legend="t('exchange.preference_legend')"
-            :disabled="!online || busy"
+            :inactive="!online || busy"
             @update:model-value="choose"
           />
           <p v-if="overview.pair" class="meta">{{ t('exchange.preference_hint', { bank }) }}</p>
@@ -206,7 +225,6 @@ import type {
   WalletBasis,
 } from '@molvia/model'
 import IconCheck from '~icons/mdi/check-bold'
-import IconCloud from '~icons/mdi/cloud-off-outline'
 import IconPlus from '~icons/mdi/plus'
 import IconSwap from '~icons/mdi/swap-horizontal'
 import AppButton from '@/components/AppButton.vue'
@@ -224,6 +242,7 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExchangeWords } from '@/composables/useExchangeWords'
 import { useExchanges } from '@/composables/useExchanges'
@@ -231,6 +250,7 @@ import type { AmendOutcome } from '@/composables/useExchanges'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 import { bankWords } from '@/components/spending'
+import { purchaseDay, timeOfDay } from '@/days'
 
 /**
  * «Обмен денег» (MOL-40), under «Деньги» since MOL-81: the person's own rate, which rate new trips take, and
@@ -251,7 +271,6 @@ export default defineComponent({
     ExchangeRemoveSheet,
     ExchangeSheet,
     IconCheck,
-    IconCloud,
     IconPlus,
     MarketRatesCard,
     OperationSkeleton,
@@ -259,6 +278,7 @@ export default defineComponent({
     ScreenState,
     SectionCaption,
     SegmentedControl,
+    StatusStrip,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -360,6 +380,9 @@ export default defineComponent({
       { value: 'official', label: t('exchange.preference_official', { bank: bank.value }) },
     ])
 
+    // «14 окт., 14:05» — the answer's day and time, as «Деньги» and «Траты» print it.
+    const whenOf = (at: Date): string =>
+      `${purchaseDay(at, locale.value)}, ${timeOfDay(at, locale.value)}`
     // The day a rate is dated by, as a calendar day of Yerevan (adversarial Ж).
     const dayOf = (when: Date): string => day(yerevanDate(when))
     const pairSigns = (pair: { base: Currency; quote: Currency }) => ({
@@ -461,6 +484,7 @@ export default defineComponent({
       rateOf,
       dayOf,
       day,
+      whenOf,
       currencySignOf: (currency: Currency) => currencySign(currency, locale.value),
       pairSigns,
       costLineOf,
@@ -480,9 +504,14 @@ export default defineComponent({
 .losses,
 .rate,
 .frozen,
-.strip {
+.notice {
   @include appear;
 
+  margin-bottom: var(--space-4);
+}
+
+// The kit's strip fades in by itself.
+.status {
   margin-bottom: var(--space-4);
 }
 
@@ -516,7 +545,7 @@ export default defineComponent({
 }
 
 .frozen,
-.strip {
+.notice {
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
@@ -536,7 +565,7 @@ export default defineComponent({
   color: var(--good-ink);
 }
 
-.strip {
+.notice {
   background: var(--warn-tint);
   color: var(--warn-ink);
 }

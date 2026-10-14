@@ -23,6 +23,15 @@ export type ExchangesPhase = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 
 export interface Exchanges {
   readonly phase: ComputedRef<ExchangesPhase>
   readonly overview: Ref<ExchangesResponse | null>
+  /** When the server last answered with the screen — what «обмены на …» of the strip names. */
+  readonly fetchedAt: Ref<Date | null>
+  /**
+   * The list is shown and reading it again failed with the connection up: after a conflict, a
+   * vanished exchange, a late «Вернуть» — what is shown may not be what the server holds now.
+   */
+  readonly stale: ComputedRef<boolean>
+  /** Reads that failed so far: a new one says the strip's same words again (MOL-181, C1). */
+  readonly attempt: Ref<number>
   /** A write in the air: the preference, a removal. The form of the sheet keeps its own. */
   readonly busy: Ref<boolean>
   /** A write that failed — said once, above the list, and cleared by the next one. */
@@ -89,7 +98,9 @@ function hasOwnMoney(overview: ExchangesResponse): boolean {
 export function useExchanges(): Exchanges {
   const actor = useActorStore()
   const overview = ref<ExchangesResponse | null>(null)
+  const fetchedAt = ref<Date | null>(null)
   const failure = ref<'offline' | 'error' | null>(null)
+  const attempt = ref(0)
   const busy = ref(false)
   const failed = ref(false)
   const removed = ref<ExchangeView | null>(null)
@@ -106,6 +117,7 @@ export function useExchanges(): Exchanges {
   function land(answer: ExchangesResponse): void {
     latest += 1
     overview.value = answer
+    fetchedAt.value = new Date()
     failure.value = null
   }
 
@@ -116,10 +128,12 @@ export function useExchanges(): Exchanges {
       const answer = await api.exchanges()
       if (mine !== latest) return
       overview.value = answer
+      fetchedAt.value = new Date()
       failure.value = null
     } catch (error) {
       reportFailure(error, 'screen')
       if (mine !== latest) return
+      attempt.value += 1
       // Decided after the failure, never before the request: a connection that drops while the
       // answer is on its way is the commonest break of all (MOL-19, A1).
       failure.value = navigator.onLine ? 'error' : 'offline'
@@ -131,6 +145,8 @@ export function useExchanges(): Exchanges {
     if (overview.value) return hasOwnMoney(overview.value) ? 'ready' : 'empty'
     return failure.value ?? 'loading'
   })
+
+  const stale = computed(() => overview.value !== null && failure.value === 'error')
 
   /** Every word above the list is about the last write; a new one takes them all away. */
   function hush(): void {
@@ -164,7 +180,9 @@ export function useExchanges(): Exchanges {
       // Everything of the last owner goes with them — «Вернуть» with their amounts would write
       // them into the next account (round 2, Г1).
       overview.value = null
+      fetchedAt.value = null
       failure.value = null
+      attempt.value = 0
       hush()
       removed.value = null
       void load()
@@ -178,6 +196,9 @@ export function useExchanges(): Exchanges {
   return {
     phase,
     overview,
+    fetchedAt,
+    stale,
+    attempt,
     busy,
     failed,
     removed,

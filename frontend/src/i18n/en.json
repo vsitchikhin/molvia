@@ -882,6 +882,7 @@
     "preference_hint": "My rate comes from exchanges and incomes; until there is one, purchases take the {bank} rate anyway",
     "record": "Record an exchange",
     "record_offline": "Recording an exchange needs a connection",
+    "error_strip": "The server did not answer — exchanges as of {when}",
     "list_title": "Exchanges",
     "row_amounts": "{given} → {received}",
     "row_rate": "{date} · {rate}",
@@ -908,7 +909,7 @@
     "offline": {
       "title": "No connection",
       "body": "The exchanges will be shown when the connection is back",
-      "strip": "No connection — an exchange or the rate can be changed when it is back"
+      "strip": "Offline · exchanges as of {when}. Recording an exchange and changing the rate need a connection"
     },
     "load_error": {
       "title": "Could not load the exchanges",
