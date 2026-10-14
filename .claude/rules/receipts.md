@@ -221,16 +221,27 @@ of MOL-114, `bestReading`, each page mode and the section) — 96 of 228 and the
 **A word is a fragment of a regular expression, as OCR reads it** — «դամե» is what every misreading of
 «Ընդամենը» keeps, `հ\S?տ` a piece however OCR read its middle — and a form only one layout reads stays apart
 (`tinMisread`, the table's): folding the forms of all layouts into one is a change of behaviour, measured on its
-own. **The tills' layouts stay the parse's** — «Ереван Сити»'s card, Dog City's table, the terminal, the class
+own. **Every word goes in a group of its own** (adversarial А1 of review 1): set bare, a second form after «|»
+took the rest of the pattern — «Ընդամենը|Ընդամեն\s+(\d…)» found the word with no sum, and the total, the tax
+number and the number were lost in silence. **A word captures nothing**: the parse reads the figures after it by
+their groups, and «(Ընդամենը)» made the total NaN — `lexiconOf` refuses such a card, as the card's test does.
+**The kilogram is one fragment wherever a line is weighed** (А2): it was a fragment in four patterns, a string in
+two comparisons and letter by letter in the table's, so «կ[գq]» weighed nothing. The table's brackets read it in
+either case by the flag `i`. **The letters read for digits are characters of a class, escaped** (А4); `letters`
+alone are a class's ranges as the card writes them, built by the card's test through the parse. **The tills' layouts stay the parse's** — «Ереван Сити»'s card, Dog City's table, the terminal, the class
 code's mark «Դաս» and its article «Ն/Կ», the section «Բաժին», the head's end and city (`receiptCityOf`, which
-reads Armenia's card by name, `ARMENIAN_RECEIPTS`): they are forms of rows, not a country's words.
+reads Armenia's card by name, `ARMENIAN_RECEIPTS`): they are forms of rows, not a country's words. **Where a
+receipt comes from is not on the card** (`receiptSourceOf` reads the schemas, `photoReceiptCountrySchema`): a
+`source` beside them would say it twice, and the card's test holds that `photo` is there exactly for a country
+read by photo.
 
 **A card names only what the parse reads** (owner, В-1 «а»): MOL-229's template also has the words of change,
 subtotal and not-an-item, the codes and the QR, which no rule of Armenia reads; they come with their first
 reader (MOL-248). A field nobody reads is a word nobody checks. **The formats of numbers are a list** — Georgia's
 pharmacies print three decimals beside its shops' two — **and a card may name only a format the parse reads**
-(`PARSED_FRACTION_DIGITS`, a test): the parse counts in hundredths throughout, and a card of three decimals
-before the parse reads them would be a word the bench cannot see.
+(`PARSED_FRACTION_DIGITS`): the parse counts in hundredths throughout, so it **refuses** a card with no format
+or with one it does not read (`RangeError` in `lexiconOf`, adversarial А3) — a card of three decimals read as
+two would be every sum wrong, and only a refusal makes the field more than a declaration.
 
 **The price, named:** `priceInDoubt` asks the receipt's country (`receiptCard`): a receipt of the tax office
 (Serbia) was read by nobody, so no digit of it is in doubt — before the card the Armenian swaps flagged a Serbian
