@@ -1044,14 +1044,58 @@ describe('ExchangeView: against the market of the day (MOL-137)', () => {
       'Best rate on Sep 15: Banks, non-cash',
       'Banks, cash on Sep 15',
     ])
-    expect(card.findAll('.plate > .difference').map((line) => line.text())).toEqual([
-      '֏1,232.12 less than at banks non-cash',
-      '֏996.40 more than at banks for cash',
+    // Against the market: the sign, the word and the tone, each line its own (Ф-30).
+    const differences = card.findAll('.plate > .difference')
+    expect(differences.map((line) => line.text())).toEqual([
+      '−֏1,232.12 · worse than at banks non-cash',
+      '+֏996.40 · better than at banks for cash',
     ])
+    expect(differences[0]?.classes()).toContain('bad')
+    expect(differences[1]?.classes()).toContain('good')
     expect(card.get('.plate > .missing').text()).toBe(en.exchange.market.pending)
-    // The central bank is still there, a step quieter: nobody changes at its rate (Р-5).
+    // The central bank is still there, a step quieter and with no tone: it is not the market (Р-5, Д-5).
     expect(card.get('.official').classes()).toContain('quiet')
-    expect(card.get('.official .difference').text()).toBe('֏8,754 more than the central bank')
+    const official = card.get('.official .difference')
+    expect(official.text()).toBe('֏8,754 more than the central bank')
+    expect(official.classes()).not.toContain('good')
+    expect(official.classes()).not.toContain('bad')
+  })
+
+  it('even with the market is said in words and takes no tone', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        exchanges: [
+          row({
+            market: { best: quote('4.75', 0n, 'exchanger'), own: null, exchangersPending: false },
+          }),
+        ],
+      }),
+    )
+    const line = (await render()).get('article .plate > .difference')
+    expect(line.text()).toBe('Exactly as at exchange offices')
+    expect(line.classes()).not.toContain('good')
+    expect(line.classes()).not.toContain('bad')
+  })
+
+  it('must not fire: no market — the central bank is the main line, neutral, never toned', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        exchanges: [
+          row({
+            official: {
+              rate: rate('4.80', '2026-09-15', 'official'),
+              provider: 'cba',
+              difference: { minor: -250_000n, currency: 'AMD' },
+            },
+          }),
+        ],
+      }),
+    )
+    const card = (await render()).get('article')
+    expect(card.get('.official').classes()).not.toContain('quiet')
+    const line = card.get('.official .difference')
+    expect(line.text()).toBe('֏2,500 less than the central bank')
+    expect(line.classes()).not.toContain('bad')
   })
 
   it('names the row of all bank clients where it stood in for non-cash (В-2)', async () => {

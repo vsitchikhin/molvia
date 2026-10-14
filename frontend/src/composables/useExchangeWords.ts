@@ -1,6 +1,7 @@
 import { useI18n } from 'vue-i18n'
 import { formatRate, formatRateBeside, yerevanDate } from '@molvia/model'
 import type { ExchangeRate, ExchangeView } from '@molvia/model'
+import { signedAmount } from '@/components/accounts'
 import { asTyped, bankWords } from '@/components/spending'
 import { calendarDay } from '@/days'
 
@@ -13,11 +14,17 @@ export interface OfficialWords {
   readonly difference: string
 }
 
-/** One market figure beside an exchange (MOL-137): whose it is and the day, the rate, the difference. */
+/**
+ * One market figure beside an exchange (MOL-137): whose it is and the day, the rate, the
+ * difference — and its tone, since against the market «хуже / лучше» is what the line means (Ф-30).
+ */
 export interface MarketLineWords {
   readonly label: string
   readonly rate: string
+  /** «−416,25 ₽ · хуже, чем в банках безналом» — the sign and the word beside the colour. */
   readonly difference: string
+  /** Below zero the exchange gave less than the market would have; nothing has no tone. */
+  readonly tone: 'bad' | 'good' | null
 }
 
 /** The market lines of a card: the best of the day, the person's own channel, what is to come. */
@@ -111,7 +118,8 @@ export function useExchangeWords(): ExchangeWords {
 
   /**
    * A market figure in words: the row it came from — «все клиенты банков» where that stood in for
-   * non-cash (В-2) — its day, the rate on the side of the exchange's own, and the difference.
+   * non-cash (В-2) — its day, the rate on the side of the exchange's own, and the difference with
+   * its sign and «хуже / лучше» (Ф-30): below zero the exchange gave less in the received currency.
    */
   function marketLineOf(
     exchange: ExchangeView,
@@ -119,9 +127,9 @@ export function useExchangeWords(): ExchangeWords {
     key: 'best' | 'own',
   ): MarketLineWords {
     const minor = quote.difference.minor
-    const amount = moneyOf({ ...quote.difference, minor: minor < 0n ? -minor : minor })
+    const amount = signedAmount(quote.difference, locale.value, { plus: true })
     const where = t(`exchange.market.where_${quote.basis}`)
-    const sign = minor > 0n ? 'more' : minor < 0n ? 'less' : 'equal'
+    const sign = minor > 0n ? 'better' : minor < 0n ? 'worse' : 'equal'
     return {
       label: t(`exchange.market.${key}`, {
         channel: t(`exchange.channel.${quote.basis}`),
@@ -131,6 +139,7 @@ export function useExchangeWords(): ExchangeWords {
         ? formatRateBeside(quote.rate, exchange.rate, locale.value)
         : rateOf(quote.rate),
       difference: t(`exchange.market.${sign}`, { amount, where }),
+      tone: minor > 0n ? 'good' : minor < 0n ? 'bad' : null,
     }
   }
 
