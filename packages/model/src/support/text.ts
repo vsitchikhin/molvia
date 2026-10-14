@@ -85,11 +85,22 @@ function isBlankLine(line: string): boolean {
 }
 
 /**
+ * The texts this process has normalised, and the longest of them — read by tests alone (MOL-266):
+ * «the length is checked before anything is split or folded» is held by these. A body let past the
+ * length costs some thirty milliseconds where it cost a third of one, and gives the same refusal, so
+ * neither the answer nor a clock on CI tells the two apart. `longest` is for a test beside a server
+ * whose timers may normalise a short text of their own meanwhile.
+ */
+export const normalisations = { count: 0, longest: 0 }
+
+/**
  * Blank lines at either end go the way `trim` sends spaces: they would only pad the card.
  * One slice over indices, not `shift()` in a loop — that moved the whole array per line, and
  * four hundred thousand empty lines at the head held the event loop for a minute.
  */
 function withoutBlankEdges(text: string): string {
+  normalisations.count += 1
+  normalisations.longest = Math.max(normalisations.longest, text.length)
   const lines = text.split('\n')
   let first = 0
   let last = lines.length

@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { expectWithin } from '@molvia/model/testing/clock'
 import { eq, sql } from 'drizzle-orm'
-import { ERROR, ISSUE, verdictCardCodec } from '@molvia/model'
+import { ERROR, ISSUE, normalisations, verdictCardCodec } from '@molvia/model'
 import type { VerdictCard } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { events, verdicts } from '@/db/schema'
@@ -199,11 +199,16 @@ describe('PUT — поставить оценку', () => {
     const actor = await insertActor(db)
     const itemId = await insertItem(db)
 
+    normalisations.longest = 0
     const started = Date.now()
     const reply = await rate(actor, itemId, { score: 3, review: `${'\u2800\n'.repeat(200_000)}a` })
 
     expect(reply.status).toBe(400)
     expectWithin(Date.now() - started, 2000)
+    // and the body went no further than its length — let past it, the same 400 comes a hundred times
+    // slower: the work holds it, not the clock (MOL-266). The longest text normalised, not a count, since
+    // the server's timers may normalise a short one of their own meanwhile; a review is 500 letters
+    expect(normalisations.longest).toBeLessThanOrEqual(2 * 500)
     expect(await rows(itemId)).toHaveLength(0)
   })
 
