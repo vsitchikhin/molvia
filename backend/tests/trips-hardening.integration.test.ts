@@ -6,7 +6,6 @@
  */
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { expectWithin } from '@molvia/model/testing/clock'
 import { eq, sql } from 'drizzle-orm'
 import { ERROR, recentPlacesResponseSchema, tripViewCodec } from '@molvia/model'
 import type { TripView } from '@molvia/model'
@@ -435,8 +434,9 @@ describe('заход 3: вид и тождество места — разные
   })
 
   it('А: хвост из тегов на сотни килобайт — быстрый 400, API не стоит', async () => {
+    // Held by the answer, not a clock (MOL-266): trimmed before its length is checked, the tail goes
+    // and the trip starts — in milliseconds, under any bound a clock could keep
     const actor = await insertActor(db)
-    const started = performance.now()
 
     const reply = await call(app, 'POST', '/trips', actor, {
       context: await tripContext(db, actor),
@@ -445,7 +445,6 @@ describe('заход 3: вид и тождество места — разные
     })
 
     expect(reply.status).toBe(400)
-    expectWithin(performance.now() - started, 1_000)
     expect(await db.select().from(places)).toEqual([])
   })
 

@@ -194,6 +194,8 @@ describe('a reading OCR glued into long figures', () => {
       ].join('\n'),
     ).join('\n')
 
+  // The bound is the clock's (MOL-266): without the ceilings the 20-digit figures take past a minute, and
+  // the worst on CI is 510 ms — the test's own timeout stands above it
   it.each([6, 9, 12, 20])(
     'is laid out in seconds, not minutes, with %i-digit figures',
     (digits) => {
@@ -202,6 +204,7 @@ describe('a reading OCR glued into long figures', () => {
       expect(got.lines).toHaveLength(12)
       expectWithin(performance.now() - started, 5_000)
     },
+    15_000,
   )
 })
 
@@ -317,12 +320,17 @@ describe('a till that prints no shelf price, settled against its total (review �
     return [...body, totalRow(total)].join('\n')
   }
 
-  it.each([12, 18, 30])('balances %i lines in seconds, not minutes', (count) => {
-    const started = performance.now()
-    const got = parse(receipt(count))
-    expect([got.lines.length, got.balanced]).toEqual([count, true])
-    expectWithin(performance.now() - started, 5_000)
-  })
+  // the clock's, as above: twelve lines with no ceilings balance in 12–30 s, and CI's worst is 229 ms
+  it.each([12, 18, 30])(
+    'balances %i lines in seconds, not minutes',
+    (count) => {
+      const started = performance.now()
+      const got = parse(receipt(count))
+      expect([got.lines.length, got.balanced]).toEqual([count, true])
+      expectWithin(performance.now() - started, 5_000)
+    },
+    15_000,
+  )
 })
 
 describe('rows of an item’s shape above the list (review Р15)', () => {
@@ -500,8 +508,8 @@ describe('rows of junk by the hundred (review Р18)', () => {
     const got = parse(`${junk(400)}\n${totalRow(1_000_000)}`)
     expect(got.lines).toHaveLength(400)
     expect(got.lines.filter((line) => line.settled).length).toBeLessThan(100)
-    // and against a fall back to seconds a row, with room for a slow runner
-    expectWithin(performance.now() - started, 5_000)
+    // and against a fall back to seconds a row: five times the worst on CI, 1 374 ms (MOL-266)
+    expectWithin(performance.now() - started, 10_000)
   }, 15_000)
 
   it('cost no second search where the total shown is not the reading’s own (MOL-244)', () => {

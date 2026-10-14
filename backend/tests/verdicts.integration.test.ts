@@ -5,7 +5,6 @@ import { randomUUID } from 'node:crypto'
  * numbers in the test names are the corners of the requirements, `requirements/MOL-27.md` §6.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { expectWithin } from '@molvia/model/testing/clock'
 import { eq, sql } from 'drizzle-orm'
 import { ERROR, ISSUE, normalisations, verdictCardCodec } from '@molvia/model'
 import type { VerdictCard } from '@molvia/model'
@@ -194,20 +193,18 @@ describe('PUT — поставить оценку', () => {
   })
 
   it('Е: сотни тысяч невидимых пустых строк в голове отзыва — отказ за миллисекунды', async () => {
-    // The bound is the proof: parsing is synchronous, so a request in parallel would wait
-    // out any blockage and still answer — it would show nothing (С-22).
+    // Parsing is synchronous, so a request in parallel would wait out any blockage and still answer —
+    // it would show nothing (С-22). Nor does a clock (MOL-266): let past its length, the body comes back
+    // the same 400 a hundred times slower, milliseconds still. The work holds it: the longest text
+    // normalised stays within twice a review's 500 letters — the longest, not a count, since the
+    // server's timers may normalise a short one of their own meanwhile.
     const actor = await insertActor(db)
     const itemId = await insertItem(db)
 
     normalisations.longest = 0
-    const started = Date.now()
     const reply = await rate(actor, itemId, { score: 3, review: `${'\u2800\n'.repeat(200_000)}a` })
 
     expect(reply.status).toBe(400)
-    expectWithin(Date.now() - started, 2000)
-    // and the body went no further than its length — let past it, the same 400 comes a hundred times
-    // slower: the work holds it, not the clock (MOL-266). The longest text normalised, not a count, since
-    // the server's timers may normalise a short one of their own meanwhile; a review is 500 letters
     expect(normalisations.longest).toBeLessThanOrEqual(2 * 500)
     expect(await rows(itemId)).toHaveLength(0)
   })

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { expectWithin } from '@molvia/model/testing/clock'
 import { ISSUE } from '#model/support/errors'
 import {
   drawsNothing,
@@ -102,12 +101,10 @@ describe('visibleText', () => {
   it('stays linear on a body of any size — the head of empty lines held the loop a minute', () => {
     // Blank lines of an invisible glyph survive `trim`, so they meet the length first — and the body goes
     // no further: let past it, it is refused all the same, a hundred times slower, which neither the
-    // answer nor a clock on CI tells apart. Held by the work (MOL-266). The clock stays for the loop
-    // of the title, which took seconds.
+    // answer nor a clock on CI tells apart. Held by the work (MOL-266). The loop of the title cannot come
+    // back alone: within twice the bound it has nothing to be slow over, so no clock is kept for it.
     const before = normalisations.count
-    const started = Date.now()
     expect(review.safeParse(`${'\u2800\n'.repeat(200_000)}a`).success).toBe(false)
-    expectWithin(Date.now() - started, 100)
     expect(normalisations.count - before).toBe(0)
     // Plain line breaks are whitespace: `trim` drops them, and what is left is «a» — the one text here
     // normalised. Held by the result: without `trim` first the body would meet the length and throw.

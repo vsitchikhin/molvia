@@ -1,5 +1,4 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { expectWithin } from '@molvia/model/testing/clock'
 import { newItemSchema, toSearchKey } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { sql as raw } from 'drizzle-orm'
@@ -735,12 +734,11 @@ describe('search — edges', () => {
 
   it('bounds the work by the query: 42 KB of words answers like the first twelve', async () => {
     await named('Молоко Ашхар')
-    const query = Array.from({ length: 6000 }, () => 'молоко').join(' ')
-    const started = performance.now()
-    expect(await names(query)).toEqual(['Молоко Ашхар'])
-    // Generous on purpose: the answer above already proves the cut; the time only guards
-    // against the unbounded cost, and a slow runner must not fail a correct build.
-    expectWithin(performance.now() - started, 5000)
+    // Every word its own: past the twelfth none of them is read, so the milk is found by the first. The
+    // answer, not a clock, holds the cut (MOL-266): read whole, these words find nothing — in the same
+    // milliseconds, and six thousand times «молоко» found the milk either way, a few times slower.
+    const words = Array.from({ length: 4399 }, (_, i) => `слово${String(i)}`)
+    expect(await names(['молоко', ...words].join(' '))).toEqual(['Молоко Ашхар'])
   })
 
   it('survives an unfinished last word longer than 255 against a longer name word', async () => {
