@@ -7,6 +7,7 @@ import am14 from './receipt-text.am-14.json'
 import am14t from './receipt-text.am-14t.json'
 import { moneyOfHundredths, needsReshoot, receiptLineOf } from '#model/entities/receipt'
 import { ARMENIAN_RECEIPTS } from '#model/entities/receipt-card'
+import type { PhotoReading } from '#model/entities/receipt-card'
 import { readPartly } from '#model/entities/receipt-sum'
 import {
   bestReading,
@@ -2398,5 +2399,50 @@ describe('a sign OCR read as a digit (MOL-246)', () => {
 
   it('never makes a price of zero: «=0.00» beside «50.00» is not 0 × 1 = 0', () => {
     expect(figures(best('50.00x1.0 հատ=0.00դրամ', 'Ընդամենը: 0.00').lines[0]!)[3]).toBe(false)
+  })
+})
+
+describe('the parse reads the country’s card, never words of its own (MOL-247)', () => {
+  // Armenia's card with some of its words or swaps changed: what the parse finds moves with them
+  const probe = (
+    words: Partial<PhotoReading['words']>,
+    swaps: PhotoReading['swaps'] = AM.swaps,
+  ): PhotoReading => ({ ...AM, swaps, words: { ...AM.words, ...words } })
+  const milk = ['1. Կաթ', '0401/1163909 1Հտ 150,00/0,00 150']
+  const card = (reading: PhotoReading, ...rows: string[]): ReceiptText =>
+    parseReceiptText(reading, rowsOf([...milk, ...rows].join('\n'), 0))
+
+  it('reads the total after the card’s word, and only after it', () => {
+    const latin = probe({ total: 'TOTAL' })
+    expect(card(AM, 'Ընդամենը 150.00').totalHundredths).toBe(15_000)
+    // must not: Armenia's word is no longer the card's
+    expect(card(latin, 'Ընդամենը 150.00').totalHundredths).toBeNull()
+    expect(card(latin, 'TOTAL 150.00').totalHundredths).toBe(15_000)
+  })
+
+  it('votes for a total by the card’s words of the total and the payment', () => {
+    const section = (total: string, paid: string): TextRow[] =>
+      rowsOf(['ԽԱՆՈՒԹ ԱՁ', 'Բաժին 1', '/ Շրջանառության հարկ/ 1700.00', total, paid].join('\n'), 0)
+    const armenian = section('Ընդամենը 1700.00', 'Առձեռն 1700.00')
+    expect(bestReading(AM, [armenian, armenian]).totalHundredths).toBe(170_000)
+    const latin = probe({ totalKept: 'TOTAL', paid: ['CASH'] })
+    // the section's sum alone is one place: no total
+    expect(bestReading(latin, [armenian, armenian]).totalHundredths).toBeNull()
+    const read = section('TOTAL 1700.00', 'CASH 1700.00')
+    expect(bestReading(latin, [read, read]).totalHundredths).toBe(170_000)
+  })
+
+  it('tries the card’s swaps of digits, and no others', () => {
+    // paid 160 for a shelf price of 150, no discount: Armenia's font reads 5 as 6
+    const misread = ['1. Կաթ', '0401/1163909 1Հտ 160,00/0,00 150']
+    const read = (reading: PhotoReading) =>
+      parseReceiptText(reading, rowsOf(misread.join('\n'), 0)).lines.map((line) => [
+        line.sumHundredths,
+        line.settled,
+      ])
+    // one swap either way meets the line: the sum's 6 or the price's 5
+    expect(read(AM)[0]?.[1]).toBe(true)
+    // must not: a card whose font confuses 1 and 7 only leaves the line as read
+    expect(read(probe({}, { 1: '7', 7: '1' }))).toEqual([[16_000, false]])
   })
 })

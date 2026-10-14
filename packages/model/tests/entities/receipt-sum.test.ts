@@ -198,6 +198,14 @@ describe('a price in doubt by the memory (В-1)', () => {
     expect(priceInDoubt('AM', amd(50), null)).toBe(false)
     expect(priceInDoubt('AM', amd(50), rub(60))).toBe(false)
   })
+
+  it('doubts no digit of a receipt the tax office gave: nobody read it (MOL-247)', () => {
+    const rsd = (major: number): Money => ({
+      minor: BigInt(Math.round(major * 100)),
+      currency: 'RSD',
+    })
+    expect(priceInDoubt('RS', rsd(60), rsd(50))).toBe(false)
+  })
 })
 
 describe('read only in part — the «переснимите» of before, a hint now (MOL-222, В-1)', () => {
