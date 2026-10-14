@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
+import { Readable } from 'node:stream'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { expectWithin } from '@molvia/model/testing/clock'
 import { eq } from 'drizzle-orm'
 import {
   ERROR,
@@ -740,11 +740,31 @@ describe('тела со снимками считаются до чтения (�
     for (let i = 0; i < FEEDBACK_HEAVY_DAY_LIMIT; i++) {
       expect((await send(heavy, cookie)).statusCode).toBe(415)
     }
-    const started = performance.now()
-    const past = await send(heavy, cookie)
+    // «Без разбора» is held by the bytes, not a clock (MOL-266): reading and parsing the megabyte costs a
+    // few milliseconds, which no bound on time tells from none — a 429 decided after the read answered
+    // within the old 200 ms too. A body that counts what was taken of it does.
+    const body = Buffer.from(JSON.stringify(heavy))
+    let taken = 0
+    const counted = new Readable({
+      read() {
+        const chunk = body.subarray(taken, taken + 16 * 1024)
+        taken += chunk.length
+        this.push(chunk.length > 0 ? chunk : null)
+      },
+    })
+    const past = await app.inject({
+      method: 'POST',
+      url: '/feedback',
+      payload: counted,
+      headers: {
+        cookie,
+        'content-type': 'application/json',
+        'content-length': String(body.length),
+      },
+    })
     expect(past.statusCode).toBe(429)
     expect(past.json()).toEqual({ code: ERROR.FEEDBACK_RATE_LIMITED })
-    expectWithin(performance.now() - started, 200)
+    expect(taken).toBe(0)
 
     expect((await send(message(), cookie)).statusCode).toBe(201)
     const other = await signIn(db, await insertActor(db))
