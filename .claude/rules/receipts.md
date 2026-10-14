@@ -228,7 +228,12 @@ their groups, and «(Ընդամենը)» made the total NaN — `lexiconOf` refu
 **The kilogram is one fragment wherever a line is weighed** (А2): it was a fragment in four patterns, a string in
 two comparisons and letter by letter in the table's, so «կ[գq]» weighed nothing. The table's brackets read it in
 either case by the flag `i`. **The letters read for digits are characters of a class, escaped** (А4); `letters`
-alone are a class's ranges as the card writes them, built by the card's test through the parse. **The tills' layouts stay the parse's** — «Ереван Сити»'s card, Dog City's table, the terminal, the class
+alone are a class's ranges as the card writes them, built by the card's test through the parse. **Every pattern a
+word goes into is read with the flag `u`**, as the word is checked (round 2, Б1): thirteen of them had none, and
+there «\p{L}» was the letters «p{L}» — a word the checks admitted lost the total, the tax number and the number in
+two layouts and was read in the third.
+
+**The tills' layouts stay the parse's** — «Ереван Сити»'s card, Dog City's table, the terminal, the class
 code's mark «Դաս» and its article «Ն/Կ», the section «Բաժին», the head's end and city (`receiptCityOf`, which
 reads Armenia's card by name, `ARMENIAN_RECEIPTS`): they are forms of rows, not a country's words. **Where a
 receipt comes from is not on the card** (`receiptSourceOf` reads the schemas, `photoReceiptCountrySchema`): a
