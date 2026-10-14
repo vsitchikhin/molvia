@@ -52,20 +52,15 @@
       />
 
       <!-- Nothing is required of anyone: the words say what an exchange buys, and that without
-           one the trips simply keep counting by the central bank (MOL-40, В-3). -->
+           one the trips simply keep counting by the central bank (MOL-40, В-3). «Записать обмен» is
+           the strip's, as on a screen with exchanges (Ф-16). -->
       <ScreenState
         v-else-if="phase === 'empty'"
         kind="empty"
         :icon="IconSwap"
         :title="t('exchange.empty.title')"
         :body="t('exchange.empty.body', { bank })"
-      >
-        <template #action>
-          <AppButton block :inactive="!online" @click="compose">
-            {{ t('exchange.record') }}
-          </AppButton>
-        </template>
-      </ScreenState>
+      />
 
       <template v-else-if="overview">
         <!-- First under the strips (handoff MOL-157 05): what the exchanges of a year gave against
@@ -167,21 +162,15 @@
       </template>
     </template>
 
-    <!-- «Записать обмен» floats where «Трата» does, under the thumb (handoff 02); the empty
-         state keeps its own button at the bottom instead. -->
-    <FloatingDock v-if="overview && phase === 'ready'">
-      <AppButton
-        ref="recordButton"
-        size="large"
-        class="add"
-        :aria-label="t('exchange.record')"
-        :inactive="!online || busy"
-        @click="compose"
-      >
+    <!-- «Записать обмен» stands in the strip over the tab bar, never over the last card (Ф-28):
+         with exchanges and on the empty screen alike, not while there is no answer yet. Without a
+         connection it stays, not now, and says why on itself (Ф-6, Р-1). -->
+    <template v-if="phase === 'ready' || phase === 'empty'" #docked>
+      <AppButton ref="recordButton" size="large" block :inactive="!online || busy" @click="compose">
         <template #icon><IconPlus /></template>
-        {{ t('exchange.fab') }}
+        {{ online ? t('exchange.record') : t('exchange.record_offline') }}
       </AppButton>
-    </FloatingDock>
+    </template>
 
     <ExchangeSheet
       v-if="overview"
@@ -230,7 +219,6 @@ import ExchangeRateChart from '@/components/ExchangeRateChart.vue'
 import MarketRatesCard from '@/components/MarketRatesCard.vue'
 import ExchangeRemoveSheet from '@/components/ExchangeRemoveSheet.vue'
 import ExchangeSheet from '@/components/ExchangeSheet.vue'
-import FloatingDock from '@/components/FloatingDock.vue'
 import OperationSkeleton from '@/components/OperationSkeleton.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
@@ -262,7 +250,6 @@ export default defineComponent({
     ExchangeRateChart,
     ExchangeRemoveSheet,
     ExchangeSheet,
-    FloatingDock,
     IconCheck,
     IconCloud,
     IconPlus,
@@ -574,9 +561,6 @@ export default defineComponent({
    list` took this one's padding for «Обмен» (MOL-159). */
 .exchanges {
   margin-top: var(--space-6);
-
-  // Room for «Обмен» under the last card: it floats over the list, as «Трата» does on the month.
-  padding-bottom: calc(var(--space-8) + var(--space-8) + var(--space-6));
 }
 
 .cards {

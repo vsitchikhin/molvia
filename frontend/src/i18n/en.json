@@ -881,6 +881,7 @@
     "preference_official": "by the {bank} rate",
     "preference_hint": "My rate comes from exchanges and incomes; until there is one, purchases take the {bank} rate anyway",
     "record": "Record an exchange",
+    "record_offline": "Recording an exchange needs a connection",
     "list_title": "Exchanges",
     "row_amounts": "{given} → {received}",
     "row_rate": "{date} · {rate}",
@@ -947,7 +948,6 @@
       "channel_bankNoncash": "Non-cash",
       "channel_exchanger": "Exchange office"
     },
-    "fab": "Exchange",
     "edit_on": "Amend the exchange of {date}:",
     "card_given": "Gave",
     "card_received": "Got",

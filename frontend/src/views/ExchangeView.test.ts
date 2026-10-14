@@ -151,14 +151,13 @@ function confirmButton() {
   return found
 }
 
-/** «Записать обмен»: the floating «Обмен» named in full, or the empty state's own button. */
+/** «Записать обмен» in the strip over the tab bar — its words say why when it is not now (Ф-6). */
 function recordButton(view: VueWrapper) {
   return view
-    .findAll('button')
+    .findAll('.screen > .dock button')
     .find(
       (button) =>
-        button.attributes('aria-label') === en.exchange.record ||
-        button.text() === en.exchange.record,
+        button.text() === en.exchange.record || button.text() === en.exchange.record_offline,
     )
 }
 
@@ -224,7 +223,7 @@ describe('ExchangeView: the four states', () => {
     expect(view.get('.figure').text()).toContain('4.3')
     expect(view.text()).toContain('by the last income')
     expect(view.text()).toContain(en.exchange.preference_legend)
-    expect(recordButton(view)?.text()).toBe(en.exchange.fab)
+    expect(recordButton(view)?.text()).toBe(en.exchange.record)
     expect(view.text()).not.toContain(en.exchange.list_title)
   })
 
@@ -263,7 +262,26 @@ describe('ExchangeView: the four states', () => {
     const view = await render()
     expect(view.text()).toContain(en.exchange.empty.title)
     expect(view.text()).toContain(cba(en.exchange.empty.body))
-    expect(view.text()).toContain(en.exchange.record)
+    // The strip's, not a button of the empty state (Ф-16).
+    expect(recordButton(view)?.text()).toBe(en.exchange.record)
+    expect(view.get('.state').findAll('button')).toHaveLength(0)
+  })
+
+  it('no «Record an exchange» while there is no answer: loading, an error, offline with nothing', async () => {
+    exchanges.mockReturnValue(new Promise(() => undefined))
+    const loading = await render()
+    expect(recordButton(loading)).toBeUndefined()
+
+    exchanges.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const failed = await render()
+    expect(failed.text()).toContain(en.exchange.load_error.title)
+    expect(recordButton(failed)).toBeUndefined()
+
+    online(false)
+    exchanges.mockRejectedValue(new TypeError('network'))
+    const offline = await render()
+    expect(offline.text()).toContain(en.exchange.offline.body)
+    expect(recordButton(offline)).toBeUndefined()
   })
 })
 
@@ -601,7 +619,8 @@ describe('ExchangeView: the rate and the list', () => {
     const restore = view.findAll('button').find((button) => button.text() === en.exchange.restore)
     await restore?.trigger('click')
     await flushPromises()
-    expect(document.activeElement?.getAttribute('aria-label')).toBe(en.exchange.record)
+    expect(document.activeElement?.textContent.trim()).toBe(en.exchange.record)
+    expect(document.activeElement?.closest('.dock')).not.toBeNull()
   })
 
   it('a new exchange that never reached the server keeps «Bring back» (Е1)', async () => {
@@ -714,25 +733,34 @@ describe('ExchangeView: the rate and the list', () => {
 
     expect(view.text()).toContain(en.exchange.offline.strip)
     expect(view.get('button.remove').attributes('disabled')).toBeDefined()
-    // «Обмен» floats on, inactive rather than gone, and a tap on it opens nothing (handoff 02).
+    // «Записать обмен» stays in the strip, not now, saying why, and a tap on it opens nothing (Ф-6).
     const record = recordButton(view)
+    expect(record?.text()).toBe(en.exchange.record_offline)
     expect(record?.attributes('aria-disabled')).toBe('true')
     await record?.trigger('click')
     await flushPromises()
     expect(document.querySelector('dialog[open]')).toBeNull()
+
+    online(true)
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(recordButton(view)?.text()).toBe(en.exchange.record)
+    expect(recordButton(view)?.attributes('aria-disabled')).toBeUndefined()
   })
 
-  it('«Обмен» floats, named in full; the empty screen keeps its own button instead (handoff 02)', async () => {
+  it('«Record an exchange» is named by its words in the strip, with exchanges and empty (Ф-28)', async () => {
     exchanges.mockResolvedValue(overview())
     const full = await render()
-    const floating = full.get(`button[aria-label="${en.exchange.record}"]`)
-    expect(floating.text()).toBe(en.exchange.fab)
-    expect(floating.attributes('aria-disabled')).toBeUndefined()
+    const record = recordButton(full)
+    expect(record?.text()).toBe(en.exchange.record)
+    expect(record?.attributes('aria-label')).toBeUndefined()
+    expect(record?.attributes('aria-disabled')).toBeUndefined()
+    // The frame's strip, under the list — the room for it is kept at the end of the content.
+    expect(full.find('.dock-room').exists()).toBe(true)
 
     exchanges.mockResolvedValue(overview({ exchanges: [], wallet: null }))
     const empty = await render()
     expect(empty.text()).toContain(en.exchange.empty.title)
-    expect(empty.find(`button[aria-label="${en.exchange.record}"]`).exists()).toBe(false)
     expect(recordButton(empty)?.text()).toBe(en.exchange.record)
   })
 })

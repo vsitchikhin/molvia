@@ -881,6 +881,7 @@
     "preference_official": "по курсу {bank}",
     "preference_hint": "Мой курс — из обменов и доходов; пока его нет, покупки всё равно посчитаются по {bank}",
     "record": "Записать обмен",
+    "record_offline": "Записать обмен можно со связью",
     "list_title": "Обмены",
     "row_amounts": "{given} → {received}",
     "row_rate": "{date} · {rate}",
@@ -947,7 +948,6 @@
       "channel_bankNoncash": "Безнал",
       "channel_exchanger": "Обменник"
     },
-    "fab": "Обмен",
     "edit_on": "Исправить обмен от {date}:",
     "card_given": "Отдал",
     "card_received": "Получил",
