@@ -1190,8 +1190,69 @@ describe('ExchangeView: «Обмены против рынка» on top (MOL-152
     expect(text).not.toContain('≈')
     expect(text.indexOf('Zvartnots')).toBeLessThan(text.indexOf(en.exchange.vs_market.no_place))
     expect(text).toContain('Not compared: 1 exchange')
-    expect(card.get('.total').classes()).toContain('negative')
+    expect(card.get('.total').classes()).toContain('bad')
     expect(card.find('a').exists()).toBe(false)
+  })
+
+  it('the difference takes its tone both ways, and the words stand beside it (Ф-30)', async () => {
+    exchanges.mockResolvedValue(overview({ losses }))
+    const view = await render()
+    const card = view.get('.losses')
+    expect(card.get('.word').text()).toBe(en.exchange.vs_market.worse)
+    expect(card.get('.word').classes()).toContain('bad')
+    const [worse, better] = card.findAll('.row')
+    expect(worse?.get('.meta').text()).toBe(`1 exchange · ${en.exchange.vs_market.worse}`)
+    expect(worse?.get('.percent').classes()).toContain('bad')
+    expect(worse?.get('.amount').classes()).toContain('bad')
+    expect(better?.get('.meta').text()).toBe(`2 exchanges · ${en.exchange.vs_market.better}`)
+    expect(better?.get('.percent').classes()).toContain('good')
+    expect(better?.get('.amount').classes()).toContain('good')
+
+    exchanges.mockResolvedValue(
+      overview({ losses: { ...losses, total: { minor: 50_000n, currency: 'AMD' } } }),
+    )
+    const plus = (await render()).get('.losses')
+    expect(plus.get('.total').classes()).toContain('good')
+    expect(plus.get('.total').text()).toContain('+')
+    expect(plus.get('.word').text()).toBe(en.exchange.vs_market.better)
+  })
+
+  it("nothing is no tone and no word; one sign a row — the money's, not a percent rounded to 0 (Р-4)", async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        losses: {
+          total: { minor: 0n, currency: 'AMD' },
+          uncounted: 0,
+          groups: [
+            {
+              place: 'Even',
+              count: 1,
+              difference: { minor: 0n, currency: 'AMD' },
+              percent: 0,
+              level: 0,
+            },
+            {
+              place: 'Hair',
+              count: 1,
+              difference: { minor: -300n, currency: 'AMD' },
+              percent: 0,
+              level: -1,
+            },
+          ],
+        },
+      }),
+    )
+    const card = (await render()).get('.losses')
+    expect(card.find('.word').exists()).toBe(false)
+    expect(card.get('.total').classes()).not.toContain('bad')
+    expect(card.get('.total').classes()).not.toContain('good')
+    const [even, hair] = card.findAll('.row')
+    expect(even?.get('.meta').text()).toBe('1 exchange')
+    expect(even?.get('.percent').classes()).not.toContain('bad')
+    expect(even?.get('.percent').classes()).not.toContain('good')
+    expect(hair?.get('.meta').text()).toBe(`1 exchange · ${en.exchange.vs_market.worse}`)
+    expect(hair?.get('.percent').classes()).toContain('bad')
+    expect(hair?.get('.amount').classes()).toContain('bad')
   })
 
   it('must not fire: nothing of the twelve months measured — no card', async () => {

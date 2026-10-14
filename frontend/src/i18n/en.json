@@ -999,7 +999,10 @@
       "note": "Over 12 months, each exchange against the market of its day by the Central Bank of Armenia: its own channel when named, else the best rate. Minus — you gave more than the market",
       "uncounted": "Not compared: {n} exchange — no market or rate for that day | Not compared: {n} exchanges — no market or rate for those days",
       "count": "{n} exchange | {n} exchanges",
-      "no_place": "No place"
+      "no_place": "No place",
+      "worse": "worse than the market",
+      "better": "better than the market",
+      "count_word": "{count} · {word}"
     },
     "rate_chart": {
       "title": {
