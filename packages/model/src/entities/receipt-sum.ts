@@ -1,7 +1,9 @@
+import { receiptCard } from '#model/entities/receipt-card'
 import { ocrSwapApart } from '#model/entities/receipt-text'
 import { divideRounded } from '#model/support/decimal'
 import { MINOR_EXPONENT, minorPerMajor } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
+import type { ReceiptCountry } from '#model/entities/receipt'
 import type { Quantity } from '#model/values/units'
 
 // MOL-126 — the arithmetic of a receipt being looked at before it is recorded. The phone calls these
@@ -190,10 +192,17 @@ export function readPartly(lines: readonly ReadFigures[], total: Money | null): 
 
 /**
  * The price read differs from the one the shop's memory holds for this article by one digit OCR confuses
- * (5↔6, 1↔4, 3↔8, 0↔9) — «60 60» read for «50 50» adds up either way, and only the memory can tell
- * (owner, В-1, 03.10.2026). A hint for the person, never a correction: the figures stay as read.
+ * in the country's tills (5↔6, 1↔4, 3↔8, 0↔9 in Armenia) — «60 60» read for «50 50» adds up either way,
+ * and only the memory can tell (owner, В-1, 03.10.2026). A hint for the person, never a correction: the
+ * figures stay as read. A receipt the tax office gave (MOL-232) was read by nobody: no digit of it is in
+ * doubt.
  */
-export function priceInDoubt(read: Money | null, remembered: Money | null): boolean {
-  if (read === null || read.currency !== remembered?.currency) return false
-  return ocrSwapApart(String(read.minor), String(remembered.minor))
+export function priceInDoubt(
+  country: ReceiptCountry,
+  read: Money | null,
+  remembered: Money | null,
+): boolean {
+  const reading = receiptCard(country).photo
+  if (reading === null || read === null || read.currency !== remembered?.currency) return false
+  return ocrSwapApart(reading, String(read.minor), String(remembered.minor))
 }

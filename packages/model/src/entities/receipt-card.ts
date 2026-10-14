@@ -91,8 +91,11 @@ export interface ReceiptCard {
   readonly photo: PhotoReading | null
 }
 
-/** Armenia: the bench of MOL-114, the layouts of MOL-125, the class code of MOL-226, MOL-227's section. */
-const ARMENIA: PhotoReading = {
+/**
+ * Armenia: the bench of MOL-114, the layouts of MOL-125, the class code of MOL-226, MOL-227's section.
+ * Read by name where a rule is Armenia's alone — the city of an Armenian till's head.
+ */
+export const ARMENIAN_RECEIPTS: PhotoReading = {
   languages: 'hye+rus+eng',
   // «5 403,12 ֏», «688.09դրամ»: a point or a comma before the hundredths, thousands apart by a space
   numbers: [{ fractionDigits: 2 }],
@@ -128,7 +131,7 @@ const ARMENIA: PhotoReading = {
  * (MOL-232, В-3); Georgia joins with its card (MOL-248).
  */
 export const RECEIPT_CARDS: Readonly<Record<ReceiptCountry, ReceiptCard>> = {
-  AM: { currency: 'AMD', nameLanguage: 'hy', photo: ARMENIA },
+  AM: { currency: 'AMD', nameLanguage: 'hy', photo: ARMENIAN_RECEIPTS },
   RS: { currency: 'RSD', nameLanguage: null, photo: null },
 }
 

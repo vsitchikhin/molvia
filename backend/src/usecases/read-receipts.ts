@@ -101,21 +101,19 @@ async function readOne(
   { reader, report, bind }: ReadReceiptsDeps,
   claimed: ClaimedReceipt,
 ): Promise<ReadOutcome> {
-  const card = receiptCard(claimed.country)
-  if (claimed.parts.length === 0 || card.photo === null) {
+  const { currency, photo: photoReading } = receiptCard(claimed.country)
+  if (claimed.parts.length === 0 || photoReading === null) {
     // restored from a nightly copy, which holds no photos (В-2); a country read by its link has no
-    // languages of the reader and never reaches it (MOL-232)
+    // reading off a photo on its card and never reaches the reader (MOL-232)
     return { kind: 'failed', failure: 'unreadable', readerVersion: null, head: null }
   }
-  const { currency } = card
-  const { languages } = card.photo
   const boxes = new Map<TextRow, Box | null>()
   let version: string | null = null
   const readings: TextRow[][] = []
   for (const mode of RECEIPT_PAGE_MODES) {
     const parts: TextRow[][] = []
     for (const [index, part] of claimed.parts.entries()) {
-      const reading = await reader.read(part.photo, languages, mode)
+      const reading = await reader.read(part.photo, photoReading.languages, mode)
       version ??= reading.version
       const rows = reading.rows.map((row, line) => {
         const text: TextRow = { text: row.text, part: index, line }
@@ -124,9 +122,9 @@ async function readOne(
       })
       parts.push(rows)
     }
-    readings.push(mergeParts(parts))
+    readings.push(mergeParts(photoReading, parts))
   }
-  const text = bestReading(readings)
+  const text = bestReading(photoReading, readings)
   const head = headOf(text, currency, readings)
   if (needsReshoot(text))
     return { kind: 'failed', failure: 'reshoot', readerVersion: version, head }

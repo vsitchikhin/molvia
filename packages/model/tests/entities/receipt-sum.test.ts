@@ -186,17 +186,17 @@ describe('the balance of a receipt', () => {
 
 describe('a price in doubt by the memory (В-1)', () => {
   it('doubts a price one confused digit off', () => {
-    expect(priceInDoubt(amd(60), amd(50))).toBe(true)
-    expect(priceInDoubt(amd(1_160), amd(1_190))).toBe(false)
-    expect(priceInDoubt(amd(1_160), amd(1_190.5))).toBe(false)
+    expect(priceInDoubt('AM', amd(60), amd(50))).toBe(true)
+    expect(priceInDoubt('AM', amd(1_160), amd(1_190))).toBe(false)
+    expect(priceInDoubt('AM', amd(1_160), amd(1_190.5))).toBe(false)
   })
 
   it('does not doubt the same price, another one, or one missing', () => {
-    expect(priceInDoubt(amd(50), amd(50))).toBe(false)
-    expect(priceInDoubt(amd(70), amd(50))).toBe(false)
-    expect(priceInDoubt(null, amd(50))).toBe(false)
-    expect(priceInDoubt(amd(50), null)).toBe(false)
-    expect(priceInDoubt(amd(50), rub(60))).toBe(false)
+    expect(priceInDoubt('AM', amd(50), amd(50))).toBe(false)
+    expect(priceInDoubt('AM', amd(70), amd(50))).toBe(false)
+    expect(priceInDoubt('AM', null, amd(50))).toBe(false)
+    expect(priceInDoubt('AM', amd(50), null)).toBe(false)
+    expect(priceInDoubt('AM', amd(50), rub(60))).toBe(false)
   })
 })
 

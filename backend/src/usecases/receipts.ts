@@ -319,7 +319,7 @@ export async function receiptOfOwner(
               : (line.match ?? 'new'),
         translation: line.translation,
         amount: amounts[i] ?? null,
-        rememberedPrice: priceInDoubt(line.price, rememberedOf(remembered))
+        rememberedPrice: priceInDoubt(receipt.country, line.price, rememberedOf(remembered))
           ? rememberedOf(remembered)
           : null,
         ...(code === null ? {} : { code }),

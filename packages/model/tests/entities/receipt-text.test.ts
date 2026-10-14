@@ -6,6 +6,7 @@ import am05 from './receipt-text.am-05.json'
 import am14 from './receipt-text.am-14.json'
 import am14t from './receipt-text.am-14t.json'
 import { moneyOfHundredths, needsReshoot, receiptLineOf } from '#model/entities/receipt'
+import { ARMENIAN_RECEIPTS } from '#model/entities/receipt-card'
 import { readPartly } from '#model/entities/receipt-sum'
 import {
   bestReading,
@@ -15,6 +16,9 @@ import {
   rowsOf,
 } from '#model/entities/receipt-text'
 import type { ReceiptText, TextRow } from '#model/entities/receipt-text'
+
+/** Armenia's card: the fixtures are Armenian tills. */
+const AM = ARMENIAN_RECEIPTS
 
 /**
  * The fixtures are the owner's receipts as Tesseract read them on the server (MOL-114) — the item
@@ -59,7 +63,10 @@ const CHANGED_BY_TOTAL: Readonly<Record<string, readonly string[]>> = { 'am-05':
 const UNVOUCHED_TOTAL: readonly string[] = ['am-03']
 
 function read(fixture: Fixture): ReceiptText {
-  return bestReading(fixture.readings.map((text) => rowsOf(text, 0)))
+  return bestReading(
+    AM,
+    fixture.readings.map((text) => rowsOf(text, 0)),
+  )
 }
 
 describe('a receipt read by Tesseract, as the prototype read it', () => {
@@ -170,7 +177,7 @@ describe('what is never cut out (review, MOL-125)', () => {
       '2.Կաթ «Իգիթ» 3.2% 1լ',
       '0401/1163909 2Հտ 740 370',
     ].join('\n')
-    const lines = parseReceiptText(rowsOf(text, 0)).lines
+    const lines = parseReceiptText(AM, rowsOf(text, 0)).lines
     expect(lines.map((l) => l.rows.map((r) => r.text))).toEqual([
       ['3923/1122223 1Հտ 60 60'],
       ['2.Կաթ «Իգիթ» 3.2% 1լ', '0401/1163909 2Հտ 740 370'],
@@ -192,7 +199,7 @@ describe('a reading OCR glued into long figures', () => {
     'is laid out in seconds, not minutes, with %i-digit figures',
     (digits) => {
       const started = performance.now()
-      const got = parseReceiptText(rowsOf(glued(digits), 0))
+      const got = parseReceiptText(AM, rowsOf(glued(digits), 0))
       expect(got.lines).toHaveLength(12)
       expect(performance.now() - started).toBeLessThan(5_000)
     },
@@ -201,22 +208,23 @@ describe('a reading OCR glued into long figures', () => {
 
 describe('what is not a receipt', () => {
   it('finds no lines in no text', () => {
-    const got = parseReceiptText(rowsOf('', 0))
+    const got = parseReceiptText(AM, rowsOf('', 0))
     expect([got.lines, got.totalHundredths, got.balanced, got.tin]).toEqual([[], null, false, null])
   })
 
   it('finds no lines in text with no figures', () => {
-    expect(parseReceiptText(rowsOf('ԵՐԵՎԱՆ-ՍԻԹԻ\nՇնորհակալություն', 0)).lines).toEqual([])
+    expect(parseReceiptText(AM, rowsOf('ԵՐԵՎԱՆ-ՍԻԹԻ\nՇնորհակալություն', 0)).lines).toEqual([])
   })
 
   it('refuses no readings at all', () => {
-    expect(() => bestReading([])).toThrow(RangeError)
+    expect(() => bestReading(AM, [])).toThrow(RangeError)
   })
 })
 
 describe('the figures of one line', () => {
   const receipt = (figures: string, total?: string) =>
     parseReceiptText(
+      AM,
       rowsOf(
         ['1.Կաթ «Իգիթ» 3.2% 1լ', figures, ...(total ? [`Ընդամենը ${total}`] : [])].join('\n'),
         0,
@@ -257,7 +265,7 @@ describe('parts of a long receipt', () => {
   const part = (index: number, ...rows: string[]) => rowsOf(rows.join('\n'), index)
 
   it('joins at the last article both parts have, dropping the overlap', () => {
-    const merged = mergeParts([
+    const merged = mergeParts(AM, [
       part(0, '1.Կաթ', '0401/1163909 1Հտ 370 370', '2.Հաց', '1905/1100001 1Հտ 250 250'),
       part(1, '2.Հաց', '1905/1100001 1Հտ 250 250', '3.Ձու', '0407/1100002 1Հտ 90 90'),
     ])
@@ -272,7 +280,7 @@ describe('parts of a long receipt', () => {
   })
 
   it('finds the seam with one digit of the article misread', () => {
-    const merged = mergeParts([
+    const merged = mergeParts(AM, [
       part(0, '1905/1100001 1Հտ 250 250'),
       part(1, '1905/1100004 1Հտ 250 250', '0407/1100002 1Հտ 90 90'),
     ])
@@ -283,13 +291,13 @@ describe('parts of a long receipt', () => {
   })
 
   it('puts parts with no common article one after another', () => {
-    const merged = mergeParts([part(0, 'a'), part(1, 'b'), part(2, 'c')])
+    const merged = mergeParts(AM, [part(0, 'a'), part(1, 'b'), part(2, 'c')])
     expect(merged.map((r) => r.text)).toEqual(['a', 'b', 'c'])
   })
 })
 
 // Review rounds 1–2 of MOL-125: what the adversarial review proved, held here so it stays fixed.
-const parse = (text: string): ReceiptText => parseReceiptText(rowsOf(text, 0))
+const parse = (text: string): ReceiptText => parseReceiptText(AM, rowsOf(text, 0))
 const money = (h: number) => `${String(Math.floor(h / 100))},${String(h % 100).padStart(2, '0')}`
 const totalRow = (h: number) =>
   `Ընդամենը ${String(Math.floor(h / 100))}.${String(h % 100).padStart(2, '0')}`
@@ -390,7 +398,7 @@ describe('the seam of two parts (review Р7–Р9)', () => {
     rows.flatMap((r) => /\d{4}\s*\/\s*(\d{5,})/.exec(r.text)?.[1] ?? [])
 
   it('is no other item’s near article: an overlap of a name row only joins the parts', () => {
-    const merged = mergeParts([
+    const merged = mergeParts(AM, [
       part(0, '1. Կեֆիր', '0401/1163909 1Հտ 366,3/3,7 370', '2. Հաց'),
       part(
         1,
@@ -405,7 +413,7 @@ describe('the seam of two parts (review Р7–Р9)', () => {
   })
 
   it('is not the first of two bags', () => {
-    const merged = mergeParts([
+    const merged = mergeParts(AM, [
       part(
         0,
         '1. Տոպրակ',
@@ -426,7 +434,7 @@ describe('the seam of two parts (review Р7–Р9)', () => {
   })
 
   it('keeps every line of an overlap of two items with near articles once', () => {
-    const merged = mergeParts([
+    const merged = mergeParts(AM, [
       part(
         0,
         '1. Կաթ',
@@ -456,7 +464,8 @@ describe('a long receipt whose overlap the second part read worse (review Р17)'
   const secondStart = rows.findIndex((row) => row.startsWith('9.Յոգուրտ'))
   const joined = (edit: (row: string) => string) =>
     parseReceiptText(
-      mergeParts([
+      AM,
+      mergeParts(AM, [
         rowsOf(rows.slice(0, firstEnd + 1).join('\n'), 0),
         rowsOf(rows.slice(secondStart).map(edit).join('\n'), 1),
       ]),
@@ -504,7 +513,7 @@ describe('rows of junk by the hundred (review Р18)', () => {
     const tail = [totalRow(1_000_000), 'Ընդամենը: 9 000,00', 'Վճարված է Առձեռն: 9 000,00']
     const text = `${junk(400)}\n${tail.join('\n')}`
     const started = performance.now()
-    const got = bestReading([rowsOf(text, 0), rowsOf(text, 0)])
+    const got = bestReading(AM, [rowsOf(text, 0), rowsOf(text, 0)])
     expect(got.totalHundredths).toBe(900_000)
     expect(performance.now() - started).toBeLessThan(5_000)
   })
@@ -599,7 +608,7 @@ describe('the seam with two blemishes in the overlap, or a cut row at the first 
     .slice(rows.findIndex((row) => row.startsWith('9.Յոգուրտ')))
     .map((row) => row.replace('0809/016189', '0809/046139'))
   const joined = (part2: readonly string[]) =>
-    parseReceiptText(mergeParts([rowsOf(first, 0), rowsOf(part2.join('\n'), 1)]))
+    parseReceiptText(AM, mergeParts(AM, [rowsOf(first, 0), rowsOf(part2.join('\n'), 1)]))
   const whole = parse((am05 as Fixture).readings[0]!).lines.map((line) => line.sku)
 
   it('item 10’s name lost at the next part’s top edge as well', () => {
@@ -617,7 +626,8 @@ describe('the seam with two blemishes in the overlap, or a cut row at the first 
 
   it('a row cut through at the first part’s foot takes no name from the next part', () => {
     const got = parseReceiptText(
-      mergeParts([
+      AM,
+      mergeParts(AM, [
         rowsOf(
           [
             '1.Կաթ',
@@ -665,7 +675,7 @@ describe('rows of a thousand letters after the articles (review Р22)', () => {
     const part1 = [...articles.map((a) => `${a} x\n${long()}`), '0401/9999999 x'].join('\n')
     const part2 = articles.map((a) => `${a} x\n${long()}`).join('\n')
     const started = performance.now()
-    mergeParts([rowsOf(part1, 0), rowsOf(part2, 1)])
+    mergeParts(AM, [rowsOf(part1, 0), rowsOf(part2, 1)])
     // a backstop as loose as its neighbours': CI's machine is slower than any laptop
     expect(performance.now() - started).toBeLessThan(5_000)
   })
@@ -695,7 +705,8 @@ describe('two flavours of one yoghurt, numbered in a row (review Р23)', () => {
   const at = (start: string) => rows.findIndex((row) => row.startsWith(start))
   const twoParts = (firstEndsAt: string, secondStartsAt: string, edit = (r: string[]) => r) =>
     parseReceiptText(
-      mergeParts([
+      AM,
+      mergeParts(AM, [
         rowsOf(rows.slice(0, at(firstEndsAt) + 1).join('\n'), 0),
         rowsOf(edit(rows.slice(at(secondStartsAt))).join('\n'), 1),
       ]),
@@ -748,7 +759,8 @@ describe('neighbours of one line numbered …5 and …6, one swap of OCR apart (
   const at = (start: string) => rows.findIndex((row) => row.startsWith(start))
   const twoParts = (secondStartsAt: string, edit = (r: string[]) => r) =>
     parseReceiptText(
-      mergeParts([
+      AM,
+      mergeParts(AM, [
         rowsOf(rows.slice(0, at('0403/1160035') + 1).join('\n'), 0),
         rowsOf(edit(rows.slice(at(secondStartsAt))).join('\n'), 1),
       ]),
@@ -773,7 +785,8 @@ describe('a rule under the head and a rule above the total, with no overlap betw
   it('joins the parts and loses no item', () => {
     const rule = '------------------------------'
     const got = parseReceiptText(
-      mergeParts([
+      AM,
+      mergeParts(AM, [
         rowsOf(
           [
             'ՎԱՃԱՌՔ',
@@ -802,7 +815,7 @@ describe('a part that starts at an item’s figures, its name left in the part b
   const name = rows.findIndex((row) => row.startsWith('9.Յոգուրտ'))
   const figures = rows.findIndex((row) => row.startsWith('0403/1160036'))
   const join = (part1: readonly string[], part2: readonly string[]) =>
-    parseReceiptText(mergeParts([rowsOf(part1.join('\n'), 0), rowsOf(part2.join('\n'), 1)]))
+    parseReceiptText(AM, mergeParts(AM, [rowsOf(part1.join('\n'), 0), rowsOf(part2.join('\n'), 1)]))
   const whole = parse(rows.join('\n')).lines.map((line) => line.sku)
 
   it('keeps the neighbour one swap of OCR off when the cut falls between its name and figures', () => {
@@ -824,7 +837,8 @@ describe('an item read twice at a seam, its article one swap of OCR off (review 
     const rows = (am05 as Fixture).readings[1]!.split('\n')
     const figures = rows.findIndex((row) => row.startsWith('0403/1160036'))
     const got = parseReceiptText(
-      mergeParts([
+      AM,
+      mergeParts(AM, [
         rowsOf(rows.slice(0, figures + 1).join('\n'), 0),
         rowsOf(
           [
@@ -835,7 +849,7 @@ describe('an item read twice at a seam, its article one swap of OCR off (review 
         ),
       ]),
     )
-    const whole = parseReceiptText(rowsOf(rows.join('\n'), 0))
+    const whole = parseReceiptText(AM, rowsOf(rows.join('\n'), 0))
     const wrong = got.lines.filter((line) => {
       const same = whole.lines.find((w) => w.sku === line.sku)
       return same?.sumHundredths !== line.sumHundredths
@@ -849,6 +863,7 @@ describe('an item read twice at a seam, its article one swap of OCR off (review 
 describe('two flavours at one price numbered …5 and …6 in one photo (review Р28)', () => {
   it('are read right and neither is highlighted: there is no seam to read one twice', () => {
     const read = bestReading(
+      AM,
       (am05 as Fixture).readings.map((text) =>
         rowsOf(text.replace('0403/1160033', '0403/1160035'), 0),
       ),
@@ -866,7 +881,10 @@ describe('two flavours at one price numbered …5 and …6 in one photo (review 
 // class 56.10; the total 8 510.
 describe('a fiscal till read by its class code (MOL-226)', () => {
   const kfc = (fixture: { readings: string[] }) =>
-    bestReading(fixture.readings.map((text) => rowsOf(text, 0)))
+    bestReading(
+      AM,
+      fixture.readings.map((text) => rowsOf(text, 0)),
+    )
   const SUMS = [68_809, 393_191, 12_000, 48_032, 62_441, 11_527, 130_000, 125_000]
 
   it('reads the till’s table: code, article and figures on a row, the name under it', () => {
@@ -920,7 +938,7 @@ describe('a fiscal till read by its class code (MOL-226)', () => {
     expect(got.lines.every((l) => l.rows.length === 1 && /\d/.test(l.rows[0]!.text))).toBe(true)
   })
 
-  const receipt = (...texts: string[]) => parseReceiptText(rowsOf(texts.join('\n'), 0))
+  const receipt = (...texts: string[]) => parseReceiptText(AM, rowsOf(texts.join('\n'), 0))
 
   it('puts back the point OCR lost in a terminal’s sum: «393191դրամ» is 3 931.91', () => {
     const got = receipt('Դաս՝ 56.10', '16 Թև', '3931.91x1.0 հատ=393191դրամ', 'Ընդամենը 3931.91')
@@ -1089,8 +1107,12 @@ describe('a fiscal till read by its class code (MOL-226)', () => {
 
 // MOL-226, review round 1: what OCR does to the class reading that the first version lost.
 describe('a fiscal till read by its class code: what OCR does (MOL-226, review)', () => {
-  const kfc = (readings: readonly string[]) => bestReading(readings.map((text) => rowsOf(text, 0)))
-  const receipt = (...texts: string[]) => parseReceiptText(rowsOf(texts.join('\n'), 0))
+  const kfc = (readings: readonly string[]) =>
+    bestReading(
+      AM,
+      readings.map((text) => rowsOf(text, 0)),
+    )
+  const receipt = (...texts: string[]) => parseReceiptText(AM, rowsOf(texts.join('\n'), 0))
 
   it('gives a line whose code OCR lost the receipt’s one class of services, and no other (А1b)', () => {
     const dishes = receipt(
@@ -1207,8 +1229,12 @@ describe('a fiscal till read by its class code: what OCR does (MOL-226, review)'
 
 // MOL-226, review round 2: «աս» is the word «Դաս» only, and a class is no figure that goes on.
 describe('a fiscal till read by its class code: the code’s mark (MOL-226, review 2)', () => {
-  const kfc = (readings: readonly string[]) => bestReading(readings.map((text) => rowsOf(text, 0)))
-  const receipt = (...texts: string[]) => parseReceiptText(rowsOf(texts.join('\n'), 0))
+  const kfc = (readings: readonly string[]) =>
+    bestReading(
+      AM,
+      readings.map((text) => rowsOf(text, 0)),
+    )
+  const receipt = (...texts: string[]) => parseReceiptText(AM, rowsOf(texts.join('\n'), 0))
 
   it('names the terminal’s first dish whose code row OCR lost whole (Б1)', () => {
     const got = kfc(am14t.readings.map((text) => text.replace(/հաս ‘56.10\n/, '')))
@@ -1300,7 +1326,7 @@ describe('a fiscal till read by its class code: the code’s mark (MOL-226, revi
 
 // MOL-226, review round 3: an amount is not a count, a price is not an article, the head is not a name.
 describe('a fiscal till read by its class code: counts, articles, the head (MOL-226, review 3)', () => {
-  const receipt = (...texts: string[]) => parseReceiptText(rowsOf(texts.join('\n'), 0))
+  const receipt = (...texts: string[]) => parseReceiptText(AM, rowsOf(texts.join('\n'), 0))
 
   it('reads a till with no article whose count stands apart from «հատ» (В1)', () => {
     const dishes = receipt(
@@ -1390,7 +1416,7 @@ describe('a fiscal till read by its class code: counts, articles, the head (MOL-
 
 // MOL-226, review round 4: junk after a code is junk, «Դ» has look-alikes, a name runs on, capitals.
 describe('a fiscal till read by its class code: junk, look-alikes, the first name (MOL-226, review 4)', () => {
-  const receipt = (...texts: string[]) => parseReceiptText(rowsOf(texts.join('\n'), 0))
+  const receipt = (...texts: string[]) => parseReceiptText(AM, rowsOf(texts.join('\n'), 0))
 
   it('makes no line of digits of junk after the terminal’s code, one or two (Г1)', () => {
     for (const code of ['Դաս՝ 56.10 1', 'Դաս՝ 56.10 19', 'Դաս՝ 56.10 20-']) {
@@ -1459,7 +1485,7 @@ describe('a fiscal till read by its class code: junk, look-alikes, the first nam
 
 // MOL-226, review round 5: with no «Դաս», a class followed by a line's figures is a price, whatever form.
 describe('a fiscal till read by its class code: a price that begins with the class (MOL-226, review 5)', () => {
-  const receipt = (...texts: string[]) => parseReceiptText(rowsOf(texts.join('\n'), 0))
+  const receipt = (...texts: string[]) => parseReceiptText(AM, rowsOf(texts.join('\n'), 0))
 
   it('reads the till’s price as a price, its sum misread or of two pieces (Д1, № 16)', () => {
     for (const [figures, total, sum] of [
@@ -1519,7 +1545,7 @@ describe('a fiscal till read by its class code: a price that begins with the cla
 
 // MOL-226, review round 6: a code read with no «Դաս» is followed by what follows a code with it.
 describe('a fiscal till read by its class code: a code with no «Դաս» (MOL-226, review 6)', () => {
-  const receipt = (...texts: string[]) => parseReceiptText(rowsOf(texts.join('\n'), 0))
+  const receipt = (...texts: string[]) => parseReceiptText(AM, rowsOf(texts.join('\n'), 0))
 
   it('takes junk after the terminal’s code with no «Դաս» for the code’s own (Е1)', () => {
     const got = receipt(
@@ -1581,7 +1607,7 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
     )
 
   it('reads the section whole: no line, the head of the terminal, the total all three print', () => {
-    const got = bestReading([
+    const got = bestReading(AM, [
       bold('СУСС', '1700.00', '1700.00'),
       bold('CUCC', '1700.00', '1700.00'),
     ])
@@ -1600,7 +1626,7 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
   })
 
   it('never takes the receipt’s own number «ԿՀ: 00000049» for the tax number', () => {
-    const got = bestReading([
+    const got = bestReading(AM, [
       reading('ԿԸ: 00000049', 'Բաժին 1 - Բաժին 1', 'Ընդամենը 120.00', 'Առձեռն 120.00'),
     ])
     expect(got.layout).toBe('department')
@@ -1608,7 +1634,7 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
   })
 
   it('takes the tax number after its word, a till number of as many digits never', () => {
-    const got = bestReading([
+    const got = bestReading(AM, [
       reading('ՀՎՀՀ 12345678 4/2 87654321', 'Բաժին 1', 'Ընդամենը 550.00', 'Առձեռն 550 00'),
     ])
     expect(got.tin).toBe('12345678')
@@ -1616,7 +1642,7 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
   })
 
   it('outvotes a total OCR misread by the section and the payment (550.09 for 550.00)', () => {
-    const got = bestReading([
+    const got = bestReading(AM, [
       reading('Բաժին 1 1', 'py հարկ/ = 550 00', 'Ընդամենը 550.09', 'լոձեռն 550 00'),
     ])
     expect(got.totalHundredths).toBe(55_000)
@@ -1624,7 +1650,7 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
 
   it('reads no total one source alone gives: the thin print lost the point of the other two', () => {
     // am-20: «Կղդամեկը 18000», the section not read — the person types the total (Р-3)
-    const got = bestReading([
+    const got = bestReading(AM, [
       reading('ՀՎՀՀ 12345678 9/2 87654321', 'Ււսժին 1]', 'Կղդամեկը 18000', 'Бибби 1800 00'),
     ])
     expect(got.layout).toBe('department')
@@ -1633,7 +1659,7 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
   })
 
   it('reads no field the two readings read apart', () => {
-    const got = bestReading([
+    const got = bestReading(AM, [
       reading('CUCC: 87345678 9/С: 87654321', '04-10-26 16:30:59', 'Բաժին 1', 'Ընդամենը 1700.00'),
       reading('СУСС: 12345678 Գ/Ը: 87654321', '04-10-26 16:31:59', 'Բաժին 1', 'Առձեռն 1700.00'),
     ])
@@ -1644,7 +1670,7 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
   })
 
   it('reads no total, time or number of two receipts on one photo (am-21)', () => {
-    const got = bestReading([
+    const got = bestReading(AM, [
       reading(
         '57311783 Գ/1',
         '04-10-26 14:23:15 ԳԱՆՔԱՊԱԼ: 3',
@@ -1666,7 +1692,7 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
   })
 
   it('must not fire where an item’s mark is read: Dog City and KFC print «Բաժին» over their items', () => {
-    const dogCity = bestReading([
+    const dogCity = bestReading(AM, [
       reading(
         'Բաժին 1',
         '| (3824) ՏՈՖՈՒ',
@@ -1675,7 +1701,7 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
         'Կանխիկ 9450.00',
       ),
     ])
-    const kfc = bestReading([
+    const kfc = bestReading(AM, [
       reading('Բաժին 1-1', '/շրջ հարկ/ = 8510 00', 'Դաս՝ 56.10', 'Ֆրի', 'Ընդամենը 8510.00'),
     ])
     for (const got of [dogCity, kfc]) {
@@ -1684,7 +1710,7 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
   })
 
   it('must not fire on a receipt with items whose lines OCR lost and no section is printed', () => {
-    const got = bestReading([reading('ԵՐԵՎԱՆ ՍԻԹԻ', 'ՀՎՀՀ 12345678', 'Ընդամենը 5460.00')])
+    const got = bestReading(AM, [reading('ԵՐԵՎԱՆ ՍԻԹԻ', 'ՀՎՀՀ 12345678', 'Ընդամենը 5460.00')])
     expect(got.layout).toBe('card')
     expect(needsReshoot(got)).toBe(true)
   })
@@ -1700,14 +1726,14 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
         'Ընդամենը 1700.00',
         'Առձեռն 1700.00',
       )
-    expect(bestReading([rows('ՀՎՀՀ:')]).tin).toBe('12345678')
+    expect(bestReading(AM, [rows('ՀՎՀՀ:')]).tin).toBe('12345678')
     // the word not read: eight digits that end a row are not the tax number of the till's row under it
-    expect(bestReading([rows('')]).tin).toBeNull()
+    expect(bestReading(AM, [rows('')]).tin).toBeNull()
   })
 
   it('reads no total, time or number where the upper receipt’s head is out of the frame (adversarial А1)', () => {
     // one moment in view, but two totals and two fiscal numbers: two receipts all the same
-    const got = bestReading([
+    const got = bestReading(AM, [
       reading(
         'Բաժին 1 - Բաժին 1',
         '/ Շրջանառության հարկ/ 3660.00',
@@ -1739,13 +1765,13 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
       `Առձեռն ${total}`,
       'ՖԻՍԿԱԼ ՀԱՄԱՐ 11223344',
     ]
-    const one = bestReading([
+    const one = bestReading(AM, [
       reading(
         ...receipt('12345678', '04-10-26 14:23:15', '3660.00'),
         ...receipt('12345678', '04-10-26 14:27:34', '1200.00'),
       ),
     ])
-    const two = bestReading([
+    const two = bestReading(AM, [
       reading(
         ...receipt('12345678', '04-10-26 14:23:15', '3660.00'),
         ...receipt('76543210', '04-10-26 14:27:34', '1200.00'),
@@ -1759,7 +1785,7 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
   it('reads no time or number from the middle of a tape of two receipts (round 2, Б1)', () => {
     // the upper receipt from its section down, the lower one's head under its fiscal number: one moment,
     // one total and one number in view — but a head under the last row of a receipt is the next one's
-    const got = bestReading([
+    const got = bestReading(AM, [
       reading(
         'Բաժին 1 - Բաժին 1',
         '/ Շրջանառության հարկ/ 3660.00',
@@ -1780,7 +1806,7 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
     // the middle of a tape of two: one reading lost the number and kept the lower head, the other stopped
     // at the number — no reading has the moment above the number, so no key is made of two receipts
     const upper = ['Բաժին 1 - Բաժին 1', '/ Շրջանառության հարկ/ 3660.00', 'Ընդամենը՝ 3660.00']
-    const got = bestReading([
+    const got = bestReading(AM, [
       reading(...upper, 'ԽԱՆՈՒԹ ԱՁ', 'ՀՎՀՀ: 12345678 Գ/Հ: 87654321', '04-10-26 14:27:34'),
       reading(...upper, 'Առձեռն 3660.00', 'ՖԻՍԿԱԼ ՀԱՄԱՐ 11223344'),
     ])
@@ -1793,7 +1819,7 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
     for (const phone of ['Հեռ. (0312) 5-12-34', 'Հեռ. 0312/51234']) {
       const head = ['ԽԱՆՈՒԹ ԱՁ', 'ԳՅՈՒՄՐԻ Աբովյան 10', phone, 'ՀՎՀՀ 12345678 9/2 87654321']
       // one reading lost the section, as psm 6 of am-20 did — the phone is no mark there either (Б2)
-      const lost = bestReading([
+      const lost = bestReading(AM, [
         reading(...head, 'Բաժին 1', 'Ընդամենը 700.00', 'Առձեռն 700 00'),
         reading(...head, 'СЕТЕ 1-1', 'Ընդամենը 700.00', 'Առձեռն 700 00'),
       ])
@@ -1802,7 +1828,7 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
         '12345678',
         70_000,
       ])
-      const got = bestReading([
+      const got = bestReading(AM, [
         reading(
           'ԽԱՆՈՒԹ ԱՁ',
           'ԳՅՈՒՄՐԻ Աբովյան 10',
@@ -1825,8 +1851,8 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
 
   it('takes a day or a time no calendar or clock has for no reading of it (adversarial А3)', () => {
     const at = (moment: string) => reading(moment, 'Բաժին 1', 'Ընդամենը 1700.00', 'Առձեռն 1700.00')
-    const day = bestReading([at('04-10-26 16:36:48'), at('64-10-26 16:36:48')])
-    const hour = bestReading([at('04-10-26 16:36:48'), at('04-10-26 76:36:48')])
+    const day = bestReading(AM, [at('04-10-26 16:36:48'), at('64-10-26 16:36:48')])
+    const hour = bestReading(AM, [at('04-10-26 16:36:48'), at('04-10-26 76:36:48')])
     expect([day.date, day.time]).toEqual(['2026-10-04', '16:36'])
     expect([hour.date, hour.time]).toEqual(['2026-10-04', '16:36'])
   })
@@ -1846,7 +1872,7 @@ describe('the total of a receipt with items: the lines that met it, or two place
     '1905/1078044 1Հտ 99,1/0,9 100',
   ]
   const reading = (...tail: string[]): TextRow[] => rowsOf([...lines, ...tail].join('\n'), 0)
-  const both = (...tail: string[]) => bestReading([reading(...tail), reading(...tail)])
+  const both = (...tail: string[]) => bestReading(AM, [reading(...tail), reading(...tail)])
 
   it('keeps the total the lines met, no payment printed', () => {
     const got = both(totalRow(19_820))
@@ -1889,7 +1915,7 @@ describe('the total of a receipt with items: the lines that met it, or two place
 
   it('takes no total whose lines met it only as it changed them, and leaves the lines as read (am-09)', () => {
     const tail = 'Ընդամենը 160.00'
-    const got = bestReading([alone(...milk, tail), alone(...milk, tail)])
+    const got = bestReading(AM, [alone(...milk, tail), alone(...milk, tail)])
     // the total not shown leaves nothing of itself in the line: 150 as read, never its 160 (review 4)
     expect([got.totalHundredths, got.balanced, got.readTotalHundredths]).toEqual([
       null,
@@ -1901,7 +1927,7 @@ describe('the total of a receipt with items: the lines that met it, or two place
 
   it('takes two places over a reading whose lines the total changed, the lines as read (А1б)', () => {
     const paid = 'Վճարված է PosTerminal: 2 050,00'
-    const got = bestReading([
+    const got = bestReading(AM, [
       alone(...milk, ...bread, 'Ընդամենը 2060.00', paid),
       alone(...milk, 'Ընդամենը 2050.00', paid),
     ])
@@ -1915,14 +1941,14 @@ describe('the total of a receipt with items: the lines that met it, or two place
   it('takes no total where the lines as read and two places name two sums — either may be the slip (Б1, Ц1)', () => {
     // Б1: the till's «5» read «6» in the card payment of both readings, and in one reading's total
     const misPaid = 'Վճարված է PosTerminal: 2 060,00'
-    const b1 = bestReading([
+    const b1 = bestReading(AM, [
       alone(...milk, ...bread, 'Ընդամենը 2050.00', misPaid),
       alone(...milk, ...bread, 'Ընդամենը 2060.00', misPaid),
     ])
     // Ц1, its mirror: the milk read «160» as the total of one reading, the payment and the other right
     const milk6 = ['1. Կաթ', '0401/1163909 1Հտ 160,00/0 160']
     const paid = 'Վճարված է PosTerminal: 2 050,00'
-    const c1 = bestReading([
+    const c1 = bestReading(AM, [
       alone(...milk6, ...bread, 'Ընդամենը 2060.00', paid),
       alone(...milk6, ...bread, 'Ընդամենը 2050.00', paid),
     ])
@@ -1939,7 +1965,10 @@ describe('the total of a receipt with items: the lines that met it, or two place
     const handed = fixture.readings.map((text) =>
       text.replace(/Կանխիկ \S+/g, 'Կանխիկ 10000.00').replace(/Վճարվում \S+/g, ''),
     )
-    const got = bestReading(handed.map((text) => rowsOf(text, 0)))
+    const got = bestReading(
+      AM,
+      handed.map((text) => rowsOf(text, 0)),
+    )
     expect([got.layout, got.totalHundredths, got.readTotalHundredths]).toEqual([
       'table',
       null,
@@ -1959,7 +1988,10 @@ describe('the total of a receipt with items: the lines that met it, or two place
         .filter((row) => !/դամե|Կանխիկ|Վճար/u.test(row))
         .join('\n'),
     )
-    const got = bestReading(bare.map((text) => rowsOf(text, 0)))
+    const got = bestReading(
+      AM,
+      bare.map((text) => rowsOf(text, 0)),
+    )
     expect([got.layout, got.totalHundredths, got.readTotalHundredths]).toEqual([
       'table',
       null,
@@ -1975,7 +2007,10 @@ describe('the total of a receipt with items: the lines that met it, or two place
     const ticked = fixture.readings.map((text) =>
       text.replace('Ընդամենը: 9450.00', 'Ընդամենը` 9450.00'),
     )
-    const got = bestReading(ticked.map((text) => rowsOf(text, 0)))
+    const got = bestReading(
+      AM,
+      ticked.map((text) => rowsOf(text, 0)),
+    )
     // shown, and no judge of the lines (В-2 «а»): the row OCR lost stays empty, the review's «≠» says so
     expect([got.totalHundredths, got.balanced]).toEqual([945_000, false])
     expect(got.lines.map((line) => line.sumHundredths)).toEqual([
@@ -1992,7 +2027,7 @@ describe('the total of a receipt with items: the lines that met it, or two place
     // and one total — two places for 2 560,00 over lines that make 2 550,00
     const cheese = ['3. Պանիր', '0406/1100001 1Հտ 500,00/0,00 777']
     const paid = 'Վճարված է PosTerminal: 2 560,00'
-    const got = bestReading([
+    const got = bestReading(AM, [
       alone(...milk, ...bread, ...cheese, 'Ընդամենը 2550.00', paid),
       alone(...milk, ...bread, ...cheese, 'Ընդամենը 2560.00', paid),
     ])
@@ -2003,22 +2038,22 @@ describe('the total of a receipt with items: the lines that met it, or two place
   it('gives a line with no reading nothing of a total not shown; with one line as read, its rest (А1в)', () => {
     const lost = ['2. Հաց', '1905/1078044 1Հտ 1900,00/0,00 1777']
     const tail = 'Ընդամենը 2060.00'
-    const none = bestReading([alone(...lost, tail), alone(...lost, tail)])
+    const none = bestReading(AM, [alone(...lost, tail), alone(...lost, tail)])
     expect(none.totalHundredths).toBeNull()
     expect(none.lines[0]?.sumHundredths).not.toBe(206_000)
     // the named price of the owner's choice: the milk as read vouches, and the bread takes the rest
-    const once = bestReading([alone(...milk, ...lost, tail), alone(...milk, ...lost, tail)])
+    const once = bestReading(AM, [alone(...milk, ...lost, tail), alone(...milk, ...lost, tail)])
     expect([once.totalHundredths, once.lines[1]?.sumHundredths]).toEqual([206_000, 191_000])
   })
 
   it('counts a row the section took as its tax once, the total’s word on it or not (Б2)', () => {
     const section = ['ՀՎՀՀ 12345678 4/2 87654321', 'Բաժին 1', 'Ընդամենը հարկով 1700.00']
-    const got = bestReading([alone(...section), alone(...section)])
+    const got = bestReading(AM, [alone(...section), alone(...section)])
     expect([got.layout, got.totalHundredths]).toEqual(['department', null])
   })
 
   it('takes the amount two places agree on over the one the reading read', () => {
-    const got = bestReading([
+    const got = bestReading(AM, [
       reading('Ընդամենը 2060.01', 'Վճարված է Առձեռն:'),
       reading('Ընդամենը 2050.01', 'Վճարված է Առձեռն: 2 050,01'),
     ])
@@ -2047,11 +2082,11 @@ describe('the total of a receipt with items: the lines that met it, or two place
 // A slice the total took is one look, as the blank's rest is, and never a line «as read» (round 4, Г1).
 describe('a sign OCR read as a digit (MOL-246)', () => {
   const milk = '1.Կաթ «Իգիթ» 3.2% 1լ'
-  const card = (...rows: string[]) => parseReceiptText(rowsOf([milk, ...rows].join('\n'), 0))
+  const card = (...rows: string[]) => parseReceiptText(AM, rowsOf([milk, ...rows].join('\n'), 0))
   const terminal = (...rows: string[]) => ['Դաս՝ 56.10', 'Թվիստեր', ...rows].join('\n')
-  const line = (...rows: string[]) => parseReceiptText(rowsOf(terminal(...rows), 0)).lines[0]!
+  const line = (...rows: string[]) => parseReceiptText(AM, rowsOf(terminal(...rows), 0)).lines[0]!
   const best = (...rows: string[]) =>
-    bestReading([rowsOf(terminal(...rows), 0), rowsOf(terminal(...rows), 0)])
+    bestReading(AM, [rowsOf(terminal(...rows), 0), rowsOf(terminal(...rows), 0)])
   const figures = (l: ReceiptText['lines'][number]) => [
     l.quantityMilli,
     l.priceHundredths,
@@ -2081,6 +2116,7 @@ describe('a sign OCR read as a digit (MOL-246)', () => {
   it('must not let a total read in one place vouch for itself through its slice (review Г1)', () => {
     const two = (other: string, bread: string, total: string) =>
       bestReading(
+        AM,
         [0, 1].map(() =>
           rowsOf(
             [
@@ -2127,7 +2163,7 @@ describe('a sign OCR read as a digit (MOL-246)', () => {
       // 1 000 + 3 119 + 1 200 = 5 319: the bread’s price lost its «3», the cheese’s 1 read 4 in both
       // columns — the blank and the cheese’s own swaps meet the total, so no slice is offered
       const text = cheese('3119,00/0,00 119', '4200,00/0,00 4200', 'Ընդամենը 5319.00', ...pay)
-      expect(shown(bestReading([rowsOf(text, 0), rowsOf(text, 0)]))).toEqual([
+      expect(shown(bestReading(AM, [rowsOf(text, 0), rowsOf(text, 0)]))).toEqual([
         [
           [100_000, true],
           [311_900, false],
@@ -2149,7 +2185,7 @@ describe('a sign OCR read as a digit (MOL-246)', () => {
       'Ընդամենը 7960.00',
       'Կանխիկ 7960.00',
     )
-    expect(shown(bestReading([rowsOf(text, 0), rowsOf(text, 0)]))).toEqual([
+    expect(shown(bestReading(AM, [rowsOf(text, 0), rowsOf(text, 0)]))).toEqual([
       [
         [100_000, true],
         [176_000, false],
@@ -2163,7 +2199,7 @@ describe('a sign OCR read as a digit (MOL-246)', () => {
   it('must not rank a reading met only by its slice above one read right (review Д2)', () => {
     const misread = cheese('3119,00/0,00 119', null, 'Ընդամենը 1119.00')
     const right = cheese('3119,00/0,00 3119', null, 'Ընդամենը 1119.00')
-    expect(shown(bestReading([rowsOf(misread, 0), rowsOf(right, 0)]))).toEqual([
+    expect(shown(bestReading(AM, [rowsOf(misread, 0), rowsOf(right, 0)]))).toEqual([
       [
         [100_000, true],
         [311_900, true],
@@ -2175,6 +2211,7 @@ describe('a sign OCR read as a digit (MOL-246)', () => {
 
   it('leaves the total’s answer to a line with none when a slice only signs a sum read (review 12)', () => {
     const got = parseReceiptText(
+      AM,
       rowsOf(
         [
           ...terminal('1480.32x1.0 հատ=480.32դրամ').split('\n'),
@@ -2190,6 +2227,7 @@ describe('a sign OCR read as a digit (MOL-246)', () => {
 
   it('gives the blank’s rest before a slice of one sum and one cost (review 13)', () => {
     const got = parseReceiptText(
+      AM,
       rowsOf(['Դաս՝ 56.10', 'Թվիստեր 1հատ 1480.32 480.32', 'Ընդամենը: 480.32'].join('\n'), 0),
     )
     expect(figures(got.lines[0]!)).toEqual([1_000, 148_032, 48_032, false])
@@ -2225,6 +2263,7 @@ describe('a sign OCR read as a digit (MOL-246)', () => {
   // review В1, В2: a slice is the total's one answer, as the blank's rest is, and at its price
   const three = (bread: string, cheese: string, ...tail: string[]) =>
     bestReading(
+      AM,
       [0, 1].map(() =>
         rowsOf(
           [
@@ -2281,7 +2320,7 @@ describe('a sign OCR read as a digit (MOL-246)', () => {
   it('must not make a misread reading tie a right one: the reading as printed wins (review Б3)', () => {
     const misread = rowsOf(terminal('2119.00x1.0 հատ=119.00դրամ', 'Ընդամենը: 2119.00'), 0)
     const right = rowsOf(terminal('2119.00x1.0 հատ=2119.00դրամ', 'Ընդամենը: 2119.00'), 0)
-    expect(figures(bestReading([misread, right]).lines[0]!)).toEqual([
+    expect(figures(bestReading(AM, [misread, right]).lines[0]!)).toEqual([
       1_000,
       211_900,
       211_900,
@@ -2291,8 +2330,10 @@ describe('a sign OCR read as a digit (MOL-246)', () => {
 
   it('must not fire on a class row with no count printed: twenty made up are not read (review Б1)', () => {
     const row = (figures: string) =>
-      parseReceiptText(rowsOf(['Դաս՝ 56.10', `Կոլա ${figures}`, 'Ընդամենը: 1750.00'].join('\n'), 0))
-        .lines[0]!
+      parseReceiptText(
+        AM,
+        rowsOf(['Դաս՝ 56.10', `Կոլա ${figures}`, 'Ընդամենը: 1750.00'].join('\n'), 0),
+      ).lines[0]!
     expect(row('1250.00 1750.00').quantityMilli).not.toBe(7_000)
     expect(row('1250.00 1750.00').settled).toBe(false)
   })
@@ -2313,6 +2354,7 @@ describe('a sign OCR read as a digit (MOL-246)', () => {
 
   it('must not fire on a class row with no «x» that a swap holds (А1г)', () => {
     const got = parseReceiptText(
+      AM,
       rowsOf(['Դաս՝ 56.10', 'Թվիստեր 3հատ 1500.00 1500.00'].join('\n'), 0),
     )
     expect(figures(got.lines[0]!)).toEqual([3_000, 150_000, 450_000, true])
