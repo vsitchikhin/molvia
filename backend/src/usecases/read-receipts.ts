@@ -1,12 +1,11 @@
 import {
-  RECEIPT_CURRENCY,
-  RECEIPT_LANGUAGES,
   RECEIPT_PAGE_MODES,
   bestReading,
   mergeParts,
   moneyOfHundredths,
   needsReshoot,
   readPartly,
+  receiptCard,
   receiptCityOf,
   receiptDateOf,
   receiptTimeOf,
@@ -102,13 +101,14 @@ async function readOne(
   { reader, report, bind }: ReadReceiptsDeps,
   claimed: ClaimedReceipt,
 ): Promise<ReadOutcome> {
-  const languages = RECEIPT_LANGUAGES[claimed.country]
-  if (claimed.parts.length === 0 || languages === undefined) {
+  const card = receiptCard(claimed.country)
+  if (claimed.parts.length === 0 || card.photo === null) {
     // restored from a nightly copy, which holds no photos (В-2); a country read by its link has no
     // languages of the reader and never reaches it (MOL-232)
     return { kind: 'failed', failure: 'unreadable', readerVersion: null, head: null }
   }
-  const currency = RECEIPT_CURRENCY[claimed.country]
+  const { currency } = card
+  const { languages } = card.photo
   const boxes = new Map<TextRow, Box | null>()
   let version: string | null = null
   const readings: TextRow[][] = []

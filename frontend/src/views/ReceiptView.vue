@@ -328,10 +328,10 @@ import IconReceiptCheck from '~icons/mdi/receipt-text-check-outline'
 import { ApiError } from '@molvia/client'
 import {
   ERROR,
-  RECEIPT_CURRENCY,
   formatMoney,
   readCovered,
   readPartly,
+  receiptCard,
   receiptDigits,
   receiptSourceOf,
   withoutItems,
@@ -448,7 +448,7 @@ export default defineComponent({
         : false,
     )
     const lang = computed(() => (detail.value ? PRINTED_LANG[detail.value.receipt.country] : 'hy'))
-    const currency = computed(() => RECEIPT_CURRENCY[detail.value?.receipt.country ?? 'AM'])
+    const currency = computed(() => receiptCard(detail.value?.receipt.country ?? 'AM').currency)
     const taken = computed(() => localDay(detail.value?.receipt.capturedAt ?? new Date()))
 
     const lines = computed(() =>

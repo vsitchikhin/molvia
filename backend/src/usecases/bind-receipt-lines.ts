@@ -1,7 +1,7 @@
 import {
-  RECEIPT_NAME_LANGUAGE,
   createLineMatcher,
   isServiceClass,
+  receiptCard,
   receiptLineName,
   serbianServiceLine,
 } from '@molvia/model'
@@ -48,14 +48,11 @@ export async function bindReceiptLines(
   /** Each line's code, in their order, where the tax office gave one (MOL-234). */
   codes: readonly (string | null)[] = [],
 ): Promise<LineBinding[]> {
-  const names = RECEIPT_NAME_LANGUAGE[country]
-  const matcher = createLineMatcher(
-    names === undefined ? [] : await items.nodes(names),
-    TILL_WORDS_RU,
-  )
+  const names = receiptCard(country).nameLanguage
+  const matcher = createLineMatcher(names === null ? [] : await items.nodes(names), TILL_WORDS_RU)
   const bound: LineBinding[] = []
   for (const [position, line] of lines.entries()) {
-    if (names === undefined) {
+    if (names === null) {
       const code = codes[position] ?? null
       const held = code === null ? null : await findByBarcode(items, code)
       if (held !== null) {
