@@ -10,6 +10,7 @@ import {
   mergePages,
   rateWords,
   refusedRows,
+  roundsToNought,
   spentApprox,
   unbroken,
   unsentIn,
@@ -325,6 +326,21 @@ describe('what the screen prints', () => {
  * pages — five rounds of review found a refusal left on a card whose one action threw it away, each
  * time at another edge of a guess where its row was. These are those edges, all at once.
  */
+describe('roundsToNought (MOL-117, MOL-187)', () => {
+  const amd = (minor: bigint) => ({ minor, currency: 'AMD' as const })
+  it('money under half a unit, either sign — what whole units would print as a nought', () => {
+    expect(roundsToNought(amd(49n))).toBe(true)
+    expect(roundsToNought(amd(-1n))).toBe(true)
+    expect(roundsToNought(amd(-49n))).toBe(true)
+  })
+  it('must not fire: nothing, half a unit and more', () => {
+    expect(roundsToNought(amd(0n))).toBe(false)
+    expect(roundsToNought(amd(50n))).toBe(false)
+    expect(roundsToNought(amd(-50n))).toBe(false)
+    expect(roundsToNought(amd(-1_338_149n))).toBe(false)
+  })
+})
+
 describe('refused spendings, apart from the journal', () => {
   const refusal = (write: SpendingWrite, code = 'error.spending_category_unknown') =>
     ({ key: `k-${write.kind}`, write, code }) as RejectedSpendingWrite

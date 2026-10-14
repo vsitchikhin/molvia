@@ -43,6 +43,18 @@ export function timeOfDay(when: Date, locale: string): string {
 }
 
 /**
+ * When the answer on screen came — «сегодня, 14:05», «14 окт., 14:05» — for the strip of the
+ * connection (MOL-181). Counted from the day the screen holds (`useLocalDay`), not from a default
+ * argument: a screen left open overnight is drawn again when that day changes, and «сегодня» of
+ * yesterday's answer becomes «вчера» (adversarial А2 of MOL-187). An answer of a day the screen has
+ * not looked at yet is today's.
+ */
+export function answeredAt(at: Date, locale: string, today = localDay()): string {
+  const [year = 0, month = 1, date = 1] = today.split('-').map(Number)
+  return `${purchaseDay(at, locale, new Date(year, month - 1, date))}, ${timeOfDay(at, locale)}`
+}
+
+/**
  * A month of «Доходы» (MOL-66): «сентябрь 2026» from `2026-09`. The month and the year only —
  * `Intl` adds «г.» to the Russian year, which the caption does not need.
  */
