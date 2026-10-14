@@ -46,8 +46,12 @@
       </div>
     </template>
 
-    <!-- The shape of what is coming: the card of the rate, then cards of exchanges (handoff 02). -->
-    <ScreenSkeleton v-if="phase === 'loading'" :groups="[32, 64, 48]">
+    <!-- The shape of what is coming, in the order it will stand (Ф-13): «Обмены против рынка», the
+         card of the rate with its switch, «Обмены» and the cards of exchanges. -->
+    <ScreenSkeleton v-if="phase === 'loading'">
+      <SkeletonPart kind="figure" />
+      <SkeletonPart kind="figure" plate />
+      <SkeletonPart kind="caption" :width="20" />
       <OperationSkeleton />
     </ScreenSkeleton>
 
@@ -242,6 +246,7 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExchangeWords } from '@/composables/useExchangeWords'
@@ -278,6 +283,7 @@ export default defineComponent({
     ScreenState,
     SectionCaption,
     SegmentedControl,
+    SkeletonPart,
     StatusStrip,
   },
   setup() {
