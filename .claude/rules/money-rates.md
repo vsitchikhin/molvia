@@ -495,6 +495,19 @@ rate exactly as before.
   fresh today — an exchange office of last week is shown, not starred beside today's banks, as a card
   sets it only beside its own day (review П-5). The server marks it; the phone compares nothing.
 - **On the card the market comes first and the central bank under it, a step quieter** (Р-5).
+- **Against the market the difference takes its tone, its sign and a word; against the central bank
+  it stays neutral** (MOL-187, Ф-30 of MOL-118, owner's В-11). The rule of MOL-81, «the difference is
+  neutral always», is withdrawn for the market: there a minus is an exchange worse than one could
+  have got at a counter that day and a plus a better one, so «−416,25 ₽ · хуже, чем в банках
+  безналом» is `bad-ink` and «+153,85 ₽ · лучше, чем в обменниках» `good-ink`, the best line and the
+  own channel each by its own sign; «Ровно как …» has no tone. The colour is never alone — the sign
+  and «хуже / лучше» stand beside it (DESIGN.md, Colour Never Alone). The central bank keeps «на … больше /
+  меньше» with no tone, as MOL-40 had it: nobody changes at its rate, a good exchanger beats it, and
+  the difference says nothing about why. «Обмены против рынка» does the same — the total, a place's
+  percent and amount both ways, «хуже / лучше рынка» under the total and in each place's line — **one
+  sign a row, the money's** (Р-4): the percent is rounded to hundredths and may read 0,00 % over a
+  difference that is not nothing; nothing is no tone and no word. The tone is the phone's by the
+  server's sign; no figure is worked out for it.
 - **«Обмены против рынка» sums each exchange as its card measures it** (MOL-152, folded into
   MOL-159, owner's decisions В-1 «в», В-2 «а», В-3 «а»): the twelve months to today — from the day
   after the same day a year back (MOL-168, В-1 «б»), one window with the year of the line below — by
