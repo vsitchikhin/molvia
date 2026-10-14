@@ -256,7 +256,8 @@ test('«Записать обмен» stands in the strip: the last card ends ab
     .locator('.dock')
     .getByRole('button', { name: 'Записать обмен можно со связью' })
   await expect(offline).toHaveAttribute('aria-disabled', 'true')
-  await offline.click()
+  // Playwright itself counts an `aria-disabled` button as disabled: the tap is forced, as a finger's.
+  await offline.click({ force: true })
   await page.waitForTimeout(400)
   await expect(sheet).toHaveCount(0)
 
