@@ -987,7 +987,7 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
   match the behaviour. A test proves the app works, not the other way round. And **never by
   making it tolerate leftovers**: that hides the cause and leaves the suite depending on the
   machine's history.
-- **A test whose work takes over a second on CI takes its own timeout, at least ten times its
+- **A test whose work takes over half a second on CI takes its own timeout, at least ten times its
   worst there; a hook likewise against its 10 s; a duration a test asserts is bound the same way and
   below the timeout, and a clock bound stays only where each breakage it guards, made on purpose and
   no wider, crosses it** (MOL-243). A wait the test sets itself is not work, and the age of a stamp

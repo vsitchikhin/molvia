@@ -9,7 +9,7 @@ paths:
 The detail behind the timeout line of `CLAUDE.md` › Testing (MOL-243). The area owns no files of its
 own — every test belongs to the area it tests — so it has no code map.
 
-## A test whose work takes over a second on CI takes its own timeout
+## A test whose work takes over half a second on CI takes its own timeout
 
 **vitest gives a test 5 s and a hook 10 s, and gives no second try.** No `vitest.config.ts` sets
 `testTimeout`, `hookTimeout` or `retry`, and CI runs `vitest run` as it is: one timeout on a busy
@@ -22,7 +22,9 @@ of 45 ms and left out the pure parse of MOL-244 at 2.6 s. Any work may take that
 writes to the database, a parse, a mount, a subprocess, the model. A wait the test sets itself is
 not work: `navigation` «a step that never moved…» waits 2.1 s on purpose, `metrics` sleeps.
 
-**A second is a fifth of vitest's 5 s**; past it a busy runner reaches the limit.
+**Half a second is a tenth of vitest's 5 s**: past it the default limit is less than ten times the
+worst. The threshold is the multiplier's, not a number of its own — while the rule said five times, it
+was a second.
 
 **Ten times the worst, because a busy runner multiplies a test of seconds nearly fivefold.**
 `merge-corpus` «names what the model cannot judge…» went past 5 s (5005–5037 ms) on other people's
