@@ -231,7 +231,8 @@ either case by the flag `i`. **The letters read for digits are characters of a c
 alone are a class's ranges as the card writes them, built by the card's test through the parse. **Every pattern a
 word goes into is read with the flag `u`**, as the word is checked (round 2, Б1): thirteen of them had none, and
 there «\p{L}» was the letters «p{L}» — a word the checks admitted lost the total, the tax number and the number in
-two layouts and was read in the third.
+the card's, the table's and the class code's layouts while the section's read it. A test reads such a word in each
+pattern with a word, the ends of the lists and the table's head included (round 3, В1).
 
 **The tills' layouts stay the parse's** — «Ереван Сити»'s card, Dog City's table, the terminal, the class
 code's mark «Դաս» and its article «Ն/Կ», the section «Բաժին», the head's end and city (`receiptCityOf`, which
