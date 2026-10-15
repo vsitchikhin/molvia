@@ -25,6 +25,10 @@ import { buildServer } from '@/server'
 import { connect, connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtures'
 
+// The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 857 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 /**
  * «Записать» (MOL-126): a parsed receipt written in one go as a finished trip on its own day, its
  * purchases, new items, the shop's memory, the place's tax number — and what it leaves behind.
@@ -288,7 +292,7 @@ describe('«Записать»', () => {
     expect([other.statusCode, codeOf(other)]).toEqual([409, ERROR.CONFLICT])
     // the repeat is the same record: counted once (MOL-222)
     expect(await db.select().from(receiptDays)).toMatchObject([{ recorded: 1, lines: 1 }])
-  })
+  }, 10_000)
 
   it('answers «recorded?» only once a record still running has ended (MOL-169, Г1)', async () => {
     const me = await insertActor(db)
@@ -345,7 +349,7 @@ describe('«Записать»', () => {
       headers: { cookie: await signIn(db, other) },
     })
     expect([theirs.statusCode, codeOf(theirs)]).toEqual([404, ERROR.NOT_FOUND])
-  })
+  }, 10_000)
 
   it('refuses the same receipt recorded before while its purchases are there (Т-11)', async () => {
     const me = await insertActor(db)
@@ -742,7 +746,7 @@ describe('«Записать»', () => {
     expect(await wordsOf(me)).toEqual([])
     // and nobody else's word moved
     expect(await wordsOf(stranger)).toEqual(all)
-  })
+  }, 10_000)
 
   // MOL-240, adversarial round 3: the word kept is what the last line still there says — its item,
   // price and moment — and two removals at once leave no word behind either
@@ -1049,7 +1053,7 @@ describe('«Записать»', () => {
     expect(await db.select().from(receiptDays)).toMatchObject([
       { recorded: 5, within5m: 1, within15m: 1, within1h: 1, within1d: 1, later: 1 },
     ])
-  })
+  }, 10_000)
 
   // MOL-222, adversarial А6: the memory learns from another record between the review and «Записать»;
   // only the phone knows what it showed, and it says which lines it put right

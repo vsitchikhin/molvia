@@ -9,6 +9,10 @@ import { completeLogin } from '@/usecases/complete-login'
 import { connectDrizzle } from './db'
 import { clearAll, telegramId } from './fixtures'
 
+// The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 716 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const first = connectDrizzle()
 const second = connectDrizzle()
 const requests = createLoginRequestRepository(first.db)
@@ -108,7 +112,7 @@ describe('login_days: the funnel is counted where each step happens (MOL-68)', (
     expect(results.filter((result) => result.status === 'fulfilled').length).toBeGreaterThan(0)
     expect(await first.db.select().from(sessions)).toHaveLength(1)
     expect((await days())[await today()]?.collected).toBe(1)
-  })
+  }, 10_000)
 
   it('does not count a collection whose transaction rolled back', async () => {
     const request = await started()
@@ -148,7 +152,7 @@ describe('login_days: the funnel is counted where each step happens (MOL-68)', (
       expiredUnconfirmed: 1,
       expiredConfirmed: 1,
     })
-  })
+  }, 10_000)
 
   it('counts what the start of a login cleans up, as the minute timer does', async () => {
     const request = await started()
@@ -183,7 +187,7 @@ describe('login_days: the funnel is counted where each step happens (MOL-68)', (
       started: LOGIN_WINDOW_LIMIT,
       refused: 2,
     })
-  })
+  }, 10_000)
 
   it('files every step under the day the login began in Yerevan, not the day of the step', async () => {
     const request = await started()
@@ -205,7 +209,7 @@ describe('login_days: the funnel is counted where each step happens (MOL-68)', (
     const counted = await days()
     expect(counted['2026-09-20']).toEqual({ ...NOTHING, confirmed: 1, collected: 1 })
     expect(counted['2026-09-21']).toEqual({ ...NOTHING, declined: 1 })
-  })
+  }, 10_000)
 
   it('holds nothing that names a person, a device or a request', async () => {
     const request = await started()

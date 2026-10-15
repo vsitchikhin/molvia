@@ -14,6 +14,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { signIn } from './fixtures'
 
+// The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 663 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 
 const UNKNOWN_ID = '11111111-1111-4111-8111-111111111111'
@@ -129,7 +133,7 @@ describe('the first visit', () => {
 
     expect(actor.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/)
     expect(new Date(actor.createdAt).getTime()).not.toBeNaN()
-  })
+  }, 10_000)
 
   it('never sends the Telegram id, though the row it just wrote holds one', async () => {
     // The wire schema is strict, so a reply that grew the field would fail `actorIn` rather
@@ -170,7 +174,7 @@ describe('a request that proves who it is', () => {
     expect(status).toBe(200)
     expect(actorIn(body).id).toBe(mine.id)
     expect(actorIn(body).id).not.toBe(other.id)
-  })
+  }, 10_000)
 
   it('is refused with 401 when there is no cookie at all', async () => {
     expect(await asActor(null)).toEqual({ status: 401, body: { code: ERROR.NO_ACTOR } })

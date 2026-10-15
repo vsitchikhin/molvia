@@ -17,6 +17,10 @@ import { buildServer } from '@/server'
 import { connect, connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtures'
 
+// The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 889 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const trips = createTripRepository(db)
 const expenses = createExpenseRepository(db)
@@ -114,7 +118,7 @@ describe('PUT — поставить оценку', () => {
     const verdict = card(reply)
     expect(verdict).toMatchObject({ itemId, score: 2, review: 'Пахнет крахмалом' })
     expect(verdict.updatedAt.getTime()).toBeGreaterThanOrEqual(verdict.ratedAt.getTime())
-  })
+  }, 10_000)
 
   it('2: повтор того же черновика — 200, одна строка, след не сдвинулся', async () => {
     const actor = await insertActor(db)
@@ -221,7 +225,7 @@ describe('PUT — поставить оценку', () => {
 
     expect((await rate(actor, itemId, { score: 1 })).status).toBe(201)
     expect((await rate(actor, itemId, { score: 5 })).status).toBe(200)
-  })
+  }, 10_000)
 
   it('10: место, владелец и позиция в теле — отказ с именем поля', async () => {
     const actor = await insertActor(db)
@@ -266,7 +270,7 @@ describe('PUT — поставить оценку', () => {
       body: { code: ISSUE.VERDICT_PLACE_NOT_FOR_KIND, details: 'placeId' },
     })
     expect(await rows(itemId)).toHaveLength(0)
-  })
+  }, 10_000)
 
   it('16: позиция без штрихкода, заведённая латиницей, оценивается как любая', async () => {
     const actor = await insertActor(db)
@@ -279,7 +283,7 @@ describe('PUT — поставить оценку', () => {
     const { id } = JSON.parse(proposed.body) as { id: string }
 
     expect((await rate(actor, id, { score: 4 })).status).toBe(201)
-  })
+  }, 10_000)
 
   it('17: двойной тап — одна строка', async () => {
     const actor = await insertActor(db)
@@ -388,7 +392,7 @@ describe('DELETE — снять оценку', () => {
     expect((await withdraw(owner, itemId)).status).toBe(404)
     expect((await withdraw(owner, lonely)).status).toBe(404)
     expect((await withdraw(owner, 'молоко')).status).toBe(404)
-  })
+  }, 10_000)
 
   it('19: оценка после снятия — 201, та же строка, время первой оценки прежнее, старый текст не вернулся', async () => {
     const actor = await insertActor(db)
@@ -479,7 +483,7 @@ describe('что не должно сработать', () => {
     expect((await amend(null, itemId, { review: null })).status).toBe(401)
     expect((await withdraw(null, itemId)).status).toBe(401)
     expect(await rows(itemId)).toMatchObject([{ score: 3, deletedAt: null }])
-  })
+  }, 10_000)
 
   it('14, 20: ни одна из трёх ручек не пишет в журнал — ворота 0.2 считают по verdicts', async () => {
     const actor = await insertActor(db)
@@ -492,7 +496,7 @@ describe('что не должно сработать', () => {
     await rate(actor, itemId, { score: 4 })
 
     expect(await eventCount()).toBe(before)
-  })
+  }, 10_000)
 
   it('15: ни владелец, ни id строки не уходят в ответе — ни полем, ни значением', async () => {
     const actor = await insertActor(db)

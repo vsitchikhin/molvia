@@ -6,6 +6,10 @@ import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, signIn, telegramId } from './fixtures'
 import { aLife } from './life'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 546 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 
 let app: FastifyInstance
@@ -65,7 +69,7 @@ describe('GET /actors/me/export (MOL-93)', () => {
     expect(own.body).not.toContain(anna)
     expect(named.statusCode).toBe(400)
     expect(named.json()).toMatchObject({ details: 'actorId' })
-  })
+  }, 10_000)
 
   it('без сессии — 401, и ни HEAD, ни POST по этому адресу нет', async () => {
     const owner = await insertActor(db)

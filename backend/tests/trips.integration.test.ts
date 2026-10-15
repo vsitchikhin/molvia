@@ -26,6 +26,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, signIn, tripContext } from './fixtures'
 
+// The 13 tests here past half a second on CI carry a timeout of 10 s: the slowest took 964 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 
 let app: FastifyInstance
@@ -134,7 +138,7 @@ describe('поход у полки — фикстуры хендоффа', () =>
     ])
     expect(wire.total).toEqual([{ amount: '6493.12', currency: 'AMD' }])
     expect(await current(actor)).toEqual(trip(last))
-  })
+  }, 10_000)
 
   it('место, страна и город — из настроек; валюта похода — снимок валюты трат', async () => {
     const actor = await insertActor(db, { spendCurrency: 'USD', city: 'Ереван' })
@@ -314,7 +318,7 @@ describe('«Начать поход», когда открыт другой (В-
     const started = await start(actor, 'Ереван Сити', next)
     expect(started.status).toBe(201)
     expect((await current(actor))?.id).toBe(next)
-  })
+  }, 10_000)
 
   it('тот же магазин — тоже выбор, а не тихое продолжение', async () => {
     const actor = await insertActor(db)
@@ -372,7 +376,7 @@ describe('чужое отвечает как несуществующее (IDOR)
     expect(code(added)).toBe(ERROR.NOT_FOUND)
     expect((await current(owner))?.expenses).toEqual([])
     expect((await current(owner))?.finishedAt).toBeNull()
-  })
+  }, 10_000)
 
   it('чужой expenseId в своём походе: правка 404, удаление 200 — чужая трата не тронута', async () => {
     const owner = await insertActor(db)
@@ -393,7 +397,7 @@ describe('чужое отвечает как несуществующее (IDOR)
     expect([patched.status, removed.status]).toEqual([404, 200])
     expect(trip(removed).id).toBe(myTrip)
     expect((await current(stranger))?.total).toEqual([{ minor: 57_000n, currency: 'AMD' }])
-  })
+  }, 10_000)
 
   it('своя трата под чужим tripId — 404', async () => {
     const owner = await insertActor(db)
@@ -407,7 +411,7 @@ describe('чужое отвечает как несуществующее (IDOR)
 
     expect(reply.status).toBe(404)
     expect((await current(owner))?.expenses).toHaveLength(1)
-  })
+  }, 10_000)
 
   it('своя трата из другого своего похода — 404, а не правка не того похода', async () => {
     const actor = await insertActor(db)
@@ -421,7 +425,7 @@ describe('чужое отвечает как несуществующее (IDOR)
       amount: amd('1'),
     })
     expect(reply.status).toBe(404)
-  })
+  }, 10_000)
 
   it('кривой id в пути — тот же 404, а не 500', async () => {
     const actor = await insertActor(db)
@@ -504,7 +508,7 @@ describe('последние места', () => {
     const second = trip(await start(actor, 'Ереван  Сити'))
 
     expect(second.place.id).not.toBe(first.place.id)
-  })
+  }, 10_000)
 
   it('чужие места не видны', async () => {
     const owner = await insertActor(db)
@@ -843,7 +847,7 @@ describe('скачок курса и выбор человека (MOL-39, Р-19)
     })
     const [row] = await db.select().from(trips).where(eq(trips.id, view.id))
     expect(row).toMatchObject({ rateScaled: 431_230_000n, rateManualScaled: 4_310_000n })
-  })
+  }, 10_000)
 
   it('₽ → $: свой курс стороной «1 $ = 89,50 ₽» ложится снимком 0,011173 (MOL-81, адв. А)', async () => {
     const usd = (value: string, date: string, jump = false): CachedRate => ({
@@ -894,7 +898,7 @@ describe('скачок курса и выбор человека (MOL-39, Р-19)
     expect(back.rate?.scaled).toBe(431_230_000n)
     expect(back.rateJump?.manual?.scaled).toBe(4_310_000n)
     expect(again.rate?.scaled).toBe(4_320_000n)
-  })
+  }, 10_000)
 
   it('свой курс, который не курс, — 400 invalid_rate, и ничего не записано', async () => {
     const { actor, view } = await jumpedTrip()
@@ -912,7 +916,7 @@ describe('скачок курса и выбор человека (MOL-39, Р-19)
     ).toBe(400)
     const [row] = await db.select().from(trips).where(eq(trips.id, view.id))
     expect(row).toMatchObject({ rateManualScaled: null, rateChoice: null })
-  })
+  }, 10_000)
 
   it('свой курс в походе без скачка — 409: предлагается только при скачке', async () => {
     await rates.upsert([rub('4.3123', daysAgo(1))])
@@ -959,7 +963,7 @@ describe('курс устарел (MOL-39, Р-18)', () => {
     const started = trip(await start(actor))
     expect(started).toMatchObject({ rate: { source: 'fallback' }, rateProvider: 'cbr' })
     expect((await current(actor))?.rateProvider).toBe('cbr')
-  })
+  }, 10_000)
 
   it('без курса издателя нет', async () => {
     const actor = await insertActor(db)
@@ -1073,7 +1077,7 @@ describe('день телефона у похода (MOL-121)', () => {
     })
     expect(back.status).toBe(200)
     expect(await days(other)).toEqual({ startedOn: null, finishedOn: null })
-  })
+  }, 10_000)
 
   // The rate a trip is snapshotted with is of the day it is dated by (review Т-7): a start the queue
   // sends after midnight takes the wallet of the evening it was tapped in.
@@ -1099,5 +1103,5 @@ describe('день телефона у похода (MOL-121)', () => {
       place: { kind: 'store', name: 'Ереван Сити' },
     })
     expect(trip(tapped).rate?.scaled).toBe(parseRate('4.3'))
-  })
+  }, 10_000)
 })

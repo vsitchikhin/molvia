@@ -13,8 +13,9 @@ import { createVerdictRepository } from '@/db/verdicts-repository'
 import { verdicts as verdictsTable } from '@/db/schema'
 
 // The test here past a second on CI carries a timeout of 15 s: the slowest took 1 484 ms there
-// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
-// only on a run twice as slow as any yet seen.
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
+// reporter names one only on a run slower than any yet seen. The 4 more here past half a second
+// carry 10 s: the slowest of them took 688 ms.
 
 const { db, close } = connectDrizzle()
 const verdicts = createVerdictRepository(db)
@@ -172,7 +173,7 @@ describe('общие данные', () => {
 
     // Трое было, двое осталось — значит, снова мои цифры.
     expect(await rowsFor(me, 'shared')).toMatchObject([{ itemId, sum: 5, count: 1 }])
-  })
+  }, 10_000)
 
   it('отдают только мой отзыв: чужие слова нечем усреднить', async () => {
     const me = await insertActor(db)
@@ -192,7 +193,7 @@ describe('общие данные', () => {
     }
 
     expect((await rowsFor(me, 'shared'))[0]?.review).toBeNull()
-  })
+  }, 10_000)
 
   it('говорят, своя ли за строкой оценка: отзыв этого не скажет (MOL-32, А2)', async () => {
     const me = await insertActor(db)
@@ -292,7 +293,7 @@ describe('порядок и предел', () => {
     const strangers = rows.rows.filter((row) => row.count === crowd.length)
     expect(strangers).toHaveLength(reserved)
     expect(rows.rows.filter((row) => row.count === 1)).toHaveLength(page - reserved)
-  })
+  }, 10_000)
 
   it('не занимают резерв, когда предупреждений меньше: место не простаивает', async () => {
     const me = await insertActor(db)
@@ -334,7 +335,7 @@ describe('порядок и предел', () => {
     const names = (await rowsFor(me, 'shared', 2)).map((row) => row.name)
     expect(names).toEqual(['Моя тройка', 'Чужая единица'])
     expect(await totalFor(me, 'shared', 2)).toBe(4)
-  })
+  }, 10_000)
 
   it('округляет границу так же, как домен — иначе предел берёг бы не те строки (С-12)', async () => {
     // Уровень строки считает домен (`divideRounded`), а что предел не имеет права срезать —

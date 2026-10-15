@@ -47,8 +47,9 @@ import {
 import { aLife } from './life'
 
 // The test here past a second on CI carries a timeout of 15 s: the slowest took 1 091 ms there
-// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
-// only on a run twice as slow as any yet seen.
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
+// reporter names one only on a run slower than any yet seen. The 5 more here past half a second
+// carry 10 s: the slowest of them took 868 ms.
 
 const { db, close } = connectDrizzle()
 const repository = createExportRepository(db)
@@ -469,7 +470,7 @@ describe('состав экспорта — один источник правд
     expect(reaching).toContain('exchange_revisions')
     expect(reaching).toContain('expenses')
     expect(reaching).not.toContain('items')
-  })
+  }, 10_000)
 
   it('каждая колонка этих таблиц — в файле или в пропущенных с причиной', async () => {
     const rows = await db.execute<{ table_name: string; column_name: string }>(sql`
@@ -519,7 +520,7 @@ describe('состав экспорта — один источник правд
       fact: { amount: '9000.00', currency: 'AMD' },
       counted: { amount: '9500.00', currency: 'AMD' },
     })
-  })
+  }, 10_000)
 
   it('каждая ссылка файла находит свою строку в самом файле — справочник полон', async () => {
     const { tg, actorId } = await someone()
@@ -562,7 +563,7 @@ describe('состав экспорта — один источник правд
     expect(content.incomes.flatMap((income) => income.earlierVersions)).toHaveLength(1)
     expect(content.feedback.flatMap((message) => message.replies)).toHaveLength(1)
     expect(content.feedback.flatMap((message) => message.pictures)).toHaveLength(1)
-  })
+  }, 10_000)
 })
 
 describe('экспорт всего своего (MOL-93)', () => {
@@ -628,7 +629,7 @@ describe('экспорт всего своего (MOL-93)', () => {
     expect(content.exchanges.filter((exchange) => exchange.removedAt !== null)).toHaveLength(1)
     expect(content.incomes.filter((income) => income.removedAt !== null)).toHaveLength(1)
     expect(content.spendings.filter((spending) => spending.removedAt !== null)).toHaveLength(1)
-  })
+  }, 10_000)
 
   it('прежняя версия обмена — внутри него, с тем, что было записано до правки', async () => {
     const { tg, actorId } = await someone()
@@ -788,7 +789,7 @@ describe('экспорт всего своего (MOL-93)', () => {
       expect.objectContaining({ type: 'advice_viewed', payload: { subject: 'product' } }),
     ])
     expect(await db.select().from(events).where(eq(events.actorId, actorId))).toHaveLength(1)
-  })
+  }, 10_000)
 
   it('нет такого владельца — нечего и выгружать', async () => {
     expect(await repository.exportOf(randomUUID(), randomUUID())).toBeNull()

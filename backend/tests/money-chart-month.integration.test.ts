@@ -21,6 +21,10 @@ import { moneyChartMonthOf } from '@/usecases/money-chart-month'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 733 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
 let app: FastifyInstance
@@ -355,5 +359,5 @@ describe('«Графики → Месяц» (MOL-158)', () => {
     expect((await call(me, 'GET', `/money/months/${current}/charts?actorId=x`)).statusCode).toBe(
       400,
     )
-  })
+  }, 10_000)
 })

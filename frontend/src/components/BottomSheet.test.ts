@@ -11,6 +11,10 @@ import { provideAnnouncer, useAnnouncer } from '@/composables/useAnnouncer'
 import { pageAnchor } from '@/composables/useSheetHistory'
 import { routes } from '@/router'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 771 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 /**
  * happy-dom runs the router on a memory history: a step back reaches the sheet at once and no
  * `popstate` ever fires, so the navigation's «a step is in flight» guard is released by hand
@@ -1991,7 +1995,7 @@ describe('words said inside the sheet', () => {
     await settle()
     expect(region('under')).toBe('Снова наверху')
     expect(region('over')).toBe('')
-  })
+  }, 10_000)
 
   // Under a modal sheet everything else is inert: a sheet's wrapper speaking from its own setup,
   // above its BottomSheet, or the screen under it, is said in the sheet (adversarial А3).

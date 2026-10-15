@@ -6,8 +6,9 @@ import { connectDrizzle, testDatabaseUrl } from './db'
 import { insertActor, telegramId } from './fixtures'
 
 // The test here past a second on CI carries a timeout of 25 s: the slowest took 2 118 ms there
-// (MOL-266), a process of its own, past a fifth of vitest's 5 s. Ten times that, so the time
-// reporter names it only on a run twice as slow as any yet seen.
+// (MOL-266), a process of its own, past a fifth of vitest's 5 s. Ten times that, up to whole 5 s,
+// so the time reporter names one only on a run slower than any yet seen. One more here past half a
+// second carries 10 s: it took 809 ms at worst.
 
 /**
  * The owner's fallback for erasure is only worth anything if it runs where it is needed: in the
@@ -45,7 +46,7 @@ describe('dist/forget.js', () => {
     const wrong = forget('not-an-id')
     expect(wrong.status).toBe(2)
     expect(wrong.stdout).toContain('usage: forget')
-  })
+  }, 10_000)
 })
 
 // Adversarial О-6 and П-3: the value of TG must not be able to bring its own `--yes`, quoted or

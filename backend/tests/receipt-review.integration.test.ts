@@ -9,6 +9,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
+// The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 926 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 /**
  * The review of a receipt (MOL-126): the shops' memory laid over what the parse found, the place by
  * the seller's tax number in its city, what a line is recorded at, the rate of the receipt's day and
@@ -265,7 +269,7 @@ describe('the review of a receipt', () => {
     // without access, closed again
     await db.update(actors).set({ sharedUntil: null }).where(eq(actors.id, me))
     expect((await doubted())?.rememberedPrice).toBeNull()
-  })
+  }, 10_000)
 
   it('names the place by the receipts of its seller recorded in the city its address prints, else the person’s', async () => {
     const me = await insertActor(db, { city: 'Гюмри' })
@@ -300,7 +304,7 @@ describe('the review of a receipt', () => {
         [unread, null],
       ]),
     )
-  })
+  }, 10_000)
 
   // В4 of the adversarial review: one wrong choice of place named it for everyone, for good
   it('takes one’s own last place, else the place most people chose, and forgets a removed trip', async () => {

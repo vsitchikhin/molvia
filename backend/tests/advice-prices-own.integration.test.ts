@@ -23,6 +23,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
+// The 6 tests here past half a second on CI carry a timeout of 10 s: the slowest took 644 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 
 let app: FastifyInstance
@@ -158,7 +162,7 @@ describe('GET /advice/prices — the item’s own places', () => {
     expect(placesOf(await prices(me, { item: milk }))).toEqual([
       { name: 'Зовуни', price: perLitre(600), day: '2026-09-12', observations: 3 },
     ])
-  })
+  }, 10_000)
 
   it('puts the cheapest last price first, and leaves another city out (В-4)', async () => {
     const me = await insertActor(db)
@@ -215,7 +219,7 @@ describe('GET /advice/prices — the item’s own places', () => {
     expect(placesOf(await prices(me, { item: milk, except: first.id }))[0]?.price).toBe(
       perLitre(560),
     )
-  })
+  }, 10_000)
 
   it('shows none of a stranger’s prices, with access or without (Т-1)', async () => {
     const me = await insertActor(db)
@@ -275,7 +279,7 @@ describe('GET /advice/prices — the item’s own places', () => {
           (place) => `${place.name} ${place.unitPrice.currency}${place.unitPrice.unit}`,
         ),
     ).toEqual(['SAS AMDl', 'Зовуни AMDpiece'])
-  })
+  }, 10_000)
 
   it('dates a record from an old queue by its moment in the zone of the request (MOL-121)', async () => {
     const me = await insertActor(db)
@@ -611,7 +615,7 @@ describe('GET /advice/prices — one’s own verdicts, with access or without (a
 
     const answer = await prices(me, { item: anelik })
     expect(answer.level !== 'never' && answer.alternatives).toEqual([])
-  })
+  }, 10_000)
 })
 
 describe('GET /advice/prices — another item of the kind (В-3, В-7)', () => {
@@ -639,7 +643,7 @@ describe('GET /advice/prices — another item of the kind (В-3, В-7)', () => {
     expect(places.map((place) => [place.name, place.day, place.unitPrice.unit])).toEqual([
       ['Зовуни', '2026-09-28', 'l'],
     ])
-  })
+  }, 10_000)
 
   it('brings none that is unrated, «не брать нигде», bought only elsewhere, or only by a stranger', async () => {
     const me = await insertActor(db)
@@ -661,7 +665,7 @@ describe('GET /advice/prices — another item of the kind (В-3, В-7)', () => {
 
     const answer = await prices(me, { item: ashhar })
     expect(answer.level !== 'never' && answer.alternatives).toEqual([])
-  })
+  }, 10_000)
 
   it('carries alternatives beside an item not rated', async () => {
     const me = await insertActor(db)

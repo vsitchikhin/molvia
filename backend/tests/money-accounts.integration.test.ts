@@ -37,6 +37,10 @@ import { recordSpending } from '@/usecases/spendings'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
+// The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 628 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
 const accountsRepository = createMoneyAccountRepository(db)
@@ -204,7 +208,7 @@ describe('счёт: добавить, повтор, имя (MOL-115)', () => {
       startOn: today,
     })
     expect(mixed.statusCode).toBe(400)
-  })
+  }, 10_000)
 
   it('держит отрицательный старт — кредитка это имя', async () => {
     const me = await owner()
@@ -953,7 +957,7 @@ describe('итоги (п. 8, Р-22)', () => {
     const view = await overview(me)
     expect(view.incomeTotals).toEqual({ currency: 'AMD', ...view.totals })
     expect(view.totals.total).toEqual({ minor: 150_000n, currency: 'AMD' })
-  })
+  }, 10_000)
 
   it('убранный счёт не входит и в итоги валюты дохода (Р-22, MOL-183)', async () => {
     const me = await owner()

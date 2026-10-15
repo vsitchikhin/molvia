@@ -12,8 +12,9 @@ import { connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertItem } from './fixtures'
 
 // The 5 tests here past a second on CI carry a timeout of 20 s: the slowest took 1 506 ms there
-// (MOL-266), a process of its own, past a fifth of vitest's 5 s. Ten times that, so the time
-// reporter names it only on a run twice as slow as any yet seen.
+// (MOL-266), a process of its own, past a fifth of vitest's 5 s. Ten times that, up to whole 5 s,
+// so the time reporter names one only on a run slower than any yet seen. The 2 more here past half
+// a second carry 10 s: the slowest of them took 827 ms.
 
 const { db, close } = connectDrizzle()
 const root = fileURLToPath(new URL('../..', import.meta.url))
@@ -83,7 +84,7 @@ describe('dist/merge.js', () => {
     const refused = merge('merge', dish, older, '--yes')
     expect([refused.status, refused.stdout]).toEqual([1, expect.stringContaining('of two kinds')])
     expect(merge('unmerge', '424242', '--yes').status).toBe(1)
-  })
+  }, 10_000)
 
   it('answers the usage for anything else', () => {
     for (const args of [
@@ -145,5 +146,5 @@ describe('dist/merge.js', () => {
     expect(listed.status).toBe(0)
     expect(listed.stdout).toContain(`make apart FROM=${younger} INTO=${older}`)
     expect(listed.stdout).toContain('1 would be merged')
-  })
+  }, 10_000)
 })

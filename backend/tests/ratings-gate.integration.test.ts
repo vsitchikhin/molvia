@@ -16,8 +16,9 @@ import { createVerdictRepository } from '@/db/verdicts-repository'
 import { actors, verdicts as verdictsTable } from '@/db/schema'
 
 // The 3 tests here past a second on CI carry a timeout of 15 s: the slowest took 1 263 ms there
-// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
-// only on a run twice as slow as any yet seen.
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
+// reporter names one only on a run slower than any yet seen. The 2 more here past half a second
+// carry 10 s: the slowest of them took 822 ms.
 
 const { db, close } = connectDrizzle()
 const verdicts = createVerdictRepository(db)
@@ -220,7 +221,7 @@ describe('gate 0.2: five verdicts in two weeks', () => {
       withoutConsent: 0,
       optedOut: 0,
     })
-  })
+  }, 10_000)
 
   it('takes a cohort from `from` inclusive to `to` exclusive', async () => {
     const start = daysAgo(40)
@@ -437,7 +438,7 @@ describe('gate 0.2: no consent to the statistics (MOL-236)', () => {
       withoutConsent: 0,
       optedOut: 0,
     })
-  })
+  }, 10_000)
 
   it('consent before the objection: one who neither consented nor is on is named once', async () => {
     await insertActor(db, { createdAt: daysAgo(30), analyticsOffAt: new Date() })

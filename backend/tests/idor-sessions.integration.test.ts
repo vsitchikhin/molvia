@@ -15,6 +15,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, signIn, tripContext } from './fixtures'
 
+// The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 747 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 
 let app: FastifyInstance
@@ -101,7 +105,7 @@ describe('чужая сессия не открывает чужой поход'
       expect(answer.status).toBe(404)
       expect(code(answer)).toBe(ERROR.NOT_FOUND)
     }
-  })
+  }, 10_000)
 
   it('отвечает на чужой поход ровно тем же, чем на несуществующий', async () => {
     const { theirs, tripId } = await scene()
@@ -111,7 +115,7 @@ describe('чужая сессия не открывает чужой поход'
     const missing = await call('POST', `/trips/${nobodys}/finish`, theirs)
 
     expect(alien).toEqual(missing)
-  })
+  }, 10_000)
 
   it('на «мой текущий поход» отдаёт пусто, а не чужой', async () => {
     const { theirs } = await scene()
@@ -120,7 +124,7 @@ describe('чужая сессия не открывает чужой поход'
 
     expect(current.status).toBe(200)
     expect(current.body).toEqual({ trip: null })
-  })
+  }, 10_000)
 
   it('у Ани всё на месте — проверка ловит запрет, а не поломку', async () => {
     const { mine, tripId, expenseId } = await scene()
@@ -132,7 +136,7 @@ describe('чужая сессия не открывает чужой поход'
 
     expect(priced.status).toBe(200)
     expect(finished.status).toBe(204)
-  })
+  }, 10_000)
 })
 
 describe('чужая сессия не трогает чужую оценку', () => {
@@ -156,7 +160,7 @@ describe('чужая сессия не трогает чужую оценку', 
 
     const annas = await call('GET', '/verdicts/pending', await signIn(db, anna))
     expect(annas.status).toBe(200)
-  })
+  }, 10_000)
 
   it('в очереди оценок чужие покупки не появляются', async () => {
     const { theirs } = await scene()
@@ -164,7 +168,7 @@ describe('чужая сессия не трогает чужую оценку', 
     const pending = await call('GET', '/verdicts/pending', theirs)
 
     expect(pending.body).toEqual({ items: [], total: 0 })
-  })
+  }, 10_000)
 })
 
 describe('чужая сессия не видит чужих данных на общих экранах', () => {
@@ -175,7 +179,7 @@ describe('чужая сессия не видит чужих данных на �
 
     expect(advice.status).toBe(200)
     expect(advice.body).toMatchObject({ rows: [], total: 0 })
-  })
+  }, 10_000)
 
   it('недавние места — только свои', async () => {
     const { theirs } = await scene()

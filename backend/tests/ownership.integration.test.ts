@@ -9,6 +9,10 @@ import { createPlaceRepository } from '@/db/places-repository'
 import { createTripRepository } from '@/db/trips-repository'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 
+// The 3 tests here past half a second on CI carry a timeout of 10 s: the slowest took 638 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 /**
  * Данные принадлежат владельцу — правило, которого в базе нет вообще: у траты своего
  * `actor_id` нет специально, она принадлежит человеку через поход. Поэтому каждый метод
@@ -48,7 +52,7 @@ describe('поход', () => {
   it('чужой не читается', async () => {
     const { trip, stranger } = await scene()
     expect(await trips.byId(trip.id, stranger)).toBeNull()
-  })
+  }, 10_000)
 
   it('чужой не завершается', async () => {
     const { trip, stranger, owner } = await scene()
@@ -93,7 +97,7 @@ describe('трата', () => {
 
     const untouched = await expenses.forTrip(trip.id, owner)
     expect(untouched[0]?.amount).toEqual(price)
-  })
+  }, 10_000)
 
   it('чужая не попадает ни в «не оценено», ни в цены', async () => {
     const { trip, itemId, owner, stranger } = await scene()
@@ -136,7 +140,7 @@ describe('место — общее, а не чьё-то', () => {
     const second = await places.ensure({ kind: 'store', name: 'sas', country: 'AM', city: 'Гюмри' })
 
     expect(second.id).toBe(first.id)
-  })
+  }, 10_000)
 
   it('но недавние места у каждого свои', async () => {
     const { owner, stranger } = await scene()

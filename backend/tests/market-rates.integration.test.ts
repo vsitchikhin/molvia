@@ -10,6 +10,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
 
+// The 3 tests here past half a second on CI carry a timeout of 10 s: the slowest took 823 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const market = createMarketRateRepository(db)
 const rates = createRateRepository(db)
@@ -308,7 +312,7 @@ describe('«Обмен денег» против рынка (MOL-137)', () => {
     expect(await db.select({ channel: exchangeRevisions.channel }).from(exchangeRevisions)).toEqual(
       [{ channel: 'bankCash' }],
     )
-  })
+  }, 10_000)
 
   it('канал, которого нет, — отказ по полю', async () => {
     const { cookie } = await owner()
@@ -405,7 +409,7 @@ describe('«Обмены против рынка» на «Обмене дене�
     expect((await read(cookie)).losses?.total.minor).toBe(-123_212n)
     await market.upsert([figure('exchanger', '4.157339', day)])
     expect((await read(cookie)).losses?.total.minor).toBe(5_322n)
-  })
+  }, 10_000)
 
   it('обмен старше двенадцати месяцев в итог не входит и не назван', async () => {
     const { cookie } = await owner()
@@ -529,7 +533,7 @@ describe('«Курс рубля за 12 месяцев» на «Обмене д�
     expect(point?.market?.rate.scaled).toBe(parseRate('4.11018'))
     // The mark ends under the point: cash bought cheaper than the exchange gave.
     expect(point?.market?.level).toBeLessThan(point?.level ?? 0)
-  })
+  }, 10_000)
 
   it('месяц днями, полгода и год неделями — из одного ответа, процент точки везде тот же (MOL-168)', async () => {
     const { cookie } = await owner()

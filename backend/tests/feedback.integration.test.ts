@@ -25,6 +25,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { aScreenshot, clearAll, insertActor, signIn } from './fixtures'
 
+// The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 644 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 
 let app: FastifyInstance
@@ -250,7 +254,7 @@ describe('POST /feedback (MOL-147)', () => {
     expect(statuses.filter((status) => status === 201)).toHaveLength(FEEDBACK_DAY_LIMIT)
     expect(statuses.filter((status) => status === 429)).toHaveLength(3)
     expect(await db.select().from(feedback)).toHaveLength(FEEDBACK_DAY_LIMIT)
-  })
+  }, 10_000)
 })
 
 /** The thread a message is of — the first message's number — as a reply to it carries it. */
@@ -769,5 +773,5 @@ describe('тела со снимками считаются до чтения (�
     expect((await send(message(), cookie)).statusCode).toBe(201)
     const other = await signIn(db, await insertActor(db))
     expect((await send(heavy, other)).statusCode).toBe(415)
-  })
+  }, 10_000)
 })

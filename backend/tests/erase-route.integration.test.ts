@@ -19,8 +19,9 @@ import {
 import { aLife } from './life'
 
 // The 2 tests here past a second on CI carry a timeout of 20 s: the slowest took 1 848 ms there
-// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
-// only on a run twice as slow as any yet seen.
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
+// reporter names one only on a run slower than any yet seen. One more here past half a second
+// carries 10 s: it took 702 ms at worst.
 
 const { db, close } = connectDrizzle()
 const botSecret = randomBytes(32).toString('base64url')
@@ -182,7 +183,7 @@ describe('DELETE /actors/me — «Удалить мои данные» в нас
       headers: { cookie: laptop },
     })
     expect(after.statusCode).toBe(401)
-  })
+  }, 10_000)
 
   it('не трогает другого человека — ни его строк, ни его входа', async () => {
     const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }

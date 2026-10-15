@@ -17,8 +17,9 @@ import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, signIn, tripContext } from './fixtures'
 
 // The test here past a second on CI carries a timeout of 15 s: the slowest took 1 052 ms there
-// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
-// only on a run twice as slow as any yet seen.
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
+// reporter names one only on a run slower than any yet seen. The 9 more here past half a second
+// carry 10 s: the slowest of them took 945 ms.
 
 const { db, close } = connectDrizzle()
 // The test pool holds one connection, so a second server needs its own to run beside the first,
@@ -112,7 +113,7 @@ describe('А. цена за единицу за пределом int8 — не �
 
     expect(reply.status).toBe(201)
     expect(view(reply).expenses[0]?.unitPrice?.scaledMinor).toBe(9_223_372_037_000_000_000n)
-  })
+  }, 10_000)
 
   it('после неё поход читается, повтор — 200, следующая трата — 201', async () => {
     const actor = await insertActor(db)
@@ -140,7 +141,7 @@ describe('А. цена за единицу за пределом int8 — не �
     })
     expect(next.status).toBe(201)
     expect(await rowsOf(tripId)).toHaveLength(2)
-  })
+  }, 10_000)
 })
 
 describe('Б. итог похода держится и между двумя одновременными тратами', () => {
@@ -201,7 +202,7 @@ describe('Б. итог похода держится и между двумя о
       itemId: bread,
     })
     expect(loaf.status).toBe(201)
-  })
+  }, 10_000)
 })
 
 describe('В. id устройства — только в нижнем регистре', () => {
@@ -225,7 +226,7 @@ describe('В. id устройства — только в нижнем реги�
 
     expect([added.status, started.status]).toEqual([400, 400])
     expect(await rowsOf(tripId)).toEqual([])
-  })
+  }, 10_000)
 
   it('путь в верхнем регистре к существующей трате работает: uuid сравнивает Postgres', async () => {
     const actor = await insertActor(db)
@@ -299,7 +300,7 @@ describe('Г. правка и удаление наперегонки с уда�
 
     expect(reply.status).toBe(404)
     expect(code(reply)).toBe(ERROR.NOT_FOUND)
-  })
+  }, 10_000)
 
   it('С-8: удаление отвечает одинаково, успел ли первый — 200 наперегонки и 200 после', async () => {
     const { actor, tripId, expenseId } = await withRow()
@@ -311,7 +312,7 @@ describe('Г. правка и удаление наперегонки с уда�
 
     expect([racing.status, after.status]).toEqual([200, 200])
     expect(view(after).expenses).toEqual([])
-  })
+  }, 10_000)
 
   it('С-8: повтор удаления не трогает чужую трату и не открывает чужой поход', async () => {
     const { actor: stranger, tripId: theirTrip, expenseId: theirs } = await withRow()
@@ -326,7 +327,7 @@ describe('Г. правка и удаление наперегонки с уда�
     expect(underTheirs.status).toBe(404)
     expect(await rowsOf(theirTrip)).toHaveLength(1)
     expect((await call(app, 'GET', '/trips/current', stranger)).status).toBe(200)
-  })
+  }, 10_000)
 })
 
 describe('Д. невидимый знак по краю имени — то же место', () => {
@@ -392,13 +393,17 @@ describe('Д, заход 2: невидимый знак и перевод стр
     ['U+2800 и \\r\\n в конце', 'Ереван Сити\u2800\r\n'],
     ['таб и U+00AD в начале', '\t\u00adЕреван Сити'],
     ['U+3164 и таб в конце', 'Ереван Сити\u3164\t'],
-  ])('%s — то же место', async (_label, name) => {
-    const actor = await insertActor(db)
-    const first = await placeOf(actor, 'Ереван Сити')
+  ])(
+    '%s — то же место',
+    async (_label, name) => {
+      const actor = await insertActor(db)
+      const first = await placeOf(actor, 'Ереван Сити')
 
-    expect((await placeOf(actor, name)).id).toBe(first.id)
-    expect(await db.select().from(places)).toHaveLength(1)
-  })
+      expect((await placeOf(actor, name)).id).toBe(first.id)
+      expect(await db.select().from(places)).toHaveLength(1)
+    },
+    10_000,
+  )
 
   it('«Кафе ☕\ufe0f» записано как ввёл человек — эмодзи не теряет вид (заход 2, Б)', async () => {
     const actor = await insertActor(db)
@@ -423,15 +428,19 @@ describe('заход 3: вид и тождество места — разные
     ['☕', '☕\ufe0f'],
     ['❤', '❤\ufe0f'],
     ['❤\ufe0f', '❤'],
-  ])('Б: «Кафе %s» и «Кафе %s» — одно место, имя — как ввели первым', async (a, b) => {
-    const actor = await insertActor(db)
-    const first = await placeOf(actor, `Кафе ${a}`)
-    const second = await placeOf(actor, `Кафе ${b}`)
+  ])(
+    'Б: «Кафе %s» и «Кафе %s» — одно место, имя — как ввели первым',
+    async (a, b) => {
+      const actor = await insertActor(db)
+      const first = await placeOf(actor, `Кафе ${a}`)
+      const second = await placeOf(actor, `Кафе ${b}`)
 
-    expect(second.id).toBe(first.id)
-    expect(second.name).toBe(`Кафе ${a}`)
-    expect(await db.select().from(places)).toHaveLength(1)
-  })
+      expect(second.id).toBe(first.id)
+      expect(second.name).toBe(`Кафе ${a}`)
+      expect(await db.select().from(places)).toHaveLength(1)
+    },
+    10_000,
+  )
 
   it('А: хвост из тегов на сотни килобайт — быстрый 400, API не стоит', async () => {
     // Held by the answer, not a clock (MOL-266): trimmed before its length is checked, the tail goes

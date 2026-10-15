@@ -22,6 +22,10 @@ import {
   tripContext,
 } from './fixtures'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 774 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 let app: FastifyInstance
 
@@ -191,7 +195,7 @@ describe('«Вернуть» (MOL-76)', () => {
     expect((await call(me, 'POST', `/trips/${trip}/restore`)).statusCode).toBe(404)
     // Past its time the removal is final for the removal too: the queue reads 404 as done.
     expect((await call(me, 'DELETE', `/trips/${trip}`)).statusCode).toBe(404)
-  })
+  }, 10_000)
 
   it('повтор удаления не растягивает десять минут', async () => {
     const me = await owner()

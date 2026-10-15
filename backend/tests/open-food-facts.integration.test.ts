@@ -18,6 +18,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
 
+// The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 630 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const cache = createOpenFoodFactsRepository(db)
 
@@ -290,7 +294,7 @@ describe('GET /catalogue/barcode/hint', () => {
     })
     expect(response.statusCode).toBe(404)
     expect(base.asked).toEqual([])
-  })
+  }, 10_000)
 })
 
 describe('«Предложить товар» после подсказки (В-2)', () => {
@@ -380,5 +384,5 @@ describe('доля лимита на человека (В-6, адверсари�
       await server.close()
       vi.unstubAllGlobals()
     }
-  })
+  }, 10_000)
 })

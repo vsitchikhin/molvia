@@ -17,6 +17,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
 
+// The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 888 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 let app: FastifyInstance
 
@@ -109,7 +113,7 @@ describe('the search on «Что брать» keeps what is rated past its limit
     expect(answer.items.slice(0, SEARCH_LIMIT).map((found) => found.name)).not.toContain(cheese)
     expect(answer.items.find((found) => found.name === cheese)?.advice?.level).toBe('take')
     expect(answer.near).toBe(true)
-  })
+  }, 10_000)
 
   it('one’s own «не брать нигде» is found, transliterated too', async () => {
     const cheese = await victim()
@@ -120,7 +124,7 @@ describe('the search on «Что брать» keeps what is rated past its limit
     expect(
       answer.items.filter((found) => found.advice?.level === 'never').map((f) => f.name),
     ).toEqual([cheese])
-  })
+  }, 10_000)
 
   it('every cheese rated — all of them answered, the one five among them', async () => {
     const best = await victim()
@@ -131,14 +135,14 @@ describe('the search on «Что брать» keeps what is rated past its limit
 
     expect(answer.items.filter((found) => found.advice !== null)).toHaveLength(CHEESES.length)
     expect(answer.items.find((found) => found.name === best)?.advice?.level).toBe('take')
-  })
+  }, 10_000)
 
   it('must not fire: what is not rated past the limit stays out — twenty and no more', async () => {
     const nobody = await insertActor(db)
     const answer = await search(nobody, 'сыр')
     expect(answer.items).toHaveLength(SEARCH_LIMIT)
     expect(answer.items.every((found) => found.advice === null)).toBe(true)
-  })
+  }, 10_000)
 
   it('the word of its own finds it as before', async () => {
     const cheese = await victim()
@@ -148,7 +152,7 @@ describe('the search on «Что брать» keeps what is rated past its limit
     const own = cheese.split(' ').at(-1) ?? ''
     const answer = await search(me, own)
     expect(answer.items.find((found) => found.name === cheese)?.advice?.level).toBe('take')
-  })
+  }, 10_000)
 
   it('«молоко» — fewer names than the limit — keeps the rated one', async () => {
     const me = await insertActor(db)
@@ -161,12 +165,12 @@ describe('the search on «Что брать» keeps what is rated past its limit
 
     const answer = await search(me, 'молоко')
     expect(answer.items.find((found) => found.name === longest)?.advice?.level).toBe('take')
-  })
+  }, 10_000)
 
   it('the list still has it — the search and the list agree', async () => {
     const cheese = await victim()
     const me = await insertActor(db)
     await rate(me, cheese, 5)
     expect((await list(me)).rows.map((row) => [row.name, row.level])).toEqual([[cheese, 'take']])
-  })
+  }, 10_000)
 })

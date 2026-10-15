@@ -15,6 +15,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { aStrangersCookie, anHourFromNow, clearAll, insertActor } from './fixtures'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 513 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const repository = createSessionRepository(db)
 
@@ -117,7 +121,7 @@ describe('репозиторий: список', () => {
 
     expect(list.sessions.map((session) => session.id)).toEqual([current.id, recent.id, older.id])
     expect(list.total).toBe(3)
-  })
+  }, 10_000)
 
   it('на равном визите решает время входа, потом id', async () => {
     const owner = await insertActor(db)

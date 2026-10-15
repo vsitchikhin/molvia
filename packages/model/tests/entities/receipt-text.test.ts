@@ -18,10 +18,11 @@ import {
 } from '#model/entities/receipt-text'
 import type { ReceiptText, TextRow } from '#model/entities/receipt-text'
 
-// The 3 tests here past a second on CI carry a timeout of their own, ten times their worst there (MOL-266),
-// so the time reporter names one only on a run twice as slow as any yet seen: 15 s for 1 266 ms, 20 s
-// for «searched only as far» — 1 408 ms, under a bound on the clock of 15 s — and 45 s for «cost no
-// second search» — 4 111 ms, two readings of four hundred rows.
+// The 3 tests here past a second on CI carry a timeout of their own, ten times their worst there
+// (MOL-266), so the time reporter names one only on a run twice as slow as any yet seen: 15 s for 1
+// 266 ms, 20 s for «searched only as far» — 1 408 ms, under a bound on the clock of 15 s — and 45 s
+// for «cost no second search» — 4 111 ms, two readings of four hundred rows. The 4 more here past
+// half a second carry 10 s: the slowest of them took 581 ms.
 
 /**
  * The fixtures are the owner's receipts as Tesseract read them on the server (MOL-114) — the item
@@ -75,50 +76,54 @@ describe('a receipt read by Tesseract, as the prototype read it', () => {
     ['am-03', am03],
     ['am-04', am04],
     ['am-05', am05],
-  ] as [string, Fixture][])('%s', (name, fixture) => {
-    const got = read(fixture)
-    const want = fixture.expected
-    expect({
-      tin: got.tin,
-      date: got.date,
-      time: got.time,
-      receiptNo: got.receiptNo,
-      total: got.totalHundredths,
-      balanced: got.balanced,
-    }).toEqual({
-      tin: want.tin,
-      date: want.date,
-      time: want.time,
-      receiptNo: want.receiptNo,
-      total: UNVOUCHED_TOTAL.includes(name) ? null : hundredths(want.total),
-      balanced: want.balanced,
-    })
-    expect(
-      got.lines.map((l) => [
-        l.printed,
-        l.hs,
-        l.sku,
-        l.quantityMilli,
-        l.unit,
-        l.priceHundredths,
-        l.sumHundredths,
-        l.discountHundredths,
-        l.settled,
-      ]),
-    ).toEqual(
-      want.lines.map((l) => [
-        l.printed,
-        l.hs,
-        l.sku ?? null,
-        thousandths(l.qty),
-        l.unit === 'kg' ? 'kg' : 'piece',
-        hundredths(l.unit_price),
-        hundredths(l.sum),
-        hundredths(l.discount),
-        l.settled && !(CHANGED_BY_TOTAL[name] ?? []).includes(l.sku ?? ''),
-      ]),
-    )
-  })
+  ] as [string, Fixture][])(
+    '%s',
+    (name, fixture) => {
+      const got = read(fixture)
+      const want = fixture.expected
+      expect({
+        tin: got.tin,
+        date: got.date,
+        time: got.time,
+        receiptNo: got.receiptNo,
+        total: got.totalHundredths,
+        balanced: got.balanced,
+      }).toEqual({
+        tin: want.tin,
+        date: want.date,
+        time: want.time,
+        receiptNo: want.receiptNo,
+        total: UNVOUCHED_TOTAL.includes(name) ? null : hundredths(want.total),
+        balanced: want.balanced,
+      })
+      expect(
+        got.lines.map((l) => [
+          l.printed,
+          l.hs,
+          l.sku,
+          l.quantityMilli,
+          l.unit,
+          l.priceHundredths,
+          l.sumHundredths,
+          l.discountHundredths,
+          l.settled,
+        ]),
+      ).toEqual(
+        want.lines.map((l) => [
+          l.printed,
+          l.hs,
+          l.sku ?? null,
+          thousandths(l.qty),
+          l.unit === 'kg' ? 'kg' : 'piece',
+          hundredths(l.unit_price),
+          hundredths(l.sum),
+          hundredths(l.discount),
+          l.settled && !(CHANGED_BY_TOTAL[name] ?? []).includes(l.sku ?? ''),
+        ]),
+      )
+    },
+    10_000,
+  )
 
   it('reads the card layout with the till discount and the weight: am-03, 17 of 18 lines', () => {
     const got = read(am03 as Fixture)
@@ -132,7 +137,7 @@ describe('a receipt read by Tesseract, as the prototype read it', () => {
       309_000,
       401_354,
     ])
-  })
+  }, 10_000)
 
   it('reads the table layout of Dog City and lets the total decide: am-04', () => {
     const got = read(am04 as Fixture)
@@ -153,7 +158,7 @@ describe('a receipt read by Tesseract, as the prototype read it', () => {
       '2.Գազավորված ըմպելիք «Կոկա Կոլա» 1.6լ',
       '2202/096796 14տ 702,9/7,1 710',
     ])
-  })
+  }, 10_000)
 
   it('cuts only the figures when the number was not read — «Յ» for «3»', () => {
     const milk = read(am03 as Fixture).lines[2]!
@@ -1097,7 +1102,7 @@ describe('a fiscal till read by its class code (MOL-226)', () => {
     const got = receipt(...rows, 'Ընդամենը 99999.99')
     expect([got.layout, got.lines.length]).toEqual(['class', 200])
     expect(got.lines.filter((line) => line.settled).length).toBeLessThan(100)
-  })
+  }, 10_000)
 })
 
 // MOL-226, review round 1: what OCR does to the class reading that the first version lost.

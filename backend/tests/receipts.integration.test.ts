@@ -35,8 +35,9 @@ import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
 // The test here past a second on CI carries a timeout of 15 s: the slowest took 1 078 ms there
-// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
-// only on a run twice as slow as any yet seen.
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
+// reporter names one only on a run slower than any yet seen. The 8 more here past half a second
+// carry 10 s: the slowest of them took 850 ms.
 
 const { db, close } = connectDrizzle()
 const repository = createReceiptRepository(db)
@@ -200,7 +201,7 @@ describe('«Отправить чек»', () => {
     expect(first.headers['cache-control']).toBe('no-store')
     const again = await send(me, receipt)
     expect([again.statusCode, again.json()]).toEqual([200, first.json()])
-  })
+  }, 10_000)
 
   it('refuses another receipt under the same id, of the owner or of someone else', async () => {
     const me = await owner()
@@ -382,7 +383,7 @@ describe('the queue', () => {
       1,
       'card',
     ])
-  })
+  }, 10_000)
 
   // MOL-126: what the lines are is found once, in the queue — by the catalogue's Armenian names and
   // the heading, then by the search with the gloss; a line nobody knows is a new item named by it
@@ -409,7 +410,7 @@ describe('the queue', () => {
     expect(lines[2]).toMatchObject({ itemId: milk, match: 'search', translation: 'молоко' })
     expect(lines.filter((line) => line.match === 'new').length).toBeGreaterThan(0)
     expect(lines.every((line) => line.match !== null)).toBe(true)
-  })
+  }, 10_000)
 
   it('asks for a new shot only when not one item line was found (MOL-222, В-1)', async () => {
     const me = await owner()
@@ -564,7 +565,7 @@ describe('the queue', () => {
       failure: 'unreadable',
     })
     expect(list.find((r) => r.id === good)).toMatchObject({ status: 'parsed' })
-  })
+  }, 10_000)
 
   it('leaves the receipt in the queue, its attempt uncounted, while the reader is away', async () => {
     const me = await owner()
@@ -581,7 +582,7 @@ describe('the queue', () => {
     expect(receiptDetailCodec.parse((await get(me, `/receipts/${id}`)).json()).receipt.status).toBe(
       'parsed',
     )
-  })
+  }, 10_000)
 
   it('sends a photo the reader drops to the end of the queue, and fails it after its attempts', async () => {
     const me = await owner()
@@ -608,7 +609,7 @@ describe('the queue', () => {
     })
     // the first drop sent it back to the queue and counted nothing; the second failed it (MOL-222)
     expect(await days()).toMatchObject([{ read: 1, unreadable: 1 }])
-  })
+  }, 10_000)
 
   it('reads each person’s oldest receipt in turn: fifty of one do not hold another’s (review А10)', async () => {
     const heavy = await owner()
@@ -817,7 +818,7 @@ describe('what lives how long (В-3)', () => {
     const images = await db.select().from(receiptLineImages)
     expect(images.some((image) => image.position === 0)).toBe(false)
     expect(images.some((image) => image.position === 1)).toBe(true)
-  })
+  }, 10_000)
 })
 
 describe('the queue through the server', () => {
@@ -862,5 +863,5 @@ describe('the queue through the server', () => {
     } finally {
       await reading.close()
     }
-  })
+  }, 10_000)
 })

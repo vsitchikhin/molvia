@@ -18,6 +18,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn, tripContext } from './fixtures'
 
+// The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 754 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
 let app: FastifyInstance
@@ -131,7 +135,7 @@ describe('«Доходы» через API (MOL-66)', () => {
     // A phone east of Yerevan after its midnight: a day Yerevan has not reached, come somewhere.
     const east = await call(me, 'POST', '/incomes', payload({ receivedOn: latestDay(new Date()) }))
     expect(east.statusCode).toBe(201)
-  })
+  }, 10_000)
 
   it('источник обязателен и из списка; лишнее поле — отказ', async () => {
     const me = await owner()
@@ -224,7 +228,7 @@ describe('«Доходы» через API (MOL-66)', () => {
     const back = await call(me, 'POST', `/incomes/${body.id}/restore`)
     expect(back.statusCode).toBe(200)
     expect(incomesResponseCodec.parse(back.json()).months).toHaveLength(1)
-  })
+  }, 10_000)
 
   it('открытие экрана делает удаление окончательным', async () => {
     const me = await owner()
@@ -242,7 +246,7 @@ describe('«Доходы» через API (MOL-66)', () => {
     await call(me, 'GET', '/incomes')
     await call(me, 'DELETE', `/incomes/${body.id}`)
     expect(await db.select().from(events)).toEqual([])
-  })
+  }, 10_000)
 })
 
 describe('доход в «моём курсе» (MOL-66, В-1)', () => {
@@ -311,7 +315,7 @@ describe('доход в «моём курсе» (MOL-66, В-1)', () => {
       estimated: false,
       rate: { scaled: parseRate('5') },
     })
-  })
+  }, 10_000)
 
   it('без курса ЦБ на день поступления — стоимость неизвестна, названо поступление, поход по ЦБ', async () => {
     await rates.upsert([rub('4.3123', daysAgo(1))])
