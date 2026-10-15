@@ -2500,6 +2500,49 @@ describe('the parse reads the country’s card, never words of its own (MOL-247)
     ])
   })
 
+  // adversarial round 3, В1: the ends of the lists and the table's head, which the test above does not reach
+  it('ends a list and reads a table’s head by a word with a class of Unicode letters', () => {
+    const lines = (got: ReceiptText) =>
+      got.lines.map((l) => [l.printed, l.quantityMilli, l.unit, l.priceHundredths, l.sumHundredths])
+    const dogCity = (reading: PhotoReading, edit: (text: string) => string = (text) => text) =>
+      bestReading(
+        reading,
+        am04.readings.map((text) => rowsOf(edit(text), 0)),
+      )
+    // the table's tax number, by its word alone
+    const tin = probe({ tin: 'ՀՎՀ\\p{Lu}', tinMisread: [] })
+    expect(dogCity(tin).tin).toBe(dogCity(AM).tin)
+    expect(dogCity(AM).tin).not.toBeNull()
+    // the table's number after «ԿՀ», where no fiscal number is printed
+    const noFiscal = (text: string) => text.replace(/Ֆիսկալ համար \d+/u, 'ԿՀ: 00000049')
+    const number = probe({ receiptNumber: 'Կ\\p{Lu}' })
+    expect(dogCity(number, noFiscal).receiptNo).toBe('00000049')
+    // the table ends at the total or the control: what is under them is never a line
+    const end = probe({ total: 'Ընդամեն\\p{L}', control: 'Հսկ\\p{L}+' })
+    for (const text of am04.readings) {
+      const rows = rowsOf(text, 0)
+      expect(lines(parseReceiptText(end, rows))).toEqual(lines(parseReceiptText(AM, rows)))
+    }
+    // the class code's list ends at the control: the tax and the payment under it are no items
+    const coded = rowsOf(
+      [
+        'ՀՎՀՀ 12345678',
+        'Ֆիսկալ համար 12345678',
+        'Դաս՝ 56.10',
+        'Կոլա 1հատ 1750.00 1750.00',
+        'Հսկիչ համար 123456',
+        'ԱԱՀ 291.67 291.67',
+        'Կանխիկ 1750.00 1750.00',
+        'Ընդամենը: 1750.00',
+      ].join('\n'),
+      0,
+    )
+    expect(lines(parseReceiptText(probe({ control: 'Հսկ\\p{L}+' }), coded))).toEqual(
+      lines(parseReceiptText(AM, coded)),
+    )
+    expect(parseReceiptText(AM, coded).lines).toHaveLength(1)
+  })
+
   // adversarial А2: the kilogram is one fragment wherever a line is weighed
   it('weighs a line by the card’s kilogram, written as a fragment, in every layout', () => {
     const kg = probe({ units: { ...AM.words.units, kg: 'կ[գq]' } })
