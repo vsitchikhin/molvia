@@ -892,7 +892,8 @@ describe('«Записать»', () => {
       expect(await settleStoreMemory(db)).toBe(0)
     })
 
-    // round 4, Р4-2: a person at a time, by their id — thousands of sellers are no tree for the parser
+    // round 4, Р4-2: a person at a time, by their id — thousands of sellers are no tree for the parser;
+    // 3 843 ms on CI at worst, ten times that its timeout (MOL-266)
     it('Р4-2: settles a person with thousands of sellers', async () => {
       const me = await insertActor(db)
       const milk = await insertItem(db)
@@ -912,7 +913,7 @@ describe('«Записать»', () => {
       // no line says any of them: every word goes
       expect(await settleStoreMemory(db)).toBe(9_000)
       expect(await wordsOf(me)).toEqual([])
-    }, 30_000)
+    }, 40_000)
 
     it('Р3-3: two removals at once leave no word behind', async () => {
       const me = await insertActor(db)

@@ -73,7 +73,7 @@ describe('dist/notify.js', () => {
   }, 15_000)
 })
 
-const SILENT_MS = 15_000
+const SILENT_MS = 25_000
 
 describe('dist/notify.js — вход', () => {
   // Adversarial А4: over `ssh … exec -T` with the file forgotten, the input is a pipe that never ends.
@@ -91,8 +91,8 @@ describe('dist/notify.js — вход', () => {
     child.stdout.on('data', (chunk: Buffer) => (output += chunk.toString()))
     const exited = new Promise<number | null>((resolve) => child.on('exit', resolve))
     // The command waits two seconds of its own (`FIRST_BYTES_MS`) and took 2 311 ms on CI at worst
-    // (MOL-266): the test waits five times that and more, then puts it out — silence is this test's
-    // red, never the timeout of vitest, twice the wait
+    // (MOL-266): the test waits ten times that and more, then puts it out — silence is this test's
+    // red, never the timeout of vitest, which stands above the wait
     const started = Date.now()
     const silent = setTimeout(() => child.kill(), SILENT_MS)
     const code = await exited

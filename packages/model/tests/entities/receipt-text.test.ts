@@ -19,8 +19,9 @@ import {
 import type { ReceiptText, TextRow } from '#model/entities/receipt-text'
 
 // The 3 tests here past a second on CI carry a timeout of their own, ten times their worst there (MOL-266),
-// so the time reporter names one only on a run twice as slow as any yet seen: 15 s for 1 374 ms and
-// below, 30 s for «cost no second search» — 2 666 ms, two readings of four hundred rows.
+// so the time reporter names one only on a run twice as slow as any yet seen: 15 s for 1 266 ms, 20 s
+// for «searched only as far» — 1 408 ms, under a bound on the clock of 15 s — and 45 s for «cost no
+// second search» — 4 111 ms, two readings of four hundred rows.
 
 /**
  * The fixtures are the owner's receipts as Tesseract read them on the server (MOL-114) — the item
@@ -195,14 +196,14 @@ describe('a reading OCR glued into long figures', () => {
     ).join('\n')
 
   // The bound is the clock's (MOL-266): without the ceilings the 20-digit figures take past a minute, and
-  // the worst on CI is 510 ms — the test's own timeout stands above it
+  // the worst on CI is 510 ms — the bound ten times that and more, the test's own timeout above it
   it.each([6, 9, 12, 20])(
     'is laid out in seconds, not minutes, with %i-digit figures',
     (digits) => {
       const started = performance.now()
       const got = parseReceiptText(rowsOf(glued(digits), 0))
       expect(got.lines).toHaveLength(12)
-      expectWithin(performance.now() - started, 5_000)
+      expectWithin(performance.now() - started, 6_000)
     },
     15_000,
   )
@@ -508,9 +509,9 @@ describe('rows of junk by the hundred (review Р18)', () => {
     const got = parse(`${junk(400)}\n${totalRow(1_000_000)}`)
     expect(got.lines).toHaveLength(400)
     expect(got.lines.filter((line) => line.settled).length).toBeLessThan(100)
-    // and against a fall back to seconds a row: five times the worst on CI, 1 374 ms (MOL-266)
-    expectWithin(performance.now() - started, 10_000)
-  }, 15_000)
+    // and against a fall back to seconds a row: ten times the worst on CI, 1 408 ms (MOL-266)
+    expectWithin(performance.now() - started, 15_000)
+  }, 20_000)
 
   it('cost no second search where the total shown is not the reading’s own (MOL-244)', () => {
     // two places vouch for 9 000,00 against the reading's 10 000,00: the reading chosen is read again as
@@ -528,7 +529,7 @@ describe('rows of junk by the hundred (review Р18)', () => {
     let got: ReceiptText | undefined
     expect(searches(() => (got = bestReading([rowsOf(text, 0), rowsOf(text, 0)])))).toBe(2 * once)
     expect(got?.totalHundredths).toBe(900_000)
-  }, 30_000)
+  }, 45_000)
 })
 
 describe('the name row of the first item, which has the head above it (review Р19)', () => {

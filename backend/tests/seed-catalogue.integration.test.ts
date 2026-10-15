@@ -24,7 +24,9 @@ const lines = CATALOGUE_SEED.map(([name, unit]) =>
 )
 // The whole list takes seconds — five statements a line — so it runs twice in this file, as the
 // dry run below and as the bundle; the rest is held on the first lines, milk and bread among them.
-const FULL_RUN_MS = 60_000
+// The bundle took 6 511 ms on CI at worst and the dry run 6 259, and ten times the slower is the limit
+// of both (MOL-266).
+const FULL_RUN_MS = 70_000
 const few = lines.slice(0, 5)
 
 async function itemCount(): Promise<number> {
