@@ -7,30 +7,39 @@ import TestTimeReporter, {
   describeBreach,
   hookTimes,
   ownHookTimeouts,
+  redScope,
   testBreaches,
   type Breach,
   type HookTime,
+  type RedScope,
 } from './test-time-reporter'
 
 describe('testBreaches', () => {
-  it('holds a test to a fifth of its timeout: exactly a fifth passes, past it does not', () => {
-    expect(testBreaches('a.test.ts', 't', 1_000, 5_000, [])).toEqual([])
-    expect(testBreaches('a.test.ts', 't', 1_001, 5_000, [])).toEqual([
-      { what: 'test', file: 'a.test.ts', name: 't', ms: 1_001, limit: 5_000 },
+  it('holds a test to a tenth of its timeout: exactly a tenth passes, past it does not', () => {
+    expect(testBreaches('a.test.ts', 't', 500, 5_000, [])).toEqual([])
+    expect(testBreaches('a.test.ts', 't', 501, 5_000, [])).toEqual([
+      { what: 'test', file: 'a.test.ts', name: 't', ms: 501, limit: 5_000 },
     ])
-    expect(testBreaches('a.test.ts', 't', 1_001, 25_000, [])).toEqual([])
+    expect(testBreaches('a.test.ts', 't', 2_400, 25_000, [])).toEqual([])
   })
 
-  it('holds a bound to five times what it met, and below the test’s timeout', () => {
-    expect(testBreaches('a.test.ts', 't', 10, 5_000, [{ elapsed: 3, bound: 15 }])).toEqual([])
-    expect(testBreaches('a.test.ts', 't', 10, 5_000, [{ elapsed: 3.1, bound: 15 }])).toEqual([
-      { what: 'clock', file: 'a.test.ts', name: 't', ms: 3.1, limit: 15 },
+  it('holds a bound to ten times what it met, and below the test’s timeout', () => {
+    expect(testBreaches('a.test.ts', 't', 10, 5_000, [{ elapsed: 1.5, bound: 15 }])).toEqual([])
+    expect(testBreaches('a.test.ts', 't', 10, 5_000, [{ elapsed: 1.6, bound: 15 }])).toEqual([
+      { what: 'clock', file: 'a.test.ts', name: 't', ms: 1.6, limit: 15 },
     ])
     // a bound at vitest's limit is vitest's to hold, not the test's (MOL-265)
     expect(testBreaches('a.test.ts', 't', 10, 5_000, [{ elapsed: 300, bound: 5_000 }])).toEqual([
       { what: 'bound', file: 'a.test.ts', name: 't', ms: 5_000, limit: 5_000 },
     ])
     expect(testBreaches('a.test.ts', 't', 10, 30_000, [{ elapsed: 300, bound: 5_000 }])).toEqual([])
+  })
+
+  it('judges no time against a timeout of 0 or Infinity: vitest gives such a test none', () => {
+    // adversarial round 1 of MOL-266, А8
+    expect(testBreaches('a.test.ts', 't', 5, 0, [{ elapsed: 1, bound: 100 }])).toEqual([])
+    expect(testBreaches('a.test.ts', 't', 9_000, Infinity, [])).toEqual([])
+    expect(testBreaches('a.test.ts', 't', 1, 5_000, [])).toEqual([])
   })
 })
 
@@ -53,6 +62,34 @@ describe('ownHookTimeouts', () => {
       ['beforeAll', ['/^outer$/s'], 60_000],
     ])
     expect(own[1]?.path[1]?.test('by day')).toBe(true)
+  })
+
+  it('reads arithmetic, each’s placeholders and a suite named by an expression; an import as unknown', () => {
+    // adversarial round 1 of MOL-266, А3
+    const own = ownHookTimeouts(`
+      import { LOAD_MS } from './load'
+      const MINUTE = 60 * 1000
+      beforeAll(() => {}, 2 * MINUTE)
+      describe.each(['light', 'dark'])('in %s', () => {
+        afterAll(() => {}, (5 * 60_000))
+      })
+      describe.for([{ kind: 'day' }])('by $kind and %#', () => {
+        beforeAll(() => {}, 30_000)
+      })
+      describe(Sheet.name, () => {
+        beforeAll(() => {}, LOAD_MS)
+      })
+      afterAll(() => {})
+    `)
+    expect(own.map(({ kind, path, timeout }) => [kind, path.map(String), timeout])).toEqual([
+      ['beforeAll', [], 120_000],
+      ['afterAll', ['/^in .*$/s'], 300_000],
+      ['beforeAll', ['/^by .* and .*$/s'], 30_000],
+      ['beforeAll', ['/^.*$/s'], undefined],
+    ])
+    expect(own[1]?.path[0]?.test('in light')).toBe(true)
+    expect(own[2]?.path[0]?.test('by day and 0')).toBe(true)
+    expect(own[3]?.path[0]?.test('ItemDetailsSheet')).toBe(true)
   })
 })
 
@@ -93,76 +130,153 @@ describe('describeBreach', () => {
       limit: 5_000,
     }
     expect(describeBreach(breach)).toBe(
-      'a.test.ts › x › y: the test took 2 371 ms against its timeout of 5 000 — give it at least 11 855',
+      'a.test.ts › x › y: the test took 2 371 ms against its timeout of 5 000, its beforeEach and afterEach included — give it at least 23 710',
     )
+  })
+})
+
+describe('redScope', () => {
+  it('reads the pull request’s files from the merge CI checks out', () => {
+    const asked: string[][] = []
+    const run = (...args: string[]): string => {
+      asked.push(args)
+      return args[0] === 'rev-list' ? 'merge base head\n' : 'a.test.ts\nbin/b.ts\n'
+    }
+    expect(redScope({ GITHUB_EVENT_NAME: 'pull_request' }, run)).toEqual({
+      files: new Set(['a.test.ts', 'bin/b.ts']),
+    })
+    expect(asked[1]).toEqual(['diff', '--name-only', 'HEAD^1', 'HEAD'])
+  })
+
+  it('makes nothing red on a push, and everything where the merge cannot be read', () => {
+    const never = (): string => {
+      throw new Error('a push asks git nothing')
+    }
+    expect(redScope({ GITHUB_EVENT_NAME: 'push' }, never)).toEqual({ files: new Set() })
+    expect(redScope({ GITHUB_EVENT_NAME: 'pull_request' }, () => 'head parent\n')).toEqual({
+      all: 'HEAD is not the merge of the pull request',
+    })
+    const shallow = (): string => {
+      throw new Error('unknown revision HEAD^1')
+    }
+    expect(redScope({ GITHUB_EVENT_NAME: 'pull_request' }, shallow)).toEqual({
+      all: expect.stringContaining('unknown revision HEAD^1') as string,
+    })
+  })
+})
+
+describe('the verdict of a run', () => {
+  const test = (file: string, duration: number) =>
+    ({
+      diagnostic: () => ({ duration }),
+      options: { timeout: 5_000 },
+      module: { moduleId: `${process.cwd()}/${file}` },
+      meta: () => ({}),
+      fullName: 'slow',
+    }) as never
+
+  const verdict = (scope: RedScope): { lines: string[]; exitCode: typeof process.exitCode } => {
+    const reporter = new TestTimeReporter({ fail: true, scope })
+    reporter.onTestCaseResult(test('ours.test.ts', 900))
+    reporter.onTestCaseResult(test('theirs.test.ts', 800))
+    const lines: string[] = []
+    const write = process.stdout.write.bind(process.stdout)
+    const before = process.exitCode
+    process.stdout.write = (chunk: string | Uint8Array) => {
+      lines.push(...String(chunk).split('\n').filter(Boolean))
+      return true
+    }
+    try {
+      reporter.onTestRunEnd()
+      return { lines, exitCode: process.exitCode }
+    } finally {
+      process.stdout.write = write
+      process.exitCode = before
+    }
+  }
+
+  it('turns red for a file of the pull request and only warns for one outside it (В-4 «а»)', () => {
+    const { lines, exitCode } = verdict({ files: new Set(['ours.test.ts']) })
+    expect(exitCode).toBe(1)
+    expect(lines.filter((line) => line.startsWith('[time] '))).toEqual([
+      '[time] past the rule of MOL-243 — 1, see CLAUDE.md › Testing:',
+      '[time] ours.test.ts › slow: the test took 900 ms against its timeout of 5 000, its beforeEach and afterEach included — give it at least 9 000',
+      '[time] past the rule of MOL-243 outside the files of the pull request, a warning — 1, see CLAUDE.md › Testing:',
+      '[time] theirs.test.ts › slow: the test took 800 ms against its timeout of 5 000, its beforeEach and afterEach included — give it at least 8 000',
+    ])
+  })
+
+  it('must not fail a run whose breaches are all outside the pull request — a push to master', () => {
+    expect(verdict({ files: new Set() }).exitCode).not.toBe(1)
+  })
+
+  it('fails on every breach, and says why, where the pull request’s files are not known', () => {
+    const { lines, exitCode } = verdict({ all: 'HEAD is not the merge of the pull request' })
+    expect(exitCode).toBe(1)
+    expect(lines).toContain('[time] every breach counts: HEAD is not the merge of the pull request')
+    expect(lines).toContain('[time] past the rule of MOL-243 — 2, see CLAUDE.md › Testing:')
   })
 })
 
 // A run of vitest of its own, on the fixture: the hooks' marks are the runner's tasks, an experimental
 // door of vitest — a version that moves them turns this red rather than the reporter silent.
-const RUN_MS = 60_000
-
 describe('a run of vitest', () => {
-  it(
-    'measures the fixture’s hooks from the worker’s marks, reads its own timeout and keeps its bounds',
-    async () => {
-      const out = mkdtempSync(join(tmpdir(), 'test-time-'))
-      const lines: string[] = []
-      const write = process.stdout.write.bind(process.stdout)
-      process.stdout.write = (chunk: string | Uint8Array) => {
-        lines.push(...String(chunk).split('\n'))
-        return true
-      }
-      try {
-        const vitest = await startVitest(
-          ['bin/test-time-reporter.fixture.ts'],
-          {
-            watch: false,
-            config: false,
-            include: ['bin/test-time-reporter.fixture.ts'],
-            reporters: [],
-          },
-          { cacheDir: out },
-          { stdout: process.stdout, stderr: process.stderr },
-        )
-        const reporter = new TestTimeReporter({ fail: false })
-        // the run is over by now: the reporter reads the modules as vitest handed them
-        for (const module of vitest.state.getTestModules()) {
-          for (const test of module.children.allTests()) reporter.onTestCaseResult(test)
-          reporter.onTestModuleEnd(module)
-        }
-        reporter.onTestRunEnd()
-        await vitest.close()
-      } finally {
-        process.stdout.write = write
-        rmSync(out, { recursive: true, force: true })
-      }
-      const measured = lines.filter((line) => line.startsWith('[time] '))
-      const ms = (prefix: string): number => {
-        const line = measured.find((l) => l.startsWith(`[time] ${prefix}`))
-        expect(line, prefix).toBeDefined()
-        return Number(/: ([\d\s ]+) of/.exec(line ?? '')?.[1]?.replace(/\s/g, ''))
-      }
-      // waits the fixture sets: the marks may only add to them
-      expect(ms('beforeAll bin/test-time-reporter.fixture.ts › (file)')).toBeGreaterThanOrEqual(315)
-      expect(ms('afterAll bin/test-time-reporter.fixture.ts › (file)')).toBeGreaterThanOrEqual(305)
-      expect(measured).toContainEqual(
-        expect.stringMatching(/beforeAll .* › \(file\): .* of 30 000 ms$/),
+  it('measures the fixture’s hooks from the worker’s marks, reads its own timeout and keeps its bounds', async () => {
+    const out = mkdtempSync(join(tmpdir(), 'test-time-'))
+    const lines: string[] = []
+    const write = process.stdout.write.bind(process.stdout)
+    process.stdout.write = (chunk: string | Uint8Array) => {
+      lines.push(...String(chunk).split('\n'))
+      return true
+    }
+    try {
+      const vitest = await startVitest(
+        ['bin/test-time-reporter.fixture.ts'],
+        {
+          watch: false,
+          config: false,
+          include: ['bin/test-time-reporter.fixture.ts'],
+          reporters: [],
+        },
+        { cacheDir: out },
+        { stdout: process.stdout, stderr: process.stderr },
       )
-      expect(measured).toContainEqual(
-        expect.stringMatching(/afterAll .* › \(file\): .* of 10 000 ms$/),
-      )
-      expect(measured).toContain(
-        '[time] clock bin/test-time-reporter.fixture.ts › inner > keeps what it bounded: 3 of 15 ms',
-      )
-      // a bound at vitest's limit, and nothing else of the fixture past the rule
-      expect(measured.filter((l) => l.includes('past the rule'))).toEqual([
-        '[time] past the rule of MOL-243 — 1, see CLAUDE.md › Testing:',
-      ])
-      expect(measured.filter((l) => l.includes('not below'))).toEqual([
-        "[time] bin/test-time-reporter.fixture.ts › inner > keeps what it bounded: a bound on the clock of 5 000 ms is not below the test's timeout of 5 000 — vitest, not the test, would hold it",
-      ])
-    },
-    RUN_MS,
-  )
+      const reporter = new TestTimeReporter({ fail: false })
+      // the run is over by now: the reporter reads the modules as vitest handed them
+      for (const module of vitest.state.getTestModules()) {
+        for (const test of module.children.allTests()) reporter.onTestCaseResult(test)
+        reporter.onTestModuleEnd(module)
+      }
+      reporter.onTestRunEnd()
+      await vitest.close()
+    } finally {
+      process.stdout.write = write
+      rmSync(out, { recursive: true, force: true })
+    }
+    const measured = lines.filter((line) => line.startsWith('[time] '))
+    const ms = (prefix: string): number => {
+      const line = measured.find((l) => l.startsWith(`[time] ${prefix}`))
+      expect(line, prefix).toBeDefined()
+      return Number(/: ([\d\s ]+) of/.exec(line ?? '')?.[1]?.replace(/\s/g, ''))
+    }
+    // waits the fixture sets: the marks may only add to them
+    expect(ms('beforeAll bin/test-time-reporter.fixture.ts › (file)')).toBeGreaterThanOrEqual(315)
+    expect(ms('afterAll bin/test-time-reporter.fixture.ts › (file)')).toBeGreaterThanOrEqual(305)
+    expect(measured).toContainEqual(
+      expect.stringMatching(/beforeAll .* › \(file\): .* of 30 000 ms$/),
+    )
+    expect(measured).toContainEqual(
+      expect.stringMatching(/afterAll .* › \(file\): .* of 10 000 ms$/),
+    )
+    expect(measured).toContain(
+      '[time] clock bin/test-time-reporter.fixture.ts › inner > keeps what it bounded: 1 of 15 ms',
+    )
+    // a bound at vitest's limit, and nothing else of the fixture past the rule
+    expect(measured.filter((l) => l.includes('past the rule'))).toEqual([
+      '[time] past the rule of MOL-243 — 1, see CLAUDE.md › Testing:',
+    ])
+    expect(measured.filter((l) => l.includes('not below'))).toEqual([
+      "[time] bin/test-time-reporter.fixture.ts › inner > keeps what it bounded: a bound on the clock of 5 000 ms is not below the test's timeout of 5 000 — vitest, not the test, would hold it",
+    ])
+  }, 60_000)
 })

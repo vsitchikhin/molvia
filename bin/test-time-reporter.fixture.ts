@@ -30,7 +30,7 @@ describe('inner', () => {
   }, 20_000)
 
   it('keeps what it bounded', () => {
-    expectWithin(3, 15)
+    expectWithin(1, 15)
     expectWithin(12, 5_000)
   })
 })
