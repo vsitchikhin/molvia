@@ -321,11 +321,6 @@ describe('what the screen prints', () => {
   })
 })
 
-/**
- * «Не приняты» (MOL-159): every refused typing is a row of its own, whatever the month shown and its
- * pages — five rounds of review found a refusal left on a card whose one action threw it away, each
- * time at another edge of a guess where its row was. These are those edges, all at once.
- */
 describe('roundsToNought (MOL-117, MOL-187)', () => {
   const amd = (minor: bigint) => ({ minor, currency: 'AMD' as const })
   it('money under half a unit, either sign — what whole units would print as a nought', () => {
@@ -341,6 +336,11 @@ describe('roundsToNought (MOL-117, MOL-187)', () => {
   })
 })
 
+/**
+ * «Не приняты» (MOL-159): every refused typing is a row of its own, whatever the month shown and its
+ * pages — five rounds of review found a refusal left on a card whose one action threw it away, each
+ * time at another edge of a guess where its row was. These are those edges, all at once.
+ */
 describe('refused spendings, apart from the journal', () => {
   const refusal = (write: SpendingWrite, code = 'error.spending_category_unknown') =>
     ({ key: `k-${write.kind}`, write, code }) as RejectedSpendingWrite

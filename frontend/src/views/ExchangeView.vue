@@ -32,16 +32,17 @@
         </template>
       </StatusStrip>
       <p v-if="failed" class="notice failed" role="alert">{{ t('exchange.failed') }}</p>
-      <!-- Read again and not answered, the list is the one from before the write: «показываем, как он
-           записан» over it would be untrue, and the strip is all that says the exchange is there. -->
+      <!-- Read again and not answered — the server silent or the connection gone (round 2, Б1) — the
+           list is the one from before the write: «показываем, как он записан» over it would be untrue,
+           and the strip is all that says the exchange is there. -->
       <p v-if="conflicted" class="notice" role="alert">
-        {{ stale ? t('exchange.conflict_stale') : t('exchange.conflict') }}
+        {{ behind ? t('exchange.conflict_stale') : t('exchange.conflict') }}
       </p>
       <p v-if="amendConflicted" class="notice" role="alert">
-        {{ stale ? t('exchange.amend_conflict_stale') : t('exchange.amend_conflict') }}
+        {{ behind ? t('exchange.amend_conflict_stale') : t('exchange.amend_conflict') }}
       </p>
       <p v-if="vanished" class="notice" role="alert">
-        {{ stale ? t('exchange.vanished_stale') : t('exchange.vanished') }}
+        {{ behind ? t('exchange.vanished_stale') : t('exchange.vanished') }}
       </p>
       <p v-if="gone" class="notice" role="alert">{{ t('exchange.restore_gone') }}</p>
       <div v-if="removed" ref="removedStrip" class="notice removed">
@@ -663,6 +664,7 @@ export default defineComponent({
   height: var(--skeleton-figure);
 }
 
+// The height of the chart's area in `ExchangeRateChart` — changed there, changed here.
 .ghost-area {
   height: 11.25rem;
   border-radius: var(--radius-sm);

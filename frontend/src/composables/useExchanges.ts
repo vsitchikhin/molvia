@@ -30,6 +30,11 @@ export interface Exchanges {
    * vanished exchange, a late «Вернуть» — what is shown may not be what the server holds now.
    */
   readonly stale: ComputedRef<boolean>
+  /**
+   * The list is shown and reading it again failed, whatever the cause — the server or the
+   * connection (round 2, Б1): the list is the one from before the last write.
+   */
+  readonly behind: ComputedRef<boolean>
   /** Reads that failed so far: a new one says the strip's same words again (MOL-181, C1). */
   readonly attempt: Ref<number>
   /** A write in the air: the preference, a removal. The form of the sheet keeps its own. */
@@ -147,6 +152,7 @@ export function useExchanges(): Exchanges {
   })
 
   const stale = computed(() => overview.value !== null && failure.value === 'error')
+  const behind = computed(() => overview.value !== null && failure.value !== null)
 
   /** Every word above the list is about the last write; a new one takes them all away. */
   function hush(): void {
@@ -198,6 +204,7 @@ export function useExchanges(): Exchanges {
     overview,
     fetchedAt,
     stale,
+    behind,
     attempt,
     busy,
     failed,

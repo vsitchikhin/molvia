@@ -51,16 +51,22 @@ describe('timeOfDay', () => {
 
 describe('answeredAt (MOL-187)', () => {
   it('names the answer by the day the screen holds, with its time', () => {
-    expect(answeredAt(at(19, 23, 40), 'ru', '2026-09-19')).toBe('сегодня, 23:40')
-    expect(answeredAt(at(17, 14, 5), 'ru', '2026-09-19')).toBe('17 сент., 14:05')
+    expect(answeredAt(at(19, 23, 40), 'ru', '2026-09-19', at(19, 23, 45))).toBe('сегодня, 23:40')
+    expect(answeredAt(at(17, 14, 5), 'ru', '2026-09-19', at(19, 9))).toBe('17 сент., 14:05')
   })
 
   it('А2: the same answer, the screen on the next day, is yesterday’s — whatever the clock says', () => {
-    expect(answeredAt(at(19, 23, 40), 'en', '2026-09-20')).toBe('yesterday, 11:40 PM')
+    expect(answeredAt(at(19, 23, 40), 'en', '2026-09-20', at(19, 23, 50))).toBe(
+      'yesterday, 11:40 PM',
+    )
   })
 
-  it('an answer of a day the screen has not looked at yet is today’s, never a date', () => {
-    expect(answeredAt(at(20, 0, 10), 'ru', '2026-09-19')).toBe('сегодня, 00:10')
+  it('Б2: the screen still on yesterday, the clock past midnight — yesterday’s too', () => {
+    expect(answeredAt(at(19, 23, 58), 'en', '2026-09-19', at(20, 0, 5))).toBe('yesterday, 11:58 PM')
+  })
+
+  it('an answer of a day neither has reached yet is today’s, never a date', () => {
+    expect(answeredAt(at(20, 0, 10), 'ru', '2026-09-19', at(19, 23, 58))).toBe('сегодня, 00:10')
   })
 })
 

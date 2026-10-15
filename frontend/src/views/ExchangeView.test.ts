@@ -968,6 +968,50 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     }
   })
 
+  it('the same read lost with the connection: no «here it is now» either, until it is read (Б1)', async () => {
+    // The connection goes the moment the server's answer to the write comes.
+    const lostOffline = (): Promise<never> => {
+      online(false)
+      window.dispatchEvent(new Event('offline'))
+      return Promise.reject(new ApiError(ERROR.INTERNAL, 'network', false))
+    }
+    for (const [write, stale, shown] of [
+      ['record', en.exchange.conflict_stale, en.exchange.conflict],
+      [ERROR.CONFLICT, en.exchange.amend_conflict_stale, en.exchange.amend_conflict],
+      [ERROR.NOT_FOUND, en.exchange.vanished_stale, en.exchange.vanished],
+    ] as const) {
+      online(true)
+      exchanges
+        .mockReset()
+        .mockResolvedValueOnce(overview())
+        .mockImplementationOnce(lostOffline)
+        .mockResolvedValue(overview({ exchanges: [row({ revision: 2 })] }))
+      recordExchange.mockReset().mockRejectedValue(new ApiError(ERROR.CONFLICT))
+      amendExchange.mockReset()
+      const view = await render()
+      if (write === 'record') await recordThroughSheet(view)
+      else {
+        amendExchange.mockRejectedValueOnce(new ApiError(write))
+        await openRow(view)
+        await saveAmendment()
+      }
+      expect(view.get('.status').text()).toContain(en.exchange.offline.strip.split('{when}')[0])
+      expect(view.text()).toContain(stale)
+      expect(view.text()).not.toContain(shown)
+
+      // Back online, the list is read by itself, and now it is what the words say.
+      online(true)
+      window.dispatchEvent(new Event('online'))
+      await flushPromises()
+      expect(exchanges).toHaveBeenCalledTimes(3)
+      expect(view.text()).toContain(shown)
+      expect(view.text()).not.toContain(stale)
+      view.unmount()
+      views.splice(views.indexOf(view), 1)
+      document.body.innerHTML = ''
+    }
+  })
+
   // Near parity the bank's rate falls on the other side of one than the exchange's own; the plate
   // prints it on the exchange's side all the same, not «1.01 $/€» over «1.01 €/$» (adversarial Г).
   it('prints the bank’s rate on the side of the exchange’s own, near parity too', async () => {
@@ -1492,6 +1536,28 @@ describe('ExchangeView: «Курс рубля за месяц, 6 и 12 меся�
     expect(router.currentRoute.value.query).toEqual({})
     expect(view.get('.rate-chart h2').text()).toBe(title('12'))
     expect(exchanges.mock.calls.length).toBe(asked)
+  })
+
+  it('the period moved past midnight, the app never hidden: the strip says «yesterday» (Б2)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(new Date(2026, 9, 14, 23, 58))
+      exchanges.mockResolvedValue(overview({ rateCharts }))
+      const view = await render()
+      online(false)
+      window.dispatchEvent(new Event('offline'))
+      await flushPromises()
+      expect(view.get('.status').text()).toContain('today, 11:58 PM')
+
+      // 00:05, the phone in hand all along: nothing told the screen the day changed.
+      vi.setSystemTime(new Date(2026, 9, 15, 0, 5))
+      await view.findAll('.periods input')[0]?.setValue(true)
+      await flushPromises()
+      expect(view.get('.status').text()).toContain('yesterday, 11:58 PM')
+      expect(exchanges).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('must not fire: no market in the year — no card', async () => {

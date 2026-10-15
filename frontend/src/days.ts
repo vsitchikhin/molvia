@@ -44,13 +44,14 @@ export function timeOfDay(when: Date, locale: string): string {
 
 /**
  * When the answer on screen came — «сегодня, 14:05», «14 окт., 14:05» — for the strip of the
- * connection (MOL-181). Counted from the day the screen holds (`useLocalDay`), not from a default
- * argument: a screen left open overnight is drawn again when that day changes, and «сегодня» of
- * yesterday's answer becomes «вчера» (adversarial А2 of MOL-187). An answer of a day the screen has
- * not looked at yet is today's.
+ * connection (MOL-181). Counted from the later of the day the screen holds (`useLocalDay`) and the
+ * clock's: the screen's day draws the strip again when the app comes back into view on another day
+ * (adversarial А2 of MOL-187), and the clock's is right for a redraw made past midnight before the
+ * screen heard of it (round 2, Б2). An answer of a day neither has reached yet is today's.
  */
-export function answeredAt(at: Date, locale: string, today = localDay()): string {
-  const [year = 0, month = 1, date = 1] = today.split('-').map(Number)
+export function answeredAt(at: Date, locale: string, today = localDay(), now = new Date()): string {
+  const clock = localDay(now)
+  const [year = 0, month = 1, date = 1] = (clock > today ? clock : today).split('-').map(Number)
   return `${purchaseDay(at, locale, new Date(year, month - 1, date))}, ${timeOfDay(at, locale)}`
 }
 
