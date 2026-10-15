@@ -162,35 +162,60 @@ setup: built by each of them, it was rewritten under a neighbour reading it.
 beside a list of the tests past it, and fourteen rounds of review chased the list: it grew with the window
 of the measure and with every test merged. So CI checks every run instead (owner's В-1 «а», 14.10.2026).
 
+- **Ten times the worst, and so half a second** (В-7 «а» and №15 «а» of MOL-243): on byte-identical code a
+  busy runner ran `merge-corpus` 4.8 times slower than a calm one, and five times a calm worst leaves
+  ~1.04 against that. Half a second is vitest's 5 s over ten: past it the default limit is less than ten
+  times the worst. **The limit is ten times the worst, rounded up to 5 s; the worst is of the runs where the
+  test's file was as it is now** (the blob in each run's commit) — the measure of 14.10 found 6 291 ms for a
+  test on its first branch that runs under 300 ms now. **It is a number, the third argument**: Prettier keeps
+  a test's body where it is for a numeric literal there, and a constant or `{ timeout }` re-indents it — as
+  does any `it.each(…)(title, fn, N)` whose title line no longer fits (5 of the 277 given 10 s on 15.10).
 - **The reporter is in the root run only** (`vitest.config.ts`): CI and `make check` run the whole suite
-  there, and a module's own `npm run test -w` stays as it was. **Red on CI, a warning here** — the
-  machine runs several copies at once, and its times say nothing of CI's. On GitHub each breach is also an
-  annotation on its file.
-- **A test is held by its whole time**, `beforeEach` and a wait it sets included: the reporter cannot tell
-  a wait from work, so `navigation` and `metrics`, whose time is their own wait, carry a limit too — it
-  costs nothing. **A hook by the worker's own marks on the runner's tasks** (`experimental_getRunnerTask`):
-  a suite's start to its first child's is its `beforeAll`, its last child's end to its own its `afterAll`.
-  The reporter's hook events come in batches, 100–200 ms late (measured: 276 ms for a hook of 400). The
-  marks are an experimental door of vitest, so the reporter's test runs vitest on a fixture of hooks with
-  set waits, and a version that moves them turns that red. A hook's own timeout is not in the API — it is
-  read from the file by parsing.
-- **A limit is ten times the worst on CI, up to whole 5 s** — five times exactly would turn the run red on
-  the first run a little slower than the worst. **The worst is of the runs where the test's file was as it
-  is now** (the blob in each run's commit): the measure of 14.10 found 6 291 ms for a test on its first
-  branch that runs under 300 ms now. **The limit is a number, the third argument** — Prettier keeps a
-  test's body where it is only for a numeric literal there; a constant or `{ timeout }` re-indents the
-  whole test.
+  there, and a module's own `npm run test -w` stays as it was. **A warning here** — the machine runs
+  several copies at once, and its times say nothing of CI's. **On CI red only in a file the pull request
+  changes** (owner's В-4 «а», 15.10.2026), an annotation of `error` on it; any other breach is a `warning`.
+  A limit of ten times the worst, rounded up, stands 1.0–2 times above it, so a run on a busy runner sets a
+  new worst somewhere now and then: red everywhere, that was somebody else's pull request red for a test it
+  never touched — the flake MOL-243 closed, back by another door. The files are the merge CI checks out,
+  `HEAD^1..HEAD` (`fetch-depth: 2` in `ci.yml`); a push to master changes no file of a pull request and only
+  warns; a merge that cannot be read makes every breach red and says why, since a guard gone quiet would go
+  unseen. **The price, named:** a test made slow by a change of the code, not of its file, only warns; and
+  whoever touches a file answers for every test in it, which is how the 277 came to be given 10 s at once.
+- **A test is held by its whole time**, `beforeEach`, `afterEach` and a wait it sets included: the reporter
+  cannot tell a wait from work, so `navigation` and `metrics`, whose time is their own wait, carry a limit
+  too — it costs nothing. **The price, named:** vitest gives `beforeEach` and `afterEach` no time of their
+  own to read, and holds them by `hookTimeout`, 10 s, whatever the test's timeout — so a slow `beforeEach`
+  behind a test of a long timeout is not told from the test (adversarial А2); the advice names them. A
+  timeout of 0 is vitest's «none», and such a test is not judged.
+- **A hook by the worker's own marks on the runner's tasks** (`experimental_getRunnerTask`): a suite's start
+  to its first child's is its `beforeAll`, its last child's end to its own its `afterAll`. The reporter's
+  hook events come in batches, 100–200 ms late (measured: 276 ms for a hook of 400). The marks are an
+  experimental door of vitest, so the reporter's test runs vitest on a fixture of hooks with set waits, and a
+  version that moves them turns that red. **A hook's own timeout is not in the API** — it is read from the
+  file by parsing: a number, arithmetic on numbers and the file's constants, `{ timeout }`, under suites named
+  by a string, a template or `each`'s placeholders, or by an expression (`X.name`, read as anything). One
+  the parse cannot read — an imported constant — is printed and not judged, rather than held to a wrong 10 s.
 - **A bound on a duration is `expectWithin`** (`packages/model/tests/support/clock.ts`, served as
   `@molvia/model/testing/clock`): it asserts and keeps the duration in the test's meta, which is how the
-  reporter sees how far below its bound each one stood. **`bin/check-clock-bounds.mjs` refuses any other
-  upper bound on a duration**, found by parsing: a subtraction of two readings of the clock, through a
-  name, a helper of the file, a mention of it, an object the duration is put in. A pattern of a line
-  missed three of eighteen (review of MOL-243, Р10-А1). The age of a stamp — the clock against a moment a
-  row holds — has one side that is not the clock and is left alone. **The price, named:** a duration the
-  code under test measures has no clock in the test to be found by.
-- **A test of the testing exports may live beside its source**: `TEST_DATA` keeps a package's testing
-  export out of `src`, which ships, and leaves `src/**/*.test.ts` alone (`TESTS_BESIDE_SOURCE`) — a
-  test never ships.
+  reporter sees how far below its bound each one stood. **In a concurrent test it takes the test's
+  context** (`expectWithin(d, n, context)`): vitest's current test is one for the worker, the neighbour or
+  none beside another running, and a bound without it is refused rather than kept on the wrong test.
+- **`bin/check-clock-bounds.mjs` refuses any other upper bound on a duration it can see**, found by parsing,
+  never by a line's pattern (a pattern missed three of eighteen, review of MOL-243, Р10-А1): a subtraction of
+  two readings of the clock — `performance.now()`, `Date.now()`, `new Date().getTime()`, hrtime, through
+  `globalThis` or `Number()` — through a name, a field, an object it is put in or taken apart from, a helper
+  of the file that returns it, one that subtracts a reading it takes (`since(t0)`), a method; bounded by any
+  matcher vitest or chai has for it, `not` before a lower bound, a lower bound with the duration on the other
+  side, a comparison under `expect` or `assert`, `toSatisfy`, or a helper of the file bounding its parameter.
+  Names are resolved by TypeScript's binder, so the age of a stamp held under a name another test gave a
+  reading is left alone: one side is not the clock. **The price, named:** a duration the code under test
+  measures has no clock in the test to be found by (`metrics`' lag), and a helper imported from another file
+  is not followed — both go to `expectWithin` by review.
+- **A test may take a testing export wherever it lives**: `TEST_DATA` keeps a package's testing export out
+  of `src`, which ships, and leaves `src/**/*.test.ts` alone (`TESTS_BESIDE_SOURCE`) — a test never ships. A
+  module's own boundary over part of `src` goes through `boundary()` of the base preset, which gives the
+  tests beside it the same boundary without `TEST_DATA`; a bare `deny` there would put it back (adversarial
+  А6: the use cases' tests could not import `expectWithin`).
 - **Where a clock cannot hold, the domain keeps a count for the tests** — `candidateSearches` in the
   parse of receipts (MOL-265), `normalisations` in `support/text.ts`: «found once», «refused before the
   normalisation». Twice the work, or a hundred times a third of a millisecond, is under any bound a clock
