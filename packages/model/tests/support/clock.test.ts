@@ -29,3 +29,22 @@ describe('expectWithin', () => {
     delete task.meta.clockBounds
   })
 })
+
+// adversarial round 1 of MOL-266, А7: vitest's current test is one for the worker, so beside a running
+// neighbour it is the neighbour or none
+describe.concurrent('expectWithin in a concurrent test', () => {
+  it('refuses a bound without the test’s context, rather than keep it on another test', ({
+    expect,
+  }) => {
+    expect(() => {
+      expectWithin(1, 10)
+    }).toThrow(/concurrent/)
+  })
+
+  it('keeps the bound on its own test when given its context', async ({ task, expect }) => {
+    await Promise.resolve()
+    expectWithin(1, 10, { task })
+    expect(task.meta.clockBounds).toEqual([{ elapsed: 1, bound: 10 }])
+    delete task.meta.clockBounds
+  })
+})
