@@ -237,12 +237,16 @@ of the measure and with every test merged. So CI checks every run instead (owner
   from is one fake timers hold still at the bound — each value followed to the clocks it was read from, so a
   `process` or `performance` elsewhere in the file changes nothing (В3). What fakes a clock there is read in the
   order vitest runs it (review №13, В2), and **in doubt a clock is real** (review №15, adversarial Г1): a bound
-  refused is still lawful through `expectWithin`, a bound let go on real time is held by nobody. The whole file
-  and every suite's body as they are collected, then the `beforeAll` of each suite outwards in — both only where
-  no other test, no other hook and no function one of them calls touches the timers — then the `beforeEach`,
-  then the test's own statements before the bound, a helper of the file they call included. What may not run —
-  a branch, a loop, a try that may stop anywhere — keeps only what both ways hold still; a `finally` always
-  runs. A bound in a hook or a helper starts from real clocks: its caller is not read. `useRealTimers()` lets
+  refused is still lawful through `expectWithin`, a bound let go on real time is held by nobody. The file's body
+  whole and then its suites' bodies, as vitest collects them (adversarial Д1), then the `beforeAll` of each
+  suite outwards in — both only where no other test, no other hook, no function one of them calls and not the
+  test itself touches the timers: `each`, `retry` and `repeats` run a test again from where it ended (Д3) —
+  then the `beforeEach` in the order they are registered, a helper's where it is called (Д2), then the test's
+  own statements before the bound, a helper of the file they call included. What may not run — a branch, a
+  loop, a try that may stop anywhere — keeps only what both ways hold still; a `finally` always runs; anything
+  else that may touch the timers — `? :`, `&&`, a callback handed to a call, a function called where it
+  stands — lets them go (review №17, Д4). A bound in a hook, a helper, `onTestFinished` or a callback handed
+  to a function of the file that touches the timers starts from real clocks: what runs around it is not read. `useRealTimers()` lets
   go, `toFake` and `toNotFake` choose, `shouldAdvanceTime` and any tick mode but `manual`
   (`vi.setTimerTickMode`) move the fake clock with the real one, so it is real, `vi.setSystemTime` alone fakes
   `Date`, options the parse cannot read whole — a name, a spread, a name in a list — leave every clock real, and
