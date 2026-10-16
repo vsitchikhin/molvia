@@ -628,13 +628,20 @@ export interface Removed {
 }
 
 /**
+ * Money that is there and that whole units would print as a nought: under half a unit, either sign,
+ * the unit the currency's own (review 11 of MOL-117). Such a figure is printed as typed instead.
+ */
+export function roundsToNought(value: Money): boolean {
+  const size = value.minor < 0n ? -value.minor : value.minor
+  return size !== 0n && size * 2n < 10n ** BigInt(MINOR_EXPONENT[value.currency])
+}
+
+/**
  * A figure of «Бюджет» (MOL-117) with its sign left to the words around it — «сверх плана», «осталось»:
  * whole units, as every figure of «Деньги», unless that prints a nought for money that is there —
  * 0,40 ֏ over the plan is «0,40 ֏», never «0 ֏» (adversarial Г).
  */
 export function budgetAmount(value: Money, locale: string): string {
   const size = { ...value, minor: value.minor < 0n ? -value.minor : value.minor }
-  // Under half a unit rounds to nought; the unit is the currency's own (review 11).
-  const half = size.minor * 2n < 10n ** BigInt(MINOR_EXPONENT[size.currency])
-  return size.minor !== 0n && half ? formatMoney(size, locale) : formatEstimate(size, locale)
+  return roundsToNought(size) ? formatMoney(size, locale) : formatEstimate(size, locale)
 }

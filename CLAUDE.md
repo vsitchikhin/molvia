@@ -262,8 +262,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   the best of the central bank's figures of its day for the person, and their own channel if named;
   the side is the bank's (`marketSideOf`), a pair without the dram has none; a file is written whole
   or refused. **«Обмены против рынка» sums each exchange as its card measures it** (MOL-152): its own
-  channel, else the best; no market — «Без сравнения», never the central bank instead. **The
-  official cache holds the bank's history since 2022**, only missing days written.
+  channel, else the best; no market — «Без сравнения», never the central bank instead. **A
+  difference with the market has its tone, sign and «хуже / лучше»; with the central bank none**
+  (MOL-187), one sign a row — the money's. **The official cache holds the bank's history since
+  2022**, only missing days written.
 - **«Курс рубля за 12 месяцев» is the line of all bank clients, the one row with a year of history,
   named so** (MOL-161); a point's percent and its mark are its card's own market, never the line
   (В-1), and the line is on the side of the pair's latest exchange (В-2). **The month, half a year
