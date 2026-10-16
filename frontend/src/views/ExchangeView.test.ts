@@ -13,6 +13,7 @@ import type {
   ExchangesResponse,
   RatePreference,
 } from '@molvia/model'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 
@@ -151,14 +152,13 @@ function confirmButton() {
   return found
 }
 
-/** «Записать обмен»: the floating «Обмен» named in full, or the empty state's own button. */
+/** «Записать обмен» in the strip over the tab bar — its words say why when it is not now (Ф-6). */
 function recordButton(view: VueWrapper) {
   return view
-    .findAll('button')
+    .findAll('.screen > .dock button')
     .find(
       (button) =>
-        button.attributes('aria-label') === en.exchange.record ||
-        button.text() === en.exchange.record,
+        button.text() === en.exchange.record || button.text() === en.exchange.record_offline,
     )
 }
 
@@ -190,6 +190,9 @@ describe('ExchangeView: the four states', () => {
     const view = await render()
     expect(view.find('.skeleton').exists()).toBe(true)
     expect(view.text()).not.toContain(en.exchange.my_rate)
+    // The line of the rate stands in the skeleton too, between the two figures (MOL-178).
+    const parts = view.findAll('.skeleton-figure, .ghost-chart').map((part) => part.classes())
+    expect(parts.map((classes) => classes.includes('ghost-chart'))).toEqual([false, true, false])
   })
 
   it('a failed read is red with «Try again», and trying again reads again', async () => {
@@ -224,7 +227,7 @@ describe('ExchangeView: the four states', () => {
     expect(view.get('.figure').text()).toContain('4.3')
     expect(view.text()).toContain('by the last income')
     expect(view.text()).toContain(en.exchange.preference_legend)
-    expect(recordButton(view)?.text()).toBe(en.exchange.fab)
+    expect(recordButton(view)?.text()).toBe(en.exchange.record)
     expect(view.text()).not.toContain(en.exchange.list_title)
   })
 
@@ -263,7 +266,26 @@ describe('ExchangeView: the four states', () => {
     const view = await render()
     expect(view.text()).toContain(en.exchange.empty.title)
     expect(view.text()).toContain(cba(en.exchange.empty.body))
-    expect(view.text()).toContain(en.exchange.record)
+    // The strip's, not a button of the empty state (Ф-16).
+    expect(recordButton(view)?.text()).toBe(en.exchange.record)
+    expect(view.get('.state').findAll('button')).toHaveLength(0)
+  })
+
+  it('no «Record an exchange» while there is no answer: loading, an error, offline with nothing', async () => {
+    exchanges.mockReturnValue(new Promise(() => undefined))
+    const loading = await render()
+    expect(recordButton(loading)).toBeUndefined()
+
+    exchanges.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const failed = await render()
+    expect(failed.text()).toContain(en.exchange.load_error.title)
+    expect(recordButton(failed)).toBeUndefined()
+
+    online(false)
+    exchanges.mockRejectedValue(new TypeError('network'))
+    const offline = await render()
+    expect(offline.text()).toContain(en.exchange.offline.body)
+    expect(recordButton(offline)).toBeUndefined()
   })
 })
 
@@ -513,7 +535,25 @@ describe('ExchangeView: the rate and the list', () => {
     const view = await render()
     await view.get('input[value="official"]').setValue(true)
     await flushPromises()
-    expect(view.get('fieldset').attributes('disabled')).toBeDefined()
+    // Not now and still in the focus order (MOL-174): every radio says so, none is disabled.
+    const fieldset = view.get('fieldset.preference')
+    expect(fieldset.attributes('disabled')).toBeUndefined()
+    expect(fieldset.classes()).toContain('inactive')
+    for (const radio of fieldset.findAll('input[type="radio"]')) {
+      expect(radio.attributes('aria-disabled')).toBe('true')
+    }
+  })
+
+  it('offline, the preference is not now but stays in the focus order (Ф-6)', async () => {
+    exchanges.mockResolvedValue(overview())
+    const view = await render()
+    online(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+    const fieldset = view.get('fieldset.preference')
+    expect(fieldset.attributes('disabled')).toBeUndefined()
+    expect(fieldset.get('input[value="personal"]').attributes('aria-disabled')).toBe('true')
+    expect(chooseRatePreference).not.toHaveBeenCalled()
   })
 
   it('the bin asks first, naming the exchange, and removes nothing until confirmed (В-5)', async () => {
@@ -601,7 +641,8 @@ describe('ExchangeView: the rate and the list', () => {
     const restore = view.findAll('button').find((button) => button.text() === en.exchange.restore)
     await restore?.trigger('click')
     await flushPromises()
-    expect(document.activeElement?.getAttribute('aria-label')).toBe(en.exchange.record)
+    expect(document.activeElement?.textContent.trim()).toBe(en.exchange.record)
+    expect(document.activeElement?.closest('.dock')).not.toBeNull()
   })
 
   it('a new exchange that never reached the server keeps «Bring back» (Е1)', async () => {
@@ -678,6 +719,47 @@ describe('ExchangeView: the rate and the list', () => {
     expect(document.querySelector('dialog[open]')).toBeNull()
   })
 
+  it('the list read again after a conflict did not come: «the server did not answer», and «Try again»', async () => {
+    exchanges
+      .mockResolvedValueOnce(overview())
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockResolvedValue(overview())
+    recordExchange.mockRejectedValue(new ApiError(ERROR.CONFLICT))
+    const view = await render()
+    expect(view.find('.status').exists()).toBe(false)
+
+    await recordThroughSheet(view)
+    const strip = view.get('.status')
+    expect(strip.text()).toContain(en.exchange.error_strip.split('{when}')[0])
+    expect(strip.text()).not.toContain('{when}')
+    // The list is the one from before the write: nothing says it shows the exchange (self-review №1).
+    expect(view.text()).toContain(en.exchange.conflict_stale)
+    expect(view.text()).not.toContain(en.exchange.conflict)
+    // One «Try again»: the strip over the tab bar holds «Record an exchange» (К-5).
+    const retries = view.findAll('button').filter((button) => button.text() === en.state.retry)
+    expect(retries).toHaveLength(1)
+    expect(recordButton(view)?.text()).toBe(en.exchange.record)
+
+    // Failed again: the same strip, a new attempt said again (C1).
+    const before = view.getComponent(StatusStrip).props('attempt') as number
+    await retries[0]?.trigger('click')
+    await flushPromises()
+    expect(view.get('.status').text()).toContain(en.exchange.error_strip.split('{when}')[0])
+    expect(view.getComponent(StatusStrip).props('attempt')).toBe(before + 1)
+
+    await view
+      .findAll('button')
+      .find((button) => button.text() === en.state.retry)
+      ?.trigger('click')
+    await flushPromises()
+    expect(view.find('.status').exists()).toBe(false)
+    expect(exchanges).toHaveBeenCalledTimes(4)
+    // Read at last: now the list does show it.
+    expect(view.text()).toContain(en.exchange.conflict)
+    expect(view.text()).not.toContain(en.exchange.conflict_stale)
+  })
+
   it('a failure said once goes when the next write succeeds — a new exchange included (Г2)', async () => {
     exchanges.mockResolvedValue(overview())
     removeExchange.mockRejectedValue(new ApiError(ERROR.INTERNAL))
@@ -712,27 +794,85 @@ describe('ExchangeView: the rate and the list', () => {
     window.dispatchEvent(new Event('offline'))
     await flushPromises()
 
-    expect(view.text()).toContain(en.exchange.offline.strip)
+    // One line, with the time of the answer on screen (MOL-181); never red, nothing to retry.
+    const strip = view.get('.status')
+    expect(strip.text()).toContain(en.exchange.offline.strip.split('{when}')[0])
+    expect(strip.text()).toMatch(/\d{1,2}:\d{2}/)
+    expect(strip.text()).not.toContain(en.state.retry)
     expect(view.get('button.remove').attributes('disabled')).toBeDefined()
-    // «Обмен» floats on, inactive rather than gone, and a tap on it opens nothing (handoff 02).
+    // «Записать обмен» stays in the strip, not now, saying why, and a tap on it opens nothing (Ф-6).
     const record = recordButton(view)
+    expect(record?.text()).toBe(en.exchange.record_offline)
     expect(record?.attributes('aria-disabled')).toBe('true')
     await record?.trigger('click')
     await flushPromises()
     expect(document.querySelector('dialog[open]')).toBeNull()
+
+    online(true)
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(recordButton(view)?.text()).toBe(en.exchange.record)
+    expect(recordButton(view)?.attributes('aria-disabled')).toBeUndefined()
   })
 
-  it('«Обмен» floats, named in full; the empty screen keeps its own button instead (handoff 02)', async () => {
+  it('offline with no switch of the rate on screen, the strip names only the recording (А3)', async () => {
+    const offlineStrip = async (answer: ExchangesResponse) => {
+      exchanges.mockResolvedValue(answer)
+      const view = await render()
+      online(false)
+      window.dispatchEvent(new Event('offline'))
+      await flushPromises()
+      return view.get('.status').text()
+    }
+    const recordOnly = en.exchange.offline.strip_record.split('{when}')[1] ?? ''
+    const withRate = en.exchange.offline.strip.split('{when}')[1] ?? ''
+
+    // Empty, and one currency for spending and income: «Записать обмен» is all that waits.
+    for (const answer of [overview({ exchanges: [], wallet: null }), overview({ pair: null })]) {
+      const text = await offlineStrip(answer)
+      expect(text).toContain(recordOnly)
+      expect(text).not.toContain(withRate)
+    }
+    // With a pair the switch is there, not now, and the strip names it.
+    expect(await offlineStrip(overview())).toContain(withRate)
+  })
+
+  it('a night offline: the answer of 23:40 is «yesterday» once the app is looked at again (А2)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(new Date(2026, 9, 14, 23, 40))
+      exchanges.mockResolvedValue(overview())
+      const view = await render()
+      online(false)
+      window.dispatchEvent(new Event('offline'))
+      await flushPromises()
+      expect(view.get('.status').text()).toContain('today, 11:40 PM')
+
+      // Unlocked at 9:00 with no connection still: nothing is read, the strip is drawn again.
+      vi.setSystemTime(new Date(2026, 9, 15, 9, 0))
+      vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+      document.dispatchEvent(new Event('visibilitychange'))
+      await flushPromises()
+      expect(view.get('.status').text()).toContain('yesterday, 11:40 PM')
+      expect(exchanges).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('«Record an exchange» is named by its words in the strip, with exchanges and empty (Ф-28)', async () => {
     exchanges.mockResolvedValue(overview())
     const full = await render()
-    const floating = full.get(`button[aria-label="${en.exchange.record}"]`)
-    expect(floating.text()).toBe(en.exchange.fab)
-    expect(floating.attributes('aria-disabled')).toBeUndefined()
+    const record = recordButton(full)
+    expect(record?.text()).toBe(en.exchange.record)
+    expect(record?.attributes('aria-label')).toBeUndefined()
+    expect(record?.attributes('aria-disabled')).toBeUndefined()
+    // The frame's strip, under the list — the room for it is kept at the end of the content.
+    expect(full.find('.dock-room').exists()).toBe(true)
 
     exchanges.mockResolvedValue(overview({ exchanges: [], wallet: null }))
     const empty = await render()
     expect(empty.text()).toContain(en.exchange.empty.title)
-    expect(empty.find(`button[aria-label="${en.exchange.record}"]`).exists()).toBe(false)
     expect(recordButton(empty)?.text()).toBe(en.exchange.record)
   })
 })
@@ -795,6 +935,81 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     amendExchange.mockResolvedValue(overview())
     await saveAmendment()
     expect(amendExchange.mock.calls.at(-1)?.[1]).toMatchObject({ revision: 2 })
+  })
+
+  it('a conflict or a vanished exchange read again and not answered: no «here it is now» (self-review №1)', async () => {
+    for (const [code, stale, shown] of [
+      [ERROR.CONFLICT, en.exchange.amend_conflict_stale, en.exchange.amend_conflict],
+      [ERROR.NOT_FOUND, en.exchange.vanished_stale, en.exchange.vanished],
+    ] as const) {
+      exchanges
+        .mockReset()
+        .mockResolvedValueOnce(overview())
+        .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+        .mockResolvedValue(overview({ exchanges: [row({ revision: 2 })] }))
+      amendExchange.mockReset().mockRejectedValueOnce(new ApiError(code))
+      const view = await render()
+      await openRow(view)
+      await saveAmendment()
+      expect(view.get('.status').text()).toContain(en.exchange.error_strip.split('{when}')[0])
+      expect(view.text()).toContain(stale)
+      expect(view.text()).not.toContain(shown)
+
+      await view
+        .findAll('button')
+        .find((button) => button.text() === en.state.retry)
+        ?.trigger('click')
+      await flushPromises()
+      expect(view.text()).toContain(shown)
+      expect(view.text()).not.toContain(stale)
+      view.unmount()
+      views.splice(views.indexOf(view), 1)
+      document.body.innerHTML = ''
+    }
+  })
+
+  it('the same read lost with the connection: no «here it is now» either, until it is read (Б1)', async () => {
+    // The connection goes the moment the server's answer to the write comes.
+    const lostOffline = (): Promise<never> => {
+      online(false)
+      window.dispatchEvent(new Event('offline'))
+      return Promise.reject(new ApiError(ERROR.INTERNAL, 'network', false))
+    }
+    for (const [write, stale, shown] of [
+      ['record', en.exchange.conflict_stale, en.exchange.conflict],
+      [ERROR.CONFLICT, en.exchange.amend_conflict_stale, en.exchange.amend_conflict],
+      [ERROR.NOT_FOUND, en.exchange.vanished_stale, en.exchange.vanished],
+    ] as const) {
+      online(true)
+      exchanges
+        .mockReset()
+        .mockResolvedValueOnce(overview())
+        .mockImplementationOnce(lostOffline)
+        .mockResolvedValue(overview({ exchanges: [row({ revision: 2 })] }))
+      recordExchange.mockReset().mockRejectedValue(new ApiError(ERROR.CONFLICT))
+      amendExchange.mockReset()
+      const view = await render()
+      if (write === 'record') await recordThroughSheet(view)
+      else {
+        amendExchange.mockRejectedValueOnce(new ApiError(write))
+        await openRow(view)
+        await saveAmendment()
+      }
+      expect(view.get('.status').text()).toContain(en.exchange.offline.strip.split('{when}')[0])
+      expect(view.text()).toContain(stale)
+      expect(view.text()).not.toContain(shown)
+
+      // Back online, the list is read by itself, and now it is what the words say.
+      online(true)
+      window.dispatchEvent(new Event('online'))
+      await flushPromises()
+      expect(exchanges).toHaveBeenCalledTimes(3)
+      expect(view.text()).toContain(shown)
+      expect(view.text()).not.toContain(stale)
+      view.unmount()
+      views.splice(views.indexOf(view), 1)
+      document.body.innerHTML = ''
+    }
   })
 
   // Near parity the bank's rate falls on the other side of one than the exchange's own; the plate
@@ -961,14 +1176,58 @@ describe('ExchangeView: against the market of the day (MOL-137)', () => {
       'Best rate on Sep 15: Banks, non-cash',
       'Banks, cash on Sep 15',
     ])
-    expect(card.findAll('.plate > .difference').map((line) => line.text())).toEqual([
-      '֏1,232.12 less than at banks non-cash',
-      '֏996.40 more than at banks for cash',
+    // Against the market: the sign, the word and the tone, each line its own (Ф-30).
+    const differences = card.findAll('.plate > .difference')
+    expect(differences.map((line) => line.text())).toEqual([
+      '−֏1,232.12 · worse than at banks non-cash',
+      '+֏996.40 · better than at banks for cash',
     ])
+    expect(differences[0]?.classes()).toContain('bad')
+    expect(differences[1]?.classes()).toContain('good')
     expect(card.get('.plate > .missing').text()).toBe(en.exchange.market.pending)
-    // The central bank is still there, a step quieter: nobody changes at its rate (Р-5).
+    // The central bank is still there, a step quieter and with no tone: it is not the market (Р-5, Д-5).
     expect(card.get('.official').classes()).toContain('quiet')
-    expect(card.get('.official .difference').text()).toBe('֏8,754 more than the central bank')
+    const official = card.get('.official .difference')
+    expect(official.text()).toBe('֏8,754 more than the central bank')
+    expect(official.classes()).not.toContain('good')
+    expect(official.classes()).not.toContain('bad')
+  })
+
+  it('even with the market is said in words and takes no tone', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        exchanges: [
+          row({
+            market: { best: quote('4.75', 0n, 'exchanger'), own: null, exchangersPending: false },
+          }),
+        ],
+      }),
+    )
+    const line = (await render()).get('article .plate > .difference')
+    expect(line.text()).toBe('Exactly as at exchange offices')
+    expect(line.classes()).not.toContain('good')
+    expect(line.classes()).not.toContain('bad')
+  })
+
+  it('must not fire: no market — the central bank is the main line, neutral, never toned', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        exchanges: [
+          row({
+            official: {
+              rate: rate('4.80', '2026-09-15', 'official'),
+              provider: 'cba',
+              difference: { minor: -250_000n, currency: 'AMD' },
+            },
+          }),
+        ],
+      }),
+    )
+    const card = (await render()).get('article')
+    expect(card.get('.official').classes()).not.toContain('quiet')
+    const line = card.get('.official .difference')
+    expect(line.text()).toBe('֏2,500 less than the central bank')
+    expect(line.classes()).not.toContain('bad')
   })
 
   it('names the row of all bank clients where it stood in for non-cash (В-2)', async () => {
@@ -1107,8 +1366,102 @@ describe('ExchangeView: «Обмены против рынка» on top (MOL-152
     expect(text).not.toContain('≈')
     expect(text.indexOf('Zvartnots')).toBeLessThan(text.indexOf(en.exchange.vs_market.no_place))
     expect(text).toContain('Not compared: 1 exchange')
-    expect(card.get('.total').classes()).toContain('negative')
+    expect(card.get('.total').classes()).toContain('bad')
     expect(card.find('a').exists()).toBe(false)
+  })
+
+  it('the difference takes its tone both ways, and the words stand beside it (Ф-30)', async () => {
+    exchanges.mockResolvedValue(overview({ losses }))
+    const view = await render()
+    const card = view.get('.losses')
+    expect(card.get('.word').text()).toBe(en.exchange.vs_market.worse)
+    expect(card.get('.word').classes()).toContain('bad')
+    const [worse, better] = card.findAll('.row')
+    expect(worse?.get('.meta').text()).toBe(`1 exchange · ${en.exchange.vs_market.worse}`)
+    expect(worse?.get('.percent').classes()).toContain('bad')
+    expect(worse?.get('.amount').classes()).toContain('bad')
+    expect(better?.get('.meta').text()).toBe(`2 exchanges · ${en.exchange.vs_market.better}`)
+    expect(better?.get('.percent').classes()).toContain('good')
+    expect(better?.get('.amount').classes()).toContain('good')
+
+    exchanges.mockResolvedValue(
+      overview({ losses: { ...losses, total: { minor: 50_000n, currency: 'AMD' } } }),
+    )
+    const plus = (await render()).get('.losses')
+    expect(plus.get('.total').classes()).toContain('good')
+    expect(plus.get('.total').text()).toContain('+')
+    expect(plus.get('.word').text()).toBe(en.exchange.vs_market.better)
+  })
+
+  it("nothing is no tone and no word; one sign a row — the money's, not a percent rounded to 0 (Р-4)", async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        losses: {
+          total: { minor: 0n, currency: 'AMD' },
+          uncounted: 0,
+          groups: [
+            {
+              place: 'Even',
+              count: 1,
+              difference: { minor: 0n, currency: 'AMD' },
+              percent: 0,
+              level: 0,
+            },
+            {
+              place: 'Hair',
+              count: 1,
+              difference: { minor: -300n, currency: 'AMD' },
+              percent: 0,
+              level: -1,
+            },
+          ],
+        },
+      }),
+    )
+    const card = (await render()).get('.losses')
+    expect(card.find('.word').exists()).toBe(false)
+    expect(card.get('.total').classes()).not.toContain('bad')
+    expect(card.get('.total').classes()).not.toContain('good')
+    const [even, hair] = card.findAll('.row')
+    expect(even?.get('.meta').text()).toBe('1 exchange')
+    expect(even?.get('.percent').classes()).not.toContain('bad')
+    expect(even?.get('.percent').classes()).not.toContain('good')
+    expect(hair?.get('.meta').text()).toBe(`1 exchange · ${en.exchange.vs_market.worse}`)
+    expect(hair?.get('.percent').classes()).toContain('bad')
+    expect(hair?.get('.amount').classes()).toContain('bad')
+  })
+
+  it('a difference whole units would print as 0 is printed as it is, under its tone and word (А1)', async () => {
+    const lossesOf = (minor: bigint): ExchangesResponse['losses'] => ({
+      total: { minor, currency: 'AMD' },
+      uncounted: 0,
+      groups: [
+        { place: 'Hair', count: 1, difference: { minor, currency: 'AMD' }, percent: 0, level: 0 },
+      ],
+    })
+    const cardOf = async (minor: bigint) => {
+      exchanges.mockResolvedValue(overview({ losses: lossesOf(minor) }))
+      return (await render()).get('.losses')
+    }
+
+    // −0,30 ֏ as the card of the exchange prints it, never «−0 ֏» under «worse than the market».
+    const worse = await cardOf(-30n)
+    expect(worse.get('.total').text()).toBe('−֏0.30')
+    expect(worse.get('.total').classes()).toContain('bad')
+    expect(worse.get('.word').text()).toBe(en.exchange.vs_market.worse)
+    expect(worse.get('.row .amount').text()).toBe('−֏0.30')
+
+    const better = await cardOf(49n)
+    expect(better.get('.total').text()).toBe('+֏0.49')
+    expect(better.get('.word').text()).toBe(en.exchange.vs_market.better)
+
+    // Half a unit and more rounds to whole units, as every figure of the card.
+    expect((await cardOf(-50n)).get('.total').text()).toBe('−֏1')
+    expect((await cardOf(-1_338_149n)).get('.total').text()).toBe('−֏13,381')
+    // Nothing stays nothing.
+    const even = await cardOf(0n)
+    expect(even.get('.total').text()).toBe('֏0')
+    expect(even.find('.word').exists()).toBe(false)
   })
 
   it('must not fire: nothing of the twelve months measured — no card', async () => {
@@ -1183,6 +1536,28 @@ describe('ExchangeView: «Курс рубля за месяц, 6 и 12 меся�
     expect(router.currentRoute.value.query).toEqual({})
     expect(view.get('.rate-chart h2').text()).toBe(title('12'))
     expect(exchanges.mock.calls.length).toBe(asked)
+  })
+
+  it('the period moved past midnight, the app never hidden: the strip says «yesterday» (Б2)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(new Date(2026, 9, 14, 23, 58))
+      exchanges.mockResolvedValue(overview({ rateCharts }))
+      const view = await render()
+      online(false)
+      window.dispatchEvent(new Event('offline'))
+      await flushPromises()
+      expect(view.get('.status').text()).toContain('today, 11:58 PM')
+
+      // 00:05, the phone in hand all along: nothing told the screen the day changed.
+      vi.setSystemTime(new Date(2026, 9, 15, 0, 5))
+      await view.findAll('.periods input')[0]?.setValue(true)
+      await flushPromises()
+      expect(view.get('.status').text()).toContain('yesterday, 11:58 PM')
+      expect(exchanges).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('must not fire: no market in the year — no card', async () => {

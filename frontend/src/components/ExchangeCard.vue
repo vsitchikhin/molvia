@@ -37,14 +37,16 @@
           <span class="value own">{{ rateOf(exchange.rate) }}</span>
         </span>
         <!-- The market first — what one could have got at a counter that day — and the central
-             bank under it, quieter: nobody changes at its rate (MOL-137, Р-5). -->
+             bank under it, quieter: nobody changes at its rate (MOL-137, Р-5). Against the market
+             the difference is «хуже / лучше» and takes its tone (Ф-30); against the bank it is a
+             difference and nothing more, no tone (Д-5). -->
         <template v-if="market">
           <template v-for="line in marketLines" :key="line.label">
             <span class="line">
               <span class="label">{{ line.label }}</span>
               <span class="value">{{ line.rate }}</span>
             </span>
-            <span class="difference">{{ line.difference }}</span>
+            <span class="difference" :class="line.tone">{{ line.difference }}</span>
           </template>
           <span v-if="market.pending" class="missing">{{ market.pending }}</span>
         </template>
@@ -223,8 +225,10 @@ export default defineComponent({
   height: calc(var(--space-6) + var(--space-1));
   margin-top: var(--space-4);
   border-radius: 50%;
-  background: var(--accent-tint);
-  color: var(--accent-ink);
+
+  // Only says «into»: terracotta is «press here» (Ф-4).
+  background: var(--surface-2);
+  color: var(--text-muted);
 
   svg {
     @include icon;
@@ -277,18 +281,23 @@ export default defineComponent({
   color: var(--text-muted);
 
   .difference {
-    padding-top: 0;
-    border-top: 0;
     font-weight: var(--weight-regular);
   }
 }
 
-// Neutral, always: a good exchanger beats the bank, and the difference says nothing about why
-// (MOL-40, В-3) — neither the colour of a win nor of a loss.
+// Against the market a minus is worse and a plus better, said in words beside the colour (Ф-30,
+// В-11). Against the central bank it stays neutral: nobody changes at its rate, a good exchanger
+// beats it, and the difference says nothing about why (MOL-40, В-3).
 .difference {
-  padding-top: var(--space-2);
-  border-top: var(--hairline) solid var(--border);
   font-weight: var(--weight-medium);
+
+  &.bad {
+    color: var(--bad-ink);
+  }
+
+  &.good {
+    color: var(--good-ink);
+  }
 }
 
 .note {
