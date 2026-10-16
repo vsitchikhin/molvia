@@ -4,17 +4,19 @@
 // on somebody else's pull request.
 //
 // What is measured, and against what:
-//   - a test — its duration, `beforeEach` and `afterEach` with it, against its timeout; vitest gives
-//     those two hooks no time of their own to read, so a slow `beforeEach` behind a test of a long
-//     timeout is not told from the test (the price, in `workspace.md`); a timeout of 0 is none;
+//   - a test — its duration, `beforeEach`, `afterEach` and `aroundEach` with it, against its timeout;
+//     vitest gives those hooks no time of their own to read, so a slow `beforeEach` behind a test of a
+//     long timeout is not told from the test (the price, in `workspace.md`); a timeout of 0 is none;
 //   - `beforeAll` and `afterAll` — from the worker's own marks on the runner's tasks (an experimental
 //     door of vitest, held by this file's test): a suite's start to its first child's, its last
-//     child's end to its own — so the sum of the suite's hooks of that kind, against the sum of their
-//     own timeouts, read from the file (`hookLimit`), or the project's `hookTimeout`; one the parse
-//     cannot read is held as the project's, and the advice asks for a number. The reporter's own hook
-//     events come in batches, 100–200 ms late;
+//     child's end to its own — so the sum of the suite's hooks of that kind and of its `aroundAll`,
+//     whose setup and teardown fall there, against the sum of their own timeouts, read from the file
+//     (`hookLimit`), or the project's `hookTimeout`; one the parse cannot read is held as the
+//     project's, and the advice asks for a number; a timeout of 0 or `Infinity` is none. The
+//     reporter's own hook events come in batches, 100–200 ms late;
 //   - a bound on the clock — what `expectWithin` kept in the test's meta: the duration against the
-//     bound, and the bound against the test's timeout, which must stand above it.
+//     bound, and the bound against the test's timeout, which must stand above it; one met with every
+//     clock fake is printed and held to nothing.
 //
 // A breach is printed always, and fails the run only where `fail` says so — on CI — and only in a file
 // the pull request changes (owner's decision В-4 «а», 15.10.2026): a run on a busy runner sets a new
@@ -48,11 +50,15 @@ export interface Breach {
   readonly limit: number
   /** A hook whose own timeout the parse could not read, held as the project's. */
   readonly unread?: boolean
+  /** The suite's `aroundAll` stands in the sum of a `beforeAll` or `afterAll`. */
+  readonly around?: boolean
 }
 
 interface ClockBound {
   readonly elapsed: number
   readonly bound: number
+  /** Met with every clock fake: no duration (`expectWithin`). */
+  readonly fake?: true
 }
 
 const isClockBound = (value: unknown): value is ClockBound =>
@@ -74,7 +80,8 @@ export function testBreaches(
   const timed = timeout > 0 && Number.isFinite(timeout)
   if (timed && duration * TIMES > timeout)
     found.push({ what: 'test', file, name, ms: duration, limit: timeout })
-  for (const { elapsed, bound } of clockBounds) {
+  for (const { elapsed, bound, fake } of clockBounds) {
+    if (fake) continue
     if (elapsed * TIMES > bound)
       found.push({ what: 'clock', file, name, ms: elapsed, limit: bound })
     if (timed && bound >= timeout)
@@ -122,14 +129,14 @@ export function hookTimes(file: RunnerTestFile): HookTime[] {
   return times
 }
 
-/** A `beforeAll` or `afterAll` of the file, as the parse reads it. */
+/** A `beforeAll`, `afterAll` or `aroundAll` of the file, as the parse reads it. */
 export interface HookTimeout {
-  readonly kind: HookTime['kind']
+  readonly kind: HookTime['kind'] | 'aroundAll'
   /** The suites it stands in, by their titles; `null` — a helper of the file registers it, anywhere. */
   readonly path: readonly RegExp[] | null
   /** Whether every title on the path is a plain string: the hook's suite, not a guess at it. */
   readonly exact: boolean
-  /** Its own timeout; `null` — none, the project's; `'unread'` — one the parse cannot read. */
+  /** Its own timeout, `Infinity` for none; `null` — not given, the project's; `'unread'` — one the parse cannot read. */
   readonly timeout: number | null | 'unread'
 }
 
@@ -145,19 +152,24 @@ function bind(fileName: string, source: string): { sf: ts.SourceFile; checker: t
 }
 
 /**
- * Every `beforeAll` and `afterAll` a file declares, with the timeout it gives itself: a number,
- * arithmetic on numbers and the file's constants (`2 * 60_000`) — read by the binder, each in its own
- * scope — or `{ timeout }`; none, or `undefined`, is the project's. Anything else is `'unread'`: the
- * limit is a number, and the reporter says so rather than guess. A suite is `describe` or `suite`;
- * one named by a template or by `each`'s placeholders is matched with them read as anything, one named
- * by an expression (`X.name`) as anything at all — neither exact. A hook in a function of the file, a
- * helper, stands wherever the helper is called.
+ * Every `beforeAll`, `afterAll` and `aroundAll` a file declares, with the timeout it gives itself: a
+ * number, arithmetic on numbers and the file's constants (`2 * 60_000`) — read by the binder, each in
+ * its own scope — or `{ timeout }`; 0 and `Infinity` are none, as vitest reads them; none given, or
+ * `undefined`, is the project's. Anything else is `'unread'`: the limit is a number, and the reporter
+ * says so rather than guess. A suite is `describe` or `suite`; one named by a template or by `each`'s
+ * placeholders is matched with them read as anything, one named by an expression (`X.name`) as
+ * anything at all — neither exact. A hook in a function of the file, a helper, stands in the suite
+ * the helper is called in, beside the suite's own (review №14, adversarial В5); one whose helper is
+ * called nowhere the parse sees stands wherever it may.
  */
 export function ownHookTimeouts(source: string, fileName = 'test.ts'): HookTimeout[] {
   const { sf, checker } = bind(fileName, source)
+  // vitest's own word: a timeout of 0 or less, or Infinity, is no timeout at all (adversarial В5)
+  const none = (ms: number): number => (ms > 0 && Number.isFinite(ms) ? ms : Infinity)
   const numberOf = (node: ts.Expression, depth = 0): number | null | 'unread' => {
     if (depth > 20) return 'unread'
-    if (ts.isNumericLiteral(node)) return Number(node.text.replace(/_/g, ''))
+    if (ts.isNumericLiteral(node)) return none(Number(node.text.replace(/_/g, '')))
+    if (/^(Number\.POSITIVE_)?INFINITY$|^Infinity$/.test(node.getText(sf))) return Infinity
     if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node))
       return numberOf(node.expression, depth + 1)
     if (ts.isIdentifier(node)) {
@@ -173,13 +185,13 @@ export function ownHookTimeouts(source: string, fileName = 'test.ts'): HookTimeo
       if (typeof left !== 'number' || typeof right !== 'number') return 'unread'
       switch (node.operatorToken.kind) {
         case ts.SyntaxKind.AsteriskToken:
-          return left * right
+          return none(left * right)
         case ts.SyntaxKind.PlusToken:
-          return left + right
+          return none(left + right)
         case ts.SyntaxKind.MinusToken:
-          return left - right
+          return none(left - right)
         case ts.SyntaxKind.SlashToken:
-          return left / right
+          return none(left / right)
         default:
           return 'unread'
       }
@@ -212,11 +224,67 @@ export function ownHookTimeouts(source: string, fileName = 'test.ts'): HookTimeo
     PLACEHOLDER.lastIndex = 0
     return { title: new RegExp(`^${parts.map(each).join('.*')}$`, 's'), exact }
   }
+  const HOOKS = ['beforeAll', 'afterAll', 'aroundAll'] as const
+  type Kind = (typeof HOOKS)[number]
+  const hookKind = (call: ts.CallExpression): Kind | undefined =>
+    HOOKS.find((kind) => kind === call.expression.getText(sf))
+  const timeoutOf = (call: ts.CallExpression): HookTimeout['timeout'] => {
+    const second = call.arguments[1]
+    return second ? numberOf(second) : null
+  }
+  const isSuite = (call: ts.CallExpression): boolean =>
+    /^(describe|suite)$/.test(call.expression.getText(sf).split('.')[0] ?? '')
+  /** The function of this file a call names, if any: a helper whose hooks stand where it is called. */
+  const helperOf = (call: ts.CallExpression): ts.FunctionLikeDeclaration | undefined => {
+    const declaration = ts.isIdentifier(call.expression)
+      ? checker.getSymbolAtLocation(call.expression)?.valueDeclaration
+      : undefined
+    if (declaration?.getSourceFile() !== sf) return undefined
+    if (ts.isFunctionDeclaration(declaration)) return declaration
+    const init = ts.isVariableDeclaration(declaration) ? declaration.initializer : undefined
+    return init && (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) ? init : undefined
+  }
+  /** Helpers whose hooks were placed in a suite, so they stand nowhere else. */
+  const placed = new Set<ts.Node>()
+  /** The hooks a helper registers, its own helpers' with them; a suite of its own is no part of it. */
+  const hooksOf = (
+    fn: ts.FunctionLikeDeclaration,
+    seen: Set<ts.Node>,
+  ): { kind: Kind; timeout: HookTimeout['timeout'] }[] => {
+    if (seen.has(fn) || !fn.body) return []
+    seen.add(fn)
+    placed.add(fn)
+    const hooks: { kind: Kind; timeout: HookTimeout['timeout'] }[] = []
+    const look = (node: ts.Node): void => {
+      if (ts.isCallExpression(node)) {
+        const kind = hookKind(node)
+        if (kind) {
+          hooks.push({ kind, timeout: timeoutOf(node) })
+          return
+        }
+        if (isSuite(node)) return
+        const helper = helperOf(node)
+        if (helper) hooks.push(...hooksOf(helper, seen))
+      }
+      ts.forEachChild(node, look)
+    }
+    look(fn.body)
+    return hooks
+  }
   const found: HookTimeout[] = []
+  /** Hooks inside a function of the file, kept until it is known whether their helper was placed. */
+  const loose: { owner: ts.Node | undefined; hook: HookTimeout }[] = []
+  const ownerOf = (node: ts.Node): ts.Node | undefined =>
+    ts.findAncestor(
+      node.parent,
+      (n) =>
+        ts.isFunctionDeclaration(n) ||
+        ((ts.isArrowFunction(n) || ts.isFunctionExpression(n)) &&
+          ts.isVariableDeclaration(n.parent)),
+    )
   const walk = (node: ts.Node, path: readonly RegExp[], exact: boolean, helper: boolean): void => {
     if (ts.isCallExpression(node)) {
-      const callee = node.expression.getText(sf).split('.')[0]
-      if (callee === 'describe' || callee === 'suite') {
+      if (isSuite(node)) {
         const { title, exact: plain } = titleOf(node.arguments[0])
         for (const argument of node.arguments) {
           // the suite's own callback is the suite, not a helper
@@ -225,15 +293,22 @@ export function ownHookTimeouts(source: string, fileName = 'test.ts'): HookTimeo
         }
         return
       }
-      if (callee === 'beforeAll' || callee === 'afterAll') {
-        const second = node.arguments[1]
-        found.push({
-          kind: callee,
+      const kind = hookKind(node)
+      if (kind) {
+        const hook = {
+          kind,
           path: helper ? null : path,
           exact: !helper && exact,
-          timeout: second ? numberOf(second) : null,
-        })
+          timeout: timeoutOf(node),
+        }
+        if (helper) loose.push({ owner: ownerOf(node), hook })
+        else found.push(hook)
       }
+      // withDb() in a suite: the helper's hooks are the suite's
+      const called = helper ? undefined : helperOf(node)
+      if (called)
+        for (const { kind: k, timeout } of hooksOf(called, new Set()))
+          found.push({ kind: k, path, exact, timeout })
     }
     // past a function of the file that is not a suite's own callback, a hook is a helper's
     const inner = helper || ts.isFunctionLike(node)
@@ -242,49 +317,51 @@ export function ownHookTimeouts(source: string, fileName = 'test.ts'): HookTimeo
     })
   }
   walk(sf, [], true, false)
+  for (const { owner, hook } of loose) if (!owner || !placed.has(owner)) found.push(hook)
   return found
 }
 
 /**
  * The limit a measured `beforeAll` or `afterAll` of a suite is held to: every hook of that kind the
- * suite declares, since the worker's marks give their sum — each its own timeout, or the project's.
- * The hooks of exactly that suite first; else those of a suite guessed at (a template, `each`, an
- * expression, a helper), the smallest of their sums where they differ (review №10). `unread` where one
- * of them gives a timeout the parse cannot read: it is held as the project's, and the advice says why.
+ * suite declares, and its `aroundAll`, since the worker's marks give their sum — each its own timeout,
+ * or the project's; one with none makes the sum none, `Infinity`. The hooks of exactly that suite
+ * first; else those of a suite guessed at (a template, `each`, an expression, a helper called nowhere
+ * seen), the smallest of their sums where they differ (review №10). `unread` where one of them gives a
+ * timeout the parse cannot read: it is held as the project's, and the advice says why; `around` where
+ * an `aroundAll` is in the sum, so the breach names it.
  */
 export function hookLimit(
   own: readonly HookTimeout[],
   kind: HookTime['kind'],
   names: readonly string[],
   project: number,
-): { limit: number; unread: boolean } {
+): { limit: number; unread: boolean; around: boolean } {
   const matches = (hook: HookTimeout): boolean =>
-    hook.kind === kind &&
+    (hook.kind === kind || hook.kind === 'aroundAll') &&
     (hook.path === null ||
       (hook.path.length === names.length && names.every((name, at) => hook.path?.[at]?.test(name))))
   const candidates = own.filter(matches)
   const exact = candidates.filter((hook) => hook.exact)
-  const sum = (hooks: readonly HookTimeout[]): { limit: number; unread: boolean } => ({
+  const sum = (
+    hooks: readonly HookTimeout[],
+  ): { limit: number; unread: boolean; around: boolean } => ({
     limit: hooks.reduce(
       (total, hook) => total + (typeof hook.timeout === 'number' ? hook.timeout : project),
       0,
     ),
     unread: hooks.some((hook) => hook.timeout === 'unread'),
+    around: hooks.some((hook) => hook.kind === 'aroundAll'),
   })
+  const projects = { limit: project, unread: false, around: false }
   if (exact.length > 0) return sum(exact)
-  if (candidates.length === 0) return { limit: project, unread: false }
+  if (candidates.length === 0) return projects
   // a guess: by where each came from, the hooks of one source summed, the smallest sum taken
   const bySource = new Map<string, HookTimeout[]>()
   for (const hook of candidates) {
     const source = hook.path === null ? 'helper' : hook.path.map(String).join('/')
     bySource.set(source, [...(bySource.get(source) ?? []), hook])
   }
-  return (
-    [...bySource.values()].map(sum).sort((a, b) => a.limit - b.limit)[0] ?? {
-      limit: project,
-      unread: false,
-    }
-  )
+  return [...bySource.values()].map(sum).sort((a, b) => a.limit - b.limit)[0] ?? projects
 }
 
 /**
@@ -334,10 +411,12 @@ export function describeBreach(breach: Breach): string {
     case 'test':
       return `${where}: the test took ${number(breach.ms)} ms against its timeout of ${number(breach.limit)}, its beforeEach and afterEach included — give it ${need}`
     case 'beforeAll':
-    case 'afterAll':
+    case 'afterAll': {
+      const hooks = breach.around ? `${breach.what} with aroundAll` : breach.what
       return breach.unread
-        ? `${where}: ${breach.what} took ${number(breach.ms)} ms, held to the project's ${number(breach.limit)}: its own timeout is not a number the reporter reads — write it as one, ${need}`
-        : `${where}: ${breach.what} took ${number(breach.ms)} ms against its timeout of ${number(breach.limit)} — give it ${need}`
+        ? `${where}: ${hooks} took ${number(breach.ms)} ms, held to the project's ${number(breach.limit)}: its own timeout is not a number the reporter reads — write it as one, ${need}`
+        : `${where}: ${hooks} took ${number(breach.ms)} ms against its timeout of ${number(breach.limit)} — give it ${need}`
+    }
     case 'clock':
       return `${where}: a bound on the clock of ${number(breach.limit)} ms was met at ${number(breach.ms)} — the bound needs at least ${number(Math.ceil(breach.ms * TIMES))}, or the work held otherwise`
     case 'bound':
@@ -367,9 +446,9 @@ export default class TestTimeReporter implements Reporter {
     if (!diagnostic || timeout === undefined) return
     const file = this.fileOf(test.module.moduleId)
     const bounds = (test.meta().clockBounds ?? []).filter(isClockBound)
-    for (const { elapsed, bound } of bounds) {
+    for (const { elapsed, bound, fake } of bounds) {
       this.measured.push(
-        `clock ${file} › ${test.fullName}: ${number(elapsed)} of ${number(bound)} ms`,
+        `clock ${file} › ${test.fullName}: ${number(elapsed)} of ${number(bound)} ms${fake ? ', every clock fake — held to nothing' : ''}`,
       )
     }
     this.breaches.push(...testBreaches(file, test.fullName, diagnostic.duration, timeout, bounds))
@@ -378,17 +457,33 @@ export default class TestTimeReporter implements Reporter {
   onTestModuleEnd(module: TestModule): void {
     const file = this.fileOf(module.moduleId)
     const limit = module.project.config.hookTimeout
+    let source: string | undefined
     let own: ReturnType<typeof ownHookTimeouts> | undefined
     for (const hook of hookTimes(runnerTaskOf(module))) {
-      if (hook.ms <= HOOK_PRINTED_MS && hook.ms * TIMES <= limit) continue
-      own ??= ownHookTimeouts(readFileSync(module.moduleId, 'utf8'), module.moduleId)
-      const { limit: timeout, unread } = hookLimit(own, hook.kind, hook.path, limit)
+      if (hook.ms <= HOOK_PRINTED_MS && hook.ms * TIMES <= limit) {
+        // a quick hook is judged only where the file may give it a limit of its own (adversarial В6)
+        source ??= readFileSync(module.moduleId, 'utf8')
+        if (!/\b(beforeAll|afterAll|aroundAll)\s*\(/.test(source)) continue
+      }
+      own ??= ownHookTimeouts(source ?? readFileSync(module.moduleId, 'utf8'), module.moduleId)
+      const { limit: timeout, unread, around } = hookLimit(own, hook.kind, hook.path, limit)
+      const breach = hook.ms * TIMES > timeout
+      if (hook.ms <= HOOK_PRINTED_MS && !breach) continue
       const name = hook.path.length > 0 ? hook.path.join(' › ') : '(file)'
+      const of = Number.isFinite(timeout) ? `of ${number(timeout)} ms` : 'ms, no timeout'
       this.measured.push(
-        `${hook.kind} ${file} › ${name}: ${number(hook.ms)} of ${number(timeout)} ms${unread ? ', its own not read' : ''}`,
+        `${hook.kind} ${file} › ${name}: ${number(hook.ms)} ${of}${unread ? ', its own not read' : ''}`,
       )
-      if (hook.ms * TIMES > timeout) {
-        this.breaches.push({ what: hook.kind, file, name, ms: hook.ms, limit: timeout, unread })
+      if (breach) {
+        this.breaches.push({
+          what: hook.kind,
+          file,
+          name,
+          ms: hook.ms,
+          limit: timeout,
+          unread,
+          around,
+        })
       }
     }
   }

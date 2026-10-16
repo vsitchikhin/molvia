@@ -37,6 +37,12 @@ describe('testBreaches', () => {
     expect(testBreaches('a.test.ts', 't', 10, 30_000, [{ elapsed: 300, bound: 5_000 }])).toEqual([])
   })
 
+  it('holds a bound met with every clock fake to nothing (adversarial round 3, В3)', () => {
+    expect(
+      testBreaches('a.test.ts', 't', 10, 5_000, [{ elapsed: 20_000, bound: 30_000, fake: true }]),
+    ).toEqual([])
+  })
+
   it('judges no time against a timeout of 0 or Infinity: vitest gives such a test none', () => {
     // adversarial round 1 of MOL-266, А8
     expect(testBreaches('a.test.ts', 't', 5, 0, [{ elapsed: 1, bound: 100 }])).toEqual([])
@@ -105,8 +111,8 @@ describe('ownHookTimeouts', () => {
     ])
   })
 
-  it('reads a constant in its own scope, and a helper’s hook as anywhere', () => {
-    // round 2, Б3-4 and Б3-2
+  it('reads a constant in its own scope, and a helper’s hook in the suite it is called in', () => {
+    // round 2, Б3-4 and Б3-2; round 3, review №14 and adversarial В5-2
     expect(
       read(`
         describe('a', () => {
@@ -127,7 +133,51 @@ describe('ownHookTimeouts', () => {
     ).toEqual([
       ['beforeAll', ['/^a$/s'], true, 4_000],
       ['beforeAll', ['/^b$/s'], true, 1_000],
-      ['beforeAll', null, false, 4_000],
+      ['beforeAll', ['/^served$/s'], true, 4_000],
+    ])
+  })
+
+  it('places a helper’s hooks beside the suite’s own, its own helpers’ too; one called nowhere seen anywhere', () => {
+    // round 3, review №14 and adversarial В5-2
+    expect(
+      read(`
+        const withDb = () => {
+          beforeAll(async () => {}, 60_000)
+          seeded()
+        }
+        function seeded() {
+          afterAll(async () => {}, 20_000)
+        }
+        function unused() {
+          beforeAll(async () => {}, 5_000)
+        }
+        describe('repo', () => {
+          withDb()
+          beforeAll(async () => {})
+        })
+      `),
+    ).toEqual([
+      ['beforeAll', ['/^repo$/s'], true, 60_000],
+      ['afterAll', ['/^repo$/s'], true, 20_000],
+      ['beforeAll', ['/^repo$/s'], true, null],
+      ['beforeAll', null, false, 5_000],
+    ])
+  })
+
+  it('reads 0 and Infinity as no timeout, as vitest does, and aroundAll beside the others', () => {
+    // round 3, adversarial В5-1 and В5-3
+    expect(
+      read(`
+        beforeAll(fn, 0)
+        afterAll(fn, Infinity)
+        beforeAll(fn, Number.POSITIVE_INFINITY)
+        aroundAll(fn, 4_000)
+      `),
+    ).toEqual([
+      ['beforeAll', [], true, Infinity],
+      ['afterAll', [], true, Infinity],
+      ['beforeAll', [], true, Infinity],
+      ['aroundAll', [], true, 4_000],
     ])
   })
 
@@ -153,9 +203,21 @@ describe('hookLimit', () => {
         afterAll(() => {}, 9_000)
       })
     `)
-    expect(hookLimit(own, 'beforeAll', ['two'], 1_000)).toEqual({ limit: 5_000, unread: false })
-    expect(hookLimit(own, 'afterAll', ['two'], 1_000)).toEqual({ limit: 9_000, unread: false })
-    expect(hookLimit(own, 'beforeAll', ['other'], 1_000)).toEqual({ limit: 1_000, unread: false })
+    expect(hookLimit(own, 'beforeAll', ['two'], 1_000)).toEqual({
+      limit: 5_000,
+      unread: false,
+      around: false,
+    })
+    expect(hookLimit(own, 'afterAll', ['two'], 1_000)).toEqual({
+      limit: 9_000,
+      unread: false,
+      around: false,
+    })
+    expect(hookLimit(own, 'beforeAll', ['other'], 1_000)).toEqual({
+      limit: 1_000,
+      unread: false,
+      around: false,
+    })
   })
 
   it('takes the exact suite before a guess, and the smaller guess where guesses differ (review №10)', () => {
@@ -164,17 +226,54 @@ describe('hookLimit', () => {
       describe('other', () => { beforeAll(async () => {}) })
       describe.each(rows)('row %s', () => { beforeAll(async () => {}, 30_000) })
     `)
-    expect(hookLimit(own, 'beforeAll', ['other'], 10_000)).toEqual({ limit: 10_000, unread: false })
-    expect(hookLimit(own, 'beforeAll', ['row 1'], 10_000)).toEqual({ limit: 30_000, unread: false })
+    expect(hookLimit(own, 'beforeAll', ['other'], 10_000)).toEqual({
+      limit: 10_000,
+      unread: false,
+      around: false,
+    })
+    expect(hookLimit(own, 'beforeAll', ['row 1'], 10_000)).toEqual({
+      limit: 30_000,
+      unread: false,
+      around: false,
+    })
     expect(hookLimit(own, 'beforeAll', ['ItemDetailsSheet'], 10_000)).toEqual({
       limit: 60_000,
       unread: false,
+      around: false,
     })
+  })
+
+  it('sums aroundAll into both kinds, and a hook with no timeout makes the sum none (round 3, В5)', () => {
+    const own = ownHookTimeouts(`
+      describe('wrapped', () => {
+        aroundAll(async (runSuite) => { await runSuite() }, 4_000)
+        beforeAll(() => {}, 1_000)
+      })
+      describe('free', () => {
+        beforeAll(() => {}, 0)
+        beforeAll(() => {}, 1_000)
+      })
+    `)
+    expect(hookLimit(own, 'beforeAll', ['wrapped'], 10_000)).toEqual({
+      limit: 5_000,
+      unread: false,
+      around: true,
+    })
+    expect(hookLimit(own, 'afterAll', ['wrapped'], 10_000)).toEqual({
+      limit: 4_000,
+      unread: false,
+      around: true,
+    })
+    expect(hookLimit(own, 'beforeAll', ['free'], 10_000).limit).toBe(Infinity)
   })
 
   it('holds a hook whose timeout is not read as the project’s, and says so', () => {
     const own = ownHookTimeouts('beforeAll(fn, IMPORTED_MS)')
-    expect(hookLimit(own, 'beforeAll', [], 10_000)).toEqual({ limit: 10_000, unread: true })
+    expect(hookLimit(own, 'beforeAll', [], 10_000)).toEqual({
+      limit: 10_000,
+      unread: true,
+      around: false,
+    })
   })
 })
 
@@ -371,10 +470,18 @@ describe('a run of vitest', () => {
     expect(measured).toContain(
       '[time] clock bin/test-time-reporter.fixture.ts › inner > keeps what it bounded: 1 of 15 ms',
     )
-    // a bound at vitest's limit, and nothing else of the fixture past the rule
+    expect(measured).toContain(
+      '[time] clock bin/test-time-reporter.fixture.ts › fake > bounds fake time: 5 of 6 ms, every clock fake — held to nothing',
+    )
+    // a bound at vitest's limit, a quick hook past its own limit, and nothing else of the fixture
     expect(measured.filter((l) => l.includes('past the rule'))).toEqual([
-      '[time] past the rule of MOL-243 — 1, see CLAUDE.md › Testing:',
+      '[time] past the rule of MOL-243 — 2, see CLAUDE.md › Testing:',
     ])
+    expect(measured).toContainEqual(
+      expect.stringMatching(
+        /^\[time\] bin\/test-time-reporter\.fixture\.ts › quick: beforeAll took \d+ ms against its timeout of 1 000 — give it [\d ]+$/,
+      ),
+    )
     expect(measured.filter((l) => l.includes('not below'))).toEqual([
       "[time] bin/test-time-reporter.fixture.ts › inner > keeps what it bounded: a bound on the clock of 5 000 ms is not below the test's timeout of 5 000 — vitest, not the test, would hold it",
     ])
