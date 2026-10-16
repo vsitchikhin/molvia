@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { yerevanDate } from '@molvia/model'
-import { dayOfAnyYear, dayWords, localDay, monthOf, purchaseDay, timeOfDay } from '@/days'
+import {
+  answeredAt,
+  dayOfAnyYear,
+  dayWords,
+  localDay,
+  monthOf,
+  purchaseDay,
+  timeOfDay,
+} from '@/days'
 
 // Built from local parts: the phone's calendar is what counts, whatever zone the test runs in.
 const at = (day: number, hour: number, minute = 0) => new Date(2026, 8, day, hour, minute)
@@ -38,6 +46,27 @@ describe('timeOfDay', () => {
     // `hour12` is the locale's business, but a zero hour is where an hour-less format shows:
     // «0:05» and «00:05» are different strings, and the strip prints one of them every night.
     expect(timeOfDay(at(18, 0, 5), 'ru')).toBe('00:05')
+  })
+})
+
+describe('answeredAt (MOL-187)', () => {
+  it('names the answer by the day the screen holds, with its time', () => {
+    expect(answeredAt(at(19, 23, 40), 'ru', '2026-09-19', at(19, 23, 45))).toBe('сегодня, 23:40')
+    expect(answeredAt(at(17, 14, 5), 'ru', '2026-09-19', at(19, 9))).toBe('17 сент., 14:05')
+  })
+
+  it('А2: the same answer, the screen on the next day, is yesterday’s — whatever the clock says', () => {
+    expect(answeredAt(at(19, 23, 40), 'en', '2026-09-20', at(19, 23, 50))).toBe(
+      'yesterday, 11:40 PM',
+    )
+  })
+
+  it('Б2: the screen still on yesterday, the clock past midnight — yesterday’s too', () => {
+    expect(answeredAt(at(19, 23, 58), 'en', '2026-09-19', at(20, 0, 5))).toBe('yesterday, 11:58 PM')
+  })
+
+  it('an answer of a day neither has reached yet is today’s, never a date', () => {
+    expect(answeredAt(at(20, 0, 10), 'ru', '2026-09-19', at(19, 23, 58))).toBe('сегодня, 00:10')
   })
 })
 
