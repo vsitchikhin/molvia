@@ -9,9 +9,10 @@
 //     timeout is not told from the test (the price, in `workspace.md`); a timeout of 0 is none;
 //   - `beforeAll` and `afterAll` — from the worker's own marks on the runner's tasks (an experimental
 //     door of vitest, held by this file's test): a suite's start to its first child's, its last
-//     child's end to its own — against the hook's own timeout, read from the file, or the project's
-//     `hookTimeout`; one the file gives but the parse cannot read is printed, never judged. The
-//     reporter's own hook events come in batches, 100–200 ms late;
+//     child's end to its own — so the sum of the suite's hooks of that kind, against the sum of their
+//     own timeouts, read from the file (`hookLimit`), or the project's `hookTimeout`; one the parse
+//     cannot read is held as the project's, and the advice asks for a number. The reporter's own hook
+//     events come in batches, 100–200 ms late;
 //   - a bound on the clock — what `expectWithin` kept in the test's meta: the duration against the
 //     bound, and the bound against the test's timeout, which must stand above it.
 //
@@ -45,6 +46,8 @@ export interface Breach {
   readonly ms: number
   /** What it is held against — for `bound`, the test's timeout. */
   readonly limit: number
+  /** A hook whose own timeout the parse could not read, held as the project's. */
+  readonly unread?: boolean
 }
 
 interface ClockBound {
@@ -119,29 +122,55 @@ export function hookTimes(file: RunnerTestFile): HookTime[] {
   return times
 }
 
-/**
- * The timeouts a file gives its `beforeAll` and `afterAll` itself, by the path of suites they stand
- * in: `beforeAll(fn, 60_000)`, arithmetic on numbers and the file's constants (`2 * 60_000`), or
- * `{ timeout }`. A suite named by a template or by `each`'s placeholders is matched with them read as
- * anything, a suite named by an expression (`X.name`) as anything at all. A timeout given but not
- * read — an imported constant — is `undefined`: the hook has one of its own, unknown.
- */
-export function ownHookTimeouts(
-  source: string,
-  fileName = 'test.ts',
-): { kind: HookTime['kind']; path: readonly RegExp[]; timeout: number | undefined }[] {
+/** A `beforeAll` or `afterAll` of the file, as the parse reads it. */
+export interface HookTimeout {
+  readonly kind: HookTime['kind']
+  /** The suites it stands in, by their titles; `null` — a helper of the file registers it, anywhere. */
+  readonly path: readonly RegExp[] | null
+  /** Whether every title on the path is a plain string: the hook's suite, not a guess at it. */
+  readonly exact: boolean
+  /** Its own timeout; `null` — none, the project's; `'unread'` — one the parse cannot read. */
+  readonly timeout: number | null | 'unread'
+}
+
+/** One file as a program of its own, with nothing to resolve: enough for the binder to name its symbols. */
+function bind(fileName: string, source: string): { sf: ts.SourceFile; checker: ts.TypeChecker } {
   const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true)
-  const constants = new Map<string, number>()
-  const numberOf = (node: ts.Expression | undefined): number | undefined => {
-    if (!node) return undefined
+  const options: ts.CompilerOptions = { noLib: true, noResolve: true, types: [] }
+  const host = ts.createCompilerHost(options)
+  host.getSourceFile = (name) => (name === fileName ? sf : undefined)
+  host.fileExists = (name) => name === fileName
+  host.readFile = (name) => (name === fileName ? source : undefined)
+  return { sf, checker: ts.createProgram([fileName], options, host).getTypeChecker() }
+}
+
+/**
+ * Every `beforeAll` and `afterAll` a file declares, with the timeout it gives itself: a number,
+ * arithmetic on numbers and the file's constants (`2 * 60_000`) — read by the binder, each in its own
+ * scope — or `{ timeout }`; none, or `undefined`, is the project's. Anything else is `'unread'`: the
+ * limit is a number, and the reporter says so rather than guess. A suite is `describe` or `suite`;
+ * one named by a template or by `each`'s placeholders is matched with them read as anything, one named
+ * by an expression (`X.name`) as anything at all — neither exact. A hook in a function of the file, a
+ * helper, stands wherever the helper is called.
+ */
+export function ownHookTimeouts(source: string, fileName = 'test.ts'): HookTimeout[] {
+  const { sf, checker } = bind(fileName, source)
+  const numberOf = (node: ts.Expression, depth = 0): number | null | 'unread' => {
+    if (depth > 20) return 'unread'
     if (ts.isNumericLiteral(node)) return Number(node.text.replace(/_/g, ''))
-    if (ts.isIdentifier(node)) return constants.get(node.text)
     if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node))
-      return numberOf(node.expression)
+      return numberOf(node.expression, depth + 1)
+    if (ts.isIdentifier(node)) {
+      if (node.text === 'undefined') return null
+      const declaration = checker.getSymbolAtLocation(node)?.valueDeclaration
+      return declaration && ts.isVariableDeclaration(declaration) && declaration.initializer
+        ? numberOf(declaration.initializer, depth + 1)
+        : 'unread'
+    }
     if (ts.isBinaryExpression(node)) {
-      const left = numberOf(node.left)
-      const right = numberOf(node.right)
-      if (left === undefined || right === undefined) return undefined
+      const left = numberOf(node.left, depth + 1)
+      const right = numberOf(node.right, depth + 1)
+      if (typeof left !== 'number' || typeof right !== 'number') return 'unread'
       switch (node.operatorToken.kind) {
         case ts.SyntaxKind.AsteriskToken:
           return left * right
@@ -152,7 +181,7 @@ export function ownHookTimeouts(
         case ts.SyntaxKind.SlashToken:
           return left / right
         default:
-          return undefined
+          return 'unread'
       }
     }
     if (ts.isObjectLiteralExpression(node)) {
@@ -160,63 +189,111 @@ export function ownHookTimeouts(
         (p): p is ts.PropertyAssignment =>
           ts.isPropertyAssignment(p) && p.name.getText(sf) === 'timeout',
       )
-      return numberOf(timeout?.initializer)
+      return timeout ? numberOf(timeout.initializer, depth + 1) : null
     }
-    return undefined
+    return 'unread'
   }
-  const collect = (node: ts.Node): void => {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
-      const value = numberOf(node.initializer)
-      if (value !== undefined) constants.set(node.name.text, value)
-    }
-    ts.forEachChild(node, collect)
-  }
-  // twice: a constant may be made of one declared below it
-  collect(sf)
-  collect(sf)
 
   const ANYTHING = /^.*$/s
   // each's placeholders — %s, %d, %#, $name, $0.a — read as anything, as a template's substitutions are
   const PLACEHOLDER = /%[sdifjoOc#$]|\$[\w.]+/g
-  const titleOf = (node: ts.Expression | undefined): RegExp => {
-    if (!node) return ANYTHING
+  const titleOf = (node: ts.Expression | undefined): { title: RegExp; exact: boolean } => {
+    if (!node) return { title: ANYTHING, exact: false }
     const parts =
       ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)
         ? [node.text]
         : ts.isTemplateExpression(node)
           ? [node.head.text, ...node.templateSpans.map((span) => span.literal.text)]
           : undefined
-    if (!parts) return ANYTHING
+    if (!parts) return { title: ANYTHING, exact: false }
     const escape = (part: string): string => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const each = (part: string): string => part.split(PLACEHOLDER).map(escape).join('.*')
-    return new RegExp(`^${parts.map(each).join('.*')}$`, 's')
+    const exact = parts.length === 1 && !PLACEHOLDER.test(parts[0] ?? '')
+    PLACEHOLDER.lastIndex = 0
+    return { title: new RegExp(`^${parts.map(each).join('.*')}$`, 's'), exact }
   }
-  const found: { kind: HookTime['kind']; path: readonly RegExp[]; timeout: number | undefined }[] =
-    []
-  const walk = (node: ts.Node, path: readonly RegExp[]): void => {
+  const found: HookTimeout[] = []
+  const walk = (node: ts.Node, path: readonly RegExp[], exact: boolean, helper: boolean): void => {
     if (ts.isCallExpression(node)) {
       const callee = node.expression.getText(sf).split('.')[0]
-      if (callee === 'describe') {
-        const title = titleOf(node.arguments[0])
-        ts.forEachChild(node, (child) => {
-          walk(child, [...path, title])
-        })
+      if (callee === 'describe' || callee === 'suite') {
+        const { title, exact: plain } = titleOf(node.arguments[0])
+        for (const argument of node.arguments) {
+          // the suite's own callback is the suite, not a helper
+          if (ts.isArrowFunction(argument) || ts.isFunctionExpression(argument))
+            walk(argument.body, [...path, title], exact && plain && !helper, helper)
+        }
         return
       }
-      if ((callee === 'beforeAll' || callee === 'afterAll') && node.arguments[1]) {
-        found.push({ kind: callee, path, timeout: numberOf(node.arguments[1]) })
+      if (callee === 'beforeAll' || callee === 'afterAll') {
+        const second = node.arguments[1]
+        found.push({
+          kind: callee,
+          path: helper ? null : path,
+          exact: !helper && exact,
+          timeout: second ? numberOf(second) : null,
+        })
       }
     }
+    // past a function of the file that is not a suite's own callback, a hook is a helper's
+    const inner = helper || ts.isFunctionLike(node)
     ts.forEachChild(node, (child) => {
-      walk(child, path)
+      walk(child, path, exact, inner)
     })
   }
-  walk(sf, [])
+  walk(sf, [], true, false)
   return found
 }
 
-/** Which breaches turn the run red: those in `files`, or every one, for the reason `all` gives. */
-export type RedScope = { readonly files: ReadonlySet<string> } | { readonly all: string }
+/**
+ * The limit a measured `beforeAll` or `afterAll` of a suite is held to: every hook of that kind the
+ * suite declares, since the worker's marks give their sum — each its own timeout, or the project's.
+ * The hooks of exactly that suite first; else those of a suite guessed at (a template, `each`, an
+ * expression, a helper), the smallest of their sums where they differ (review №10). `unread` where one
+ * of them gives a timeout the parse cannot read: it is held as the project's, and the advice says why.
+ */
+export function hookLimit(
+  own: readonly HookTimeout[],
+  kind: HookTime['kind'],
+  names: readonly string[],
+  project: number,
+): { limit: number; unread: boolean } {
+  const matches = (hook: HookTimeout): boolean =>
+    hook.kind === kind &&
+    (hook.path === null ||
+      (hook.path.length === names.length && names.every((name, at) => hook.path?.[at]?.test(name))))
+  const candidates = own.filter(matches)
+  const exact = candidates.filter((hook) => hook.exact)
+  const sum = (hooks: readonly HookTimeout[]): { limit: number; unread: boolean } => ({
+    limit: hooks.reduce(
+      (total, hook) => total + (typeof hook.timeout === 'number' ? hook.timeout : project),
+      0,
+    ),
+    unread: hooks.some((hook) => hook.timeout === 'unread'),
+  })
+  if (exact.length > 0) return sum(exact)
+  if (candidates.length === 0) return { limit: project, unread: false }
+  // a guess: by where each came from, the hooks of one source summed, the smallest sum taken
+  const bySource = new Map<string, HookTimeout[]>()
+  for (const hook of candidates) {
+    const source = hook.path === null ? 'helper' : hook.path.map(String).join('/')
+    bySource.set(source, [...(bySource.get(source) ?? []), hook])
+  }
+  return (
+    [...bySource.values()].map(sum).sort((a, b) => a.limit - b.limit)[0] ?? {
+      limit: project,
+      unread: false,
+    }
+  )
+}
+
+/**
+ * Which breaches turn the run red: those in `files`, or every one, for the reason `all` gives; `said` is
+ * the line the log opens the verdict with, so a run with no breach still shows the merge was read.
+ */
+export type RedScope =
+  | { readonly files: ReadonlySet<string>; readonly said: string }
+  | { readonly all: string; readonly said: string }
 
 const git = (...args: string[]): string => execFileSync('git', args, { encoding: 'utf8' })
 
@@ -228,34 +305,41 @@ const git = (...args: string[]): string => execFileSync('git', args, { encoding:
  * and the log says why: a guard that went quiet would never be noticed.
  */
 export function redScope(env: NodeJS.ProcessEnv = process.env, run = git): RedScope {
-  if (env.GITHUB_EVENT_NAME !== 'pull_request') return { files: new Set() }
+  const all = (why: string): RedScope => ({ all: why, said: `every breach counts: ${why}` })
+  if (env.GITHUB_EVENT_NAME !== 'pull_request')
+    return { files: new Set(), said: 'no pull request: every breach is a warning' }
   try {
     const parents = run('rev-list', '--parents', '-n', '1', 'HEAD').trim().split(/\s+/)
-    if (parents.length !== 3) return { all: 'HEAD is not the merge of the pull request' }
+    if (parents.length !== 3) return all('HEAD is not the merge of the pull request')
     const files = run('diff', '--name-only', 'HEAD^1', 'HEAD').split('\n').filter(Boolean)
-    return { files: new Set(files) }
+    return {
+      files: new Set(files),
+      said: `red only in the ${String(files.length)} files of the pull request`,
+    }
   } catch (error) {
-    return { all: `the merge of the pull request could not be read (${String(error)})` }
+    return all(`the merge of the pull request could not be read (${String(error)})`)
   }
 }
-
-const samePath = (names: readonly string[], patterns: readonly RegExp[]): boolean =>
-  names.length === patterns.length && names.every((name, at) => patterns[at]?.test(name))
 
 /** Thousands parted by a plain space, as the project writes them — never the locale's no-break one. */
 const number = (ms: number): string => String(Math.round(ms)).replace(/\B(?=(\d{3})+$)/g, ' ')
 
+/** A limit as the rule writes it: ten times the time, rounded up to 5 s (`workspace.md`). */
+export const limitFor = (ms: number): number => Math.ceil((ms * TIMES) / 5_000) * 5_000
+
 export function describeBreach(breach: Breach): string {
   const where = `${breach.file} › ${breach.name}`
-  const need = number(breach.ms * TIMES)
+  const need = number(limitFor(breach.ms))
   switch (breach.what) {
     case 'test':
-      return `${where}: the test took ${number(breach.ms)} ms against its timeout of ${number(breach.limit)}, its beforeEach and afterEach included — give it at least ${need}`
+      return `${where}: the test took ${number(breach.ms)} ms against its timeout of ${number(breach.limit)}, its beforeEach and afterEach included — give it ${need}`
     case 'beforeAll':
     case 'afterAll':
-      return `${where}: ${breach.what} took ${number(breach.ms)} ms against its timeout of ${number(breach.limit)} — give it at least ${need}`
+      return breach.unread
+        ? `${where}: ${breach.what} took ${number(breach.ms)} ms, held to the project's ${number(breach.limit)}: its own timeout is not a number the reporter reads — write it as one, ${need}`
+        : `${where}: ${breach.what} took ${number(breach.ms)} ms against its timeout of ${number(breach.limit)} — give it ${need}`
     case 'clock':
-      return `${where}: a bound on the clock of ${number(breach.limit)} ms was met at ${number(breach.ms)} — the bound needs at least ${need}, or the work held otherwise`
+      return `${where}: a bound on the clock of ${number(breach.limit)} ms was met at ${number(breach.ms)} — the bound needs at least ${number(Math.ceil(breach.ms * TIMES))}, or the work held otherwise`
     case 'bound':
       return `${where}: a bound on the clock of ${number(breach.ms)} ms is not below the test's timeout of ${number(breach.limit)} — vitest, not the test, would hold it`
   }
@@ -298,21 +382,13 @@ export default class TestTimeReporter implements Reporter {
     for (const hook of hookTimes(runnerTaskOf(module))) {
       if (hook.ms <= HOOK_PRINTED_MS && hook.ms * TIMES <= limit) continue
       own ??= ownHookTimeouts(readFileSync(module.moduleId, 'utf8'), module.moduleId)
-      const given = own.find((h) => h.kind === hook.kind && samePath(hook.path, h.path))
+      const { limit: timeout, unread } = hookLimit(own, hook.kind, hook.path, limit)
       const name = hook.path.length > 0 ? hook.path.join(' › ') : '(file)'
-      if (given && given.timeout === undefined) {
-        // its own timeout, which the parse cannot read: held against nothing rather than a wrong 10 s
-        this.measured.push(
-          `${hook.kind} ${file} › ${name}: ${number(hook.ms)} ms of its own timeout, not read`,
-        )
-        continue
-      }
-      const timeout = given?.timeout ?? limit
       this.measured.push(
-        `${hook.kind} ${file} › ${name}: ${number(hook.ms)} of ${number(timeout)} ms`,
+        `${hook.kind} ${file} › ${name}: ${number(hook.ms)} of ${number(timeout)} ms${unread ? ', its own not read' : ''}`,
       )
       if (hook.ms * TIMES > timeout) {
-        this.breaches.push({ what: hook.kind, file, name, ms: hook.ms, limit: timeout })
+        this.breaches.push({ what: hook.kind, file, name, ms: hook.ms, limit: timeout, unread })
       }
     }
   }
@@ -327,8 +403,9 @@ export default class TestTimeReporter implements Reporter {
       )
       for (const line of this.measured) log(`[time] ${line}`)
     }
-    if (this.breaches.length === 0) return
     const scope = this.scope
+    if (scope) log(`\n[time] ${scope.said}`)
+    if (this.breaches.length === 0) return
     const isRed = (breach: Breach): boolean =>
       scope !== undefined && ('all' in scope || scope.files.has(breach.file))
     const red = this.breaches.filter(isRed)
@@ -342,7 +419,6 @@ export default class TestTimeReporter implements Reporter {
         if (process.env.GITHUB_ACTIONS) log(`::${level} file=${breach.file}::${text}`)
       }
     }
-    if (scope && 'all' in scope) log(`\n[time] every breach counts: ${scope.all}`)
     print('past the rule of MOL-243', red, 'error')
     print(
       scope

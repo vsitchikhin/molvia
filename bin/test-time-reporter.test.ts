@@ -6,6 +6,8 @@ import { startVitest } from 'vitest/node'
 import TestTimeReporter, {
   describeBreach,
   hookTimes,
+  hookLimit,
+  limitFor,
   ownHookTimeouts,
   redScope,
   testBreaches,
@@ -44,6 +46,14 @@ describe('testBreaches', () => {
 })
 
 describe('ownHookTimeouts', () => {
+  const read = (source: string) =>
+    ownHookTimeouts(source).map(({ kind, path, exact, timeout }) => [
+      kind,
+      path?.map(String) ?? null,
+      exact,
+      timeout,
+    ])
+
   it('reads a hook’s own timeout by the suites it stands in, a constant and a template too', () => {
     const own = ownHookTimeouts(`
       const LOAD_MS = 600_000
@@ -56,40 +66,115 @@ describe('ownHookTimeouts', () => {
         beforeAll(() => {}, 60_000)
       })
     `)
-    expect(own.map(({ kind, path, timeout }) => [kind, path.map(String), timeout])).toEqual([
-      ['beforeAll', [], 600_000],
-      ['afterAll', ['/^outer$/s', '/^by .*$/s'], 20_000],
-      ['beforeAll', ['/^outer$/s'], 60_000],
+    expect(
+      own.map(({ kind, path, exact, timeout }) => [kind, path?.map(String), exact, timeout]),
+    ).toEqual([
+      ['beforeAll', [], true, 600_000],
+      ['afterAll', [], true, null],
+      ['afterAll', ['/^outer$/s', '/^by .*$/s'], false, 20_000],
+      ['beforeAll', ['/^outer$/s'], true, 60_000],
     ])
-    expect(own[1]?.path[1]?.test('by day')).toBe(true)
+    expect(own[2]?.path?.[1]?.test('by day')).toBe(true)
   })
 
-  it('reads arithmetic, each’s placeholders and a suite named by an expression; an import as unknown', () => {
-    // adversarial round 1 of MOL-266, А3
-    const own = ownHookTimeouts(`
-      import { LOAD_MS } from './load'
-      const MINUTE = 60 * 1000
-      beforeAll(() => {}, 2 * MINUTE)
-      describe.each(['light', 'dark'])('in %s', () => {
-        afterAll(() => {}, (5 * 60_000))
-      })
-      describe.for([{ kind: 'day' }])('by $kind and %#', () => {
-        beforeAll(() => {}, 30_000)
-      })
-      describe(Sheet.name, () => {
-        beforeAll(() => {}, LOAD_MS)
-      })
-      afterAll(() => {})
-    `)
-    expect(own.map(({ kind, path, timeout }) => [kind, path.map(String), timeout])).toEqual([
-      ['beforeAll', [], 120_000],
-      ['afterAll', ['/^in .*$/s'], 300_000],
-      ['beforeAll', ['/^by .* and .*$/s'], 30_000],
-      ['beforeAll', ['/^.*$/s'], undefined],
+  it('reads arithmetic, each’s placeholders, suite and a suite named by an expression', () => {
+    // review round 1 of MOL-266, А3; round 2, Б3-3
+    expect(
+      read(`
+        const MINUTE = 60 * 1000
+        beforeAll(() => {}, 2 * MINUTE)
+        describe.each(['light', 'dark'])('in %s', () => {
+          afterAll(() => {}, (5 * 60_000))
+        })
+        describe.for([{ kind: 'day' }])('by $kind and %#', () => {
+          beforeAll(() => {}, 30_000)
+        })
+        describe(Sheet.name, () => {
+          beforeAll(() => {}, 4_000)
+        })
+        suite('served', () => {
+          beforeAll(() => {}, 4_000)
+        })
+      `),
+    ).toEqual([
+      ['beforeAll', [], true, 120_000],
+      ['afterAll', ['/^in .*$/s'], false, 300_000],
+      ['beforeAll', ['/^by .* and .*$/s'], false, 30_000],
+      ['beforeAll', ['/^.*$/s'], false, 4_000],
+      ['beforeAll', ['/^served$/s'], true, 4_000],
     ])
-    expect(own[1]?.path[0]?.test('in light')).toBe(true)
-    expect(own[2]?.path[0]?.test('by day and 0')).toBe(true)
-    expect(own[3]?.path[0]?.test('ItemDetailsSheet')).toBe(true)
+  })
+
+  it('reads a constant in its own scope, and a helper’s hook as anywhere', () => {
+    // round 2, Б3-4 and Б3-2
+    expect(
+      read(`
+        describe('a', () => {
+          const LIMIT = 4_000
+          beforeAll(() => {}, LIMIT)
+        })
+        describe('b', () => {
+          const LIMIT = 1_000
+          beforeAll(() => {}, LIMIT)
+        })
+        function startsSlowly() {
+          beforeAll(() => {}, 4_000)
+        }
+        describe('served', () => {
+          startsSlowly()
+        })
+      `),
+    ).toEqual([
+      ['beforeAll', ['/^a$/s'], true, 4_000],
+      ['beforeAll', ['/^b$/s'], true, 1_000],
+      ['beforeAll', null, false, 4_000],
+    ])
+  })
+
+  it('takes undefined for the project’s, and anything not a number as unread (round 2, Б4)', () => {
+    expect(ownHookTimeouts('beforeAll(fn, undefined)')[0]?.timeout).toBeNull()
+    for (const second of [
+      '+60_000',
+      'process.env.CI ? 60_000 : 10_000',
+      'Math.max(1_000, 60_000)',
+      'IMPORTED_MS',
+    ]) {
+      expect(ownHookTimeouts(`beforeAll(fn, ${second})`)[0]?.timeout).toBe('unread')
+    }
+  })
+})
+
+describe('hookLimit', () => {
+  it('sums the suite’s hooks of a kind, each its own or the project’s (round 2, Б3-1)', () => {
+    const own = ownHookTimeouts(`
+      describe('two', () => {
+        beforeAll(() => {}, 4_000)
+        beforeAll(() => {})
+        afterAll(() => {}, 9_000)
+      })
+    `)
+    expect(hookLimit(own, 'beforeAll', ['two'], 1_000)).toEqual({ limit: 5_000, unread: false })
+    expect(hookLimit(own, 'afterAll', ['two'], 1_000)).toEqual({ limit: 9_000, unread: false })
+    expect(hookLimit(own, 'beforeAll', ['other'], 1_000)).toEqual({ limit: 1_000, unread: false })
+  })
+
+  it('takes the exact suite before a guess, and the smaller guess where guesses differ (review №10)', () => {
+    const own = ownHookTimeouts(`
+      describe(Sheet.name, () => { beforeAll(async () => {}, 60_000) })
+      describe('other', () => { beforeAll(async () => {}) })
+      describe.each(rows)('row %s', () => { beforeAll(async () => {}, 30_000) })
+    `)
+    expect(hookLimit(own, 'beforeAll', ['other'], 10_000)).toEqual({ limit: 10_000, unread: false })
+    expect(hookLimit(own, 'beforeAll', ['row 1'], 10_000)).toEqual({ limit: 30_000, unread: false })
+    expect(hookLimit(own, 'beforeAll', ['ItemDetailsSheet'], 10_000)).toEqual({
+      limit: 60_000,
+      unread: false,
+    })
+  })
+
+  it('holds a hook whose timeout is not read as the project’s, and says so', () => {
+    const own = ownHookTimeouts('beforeAll(fn, IMPORTED_MS)')
+    expect(hookLimit(own, 'beforeAll', [], 10_000)).toEqual({ limit: 10_000, unread: true })
   })
 })
 
@@ -121,6 +206,12 @@ describe('hookTimes', () => {
 })
 
 describe('describeBreach', () => {
+  it('advises the limit as the rule writes it: ten times, rounded up to 5 s (review №11)', () => {
+    expect([limitFor(1_204.2), limitFor(500), limitFor(501), limitFor(2_371)]).toEqual([
+      15_000, 5_000, 10_000, 25_000,
+    ])
+  })
+
   it('names the file, the test, the time and the limit it needs', () => {
     const breach: Breach = {
       what: 'test',
@@ -130,7 +221,7 @@ describe('describeBreach', () => {
       limit: 5_000,
     }
     expect(describeBreach(breach)).toBe(
-      'a.test.ts › x › y: the test took 2 371 ms against its timeout of 5 000, its beforeEach and afterEach included — give it at least 23 710',
+      'a.test.ts › x › y: the test took 2 371 ms against its timeout of 5 000, its beforeEach and afterEach included — give it 25 000',
     )
   })
 })
@@ -144,6 +235,7 @@ describe('redScope', () => {
     }
     expect(redScope({ GITHUB_EVENT_NAME: 'pull_request' }, run)).toEqual({
       files: new Set(['a.test.ts', 'bin/b.ts']),
+      said: 'red only in the 2 files of the pull request',
     })
     expect(asked[1]).toEqual(['diff', '--name-only', 'HEAD^1', 'HEAD'])
   })
@@ -152,14 +244,18 @@ describe('redScope', () => {
     const never = (): string => {
       throw new Error('a push asks git nothing')
     }
-    expect(redScope({ GITHUB_EVENT_NAME: 'push' }, never)).toEqual({ files: new Set() })
+    expect(redScope({ GITHUB_EVENT_NAME: 'push' }, never)).toEqual({
+      files: new Set(),
+      said: 'no pull request: every breach is a warning',
+    })
     expect(redScope({ GITHUB_EVENT_NAME: 'pull_request' }, () => 'head parent\n')).toEqual({
       all: 'HEAD is not the merge of the pull request',
+      said: 'every breach counts: HEAD is not the merge of the pull request',
     })
     const shallow = (): string => {
       throw new Error('unknown revision HEAD^1')
     }
-    expect(redScope({ GITHUB_EVENT_NAME: 'pull_request' }, shallow)).toEqual({
+    expect(redScope({ GITHUB_EVENT_NAME: 'pull_request' }, shallow)).toMatchObject({
       all: expect.stringContaining('unknown revision HEAD^1') as string,
     })
   })
@@ -196,22 +292,26 @@ describe('the verdict of a run', () => {
   }
 
   it('turns red for a file of the pull request and only warns for one outside it (В-4 «а»)', () => {
-    const { lines, exitCode } = verdict({ files: new Set(['ours.test.ts']) })
+    const { lines, exitCode } = verdict({ files: new Set(['ours.test.ts']), said: 'red only in 1' })
     expect(exitCode).toBe(1)
     expect(lines.filter((line) => line.startsWith('[time] '))).toEqual([
+      '[time] red only in 1',
       '[time] past the rule of MOL-243 — 1, see CLAUDE.md › Testing:',
-      '[time] ours.test.ts › slow: the test took 900 ms against its timeout of 5 000, its beforeEach and afterEach included — give it at least 9 000',
+      '[time] ours.test.ts › slow: the test took 900 ms against its timeout of 5 000, its beforeEach and afterEach included — give it 10 000',
       '[time] past the rule of MOL-243 outside the files of the pull request, a warning — 1, see CLAUDE.md › Testing:',
-      '[time] theirs.test.ts › slow: the test took 800 ms against its timeout of 5 000, its beforeEach and afterEach included — give it at least 8 000',
+      '[time] theirs.test.ts › slow: the test took 800 ms against its timeout of 5 000, its beforeEach and afterEach included — give it 10 000',
     ])
   })
 
   it('must not fail a run whose breaches are all outside the pull request — a push to master', () => {
-    expect(verdict({ files: new Set() }).exitCode).not.toBe(1)
+    expect(verdict({ files: new Set(), said: 'no pull request' }).exitCode).not.toBe(1)
   })
 
   it('fails on every breach, and says why, where the pull request’s files are not known', () => {
-    const { lines, exitCode } = verdict({ all: 'HEAD is not the merge of the pull request' })
+    const { lines, exitCode } = verdict({
+      all: 'HEAD is not the merge of the pull request',
+      said: 'every breach counts: HEAD is not the merge of the pull request',
+    })
     expect(exitCode).toBe(1)
     expect(lines).toContain('[time] every breach counts: HEAD is not the merge of the pull request')
     expect(lines).toContain('[time] past the rule of MOL-243 — 2, see CLAUDE.md › Testing:')
