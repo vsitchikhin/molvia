@@ -31,11 +31,14 @@
 // duration, as one side is not the clock; and a bound where every clock it reads is one
 // `vi.useFakeTimers()` holds still is not one either: no runner moves fake time. What fakes a clock at a
 // bound is read in the order vitest runs it, and in doubt a clock is real — a bound refused here is still
-// lawful through `expectWithin`: the whole file and its suites as they are collected, then `beforeAll` —
-// both only where no other test, no other hook and nothing they call may touch the timers between —
-// `beforeEach`, the test's own statements before the bound, a helper of the file they call; what may
-// not run (a branch, a loop, a try) keeps only what both ways hold, a finally always runs; a bound in a
-// hook or a helper starts from real clocks. `useRealTimers()` lets go, `toFake` and `toNotFake` choose,
+// lawful through `expectWithin`: the file's body whole, then its suites' bodies, as vitest collects
+// them, then `beforeAll` — both only where no other test, no hook but its own, nothing they call and
+// not the test itself, which may run again, touches the timers — `beforeEach` in the order registered,
+// a helper's too, the test's own statements before the bound, a helper of the file they call; what may
+// not run (a branch, a loop, a try) keeps only what both ways hold, a finally always runs, and anything
+// else that may touch the timers — `? :`, `&&`, a callback handed to a call — lets them go; a bound in
+// a hook, a helper, `onTestFinished` or a callback handed to a function that touches the timers starts
+// from real clocks. `useRealTimers()` lets go, `toFake` and `toNotFake` choose,
 // `shouldAdvanceTime` and a tick mode but `manual` move fake time with the real one, options not read
 // whole leave every clock real; a clock taken under another name keeps the real one.
 //
@@ -876,11 +879,43 @@ export function rawBounds(fileName, source) {
   const HOOK = /^(before|after|around)(All|Each)$/
   const TIMERS = new Set(['useFakeTimers', 'useRealTimers', 'setTimerTickMode'])
   const intersect = (a, b) => new Set([...a].filter((kind) => b.has(kind)))
+  /** After a test: what runs there is no part of the test's time as written (adversarial Д4). */
+  const AFTER = /^(onTestFinished|onTestFailed)$/
+  const touching = new Map()
+  /** Whether anything in a node may touch the timers: a timer call or a function of the file that makes one. */
+  const touchesTimers = (node) => {
+    let found = false
+    const look = (n) => {
+      if (found) return
+      if (ts.isIdentifier(n) && TIMERS.has(n.text)) {
+        found = true
+        return
+      }
+      const fn = ts.isIdentifier(n) ? functionNamed(n) : undefined
+      if (fn?.body && fn.body !== node) {
+        if (!touching.has(fn)) {
+          touching.set(fn, false)
+          touching.set(fn, touchesTimers(fn.body))
+        }
+        if (touching.get(fn)) {
+          found = true
+          return
+        }
+      }
+      ts.forEachChild(n, look)
+    }
+    look(node)
+    return found
+  }
 
   // What runs is read in order; what may or may not run keeps only the clocks both ways hold still — in
   // doubt a clock is real, since a bound refused here is still lawful through `expectWithin` (round 4, Г1).
-  /** The clocks held still after a chain of calls in an expression: `vi.useFakeTimers().setSystemTime(…)`. */
+  /**
+   * The clocks held still after a chain of calls in an expression: `vi.useFakeTimers().setSystemTime(…)`;
+   * anything else that may touch the timers — `? :`, `&&`, a callback handed to a call — lets them go (Д4).
+   */
   const calls = (expression, state, depth) => {
+    if (!ts.isCallExpression(bare(expression))) return touchesTimers(expression) ? new Set() : state
     const chain = []
     for (
       let c = bare(expression);
@@ -900,10 +935,15 @@ export function rawBounds(fileName, source) {
         const mode = call.arguments[0] && bare(call.arguments[0])
         if (!(mode && ts.isStringLiteralLike(mode) && mode.text === 'manual')) now = new Set()
       } else if (depth < 5) {
-        const helper = ts.isIdentifier(call.expression) ? functionNamed(call.expression) : undefined
+        // a function of the file, or one called where it is written: (async () => { … })()
+        const helper = functionNamed(call.expression)
         if (helper) now = steps(bodyOf(helper), now, depth + 1)
       }
+      if (call.arguments.some(touchesTimers)) now = new Set()
     }
+    // what the chain is called on: [vi.useRealTimers].forEach(…)
+    const base = chain[0] && ts.isPropertyAccessExpression(chain[0].expression)
+    if (base && touchesTimers(chain[0].expression.expression)) now = new Set()
     return now
   }
   /** The clocks held still after one statement — or an arrow's body — runs. */
@@ -933,21 +973,30 @@ export function rawBounds(fileName, source) {
         (now, branch) => (branch ? intersect(now, step(branch, state, depth)) : now),
         state,
       )
-    if (ts.isStatement(node)) return state
+    if (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) return state
+    if (ts.isStatement(node)) return touchesTimers(node) ? new Set() : state
     return calls(node, state, depth)
   }
   const steps = (statements, state, depth = 0) =>
     statements.reduce((now, statement) => step(statement, now, depth), state)
-  /** The clocks held still once the file is collected: its body and every suite's, in order. */
-  const collected = (statements, state) =>
-    statements.reduce((now, statement) => {
+  /**
+   * The clocks held still once the file is collected: as vitest does it, a body whole first, then each of
+   * its suites' bodies in order (adversarial Д1).
+   */
+  const collected = (statements, state) => {
+    const suites = []
+    let now = statements.reduce((before, statement) => {
       const call = ts.isExpressionStatement(statement) && bare(statement.expression)
       if (call && ts.isCallExpression(call) && SUITE.test(calleeRoot(call))) {
         const fn = call.arguments.map(bare).find((a) => ts.isFunctionLike(a))
-        return fn ? collected(bodyOf(fn), now) : now
+        if (fn) suites.push(fn)
+        return before
       }
-      return step(statement, now, 0)
+      return step(statement, before, 0)
     }, state)
+    for (const fn of suites) now = collected(bodyOf(fn), now)
+    return now
+  }
   const callOf = (fn) =>
     ts.isCallExpression(fn.parent) && fn.parent.arguments.includes(fn) ? fn.parent : undefined
   const declaredName = (fn) =>
@@ -974,7 +1023,8 @@ export function rawBounds(fileName, source) {
   gather(sf)
   /**
    * Whether a node may run after the file is collected and before the test `test`, outside the hooks of
-   * its own suites read in order: another test, any other hook, a function called from one.
+   * its own suites read in order: another test, any other hook, a function called from one — and the test
+   * itself, which `each`, `retry` or `repeats` may run again from where it ended (adversarial Д3).
    */
   const runsBetween = (node, test, own, seen) => {
     // a function handed over by name runs as what it is handed to: afterEach(realClock)
@@ -985,7 +1035,7 @@ export function rawBounds(fileName, source) {
       if (TEST.test(root) || HOOK.test(root) || SUITE.test(root)) return true
     }
     for (let n = node.parent; n; n = n.parent) {
-      if (n === test) return false
+      if (n === test) return true
       if (!ts.isFunctionLike(n)) continue
       const call = callOf(n)
       if (call) {
@@ -1011,15 +1061,16 @@ export function rawBounds(fileName, source) {
       else if (ts.isFunctionLike(n) && callOf(n) && SUITE.test(calleeRoot(callOf(n))))
         levels.unshift(bodyOf(n))
     }
-    const hooks = (kind) =>
-      levels.flatMap((statements) =>
-        statements.flatMap((statement) => {
-          const call = ts.isExpressionStatement(statement) && bare(statement.expression)
-          return call && ts.isCallExpression(call) && calleeText(call) === kind && call.arguments[0]
-            ? [call.arguments[0]]
-            : []
-        }),
-      )
+    // in the order they are registered, a helper's where it is called (adversarial Д2)
+    const registered = (statements, kind, depth) =>
+      statements.flatMap((statement) => {
+        const call = ts.isExpressionStatement(statement) && bare(statement.expression)
+        if (!call || !ts.isCallExpression(call)) return []
+        if (calleeText(call) === kind) return call.arguments[0] ? [call.arguments[0]] : []
+        const helper = depth < 5 && !SUITE.test(calleeRoot(call)) && functionNamed(call.expression)
+        return helper ? registered(bodyOf(helper), kind, depth + 1) : []
+      })
+    const hooks = (kind) => levels.flatMap((statements) => registered(statements, kind, 0))
     const beforeAll = hooks('beforeAll')
     const beforeEach = hooks('beforeEach')
     const own = new Set([...beforeAll, ...beforeEach].map(bare))
@@ -1041,8 +1092,18 @@ export function rawBounds(fileName, source) {
       if (!ts.isFunctionLike(n)) continue
       const call = callOf(n)
       const root = call ? calleeRoot(call) : ''
-      // a callback the test runs as it goes: waitFor(() => …)
-      if (call && !TEST.test(root) && !SUITE.test(root) && !HOOK.test(root)) continue
+      // a callback the test runs as it goes: waitFor(() => …) — not one run after it, nor one handed to a
+      // function of the file that touches the timers around it: withRealClock(() => …) (Д4)
+      const handedTo = call && functionNamed(call.expression)
+      if (
+        call &&
+        !TEST.test(root) &&
+        !SUITE.test(root) &&
+        !HOOK.test(root) &&
+        !AFTER.test(root) &&
+        !(handedTo?.body && touchesTimers(handedTo.body))
+      )
+        continue
       start = n
       test = TEST.test(root)
     }

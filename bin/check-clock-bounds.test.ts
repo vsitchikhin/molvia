@@ -508,4 +508,67 @@ describe('rawBounds', () => {
   ])('finds the bound written as %s', (_, source) => {
     expect(rawBounds('a.test.ts', source)).toHaveLength(1)
   })
+
+  // review round 5 of MOL-266: №17 and adversarial Д1–Д4 — what touches the timers outside the order read lets them go
+  it.each([
+    [
+      'useFakeTimers() at the file’s end, run before the suites’ bodies',
+      `describe('a', () => {\nvi.useRealTimers()\nit('x', async () => {\n${REAL}\n})\n})\nvi.useFakeTimers()`,
+    ],
+    [
+      'a helper’s beforeEach registered after the suite’s own',
+      `beforeEach(() => {\nvi.useFakeTimers()\n})\nfunction realEach(): void {\nbeforeEach(() => {\nvi.useRealTimers()\n})\n}\nrealEach()\nit('x', async () => {\n${REAL}\n})`,
+    ],
+    [
+      'the test run again from where it ended',
+      `beforeAll(() => {\nvi.useFakeTimers()\n})\nit.each([1, 2])('x %i', async () => {\n${REAL}\nvi.useRealTimers()\n})`,
+    ],
+    [
+      'a let-go in ? :',
+      `it('x', async () => {\nvi.useFakeTimers()\nREAL_TIME ? vi.useRealTimers() : vi.advanceTimersByTime(0)\n${REAL}\n})`,
+    ],
+    [
+      'a let-go behind &&',
+      `it('x', async () => {\nvi.useFakeTimers()\nREAL_TIME && vi.useRealTimers()\n${REAL}\n})`,
+    ],
+    [
+      'a let-go in a callback of .then',
+      `it('x', async () => {\nvi.useFakeTimers()\nawait Promise.resolve().then(() => vi.useRealTimers())\n${REAL}\n})`,
+    ],
+    [
+      'a let-go handed to forEach',
+      `it('x', async () => {\nvi.useFakeTimers()\n;[vi.useRealTimers].forEach((f) => f())\n${REAL}\n})`,
+    ],
+    [
+      'a let-go in a function called where it stands',
+      `beforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\nawait (async () => {\nvi.useRealTimers()\n})()\n${REAL}\n})`,
+    ],
+    [
+      'the bound handed to a helper that lets go around it',
+      `function withRealClock(fn: () => Promise<void>) {\nvi.useRealTimers()\ntry {\nreturn fn()\n} finally {\nvi.useFakeTimers()\n}\n}\nbeforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\nawait withRealClock(async () => {\n${REAL}\n})\n})`,
+    ],
+    [
+      'the bound in onTestFinished, which runs after the test',
+      `it('x', async () => {\nvi.useFakeTimers()\nonTestFinished(async () => {\n${REAL}\n})\nvi.useRealTimers()\n})`,
+    ],
+  ])('finds a bound on real time beside fake timers — %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toHaveLength(1)
+  })
+
+  it.each([
+    [
+      'the test fakes itself and lets go in a finally after the bound',
+      `it('x', async () => {\nvi.useFakeTimers()\ntry {\n${FAKE}\n} finally {\nvi.useRealTimers()\n}\n})`,
+    ],
+    [
+      'it.each faking itself',
+      `it.each([1, 2])('x %i', async () => {\nvi.useFakeTimers()\n${FAKE}\nvi.useRealTimers()\n})`,
+    ],
+    [
+      'beforeEach given a helper that fakes',
+      `function fakeClock(): void {\nvi.useFakeTimers()\n}\nbeforeEach(fakeClock)\nafterEach(() => {\nvi.useRealTimers()\n})\nit('x', async () => {\n${FAKE}\n})`,
+    ],
+  ])('leaves alone a bound on fake time — %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toEqual([])
+  })
 })
