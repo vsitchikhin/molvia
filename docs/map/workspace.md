@@ -63,7 +63,7 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `.prettierignore` — What Prettier leaves alone: builds, the lockfile, the shared links, hooks, recorded rate-provider responses.
 - `.prettierrc.json` — Prettier settings: no semicolons, single quotes, width 100, trailing commas.
 - `Makefile` — The canonical entry point: setup, stack, the receipt reader, database, migrate, forget, seed, gates, dev, format, lint, typecheck, test, check, the outside watch to Cloudflare (`watcher`), certs, icons.
-- `bin/check-clock-bounds.mjs` — Refuses a bound on a duration a test asserts other than through `expectWithin` (MOL-266), found by parsing — a subtraction of two readings of the clock, through names resolved by TypeScript's binder and the file's helpers, bounded in any spelling of vitest, chai or `assert`; run by `npm run lint`.
+- `bin/check-clock-bounds.mjs` — Refuses a bound on a duration a test asserts other than through `expectWithin` (MOL-266), found by parsing — a subtraction of two readings of the clock, through names resolved by TypeScript's binder and the file's helpers, bounded in the spellings of vitest, chai and `assert` its head lists, fake time left alone; run by `npm run lint`.
 - `bin/check-clock-bounds.d.mts` — Types of the clock check for its test: the check is plain JS.
 - `bin/check-clock-bounds.test.ts` — Test: a bound on a duration found written any way — a name, a helper of the file and a mention of it, an object it is put in, `expect(d < n)`; a lower bound, `expectWithin`, the age of a stamp and a fake clock's equality left alone.
 - `bin/check-code-map.mjs` — Refuses a code map that lies: a file it does not cover, a path that does not exist, a file with two homes; run by `npm run lint`.
