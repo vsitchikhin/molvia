@@ -248,10 +248,11 @@ test('«Записать обмен» stands in the strip: the last card ends ab
   expect((last?.y ?? 0) + (last?.height ?? 0)).toBeLessThanOrEqual(dock?.y ?? 0)
 
   await context.setOffline(true)
-  const strip = page.getByText(
+  // The strip's own node: its words are said in the live region too (MOL-181).
+  const strip = page.locator('.strip', { hasText: /Без связи · обмены на/ })
+  await expect(strip).toHaveText(
     /^Без связи · обмены на .+\d:\d\d\. Записать обмен и поменять курс можно со связью$/,
   )
-  await expect(strip).toBeVisible()
   const offline = page
     .locator('.dock')
     .getByRole('button', { name: 'Записать обмен можно со связью' })
