@@ -195,9 +195,65 @@ there is by the line's text only.
 currency; `moneyOfHundredths` turns them into the currency's minor units by its exponent. Quantities
 are thousandths. A float is a ratio that ranks candidates, never money.
 
-**The languages are the country's.** Armenia `hye+rus+eng`; Georgia has its language files in the
-reader, and joins with its card (MOL-248); Serbia is read by its link, not by the reader (MOL-232). Every alphabet at once is slower and
-mixes the scripts.
+**The languages are the country's** — its card's (below). Armenia `hye+rus+eng`; Georgia has its language
+files in the reader, and joins with its card (MOL-248); Serbia is read by its link, not by the reader (MOL-232).
+Every alphabet at once is slower and mixes the scripts.
+
+## A country's card (MOL-247)
+
+**Everything the product knows of a country's receipts is one record, its card** (`receipt-card.ts`,
+`RECEIPT_CARDS`): the currency, the language of its names in the catalogue and, for a country read off a photo,
+Tesseract's languages, the formats of its numbers, the digits OCR confuses in its tills' font, the letters read
+for digits, and the words. MOL-229 measured why (`.scratch/tasks/research/MOL-229.md`, Г-5): the line of an item
+is the same the world over, and where a receipt ends and which figure is its total are the country's words —
+without them no total is found and the taxes and the payment under it are read as items, while a card of one
+country reads no worse than every language's words at once. A second country is a second record, not edits
+across the parse.
+
+**The parse reads the card, never words of its own.** `bestReading`, `mergeParts`, `parseReceiptText`,
+`departmentReceipt` and `classListStart` take the card first; every pattern with a word in it is built from the
+card's words once a card (`lexiconOf`), and the swaps ride in the `Budget` every search already carries and in
+the seams of parts. A test with a **probe card** — Armenia's with its total's word, its payment or its swaps
+changed — holds that the parse follows the card: a word left as a literal in the parse fails it. The move was
+measured on the bench's whole answer, byte for byte (`.scratch/tasks/status/MOL-247/dump.mts`: the 45 receipts
+of MOL-114, `bestReading`, each page mode and the section) — 96 of 228 and the section 10/10, as before.
+
+**A word is a fragment of a regular expression, as OCR reads it** — «դամե» is what every misreading of
+«Ընդամենը» keeps, `հ\S?տ` a piece however OCR read its middle — and a form only one layout reads stays apart
+(`tinMisread`, the table's): folding the forms of all layouts into one is a change of behaviour, measured on its
+own. **Every word goes in a group of its own** (adversarial А1 of review 1): set bare, a second form after «|»
+took the rest of the pattern — «Ընդամենը|Ընդամեն\s+(\d…)» found the word with no sum, and the total, the tax
+number and the number were lost in silence. **A word captures nothing**: the parse reads the figures after it by
+their groups, and «(Ընդամենը)» made the total NaN — `lexiconOf` refuses such a card, as the card's test does.
+**The kilogram is one fragment wherever a line is weighed** (А2): it was a fragment in four patterns, a string in
+two comparisons and letter by letter in the table's, so «կ[գq]» weighed nothing. The table's brackets read it in
+either case by the flag `i`. **The letters read for digits are characters of a class, escaped** (А4); `letters`
+alone are a class's ranges as the card writes them, built by the card's test through the parse. **Every pattern a
+word goes into is read with the flag `u`**, as the word is checked (round 2, Б1): thirteen of them had none, and
+there «\p{L}» was the letters «p{L}» — a word the checks admitted lost the total, the tax number and the number in
+the card's, the table's and the class code's layouts while the section's read it. A test reads such a word in each
+pattern with a word, the ends of the lists and the table's head included (round 3, В1).
+
+**The tills' layouts stay the parse's** — «Ереван Сити»'s card, Dog City's table, the terminal, the class
+code's mark «Դաս» and its article «Ն/Կ», the section «Բաժին», the head's end and city (`receiptCityOf`, which
+reads Armenia's card by name, `ARMENIAN_RECEIPTS`): they are forms of rows, not a country's words. **Where a
+receipt comes from is not on the card** (`receiptSourceOf` reads the schemas, `photoReceiptCountrySchema`): a
+`source` beside them would say it twice, and the card's test holds that `photo` is there exactly for a country
+read by photo.
+
+**A card names only what the parse reads** (owner, В-1 «а»): MOL-229's template also has the words of change,
+subtotal and not-an-item, the codes and the QR, which no rule of Armenia reads; they come with their first
+reader (MOL-248). A field nobody reads is a word nobody checks. **The formats of numbers are a list** — Georgia's
+pharmacies print three decimals beside its shops' two — **and a card may name only a format the parse reads**
+(`PARSED_FRACTION_DIGITS`): the parse counts in hundredths throughout, so it **refuses** a card with no format
+or with one it does not read (`RangeError` in `lexiconOf`, adversarial А3) — a card of three decimals read as
+two would be every sum wrong, and only a refusal makes the field more than a declaration.
+
+**The price, as before:** `priceInDoubt` asks the receipt's country (`receiptCard`), and a card read off no photo
+— Serbia's, from the tax office — keeps the Armenian swaps it was checked by before the card (`ARMENIAN_RECEIPTS`).
+A price of such a receipt one «confused» digit off the memory's is still flagged, though nobody read it and the
+change of price is likely real: doubting none of its digits is a change of behaviour the owner had not decided,
+so it is MOL-270's, not the card's (self-review № 3).
 
 ## What a line is (MOL-126)
 

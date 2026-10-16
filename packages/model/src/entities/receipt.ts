@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { EXCHANGE_UNDO_MINUTES } from '#model/entities/exchange'
 import { serbianItemName } from '#model/entities/receipt-journal'
+import { ARMENIAN_RECEIPTS } from '#model/entities/receipt-card'
 import { classListStart } from '#model/entities/receipt-text'
 import type { ReceiptText, ReceiptTextLine, TextRow } from '#model/entities/receipt-text'
 import { COUNTRY_CITIES } from '#model/contracts/settings'
@@ -132,10 +133,9 @@ export function tellsQuietly(now: Date, timeZone: string): boolean {
 }
 
 /**
- * The countries a receipt is read in, with Tesseract's languages for each, as MOL-114 measured them:
- * one country's set, never every script at once, which is slower and confuses the alphabets. Serbia's
- * receipts are not read off a photo at all but by the link of their QR code — the tax office gives
- * their lines (MOL-232); Georgia (`kat+eng`) joins with its card (MOL-248).
+ * The countries a receipt is read in — each with its card (`RECEIPT_CARDS`, MOL-247). Serbia's receipts
+ * are not read off a photo at all but by the link of their QR code — the tax office gives their lines
+ * (MOL-232); Georgia joins with its card (MOL-248).
  */
 export const photoReceiptCountrySchema = z.enum(['AM'])
 export const linkReceiptCountrySchema = z.enum(['RS'])
@@ -174,26 +174,14 @@ export const RECEIPT_CITIES = [...COUNTRY_CITIES.AM, ...COUNTRY_CITIES.RS] as co
 export type ReceiptCity = (typeof RECEIPT_CITIES)[number]
 type ArmenianCity = (typeof COUNTRY_CITIES.AM)[number]
 
-/** Tesseract's languages of the countries read off a photo. */
-export const RECEIPT_LANGUAGES: Readonly<Partial<Record<ReceiptCountry, string>>> = {
-  AM: 'hye+rus+eng',
-}
-export const RECEIPT_CURRENCY: Readonly<Record<ReceiptCountry, Currency>> = {
-  AM: 'AMD',
-  RS: 'RSD',
-}
-
 /**
- * The language a country's tills print names in, and the language of the catalogue's names a line is
- * matched against (MOL-126): an item is a node, reached by its barcodes, the shops' articles, its
- * customs headings and its names in the countries' languages. Serbia has no names of its own yet: its
+ * The languages a country's tills print names in, and of the catalogue's names a line is matched against
+ * (MOL-126): an item is a node, reached by its barcodes, the shops' articles, its customs headings and its
+ * names in the countries' languages. A country's is its card's (`nameLanguage`); Serbia has none yet: its
  * lines go by the shop's memory and the catalogue's search (MOL-232, В-3).
  */
 export const itemNameLanguageSchema = z.enum(['hy'])
 export type ItemNameLanguage = z.infer<typeof itemNameLanguageSchema>
-export const RECEIPT_NAME_LANGUAGE: Readonly<Partial<Record<ReceiptCountry, ItemNameLanguage>>> = {
-  AM: 'hy',
-}
 
 /**
  * What a line of a country with no names of its own in the catalogue is searched by, and the name a
@@ -313,7 +301,7 @@ function headEnd(rows: readonly TextRow[]): number {
   }
   // a fiscal till's class code «Դաս. 56.10» opens its first item where neither layout reads (MOL-226)
   // read as the class reading reads it, so the head and the list never disagree (review А6)
-  const coded = ends.length === 0 ? classListStart(rows) : -1
+  const coded = ends.length === 0 ? classListStart(ARMENIAN_RECEIPTS, rows) : -1
   if (coded >= 0) ends.push(coded)
   return ends.length === 0 ? Math.min(rows.length, HEAD_ROWS) : Math.min(...ends)
 }

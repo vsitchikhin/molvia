@@ -587,6 +587,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   database and no disk; the API holds the queue, the photos and the parse, one receipt at a time.
 - **The parse is MOL-114's prototype, measured on the bench** (`receipt-text.ts`, `score.mjs`): a rule
   changed is run on the bench's truth before and after; amounts in hundredths, never floats.
+- **A country's words are its card's, never a literal of the parse** (MOL-247, `receipt-card.ts`): currency,
+  languages, swaps, the words of the total, the payment, the tax and the head; the tills' layouts stay hints, and
+  a card names only what the parse reads — a probe card holds it.
 - **Every receipt with a line in it is read** (MOL-222, В-1): «переснимите» only when not one line was
   found, and it asserts no cause it does not know — faint print named among those it may be (MOL-227,
   В-2); read in part (`readPartly`, the model's) is a hint on the review, never a refusal — the person's

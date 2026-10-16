@@ -5,13 +5,13 @@ import {
   DomainError,
   ERROR,
   placeSchema,
-  RECEIPT_CURRENCY,
   RECEIPT_KEEP_DAYS,
   RECEIPT_LINK_WAIT_HOURS,
   RECEIPT_READ_ATTEMPTS,
   RECEIPT_TELL_AFTER_SECONDS,
   RECEIPT_TELL_WITHIN_HOURS,
   RECEIPT_UNDO_MINUTES,
+  receiptCard,
   receiptClockOf,
   serbianReceiptLink,
   withoutItems,
@@ -587,7 +587,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
               actorId,
               country: body.country,
               language: body.language,
-              currency: RECEIPT_CURRENCY[body.country],
+              currency: receiptCard(body.country).currency,
               capturedAt: body.capturedAt,
               ...('link' in body
                 ? linkReceipt(body).row

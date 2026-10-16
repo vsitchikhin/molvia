@@ -1,6 +1,6 @@
 import {
-  RECEIPT_CURRENCY,
   receiptBalance,
+  receiptCard,
   receiptDigits,
   receiptLineName,
   recordedSums,
@@ -158,7 +158,7 @@ export function reviewBalance(
   return receiptBalance(
     lines.map((one) => ({ printed: one.line.sum, amount: one.amount, skip: one.skip })),
     draft?.total ?? detail.receipt.total,
-    RECEIPT_CURRENCY[detail.receipt.country],
+    receiptCard(detail.receipt.country).currency,
   )
 }
 

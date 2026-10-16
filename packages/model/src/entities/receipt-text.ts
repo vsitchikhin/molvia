@@ -7,6 +7,13 @@
 // The figures are code's, not a model's: OCR's own slips in this font (5 read as 6, 1 as 4) are
 // undone by the line's arithmetic — paid + discount = quantity × shelf price — by the receipt's
 // one card discount rate, and last by the printed total.
+//
+// The words it reads by — the total, the payment, the tax, the end of the list, the units, the
+// currency after a sum — and the digits OCR confuses are the country's card (MOL-247): every pattern
+// with a word in it is built from the card, once a card. The tills' layouts stay the parse's own.
+
+import { PARSED_FRACTION_DIGITS } from '#model/entities/receipt-card'
+import type { PhotoReading } from '#model/entities/receipt-card'
 
 /** One row of a reading: its text and where it stands on the photo of its part. */
 export interface TextRow {
@@ -83,26 +90,184 @@ const milliOf = (text: string): number => Math.round(number(text) * 1000)
 const finite = (value: number | null | undefined): number | null =>
   value === null || value === undefined || !Number.isFinite(value) ? null : value
 
-// Digits OCR confuses in this font; a figure is tried with each of them swapped in.
-const CONFUSED: Readonly<Record<string, string>> = {
-  5: '6',
-  6: '5',
-  1: '4',
-  4: '1',
-  3: '8',
-  8: '3',
-  0: '9',
-  9: '0',
+/** The patterns of the parse with a country's words in them, built from its card (MOL-247). */
+interface Lexicon {
+  /** Digits OCR confuses in the tills' font; a figure is tried with each of them swapped in. */
+  readonly swaps: Readonly<Record<string, string>>
+  /** Letters Tesseract puts where the font has digits, before a digit or a point. */
+  readonly digitLike: Readonly<Record<string, string>>
+  readonly digitLikeAt: RegExp
+  readonly cardTotal: RegExp
+  readonly cardTin: RegExp
+  readonly cardNo: RegExp
+  readonly tableEnd: RegExp
+  readonly tableTotal: RegExp
+  readonly tableWeighed: RegExp
+  readonly tableTin: RegExp
+  readonly tableNo: RegExp
+  readonly tableReceiptNo: RegExp
+  readonly classTail: string
+  readonly classMark: RegExp
+  readonly classEnd: RegExp
+  readonly classTotal: RegExp
+  readonly classUnit: RegExp
+  readonly classTin: RegExp
+  readonly classNo: RegExp
+  readonly classHead: RegExp
+  readonly kg: RegExp
+  readonly kgWhole: RegExp
+  readonly terminalSum: RegExp
+  readonly terminalUnit: RegExp
+  readonly tillWords: RegExp
+  readonly oneLetterUnit: RegExp
+  readonly letter: RegExp
+  readonly capitals: RegExp
+  readonly small: RegExp
+  readonly startsSmall: RegExp
+  readonly itemMark: RegExp
+  readonly tinWord: RegExp
+  readonly fiscal: RegExp
+  readonly fiscalNo: RegExp
+  readonly sectionTax: RegExp
+  readonly totalKept: RegExp
+  readonly discountKept: RegExp
+  readonly paid: RegExp
 }
 
-function variants(text: string, depth = 2): string[] {
+const lexicons = new WeakMap<PhotoReading, Lexicon>()
+
+/** The parse's patterns for a card, built once: a reading costs no compiling. */
+function lexiconOf(reading: PhotoReading): Lexicon {
+  const known = lexicons.get(reading)
+  if (known !== undefined) return known
+  // a card names only formats of numbers the parse reads: amounts are hundredths throughout, and three
+  // decimals read as two would be every sum wrong (MOL-248 adds the third with the reading of it)
+  const unread = reading.numbers.find((f) => !PARSED_FRACTION_DIGITS.includes(f.fractionDigits))
+  if (reading.numbers.length === 0 || unread !== undefined) {
+    throw new RangeError(
+      `a card's formats of numbers are not the parse's: ${JSON.stringify(reading.numbers)}`,
+    )
+  }
+  const w = reading.words
+  const u = w.units
+  // a word that captures moves the figures the parse reads after it by their groups: the total read as the
+  // word, NaN (adversarial А1) — refused, as a format it cannot read is
+  const fragments = [
+    ...[w.total, w.totalKept, w.discountKept, w.control, w.fiscalSign, w.tin, w.fiscal],
+    ...[w.fiscalNumber, w.receiptNumber, w.sumSign, ...w.paid, ...w.sectionTax, ...w.tinMisread],
+    ...[...w.head, ...w.currency, ...Object.values(u)],
+  ]
+  const captures = fragments.find(
+    (fragment) => (new RegExp(`(?:${fragment})|`, 'u').exec('')?.length ?? 1) > 1,
+  )
+  if (captures !== undefined) throw new RangeError(`a card's word captures: ${captures}`)
+  // A word is a fragment as OCR reads it, so it goes in a group of its own (adversarial А1): a form after
+  // «|» would otherwise take the rest of the pattern for its own and find the word with no sum after it. And
+  // every pattern a word goes into is read with `u`, as the word is checked: without it «\p{L}» is the
+  // letters «p{L}», and a word the card's test admits was lost by half the layouts (round 2, Б1).
+  const word = (fragment: string): string => `(?:${fragment})`
+  const any = (forms: readonly string[]): string => word(forms.join('|'))
+  // characters set into a class: the four a class reads as its own syntax are escaped (adversarial А4)
+  const inClass = (chars: string): string => chars.replace(/[\\\]^-]/g, '\\$&')
+  // What OCR keeps of «Դաս» — «Դաս.», «աս,», «հաս ‘» — and the class after it: «56.10», «56 10», «5610».
+  // «աս» is the word «Դաս»: «Դ», «դ» or «հ» before it, or no letter — never inside a name, «Կվաս». And the
+  // class is no figure that goes on (reviews 1, 2): not an amount after it — «1 հաս 1300 1300», «Բաքեթ
+  // 5610 5610», «5610 00х10», «5610.00x1.0» — nor a unit of volume or weight, glued or apart, «1000 մլ».
+  // Letters right after it are the article's, «56.10Ն/Կ 745030»: OCR eats the comma and the space.
+  const classTail = [
+    '(?!\\d',
+    // a price's decimals, «5610.00x» — an article glued with its comma, «56.10,745030», is no price (review 3)
+    '|[.,]\\d{1,2}(?!\\d)',
+    '|\\s*[xх×*]',
+    // the same figure again — a price and its sum, «1 հաս 1300 1300», «Բաքեթ 5610 5610» — or a figure
+    // before «x»: the «class» was the line's price. Anything else after it is the code's own junk, «19»,
+    // «20-», or a count before its unit, «56.10 1 հատ» (reviews 3, 4)
+    `|\\s+\\1\\s?[.,]?\\s?\\2(?:[.,]\\d{1,2})?(?![\\d.,])(?!\\s*${any([u.piece, u.kg])})`,
+    '|\\s+\\d{1,4}(?:[.,]\\d+)?\\s*[xх×*]',
+    `|\\s*${any([u.ml, u.litre, u.gram, u.kg])}(?!\\p{L}))`,
+  ].join('')
+  // «Դաս», «հաս», «աս», and «Դ» misread as its look-alikes «Գ», «Ղ» (review 4) — a letter glued before
+  // the word stays, «րԴաս» (review 3); «Կվաս» is a name
+  const classMark = new RegExp(
+    `(?:(?<=[ԴդհԳգՂղ])|(?<!\\p{L}))(?<!\\d\\s?հ)աս[^\\p{L}\\d]{0,4}(\\d{2})\\s?[.,]?\\s?(\\d{2})${classTail}`,
+    'u',
+  )
+  const lexicon: Lexicon = {
+    swaps: reading.swaps,
+    digitLike: reading.digitLike,
+    digitLikeAt: new RegExp(
+      `[${inClass(Object.keys(reading.digitLike).join(''))}](?=[\\d,.])`,
+      'gu',
+    ),
+    cardTotal: new RegExp(`${word(w.total)}\\s+(\\d[\\d ]*\\.\\d{1,2})\\b`, 'u'),
+    cardTin: new RegExp(`${word(w.tin)}.{0,4}:?\\s*\\S+|:\\s*0\\d{7}`, 'u'),
+    cardNo: new RegExp(`${word(w.fiscal)}\\s+\\S+\\s+(\\d{6,})`, 'u'),
+    tableEnd: new RegExp(any([w.total, w.control, w.fiscalSign]), 'u'),
+    tableTotal: new RegExp(`${word(w.total)}:?\\s+(\\d[\\d ]*[.,]\\d{2})`, 'u'),
+    // the table prints its unit in brackets, in either case: «20կգ(Կգ)», «կԳ(ԿԳ)»
+    tableWeighed: new RegExp(`${word(u.kg)}\\)`, 'iu'),
+    tableTin: new RegExp(`${any([w.tin, ...w.tinMisread])}\\S{0,2}\\s*(\\d{8})`, 'u'),
+    tableNo: new RegExp(`${word(w.fiscal)}\\s*\\S*\\s+(\\d{6,})`, 'u'),
+    tableReceiptNo: new RegExp(`${word(w.receiptNumber)}:?\\s*(\\d[\\d ]{2,})`, 'u'),
+    classTail,
+    classMark,
+    classEnd: new RegExp(any([w.control, w.total]), 'u'),
+    classTotal: new RegExp(`${word(w.total)}:?\\s+(\\d[\\d ]*(?:[.,]\\d{1,2})?)(?![\\d.,])`, 'u'),
+    // a count before its unit: «1հատ», «4 հատ», «0.742 կգ»
+    classUnit: new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*(${word(u.piece)}|${word(u.kg)})`, 'u'),
+    classTin: new RegExp(`${word(w.tin)}\\S{0,2}\\s*(\\d{8})(?!\\d)`, 'u'),
+    classNo: new RegExp(
+      `${word(w.fiscal)}\\S*(?:\\s+\\S*${word(w.fiscalNumber)}\\S*)?\\s+(\\d{6,})`,
+      'u',
+    ),
+    // words of a fiscal head that are no dish: the fiscal mark, the tax number, the cashier, the section,
+    // the address, the till
+    classHead: new RegExp(any([w.fiscal, w.tin, ...w.head]), 'u'),
+    // a kilogram, read as the card's fragment wherever a line is weighed (adversarial А2)
+    kg: new RegExp(word(u.kg), 'u'),
+    kgWhole: new RegExp(`^${word(u.kg)}$`, 'u'),
+    // the terminal's figures: «price x qty unit = sum դրամ»; OCR reads «=» as «-»
+    terminalSum: new RegExp(`[-=—–]\\s*(\\d+(?:[.,]\\d+| \\d{2})?)\\s*${word(w.sumSign)}`, 'u'),
+    terminalUnit: new RegExp(`\\s*${any([u.pieceCut, u.kg])}\\s*$`, 'u'),
+    tillWords: new RegExp(`${any([u.piece, u.kg, ...w.currency])}(?=\\s|$)`, 'gu'),
+    oneLetterUnit: new RegExp(`^${any([u.litre, u.gram])}$`, 'u'),
+    // the letters are ranges of a class, as the card names them
+    letter: new RegExp(`[${w.letters.any}]`, 'u'),
+    capitals: new RegExp(`[${w.letters.capital}]{3}`, 'u'),
+    small: new RegExp(`[${w.letters.small}]`, 'u'),
+    // a row whose first letter is a small one: a name run on from the row above, «նալ», «դե լյուքս»
+    startsSmall: new RegExp(`^[^\\p{L}]*[${w.letters.small}]`, 'u'),
+    // What only an item prints: the class code, a customs heading with its item's name «(3824) ՏՈՖՈՒ», a
+    // till's article «0401/1163909» — six digits and more, the bench's 386 of 394 — a table's heading «Անուն
+    // Քան Գին Գումար». Dog City and KFC print «Բաժին» too, over their items. A phone in the trader's head is
+    // none of them, «(0312) 5-12-34», «0312/51234», wherever it stands and whichever reading lost the section
+    // (adversarial А2, round 2 Б2, review 2 № 10).
+    itemMark: new RegExp(
+      `${classMark.source}|\\(\\d{4}\\)\\s*\\p{L}|(?<!\\d)\\d{4}\\s*/\\s*\\d{6,}|Անուն.{0,20}Քան`,
+      'u',
+    ),
+    // the tax number after its word, anywhere — never the receipt's own number «ԿՀ: 00000049»
+    tinWord: new RegExp(`${word(w.tin)}\\S{0,2}\\s*(\\d{8})(?!\\d)`, 'u'),
+    fiscal: new RegExp(word(w.fiscal), 'iu'),
+    // «ՖԻՍԿԱԼ ՀԱՄԱՐ 04143299», in capitals as often as not
+    fiscalNo: new RegExp(`${word(w.fiscal)}\\S*\\s+\\S*\\s*(\\d{8})(?!\\d)`, 'iu'),
+    sectionTax: new RegExp(any(w.sectionTax), 'u'),
+    totalKept: new RegExp(word(w.totalKept), 'u'),
+    discountKept: new RegExp(word(w.discountKept), 'u'),
+    paid: new RegExp(any(w.paid), 'u'),
+  }
+  lexicons.set(reading, lexicon)
+  return lexicon
+}
+
+function variants(swaps: Readonly<Record<string, string>>, text: string, depth = 2): string[] {
   const out = new Set([text])
   let edge = [text]
   for (let k = 0; k < depth; k++) {
     const next: string[] = []
     for (const value of edge) {
       for (let i = 0; i < value.length; i++) {
-        const swapped = CONFUSED[value.charAt(i)]
+        const swapped = swaps[value.charAt(i)]
         if (swapped === undefined) continue
         const variant = value.slice(0, i) + swapped + value.slice(i + 1)
         if (!out.has(variant)) {
@@ -174,10 +339,11 @@ export const READING_COMBINATIONS_MAX = 300_000
 export const LINE_COMBINATIONS_FLOOR = 10_000
 export const FLOOR_COMBINATIONS_MAX = 200_000
 
-/** What a reading may still try: its own budget, and the floors' beside it. */
+/** What a reading may still try: its own budget, and the floors' beside it — and the swaps it tries. */
 interface Budget {
   left: number
   floors: number
+  readonly swaps: Readonly<Record<string, string>>
 }
 
 // Takes `combinations` from a budget, or says the line is to be taken as read.
@@ -208,10 +374,10 @@ function candidates(
   priceS: string | null,
 ): Candidate[] {
   const out: Candidate[] = []
-  const qtys = variants(qtyS)
-  const paids = [paidS, ...dropGroup(paidS)].map((p0) => ({ p0, all: variants(p0) }))
-  const discs = variants(discS)
-  const prices = priceS === null ? [null] : variants(priceS)
+  const qtys = variants(budget.swaps, qtyS)
+  const paids = [paidS, ...dropGroup(paidS)].map((p0) => ({ p0, all: variants(budget.swaps, p0) }))
+  const discs = variants(budget.swaps, discS)
+  const prices = priceS === null ? [null] : variants(budget.swaps, priceS)
   const combinations =
     qtys.length * paids.reduce((n, p) => n + p.all.length, 0) * discs.length * prices.length
   if (!afford(budget, combinations)) return out
@@ -585,16 +751,6 @@ const NUMBERED = /^\s*\d{1,2}(?!\d)\s*[.,]?\s*\p{L}/u
 // «8506/119112 1Հտ 760,75/89,25 850» — code, quantity, paid/discount, shelf price (old/new).
 const FIGURES =
   /^\s*(\d{1,4})\s*\/\s*([\d.]{5,})\s+(.*?)\s*(\d[\d ]*[.,]\d{1,2})\s*\/\s*(\d[\d ]*(?:[.,]\d{1,2})?)(?:\s+(?:\d[\d ]*\/\s*)?(\d[\d ]*\d|\d))?\s*$/
-// Letters Tesseract puts where this font has digits.
-const DIGIT_LIKE: Readonly<Record<string, string>> = {
-  Յ: '3',
-  З: '3',
-  б: '6',
-  О: '0',
-  O: '0',
-  o: '0',
-}
-
 // A shadow or the paper's edge puts junk at both ends of a row: «=, 0401/1183903 2 732,17,4 370 М».
 // A row that has a code «dddd/ddddd» keeps what lies from the code to its last digit.
 function margins(row: string): string {
@@ -604,8 +760,9 @@ function margins(row: string): string {
   return row.slice(code.index, end + 1)
 }
 
-const digits = (row: string): string =>
-  margins(row).replace(/[ՅЗбОOo](?=[\d,.])/g, (c) => DIGIT_LIKE[c] ?? c)
+// Letters Tesseract puts where this font has digits, put back.
+const digits = (row: string, lx: Lexicon): string =>
+  margins(row).replace(lx.digitLikeAt, (c) => lx.digitLike[c] ?? c)
 
 const WEIGHT = /(\d+[.,]\d+)\s*\S*$/
 
@@ -630,8 +787,8 @@ interface Found {
 // comes out in whole grams — at a cost of two swaps, so a readable weight always wins.
 function byWeight(budget: Budget, paidS: string, priceS: string): Candidate[] {
   const out: Candidate[] = []
-  const paids = variants(paidS)
-  const prices = variants(priceS)
+  const paids = variants(budget.swaps, paidS)
+  const prices = variants(budget.swaps, priceS)
   if (!afford(budget, paids.length * prices.length)) return out
   for (const p of paids) {
     for (const pr of prices) {
@@ -679,7 +836,6 @@ function plainCandidates(budget: Budget, found: Found): Candidate[] {
   return out.filter((x) => Math.round((x.qty * x.price) / 1000) === x.paid)
 }
 
-const TOTAL = /Ընդամենը\s+(\d[\d ]*\.\d{1,2})\b/
 const DATE = /(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/
 
 function dateOf(text: string): { date: string | null; time: string | null } {
@@ -697,9 +853,9 @@ function dateOf(text: string): { date: string | null; time: string | null } {
   return { date: `${year}-${month}-${day}`, time: `${hour}:${minute}` }
 }
 
-function cardReceipt(rows: readonly TextRow[]): Laid {
+function cardReceipt(rows: readonly TextRow[], lx: Lexicon): Laid {
   const text = rows.map((r) => r.text).join('\n')
-  const mapped = rows.map((r) => digits(r.text))
+  const mapped = rows.map((r) => digits(r.text, lx))
   const found: Found[] = []
   let lastFigures = -1
   for (let i = 1; i < mapped.length; i++) {
@@ -754,9 +910,13 @@ function cardReceipt(rows: readonly TextRow[]): Laid {
     }
   }
 
-  const printedTotal = TOTAL.exec(text)
+  const printedTotal = lx.cardTotal.exec(text)
   const total = printedTotal?.[1] === undefined ? null : hundredthsOf(printedTotal[1])
-  const budget: Budget = { left: READING_COMBINATIONS_MAX, floors: FLOOR_COMBINATIONS_MAX }
+  const budget: Budget = {
+    left: READING_COMBINATIONS_MAX,
+    floors: FLOOR_COMBINATIONS_MAX,
+    swaps: lx.swaps,
+  }
   const lists = found.map((f) => {
     if (f.plain !== null) return plainCandidates(budget, f)
     const before = funds(budget)
@@ -765,7 +925,7 @@ function cardReceipt(rows: readonly TextRow[]): Laid {
       ? sliced(budget, f.qtyS, f.paidS, f.discS, f.priceS)
       : out
   })
-  const tin = /(\d{8})\b/.exec(/ՀՎՀՀ.{0,4}:?\s*\S+|:\s*0\d{7}/.exec(text)?.[0] ?? '')?.[1] ?? null
+  const tin = /(\d{8})\b/.exec(lx.cardTin.exec(text)?.[0] ?? '')?.[1] ?? null
   // whether the reading by its own total took a slice (MOL-246): `bestReading` lets no such total vouch
   let tookSlice = false
   const judge = (byTotal: boolean): ReceiptText => {
@@ -796,7 +956,7 @@ function cardReceipt(rows: readonly TextRow[]): Laid {
       layout: 'card',
       tin,
       ...dateOf(text),
-      receiptNo: /Ֆիսկալ\s+\S+\s+(\d{6,})/.exec(text)?.[1] ?? null,
+      receiptNo: lx.cardNo.exec(text)?.[1] ?? null,
       totalHundredths: total,
       readTotalHundredths: total,
       balanced,
@@ -844,24 +1004,27 @@ const TABLE_COMBINATIONS_MAX = 100_000
 // «(3824) ՏՈՖՈՒ ՀՈՂ …» (Dog City). A row runs from one «(dddd)» to the next; the figures are the
 // numbers at the ends of its lines, and how «1 2 200 2 200» splits into qty, price and sum is
 // decided by qty × price = sum. A row whose figures OCR lost takes what the total leaves over.
-function tableLines(rows: readonly TextRow[]): {
+function tableLines(
+  rows: readonly TextRow[],
+  lx: Lexicon,
+): {
   total: number | null
   judge: (byTotal: boolean) => ReceiptTextLine[]
 } {
   const text = rows.map((r) => r.text).join('\n')
   const items: { hs: string; words: string[]; rows: TextRow[] }[] = []
   for (const row of rows) {
-    const mapped = digits(row.text)
+    const mapped = digits(row.text, lx)
     const heading = /\((\d{4})\)\s*(.*)$/.exec(mapped)
     const last = items.at(-1)
     if (heading !== null)
       items.push({ hs: heading[1] ?? '', words: [heading[2] ?? ''], rows: [row] })
-    else if (last !== undefined && !/Ընդամենը|Հսկիչ|\(Ֆ/.test(mapped)) {
+    else if (last !== undefined && !lx.tableEnd.test(mapped)) {
       last.words.push(mapped)
       last.rows.push(row)
     } else if (last !== undefined) break
   }
-  const printedTotal = /Ընդամենը:?\s+(\d[\d ]*[.,]\d{2})/.exec(text)?.[1]
+  const printedTotal = lx.tableTotal.exec(text)?.[1]
   const total = printedTotal === undefined ? null : hundredthsOf(printedTotal)
 
   const options = items.map((item) => {
@@ -905,7 +1068,7 @@ function tableLines(rows: readonly TextRow[]): {
       .replace(/(?:^|\s)\d+(?:[.,]\d+)?(?=\s|$)/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
-    return { item, name, weighed: /[կԿ][գԳ]\)/.test(body), out: out.slice(0, 6) }
+    return { item, name, weighed: lx.tableWeighed.test(body), out: out.slice(0, 6) }
   })
 
   // The receipt's total decides among the readings of rows OCR left short (one row may be blank and
@@ -977,16 +1140,15 @@ function tableReceipt(
   rows: readonly TextRow[],
   total: number | null,
   lines: ReceiptTextLine[],
+  lx: Lexicon,
 ): ReceiptText {
   const text = rows.map((r) => r.text).join('\n')
   return {
     layout: 'table',
-    tin: /(?:ՀՎՀՀ|ՎՎՀՀ|ՀՎՀ)\S{0,2}\s*(\d{8})/.exec(text)?.[1] ?? null,
+    tin: lx.tableTin.exec(text)?.[1] ?? null,
     ...dateOf(text),
     receiptNo:
-      /Ֆիսկալ\s*\S*\s+(\d{6,})/.exec(text)?.[1] ??
-      /ԿՀ:?\s*(\d[\d ]{2,})/.exec(text)?.[1]?.replace(/\s/g, '') ??
-      null,
+      lx.tableNo.exec(text)?.[1] ?? lx.tableReceiptNo.exec(text)?.[1]?.replace(/\s/g, '') ?? null,
     totalHundredths: total,
     readTotalHundredths: total,
     // the prototype's table reading never said whether its lines met the total
@@ -1003,41 +1165,13 @@ function tableReceipt(
 // article. So the code is a boundary rather than a layout: a row of figures is an item, its code
 // the last one above it, and its name on the side the receipt's coded items put it.
 
-// What OCR keeps of «Դաս» — «Դաս.», «աս,», «հաս ‘» — and the class after it: «56.10», «56 10», «5610».
-// «աս» is the word «Դաս»: «Դ», «դ» or «հ» before it, or no letter — never inside a name, «Կվաս». And the
-// class is no figure that goes on (reviews 1, 2): not an amount after it — «1 հաս 1300 1300», «Բաքեթ
-// 5610 5610», «5610 00х10», «5610.00x1.0» — nor a unit of volume or weight, glued or apart, «1000 մլ».
-// Letters right after it are the article's, «56.10Ն/Կ 745030»: OCR eats the comma and the space.
-const CLASS_TAIL = [
-  '(?!\\d',
-  // a price's decimals, «5610.00x» — an article glued with its comma, «56.10,745030», is no price (review 3)
-  '|[.,]\\d{1,2}(?!\\d)',
-  '|\\s*[xх×*]',
-  // the same figure again — a price and its sum, «1 հաս 1300 1300», «Բաքեթ 5610 5610» — or a figure
-  // before «x»: the «class» was the line's price. Anything else after it is the code's own junk, «19»,
-  // «20-», or a count before its unit, «56.10 1 հատ» (reviews 3, 4)
-  '|\\s+\\1\\s?[.,]?\\s?\\2(?:[.,]\\d{1,2})?(?![\\d.,])(?!\\s*(?:հ\\S?տ|կգ))',
-  '|\\s+\\d{1,4}(?:[.,]\\d+)?\\s*[xх×*]',
-  '|\\s*(?:մլ|լ|գ|կգ)(?!\\p{L}))',
-].join('')
-// «Դաս», «հաս», «աս», and «Դ» misread as its look-alikes «Գ», «Ղ» (review 4) — a letter glued before
-// the word stays, «րԴաս» (review 3); «Կվաս» is a name
-export const CLASS_MARK = new RegExp(
-  `(?:(?<=[ԴդհԳգՂղ])|(?<!\\p{L}))(?<!\\d\\s?հ)աս[^\\p{L}\\d]{0,4}(\\d{2})\\s?[.,]?\\s?(\\d{2})${CLASS_TAIL}`,
-  'u',
-)
 // The till's article after the class: «Ն/Կ 745030», read «ՆԿ», «ԽԿ» — after a digit or two of the code's
 // own junk too where its mark is read, «56.10 19 Ն/Կ 745030» (review 5, № 15).
 const CLASS_ARTICLE =
   /^(?:[^\d]{0,8}?|[^\d]{0,3}\d{1,2}[^\d]{0,3}(?:Ն\/?Կ|ՆԿ|Խ\/?Կ{1,2})[^\d]{0,3})(\d{5,7})(?!\d)/u
 // The article's mark is no word of a name: «Դաս. 56.10, Ն/Կ 1հատ …» with its digits lost (№ 15).
 const ARTICLE_MARK = /^(?:Ն\/?Կ|ՆԿ|Խ\/?Կ{1,2})$/u
-const CLASS_END = /Հսկիչ|Ընդամենը/
-const CLASS_TOTAL = /Ընդամենը:?\s+(\d[\d ]*(?:[.,]\d{1,2})?)(?![\d.,])/
-// A count before its unit: «1հատ», «4 հատ», «0.742 կգ».
-const CLASS_UNIT = /(\d+(?:[.,]\d+)?)\s*(հ\S?տ|կգ)/u
-// The terminal's figures: «price x qty unit = sum դրամ»; OCR reads «=» as «-», «x» as «х» or «:».
-const TERMINAL_SUM = /[-=—–]\s*(\d+(?:[.,]\d+| \d{2})?)\s*դր/u
+// The terminal's figures: «price x qty unit = sum դրամ»; OCR reads «x» as «х» or «:».
 const TERMINAL_TIMES = /(\d+(?:[.,]\d+| \d{2})?)\s*[xх×*:]\s*(\d+(?:[.,]\d+| \d)?)\s*(\S*)\s*$/u
 
 interface ClassFigures {
@@ -1051,8 +1185,6 @@ interface ClassFigures {
   readonly words: string
 }
 
-const ARMENIAN = /[Ա-և]/u
-
 // «688 09» is 688.09 whose point OCR read as a space.
 const pointed = (text: string): string => text.replace(/^(\d+) (\d{1,2})$/, '$1.$2')
 
@@ -1065,9 +1197,9 @@ function unpointed(text: string, places: number): string[] {
 
 // The words of a name on a row: a number before a word stays — a count «16 Թև», a volume «1000 մլ» —
 // figures and units of the till go.
-function wordsOf(text: string): string {
+function wordsOf(text: string, lx: Lexicon): string {
   const tokens = text
-    .replace(/(?:հ\S?տ|կգ|դրամ|դրա)(?=\s|$)/gu, ' ')
+    .replace(lx.tillWords, ' ')
     .split(/\s+/)
     .map((w) => w.replace(/^[^\p{L}\d]+|[^\p{L}\d]+$/gu, ''))
     .filter((w) => !ARTICLE_MARK.test(w))
@@ -1077,38 +1209,38 @@ function wordsOf(text: string): string {
       // a number before a word of two letters, or before «լ», «գ»: not before a smudge, «2 Ա» (review 3)
       (/^\d{1,4}(?:[.,]\d+)?$/.test(w) &&
         ((tokens[i + 1]?.match(/\p{L}/gu) ?? []).length >= 2 ||
-          /^[լգ]$/u.test(tokens[i + 1] ?? ''))) ||
-      (/^[լգ]$/u.test(w) && /^\d/.test(tokens[i - 1] ?? '')),
+          lx.oneLetterUnit.test(tokens[i + 1] ?? ''))) ||
+      (lx.oneLetterUnit.test(w) && /^\d/.test(tokens[i - 1] ?? '')),
   )
   return kept.join(' ')
 }
 
-// OCR reads smudges as Latin or Cyrillic («Ստրիպս Thuin ‘Al»): in a name with Armenian words, a word
-// with no Armenian letter is dropped.
-const nameOf = (parts: readonly string[]): string => {
+// OCR reads smudges as Latin or Cyrillic («Ստրիպս Thuin ‘Al»): in a name with words of the country's
+// letters, a word with none of them is dropped.
+const nameOf = (parts: readonly string[], lx: Lexicon): string => {
   const words = parts
     .join(' ')
     .split(' ')
     .filter((w) => w !== '')
-  const armenian = words.filter((w) => !/\p{L}/u.test(w) || ARMENIAN.test(w))
-  return (armenian.some((w) => ARMENIAN.test(w)) ? armenian : words).join(' ')
+  const armenian = words.filter((w) => !/\p{L}/u.test(w) || lx.letter.test(w))
+  return (armenian.some((w) => lx.letter.test(w)) ? armenian : words).join(' ')
 }
 
-function classFigures(row: string): ClassFigures | null {
-  const sum = TERMINAL_SUM.exec(row)
+function classFigures(row: string, lx: Lexicon): ClassFigures | null {
+  const sum = lx.terminalSum.exec(row)
   if (sum?.[1] !== undefined) {
-    const left = row.slice(0, sum.index).replace(/\s*(?:հ\S{1,2}|կգ)\s*$/u, '')
+    const left = row.slice(0, sum.index).replace(lx.terminalUnit, '')
     const times = TERMINAL_TIMES.exec(left)
     return {
       qtyS: times?.[2] === undefined ? null : pointed(times[2]),
       priceS: times?.[1] === undefined ? null : pointed(times[1]),
       sumS: pointed(sum[1]),
-      weighed: row.slice(0, sum.index).includes('կգ'),
+      weighed: lx.kg.test(row.slice(0, sum.index)),
       terminal: true,
-      words: wordsOf(row.slice(0, times?.index ?? sum.index)),
+      words: wordsOf(row.slice(0, times?.index ?? sum.index), lx),
     }
   }
-  const unit = CLASS_UNIT.exec(row)
+  const unit = lx.classUnit.exec(row)
   const tail = unit === null ? row : row.slice(unit.index + unit[0].length)
   const numbers = tail.match(/(?<![\p{L}\d])\d+(?:[.,]\d+)?(?![\p{L}\d])/gu) ?? []
   // with no unit read, a row of figures is one that ends in two amounts: «624.44 624.41»
@@ -1119,9 +1251,9 @@ function classFigures(row: string): ClassFigures | null {
     qtyS: unit?.[1] ?? null,
     priceS: numbers.length > 1 ? (numbers.at(-2) ?? null) : null,
     sumS,
-    weighed: unit?.[2] === 'կգ',
+    weighed: unit?.[2] !== undefined && lx.kgWhole.test(unit[2]),
     terminal: false,
-    words: wordsOf(unit === null ? row.replace(/[\d\s.,]+$/, '') : row.slice(0, unit.index)),
+    words: wordsOf(unit === null ? row.replace(/[\d\s.,]+$/, '') : row.slice(0, unit.index), lx),
   }
 }
 
@@ -1178,10 +1310,6 @@ function classCandidates(budget: Budget, f: ClassFigures, guessed: Set<Candidate
 
 // How far above the first code the figures of an item whose code row OCR lost are looked for.
 const CLASS_LOOKBACK = 3
-// A row whose first letter is a small one: a name run on from the row above, «նալ», «դե լյուքս».
-const startsSmall = (row: string): boolean => /^[^\p{L}]*[ա-ֆ]/u.test(row)
-// Words of a fiscal head that are no dish: the cashier, the section, the fiscal mark, the address.
-const CLASS_HEAD_WORDS = /Գանձապահ|Բաժին|Ֆիսկալ|Հասցե|ՀՎՀՀ|ՀԴՄ/u
 
 interface ClassAnchor {
   readonly hs: string
@@ -1190,28 +1318,31 @@ interface ClassAnchor {
 }
 
 /** The rows as the class reading reads them, how it finds a code, and where its list begins. */
-function classList(rows: readonly TextRow[]): {
+function classList(
+  rows: readonly TextRow[],
+  lx: Lexicon,
+): {
   mapped: string[]
   anchorOf: (row: string) => ClassAnchor | null
   start: number
 } {
-  const mapped = rows.map((r) => r.text.replace(/[ՅЗбОOo](?=[\d,.])/g, (c) => DIGIT_LIKE[c] ?? c))
+  const mapped = rows.map((r) => r.text.replace(lx.digitLikeAt, (c) => lx.digitLike[c] ?? c))
   // a class of services read with its point anywhere on the receipt is the receipt's: «5610» and
   // «56 10» on the other rows are it, and so is a row whose «Դաս» OCR lost
   const services = new Set(
     mapped.flatMap((row) => {
-      const mark = CLASS_MARK.exec(row)
+      const mark = lx.classMark.exec(row)
       return mark !== null && /\d{2}[.,]\d{2}/.test(mark[0])
         ? [`${mark[1] ?? ''}${mark[2] ?? ''}`]
         : []
     }),
   )
   const anchorOf = (row: string): ClassAnchor | null => {
-    let mark: RegExpExecArray | null = CLASS_MARK.exec(row)
+    let mark: RegExpExecArray | null = lx.classMark.exec(row)
     if (mark === null) {
       for (const service of services) {
         const loose = new RegExp(
-          `^[^\\d]{0,12}?(${service.slice(0, 2)})\\s?[.,]?\\s?(${service.slice(2)})${CLASS_TAIL}`,
+          `^[^\\d]{0,12}?(${service.slice(0, 2)})\\s?[.,]?\\s?(${service.slice(2)})${lx.classTail}`,
           'u',
         ).exec(row)
         // with no «Դաս» the class is the code only where what follows is a code's (review 5, 6): nothing,
@@ -1219,7 +1350,7 @@ function classList(rows: readonly TextRow[]): {
         // mark too, «ամ. 56.10 19 Ն/Կ 745030» — or a line's figures whose own arithmetic holds as read,
         // «ամ. 56.10 1հատ 688.09 688.09». A price that begins with the class is none of them, whatever
         // OCR made of the rest — «5610 5640», «5610:1.0», «5610 00:1.0», «5610 11220»
-        if (loose !== null && looseCode(row.slice(loose.index + loose[0].length))) mark = loose
+        if (loose !== null && looseCode(row.slice(loose.index + loose[0].length), lx)) mark = loose
       }
     }
     if (mark === null) return null
@@ -1241,18 +1372,18 @@ function classList(rows: readonly TextRow[]): {
     .slice(Math.max(start, 0))
     .some(
       (row) =>
-        /[Ա-Ֆ]{3}/u.test(row) &&
-        !/[ա-ֆ]/u.test(row) &&
+        lx.capitals.test(row) &&
+        !lx.small.test(row) &&
         !/\d/.test(row) &&
-        !CLASS_END.test(row) &&
-        !CLASS_HEAD_WORDS.test(row),
+        !lx.classEnd.test(row) &&
+        !lx.classHead.test(row),
     )
   for (let i = start - 1, seen = 0; start > 0 && i >= 0 && seen < CLASS_LOOKBACK; i--) {
     const row = mapped[i] ?? ''
     if (row.trim() === '') continue
     seen += 1
-    const figures = classFigures(row)
-    if (figures !== null && (figures.terminal || CLASS_UNIT.test(row))) {
+    const figures = classFigures(row, lx)
+    if (figures !== null && (figures.terminal || lx.classUnit.test(row))) {
       start = i
       // the terminal prints the name over its figures: the name rows right above them are the item's,
       // or the dish is left nameless and its name is read as the head (review 2, Б1) — up to three rows
@@ -1266,11 +1397,11 @@ function classList(rows: readonly TextRow[]): {
         const above = mapped[j] ?? ''
         if (above.trim() === '') continue
         if (
-          wordsOf(above) === '' ||
+          wordsOf(above, lx) === '' ||
           /\d/.test(above.replace(/^\s*\d{1,3}\s+(?=\p{L})/u, '')) ||
-          (!capitals && /[Ա-Ֆ]{3}/u.test(above)) ||
-          CLASS_HEAD_WORDS.test(above) ||
-          (below !== null && !startsSmall(above) && !startsSmall(below))
+          (!capitals && lx.capitals.test(above)) ||
+          lx.classHead.test(above) ||
+          (below !== null && !lx.startsSmall.test(above) && !lx.startsSmall.test(below))
         ) {
           break
         }
@@ -1285,28 +1416,28 @@ function classList(rows: readonly TextRow[]): {
 }
 
 // What may follow a class read with no «Դաս» for it to be the code (see `classList`).
-function looseCode(rest: string): boolean {
+function looseCode(rest: string, lx: Lexicon): boolean {
   if (!/\d/.test(rest) || /^[^\d]*\d{1,2}(?!\d)[^\d]*$/.test(rest)) return true
   const article = CLASS_ARTICLE.exec(rest)
   if (article?.[1] !== undefined && /[,\p{L}]/u.test(rest.slice(0, rest.indexOf(article[1]))))
     return true
-  const figures = classFigures(rest)
-  if (figures?.priceS == null || !(figures.terminal || CLASS_UNIT.test(rest))) {
+  const figures = classFigures(rest, lx)
+  if (figures?.priceS == null || !(figures.terminal || lx.classUnit.test(rest))) {
     return false
   }
-  const budget: Budget = { left: LINE_COMBINATIONS_FLOOR, floors: 0 }
+  const budget: Budget = { left: LINE_COMBINATIONS_FLOOR, floors: 0, swaps: lx.swaps }
   return classCandidates(budget, figures, new Set()).some((x) => x.swaps === 0)
 }
 
 /** Where a fiscal till's list of items begins: its first class code, or -1 (MOL-226). */
-export function classListStart(rows: readonly TextRow[]): number {
-  return classList(rows).start
+export function classListStart(reading: PhotoReading, rows: readonly TextRow[]): number {
+  return classList(rows, lexiconOf(reading)).start
 }
 
-function classReceipt(rows: readonly TextRow[]): Laid {
+function classReceipt(rows: readonly TextRow[], lx: Lexicon): Laid {
   const text = rows.map((r) => r.text).join('\n')
-  const { mapped, anchorOf, start: first } = classList(rows)
-  const end = first < 0 ? -1 : mapped.findIndex((row, i) => i > first && CLASS_END.test(row))
+  const { mapped, anchorOf, start: first } = classList(rows, lx)
+  const end = first < 0 ? -1 : mapped.findIndex((row, i) => i > first && lx.classEnd.test(row))
   const list = first < 0 ? [] : mapped.slice(first, end < 0 ? undefined : end)
   type Kind =
     | { kind: 'anchor'; hs: string; sku: string | null; figures: ClassFigures | null }
@@ -1315,10 +1446,11 @@ function classReceipt(rows: readonly TextRow[]): Laid {
     | { kind: 'other' }
   const kinds = list.map((row): Kind => {
     const anchor = anchorOf(row)
-    if (anchor !== null) return { kind: 'anchor', ...anchor, figures: classFigures(anchor.rest) }
-    const figures = classFigures(row)
+    if (anchor !== null)
+      return { kind: 'anchor', ...anchor, figures: classFigures(anchor.rest, lx) }
+    const figures = classFigures(row, lx)
     if (figures !== null) return { kind: 'figures', figures }
-    const words = wordsOf(row)
+    const words = wordsOf(row, lx)
     // an article or a code is no name: «Ан Ц 56. յ wit 70211»
     return words !== '' && !/\d{5}/.test(row) ? { kind: 'name', words } : { kind: 'other' }
   })
@@ -1361,7 +1493,7 @@ function classReceipt(rows: readonly TextRow[]): Laid {
   ).length
   const nameAbove = above * 2 > items.filter((item) => item.anchored !== null).length
   const names = items.map((item, i) => {
-    const own = ARMENIAN.test(item.figures.words) ? [item.figures.words] : []
+    const own = lx.letter.test(item.figures.words) ? [item.figures.words] : []
     if (nameAbove) {
       const from = item.anchored ?? items[i - 1]?.at ?? -1
       return [...namesBetween(from + 1, item.at), ...own]
@@ -1375,9 +1507,13 @@ function classReceipt(rows: readonly TextRow[]): Laid {
     return [...own, ...below]
   })
 
-  const printedTotal = CLASS_TOTAL.exec(text)?.[1]
+  const printedTotal = lx.classTotal.exec(text)?.[1]
   const total = printedTotal === undefined ? null : hundredthsOf(printedTotal)
-  const budget: Budget = { left: READING_COMBINATIONS_MAX, floors: FLOOR_COMBINATIONS_MAX }
+  const budget: Budget = {
+    left: READING_COMBINATIONS_MAX,
+    floors: FLOOR_COMBINATIONS_MAX,
+    swaps: lx.swaps,
+  }
   const guessed = new Set<Candidate>()
   const lists = items.map((item) => classCandidates(budget, item.figures, guessed))
   // whether the reading by its own total took a slice (MOL-246): `bestReading` lets no such total vouch
@@ -1394,7 +1530,7 @@ function classReceipt(rows: readonly TextRow[]): Laid {
       const f = item.figures
       const sumAsRead = f.terminal ? (unpointed(f.sumS, 2)[0] ?? f.sumS) : f.sumS
       return {
-        printed: nameOf(names[i] ?? []),
+        printed: nameOf(names[i] ?? [], lx),
         hs: item.hs ?? lostHs,
         sku: item.sku,
         quantityMilli: finite(pick?.qty ?? (f.qtyS === null ? 1000 : milliOf(f.qtyS))),
@@ -1408,9 +1544,9 @@ function classReceipt(rows: readonly TextRow[]): Laid {
     })
     return {
       layout: 'class',
-      tin: /ՀՎՀՀ\S{0,2}\s*(\d{8})(?!\d)/.exec(text)?.[1] ?? null,
+      tin: lx.classTin.exec(text)?.[1] ?? null,
       ...dateOf(text),
-      receiptNo: /Ֆիսկալ\S*(?:\s+\S*համար\S*)?\s+(\d{6,})/.exec(text)?.[1] ?? null,
+      receiptNo: lx.classNo.exec(text)?.[1] ?? null,
       totalHundredths: total,
       readTotalHundredths: total,
       balanced,
@@ -1436,32 +1572,17 @@ function classReceipt(rows: readonly TextRow[]): Laid {
 
 // «Բաժին 1», as OCR reads it: «Ււսժին 1]», «Բայժին 11» — the section and its number.
 const DEPARTMENT = /(?:Բա|Բայ|Ււս)ժին\s*\d/u
-// What only an item prints: the class code, a customs heading with its item's name «(3824) ՏՈՖՈՒ», a
-// till's article «0401/1163909» — six digits and more, the bench's 386 of 394 — a table's heading «Անուն Քան
-// Գին Գումար». Dog City and KFC print «Բաժին» too, over their items. A phone in the trader's head is none of
-// them, «(0312) 5-12-34», «0312/51234», wherever it stands and whichever reading lost the section
-// (adversarial А2, round 2 Б2, review 2 № 10).
-const ITEM_MARK = new RegExp(
-  `${CLASS_MARK.source}|\\(\\d{4}\\)\\s*\\p{L}|(?<!\\d)\\d{4}\\s*/\\s*\\d{6,}|Անուն.{0,20}Քան`,
-  'u',
-)
 // The tax number: after its word first, anywhere; else before the till's registration number on the same
 // row, however OCR read the word, «CUCC: 57311783 9/С: 31028805» — never the receipt's own number
 // «ԿՀ: 00000049» on the row above it (review 1, № 1).
-const DEPARTMENT_TIN_WORD = /ՀՎՀՀ\S{0,2}\s*(\d{8})(?!\d)/u
 const DEPARTMENT_TIN_TILL = /(?<!\d)(\d{8})\s+\S{1,3}\/\S{1,3}:?\s*\d{6,}/u
 const DEPARTMENT_DATE = /(?<!\d)(\d{2})[-.]\s?(\d{2})[-.]\s?(\d{2})\s+(\d{2}):(\d{2})/g
 // the same, to ask of one row (`test` of a global pattern carries its place from row to row)
 const DEPARTMENT_MOMENT = new RegExp(DEPARTMENT_DATE.source)
-// «ՖԻՍԿԱԼ ՀԱՄԱՐ 04143299», in capitals as often as not.
-const DEPARTMENT_FISCAL = /Ֆիսկալ\S*\s+\S*\s*(\d{8})(?!\d)/iu
-const SECTION_TAX = /Շրջ|հար[կլ]/u
-// The total's word as OCR reads it, «Ընդամենը», «/չդամենը», «Կղդամեկը» — and not its discount,
-// «Ընդամենը զեղչ»; and the payment's, in cash or by card. The words of any Armenian till.
-const TOTAL_WORD = 'դամե'
-const PAID_WORDS = /ձեռն|ձեոն|ձեդն|Կանխիկ|Անկանխ|Վճար/u
-// the discount however OCR spells its first letter — «զեղչ», «Զեղչ», «qեղչ» — as loosely as the total's word
-const totalRow = (text: string): boolean => text.includes(TOTAL_WORD) && !text.includes('եղչ')
+// The total's row as OCR reads its word, «Ընդամենը», «/չդամենը», «Կղդամեկը» — and not its discount,
+// «Ընդամենը զեղչ», however OCR spells the discount's first letter.
+const totalRow = (text: string, lx: Lexicon): boolean =>
+  lx.totalKept.test(text) && !lx.discountKept.test(text)
 // An amount with its hundredths: «1700.00», «1800 00», and with its thousands apart before a point,
 // «2 050,01» — the card's payment, which read digit by digit was 50,01 in two places at once (MOL-244). A
 // figure that lost its point is no vote.
@@ -1477,7 +1598,11 @@ const amountsOf = (text: string): number[] =>
  * The amounts of a reading by where they stand: the total, the payment and, on a receipt with no items,
  * the section's sum — each a place of its own on the paper, read on its own by OCR.
  */
-function placedAmounts(rows: readonly TextRow[], withSection: boolean): Map<string, Set<number>> {
+function placedAmounts(
+  rows: readonly TextRow[],
+  withSection: boolean,
+  lx: Lexicon,
+): Map<string, Set<number>> {
   const texts = rows.map((r) => r.text).filter((t) => t.trim() !== '')
   const found = new Map<string, Set<number>>([
     ['section', new Set()],
@@ -1496,12 +1621,12 @@ function placedAmounts(rows: readonly TextRow[], withSection: boolean): Map<stri
       add('section', amountsOf(text))
       // the turnover tax under it carries the section's sum
       for (const [k, next] of texts.slice(i + 1, i + 3).entries()) {
-        if (!SECTION_TAX.test(next)) continue
+        if (!lx.sectionTax.test(next)) continue
         add('section', amountsOf(next))
         taken.add(i + 1 + k)
       }
-    } else if (totalRow(text)) add('total', amountsOf(text))
-    else if (PAID_WORDS.test(text)) add('paid', amountsOf(text))
+    } else if (totalRow(text, lx)) add('total', amountsOf(text))
+    else if (lx.paid.test(text)) add('paid', amountsOf(text))
   })
   return found
 }
@@ -1515,10 +1640,11 @@ function placedAmounts(rows: readonly TextRow[], withSection: boolean): Map<stri
 function votedTotal(
   readings: readonly (readonly TextRow[])[],
   withSection: boolean,
+  lx: Lexicon,
 ): number | null {
   const votes = new Map<number, Set<string>>()
   for (const rows of readings) {
-    for (const [source, amounts] of placedAmounts(rows, withSection)) {
+    for (const [source, amounts] of placedAmounts(rows, withSection, lx)) {
       for (const amount of amounts) votes.set(amount, (votes.get(amount) ?? new Set()).add(source))
     }
   }
@@ -1553,9 +1679,13 @@ function agreed<T>(values: readonly (T | null)[]): T | null {
  * is worse than none, which the person sees and types (Р-3). A field the two readings read apart is
  * not read.
  */
-export function departmentReceipt(readings: readonly (readonly TextRow[])[]): ReceiptText | null {
+export function departmentReceipt(
+  reading: PhotoReading,
+  readings: readonly (readonly TextRow[])[],
+): ReceiptText | null {
+  const lx = lexiconOf(reading)
   if (!readings.some((rows) => rows.some((row) => DEPARTMENT.test(row.text)))) return null
-  if (readings.some((rows) => rows.some((row) => ITEM_MARK.test(row.text)))) return null
+  if (readings.some((rows) => rows.some((row) => lx.itemMark.test(row.text)))) return null
   const texts = readings.map(rowTexts)
   const moments = texts.map((rows) => [
     ...new Map(
@@ -1577,7 +1707,7 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
   // upper (round 2, Б1).
   const repeated = (rows: readonly string[], test: (text: string) => boolean): boolean =>
     rows.filter(test).length > 1
-  const fiscal = (text: string): boolean => /Ֆիսկալ/iu.test(text)
+  const fiscal = (text: string): boolean => lx.fiscal.test(text)
   const headUnder = (rows: readonly string[]): boolean => {
     const end = rows.findIndex(fiscal)
     return (
@@ -1586,9 +1716,7 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
         .slice(end + 1)
         .some(
           (text) =>
-            DEPARTMENT_MOMENT.test(text) ||
-            DEPARTMENT_TIN_WORD.test(text) ||
-            DEPARTMENT_TIN_TILL.test(text),
+            DEPARTMENT_MOMENT.test(text) || lx.tinWord.test(text) || DEPARTMENT_TIN_TILL.test(text),
         )
     )
   }
@@ -1596,7 +1724,7 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
     (rows, i) =>
       (moments[i]?.length ?? 0) > 1 ||
       repeated(rows, fiscal) ||
-      repeated(rows, totalRow) ||
+      repeated(rows, (text) => totalRow(text, lx)) ||
       headUnder(rows),
   )
   // a day or a time no calendar or clock has is no reading of it, and outvotes nothing (adversarial А3)
@@ -1607,7 +1735,7 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
   // the tax number of every head a reading holds, row by row
   const tins = texts.map((rows) =>
     rows.flatMap((text) => {
-      const found = DEPARTMENT_TIN_WORD.exec(text)?.[1] ?? DEPARTMENT_TIN_TILL.exec(text)?.[1]
+      const found = lx.tinWord.exec(text)?.[1] ?? DEPARTMENT_TIN_TILL.exec(text)?.[1]
       return found === undefined ? [] : [found]
     }),
   )
@@ -1619,11 +1747,7 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
     ? tins.some((found) => found.length > 1) && new Set(tins.flat()).size === 1
       ? (tins.flat()[0] ?? null)
       : null
-    : agreed(
-        texts.map(
-          (rows) => firstOf(rows, DEPARTMENT_TIN_WORD) ?? firstOf(rows, DEPARTMENT_TIN_TILL),
-        ),
-      )
+    : agreed(texts.map((rows) => firstOf(rows, lx.tinWord) ?? firstOf(rows, DEPARTMENT_TIN_TILL)))
   return {
     layout: 'department',
     tin,
@@ -1639,10 +1763,10 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
           texts.map((rows) => {
             const end = rows.findIndex(fiscal)
             const moment = rows.findIndex((text) => DEPARTMENT_MOMENT.test(text))
-            return moment >= 0 && moment < end ? firstOf(rows, DEPARTMENT_FISCAL) : null
+            return moment >= 0 && moment < end ? firstOf(rows, lx.fiscalNo) : null
           }),
         ),
-    totalHundredths: several ? null : votedTotal(readings, true),
+    totalHundredths: several ? null : votedTotal(readings, true, lx),
     readTotalHundredths: null,
     balanced: false,
     lines: [],
@@ -1650,8 +1774,9 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
 }
 
 /** One reading of a receipt — the rows of its parts, joined — into lines with figures. */
-export function parseReceiptText(rows: readonly TextRow[]): ReceiptText {
-  return withTwins(readingOf(rows).read)
+export function parseReceiptText(reading: PhotoReading, rows: readonly TextRow[]): ReceiptText {
+  const lx = lexiconOf(reading)
+  return withTwins(readingOf(rows, lx).read, lx)
 }
 
 /**
@@ -1660,7 +1785,7 @@ export function parseReceiptText(rows: readonly TextRow[]): ReceiptText {
  * the reading is chosen, never in the choice: it says nothing of how well a reading read (am-13 on the
  * bench lost four right lines to a reading chosen so).
  */
-function withTwins(read: ReceiptText): ReceiptText {
+function withTwins(read: ReceiptText, lx: Lexicon): ReceiptText {
   // only across a seam: in one photo an item has nowhere to be read twice, and two flavours of one
   // price numbered …5 and …6 are two items read right (review Р28)
   const parts = (line: ReceiptTextLine) => new Set(line.rows.map((row) => row.part))
@@ -1676,7 +1801,7 @@ function withTwins(read: ReceiptText): ReceiptText {
         line.sku !== null &&
         other.sku !== null &&
         line.sku !== other.sku &&
-        near(line.sku, other.sku) &&
+        near(line.sku, other.sku, lx.swaps) &&
         line.sumHundredths !== null &&
         other.sumHundredths === line.sumHundredths,
     )
@@ -1699,25 +1824,25 @@ interface Laid {
   readonly sliced: boolean
 }
 
-function readingOf(rows: readonly TextRow[]): Laid {
-  const card = cardReceipt(rows)
+function readingOf(rows: readonly TextRow[], lx: Lexicon): Laid {
+  const card = cardReceipt(rows, lx)
   const text = rows.map((r) => r.text).join('\n')
   let laid = card
   // a customs heading names its item after it, «(3824) ՏՈՖՈՒՀՈՂ»; «(0312) 5-12-34» is a phone in the head,
   // and read as Dog City's table it made one «line» of the whole head (MOL-227, adversarial А2)
   if (/\(\d{4}\)\s*\p{L}/u.test(text)) {
-    const table = tableLines(rows)
+    const table = tableLines(rows, lx)
     const lines = table.judge(true)
     if (lines.length > card.read.lines.length) {
       laid = {
-        read: tableReceipt(rows, table.total, lines),
-        asPrinted: () => tableReceipt(rows, table.total, table.judge(false)),
+        read: tableReceipt(rows, table.total, lines, lx),
+        asPrinted: () => tableReceipt(rows, table.total, table.judge(false), lx),
         sliced: false,
       }
     }
   }
   // the class code reads a till neither layout knows; where one of them reads, it keeps the receipt
-  const coded = classReceipt(rows)
+  const coded = classReceipt(rows, lx)
   return coded.read.lines.length > laid.read.lines.length ? coded : laid
 }
 
@@ -1735,15 +1860,15 @@ export function rowsOf(text: string, part: number): TextRow[] {
 // No seam — an overlap of a name row only — joins the parts, dropping the rows both of them hold.
 const ARTICLE = /\d{4}\s*\/\s*(\d{5,})/
 
-/** Two figures one digit OCR confuses apart (5↔6, 1↔4, 3↔8, 0↔9) — not the same figure. */
-export function ocrSwapApart(a: string, b: string): boolean {
-  return a !== b && near(a, b)
+/** Two figures one digit OCR confuses apart (5↔6, 1↔4, 3↔8, 0↔9 in Armenia) — not the same figure. */
+export function ocrSwapApart(reading: PhotoReading, a: string, b: string): boolean {
+  return a !== b && near(a, b, reading.swaps)
 }
 
 // One digit off the way OCR misreads this font (5 for 6, 1 for 4, 3 for 8, 0 for 9) — not any
 // digit: a till numbers one maker's line in a row, and 1160033 and 1160036 are two flavours of one
 // yoghurt, not one article read twice (review Р23).
-function near(a: string, b: string): boolean {
+function near(a: string, b: string, swaps: Readonly<Record<string, string>>): boolean {
   if (a.length !== b.length) return false
   let off = -1
   for (let i = 0; i < a.length; i++) {
@@ -1751,7 +1876,7 @@ function near(a: string, b: string): boolean {
     if (off >= 0) return false
     off = i
   }
-  return off < 0 || CONFUSED[a.charAt(off)] === b.charAt(off)
+  return off < 0 || swaps[a.charAt(off)] === b.charAt(off)
 }
 const articleOf = (row: TextRow): string => ARTICLE.exec(row.text)?.[1] ?? ''
 
@@ -1811,10 +1936,10 @@ function sameRow(a: string, b: string): boolean {
 }
 
 // Two articles one could be the other misread: two digits off at most, each by a swap OCR makes.
-function misread(a: string, b: string): boolean {
+function misread(a: string, b: string, swaps: Readonly<Record<string, string>>): boolean {
   if (a.length !== b.length) return false
   const off = Array.from(a).flatMap((c, i) => (c === b.charAt(i) ? [] : [[c, b.charAt(i)]]))
-  return off.length <= 2 && off.every(([x, y]) => CONFUSED[x ?? ''] === y)
+  return off.length <= 2 && off.every(([x, y]) => swaps[x ?? ''] === y)
 }
 
 // The name above an article, as one row and as two — OCR splits a long one (review Р21), and its upper
@@ -1860,11 +1985,13 @@ function articleSeam(
   rows: readonly TextRow[],
   next: readonly TextRow[],
   exactOnly: boolean,
+  swaps: Readonly<Record<string, string>>,
 ): Seam | null {
   const mine = articlesOf(rows)
   const theirs = articlesOf(next)
   const twin = (a: Article, b: Article) =>
-    a.article === b.article || (near(a.article, b.article) && namesAgree(rows, a.at, next, b.at))
+    a.article === b.article ||
+    (near(a.article, b.article, swaps) && namesAgree(rows, a.at, next, b.at))
   for (let i = mine.length - 1; i >= 0; i--) {
     const a = mine[i]
     if (a === undefined) continue
@@ -1885,7 +2012,11 @@ function articleSeam(
  * row in order (`sameRow`), the longest alignment that starts near the next part's top: the next part
  * goes on after the last row aligned, and the first part keeps its own reading of the overlap.
  */
-function alignedSeam(rows: readonly TextRow[], next: readonly TextRow[]): number | null {
+function alignedSeam(
+  rows: readonly TextRow[],
+  next: readonly TextRow[],
+  swaps: Readonly<Record<string, string>>,
+): number | null {
   const tail = rows.flatMap((row, at) => (row.text.trim() === '' ? [] : [at])).slice(-OVERLAP_ROWS)
   const head = next
     .flatMap((row, at) => (row.text.trim() === '' ? [] : [at]))
@@ -1913,7 +2044,7 @@ function alignedSeam(rows: readonly TextRow[], next: readonly TextRow[]): number
         a !== undefined &&
         b !== undefined &&
         a !== b &&
-        misread(a, b) &&
+        misread(a, b, swaps) &&
         (namesAgree(rows, tail[i] ?? 0, next, head[j] ?? 0) || placed(i, j))
       const unarticled = mineText(i).replace(ARTICLE, '')
       const theirs = theirText(j).replace(ARTICLE, '')
@@ -1956,15 +2087,19 @@ function alignedSeam(rows: readonly TextRow[], next: readonly TextRow[]): number
   return head[last] ?? null
 }
 
-export function mergeParts(parts: readonly (readonly TextRow[])[]): TextRow[] {
+export function mergeParts(
+  reading: PhotoReading,
+  parts: readonly (readonly TextRow[])[],
+): TextRow[] {
+  const { swaps } = reading
   let rows = [...(parts[0] ?? [])]
   for (const next of parts.slice(1)) {
-    const seam = articleSeam(rows, next, true) ?? articleSeam(rows, next, false)
+    const seam = articleSeam(rows, next, true, swaps) ?? articleSeam(rows, next, false, swaps)
     if (seam !== null) {
       rows = [...rows.slice(0, seam.mine + 1), ...next.slice(seam.theirs + 1)]
       continue
     }
-    const aligned = alignedSeam(rows, next)
+    const aligned = alignedSeam(rows, next, swaps)
     rows = [...rows, ...next.slice(aligned === null ? 0 : aligned + 1)]
   }
   return rows
@@ -1980,8 +2115,12 @@ export function mergeParts(parts: readonly (readonly TextRow[])[]): TextRow[] {
  * am-36 on the bench), and a wrong sum on a trip is worse than none the person sees and types. What the
  * reading read stays `readTotalHundredths`, for «Прочитали не всё» alone.
  */
-export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptText {
-  const laid = readings.map(readingOf)
+export function bestReading(
+  reading: PhotoReading,
+  readings: readonly (readonly TextRow[])[],
+): ReceiptText {
+  const lx = lexiconOf(reading)
+  const laid = readings.map((rows) => readingOf(rows, lx))
   const parsed = laid.map((one) => one.read)
   const settledAt = (i: number): number => parsed[i]?.lines.filter((l) => l.settled).length ?? 0
   // a reading that met its total through a slice met its own choice (MOL-246): no balance to rank by
@@ -1994,7 +2133,7 @@ export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptT
   if (best === undefined) throw new RangeError('a receipt needs at least one reading')
   // no reading found a line: a section with no items is read whole, not one to shoot again (MOL-227)
   if (best.lines.length === 0) {
-    const section = departmentReceipt(readings)
+    const section = departmentReceipt(reading, readings)
     if (section !== null) return section
   }
   // Lines «meet» a total only as read: the total changes a line's digit to meet itself, or gives a line
@@ -2007,7 +2146,7 @@ export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptT
     !tookSlice &&
     (every ? best.lines.every((l) => l.settled) : best.lines.some((l) => l.settled))
   const own = best.totalHundredths
-  const voted = votedTotal(readings, false)
+  const voted = votedTotal(readings, false, lx)
   // the lines as read and two places naming two sums: either may be the font's slip, and nothing tells
   // which (Б1 against its mirror, round 3 Ц1) — so no total (owner, 09.10.2026)
   const total = asRead(true)
@@ -2015,7 +2154,7 @@ export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptT
       ? own
       : null
     : (voted ?? (asRead(false) ? own : null))
-  if (total === own) return withTwins({ ...best, totalHundredths: total })
+  if (total === own) return withTwins({ ...best, totalHundredths: total }, lx)
   // A total the reading did not judge its lines by leaves nothing in them, and judges none (review 4, 7):
   // the reading chosen is read again as printed. Two places shown are no judge either (В-2 «а»; round 5 Д1:
   // a vote misread alike in two places made a lost row up to meet itself, and the review's «≠» was gone) —
@@ -2026,5 +2165,8 @@ export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptT
     total !== null &&
     sums.every((sum) => sum !== null) &&
     sums.reduce((all, sum) => all + sum, 0) === total
-  return withTwins({ ...reread, totalHundredths: total, readTotalHundredths: own, balanced: met })
+  return withTwins(
+    { ...reread, totalHundredths: total, readTotalHundredths: own, balanced: met },
+    lx,
+  )
 }
