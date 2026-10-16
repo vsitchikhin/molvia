@@ -36,9 +36,9 @@ it 1.7× (3.0 → 5.0 s); the twenty runs after #173 and the pull request's own 
 taken in a window without the busiest runner is a calm one: five times it leaves ~1.04 against a run
 4.8× slower, ten times ~2. So the test now has 90 s. A short test swings as far: `feedback-bot` ran
 under 300 ms in 296 of the 301 runs of 03–09.10, and once 1169 ms — ×3.9 at least. The window of a
-measure is written beside it, and the measure reads every run whose job of tests finished: a new push
-cancels the whole run, often with its tests done and only end-to-end cut short, and a push after a push
-is the busy hour. The measure of MOL-266 left out 43 such runs and with them `spendings`' 1482 ms.
+measure is written beside it, and the measure reads every test that finished, whatever became of its
+run: a new push cancels the whole run, often with its tests done or halfway, and a push after a push is
+the busy hour. The measure of MOL-266 left out 43 such runs and with them `spendings`' 1482 ms.
 
 **A hook is held the same way against its 10 s.** The CI log prints a test's time only past 300 ms,
 and never a hook's, so the hooks and the short tests are measured by a reporter — MOL-266 brings
