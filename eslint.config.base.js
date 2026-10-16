@@ -122,6 +122,11 @@ export function deny(group, message) {
  * replaced, never merged, so the later block must carry the boundary again.
  */
 export function boundary(files, group, message) {
+  // the tests' block is the glob with `*.test.ts` for `*.ts`: any other glob would hand it the sources
+  // and take TEST_DATA off them (adversarial Б5)
+  for (const glob of files) {
+    if (!glob.endsWith('*.ts')) throw new Error(`boundary(): a glob of .ts sources, not «${glob}»`)
+  }
   return [
     { files, ignores: TESTS_BESIDE_SOURCE, rules: deny(group, message) },
     {
