@@ -164,6 +164,39 @@ describe('ownHookTimeouts', () => {
     ])
   })
 
+  it('places a hook in a suite the helper declares itself under the suite it is called in, and counts it once', () => {
+    // round 4, review №16 and adversarial Г5
+    expect(
+      read(`
+        function servedSuite(name: string) {
+          describe(name, () => {
+            beforeAll(async () => {}, 4_000)
+          })
+        }
+        servedSuite('served')
+        function behavesLikeRepo() {
+          describe('db', () => {
+            beforeAll(async () => {}, 60_000)
+          })
+        }
+        function withDb() {
+          function seed() {
+            beforeAll(async () => {}, 60_000)
+          }
+          seed()
+        }
+        describe('outer', () => {
+          behavesLikeRepo()
+          withDb()
+        })
+      `),
+    ).toEqual([
+      ['beforeAll', ['/^.*$/s'], false, 4_000],
+      ['beforeAll', ['/^outer$/s', '/^db$/s'], true, 60_000],
+      ['beforeAll', ['/^outer$/s'], true, 60_000],
+    ])
+  })
+
   it('reads 0 and Infinity as no timeout, as vitest does, and aroundAll beside the others', () => {
     // round 3, adversarial В5-1 and В5-3
     expect(

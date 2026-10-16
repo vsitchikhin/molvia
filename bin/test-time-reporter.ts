@@ -159,8 +159,9 @@ function bind(fileName: string, source: string): { sf: ts.SourceFile; checker: t
  * says so rather than guess. A suite is `describe` or `suite`; one named by a template or by `each`'s
  * placeholders is matched with them read as anything, one named by an expression (`X.name`) as
  * anything at all — neither exact. A hook in a function of the file, a helper, stands in the suite
- * the helper is called in, beside the suite's own (review №14, adversarial В5); one whose helper is
- * called nowhere the parse sees stands wherever it may.
+ * the helper is called in, beside the suite's own (review №14, adversarial В5), and in a suite the
+ * helper declares, under it (review №16, Г5); one whose helper is called nowhere the parse sees stands
+ * wherever it may.
  */
 export function ownHookTimeouts(source: string, fileName = 'test.ts'): HookTimeout[] {
   const { sf, checker } = bind(fileName, source)
@@ -246,29 +247,52 @@ export function ownHookTimeouts(source: string, fileName = 'test.ts'): HookTimeo
   }
   /** Helpers whose hooks were placed in a suite, so they stand nowhere else. */
   const placed = new Set<ts.Node>()
-  /** The hooks a helper registers, its own helpers' with them; a suite of its own is no part of it. */
-  const hooksOf = (
-    fn: ts.FunctionLikeDeclaration,
-    seen: Set<ts.Node>,
-  ): { kind: Kind; timeout: HookTimeout['timeout'] }[] => {
+  interface Registered {
+    readonly kind: Kind
+    readonly timeout: HookTimeout['timeout']
+    /** The suites the helper itself declares around it, from where it is called. */
+    readonly path: readonly RegExp[]
+    readonly exact: boolean
+  }
+  /**
+   * The hooks a helper registers, in the suites it declares itself (review №16, adversarial Г5), its own
+   * helpers' with them — by their calls only, so a function declared inside counts once.
+   */
+  const hooksOf = (fn: ts.FunctionLikeDeclaration, seen: Set<ts.Node>): Registered[] => {
     if (seen.has(fn) || !fn.body) return []
     seen.add(fn)
     placed.add(fn)
-    const hooks: { kind: Kind; timeout: HookTimeout['timeout'] }[] = []
-    const look = (node: ts.Node): void => {
+    const hooks: Registered[] = []
+    const look = (node: ts.Node, path: readonly RegExp[], exact: boolean): void => {
       if (ts.isCallExpression(node)) {
         const kind = hookKind(node)
         if (kind) {
-          hooks.push({ kind, timeout: timeoutOf(node) })
+          hooks.push({ kind, timeout: timeoutOf(node), path, exact })
           return
         }
-        if (isSuite(node)) return
+        if (isSuite(node)) {
+          const { title, exact: plain } = titleOf(node.arguments[0])
+          for (const argument of node.arguments)
+            if (ts.isArrowFunction(argument) || ts.isFunctionExpression(argument))
+              look(argument.body, [...path, title], exact && plain)
+          return
+        }
         const helper = helperOf(node)
-        if (helper) hooks.push(...hooksOf(helper, seen))
+        if (helper)
+          for (const hook of hooksOf(helper, seen))
+            hooks.push({ ...hook, path: [...path, ...hook.path], exact: exact && hook.exact })
       }
-      ts.forEachChild(node, look)
+      // a function declared here registers its hooks where it is called
+      if (
+        ts.isFunctionDeclaration(node) ||
+        (ts.isFunctionLike(node) && ts.isVariableDeclaration(node.parent))
+      )
+        return
+      ts.forEachChild(node, (child) => {
+        look(child, path, exact)
+      })
     }
-    look(fn.body)
+    look(fn.body, [], true)
     return hooks
   }
   const found: HookTimeout[] = []
@@ -307,8 +331,13 @@ export function ownHookTimeouts(source: string, fileName = 'test.ts'): HookTimeo
       // withDb() in a suite: the helper's hooks are the suite's
       const called = helper ? undefined : helperOf(node)
       if (called)
-        for (const { kind: k, timeout } of hooksOf(called, new Set()))
-          found.push({ kind: k, path, exact, timeout })
+        for (const hook of hooksOf(called, new Set()))
+          found.push({
+            kind: hook.kind,
+            path: [...path, ...hook.path],
+            exact: exact && hook.exact,
+            timeout: hook.timeout,
+          })
     }
     // past a function of the file that is not a suite's own callback, a hook is a helper's
     const inner = helper || ts.isFunctionLike(node)
