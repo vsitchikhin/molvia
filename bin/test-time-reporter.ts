@@ -259,6 +259,7 @@ export function ownHookTimeouts(source: string, fileName = 'test.ts'): HookTimeo
    * helpers' with them — by their calls only, so a function declared inside counts once.
    */
   const hooksOf = (fn: ts.FunctionLikeDeclaration, seen: Set<ts.Node>): Registered[] => {
+    // `seen` is the helpers being walked, not those walked once: a helper called twice registers twice (№18)
     if (seen.has(fn) || !fn.body) return []
     seen.add(fn)
     placed.add(fn)
@@ -293,6 +294,7 @@ export function ownHookTimeouts(source: string, fileName = 'test.ts'): HookTimeo
       })
     }
     look(fn.body, [], true)
+    seen.delete(fn)
     return hooks
   }
   const found: HookTimeout[] = []

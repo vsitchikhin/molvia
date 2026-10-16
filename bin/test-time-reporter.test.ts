@@ -197,6 +197,22 @@ describe('ownHookTimeouts', () => {
     ])
   })
 
+  it('counts a helper called twice from another helper twice, as vitest registers it (review №18)', () => {
+    const own = ownHookTimeouts(`
+      function seed() {
+        beforeAll(async () => {}, 60_000)
+      }
+      function withDb() {
+        seed()
+        seed()
+      }
+      describe('s', () => {
+        withDb()
+      })
+    `)
+    expect(hookLimit(own, 'beforeAll', ['s'], 10_000).limit).toBe(120_000)
+  })
+
   it('reads 0 and Infinity as no timeout, as vitest does, and aroundAll beside the others', () => {
     // round 3, adversarial В5-1 and В5-3
     expect(
