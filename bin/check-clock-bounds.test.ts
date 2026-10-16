@@ -267,4 +267,141 @@ describe('rawBounds', () => {
       `),
     ).toEqual([])
   })
+
+  // review round 3 of MOL-266: adversarial В1 — the listed forms the other way round, the clock under another name
+  it.each([
+    [
+      'a comparison asserted false',
+      `${START}expect(performance.now() - started > 200).toBe(false)`,
+    ],
+    ['… toBeFalsy()', `${START}expect(performance.now() - started >= 200).toBeFalsy()`],
+    ['… not.toBe(true)', `${START}expect(performance.now() - started > 200).not.toBe(true)`],
+    ['assert.isFalse', `${START}assert.isFalse(performance.now() - started > 200)`],
+    ['assert.notOk', `${START}assert.notOk(performance.now() - started > 200)`],
+    ['assert(!(…))', `${START}assert(!(performance.now() - started > 200))`],
+    [
+      'a range with &&',
+      `${START}const took = performance.now() - started\nexpect(took >= 0 && took < 200).toBe(true)`,
+    ],
+    [
+      'toSatisfy with a range',
+      `${START}expect(performance.now() - started).toSatisfy((ms: number) => ms >= 0 && ms < 200)`,
+    ],
+    [
+      'toSatisfy with !(…)',
+      `${START}expect(performance.now() - started).toSatisfy((ms: number) => !(ms > 200))`,
+    ],
+    [
+      'if (!(d < n)) throw',
+      `${START}if (!(performance.now() - started < 200)) throw new Error('slow')`,
+    ],
+    ['the budget left', `${START}expect(200 - (performance.now() - started)).toBeGreaterThan(0)`],
+    [
+      'the budget, -=',
+      `${START}let left = 200\nleft -= performance.now() - started\nexpect(left).toBeGreaterThan(0)`,
+    ],
+    [
+      'what is left of a deadline',
+      `const deadline = Date.now() + 200\nwork()\nexpect(deadline - Date.now()).toBeGreaterThan(0)`,
+    ],
+    [
+      'the clock past a deadline',
+      `const deadline = Date.now() + 200\nwork()\nexpect(Date.now() - deadline).toBeLessThan(0)`,
+    ],
+    [
+      'a getter of a class of the file',
+      `class Stopwatch { private start = performance.now(); get ms() { return performance.now() - this.start } }\nconst watch = new Stopwatch()\nexpect(watch.ms).toBeLessThan(200)`,
+    ],
+    [
+      'now bound to performance',
+      `const now = performance.now.bind(performance)\nconst t0 = now()\nexpect(now() - t0).toBeLessThan(200)`,
+    ],
+    [
+      'now taken apart from Date',
+      `const { now } = Date\nconst t0 = now()\nexpect(now() - t0).toBeLessThan(200)`,
+    ],
+    [
+      'performance of node:perf_hooks under another name',
+      `import { performance as perf } from 'node:perf_hooks'\nconst t0 = perf.now()\nexpect(perf.now() - t0).toBeLessThan(200)`,
+    ],
+    [
+      'hrtime of node:process',
+      `import { hrtime } from 'node:process'\nconst t0 = hrtime.bigint()\nexpect(hrtime.bigint() - t0).toBeLessThan(200_000_000n)`,
+    ],
+  ])('finds the bound written as %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toHaveLength(1)
+  })
+
+  it('leaves alone a lower bound between two readings (adversarial В4)', () => {
+    expect(
+      lines(`
+        const t0 = Date.now()
+        work()
+        const t1 = Date.now()
+        expect(t1).toBeGreaterThanOrEqual(t0)
+        expect(t0).toBeLessThanOrEqual(t1)
+        expect(t1 > t0).toBe(true)
+        expect(t1 - t0).toBeGreaterThanOrEqual(0)
+      `),
+    ).toEqual([])
+  })
+
+  // adversarial В2 and review №13: what fakes a clock is read where the bound stands, in the order vitest runs it
+  const BOUND = `const t0 = performance.now()\nawait wait(300)\nexpect(performance.now() - t0).toBeLessThan(1_000)`
+  it.each([
+    [
+      'useRealTimers() before it',
+      `it('x', async () => {\nvi.useFakeTimers()\nvi.useRealTimers()\n${BOUND}\n})`,
+    ],
+    [
+      'the test turning real time back after the file’s beforeEach',
+      `beforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\nvi.useRealTimers()\n${BOUND}\n})`,
+    ],
+    ['useFakeTimers() after it', `it('x', async () => {\n${BOUND}\nvi.useFakeTimers()\n})`],
+    [
+      'toNotFake: performance',
+      `it('x', async () => {\nvi.useFakeTimers({ toNotFake: ['performance'] })\n${BOUND}\n})`,
+    ],
+    [
+      'shouldAdvanceTime',
+      `it('x', async () => {\nvi.useFakeTimers({ shouldAdvanceTime: true })\n${BOUND}\n})`,
+    ],
+    [
+      'options the parse cannot read',
+      `it('x', async () => {\nvi.useFakeTimers(OPTIONS)\n${BOUND}\n})`,
+    ],
+    [
+      'a clock taken under another name before the fake',
+      `const { now } = performance\nit('x', async () => {\nvi.useFakeTimers()\nconst t0 = now()\nawait wait(300)\nexpect(now() - t0).toBeLessThan(1_000)\n})`,
+    ],
+  ])('finds a bound on real time beside fake timers — %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toHaveLength(1)
+  })
+
+  // adversarial В3: and a bound on fake time is let go however the file says it fakes
+  const FAKE = `const back = Date.now()\nawait vi.advanceTimersByTimeAsync(20_000)\nexpect(Date.now() - back).toBeLessThan(30_000)`
+  it.each([
+    [
+      'a file that mentions process and performance elsewhere',
+      `const CI = process.env.CI // performance left real\nit('x', async () => {\nvi.useFakeTimers({ toFake: ['Date'] })\n${FAKE}\n})`,
+    ],
+    [
+      'a hook with an expression body',
+      `beforeEach(() => vi.useFakeTimers())\nit('x', async () => {\n${FAKE}\n})`,
+    ],
+    [
+      'a helper of the file',
+      `function fakeClock(): void {\nvi.useFakeTimers()\n}\nit('x', async () => {\nfakeClock()\n${FAKE}\n})`,
+    ],
+    [
+      'an outer suite’s beforeAll',
+      `describe('a', () => {\nbeforeAll(() => {\nvi.useFakeTimers()\n})\ndescribe('b', () => {\nit('x', async () => {\n${FAKE}\n})\n})\n})`,
+    ],
+    [
+      'vi.setSystemTime alone, which fakes Date',
+      `it('x', async () => {\nvi.setSystemTime(0)\n${FAKE}\n})`,
+    ],
+  ])('leaves alone a bound on fake time — %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toEqual([])
+  })
 })

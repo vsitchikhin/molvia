@@ -8,27 +8,36 @@
 // scope: the age of a stamp held under a name another test gave a reading is left alone.
 //
 // A reading of the clock: `performance.now()`, `Date.now()`, `process.hrtime()` and its `bigint()`,
-// `new Date()` and its `getTime()`, through `globalThis`, `Number()`, `Math.floor(… / 1000)`; a function of
-// the file that returns one (`const now = () => performance.now()`, `const { now } = performance`); a
-// name, a field, a field of a class (`this.start`) or a shorthand field given one; an array of them —
-// pushed, by index, `at()`. A duration: a subtraction of two readings and whatever is made of it — a
-// name, a field, an object or array it is put in (`=`, `+=`, `push`) or taken apart from, a function of
-// the file or a method that returns it, a call of one that subtracts a reading it takes from the clock
-// however it rounds (`since(t0)`), `process.hrtime(t0)`, `performance.measure()`.
+// `new Date()` and its `getTime()`, through `globalThis`, `Number()`, `Math.floor(… / 1000)`, under another
+// name (`perf_hooks`' and `node:process`' own, `{ now } = Date`, `.bind`); a function of the file that
+// returns one (`const now = () => performance.now()`); a name, a field, a field of a class
+// (`this.start`) or a shorthand field given one; an array of them — pushed, by index, `at()`. A duration:
+// a subtraction of two readings, or of a deadline from a reading, and whatever is made of it — a name, a
+// field, an object or array it is put in (`=`, `+=`, `push`) or taken apart from, a function of the file,
+// a method or a getter that returns it, a call of one that subtracts a reading it takes from the clock
+// however it rounds (`since(t0)`), `process.hrtime(t0)`, `performance.measure()`. A budget is a duration
+// taken from a number (`200 - d`, `left -= d`, `deadline - Date.now()`), and a lower bound on it is an
+// upper bound on the duration.
 //
-// Refused is an upper bound on a duration — `toBeLessThan`, `toBeLessThanOrEqual`, chai's `lessThan`,
-// `below`, `lt`, `lte`, `most`, `within`, `toBeCloseTo`; `not` before a lower bound; a lower bound with
-// the duration on the other side; a comparison under `expect`, `expect.soft` or any `assert`; `toSatisfy`
+// Refused is an upper bound on a duration, and a lower bound on a budget — `toBeLessThan`,
+// `toBeLessThanOrEqual`, chai's `lessThan`, `below`, `lt`, `lte`, `most`, `within`, `toBeCloseTo`; `not`
+// before a lower bound; a lower bound with the duration on the other side; a comparison under `expect`,
+// `expect.soft` or any `assert`, asserted true or false (`toBe(false)`, `isFalse`, `!`, `&&`); `toSatisfy`
 // with a comparison, inline or a function of the file; `if (d > n)` that throws or fails; a call of a
-// function of the file that bounds its parameter so — and a deadline: a reading bounded by a reading
-// plus a number (`expect(Date.now()).toBeLessThan(deadline)`). A lower bound is no breach of time; the age
-// of a stamp — the clock against a moment a row holds — is no duration, as one side is not the clock;
-// and a bound where `vi.useFakeTimers()` fakes that clock is not one either: no runner moves fake time.
+// function of the file that bounds its parameter so — and a deadline: a reading bounded by a reading plus
+// a number (`expect(Date.now()).toBeLessThan(deadline)`). A lower bound is no breach of time, two readings
+// against each other included; the age of a stamp — the clock against a moment a row holds — is no
+// duration, as one side is not the clock; and a bound where every clock it reads is one
+// `vi.useFakeTimers()` holds still is not one either: no runner moves fake time. What fakes a clock at a
+// bound is read in the order vitest runs it — the file and its suites as they are collected, `beforeAll`,
+// `beforeEach`, the test's own statements before the bound, a helper of the file they call;
+// `useRealTimers()` lets go, `toFake` and `toNotFake` choose, `shouldAdvanceTime` moves fake time with
+// the real one; a clock taken under another name keeps the real one.
 //
 // The price, named (`workspace.md`): what is not in the lists above is not seen — a duration the code
 // under test measures (`metrics`' lag), a helper imported from another file, a reading kept in a
-// structure the lists do not name, a fake clock turned on by a helper of another file. Those go to
-// `expectWithin`, or are left, by review.
+// structure the lists do not name, a fake clock turned on by a helper of another file, by an earlier test
+// or by options the parse cannot read (held as real). Those go to `expectWithin`, or are left, by review.
 //
 //   node bin/check-clock-bounds.mjs
 
@@ -40,14 +49,24 @@ import ts from 'typescript'
 /** The files a vitest run reads: tests, the helpers beside the integration tests, a package's test helpers. */
 const FILES = ['*.test.ts', '*.test.mts', 'backend/tests/*.ts', 'packages/*/tests/*.ts']
 
-/** A reading of the clock, with `globalThis.`, `window.` or `self.` taken off first. */
+/** A reading of the clock, with `globalThis.`, `window.` or `self.` taken off and other names resolved. */
 const CLOCK = /^(performance\.now|Date\.now|process\.hrtime\.bigint|process\.hrtime)$/
 /** What a reading is still a reading through: a cast, and whole seconds of it. */
 const SAME = /^(Number|BigInt|Math\.(round|floor|ceil|trunc))$/
 /** A duration the platform measures itself. */
 const MEASURED = /^(performance\.measure|process\.hrtime)$/
-/** Which fake of `vi.useFakeTimers({ toFake })` each clock is. */
-const FAKED_AS = { performance: 'performance', Date: 'Date', process: 'hrtime' }
+/** What another name may stand for: a clock, or what holds one. */
+const CLOCK_PATHS = new Set([
+  'performance',
+  'Date',
+  'process',
+  'process.hrtime',
+  'performance.now',
+  'Date.now',
+  'process.hrtime.bigint',
+])
+/** The clocks of `vi.useFakeTimers({ toFake })`, by their names there. */
+const CLOCKS = ['performance', 'Date', 'hrtime']
 /** A matcher that bounds its subject from above — and, under `not`, from below. */
 const UPPER = new Set([
   'toBeLessThan',
@@ -70,9 +89,14 @@ const LOWER = new Set([
   'gte',
   'least',
 ])
+/** What asserts its subject false: `expect(c).toBeFalsy()`, chai's `.false`. */
+const FALSY = new Set(['toBeFalsy', 'false', 'notOk'])
+/** What asserts its subject equal to its argument: `expect(c).toBe(false)`. */
+const EQUAL = new Set(['toBe', 'toEqual', 'toStrictEqual', 'equal', 'equals', 'eq', 'eql'])
 const EXPECT = new Set(['expect', 'expect.soft', 'chai.expect'])
 const LESS = [ts.SyntaxKind.LessThanToken, ts.SyntaxKind.LessThanEqualsToken]
 const MORE = [ts.SyntaxKind.GreaterThanToken, ts.SyntaxKind.GreaterThanEqualsToken]
+const SUITE = /^(describe|suite)$/
 
 /** One file as a program of its own, with nothing to resolve: enough for the binder to name its symbols. */
 function bind(fileName, source) {
@@ -118,11 +142,30 @@ export function rawBounds(fileName, source) {
       n = n.expression
     return n
   }
-  const calleeText = (call) =>
-    call.expression
-      .getText(sf)
+  /** Another name of a clock or of what holds one: `perf` of `perf_hooks`, `{ now } = Date`. */
+  const aliases = new Map()
+  /** An expression as text, another name of a clock resolved: `perf.now` is `performance.now`. */
+  const resolvedText = (expression) => {
+    let root = bare(expression)
+    const rest = []
+    while (ts.isPropertyAccessExpression(root)) {
+      rest.unshift(root.name.text)
+      root = bare(root.expression)
+    }
+    const alias = ts.isIdentifier(root) ? aliases.get(symbolKey(root)) : undefined
+    const head = alias ? alias.path : root.getText(sf)
+    return [head, ...rest]
+      .join('.')
       .replace(/^(globalThis|window|self)\./, '')
       .replace(/\s+/g, '')
+  }
+  /** Whether an expression reaches a clock through a name that holds it whole, faked or not. */
+  const heldThrough = (expression) => {
+    let root = bare(expression)
+    while (ts.isPropertyAccessExpression(root)) root = bare(root.expression)
+    return ts.isIdentifier(root) && aliases.get(symbolKey(root))?.held === true
+  }
+  const calleeText = (call) => resolvedText(call.expression)
   const classKey = (node) => {
     let n = node.parent
     while (n && !ts.isClassLike(n)) n = n.parent
@@ -144,22 +187,19 @@ export function rawBounds(fileName, source) {
     }
     return undefined
   }
-  /** The key a function or a method is called by, from where it is declared. */
+  /** The key a function, a method or a getter is called by, from where it is declared. */
   const declaredKey = (fn) => {
     const parent = fn.parent
     if ((ts.isFunctionDeclaration(fn) || ts.isFunctionExpression(fn)) && fn.name)
       return symbolKey(fn.name)
     if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name))
       return symbolKey(parent.name)
-    if (ts.isMethodDeclaration(fn) && ts.isClassLike(parent) && parent.name)
+    const accessor = ts.isMethodDeclaration(fn) || ts.isGetAccessorDeclaration(fn)
+    if (accessor && ts.isClassLike(parent) && parent.name)
       return `${symbolKey(parent.name)}.${fn.name.getText(sf)}`
     if (ts.isPropertyDeclaration(parent) && ts.isClassLike(parent.parent) && parent.parent.name)
       return `${symbolKey(parent.parent.name)}.${parent.name.getText(sf)}`
-    const member = ts.isMethodDeclaration(fn)
-      ? fn
-      : ts.isPropertyAssignment(parent)
-        ? parent
-        : undefined
+    const member = accessor ? fn : ts.isPropertyAssignment(parent) ? parent : undefined
     const object = member?.parent
     if (
       member &&
@@ -191,18 +231,20 @@ export function rawBounds(fileName, source) {
   /** Names holding a reading plus a number: a deadline. */
   const deadlines = new Set()
   const carriers = new Set()
+  /** Names holding a duration taken from a number: `left -= d`. */
+  const budgets = new Set()
   /** Functions that return a duration. */
   const timers = new Set()
   /** Functions that subtract a parameter from the clock, by the parameter's place: `since(t0)`. */
   const since = new Map()
   /** Functions that bound a parameter from above, by its place: `within(d)`. */
   const bounders = new Map()
-  /** Functions whose answer is their parameter compared from above: `const fast = (ms) => ms < 200`. */
-  const predicates = new Set()
+  /** Functions whose answer bounds their parameter — `above`, `below` or both: `(ms) => ms < 200`. */
+  const predicates = new Map()
 
   const isNewDate = (node) => {
     const n = bare(node)
-    return ts.isNewExpression(n) && n.expression.getText(sf) === 'Date' && !n.arguments?.length
+    return ts.isNewExpression(n) && resolvedText(n.expression) === 'Date' && !n.arguments?.length
   }
   const isReading = (node) => {
     const n = core(node)
@@ -231,20 +273,19 @@ export function rawBounds(fileName, source) {
     const key = keyOf(n)
     return key !== undefined && readings.has(key)
   }
-  /** Whether anything in a value is a reading or a deadline: what a deadline is bounded by. */
-  const mentionsReading = (node) => {
-    let found = false
-    const walk = (n) => {
-      if (found) return
-      if (isReading(n)) found = true
-      else if (ts.isIdentifier(n) || ts.isPropertyAccessExpression(n)) {
-        const key = keyOf(n)
-        if (key !== undefined && deadlines.has(key)) found = true
-        else if (ts.isPropertyAccessExpression(n)) walk(n.expression)
-      } else ts.forEachChild(n, walk)
+  /** A reading plus a number, or a name given one: what a deadline is. */
+  const isDeadline = (node) => {
+    const n = core(node)
+    if (ts.isBinaryExpression(n)) {
+      const op = n.operatorToken.kind
+      const either = (side) => isReading(side) || isDeadline(side)
+      if (op === ts.SyntaxKind.PlusToken) return either(n.left) || either(n.right)
+      if (op === ts.SyntaxKind.MinusToken)
+        return either(n.left) && ts.isNumericLiteral(bare(n.right))
+      return false
     }
-    walk(node)
-    return found
+    const key = ts.isIdentifier(n) || ts.isPropertyAccessExpression(n) ? keyOf(n) : undefined
+    return key !== undefined && deadlines.has(key)
   }
   /** The place of a parameter of the function `fn` that `node` names, or -1. */
   const parameterAt = (node, fn) => {
@@ -256,54 +297,95 @@ export function rawBounds(fileName, source) {
       : -1
   }
   /**
-   * Whether a value holds a duration: a subtraction of two readings, a name, field or function that
-   * carries one, a call that subtracts its reading from the clock, a duration the platform measured —
-   * anywhere inside it.
+   * Which way a value moves with a duration: 1 — a duration, a name, field or function that carries
+   * one, a call that subtracts its reading from the clock, a duration the platform measured, anywhere in
+   * it; -1 — a budget, a duration taken from a number; 0 — neither.
    */
-  const carries = (node) => {
-    let found = false
-    const walk = (n) => {
-      if (found) return
-      if (
-        ts.isBinaryExpression(n) &&
-        n.operatorToken.kind === ts.SyntaxKind.MinusToken &&
-        isReading(n.left) &&
-        isReading(n.right)
-      ) {
-        found = true
-        return
+  const sign = (node) => {
+    const n = core(node)
+    if (ts.isPrefixUnaryExpression(n) && n.operator === ts.SyntaxKind.MinusToken)
+      return -sign(n.operand)
+    if (ts.isBinaryExpression(n)) {
+      const op = n.operatorToken.kind
+      if (op === ts.SyntaxKind.MinusToken) {
+        if (isReading(n.left) && (isReading(n.right) || isDeadline(n.right))) return 1
+        if (isDeadline(n.left) && isReading(n.right)) return -1
+        return sign(n.left) || -sign(n.right)
       }
-      if (ts.isCallExpression(n)) {
-        const callee = calleeText(n)
-        if (MEASURED.test(callee) && (callee !== 'process.hrtime' || n.arguments.length > 0)) {
-          found = true
-          return
-        }
-        const key = keyOf(n.expression)
-        const places = key === undefined ? undefined : since.get(key)
-        if (places?.some((place) => n.arguments[place] && isReading(n.arguments[place]))) {
-          found = true
-          return
-        }
+      if (op === ts.SyntaxKind.PlusToken) {
+        const left = sign(n.left)
+        const right = sign(n.right)
+        return left === 1 || right === 1 ? 1 : left || right
       }
-      if (ts.isIdentifier(n) || ts.isPropertyAccessExpression(n)) {
-        const key = keyOf(n)
-        if (key !== undefined && (carriers.has(key) || timers.has(key))) {
-          found = true
-          return
-        }
-        // a field's own name is no mention of anything
-        if (ts.isPropertyAccessExpression(n)) walk(n.expression)
-        return
-      }
-      ts.forEachChild(n, walk)
     }
-    walk(node)
+    if (ts.isCallExpression(n)) {
+      const callee = calleeText(n)
+      if (MEASURED.test(callee) && (callee !== 'process.hrtime' || n.arguments.length > 0)) return 1
+      const key = keyOf(n.expression)
+      const places = key === undefined ? undefined : since.get(key)
+      if (places?.some((place) => n.arguments[place] && isReading(n.arguments[place]))) return 1
+    }
+    if (ts.isIdentifier(n) || ts.isPropertyAccessExpression(n)) {
+      const key = keyOf(n)
+      if (key !== undefined && (carriers.has(key) || timers.has(key))) return 1
+      if (key !== undefined && budgets.has(key)) return -1
+      // a field's own name is no mention of anything
+      return ts.isPropertyAccessExpression(n) && sign(n.expression) === 1 ? 1 : 0
+    }
+    let found = 0
+    ts.forEachChild(n, (child) => {
+      if (found === 0 && sign(child) === 1) found = 1
+    })
     return found
   }
+  const carries = (node) => sign(node) === 1
 
-  /** A check of `toSatisfy`, or a predicate of the file: whether it bounds its parameter from above. */
-  const boundsItsParameter = (fn) => {
+  /**
+   * What an assertion that `node` is `truth` bounds, as pairs held `small < big`: `d < n` true, `d >= n`
+   * false, `!`, and each side of `&&` asserted true or of `||` asserted false.
+   */
+  const asserted = (node, truth) => {
+    const n = node && bare(node)
+    if (!n) return []
+    if (ts.isPrefixUnaryExpression(n) && n.operator === ts.SyntaxKind.ExclamationToken)
+      return asserted(n.operand, !truth)
+    if (!ts.isBinaryExpression(n)) return []
+    const op = n.operatorToken.kind
+    if (op === ts.SyntaxKind.AmpersandAmpersandToken)
+      return truth ? [...asserted(n.left, true), ...asserted(n.right, true)] : []
+    if (op === ts.SyntaxKind.BarBarToken)
+      return truth ? [] : [...asserted(n.left, false), ...asserted(n.right, false)]
+    const less = LESS.includes(op)
+    if (!less && !MORE.includes(op)) return []
+    return less === truth ? [{ small: n.left, big: n.right }] : [{ small: n.right, big: n.left }]
+  }
+  /** What `expect(c)` asserts `c` to be, by what follows it: `.toBe(false)`, `.not`, `.toBeFalsy()`. */
+  const expectedTruth = (call) => {
+    let truth = true
+    for (let n = call; ts.isPropertyAccessExpression(n.parent) && n.parent.expression === n;) {
+      n = n.parent
+      const name = n.name.text
+      if (name === 'not' || FALSY.has(name)) truth = !truth
+      const asked = n.parent
+      if (EQUAL.has(name) && ts.isCallExpression(asked) && asked.expression === n) {
+        const value = asked.arguments[0] && bare(asked.arguments[0])
+        if (value?.kind === ts.SyntaxKind.FalseKeyword) truth = !truth
+      }
+    }
+    return truth
+  }
+  /** What `assert.…(c, …)` asserts `c` to be. */
+  const assertedTruth = (callee, call) => {
+    const method = callee.split('.').pop()
+    if (['isFalse', 'notOk', 'isNotOk', 'isNotTrue'].includes(method)) return false
+    const value = call.arguments[1] && bare(call.arguments[1])
+    const negated = /^not/.test(method)
+    if (value?.kind === ts.SyntaxKind.FalseKeyword) return negated
+    if (value?.kind === ts.SyntaxKind.TrueKeyword) return !negated
+    return true
+  }
+  /** Which way the answer of a check — `toSatisfy`'s, or a predicate of the file — bounds its parameter. */
+  const parameterBounds = (fn) => {
     const answers = []
     if (ts.isBlock(fn.body)) {
       const returns = (n) => {
@@ -313,25 +395,14 @@ export function rawBounds(fileName, source) {
       }
       returns(fn.body)
     } else answers.push(fn.body)
-    return answers.some((answer) => {
-      const a = bare(answer)
-      if (!ts.isBinaryExpression(a)) return false
-      if (LESS.includes(a.operatorToken.kind)) return parameterAt(a.left, fn) === 0
-      if (MORE.includes(a.operatorToken.kind)) return parameterAt(a.right, fn) === 0
-      return false
-    })
+    const ways = new Set()
+    for (const { small, big } of answers.flatMap((answer) => asserted(answer, true))) {
+      if (parameterAt(small, fn) === 0) ways.add('above')
+      if (parameterAt(big, fn) === 0) ways.add('below')
+    }
+    return ways
   }
 
-  /** The sides of a comparison: what is bounded from above, and by what — of its failing case, `if`'s. */
-  const comparison = (node, failing = false) => {
-    const c = node && bare(node)
-    if (!c || !ts.isBinaryExpression(c)) return []
-    const below = failing ? MORE : LESS
-    const above = failing ? LESS : MORE
-    if (below.includes(c.operatorToken.kind)) return [{ measured: c.left, limit: c.right }]
-    if (above.includes(c.operatorToken.kind)) return [{ measured: c.right, limit: c.left }]
-    return []
-  }
   const fails = (statement) => {
     let found = false
     const walk = (n) => {
@@ -344,22 +415,23 @@ export function rawBounds(fileName, source) {
     return found
   }
 
-  /** What a node bounds from above, if anything: each measured value and what it is held below. */
+  /** What a node asserts, as pairs held `small < big`; a side left out is any value. */
   const boundedAbove = (node) => {
     // if (d > n) throw …, if (d > n) expect.fail(…)
-    if (ts.isIfStatement(node) && fails(node.thenStatement))
-      return comparison(node.expression, true)
+    if (ts.isIfStatement(node) && fails(node.thenStatement)) return asserted(node.expression, false)
     const pairs = []
     if (!ts.isCallExpression(node)) return pairs
     const callee = calleeText(node)
-    // expect(d < n), assert(n > d), assert.strictEqual(d < n, true)
-    if (EXPECT.has(callee) || /^(chai\.)?assert(\.\w+)?$/.test(callee))
-      pairs.push(...comparison(node.arguments[0]))
+    // expect(d < n).toBe(true), expect(d > n).toBe(false), expect.soft(n > d).toBeTruthy()
+    if (EXPECT.has(callee)) pairs.push(...asserted(node.arguments[0], expectedTruth(node)))
+    // assert(d < n), assert.isFalse(d > n), assert.strictEqual(d < n, true)
+    if (/^(chai\.)?assert(\.\w+)?$/.test(callee))
+      pairs.push(...asserted(node.arguments[0], assertedTruth(callee, node)))
     // assert.isBelow(d, n), assert.isAtMost(d, n), assert.isAbove(n, d), assert.isAtLeast(n, d)
     if (/^assert\.(isBelow|isAtMost)$/.test(callee) && node.arguments[0])
-      pairs.push({ measured: node.arguments[0], limit: node.arguments[1] })
+      pairs.push({ small: node.arguments[0], big: node.arguments[1] })
     if (/^assert\.(isAbove|isAtLeast)$/.test(callee) && node.arguments[1])
-      pairs.push({ measured: node.arguments[1], limit: node.arguments[0] })
+      pairs.push({ small: node.arguments[1], big: node.arguments[0] })
     // expect(d).….matcher(n)
     if (ts.isPropertyAccessExpression(node.expression)) {
       const matcher = node.expression.name.text
@@ -372,26 +444,30 @@ export function rawBounds(fileName, source) {
       if (ts.isCallExpression(subject) && EXPECT.has(calleeText(subject)) && subject.arguments[0]) {
         const [value] = subject.arguments
         const [argument] = node.arguments
-        if (UPPER.has(matcher) && !negated) pairs.push({ measured: value, limit: argument })
-        if (LOWER.has(matcher) && negated) pairs.push({ measured: value, limit: argument })
-        if (LOWER.has(matcher) && !negated && argument)
-          pairs.push({ measured: argument, limit: value })
-        if (UPPER.has(matcher) && negated && argument && matcher !== 'toBeCloseTo')
-          pairs.push({ measured: argument, limit: value })
+        if (UPPER.has(matcher) && !negated) pairs.push({ small: value, big: argument })
+        if (LOWER.has(matcher) && negated) pairs.push({ small: value, big: argument })
+        if (LOWER.has(matcher) && !negated && argument) pairs.push({ small: argument, big: value })
+        // not.toBeLessThan(n) bounds from below; toBeCloseTo bounds both ways, `not` neither
+        if (UPPER.has(matcher) && negated !== (matcher === 'toBeCloseTo') && argument)
+          pairs.push({ small: argument, big: value })
         // toSatisfy((ms) => ms < n), toSatisfy((ms) => { return ms < n }), toSatisfy(fast)
         const check = argument && bare(argument)
         if (matcher === 'toSatisfy' && check && !negated) {
-          const inline =
-            (ts.isArrowFunction(check) || ts.isFunctionExpression(check)) &&
-            boundsItsParameter(check)
-          const key = keyOf(check)
-          if (inline || (key !== undefined && predicates.has(key)))
-            pairs.push({ measured: value, limit: undefined })
+          const inline = ts.isArrowFunction(check) || ts.isFunctionExpression(check)
+          const key = inline ? undefined : keyOf(check)
+          const ways = inline ? parameterBounds(check) : (predicates.get(key) ?? new Set())
+          if (ways.has('above')) pairs.push({ small: value, big: undefined })
+          if (ways.has('below')) pairs.push({ small: undefined, big: value })
         }
       }
     }
     return pairs
   }
+  /** A pair that bounds a duration from above: the duration small, a budget big, or a deadline met. */
+  const breaks = ({ small, big }) =>
+    (small !== undefined && sign(small) === 1) ||
+    (big !== undefined && sign(big) === -1) ||
+    (small !== undefined && big !== undefined && isReading(small) && isDeadline(big))
 
   const enclosingFunction = (node) => {
     let n = node.parent
@@ -404,6 +480,20 @@ export function rawBounds(fileName, source) {
     map.set(key, [...places, at])
     return true
   }
+  /** What another name stands for, if it is a clock or holds one: `performance.now.bind(performance)`. */
+  const clockPath = (node) => {
+    const n = bare(node)
+    if (
+      ts.isCallExpression(n) &&
+      ts.isPropertyAccessExpression(n.expression) &&
+      n.expression.name.text === 'bind'
+    )
+      return clockPath(n.expression.expression)
+    if (!ts.isIdentifier(n) && !ts.isPropertyAccessExpression(n)) return undefined
+    const path = resolvedText(n)
+    if (/^(globalThis|window|self)$/.test(path)) return ''
+    return CLOCK_PATHS.has(path) ? path : undefined
+  }
 
   // Learn the readings, the carriers and the helpers until nothing new is learnt.
   for (let grown = true; grown;) {
@@ -413,18 +503,54 @@ export function rawBounds(fileName, source) {
       set.add(key)
       grown = true
     }
-    /** A value given to a name or a field: a reading, a duration, or a deadline. */
+    /** A name standing for a clock; `held` — it keeps the clock it was given, which no fake replaces. */
+    const alias = (id, path, held) => {
+      const key = symbolKey(id)
+      if (aliases.get(key)?.path === path) return
+      aliases.set(key, { path, held })
+      grown = true
+    }
+    /** A value given to a name or a field: a reading, a duration, a budget or a deadline. */
     const given = (key, value) => {
       if (key === undefined || !value) return
       const v = bare(value)
       if (isReading(v)) learn(key, readings)
       else if (ts.isArrayLiteralExpression(v) && v.elements.some(isReading)) learn(key, readings)
-      else if (carries(v)) learn(key, carriers)
-      else if (mentionsReading(v)) learn(key, deadlines)
+      else if (sign(v) === 1) learn(key, carriers)
+      else if (sign(v) === -1) learn(key, budgets)
+      else if (isDeadline(v)) learn(key, deadlines)
     }
     const walk = (node) => {
+      // import { performance as perf } from 'node:perf_hooks', import { hrtime } from 'node:process'
+      if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+        const from = node.moduleSpecifier.text.replace(/^node:/, '')
+        const clause = node.importClause
+        const bindings = clause?.namedBindings
+        if (from === 'process' && clause?.name) alias(clause.name, 'process', false)
+        if (from === 'process' && bindings && ts.isNamespaceImport(bindings))
+          alias(bindings.name, 'process', false)
+        if (bindings && ts.isNamedImports(bindings))
+          for (const element of bindings.elements) {
+            const name = (element.propertyName ?? element.name).text
+            if (from === 'perf_hooks' && name === 'performance')
+              alias(element.name, 'performance', true)
+            if (from === 'process' && name === 'hrtime') alias(element.name, 'process.hrtime', true)
+          }
+      }
       if (ts.isVariableDeclaration(node) && node.initializer) {
-        if (ts.isIdentifier(node.name)) {
+        const path = clockPath(node.initializer)
+        if (path !== undefined && ts.isIdentifier(node.name) && path !== '')
+          // const perf = performance, const now = Date.now, const now = performance.now.bind(performance)
+          alias(node.name, path, path !== 'process')
+        else if (path !== undefined && ts.isObjectBindingPattern(node.name)) {
+          // const { now } = Date, const { hrtime } = process, const { performance } = globalThis
+          for (const element of node.name.elements) {
+            const name = (element.propertyName ?? element.name).getText(sf)
+            const whole = path === '' ? name : `${path}.${name}`
+            if (CLOCK_PATHS.has(whole) && ts.isIdentifier(element.name))
+              alias(element.name, whole, whole !== 'process')
+          }
+        } else if (ts.isIdentifier(node.name)) {
           given(symbolKey(node.name), node.initializer)
           const init = bare(node.initializer)
           const made = ts.isNewExpression(init) && ts.isIdentifier(init.expression)
@@ -441,16 +567,6 @@ export function rawBounds(fileName, source) {
               instances.set(own, of)
               grown = true
             }
-          }
-        } else if (
-          ts.isObjectBindingPattern(node.name) &&
-          /^(globalThis\.)?performance$/.test(node.initializer.getText(sf))
-        ) {
-          // const { now } = performance
-          for (const element of node.name.elements) {
-            const name = (element.propertyName ?? element.name).getText(sf)
-            if (name === 'now' && ts.isIdentifier(element.name))
-              learn(symbolKey(element.name), clocks)
           }
         } else if (carries(node.initializer)) {
           // const { elapsed } = measure(), const [s, ns] = process.hrtime(t0)
@@ -491,6 +607,9 @@ export function rawBounds(fileName, source) {
         const op = node.operatorToken.kind
         if (op === ts.SyntaxKind.EqualsToken && isReading(node.right))
           learn(keyOf(node.left), readings)
+        else if (op === ts.SyntaxKind.MinusEqualsToken && carries(node.right))
+          // left -= d: what is left of a budget
+          learn(keyOf(node.left), budgets)
         else if (
           (op === ts.SyntaxKind.EqualsToken || op === ts.SyntaxKind.PlusEqualsToken) &&
           carries(node.right)
@@ -559,7 +678,11 @@ export function rawBounds(fileName, source) {
           }
           if (returned.some(isReading)) learn(key, clocks)
           else if (returned.some(carries)) learn(key, timers)
-          if (boundsItsParameter(node)) learn(key, predicates)
+          const ways = parameterBounds(node)
+          if (ways.size > (predicates.get(key)?.size ?? 0)) {
+            predicates.set(key, ways)
+            grown = true
+          }
           for (const value of returned) {
             const v = core(value)
             if (ts.isBinaryExpression(v) && v.operatorToken.kind === ts.SyntaxKind.MinusToken) {
@@ -573,9 +696,9 @@ export function rawBounds(fileName, source) {
           }
         }
       }
-      for (const { measured } of boundedAbove(node)) {
+      for (const { small } of boundedAbove(node)) {
         const fn = enclosingFunction(node)
-        const at = fn ? parameterAt(measured, fn) : -1
+        const at = fn && small !== undefined ? parameterAt(small, fn) : -1
         const key = at >= 0 ? declaredKey(fn) : undefined
         if (key !== undefined && add(bounders, key, at)) grown = true
       }
@@ -584,64 +707,226 @@ export function rawBounds(fileName, source) {
     walk(sf)
   }
 
-  // Which clocks `vi.useFakeTimers()` fakes where a bound stands: its scope, or a hook of it.
-  const used = new Set(
-    [...source.matchAll(/\b(performance|Date|process)\b/g)].map((m) => FAKED_AS[m[1]]),
-  )
-  const fakesIn = (statements) => {
-    const kinds = new Set()
-    const look = (statement) => {
-      if (!ts.isExpressionStatement(statement) || !ts.isCallExpression(statement.expression)) return
-      const call = statement.expression
-      const callee = calleeText(call)
-      if (/(^|\.)useFakeTimers$/.test(callee)) {
-        const options = call.arguments[0] && bare(call.arguments[0])
-        const toFake =
-          options && ts.isObjectLiteralExpression(options)
-            ? options.properties.find((p) => p.name?.getText(sf) === 'toFake')
-            : undefined
-        const list =
-          toFake && ts.isPropertyAssignment(toFake) ? bare(toFake.initializer) : undefined
-        if (list && ts.isArrayLiteralExpression(list)) {
-          for (const e of list.elements) if (ts.isStringLiteralLike(e)) kinds.add(e.text)
-        } else for (const kind of Object.values(FAKED_AS)) kinds.add(kind)
+  // What each name, field and function of the file is given, for the clocks a value is read from.
+  const values = new Map()
+  const put = (key, value) => {
+    if (key !== undefined && value) values.set(key, [...(values.get(key) ?? []), value])
+  }
+  const index = (node) => {
+    if (ts.isVariableDeclaration(node) && node.initializer) {
+      const names = (name) => {
+        if (ts.isIdentifier(name)) put(symbolKey(name), node.initializer)
+        else
+          for (const element of name.elements) if (ts.isBindingElement(element)) names(element.name)
       }
-      // beforeEach(() => { vi.useFakeTimers() })
-      if (/^(beforeEach|beforeAll)$/.test(callee)) {
-        const fn = call.arguments[0] && bare(call.arguments[0])
-        if (fn && ts.isFunctionLike(fn) && fn.body && ts.isBlock(fn.body))
-          for (const kind of fakesIn(fn.body.statements)) kinds.add(kind)
+      names(node.name)
+    }
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+      node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+    ) {
+      put(keyOf(node.left), node.right)
+      let root = node.left
+      while (ts.isElementAccessExpression(root) || ts.isPropertyAccessExpression(root))
+        root = root.expression
+      put(keyOf(root), node.right)
+    }
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      ['push', 'unshift'].includes(node.expression.name.text)
+    )
+      for (const argument of node.arguments) put(keyOf(node.expression.expression), argument)
+    if (ts.isPropertyDeclaration(node) && node.initializer) {
+      const owner = classKey(node)
+      if (owner !== undefined) put(`${owner}.${node.name.getText(sf)}`, node.initializer)
+    }
+    if (
+      ts.isPropertyAssignment(node) &&
+      ts.isObjectLiteralExpression(node.parent) &&
+      ts.isVariableDeclaration(node.parent.parent) &&
+      ts.isIdentifier(node.parent.parent.name)
+    )
+      put(`${symbolKey(node.parent.parent.name)}.${node.name.getText(sf)}`, node.initializer)
+    if (ts.isFunctionLike(node) && 'body' in node && node.body) {
+      const key = declaredKey(node)
+      if (key !== undefined && !ts.isBlock(node.body)) put(key, node.body)
+      if (key !== undefined && ts.isBlock(node.body)) {
+        const returns = (n) => {
+          if (ts.isReturnStatement(n) && n.expression) put(key, n.expression)
+          if (n !== node.body && (ts.isFunctionLike(n) || ts.isClassLike(n))) return
+          ts.forEachChild(n, returns)
+        }
+        returns(node.body)
       }
     }
-    statements.forEach(look)
+    ts.forEachChild(node, index)
+  }
+  index(sf)
+  /** The clocks a value is read from — `performance`, `Date`, `hrtime`, or `held` for one no fake replaces. */
+  const clocksOf = (node) => {
+    const kinds = new Set()
+    const seen = new Set()
+    const visit = (key) => {
+      if (key === undefined || seen.has(key)) return
+      seen.add(key)
+      for (const value of values.get(key) ?? []) walk(value)
+    }
+    const walk = (n) => {
+      if (ts.isCallExpression(n) || ts.isNewExpression(n)) {
+        const callee = resolvedText(n.expression)
+        const kind = /^performance\./.test(callee)
+          ? 'performance'
+          : /^Date(\.now)?$/.test(callee)
+            ? 'Date'
+            : /^process\.hrtime/.test(callee)
+              ? 'hrtime'
+              : undefined
+        if (kind) kinds.add(heldThrough(n.expression) ? 'held' : kind)
+      }
+      if (ts.isShorthandPropertyAssignment(n)) {
+        const value = checker.getShorthandAssignmentValueSymbol(n)
+        if (value) visit(keyOfSymbol(value))
+      }
+      if (
+        ts.isIdentifier(n) ||
+        ts.isPropertyAccessExpression(n) ||
+        n.kind === ts.SyntaxKind.ThisKeyword
+      )
+        visit(keyOf(n))
+      ts.forEachChild(n, walk)
+    }
+    walk(node)
     return kinds
   }
-  const fake = (node) => {
-    const kinds = new Set()
-    for (let n = node; n; n = n.parent) {
-      if (ts.isBlock(n) || ts.isSourceFile(n))
-        for (const kind of fakesIn(n.statements)) kinds.add(kind)
+
+  /** The clocks `vi.useFakeTimers(options)` holds still; options it cannot read leave every clock real. */
+  const fakedBy = (call) => {
+    const options = call.arguments[0] && bare(call.arguments[0])
+    if (!options) return new Set(CLOCKS)
+    if (!ts.isObjectLiteralExpression(options)) return new Set()
+    const option = (name) => options.properties.find((p) => p.name?.getText(sf) === name)
+    const advance = option('shouldAdvanceTime')
+    if (
+      advance &&
+      !(ts.isPropertyAssignment(advance) && advance.initializer.kind === ts.SyntaxKind.FalseKeyword)
+    )
+      return new Set()
+    const list = (name) => {
+      const p = option(name)
+      if (!p) return null
+      const v = ts.isPropertyAssignment(p) ? bare(p.initializer) : undefined
+      return v && ts.isArrayLiteralExpression(v)
+        ? v.elements.filter(ts.isStringLiteralLike).map((e) => e.text)
+        : undefined
     }
-    return [...used].every((kind) => kinds.has(kind))
+    const toFake = list('toFake')
+    const toNotFake = list('toNotFake')
+    if (toFake === undefined || toNotFake === undefined) return new Set()
+    // an empty toFake fakes everything, as @sinonjs/fake-timers reads it
+    if (toFake?.length) return new Set(CLOCKS.filter((clock) => toFake.includes(clock)))
+    return new Set(CLOCKS.filter((clock) => !toNotFake?.includes(clock)))
+  }
+  /** The function of this file a call names, if any. */
+  const helperOf = (call) => {
+    const declaration = ts.isIdentifier(call.expression)
+      ? checker.getSymbolAtLocation(call.expression)?.valueDeclaration
+      : undefined
+    if (!declaration || declaration.getSourceFile() !== sf) return undefined
+    if (ts.isFunctionDeclaration(declaration)) return declaration
+    const init = ts.isVariableDeclaration(declaration) && declaration.initializer
+    return init && ts.isFunctionLike(bare(init)) ? bare(init) : undefined
+  }
+  const bodyOf = (fn) =>
+    fn && ts.isFunctionLike(fn) && fn.body
+      ? ts.isBlock(fn.body)
+        ? fn.body.statements
+        : [fn.body]
+      : []
+  /** The clocks held still after statements run, from those held before: a chain of calls in order. */
+  const run = (statements, faked, depth = 0) => {
+    let state = faked
+    for (const statement of statements) {
+      const calls = []
+      for (
+        let c = bare(ts.isExpressionStatement(statement) ? statement.expression : statement);
+        c !== undefined && ts.isCallExpression(c);
+        c = ts.isPropertyAccessExpression(c.expression) ? bare(c.expression.expression) : undefined
+      )
+        calls.unshift(c)
+      for (const call of calls) {
+        const name = ts.isPropertyAccessExpression(call.expression)
+          ? call.expression.name.text
+          : call.expression.getText(sf)
+        if (name === 'useFakeTimers') state = fakedBy(call)
+        else if (name === 'useRealTimers') state = new Set()
+        // vi.setSystemTime with real timers fakes Date alone
+        else if (name === 'setSystemTime' && state.size === 0) state = new Set(['Date'])
+        else if (depth < 5) {
+          const helper = helperOf(call)
+          if (helper) state = run(bodyOf(helper), state, depth + 1)
+        }
+      }
+    }
+    return state
+  }
+  const calleeRoot = (call) => {
+    let e = call.expression
+    while (ts.isPropertyAccessExpression(e) || ts.isCallExpression(e)) e = e.expression
+    return ts.isIdentifier(e) ? e.text : ''
+  }
+  const isSuiteBody = (block) =>
+    ts.isSourceFile(block) ||
+    (ts.isFunctionLike(block.parent) &&
+      ts.isCallExpression(block.parent.parent) &&
+      block.parent.parent.arguments.includes(block.parent) &&
+      SUITE.test(calleeRoot(block.parent.parent)))
+  const contains = (outer, inner) => inner.pos >= outer.pos && inner.end <= outer.end
+  /** The clocks held still where a node runs, in the order vitest runs what stands before it. */
+  const fakedAt = (node) => {
+    const path = []
+    for (let child = node, n = node.parent; n; child = n, n = n.parent)
+      if (ts.isBlock(n) || ts.isSourceFile(n)) path.unshift({ block: n, child })
+    const before = ({ block, child }) =>
+      block.statements.slice(0, Math.max(0, block.statements.indexOf(child)))
+    const suites = path.filter(({ block }) => isSuiteBody(block))
+    let state = new Set()
+    for (const level of suites) state = run(before(level), state)
+    for (const hook of ['beforeAll', 'beforeEach'])
+      for (const { block } of suites)
+        for (const statement of block.statements) {
+          const call = ts.isExpressionStatement(statement) && bare(statement.expression)
+          if (!call || !ts.isCallExpression(call) || calleeText(call) !== hook) continue
+          const fn = call.arguments[0] && bare(call.arguments[0])
+          if (fn && !contains(fn, node)) state = run(bodyOf(fn), state)
+        }
+    for (const level of path) if (!isSuiteBody(level.block)) state = run(before(level), state)
+    return state
+  }
+  /** Whether every clock the values read is one fake timers hold still where the node runs. */
+  const fake = (node, read) => {
+    const kinds = new Set(read.filter(Boolean).flatMap((value) => [...clocksOf(value)]))
+    const faked = fakedAt(node)
+    return [...(kinds.size > 0 ? kinds : CLOCKS)].every((kind) => faked.has(kind))
   }
 
   const found = []
   const at = (node) =>
     `${String(sf.getLineAndCharacterOfPosition(node.getStart()).line + 1)}: ${node.getText(sf).split('\n')[0]}`
   const walk = (node) => {
-    const bound = boundedAbove(node).some(
-      ({ measured, limit }) =>
-        carries(measured) || (isReading(measured) && limit !== undefined && mentionsReading(limit)),
-    )
-    let raw = bound
+    let raw = boundedAbove(node).some((pair) => breaks(pair) && !fake(node, [pair.small, pair.big]))
     if (!raw && ts.isCallExpression(node)) {
       const key = keyOf(node.expression)
       const places = key === undefined ? undefined : bounders.get(key)
       raw = Boolean(
-        places?.some((place) => node.arguments[place] && carries(node.arguments[place])),
+        places?.some((place) => {
+          const argument = node.arguments[place]
+          return argument && carries(argument) && !fake(node, [argument])
+        }),
       )
     }
-    if (raw && !fake(node)) found.push(at(node))
+    if (raw) found.push(at(node))
     ts.forEachChild(node, walk)
   }
   walk(sf)
@@ -656,7 +941,7 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()
   const problems = files.flatMap((file) => {
     const source = readFileSync(file, 'utf8')
     // a file that never reads the clock holds no duration: the binder is spared it
-    if (!/\.now\(|\bDate\b|hrtime/.test(source)) return []
+    if (!/\.now\b|\bDate\b|hrtime/.test(source)) return []
     return rawBounds(file, source).map((line) => `  ${file}:${line}`)
   })
   if (problems.length > 0) {
