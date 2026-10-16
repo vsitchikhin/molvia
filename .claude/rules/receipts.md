@@ -249,9 +249,11 @@ pharmacies print three decimals beside its shops' two — **and a card may name 
 or with one it does not read (`RangeError` in `lexiconOf`, adversarial А3) — a card of three decimals read as
 two would be every sum wrong, and only a refusal makes the field more than a declaration.
 
-**The price, named:** `priceInDoubt` asks the receipt's country (`receiptCard`): a receipt of the tax office
-(Serbia) was read by nobody, so no digit of it is in doubt — before the card the Armenian swaps flagged a Serbian
-price one «confused» digit off the memory's, a real change of price shown as a misreading.
+**The price, as before:** `priceInDoubt` asks the receipt's country (`receiptCard`), and a card read off no photo
+— Serbia's, from the tax office — keeps the Armenian swaps it was checked by before the card (`ARMENIAN_RECEIPTS`).
+A price of such a receipt one «confused» digit off the memory's is still flagged, though nobody read it and the
+change of price is likely real: doubting none of its digits is a change of behaviour the owner had not decided,
+so it is MOL-270's, not the card's (self-review № 3).
 
 ## What a line is (MOL-126)
 
