@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { expectWithin } from './clock'
 
 describe('expectWithin', () => {
@@ -46,5 +46,19 @@ describe.concurrent('expectWithin in a concurrent test', () => {
     expectWithin(1, 10, { task })
     expect(task.meta.clockBounds).toEqual([{ elapsed: 1, bound: 10 }])
     delete task.meta.clockBounds
+  })
+})
+
+// adversarial round 2 of MOL-266, Б2: fake time is no duration — no runner moves it
+describe('expectWithin under fake timers', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('refuses a bound on fake time, which an ordinary expect holds', () => {
+    vi.useFakeTimers()
+    expect(() => {
+      expectWithin(1, 10)
+    }).toThrow(/fake time/)
   })
 })

@@ -1,4 +1,4 @@
-import { expect, TestRunner, type TestContext } from 'vitest'
+import { expect, TestRunner, vi, type TestContext } from 'vitest'
 
 /** What a test asserted of a duration, kept for the time reporter (`bin/test-time-reporter.ts`). */
 export interface ClockBound {
@@ -23,12 +23,20 @@ declare module 'vitest' {
  * A concurrent test passes its context: vitest's current test is one for the whole worker, and
  * beside another test running it is that other test, or none (adversarial А7). Without the context
  * a bound there is refused rather than kept on the wrong test.
+ *
+ * Fake time is no duration: no runner moves it, so a bound on it is an ordinary `expect`, and here it
+ * is refused (adversarial Б2) — the reporter would hold it to ten times what it met.
  */
 export function expectWithin(
   elapsed: number,
   bound: number,
   context?: Pick<TestContext, 'task'>,
 ): void {
+  if (vi.isFakeTimers()) {
+    throw new Error(
+      'expectWithin under vi.useFakeTimers(): fake time is no duration — bound it with expect',
+    )
+  }
   const test = context?.task ?? TestRunner.getCurrentTest()
   if (!test || (!context && test.concurrent)) {
     throw new Error(
