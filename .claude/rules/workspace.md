@@ -203,7 +203,8 @@ of the measure and with every test merged. So CI checks every run instead (owner
   TypeScript's binder — `{ timeout }`; `undefined` or nothing is the project's. A suite is `describe` or
   `suite`; one named by a string is the hook's own, one named by a template, `each`'s placeholders or an
   expression (`X.name`) a guess. A hook in a helper of the file stands in the suite the helper is called in,
-  beside the suite's own and summed with them (review №14, В5) — its own helpers' with it; one whose helper is
+  beside the suite's own and summed with them (review №14, В5) — its own helpers' with it, by their calls, and a
+  suite the helper declares itself under that suite (review №16, Г5); one whose helper is
   called nowhere the parse sees stands wherever it may, a guess, and a helper of another file is not seen. The exact suite is taken before a guess, and the smallest of the guesses where they differ (review
   №10). **A timeout the parse cannot read** — an import, a condition, a call — is held as the project's, and
   the advice asks for it as a number: the limit is one, and silence would let a hook past the rule (Б4).
@@ -226,7 +227,8 @@ of the measure and with every test merged. So CI checks every run instead (owner
   and `node:process`' own, `{ now } = Date`, `.bind`), and the file's own clocks; a duration through names,
   fields, classes and their getters, arrays, `+=`, `push`, the answer of a helper, a helper that subtracts a
   reading it takes however it rounds, `hrtime(t0)`, `performance.measure`; a budget — a duration taken from a
-  number, `200 - d`, `left -= d`, `deadline - Date.now()` — whose lower bound is an upper bound on the duration;
+  number, `200 - d`, `left -= d`, `deadline - Date.now()`, or divided into one, a rate (`1000 / ms`), kept through
+  `Math.max` and `Math.min` — whose lower bound is an upper bound on the duration;
   bounded by vitest's, chai's and `assert`'s forms, a comparison asserted true or false (`toBe(false)`,
   `isFalse`, `!`, `&&`), `toSatisfy`, `if … throw`, a helper bounding its parameter, and a deadline — a reading
   held below a reading plus a number. Two readings against each other are a lower bound (adversarial В4). Names are resolved by TypeScript's binder, so the age of a stamp held under a name
@@ -234,11 +236,17 @@ of the measure and with every test merged. So CI checks every run instead (owner
   `bot/src/assemble` bounds a retry on fake time): a bound is let go only where every clock its values are read
   from is one fake timers hold still at the bound — each value followed to the clocks it was read from, so a
   `process` or `performance` elsewhere in the file changes nothing (В3). What fakes a clock there is read in the
-  order vitest runs it (review №13, В2): the file and its suites as they are collected, the `beforeAll` of each
-  suite outwards in, then the `beforeEach`, then the test's own statements before the bound, a helper of the file
-  they call included; `useRealTimers()` lets go, `toFake` and `toNotFake` choose, `shouldAdvanceTime` moves the
-  fake clock with the real one, so it is real, `vi.setSystemTime` alone fakes `Date`, options the parse cannot
-  read leave every clock real, and a clock taken under another name keeps the real one. **The price, named:** a
+  order vitest runs it (review №13, В2), and **in doubt a clock is real** (review №15, adversarial Г1): a bound
+  refused is still lawful through `expectWithin`, a bound let go on real time is held by nobody. The whole file
+  and every suite's body as they are collected, then the `beforeAll` of each suite outwards in — both only where
+  no other test, no other hook and no function one of them calls touches the timers — then the `beforeEach`,
+  then the test's own statements before the bound, a helper of the file they call included. What may not run —
+  a branch, a loop, a try that may stop anywhere — keeps only what both ways hold still; a `finally` always
+  runs. A bound in a hook or a helper starts from real clocks: its caller is not read. `useRealTimers()` lets
+  go, `toFake` and `toNotFake` choose, `shouldAdvanceTime` and any tick mode but `manual`
+  (`vi.setTimerTickMode`) move the fake clock with the real one, so it is real, `vi.setSystemTime` alone fakes
+  `Date`, options the parse cannot read whole — a name, a spread, a name in a list — leave every clock real, and
+  a clock taken under another name keeps the real one. **The price, named:** a
   duration the code under test measures has no clock in the test to be found by (`metrics`' lag), a helper
   imported from another file is not followed, a structure the lists do not name is not seen, nor fake timers
   turned on by a helper of another file, a hook a helper registers or a test before — all go to `expectWithin`,
