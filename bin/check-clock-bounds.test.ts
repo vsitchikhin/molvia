@@ -404,4 +404,108 @@ describe('rawBounds', () => {
   ])('leaves alone a bound on fake time — %s', (_, source) => {
     expect(rawBounds('a.test.ts', source)).toEqual([])
   })
+
+  // review round 4 of MOL-266: №15 and adversarial Г1–Г3 — what may let the fake go between is read as letting it
+  // go: in doubt a clock is real, and a bound refused here is still lawful through expectWithin
+  const REAL = `const t0 = performance.now()\nawait wait(300)\nexpect(performance.now() - t0).toBeLessThan(1_000)`
+  it.each([
+    [
+      'useRealTimers() at the file’s end',
+      `vi.useFakeTimers()\nit('x', async () => {\n${REAL}\n})\nvi.useRealTimers()`,
+    ],
+    [
+      'a sibling suite collected after it',
+      `describe('a', () => {\nvi.useFakeTimers()\nit('x', async () => {\n${REAL}\n})\n})\ndescribe('b', () => {\nvi.useRealTimers()\n})`,
+    ],
+    [
+      'afterEach letting go of beforeAll',
+      `beforeAll(() => {\nvi.useFakeTimers()\n})\nafterEach(() => {\nvi.useRealTimers()\n})\nit('first', () => {})\nit('x', async () => {\n${REAL}\n})`,
+    ],
+    [
+      'an earlier test letting go',
+      `beforeAll(() => {\nvi.useFakeTimers()\n})\nit('first', () => {\nvi.useRealTimers()\n})\nit('x', async () => {\n${REAL}\n})`,
+    ],
+    [
+      'an earlier suite’s afterAll letting go',
+      `beforeAll(() => {\nvi.useFakeTimers()\n})\ndescribe('a', () => {\nafterAll(() => {\nvi.useRealTimers()\n})\nit('first', () => {})\n})\ndescribe('b', () => {\nit('x', async () => {\n${REAL}\n})\n})`,
+    ],
+    [
+      'a beforeEach given by reference',
+      `const realClock = (): void => {\nvi.useRealTimers()\n}\nbeforeAll(() => {\nvi.useFakeTimers()\n})\nbeforeEach(realClock)\nit('x', async () => {\n${REAL}\n})`,
+    ],
+    [
+      'a helper an afterEach calls',
+      `function realClock(): void {\nvi.useRealTimers()\n}\nbeforeAll(() => {\nvi.useFakeTimers()\n})\nafterEach(() => {\nrealClock()\n})\nit('x', async () => {\n${REAL}\n})`,
+    ],
+    [
+      'useRealTimers() in a finally',
+      `it('x', async () => {\nvi.useFakeTimers()\ntry {\nawait vi.advanceTimersByTimeAsync(10)\n} finally {\nvi.useRealTimers()\n}\n${REAL}\n})`,
+    ],
+    [
+      'useRealTimers() in a branch',
+      `it('x', async () => {\nvi.useFakeTimers()\nif (slow) vi.useRealTimers()\n${REAL}\n})`,
+    ],
+    [
+      'a helper’s bound — its caller is not read',
+      `beforeEach(() => {\nvi.useFakeTimers()\n})\nasync function bounded(): Promise<void> {\n${REAL}\n}\nit('x', async () => {\nvi.useRealTimers()\nawait bounded()\n})`,
+    ],
+    [
+      'setTimerTickMode, which moves fake time with the real one',
+      `it('x', async () => {\nvi.useFakeTimers()\nvi.setTimerTickMode('interval', 20)\n${REAL}\n})`,
+    ],
+    ['a spread of options', `it('x', async () => {\nvi.useFakeTimers({ ...OPTIONS })\n${REAL}\n})`],
+    [
+      'a name in toNotFake',
+      `it('x', async () => {\nvi.useFakeTimers({ toNotFake: [REAL_CLOCK] })\n${REAL}\n})`,
+    ],
+    [
+      'a quoted shouldAdvanceTime',
+      `it('x', async () => {\nvi.useFakeTimers({ 'shouldAdvanceTime': true })\n${REAL}\n})`,
+    ],
+  ])('finds a bound on real time beside fake timers — %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toHaveLength(1)
+  })
+
+  it.each([
+    [
+      'beforeEach fakes, afterEach lets go',
+      `beforeEach(() => {\nvi.useFakeTimers()\n})\nafterEach(() => {\nvi.useRealTimers()\n})\nit('first', () => {})\nit('x', async () => {\n${FAKE}\n})`,
+    ],
+    [
+      'the test fakes after the file’s afterEach let go — bot/src/assemble.test.ts',
+      `afterEach(() => {\nvi.useRealTimers()\n})\nit('x', async () => {\nvi.useFakeTimers()\n${FAKE}\n})`,
+    ],
+    [
+      'beforeAll with no other test or hook touching the timers',
+      `beforeAll(() => {\nvi.useFakeTimers()\n})\nit('first', () => {})\nit('x', async () => {\n${FAKE}\n})`,
+    ],
+    [
+      'a manual tick mode',
+      `it('x', async () => {\nvi.useFakeTimers()\nvi.setTimerTickMode('manual')\n${FAKE}\n})`,
+    ],
+    [
+      'a bound inside a callback the test runs',
+      `it('x', async () => {\nvi.useFakeTimers()\nconst back = Date.now()\nawait vi.advanceTimersByTimeAsync(20_000)\nawait vi.waitFor(() => {\nexpect(Date.now() - back).toBeLessThan(30_000)\n})\n})`,
+    ],
+  ])('leaves alone a bound on fake time — %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toEqual([])
+  })
+
+  // adversarial Г4: a rate falls as the duration grows, and Math.max keeps a budget a budget
+  it.each([
+    [
+      'a rate bounded below',
+      `${START}const ms = performance.now() - started\nexpect(1_000 / ms).toBeGreaterThan(5)`,
+    ],
+    [
+      'items a second',
+      `${START}const ms = performance.now() - started\nexpect(items / (ms / 1_000)).toBeGreaterThanOrEqual(1_000)`,
+    ],
+    [
+      'what is left through Math.max',
+      `const deadline = Date.now() + 200\nwork()\nexpect(Math.max(0, deadline - Date.now())).toBeGreaterThan(0)`,
+    ],
+  ])('finds the bound written as %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toHaveLength(1)
+  })
 })

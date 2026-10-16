@@ -16,8 +16,9 @@
 // field, an object or array it is put in (`=`, `+=`, `push`) or taken apart from, a function of the file,
 // a method or a getter that returns it, a call of one that subtracts a reading it takes from the clock
 // however it rounds (`since(t0)`), `process.hrtime(t0)`, `performance.measure()`. A budget is a duration
-// taken from a number (`200 - d`, `left -= d`, `deadline - Date.now()`), and a lower bound on it is an
-// upper bound on the duration.
+// taken from a number (`200 - d`, `left -= d`, `deadline - Date.now()`) or divided into one (a rate,
+// `1000 / ms`), kept through `Math.max` and `Math.min`, and a lower bound on it is an upper bound on the
+// duration.
 //
 // Refused is an upper bound on a duration, and a lower bound on a budget — `toBeLessThan`,
 // `toBeLessThanOrEqual`, chai's `lessThan`, `below`, `lt`, `lte`, `most`, `within`, `toBeCloseTo`; `not`
@@ -29,15 +30,20 @@
 // against each other included; the age of a stamp — the clock against a moment a row holds — is no
 // duration, as one side is not the clock; and a bound where every clock it reads is one
 // `vi.useFakeTimers()` holds still is not one either: no runner moves fake time. What fakes a clock at a
-// bound is read in the order vitest runs it — the file and its suites as they are collected, `beforeAll`,
-// `beforeEach`, the test's own statements before the bound, a helper of the file they call;
-// `useRealTimers()` lets go, `toFake` and `toNotFake` choose, `shouldAdvanceTime` moves fake time with
-// the real one; a clock taken under another name keeps the real one.
+// bound is read in the order vitest runs it, and in doubt a clock is real — a bound refused here is still
+// lawful through `expectWithin`: the whole file and its suites as they are collected, then `beforeAll` —
+// both only where no other test, no other hook and nothing they call may touch the timers between —
+// `beforeEach`, the test's own statements before the bound, a helper of the file they call; what may
+// not run (a branch, a loop, a try) keeps only what both ways hold, a finally always runs; a bound in a
+// hook or a helper starts from real clocks. `useRealTimers()` lets go, `toFake` and `toNotFake` choose,
+// `shouldAdvanceTime` and a tick mode but `manual` move fake time with the real one, options not read
+// whole leave every clock real; a clock taken under another name keeps the real one.
 //
 // The price, named (`workspace.md`): what is not in the lists above is not seen — a duration the code
 // under test measures (`metrics`' lag), a helper imported from another file, a reading kept in a
-// structure the lists do not name, a fake clock turned on by a helper of another file, by an earlier test
-// or by options the parse cannot read (held as real). Those go to `expectWithin`, or are left, by review.
+// structure the lists do not name, a fake clock turned on by a helper of another file, by an earlier test,
+// by a hook a helper registers or outside what is read for sure (held as real). Those go to
+// `expectWithin`, or are left, by review.
 //
 //   node bin/check-clock-bounds.mjs
 
@@ -312,14 +318,21 @@ export function rawBounds(fileName, source) {
         if (isDeadline(n.left) && isReading(n.right)) return -1
         return sign(n.left) || -sign(n.right)
       }
-      if (op === ts.SyntaxKind.PlusToken) {
+      if (op === ts.SyntaxKind.PlusToken || op === ts.SyntaxKind.AsteriskToken) {
         const left = sign(n.left)
         const right = sign(n.right)
         return left === 1 || right === 1 ? 1 : left || right
       }
+      // a rate: `1000 / ms` falls as the duration grows (adversarial Г4)
+      if (op === ts.SyntaxKind.SlashToken) return sign(n.left) || -sign(n.right)
     }
     if (ts.isCallExpression(n)) {
       const callee = calleeText(n)
+      // Math.max(0, deadline - Date.now()): each argument moves its answer the same way
+      if (/^Math\.(max|min)$/.test(callee)) {
+        const ways = n.arguments.map(sign)
+        return ways.includes(1) ? 1 : ways.includes(-1) ? -1 : 0
+      }
       if (MEASURED.test(callee) && (callee !== 'process.hrtime' || n.arguments.length > 0)) return 1
       const key = keyOf(n.expression)
       const places = key === undefined ? undefined : since.get(key)
@@ -801,24 +814,28 @@ export function rawBounds(fileName, source) {
     return kinds
   }
 
-  /** The clocks `vi.useFakeTimers(options)` holds still; options it cannot read leave every clock real. */
+  /** A property's own name, quoted or not; `undefined` for a computed one. */
+  const nameOfProperty = (p) =>
+    p.name && (ts.isIdentifier(p.name) || ts.isStringLiteralLike(p.name)) ? p.name.text : undefined
+  /** The clocks `vi.useFakeTimers(options)` holds still; options it cannot read whole leave every clock real. */
   const fakedBy = (call) => {
     const options = call.arguments[0] && bare(call.arguments[0])
     if (!options) return new Set(CLOCKS)
     if (!ts.isObjectLiteralExpression(options)) return new Set()
-    const option = (name) => options.properties.find((p) => p.name?.getText(sf) === name)
-    const advance = option('shouldAdvanceTime')
+    // a spread, a shorthand or a computed name: what it holds is not read (adversarial Г3)
     if (
-      advance &&
-      !(ts.isPropertyAssignment(advance) && advance.initializer.kind === ts.SyntaxKind.FalseKeyword)
+      options.properties.some((p) => !ts.isPropertyAssignment(p) || nameOfProperty(p) === undefined)
     )
       return new Set()
+    const option = (name) => options.properties.find((p) => nameOfProperty(p) === name)
+    const advance = option('shouldAdvanceTime')
+    if (advance && advance.initializer.kind !== ts.SyntaxKind.FalseKeyword) return new Set()
     const list = (name) => {
       const p = option(name)
       if (!p) return null
-      const v = ts.isPropertyAssignment(p) ? bare(p.initializer) : undefined
-      return v && ts.isArrayLiteralExpression(v)
-        ? v.elements.filter(ts.isStringLiteralLike).map((e) => e.text)
+      const v = bare(p.initializer)
+      return ts.isArrayLiteralExpression(v) && v.elements.every(ts.isStringLiteralLike)
+        ? v.elements.map((e) => e.text)
         : undefined
     }
     const toFake = list('toFake')
@@ -828,10 +845,12 @@ export function rawBounds(fileName, source) {
     if (toFake?.length) return new Set(CLOCKS.filter((clock) => toFake.includes(clock)))
     return new Set(CLOCKS.filter((clock) => !toNotFake?.includes(clock)))
   }
-  /** The function of this file a call names, if any. */
-  const helperOf = (call) => {
-    const declaration = ts.isIdentifier(call.expression)
-      ? checker.getSymbolAtLocation(call.expression)?.valueDeclaration
+  /** The function of this file an expression names, if any. */
+  const functionNamed = (expression) => {
+    const e = bare(expression)
+    if (ts.isFunctionLike(e)) return e
+    const declaration = ts.isIdentifier(e)
+      ? checker.getSymbolAtLocation(e)?.valueDeclaration
       : undefined
     if (!declaration || declaration.getSourceFile() !== sf) return undefined
     if (ts.isFunctionDeclaration(declaration)) return declaration
@@ -844,64 +863,208 @@ export function rawBounds(fileName, source) {
         ? fn.body.statements
         : [fn.body]
       : []
-  /** The clocks held still after statements run, from those held before: a chain of calls in order. */
-  const run = (statements, faked, depth = 0) => {
-    let state = faked
-    for (const statement of statements) {
-      const calls = []
-      for (
-        let c = bare(ts.isExpressionStatement(statement) ? statement.expression : statement);
-        c !== undefined && ts.isCallExpression(c);
-        c = ts.isPropertyAccessExpression(c.expression) ? bare(c.expression.expression) : undefined
-      )
-        calls.unshift(c)
-      for (const call of calls) {
-        const name = ts.isPropertyAccessExpression(call.expression)
-          ? call.expression.name.text
-          : call.expression.getText(sf)
-        if (name === 'useFakeTimers') state = fakedBy(call)
-        else if (name === 'useRealTimers') state = new Set()
-        // vi.setSystemTime with real timers fakes Date alone
-        else if (name === 'setSystemTime' && state.size === 0) state = new Set(['Date'])
-        else if (depth < 5) {
-          const helper = helperOf(call)
-          if (helper) state = run(bodyOf(helper), state, depth + 1)
-        }
-      }
-    }
-    return state
-  }
+  const nameOfCall = (call) =>
+    ts.isPropertyAccessExpression(call.expression)
+      ? call.expression.name.text
+      : call.expression.getText(sf)
   const calleeRoot = (call) => {
     let e = call.expression
     while (ts.isPropertyAccessExpression(e) || ts.isCallExpression(e)) e = e.expression
     return ts.isIdentifier(e) ? e.text : ''
   }
-  const isSuiteBody = (block) =>
-    ts.isSourceFile(block) ||
-    (ts.isFunctionLike(block.parent) &&
-      ts.isCallExpression(block.parent.parent) &&
-      block.parent.parent.arguments.includes(block.parent) &&
-      SUITE.test(calleeRoot(block.parent.parent)))
-  const contains = (outer, inner) => inner.pos >= outer.pos && inner.end <= outer.end
-  /** The clocks held still where a node runs, in the order vitest runs what stands before it. */
-  const fakedAt = (node) => {
-    const path = []
-    for (let child = node, n = node.parent; n; child = n, n = n.parent)
-      if (ts.isBlock(n) || ts.isSourceFile(n)) path.unshift({ block: n, child })
-    const before = ({ block, child }) =>
-      block.statements.slice(0, Math.max(0, block.statements.indexOf(child)))
-    const suites = path.filter(({ block }) => isSuiteBody(block))
-    let state = new Set()
-    for (const level of suites) state = run(before(level), state)
-    for (const hook of ['beforeAll', 'beforeEach'])
-      for (const { block } of suites)
-        for (const statement of block.statements) {
+  const TEST = /^(it|test)$/
+  const HOOK = /^(before|after|around)(All|Each)$/
+  const TIMERS = new Set(['useFakeTimers', 'useRealTimers', 'setTimerTickMode'])
+  const intersect = (a, b) => new Set([...a].filter((kind) => b.has(kind)))
+
+  // What runs is read in order; what may or may not run keeps only the clocks both ways hold still — in
+  // doubt a clock is real, since a bound refused here is still lawful through `expectWithin` (round 4, Г1).
+  /** The clocks held still after a chain of calls in an expression: `vi.useFakeTimers().setSystemTime(…)`. */
+  const calls = (expression, state, depth) => {
+    const chain = []
+    for (
+      let c = bare(expression);
+      c !== undefined && ts.isCallExpression(c);
+      c = ts.isPropertyAccessExpression(c.expression) ? bare(c.expression.expression) : undefined
+    )
+      chain.unshift(c)
+    let now = state
+    for (const call of chain) {
+      const name = nameOfCall(call)
+      if (name === 'useFakeTimers') now = fakedBy(call)
+      else if (name === 'useRealTimers') now = new Set()
+      // vi.setSystemTime with real timers fakes Date alone
+      else if (name === 'setSystemTime' && now.size === 0) now = new Set(['Date'])
+      // any mode but `manual` moves fake time by itself, as shouldAdvanceTime does (Г2)
+      else if (name === 'setTimerTickMode') {
+        const mode = call.arguments[0] && bare(call.arguments[0])
+        if (!(mode && ts.isStringLiteralLike(mode) && mode.text === 'manual')) now = new Set()
+      } else if (depth < 5) {
+        const helper = ts.isIdentifier(call.expression) ? functionNamed(call.expression) : undefined
+        if (helper) now = steps(bodyOf(helper), now, depth + 1)
+      }
+    }
+    return now
+  }
+  /** The clocks held still after one statement — or an arrow's body — runs. */
+  const step = (node, state, depth) => {
+    if (ts.isBlock(node)) return steps(node.statements, state, depth)
+    if (ts.isExpressionStatement(node)) return calls(node.expression, state, depth)
+    if (ts.isVariableStatement(node))
+      return node.declarationList.declarations.reduce(
+        (now, d) => (d.initializer ? calls(d.initializer, now, depth) : now),
+        state,
+      )
+    if (ts.isTryStatement(node)) {
+      // a try may stop anywhere, a catch may not run; the finally always runs
+      let now = intersect(state, step(node.tryBlock, state, depth))
+      if (node.catchClause) now = intersect(now, step(node.catchClause.block, now, depth))
+      return node.finallyBlock ? step(node.finallyBlock, now, depth) : now
+    }
+    const branches = ts.isIfStatement(node)
+      ? [node.thenStatement, node.elseStatement]
+      : ts.isIterationStatement(node, false) || ts.isLabeledStatement(node)
+        ? [node.statement]
+        : ts.isSwitchStatement(node)
+          ? node.caseBlock.clauses.map((clause) => ts.factory.createBlock(clause.statements))
+          : undefined
+    if (branches)
+      return branches.reduce(
+        (now, branch) => (branch ? intersect(now, step(branch, state, depth)) : now),
+        state,
+      )
+    if (ts.isStatement(node)) return state
+    return calls(node, state, depth)
+  }
+  const steps = (statements, state, depth = 0) =>
+    statements.reduce((now, statement) => step(statement, now, depth), state)
+  /** The clocks held still once the file is collected: its body and every suite's, in order. */
+  const collected = (statements, state) =>
+    statements.reduce((now, statement) => {
+      const call = ts.isExpressionStatement(statement) && bare(statement.expression)
+      if (call && ts.isCallExpression(call) && SUITE.test(calleeRoot(call))) {
+        const fn = call.arguments.map(bare).find((a) => ts.isFunctionLike(a))
+        return fn ? collected(bodyOf(fn), now) : now
+      }
+      return step(statement, now, 0)
+    }, state)
+  const callOf = (fn) =>
+    ts.isCallExpression(fn.parent) && fn.parent.arguments.includes(fn) ? fn.parent : undefined
+  const declaredName = (fn) =>
+    ts.isFunctionDeclaration(fn)
+      ? fn.name
+      : ts.isVariableDeclaration(fn.parent) && ts.isIdentifier(fn.parent.name)
+        ? fn.parent.name
+        : undefined
+  const referencesTo = (symbol, declared) => {
+    const found = []
+    const look = (n) => {
+      if (ts.isIdentifier(n) && n !== declared && checker.getSymbolAtLocation(n) === symbol)
+        found.push(n)
+      ts.forEachChild(n, look)
+    }
+    look(sf)
+    return found
+  }
+  const timerCalls = []
+  const gather = (n) => {
+    if (ts.isCallExpression(n) && TIMERS.has(nameOfCall(n))) timerCalls.push(n)
+    ts.forEachChild(n, gather)
+  }
+  gather(sf)
+  /**
+   * Whether a node may run after the file is collected and before the test `test`, outside the hooks of
+   * its own suites read in order: another test, any other hook, a function called from one.
+   */
+  const runsBetween = (node, test, own, seen) => {
+    // a function handed over by name runs as what it is handed to: afterEach(realClock)
+    const handed = ts.isIdentifier(node) ? callOf(node) : undefined
+    if (handed) {
+      if (own.has(node)) return false
+      const root = calleeRoot(handed)
+      if (TEST.test(root) || HOOK.test(root) || SUITE.test(root)) return true
+    }
+    for (let n = node.parent; n; n = n.parent) {
+      if (n === test) return false
+      if (!ts.isFunctionLike(n)) continue
+      const call = callOf(n)
+      if (call) {
+        const root = calleeRoot(call)
+        if (SUITE.test(root)) return false
+        if (TEST.test(root)) return true
+        if (HOOK.test(root)) return !own.has(n)
+        continue
+      }
+      const id = declaredName(n)
+      const symbol = id && checker.getSymbolAtLocation(id)
+      if (!symbol || seen.has(symbol)) return true
+      seen.add(symbol)
+      return referencesTo(symbol, id).some((ref) => runsBetween(ref, test, own, seen))
+    }
+    return false
+  }
+  /** The clocks held still as a test's own body begins. */
+  const beforeTest = (test) => {
+    const levels = []
+    for (let n = test.parent; n; n = n.parent) {
+      if (ts.isSourceFile(n)) levels.unshift(n.statements)
+      else if (ts.isFunctionLike(n) && callOf(n) && SUITE.test(calleeRoot(callOf(n))))
+        levels.unshift(bodyOf(n))
+    }
+    const hooks = (kind) =>
+      levels.flatMap((statements) =>
+        statements.flatMap((statement) => {
           const call = ts.isExpressionStatement(statement) && bare(statement.expression)
-          if (!call || !ts.isCallExpression(call) || calleeText(call) !== hook) continue
-          const fn = call.arguments[0] && bare(call.arguments[0])
-          if (fn && !contains(fn, node)) state = run(bodyOf(fn), state)
-        }
-    for (const level of path) if (!isSuiteBody(level.block)) state = run(before(level), state)
+          return call && ts.isCallExpression(call) && calleeText(call) === kind && call.arguments[0]
+            ? [call.arguments[0]]
+            : []
+        }),
+      )
+    const beforeAll = hooks('beforeAll')
+    const beforeEach = hooks('beforeEach')
+    const own = new Set([...beforeAll, ...beforeEach].map(bare))
+    const between = timerCalls.some((call) => runsBetween(call, test, own, new Set()))
+    // what another test or hook may do between, the collection and its beforeAll are no longer sure of
+    let state = between ? new Set() : collected(sf.statements, new Set())
+    if (!between) for (const hook of beforeAll) state = steps(bodyOf(functionNamed(hook)), state)
+    for (const hook of beforeEach) state = steps(bodyOf(functionNamed(hook)), state)
+    return state
+  }
+  /**
+   * The clocks held still where a node runs: in a test, what runs before its body and its statements
+   * before the node; in a hook or a helper, only its own statements, since its caller is not read (Г1-7).
+   */
+  const fakedAt = (node) => {
+    let start
+    let test = false
+    for (let n = node.parent; n && start === undefined; n = n.parent) {
+      if (!ts.isFunctionLike(n)) continue
+      const call = callOf(n)
+      const root = call ? calleeRoot(call) : ''
+      // a callback the test runs as it goes: waitFor(() => …)
+      if (call && !TEST.test(root) && !SUITE.test(root) && !HOOK.test(root)) continue
+      start = n
+      test = TEST.test(root)
+    }
+    const path = []
+    for (let child = node, n = node.parent; n && n !== start; child = n, n = n.parent)
+      if (ts.isBlock(n) || ts.isSourceFile(n)) path.unshift({ block: n, child })
+    let state = test ? beforeTest(start) : new Set()
+    path.forEach(({ block, child }, at) => {
+      state = steps(block.statements.slice(0, Math.max(0, block.statements.indexOf(child))), state)
+      const inner = path[at + 1]?.block
+      if (!inner || child === inner) return
+      // entering a finally the try ran first, a catch after a try that may have stopped anywhere
+      if (ts.isTryStatement(child)) {
+        if (inner === child.finallyBlock || inner === child.catchClause?.block)
+          state = intersect(state, step(child.tryBlock, state, 0))
+        if (inner === child.finallyBlock && child.catchClause)
+          state = intersect(state, step(child.catchClause.block, state, 0))
+      }
+      // a loop's body ran before, as many times as it did
+      if (ts.isIterationStatement(child, false))
+        state = intersect(state, step(child.statement, state, 0))
+    })
     return state
   }
   /** Whether every clock the values read is one fake timers hold still where the node runs. */
