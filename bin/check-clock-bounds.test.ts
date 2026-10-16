@@ -143,4 +143,128 @@ describe('rawBounds', () => {
       `),
     ).toEqual([])
   })
+
+  // review round 2 of MOL-266: №9 and adversarial Б1 — each a bound the parse of round 1 let through
+  it.each([
+    [
+      'a deadline',
+      `const deadline = Date.now() + 100\nwork()\nexpect(Date.now()).toBeLessThan(deadline)`,
+    ],
+    [
+      'a reading against a reading plus a number',
+      `const t0 = Date.now()\nwork()\nexpect(Date.now()).toBeLessThanOrEqual(t0 + 100)`,
+    ],
+    [
+      'a now() of the file',
+      `const now = () => performance.now()\nconst started = now()\nexpect(now() - started).toBeLessThan(200)`,
+    ],
+    [
+      'now taken apart from performance',
+      `const { now } = performance\nconst started = now()\nexpect(now() - started).toBeLessThan(200)`,
+    ],
+    [
+      'a helper that rounds',
+      `const since = (from: number) => Math.round(performance.now() - from)\n${START}expect(since(started)).toBeLessThan(200)`,
+    ],
+    [
+      'a helper in seconds',
+      `const since = (from: number) => (performance.now() - from) / 1000\n${START}expect(since(started)).toBeLessThan(0.2)`,
+    ],
+    [
+      'durations summed by +=',
+      `let total = 0\nfor (const x of xs) { const s = performance.now(); work(x); total += performance.now() - s }\nexpect(total).toBeLessThan(200)`,
+    ],
+    [
+      'durations pushed',
+      `const took: number[] = []\nfor (const x of xs) { const s = performance.now(); work(x); took.push(performance.now() - s) }\nexpect(Math.max(...took)).toBeLessThan(200)`,
+    ],
+    [
+      'readings pushed',
+      `const calls: number[] = []\nconst back = Date.now()\nwork(() => calls.push(Date.now()))\nexpect((calls.at(-1) ?? Infinity) - back).toBeLessThan(200)`,
+    ],
+    [
+      'readings by index',
+      `const marks = [performance.now()]\nwork()\nmarks.push(performance.now())\nexpect(marks[1] - marks[0]).toBeLessThan(200)`,
+    ],
+    [
+      'readings in the answer of a helper',
+      `function asking() { const calls: number[] = []; work(() => calls.push(Date.now())); return { calls } }\nconst { calls } = asking()\nconst back = Date.now()\nexpect((calls.at(-1) ?? Infinity) - back).toBeLessThan(200)`,
+    ],
+    [
+      'a class of the file',
+      `class Stopwatch { start = performance.now(); elapsed() { return performance.now() - this.start } }\nconst watch = new Stopwatch()\nexpect(watch.elapsed()).toBeLessThan(200)`,
+    ],
+    [
+      'a shorthand field',
+      `const t0 = performance.now()\nconst mark = { t0 }\nexpect(performance.now() - mark.t0).toBeLessThan(200)`,
+    ],
+    ['if … throw', `${START}if (performance.now() - started > 200) throw new Error('too slow')`],
+    ['if … expect.fail', `${START}if (performance.now() - started > 200) expect.fail('too slow')`],
+    [
+      'toSatisfy with a block',
+      `${START}expect(performance.now() - started).toSatisfy((ms: number) => { return ms < 200 })`,
+    ],
+    [
+      'toSatisfy with a named check',
+      `${START}const fast = (ms: number) => ms < 200\nexpect(performance.now() - started).toSatisfy(fast)`,
+    ],
+    [
+      'assert.strictEqual of a comparison',
+      `${START}assert.strictEqual(performance.now() - started < 200, true)`,
+    ],
+    ['toBeCloseTo', `${START}expect(performance.now() - started).toBeCloseTo(0, -3)`],
+    [
+      'hrtime(t0)',
+      `const t0 = process.hrtime()\nconst [s, ns] = process.hrtime(t0)\nexpect(s * 1000 + ns / 1e6).toBeLessThan(200)`,
+    ],
+    [
+      'performance.measure',
+      `performance.mark('a')\nconst { duration } = performance.measure('work', 'a')\nexpect(duration).toBeLessThan(200)`,
+    ],
+    [
+      'a Date kept whole',
+      `const started = new Date()\nexpect(new Date().getTime() - started.getTime()).toBeLessThan(200)`,
+    ],
+    [
+      'seconds of the clock',
+      `const started = Math.floor(Date.now() / 1000)\nexpect(Math.floor(Date.now() / 1000) - started).toBeLessThan(2)`,
+    ],
+    [
+      'a clock fake timers leave real',
+      `vi.useFakeTimers({ toFake: ['Date'] })\n${START}expect(performance.now() - started).toBeLessThan(200)`,
+    ],
+  ])('finds the bound written as %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toHaveLength(1)
+  })
+
+  it('leaves alone a bound on fake time — no runner moves it (adversarial Б2)', () => {
+    // bot/src/assemble.test.ts › «Telegram лежал полчаса…»: readings in a helper's answer, under fake timers
+    const helper = `function asking() { const calls: number[] = []; work(() => calls.push(Date.now())); return { calls } }\n`
+    const bound = `const { calls } = asking()\nconst back = Date.now()\nawait vi.advanceTimersByTimeAsync(30_000)\nexpect((calls.at(-1) ?? Infinity) - back).toBeLessThan(30_000)`
+    expect(lines(`${helper}it('x', async () => {\nvi.useFakeTimers()\n${bound}\n})`)).toEqual([])
+    expect(
+      lines(
+        `${helper}beforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\n${bound}\n})`,
+      ),
+    ).toEqual([])
+    expect(
+      lines(`${helper}it('x', async () => {\nvi.useFakeTimers({ toFake: ['Date'] })\n${bound}\n})`),
+    ).toEqual([])
+    // the control: the same bound on the real clock is refused
+    expect(lines(`${helper}it('x', async () => {\n${bound}\n})`)).toEqual([6])
+  })
+
+  it('leaves alone what bounds a stamp or a duration from below, however written', () => {
+    expect(
+      lines(`
+        const row = await get()
+        expect(Date.now()).toBeGreaterThan(row.at)
+        const expires = new Date(row.expiresAt)
+        expect(expires.getTime() - Date.now()).toBeLessThan(DAY)
+        const s = performance.now()
+        if (performance.now() - s < 5) throw new Error('too fast')
+        expect(performance.now() - s).not.toBeCloseTo(0, -3)
+      `),
+    ).toEqual([])
+  })
 })
