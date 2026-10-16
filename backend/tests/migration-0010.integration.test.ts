@@ -6,6 +6,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { testDatabaseUrl } from './db'
 import { MIGRATIONS } from '@/db/migrate'
 
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 348 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 /**
  * 0010 on a database that already holds what it makes one: two cards of one café that differ
  * only by a variation selector — legal before it, one place after. Without the merge the new
@@ -130,5 +134,5 @@ describe('0010: places that the new identity makes one', () => {
         values (${randomUUID()}, 'venue', ${`Кафе ${CUP}${VS16}`}, 'AM', 'Гюмри')
       `,
     ).rejects.toThrow(/places_identity_key/)
-  })
+  }, 15_000)
 })

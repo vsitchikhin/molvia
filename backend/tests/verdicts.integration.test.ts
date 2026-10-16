@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
-import { ERROR, ISSUE, verdictCardCodec } from '@molvia/model'
+import { ERROR, ISSUE, normalisations, verdictCardCodec } from '@molvia/model'
 import type { VerdictCard } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { events, verdicts } from '@/db/schema'
@@ -16,6 +16,10 @@ import { createVerdictRepository } from '@/db/verdicts-repository'
 import { buildServer } from '@/server'
 import { connect, connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtures'
+
+// The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 889 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
 
 const { db, close } = connectDrizzle()
 const trips = createTripRepository(db)
@@ -114,7 +118,7 @@ describe('PUT — поставить оценку', () => {
     const verdict = card(reply)
     expect(verdict).toMatchObject({ itemId, score: 2, review: 'Пахнет крахмалом' })
     expect(verdict.updatedAt.getTime()).toBeGreaterThanOrEqual(verdict.ratedAt.getTime())
-  })
+  }, 10_000)
 
   it('2: повтор того же черновика — 200, одна строка, след не сдвинулся', async () => {
     const actor = await insertActor(db)
@@ -193,16 +197,19 @@ describe('PUT — поставить оценку', () => {
   })
 
   it('Е: сотни тысяч невидимых пустых строк в голове отзыва — отказ за миллисекунды', async () => {
-    // The bound is the proof: parsing is synchronous, so a request in parallel would wait
-    // out any blockage and still answer — it would show nothing (С-22).
+    // Parsing is synchronous, so a request in parallel would wait out any blockage and still answer —
+    // it would show nothing (С-22). Nor does a clock (MOL-266): let past its length, the body comes back
+    // the same 400 a hundred times slower, milliseconds still. The work holds it: the longest text
+    // normalised stays within twice a review's 500 letters — the longest, not a count, since the
+    // server's timers may normalise a short one of their own meanwhile.
     const actor = await insertActor(db)
     const itemId = await insertItem(db)
 
-    const started = Date.now()
+    normalisations.longest = 0
     const reply = await rate(actor, itemId, { score: 3, review: `${'\u2800\n'.repeat(200_000)}a` })
 
     expect(reply.status).toBe(400)
-    expect(Date.now() - started).toBeLessThan(2000)
+    expect(normalisations.longest).toBeLessThanOrEqual(2 * 500)
     expect(await rows(itemId)).toHaveLength(0)
   })
 
@@ -218,7 +225,7 @@ describe('PUT — поставить оценку', () => {
 
     expect((await rate(actor, itemId, { score: 1 })).status).toBe(201)
     expect((await rate(actor, itemId, { score: 5 })).status).toBe(200)
-  })
+  }, 10_000)
 
   it('10: место, владелец и позиция в теле — отказ с именем поля', async () => {
     const actor = await insertActor(db)
@@ -263,7 +270,7 @@ describe('PUT — поставить оценку', () => {
       body: { code: ISSUE.VERDICT_PLACE_NOT_FOR_KIND, details: 'placeId' },
     })
     expect(await rows(itemId)).toHaveLength(0)
-  })
+  }, 10_000)
 
   it('16: позиция без штрихкода, заведённая латиницей, оценивается как любая', async () => {
     const actor = await insertActor(db)
@@ -276,7 +283,7 @@ describe('PUT — поставить оценку', () => {
     const { id } = JSON.parse(proposed.body) as { id: string }
 
     expect((await rate(actor, id, { score: 4 })).status).toBe(201)
-  })
+  }, 10_000)
 
   it('17: двойной тап — одна строка', async () => {
     const actor = await insertActor(db)
@@ -385,7 +392,7 @@ describe('DELETE — снять оценку', () => {
     expect((await withdraw(owner, itemId)).status).toBe(404)
     expect((await withdraw(owner, lonely)).status).toBe(404)
     expect((await withdraw(owner, 'молоко')).status).toBe(404)
-  })
+  }, 10_000)
 
   it('19: оценка после снятия — 201, та же строка, время первой оценки прежнее, старый текст не вернулся', async () => {
     const actor = await insertActor(db)
@@ -476,7 +483,7 @@ describe('что не должно сработать', () => {
     expect((await amend(null, itemId, { review: null })).status).toBe(401)
     expect((await withdraw(null, itemId)).status).toBe(401)
     expect(await rows(itemId)).toMatchObject([{ score: 3, deletedAt: null }])
-  })
+  }, 10_000)
 
   it('14, 20: ни одна из трёх ручек не пишет в журнал — ворота 0.2 считают по verdicts', async () => {
     const actor = await insertActor(db)
@@ -489,7 +496,7 @@ describe('что не должно сработать', () => {
     await rate(actor, itemId, { score: 4 })
 
     expect(await eventCount()).toBe(before)
-  })
+  }, 10_000)
 
   it('15: ни владелец, ни id строки не уходят в ответе — ни полем, ни значением', async () => {
     const actor = await insertActor(db)

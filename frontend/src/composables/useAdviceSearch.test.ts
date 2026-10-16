@@ -5,6 +5,10 @@ import type { AdviceResponse, AdviceRow, AdviceSearchResponse } from '@molvia/mo
 import { searchRemembered, useAdviceSearch } from '@/composables/useAdviceSearch'
 import type { AdviceSearch } from '@/composables/useAdviceSearch'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 592 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const adviceSearch = vi.fn<(query: string) => Promise<AdviceSearchResponse>>()
 vi.mock('@/api', () => ({ api: { adviceSearch: (query: string) => adviceSearch(query) } }))
 
@@ -183,7 +187,7 @@ describe('useAdviceSearch — the rhythm', () => {
     await flushPromises()
 
     expect(search.found.value[0]?.name).toBe('newer')
-  })
+  }, 10_000)
 
   it('cleared while a search is out — idle, and the answer that lands is dropped', async () => {
     const out = held<AdviceSearchResponse>()

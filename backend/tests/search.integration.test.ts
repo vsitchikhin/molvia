@@ -10,6 +10,10 @@ import { itemBarcodes, items } from '@/db/schema'
 import { connect, connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem } from './fixtures'
 
+// The 5 tests here past half a second on CI carry a timeout of 10 s: the slowest took 932 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const sql = connect()
 const { db, close } = connectDrizzle()
 const repo = createItemRepository(db)
@@ -321,7 +325,7 @@ describe('search — a unit is a size, not a word (MOL-48)', () => {
       expect(await candidate(query, name), query).toBe(true)
       expect(await names(query), query).toEqual([])
     }
-  })
+  }, 10_000)
 
   it('still refines the ranking: «кефир 500 мл» puts its own size first', async () => {
     // The rule holds on the query's side too: `ml` of the query grounds nothing, so it does
@@ -713,7 +717,7 @@ describe('search — edges', () => {
     )
     await named('Масло сливочное')
     expect((await names('ма'))[0]).toBe('Масло сливочное')
-  })
+  }, 10_000)
 
   it('ranks every candidate: two hundred near misses do not push the right item out', async () => {
     // «малако» scores 0.429 against any «Малина» and 0.167 against the milk. Cut by
@@ -734,12 +738,11 @@ describe('search — edges', () => {
 
   it('bounds the work by the query: 42 KB of words answers like the first twelve', async () => {
     await named('Молоко Ашхар')
-    const query = Array.from({ length: 6000 }, () => 'молоко').join(' ')
-    const started = performance.now()
-    expect(await names(query)).toEqual(['Молоко Ашхар'])
-    // Generous on purpose: the answer above already proves the cut; the time only guards
-    // against the unbounded cost, and a slow runner must not fail a correct build.
-    expect(performance.now() - started).toBeLessThan(5000)
+    // Every word its own: past the twelfth none of them is read, so the milk is found by the first. The
+    // answer, not a clock, holds the cut (MOL-266): read whole, these words find nothing — in the same
+    // milliseconds, and six thousand times «молоко» found the milk either way, a few times slower.
+    const words = Array.from({ length: 4399 }, (_, i) => `слово${String(i)}`)
+    expect(await names(['молоко', ...words].join(' '))).toEqual(['Молоко Ашхар'])
   })
 
   it('survives an unfinished last word longer than 255 against a longer name word', async () => {
@@ -751,7 +754,7 @@ describe('search — edges', () => {
     expect((await repo.search(`сыр ${'щ'.repeat(150)}`, 10, nobody, null)).items).toBeInstanceOf(
       Array,
     )
-  })
+  }, 10_000)
 
   it('returns exactly as many as asked: 0, 1, N, N+1', async () => {
     for (const name of ['Молоко Ашхар', 'Молоко Марианна', 'Молоко Лори']) await named(name)
@@ -903,7 +906,7 @@ describe('search — a word the shelf writes otherwise (MOL-45)', () => {
       await named(name)
       expect(await names('картошка'), code.toString(16)).toEqual([name])
     }
-  })
+  }, 10_000)
 
   it('takes a noun with an adjective ending for the kind: «Пирожное Картошка» is no potato (review Р)', async () => {
     await named('Пирожное Картошка')
@@ -1045,7 +1048,7 @@ describe("search — a word of the person's own (MOL-45)", () => {
     await picks.remember(actorId, 'бахчевые', melon)
 
     expect(await namesFor(actorId, 'бахчевые')).toEqual(['Арбуз'])
-  })
+  }, 10_000)
 
   it('reaches the index with a learnt word in the query', async () => {
     const actorId = await insertActor(db)

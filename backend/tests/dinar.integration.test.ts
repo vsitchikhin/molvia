@@ -21,6 +21,10 @@ import { officialRatesRefresh } from '@/usecases/refresh-official-rates'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertPlace, signIn, tripContext } from './fixtures'
 
+// The 3 tests here past half a second on CI carry a timeout of 10 s: the slowest took 824 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 // The dinar (MOL-230): against the rouble, the dollar and the euro it is the National Bank of
 // Serbia's, whose rows are dinars rather than drams; against the dram the National Bank of
 // Georgia's; and the database holds the base of a row and the bank of a pair as the domain does.
@@ -142,7 +146,7 @@ describe('поход в динарах', () => {
     const trip = await start({ id, cookie: await signIn(db, id) })
     expect(trip.rate).toMatchObject({ base: 'RUB', quote: 'AMD', scaled: parseRate('4.3') })
     expect(trip.rateProvider).toBe('cba')
-  })
+  }, 10_000)
 
   it('ЦБ РА молчит — строки НБ Сербии пару драма всё равно не собирают', async () => {
     await rates.upsert([...serbian(daysAgo(1)), ...armenian(daysAgo(10))])
@@ -150,7 +154,7 @@ describe('поход в динарах', () => {
     const trip = await start({ id, cookie: await signIn(db, id) })
     expect(trip.rateProvider).toBe('cba')
     expect(trip.rateStale).toBe(true)
-  })
+  }, 10_000)
 })
 
 describe('динар в своём курсе', () => {
@@ -171,7 +175,7 @@ describe('динар в своём курсе', () => {
     })
     expect(exchange?.market).toBeNull()
     expect((await start(me)).rate).toMatchObject({ source: 'personal', scaled: parseRate('1.26') })
-  })
+  }, 10_000)
 
   it('доход в динарах оценён по НБ Сербии своего дня, и поход берёт это число', async () => {
     await rates.upsert(serbian(daysAgo(3)))

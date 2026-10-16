@@ -9,6 +9,10 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { describeMigrationFailure } from '@/db/failure'
 import { connect, testDatabaseUrl } from './db'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 517 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 /** What a person typed, already in a table when the deploy comes. */
 const TYPED = 'Молоко Мариан 1Л у Ашота'
 
@@ -80,7 +84,7 @@ describe('лог упавшей миграции — вид и инструкц�
     const summary = describeMigrationFailure(error)
     expect(summary).toMatchObject({ errorName: 'Error', code: '22P02', statement })
     expect(JSON.stringify(summary)).not.toContain(TYPED)
-  })
+  }, 10_000)
 
   it('журнал называет файл, которого нет, — в логе его имя: слова мигратора о наших файлах (Е)', async () => {
     const error = await failingMigration({

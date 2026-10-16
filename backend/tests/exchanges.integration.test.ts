@@ -30,6 +30,10 @@ import {
   tripContext,
 } from './fixtures'
 
+// The 9 tests here past half a second on CI carry a timeout of 10 s: the slowest took 646 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
 let app: FastifyInstance
@@ -141,7 +145,7 @@ describe('«Обмен денег» через API (MOL-40)', () => {
     })
     const list = overviewOf(second.json()).exchanges
     expect(list.map((exchange) => exchange.exchangedOn)).toEqual([daysAgo(2), daysAgo(10)])
-  })
+  }, 10_000)
 
   it('сравнивает каждый обмен с ЦБ РА на его день, со знаком', async () => {
     await rates.upsert([rub('4.3123', daysAgo(11)), rub('5.5000', daysAgo(3))])
@@ -163,7 +167,7 @@ describe('«Обмен денег» через API (MOL-40)', () => {
     // 20 000 × 4.3123 = 86 246 ֏; the exchanger gave 13 754 more.
     expect(list[1]?.official?.difference).toEqual({ minor: 1_375_400n, currency: 'AMD' })
     expect(list[1]?.official?.rate.scaled).toBe(parseRate('4.3123'))
-  })
+  }, 10_000)
 
   it('без курса ЦБ на тот день обмен записан, но без сравнения', async () => {
     await rates.upsert([rub('4.3123', daysAgo(1))])
@@ -506,7 +510,7 @@ describe('«Обмен денег»: правки второго захода', 
     expect(back.json()).toMatchObject({
       wallet: { rate: { rate: '4.791667' }, basis: 'weighted' },
     })
-  })
+  }, 10_000)
 
   it('«Вернуть» после любого другого запроса — 404: удаление стало окончательным', async () => {
     const { cookie } = await owner()
@@ -574,7 +578,7 @@ describe('«Обмен денег»: правки второго захода', 
       minor: 7_000_000n,
       currency: 'AMD',
     })
-  })
+  }, 10_000)
 })
 
 describe('«Обмен денег»: правки третьего захода', () => {
@@ -588,7 +592,7 @@ describe('«Обмен денег»: правки третьего захода'
     const again = await app.inject({ method: 'POST', url, headers: { cookie } })
     expect(again.statusCode).toBe(200)
     expect(overviewOf(again.json()).exchanges.map((row) => row.id)).toEqual([one.id])
-  })
+  }, 10_000)
 
   it('Д2: удаление ещё раз после потерянного ответа не делает обмен окончательным', async () => {
     const { cookie } = await owner()
@@ -602,7 +606,7 @@ describe('«Обмен денег»: правки третьего захода'
       headers: { cookie },
     })
     expect(back.statusCode).toBe(200)
-  })
+  }, 10_000)
 })
 
 describe('свой курс в походе (MOL-40)', () => {
@@ -658,7 +662,7 @@ describe('свой курс в походе (MOL-40)', () => {
     const { trip } = await start(me)
     expect(trip.rate?.source).toBe('official')
     expect(trip.rateProvider).toBe('cba')
-  })
+  }, 10_000)
 
   it('обмен после старта не трогает открытый поход, и повтор старта — прежний снимок', async () => {
     const me = await owner()
@@ -838,7 +842,7 @@ describe('стоимость валют (MOL-42)', () => {
 
     const trip = await start(me)
     expect(trip.rate).toMatchObject({ source: 'personal', scaled: 4_295_130n })
-  })
+  }, 10_000)
 
   it('без курса ЦБ на тот день стоимость неизвестна, и поход берёт официальный', async () => {
     await rates.upsert([rub('4.3123', daysAgo(1))])
@@ -856,7 +860,7 @@ describe('стоимость валют (MOL-42)', () => {
       reason: 'noRate',
     })
     expect((await start(me)).rate?.source).toBe('official')
-  })
+  }, 10_000)
 
   it('курс ЦБ давностью больше недели оценкой не служит: стоимость неизвестна (Ж3)', async () => {
     await rates.upsert([rub('4.3123', daysAgo(70)), usd('363.44', daysAgo(70))])

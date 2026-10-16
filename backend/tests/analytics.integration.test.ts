@@ -13,6 +13,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertCounted, insertItem, signIn } from './fixtures'
 
+// The test here past a second on CI carries a timeout of 20 s: the slowest took 1 507 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 const { db, close } = connectDrizzle()
 const log = createEventRepository(db)
 const verdictRepository = createVerdictRepository(db)
@@ -258,7 +262,7 @@ describe('стирание', () => {
       expect(await rowsOf(me.id)).toHaveLength(0)
       expect(await moments(me.id)).toBeUndefined()
     }
-  })
+  }, 20_000)
 })
 
 describe('включение обратно', () => {

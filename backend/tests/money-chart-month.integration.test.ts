@@ -21,6 +21,10 @@ import { moneyChartMonthOf } from '@/usecases/money-chart-month'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 733 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
 let app: FastifyInstance
@@ -323,18 +327,22 @@ describe('«Графики → Месяц» (MOL-158)', () => {
     HEAVY_MS,
   )
 
-  it('убранная категория без трат в месяце в «Против обычного» не попадает', async () => {
-    const me = await owner()
-    for (const one of [m4, m3, m2]) await spend(me, '50000', 'AMD', `${one}-01`, 'rent')
-    await spend(me, '1000', 'AMD', `${m1}-01`, 'cafe')
-    const before = await chartMonth(me, m1)
-    expect(before.deviations.map((row) => row.change)).toEqual([-100, null])
-    expect(
-      (await call(me, 'DELETE', `/spending-categories/${await presetId(me, 'rent')}`)).statusCode,
-    ).toBe(200)
-    const after = await chartMonth(me, m1)
-    expect(after.deviations.map((row) => row.categoryId)).toEqual([await presetId(me, 'cafe')])
-  })
+  it(
+    'убранная категория без трат в месяце в «Против обычного» не попадает',
+    async () => {
+      const me = await owner()
+      for (const one of [m4, m3, m2]) await spend(me, '50000', 'AMD', `${one}-01`, 'rent')
+      await spend(me, '1000', 'AMD', `${m1}-01`, 'cafe')
+      const before = await chartMonth(me, m1)
+      expect(before.deviations.map((row) => row.change)).toEqual([-100, null])
+      expect(
+        (await call(me, 'DELETE', `/spending-categories/${await presetId(me, 'rent')}`)).statusCode,
+      ).toBe(200)
+      const after = await chartMonth(me, m1)
+      expect(after.deviations.map((row) => row.categoryId)).toEqual([await presetId(me, 'cafe')])
+    },
+    HEAVY_MS,
+  )
 
   it('чужие траты не видны; без сессии — 401; не месяц — 404; лишний параметр — 400', async () => {
     const me = await owner()
@@ -351,5 +359,5 @@ describe('«Графики → Месяц» (MOL-158)', () => {
     expect((await call(me, 'GET', `/money/months/${current}/charts?actorId=x`)).statusCode).toBe(
       400,
     )
-  })
+  }, 10_000)
 })

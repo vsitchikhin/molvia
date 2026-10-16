@@ -23,6 +23,11 @@ import type { QuietToday } from '@/usecases/remind-ratings'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, telegramId } from './fixtures'
 
+// The test here past a second on CI carries a timeout of 25 s: the slowest took 2 371 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
+// reporter names one only on a run slower than any yet seen. The 5 more here past half a second
+// carry 10 s: the slowest of them took 760 ms.
+
 const { db, close } = connectDrizzle()
 const reminders = createReminderRepository(db)
 const botSecret = randomBytes(32).toString('base64url')
@@ -186,7 +191,7 @@ describe('ступень 1 — вечером следующего дня', () =
     } finally {
       await db.execute(sql`set timezone = 'UTC'`)
     }
-  })
+  }, 10_000)
 
   it('не больше трёх позиций, самые свежие; total — все вчерашние', async () => {
     const anna = await person()
@@ -253,7 +258,7 @@ describe('ступень 1 — вечером следующего дня', () =
 
     expect((await evening('2026-07-14', '19:00')).reminders).toHaveLength(REMINDERS_PER_CLAIM)
     expect((await evening('2026-07-14', '19:01')).reminders).toHaveLength(1)
-  })
+  }, 25_000)
 })
 
 describe('лестница владельца: 1 → 3 дня → 7 дней → полгода', () => {
@@ -386,7 +391,7 @@ describe('MOL-29: позиция со снятой оценкой (В-3)', () =>
     await verdict(anna, lori, yerevan('2026-07-12', '20:00'), yerevan('2026-07-13', '09:00'))
 
     expect(asked(await evening('2026-07-13'))).toEqual({})
-  })
+  }, 10_000)
 
   it('выключенная статистика снятое не забывает: до снятия — не спрашиваем (MOL-97, В1)', async () => {
     // The switch takes a person out of the gates; the reminder is the contract's, and the
@@ -534,7 +539,7 @@ describe('счётчики напоминаний (В-4)', () => {
       { day: '2026-07-13', firstSteps: 2, secondSteps: 0, thirdSteps: 0, items: 3, rated: 0 },
       { day: '2026-07-16', firstSteps: 0, secondSteps: 2, thirdSteps: 0, items: 3, rated: 0 },
     ])
-  })
+  }, 10_000)
 })
 
 // A name today's `visibleLine` refuses and the database keeps (`items.name` is a bare varchar):
@@ -749,7 +754,7 @@ describe('лишних выдач нет (адверсариальный В, р�
     expect(await at('19:30')).toEqual({})
     await enter(trip, await item('Молоко'), yerevan('2026-07-14', '20:00'))
     expect(await at('20:01')).toEqual({ [anna.tg]: ['Молоко'] })
-  })
+  }, 10_000)
 
   it('и после оценки, снятой вчера (MOL-29): дописанное вечером спрашивается (И2)', async () => {
     const anna = await person()
@@ -868,7 +873,7 @@ describe('две выдачи одной минуты разом (ревью Т-
     const rows = await db.select().from(reminderDays)
     expect(rows.map((row) => row.firstSteps)).toEqual([1])
     expect(failures).toEqual([])
-  })
+  }, 10_000)
 
   it('на ступени 2 — одно напоминание, ступень сдвинута один раз', async () => {
     const anna = await person()

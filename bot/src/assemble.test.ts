@@ -1,11 +1,16 @@
 import { format } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { expectWithin } from '@molvia/model/testing/clock'
 import { Bot, HttpError } from 'grammy'
 import type { Transformer } from 'grammy'
 import type { Update, UserFromGetMe } from 'grammy/types'
 import type { MolviaBotClient } from '@molvia/client'
 import type { LoginPreview } from '@molvia/model'
 import { assembleBot, introduce, startBot, telegramFailure } from './assemble'
+
+// The 3 tests here past half a second on CI carry a timeout of 10 s: the slowest took 672 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
 
 const BOT_INFO: UserFromGetMe = {
   id: 42,
@@ -111,8 +116,8 @@ describe('как бот разбирает апдейты', () => {
     // апдейт, и коды в хвосте очереди истекают, не дойдя до обработчика.
     const lag = await lagBetween([start(1, 1001, 'a'.repeat(43)), start(2, 1002, 'b'.repeat(43))])
 
-    expect(lag).toBeLessThan(HELD_MS / 2)
-  })
+    expectWithin(lag, HELD_MS / 2)
+  }, 10_000)
 
   it('а два нажатия одного человека — по порядку', async () => {
     // Вторая половина того же правила, и она тоже нужна: два подтверждения одного человека
@@ -120,7 +125,7 @@ describe('как бот разбирает апдейты', () => {
     const lag = await lagBetween([start(1, 1001, 'a'.repeat(43)), start(2, 1001, 'b'.repeat(43))])
 
     expect(lag).toBeGreaterThanOrEqual(HELD_MS - 20)
-  })
+  }, 10_000)
 })
 
 describe('отказ getUpdates в журнале (MOL-142)', () => {
@@ -150,7 +155,7 @@ describe('отказ getUpdates в журнале (MOL-142)', () => {
     expect(lines.length).toBeGreaterThanOrEqual(3)
     expect(new Set(lines)).toEqual(new Set(['[molvia] telegram getUpdates: network']))
     expect(lines.join('\n')).not.toContain('secret-token')
-  })
+  }, 10_000)
 })
 
 describe('кто бот — до раннера (MOL-142)', () => {

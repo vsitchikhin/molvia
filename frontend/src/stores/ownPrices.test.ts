@@ -10,6 +10,10 @@ import {
   rememberRecordCity,
 } from '@/stores/ownPrices'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 553 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const ME = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const MILK = 'dddddddd-0000-4000-8000-000000000001'
 const MARIANNA = 'dddddddd-0000-4000-8000-000000000002'
@@ -67,7 +71,7 @@ describe('the memory of «Тут дешевле» (MOL-92, В-5)', () => {
     expect(recallOwnPrices(ME, id(0), erevan)).toBeNull()
     expect(recallOwnPrices(ME, id(1), erevan)).not.toBeNull()
     expect(recallOwnPrices(ME, id(OWN_PRICES_REMEMBERED), erevan)).not.toBeNull()
-  })
+  }, 10_000)
 
   it(`knows the city of the last ${String(RECORD_CITIES_REMEMBERED)} records it was answered for (review №1)`, () => {
     for (let n = 0; n <= RECORD_CITIES_REMEMBERED; n += 1) {

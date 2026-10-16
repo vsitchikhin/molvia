@@ -8,6 +8,10 @@ import { DomainError, ERROR, ISSUE, newExpenseSchema } from '@molvia/model'
 import { parseBody } from '@/parse'
 import { buildServer } from '@/server'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 516 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const UUID = '11111111-1111-4111-8111-111111111111'
 
 async function post(payload: unknown): Promise<{ status: number; body: unknown }> {
@@ -29,7 +33,7 @@ describe('a body that did not parse', () => {
     const res = await post({ tripId: 'nope', itemId: 'nope' })
     expect(res.status).toBe(400)
     expect(res.body).toMatchObject({ code: ISSUE.BODY_INVALID, details: 'tripId' })
-  })
+  }, 10_000)
 
   it('carries the registry code the codecs were rewritten to report', async () => {
     // Round one rewrote the codecs so safeParse returns an issue instead of throwing.

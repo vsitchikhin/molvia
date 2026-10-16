@@ -26,6 +26,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { aStrangersCookie, clearAll, insertActor, signIn } from './fixtures'
 
+// The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 940 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const repository = createItemRepository(db)
 const picks = createSearchPickRepository(db)
@@ -275,7 +279,7 @@ describe('GET /catalogue/search — the answer', () => {
       unit: 'l',
     })
     expect(wire.find((row) => row.name.includes('Марианна'))?.typicalQuantity).toBeNull()
-  })
+  }, 10_000)
 
   it('carries a dish counted in pieces without loss', async () => {
     const actor = await insertActor(db)
@@ -305,7 +309,7 @@ describe('GET /catalogue/search — the answer', () => {
 
       expect(found(await search(actor, q('молоко'))), String(count)).toHaveLength(expected)
     }
-  })
+  }, 10_000)
 
   it('lifts the asker’s own pick, and nobody else’s', async () => {
     const mine = await insertActor(db)
@@ -495,7 +499,7 @@ describe('GET /catalogue/barcode — the item a code belongs to (MOL-99)', () =>
     const extra = await byCode(actor, `${code('4850000000007')}&actorId=${actor}`)
     expect(extra.status).toBe(400)
     expect(extra.body).toEqual({ code: ISSUE.QUERY_INVALID, details: 'actorId' })
-  })
+  }, 10_000)
 
   it('answers nobody named with the door, as the search does', async () => {
     const reply = await byCode(null, code('4850000000007'))
@@ -584,7 +588,7 @@ describe('POST /catalogue/items — «Предложить товар»', () => 
     // Refused by the quantity codec already: precision below the unit's resolution (MOL-4).
     expect(halfPiece.body).toMatchObject({ code: ERROR.INVALID_QUANTITY })
     expect(await db.select().from(items)).toHaveLength(0)
-  })
+  }, 10_000)
 
   it('returns the item already there instead of adding it twice', async () => {
     const actor = await insertActor(db)
@@ -808,7 +812,7 @@ describe('POST /catalogue/items — with the codes read from the package (MOL-10
     })
     expect(reply.raw).not.toContain(author)
     expect(await db.select().from(items)).toHaveLength(1)
-  })
+  }, 10_000)
 
   it('holds a code taken by its twin: the label typed as thirteen, held as eight (Р-2)', async () => {
     const actor = await insertActor(db)
@@ -829,7 +833,7 @@ describe('POST /catalogue/items — with the codes read from the package (MOL-10
 
     expect(reply.status).toBe(409)
     expect(await codesOf(first.id)).toEqual([])
-  })
+  }, 10_000)
 })
 
 describe('POST /catalogue/items — codes, the review (MOL-100)', () => {
@@ -1011,7 +1015,7 @@ describe('POST /catalogue/items/:itemId/barcodes — «привязать код
     expect(twentyFirst.status).toBe(409)
     expect(twentyFirst.body).toEqual({ code: ERROR.BARCODES_FULL })
     expect(await codesOf(cream.id)).toHaveLength(20)
-  })
+  }, 10_000)
 
   it('writes one package to one item when two write it at once through its twins (Р-2)', async () => {
     const actor = await insertActor(db)

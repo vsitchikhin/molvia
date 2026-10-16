@@ -27,6 +27,10 @@ import {
   insertTrip,
 } from './fixtures'
 
+// The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 923 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const merges = createMergeRepository(db)
 const NIGHT = { by: 'night', night: '2026-10-06', edits: 1, worst: 1, meaning: 0.95 } as const
@@ -283,22 +287,28 @@ describe('the 0.2 gate across a merge (Т-6)', () => {
     [GATE_RATINGS - 1, 0],
     [GATE_RATINGS, 1],
     [GATE_RATINGS + 1, 1],
-  ])('one who rated %i, both twins among them, stays where they were', async (count, reached) => {
-    await db.execute(sql`update actors set created_at = '2026-09-01T09:00:00Z' where id = ${owner}`)
-    await verdict(owner, older, { ratedAt: '2026-09-01T10:00:00Z' })
-    await verdict(owner, younger, { ratedAt: '2026-09-01T11:00:00Z' })
-    for (let i = 2; i < count; i++) {
-      const other = await insertItem(db, {
-        name: `Товар ${String(i)}`,
-        searchKey: `tovar ${String(i)}`,
-      })
-      await verdict(owner, other, { ratedAt: '2026-09-02T10:00:00Z' })
-    }
-    const before = await gate()
-    expect(before.reached).toBe(reached)
-    await merges.mergeItems(younger, older, NIGHT)
-    expect(await gate()).toEqual(before)
-  })
+  ])(
+    'one who rated %i, both twins among them, stays where they were',
+    async (count, reached) => {
+      await db.execute(
+        sql`update actors set created_at = '2026-09-01T09:00:00Z' where id = ${owner}`,
+      )
+      await verdict(owner, older, { ratedAt: '2026-09-01T10:00:00Z' })
+      await verdict(owner, younger, { ratedAt: '2026-09-01T11:00:00Z' })
+      for (let i = 2; i < count; i++) {
+        const other = await insertItem(db, {
+          name: `Товар ${String(i)}`,
+          searchKey: `tovar ${String(i)}`,
+        })
+        await verdict(owner, other, { ratedAt: '2026-09-02T10:00:00Z' })
+      }
+      const before = await gate()
+      expect(before.reached).toBe(reached)
+      await merges.mergeItems(younger, older, NIGHT)
+      expect(await gate()).toEqual(before)
+    },
+    10_000,
+  )
 })
 
 describe('the undo', () => {
@@ -506,7 +516,7 @@ describe('the undo of a chain, from its end (adversarial А3, Б1)', () => {
     const before = await snapshot()
     expect(await merges.unmerge(first)).toEqual({ refused: 'chained', later: second })
     expect(await snapshot()).toEqual(before)
-  })
+  }, 10_000)
 })
 
 describe('the undo leaves what people did after the merge (adversarial А4)', () => {
@@ -521,7 +531,7 @@ describe('the undo leaves what people did after the merge (adversarial А4)', ()
     await catalogue.attachBarcode(other, '4600000000003', owner)
     await merges.unmerge(id)
     expect(await db.execute(sql`select item_id from item_barcodes`)).toEqual([{ item_id: other }])
-  })
+  }, 10_000)
 
   it('leaves a word of the shop’s memory said again after the merge', async () => {
     const other = await made('Кефир 1%', 'kefir 1', '2026-09-05')
@@ -789,7 +799,7 @@ describe('every pair of a night (adversarial В2) and «apart» through a third 
     const night = await merges.nightList('2026-10-06')
     expect(night?.mode).toBe('on')
     expect(night?.pairs.map((pair) => typeof pair.id)).toEqual(Array(12).fill('number'))
-  })
+  }, 10_000)
 
   it('keeps every pair a `report` night would merge, with both ids', async () => {
     await twelvePairs()

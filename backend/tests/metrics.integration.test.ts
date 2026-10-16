@@ -15,6 +15,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll } from './fixtures'
 
+// The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 620 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 
 let metrics: HttpMetrics
@@ -143,7 +147,7 @@ describe('a request its client left before the answer (adversarial А1)', () => 
     expect(metrics.render()).toMatch(
       /^molvia_http_request_duration_seconds_count\{method="GET",route="\/probe-slow\/:outcome"\} 1$/m,
     )
-  })
+  }, 10_000)
 
   it('a failure after the client left is aborted in the metrics and recorded as a failure', async () => {
     await abandon('/probe-slow/fail', 100)
@@ -153,7 +157,7 @@ describe('a request its client left before the answer (adversarial А1)', () => 
       '{method="GET",route="/probe-slow/:outcome",status="aborted"} 1',
     ])
     expect(recordings.length).toBeGreaterThan(0)
-  })
+  }, 10_000)
 })
 
 describe('/metrics', () => {

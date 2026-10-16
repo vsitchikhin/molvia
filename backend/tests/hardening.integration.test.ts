@@ -11,6 +11,10 @@ import { createPlaceRepository } from '@/db/places-repository'
 import { createTripRepository } from '@/db/trips-repository'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 519 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 /**
  * Что нашёл адверсариальный проход по PR #12 и чем это закрыто. Каждый раздел — дефект,
  * который был жив на `c942962`.
@@ -154,7 +158,7 @@ describe('предел выборки', () => {
 
     expect(await expenses.placePricesFor(ownPrices(actorId, [itemId], 2))).toHaveLength(2)
     expect(await expenses.placePricesFor(ownPrices(actorId, [itemId]))).toHaveLength(4)
-  })
+  }, 10_000)
 })
 
 describe('негодный идентификатор', () => {

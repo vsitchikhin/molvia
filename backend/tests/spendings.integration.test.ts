@@ -36,6 +36,10 @@ import {
   tripContext,
 } from './fixtures'
 
+// The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 944 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
 let app: FastifyInstance
@@ -129,7 +133,7 @@ describe('категории трат (MOL-73, В-3)', () => {
     const { categories: list } = await categories(me)
     expect(list.map((category) => category.preset)).toEqual([...SPENDING_PRESETS])
     expect(list.every((category) => !category.archived)).toBe(true)
-  })
+  }, 10_000)
 
   it('своя категория: 201, повтор — 200, чужое имя под тем же id — 409, занятое имя — 409', async () => {
     const me = await owner()
@@ -503,7 +507,7 @@ describe('месяц «Денег» (MOL-73)', () => {
     const gone = idsOf(first)[0] ?? ''
     expect((await call(me, 'DELETE', `/spendings/${gone}`)).statusCode).toBe(204)
     expect((await month(me, today.slice(0, 7))).count).toBe(44)
-  })
+  }, 10_000)
 })
 
 async function exchange(me: Owner, given: string, received: string, on: string): Promise<string> {
@@ -622,7 +626,7 @@ describe('курсы «Денег» (ревью MOL-73: Р-1…Р-5, адвер�
         uncounted: [{ minor: 5000n, currency: 'USD' }],
       })
     }
-  })
+  }, 10_000)
 
   it('официальный курс — только свежий: трата в $ с курсом трёхнедельной давности не посчитана (Р-4)', async () => {
     const me = await owner()
@@ -714,7 +718,7 @@ describe('месяц «Денег» — края (адверсариальный
     expect((await call(me, 'DELETE', `/spendings/${idsOf(first)[3] ?? ''}`)).statusCode).toBe(204)
     const again = await month(me, today.slice(0, 7), first.cursor ?? undefined)
     expect(idsOf(again)).toEqual(idsOf(second))
-  })
+  }, 10_000)
 
   it('курсор, который не ключ строки, — отказ, а не первая страница', async () => {
     const me = await owner()
@@ -809,7 +813,7 @@ describe('месяц «Денег» — края (адверсариальный
     // Removing the late one lets August go again.
     expect((await call(me, 'DELETE', `/exchanges/${late}`)).statusCode).toBe(200)
     expect((await month(me, '2026-08')).spentIncome).toEqual({ minor: 1000000n, currency: 'RUB' })
-  })
+  }, 10_000)
 })
 
 describe('второй раунд (адверсариальный Е1, Е2)', () => {
@@ -830,7 +834,7 @@ describe('второй раунд (адверсариальный Е1, Е2)', ()
     expect((await call(me, 'POST', `/spendings/${body.id}/restore`)).statusCode).toBe(404)
     expect((await call(me, 'POST', '/spendings', body)).statusCode).toBe(201)
     expect(idsOf(await month(me, today.slice(0, 7)))).toEqual([body.id])
-  })
+  }, 10_000)
 
   it('«мой курс → ЦБ РА» размораживает прошлые месяцы: все по одному правилу (В-8, Е1)', async () => {
     const me = await owner()
@@ -843,7 +847,7 @@ describe('второй раунд (адверсариальный Е1, Е2)', ()
     const august = await month(me, '2026-08')
     expect(august.rate).toMatchObject({ source: 'official', scaled: parseRate('4.5') })
     expect(august.spentIncome).toEqual({ minor: 1000000n, currency: 'RUB' })
-  })
+  }, 10_000)
 
   it('смена валюты пересчёта размораживает прошлые месяцы; смена города — нет (В-8)', async () => {
     const me = await owner()

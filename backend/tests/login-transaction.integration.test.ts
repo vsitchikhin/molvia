@@ -8,6 +8,10 @@ import { completeLogin } from '@/usecases/complete-login'
 import { connectDrizzle } from './db'
 import { anHourFromNow, clearAll, telegramId } from './fixtures'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 502 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const first = connectDrizzle()
 const second = connectDrizzle()
 const repositories = authRepositories(first.db)
@@ -109,7 +113,7 @@ describe('atomic login', () => {
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
     expect(await first.db.select().from(sessions)).toHaveLength(1)
     expect(await repositories.requests.byIdAndSecret(request.id, request.secret)).toBeNull()
-  })
+  }, 10_000)
 
   it('two first logins share one owner, without aborting either transaction', async () => {
     const telegramUserId = telegramId()

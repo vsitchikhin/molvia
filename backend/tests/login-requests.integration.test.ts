@@ -8,6 +8,10 @@ import { loginRequests } from '@/db/schema'
 import { connectDrizzle } from './db'
 import { anHourFromNow, clearAll } from './fixtures'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 556 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const repository = createLoginRequestRepository(db)
 
@@ -210,7 +214,7 @@ describe('вход судится до записи, а не после', () => 
 
     // И запрос при этом цел: отказ не тронул строку.
     expect((await repository.byCode(request.code))?.telegramUserId).toBeNull()
-  })
+  }, 10_000)
 
   it('имя устройства длиннее предела режется, а не пропадает', async () => {
     // Разница между «слишком длинное» и «не рисует ничего» (Р5): у первого есть что показать

@@ -6,6 +6,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { testDatabaseUrl } from './db'
 import { MIGRATIONS } from '@/db/migrate'
 
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 191 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 /**
  * 0012 on a database that holds what every copy holds: owners, and everything hanging off
  * them. `telegram_user_id` is NOT NULL and there is nowhere to get one for a row already
@@ -151,5 +155,5 @@ describe('0012: the owners a Telegram identity cannot be found for', () => {
     `
     await one(777_000_123)
     await expect(one(777_000_123)).rejects.toMatchObject({ code: '23505' })
-  })
+  }, 15_000)
 })

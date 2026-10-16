@@ -27,6 +27,10 @@ import {
   telegramId,
 } from './fixtures'
 
+// The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 572 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const reminders = createReminderRepository(db)
 const botSecret = randomBytes(32).toString('base64url')
@@ -172,7 +176,7 @@ describe('«Напоминать об оценке в Telegram» в настро
     expect((await choose(anna, { on: true })).json()).toEqual({ off: null })
     expect((await choose(anna, { on: true })).json()).toEqual({ off: null })
     expect((await read(anna)).json()).toEqual({ off: null })
-  })
+  }, 10_000)
 
   it('кривое тело — 400, прежнее остаётся', async () => {
     const anna = await person()
@@ -191,7 +195,7 @@ describe('«Напоминать об оценке в Telegram» в настро
     await bot(boris, 'blocked')
     expect((await read(anna)).json()).toEqual({ off: 'chosen' })
     expect((await read(boris)).json()).toEqual({ off: 'blocked' })
-  })
+  }, 10_000)
 
   it('без сессии — 401 на обеих ручках', async () => {
     for (const method of ['GET', 'PUT'] as const) {

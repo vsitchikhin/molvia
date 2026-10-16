@@ -14,6 +14,10 @@ import { createExpenseRepository } from '@/db/expenses-repository'
 import type { PriceQuery } from '@/db/expenses-repository'
 import { expenses as expensesTable } from '@/db/schema'
 
+// The 6 tests here past half a second on CI carry a timeout of 10 s: the slowest took 686 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const expenses = createExpenseRepository(db)
 
@@ -95,7 +99,7 @@ describe('медиана цены за единицу', () => {
     // 300 000 и 320 000 — две середины; берём нижнюю, как isRateJump.
     const [row] = await expenses.medianPriceFor(ownPrices(actorId, [itemId]))
     expect(row?.scaledMinor).toBe(unitPrice(amd(300_000), kilo).scaledMinor)
-  })
+  }, 10_000)
 
   it('не смешивает валюты и единицы: у каждой пары своя середина', async () => {
     const actorId = await insertActor(db)
@@ -106,7 +110,7 @@ describe('медиана цены за единицу', () => {
     await bought(actorId, itemId, placeId, amd(300_000), { milli: 1000n, unit: 'piece' })
 
     expect(await expenses.medianPriceFor(ownPrices(actorId, [itemId]))).toHaveLength(3)
-  })
+  }, 10_000)
 
   it('не считает покупку без цены или без количества', async () => {
     const actorId = await insertActor(db)
@@ -165,7 +169,7 @@ describe('общий режим', () => {
     const [row] = await expenses.placePricesFor(sharedPrices(me, [itemId]))
     expect(row?.scaledMinor).toBe(unitPrice(amd(500_000), kilo).scaledMinor)
     expect(row?.observations).toBe(1)
-  })
+  }, 10_000)
 
   it('не показывает место, где я не покупал, пока покупателей меньше трёх', async () => {
     const me = await insertActor(db)
@@ -237,7 +241,7 @@ describe('общий режим', () => {
 
     const rows = await expenses.placePricesFor(sharedPrices(me, [itemId]))
     expect(rows.map((row) => row.placeName)).toEqual(['Дешёвое', 'Дорогое'])
-  })
+  }, 10_000)
 
   it('в своём режиме мои покупки видны из любого города', async () => {
     const me = await insertActor(db)
@@ -328,7 +332,7 @@ describe('цена места — последняя, а не минимум (MO
     const [row] = await expenses.placePricesFor(ownPrices(me, [itemId]))
     expect(row?.scaledMinor).toBe(price(600_000))
     expect(row?.observations).toBe(3)
-  })
+  }, 10_000)
 
   it('решает день записи, как его назвал телефон, а не момент её начала', async () => {
     const me = await insertActor(db)
@@ -421,7 +425,7 @@ describe('цена места — последняя, а не минимум (MO
       ['SAS', price(580_000)],
       ['Зовуни', price(600_000)],
     ])
-  })
+  }, 10_000)
 
   it('общий режим, своё место: моя последняя, даже когда чужие брали там позже и дешевле', async () => {
     const me = await insertActor(db)

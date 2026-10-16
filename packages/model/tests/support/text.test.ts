@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { ISSUE } from '#model/support/errors'
-import { drawsNothing, pastedLine, tidyText, visibleLine, visibleText } from '#model/support/text'
+import {
+  drawsNothing,
+  normalisations,
+  pastedLine,
+  tidyText,
+  visibleLine,
+  visibleText,
+} from '#model/support/text'
+
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 415 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
 
 const review = visibleText(500)
 
@@ -88,14 +99,17 @@ describe('visibleText', () => {
   })
 
   it('stays linear on a body of any size — the head of empty lines held the loop a minute', () => {
-    // Blank lines of an invisible glyph survive `trim`, so they meet the length first.
-    let started = Date.now()
+    // Blank lines of an invisible glyph survive `trim`, so they meet the length first — and the body goes
+    // no further: let past it, it is refused all the same, a hundred times slower, which neither the
+    // answer nor a clock on CI tells apart. Held by the work (MOL-266). The loop of the title cannot come
+    // back alone: within twice the bound it has nothing to be slow over, so no clock is kept for it.
+    const before = normalisations.count
     expect(review.safeParse(`${'\u2800\n'.repeat(200_000)}a`).success).toBe(false)
-    expect(Date.now() - started).toBeLessThan(100)
-    // Plain line breaks are whitespace: `trim` drops them, linearly, and what is left is «a».
-    started = Date.now()
+    expect(normalisations.count - before).toBe(0)
+    // Plain line breaks are whitespace: `trim` drops them, and what is left is «a» — the one text here
+    // normalised. Held by the result: without `trim` first the body would meet the length and throw.
     expect(review.parse(`${'\n'.repeat(400_000)}a`)).toBe('a')
-    expect(Date.now() - started).toBeLessThan(100)
+    expect(normalisations.count - before).toBe(1)
     // Twice the bound still passes when what remains fits.
     expect(review.parse(`${'\u200b\r\n'.repeat(160)}${'а'.repeat(500)}`)).toBe('а'.repeat(500))
   })
@@ -185,7 +199,7 @@ describe('pastedLine', () => {
       if (!name.safeParse(pastedLine(text)).success) missed.push(code.toString(16))
     }
     expect(missed).toEqual([])
-  })
+  }, 15_000)
 
   it('turns a break into one space and drops the direction marks', () => {
     const tab = String.fromCodePoint(9)

@@ -12,6 +12,10 @@ import * as schema from '@/db/schema'
 import { expenses, receiptLineImages, storeMemory } from '@/db/schema'
 import { settleStoreMemory } from '@/db/store-memory-repository'
 
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 130 ms there
+// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run twice as slow as any yet seen.
+
 /**
  * 0061 on a database that holds what `SET NULL` left behind (MOL-240): a recorded receipt whose trip
  * was removed for good, a line whose purchase was removed, a line not recorded at «Записать», a
@@ -213,5 +217,5 @@ describe('0061: what a removed trip or purchase left of its receipt', () => {
     await expect(
       sql`update receipts set status = 'recorded', recorded_at = now() where id = ${parsed}`,
     ).rejects.toThrow(/receipts_recorded_with_trip/)
-  })
+  }, 15_000)
 })

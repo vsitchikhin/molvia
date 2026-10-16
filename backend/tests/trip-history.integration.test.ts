@@ -8,6 +8,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
+// The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 729 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const app = buildServer({ db })
 beforeAll(async () => {
@@ -34,7 +38,7 @@ describe('history of completed trips', () => {
       expect(answer.json()).toMatchObject({ code: ERROR.NOT_FOUND })
     }
     expect((await app.inject({ url: '/trips/history' })).statusCode).toBe(401)
-  })
+  }, 10_000)
 
   it('keeps the first device time even when it is before the server start', async () => {
     const actor = await insertActor(db)
@@ -90,6 +94,7 @@ describe('history of completed trips', () => {
       )
       if (second) expect(second.nextCursor).toBeNull()
     },
+    10_000,
   )
 
   it('sorts by device completion with a server fallback for legacy rows', async () => {

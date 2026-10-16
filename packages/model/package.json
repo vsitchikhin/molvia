@@ -7,7 +7,8 @@
     ".": "./src/index.ts",
     "./testing/search-corpus": "./tests/support/search-corpus.ts",
     "./testing/receipt-text.am-05.json": "./tests/entities/receipt-text.am-05.json",
-    "./testing/serbian-receipt": "./tests/entities/serbian-receipt.ts"
+    "./testing/serbian-receipt": "./tests/entities/serbian-receipt.ts",
+    "./testing/clock": "./tests/support/clock.ts"
   },
   "types": "./src/index.ts",
   "dependencies": {

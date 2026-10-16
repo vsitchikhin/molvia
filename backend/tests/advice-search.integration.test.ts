@@ -14,6 +14,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
+// The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 702 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 
 let app: FastifyInstance
@@ -132,7 +136,7 @@ describe('GET /advice/search', () => {
     })
     expect(list.body).not.toContain('Айва')
     expect(answered(await search(me, 'айва'))).toEqual([['Айва', 'take']])
-  })
+  }, 10_000)
 
   it('«не брать нигде» уходит без цены, места и порога — полей нет и в JSON', async () => {
     const me = await insertActor(db)
@@ -148,7 +152,7 @@ describe('GET /advice/search', () => {
     expect(Object.keys(found?.advice ?? {})).not.toEqual(
       expect.arrayContaining([expect.stringMatching(/places|threshold/)]),
     )
-  })
+  }, 10_000)
 
   it('у «брать» — цена, по тем же правилам, что у списка', async () => {
     const me = await insertActor(db)

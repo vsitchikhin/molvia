@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { Readable } from 'node:stream'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
 import {
@@ -23,6 +24,10 @@ import {
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { aScreenshot, clearAll, insertActor, signIn } from './fixtures'
+
+// The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 644 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
 
 const { db, close } = connectDrizzle()
 
@@ -249,7 +254,7 @@ describe('POST /feedback (MOL-147)', () => {
     expect(statuses.filter((status) => status === 201)).toHaveLength(FEEDBACK_DAY_LIMIT)
     expect(statuses.filter((status) => status === 429)).toHaveLength(3)
     expect(await db.select().from(feedback)).toHaveLength(FEEDBACK_DAY_LIMIT)
-  })
+  }, 10_000)
 })
 
 /** The thread a message is of — the first message's number — as a reply to it carries it. */
@@ -739,14 +744,34 @@ describe('тела со снимками считаются до чтения (�
     for (let i = 0; i < FEEDBACK_HEAVY_DAY_LIMIT; i++) {
       expect((await send(heavy, cookie)).statusCode).toBe(415)
     }
-    const started = performance.now()
-    const past = await send(heavy, cookie)
+    // «Без разбора» is held by the bytes, not a clock (MOL-266): reading and parsing the megabyte costs a
+    // few milliseconds, which no bound on time tells from none — a 429 decided after the read answered
+    // within the old 200 ms too. A body that counts what was taken of it does.
+    const body = Buffer.from(JSON.stringify(heavy))
+    let taken = 0
+    const counted = new Readable({
+      read() {
+        const chunk = body.subarray(taken, taken + 16 * 1024)
+        taken += chunk.length
+        this.push(chunk.length > 0 ? chunk : null)
+      },
+    })
+    const past = await app.inject({
+      method: 'POST',
+      url: '/feedback',
+      payload: counted,
+      headers: {
+        cookie,
+        'content-type': 'application/json',
+        'content-length': String(body.length),
+      },
+    })
     expect(past.statusCode).toBe(429)
     expect(past.json()).toEqual({ code: ERROR.FEEDBACK_RATE_LIMITED })
-    expect(performance.now() - started).toBeLessThan(200)
+    expect(taken).toBe(0)
 
     expect((await send(message(), cookie)).statusCode).toBe(201)
     const other = await signIn(db, await insertActor(db))
     expect((await send(heavy, other)).statusCode).toBe(415)
-  })
+  }, 10_000)
 })

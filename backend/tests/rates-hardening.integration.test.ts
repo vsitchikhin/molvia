@@ -19,6 +19,10 @@ import { FALLBACK_AFTER_FAILURES, officialRatesRefresh } from '@/usecases/refres
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, signIn, tripContext } from './fixtures'
 
+// The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 572 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
 let app: FastifyInstance
@@ -120,7 +124,7 @@ describe('А. ЦБ РА отвечает, но курс стоит (Р-18)', () 
       rate: { scaled: 4_316_500n, source: 'fallback' },
       rateStale: false,
     })
-  })
+  }, 10_000)
 
   it('запасные молчат — поход получает старый курс ЦБ РА с признаком «устарел»', async () => {
     const run = officialRatesRefresh({
@@ -197,7 +201,7 @@ describe('Б. Курс, сдвинутый в 100 раз, — скачок и в
       choice: null,
     })
     expect(chosen.body).toMatchObject({ converted: { amount: '2318.95', currency: 'RUB' } })
-  })
+  }, 10_000)
 
   it('скачок у open.er-api — тоже метка: RUB 0.0023 за драм вместо 0.2317', async () => {
     const steady = parseErapi(erapiJson)

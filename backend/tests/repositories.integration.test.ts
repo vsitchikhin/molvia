@@ -15,6 +15,10 @@ import { createPlaceRepository } from '@/db/places-repository'
 import { createTripRepository } from '@/db/trips-repository'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 531 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const actors = createActorRepository(db)
 const catalogue = createItemRepository(db)
@@ -475,5 +479,5 @@ describe('вердикты', () => {
     `)
     expect(row?.apart).toBe(true)
     expect(second.updatedAt.getTime()).toBeGreaterThanOrEqual(second.ratedAt.getTime())
-  })
+  }, 10_000)
 })
