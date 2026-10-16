@@ -996,8 +996,8 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
   only where it stands in a file the pull request changes — elsewhere it warns, since a busy runner
   sets a new worst now and then. A bound on a duration goes only through `expectWithin`
   (`@molvia/model/testing/clock`); `bin/check-clock-bounds.mjs` in `npm run lint` refuses the other
-  spellings it knows, found by parsing; a bound on fake time (`vi.useFakeTimers()`) is no duration
-  and goes through `expect`. Why, and the prices — `.claude/rules/workspace.md`.
+  spellings it knows, found by parsing; a bound on a clock `vi.useFakeTimers()` holds still there is no
+  duration and goes through `expect`. Why, and the prices — `.claude/rules/workspace.md`.
 - **Maximize corner cases.** Mandatory checklist:
   - NULL / legacy — the field is empty but the entity still falls under the rule
   - alternative write path — the same outcome reached by a different route

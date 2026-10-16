@@ -181,9 +181,9 @@ of the measure and with every test merged. So CI checks every run instead (owner
   warns; a merge that cannot be read makes every breach red and says why, since a guard gone quiet would go
   unseen. **The price, named:** a test made slow by a change of the code, not of its file, only warns; and
   whoever touches a file answers for every test in it, which is how the 277 came to be given 10 s at once.
-- **A test is held by its whole time**, `beforeEach`, `afterEach` and a wait it sets included: the reporter
-  cannot tell a wait from work, so `navigation` and `metrics`, whose time is their own wait, carry a limit
-  too — it costs nothing. **The price, named:** vitest gives `beforeEach` and `afterEach` no time of their
+- **A test is held by its whole time**, `beforeEach`, `afterEach`, `aroundEach` and a wait it sets included:
+  the reporter cannot tell a wait from work, so `navigation` and `metrics`, whose time is their own wait,
+  carry a limit too — it costs nothing. **The price, named:** vitest gives those hooks no time of their
   own to read, and holds them by `hookTimeout`, 10 s, whatever the test's timeout — so a slow `beforeEach`
   behind a test of a long timeout is not told from the test (adversarial А2); the advice names them. A
   timeout of 0 is vitest's «none», and such a test is not judged. **The advice is the limit as the rule
@@ -194,13 +194,17 @@ of the measure and with every test merged. So CI checks every run instead (owner
   hook events come in batches, 100–200 ms late (measured: 276 ms for a hook of 400). The marks are an
   experimental door of vitest, so the reporter's test runs vitest on a fixture of hooks with set waits, and a
   version that moves them turns that red. **The marks give the sum of a suite's hooks of a kind**, so the sum
-  is held to the sum of their limits (`hookLimit`). **The price, named:** one slow hook beside fast ones of the
-  same suite is judged with their time to spare. **A hook's own timeout is not in the API** — it is read from
+  is held to the sum of their limits (`hookLimit`) — and of its `aroundAll`, whose setup falls before the first
+  child and its teardown after the last, each held by its own timeout (adversarial В5). A timeout of 0 or
+  `Infinity` is vitest's «none», and a sum with one in it is none. A hook under 300 ms is still judged where
+  the file gives it a limit of its own below ten times it (В6). **The price, named:** one slow hook beside
+  fast ones of the same suite is judged with their time to spare. **A hook's own timeout is not in the API** — it is read from
   the file by parsing: a number, arithmetic on numbers and the file's constants — each in its own scope, by
   TypeScript's binder — `{ timeout }`; `undefined` or nothing is the project's. A suite is `describe` or
   `suite`; one named by a string is the hook's own, one named by a template, `each`'s placeholders or an
-  expression (`X.name`) a guess, and a hook in a helper of the file stands wherever it is called — a guess
-  too. The exact suite is taken before a guess, and the smallest of the guesses where they differ (review
+  expression (`X.name`) a guess. A hook in a helper of the file stands in the suite the helper is called in,
+  beside the suite's own and summed with them (review №14, В5) — its own helpers' with it; one whose helper is
+  called nowhere the parse sees stands wherever it may, a guess, and a helper of another file is not seen. The exact suite is taken before a guess, and the smallest of the guesses where they differ (review
   №10). **A timeout the parse cannot read** — an import, a condition, a call — is held as the project's, and
   the advice asks for it as a number: the limit is one, and silence would let a hook past the rule (Б4).
 - **A bound on a duration is `expectWithin`** (`packages/model/tests/support/clock.ts`, served as
@@ -208,21 +212,37 @@ of the measure and with every test merged. So CI checks every run instead (owner
   reporter sees how far below its bound each one stood. **In a concurrent test it takes the test's
   context** (`expectWithin(d, n, context)`): vitest's current test is one for the worker, the neighbour or
   none beside another running, and a bound without it is refused rather than kept on the wrong test.
+  **It never refuses fake time** (review №12, adversarial В3): a number does not say which clock it came
+  from, and a refusal there left a bound on the real clock of a test that fakes only `Date` with no lawful
+  spelling. A bound met where fake timers replaced every clock the module found is kept marked `fake`, printed,
+  and held to nothing; with one clock left real it is held as real. **The price, named:** with every clock
+  fake and moving with real time (`shouldAdvanceTime`), or a clock kept under another name before the fake,
+  the duration is real and still held to nothing; a bound on the fake `Date` of a test that leaves
+  `performance` real is held as real — it is an ordinary `expect`, which the parse lets through.
 - **`bin/check-clock-bounds.mjs` refuses the upper bounds on a duration it knows**, found by parsing, never by
   a line's pattern (a pattern missed three of eighteen, review of MOL-243, Р10-А1); **the lists are in its
   head**, and two rounds of review found forty spellings past the first one — so the claim is what it lists,
-  not «any». In short: readings of every clock of the platform and the file's own clocks; a duration through
-  names, fields, classes, arrays, `+=`, `push`, the answer of a helper, a helper that subtracts a reading it
-  takes however it rounds, `hrtime(t0)`, `performance.measure`; bounded by vitest's, chai's and `assert`'s
-  forms, `toSatisfy`, `if … throw`, a helper bounding its parameter, and a deadline — a reading held below a
-  reading plus a number. Names are resolved by TypeScript's binder, so the age of a stamp held under a name
-  another test gave a reading is left alone: one side is not the clock. **Fake time is no duration**: where
-  `vi.useFakeTimers()` fakes a clock — in the bound's scope or a hook of it, by `toFake` — a bound on it is an
-  ordinary `expect`, and `expectWithin` refuses to run under fake timers (adversarial Б2: `bot/src/assemble`
-  bounds a retry on fake time). **The price, named:** a duration the code under test measures has no clock in
-  the test to be found by (`metrics`' lag), a helper imported from another file is not followed, a structure
-  the lists do not name is not seen, nor fake timers a helper of another file turns on — all go to
-  `expectWithin`, or are left, by review.
+  not «any». In short: readings of every clock of the platform, under another name too (`perf_hooks`'
+  and `node:process`' own, `{ now } = Date`, `.bind`), and the file's own clocks; a duration through names,
+  fields, classes and their getters, arrays, `+=`, `push`, the answer of a helper, a helper that subtracts a
+  reading it takes however it rounds, `hrtime(t0)`, `performance.measure`; a budget — a duration taken from a
+  number, `200 - d`, `left -= d`, `deadline - Date.now()` — whose lower bound is an upper bound on the duration;
+  bounded by vitest's, chai's and `assert`'s forms, a comparison asserted true or false (`toBe(false)`,
+  `isFalse`, `!`, `&&`), `toSatisfy`, `if … throw`, a helper bounding its parameter, and a deadline — a reading
+  held below a reading plus a number. Two readings against each other are a lower bound (adversarial В4). Names are resolved by TypeScript's binder, so the age of a stamp held under a name
+  another test gave a reading is left alone: one side is not the clock. **Fake time is no duration** (adversarial Б2:
+  `bot/src/assemble` bounds a retry on fake time): a bound is let go only where every clock its values are read
+  from is one fake timers hold still at the bound — each value followed to the clocks it was read from, so a
+  `process` or `performance` elsewhere in the file changes nothing (В3). What fakes a clock there is read in the
+  order vitest runs it (review №13, В2): the file and its suites as they are collected, the `beforeAll` of each
+  suite outwards in, then the `beforeEach`, then the test's own statements before the bound, a helper of the file
+  they call included; `useRealTimers()` lets go, `toFake` and `toNotFake` choose, `shouldAdvanceTime` moves the
+  fake clock with the real one, so it is real, `vi.setSystemTime` alone fakes `Date`, options the parse cannot
+  read leave every clock real, and a clock taken under another name keeps the real one. **The price, named:** a
+  duration the code under test measures has no clock in the test to be found by (`metrics`' lag), a helper
+  imported from another file is not followed, a structure the lists do not name is not seen, nor fake timers
+  turned on by a helper of another file, a hook a helper registers or a test before — all go to `expectWithin`,
+  or are left, by review.
 - **A test may take a testing export wherever it lives**: `TEST_DATA` keeps a package's testing export out
   of `src`, which ships, and leaves `src/**/*.test.ts` alone (`TESTS_BESIDE_SOURCE`) — a test never ships. A
   module's own boundary over part of `src` goes through `boundary()` of the base preset, which gives the
