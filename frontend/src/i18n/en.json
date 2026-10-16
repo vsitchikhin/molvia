@@ -881,13 +881,17 @@
     "preference_official": "by the {bank} rate",
     "preference_hint": "My rate comes from exchanges and incomes; until there is one, purchases take the {bank} rate anyway",
     "record": "Record an exchange",
+    "record_offline": "Recording an exchange needs a connection",
+    "error_strip": "The server did not answer — exchanges as of {when}",
     "list_title": "Exchanges",
     "row_amounts": "{given} → {received}",
     "row_rate": "{date} · {rate}",
     "remove": "Delete the exchange {amounts}",
     "amended": "amended {date}",
     "amend_conflict": "This exchange was already amended on another device — here it is as it stands now. Amend it again if you need to",
+    "amend_conflict_stale": "This exchange was already amended on another device. It will show as it stands now once the server can be reached",
     "vanished": "This exchange is gone — it was removed. The list is up to date",
+    "vanished_stale": "This exchange is gone — it was removed. The list will be updated once the server can be reached",
     "remove_sheet": {
       "title": "Delete the exchange?",
       "body": "A deleted exchange no longer counts in the rate of new purchases. Past purchases do not change",
@@ -900,6 +904,7 @@
     "restored": "The exchange is back",
     "restore_gone": "The exchange can no longer be brought back — the removal is final. If it was needed, record it again",
     "conflict": "This exchange is already recorded — the list shows it as it stands now. If the amounts are wrong, tap it in the list and amend it",
+    "conflict_stale": "This exchange is already recorded — do not record it again. It will show once the server can be reached",
     "empty": {
       "title": "No exchanges yet",
       "body": "Record what you gave and what you got — the rate is worked out for you. Until you have a rate of your own, purchases count by the {bank} rate"
@@ -907,7 +912,8 @@
     "offline": {
       "title": "No connection",
       "body": "The exchanges will be shown when the connection is back",
-      "strip": "No connection — an exchange or the rate can be changed when it is back"
+      "strip": "Offline · exchanges as of {when}. Recording an exchange and changing the rate need a connection",
+      "strip_record": "Offline · exchanges as of {when}. Recording an exchange needs a connection"
     },
     "load_error": {
       "title": "Could not load the exchanges",
@@ -947,7 +953,6 @@
       "channel_bankNoncash": "Non-cash",
       "channel_exchanger": "Exchange office"
     },
-    "fab": "Exchange",
     "edit_on": "Amend the exchange of {date}:",
     "card_given": "Gave",
     "card_received": "Got",
@@ -984,8 +989,8 @@
       "row_date": "on {date}",
       "best": "Best rate on {date}: {channel}",
       "own": "{channel} on {date}",
-      "more": "{amount} more than {where}",
-      "less": "{amount} less than {where}",
+      "worse": "{amount} · worse than {where}",
+      "better": "{amount} · better than {where}",
       "equal": "Exactly as {where}",
       "where_bankCash": "at banks for cash",
       "where_bankNoncash": "at banks non-cash",
@@ -998,7 +1003,10 @@
       "note": "Over 12 months, each exchange against the market of its day by the Central Bank of Armenia: its own channel when named, else the best rate. Minus — you gave more than the market",
       "uncounted": "Not compared: {n} exchange — no market or rate for that day | Not compared: {n} exchanges — no market or rate for those days",
       "count": "{n} exchange | {n} exchanges",
-      "no_place": "No place"
+      "no_place": "No place",
+      "worse": "worse than the market",
+      "better": "better than the market",
+      "count_word": "{count} · {word}"
     },
     "rate_chart": {
       "title": {

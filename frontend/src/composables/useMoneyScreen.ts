@@ -10,7 +10,7 @@ import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useMoneyMonth } from '@/composables/useMoneyMonth'
 import type { MoneyMonth } from '@/composables/useMoneyMonth'
-import { localDay, purchaseDay, timeOfDay } from '@/days'
+import { answeredAt, localDay } from '@/days'
 import { useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 import type { SpendingPrefill } from '@/stores/spendingHandoff'
@@ -227,7 +227,7 @@ export function useMoneyScreen(): MoneyScreen {
     return category.preset ? t(`spending.category.${category.preset}`) : (category.name ?? '')
   }
 
-  const whenOf = (at: Date) => `${purchaseDay(at, locale.value)}, ${timeOfDay(at, locale.value)}`
+  const whenOf = (at: Date) => answeredAt(at, locale.value, today.value)
 
   const sheetOpen = ref(false)
   const newCategoryOpen = ref(false)

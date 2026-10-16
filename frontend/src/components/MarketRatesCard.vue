@@ -1,7 +1,9 @@
 <template>
   <AppCard v-if="shown.length > 0" class="market">
-    <SectionCaption inset>{{ t('exchange.market.title') }}</SectionCaption>
-    <p class="hint">{{ t('exchange.market.hint') }}</p>
+    <div class="heading">
+      <SectionCaption inset>{{ t('exchange.market.title') }}</SectionCaption>
+      <p class="hint">{{ t('exchange.market.hint') }}</p>
+    </div>
     <table v-for="row in shown" :key="row.currency" class="table">
       <caption class="currency">
         <span class="name">{{ t(`spending.currency_name.${row.currency}`) }}</span>
@@ -98,10 +100,17 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+// The caption and its hint are one group; the currencies stand 24 apart (Ф-10).
 .market {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-6);
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
 .hint {
@@ -135,9 +144,10 @@ export default defineComponent({
   color: var(--text-muted);
 }
 
+// Not pressed, so no 44 under the finger — but 13 px in two lines at 4 read as one block.
 th,
 td {
-  padding: var(--space-1) 0;
+  padding: var(--space-2) 0;
   border-top: var(--hairline) solid var(--border);
   vertical-align: baseline;
 }
@@ -169,12 +179,14 @@ thead th {
   font-weight: var(--weight-bold);
 }
 
+// Nobody presses the star, so it is no terracotta (Ф-4): the best is told by the star, the weight
+// and the word read out, never by a colour.
 .star {
   @include icon;
 
   font-size: var(--icon-sm);
   margin-right: var(--space-1);
-  color: var(--accent-ink);
+  color: var(--text);
   vertical-align: -0.1em;
 }
 
