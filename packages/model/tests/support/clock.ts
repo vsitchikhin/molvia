@@ -1,9 +1,11 @@
-import { expect, TestRunner, vi, type TestContext } from 'vitest'
+import { expect, TestRunner, type TestContext } from 'vitest'
 
 /** What a test asserted of a duration, kept for the time reporter (`bin/test-time-reporter.ts`). */
 export interface ClockBound {
   readonly elapsed: number
   readonly bound: number
+  /** Met where fake timers held every clock still: no duration, and the reporter holds it to nothing. */
+  readonly fake?: true
 }
 
 declare module 'vitest' {
@@ -11,6 +13,17 @@ declare module 'vitest' {
     clockBounds?: ClockBound[]
   }
 }
+
+/** The clocks as this module found them: fake timers replace each one they hold still. */
+const REAL = {
+  date: Date.now,
+  performance: globalThis.performance,
+  hrtime: globalThis.process.hrtime,
+}
+const everyClockFake = (): boolean =>
+  Date.now !== REAL.date &&
+  globalThis.performance !== REAL.performance &&
+  globalThis.process.hrtime !== REAL.hrtime
 
 /**
  * The one way a test bounds a duration from above (MOL-243, MOL-266): asserts `elapsed < bound`, in
@@ -24,25 +37,26 @@ declare module 'vitest' {
  * beside another test running it is that other test, or none (adversarial А7). Without the context
  * a bound there is refused rather than kept on the wrong test.
  *
- * Fake time is no duration: no runner moves it, so a bound on it is an ordinary `expect`, and here it
- * is refused (adversarial Б2) — the reporter would hold it to ten times what it met.
+ * Fake time is no duration: no runner moves it, so a bound on it is an ordinary `expect` (adversarial
+ * Б2). A number does not say which clock it came from, so a bound is never refused here (review №12,
+ * adversarial В3): met where fake timers replaced every clock the module found, it is kept marked
+ * `fake`, and the reporter holds it to nothing; where one clock is left real, it is held as real.
  */
 export function expectWithin(
   elapsed: number,
   bound: number,
   context?: Pick<TestContext, 'task'>,
 ): void {
-  if (vi.isFakeTimers()) {
-    throw new Error(
-      'expectWithin under vi.useFakeTimers(): fake time is no duration — bound it with expect',
-    )
-  }
   const test = context?.task ?? TestRunner.getCurrentTest()
   if (!test || (!context && test.concurrent)) {
     throw new Error(
       'expectWithin outside a test, or in a concurrent one without its context: expectWithin(elapsed, bound, context)',
     )
   }
-  ;(test.meta.clockBounds ??= []).push({ elapsed, bound })
+  ;(test.meta.clockBounds ??= []).push({
+    elapsed,
+    bound,
+    ...(everyClockFake() ? { fake: true as const } : {}),
+  })
   expect(elapsed).toBeLessThan(bound)
 }
