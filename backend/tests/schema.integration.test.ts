@@ -27,7 +27,7 @@ import {
   verdicts,
 } from '@/db/schema'
 
-// The 3 tests here past half a second on CI carry a timeout of 10 s: the slowest took 809 ms there
+// The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 809 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
 // than any yet seen.
 
@@ -951,7 +951,7 @@ describe('the remembered pick', () => {
     await db.insert(searchPicks).values({ actorId, queryKey, itemId })
 
     await refuses(() => db.insert(searchPicks).values({ actorId, queryKey, itemId }), UNIQUE)
-  })
+  }, 10_000)
 
   it('keeps the pick personal: two people, one query, one item, two rows', async () => {
     const itemId = await insertItem(db)

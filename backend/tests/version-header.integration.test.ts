@@ -8,8 +8,9 @@ import { DomainError, ERROR, VERSION_HEADER } from '@molvia/model'
 import { VERSION } from '@/env'
 import { buildServer } from '@/server'
 
-// The test here past half a second on CI carries a timeout of 10 s: it took 656 ms there at worst
-// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// The test here past a second on CI carries a timeout of 15 s: it took 1 150 ms there at worst
+// (MOL-266), in the first attempt of a run re-run, which the first measure did not read (MOL-243,
+// round 21). Ten times that, rounded up to 5 s, so the time reporter names it only on a run slower
 // than any yet seen.
 
 let app: FastifyInstance
@@ -89,6 +90,6 @@ describe('a build named outside latin1', () => {
       expect(nowhere.status).toBe(404)
       expect(nowhere.headers.get(VERSION_HEADER)).toBe(named)
     },
-    10_000,
+    15_000,
   )
 })

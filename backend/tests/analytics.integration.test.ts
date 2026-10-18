@@ -15,7 +15,9 @@ import { clearAll, insertCounted, insertItem, signIn } from './fixtures'
 
 // The test here past a second on CI carries a timeout of 20 s: the slowest took 1 507 ms there
 // (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
-// only on a run twice as slow as any yet seen.
+// only on a run twice as slow as any yet seen. One more here past half a second carries 10 s: it
+// took 568 ms at worst, in the first attempt of a run re-run, which the first measure did not read
+// (MOL-243, round 21).
 
 const { db, close } = connectDrizzle()
 const log = createEventRepository(db)
@@ -205,7 +207,7 @@ describe('выключение', () => {
       ])
       expect(await rowsOf(me.id)).toHaveLength(0)
     }
-  })
+  }, 10_000)
 })
 
 describe('снятые оценки (MOL-97, В1)', () => {

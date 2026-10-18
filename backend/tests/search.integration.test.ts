@@ -10,9 +10,10 @@ import { itemBarcodes, items } from '@/db/schema'
 import { connect, connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem } from './fixtures'
 
-// The 5 tests here past half a second on CI carry a timeout of 10 s: the slowest took 932 ms there
-// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
-// than any yet seen.
+// The 5 tests here past half a second on CI carry a timeout of their own (MOL-266), ten times their
+// worst there, rounded up to 5 s, so the time reporter names one only on a run slower than any yet
+// seen: 10 s for 4 of them, and 15 s for «splits a name at every White_Space…», which took 1 022 ms
+// in a cancelled run, which the first measure left out (MOL-243, round 19).
 
 const sql = connect()
 const { db, close } = connectDrizzle()
@@ -906,7 +907,7 @@ describe('search — a word the shelf writes otherwise (MOL-45)', () => {
       await named(name)
       expect(await names('картошка'), code.toString(16)).toEqual([name])
     }
-  }, 10_000)
+  }, 15_000)
 
   it('takes a noun with an adjective ending for the kind: «Пирожное Картошка» is no potato (review Р)', async () => {
     await named('Пирожное Картошка')

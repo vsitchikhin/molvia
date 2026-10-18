@@ -18,7 +18,7 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn, tripContext } from './fixtures'
 
-// The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 754 ms there
+// The 5 tests here past half a second on CI carry a timeout of 10 s: the slowest took 754 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
 // than any yet seen.
 
@@ -291,7 +291,7 @@ describe('доход в «моём курсе» (MOL-66, В-1)', () => {
     expect(wallet).toMatchObject({ basis: 'weighted', estimated: true })
     expect(wallet?.rate.scaled).toBe(4_510_490n)
     expect((await start(me)).rate).toMatchObject({ source: 'personal', scaled: 4_510_490n })
-  })
+  }, 10_000)
 
   it('без остатка — курс по этому поступлению, и так и названо', async () => {
     await rates.upsert([rub('4.3', daysAgo(3))])

@@ -22,11 +22,11 @@ const seeder = createSeedRepository(db)
 const lines = CATALOGUE_SEED.map(([name, unit]) =>
   newItemSchema.parse({ kind: 'product', name, defaultUnit: unit }),
 )
-// The whole list takes seconds — five statements a line — so it runs twice in this file, as the
-// dry run below and as the bundle; the rest is held on the first lines, milk and bread among them.
-// The bundle took 6 511 ms on CI at worst and the dry run 6 259, and ten times the slower is the limit
-// of both (MOL-266).
-const FULL_RUN_MS = 70_000
+// The whole list takes seconds — five statements a line — so it runs twice in this file, as the dry
+// run below and as the bundle; the rest is held on the first lines, milk and bread among them. The
+// dry run took 7 119 ms on CI at worst — in the first attempt of a run re-run (MOL-243, round 21) —
+// and the bundle 6 511, and ten times the slower, up to 5 s, is the limit of both (MOL-266).
+const FULL_RUN_MS = 75_000
 const few = lines.slice(0, 5)
 
 async function itemCount(): Promise<number> {

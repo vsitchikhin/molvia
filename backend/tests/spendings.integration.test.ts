@@ -36,9 +36,10 @@ import {
   tripContext,
 } from './fixtures'
 
-// The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 944 ms there
-// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
-// than any yet seen.
+// The 7 tests here past half a second on CI carry a timeout of their own (MOL-266), ten times their
+// worst there, rounded up to 5 s, so the time reporter names one only on a run slower than any yet
+// seen: 10 s for 6 of them, the slowest 944 ms, and 15 s for «трата, записанная между страницами…»,
+// which took 1 482 ms in a cancelled run, which the first measure left out (MOL-243, round 19).
 
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
@@ -718,7 +719,7 @@ describe('месяц «Денег» — края (адверсариальный
     expect((await call(me, 'DELETE', `/spendings/${idsOf(first)[3] ?? ''}`)).statusCode).toBe(204)
     const again = await month(me, today.slice(0, 7), first.cursor ?? undefined)
     expect(idsOf(again)).toEqual(idsOf(second))
-  }, 10_000)
+  }, 15_000)
 
   it('курсор, который не ключ строки, — отказ, а не первая страница', async () => {
     const me = await owner()

@@ -9,7 +9,7 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
-// The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 926 ms there
+// The 3 tests here past half a second on CI carry a timeout of 10 s: the slowest took 926 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
 // than any yet seen.
 
@@ -145,7 +145,7 @@ describe('the shops’ memory (Р-2)', () => {
     await db.delete(actors).where(eq(actors.id, me))
     expect(await recall(newcomer)).toBe(full)
     expect(await recall(wife)).toBe(light)
-  })
+  }, 10_000)
 
   it('rewrites a person’s own word, and knows nothing at another seller', async () => {
     const me = await insertActor(db)
