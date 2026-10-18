@@ -372,6 +372,110 @@ describe('«Записать»', () => {
     expect((await record(me, second, body())).statusCode).toBe(200)
   })
 
+  // MOL-254: a new shot is recorded while the trip of the first lies removed, and that trip's
+  // «Вернуть» is refused — brought back, one paper was two records
+  describe('«Вернуть» of a trip whose receipt was recorded again (MOL-254)', () => {
+    let shop: { milk: string; place: string }
+    beforeEach(async () => {
+      shop = { milk: await insertItem(db), place: await insertPlace(db) }
+    })
+    const recordBody = (tripId: string) => ({
+      tripId,
+      place: { id: shop.place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        {
+          position: 0,
+          skip: false,
+          item: { id: shop.milk },
+          quantity: pieces(2),
+          amount: amount(740),
+        },
+      ],
+    })
+    const recorded = async (me: string, over: Partial<typeof receipts.$inferInsert> = {}) => {
+      const tripId = randomUUID()
+      const id = await parsedReceipt(me, LINES.slice(0, 1), over)
+      expect((await record(me, id, recordBody(tripId))).statusCode).toBe(200)
+      return tripId
+    }
+    const trip = async (me: string, tripId: string, action: 'DELETE' | 'restore') =>
+      app.inject({
+        method: action === 'DELETE' ? 'DELETE' : 'POST',
+        url: action === 'DELETE' ? `/trips/${tripId}` : `/trips/${tripId}/restore`,
+        headers: { cookie: await signIn(db, me) },
+      })
+    const alive = async (me: string) =>
+      (
+        await db
+          .select({ id: trips.id })
+          .from(trips)
+          .where(and(eq(trips.actorId, me), sql`${trips.deletedAt} is null`))
+      ).map((row) => row.id)
+
+    it('refuses it while the new record is there, and lets the other come back once it is not', async () => {
+      const me = await insertActor(db)
+      const first = await recorded(me)
+      expect((await trip(me, first, 'DELETE')).statusCode).toBe(204)
+      const second = await recorded(me)
+
+      const refused = await trip(me, first, 'restore')
+      expect([refused.statusCode, codeOf(refused)]).toEqual([409, ERROR.RECEIPT_RECORDED_BEFORE])
+      expect(await alive(me)).toEqual([second])
+
+      // the new one removed in its turn: the first comes back, and now the new one is refused
+      expect((await trip(me, second, 'DELETE')).statusCode).toBe(204)
+      expect((await trip(me, first, 'restore')).statusCode).toBe(200)
+      const again = await trip(me, second, 'restore')
+      expect([again.statusCode, codeOf(again)]).toEqual([409, ERROR.RECEIPT_RECORDED_BEFORE])
+      expect(await alive(me)).toEqual([first])
+    })
+
+    it('does not refuse it for a receipt with no number: it is held by its id alone', async () => {
+      const me = await insertActor(db)
+      const unnumbered = await recorded(me, { receiptNo: null })
+      expect((await trip(me, unnumbered, 'DELETE')).statusCode).toBe(204)
+      await recorded(me, { receiptNo: null })
+      expect((await trip(me, unnumbered, 'restore')).statusCode).toBe(200)
+    })
+
+    it('does not refuse it for the same receipt recorded by another person', async () => {
+      const me = await insertActor(db)
+      const mine = await recorded(me)
+      expect((await trip(me, mine, 'DELETE')).statusCode).toBe(204)
+      await recorded(await insertActor(db))
+      expect((await trip(me, mine, 'restore')).statusCode).toBe(200)
+    })
+
+    it('answers 404 past the ten minutes, as for any trip', async () => {
+      const me = await insertActor(db)
+      const late = await recorded(me)
+      expect((await trip(me, late, 'DELETE')).statusCode).toBe(204)
+      await recorded(me)
+      await db
+        .update(trips)
+        .set({ deletedAt: sql`clock_timestamp() - interval '11 minutes'` })
+        .where(eq(trips.id, late))
+      const gone = await trip(me, late, 'restore')
+      expect([gone.statusCode, codeOf(gone)]).toEqual([404, ERROR.NOT_FOUND])
+    })
+
+    it('lets one of «Записать» and «Вернуть» through when they come at once', async () => {
+      const me = await insertActor(db)
+      const first = await recorded(me)
+      expect((await trip(me, first, 'DELETE')).statusCode).toBe(204)
+      const shot = await parsedReceipt(me, LINES.slice(0, 1))
+      const answers = await Promise.all([
+        record(me, shot, recordBody(randomUUID())),
+        trip(me, first, 'restore'),
+      ])
+      expect(answers.map((answer) => answer.statusCode).sort()).toEqual([200, 409])
+      const refused = answers.find((answer) => answer.statusCode === 409)
+      expect(refused && codeOf(refused)).toBe(ERROR.RECEIPT_RECORDED_BEFORE)
+      expect(await alive(me)).toHaveLength(1)
+    })
+  })
+
   it('refuses a receipt not read yet, lines that are not the receipt’s, and a day to come', async () => {
     const me = await insertActor(db)
     const place = await insertPlace(db)
