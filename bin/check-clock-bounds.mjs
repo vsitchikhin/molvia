@@ -46,8 +46,9 @@
 // concurrent tests, by `.concurrent` or the options, no options under a name, and no config of its
 // directory that names `fakeTimers`, `concurrent` or `extends`, reads a file or takes settings from a file
 // of the repository, or has a setup file that touches them or imports what does, or loads a module any
-// way but a static import; no clock put back by hand, no timer call in a default of a parameter, no
-// command line that gives vitest a setting: else no bound there is let go. A callback runs where it is written only for a call known to run it before it returns
+// way but a static import; no clock put back by hand or by another name (a member of `vi`, a property
+// definer, the global object referred to but not read through), nothing that touches the timers in a
+// default of a parameter, no command line that gives vitest a setting: else no bound there is let go. A callback runs where it is written only for a call known to run it before it returns
 // — a `then` only on what touches no timers. `useRealTimers()` lets go, `toFake` and `toNotFake` choose,
 // `shouldAdvanceTime` and a tick mode but `manual` move fake time with the real one, options not read
 // whole leave every clock real; a clock taken under another name keeps the real one.
@@ -1314,6 +1315,26 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
         /^(performance|Date|process\.hrtime)(\.|$)/.test(resolvedText(n.left))
       )
         ok = false
+      // a default of a parameter that may touch the timers, through a function of the file too (Л1)
+      if (ts.isParameter(n) && n.initializer && touchesTimers(n.initializer)) ok = false
+      // vi's members, Object.defineProperty and its kin, or the global object under another name — a
+      // reference to one not called or read through where it stands (Л2)
+      if (ts.isPropertyAccessExpression(n)) {
+        const parent = n.parent
+        const used =
+          (ts.isCallExpression(parent) && parent.expression === n) ||
+          (ts.isPropertyAccessExpression(parent) && parent.expression === n)
+        if (!used && calleeRootOf(n) === 'vi') ok = false
+        if (
+          !used &&
+          /^(Object|Reflect)\.(defineProperty|defineProperties|assign|set)$/.test(resolvedText(n))
+        )
+          ok = false
+      }
+      if (ts.isIdentifier(n) && /^(globalThis|window|self|global)$/.test(n.text)) {
+        const parent = n.parent
+        if (!(ts.isPropertyAccessExpression(parent) && parent.expression === n)) ok = false
+      }
       // describe.concurrent, it.concurrent: the tests run side by side, and the clocks are one (№19)
       if (
         ts.isPropertyAccessExpression(n) &&
@@ -1374,7 +1395,15 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
  * @returns {string[]}
  */
 export function unsureDirectories(configs, read) {
-  const TOUCH = /useFakeTimers|useRealTimers|setTimerTickMode|setConfig|stubGlobal|defineProperty/
+  // what may touch the timers or the clocks in a setup file — the same as the test file reads, not a list
+  // of the calls that do (review №24, adversarial Л3): the clocks by name, a spy, the global object, a
+  // module loaded by another name
+  // module loaded by another name — wherever vitest is at hand to hook it there; the timers' own calls anywhere
+  const TOUCH = /useFakeTimers|useRealTimers|setTimerTickMode|setConfig|stubGlobal/
+  const HOOKED =
+    /defineProperty|\bDate\b|performance|hrtime|spyOn|globalThis|\bwindow\b|\bassign\b|importActual|importMock|\brequire\b|\bimport\s*\(/
+  const VITEST = /['"]vitest['"]|\bglobals\s*:\s*true/
+  const touchesClock = (text) => TOUCH.test(text) || (VITEST.test(text) && HOOKED.test(text))
   /**
    * What a file loads, parsed: the specifiers of its static `import … from '…'`, `import '…'` and
    * `export … from '…'`, and whether it loads anything any other way — `import()`, `require`,
@@ -1479,7 +1508,7 @@ export function unsureDirectories(configs, read) {
     const found = candidates.find((path) => read(path) !== undefined)
     const text = found === undefined ? undefined : read(found)
     if (found === undefined || text === undefined) return true
-    if (TOUCH.test(text)) return true
+    if (touchesClock(text)) return true
     const { specs, loose } = modulesOf(text, found)
     if (loose) return true
     return specs.some((spec) => {
@@ -1520,21 +1549,52 @@ export function unsureDirectories(configs, read) {
  * Whether a command line of the repository gives vitest a setting the configs do not show (adversarial
  * К5): every word after `vitest` is `run`, a config, a project, a report or a file, or the run is unsure —
  * `--sequence.concurrent`, `--setupFiles` and the rest set what the check cannot read.
+ * After `npm run … --` too, which npm hands to the script; and a `-c` only to a config the check reads.
  * @param {string[]} texts — package.json files, the Makefile, the workflows
+ * @param {string[]} [configs] — the configs the check reads
  * @returns {boolean}
  */
-export function vitestFlagsUnsure(texts) {
-  // what touches no clock: the command, a config read anyway, a project, what is reported, a file
+export function vitestFlagsUnsure(texts, configs = []) {
+  // what touches no clock: the command, a project, what is reported, a file — and a config the check reads
   const SAFE =
-    /^(run|--run|-c|--config|--project|--passWithNoTests|--silent|--coverage|--reporter|--outputFile|--bail|--shard|[^-].*)$/
-  return texts.some((text) =>
-    [...text.matchAll(/\bvitest\b([^"\n&|;]*)/g)].some(([, rest]) =>
-      rest
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean)
-        .some((word) => !SAFE.test(word.split('=')[0])),
-    ),
+    /^(run|--run|--project|--passWithNoTests|--silent|--coverage|--reporter|--outputFile|--bail|--shard|[^-].*)$/
+  const known = (path) =>
+    configs.length === 0 || configs.some((config) => config.endsWith(path.replace(/^\.\//, '')))
+  const unsure = (rest) => {
+    const words = rest.trim().split(/\s+/).filter(Boolean)
+    return words.some((word, at) => {
+      const [flag, value] = word.split('=')
+      if (flag === '-c' || flag === '--config') {
+        const path = value ?? words[at + 1]
+        return path === undefined || !known(path)
+      }
+      if (at > 0 && (words[at - 1] === '-c' || words[at - 1] === '--config')) return false
+      return !SAFE.test(flag ?? '')
+    })
+  }
+  // the scripts that run vitest, by their names in every package.json: what npm hands them after `--`
+  // reaches vitest (Л4)
+  const scripts = new Set(
+    texts.flatMap((text) => {
+      try {
+        return Object.entries(JSON.parse(text).scripts ?? {})
+          .filter(([, command]) => /\bvitest\b/.test(String(command)))
+          .map(([name]) => name)
+      } catch {
+        return []
+      }
+    }),
+  )
+  return texts.some(
+    (text) =>
+      [...text.matchAll(/\bvitest\b([^"\n&|;]*)/g)].some(([, rest]) => unsure(rest)) ||
+      [
+        ...text.matchAll(
+          /\bnpm\s+(?:run(?:-script)?\s+)?(?:-\S+\s+)*([\w:.-]+)[^"\n&|;]*?\s--\s([^"\n&|;]*)/g,
+        ),
+      ].some(
+        ([, name, rest]) => (scripts.has(name ?? '') || name === 'test') && unsure(rest ?? ''),
+      ),
   )
 }
 
@@ -1560,7 +1620,13 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()
     .split('\n')
     .filter(Boolean)
     .map((path) => readFileSync(path, 'utf8'))
-  if (vitestFlagsUnsure(commands)) unsure.push('.')
+  if (
+    vitestFlagsUnsure(
+      commands,
+      configs.map(({ path }) => path),
+    )
+  )
+    unsure.push('.')
   const problems = files.flatMap((file) => {
     const source = readFileSync(file, 'utf8')
     // a file that never reads the clock holds no duration: the binder is spared it

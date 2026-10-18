@@ -899,4 +899,62 @@ describe('rawBounds', () => {
     expect(vitestFlagsUnsure(['"test": "vitest run --sequence.concurrent"'])).toBe(true)
     expect(vitestFlagsUnsure(['test:\n\tnpx vitest run --setupFiles ./setup.ts'])).toBe(true)
   })
+
+  // review round 11 of MOL-266: №24 and adversarial Л1–Л4
+  it.each([
+    [
+      'a default of a parameter that calls what lets go',
+      `function realClock(): typeof vi {\nreturn vi.useRealTimers()\n}\nfunction prepare(utils = realClock()): typeof vi {\nreturn utils\n}\nbeforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\nprepare()\n${REAL}\n})`,
+    ],
+    ...[
+      "const stub = vi.stubGlobal\nbeforeEach(() => {\nvi.useFakeTimers()\nstub('performance', REAL_CLOCK)\n})",
+      "const define = Object.defineProperty\nbeforeEach(() => {\nvi.useFakeTimers()\ndefine(globalThis, 'performance', { value: REAL_CLOCK })\n})",
+      'const g = globalThis\nbeforeEach(() => {\nvi.useFakeTimers()\ng.performance = REAL_CLOCK\n})',
+    ].map((back) => [
+      `the clock put back under another name: ${back.split('\n')[0]}`,
+      `${back}\nit('x', async () => {\n${REAL}\n})`,
+    ]),
+  ])('finds a bound on real time beside fake timers — %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toHaveLength(1)
+  })
+
+  it('reads a setup file that puts a clock back by hand, or loads a module under another name (№24, Л3)', () => {
+    const config = { path: 'bot/vitest.config.ts', text: "setupFiles: ['./setup.ts']" }
+    for (const setup of [
+      "import { afterEach } from 'vitest'\nconst realNow = Date.now\nafterEach(() => {\nDate.now = realNow\n})",
+      "import { afterEach, vi } from 'vitest'\nafterEach(() => {\nvi.spyOn(performance, 'now').mockRestore()\n})",
+      "import { afterEach } from 'vitest'\nafterEach(() => {\nObject.assign(globalThis, { performance: REAL })\n})",
+      "import { vi } from 'vitest'\nconst load = vi.importActual\nawait load('./clock-reset')",
+    ])
+      expect(
+        unsureDirectories([config], (path) => (path === 'bot/setup.ts' ? setup : undefined)),
+      ).toEqual(['bot'])
+    // a file that cannot hook — no vitest in it — may name Date freely
+    expect(
+      unsureDirectories([config], (path) =>
+        path === 'bot/setup.ts' ? 'export const at = (d: Date): number => d.getTime()' : undefined,
+      ),
+    ).toEqual([])
+  })
+
+  it('reads what npm hands a script that runs vitest, and a config the check does not read (Л4)', () => {
+    const scripts = JSON.stringify({ scripts: { test: 'vitest run', lint: 'eslint .' } })
+    expect(vitestFlagsUnsure([scripts, 'test:\n\tnpm run test -- --sequence.concurrent'])).toBe(
+      true,
+    )
+    expect(vitestFlagsUnsure([scripts, '- run: npm test -- --sequence.concurrent'])).toBe(true)
+    expect(vitestFlagsUnsure([scripts, 'lint:\n\tnpm run lint -- --fix'])).toBe(false)
+    expect(
+      vitestFlagsUnsure(
+        ['"test": "vitest run -c clock.config.ts"'],
+        ['backend/vitest.integration.config.ts'],
+      ),
+    ).toBe(true)
+    expect(
+      vitestFlagsUnsure(
+        ['"test": "vitest run -c vitest.integration.config.ts"'],
+        ['backend/vitest.integration.config.ts'],
+      ),
+    ).toBe(false)
+  })
 })
