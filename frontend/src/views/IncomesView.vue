@@ -55,7 +55,7 @@
     </template>
 
     <!-- The shape of what is coming, in the order it will stand (Ф-13): a month and two cards, then a
-         month and a card — their plates by whether the person has an account (`skeletonPlates`). -->
+         month and a card — their plates by the account a new income lands on (`skeletonPlates`). -->
     <ScreenSkeleton v-if="phase === 'loading'">
       <SkeletonPart kind="caption" :width="22" />
       <OperationSkeleton form="income" :plates="skeletonPlates[0]" />
@@ -148,7 +148,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { IncomeAmendBody, IncomeView as Row, Money } from '@molvia/model'
 import IconCashPlus from '~icons/mdi/cash-plus'
@@ -161,7 +161,7 @@ import IncomeRemoveSheet from '@/components/IncomeRemoveSheet.vue'
 import IncomeSheet from '@/components/IncomeSheet.vue'
 import OperationSkeleton from '@/components/OperationSkeleton.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
-import { pageOrder } from '@/components/accounts'
+import { defaultAccount } from '@/components/accounts'
 import { asTyped } from '@/components/spending'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
@@ -267,14 +267,22 @@ export default defineComponent({
     const accounts = useAccountsStore()
     onMounted(() => void accounts.refresh())
     /**
-     * The plates of the skeleton's cards, in lines (adversarial Б2): with an account a new income lands
-     * on it untouched, so every card has its plate — the account and a note, the account (frame
-     * incomes-light); with none, a note and nothing (frame incomes-loading). The accounts come from the
-     * phone's memory before their answer, so the shape is known as the skeleton comes.
+     * The plates of the skeleton's cards, in lines (adversarial Б2): a new income lands untouched on the
+     * first account of the income currency (`defaultAccount`), so with one every card has its plate —
+     * the account and a note, the account (frame incomes-light); with none, a note and nothing (frame
+     * incomes-loading). An account in another currency takes no income untouched (adversarial В1: a card
+     * in drams under a salary in roubles). Taken as the skeleton comes and held while it stands (В2):
+     * with nothing in memory the accounts may answer before the incomes, and the skeleton would change
+     * its shape in one frame (MOL-151); the answer is where the cards take their own.
      */
-    const skeletonPlates = computed<readonly [readonly number[], readonly number[]]>(() =>
-      pageOrder(accounts.accounts).length > 0 ? [[2, 1], [1]] : [[1, 0], [1]],
-    )
+    const platesNow = (): readonly [readonly number[], readonly number[]] => {
+      const currency = accounts.overview?.incomeTotals?.currency
+      return currency && defaultAccount(accounts.accounts, currency) ? [[2, 1], [1]] : [[1, 0], [1]]
+    }
+    const skeletonPlates = ref(platesNow())
+    watch(incomes.phase, (phase) => {
+      if (phase === 'loading') skeletonPlates.value = platesNow()
+    })
     onMounted(() => {
       window.addEventListener('online', follow)
       window.addEventListener('offline', follow)

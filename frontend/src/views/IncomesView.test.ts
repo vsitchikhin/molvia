@@ -72,6 +72,38 @@ function overview(patch: Partial<IncomesResponse> = {}): IncomesResponse {
   }
 }
 
+/** «Счета» with one card in `currency`, under a salary in roubles. */
+function accountsPage(currency: 'RUB' | 'AMD'): MoneyAccountsResponse {
+  const money = (amount: string) => parseMoney(amount, currency)
+  const totals = { total: money('0'), spendable: money('0'), savings: money('0'), uncounted: 0 }
+  return {
+    spendCurrency: currency,
+    accounts: [
+      {
+        id: '5c1f8b2d-3e4a-4b6c-8d7e-9f0a1b2c3d4e',
+        name: currency === 'RUB' ? 'Card ₽' : 'Card ֏',
+        currency,
+        savings: false,
+        start: money('1000'),
+        startOn: '2026-09-01',
+        balance: money('1000'),
+        approximate: false,
+        uncounted: 0,
+        inSpend: null,
+        rate: null,
+        lastCheckedOn: null,
+        hasOperations: true,
+        archivedAt: null,
+        revision: 1,
+      },
+    ],
+    totals,
+    incomeTotals: { ...totals, currency: 'RUB' },
+    unassigned: 0,
+    countedAt: new Date(),
+  }
+}
+
 const views: VueWrapper[] = []
 async function render(): Promise<VueWrapper> {
   const pinia = createPinia()
@@ -99,8 +131,11 @@ beforeEach(() => {
   for (const mock of [incomes, recordIncome, amendIncome, removeIncome, restoreIncome]) {
     mock.mockReset()
   }
-  // No accounts unless a test names one: the page is never asked otherwise.
+  // No accounts unless a test names one: the page is never asked otherwise. Nor any kept by a test
+  // before — «Счета» are remembered on both shelves (self-review №7, adversarial В).
   moneyAccounts.mockReset().mockRejectedValue(new TypeError('network'))
+  localStorage.clear()
+  sessionStorage.clear()
   online(true)
   clock = 0
   vi.spyOn(performance, 'now').mockImplementation(() => clock)
@@ -145,42 +180,32 @@ describe('IncomesView: the four states', () => {
     expect(view.find('.skeleton-lines').exists()).toBe(false)
   })
 
-  it('with an account every card of the skeleton has its plate, as every income lands on it (Б2)', async () => {
-    moneyAccounts.mockResolvedValue({
-      spendCurrency: 'RUB',
-      accounts: [
-        {
-          id: '5c1f8b2d-3e4a-4b6c-8d7e-9f0a1b2c3d4e',
-          name: 'Card ₽',
-          currency: 'RUB',
-          savings: false,
-          start: parseMoney('1000', 'RUB'),
-          startOn: '2026-09-01',
-          balance: parseMoney('1000', 'RUB'),
-          approximate: false,
-          uncounted: 0,
-          inSpend: null,
-          rate: null,
-          lastCheckedOn: null,
-          hasOperations: true,
-          archivedAt: null,
-          revision: 1,
-        },
-      ],
-      totals: {
-        total: parseMoney('0', 'RUB'),
-        spendable: parseMoney('0', 'RUB'),
-        savings: parseMoney('0', 'RUB'),
-        uncounted: 0,
-      },
-      incomeTotals: null,
-      unassigned: 0,
-      countedAt: new Date(),
-    })
+  it('with an account of the income currency every card of the skeleton has its plate (Б2)', async () => {
+    moneyAccounts.mockResolvedValue(accountsPage('RUB'))
     incomes.mockReturnValue(new Promise(() => undefined))
+    // «Счета» read once before, as through «Деньги»: the page is in the phone's memory.
+    ;(await render()).unmount()
     const view = await render()
     // The account and a note, the account; a month, the account (frame incomes-light).
     expect(skeletonShape(view)).toEqual(['month', 2, 1, 'month', 1])
+  })
+
+  it('an account in another currency takes no income untouched, and the skeleton has no plate for it (В1)', async () => {
+    // A card in drams, a salary in roubles: the sheet starts a rouble income on no account.
+    moneyAccounts.mockResolvedValue(accountsPage('AMD'))
+    incomes.mockReturnValue(new Promise(() => undefined))
+    ;(await render()).unmount()
+    const view = await render()
+    expect(skeletonShape(view)).toEqual(['month', 1, 0, 'month', 1])
+  })
+
+  it('the shape is taken as the skeleton comes: «Счета» answering under it change nothing (В2)', async () => {
+    // Nothing kept — the first visit on a phone — and «Счета» answer while the incomes still wait.
+    moneyAccounts.mockResolvedValue(accountsPage('RUB'))
+    incomes.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    expect(moneyAccounts).toHaveBeenCalled()
+    expect(skeletonShape(view)).toEqual(['month', 1, 0, 'month', 1])
   })
 
   it('a failed read is red with «Try again», and trying again reads again', async () => {
