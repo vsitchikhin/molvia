@@ -682,11 +682,11 @@ set of rules — the task's own «as for exchanges in MOL-40» predates MOL-42's
   the currency «Счета» name in `incomeTotals`), so with one every card has its plate — the account and
   a note, the account; the account (frame incomes-light); with none — a note, nothing; a note (frame
   incomes-loading). An account in another currency takes no income untouched: a card in drams under a
-  salary in roubles drew every plate, and the second caption came 79 px higher than its bar. **The
+  salary in roubles drew every plate, and the second caption came some 79 px higher than its bar (counted from the cards' heights, not measured, adversarial round 4). **The
   shape is taken as the skeleton comes and held while it stands** (В2), from «Счета» kept on the phone:
-  with nothing kept they may answer before the incomes, and the skeleton grew 79 px in one frame
+  with nothing kept they may answer before the incomes, and the skeleton grew some 79 px in one frame
   (MOL-151). Drawn as an exchange's card, one with no plate stood 65 px for 95 and the second month came
-  120 px lower; drawn as a person's with no account, an owner's came 78 px lower. **The price, named:**
+  120 px lower; drawn as a person's with no account, an owner's came some 78 px lower (counted the same way). **The price, named:**
   with nothing kept — the first visit on a phone, after «Выйти», a page kept before MOL-183 with no
   `incomeTotals` — the shape is a person's with no account, and an owner's cards come lower by their
   plates; an income in a currency other than the income currency lands on its own currency's account
