@@ -673,7 +673,13 @@ set of rules — the task's own «as for exchanges in MOL-40» predates MOL-42's
   vanished income then say they will show it once the server is reached (`*_stale`, by `behind`), never
   «показываем, как он записан» over the list from before. **A month is captioned without its year when
   it is the phone's year** («СЕНТЯБРЬ», «ДЕКАБРЬ 2025», owner's В-2 «а»): the handoff drew no year, and
-  a journal reaches back across years.
+  a journal reaches back across years. The year is the later of the screen's day and the clock's
+  (`shownDay`, as `answeredAt`, adversarial А1): a screen held past New Year's midnight and drawn again
+  by a write's answer said «ЯНВАРЬ 2027» over «ДЕКАБРЬ». **The skeleton's cards are an income's**
+  (`OperationSkeleton form="income"`, А2): drawn as an exchange's, a card with no plate stood 65 px for
+  one of 95 and the second month came 120 px lower. **The price, named:** the first card comes 3 px
+  lower than its bars — the caption holds its sum of 13 beside words of 11, the kit's caption bar does
+  not — and each card 2 px taller, by the hairline the bars do not draw.
 
 ## Which side a rate is printed on
 

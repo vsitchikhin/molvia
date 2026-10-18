@@ -83,7 +83,7 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 - `frontend/src/components/IncomeSheet.vue` — «Записать доход» sheet: amount, currency, source, day, «сколько было до» where it weighs; also amends an income.
 - `frontend/src/components/MarketRatesCard.vue` — «Курсы по данным ЦБ РА» on «Обмен денег» (MOL-137): per currency the official rate and each channel's latest figures to sell and to buy, dated, the best starred and said.
 - `frontend/src/components/OperationCardHead.vue` — Head of an exchange or income card: the day, «исправлен …» and the bin, kept outside the card's button.
-- `frontend/src/components/OperationSkeleton.vue` — Loading placeholder drawn in `ScreenSkeleton`'s slot so the list does not jump: the cards of exchanges or incomes, each with its plate or without (`plates`, MOL-188) (the rows of an operation are `SkeletonPart`'s, MOL-178).
+- `frontend/src/components/OperationSkeleton.vue` — Loading placeholder drawn in `ScreenSkeleton`'s slot so the list does not jump: the cards of exchanges or incomes, each in its own card's geometry (`form`) and with its plate or without (`plates`, MOL-188) (the rows of an operation are `SkeletonPart`'s, MOL-178).
 
 ## frontend · composables
 
@@ -94,4 +94,4 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 ## e2e
 
 - `e2e/exchange.spec.ts` — End-to-end: an exchange recorded on screen becomes the next trip's rate, the chain carries through, amendments and long amounts hold; the line of the rate by the finger and by period.
-- `e2e/incomes.spec.ts` — End-to-end: an income lands in its month, is amended with a trace, comes back after removal, and an unknown cost is said.
+- `e2e/incomes.spec.ts` — End-to-end: an income lands in its month, is amended with a trace, comes back after removal, and an unknown cost is said; «Записать доход» in the docked strip, not now offline; the note's hint whole at 360 in both languages; the skeleton's cards as tall as the answer's (MOL-188).
