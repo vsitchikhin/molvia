@@ -272,7 +272,7 @@ export default defineComponent({
      * incomes-light); with none, a note and nothing (frame incomes-loading). The accounts come from the
      * phone's memory before their answer, so the shape is known as the skeleton comes.
      */
-    const skeletonPlates = computed(() =>
+    const skeletonPlates = computed<readonly [readonly number[], readonly number[]]>(() =>
       pageOrder(accounts.accounts).length > 0 ? [[2, 1], [1]] : [[1, 0], [1]],
     )
     onMounted(() => {
