@@ -666,6 +666,35 @@ set of rules — the task's own «as for exchanges in MOL-40» predates MOL-42's
   sum is the model's (`incomeMonths`); one no money can hold is left out rather than thrown — the
   screen failing whole would take away the one way to remove the income that made it. «Пришло /
   потрачено» is not in 0.1: a purchase need not have a price, so «потрачено» would always be short.
+- **On the phone it stands on the frame «Обмен денег» was moved onto** (MOL-188, as MOL-187): «Записать
+  доход» in the docked strip, not now and saying why offline; the connection one `StatusStrip` with the
+  time of the last answer, and «Сервер не ответил» with «Повторить» when the list read again after a
+  write's answer did not come — the notices of a conflict, an amendment over another version and a
+  vanished income then say they will show it once the server is reached (`*_stale`, by `behind`), never
+  «показываем, как он записан» over the list from before. **A month is captioned without its year when
+  it is the phone's year** («СЕНТЯБРЬ», «ДЕКАБРЬ 2025», owner's В-2 «а»): the handoff drew no year, and
+  a journal reaches back across years. **The captions and the cards speak by one day**, the later of
+  the screen's and the clock's (`shownDay`, as `answeredAt`, adversarial А1, Б1): a screen held past
+  New Year's midnight and drawn again by a write's answer said «ЯНВАРЬ 2027» over «ДЕКАБРЬ», and then
+  «DECEMBER 2026» over a card of the 31st that said «Today». **The skeleton's cards are an income's**
+  (`OperationSkeleton form="income"`, А2), **their plates by whether a new income lands on an account**
+  (Б2, В1): the sheet starts it on the first live account of the income currency (`defaultAccount`,
+  the currency «Счета» name in `incomeTotals`), so with one every card has its plate — the account and
+  a note, the account; the account (frame incomes-light); with none — a note, nothing; a note (frame
+  incomes-loading). An account in another currency takes no income untouched: a card in drams under a
+  salary in roubles drew every plate, and the second caption came some 79 px higher than its bar (counted from the cards' heights, not measured, adversarial round 4). **The
+  shape is taken as the skeleton comes and held while it stands** (В2), from «Счета» kept on the phone:
+  with nothing kept they may answer before the incomes, and the skeleton grew some 79 px in one frame
+  (MOL-151). Drawn as an exchange's card, one with no plate stood 65 px for 95 and the second month came
+  120 px lower; drawn as a person's with no account, an owner's came some 78 px lower (counted the same way). **The price, named:**
+  with nothing kept — the first visit on a phone, after «Выйти», a page kept before MOL-183 with no
+  `incomeTotals` — the shape is a person's with no account, and an owner's cards come lower by their
+  plates; an income in a currency other than the income currency lands on its own currency's account
+  and has a plate the shape did not draw. Each card comes
+  3 px lower than its bars for every month caption above it — the caption holds its sum of 13 beside
+  words of 11, the kit's caption bar does not — and 2 px for every card above it, by the hairline the
+  bars do not draw; a card whose plate has more or fewer lines than the shape is taller or shorter by
+  that line.
 
 ## Which side a rate is printed on
 

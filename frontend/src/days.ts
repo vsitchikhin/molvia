@@ -50,16 +50,27 @@ export function timeOfDay(when: Date, locale: string): string {
  * screen heard of it (round 2, Б2). An answer of a day neither has reached yet is today's.
  */
 export function answeredAt(at: Date, locale: string, today = localDay(), now = new Date()): string {
-  const clock = localDay(now)
-  const [year = 0, month = 1, date = 1] = (clock > today ? clock : today).split('-').map(Number)
+  const [year = 0, month = 1, date = 1] = shownDay(today, now).split('-').map(Number)
   return `${purchaseDay(at, locale, new Date(year, month - 1, date))}, ${timeOfDay(at, locale)}`
 }
 
 /**
- * A month of «Доходы» (MOL-66): «сентябрь 2026» from `2026-09`. The month and the year only —
- * `Intl` adds «г.» to the Russian year, which the caption does not need.
+ * The day a screen draws its words by: the later of the day it holds (`useLocalDay`) and the clock's.
+ * The held day is asked again only when the app comes back into view, so a redraw made past midnight
+ * before the screen heard of it would speak of yesterday (MOL-187, Б2; MOL-188, А1).
  */
-export function monthOf(month: string, locale: string): string {
+export function shownDay(today: string, now = new Date()): string {
+  const clock = localDay(now)
+  return clock > today ? clock : today
+}
+
+/**
+ * A month: «сентябрь 2026» from `2026-09`. The month and the year only — `Intl` adds «г.» to the
+ * Russian year, which the caption does not need. Given the day it is shown on (`today`), the year of
+ * that day is left out — «сентябрь», «декабрь 2025» — as the months of «Доходы» are captioned (MOL-188,
+ * В-2 «а»): a journal goes back across years, and only another year needs saying.
+ */
+export function monthOf(month: string, locale: string, today?: string): string {
   const [year = '', number = ''] = month.split('-')
   const parts = new Intl.DateTimeFormat(locale, {
     month: 'long',
@@ -67,6 +78,7 @@ export function monthOf(month: string, locale: string): string {
     timeZone: 'UTC',
   }).formatToParts(new Date(Date.UTC(Number(year), Number(number) - 1, 1)))
   const part = (type: string) => parts.find((one) => one.type === type)?.value ?? ''
+  if (today?.slice(0, 4) === year) return part('month')
   return `${part('month')} ${part('year')}`
 }
 

@@ -1058,6 +1058,8 @@
   "income": {
     "title": "Income",
     "record": "Record income",
+    "record_offline": "Recording income needs a connection",
+    "error_strip": "The server did not answer — income as of {when}",
     "row_line": "{source} · {date}",
     "amended": "amended {date}",
     "remove": "Remove income {amount}",
@@ -1073,8 +1075,11 @@
     "restored": "Income restored",
     "restore_gone": "This income can no longer be restored — the removal is final. If you needed it, record it again",
     "conflict": "This income is already recorded — here it is as it stands. If something is wrong, tap it in the list and amend it",
+    "conflict_stale": "This income is already recorded — do not record it again. It will show once the server can be reached",
     "amend_conflict": "This income was amended on another device — here it is as it stands now. Amend it again if you need to",
+    "amend_conflict_stale": "This income was amended on another device. It will show as it stands now once the server can be reached",
     "vanished": "This income is gone — it was removed. The list is up to date",
+    "vanished_stale": "This income is gone — it was removed. The list will be updated once the server can be reached",
     "empty": {
       "title": "No income yet",
       "body": "Record how much came in and when — we will add up each month. Income is optional: purchases and ratings work without it"
@@ -1082,7 +1087,7 @@
     "offline": {
       "title": "No connection",
       "body": "We will show your income once the connection is back",
-      "strip": "No connection — you can record income once it is back"
+      "strip": "Offline · income as of {when}"
     },
     "load_error": {
       "title": "Could not load your income",
@@ -1115,7 +1120,7 @@
       "held": "{currency} held before it came in",
       "held_hint": "Optional. With it the rate counts what the money already held cost; without it we take the {bank} rate of that day",
       "note": "Note",
-      "note_placeholder": "For example, «for September» or «from a client»",
+      "note_placeholder": "For example, «for September»",
       "bad_note": "There is nothing to save in the note — write a word or leave it empty",
       "history": "Earlier versions",
       "version": "until {until}: {amount} · {source} · {date}",
