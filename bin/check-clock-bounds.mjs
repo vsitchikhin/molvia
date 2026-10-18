@@ -42,9 +42,11 @@
 // the timers in ways read in order — each a call, in the file's body, a callback or a function of the
 // file — with no reference handed over or kept, no string, method or class, no hook or test under
 // another name, no fixture, no `vi.setConfig`, no `it.beforeEach`, no timer call kept by a call for
-// later, no concurrent tests, and no config of its directory that sets `fakeTimers`, runs tests
-// concurrently or has a setup file that touches them, or imports what does: else no bound there is let
-// go. A callback runs where it is written only for a call known to run it before it returns. `useRealTimers()` lets go, `toFake` and `toNotFake` choose,
+// later — written there or a function of the file by its name — no concurrent tests, by `.concurrent` or
+// the options, and no config of its directory that names `fakeTimers` or `concurrent`, takes settings from
+// a file of the repository, or has a setup file that touches them or imports what does: else no bound
+// there is let go. A callback runs where it is written only for a call known to run it before it returns
+// — a `then` only on what touches no timers. `useRealTimers()` lets go, `toFake` and `toNotFake` choose,
 // `shouldAdvanceTime` and a tick mode but `manual` move fake time with the real one, options not read
 // whole leave every clock real; a clock taken under another name keeps the real one.
 //
@@ -57,7 +59,7 @@
 //   node bin/check-clock-bounds.mjs
 
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import ts from 'typescript'
@@ -890,13 +892,17 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
     while (ts.isParenthesizedExpression(n)) n = n.parent
     return ts.isAwaitExpression(n) || ts.isReturnStatement(n)
   }
-  /** A call that runs its callback before what it returns settles: `vi.waitFor`, a promise's `then`. */
+  /**
+   * A call that runs its callback before what it returns settles: `vi.waitFor`, a promise's `then` — on
+   * what touches no timers, since that runs first (adversarial round 8, З1).
+   */
   const RUNS_NOW = /^(vi\.waitFor|vi\.waitUntil|expect\.poll)$/
   const runsInPlace = (call) =>
     awaitedInPlace(call) &&
     (RUNS_NOW.test(calleeText(call)) ||
       (ts.isPropertyAccessExpression(call.expression) &&
-        /^(then|catch|finally)$/.test(call.expression.name.text)))
+        /^(then|catch|finally)$/.test(call.expression.name.text) &&
+        !touchesTimers(call.expression.expression)))
   const TEST = /^(it|test)$/
   const HOOK = /^(before|after|around)(All|Each)$/
   const TIMERS = new Set(['useFakeTimers', 'useRealTimers', 'setTimerTickMode'])
@@ -1207,17 +1213,31 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
         if (name === 'setConfig') ok = false
         // it.beforeEach(…): a hook under the test's name, registered in its own order (Ж5)
         if (/^(before|after|around)(All|Each)$/.test(name) && calleeText(n) !== name) ok = false
-        // a timer call kept by an ordinary call for later: cleanups.push(() => vi.useRealTimers()) (Ж3)
+        // a timer call kept by an ordinary call for later: cleanups.push(() => vi.useRealTimers()) (Ж3),
+        // or a function of the file that makes one, by its name: cleanups.push(realClock) (З2)
         const root = calleeRoot(n)
         const ordinary =
           !TEST.test(root) && !SUITE.test(root) && !HOOK.test(root) && !AFTER.test(root)
-        if (
-          ordinary &&
-          !runsInPlace(n) &&
-          n.arguments.some((a) => ts.isFunctionLike(bare(a)) && touchesTimers(bare(a)))
-        )
+        if (ordinary && !runsInPlace(n) && n.arguments.some((a) => touchesTimers(bare(a))))
           ok = false
       }
+      // describe('s', { concurrent: true }, …), in the options too (review №20)
+      if (
+        ts.isCallExpression(n) &&
+        (TEST.test(calleeRoot(n)) || SUITE.test(calleeRoot(n))) &&
+        n.arguments.some(
+          (a) =>
+            ts.isObjectLiteralExpression(bare(a)) &&
+            bare(a).properties.some(
+              (p) =>
+                (ts.isSpreadAssignment(p) ||
+                  nameOfProperty(p) === 'concurrent' ||
+                  nameOfProperty(p) === undefined) &&
+                !(ts.isPropertyAssignment(p) && p.initializer.kind === ts.SyntaxKind.FalseKeyword),
+            ),
+        )
+      )
+        ok = false
       // describe.concurrent, it.concurrent: the tests run side by side, and the clocks are one (№19)
       if (
         ts.isPropertyAccessExpression(n) &&
@@ -1267,15 +1287,64 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
 
 /**
  * The directories whose test files a vitest config leaves unsure about the timers (adversarial Е6, Ж1, Ж2,
- * review №19): its setup files — and the files of this repository they import, `./…` and `@/…` — touch
- * them, or one cannot be read; or it sets `fakeTimers` or runs tests concurrently. A setup file runs in
- * every test file of its run, so its hooks stand between any two tests.
+ * З3, З4, review №19): its setup files — and the files of this repository they import, statically, by
+ * `import()` or `require`, `./…` and `@/…` — touch them, or one cannot be read or followed (`#…`, a
+ * workspace package); or it names `fakeTimers`, `concurrent` other than `false`, or takes settings from a
+ * file of this repository. A setup file runs in every test file of its run, so its hooks stand between
+ * any two tests.
  * @param {{ path: string, text: string }[]} configs
  * @param {(path: string) => string | undefined} read
  * @returns {string[]}
  */
 export function unsureDirectories(configs, read) {
   const TOUCH = /useFakeTimers|useRealTimers|setTimerTickMode|setConfig/
+  // every import a file makes, static, dynamic or required (adversarial З3)
+  const IMPORTS = /(?:\bfrom|\bimport|\brequire)\s*\(?\s*['"]([^'"]+)['"]/g
+  const json = (path) => {
+    try {
+      const text = read(path)
+      return text === undefined ? undefined : JSON.parse(text)
+    } catch {
+      return undefined
+    }
+  }
+  /** Where a workspace package (`@molvia/model/…`) or a subpath import (`#model/…`) leads, if anywhere. */
+  const resolved = (spec, from) => {
+    if (spec.startsWith('@molvia/')) {
+      const [, name, ...rest] = spec.split('/')
+      for (const dir of [`packages/${name}`, name, `deploy/${name}`]) {
+        const manifest = json(join(dir, 'package.json'))
+        if (manifest?.name !== `@molvia/${name}`) continue
+        const exports = manifest.exports
+        const key = rest.length > 0 ? `./${rest.join('/')}` : '.'
+        const target = typeof exports === 'string' && key === '.' ? exports : exports?.[key]
+        return typeof target === 'string' ? join(dir, target) : undefined
+      }
+      return undefined
+    }
+    for (let dir = dirname(from); dir !== '.' && dir !== '/' && dir !== ''; dir = dirname(dir)) {
+      const imports = json(join(dir, 'package.json'))?.imports
+      if (!imports) continue
+      for (const [pattern, target] of Object.entries(imports)) {
+        const [head, tail = ''] = pattern.split('*')
+        if (typeof target !== 'string' || !spec.startsWith(head) || !spec.endsWith(tail)) continue
+        return join(dir, target.replace('*', spec.slice(head.length, spec.length - tail.length)))
+      }
+      return undefined
+    }
+    return undefined
+  }
+  /** An import of this repository: relative, `@/`, a workspace package, a subpath import. */
+  const local = (spec) =>
+    /^\.{1,2}\//.test(spec) ||
+    spec.startsWith('@/') ||
+    spec.startsWith('#') ||
+    spec.startsWith('@molvia/')
+  const packageRoot = (file) => {
+    for (let dir = dirname(file); dir !== '.' && dir !== '/' && dir !== ''; dir = dirname(dir))
+      if (read(join(dir, 'package.json')) !== undefined) return dir
+    return '.'
+  }
   const touches = (file, root, seen) => {
     if (seen.has(file)) return false
     seen.add(file)
@@ -1285,19 +1354,22 @@ export function unsureDirectories(configs, read) {
     const text = candidates.map(read).find((t) => t !== undefined)
     if (text === undefined) return true
     if (TOUCH.test(text)) return true
-    return [...text.matchAll(/(?:from|import)\s*['"]((?:\.{1,2}\/|@\/)[^'"]+)['"]/g)].some(
-      ([, spec]) =>
-        touches(
-          spec.startsWith('@/') ? join(root, 'src', spec.slice(2)) : join(dirname(file), spec),
-          root,
-          seen,
-        ),
-    )
+    return [...text.matchAll(IMPORTS)].some(([, spec]) => {
+      if (!local(spec)) return false
+      if (spec.startsWith('@/')) return touches(join(root, 'src', spec.slice(2)), root, seen)
+      if (/^\.{1,2}\//.test(spec)) return touches(join(dirname(file), spec), root, seen)
+      const target = resolved(spec, file)
+      // a package's own `@/` is its own `src`
+      return target === undefined || touches(target, packageRoot(target), seen)
+    })
   }
   return configs
     .filter(({ path, text }) => {
       const root = dirname(path)
-      if (/\bfakeTimers\s*:/.test(text) || /\bconcurrent\s*:\s*true/.test(text)) return true
+      if (/\bfakeTimers\b/.test(text) || /\bconcurrent\s*:\s*(?!false\b)/.test(text)) return true
+      // a config is read by its own text: one that takes settings from a file of this repository is not
+      // read whole (adversarial З4)
+      if ([...text.matchAll(IMPORTS)].some(([, spec]) => local(spec))) return true
       const list =
         /setupFiles\s*:\s*\[([^\]]*)\]/.exec(text)?.[1] ??
         /setupFiles\s*:\s*(['"][^'"]+['"])/.exec(text)?.[1] ??
@@ -1320,7 +1392,7 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()
     .filter(Boolean)
     .map((path) => ({ path, text: readFileSync(path, 'utf8') }))
   const unsure = unsureDirectories(configs, (path) =>
-    existsSync(path) ? readFileSync(path, 'utf8') : undefined,
+    existsSync(path) && statSync(path).isFile() ? readFileSync(path, 'utf8') : undefined,
   )
   const problems = files.flatMap((file) => {
     const source = readFileSync(file, 'utf8')

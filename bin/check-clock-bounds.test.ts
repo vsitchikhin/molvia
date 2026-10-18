@@ -663,6 +663,54 @@ describe('rawBounds', () => {
         read,
       ),
     ).toEqual(['frontend', 'packages/model'])
+    // round 8, З3: a dynamic import, a workspace package and a subpath import are followed; what leads
+    // nowhere is unsure
+    const more: Record<string, string> = {
+      ...files,
+      'bot/dynamic.ts': "await import('./clock-reset')",
+      'bot/package-setup.ts': "import '@molvia/model/testing/clock'",
+      'bot/subpath-setup.ts': "import '#bot/reset'",
+      'bot/package.json': JSON.stringify({
+        name: '@molvia/bot',
+        imports: { '#bot/*': './src/*.ts' },
+      }),
+      'bot/src/reset.ts': 'afterEach(() => vi.useRealTimers())',
+      'packages/model/package.json': JSON.stringify({
+        name: '@molvia/model',
+        exports: { '.': './src/index.ts', './testing/clock': './tests/support/clock.ts' },
+      }),
+      'packages/model/tests/support/clock.ts': "import { expect } from 'vitest'",
+      'bot/gone-package.ts': "import '@molvia/nowhere'",
+    }
+    const at = (setup: string) =>
+      unsureDirectories(
+        [config('bot/vitest.config.ts', `setupFiles: ['./${setup}']`)],
+        (path) => more[path],
+      )
+    expect(at('dynamic.ts')).toEqual(['bot'])
+    expect(at('package-setup.ts')).toEqual([])
+    expect(at('subpath-setup.ts')).toEqual(['bot'])
+    expect(at('gone-package.ts')).toEqual(['bot'])
+    // round 8, З4: settings taken from a file of this repository, and concurrency by an expression
+    expect(
+      unsureDirectories(
+        [
+          config(
+            'bot/vitest.config.ts',
+            "import { shared } from './vitest.shared'\nexport default { test: { ...shared } }",
+          ),
+          config(
+            'frontend/vitest.config.ts',
+            'test: { sequence: { concurrent: !process.env.CI } }',
+          ),
+          config(
+            'backend/vitest.config.ts',
+            "test: { exclude: [...configDefaults.exclude, '**/*.attack.*'] }",
+          ),
+        ],
+        read,
+      ),
+    ).toEqual(['bot', 'frontend'])
   })
 
   // review round 7 of MOL-266: №19 and adversarial Ж1, Ж3–Ж5 — the file is no longer read as sure
@@ -689,5 +737,36 @@ describe('rawBounds', () => {
     ],
   ])('finds a bound on real time beside fake timers — %s', (_, source) => {
     expect(rawBounds('a.test.ts', source)).toHaveLength(1)
+  })
+
+  // review round 8 of MOL-266: №20 and adversarial З1–З2
+  it.each([
+    [
+      'concurrent in a suite’s options',
+      `describe('s', { concurrent: true }, () => {\nit('a', async () => {\nawait tick()\nvi.useRealTimers()\n})\nit('b', async () => {\nvi.useFakeTimers()\n${FAKE}\n})\n})`,
+    ],
+    [
+      'concurrent in a test’s options',
+      `it('a', { concurrent: true }, async () => {\nawait tick()\nvi.useRealTimers()\n})\nit('b', { concurrent: true }, async () => {\nvi.useFakeTimers()\n${FAKE}\n})`,
+    ],
+    [
+      'the bound in a then after what lets go',
+      `async function realWork(): Promise<void> {\nvi.useRealTimers()\nawait wait(300)\n}\nbeforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\nconst t0 = performance.now()\nawait realWork().then(() => {\nexpect(performance.now() - t0).toBeLessThan(1_000)\n})\n})`,
+    ],
+    [
+      'a let-go kept for a hook by its name',
+      `function realClock(): void {\nvi.useRealTimers()\n}\nconst cleanups: Array<() => void> = []\ncleanups.push(realClock)\n${AFTER_FIRST}\nafterEach(() => {\nfor (const cleanup of cleanups) cleanup()\n})\nit('first', () => {})\nit('x', async () => {\n${REAL}\n})`,
+    ],
+  ])('finds a bound on real time beside fake timers — %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toHaveLength(1)
+  })
+
+  it('leaves alone a fake bound beside a test whose options say concurrent: false', () => {
+    expect(
+      rawBounds(
+        'a.test.ts',
+        `it('x', { concurrent: false, timeout: 10_000 }, async () => {\nvi.useFakeTimers()\n${FAKE}\n})`,
+      ),
+    ).toEqual([])
   })
 })
