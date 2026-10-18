@@ -483,26 +483,41 @@ describe('«Записать»', () => {
         await racing.ready()
         const holder = connect()
         const watcher = connect()
+        // who waits on this owner's lock by its key — another waiter of the database never sets the
+        // order (adversarial Б1); given up within the case's 5 s, so a failure names itself (Б2)
         const waiting = async (n: number) => {
-          for (let tries = 0; tries < 500; tries += 1) {
+          const deadline = Date.now() + 2_000
+          while (Date.now() < deadline) {
             const [row] = await watcher<{ n: number }[]>`
-            select count(*)::int as n from pg_stat_activity
-            where wait_event_type = 'Lock' and wait_event = 'advisory' and datname = current_database()
+            select count(*)::int as n from pg_locks
+            where locktype = 'advisory' and not granted and objsubid = 2
+              and classid = hashtext('trips')::oid and objid = hashtext(${me})::oid
+              and database = (select oid from pg_database where datname = current_database())
           `
             if ((row?.n ?? 0) >= n) return
             await new Promise((resolve) => setTimeout(resolve, 10))
           }
           throw new Error(`fewer than ${String(n)} waiting on the owner's lock`)
         }
+        // a request still on its way is waited for before the pool closes, never left to the next case
+        const sent: PromiseLike<unknown>[] = []
+        const send = <T>(request: PromiseLike<T>) => {
+          sent.push(request)
+          return request
+        }
         const recordShot = () =>
-          racing.inject({
-            method: 'POST',
-            url: `/receipts/${shot}/record`,
-            headers: { cookie, 'x-molvia-today': '2026-10-03' },
-            payload: recordBody(randomUUID()),
-          })
+          send(
+            racing.inject({
+              method: 'POST',
+              url: `/receipts/${shot}/record`,
+              headers: { cookie, 'x-molvia-today': '2026-10-03' },
+              payload: recordBody(randomUUID()),
+            }),
+          )
         const restoreFirst = () =>
-          racing.inject({ method: 'POST', url: `/trips/${first}/restore`, headers: { cookie } })
+          send(
+            racing.inject({ method: 'POST', url: `/trips/${first}/restore`, headers: { cookie } }),
+          )
 
         let release: () => void = () => undefined
         let locked: () => void = () => undefined
@@ -531,6 +546,7 @@ describe('«Записать»', () => {
         } finally {
           release()
           await held.catch(() => undefined)
+          await Promise.allSettled(sent)
           await racing.close()
           await Promise.all([pool.end(), holder.end(), watcher.end()])
         }
