@@ -24,7 +24,7 @@ import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, telegramId } from './fixtures'
 
 // The test here past a second on CI carries a timeout of 25 s: the slowest took 2 371 ms there
-// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
+// (MOL-266), its work, past a tenth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
 // reporter names one only on a run slower than any yet seen. The 5 more here past half a second
 // carry 10 s: the slowest of them took 760 ms.
 

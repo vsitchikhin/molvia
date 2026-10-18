@@ -5,8 +5,8 @@ import type * as Api from '@/api'
 import type * as Navigation from '@/navigation'
 
 // The test here past a second on CI carries a timeout of 15 s: the slowest took 1 154 ms there
-// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
-// only on a run twice as slow as any yet seen.
+// (MOL-266), its work, past a tenth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run slower than any yet seen.
 
 // The first route of the start throws: a guard with a bug, a route that cannot load (adversarial Б2).
 vi.mock('@/navigation', async (original) => ({

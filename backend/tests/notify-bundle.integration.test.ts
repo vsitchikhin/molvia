@@ -11,8 +11,8 @@ import { connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertActor } from './fixtures'
 
 // The test here past a second on CI carries a timeout of 15 s: the slowest took 1 265 ms there
-// (MOL-266), a process of its own, past a fifth of vitest's 5 s. Ten times that, so the time
-// reporter names it only on a run twice as slow as any yet seen.
+// (MOL-266), a process of its own, past a tenth of vitest's 5 s. Ten times that, so the time
+// reporter names it only on a run slower than any yet seen.
 
 /**
  * The message about a leak is only worth anything if it can be sent where it is needed: from the

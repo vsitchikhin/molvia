@@ -7,7 +7,7 @@ import { insertActor, telegramId } from './fixtures'
 
 // The test here past a second on CI carries a timeout of 30 s: the slowest took 2 725 ms there
 // (MOL-266), in the first attempt of a run re-run, which the first measure did not read (MOL-243,
-// round 21), a process of its own, past a fifth of vitest's 5 s. Ten times that, up to whole 5 s,
+// round 21), a process of its own, past a tenth of vitest's 5 s. Ten times that, up to whole 5 s,
 // so the time reporter names one only on a run slower than any yet seen. One more here past half a
 // second carries 10 s: it took 809 ms at worst.
 

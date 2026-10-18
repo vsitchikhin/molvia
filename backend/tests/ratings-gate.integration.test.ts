@@ -16,7 +16,7 @@ import { createVerdictRepository } from '@/db/verdicts-repository'
 import { actors, verdicts as verdictsTable } from '@/db/schema'
 
 // The 3 tests here past a second on CI carry a timeout of 15 s: the slowest took 1 263 ms there
-// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
+// (MOL-266), its work, past a tenth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
 // reporter names one only on a run slower than any yet seen. The 2 more here past half a second
 // carry 10 s: the slowest of them took 822 ms.
 

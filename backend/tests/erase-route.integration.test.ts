@@ -19,7 +19,7 @@ import {
 import { aLife } from './life'
 
 // The 2 tests here past a second on CI carry a timeout of 20 s: the slowest took 1 848 ms there
-// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
+// (MOL-266), its work, past a tenth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
 // reporter names one only on a run slower than any yet seen. One more here past half a second
 // carries 10 s: it took 702 ms at worst.
 

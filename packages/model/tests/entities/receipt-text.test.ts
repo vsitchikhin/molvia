@@ -21,7 +21,7 @@ import {
 import type { ReceiptText, TextRow } from '#model/entities/receipt-text'
 
 // The 3 tests here past a second on CI carry a timeout of their own, ten times their worst there
-// (MOL-266), so the time reporter names one only on a run twice as slow as any yet seen: 15 s for 1
+// (MOL-266), so the time reporter names one only on a run slower than any yet seen: 15 s for 1
 // 266 ms, 20 s for «searched only as far» — 1 408 ms, under a bound on the clock of 15 s — and 45 s
 // for «cost no second search» — 4 111 ms, two readings of four hundred rows. The 4 more here past
 // half a second carry 10 s: the slowest of them took 581 ms.

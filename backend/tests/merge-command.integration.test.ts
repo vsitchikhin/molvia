@@ -12,7 +12,7 @@ import { connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertItem } from './fixtures'
 
 // The 5 tests here past a second on CI carry a timeout of 20 s: the slowest took 1 506 ms there
-// (MOL-266), a process of its own, past a fifth of vitest's 5 s. Ten times that, up to whole 5 s,
+// (MOL-266), a process of its own, past a tenth of vitest's 5 s. Ten times that, up to whole 5 s,
 // so the time reporter names one only on a run slower than any yet seen. The 2 more here past half
 // a second carry 10 s: the slowest of them took 827 ms.
 

@@ -7,8 +7,8 @@ import { testDatabaseUrl } from './db'
 import { MIGRATIONS } from '@/db/migrate'
 
 // The test here past a second on CI carries a timeout of 15 s: the slowest took 1 191 ms there
-// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
-// only on a run twice as slow as any yet seen.
+// (MOL-266), its work, past a tenth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run slower than any yet seen.
 
 /**
  * 0012 on a database that holds what every copy holds: owners, and everything hanging off

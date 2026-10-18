@@ -13,8 +13,8 @@ import { expenses, receiptLineImages, storeMemory } from '@/db/schema'
 import { settleStoreMemory } from '@/db/store-memory-repository'
 
 // The test here past a second on CI carries a timeout of 15 s: the slowest took 1 130 ms there
-// (MOL-266), its work, past a fifth of vitest's 5 s. Ten times that, so the time reporter names it
-// only on a run twice as slow as any yet seen.
+// (MOL-266), its work, past a tenth of vitest's 5 s. Ten times that, so the time reporter names it
+// only on a run slower than any yet seen.
 
 /**
  * 0061 on a database that holds what `SET NULL` left behind (MOL-240): a recorded receipt whose trip
