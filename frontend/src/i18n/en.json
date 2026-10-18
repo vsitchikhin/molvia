@@ -1057,6 +1057,7 @@
   "income": {
     "title": "Income",
     "record": "Record income",
+    "record_offline": "Recording income needs a connection",
     "row_line": "{source} · {date}",
     "amended": "amended {date}",
     "remove": "Remove income {amount}",

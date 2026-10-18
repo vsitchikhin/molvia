@@ -50,20 +50,15 @@
       />
 
       <!-- Nothing is required of anyone: incomes are optional, and trips and ratings work
-           without them (MOL-41). -->
+           without them (MOL-41). «Записать доход» is the strip's, as on a screen with incomes
+           (Ф-16). -->
       <ScreenState
         v-else-if="phase === 'empty'"
         kind="empty"
         :icon="IconCashPlus"
         :title="t('income.empty.title')"
         :body="t('income.empty.body')"
-      >
-        <template #action>
-          <AppButton block :inactive="!online" @click="compose">
-            {{ t('income.record') }}
-          </AppButton>
-        </template>
-      </ScreenState>
+      />
 
       <template v-else-if="overview">
         <!-- A month and what came in, per currency and never converted (В-2): the sums are the
@@ -91,21 +86,15 @@
       </template>
     </template>
 
-    <!-- «Записать доход» floats where «Трата» does (handoff 03); the empty state keeps its own
-         button at the bottom instead. -->
-    <FloatingDock v-if="overview && phase === 'ready'">
-      <AppButton
-        ref="recordButton"
-        size="large"
-        class="add"
-        :aria-label="t('income.record')"
-        :inactive="!online || busy"
-        @click="compose"
-      >
+    <!-- «Записать доход» stands in the strip over the tab bar, never over the last card (Ф-28):
+         with incomes and on the empty screen alike, not while there is no answer yet. Without a
+         connection it stays, not now, and says why on itself (Ф-6, Р-1). -->
+    <template v-if="phase === 'ready' || phase === 'empty'" #docked>
+      <AppButton ref="recordButton" size="large" block :inactive="!online || busy" @click="compose">
         <template #icon><IconPlus /></template>
-        {{ t('income.fab') }}
+        {{ online ? t('income.record') : t('income.record_offline') }}
       </AppButton>
-    </FloatingDock>
+    </template>
 
     <IncomeSheet
       v-if="overview"
@@ -135,7 +124,6 @@ import IconPlus from '~icons/mdi/plus'
 import AppButton from '@/components/AppButton.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
-import FloatingDock from '@/components/FloatingDock.vue'
 import IncomeCard from '@/components/IncomeCard.vue'
 import IncomeRemoveSheet from '@/components/IncomeRemoveSheet.vue'
 import IncomeSheet from '@/components/IncomeSheet.vue'
@@ -162,7 +150,6 @@ export default defineComponent({
     AppButton,
     AppReveal,
     AppScreen,
-    FloatingDock,
     IconCloud,
     IconPlus,
     IncomeCard,
@@ -334,10 +321,5 @@ export default defineComponent({
   margin: 0;
   padding: 0;
   list-style: none;
-}
-
-// Room for «Доход» under the last card: it floats over the list, as «Трата» does on the month.
-.month:last-of-type {
-  padding-bottom: calc(var(--space-8) + var(--space-8) + var(--space-6));
 }
 </style>

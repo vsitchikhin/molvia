@@ -146,7 +146,26 @@ describe('IncomesView: the four states', () => {
     const view = await render()
     expect(view.text()).toContain(en.income.empty.title)
     expect(view.text()).toContain(en.income.empty.body)
-    expect(view.text()).toContain(en.income.record)
+    // The strip's, not a button of the empty state (Ф-16).
+    expect(recordButton(view)?.text()).toBe(en.income.record)
+    expect(view.get('.state').findAll('button')).toHaveLength(0)
+  })
+
+  it('no «Record income» while there is no answer: loading, an error, offline with nothing', async () => {
+    incomes.mockReturnValue(new Promise(() => undefined))
+    const loading = await render()
+    expect(recordButton(loading)).toBeUndefined()
+
+    incomes.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const failed = await render()
+    expect(failed.text()).toContain(en.income.load_error.title)
+    expect(recordButton(failed)).toBeUndefined()
+
+    online(false)
+    incomes.mockRejectedValue(new TypeError('network'))
+    const offline = await render()
+    expect(offline.text()).toContain(en.income.offline.body)
+    expect(recordButton(offline)).toBeUndefined()
   })
 })
 
@@ -252,13 +271,12 @@ describe('IncomesView: the months (В-2)', () => {
   })
 })
 
-/** «Записать доход»: the floating «Доход» named in full, or the empty state's own button. */
+/** «Записать доход» in the strip over the tab bar — its words say why when it is not now (Ф-6). */
 function recordButton(view: VueWrapper) {
   return view
-    .findAll('button')
+    .findAll('.screen > .dock button')
     .find(
-      (button) =>
-        button.attributes('aria-label') === en.income.record || button.text() === en.income.record,
+      (button) => button.text() === en.income.record || button.text() === en.income.record_offline,
     )
 }
 
@@ -377,7 +395,7 @@ describe('IncomesView: recording, amending and removing', () => {
     await flushPromises()
     expect(restoreIncome).toHaveBeenCalledWith(row().id)
     expect(view.text()).not.toContain('Income removed')
-    expect(document.activeElement?.getAttribute('aria-label')).toBe(en.income.record)
+    expect(document.activeElement?.textContent.trim()).toBe(en.income.record)
   })
 
   // MOL-225, adversarial Р1-А2: «Bring back» at work said nothing and was drawn not now.
@@ -459,24 +477,46 @@ describe('IncomesView: recording, amending and removing', () => {
     expect(view.text()).toContain(en.income.offline.strip)
     expect(view.get('button.remove').attributes('disabled')).toBeDefined()
     expect(view.get('button.body').attributes('disabled')).toBeDefined()
-    // «Доход» floats on, inactive rather than gone, and a tap on it opens nothing (handoff 03).
+    // «Записать доход» stays in the strip, not now, saying why, and a tap on it opens nothing (Ф-6).
     const record = recordButton(view)
+    expect(record?.text()).toBe(en.income.record_offline)
     expect(record?.attributes('aria-disabled')).toBe('true')
     await record?.trigger('click')
     await flushPromises()
     expect(document.querySelector('dialog[open]')).toBeNull()
+
+    online(true)
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(recordButton(view)?.text()).toBe(en.income.record)
+    expect(recordButton(view)?.attributes('aria-disabled')).toBeUndefined()
   })
 
-  it('«Доход» floats, named in full; the empty screen keeps its own button instead (handoff 03)', async () => {
+  it('offline on the empty screen: the strip stays, not now, over the quiet circle', async () => {
+    incomes.mockResolvedValue(overview({ months: [] }))
+    const view = await render()
+    online(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+    expect(view.text()).toContain(en.income.empty.title)
+    expect(recordButton(view)?.text()).toBe(en.income.record_offline)
+    expect(recordButton(view)?.attributes('aria-disabled')).toBe('true')
+  })
+
+  it('«Record income» is named by its words in the strip, with incomes and empty (Ф-28)', async () => {
     incomes.mockResolvedValue(overview())
     const full = await render()
-    const floating = full.get(`button[aria-label="${en.income.record}"]`)
-    expect(floating.text()).toBe(en.income.fab)
+    const record = recordButton(full)
+    expect(record?.text()).toBe(en.income.record)
+    expect(record?.attributes('aria-label')).toBeUndefined()
+    expect(record?.attributes('aria-disabled')).toBeUndefined()
+    // The frame's strip, under the list — the room for it is kept at the end of the content.
+    expect(full.find('.dock-room').exists()).toBe(true)
+    expect(full.findComponent({ name: 'FloatingDock' }).exists()).toBe(false)
 
     incomes.mockResolvedValue(overview({ months: [] }))
     const empty = await render()
     expect(empty.text()).toContain(en.income.empty.title)
-    expect(empty.find(`button[aria-label="${en.income.record}"]`).exists()).toBe(false)
     expect(recordButton(empty)?.text()).toBe(en.income.record)
   })
 })

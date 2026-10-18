@@ -1057,6 +1057,7 @@
   "income": {
     "title": "Доходы",
     "record": "Записать доход",
+    "record_offline": "Записать доход можно со связью",
     "row_line": "{source} · {date}",
     "amended": "исправлен {date}",
     "remove": "Удалить доход {amount}",
