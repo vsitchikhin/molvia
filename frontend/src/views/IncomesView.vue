@@ -3,15 +3,44 @@
     <template v-if="overview && phase !== 'loading'">
       <!-- Above every branch: removing the last income leaves the empty state, and «Вернуть» must
            still be there (В-5). -->
-      <p v-if="!online" class="strip">
-        <IconCloud aria-hidden="true" />{{ t('income.offline.strip') }}
+      <!-- The connection in one line, with the time of the answer shown (MOL-181, Ф-14). Nothing is
+           kept on the phone, but an app stays open for days: «на 14:05» of yesterday would be untrue.
+           What waits for the connection — «Записать доход» — says so on itself (Р-1). -->
+      <StatusStrip
+        v-if="!online && fetchedAt"
+        class="status"
+        kind="offline"
+        :text="t('income.offline.strip', { when: whenOf(fetchedAt) })"
+      />
+      <!-- The list read again after a write's answer — a conflict, a vanished income, a late
+           «Вернуть» — did not come: what is shown may no longer be what the server holds. The strip
+           over the tab bar holds «Записать доход», so «Повторить» is here (К-5). -->
+      <StatusStrip
+        v-else-if="stale && fetchedAt"
+        class="status"
+        kind="unanswered"
+        :text="t('income.error_strip', { when: whenOf(fetchedAt) })"
+        :attempt="attempt"
+      >
+        <template #action>
+          <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+        </template>
+      </StatusStrip>
+      <p v-if="failed" class="notice failed" role="alert">{{ t('income.failed') }}</p>
+      <!-- Read again and not answered — the server silent or the connection gone (MOL-187, Б1) — the
+           list is the one from before the write: «показываем, как он записан» over it would be
+           untrue. -->
+      <p v-if="conflicted" class="notice" role="alert">
+        {{ behind ? t('income.conflict_stale') : t('income.conflict') }}
       </p>
-      <p v-if="failed" class="strip failed" role="alert">{{ t('income.failed') }}</p>
-      <p v-if="conflicted" class="strip" role="alert">{{ t('income.conflict') }}</p>
-      <p v-if="amendConflicted" class="strip" role="alert">{{ t('income.amend_conflict') }}</p>
-      <p v-if="vanished" class="strip" role="alert">{{ t('income.vanished') }}</p>
-      <p v-if="gone" class="strip" role="alert">{{ t('income.restore_gone') }}</p>
-      <div v-if="removed" ref="removedStrip" class="strip removed">
+      <p v-if="amendConflicted" class="notice" role="alert">
+        {{ behind ? t('income.amend_conflict_stale') : t('income.amend_conflict') }}
+      </p>
+      <p v-if="vanished" class="notice" role="alert">
+        {{ behind ? t('income.vanished_stale') : t('income.vanished') }}
+      </p>
+      <p v-if="gone" class="notice" role="alert">{{ t('income.restore_gone') }}</p>
+      <div v-if="removed" ref="removedStrip" class="notice removed">
         <span class="removed-text">{{ t('income.removed', { amount: amountOf(removed) }) }}</span>
         <AppButton
           variant="ghost"
@@ -119,7 +148,6 @@ import { defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'v
 import { useI18n } from 'vue-i18n'
 import type { IncomeAmendBody, IncomeView as Row, Money } from '@molvia/model'
 import IconCashPlus from '~icons/mdi/cash-plus'
-import IconCloud from '~icons/mdi/cloud-off-outline'
 import IconPlus from '~icons/mdi/plus'
 import AppButton from '@/components/AppButton.vue'
 import AppReveal from '@/components/AppReveal.vue'
@@ -132,11 +160,12 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import { asTyped } from '@/components/spending'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { incomesOf, useIncomes } from '@/composables/useIncomes'
 import { useLocalDay } from '@/composables/useLocalDay'
-import { calendarDay, monthOf } from '@/days'
+import { answeredAt, calendarDay, monthOf } from '@/days'
 import { useAccountsStore } from '@/stores/accounts'
 
 /**
@@ -150,7 +179,6 @@ export default defineComponent({
     AppButton,
     AppReveal,
     AppScreen,
-    IconCloud,
     IconPlus,
     IncomeCard,
     IncomeRemoveSheet,
@@ -159,6 +187,7 @@ export default defineComponent({
     ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    StatusStrip,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -246,6 +275,9 @@ export default defineComponent({
       })
     const sumsOf = (sums: readonly Money[]): string =>
       sums.map((sum) => asTyped(sum, locale.value)).join(' · ')
+    // «14 окт., 14:05» — the answer's day and time, as «Обмен денег», «Деньги» and «Траты» print it;
+    // by the day the screen holds, so a night offline turns «сегодня» into «вчера» (MOL-187, А2).
+    const whenOf = (at: Date): string => answeredAt(at, locale.value, today.value)
 
     return {
       today,
@@ -266,6 +298,7 @@ export default defineComponent({
       amountOf,
       lineOf,
       sumsOf,
+      whenOf,
       monthOf: (month: string) => monthOf(month, locale.value),
       IconCashPlus,
     }
@@ -274,24 +307,26 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.strip {
+// A notice of the last write, never the kit's `.strip` — a class of the screen would land on the root
+// of `StatusStrip` too (MOL-187).
+.notice {
   @include appear;
 
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
-  margin-bottom: var(--space-4);
   padding: var(--space-3);
   border-radius: var(--radius);
   background: var(--warn-tint);
   color: var(--warn-ink);
   font-size: var(--text-footnote);
+}
 
-  svg {
-    @include icon;
-
-    font-size: var(--icon-sm);
-  }
+// Strips over the answer stand 16 apart. `margin`, not its bottom alone: a notice is a paragraph, and
+// the browser's 1em above it stood on top of the 16 (MOL-187, №2).
+.notice,
+.status {
+  margin: 0 0 var(--space-4);
 }
 
 .removed {

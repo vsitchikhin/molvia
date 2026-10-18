@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { IncomeAmendBody, IncomeBody, IncomeView as Row, IncomesResponse } from '@molvia/model'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -280,6 +281,40 @@ function recordButton(view: VueWrapper) {
     )
 }
 
+/** «Записать доход» → the sheet → 1 ₽ of «Другое» → «Сохранить». */
+async function recordThroughSheet(view: VueWrapper): Promise<void> {
+  await recordButton(view)?.trigger('click')
+  await risen()
+  const sheet = document.querySelector('dialog[open]')
+  const amount = sheet?.querySelector<HTMLInputElement>('input[inputmode="decimal"]')
+  const [, source] = [...(sheet?.querySelectorAll('select') ?? [])]
+  if (!amount || !source) throw new Error('no fields')
+  amount.value = '1'
+  amount.dispatchEvent(new Event('input'))
+  source.value = 'other'
+  source.dispatchEvent(new Event('change'))
+  await flushPromises()
+  sheetButton(en.income.sheet.save).click()
+  await flushPromises()
+}
+
+/** A tap on the row, the sheet risen, and «Сохранить исправление». */
+async function amendThroughSheet(view: VueWrapper): Promise<void> {
+  await view.get('button.body').trigger('click')
+  await risen()
+  sheetButton(en.income.sheet.save_amend).click()
+  await flushPromises()
+}
+
+/** «Повторить» of the strip — the one on screen. */
+async function retryStrip(view: VueWrapper): Promise<void> {
+  await view
+    .findAll('button')
+    .find((button) => button.text() === en.state.retry)
+    ?.trigger('click')
+  await flushPromises()
+}
+
 describe('IncomesView: recording, amending and removing', () => {
   it('records through the sheet and lands the answer', async () => {
     incomes.mockResolvedValue(overview({ months: [] }))
@@ -313,20 +348,7 @@ describe('IncomesView: recording, amending and removing', () => {
     incomes.mockResolvedValue(overview())
     const view = await render()
     recordIncome.mockRejectedValue(new ApiError(ERROR.CONFLICT))
-    const record = recordButton(view)
-    await record?.trigger('click')
-    await risen()
-    const sheet = document.querySelector('dialog[open]')
-    const amount = sheet?.querySelector<HTMLInputElement>('input[inputmode="decimal"]')
-    const [, source] = [...(sheet?.querySelectorAll('select') ?? [])]
-    if (!amount || !source) throw new Error('no fields')
-    amount.value = '1'
-    amount.dispatchEvent(new Event('input'))
-    source.value = 'other'
-    source.dispatchEvent(new Event('change'))
-    await flushPromises()
-    sheetButton(en.income.sheet.save).click()
-    await flushPromises()
+    await recordThroughSheet(view)
     expect(view.text()).toContain(en.income.conflict)
     expect(incomes).toHaveBeenCalledTimes(2)
   })
@@ -474,7 +496,14 @@ describe('IncomesView: recording, amending and removing', () => {
     online(false)
     window.dispatchEvent(new Event('offline'))
     await flushPromises()
-    expect(view.text()).toContain(en.income.offline.strip)
+    // One line, with the time of the answer on screen (MOL-181); never red, nothing to retry, and
+    // nothing of the recording — the button says it (Р-1).
+    const strip = view.get('.status')
+    expect(strip.text()).toContain(en.income.offline.strip.split('{when}')[0])
+    expect(strip.text()).toMatch(/\d{1,2}:\d{2}/)
+    expect(strip.text()).not.toContain(en.state.retry)
+    expect(strip.text()).not.toContain(en.income.record_offline)
+    expect(view.findAllComponents(StatusStrip)).toHaveLength(1)
     expect(view.get('button.remove').attributes('disabled')).toBeDefined()
     expect(view.get('button.body').attributes('disabled')).toBeDefined()
     // «Записать доход» stays in the strip, not now, saying why, and a tap on it opens nothing (Ф-6).
@@ -518,5 +547,197 @@ describe('IncomesView: recording, amending and removing', () => {
     const empty = await render()
     expect(empty.text()).toContain(en.income.empty.title)
     expect(recordButton(empty)?.text()).toBe(en.income.record)
+  })
+})
+
+describe('IncomesView: the connection in one line (MOL-181, Ф-14)', () => {
+  /** The list as the server holds it after the write: the income at its next version. */
+  const amended = (): IncomesResponse =>
+    overview({ months: [{ month: '2026-09', sums: [], incomes: [row({ revision: 2 })] }] })
+
+  it('no strip while the list is the server’s', async () => {
+    incomes.mockResolvedValue(overview())
+    const view = await render()
+    expect(view.findComponent(StatusStrip).exists()).toBe(false)
+  })
+
+  it('a night offline: the answer of 23:40 is «yesterday» once the app is looked at again', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(new Date(2026, 9, 14, 23, 40))
+      incomes.mockResolvedValue(overview())
+      const view = await render()
+      online(false)
+      window.dispatchEvent(new Event('offline'))
+      await flushPromises()
+      expect(view.get('.status').text()).toContain('today, 11:40 PM')
+
+      // Unlocked at 9:00 with no connection still: nothing is read, the strip is drawn again.
+      vi.setSystemTime(new Date(2026, 9, 15, 9, 0))
+      vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+      document.dispatchEvent(new Event('visibilitychange'))
+      await flushPromises()
+      expect(view.get('.status').text()).toContain('yesterday, 11:40 PM')
+      expect(incomes).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('offline on the empty screen: the strip over the quiet circle (incomes-offline-empty)', async () => {
+    incomes.mockResolvedValue(overview({ months: [] }))
+    const view = await render()
+    online(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+    expect(view.get('.status').text()).toContain(en.income.offline.strip.split('{when}')[0])
+    expect(view.text()).toContain(en.income.empty.title)
+  })
+
+  it('the list read again after a conflict did not come: «the server did not answer», and «Try again»', async () => {
+    incomes
+      .mockResolvedValueOnce(overview())
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockResolvedValue(overview())
+    recordIncome.mockRejectedValue(new ApiError(ERROR.CONFLICT))
+    const view = await render()
+
+    await recordThroughSheet(view)
+    const strip = view.get('.status')
+    expect(strip.text()).toContain(en.income.error_strip.split('{when}')[0])
+    expect(strip.text()).not.toContain('{when}')
+    // The list is the one from before the write: nothing says it shows the income (MOL-187, №1).
+    expect(view.text()).toContain(en.income.conflict_stale)
+    expect(view.text()).not.toContain(en.income.conflict)
+    // One «Try again»: the strip over the tab bar holds «Record income» (К-5).
+    const retries = view.findAll('button').filter((button) => button.text() === en.state.retry)
+    expect(retries).toHaveLength(1)
+    expect(recordButton(view)?.text()).toBe(en.income.record)
+
+    // Failed again: the same strip, a new attempt said again (C1).
+    const before = view.getComponent(StatusStrip).props('attempt') as number
+    await retryStrip(view)
+    expect(view.get('.status').text()).toContain(en.income.error_strip.split('{when}')[0])
+    expect(view.getComponent(StatusStrip).props('attempt')).toBe(before + 1)
+
+    await retryStrip(view)
+    expect(view.find('.status').exists()).toBe(false)
+    expect(incomes).toHaveBeenCalledTimes(4)
+    // Read at last: now the list does show it.
+    expect(view.text()).toContain(en.income.conflict)
+    expect(view.text()).not.toContain(en.income.conflict_stale)
+  })
+
+  it('an amendment over a moved-on version or a vanished income, read again and not answered', async () => {
+    for (const [code, stale, shown] of [
+      [ERROR.CONFLICT, en.income.amend_conflict_stale, en.income.amend_conflict],
+      [ERROR.NOT_FOUND, en.income.vanished_stale, en.income.vanished],
+    ] as const) {
+      incomes
+        .mockReset()
+        .mockResolvedValueOnce(overview())
+        .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+        .mockResolvedValue(amended())
+      amendIncome.mockReset().mockRejectedValueOnce(new ApiError(code))
+      const view = await render()
+      await amendThroughSheet(view)
+      expect(view.get('.status').text()).toContain(en.income.error_strip.split('{when}')[0])
+      expect(view.text()).toContain(stale)
+      expect(view.text()).not.toContain(shown)
+
+      await retryStrip(view)
+      expect(view.text()).toContain(shown)
+      expect(view.text()).not.toContain(stale)
+      view.unmount()
+      views.splice(views.indexOf(view), 1)
+      document.body.innerHTML = ''
+    }
+  })
+
+  it('a late «Bring back» read again and not answered: the strip says the list may be old', async () => {
+    incomes
+      .mockResolvedValueOnce(overview())
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockResolvedValue(overview())
+    removeIncome.mockResolvedValue(overview({ months: [] }))
+    restoreIncome.mockRejectedValue(new ApiError(ERROR.NOT_FOUND))
+    const view = await render()
+    await view.get('button.remove').trigger('click')
+    await risen()
+    sheetButton(en.income.remove_sheet.confirm).click()
+    await flushPromises()
+    await view
+      .findAll('button')
+      .find((button) => button.text() === en.income.restore)
+      ?.trigger('click')
+    await flushPromises()
+    expect(view.text()).toContain(en.income.restore_gone)
+    expect(view.get('.status').text()).toContain(en.income.error_strip.split('{when}')[0])
+  })
+
+  it('the same read lost with the connection: offline, not «the server», and no «here it is now» (Б1)', async () => {
+    // The connection goes the moment the server's answer to the write comes.
+    const lostOffline = (): Promise<never> => {
+      online(false)
+      window.dispatchEvent(new Event('offline'))
+      return Promise.reject(new ApiError(ERROR.INTERNAL, 'network', false))
+    }
+    for (const [write, stale, shown] of [
+      ['record', en.income.conflict_stale, en.income.conflict],
+      [ERROR.CONFLICT, en.income.amend_conflict_stale, en.income.amend_conflict],
+      [ERROR.NOT_FOUND, en.income.vanished_stale, en.income.vanished],
+    ] as const) {
+      online(true)
+      incomes
+        .mockReset()
+        .mockResolvedValueOnce(overview())
+        .mockImplementationOnce(lostOffline)
+        .mockResolvedValue(amended())
+      recordIncome.mockReset().mockRejectedValue(new ApiError(ERROR.CONFLICT))
+      amendIncome.mockReset()
+      const view = await render()
+      if (write === 'record') await recordThroughSheet(view)
+      else {
+        amendIncome.mockRejectedValueOnce(new ApiError(write))
+        await amendThroughSheet(view)
+      }
+      expect(view.get('.status').text()).toContain(en.income.offline.strip.split('{when}')[0])
+      expect(view.text()).not.toContain(en.state.retry)
+      expect(view.text()).toContain(stale)
+      expect(view.text()).not.toContain(shown)
+
+      // Back online, the list is read by itself, and now it is what the words say.
+      online(true)
+      window.dispatchEvent(new Event('online'))
+      await flushPromises()
+      expect(incomes).toHaveBeenCalledTimes(3)
+      expect(view.text()).toContain(shown)
+      expect(view.text()).not.toContain(stale)
+      view.unmount()
+      views.splice(views.indexOf(view), 1)
+      document.body.innerHTML = ''
+    }
+  })
+
+  it('another owner starts with no answer time and no failed reads of the last one', async () => {
+    incomes
+      .mockResolvedValueOnce(overview())
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockResolvedValueOnce(overview())
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+    recordIncome.mockRejectedValue(new ApiError(ERROR.CONFLICT))
+    const view = await render()
+    await recordThroughSheet(view)
+    expect(view.getComponent(StatusStrip).props('attempt')).toBe(1)
+
+    useActorStore().id = 'aaaaaaaa-0000-4000-8000-000000000009'
+    await flushPromises()
+    expect(view.findComponent(StatusStrip).exists()).toBe(false)
+    expect(view.text()).not.toContain(en.income.conflict_stale)
+
+    // The new owner's first failed read is the first, not the second.
+    await recordThroughSheet(view)
+    expect(view.getComponent(StatusStrip).props('attempt')).toBe(1)
   })
 })
