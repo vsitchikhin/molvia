@@ -711,6 +711,57 @@ describe('rawBounds', () => {
         read,
       ),
     ).toEqual(['bot', 'frontend'])
+    // round 9, И3 and И6: concurrent quoted or short, a project's extends, settings read from a file
+    expect(
+      unsureDirectories(
+        [
+          config('bot/vitest.config.ts', "test: { sequence: { 'concurrent': true } }"),
+          config(
+            'frontend/vitest.config.ts',
+            'const concurrent = true\ntest: { sequence: { concurrent } }',
+          ),
+          config(
+            'vitest.config.ts',
+            "projects: [{ extends: './bin/vitest.shared.ts', test: { name: 'bin' } }]",
+          ),
+          config(
+            'deploy/watch/vitest.config.ts',
+            "test: JSON.parse(readFileSync('./shared.json', 'utf8'))",
+          ),
+          config('packages/model/vitest.config.ts', 'test: { sequence: { concurrent: false } }'),
+        ],
+        read,
+      ),
+    ).toEqual(['bot', 'frontend', '.', 'deploy/watch'])
+    // round 9, И4: an import by a template or a name, a glob
+    const imports: Record<string, string> = {
+      ...more,
+      'bot/template.ts': 'await import(`./clock-reset`)',
+      'bot/named.ts': "const where = './clock-reset'\nawait import(where)",
+      'bot/glob.ts': "import.meta.glob('./clock-*.ts', { eager: true })",
+    }
+    const via = (setup: string) =>
+      unsureDirectories(
+        [config('bot/vitest.config.ts', `setupFiles: ['./${setup}']`)],
+        (path) => imports[path],
+      )
+    for (const setup of ['template.ts', 'named.ts', 'glob.ts']) expect(via(setup)).toEqual(['bot'])
+    // round 9, И5: a subpath key matched whole, not by its start
+    const keyed: Record<string, string> = {
+      'bot/package.json': JSON.stringify({
+        name: '@molvia/bot',
+        imports: { '#clock': './clock.ts', '#clock-reset': './clock-reset.ts' },
+      }),
+      'bot/clock.ts': 'export {}',
+      'bot/clock-reset.ts': 'afterEach(() => vi.useRealTimers())',
+      'bot/setup.ts': "import '#clock-reset'",
+    }
+    expect(
+      unsureDirectories(
+        [config('bot/vitest.config.ts', "setupFiles: ['./setup.ts']")],
+        (path) => keyed[path],
+      ),
+    ).toEqual(['bot'])
   })
 
   // review round 7 of MOL-266: №19 and adversarial Ж1, Ж3–Ж5 — the file is no longer read as sure
@@ -766,6 +817,37 @@ describe('rawBounds', () => {
       rawBounds(
         'a.test.ts',
         `it('x', { concurrent: false, timeout: 10_000 }, async () => {\nvi.useFakeTimers()\n${FAKE}\n})`,
+      ),
+    ).toEqual([])
+  })
+
+  // review round 9 of MOL-266: №21 and adversarial И1–И2
+  it.each([
+    ...['[realClock]', 'new Set([realClock])', '{ reset: realClock }'].map((kept) => [
+      `the let-go kept as ${kept}`,
+      `function realClock(): void {\nvi.useRealTimers()\n}\nconst cleanups = ${kept}\n${AFTER_FIRST}\nafterEach(() => {\nrun(cleanups)\n})\nit('first', () => {})\nit('x', async () => {\n${REAL}\n})`,
+    ]),
+    [
+      'the let-go under an alias',
+      `function realClock(): void {\nvi.useRealTimers()\n}\nconst reset = realClock\n${AFTER_FIRST}\nafterEach(() => {\nreset()\n})\nit('first', () => {})\nit('x', async () => {\n${REAL}\n})`,
+    ],
+    [
+      'options under a name',
+      `const opts = { concurrent: true }\nit('a', opts, async () => {\nawait tick()\nvi.useRealTimers()\n})\nit('b', opts, async () => {\nvi.useFakeTimers()\n${FAKE}\n})`,
+    ],
+    [
+      'options made by a call',
+      `describe('s', options(), () => {\nit('a', async () => {\nvi.useRealTimers()\n})\nit('b', async () => {\nvi.useFakeTimers()\n${FAKE}\n})\n})`,
+    ],
+  ])('finds a bound on real time beside fake timers — %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toHaveLength(1)
+  })
+
+  it('leaves alone a fake bound whose test has a timeout named by a number of the file', () => {
+    expect(
+      rawBounds(
+        'a.test.ts',
+        `const SLOW_MS = 2 * 60_000\nit('x', async () => {\nvi.useFakeTimers()\n${FAKE}\n}, SLOW_MS)`,
       ),
     ).toEqual([])
   })

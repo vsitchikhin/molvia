@@ -42,10 +42,11 @@
 // the timers in ways read in order — each a call, in the file's body, a callback or a function of the
 // file — with no reference handed over or kept, no string, method or class, no hook or test under
 // another name, no fixture, no `vi.setConfig`, no `it.beforeEach`, no timer call kept by a call for
-// later — written there or a function of the file by its name — no concurrent tests, by `.concurrent` or
-// the options, and no config of its directory that names `fakeTimers` or `concurrent`, takes settings from
-// a file of the repository, or has a setup file that touches them or imports what does: else no bound
-// there is let go. A callback runs where it is written only for a call known to run it before it returns
+// later — written there or a function of the file named anywhere but as a call or a hook's — no
+// concurrent tests, by `.concurrent` or the options, no options under a name, and no config of its
+// directory that names `fakeTimers`, `concurrent` or `extends`, reads a file or takes settings from a file
+// of the repository, or has a setup file that touches them or imports what does, or imports what it
+// cannot follow: else no bound there is let go. A callback runs where it is written only for a call known to run it before it returns
 // — a `then` only on what touches no timers. `useRealTimers()` lets go, `toFake` and `toNotFake` choose,
 // `shouldAdvanceTime` and a tick mode but `manual` move fake time with the real one, options not read
 // whole leave every clock real; a clock taken under another name keeps the real one.
@@ -1221,6 +1222,47 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
         if (ordinary && !runsInPlace(n) && n.arguments.some((a) => touchesTimers(bare(a))))
           ok = false
       }
+      // options under a name or made by a call: what they set is not read (review №21, adversarial И2) —
+      // a timeout named by a number of the file excepted
+      if (
+        ts.isCallExpression(n) &&
+        (TEST.test(calleeRoot(n)) || SUITE.test(calleeRoot(n))) &&
+        !(
+          ts.isPropertyAccessExpression(n.expression) &&
+          /^(each|for|skipIf|runIf)$/.test(n.expression.name.text)
+        ) &&
+        n.arguments.slice(1).some((a) => {
+          const v = bare(a)
+          if (ts.isFunctionLike(v) || ts.isObjectLiteralExpression(v) || ts.isNumericLiteral(v))
+            return false
+          const declaration = ts.isIdentifier(v)
+            ? checker.getSymbolAtLocation(v)?.valueDeclaration
+            : undefined
+          const init =
+            declaration && ts.isVariableDeclaration(declaration)
+              ? declaration.initializer
+              : undefined
+          return !(init && /^[\d_\s*+\-/().]+$/.test(init.getText(sf)))
+        })
+      )
+        ok = false
+      // a function of the file that touches the timers, kept or handed over by its name anywhere but
+      // as a call or to a hook — [realClock], { reset: realClock }, const reset = realClock (И1)
+      if (ts.isIdentifier(n) && !TIMERS.has(n.text)) {
+        const parent = n.parent
+        const declared =
+          (ts.isFunctionDeclaration(parent) || ts.isVariableDeclaration(parent)) &&
+          parent.name === n
+        const called = ts.isCallExpression(parent) && parent.expression === n
+        const hooked =
+          ts.isCallExpression(parent) &&
+          parent.arguments.includes(n) &&
+          (HOOK.test(calleeRoot(parent)) || TEST.test(calleeRoot(parent)))
+        if (!declared && !called && !hooked) {
+          const fn = functionNamed(n)
+          if (fn?.body && touchesTimers(fn.body)) ok = false
+        }
+      }
       // describe('s', { concurrent: true }, …), in the options too (review №20)
       if (
         ts.isCallExpression(n) &&
@@ -1325,12 +1367,24 @@ export function unsureDirectories(configs, read) {
     for (let dir = dirname(from); dir !== '.' && dir !== '/' && dir !== ''; dir = dirname(dir)) {
       const imports = json(join(dir, 'package.json'))?.imports
       if (!imports) continue
-      for (const [pattern, target] of Object.entries(imports)) {
-        const [head, tail = ''] = pattern.split('*')
-        if (typeof target !== 'string' || !spec.startsWith(head) || !spec.endsWith(tail)) continue
-        return join(dir, target.replace('*', spec.slice(head.length, spec.length - tail.length)))
-      }
-      return undefined
+      // as Node resolves it: the key itself, else the pattern of the longest head (adversarial И5)
+      const exact = imports[spec]
+      if (exact !== undefined) return typeof exact === 'string' ? join(dir, exact) : undefined
+      const [pattern, target] =
+        Object.entries(imports)
+          .filter(([key]) => key.includes('*'))
+          .filter(([key]) => {
+            const [head, tail = ''] = key.split('*')
+            return (
+              spec.startsWith(head) &&
+              spec.endsWith(tail) &&
+              spec.length >= head.length + tail.length
+            )
+          })
+          .sort(([a], [b]) => b.indexOf('*') - a.indexOf('*'))[0] ?? []
+      if (typeof pattern !== 'string' || typeof target !== 'string') return undefined
+      const [head, tail = ''] = pattern.split('*')
+      return join(dir, target.replace('*', spec.slice(head.length, spec.length - tail.length)))
     }
     return undefined
   }
@@ -1354,6 +1408,9 @@ export function unsureDirectories(configs, read) {
     const text = candidates.map(read).find((t) => t !== undefined)
     if (text === undefined) return true
     if (TOUCH.test(text)) return true
+    // an import by what is not a quoted string, or a glob: where it leads is not read (И4)
+    if (/\b(?:import|require)\s*\(\s*(?!['"])/.test(text) || /import\.meta\.glob/.test(text))
+      return true
     return [...text.matchAll(IMPORTS)].some(([, spec]) => {
       if (!local(spec)) return false
       if (spec.startsWith('@/')) return touches(join(root, 'src', spec.slice(2)), root, seen)
@@ -1366,7 +1423,13 @@ export function unsureDirectories(configs, read) {
   return configs
     .filter(({ path, text }) => {
       const root = dirname(path)
-      if (/\bfakeTimers\b/.test(text) || /\bconcurrent\s*:\s*(?!false\b)/.test(text)) return true
+      if (/\bfakeTimers\b/.test(text)) return true
+      // concurrent anywhere but as `concurrent: false` — quoted, short, by an expression (И3, №22)
+      const concurrent = [...text.matchAll(/\bconcurrent\b/g)].length
+      const off = [...text.matchAll(/\bconcurrent['"]?\s*:\s*false\b/g)].length
+      if (concurrent > off) return true
+      // settings that come from elsewhere than this text: a project's `extends`, a file read (И6)
+      if (/\bextends\b|\breadFile|\bJSON\.parse\b|\brequire\s*\(/.test(text)) return true
       // a config is read by its own text: one that takes settings from a file of this repository is not
       // read whole (adversarial З4)
       if ([...text.matchAll(IMPORTS)].some(([, spec]) => local(spec))) return true
