@@ -258,11 +258,16 @@ of the measure and with every test merged. So CI checks every run instead (owner
   under another name, no fixture (`test.extend`, run after `beforeEach`), no hook given anything but a function
   of the file, no `vi.setConfig` (it changes what a later `useFakeTimers()` fakes), no `it.beforeEach`, no
   timer call handed to a call that keeps it for later (`cleanups.push(() => vi.useRealTimers())`), no
-  concurrent tests — the clocks are one — and no config of the file's directory that sets `fakeTimers`, runs
-  tests concurrently or has a setup file that touches the timers, itself or by what it imports (`./…`,
-  `@/…`; read by the check's own run, `unsureDirectories`; adversarial rounds 6–7, review №19). A callback
+  concurrent tests, by `.concurrent` or in the options (`{ concurrent: true }`) — the clocks are one — and no
+  config of the file's directory that names `fakeTimers`, `concurrent` other than `false`, takes settings from
+  a file of this repository or has a setup file that touches the timers, itself or by what it imports
+  statically, by `import()` or `require` — `./…`, `@/…`, a workspace package and a `#…` subpath followed by
+  their `package.json`, anything that leads nowhere unsure (read by the check's own run, `unsureDirectories`;
+  adversarial rounds 6–8, review №19–20). A function of the file handed by its name to a call that keeps it
+  is as a timer call kept there (З2). A callback
   counts as run where it is written only when the call is known to run it before it settles — `vi.waitFor`,
-  `vi.waitUntil`, `expect.poll`, an awaited `then` — not any awaited call, which may only keep it (Ж4). Anywhere else no bound in the file is let go as fake. Each round found the parse reading «what touches
+  `vi.waitUntil`, `expect.poll`, an awaited `then` on what touches no timers — not any awaited call, which may
+  only keep it (Ж4), and not a `then` on what lets go, which runs first (З1). Anywhere else no bound in the file is let go as fake. Each round found the parse reading «what touches
   the timers» by a name, and a name has more spellings than any list: this ends the class, not a spelling. `useRealTimers()` lets
   go, `toFake` and `toNotFake` choose, `shouldAdvanceTime` and any tick mode but `manual`
   (`vi.setTimerTickMode`) move the fake clock with the real one, so it is real, `vi.setSystemTime` alone fakes
