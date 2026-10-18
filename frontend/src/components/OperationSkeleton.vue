@@ -1,9 +1,9 @@
 <template>
   <div class="skeleton-cards" :class="`skeleton-${form}`">
-    <div v-for="(plate, n) in plates" :key="n" class="entry">
+    <div v-for="(lines, n) in plates" :key="n" class="entry">
       <span class="head"><span class="day"></span></span>
       <span class="sums"><span class="sum"></span><span class="sum"></span></span>
-      <span v-if="plate" class="plate"></span>
+      <span v-if="lines" class="plate" :class="{ double: lines > 1 }"></span>
     </div>
   </div>
 </template>
@@ -21,10 +21,11 @@ export default defineComponent({
   name: 'OperationSkeleton',
   props: {
     /**
-     * A card a value, whether it has its plate: an exchange always has its plate of rates, an income
-     * only with an account or a note — so «Доходы» draw one with and one without (MOL-188, Р-7).
+     * A card a value, the lines of its plate — 0 for none: an exchange always has its plate of rates
+     * (any number but 0 draws it), an income one line for its account or its note, two for both, none
+     * for neither (MOL-188, Р-7, adversarial Б2).
      */
-    plates: { type: Array as PropType<readonly boolean[]>, default: () => [true, true] },
+    plates: { type: Array as PropType<readonly number[]>, default: () => [1, 1] },
     /**
      * Whose card: an income's is as tall as `IncomeCard` — the head of the bin, the line of its figure, a
      * plate of one line of the note (MOL-188, adversarial А2: drawn as an exchange's, the second month
@@ -111,6 +112,13 @@ export default defineComponent({
   .plate {
     height: calc(var(--text-footnote) * var(--leading-body) + 2 * var(--space-2));
     margin-top: var(--space-2);
+  }
+
+  // The account and the note under a hairline, 8 above it and 8 under it.
+  .plate.double {
+    height: calc(
+      2 * var(--text-footnote) * var(--leading-body) + 4 * var(--space-2) + var(--hairline)
+    );
   }
 }
 </style>

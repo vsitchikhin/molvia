@@ -4,8 +4,14 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
-import { ERROR } from '@molvia/model'
-import type { IncomeAmendBody, IncomeBody, IncomeView as Row, IncomesResponse } from '@molvia/model'
+import { ERROR, parseMoney } from '@molvia/model'
+import type {
+  IncomeAmendBody,
+  IncomeBody,
+  IncomeView as Row,
+  IncomesResponse,
+  MoneyAccountsResponse,
+} from '@molvia/model'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
@@ -19,6 +25,7 @@ const recordIncome =
 const amendIncome = vi.fn<(id: string, body: IncomeAmendBody) => Promise<IncomesResponse>>()
 const removeIncome = vi.fn<(id: string) => Promise<IncomesResponse>>()
 const restoreIncome = vi.fn<(id: string) => Promise<IncomesResponse>>()
+const moneyAccounts = vi.fn<() => Promise<MoneyAccountsResponse>>()
 vi.mock('@/api', () => ({
   api: {
     incomes: () => incomes(),
@@ -26,6 +33,7 @@ vi.mock('@/api', () => ({
     amendIncome: (id: string, body: IncomeAmendBody) => amendIncome(id, body),
     removeIncome: (id: string) => removeIncome(id),
     restoreIncome: (id: string) => restoreIncome(id),
+    moneyAccounts: () => moneyAccounts(),
   },
 }))
 
@@ -91,6 +99,8 @@ beforeEach(() => {
   for (const mock of [incomes, recordIncome, amendIncome, removeIncome, restoreIncome]) {
     mock.mockReset()
   }
+  // No accounts unless a test names one: the page is never asked otherwise.
+  moneyAccounts.mockReset().mockRejectedValue(new TypeError('network'))
   online(true)
   clock = 0
   vi.spyOn(performance, 'now').mockImplementation(() => clock)
@@ -122,19 +132,55 @@ describe('IncomesView: the four states', () => {
     const view = await render()
     expect(view.find('.skeleton').exists()).toBe(true)
     expect(view.text()).not.toContain(en.income.record)
-    // The answer's shape (Ф-13): a month, a card with its plate and one without, a month, a card
-    // with its plate — no paragraphs of `groups`.
-    const parts = view
-      .findAll('.skeleton-caption, .entry')
-      .map((part) =>
-        part.classes('entry') ? (part.find('.plate').exists() ? 'plate' : 'card') : 'month',
-      )
-    expect(parts).toEqual(['month', 'plate', 'card', 'month', 'plate'])
-    // The income's card, not an exchange's (adversarial А2): the head of the bin, the line of its figure.
-    expect(view.findAll('.skeleton-cards').every((cards) => cards.classes('skeleton-income'))).toBe(
-      true,
-    )
+    // The answer's shape (Ф-13) of a person with no account: a month, a card with a note and one
+    // with nothing, a month, a card with a note — no paragraphs of `groups`.
+    expect(skeletonShape(view)).toEqual(['month', 1, 0, 'month', 1])
+    // The income's card, not an exchange's (adversarial А2), on a root of its own (self-review №1,
+    // adversarial Б3): two of them, never a screen's `.cards`.
+    const roots = view.findAll('.skeleton-cards')
+    expect(roots).toHaveLength(2)
+    for (const root of roots) {
+      expect(root.classes()).toEqual(['skeleton-cards', 'skeleton-income'])
+    }
     expect(view.find('.skeleton-lines').exists()).toBe(false)
+  })
+
+  it('with an account every card of the skeleton has its plate, as every income lands on it (Б2)', async () => {
+    moneyAccounts.mockResolvedValue({
+      spendCurrency: 'RUB',
+      accounts: [
+        {
+          id: '5c1f8b2d-3e4a-4b6c-8d7e-9f0a1b2c3d4e',
+          name: 'Card ₽',
+          currency: 'RUB',
+          savings: false,
+          start: parseMoney('1000', 'RUB'),
+          startOn: '2026-09-01',
+          balance: parseMoney('1000', 'RUB'),
+          approximate: false,
+          uncounted: 0,
+          inSpend: null,
+          rate: null,
+          lastCheckedOn: null,
+          hasOperations: true,
+          archivedAt: null,
+          revision: 1,
+        },
+      ],
+      totals: {
+        total: parseMoney('0', 'RUB'),
+        spendable: parseMoney('0', 'RUB'),
+        savings: parseMoney('0', 'RUB'),
+        uncounted: 0,
+      },
+      incomeTotals: null,
+      unassigned: 0,
+      countedAt: new Date(),
+    })
+    incomes.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    // The account and a note, the account; a month, the account (frame incomes-light).
+    expect(skeletonShape(view)).toEqual(['month', 2, 1, 'month', 1])
   })
 
   it('a failed read is red with «Try again», and trying again reads again', async () => {
@@ -234,10 +280,12 @@ describe('IncomesView: the months (В-2)', () => {
       sums: [{ minor: 100_000n, currency: 'RUB' as const }],
       incomes: [row({ id, receivedOn })],
     })
-    const december = month('2026-12', '2026-12-20', '5d1c6a2b-3e4f-4a5b-8c6d-7e8f9a0b1c31')
+    const december = month('2026-12', '2026-12-31', '5d1c6a2b-3e4f-4a5b-8c6d-7e8f9a0b1c31')
     const january = month('2027-01', '2027-01-01', '5d1c6a2b-3e4f-4a5b-8c6d-7e8f9a0b1c32')
     const captions = (view: VueWrapper): string[] =>
       view.findAll('.month-head .words').map((words) => words.text())
+    const heads = (view: VueWrapper): string[] =>
+      view.findAll('article .head .day').map((day) => day.text())
     vi.useFakeTimers({ toFake: ['Date'] })
     try {
       vi.setSystemTime(new Date(2026, 11, 31, 23, 50))
@@ -248,6 +296,7 @@ describe('IncomesView: the months (В-2)', () => {
       })
       const view = await render()
       expect(captions(view)).toEqual(['December'])
+      expect(heads(view)).toEqual(['Today'])
 
       // 00:05 of the 1st, never hidden: the screen's own day is still the 31st, the answer of the
       // write redraws it.
@@ -255,6 +304,8 @@ describe('IncomesView: the months (В-2)', () => {
       await recordThroughSheet(view)
       expect(incomes).toHaveBeenCalledTimes(1)
       expect(captions(view)).toEqual(['January', 'December 2026'])
+      // The cards speak by the same day as their captions (Б1): never «December 2026» over «Today».
+      expect(heads(view)).toEqual(['Today', 'Yesterday'])
     } finally {
       vi.useRealTimers()
     }
@@ -328,6 +379,16 @@ describe('IncomesView: the months (В-2)', () => {
     expect(view.get('article').find('.plate').exists()).toBe(false)
   })
 })
+
+/** The skeleton top to bottom: `month` for a caption, a card as the lines of its plate. */
+function skeletonShape(view: VueWrapper): (string | number)[] {
+  return view.findAll('.skeleton-caption, .entry').map((part) => {
+    if (!part.classes('entry')) return 'month'
+    const plate = part.find('.plate')
+    if (!plate.exists()) return 0
+    return plate.classes('double') ? 2 : 1
+  })
+}
 
 /** «Записать доход» in the strip over the tab bar — its words say why when it is not now (Ф-6). */
 function recordButton(view: VueWrapper) {

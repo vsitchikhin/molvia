@@ -54,13 +54,13 @@
       </div>
     </template>
 
-    <!-- The shape of what is coming, in the order it will stand (Ф-13, frame incomes-loading): a month
-         and two cards, one with its plate and one without, then a month and a card with its plate. -->
+    <!-- The shape of what is coming, in the order it will stand (Ф-13): a month and two cards, then a
+         month and a card — their plates by whether the person has an account (`skeletonPlates`). -->
     <ScreenSkeleton v-if="phase === 'loading'">
       <SkeletonPart kind="caption" :width="22" />
-      <OperationSkeleton form="income" :plates="[true, false]" />
+      <OperationSkeleton form="income" :plates="skeletonPlates[0]" />
       <SkeletonPart kind="caption" :width="18" />
-      <OperationSkeleton form="income" :plates="[true]" />
+      <OperationSkeleton form="income" :plates="skeletonPlates[1]" />
     </ScreenSkeleton>
 
     <template v-else-if="phase !== 'idle'">
@@ -106,7 +106,7 @@
                 <li v-for="income in month.incomes" :key="income.id">
                   <IncomeCard
                     :income="income"
-                    :today="today"
+                    :today="shownToday()"
                     :disabled="!online || busy"
                     @edit="edit"
                     @remove="ask"
@@ -148,7 +148,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { IncomeAmendBody, IncomeView as Row, Money } from '@molvia/model'
 import IconCashPlus from '~icons/mdi/cash-plus'
@@ -161,6 +161,7 @@ import IncomeRemoveSheet from '@/components/IncomeRemoveSheet.vue'
 import IncomeSheet from '@/components/IncomeSheet.vue'
 import OperationSkeleton from '@/components/OperationSkeleton.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import { pageOrder } from '@/components/accounts'
 import { asTyped } from '@/components/spending'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
@@ -200,6 +201,10 @@ export default defineComponent({
     const incomes = useIncomes()
     // «Сегодня» of the cards, asked again when the app comes back into view (MOL-121, adversarial Н).
     const today = useLocalDay()
+    // The day the captions and the cards speak by, one for both: the later of the screen's and the
+    // clock's, as `answeredAt` (adversarial А1, Б1) — past New Year's midnight, drawn again by a
+    // write's answer, «December 2026» stood over a card of the 31st that said «Today».
+    const shownToday = (): string => shownDay(today.value)
     const sheetOpen = ref(false)
     // The income the sheet amends, or null when it records a new one.
     const editing = ref<Row | null>(null)
@@ -261,6 +266,15 @@ export default defineComponent({
     // The names of the accounts on the cards (MOL-123): the page as the server has it now.
     const accounts = useAccountsStore()
     onMounted(() => void accounts.refresh())
+    /**
+     * The plates of the skeleton's cards, in lines (adversarial Б2): with an account a new income lands
+     * on it untouched, so every card has its plate — the account and a note, the account (frame
+     * incomes-light); with none, a note and nothing (frame incomes-loading). The accounts come from the
+     * phone's memory before their answer, so the shape is known as the skeleton comes.
+     */
+    const skeletonPlates = computed(() =>
+      pageOrder(accounts.accounts).length > 0 ? [[2, 1], [1]] : [[1, 0], [1]],
+    )
     onMounted(() => {
       window.addEventListener('online', follow)
       window.addEventListener('offline', follow)
@@ -286,7 +300,8 @@ export default defineComponent({
     const whenOf = (at: Date): string => answeredAt(at, locale.value, today.value)
 
     return {
-      today,
+      shownToday,
+      skeletonPlates,
       t,
       ...incomes,
       sheetOpen,
@@ -305,9 +320,8 @@ export default defineComponent({
       lineOf,
       sumsOf,
       whenOf,
-      // The year only where it is not the phone's (В-2 «а»), by the later of the screen's day and the
-      // clock's, as `answeredAt`: drawn again past New Year's midnight, January was «январь 2027» (А1).
-      monthOf: (month: string) => monthOf(month, locale.value, shownDay(today.value)),
+      // The year only where it is not the phone's (В-2 «а»).
+      monthOf: (month: string) => monthOf(month, locale.value, shownToday()),
       IconCashPlus,
     }
   },
