@@ -50,9 +50,18 @@ export function timeOfDay(when: Date, locale: string): string {
  * screen heard of it (round 2, Б2). An answer of a day neither has reached yet is today's.
  */
 export function answeredAt(at: Date, locale: string, today = localDay(), now = new Date()): string {
-  const clock = localDay(now)
-  const [year = 0, month = 1, date = 1] = (clock > today ? clock : today).split('-').map(Number)
+  const [year = 0, month = 1, date = 1] = shownDay(today, now).split('-').map(Number)
   return `${purchaseDay(at, locale, new Date(year, month - 1, date))}, ${timeOfDay(at, locale)}`
+}
+
+/**
+ * The day a screen draws its words by: the later of the day it holds (`useLocalDay`) and the clock's.
+ * The held day is asked again only when the app comes back into view, so a redraw made past midnight
+ * before the screen heard of it would speak of yesterday (MOL-187, Б2; MOL-188, А1).
+ */
+export function shownDay(today: string, now = new Date()): string {
+  const clock = localDay(now)
+  return clock > today ? clock : today
 }
 
 /**

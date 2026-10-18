@@ -130,6 +130,10 @@ describe('IncomesView: the four states', () => {
         part.classes('entry') ? (part.find('.plate').exists() ? 'plate' : 'card') : 'month',
       )
     expect(parts).toEqual(['month', 'plate', 'card', 'month', 'plate'])
+    // The income's card, not an exchange's (adversarial А2): the head of the bin, the line of its figure.
+    expect(view.findAll('.skeleton-cards').every((cards) => cards.classes('skeleton-income'))).toBe(
+      true,
+    )
     expect(view.find('.skeleton-lines').exists()).toBe(false)
   })
 
@@ -222,6 +226,38 @@ describe('IncomesView: the months (В-2)', () => {
     expect(heads[1]).toMatch(/^August₽137,540 · \$500$/)
     expect(heads[2]).toMatch(/^December 2025₽1,000$/)
     expect(view.text()).toContain(en.income.source.freelance)
+  })
+
+  it('past New Year’s midnight with the screen in the hand, the year goes by the clock (А1)', async () => {
+    const month = (month: string, receivedOn: string, id: string) => ({
+      month,
+      sums: [{ minor: 100_000n, currency: 'RUB' as const }],
+      incomes: [row({ id, receivedOn })],
+    })
+    const december = month('2026-12', '2026-12-20', '5d1c6a2b-3e4f-4a5b-8c6d-7e8f9a0b1c31')
+    const january = month('2027-01', '2027-01-01', '5d1c6a2b-3e4f-4a5b-8c6d-7e8f9a0b1c32')
+    const captions = (view: VueWrapper): string[] =>
+      view.findAll('.month-head .words').map((words) => words.text())
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(new Date(2026, 11, 31, 23, 50))
+      incomes.mockResolvedValue(overview({ months: [december] }))
+      recordIncome.mockResolvedValue({
+        incomes: overview({ months: [january, december] }),
+        created: true,
+      })
+      const view = await render()
+      expect(captions(view)).toEqual(['December'])
+
+      // 00:05 of the 1st, never hidden: the screen's own day is still the 31st, the answer of the
+      // write redraws it.
+      vi.setSystemTime(new Date(2027, 0, 1, 0, 5))
+      await recordThroughSheet(view)
+      expect(incomes).toHaveBeenCalledTimes(1)
+      expect(captions(view)).toEqual(['January', 'December 2026'])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('a row says the source and the day, marks an amendment and shows its note', async () => {
@@ -460,6 +496,10 @@ describe('IncomesView: recording, amending and removing', () => {
     expect(restore.find('.words > :not([aria-hidden])').text()).toBe(en.income.restoring)
     expect(restore.attributes('aria-busy')).toBe('true')
     expect(document.activeElement).toBe(restore.element)
+    // «Записать доход» is not now while the write is on its way, in its own words — the connection
+    // is there (self-review №2): a tap would open the sheet over the write in the air.
+    expect(recordButton(view)?.text()).toBe(en.income.record)
+    expect(recordButton(view)?.attributes('aria-disabled')).toBe('true')
     await restore.trigger('click')
     expect(restoreIncome).toHaveBeenCalledOnce()
   })

@@ -1,9 +1,16 @@
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import { actorCodec, settingsOf } from '@molvia/model'
 import { asBrowser, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
+
+// The English words are the dictionary's, never a copy in the spec: a longer hint there must fail here
+// (adversarial А3).
+const en = JSON.parse(
+  readFileSync(new URL('../frontend/src/i18n/en.json', import.meta.url), 'utf8'),
+) as { income: { sheet: { note_placeholder: string } } }
 
 /**
  * «Доходы» end to end (MOL-66): an income written on the screen lands in its month with the sum
@@ -199,7 +206,7 @@ test('the hint of the income’s note fits its field on a 360 px phone, in both 
   const note = page.locator('dialog[open]').getByLabel('Заметка')
   await expect(note).toHaveAttribute('placeholder', 'Например, «за сентябрь»')
   // The English words of `income.sheet.note_placeholder`, drawn beside the Russian ones.
-  const texts = [(await note.getAttribute('placeholder')) ?? '', 'For example, «for September»']
+  const texts = [(await note.getAttribute('placeholder')) ?? '', en.income.sheet.note_placeholder]
   const room = await note.evaluate(async (field: HTMLInputElement, words: string[]) => {
     await document.fonts.ready
     const style = getComputedStyle(field)
@@ -219,4 +226,75 @@ test('the hint of the income’s note fits its field on a 360 px phone, in both 
     })
   }, texts)
   for (const left of room) expect(left).toBeGreaterThan(0)
+})
+
+/**
+ * The skeleton of «Доходы» is the answer's shape in height too (MOL-188, adversarial А2; MOL-178): its
+ * cards are an income's — the head of the bin, the line of the figure, a plate of one line of the note —
+ * so the second month does not come down by the height they lacked.
+ */
+test('the skeleton’s cards are as tall as the incomes they stand for, with a plate and without', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('link', { name: 'Доходы' }).click()
+  await expect(page.getByRole('heading', { name: 'Доходов пока нет' })).toBeVisible()
+
+  // The skeleton's own shape: an income with a note, and one with neither a note nor an account.
+  const record = page.locator('.dock').getByRole('button', { name: 'Записать доход', exact: true })
+  const sheet = page.locator('dialog[open]')
+  for (const [amount, note] of [
+    ['99615', 'за сентябрь'],
+    ['20385', ''],
+  ] as const) {
+    await record.click()
+    await expect(sheet).toContainText('Сколько и когда пришло')
+    await page.waitForTimeout(400)
+    await sheet.getByLabel('Сумма').fill(amount)
+    await sheet.getByLabel('Откуда').selectOption('salary')
+    if (note) await sheet.getByLabel('Заметка').fill(note)
+    await sheet.getByRole('button', { name: 'Сохранить доход' }).click()
+    await expect(sheet).toBeHidden()
+  }
+  await expect(page.locator('article')).toHaveCount(2)
+  const measure = (cards: Element[]) =>
+    cards.map((card) => ({
+      plate: card.querySelector('.plate') !== null,
+      top: card.getBoundingClientRect().top,
+      height: card.getBoundingClientRect().height,
+    }))
+  const answer = await page.locator('article').evaluateAll(measure)
+
+  // The same screen again, its read held: the skeleton stands until it is let go.
+  let release: () => void = () => undefined
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route(/\/api\/incomes(\?|$)/, async (route) => {
+    await held
+    await route.continue()
+  })
+  await page.goBack()
+  await page.getByRole('link', { name: 'Доходы' }).click()
+  const entries = page.locator('.skeleton .entry')
+  await expect(entries).toHaveCount(3)
+  const skeleton = await entries.evaluateAll(measure)
+  release()
+  await expect(page.locator('article')).toHaveCount(2)
+
+  const of = (cards: typeof answer, plate: boolean) =>
+    cards.find((card) => card.plate === plate)?.height ?? Number.NaN
+  test.info().annotations.push({
+    type: 'heights',
+    description: JSON.stringify({ skeleton, answer }),
+  })
+  // The first card starts where its bars did — 3 px lower, the month's caption holding its sum of 13
+  // beside words of 11, which the kit's caption bar does not (a price, named) — and each card's height
+  // is its bars', within the card's hairline edge, which the bars do not draw.
+  expect(Math.abs((skeleton[0]?.top ?? 0) - (answer[0]?.top ?? 0))).toBeLessThanOrEqual(4)
+  for (const plate of [true, false]) {
+    expect(Math.abs(of(answer, plate) - of(skeleton, plate))).toBeLessThanOrEqual(3)
+  }
 })

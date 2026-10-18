@@ -7,6 +7,7 @@ import {
   localDay,
   monthOf,
   purchaseDay,
+  shownDay,
   timeOfDay,
 } from '@/days'
 
@@ -85,6 +86,16 @@ describe('dayOfAnyYear (MOL-57, self-review С-5)', () => {
 
   it('across New Year yesterday is still «вчера», not a date with a year', () => {
     expect(dayOfAnyYear(new Date(2025, 11, 31, 20), 'ru', new Date(2026, 0, 1, 9))).toBe('вчера')
+  })
+})
+
+describe('shownDay (MOL-187, Б2; MOL-188, А1)', () => {
+  it('is the later of the screen’s day and the clock’s', () => {
+    // Past midnight, the screen not told yet: the clock's.
+    expect(shownDay('2026-12-31', new Date(2027, 0, 1, 0, 5))).toBe('2027-01-01')
+    // A screen's day ahead of the clock — a phone whose clock lags: the screen's.
+    expect(shownDay('2026-10-19', new Date(2026, 9, 18, 12))).toBe('2026-10-19')
+    expect(shownDay('2026-10-18', new Date(2026, 9, 18, 12))).toBe('2026-10-18')
   })
 })
 

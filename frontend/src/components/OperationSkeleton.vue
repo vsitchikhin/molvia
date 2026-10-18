@@ -1,7 +1,7 @@
 <template>
-  <div class="cards">
+  <div class="skeleton-cards" :class="`skeleton-${form}`">
     <div v-for="(plate, n) in plates" :key="n" class="entry">
-      <span class="day"></span>
+      <span class="head"><span class="day"></span></span>
       <span class="sums"><span class="sum"></span><span class="sum"></span></span>
       <span v-if="plate" class="plate"></span>
     </div>
@@ -25,15 +25,27 @@ export default defineComponent({
      * only with an account or a note — so «Доходы» draw one with and one without (MOL-188, Р-7).
      */
     plates: { type: Array as PropType<readonly boolean[]>, default: () => [true, true] },
+    /**
+     * Whose card: an income's is as tall as `IncomeCard` — the head of the bin, the line of its figure, a
+     * plate of one line of the note (MOL-188, adversarial А2: drawn as an exchange's, the second month
+     * came 120 px below its bars).
+     */
+    form: {
+      type: String as PropType<'exchange' | 'income'>,
+      default: 'exchange',
+      validator: (form: string) => form === 'exchange' || form === 'income',
+    },
   },
 })
 </script>
 
 <style scoped lang="scss">
-.cards {
+// The root is the part's own, never a class a screen uses: a screen's scoped `.cards` landed on it and
+// set the gap by the order the sheets load in (MOL-188, self-review №1). 8, as the cards of the answer.
+.skeleton-cards {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .entry {
@@ -43,6 +55,10 @@ export default defineComponent({
   padding: var(--space-4);
   border-radius: var(--radius-lg);
   background: var(--surface);
+}
+
+.head {
+  display: flex;
 }
 
 .day,
@@ -71,5 +87,30 @@ export default defineComponent({
 
   height: var(--touch-target-lg);
   border-radius: var(--radius);
+}
+
+// `IncomeCard`: `OperationCardHead` — the bin's 44 and 4 above it — and right under it the source and
+// the figure at the body's leading, then 8 and a plate of one line of the note in its padding.
+.skeleton-income {
+  .entry {
+    gap: 0;
+    padding: 0 var(--space-4) var(--space-4);
+  }
+
+  .head {
+    align-items: center;
+    min-height: calc(var(--touch-target) + var(--space-1));
+    padding-top: var(--space-1);
+  }
+
+  .sums {
+    align-items: center;
+    height: calc(var(--text-card-figure) * var(--leading-body));
+  }
+
+  .plate {
+    height: calc(var(--text-footnote) * var(--leading-body) + 2 * var(--space-2));
+    margin-top: var(--space-2);
+  }
 }
 </style>

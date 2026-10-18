@@ -58,9 +58,9 @@
          and two cards, one with its plate and one without, then a month and a card with its plate. -->
     <ScreenSkeleton v-if="phase === 'loading'">
       <SkeletonPart kind="caption" :width="22" />
-      <OperationSkeleton :plates="[true, false]" />
+      <OperationSkeleton form="income" :plates="[true, false]" />
       <SkeletonPart kind="caption" :width="18" />
-      <OperationSkeleton :plates="[true]" />
+      <OperationSkeleton form="income" :plates="[true]" />
     </ScreenSkeleton>
 
     <template v-else-if="phase !== 'idle'">
@@ -170,7 +170,7 @@ import { useAnnouncer } from '@/composables/useAnnouncer'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { incomesOf, useIncomes } from '@/composables/useIncomes'
 import { useLocalDay } from '@/composables/useLocalDay'
-import { answeredAt, calendarDay, monthOf } from '@/days'
+import { answeredAt, calendarDay, monthOf, shownDay } from '@/days'
 import { useAccountsStore } from '@/stores/accounts'
 
 /**
@@ -305,8 +305,9 @@ export default defineComponent({
       lineOf,
       sumsOf,
       whenOf,
-      // The year only where it is not the phone's (В-2 «а»).
-      monthOf: (month: string) => monthOf(month, locale.value, today.value),
+      // The year only where it is not the phone's (В-2 «а»), by the later of the screen's day and the
+      // clock's, as `answeredAt`: drawn again past New Year's midnight, January was «январь 2027» (А1).
+      monthOf: (month: string) => monthOf(month, locale.value, shownDay(today.value)),
       IconCashPlus,
     }
   },
