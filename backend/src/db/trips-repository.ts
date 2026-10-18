@@ -22,8 +22,9 @@ import type {
 import { rateFrom, rateTo, sideRateFrom } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
+import { recordedTwinOf } from './receipts-repository'
 import { idOrNull, rowLimit, theRow } from './rows'
-import { expenses, trips, places } from './schema'
+import { expenses, trips, places, receipts } from './schema'
 import { forgetWordsOf } from './store-memory-repository'
 import { tripMoneyRows } from './trip-money'
 import type { TripMoneyRow } from './trip-money'
@@ -174,7 +175,9 @@ export interface TripRepository {
    * «Вернуть» within ten minutes — `null` past them or for a trip that is not the owner's; a trip
    * never removed comes back as it is. An unfinished trip while another is open is `TRIP_OPEN`:
    * two open trips is the state `start` exists to refuse (Р-4) — unless it comes back finished
-   * (`finish`, round 3 В1), which is one statement, so no moment holds two open trips.
+   * (`finish`, round 3 В1), which is one statement, so no moment holds two open trips. A trip whose
+   * receipt was recorded again by a new shot while it lay removed is `RECEIPT_RECORDED_BEFORE`
+   * (MOL-254): one paper, one record.
    */
   restore(
     id: string,
@@ -238,6 +241,23 @@ function removedForGood(which: SQL) {
 
 function ownerLock(tx: Conn, actorId: string) {
   return tx.execute(sql`select pg_advisory_xact_lock(hashtext('trips'), hashtext(${actorId}))`)
+}
+
+/**
+ * «Вернуть» of a trip recorded from a receipt the person has since recorded again by a new shot
+ * (MOL-254): brought back, one paper would be two records. Under the owner's lock «Записать» takes
+ * too, so a record and a «Вернуть» at once see each other.
+ */
+async function refuseRecordedAgain(tx: Conn, actorId: string, tripId: string) {
+  const [own] = await tx
+    .select({ id: receipts.id, tin: receipts.tin, receiptNo: receipts.receiptNo })
+    .from(receipts)
+    .where(and(eq(receipts.tripId, tripId), eq(receipts.status, 'recorded')))
+    .limit(1)
+  if (own?.tin == null || own.receiptNo === null) return
+  if ((await recordedTwinOf(tx, actorId, own.tin, own.receiptNo, own.id)) !== null) {
+    throw new DomainError(ERROR.RECEIPT_RECORDED_BEFORE)
+  }
 }
 
 export function createTripRepository(db: Conn): TripRepository {
@@ -593,6 +613,7 @@ export function createTripRepository(db: Conn): TripRepository {
           if (!held) return null
           const finishing = finish !== undefined && held.finishedAt === null
           if (held.deletedAt === null && !finishing) return toTrip(held)
+          if (held.deletedAt !== null) await refuseRecordedAgain(tx, actorId, id)
           if (held.finishedAt === null && !finishing) {
             const [open] = await tx
               .select({ id: trips.id })

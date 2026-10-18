@@ -341,7 +341,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   ones that hold is set aside, never retried. A receipt — its parts, removal, «Записать» — goes
   through a queue of its own by the same rules (`receiptQueue`, MOL-127).
 - **A removed trip is marked** (MOL-76): «Вернуть» for ten minutes, **every reader filters the
-  mark** except erasure, the timer and an account's «удалить или убрать».
+  mark** except erasure, the timer and an account's «удалить или убрать». **A new shot of its
+  receipt is recorded meanwhile, and then its «Вернуть» is a 409** (MOL-254): one paper, one record.
 - **A trip names its own geography** (`context`, MOL-65): a start without one is
   `error.trip_context_required`, held by the queue without a timer; the settings are settled
   choice by choice inside the `UPDATE`.
