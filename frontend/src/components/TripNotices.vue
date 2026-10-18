@@ -263,11 +263,6 @@ export default defineComponent({
         : 0
 
     /**
-     * Why it was refused, in the person's words where the dictionary has them. A code from the
-     * `issue.*` half is a fault of the app rather than of what was typed: it is named plainly and
-     * carried as the code itself, which is what a report needs.
-     */
-    /**
      * Why a trip did not come back: another opened meanwhile, its receipt recorded again by a new shot
      * (MOL-254) — else its ten minutes are over.
      */
@@ -277,6 +272,11 @@ export default defineComponent({
       return t('trip.remove.not_restored_gone')
     }
 
+    /**
+     * Why it was refused, in the person's words where the dictionary has them. A code from the
+     * `issue.*` half is a fault of the app rather than of what was typed: it is named plainly and
+     * carried as the code itself, which is what a report needs.
+     */
     const refusalReason = (item: RejectedWrite): string => {
       const key = item.code.startsWith('error.') ? item.code : null
       const why =

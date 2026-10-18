@@ -83,44 +83,45 @@ The detail behind the trip lines of `CLAUDE.md`.
   aggregates too — the month of «Деньги», the accounts, the hint of an exchange and the recent
   places; one integration test asks all of them about one trip before, during and after. An open
   trip brought back while another is open is `409 error.trip_open`; a trip recorded from a receipt
-  the person has since recorded again by a new shot is `409 error.receipt_recorded_before`
-  (MOL-254, `receipts.md`) — one paper is one record, and the phone names that reason of its own,
-  never «ten minutes are over». On the phone removal and
-  «Вернуть» are writes of the trip's queue (`delete`, `restore`): the trip's waiting writes are taken
-  out and handed back by «Вернуть», the removal is sent **always** — 404 is done — and a trip whose
-  removal waits is shown nowhere. **The removal stands where the trip's first write stood, and
-  «Вернуть» puts the trip back in the removal's place** (adversarial А3, А4): the order of the queue
-  is the order the trips lived in — one trip's `finish` lets the next one's `start` through — and put
-  at the end, a removal left the server holding the trip open under the next start, and «Вернуть»
-  made yesterday's trip the one going on. A «Вернуть» the server refuses leaves the trip's writes on
-  the phone, stepped over and counted as a refused start's are (А2) — one predicate, `orphaned`, for
-  the queue, the screen's «not sent yet» and the history. **«Вернуть» is offered only while it can
-  put the trip back where it was**: a new start withdraws it, and so does another trip's start
-  landing on the server over a removed trip the server never had — brought back, its start would
-  meet that trip open (round 2, Б3). The store keeps the same rule as the screen. **A trip comes
-  back with its own «Завершить»** (`POST /trips/:id/restore` with `finish`, round 3, В1): finished on
-  the phone with no signal and removed before that finish left, it is open on the server, and brought
-  back open under the next trip it was refused as a second open trip the person never held — then
-  gone with its purchases ten minutes later. Brought back finished in one statement, no moment holds
-  two open trips; the `finish` behind it moves nothing, as finishing twice never does. **The
-  removals and «Вернуть» are mirrored under keys of their own** (`molvia.trip-marks`,
-  `molvia.trip-marks-rejected`, round 4, Г1), each with the write it stood before: a window still on
-  the previous version reads the shared queue, drops the kinds it does not know and writes the queue
-  back without them, and the version that knows them puts them back in their place (MOL-77's rule —
-  a phone-side cache is read by both versions). The price, named: while it sends, the older window
-  does not see the removal, and a start of the next trip it sends first meets the removed trip open.
-  **The account of a trip is a write of its own** (`payment`, `PUT /trips/:id/payment`, MOL-123 Р-3),
-  from the summary in «Деньги»: behind the trip's start, whole each time, 404 done. A new one goes
-  last and takes the place of none — the earlier one still waiting leaves — because the server takes
-  «списано» off at any change of the trip's money (Р-32 MOL-115) and one typed after a price change
-  must reach it after that change (adversarial К). It is mirrored under `molvia.trip-payments(-rejected)`,
-  as the marks are, since the version before it knows the marks and writes their mirror back; every
-  mirrored write keeps the key it stood after as well as before, so a write behind it given a new key
-  by an older window does not send it to the head (adversarial Л). **The price, named** (review 30):
-  a `payment` waits behind a start held for an answer — another trip open, a missing context — with
-  no timer; a check does not wait for it — it counts without it and says the trip waits for an
-  answer in «Покупки» (adversarial round 3, Н4). **The price, named:** removing a trip dated before a check that
-  came out even moves the balance with no reason the check can name, as a removed spending does.
+  the person has since recorded again by a new shot is `409 error.receipt_recorded_before` (MOL-254,
+  `receipts.md`) — one paper is one record, and the phone names that reason of its own, never «ten
+  minutes are over». On the phone removal and «Вернуть» are writes of the trip's queue (`delete`,
+  `restore`): the trip's waiting writes are taken out and handed back by «Вернуть», the removal is
+  sent **always** — 404 is done — and a trip whose removal waits is shown nowhere. **The removal
+  stands where the trip's first write stood, and «Вернуть» puts the trip back in the removal's
+  place** (adversarial А3, А4): the order of the queue is the order the trips lived in — one trip's
+  `finish` lets the next one's `start` through — and put at the end, a removal left the server
+  holding the trip open under the next start, and «Вернуть» made yesterday's trip the one going on.
+  A «Вернуть» the server refuses leaves the trip's writes on the phone, stepped over and counted as
+  a refused start's are (А2) — one predicate, `orphaned`, for the queue, the screen's «not sent yet»
+  and the history. **«Вернуть» is offered only while it can put the trip back where it was**: a new
+  start withdraws it, and so does another trip's start landing on the server over a removed trip the
+  server never had — brought back, its start would meet that trip open (round 2, Б3). The store
+  keeps the same rule as the screen. **A trip comes back with its own «Завершить»**
+  (`POST /trips/:id/restore` with `finish`, round 3, В1): finished on the phone with no signal and
+  removed before that finish left, it is open on the server, and brought back open under the next
+  trip it was refused as a second open trip the person never held — then gone with its purchases ten
+  minutes later. Brought back finished in one statement, no moment holds two open trips; the
+  `finish` behind it moves nothing, as finishing twice never does. **The removals and «Вернуть» are
+  mirrored under keys of their own** (`molvia.trip-marks`, `molvia.trip-marks-rejected`, round 4,
+  Г1), each with the write it stood before: a window still on the previous version reads the shared
+  queue, drops the kinds it does not know and writes the queue back without them, and the version
+  that knows them puts them back in their place (MOL-77's rule — a phone-side cache is read by both
+  versions). The price, named: while it sends, the older window does not see the removal, and a
+  start of the next trip it sends first meets the removed trip open. **The account of a trip is a
+  write of its own** (`payment`, `PUT /trips/:id/payment`, MOL-123 Р-3), from the summary in
+  «Деньги»: behind the trip's start, whole each time, 404 done. A new one goes last and takes the
+  place of none — the earlier one still waiting leaves — because the server takes «списано» off at
+  any change of the trip's money (Р-32 MOL-115) and one typed after a price change must reach it
+  after that change (adversarial К). It is mirrored under `molvia.trip-payments(-rejected)`, as the
+  marks are, since the version before it knows the marks and writes their mirror back; every
+  mirrored write keeps the key it stood after as well as before, so a write behind it given a new
+  key by an older window does not send it to the head (adversarial Л). **The price, named** (review
+  30): a `payment` waits behind a start held for an answer — another trip open, a missing context —
+  with no timer; a check does not wait for it — it counts without it and says the trip waits for an
+  answer in «Покупки» (adversarial round 3, Н4). **The price, named:** removing a trip dated before
+  a check that came out even moves the balance with no reason the check can name, as a removed
+  spending does.
 
 ## «Сумма по чеку» — a trip's money whole (MOL-78)
 

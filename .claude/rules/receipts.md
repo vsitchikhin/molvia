@@ -413,7 +413,8 @@ They were `SET NULL`, so that a receipt whose trip was removed for good could be
 lines (В7) — but the phone draws no recorded receipt, so nobody could, and what a person removed lay on
 the server, unseen, until erasure. The paper is recorded again by a new shot: its twin went with the
 trip. A trip only marked removed keeps its receipt whole, and «Вернуть» brings both back; until then
-«Записать» of that very receipt is a 409 — a new shot of the paper is another receipt, Т-11 above. **A line not recorded goes at «Записать»** (MOL-240, В-2): nobody sees it once the
+«Записать» of that very receipt is a 409 — a new shot of the paper is another receipt, Т-11 above.
+**A line not recorded goes at «Записать»** (MOL-240, В-2): nobody sees it once the
 receipt is recorded, and what it costs is counted at that moment — so a recorded receipt's lines have
 gaps, and a line is found by its `position`, never its place in a list (`codesAgain`; the wire carries
 no position, so a recorded receipt's `lines` are never read by their place). The minute timer deletes a
