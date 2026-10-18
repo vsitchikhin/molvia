@@ -393,7 +393,15 @@ receipt of a week ago is a purchase of a week ago.
 write offline (MOL-24). **The same receipt recorded before is refused** (Т-11,
 `error.receipt_recorded_before`): its seller's tax number and number, the person's, while its purchases
 are there — a trip removed lets a new shot of it be recorded. A receipt with no number is held by its id
-alone.
+alone. **A trip only marked removed holds no new shot, and a new shot holds its «Вернуть»** (MOL-254,
+owner's decision Р-1 «б»): the commonest reason to shoot a receipt again is having just removed its record
+— the wrong shop, the wrong day — and that falls whole inside the ten minutes, while the phone offers
+«Вернуть» for ten seconds; a 409 at «Записать» would have said «уже записан» for up to ten minutes of a
+record nowhere to be seen. So `POST /trips/:id/restore` of a trip whose receipt has a twin recorded since,
+its trip there, is the same `409 error.receipt_recorded_before`, the trip left marked to go with the
+timer. One rule, `recordedTwinOf`, for «Записать», the review's `duplicateOf`, the bot's notice and
+«Вернуть»; the check runs inside `trips.restore`, under the owner's lock «Записать» takes first, so a
+record and a «Вернуть» at once pass one at a time and the second sees the first.
 
 **A recorded receipt is not removed while its trip is there** (review 1, В1, В2): its row dates the trip
 on the accounts, names it «из чека», names its seller's place and guards against a second record —
@@ -405,7 +413,7 @@ They were `SET NULL`, so that a receipt whose trip was removed for good could be
 lines (В7) — but the phone draws no recorded receipt, so nobody could, and what a person removed lay on
 the server, unseen, until erasure. The paper is recorded again by a new shot: its twin went with the
 trip. A trip only marked removed keeps its receipt whole, and «Вернуть» brings both back; until then
-«Записать» is a 409. **A line not recorded goes at «Записать»** (MOL-240, В-2): nobody sees it once the
+«Записать» of that very receipt is a 409 — a new shot of the paper is another receipt, Т-11 above. **A line not recorded goes at «Записать»** (MOL-240, В-2): nobody sees it once the
 receipt is recorded, and what it costs is counted at that moment — so a recorded receipt's lines have
 gaps, and a line is found by its `position`, never its place in a list (`codesAgain`; the wire carries
 no position, so a recorded receipt's `lines` are never read by their place). The minute timer deletes a

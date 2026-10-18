@@ -82,7 +82,10 @@ The detail behind the trip lines of `CLAUDE.md`.
   selected and history trips, «one open», the purchases, «Оценки», «Что брать» — other people's
   aggregates too — the month of «Деньги», the accounts, the hint of an exchange and the recent
   places; one integration test asks all of them about one trip before, during and after. An open
-  trip brought back while another is open is `409 error.trip_open`. On the phone removal and
+  trip brought back while another is open is `409 error.trip_open`; a trip recorded from a receipt
+  the person has since recorded again by a new shot is `409 error.receipt_recorded_before`
+  (MOL-254, `receipts.md`) — one paper is one record, and the phone names that reason of its own,
+  never «ten minutes are over». On the phone removal and
   «Вернуть» are writes of the trip's queue (`delete`, `restore`): the trip's waiting writes are taken
   out and handed back by «Вернуть», the removal is sent **always** — 404 is done — and a trip whose
   removal waits is shown nowhere. **The removal stands where the trip's first write stood, and
