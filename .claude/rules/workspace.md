@@ -256,8 +256,13 @@ of the measure and with every test merged. So CI checks every run instead (owner
   `setTimerTickMode` a call in the file's body, a callback or a function of the file — not a reference
   handed to a hook or kept under another name, not a string, a method or a class — no hook or test imported
   under another name, no fixture (`test.extend`, run after `beforeEach`), no hook given anything but a function
-  of the file, and no setup file of the run that touches the timers (`setupFiles`, read by the check's own
-  run). Anywhere else no bound in the file is let go as fake. Each round found the parse reading «what touches
+  of the file, no `vi.setConfig` (it changes what a later `useFakeTimers()` fakes), no `it.beforeEach`, no
+  timer call handed to a call that keeps it for later (`cleanups.push(() => vi.useRealTimers())`), no
+  concurrent tests — the clocks are one — and no config of the file's directory that sets `fakeTimers`, runs
+  tests concurrently or has a setup file that touches the timers, itself or by what it imports (`./…`,
+  `@/…`; read by the check's own run, `unsureDirectories`; adversarial rounds 6–7, review №19). A callback
+  counts as run where it is written only when the call is known to run it before it settles — `vi.waitFor`,
+  `vi.waitUntil`, `expect.poll`, an awaited `then` — not any awaited call, which may only keep it (Ж4). Anywhere else no bound in the file is let go as fake. Each round found the parse reading «what touches
   the timers» by a name, and a name has more spellings than any list: this ends the class, not a spelling. `useRealTimers()` lets
   go, `toFake` and `toNotFake` choose, `shouldAdvanceTime` and any tick mode but `manual`
   (`vi.setTimerTickMode`) move the fake clock with the real one, so it is real, `vi.setSystemTime` alone fakes
