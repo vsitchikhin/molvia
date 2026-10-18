@@ -249,8 +249,16 @@ of the measure and with every test merged. So CI checks every run instead (owner
   own statements before the bound, a helper of the file they call included. What may not run — a branch, a
   loop, a try that may stop anywhere — keeps only what both ways hold still; a `finally` always runs; anything
   else that may touch the timers — `? :`, `&&`, a callback handed to a call, a function called where it
-  stands — lets them go (review №17, Д4). A bound in a hook, a helper, `onTestFinished` or a callback handed
-  to a function of the file that touches the timers starts from real clocks: what runs around it is not read. `useRealTimers()` lets
+  stands — lets them go (review №17, Д4). A bound in a hook, a helper, `onTestFinished`, a callback not awaited
+  where it is written (Е4) or one handed to a function of the file that touches the timers starts from real
+  clocks: what runs around it is not read. **And a file is read so only where it touches the timers in ways
+  the order can be read in** (adversarial round 6): every mention of `useFakeTimers`, `useRealTimers` or
+  `setTimerTickMode` a call in the file's body, a callback or a function of the file — not a reference
+  handed to a hook or kept under another name, not a string, a method or a class — no hook or test imported
+  under another name, no fixture (`test.extend`, run after `beforeEach`), no hook given anything but a function
+  of the file, and no setup file of the run that touches the timers (`setupFiles`, read by the check's own
+  run). Anywhere else no bound in the file is let go as fake. Each round found the parse reading «what touches
+  the timers» by a name, and a name has more spellings than any list: this ends the class, not a spelling. `useRealTimers()` lets
   go, `toFake` and `toNotFake` choose, `shouldAdvanceTime` and any tick mode but `manual`
   (`vi.setTimerTickMode`) move the fake clock with the real one, so it is real, `vi.setSystemTime` alone fakes
   `Date`, options the parse cannot read whole — a name, a spread, a name in a list — leave every clock real, and
