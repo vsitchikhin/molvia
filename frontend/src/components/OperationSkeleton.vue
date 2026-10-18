@@ -1,6 +1,6 @@
 <template>
   <div class="cards">
-    <div v-for="n in count" :key="n" class="entry">
+    <div v-for="(plate, n) in plates" :key="n" class="entry">
       <span class="day"></span>
       <span class="sums"><span class="sum"></span><span class="sum"></span></span>
       <span v-if="plate" class="plate"></span>
@@ -10,6 +10,7 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue'
+import type { PropType } from 'vue'
 
 /**
  * The cards of exchanges or incomes that are coming, drawn in the slot of `ScreenSkeleton` so the list
@@ -19,9 +20,11 @@ import { defineComponent } from 'vue'
 export default defineComponent({
   name: 'OperationSkeleton',
   props: {
-    count: { type: Number, default: 2 },
-    /** An exchange always has its plate of rates; an income only sometimes. */
-    plate: { type: Boolean, default: true },
+    /**
+     * A card a value, whether it has its plate: an exchange always has its plate of rates, an income
+     * only with an account or a note — so «Доходы» draw one with and one without (MOL-188, Р-7).
+     */
+    plates: { type: Array as PropType<readonly boolean[]>, default: () => [true, true] },
   },
 })
 </script>

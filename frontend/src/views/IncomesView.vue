@@ -54,9 +54,13 @@
       </div>
     </template>
 
-    <!-- The shape of what is coming: cards of incomes under the month (handoff 03). -->
-    <ScreenSkeleton v-if="phase === 'loading'" :groups="[32]">
-      <OperationSkeleton :plate="false" />
+    <!-- The shape of what is coming, in the order it will stand (Ф-13, frame incomes-loading): a month
+         and two cards, one with its plate and one without, then a month and a card with its plate. -->
+    <ScreenSkeleton v-if="phase === 'loading'">
+      <SkeletonPart kind="caption" :width="22" />
+      <OperationSkeleton :plates="[true, false]" />
+      <SkeletonPart kind="caption" :width="18" />
+      <OperationSkeleton :plates="[true]" />
     </ScreenSkeleton>
 
     <template v-else-if="phase !== 'idle'">
@@ -160,6 +164,7 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import { asTyped } from '@/components/spending'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import type { AmendOutcome } from '@/composables/useExchanges'
@@ -187,6 +192,7 @@ export default defineComponent({
     ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    SkeletonPart,
     StatusStrip,
   },
   setup() {

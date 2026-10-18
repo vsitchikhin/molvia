@@ -122,6 +122,15 @@ describe('IncomesView: the four states', () => {
     const view = await render()
     expect(view.find('.skeleton').exists()).toBe(true)
     expect(view.text()).not.toContain(en.income.record)
+    // The answer's shape (Ф-13): a month, a card with its plate and one without, a month, a card
+    // with its plate — no paragraphs of `groups`.
+    const parts = view
+      .findAll('.skeleton-caption, .entry')
+      .map((part) =>
+        part.classes('entry') ? (part.find('.plate').exists() ? 'plate' : 'card') : 'month',
+      )
+    expect(parts).toEqual(['month', 'plate', 'card', 'month', 'plate'])
+    expect(view.find('.skeleton-lines').exists()).toBe(false)
   })
 
   it('a failed read is red with «Try again», and trying again reads again', async () => {
