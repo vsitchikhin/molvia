@@ -262,10 +262,16 @@ of the measure and with every test merged. So CI checks every run instead (owner
   suite takes under a name or from a call, a timeout named by a number of the file excepted — the clocks are
   one — and no config of the file's directory that names `fakeTimers`, `concurrent` anywhere but as
   `concurrent: false`, `extends`, reads a file or takes settings from a file of this repository, or has a setup
-  file that touches the timers, itself or by what it imports statically, by `import()` or `require` — `./…`,
-  `@/…`, a workspace package and a `#…` subpath followed by their `package.json`, as Node resolves them;
-  anything that leads nowhere, an import by what is not a quoted string and a glob unsure (read by the check's
-  own run, `unsureDirectories`; adversarial rounds 6–9, review №19–22). A function of the file that touches
+  file that touches the timers, itself or by what it imports — `./…`, `@/…`, a workspace package and a `#…`
+  subpath followed by their `package.json`, as Node resolves them. A config and a setup file are parsed, and
+  each counts as read only where every module it loads is a static `import … from '…'` or `import '…'`: an
+  `import()`, a `require`, `createRequire`, `vi.importActual`, `import.meta.glob`, anything that leads nowhere
+  is unsure (review №23). No command line of the repository may give vitest a setting either — a word after
+  `vitest` other than the command, a config, a project, a report or a file (`--sequence.concurrent`) leaves
+  every directory unsure (read by the check's own run, `unsureDirectories`, `vitestFlagsUnsure`; adversarial
+  rounds 6–10, review №19–23). Nor may a file put a clock back by hand — `vi.stubGlobal`,
+  `Object.defineProperty(globalThis, …)`, a spy on a clock, an assignment to one — or call the timers in a
+  default of a parameter, which runs at the call (К1, К2). A function of the file that touches
   the timers, named anywhere but as a call or handed to a hook — in an array, a field, an alias, handed to a
   call that keeps it — is as a timer call kept there (З2, И1). A callback
   counts as run where it is written only when the call is known to run it before it settles — `vi.waitFor`,
