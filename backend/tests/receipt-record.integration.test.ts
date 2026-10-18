@@ -3,7 +3,9 @@ import { and, asc, eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { ERROR, receiptRecordedCodec, tripHistoryCodec, tripViewCodec } from '@molvia/model'
+import { drizzle } from 'drizzle-orm/postgres-js'
 import type { FastifyInstance } from 'fastify'
+import postgres from 'postgres'
 import { createExpenseRepository } from '@/db/expenses-repository'
 import { createMoneyRepository } from '@/db/money-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
@@ -20,9 +22,10 @@ import {
   trips,
 } from '@/db/schema'
 import { settleStoreMemory } from '@/db/store-memory-repository'
+import * as schema from '@/db/schema'
 import { createTripRepository } from '@/db/trips-repository'
 import { buildServer } from '@/server'
-import { connect, connectDrizzle } from './db'
+import { connect, connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtures'
 
 /**
@@ -460,20 +463,79 @@ describe('«Записать»', () => {
       expect([gone.statusCode, codeOf(gone)]).toEqual([404, ERROR.NOT_FOUND])
     })
 
-    it('lets one of «Записать» and «Вернуть» through when they come at once', async () => {
-      const me = await insertActor(db)
-      const first = await recorded(me)
-      expect((await trip(me, first, 'DELETE')).statusCode).toBe(204)
-      const shot = await parsedReceipt(me, LINES.slice(0, 1))
-      const answers = await Promise.all([
-        record(me, shot, recordBody(randomUUID())),
-        trip(me, first, 'restore'),
-      ])
-      expect(answers.map((answer) => answer.statusCode).sort()).toEqual([200, 409])
-      const refused = answers.find((answer) => answer.statusCode === 409)
-      expect(refused && codeOf(refused)).toBe(ERROR.RECEIPT_RECORDED_BEFORE)
-      expect(await alive(me)).toHaveLength(1)
-    })
+    // Т-4: the two wait on the owner's lock in an order the test sets, on a pool of their own as in
+    // production — the file's one connection would line them up and the lock would never be waited
+    // on (adversarial А1); a check read before the lock lets both through, so the first case is red
+    it.each([
+      ['«Записать»', [200, 409]],
+      ['«Вернуть»', [409, 200]],
+    ] as const)(
+      'lets one of «Записать» and «Вернуть» through, %s first',
+      async (firstIn, expected) => {
+        const me = await insertActor(db)
+        const first = await recorded(me)
+        expect((await trip(me, first, 'DELETE')).statusCode).toBe(204)
+        const shot = await parsedReceipt(me, LINES.slice(0, 1))
+        const cookie = await signIn(db, me)
+
+        const pool = postgres(testDatabaseUrl(), { max: 4, onnotice: () => undefined })
+        const racing = buildServer({ db: drizzle(pool, { schema }), receiptReader: null })
+        await racing.ready()
+        const holder = connect()
+        const watcher = connect()
+        const waiting = async (n: number) => {
+          for (let tries = 0; tries < 500; tries += 1) {
+            const [row] = await watcher<{ n: number }[]>`
+            select count(*)::int as n from pg_stat_activity
+            where wait_event_type = 'Lock' and wait_event = 'advisory' and datname = current_database()
+          `
+            if ((row?.n ?? 0) >= n) return
+            await new Promise((resolve) => setTimeout(resolve, 10))
+          }
+          throw new Error(`fewer than ${String(n)} waiting on the owner's lock`)
+        }
+        const recordShot = () =>
+          racing.inject({
+            method: 'POST',
+            url: `/receipts/${shot}/record`,
+            headers: { cookie, 'x-molvia-today': '2026-10-03' },
+            payload: recordBody(randomUUID()),
+          })
+        const restoreFirst = () =>
+          racing.inject({ method: 'POST', url: `/trips/${first}/restore`, headers: { cookie } })
+
+        let release: () => void = () => undefined
+        let locked: () => void = () => undefined
+        const holding = new Promise<void>((resolve) => (locked = resolve))
+        const held = holder.begin(async (tx) => {
+          await tx`select pg_advisory_xact_lock(hashtext('trips'), hashtext(${me}))`
+          locked()
+          await new Promise<void>((resolve) => (release = resolve))
+        })
+        try {
+          await holding
+          const recordFirst = firstIn === '«Записать»'
+          const one = recordFirst ? recordShot() : restoreFirst()
+          await waiting(1)
+          const two = recordFirst ? restoreFirst() : recordShot()
+          await waiting(2)
+          release()
+          await held
+          const [recordedNow, restored] = recordFirst
+            ? [await one, await two]
+            : [await two, await one]
+          expect([recordedNow.statusCode, restored.statusCode]).toEqual(expected)
+          const refused = recordedNow.statusCode === 409 ? recordedNow : restored
+          expect(codeOf(refused)).toBe(ERROR.RECEIPT_RECORDED_BEFORE)
+          expect(await alive(me)).toHaveLength(1)
+        } finally {
+          release()
+          await held.catch(() => undefined)
+          await racing.close()
+          await Promise.all([pool.end(), holder.end(), watcher.end()])
+        }
+      },
+    )
   })
 
   it('refuses a receipt not read yet, lines that are not the receipt’s, and a day to come', async () => {
