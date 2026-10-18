@@ -176,7 +176,8 @@ export async function recordReceipt(
     }
     // recorded: the same trip again is the same answer while it is there; a trip marked removed may
     // still come back with «Вернуть». One removed for good takes the receipt with it (MOL-240): the
-    // paper is recorded again by a new shot, its twin gone with the trip
+    // paper is recorded again by a new shot, its twin gone with the trip. A new shot is recorded
+    // while the trip is only marked too, and then that trip's «Вернуть» is refused (MOL-254)
     if (held.tripId !== null) {
       if (held.tripId === body.tripId && held.tripAlive) {
         const again = await answer(body.tripId)

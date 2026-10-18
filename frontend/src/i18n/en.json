@@ -74,7 +74,8 @@
       "restored": "The entry is back",
       "not_restored": "The entry did not come back: {name}",
       "not_restored_open": "Another entry was started meanwhile, and only one can be open",
-      "not_restored_gone": "More than ten minutes have passed — the entry is deleted for good"
+      "not_restored_gone": "More than ten minutes have passed — the entry is deleted for good",
+      "not_restored_recorded": "This receipt was recorded again meanwhile, and one receipt is recorded only once"
     },
     "empty": {
       "title": "The entry has started",

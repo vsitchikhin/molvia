@@ -21,7 +21,8 @@ export async function removeTrip(
 /**
  * «Вернуть»: the trip whole, as every answer about a trip is. Past its ten minutes it is gone; an
  * open one while another trip is open is `TRIP_OPEN` (Р-4) — unless it is brought back finished
- * (round 3, В1). The device's moment is judged as `finishTrip` judges it: dropped, not refused.
+ * (round 3, В1); one whose receipt was recorded again meanwhile is `RECEIPT_RECORDED_BEFORE`
+ * (MOL-254). The device's moment is judged as `finishTrip` judges it: dropped, not refused.
  */
 export async function restoreTrip(
   deps: CurrentTripDeps,
