@@ -33,8 +33,9 @@ test('an income lands in its month, is amended with a trace, and comes back afte
   await sheet.getByRole('button', { name: 'Сохранить доход' }).click()
   await expect(sheet).toBeHidden()
 
-  // The month and its sum, by the heading — the server's figure, not the phone's.
-  await expect(page.getByRole('heading', { name: /\d{4} 99 615 ₽/ })).toBeVisible()
+  // The month and its sum, by the heading — the server's figure, not the phone's; this year's month
+  // is named without its year (MOL-188, В-2 «а»).
+  await expect(page.getByRole('heading', { name: /^[а-яё]+ 99 615 ₽$/ })).toBeVisible()
   const row = page.locator('button.body')
   await expect(row).toContainText('Зарплата')
   await expect(row).toContainText('Викаса')
@@ -46,7 +47,7 @@ test('an income lands in its month, is amended with a trace, and comes back afte
   await sheet.getByLabel('Сумма').fill('102345')
   await sheet.getByRole('button', { name: 'Сохранить правку' }).click()
   await expect(sheet).toBeHidden()
-  await expect(page.getByRole('heading', { name: /\d{4} 102 345 ₽/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^[а-яё]+ 102 345 ₽$/ })).toBeVisible()
   // «исправлен» stands in the card's head, beside the day, outside the button (MOL-81).
   await expect(page.locator('article .amended')).toContainText('исправлен')
   await row.click()
@@ -61,7 +62,7 @@ test('an income lands in its month, is amended with a trace, and comes back afte
   await sheet.getByRole('button', { name: 'Удалить доход' }).click()
   await expect(page.getByRole('heading', { name: 'Доходов пока нет' })).toBeVisible()
   await page.getByRole('button', { name: 'Вернуть' }).click()
-  await expect(page.getByRole('heading', { name: /\d{4} 102 345 ₽/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^[а-яё]+ 102 345 ₽$/ })).toBeVisible()
   await expect(page.locator('article .amended')).toContainText('исправлен')
 })
 
@@ -115,4 +116,107 @@ test('drams that came in with no rate of their day make the wallet unknown, and 
   expect(started.status()).toBe(201)
   // No rate of the person's own, and no cached official rate either.
   expect(await started.json()).toMatchObject({ rate: null })
+})
+
+/**
+ * «Записать доход» is the strip's over the tab bar, not a button floating over the list (MOL-188,
+ * Ф-28): at the end of the scroll the last card ends above the strip, and without a connection the
+ * button stays, not now, saying why on itself, under one line of the connection (Ф-6, Ф-14, Р-1).
+ */
+test('«Записать доход» stands in the strip: the last card ends above it, offline it says why', async ({
+  page,
+  context,
+}) => {
+  await page.setViewportSize({ width: 390, height: 640 })
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('link', { name: 'Доходы' }).click()
+  await expect(page.getByRole('heading', { name: 'Доходов пока нет' })).toBeVisible()
+  // The empty screen offers it in the strip too, and nowhere else (Ф-16).
+  const record = page.locator('.dock').getByRole('button', { name: 'Записать доход', exact: true })
+  await expect(record).toBeVisible()
+  await expect(page.getByRole('button', { name: /Записать доход/ })).toHaveCount(1)
+
+  const sheet = page.locator('dialog[open]')
+  for (const [amount, note] of [
+    ['99615', 'за сентябрь'],
+    ['20385', ''],
+    ['150000', 'аванс'],
+  ] as const) {
+    await record.click()
+    await expect(sheet).toContainText('Сколько и когда пришло')
+    await page.waitForTimeout(400)
+    await sheet.getByLabel('Сумма').fill(amount)
+    await sheet.getByLabel('Откуда').selectOption('salary')
+    if (note) await sheet.getByLabel('Заметка').fill(note)
+    await sheet.getByRole('button', { name: 'Сохранить доход' }).click()
+    await expect(sheet).toBeHidden()
+  }
+  await expect(page.locator('article')).toHaveCount(3)
+
+  await page.evaluate(() => {
+    window.scrollTo(0, document.documentElement.scrollHeight)
+  })
+  await page.waitForTimeout(300)
+  const [last, dock] = await Promise.all([
+    page.locator('article').last().boundingBox(),
+    page.locator('.dock').boundingBox(),
+  ])
+  expect((last?.y ?? 0) + (last?.height ?? 0)).toBeLessThanOrEqual(dock?.y ?? 0)
+
+  await context.setOffline(true)
+  // The strip's own node: its words are said in the live region too (MOL-181, В1 of MOL-187).
+  const strip = page.locator('.strip', { hasText: /Без связи · доходы на/ })
+  await expect(strip).toHaveText(/^Без связи · доходы на .+\d:\d\d$/)
+  const offline = page
+    .locator('.dock')
+    .getByRole('button', { name: 'Записать доход можно со связью' })
+  await expect(offline).toHaveAttribute('aria-disabled', 'true')
+  // Playwright itself counts an `aria-disabled` button as disabled: the tap is forced, as a finger's.
+  await offline.click({ force: true })
+  await page.waitForTimeout(400)
+  await expect(sheet).toHaveCount(0)
+
+  await context.setOffline(false)
+  await expect(record).toBeVisible()
+  await expect(record).not.toHaveAttribute('aria-disabled', 'true')
+  await expect(strip).toBeHidden()
+})
+
+/**
+ * The hint of «Заметка» is whole in its field (MOL-188, Е-11): a placeholder is one line and never
+ * wraps, so the words must fit the field of a 360 px phone — in either language, set in the field's
+ * own face, size and spacing.
+ */
+test('the hint of the income’s note fits its field on a 360 px phone, in both languages', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 740 })
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('link', { name: 'Доходы' }).click()
+  await page.locator('.dock').getByRole('button', { name: 'Записать доход', exact: true }).click()
+  const note = page.locator('dialog[open]').getByLabel('Заметка')
+  await expect(note).toHaveAttribute('placeholder', 'Например, «за сентябрь»')
+  // The English words of `income.sheet.note_placeholder`, drawn beside the Russian ones.
+  const texts = [(await note.getAttribute('placeholder')) ?? '', 'For example, «for September»']
+  const room = await note.evaluate(async (field: HTMLInputElement, words: string[]) => {
+    await document.fonts.ready
+    const style = getComputedStyle(field)
+    const inner = field.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+    return words.map((text) => {
+      const probe = document.createElement('span')
+      for (const key of ['fontFamily', 'fontSize', 'fontWeight', 'letterSpacing'] as const) {
+        probe.style[key] = style[key]
+      }
+      probe.style.whiteSpace = 'pre'
+      probe.style.position = 'absolute'
+      probe.textContent = text
+      document.body.append(probe)
+      const width = probe.getBoundingClientRect().width
+      probe.remove()
+      return inner - width
+    })
+  }, texts)
+  for (const left of room) expect(left).toBeGreaterThan(0)
 })
