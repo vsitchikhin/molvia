@@ -911,7 +911,7 @@ describe('rawBounds', () => {
       "const define = Object.defineProperty\nbeforeEach(() => {\nvi.useFakeTimers()\ndefine(globalThis, 'performance', { value: REAL_CLOCK })\n})",
       'const g = globalThis\nbeforeEach(() => {\nvi.useFakeTimers()\ng.performance = REAL_CLOCK\n})',
     ].map((back) => [
-      `the clock put back under another name: ${back.split('\n')[0]}`,
+      `the clock put back under another name: ${back.slice(0, back.indexOf('\n'))}`,
       `${back}\nit('x', async () => {\n${REAL}\n})`,
     ]),
   ])('finds a bound on real time beside fake timers — %s', (_, source) => {
