@@ -673,13 +673,20 @@ set of rules — the task's own «as for exchanges in MOL-40» predates MOL-42's
   vanished income then say they will show it once the server is reached (`*_stale`, by `behind`), never
   «показываем, как он записан» over the list from before. **A month is captioned without its year when
   it is the phone's year** («СЕНТЯБРЬ», «ДЕКАБРЬ 2025», owner's В-2 «а»): the handoff drew no year, and
-  a journal reaches back across years. The year is the later of the screen's day and the clock's
-  (`shownDay`, as `answeredAt`, adversarial А1): a screen held past New Year's midnight and drawn again
-  by a write's answer said «ЯНВАРЬ 2027» over «ДЕКАБРЬ». **The skeleton's cards are an income's**
-  (`OperationSkeleton form="income"`, А2): drawn as an exchange's, a card with no plate stood 65 px for
-  one of 95 and the second month came 120 px lower. **The price, named:** the first card comes 3 px
-  lower than its bars — the caption holds its sum of 13 beside words of 11, the kit's caption bar does
-  not — and each card 2 px taller, by the hairline the bars do not draw.
+  a journal reaches back across years. **The captions and the cards speak by one day**, the later of
+  the screen's and the clock's (`shownDay`, as `answeredAt`, adversarial А1, Б1): a screen held past
+  New Year's midnight and drawn again by a write's answer said «ЯНВАРЬ 2027» over «ДЕКАБРЬ», and then
+  «DECEMBER 2026» over a card of the 31st that said «Today». **The skeleton's cards are an income's**
+  (`OperationSkeleton form="income"`, А2), **their plates by whether the person has an account** (Б2):
+  with one a new income lands on it untouched, so every card has its plate — the account and a note,
+  the account; the account (frame incomes-light); with none — a note, nothing; a note (frame
+  incomes-loading). The accounts come from the phone's memory before their answer. Drawn as an
+  exchange's card, one with no plate stood 65 px for 95 and the second month came 120 px lower; drawn
+  as a person's with no account, an owner's came 78 px lower. **The price, named:** each card comes
+  3 px lower than its bars for every month caption above it — the caption holds its sum of 13 beside
+  words of 11, the kit's caption bar does not — and 2 px for every card above it, by the hairline the
+  bars do not draw; a card whose plate has more or fewer lines than the shape is taller or shorter by
+  that line.
 
 ## Which side a rate is printed on
 
