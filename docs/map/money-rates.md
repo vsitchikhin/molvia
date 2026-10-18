@@ -70,7 +70,7 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 ## frontend · views
 
 - `frontend/src/views/ExchangeView.vue` — «Обмен денег» screen under «Деньги»: «Обмены против рынка» and the line of the rate on top, the own rate, which rate trips take, and the list of exchanges beside the market.
-- `frontend/src/views/IncomesView.vue` — «Доходы» screen under «Деньги»: incomes by month with the per-currency sums, recording, amending and «Вернуть».
+- `frontend/src/views/IncomesView.vue` — «Доходы» screen under «Деньги»: incomes by month with the per-currency sums, recording from the docked strip, amending and «Вернуть»; the connection in one `StatusStrip` (MOL-188).
 
 ## frontend · components
 
@@ -83,15 +83,15 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 - `frontend/src/components/IncomeSheet.vue` — «Записать доход» sheet: amount, currency, source, day, «сколько было до» where it weighs; also amends an income.
 - `frontend/src/components/MarketRatesCard.vue` — «Курсы по данным ЦБ РА» on «Обмен денег» (MOL-137): per currency the official rate and each channel's latest figures to sell and to buy, dated, the best starred and said.
 - `frontend/src/components/OperationCardHead.vue` — Head of an exchange or income card: the day, «исправлен …» and the bin, kept outside the card's button.
-- `frontend/src/components/OperationSkeleton.vue` — Loading placeholder drawn in `ScreenSkeleton`'s slot so the list does not jump: the cards of exchanges or incomes (the rows of an operation are `SkeletonPart`'s, MOL-178).
+- `frontend/src/components/OperationSkeleton.vue` — Loading placeholder drawn in `ScreenSkeleton`'s slot so the list does not jump: the cards of exchanges or incomes, each in its own card's geometry (`form`) and with the lines of its plate (`plates`, MOL-188) (the rows of an operation are `SkeletonPart`'s, MOL-178).
 
 ## frontend · composables
 
 - `frontend/src/composables/useExchangeWords.ts` — Composable: the words an exchange is said in — on its card, the undo strip and the removal sheet — from the server's figures.
 - `frontend/src/composables/useExchanges.ts` — Composable: «Обмен денег» state from the server — phase, overview, writes, amend outcome and «Вернуть» after removal.
-- `frontend/src/composables/useIncomes.ts` — Composable: «Доходы» state from the server — phase, overview, record, amend, remove and «Вернуть».
+- `frontend/src/composables/useIncomes.ts` — Composable: «Доходы» state from the server — phase, overview, record, amend, remove and «Вернуть», and when the server last answered (`fetchedAt`, `stale`, `behind`, `attempt`, MOL-188).
 
 ## e2e
 
 - `e2e/exchange.spec.ts` — End-to-end: an exchange recorded on screen becomes the next trip's rate, the chain carries through, amendments and long amounts hold; the line of the rate by the finger and by period.
-- `e2e/incomes.spec.ts` — End-to-end: an income lands in its month, is amended with a trace, comes back after removal, and an unknown cost is said.
+- `e2e/incomes.spec.ts` — End-to-end: an income lands in its month, is amended with a trace, comes back after removal, and an unknown cost is said; «Записать доход» in the docked strip, not now offline; the note's hint whole at 360 in both languages; the skeleton's cards where the answer's come, over two months, with an account and without (MOL-188).
