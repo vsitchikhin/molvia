@@ -299,7 +299,8 @@ export default defineComponent({
       lineOf,
       sumsOf,
       whenOf,
-      monthOf: (month: string) => monthOf(month, locale.value),
+      // The year only where it is not the phone's (В-2 «а»).
+      monthOf: (month: string) => monthOf(month, locale.value, today.value),
       IconCashPlus,
     }
   },
@@ -345,14 +346,15 @@ export default defineComponent({
   color: var(--bad-ink);
 }
 
+// Months 24 apart, the cards of a month 8 apart and 8 under its caption (Ф-10): the caption's own 8.
 .month + .month {
-  margin-top: var(--space-4);
+  margin-top: var(--space-6);
 }
 
 .cards {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;

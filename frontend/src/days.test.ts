@@ -96,6 +96,15 @@ describe('monthOf (MOL-66)', () => {
     expect(monthOf('2027-01', 'ru')).toBe('январь 2027')
     expect(monthOf('2026-12', 'en')).toBe('December 2026')
   })
+
+  it('leaves out the year of the day it is shown on, and only that year (MOL-188, В-2)', () => {
+    expect(monthOf('2026-09', 'ru', '2026-10-18')).toBe('сентябрь')
+    expect(monthOf('2026-09', 'en', '2026-10-18')).toBe('September')
+    // The year before and the one after are said, the first day of the year too.
+    expect(monthOf('2025-12', 'ru', '2026-01-01')).toBe('декабрь 2025')
+    expect(monthOf('2027-01', 'ru', '2026-12-31')).toBe('январь 2027')
+    expect(monthOf('2026-01', 'ru', '2026-01-01')).toBe('январь')
+  })
 })
 
 describe('localDay (MOL-121)', () => {

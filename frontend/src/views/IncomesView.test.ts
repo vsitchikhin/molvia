@@ -131,7 +131,7 @@ describe('IncomesView: the four states', () => {
     const retry = view.findAll('button').find((button) => button.text() === en.state.retry)
     await retry?.trigger('click')
     await flushPromises()
-    expect(view.text()).toContain('September 2026')
+    expect(view.text()).toContain('September')
   })
 
   it('offline is never red and offers no button — the screen comes back by itself', async () => {
@@ -172,6 +172,8 @@ describe('IncomesView: the four states', () => {
 
 describe('IncomesView: the months (В-2)', () => {
   it('names each month with what came in per currency, as the server summed it', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-18T09:00:00Z'))
     incomes.mockResolvedValue(
       overview({
         months: [
@@ -192,14 +194,24 @@ describe('IncomesView: the months (В-2)', () => {
               }),
             ],
           },
+          {
+            month: '2025-12',
+            sums: [{ minor: 100_000n, currency: 'RUB' }],
+            incomes: [
+              row({ id: '5d1c6a2b-3e4f-4a5b-8c6d-7e8f9a0b1c30', receivedOn: '2025-12-10' }),
+            ],
+          },
         ],
       }),
     )
     const view = await render()
+    vi.useRealTimers()
     const heads = view.findAll('.month-head').map((head) => head.text())
-    // Whole sums as they would be typed, as everywhere in «Деньги» (MOL-81, В-1).
-    expect(heads[0]).toMatch(/^September 2026₽99,615$/)
-    expect(heads[1]).toMatch(/^August 2026₽137,540 · \$500$/)
+    // Whole sums as they would be typed, as everywhere in «Деньги» (MOL-81, В-1); the year only
+    // where it is not this one (MOL-188, В-2 «а»).
+    expect(heads[0]).toMatch(/^September₽99,615$/)
+    expect(heads[1]).toMatch(/^August₽137,540 · \$500$/)
+    expect(heads[2]).toMatch(/^December 2025₽1,000$/)
     expect(view.text()).toContain(en.income.source.freelance)
   })
 
@@ -341,7 +353,7 @@ describe('IncomesView: recording, amending and removing', () => {
         source: 'salary',
       }),
     )
-    expect(view.text()).toContain('September 2026')
+    expect(view.text()).toContain('September')
   })
 
   it('a correction sent under the old name is said and the list read again (В-6)', async () => {

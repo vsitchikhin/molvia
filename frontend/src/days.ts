@@ -56,10 +56,12 @@ export function answeredAt(at: Date, locale: string, today = localDay(), now = n
 }
 
 /**
- * A month of «Доходы» (MOL-66): «сентябрь 2026» from `2026-09`. The month and the year only —
- * `Intl` adds «г.» to the Russian year, which the caption does not need.
+ * A month: «сентябрь 2026» from `2026-09`. The month and the year only — `Intl` adds «г.» to the
+ * Russian year, which the caption does not need. Given the day it is shown on (`today`), the year of
+ * that day is left out — «сентябрь», «декабрь 2025» — as the months of «Доходы» are captioned (MOL-188,
+ * В-2 «а»): a journal goes back across years, and only another year needs saying.
  */
-export function monthOf(month: string, locale: string): string {
+export function monthOf(month: string, locale: string, today?: string): string {
   const [year = '', number = ''] = month.split('-')
   const parts = new Intl.DateTimeFormat(locale, {
     month: 'long',
@@ -67,6 +69,7 @@ export function monthOf(month: string, locale: string): string {
     timeZone: 'UTC',
   }).formatToParts(new Date(Date.UTC(Number(year), Number(number) - 1, 1)))
   const part = (type: string) => parts.find((one) => one.type === type)?.value ?? ''
+  if (today?.slice(0, 4) === year) return part('month')
   return `${part('month')} ${part('year')}`
 }
 
