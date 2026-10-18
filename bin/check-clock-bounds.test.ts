@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rawBounds } from './check-clock-bounds.mjs'
+import { rawBounds, setupFilesTouchTimers } from './check-clock-bounds.mjs'
 
 const START = `const started = performance.now()\nwork()\n`
 
@@ -570,5 +570,78 @@ describe('rawBounds', () => {
     ],
   ])('leaves alone a bound on fake time — %s', (_, source) => {
     expect(rawBounds('a.test.ts', source)).toEqual([])
+  })
+
+  // review round 6 of MOL-266, adversarial Е1–Е6: a file that touches the timers in a way not read in order lets
+  // no bound go as fake
+  const AFTER_FIRST = `beforeAll(() => {\nvi.useFakeTimers()\n})`
+  it.each([
+    [
+      'afterEach handed vi.useRealTimers itself',
+      `${AFTER_FIRST}\nafterEach(vi.useRealTimers)\nit('first', () => {})\nit('x', async () => {\n${REAL}\n})`,
+    ],
+    [
+      'onTestFinished handed it in the test before',
+      `${AFTER_FIRST}\nit('first', () => {\nonTestFinished(vi.useRealTimers)\n})\nit('x', async () => {\n${REAL}\n})`,
+    ],
+    [
+      'afterEach imported under another name',
+      `import { afterEach as after } from 'vitest'\n${AFTER_FIRST}\nafter(() => {\nvi.useRealTimers()\n})\nit('first', () => {})\nit('x', async () => {\n${REAL}\n})`,
+    ],
+    [
+      'the let-go kept under another name',
+      `const realClock = vi.useRealTimers\nbeforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\nrealClock()\n${REAL}\n})`,
+    ],
+    [
+      'the let-go taken apart under another name',
+      `const { useRealTimers: realClock } = vi\nbeforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\nrealClock()\n${REAL}\n})`,
+    ],
+    [
+      'the let-go by a string',
+      `beforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\nvi['useRealTimers']()\n${REAL}\n})`,
+    ],
+    [
+      'the let-go bound',
+      `const realClock = vi.useRealTimers.bind(vi)\nbeforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\nrealClock()\n${REAL}\n})`,
+    ],
+    [
+      'a method of an object',
+      `const clock = { real() {\nvi.useRealTimers()\n} }\nbeforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\nclock.real()\n${REAL}\n})`,
+    ],
+    [
+      'a static method of a class',
+      `class Clock { static real(): void {\nvi.useRealTimers()\n} }\nbeforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\nClock.real()\n${REAL}\n})`,
+    ],
+    [
+      'a fixture the test asks for',
+      `const it = base.extend<{ real: undefined }>({ real: async ({}, use) => {\nvi.useRealTimers()\nawait use(undefined)\n} })\nbeforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async ({ real }) => {\n${REAL}\n})`,
+    ],
+    [
+      'a callback kept for later, run after the let-go',
+      `beforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\nlet t0 = 0\nconst done = ready.then(() => {\nexpect(performance.now() - t0).toBeLessThan(1_000)\n})\nvi.useRealTimers()\nt0 = performance.now()\nawait done\n})`,
+    ],
+  ])('finds a bound on real time beside fake timers — %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toHaveLength(1)
+  })
+
+  it('lets no bound go as fake where a setup file of the run touches the timers (adversarial Е6)', () => {
+    const source = `beforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\n${FAKE}\n})`
+    expect(rawBounds('a.test.ts', source)).toEqual([])
+    expect(rawBounds('a.test.ts', source, { setupTouchesTimers: true })).toHaveLength(1)
+    const configs = [
+      {
+        path: 'backend/vitest.integration.config.ts',
+        text: "setupFiles: ['./tests/setup-worker.ts']",
+      },
+    ]
+    expect(setupFilesTouchTimers(configs, () => 'export {}')).toBe(false)
+    expect(setupFilesTouchTimers(configs, () => 'afterEach(() => vi.useRealTimers())')).toBe(true)
+    expect(setupFilesTouchTimers(configs, () => undefined)).toBe(true)
+    expect(
+      setupFilesTouchTimers(
+        [{ path: 'vitest.config.ts', text: 'export default {}' }],
+        () => undefined,
+      ),
+    ).toBe(false)
   })
 })

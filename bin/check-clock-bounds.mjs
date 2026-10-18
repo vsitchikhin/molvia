@@ -37,8 +37,11 @@
 // a helper's too, the test's own statements before the bound, a helper of the file they call; what may
 // not run (a branch, a loop, a try) keeps only what both ways hold, a finally always runs, and anything
 // else that may touch the timers — `? :`, `&&`, a callback handed to a call — lets them go; a bound in
-// a hook, a helper, `onTestFinished` or a callback handed to a function that touches the timers starts
-// from real clocks. `useRealTimers()` lets go, `toFake` and `toNotFake` choose,
+// a hook, a helper, `onTestFinished`, a callback not awaited where it is written or one handed to a
+// function that touches the timers starts from real clocks. And all of it only in a file that touches
+// the timers in ways read in order — each a call, in the file's body, a callback or a function of the
+// file — with no reference handed over or kept, no string, method or class, no hook or test under
+// another name, no fixture and no setup file that touches them: else no bound there is let go. `useRealTimers()` lets go, `toFake` and `toNotFake` choose,
 // `shouldAdvanceTime` and a tick mode but `manual` move fake time with the real one, options not read
 // whole leave every clock real; a clock taken under another name keeps the real one.
 //
@@ -51,7 +54,8 @@
 //   node bin/check-clock-bounds.mjs
 
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import process from 'node:process'
 import ts from 'typescript'
 
@@ -123,9 +127,10 @@ function bind(fileName, source) {
  * Every bound on a duration in one file that does not go through `expectWithin`, as `line: text`.
  * @param {string} fileName
  * @param {string} source
+ * @param {{ setupTouchesTimers?: boolean }} [options] — a setup file of the run touches the timers
  * @returns {string[]}
  */
-export function rawBounds(fileName, source) {
+export function rawBounds(fileName, source, { setupTouchesTimers = false } = {}) {
   const { sf, checker } = bind(fileName, source)
 
   /** @type {Map<ts.Symbol, number>} */
@@ -870,10 +875,17 @@ export function rawBounds(fileName, source) {
     ts.isPropertyAccessExpression(call.expression)
       ? call.expression.name.text
       : call.expression.getText(sf)
-  const calleeRoot = (call) => {
-    let e = call.expression
+  const calleeRoot = (call) => calleeRootOf(call.expression)
+  const calleeRootOf = (expression) => {
+    let e = expression
     while (ts.isPropertyAccessExpression(e) || ts.isCallExpression(e)) e = e.expression
     return ts.isIdentifier(e) ? e.text : ''
+  }
+  /** Whether a call is awaited, or its value given, where it stands: its callbacks run there or never. */
+  const awaitedInPlace = (call) => {
+    let n = call.parent
+    while (ts.isParenthesizedExpression(n)) n = n.parent
+    return ts.isAwaitExpression(n) || ts.isReturnStatement(n)
   }
   const TEST = /^(it|test)$/
   const HOOK = /^(before|after|around)(All|Each)$/
@@ -1094,6 +1106,7 @@ export function rawBounds(fileName, source) {
       const root = call ? calleeRoot(call) : ''
       // a callback the test runs as it goes: waitFor(() => …) — not one run after it, nor one handed to a
       // function of the file that touches the timers around it: withRealClock(() => …) (Д4)
+      // — and only one awaited where it is written: `.then(() => …)` kept for later runs whenever (Е4)
       const handedTo = call && functionNamed(call.expression)
       if (
         call &&
@@ -1101,7 +1114,8 @@ export function rawBounds(fileName, source) {
         !SUITE.test(root) &&
         !HOOK.test(root) &&
         !AFTER.test(root) &&
-        !(handedTo?.body && touchesTimers(handedTo.body))
+        !(handedTo?.body && touchesTimers(handedTo.body)) &&
+        awaitedInPlace(call)
       )
         continue
       start = n
@@ -1128,8 +1142,65 @@ export function rawBounds(fileName, source) {
     })
     return state
   }
+  /**
+   * Whether the file touches the timers only in ways read in order (adversarial round 6, Е1–Е6): every
+   * mention of a timer call a call itself, in the file's body, a callback or a function of the file —
+   * never a reference handed over or kept (`afterEach(vi.useRealTimers)`, `const real = vi.useRealTimers`),
+   * a string (`vi['useRealTimers']`), a method or a class; no hook or test under another name, no
+   * fixture (`test.extend`), no hook given anything but a function of the file, no setup file that
+   * touches the timers. Else no bound in the file is let go as fake: what touches the timers is not read.
+   */
+  const readable = (() => {
+    if (setupTouchesTimers) return false
+    let ok = true
+    const named = (fn) =>
+      ts.isFunctionDeclaration(fn) ||
+      ((ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) &&
+        (ts.isVariableDeclaration(fn.parent) || callOf(fn) !== undefined))
+    const look = (n) => {
+      if (!ok) return
+      const text = ts.isIdentifier(n) || ts.isStringLiteralLike(n) ? n.text : undefined
+      if (text !== undefined && TIMERS.has(text)) {
+        const access = n.parent
+        const called =
+          ts.isIdentifier(n) &&
+          ((ts.isPropertyAccessExpression(access) &&
+            access.name === n &&
+            ts.isCallExpression(access.parent) &&
+            access.parent.expression === access) ||
+            (ts.isCallExpression(access) && access.expression === n))
+        const owner = ts.findAncestor(n.parent, ts.isFunctionLike)
+        if (!called || (owner && !named(owner))) ok = false
+      }
+      // import { afterEach as after } from 'vitest'
+      if (
+        ts.isImportSpecifier(n) &&
+        n.propertyName &&
+        /^(it|test|describe|suite|(before|after|around)(All|Each)|onTestFinished|onTestFailed)$/.test(
+          n.propertyName.text,
+        )
+      )
+        ok = false
+      // test.extend({ … }): a fixture runs where vitest puts it, after beforeEach or before
+      if (
+        ts.isPropertyAccessExpression(n) &&
+        n.name.text === 'extend' &&
+        TEST.test(calleeRootOf(n))
+      )
+        ok = false
+      // afterEach(helpers.cleanup): a hook given what the parse cannot read
+      if (ts.isCallExpression(n) && (HOOK.test(calleeRoot(n)) || AFTER.test(calleeRoot(n)))) {
+        const fn = n.arguments[0] && bare(n.arguments[0])
+        if (fn && !ts.isFunctionLike(fn) && !functionNamed(fn)) ok = false
+      }
+      ts.forEachChild(n, look)
+    }
+    look(sf)
+    return ok
+  })()
   /** Whether every clock the values read is one fake timers hold still where the node runs. */
   const fake = (node, read) => {
+    if (!readable) return false
     const kinds = new Set(read.filter(Boolean).flatMap((value) => [...clocksOf(value)]))
     const faked = fakedAt(node)
     return [...(kinds.size > 0 ? kinds : CLOCKS)].every((kind) => faked.has(kind))
@@ -1157,16 +1228,46 @@ export function rawBounds(fileName, source) {
   return found
 }
 
+/**
+ * Whether a setup file of any vitest config touches the timers (adversarial Е6): it runs in every test
+ * file of its run, so its hooks stand between any two tests. One that cannot be read counts as touching.
+ * @param {{ path: string, text: string }[]} configs
+ * @param {(path: string) => string | undefined} read
+ * @returns {boolean}
+ */
+export function setupFilesTouchTimers(configs, read) {
+  return configs
+    .flatMap(({ path, text }) => {
+      const list =
+        /setupFiles\s*:\s*\[([^\]]*)\]/.exec(text)?.[1] ??
+        /setupFiles\s*:\s*(['"][^'"]+['"])/.exec(text)?.[1] ??
+        (/setupFiles/.test(text) ? '"?"' : '')
+      return [...list.matchAll(/['"]([^'"]+)['"]/g)].map((m) => join(dirname(path), m[1]))
+    })
+    .some((setup) => {
+      const text = read(setup)
+      return text === undefined || /useFakeTimers|useRealTimers|setTimerTickMode/.test(text)
+    })
+}
+
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop() ?? '')) {
   const files = execFileSync('git', ['ls-files', ...FILES], { encoding: 'utf8' })
     .trim()
     .split('\n')
     .filter(Boolean)
+  const configs = execFileSync('git', ['ls-files', '*vitest*.config.*'], { encoding: 'utf8' })
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((path) => ({ path, text: readFileSync(path, 'utf8') }))
+  const setupTouchesTimers = setupFilesTouchTimers(configs, (path) =>
+    existsSync(path) ? readFileSync(path, 'utf8') : undefined,
+  )
   const problems = files.flatMap((file) => {
     const source = readFileSync(file, 'utf8')
     // a file that never reads the clock holds no duration: the binder is spared it
     if (!/\.now\b|\bDate\b|hrtime/.test(source)) return []
-    return rawBounds(file, source).map((line) => `  ${file}:${line}`)
+    return rawBounds(file, source, { setupTouchesTimers }).map((line) => `  ${file}:${line}`)
   })
   if (problems.length > 0) {
     console.error(
