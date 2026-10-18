@@ -244,8 +244,8 @@ describe('потолок разбора (адверсариальное А3)', (
       return performance.now() - started
     }
     // The fastest of five: other copies' load on this machine only ever adds time. The base64 of two
-    // megabytes is most of what is left. 25 ms: over ten times CI's worst, 2 ms, and under the walk of
-    // the whole file, 44–94 ms (MOL-266)
+    // megabytes is most of what is left. 25 ms: over ten times CI's worst, 2 ms, and under the walk
+    // of the whole file, 44–94 ms (MOL-266)
     expectWithin(Math.min(...Array.from({ length: 5 }, timed)), 25)
   })
 })

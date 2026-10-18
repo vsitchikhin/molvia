@@ -167,7 +167,11 @@ of the measure and with every test merged. So CI checks every run instead (owner
   ~1.04 against that. Half a second is vitest's 5 s over ten: past it the default limit is less than ten
   times the worst. **The limit is ten times the worst, rounded up to 5 s; the worst is of the runs where the
   test's file was as it is now** (the blob in each run's commit) — the measure of 14.10 found 6 291 ms for a
-  test on its first branch that runs under 300 ms now. **It is a number, the third argument**: Prettier keeps
+  test on its first branch that runs under 300 ms now. **The worst is every printed time of the test, in every
+  run and every attempt of it** — a run cancelled by a new push, a job cut off halfway, the first attempt of a
+  run re-run, which the list of runs leaves out (MOL-243, rounds 19–21): the first measure read none of them,
+  and the fourteen tests they put past ten times were raised on 18.10 — `seed-catalogue`'s dry run to 75 s
+  for 7 119 ms. **It is a number, the third argument**: Prettier keeps
   a test's body where it is for a numeric literal there, and a constant or `{ timeout }` re-indents it — as
   does any `it.each(…)(title, fn, N)` whose title line no longer fits (5 of the 277 given 10 s on 15.10).
 - **The reporter is in the root run only** (`vitest.config.ts`): CI and `make check` run the whole suite
