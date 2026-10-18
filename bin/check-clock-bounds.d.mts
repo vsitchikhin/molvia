@@ -4,7 +4,7 @@ export declare function rawBounds(
   source: string,
   options?: { setupTouchesTimers?: boolean },
 ): string[]
-export declare function setupFilesTouchTimers(
+export declare function unsureDirectories(
   configs: { path: string; text: string }[],
   read: (path: string) => string | undefined,
-): boolean
+): string[]

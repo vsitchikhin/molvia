@@ -41,7 +41,10 @@
 // function that touches the timers starts from real clocks. And all of it only in a file that touches
 // the timers in ways read in order — each a call, in the file's body, a callback or a function of the
 // file — with no reference handed over or kept, no string, method or class, no hook or test under
-// another name, no fixture and no setup file that touches them: else no bound there is let go. `useRealTimers()` lets go, `toFake` and `toNotFake` choose,
+// another name, no fixture, no `vi.setConfig`, no `it.beforeEach`, no timer call kept by a call for
+// later, no concurrent tests, and no config of its directory that sets `fakeTimers`, runs tests
+// concurrently or has a setup file that touches them, or imports what does: else no bound there is let
+// go. A callback runs where it is written only for a call known to run it before it returns. `useRealTimers()` lets go, `toFake` and `toNotFake` choose,
 // `shouldAdvanceTime` and a tick mode but `manual` move fake time with the real one, options not read
 // whole leave every clock real; a clock taken under another name keeps the real one.
 //
@@ -881,12 +884,19 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
     while (ts.isPropertyAccessExpression(e) || ts.isCallExpression(e)) e = e.expression
     return ts.isIdentifier(e) ? e.text : ''
   }
-  /** Whether a call is awaited, or its value given, where it stands: its callbacks run there or never. */
+  /** Whether a call is awaited, or its value given, where it stands. */
   const awaitedInPlace = (call) => {
     let n = call.parent
     while (ts.isParenthesizedExpression(n)) n = n.parent
     return ts.isAwaitExpression(n) || ts.isReturnStatement(n)
   }
+  /** A call that runs its callback before what it returns settles: `vi.waitFor`, a promise's `then`. */
+  const RUNS_NOW = /^(vi\.waitFor|vi\.waitUntil|expect\.poll)$/
+  const runsInPlace = (call) =>
+    awaitedInPlace(call) &&
+    (RUNS_NOW.test(calleeText(call)) ||
+      (ts.isPropertyAccessExpression(call.expression) &&
+        /^(then|catch|finally)$/.test(call.expression.name.text)))
   const TEST = /^(it|test)$/
   const HOOK = /^(before|after|around)(All|Each)$/
   const TIMERS = new Set(['useFakeTimers', 'useRealTimers', 'setTimerTickMode'])
@@ -1106,7 +1116,8 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
       const root = call ? calleeRoot(call) : ''
       // a callback the test runs as it goes: waitFor(() => …) — not one run after it, nor one handed to a
       // function of the file that touches the timers around it: withRealClock(() => …) (Д4)
-      // — and only one awaited where it is written: `.then(() => …)` kept for later runs whenever (Е4)
+      // — and only one awaited where it is written: `.then(() => …)` kept for later runs whenever (Е4) — by
+      // a call that runs it before it returns: an awaited call may only keep it, as `on(handler)` does (Ж4)
       const handedTo = call && functionNamed(call.expression)
       if (
         call &&
@@ -1115,7 +1126,7 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
         !HOOK.test(root) &&
         !AFTER.test(root) &&
         !(handedTo?.body && touchesTimers(handedTo.body)) &&
-        awaitedInPlace(call)
+        runsInPlace(call)
       )
         continue
       start = n
@@ -1148,7 +1159,9 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
    * never a reference handed over or kept (`afterEach(vi.useRealTimers)`, `const real = vi.useRealTimers`),
    * a string (`vi['useRealTimers']`), a method or a class; no hook or test under another name, no
    * fixture (`test.extend`), no hook given anything but a function of the file, no setup file that
-   * touches the timers. Else no bound in the file is let go as fake: what touches the timers is not read.
+   * touches the timers; and (round 7) no `vi.setConfig`, no `it.beforeEach`, no timer call handed to a
+   * call that keeps it for later, no concurrent tests, no config that sets `fakeTimers` or runs tests
+   * concurrently. Else no bound in the file is let go as fake: what touches the timers is not read.
    */
   const readable = (() => {
     if (setupTouchesTimers) return false
@@ -1186,6 +1199,30 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
         ts.isPropertyAccessExpression(n) &&
         n.name.text === 'extend' &&
         TEST.test(calleeRootOf(n))
+      )
+        ok = false
+      if (ts.isCallExpression(n)) {
+        const name = nameOfCall(n)
+        // vi.setConfig({ fakeTimers }): what a later useFakeTimers() fakes is no longer its argument (Ж1)
+        if (name === 'setConfig') ok = false
+        // it.beforeEach(…): a hook under the test's name, registered in its own order (Ж5)
+        if (/^(before|after|around)(All|Each)$/.test(name) && calleeText(n) !== name) ok = false
+        // a timer call kept by an ordinary call for later: cleanups.push(() => vi.useRealTimers()) (Ж3)
+        const root = calleeRoot(n)
+        const ordinary =
+          !TEST.test(root) && !SUITE.test(root) && !HOOK.test(root) && !AFTER.test(root)
+        if (
+          ordinary &&
+          !runsInPlace(n) &&
+          n.arguments.some((a) => ts.isFunctionLike(bare(a)) && touchesTimers(bare(a)))
+        )
+          ok = false
+      }
+      // describe.concurrent, it.concurrent: the tests run side by side, and the clocks are one (№19)
+      if (
+        ts.isPropertyAccessExpression(n) &&
+        n.name.text === 'concurrent' &&
+        (TEST.test(calleeRootOf(n)) || SUITE.test(calleeRootOf(n)))
       )
         ok = false
       // afterEach(helpers.cleanup): a hook given what the parse cannot read
@@ -1229,25 +1266,47 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
 }
 
 /**
- * Whether a setup file of any vitest config touches the timers (adversarial Е6): it runs in every test
- * file of its run, so its hooks stand between any two tests. One that cannot be read counts as touching.
+ * The directories whose test files a vitest config leaves unsure about the timers (adversarial Е6, Ж1, Ж2,
+ * review №19): its setup files — and the files of this repository they import, `./…` and `@/…` — touch
+ * them, or one cannot be read; or it sets `fakeTimers` or runs tests concurrently. A setup file runs in
+ * every test file of its run, so its hooks stand between any two tests.
  * @param {{ path: string, text: string }[]} configs
  * @param {(path: string) => string | undefined} read
- * @returns {boolean}
+ * @returns {string[]}
  */
-export function setupFilesTouchTimers(configs, read) {
+export function unsureDirectories(configs, read) {
+  const TOUCH = /useFakeTimers|useRealTimers|setTimerTickMode|setConfig/
+  const touches = (file, root, seen) => {
+    if (seen.has(file)) return false
+    seen.add(file)
+    const candidates = /\.[cm]?[jt]s$/.test(file)
+      ? [file]
+      : ['.ts', '.mts', '.js', '/index.ts'].map((end) => `${file}${end}`)
+    const text = candidates.map(read).find((t) => t !== undefined)
+    if (text === undefined) return true
+    if (TOUCH.test(text)) return true
+    return [...text.matchAll(/(?:from|import)\s*['"]((?:\.{1,2}\/|@\/)[^'"]+)['"]/g)].some(
+      ([, spec]) =>
+        touches(
+          spec.startsWith('@/') ? join(root, 'src', spec.slice(2)) : join(dirname(file), spec),
+          root,
+          seen,
+        ),
+    )
+  }
   return configs
-    .flatMap(({ path, text }) => {
+    .filter(({ path, text }) => {
+      const root = dirname(path)
+      if (/\bfakeTimers\s*:/.test(text) || /\bconcurrent\s*:\s*true/.test(text)) return true
       const list =
         /setupFiles\s*:\s*\[([^\]]*)\]/.exec(text)?.[1] ??
         /setupFiles\s*:\s*(['"][^'"]+['"])/.exec(text)?.[1] ??
         (/setupFiles/.test(text) ? '"?"' : '')
-      return [...list.matchAll(/['"]([^'"]+)['"]/g)].map((m) => join(dirname(path), m[1]))
+      return [...list.matchAll(/['"]([^'"]+)['"]/g)].some(([, setup]) =>
+        touches(join(root, setup), root, new Set()),
+      )
     })
-    .some((setup) => {
-      const text = read(setup)
-      return text === undefined || /useFakeTimers|useRealTimers|setTimerTickMode/.test(text)
-    })
+    .map(({ path }) => dirname(path))
 }
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop() ?? '')) {
@@ -1260,13 +1319,14 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()
     .split('\n')
     .filter(Boolean)
     .map((path) => ({ path, text: readFileSync(path, 'utf8') }))
-  const setupTouchesTimers = setupFilesTouchTimers(configs, (path) =>
+  const unsure = unsureDirectories(configs, (path) =>
     existsSync(path) ? readFileSync(path, 'utf8') : undefined,
   )
   const problems = files.flatMap((file) => {
     const source = readFileSync(file, 'utf8')
     // a file that never reads the clock holds no duration: the binder is spared it
     if (!/\.now\b|\bDate\b|hrtime/.test(source)) return []
+    const setupTouchesTimers = unsure.some((dir) => dir === '.' || file.startsWith(`${dir}/`))
     return rawBounds(file, source, { setupTouchesTimers }).map((line) => `  ${file}:${line}`)
   })
   if (problems.length > 0) {

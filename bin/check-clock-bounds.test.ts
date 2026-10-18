@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rawBounds, setupFilesTouchTimers } from './check-clock-bounds.mjs'
+import { rawBounds, unsureDirectories } from './check-clock-bounds.mjs'
 
 const START = `const started = performance.now()\nwork()\n`
 
@@ -628,20 +628,66 @@ describe('rawBounds', () => {
     const source = `beforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\n${FAKE}\n})`
     expect(rawBounds('a.test.ts', source)).toEqual([])
     expect(rawBounds('a.test.ts', source, { setupTouchesTimers: true })).toHaveLength(1)
-    const configs = [
-      {
-        path: 'backend/vitest.integration.config.ts',
-        text: "setupFiles: ['./tests/setup-worker.ts']",
-      },
-    ]
-    expect(setupFilesTouchTimers(configs, () => 'export {}')).toBe(false)
-    expect(setupFilesTouchTimers(configs, () => 'afterEach(() => vi.useRealTimers())')).toBe(true)
-    expect(setupFilesTouchTimers(configs, () => undefined)).toBe(true)
+    const files: Record<string, string> = {
+      'backend/tests/setup-worker.ts': "import { testDatabaseUrl } from './db'",
+      'backend/tests/db.ts': "import * as schema from '@/db/schema'",
+      'backend/src/db/schema.ts': "import { pgTable } from 'drizzle-orm/pg-core'",
+      'bot/setup.ts': "import './clock-reset'",
+      'bot/clock-reset.ts': 'afterEach(() => vi.useRealTimers())',
+    }
+    const read = (path: string): string | undefined => files[path]
+    const config = (path: string, text: string) => ({ path, text })
     expect(
-      setupFilesTouchTimers(
-        [{ path: 'vitest.config.ts', text: 'export default {}' }],
-        () => undefined,
+      unsureDirectories(
+        [
+          config('backend/vitest.integration.config.ts', "setupFiles: ['./tests/setup-worker.ts']"),
+          config('frontend/vitest.config.ts', 'export default {}'),
+        ],
+        read,
       ),
-    ).toBe(false)
+    ).toEqual([])
+    // round 7, Ж2: a setup file that only imports what touches the timers; one that cannot be read
+    expect(
+      unsureDirectories([config('bot/vitest.config.ts', "setupFiles: ['./setup.ts']")], read),
+    ).toEqual(['bot'])
+    expect(
+      unsureDirectories([config('bot/vitest.config.ts', "setupFiles: './gone.ts'")], read),
+    ).toEqual(['bot'])
+    // round 7, Ж1 and review №19: fake timers or concurrency set by the config
+    expect(
+      unsureDirectories(
+        [
+          config('frontend/vitest.config.ts', "test: { fakeTimers: { toFake: ['Date'] } }"),
+          config('packages/model/vitest.config.ts', 'test: { sequence: { concurrent: true } }'),
+        ],
+        read,
+      ),
+    ).toEqual(['frontend', 'packages/model'])
+  })
+
+  // review round 7 of MOL-266: №19 and adversarial Ж1, Ж3–Ж5 — the file is no longer read as sure
+  it.each([
+    [
+      'vi.setConfig with fakeTimers',
+      `vi.setConfig({ fakeTimers: { shouldAdvanceTime: true } })\nbeforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\n${REAL}\n})`,
+    ],
+    [
+      'a let-go kept for a hook',
+      `const cleanups: Array<() => void> = []\ncleanups.push(() => vi.useRealTimers())\n${AFTER_FIRST}\nafterEach(() => {\nfor (const cleanup of cleanups) cleanup()\n})\nit('first', () => {})\nit('x', async () => {\n${REAL}\n})`,
+    ],
+    [
+      'the bound handed to an awaited call that only keeps it',
+      `const handlers: Array<() => void> = []\nconst on = async (handler: () => void): Promise<void> => {\nhandlers.push(handler)\n}\nbeforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\nlet t0 = 0\nawait on(() => {\nexpect(performance.now() - t0).toBeLessThan(1_000)\n})\nvi.useRealTimers()\nt0 = performance.now()\nfor (const handler of handlers) handler()\n})`,
+    ],
+    [
+      'it.beforeEach letting go after the file’s',
+      `beforeEach(() => {\nvi.useFakeTimers()\n})\nit.beforeEach(() => {\nvi.useRealTimers()\n})\nit('x', async () => {\n${REAL}\n})`,
+    ],
+    [
+      'concurrent tests side by side',
+      `describe.concurrent('s', () => {\nit('a', async () => {\nawait tick()\nvi.useRealTimers()\n})\nit('b', async () => {\nvi.useFakeTimers()\n${FAKE}\n})\n})`,
+    ],
+  ])('finds a bound on real time beside fake timers — %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toHaveLength(1)
   })
 })
