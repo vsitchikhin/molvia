@@ -339,7 +339,8 @@ export interface MolviaClient {
   removeTrip(tripId: string): Promise<void>
   /**
    * «Вернуть» within ten minutes; `error.trip_open` for an open one while another is open, unless
-   * it comes back finished (`finish`).
+   * it comes back finished (`finish`); `error.receipt_recorded_before` for a trip whose receipt was
+   * recorded again by a new shot meanwhile (MOL-254).
    */
   restoreTrip(tripId: string, finish?: FinishTripBody): Promise<TripView>
   /**

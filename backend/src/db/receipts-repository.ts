@@ -358,7 +358,10 @@ export interface ReceiptRepository {
   sourceOf(tripId: string): Promise<TripReceiptSource | null>
   /** Where these sellers' receipts were recorded, in a country, by anyone, the purchases still there. */
   placesOfTins(actorId: string, tins: readonly string[], country: string): Promise<TinPlace[]>
-  /** The person's receipt of this tax number and number, recorded as purchases still there (Т-11). */
+  /**
+   * The person's receipt of this tax number and number, recorded as purchases still there (Т-11):
+   * `recordedTwinOf`, the one rule a trip's «Вернуть» reads as well (MOL-254).
+   */
   recordedTwin(
     actorId: string,
     tin: string,
@@ -553,6 +556,40 @@ function sentColumn(row: { via: ReceiptVia | null; qrMissed: boolean | null }) {
   if (row.via === null) return 'sentUnnamed'
   if (row.via === 'qr') return row.qrMissed === true ? 'sentQrMissed' : 'sentQr'
   return row.qrMissed === true ? 'sentPasteMissed' : 'sentPaste'
+}
+
+/**
+ * The one rule of a second record of a receipt (Т-11): the person's receipt of this tax number and
+ * number, recorded, its trip not marked removed — for «Записать», the review, the bot and a trip's
+ * «Вернуть» alike (MOL-254). A trip only marked removed holds no new shot: it may never come back.
+ */
+export async function recordedTwinOf(
+  db: Conn,
+  actorId: string,
+  tin: string,
+  receiptNo: string,
+  except: string,
+): Promise<RecordedTwin | null> {
+  const [twin] = await db
+    .select({
+      receiptId: receipts.id,
+      tripId: trips.id,
+      recordedAt: sql<Date>`${receipts.recordedAt}`.mapWith(receipts.recordedAt),
+    })
+    .from(receipts)
+    .innerJoin(trips, and(eq(trips.id, receipts.tripId), sql`${trips.deletedAt} is null`))
+    .where(
+      and(
+        eq(receipts.actorId, actorId),
+        eq(receipts.tin, tin),
+        eq(receipts.receiptNo, receiptNo),
+        sql`${receipts.id} <> ${except}`,
+        eq(receipts.status, 'recorded'),
+      ),
+    )
+    .orderBy(asc(receipts.recordedAt))
+    .limit(1)
+  return twin ?? null
 }
 
 export function createReceiptRepository(db: Conn): ReceiptRepository {
@@ -983,26 +1020,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     },
 
     async recordedTwin(actorId, tin, receiptNo, except) {
-      const [twin] = await db
-        .select({
-          receiptId: receipts.id,
-          tripId: trips.id,
-          recordedAt: sql<Date>`${receipts.recordedAt}`.mapWith(receipts.recordedAt),
-        })
-        .from(receipts)
-        .innerJoin(trips, and(eq(trips.id, receipts.tripId), sql`${trips.deletedAt} is null`))
-        .where(
-          and(
-            eq(receipts.actorId, actorId),
-            eq(receipts.tin, tin),
-            eq(receipts.receiptNo, receiptNo),
-            sql`${receipts.id} <> ${except}`,
-            eq(receipts.status, 'recorded'),
-          ),
-        )
-        .orderBy(asc(receipts.recordedAt))
-        .limit(1)
-      return twin ?? null
+      return recordedTwinOf(db, actorId, tin, receiptNo, except)
     },
 
     async remove(actorId, id) {
