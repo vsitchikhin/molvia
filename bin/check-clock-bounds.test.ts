@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rawBounds, unsureDirectories } from './check-clock-bounds.mjs'
+import { rawBounds, unsureDirectories, vitestFlagsUnsure } from './check-clock-bounds.mjs'
 
 const START = `const started = performance.now()\nwork()\n`
 
@@ -762,6 +762,26 @@ describe('rawBounds', () => {
         (path) => keyed[path],
       ),
     ).toEqual(['bot'])
+    // round 10, №23, К3 and К4: a module loaded any way but a static import, in a setup file or a config
+    const loaders: Record<string, string> = {
+      ...more,
+      'bot/actual.ts': "await vi.importActual('./clock-reset')",
+      'bot/required.ts':
+        "import { createRequire } from 'node:module'\ncreateRequire(import.meta.url)('./clock-reset')",
+    }
+    for (const setup of ['actual.ts', 'required.ts'])
+      expect(
+        unsureDirectories(
+          [config('bot/vitest.config.ts', `setupFiles: ['./${setup}']`)],
+          (path) => loaders[path],
+        ),
+      ).toEqual(['bot'])
+    for (const text of [
+      'const { shared } = await import(`./vitest.shared`)',
+      'const shared = (await import(where)).default',
+      "const shared = Object.values(import.meta.glob('./vitest.shared.ts', { eager: true }))",
+    ])
+      expect(unsureDirectories([config('bot/vitest.config.ts', text)], read)).toEqual(['bot'])
   })
 
   // review round 7 of MOL-266: №19 and adversarial Ж1, Ж3–Ж5 — the file is no longer read as sure
@@ -850,5 +870,33 @@ describe('rawBounds', () => {
         `const SLOW_MS = 2 * 60_000\nit('x', async () => {\nvi.useFakeTimers()\n${FAKE}\n}, SLOW_MS)`,
       ),
     ).toEqual([])
+  })
+
+  // review round 10 of MOL-266: adversarial К1, К2 and К5
+  it.each([
+    [
+      'a let-go in a default of a parameter',
+      `function prepare(utils = vi.useRealTimers()): typeof vi {\nreturn utils\n}\nbeforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\nprepare()\n${REAL}\n})`,
+    ],
+    ...[
+      "vi.stubGlobal('performance', REAL_CLOCK)",
+      "Object.defineProperty(globalThis, 'performance', { value: REAL_CLOCK })",
+      "vi.spyOn(performance, 'now').mockImplementation(realNow)",
+      'performance.now = realNow',
+    ].map((back) => [
+      `the clock put back by hand: ${back}`,
+      `beforeEach(() => {\nvi.useFakeTimers()\n${back}\n})\nit('x', async () => {\n${REAL}\n})`,
+    ]),
+  ])('finds a bound on real time beside fake timers — %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toHaveLength(1)
+  })
+
+  it('reads a command line that gives vitest a setting the configs do not show (adversarial К5)', () => {
+    expect(
+      vitestFlagsUnsure(['"test": "vitest run && vitest run -c vitest.integration.config.ts"']),
+    ).toBe(false)
+    expect(vitestFlagsUnsure(['"test": "vitest run --coverage"'])).toBe(false)
+    expect(vitestFlagsUnsure(['"test": "vitest run --sequence.concurrent"'])).toBe(true)
+    expect(vitestFlagsUnsure(['test:\n\tnpx vitest run --setupFiles ./setup.ts'])).toBe(true)
   })
 })

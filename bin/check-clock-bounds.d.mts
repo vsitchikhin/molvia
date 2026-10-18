@@ -8,3 +8,4 @@ export declare function unsureDirectories(
   configs: { path: string; text: string }[],
   read: (path: string) => string | undefined,
 ): string[]
+export declare function vitestFlagsUnsure(texts: string[]): boolean

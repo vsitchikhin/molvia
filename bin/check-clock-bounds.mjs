@@ -45,8 +45,9 @@
 // later — written there or a function of the file named anywhere but as a call or a hook's — no
 // concurrent tests, by `.concurrent` or the options, no options under a name, and no config of its
 // directory that names `fakeTimers`, `concurrent` or `extends`, reads a file or takes settings from a file
-// of the repository, or has a setup file that touches them or imports what does, or imports what it
-// cannot follow: else no bound there is let go. A callback runs where it is written only for a call known to run it before it returns
+// of the repository, or has a setup file that touches them or imports what does, or loads a module any
+// way but a static import; no clock put back by hand, no timer call in a default of a parameter, no
+// command line that gives vitest a setting: else no bound there is let go. A callback runs where it is written only for a call known to run it before it returns
 // — a `then` only on what touches no timers. `useRealTimers()` lets go, `toFake` and `toNotFake` choose,
 // `shouldAdvanceTime` and a tick mode but `manual` move fake time with the real one, options not read
 // whole leave every clock real; a clock taken under another name keeps the real one.
@@ -1190,7 +1191,13 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
             access.parent.expression === access) ||
             (ts.isCallExpression(access) && access.expression === n))
         const owner = ts.findAncestor(n.parent, ts.isFunctionLike)
-        if (!called || (owner && !named(owner))) ok = false
+        // a default of a parameter runs at the call, not in the body the parse reads (adversarial К1)
+        const inDefault = ts.findAncestor(
+          n.parent,
+          (a) => ts.isParameter(a) || ts.isFunctionLike(a),
+        )
+        if (!called || (owner && !named(owner)) || (inDefault && ts.isParameter(inDefault)))
+          ok = false
       }
       // import { afterEach as after } from 'vitest'
       if (
@@ -1280,6 +1287,33 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
         )
       )
         ok = false
+      // the clocks put back by hand: vi.stubGlobal, Object.defineProperty(globalThis, …), a spy or an
+      // assignment on a clock (adversarial К2) — what fake timers hold is no longer theirs
+      if (ts.isCallExpression(n)) {
+        const callee = calleeText(n)
+        const target = n.arguments[0] && resolvedText(n.arguments[0])
+        if (/(^|\.)(stubGlobal|unstubAllGlobals)$/.test(callee)) ok = false
+        if (
+          /^(Object\.(defineProperty|defineProperties|assign)|Reflect\.(defineProperty|set))$/.test(
+            callee,
+          ) &&
+          target !== undefined &&
+          /^(globalThis|window|self|global|performance|Date|process(\.hrtime)?)$/.test(target)
+        )
+          ok = false
+        if (
+          /(^|\.)spyOn$/.test(callee) &&
+          target !== undefined &&
+          /^(performance|Date|process|globalThis)/.test(target)
+        )
+          ok = false
+      }
+      if (
+        ts.isBinaryExpression(n) &&
+        n.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+        /^(performance|Date|process\.hrtime)(\.|$)/.test(resolvedText(n.left))
+      )
+        ok = false
       // describe.concurrent, it.concurrent: the tests run side by side, and the clocks are one (№19)
       if (
         ts.isPropertyAccessExpression(n) &&
@@ -1329,19 +1363,56 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
 
 /**
  * The directories whose test files a vitest config leaves unsure about the timers (adversarial Е6, Ж1, Ж2,
- * З3, З4, review №19): its setup files — and the files of this repository they import, statically, by
- * `import()` or `require`, `./…` and `@/…` — touch them, or one cannot be read or followed (`#…`, a
- * workspace package); or it names `fakeTimers`, `concurrent` other than `false`, or takes settings from a
- * file of this repository. A setup file runs in every test file of its run, so its hooks stand between
- * any two tests.
+ * З3, З4, И3–И6, К3, К4, review №19, №22, №23): its setup files — and the files of this repository they
+ * import, `./…`, `@/…`, a workspace package, a `#…` subpath — touch them, or one cannot be read or
+ * followed, or loads a module any way but a static import; or the config names `fakeTimers`,
+ * `concurrent` other than `false`, `extends`, reads a file, takes settings from a file of this
+ * repository or loads a module any way but a static import. A setup file runs in every test file of
+ * its run, so its hooks stand between any two tests.
  * @param {{ path: string, text: string }[]} configs
  * @param {(path: string) => string | undefined} read
  * @returns {string[]}
  */
 export function unsureDirectories(configs, read) {
-  const TOUCH = /useFakeTimers|useRealTimers|setTimerTickMode|setConfig/
-  // every import a file makes, static, dynamic or required (adversarial З3)
-  const IMPORTS = /(?:\bfrom|\bimport|\brequire)\s*\(?\s*['"]([^'"]+)['"]/g
+  const TOUCH = /useFakeTimers|useRealTimers|setTimerTickMode|setConfig|stubGlobal|defineProperty/
+  /**
+   * What a file loads, parsed: the specifiers of its static `import … from '…'`, `import '…'` and
+   * `export … from '…'`, and whether it loads anything any other way — `import()`, `require`,
+   * `createRequire`, `vi.importActual`, `vi.importMock`, `import.meta.glob` — which is not read
+   * (review №23, adversarial К3, К4).
+   */
+  const modulesOf = (text, file) => {
+    const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true)
+    const specs = []
+    let loose = false
+    const look = (n) => {
+      if (
+        (ts.isImportDeclaration(n) || ts.isExportDeclaration(n)) &&
+        n.moduleSpecifier &&
+        ts.isStringLiteral(n.moduleSpecifier)
+      )
+        specs.push(n.moduleSpecifier.text)
+      if (ts.isCallExpression(n)) {
+        const callee = n.expression
+        const name = ts.isPropertyAccessExpression(callee)
+          ? callee.name.text
+          : ts.isIdentifier(callee)
+            ? callee.text
+            : ''
+        if (callee.kind === ts.SyntaxKind.ImportKeyword || /import|require/i.test(name))
+          loose = true
+      }
+      if (
+        ts.isMetaProperty(n) &&
+        ts.isPropertyAccessExpression(n.parent) &&
+        n.parent.name.text === 'glob'
+      )
+        loose = true
+      ts.forEachChild(n, look)
+    }
+    look(sf)
+    return { specs, loose }
+  }
   const json = (path) => {
     try {
       const text = read(path)
@@ -1405,13 +1476,13 @@ export function unsureDirectories(configs, read) {
     const candidates = /\.[cm]?[jt]s$/.test(file)
       ? [file]
       : ['.ts', '.mts', '.js', '/index.ts'].map((end) => `${file}${end}`)
-    const text = candidates.map(read).find((t) => t !== undefined)
-    if (text === undefined) return true
+    const found = candidates.find((path) => read(path) !== undefined)
+    const text = found === undefined ? undefined : read(found)
+    if (found === undefined || text === undefined) return true
     if (TOUCH.test(text)) return true
-    // an import by what is not a quoted string, or a glob: where it leads is not read (И4)
-    if (/\b(?:import|require)\s*\(\s*(?!['"])/.test(text) || /import\.meta\.glob/.test(text))
-      return true
-    return [...text.matchAll(IMPORTS)].some(([, spec]) => {
+    const { specs, loose } = modulesOf(text, found)
+    if (loose) return true
+    return specs.some((spec) => {
       if (!local(spec)) return false
       if (spec.startsWith('@/')) return touches(join(root, 'src', spec.slice(2)), root, seen)
       if (/^\.{1,2}\//.test(spec)) return touches(join(dirname(file), spec), root, seen)
@@ -1430,9 +1501,10 @@ export function unsureDirectories(configs, read) {
       if (concurrent > off) return true
       // settings that come from elsewhere than this text: a project's `extends`, a file read (И6)
       if (/\bextends\b|\breadFile|\bJSON\.parse\b|\brequire\s*\(/.test(text)) return true
-      // a config is read by its own text: one that takes settings from a file of this repository is not
-      // read whole (adversarial З4)
-      if ([...text.matchAll(IMPORTS)].some(([, spec]) => local(spec))) return true
+      // a config is read by its own text: one that takes settings from a file of this repository, or loads
+      // a module any way but a static import, is not read whole (adversarial З4, К4, review №23)
+      const { specs, loose } = modulesOf(text, path)
+      if (loose || specs.some(local)) return true
       const list =
         /setupFiles\s*:\s*\[([^\]]*)\]/.exec(text)?.[1] ??
         /setupFiles\s*:\s*(['"][^'"]+['"])/.exec(text)?.[1] ??
@@ -1442,6 +1514,28 @@ export function unsureDirectories(configs, read) {
       )
     })
     .map(({ path }) => dirname(path))
+}
+
+/**
+ * Whether a command line of the repository gives vitest a setting the configs do not show (adversarial
+ * К5): every word after `vitest` is `run`, a config, a project, a report or a file, or the run is unsure —
+ * `--sequence.concurrent`, `--setupFiles` and the rest set what the check cannot read.
+ * @param {string[]} texts — package.json files, the Makefile, the workflows
+ * @returns {boolean}
+ */
+export function vitestFlagsUnsure(texts) {
+  // what touches no clock: the command, a config read anyway, a project, what is reported, a file
+  const SAFE =
+    /^(run|--run|-c|--config|--project|--passWithNoTests|--silent|--coverage|--reporter|--outputFile|--bail|--shard|[^-].*)$/
+  return texts.some((text) =>
+    [...text.matchAll(/\bvitest\b([^"\n&|;]*)/g)].some(([, rest]) =>
+      rest
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .some((word) => !SAFE.test(word.split('=')[0])),
+    ),
+  )
 }
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop() ?? '')) {
@@ -1457,6 +1551,16 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()
   const unsure = unsureDirectories(configs, (path) =>
     existsSync(path) && statSync(path).isFile() ? readFileSync(path, 'utf8') : undefined,
   )
+  const commands = execFileSync(
+    'git',
+    ['ls-files', 'package.json', '*/package.json', 'Makefile', '.github/workflows/*.yml'],
+    { encoding: 'utf8' },
+  )
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((path) => readFileSync(path, 'utf8'))
+  if (vitestFlagsUnsure(commands)) unsure.push('.')
   const problems = files.flatMap((file) => {
     const source = readFileSync(file, 'utf8')
     // a file that never reads the clock holds no duration: the binder is spared it
