@@ -217,19 +217,20 @@ of the measure and with every test merged. So CI checks every run instead (owner
   reporter sees how far below its bound each one stood. **In a concurrent test it takes the test's
   context** (`expectWithin(d, n, context)`): vitest's current test is one for the worker, the neighbour or
   none beside another running, and a bound without it is refused rather than kept on the wrong test.
-  **It never refuses fake time** (review №12, adversarial В3): a number does not say which clock it came
-  from, and a refusal there left a bound on the real clock of a test that fakes only `Date` with no lawful
-  spelling. A bound met while vitest's fake timers are on (`vi.isFakeTimers()`) and have replaced every clock
-  the module found is kept marked `fake`, printed, and held to nothing; with one clock left real, or every one
-  replaced by hand with the fake timers off, it is held as real. **The price, named:** with every clock fake
-  and moving with real time (`shouldAdvanceTime`), or a clock kept under another name before the fake, the
-  duration is real and still held to nothing — the run does not say how fake time moves, and the repository's
-  `shouldAdvanceTime` fakes `Date` alone.
+  **It never refuses fake time, and never lets it go** (review №12, adversarial В3; round 16): a number does
+  not say which clock it came from, nor whether that clock stood still while it measured. Until round 16 a
+  bound met with every clock replaced by vitest's fake timers was marked `fake` and held to nothing; round 16
+  let real time through that mark three ways — fake timers that move with the real ones
+  (`shouldAdvanceTime`), `perf_hooks`' and `node:process`' own clocks the fake never replaces, a fake turned on
+  after the measure or by a concurrent neighbour. So every bound is held as real. **Under fake timers a test
+  bounds the schedule, not a clock**: it moves the timers by the bound and asserts the outcome
+  (`await vi.advanceTimersByTimeAsync(30_000)`, then `expect(bot.isInited()).toBe(true)` —
+  `bot/src/assemble.test.ts`, the one such bound the repository had).
 - **`bin/check-clock-bounds.mjs` refuses the upper bounds on a duration it knows**, found by parsing, never by
   a line's pattern (a pattern missed three of eighteen, review of MOL-243, Р10-А1); **the lists are in its
   head**, and two rounds of review found forty spellings past the first one — so the claim is what it lists,
-  not «any». In short: readings of every clock of the platform, under another name too (`perf_hooks`'
-  and `node:process`' own, `{ now } = Date`, `.bind`), and the file's own clocks; a duration through names,
+  not «any». In short: readings of `performance.now`, `Date.now`, `new Date`, `process.hrtime` and
+  `process.uptime` — the list, not «every clock» — under another name too (`perf_hooks`' and `node:process`' own, `{ now } = Date`, `.bind`), and the file's own clocks; a duration through names,
   fields, classes and their getters, arrays, `+=`, `push`, the answer of a helper, a helper that subtracts a
   reading it takes however it rounds, `hrtime(t0)`, `performance.measure`; a budget — a duration taken from a
   number, `200 - d`, `left -= d`, `deadline - Date.now()`, or divided into one, a rate (`1000 / ms`), kept through
@@ -238,8 +239,7 @@ of the measure and with every test merged. So CI checks every run instead (owner
   `isFalse`, `!`, `&&`), `toSatisfy`, `if … throw`, a helper bounding its parameter, and a deadline — a reading
   held below a reading plus a number. Two readings against each other are a lower bound (adversarial В4). Names are resolved by TypeScript's binder, so the age of a stamp held under a name
   another test gave a reading is left alone: one side is not the clock. **Fake time is no exception** (MOL-266,
-  round 15): a bound under `vi.useFakeTimers()` goes through `expectWithin` as any other, and `expectWithin` marks
-  it `fake` as the test runs. For fourteen rounds the parse let such a bound go raw where it read every clock
+  round 15): a bound under `vi.useFakeTimers()` goes through `expectWithin` as any other, and is held as real. For fourteen rounds the parse let such a bound go raw where it read every clock
   fake at the bound — in the order vitest runs hooks, through the file's helpers, its directory's configs and
   setup files, every command line of the repository — and every round found another way the clock stayed
   real: a list of spellings, a lexer of the shell, a reader of YAML, each answered by one more. Whether a clock
