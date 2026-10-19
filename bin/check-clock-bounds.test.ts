@@ -1069,4 +1069,41 @@ describe('rawBounds', () => {
     expect(unsure('# vitest finds its command past options (`-c … watch`)')).toBe(false)
     expect(unsure('    watch) endless="vitest $arg" ;;')).toBe(false)
   })
+
+  // review round 13 of MOL-266 (№25–26) and adversarial round 14 (О1–О5)
+  it.each([
+    [
+      'a class whose extends calls what lets go',
+      `function realBase(): new () => object {\nvi.useRealTimers()\nreturn class {}\n}\nvi.useFakeTimers()\nclass Clock extends realBase() {\nreadonly n = 1\n}\nit('x', async () => {\n${REAL}\n})`,
+    ],
+    [
+      'a clock handed to a function that puts it back',
+      `const put = (p: Performance): void => {\np.now = realNow\n}\nbeforeEach(() => {\nvi.useFakeTimers({ toFake: ['performance'] })\nput(performance)\n})\nit('x', async () => {\n${REAL}\n})`,
+    ],
+  ])('finds a bound on real time beside fake timers — %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toHaveLength(1)
+  })
+
+  it('reads a setup file that puts every global property back (О3)', () => {
+    const setup =
+      "import { afterEach } from 'vitest'\nconst saved = Object.getOwnPropertyDescriptors(global)\nafterEach(() => {\nObject.defineProperties(global, saved)\n})"
+    expect(
+      unsureDirectories(
+        [{ path: 'bot/vitest.config.ts', text: "setupFiles: ['./setup.ts']" }],
+        (path) => (path === 'bot/setup.ts' ? setup : undefined),
+      ),
+    ).toEqual(['bot'])
+  })
+
+  it('reads a quoted command as a command, and node --run as npm run (№25–26, О4–О5)', () => {
+    const scripts = JSON.stringify({ scripts: { test: 'vitest run' } })
+    const unsure = (text: string) => vitestFlagsUnsure([scripts, text], ['bot/vitest.config.ts'])
+    expect(unsure('test:\n\tsh -c "npx vitest run --sequence.concurrent"')).toBe(true)
+    expect(unsure("bash -c 'npx vitest run --sequence.concurrent'")).toBe(true)
+    expect(unsure('eval "npx vitest run --sequence.concurrent"')).toBe(true)
+    expect(unsure('node --run test -- --sequence.concurrent')).toBe(true)
+    // the lock's own text: an assignment's value and what echo prints stay data
+    expect(unsure('    watch) endless="vitest $arg" ;;')).toBe(false)
+    expect(unsure('echo "one-at-a-time:" \\\n  "use `npx vitest run …`" >&2')).toBe(false)
+  })
 })

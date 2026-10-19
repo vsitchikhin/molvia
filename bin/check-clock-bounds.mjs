@@ -1323,6 +1323,25 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
         touchesTimers(n.initializer)
       )
         ok = false
+      // what a class runs where it is declared — its `extends`, its decorators — which the parse steps over (О1)
+      if (ts.isHeritageClause(n) && n.types.some((type) => touchesTimers(type.expression)))
+        ok = false
+      if (ts.isDecorator(n) && touchesTimers(n.expression)) ok = false
+      // a clock handed as a value — put(performance) — may be given back through a parameter (О2)
+      if (ts.isIdentifier(n) && /^(performance|Date|process)$/.test(n.text)) {
+        const parent = n.parent
+        const used =
+          (ts.isPropertyAccessExpression(parent) && parent.expression === n) ||
+          (ts.isElementAccessExpression(parent) && parent.expression === n) ||
+          (ts.isNewExpression(parent) && parent.expression === n) ||
+          (ts.isCallExpression(parent) && parent.expression === n) ||
+          ts.isTypeReferenceNode(parent) ||
+          ts.isQualifiedName(parent) ||
+          ts.isImportSpecifier(parent) ||
+          ts.isImportClause(parent) ||
+          (ts.isVariableDeclaration(parent) && parent.name === n)
+        if (!used) ok = false
+      }
       // a static block of a class runs where the class is declared, which the parse steps over (Н1)
       if (ts.isClassStaticBlockDeclaration(n) && touchesTimers(n.body)) ok = false
       // vi, Object or Reflect taken apart, and Object or Reflect under another name (М2)
@@ -1450,7 +1469,7 @@ export function unsureDirectories(configs, read) {
   // module loaded by another name — wherever vitest is at hand to hook it there; the timers' own calls anywhere
   const TOUCH = /useFakeTimers|useRealTimers|setTimerTickMode|setConfig|stubGlobal/
   const HOOKED =
-    /defineProperty|\bDate\b|performance|hrtime|spyOn|globalThis|\bwindow\b|\bassign\b|importActual|importMock|\brequire\b|\bimport\s*\(/
+    /defineProp|PropertyDescriptor|\bDate\b|performance|hrtime|spyOn|\bglobal(This)?\b|\bwindow\b|\bself\b|\bassign\b|importActual|importMock|\brequire\b|\bimport\s*\(/
   // vitest at hand: imported, its globals referenced — or, below, a config that sets `globals` (Н3)
   const VITEST = /['"]vitest(\/[\w-]+)?['"]|\bglobals\b/
   /** The setup files a config names, each a string written out; `undefined` where the list is not read. */
@@ -1704,9 +1723,13 @@ export function vitestFlagsUnsure(texts, configs = []) {
         .map((line) =>
           line
             .replace(/^(\s*(?:-\s+)?["']?[\w:-]+["']?:\s*)(["'])(.*)\2,?\s*$/, '$1$3')
-            .replace(/"([^"]*)"|'([^']*)'/g, (_, double, single) => {
+            // data only as the value of an assignment or what echo and printf print (review №25, О4) —
+            // anywhere else, after `sh -c`, `eval` or alone, a quoted command is a command
+            .replace(/(^|&&|\|\||;|\()\s*(?:echo|printf)\b[^;&|]*/g, '$1')
+            .replace(/(=)?"([^"]*)"|(=)?'([^']*)'/g, (_, before1, double, before2, single) => {
+              const before = String(before1 ?? before2 ?? '')
               const inner = String(double ?? single ?? '')
-              return /\bvitest\b/.test(inner) ? ' ' : inner
+              return before !== '' && /\bvitest\b/.test(inner) ? `${before} ` : `${before}${inner}`
             }),
         )
       for (let i = 0; i < joined.length; i++) {
@@ -1733,6 +1756,14 @@ export function vitestFlagsUnsure(texts, configs = []) {
   // npm [options] run <script> [options] -- <args>: found by npm's own commands, not by which options
   // take a value — any word after `run` may be the script (М5, Н5)
   const npm = (list) => {
+    // node --run <script> -- <args>: Node's own runner of a package.json script (review №26, О5)
+    const node = list.findIndex((word, at) => /(^|\/)node$/.test(word) && list[at + 1] === '--run')
+    if (node >= 0) {
+      const rest = list.slice(node + 2)
+      const dash = rest.indexOf('--')
+      const head = (dash < 0 ? rest : rest.slice(0, dash)).filter((word) => !word.startsWith('-'))
+      return { scripts: head.slice(0, 1), args: dash < 0 ? [] : rest.slice(dash + 1) }
+    }
     const at = list.findIndex((word) => word === 'npm' || word.endsWith('/npm'))
     if (at < 0) return undefined
     const rest = list.slice(at + 1)
