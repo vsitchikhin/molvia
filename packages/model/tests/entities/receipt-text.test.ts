@@ -62,6 +62,11 @@ const CHANGED_BY_TOTAL: Readonly<Record<string, readonly string[]>> = { 'am-05':
 // And a total read in one place that no lines met is no total (MOL-244, В-1 «а»): am-03's 16 167,73
 // stands alone — paid 20 000 in cash, the lines one short of it.
 const UNVOUCHED_TOTAL: readonly string[] = ['am-03']
+// And a row of a table OCR left blank takes nothing of the total (MOL-255, В-5 «а»): am-04's softener
+// was the prototype's 2 200 by what the total left; now the review shows the difference instead.
+const BLANK_LEFT_EMPTY: Readonly<Record<string, readonly string[]>> = {
+  'am-04': ['ՏՈՖՈՒՀՈՂ ԼԱՎԱՆԴԱ 8լ(Հատ)'],
+}
 
 function read(fixture: Fixture): ReceiptText {
   return bestReading(
@@ -113,8 +118,8 @@ describe('a receipt read by Tesseract, as the prototype read it', () => {
         l.sku ?? null,
         thousandths(l.qty),
         l.unit === 'kg' ? 'kg' : 'piece',
-        hundredths(l.unit_price),
-        hundredths(l.sum),
+        (BLANK_LEFT_EMPTY[name] ?? []).includes(l.printed) ? null : hundredths(l.unit_price),
+        (BLANK_LEFT_EMPTY[name] ?? []).includes(l.printed) ? null : hundredths(l.sum),
         hundredths(l.discount),
         l.settled && !(CHANGED_BY_TOTAL[name] ?? []).includes(l.sku ?? ''),
       ]),
@@ -139,7 +144,26 @@ describe('a receipt read by Tesseract, as the prototype read it', () => {
     const got = read(am04 as Fixture)
     expect(got.layout).toBe('table')
     expect(got.totalHundredths).toBe(945_000)
-    expect(got.lines.reduce((sum, l) => sum + (l.sumHundredths ?? 0), 0)).toBe(945_000)
+    // the blank row takes nothing: 2 200 short is the review's difference (MOL-255)
+    expect(got.lines.reduce((sum, l) => sum + (l.sumHundredths ?? 0), 0)).toBe(725_000)
+  })
+
+  it('gives a blank row of a table no sum below zero, nor any (MOL-255)', () => {
+    // am-26: the rows OCR left short of figures took −182 140,00 each, the total less the rest
+    const got = parse(
+      [
+        '| ԱՆՎԱՆՈՒՄ | Քան | Գին | Գումար |',
+        '(3818) Թուղթ զուգարանի | 1 | 1380 | 1380 |',
+        '(3923) Ցելաֆոն |',
+        '(3924) Ճզմիչ |',
+        'Ընդամենը 8540.00',
+      ].join('\n'),
+    )
+    expect(got.lines.map((l) => [l.sumHundredths, l.priceHundredths, l.settled])).toEqual([
+      [138_000, 138_000, true],
+      [null, null, false],
+      [null, null, false],
+    ])
   })
 
   it('settles a receipt with no card discount by its total: am-05 adds up', () => {

@@ -1079,9 +1079,9 @@ function tableLines(
     return { item, name, weighed: lx.tableWeighed.test(body), out: out.slice(0, 6) }
   })
 
-  // The receipt's total decides among the readings of rows OCR left short (one row may be blank and
-  // takes what is left); among readings that add up, the one with rounder prices wins — a shop
-  // prices in whole tens, 2 200 and 900, not 1 525.
+  // The receipt's total decides among the readings of rows OCR left short (one row may be blank —
+  // what it leaves is the review's difference, never the row's sum: MOL-255, В-5 «а»); among readings
+  // that add up, the one with rounder prices wins — a shop prices in whole tens, 2 200 and 900, not 1 525.
   // With no total to judge — none read, or none shown (MOL-244) — a row reads as printed: its own arithmetic
   // first, else its last figure its sum — «1,5 1 350» is 1 350 at 900, never 2 025 at 1 350 (review 6, 7).
   const judge = (byTotal: boolean): ReceiptTextLine[] => {
@@ -1118,14 +1118,9 @@ function tableLines(
     const combinations = options.reduce((n, o) => n * o.out.length, 1)
     if (judging !== null && combinations <= TABLE_COMBINATIONS_MAX) pick(0, [])
 
-    const chosenSum = chosen.reduce((a, x) => a + (x.sum ?? 0), 0)
     const lines = options.map((o, i): ReceiptTextLine => {
       const c = chosen[i] ?? { qty: null, price: null, sum: null, settled: false }
-      let { sum, price } = c
-      if (sum === null && judging !== null) {
-        sum = judging - chosenSum
-        price = c.qty ? Math.round((sum * 1000) / c.qty) : null
-      }
+      const { sum, price } = c
       return {
         printed: o.name,
         hs: o.item.hs,
