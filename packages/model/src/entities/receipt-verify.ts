@@ -9,7 +9,8 @@ import type { ReceiptLayout, ReceiptText, ReceiptTextLine } from '#model/entitie
  * printed by its nature (MOL-272).
  *
  * A line is verified when it is as printed (`asPrinted`: settled with no swap, nothing worked out,
- * nothing the total gave) with a quantity and a sum above zero. **A line of a quantity of one whose price
+ * nothing the total gave) with a quantity and a sum above zero — or a sum of nothing where the shelf price
+ * is the discount to the hundredth, a gift by the card (review round 2, А7 «а»). **A line of a quantity of one whose price
  * is its sum is not, on its own** — a piece or a kilogram (review round 1, А2 «а»): the till prints one
  * number twice, and a digit misread alike in both columns — «660 660» for 560 — holds that arithmetic
  * (owner's В-2 «а»; 18 of the bench's 207 fields read so were wrong); it is verified only on a receipt
@@ -45,7 +46,13 @@ function verifiedLine(
 ): ReceiptTextLine {
   const { quantityMilli: qty, priceHundredths: price, sumHundredths: sum } = line
   const discount = line.discountHundredths ?? 0
-  if (!line.asPrinted || qty === null || qty <= 0 || sum === null || sum <= 0) return blank(line)
+  if (!line.asPrinted || qty === null || qty <= 0 || sum === null || sum < 0) return blank(line)
+  // a gift — its whole price the discount — is nothing paid only where that holds to the hundredth
+  // (review round 2, А7 «а»): «0 0» or a stray «0,00» holds any arithmetic
+  if (sum === 0) {
+    const gift = price !== null && price > 0 && Math.round((qty * price) / 1_000) === discount
+    return gift ? line : blank(line)
+  }
   const oneAlike = qty === 1_000 && price === sum && discount === 0
   if (oneAlike && !proven) return blank(line)
   const rounding = layout === 'card' ? TOLERANCE_HUNDREDTHS : 0

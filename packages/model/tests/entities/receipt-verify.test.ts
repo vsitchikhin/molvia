@@ -77,6 +77,9 @@ describe('what of a reading goes to the review as read (MOL-255)', () => {
 
   it('empties a sum of nothing or below it, and a line with no quantity or no sum', () => {
     expect(figures(one({ sumHundredths: 0, priceHundredths: 0 }))).toEqual(BLANK)
+    expect(figures(one({ quantityMilli: 1_000, sumHundredths: 0, priceHundredths: 0 }))).toEqual(
+      BLANK,
+    )
     expect(figures(one({ sumHundredths: -18_214_000 }))).toEqual(BLANK)
     expect(figures(one({ quantityMilli: null }))).toEqual(BLANK)
     expect(figures(one({ sumHundredths: null }))).toEqual(BLANK)
@@ -112,6 +115,43 @@ describe('what of a reading goes to the review as read (MOL-255)', () => {
       terminal({ quantityMilli: 3_000, priceHundredths: price, sumHundredths: 30_000 })
         .priceHundredths
     expect([off(9_999), off(10_000), off(10_001)]).toEqual([null, 10_000, null])
+  })
+})
+
+describe('a line paid nothing, its whole price the discount (review round 2, А7 «а»)', () => {
+  const gift = { quantityMilli: 1_000, priceHundredths: 50_000, sumHundredths: 0 }
+
+  it('keeps its figures where the discount is the price to the hundredth: «0,00/500,00 500»', () => {
+    const got = one({ ...gift, discountHundredths: 50_000 })
+    expect(figures(got)).toEqual([1_000, 50_000, 0, 50_000, true])
+    const two = one({ ...gift, quantityMilli: 2_000, discountHundredths: 100_000 })
+    expect(figures(two)).toEqual([2_000, 50_000, 0, 100_000, true])
+  })
+
+  it('is emptied a hundredth off, with no discount, or with no price — the card’s rounding none', () => {
+    expect(figures(one({ ...gift, discountHundredths: 49_999 }))).toEqual(BLANK)
+    expect(figures(one({ ...gift, discountHundredths: 0 }))).toEqual(BLANK)
+    expect(figures(one({ ...gift, discountHundredths: null }))).toEqual(BLANK)
+    expect(figures(one({ ...gift, priceHundredths: null, discountHundredths: 50_000 }))).toEqual(
+      BLANK,
+    )
+  })
+
+  it('proves a receipt with it: nothing and 300 are the total of 300', () => {
+    const got = verifiedReading(
+      reading(
+        [
+          line({ ...gift, discountHundredths: 50_000 }),
+          line({ quantityMilli: 1_000, priceHundredths: 30_000, sumHundredths: 30_000 }),
+        ],
+        30_000,
+      ),
+    )
+    expect(got.balanced).toBe(true)
+    expect(got.lines.map(figures)).toEqual([
+      [1_000, 50_000, 0, 50_000, true],
+      [1_000, 30_000, 30_000, 0, true],
+    ])
   })
 })
 
