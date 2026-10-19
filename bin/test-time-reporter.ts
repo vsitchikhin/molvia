@@ -6,7 +6,7 @@
 // What is measured, and against what:
 //   - a test — its duration, `beforeEach`, `afterEach` and `aroundEach` with it, against its timeout;
 //     vitest gives those hooks no time of their own to read, so a slow `beforeEach` behind a test of a
-//     long timeout is not told from the test (the price, in `workspace.md`); a timeout of 0 is none;
+//     long timeout is not told from the test (the price, in `testing.md`); a timeout of 0 is none;
 //   - `beforeAll` and `afterAll` — from the worker's own marks on the runner's tasks (an experimental
 //     door of vitest, held by this file's test): a suite's start to its first child's, its last
 //     child's end to its own — so the sum of the suite's hooks of that kind and of its `aroundAll`,
@@ -430,7 +430,7 @@ export function redScope(env: NodeJS.ProcessEnv = process.env, run = git): RedSc
 const number = (ms: number): string => String(Math.round(ms)).replace(/\B(?=(\d{3})+$)/g, ' ')
 
 /**
- * The limit advised: twice the rule's ten times, rounded up to 5 s (`workspace.md`). A busy runner sets a
+ * The limit advised: twice the rule's ten times, rounded up to 5 s (`testing.md`). A busy runner sets a
  * new worst up to twice the last (1 201 runs of CI, review №29): a limit of ten times exactly would be red
  * again at the next one, and the advice is what the file is given.
  */

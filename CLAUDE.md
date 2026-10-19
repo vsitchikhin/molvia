@@ -1010,8 +1010,8 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
   sets a new worst now and then. A bound on a duration goes only through `expectWithin`
   (`@molvia/model/testing/clock`); `bin/check-clock-bounds.mjs` in `npm run lint` refuses the other
   spellings it knows, found by parsing; under `vi.useFakeTimers()` a bound is held as real too, so a test
-  there bounds the time it moves the timers by, never a clock. Why, and the prices —
-  `.claude/rules/workspace.md`.
+  there bounds the time it moves the timers by, never a clock. Why ten, how a bound is judged, how CI holds it and its prices —
+  `.claude/rules/testing.md`.
 - **Maximize corner cases.** Mandatory checklist:
   - NULL / legacy — the field is empty but the entity still falls under the rule
   - alternative write path — the same outcome reached by a different route
