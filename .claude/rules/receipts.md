@@ -755,7 +755,11 @@ is verified whole. The reading chosen, its lines and its total are as before —
 price, sum and discount `null`, `settled` false, its name, codes and rows kept. **A line paid nothing keeps its
 figures where its discount is its whole price to the hundredth** (round 2, А7 «а»): a gift by the card,
 «0,00/500,00 500», was emptied on a receipt proven whole, and nothing said why — the foot had nothing to lack;
-«0 0», or a «0,00» with no price, holds any arithmetic and is emptied still. **A line of a quantity of one
+«0 0», or a «0,00» with no price, holds any arithmetic and is emptied still. Of a quantity of one its price and
+discount are one number printed twice, and it is kept only on a receipt proven whole, as «660 660» below (round 3,
+А9 «а»). **The price, named** (№11, А8): recorded, it is a purchase at 0, and every reader of a price takes it —
+the place's last price «0 ֏», a median's share — as master did; the readers' rule for any purchase at 0 is MOL-274
+(owner's «б»). **A line of a quantity of one
 whose price is its sum is not verified on its own** (В-2 «а», a kilogram too since round 1, А2): the till prints
 one number twice, and a digit misread alike in both columns — «660 660» for 560 — holds that arithmetic; such a
 line keeps its figures only on a receipt **proven whole** — every line as printed and their sums exactly the
@@ -800,9 +804,13 @@ the bench: every one of the 35 has an empty line, and OCR lost rows on 23. By th
 receipt read before keeps no word (`null`): its lines were shown as read, and the phone measures them as before.
 **A line found with no figures of its own is no line lost** (round 2, №9): where the rest meet the total, the
 parse gives it what the total leaves, the measure counts it, and the foot says what it lacks — counted as lost,
-the strip would say «not all read» of a receipt whose every line was found. **The price, named:** 12 receipts
-that lost rows stay unsaid — 11 have no total, and with none the measure is the share of lines that add up, which
-tells a bad reading rather than rows lost; am-28's lines as read make more than its total. «Покупки» call a
+the strip would say «not all read» of a receipt whose every line was found. **With no total, a line adds up only
+as printed** (round 3, А10 «а»): the share of lines that add up was of `settled`, and lines settled by swaps or a
+count made up — every one emptied on the review — said «read whole» of am-12, six lines found of seven, none of
+them as printed. The strip now stands on 25 of the bench's 35: 19 of the 23 that lost rows, and six that lost none
+whose lines mostly go empty — «сверьте строки с бумагой» is true of them too. **The price, named:** am-02 and am-38
+lost rows with half their lines as printed or more, am-12L found one line of seven and read it as printed, and
+am-28's lines as read make more than its total — those four stay unsaid. «Покупки» call a
 receipt with lines not added up or empty «проверьте N строк» (№3 «а»): «не сходятся» said of a line with nothing
 to add up.
 
