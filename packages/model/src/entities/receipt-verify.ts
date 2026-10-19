@@ -9,16 +9,16 @@ import type { ReceiptLayout, ReceiptText, ReceiptTextLine } from '#model/entitie
  * printed by its nature (MOL-272).
  *
  * A line is verified when it is as printed (`asPrinted`: settled with no swap, nothing worked out,
- * nothing the total gave) with a quantity and a sum above zero. **A line of one piece whose price is its
- * sum is not, on its own**: the till prints one number twice, and a digit misread alike in both columns
- * — «660 660» for 560 — holds that arithmetic (owner's В-2 «а»; 18 of the bench's 207 fields read so were
- * wrong); it is verified only on a receipt proven whole — every line as printed and their sums the total
- * shown. **The price is kept only where quantity × price is the sum and the discount to the hundredth**
- * (Т-4) — on a till that prints a shelf price apart from what was paid (the card's layout), to the few
- * luma it rounds by, «419,98/0 490/420»; elsewhere one of two figures meant to be one was misread:
- * 624,44 for a sum of 624,41.
+ * nothing the total gave) with a quantity and a sum above zero. **A line of a quantity of one whose price
+ * is its sum is not, on its own** — a piece or a kilogram (review round 1, А2 «а»): the till prints one
+ * number twice, and a digit misread alike in both columns — «660 660» for 560 — holds that arithmetic
+ * (owner's В-2 «а»; 18 of the bench's 207 fields read so were wrong); it is verified only on a receipt
+ * proven whole — every line as printed and their sums the total shown. **The price is kept only where
+ * quantity × price is the sum and the discount to the hundredth** (Т-4) — on a till that prints a shelf
+ * price apart from what was paid (the card's layout), to the few luma it rounds by, «419,98/0 490/420»;
+ * elsewhere one of two figures meant to be one was misread: 624,44 for a sum of 624,41.
  *
- * The bench, 54 receipts and 1 038 fields: 478 right and 166 made up before, 110 right and none after
+ * The bench, 54 receipts and 1 038 fields: 478 right and 166 made up before, 105 right and none after
  * (`.scratch/tasks/research/MOL-255.md`). A receipt by the tax office's link is not read and not judged.
  */
 export function verifiedReading(text: ReceiptText): ReceiptText {
@@ -46,8 +46,8 @@ function verifiedLine(
   const { quantityMilli: qty, priceHundredths: price, sumHundredths: sum } = line
   const discount = line.discountHundredths ?? 0
   if (!line.asPrinted || qty === null || qty <= 0 || sum === null || sum <= 0) return blank(line)
-  const onePieceAlike = line.unit === 'piece' && qty === 1_000 && price === sum && discount === 0
-  if (onePieceAlike && !proven) return blank(line)
+  const oneAlike = qty === 1_000 && price === sum && discount === 0
+  if (oneAlike && !proven) return blank(line)
   const rounding = layout === 'card' ? TOLERANCE_HUNDREDTHS : 0
   const holds =
     price !== null && Math.abs(Math.round((qty * price) / 1_000) - (sum + discount)) <= rounding

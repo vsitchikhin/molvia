@@ -115,7 +115,7 @@ describe('what of a reading goes to the review as read (MOL-255)', () => {
   })
 })
 
-describe('a line of one piece whose price is its sum (MOL-255, В-2 «а»)', () => {
+describe('a line of one piece or one kilogram whose price is its sum (MOL-255, В-2 «а»)', () => {
   const alike = { quantityMilli: 1_000, priceHundredths: 66_000, sumHundredths: 66_000 }
 
   it('is emptied on its own: «660 660» holds for 560 misread alike in both columns', () => {
@@ -145,8 +145,10 @@ describe('a line of one piece whose price is its sum (MOL-255, В-2 «а»)', ()
     expect(got.balanced).toBe(false)
   })
 
-  it('is no rule of a weight: one kilogram at its price is a weight read', () => {
-    expect(figures(one({ ...alike, unit: 'kg' }))).toEqual([1_000, 66_000, 66_000, 0, true])
+  it('is the rule of one kilogram too: the till prints one number twice for it (adversarial А2)', () => {
+    expect(figures(one({ ...alike, unit: 'kg' }))).toEqual(BLANK)
+    const weighed = one({ ...alike, unit: 'kg', quantityMilli: 2_000, sumHundredths: 132_000 })
+    expect(figures(weighed)).toEqual([2_000, 66_000, 132_000, 0, true])
   })
 
   it('is no rule of a line with a discount: three figures add up', () => {
