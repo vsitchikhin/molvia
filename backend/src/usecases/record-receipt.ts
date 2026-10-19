@@ -41,11 +41,13 @@ const sameQuantity = (a: StoredReceiptLine['quantity'], b: StoredReceiptLine['qu
 /**
  * A line recorded as it was read (В-4): it added up, and the person changed neither its quantity nor
  * what was paid. Its cut-out rows keep the text read as their confirmed text; its shelf price is what
- * the memory keeps.
+ * the memory keeps. A line that added up has no price only where the check took it off as misread
+ * (MOL-255): its row would teach the reader that misreading, so it is not read as printed.
  */
 function asRead(stored: StoredReceiptLine, line: RecordedLine): boolean {
   return (
     stored.settled &&
+    stored.price !== null &&
     sameQuantity(line.quantity, stored.quantity) &&
     sameMoney(line.amount, stored.sum)
   )

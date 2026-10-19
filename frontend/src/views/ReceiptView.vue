@@ -457,7 +457,7 @@ export default defineComponent({
     const balance = computed(() =>
       detail.value
         ? reviewBalance(detail.value, lines.value, draft.value)
-        : { lines: null, difference: null, suspect: null, recorded: 0 },
+        : { lines: null, difference: null, suspect: null, recorded: 0, blank: 0 },
     )
     const place = computed(() => (detail.value ? reviewPlace(detail.value, draft.value) : null))
     const placeChosen = computed(() => !!draft.value?.place)
@@ -631,20 +631,34 @@ export default defineComponent({
     /**
      * Read in part (MOL-222, В-1): the model's own rule, of what the server read — never of the edits —
      * said with what it read against the printed total, or how many lines added up without one. A total
-     * read in one place is not shown, and still measures the lines, as «примерно» (MOL-244).
+     * read in one place is not shown, and still measures the lines, as «примерно» (MOL-244). The server's
+     * word where it gave one (MOL-255, А6 «а»): it measured the lines as read, before the check emptied
+     * any, and an emptied line here cannot be told from a lost one — so with an empty line it is said
+     * with no sums, which the lines shown do not make.
      */
     const partly = computed(() => {
       const one = detail.value
       if (!one || one.lines.length === 0) return null
       const total = one.receipt.total ?? one.readTotal ?? null
-      if (!readPartly(one.lines, total)) return null
+      const blank = one.lines.some((line) => line.sum === null)
+      // a receipt read before keeps no word, and no line the check emptied (А5 «а»)
+      if (!(one.readPartly ?? (!blank && readPartly(one.lines, total)))) return null
+      if (blank) return t('receipt.review.partly_check')
       const covered = readCovered(one.lines, total)
       if (covered !== null && total !== null) {
         return t(
           one.receipt.total === null
             ? 'receipt.review.partly_read_total'
             : 'receipt.review.partly_total',
-          { lines: formatMoney(covered, locale.value), total: formatMoney(total, locale.value) },
+          {
+            lines: formatMoney(covered, locale.value),
+            total: formatMoney(total, locale.value),
+            // what the lines leave of the total, said with it (MOL-255, В-7 «а»)
+            short: formatMoney(
+              { minor: total.minor - covered.minor, currency: total.currency },
+              locale.value,
+            ),
+          },
         )
       }
       return t('receipt.review.partly_lines', {

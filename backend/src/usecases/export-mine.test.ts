@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DomainError, ERROR } from '@molvia/model'
+import { DomainError, ERROR, EXPORT_VERSION } from '@molvia/model'
 import type { ExportContent } from '@molvia/model'
 import type { ExportRepository } from '@/db/export-repository'
 import { exportMine } from './export-mine'
@@ -26,7 +26,12 @@ describe('exportMine', () => {
     const file = await exportMine(fake(content, calls), ACTOR, SESSION, NOW)
 
     expect(calls).toEqual([[ACTOR, SESSION]])
-    expect(file).toMatchObject({ format: 'molvia-export', version: 18, exportedAt: NOW, trips: [] })
+    expect(file).toMatchObject({
+      format: 'molvia-export',
+      version: EXPORT_VERSION,
+      exportedAt: NOW,
+      trips: [],
+    })
   })
 
   it('answers «no owner» when the owner was erased between the session and the read', async () => {

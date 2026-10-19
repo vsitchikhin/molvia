@@ -72,6 +72,8 @@ function lineOf(text: string, price: string, quantity: string, sum: string): Rec
     sumHundredths,
     discountHundredths,
     settled: settles(priceHundredths, milli, sumHundredths, discountHundredths),
+    // the tax office's own figures, read by no OCR; a discount is what the line paid less (А2)
+    asPrinted: settles(priceHundredths, milli, sumHundredths, discountHundredths),
     rows: [],
   }
 }

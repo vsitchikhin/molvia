@@ -90,6 +90,45 @@ describe('binding the lines of a parsed receipt (MOL-126)', () => {
     expect(weak).toEqual({ itemId: SOUR_CREAM, match: 'weak', translation: 'сметана' })
   })
 
+  it('marks «проверьте» an item the search found whose headings the printed one rules out (MOL-255)', async () => {
+    // the seed's sour cream is 0403; a line printed 9603 — brushes — is no sour cream however the gloss read
+    const nodes: CatalogueNode[] = [
+      ...NODES,
+      { itemId: SOUR_CREAM, name: 'Сметана', names: [], headings: ['0403'] },
+    ]
+    const search = vi.fn<ItemRepository['search']>(() =>
+      Promise.resolve({ items: [item(SOUR_CREAM, 'Сметана')], near: true, nearIds: [SOUR_CREAM] }),
+    )
+    const bound = await bindReceiptLines(
+      {
+        items: { nodes: () => Promise.resolve(nodes), search, byBarcode: NONE },
+        embedder: NO_EMBEDDER,
+      },
+      ACTOR,
+      'AM',
+      'ru',
+      [
+        line('ԹԹՎԱՍԵՐ 20%', '9603'),
+        // 0403 read with a swap of OCR, and no heading printed: nothing is ruled out
+        line('ԹԹՎԱՍԵՐ 20%', '0408'),
+        line('ԹԹՎԱՍԵՐ 20%'),
+      ],
+    )
+    expect(bound.map((one) => one.match)).toEqual(['weak', 'search', 'search'])
+  })
+
+  it('must not mark an item the seed gave no heading: nothing rules it out', async () => {
+    const { items } = fakeItems({
+      items: [item(SOUR_CREAM, 'Сметана')],
+      near: true,
+      nearIds: [SOUR_CREAM],
+    })
+    const [found] = await bindReceiptLines({ items, embedder: NO_EMBEDDER }, ACTOR, 'AM', 'ru', [
+      line('ԹԹՎԱՍԵՐ 20%', '9603'),
+    ])
+    expect(found).toEqual({ itemId: SOUR_CREAM, match: 'search', translation: 'сметана' })
+  })
+
   it('binds a dish of a class of services only as «проверьте», by its names or the search (MOL-226)', async () => {
     const { items } = fakeItems({
       items: [item(SOUR_CREAM, 'Сметана')],
