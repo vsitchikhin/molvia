@@ -479,8 +479,9 @@ scripts are kept. The cut-out lines are still kept and confirmed (В-4), with no
 **Every receipt with a line in it is read and goes to the review** (owner, 04.10.2026: «читать надо
 все кассы, все чеки, пытаться максимально собрать информацию»). A receipt fails as `reshoot` only when
 not one item line was found: there is nothing to correct, and only a new shot can help. What was
-«переснимите» before (В-4 of MOL-125) — the total read and the lines under 70 % of it, or no total and
-fewer than half the lines adding up — is **read in part** (`readPartly` in `receipt-sum.ts`, one
+«переснимите» before (В-4 of MOL-125) — the total read and the lines short of it (under 70 % until
+MOL-255, any shortfall since, said with its sum), or no total and fewer than half the lines adding up —
+is **read in part** (`readPartly` in `receipt-sum.ts`, one
 function for the server and the phone): the review says «Прочитали не всё» under its count with
 «Переснять» beside it, and «Записать» stays. Before, it threw away everything read: am-06, a till whose
 print Tesseract misreads, found 14 lines of which 2 add up and showed none of them; a crumpled am-13L
@@ -698,8 +699,10 @@ lost stays empty. **A line's candidates are found once** (`Laid`): read again, a
 alone, so the worst shape of the review — four hundred rows of junk in two readings — takes what it took before
 MOL-244. **A sum with its thousands apart is read whole** — «6 331,07», never 331,07 in two places: the
 card's shelf total and a card payment print so where there is no discount. **A table's total is never
-«balanced»** (Dog City, `tableReceipt`): a blank row takes what the total leaves, so its lines meeting it vouch
-for nothing — its total stands by its payment «Կանխիկ».
+«balanced»** (Dog City, `tableReceipt`): a blank row helps the total choose the splits, so its lines meeting it
+vouch for nothing — its total stands by its payment «Կանխիկ». Since MOL-255 the blank row takes nothing of the
+total: what the lines leave is the review's difference (В-5 «а») — it gave every blank row the same rest, below
+zero too (am-26: −182 140 ֏ each).
 
 | On the bench, 69 readings with a truth                   | right  | wrong | none   |
 | -------------------------------------------------------- | ------ | ----- | ------ |
@@ -726,6 +729,52 @@ the total, else by it — «строки дают X из примерно Y». I
 line's recorded sum (`shownLines` reads the total). **On the wire only to a phone that asks**
 (`RECEIPT_READ_TOTAL_HEADER`, as `code`'s): an installed app of an earlier build reads the detail strictly.
 A receipt read before keeps none; its total is the one it was shown with. The copy carries it (version 18).
+
+## Only what was verified goes to the review as read (MOL-255)
+
+**«Неправильно прочитанный чек хуже вообще не прочитанного»** (owner, 08.10.2026). Every receipt is still read
+(MOL-222, В-1), but a figure goes to the review as read only where it is verified, and is otherwise left empty
+— «Цифры не прочитали — посмотрите в чеке» (В-3 «а») — never a guess the person must find and erase. The
+receipts of 08.10 showed why: «ушные палочки» at 8 320 ֏ for 380 printed, sums of 175 560 ֏, the total's rest
+on blank rows, and the person spent the review erasing.
+
+**`settled` was never «read»**: it meant the parse found some reading, and a reading may bend two digits a
+field by OCR's swaps, work the price out of the sum, the weight out of the money, or take the total's rest.
+**The parse now says whether a line is as printed** (`asPrinted`): settled with no swap, nothing worked out,
+nothing the total gave — the card's and the class code's `pick.swaps === 0`, the table's split of three printed
+figures, the twins of a seam never. The reading chosen, its lines and its total are as before.
+
+**One function decides what is shown, for any reader** (`verifiedReading`, `receipt-verify.ts`, owner's В-1
+«а»): a line as printed with a quantity and a sum above zero keeps its figures; any other is emptied — quantity,
+price, sum and discount `null`, `settled` false, its name, codes and rows kept. **A line of one piece whose price
+is its sum is not verified on its own** (В-2 «а»): the till prints one number twice, and a digit misread alike in
+both columns — «660 660» for 560 — holds that arithmetic; such a line keeps its figures only on a receipt
+**proven whole** — every line as printed and their sums exactly the total shown. **The price is kept only where
+quantity × price is the sum and the discount**: on the card's layout to the few luma the till rounds what was
+paid by («419,98/0 490/420»), elsewhere to the hundredth — the terminal's «624.44 624.41» is a misread, not a
+rounding. **`balanced` of a receipt is «proven whole»**, not «the total met the lines». It stands at the seam
+between the parse and the rows written (`readOne` of `read-receipts.ts`), so `receipt_lines` holds only what was shown: a
+guess kept would be «as read» to «Записать» once the person typed the same figure, and its strip would teach
+the reader. A model's answer (MOL-272) is printed by its nature and goes through the same function.
+
+**On the bench** (`.scratch/tasks/research/MOL-255.md`, 54 receipts, 346 lines, 1 038 fields): 478 right and
+166 made up before, **110 right and none after**; the total unchanged (17 right, none wrong). Haiku's answers of
+MOL-268 through it: 225 right and 9 wrong — wrong by sense, a shelf price for what was paid. **The price,
+named:** three in four right figures of Tesseract are now typed by the person — and counted by `receipt_days` as
+figures put right, which is the honest measure of this reader; a receipt read before the rollout keeps its
+figures as they were read.
+
+**A line with no sum is recorded with none** (В-4 «а»): only the item is required, the trip's money is the
+total, and no price is made up. **The total's rest is given to no line** (В-5 «а») — neither a card's or a
+class code's blank, which the gate empties, nor a table's, which the parse no longer fills. **«Прочитали не
+всё» is any shortfall of the lines against the total, said with it** (В-7 «а», `readPartly`): «строки дают
+1 380 из 8 540 ֏, не хватает 7 160» — the 70 % of before kept 122b8e5f quiet at 74 %, five lines lost at
+the seams.
+
+**A found item the printed heading rules out is «проверьте»** (В-6 «б», `headingRulesOut`): the matcher's own
+rule — the item has headings and none is the line's, OCR's swaps allowed — now for an item the search found by
+the gloss too: «Ռոլիկ» (9603, brushes) glossed one letter off «լոլիկ» found tomatoes (0702) near. Only the
+headings the seed gave the catalogue's nodes are known; an item with none is ruled out by nothing.
 
 ## A Serbian receipt by its link (MOL-232)
 
