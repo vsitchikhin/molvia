@@ -144,12 +144,6 @@ export function receiptBalance(
   }
 }
 
-/**
- * Below this share of the printed total a receipt is read only in part (В-4 of MOL-125): a crumpled one
- * loses its rows. Above it one or two lost lines are the review's to live with.
- */
-export const READ_PARTLY_TOTAL_SHARE = 0.7
-
 /** A line as read: whether its own arithmetic held, and what was paid for it. */
 export interface ReadFigures {
   readonly settled: boolean
@@ -175,8 +169,9 @@ export function readCovered(lines: readonly ReadFigures[], total: Money | null):
 /**
  * Read only in part (MOL-222, В-1 — the «переснимите» of before, now a hint on the review that never
  * keeps the receipt from being recorded): no lines; or the total was read and the lines make up less
- * than `READ_PARTLY_TOTAL_SHARE` of it (`readCovered`); or the total was not read and fewer than half
- * of the lines add up by their own arithmetic. A total that was not read decides nothing alone — OCR
+ * than it (`readCovered`) — any shortfall, said with its sum (MOL-255, В-7 «а»: 74 % of a total read in
+ * three parts went unsaid under the 70 % of before, five lines lost at the seams); or the total was not
+ * read and fewer than half of the lines add up by their own arithmetic. A total that was not read decides nothing alone — OCR
  * missed it on 9 of the bench's 16 readings, most of them good ones. Of what was read, never of the
  * person's edits: the server counts it at the reading, the phone shows it on the review.
  */
@@ -184,7 +179,7 @@ export function readPartly(lines: readonly ReadFigures[], total: Money | null): 
   if (lines.length === 0) return true
   const covered = readCovered(lines, total)
   if (covered !== null && total !== null) {
-    return covered.minor * 100n < total.minor * BigInt(Math.round(READ_PARTLY_TOTAL_SHARE * 100))
+    return covered.minor < total.minor
   }
   const settled = lines.filter((line) => line.settled).length
   return settled * 2 < lines.length

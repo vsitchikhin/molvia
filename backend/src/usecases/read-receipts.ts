@@ -11,6 +11,7 @@ import {
   receiptTimeOf,
   receiptLineOf,
   receiptLineCodec,
+  verifiedReading,
 } from '@molvia/model'
 import type { Currency, ReceiptLine, ReceiptText, TextRow } from '@molvia/model'
 import { z } from 'zod'
@@ -125,11 +126,13 @@ async function readOne(
     readings.push(mergeParts(photoReading, parts))
   }
   const text = bestReading(photoReading, readings)
-  const head = headOf(text, currency, readings)
+  // a figure goes to the review as read only where it is verified, the rest is left empty (MOL-255)
+  const shown = verifiedReading(text)
+  const head = headOf(shown, currency, readings)
   if (needsReshoot(text))
     return { kind: 'failed', failure: 'reshoot', readerVersion: version, head }
 
-  const lines = text.lines.map((line) => receiptLineOf(line, currency))
+  const lines = shown.lines.map((line) => receiptLineOf(line, currency))
   let images: LineImage[] = []
   try {
     images = await cutLines(reader, claimed, text, boxes)

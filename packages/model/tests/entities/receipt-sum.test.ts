@@ -3,7 +3,6 @@ import {
   lineAddsUp,
   lineProduct,
   priceInDoubt,
-  READ_PARTLY_TOTAL_SHARE,
   readCovered,
   readPartly,
   receiptBalance,
@@ -217,13 +216,14 @@ describe('read only in part — the «переснимите» of before, a hint
     expect(readPartly([], null)).toBe(true)
   })
 
-  it(`with the total read, is below ${String(READ_PARTLY_TOTAL_SHARE * 100)} % of it: exactly the share, a luma under`, () => {
-    expect(readPartly([read(amd(700))], amd(1_000))).toBe(false)
-    expect(readPartly([read(amd(699.99))], amd(1_000))).toBe(true)
+  it('with the total read, is any shortfall of it: the total, a luma under (MOL-255, В-7 «а»)', () => {
+    expect(readPartly([read(amd(1_000))], amd(1_000))).toBe(false)
+    expect(readPartly([read(amd(999.99))], amd(1_000))).toBe(true)
   })
 
-  it('with the total read, one lost line of many is not it (am-03: 0,97)', () => {
-    expect(readPartly([read(amd(970))], amd(1_000))).toBe(false)
+  it('with the total read, is one lost line of many too (122b8e5f: 74 %, five lines at the seams)', () => {
+    expect(readPartly([read(amd(740))], amd(1_000))).toBe(true)
+    expect(readPartly([read(amd(970))], amd(1_000))).toBe(true)
   })
 
   it('with the total read, counts a line whose sum was lost as nothing', () => {
