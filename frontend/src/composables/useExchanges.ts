@@ -72,6 +72,11 @@ export interface Exchanges {
   prefer(preference: RatePreference): Promise<void>
   remove(exchange: ExchangeView): Promise<void>
   restore(): Promise<void>
+  /**
+   * The ten seconds of «Вернуть» ran out (MOL-189, Ф-29): the screen stops offering it. The server
+   * keeps the mark until its timer or the screen's next request, as before.
+   */
+  forget(): void
 }
 
 /**
@@ -216,6 +221,9 @@ export function useExchanges(): Exchanges {
     restored,
     restoring,
     retry: load,
+    forget() {
+      removed.value = null
+    },
     async record(body) {
       hush()
       // The offer to bring a removed exchange back goes when the server made the removal final —

@@ -8,7 +8,11 @@
     :draft="draft"
     :record="record"
     :amend="amend"
+    :behind="incomes.behind.value"
+    :stale="incomes.stale.value"
+    :attempt="incomes.attempt.value"
     @update:open="$emit('update:open', $event)"
+    @retry="incomes.retry()"
   />
 </template>
 

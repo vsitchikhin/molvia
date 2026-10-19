@@ -27,7 +27,7 @@ export default defineComponent({
      */
     plates: { type: Array as PropType<readonly number[]>, default: () => [1, 1] },
     /**
-     * Whose card: an income's is as tall as `IncomeCard` — the head of the bin, the line of its figure, a
+     * Whose card: an income's is as tall as `IncomeCard` — its head, the line of its figure, a
      * plate of one line of the note (MOL-188, adversarial А2: drawn as an exchange's, the second month
      * came 120 px below its bars).
      */
@@ -58,8 +58,11 @@ export default defineComponent({
   background: var(--surface);
 }
 
+// The head of `OperationCardHead`: the day and the chevron of 20 on one line (MOL-189).
 .head {
   display: flex;
+  align-items: center;
+  min-height: var(--icon);
 }
 
 .day,
@@ -90,23 +93,17 @@ export default defineComponent({
   border-radius: var(--radius);
 }
 
-// `IncomeCard`: `OperationCardHead` — the bin's 44 and 4 above it — and right under it the source and
-// the figure at the body's leading, then 8 and a plate of one line of the note in its padding.
+// `IncomeCard`: `OperationCardHead`, 8 under it the source and the figure at the body's leading, then 8
+// and a plate of one line of the note in its padding.
 .skeleton-income {
   .entry {
     gap: 0;
-    padding: 0 var(--space-4) var(--space-4);
-  }
-
-  .head {
-    align-items: center;
-    min-height: calc(var(--touch-target) + var(--space-1));
-    padding-top: var(--space-1);
   }
 
   .sums {
     align-items: center;
     height: calc(var(--text-card-figure) * var(--leading-body));
+    margin-top: var(--space-2);
   }
 
   .plate {

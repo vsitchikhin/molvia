@@ -80,7 +80,8 @@ export default defineComponent({
     /**
      * Each segment as wide as its word, the room left shared out evenly — for words of unequal
      * length, where even thirds cut the longest: «Системная · Светлая · Тёмная» on a 320 px phone
-     * (MOL-111, the owner's В-1). iOS calls it `apportionsSegmentWidthsByContent`.
+     * (MOL-111, the owner's В-1), «Обменник» of «Как меняли» (MOL-189, Е-11). iOS calls it
+     * `apportionsSegmentWidthsByContent`.
      */
     fit: { type: Boolean, default: false },
   },
@@ -206,11 +207,14 @@ export default defineComponent({
   z-index: 1;
 }
 
-/* Its word is its basis, never wrapped; every word is at one weight, so nothing shifts on a tap. */
+/* Its words are its basis; every word is at one weight, so nothing shifts on a tap. A label of two
+   words breaks between them where the row is short, never inside a word, and the track grows a line:
+   kept on one line, «Как меняли» stood 24 px past the field at 320 in Russian and 28 at 390 in
+   English (MOL-189, Е-11) — a single word, as «Тема» has, is never broken. */
 .fit .segment {
   flex: 1 1 auto;
   padding: 0 var(--space-2);
-  white-space: nowrap;
+  text-align: center;
 }
 
 .on {

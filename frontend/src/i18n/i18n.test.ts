@@ -154,6 +154,8 @@ describe('словарь: повторяющиеся тексты', () => {
       // Цена Р-2: одно состояние, написанное для трёх экранов, и у просмотра чека своё (MOL-127).
       'Сервер не ответил': [
         'advice.error.title',
+        'exchange.sheet.unanswered',
+        'income.sheet.unanswered',
         'item.error.title',
         'receipt.review.error.title',
         'trip.error.title',
@@ -279,7 +281,23 @@ describe('словарь: повторяющиеся тексты', () => {
       Откуда: ['income.sheet.source', 'transfer.from'],
       Перевод: ['transfer.row_meta', 'transfer.title'],
       'Попробуйте ещё раз': ['settings.load_error.body', 'transfer.failed_retry'],
-      'Сохраним, когда будет связь': ['accounts.sheet.wait_online', 'transfer.wait_online_save'],
+      'Сохраним, когда будет связь': [
+        'accounts.sheet.wait_online',
+        'exchange.sheet.save_offline',
+        'income.sheet.save_offline',
+        'transfer.wait_online_save',
+      ],
+      // Правка обмена и дохода без связи (MOL-189, Ф-6): те же слова неактивной кнопки, что у
+      // перевода и счёта, и одно «Вернём» у обеих полос «Вернуть».
+      'Удалим, когда будет связь': [
+        'exchange.sheet.remove_offline',
+        'income.sheet.remove_offline',
+        'transfer.remove_wait',
+      ],
+      'Вернём, когда будет связь': ['exchange.restore_offline', 'income.restore_offline'],
+      // Кнопка в подвале правки и подтверждение над ней — одни слова (81 v2, кадр 3e): человек
+      // видит, что подтверждает то, что нажал.
+      'Удалить доход': ['income.remove_sheet.confirm', 'income.sheet.remove'],
     })
   })
 
@@ -377,7 +395,20 @@ describe('словарь: повторяющиеся тексты', () => {
         'spending.categories.offline.title',
         'spending.offline.title',
       ],
-      'The server did not answer': ['advice.error.title', 'item.error.title', 'trip.error.title'],
+      'The server did not answer': [
+        'advice.error.title',
+        'exchange.sheet.unanswered',
+        'income.sheet.unanswered',
+        'item.error.title',
+        'trip.error.title',
+      ],
+      // MOL-189, as in Russian.
+      'Will bring back once online': ['exchange.restore_offline', 'income.restore_offline'],
+      'Will save once online': [
+        'accounts.sheet.wait_online',
+        'exchange.sheet.save_offline',
+        'income.sheet.save_offline',
+      ],
       // Английский не различает отмену диалога и отмену ввода; русский различает.
       Cancel: ['item.cancel', 'trip.finish_confirm.cancel'],
       // Отметка строки и заголовок «Не приняты» над такими строками: число есть только в русском.

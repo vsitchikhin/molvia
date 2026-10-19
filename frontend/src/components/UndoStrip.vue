@@ -8,16 +8,27 @@
     @pointerdown="hold(true)"
   >
     <span class="text">{{ text }}</span>
-    <span class="count" aria-hidden="true">{{ left }}</span>
-    <AppButton ref="button" variant="tinted" class="restore" @click="restore">
-      <template #icon><IconUndo /></template>
-      {{ action }}
-    </AppButton>
+    <!-- The count and «Вернуть» go together: under the words, at the right, when the strip is narrow. -->
+    <span class="tail">
+      <span class="count" aria-hidden="true">{{ left }}</span>
+      <AppButton
+        ref="button"
+        variant="tinted"
+        class="restore"
+        :busy="busy"
+        :busy-label="busyLabel"
+        :inactive="waiting || inactive"
+        @click="restore"
+      >
+        <template #icon><IconUndo /></template>
+        {{ waiting ? waitingAction : action }}
+      </AppButton>
+    </span>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { defineComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import IconUndo from '~icons/mdi/undo-variant'
 import AppButton from '@/components/AppButton.vue'
@@ -36,6 +47,11 @@ import { useAnnouncer } from '@/composables/useAnnouncer'
  *
  * The words are said once as the strip comes; the focus goes to «Вернуть», since the row it was
  * opened from is gone. What happens after — back or final — is the screen's to say.
+ *
+ * A «Вернуть» that waits for the server — an exchange's, an income's (MOL-189) — says so: at work it
+ * is `busy` with its word, and with no connection not now, saying why (Ф-6). The count stands still
+ * while it cannot be pressed (owner's В-2 «а»): ten seconds are the time to take it back, and run out
+ * offline they took away a removal the server still keeps for ten minutes.
  */
 export default defineComponent({
   name: 'UndoStrip',
@@ -52,6 +68,17 @@ export default defineComponent({
      * the first time, and taking them again moved the person's focus for a thing already known.
      */
     quiet: { type: Boolean, default: false },
+    /** «Вернуть» at work — the server is asked — with the word that says so (MOL-225). */
+    busy: { type: Boolean, default: false },
+    busyLabel: { type: String, default: '' },
+    /** «Вернуть» cannot be pressed now — no connection — and says why in `waitingAction`. */
+    waiting: { type: Boolean, default: false },
+    waitingAction: { type: String, default: '' },
+    /**
+     * Another write of the screen is in the air (MOL-189, adversarial А2): its answer makes the removal
+     * final, and a «Вернуть» pressed meanwhile would be sent nowhere — not now, with its own word.
+     */
+    inactive: { type: Boolean, default: false },
   },
   /** `tick`: what is left, every second, held or not — a screen taking the strip over goes on from it. */
   emits: ['restore', 'expire', 'tick'],
@@ -65,7 +92,7 @@ export default defineComponent({
     const announce = useAnnouncer()
 
     function tick(): void {
-      if (!held && !focused) left.value -= 1
+      if (!held && !focused && !props.waiting && !props.busy && !props.inactive) left.value -= 1
       emit('tick', left.value)
       if (left.value <= 0) {
         clearInterval(timer)
@@ -97,6 +124,17 @@ export default defineComponent({
       emit('restore')
     }
 
+    // A «Вернуть» that waited for the server and did not get it back leaves the strip: the count goes
+    // on from where it stood, or the strip stayed for good, its ten seconds stopped (MOL-189 №2).
+    watch(
+      () => props.busy,
+      (busy, was) => {
+        if (busy || !was) return
+        clearInterval(timer)
+        timer = setInterval(tick, 1000)
+      },
+    )
+
     onMounted(async () => {
       timer = setInterval(tick, 1000)
       if (props.quiet) return
@@ -118,10 +156,15 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+// The words beside the count and «Вернуть» while they have 7rem; narrower, the words take the first
+// line and the two go under them together, at the right. Kept on one line, a «Вернуть» holding «Возвращаем…»
+// left the words some 50 px at 320 and broke them a letter a line, and «Вернём, когда будет связь»
+// none at all (MOL-189).
 .undo-strip {
   @include appear;
 
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   min-height: 3.5rem;
@@ -130,6 +173,15 @@ export default defineComponent({
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow-md);
+}
+
+.tail {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  margin-left: auto;
 }
 
 .count {
@@ -147,13 +199,15 @@ export default defineComponent({
 }
 
 .text {
-  flex: 1;
+  flex: 1 1 7rem;
   min-width: 0;
   font-size: var(--text-callout);
   overflow-wrap: anywhere;
 }
 
+// May give way, its words wrapping inside it, so a long one never stands past the strip.
 .restore {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 </style>
