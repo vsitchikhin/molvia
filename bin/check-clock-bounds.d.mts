@@ -4,3 +4,4 @@ export declare function boundsOf(
   fileName: string,
   source: string,
 ): { found: string[]; noted: string[] }
+export declare const MAY_READ_THE_CLOCK: RegExp

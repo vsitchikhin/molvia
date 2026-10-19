@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boundsOf, rawBounds } from './check-clock-bounds.mjs'
+import { boundsOf, MAY_READ_THE_CLOCK, rawBounds } from './check-clock-bounds.mjs'
 
 const START = `const started = performance.now()\nwork()\n`
 
@@ -147,6 +147,50 @@ describe('rawBounds', () => {
   ])('finds a bound held in a store or a field — %s', (_, bound) => {
     const source = `it('x', () => {\nconst t0 = performance.now()\nconst d = performance.now() - t0\n${bound}\n})`
     expect(rawBounds('a.test.ts', source)).not.toEqual([])
+  })
+
+  // review №38 and adversarial Ц2: a duration against zero says time has passed — an overage or a budget is a bound
+  it.each([
+    ['a check that time has passed', `const ds: number[] = []\nif (d > 0) ds.push(d)`],
+    ['a ternary keeping a positive one', `const kept = d > 0 ? d : 0`],
+    ['a filter of positive ones', `const ds = [d]\nconst positive = ds.filter((ms) => ms > 0)`],
+    ['a mark started at zero', `let firstAt = 0\nif (firstAt <= 0) firstAt = d`],
+  ])('leaves alone a duration against zero — %s', (_, code) => {
+    const source = `it('x', () => {\nconst t0 = performance.now()\nconst d = performance.now() - t0\n${code}\n})`
+    expect(rawBounds('a.test.ts', source)).toEqual([])
+  })
+
+  // review №37: a note never takes a duration a function of the file or a method of it gives
+  it('lets no note take since(t0) or d.toFixed()', () => {
+    const source = `const since = (from: number) => performance.now() - from
+it('x', () => {
+const t0 = performance.now()
+const d = performance.now() - t0
+// not a duration: x
+expect(since(t0)).toBeLessThan(5_000)
+// not a duration: x
+expect(Number(d.toFixed(0))).toBeLessThan(5_000)
+})`
+    expect(boundsOf('a.test.ts', source)).toEqual({
+      found: [
+        '6: expect(since(t0)).toBeLessThan(5_000)',
+        '8: expect(Number(d.toFixed(0))).toBeLessThan(5_000)',
+      ],
+      noted: [],
+    })
+  })
+
+  // adversarial Ц1: the run reads a file bounded on what the platform measures alone
+  it('reads a file that names only performance.measure or its entries', () => {
+    expect(
+      MAY_READ_THE_CLOCK.test(`expect(performance.measure('a', 'b').duration).toBeLessThan(1)`),
+    ).toBe(true)
+    expect(
+      MAY_READ_THE_CLOCK.test(
+        `expect(performance.getEntriesByName('a')[0].duration).toBeLessThan(1)`,
+      ),
+    ).toBe(true)
+    expect(MAY_READ_THE_CLOCK.test(`expect(rows.length).toBeLessThan(3)`)).toBe(false)
   })
 
   // review №32 and adversarial Ф4: a count beside a duration is a count, and only a store the file made holds one

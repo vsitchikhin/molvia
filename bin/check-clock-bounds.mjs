@@ -37,8 +37,8 @@
 // a number (`expect(Date.now()).toBeLessThan(deadline)`), or a reading less a number below a reading
 // (`expect(t1 - 1_000).toBeLessThan(t0)`). And a comparison of time no assertion reads where it stands —
 // kept in a name, returned by a callback, a condition — in doubt a bound, a lower one asserted where it
-// stands instead; but a loop's condition, a wait, and a mark against zero — a name given a negative
-// number — are not; a budget or an overage against zero is. What is none and held so only in doubt says it
+// stands instead; but a loop's condition, a wait, and a duration against zero — time has passed, a mark —
+// are not; a budget or an overage against zero is. What is none and held so only in doubt says it
 // at the end of its line or on a line of its own above: `// not a duration: <why>`, never over the clock
 // read straight, and printed on every run. A lower bound is no breach of time, two readings
 // against each other included; the age of a stamp — the clock against a moment a row holds — is no
@@ -63,6 +63,12 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import process from 'node:process'
 import ts from 'typescript'
+
+/**
+ * A file that names none of these reads no clock and measures nothing: the binder is spared it. The words of
+ * `CLOCK`, `MEASURED` and `new Date` — a file bounded on `performance.measure` alone is read too (adversarial Ц1).
+ */
+export const MAY_READ_THE_CLOCK = /\.now\b|\bDate\b|hrtime|uptime|measure|getEntries/
 
 /** The files a vitest run reads: tests, the helpers beside the integration tests, a package's test helpers. */
 const FILES = ['*.test.ts', '*.test.mts', 'backend/tests/*.ts', 'packages/*/tests/*.ts']
@@ -594,14 +600,11 @@ export function boundsOf(fileName, source) {
         (ts.isPrefixUnaryExpression(v) && v.operator === ts.SyntaxKind.MinusToken)
       )
     }
-    // a budget against zero is what is left of the time, `deadline - Date.now() > 0`: a bound (№30)
-    // a mark is a name, `failAt < 0`; what is made of a duration against zero, `d - 1_000 > 0`, is a bound (Ф1)
-    const mark = (side) => {
-      const v = bare(side)
-      const key = ts.isIdentifier(v) || ts.isPropertyAccessExpression(v) ? keyOf(v) : undefined
-      return key !== undefined && marks.has(key) && sign(v) !== -1
-    }
-    if ((zero(n.left) && mark(n.right)) || (zero(n.right) && mark(n.left))) return false
+    // a duration against zero says time has passed, or is a mark (`failAt < 0`, `firstAt <= 0`): no bound
+    // (№38, Ц2); a budget against zero is what is left of the time (№30), and an overage — a duration less a
+    // number, written there or kept in a name — is past it (Ф1, №36): both bounds
+    const passed = (side) => sign(side) !== -1 && !isOverage(side)
+    if ((zero(n.left) && passed(n.right)) || (zero(n.right) && passed(n.left))) return false
     if (sign(n.left) !== 0 || sign(n.right) !== 0) return true
     const point = (side) => isReading(side) || isDeadline(side) || isLowered(side)
     return point(n.left) && point(n.right) && !(isReading(n.left) && isReading(n.right))
@@ -699,8 +702,24 @@ export function boundsOf(fileName, source) {
     return CLOCK_PATHS.has(path) ? path : undefined
   }
 
-  /** Names given a negative number, a mark of «not yet»: `let failAt = -1` (Х4, №36). */
-  const marks = new Set()
+  /** Names given an overage, a duration less a number: `const over = d - 1_000` (Х4, №36). */
+  const overs = new Set()
+  /** A duration less what is no clock — `d - 1_000` — or a name given one: how far past a limit it went. */
+  const isOverage = (node) => {
+    const n = core(node)
+    if (ts.isIdentifier(n) || ts.isPropertyAccessExpression(n)) {
+      const key = keyOf(n)
+      return key !== undefined && overs.has(key)
+    }
+    return (
+      ts.isBinaryExpression(n) &&
+      n.operatorToken.kind === ts.SyntaxKind.MinusToken &&
+      sign(n.left) === 1 &&
+      sign(n.right) === 0 &&
+      !isReading(n.right) &&
+      !isDeadline(n.right)
+    )
+  }
   /** Names a method of their own filled with a duration — a helper's parameter fills its argument (Х5). */
   const filled = new Set()
   /** The calls a function of the file makes of a callback it is given, by the callback's place. */
@@ -985,27 +1004,20 @@ export function boundsOf(fileName, source) {
           }
         }
       }
-      const negative = (value) => {
-        const v = value && bare(value)
-        return (
-          v !== undefined &&
-          ts.isPrefixUnaryExpression(v) &&
-          v.operator === ts.SyntaxKind.MinusToken &&
-          ts.isNumericLiteral(bare(v.operand))
-        )
-      }
+      // const over = d - 1_000, over = d - limit: an overage kept in a name
       if (
         ts.isVariableDeclaration(node) &&
         ts.isIdentifier(node.name) &&
-        negative(node.initializer)
+        node.initializer &&
+        isOverage(node.initializer)
       )
-        learn(symbolKey(node.name), marks)
+        learn(symbolKey(node.name), overs)
       if (
         ts.isBinaryExpression(node) &&
         node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-        negative(node.right)
+        isOverage(node.right)
       )
-        learn(keyOf(node.left), marks)
+        learn(keyOf(node.left), overs)
       // for (const d of took): each element is what the array holds (adversarial Т1)
       if (ts.isForOfStatement(node) && ts.isVariableDeclarationList(node.initializer)) {
         const [declaration] = node.initializer.declarations
@@ -1103,8 +1115,15 @@ export function boundsOf(fileName, source) {
     }
     if (ts.isPrefixUnaryExpression(n)) return direct(n.operand)
     if (ts.isBinaryExpression(n)) return direct(n.left) || direct(n.right)
-    if (ts.isCallExpression(n) && /^Math\.(max|min|abs)$/.test(calleeText(n)))
-      return n.arguments.some(direct)
+    if (ts.isCallExpression(n)) {
+      if (/^Math\.(max|min|abs)$/.test(calleeText(n))) return n.arguments.some(direct)
+      // since(t0), a function of the file that is a duration, and a method of one, d.toFixed(0) (№37)
+      const key = keyOf(n.expression)
+      if (key !== undefined && timers.has(key)) return true
+      const places = key === undefined ? undefined : since.get(key)
+      if (places?.some((place) => n.arguments[place] && isReading(n.arguments[place]))) return true
+      if (ts.isPropertyAccessExpression(n.expression)) return direct(n.expression.expression)
+    }
     return false
   }
   /** Each note that let a bound go, as `line: text`, for the log: review reads them there. */
@@ -1167,7 +1186,7 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()
   const problems = files.flatMap((file) => {
     const source = readFileSync(file, 'utf8')
     // a file that never reads the clock holds no duration: the binder is spared it
-    if (!/\.now\b|\bDate\b|hrtime|uptime/.test(source)) return []
+    if (!MAY_READ_THE_CLOCK.test(source)) return []
     const { found, noted } = boundsOf(file, source)
     notes.push(...noted.map((line) => `  ${file}:${line}`))
     return found.map((line) => `  ${file}:${line}`)
