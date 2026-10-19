@@ -42,5 +42,5 @@ describe('сбой на старте (MOL-144, адверсариальный А
       screen: string
     }[]
     expect(kept).toEqual([expect.objectContaining({ catcher: 'start', screen: 'start' })])
-  }, 10_000)
+  }, 20_000)
 })

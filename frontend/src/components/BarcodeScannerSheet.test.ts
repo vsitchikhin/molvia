@@ -164,7 +164,7 @@ describe('BarcodeScannerSheet', () => {
     expect(sheet.find('video').exists()).toBe(true)
     expect(sheet.text()).toContain(en.scanner.hint)
     expect(sheet.text()).toContain(en.scanner.manual)
-  })
+  }, 10_000)
 
   it('hands over a code two frames agree on, and closes', async () => {
     const { stream, track } = fakeStream()
@@ -648,7 +648,7 @@ describe('BarcodeScannerSheet · how to stop Safari asking', () => {
     await new Promise((resolve) => setTimeout(resolve, PERMISSION_WAIT * 2))
     await settle()
     expect(getUserMedia).not.toHaveBeenCalled()
-  }, 10_000)
+  }, 15_000)
 
   it('asks for the camera once for one opening, however the answers cross (adversarial В)', async () => {
     // Seen before: the line, not the sheet, so nothing lies over the scanner's own buttons.
@@ -691,7 +691,7 @@ describe('BarcodeScannerSheet · how to stop Safari asking', () => {
     )
     await settle()
     expect(hintUp()).toBe(false)
-  })
+  }, 10_000)
 
   it('puts the quiet line in the footer before the camera answers, not under a live picture', async () => {
     localStorage.setItem('molvia.camera-hint', '1')

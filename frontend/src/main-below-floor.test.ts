@@ -5,9 +5,9 @@ import type * as Api from '@/api'
 import type * as Identity from '@/stores/identity'
 import { OUTDATED_MARK } from '@/browserFloor'
 
-// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 162 ms there
-// (MOL-266), its work, past a tenth of vitest's 5 s. Ten times that, so the time reporter names it
-// only on a run slower than any yet seen.
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
 
 // The first step of the start throws, as it would in a browser below the floor: started, the app
 // would report it — and here it must not start at all.
@@ -59,5 +59,5 @@ describe('браузер ниже пола сборки (MOL-231)', () => {
     expect(localStorage.getItem('molvia.failures')).toBeNull()
     expect(sent).not.toHaveBeenCalled()
     expect(document.getElementById('app')?.innerHTML).toBe('line')
-  }, 15_000)
+  }, 25_000)
 })

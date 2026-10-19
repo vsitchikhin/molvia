@@ -6,9 +6,9 @@ import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, signIn, telegramId } from './fixtures'
 import { aLife } from './life'
 
-// The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 590 ms there
-// (MOL-266), in a cancelled run, which the first measure left out (MOL-243, round 19). Ten times
-// that, rounded up to 5 s, so the time reporter names one only on a run slower than any yet seen.
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
 
 const { db, close } = connectDrizzle()
 
@@ -55,7 +55,7 @@ describe('GET /actors/me/export (MOL-93)', () => {
     expect(file.transfers).toHaveLength(1)
     // The session this request came with is marked; the one `aLife` wrote beside it is not.
     expect(file.sessions.map((session) => session.current).sort()).toEqual([false, true])
-  }, 10_000)
+  }, 15_000)
 
   it('чужая cookie открывает только своё, а назвать владельца параметром нельзя', async () => {
     const anna = await insertActor(db)

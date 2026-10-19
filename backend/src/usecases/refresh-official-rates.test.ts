@@ -990,7 +990,7 @@ describe('банк страны: НБ Грузии (MOL-110)', () => {
     // Только суточный взгляд на месяц (с днями перед ним), а не проход от марта 2024.
     expect(perDay.every((asked) => asked <= ARCHIVE_RECENT_DAYS + 1 + ARCHIVE_GAP_DAYS)).toBe(true)
     expect(home.warnings).toEqual([])
-  }, 10_000)
+  }, 15_000)
 
   it('архив отдал завтрашний курс на сегодня — день пропущен, проход не отвергнут; позже завтра — отвергнут', async () => {
     const tomorrow = '2026-09-20'

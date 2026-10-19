@@ -160,7 +160,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     expect(await rowsMentioning(exchangeId)).toEqual([])
     expect(await rowsMentioning(incomeId)).toEqual([])
     expect(await rowsMentioning(transferId)).toEqual([])
-  }, 10_000)
+  }, 15_000)
 
   it('товар, который человек завёл, остаётся в справочнике без автора', async () => {
     const tg = telegramId()
@@ -175,7 +175,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     const [item] = await db.select().from(items).where(eq(items.id, ownItem))
     expect(item?.createdBy).toBeNull()
     expect(item?.name).toBe('Рынок-сыр')
-  })
+  }, 10_000)
 
   it('код, который человек дописал к позиции, остаётся в справочнике без автора (MOL-100)', async () => {
     const tg = telegramId()
@@ -312,7 +312,7 @@ describe('подтверждение входа и стирание одного
     } finally {
       await holder.close()
     }
-  })
+  }, 10_000)
 
   it('и стирание ждёт того же замка — первым, до любой строки', async () => {
     const tg = telegramId()
@@ -329,7 +329,7 @@ describe('подтверждение входа и стирание одного
     } finally {
       await holder.close()
     }
-  })
+  }, 10_000)
 
   it('а другой аккаунт этот замок не держит', async () => {
     const tg = telegramId()
@@ -393,7 +393,7 @@ describe('владельца, пока идёт стирание, не созд�
     } finally {
       await holder.close()
     }
-  })
+  }, 10_000)
 })
 
 describe('стирание не закрывает вход остальным (adversarial Р-3)', () => {

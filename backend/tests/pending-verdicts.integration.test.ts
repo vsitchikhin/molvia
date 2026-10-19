@@ -12,10 +12,9 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
-// The test here past a second on CI carries a timeout of 20 s: the slowest took 1 633 ms there
-// (MOL-266), its work, past a tenth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
-// reporter names one only on a run slower than any yet seen. The 3 more here past half a second
-// carry 10 s: the slowest of them took 689 ms.
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
 
 const { db, close } = connectDrizzle()
 

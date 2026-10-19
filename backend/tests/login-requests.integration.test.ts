@@ -100,7 +100,7 @@ describe('истёкший, использованный и несуществу
     expect(await repository.byIdAndSecret(spent.id, spent.secret)).toBeNull()
     expect(await repository.byIdAndSecret(refused.id, refused.secret)).toBeNull()
     expect(await repository.byIdAndSecret(other.id, secret())).toBeNull()
-  })
+  }, 10_000)
 
   it('мусорный идентификатор — тоже ничего, а не ошибка Postgres', async () => {
     // `22P02` уходил наверх пятисоткой: третий различимый ответ там, где должен быть один.

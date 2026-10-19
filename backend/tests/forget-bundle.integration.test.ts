@@ -5,11 +5,9 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { connectDrizzle, testDatabaseUrl } from './db'
 import { insertActor, telegramId } from './fixtures'
 
-// The test here past a second on CI carries a timeout of 30 s: the slowest took 2 725 ms there
-// (MOL-266), in the first attempt of a run re-run, which the first measure did not read (MOL-243,
-// round 21), a process of its own, past a tenth of vitest's 5 s. Ten times that, up to whole 5 s,
-// so the time reporter names one only on a run slower than any yet seen. One more here past half a
-// second carries 10 s: it took 809 ms at worst.
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
 
 /**
  * The owner's fallback for erasure is only worth anything if it runs where it is needed: in the
@@ -47,7 +45,7 @@ describe('dist/forget.js', () => {
     const wrong = forget('not-an-id')
     expect(wrong.status).toBe(2)
     expect(wrong.stdout).toContain('usage: forget')
-  }, 10_000)
+  }, 15_000)
 })
 
 // Adversarial О-6 and П-3: the value of TG must not be able to bring its own `--yes`, quoted or
@@ -64,7 +62,7 @@ describe('make forget', () => {
       expect(run.stdout).toContain('usage: forget')
       expect(run.stdout).not.toContain('PWNED')
     },
-    30_000,
+    55_000,
   )
 
   // MOL-112, adversarial Е: only YES=1 typed on the command line erases. `-n` prints the recipe

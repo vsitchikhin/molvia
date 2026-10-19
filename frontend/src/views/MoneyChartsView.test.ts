@@ -873,7 +873,7 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     const newcomer = await render()
     const buttons = newcomer.find('.switcher').findAll('button')
     expect(buttons.map((one) => one.attributes('aria-disabled'))).toEqual(['true', 'true'])
-  }, 10_000)
+  }, 15_000)
 
   it('a year with no sum says nothing under its «—», and blames no rate (adversarial М)', async () => {
     moneyChartYear.mockResolvedValue(

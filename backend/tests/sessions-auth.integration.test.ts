@@ -133,7 +133,7 @@ describe('четыре отказа — один ответ', () => {
     expect(new Set(answers.map((answer) => answer.status)).size).toBe(1)
     expect(new Set(answers.map((answer) => answer.raw)).size).toBe(1)
     expect(new Set(answers.map((answer) => answer.headers['www-authenticate'])).size).toBe(1)
-  })
+  }, 10_000)
 
   it('отвечает тем же на всё, чего этот сервер не мог выпустить', async () => {
     // Негодная форма отсекается до Postgres: иначе `22P02` пришёл бы пятисоткой, то есть

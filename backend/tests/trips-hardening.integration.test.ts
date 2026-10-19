@@ -16,10 +16,9 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, signIn, tripContext } from './fixtures'
 
-// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 052 ms there
-// (MOL-266), its work, past a tenth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
-// reporter names one only on a run slower than any yet seen. The 9 more here past half a second
-// carry 10 s: the slowest of them took 945 ms.
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
 
 const { db, close } = connectDrizzle()
 // The test pool holds one connection, so a second server needs its own to run beside the first,
@@ -202,7 +201,7 @@ describe('Б. итог похода держится и между двумя о
       itemId: bread,
     })
     expect(loaf.status).toBe(201)
-  }, 10_000)
+  }, 15_000)
 })
 
 describe('В. id устройства — только в нижнем регистре', () => {
@@ -252,7 +251,7 @@ describe('В. id устройства — только в нижнем реги�
       200,
     )
     expect(await rowsOf(tripId)).toEqual([])
-  })
+  }, 10_000)
 })
 
 describe('Г. правка и удаление наперегонки с удалением', () => {
@@ -300,7 +299,7 @@ describe('Г. правка и удаление наперегонки с уда�
 
     expect(reply.status).toBe(404)
     expect(code(reply)).toBe(ERROR.NOT_FOUND)
-  }, 10_000)
+  }, 15_000)
 
   it('С-8: удаление отвечает одинаково, успел ли первый — 200 наперегонки и 200 после', async () => {
     const { actor, tripId, expenseId } = await withRow()

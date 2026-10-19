@@ -23,10 +23,9 @@ import type { QuietToday } from '@/usecases/remind-ratings'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, telegramId } from './fixtures'
 
-// The test here past a second on CI carries a timeout of 25 s: the slowest took 2 371 ms there
-// (MOL-266), its work, past a tenth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
-// reporter names one only on a run slower than any yet seen. The 5 more here past half a second
-// carry 10 s: the slowest of them took 760 ms.
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
 
 const { db, close } = connectDrizzle()
 const reminders = createReminderRepository(db)
@@ -258,7 +257,7 @@ describe('ступень 1 — вечером следующего дня', () =
 
     expect((await evening('2026-07-14', '19:00')).reminders).toHaveLength(REMINDERS_PER_CLAIM)
     expect((await evening('2026-07-14', '19:01')).reminders).toHaveLength(1)
-  }, 25_000)
+  }, 40_000)
 })
 
 describe('лестница владельца: 1 → 3 дня → 7 дней → полгода', () => {
@@ -295,7 +294,7 @@ describe('лестница владельца: 1 → 3 дня → 7 дней →
       remindedOn: '2027-01-24',
       windowFrom: '2027-01-23',
     })
-  })
+  }, 10_000)
 
   it('своя оценка между ступенями — лестница заново с новой покупки', async () => {
     const anna = await person()
@@ -350,7 +349,7 @@ describe('лестница владельца: 1 → 3 дня → 7 дней →
 
     expect(asked(await evening('2026-08-13'))).toEqual({})
     expect(asked(await evening('2026-08-14'))).toEqual({ [anna.tg]: ['Кефир', 'Молоко'] })
-  })
+  }, 10_000)
 
   it('на ступени 2 спрашивать нечего — лестница кончается молча', async () => {
     const anna = await person()
@@ -572,7 +571,7 @@ describe('одна выдача не роняет другие (адверсар
     })
     const [day] = await db.select().from(reminderDays)
     expect(day).toMatchObject({ firstSteps: 2, items: 2 })
-  })
+  }, 10_000)
 
   it('у кого все позиции с такими именами — не помечен и не посчитан, ответ ручки — 200', async () => {
     const anna = await person()
@@ -619,7 +618,7 @@ describe('одна выдача не роняет другие (адверсар
     const second = await evening('2026-07-14', '19:01')
     expect(second.reminders).toHaveLength(1)
     expect(second.reminders[0]?.telegramUserId).not.toBe(first.reminders[0]?.telegramUserId)
-  })
+  }, 10_000)
 })
 
 describe('лишних выдач нет (адверсариальный В, ревью Т-5)', () => {
@@ -829,7 +828,7 @@ describe('лишних выдач нет (адверсариальный В, р�
 
     expect(asked(await evening('2027-01-14', '18:59'))).toEqual({})
     expect(asked(await evening('2027-01-14', '19:00'))).toEqual({ [nino.tg]: ['Боржоми'] })
-  })
+  }, 10_000)
 })
 
 describe('две выдачи одной минуты разом (ревью Т-6: «даже при двух процессах бота»)', () => {

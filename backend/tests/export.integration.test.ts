@@ -46,10 +46,9 @@ import {
 } from './fixtures'
 import { aLife } from './life'
 
-// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 091 ms there
-// (MOL-266), its work, past a tenth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
-// reporter names one only on a run slower than any yet seen. The 5 more here past half a second
-// carry 10 s: the slowest of them took 868 ms.
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
 
 const { db, close } = connectDrizzle()
 const repository = createExportRepository(db)
@@ -593,7 +592,7 @@ describe('экспорт всего своего (MOL-93)', () => {
     expect(text).not.toContain('Бориса')
     expect(content.proposedItems.map((item) => item.name)).toEqual(['Рынок-сыр'])
     expect(text).toContain(anna.actorId)
-  })
+  }, 10_000)
 
   it('тот же магазин и та же позиция у другого человека — его строк в файле нет', async () => {
     const anna = await someone()

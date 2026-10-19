@@ -409,7 +409,7 @@ describe('чужое', () => {
     expect(row?.ratingsCount).toBe(3)
     // Как на листе покупки: место открыто троими, но я там брал — моя последняя, а не чужая.
     expect(row?.level === 'take' && row.places[0]?.unitPrice.scaledMinor).toBe(perKilo(510_000))
-  }, 10_000)
+  }, 15_000)
 
   it('на двоих отдаёт мои цифры: из средней вычиталась бы чужая оценка', async () => {
     const me = await insertActor(db)

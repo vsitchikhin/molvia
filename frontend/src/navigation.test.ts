@@ -301,7 +301,7 @@ describe('a tab tapped on a nested screen', () => {
       expect(router.currentRoute.value.name).toBe('advice')
     }
     expect(router.options.history.state.back).toBeNull()
-  })
+  }, 10_000)
 
   it('opened with no ancestor underneath, a tab acts from the screen`s section', async () => {
     const router = await fresh('/')
@@ -334,7 +334,7 @@ describe('a tab tapped on a nested screen', () => {
     await router.push('/purchases/manual/add')
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(router.currentRoute.value.name).toBe('item-search')
-  }, 25_000)
+  }, 45_000)
 })
 
 describe('the tab bar walks the history as В-2 decided', () => {
@@ -404,7 +404,7 @@ describe('the tab bar walks the history as В-2 decided', () => {
       expect(router.currentRoute.value.name).toBe('settings')
     })
     expect(back).toHaveBeenCalledExactlyOnceWith(-1)
-  })
+  }, 10_000)
 
   // The example the owner answered, with the new home: What to buy → Purchases → Ratings, «back».
   it('What to buy → Purchases → Ratings, back → What to buy', async () => {

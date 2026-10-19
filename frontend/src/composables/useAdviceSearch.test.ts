@@ -187,7 +187,7 @@ describe('useAdviceSearch — the rhythm', () => {
     await flushPromises()
 
     expect(search.found.value[0]?.name).toBe('newer')
-  }, 10_000)
+  }, 15_000)
 
   it('cleared while a search is out — idle, and the answer that lands is dropped', async () => {
     const out = held<AdviceSearchResponse>()

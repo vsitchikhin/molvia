@@ -113,7 +113,7 @@ describe('the search on «Что брать» keeps what is rated past its limit
     expect(answer.items.slice(0, SEARCH_LIMIT).map((found) => found.name)).not.toContain(cheese)
     expect(answer.items.find((found) => found.name === cheese)?.advice?.level).toBe('take')
     expect(answer.near).toBe(true)
-  }, 10_000)
+  }, 15_000)
 
   it('one’s own «не брать нигде» is found, transliterated too', async () => {
     const cheese = await victim()

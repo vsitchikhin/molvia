@@ -28,10 +28,9 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 import ItemSearchView from '@/views/ItemSearchView.vue'
 import { holdsTyping } from '@/pwaUpdate'
 
-// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 035 ms there
-// (MOL-266), its work, past a tenth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
-// reporter names one only on a run slower than any yet seen. The 10 more here past half a second
-// carry 10 s: the slowest of them took 780 ms.
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
 
 /** Rows alone are a near answer — or an empty one; a far answer is given whole (MOL-46). */
 const searchCatalogue =
@@ -213,7 +212,7 @@ describe('«What did you pick up?»', () => {
     expect(view.text()).toContain(en.item.group_found)
     expect(view.text()).not.toContain(en.item.group_recent)
     expect(view.find('.loading').exists()).toBe(false)
-  })
+  }, 10_000)
 
   it('reads the count out once the answer is in', async () => {
     searchCatalogue.mockResolvedValue([milk, marianna])
@@ -224,7 +223,7 @@ describe('«What did you pick up?»', () => {
     await vi.waitFor(() => {
       expect(view.get('.live').text()).toBe('Found 2 items')
     })
-  })
+  }, 10_000)
 
   it('reads out that nothing was found — after «Found 1 item» silence would mean nothing happened', async () => {
     searchCatalogue.mockResolvedValueOnce([milk]).mockResolvedValueOnce([])
@@ -239,7 +238,7 @@ describe('«What did you pick up?»', () => {
     await vi.waitFor(() => {
       expect(view.get('.live').text()).toBe(en.item.empty.body.replace('{query}', 'молокоо'))
     })
-  }, 10_000)
+  }, 20_000)
 
   describe('takes its words back when the answer they describe goes', () => {
     async function foundOne() {
@@ -256,7 +255,7 @@ describe('«What did you pick up?»', () => {
       const view = await foundOne()
       await field(view).setValue('')
       expect(view.get('.live').text()).toBe('')
-    })
+    }, 10_000)
 
     it('when the next search fails — «found one» over an error would be a lie', async () => {
       const view = await foundOne()
@@ -266,7 +265,7 @@ describe('«What did you pick up?»', () => {
         expect(view.text()).toContain(en.item.error.title)
       })
       expect(view.get('.live').text()).not.toContain('Found')
-    }, 10_000)
+    }, 15_000)
 
     it('when the screen is left', async () => {
       searchCatalogue.mockResolvedValue([milk])
@@ -281,7 +280,7 @@ describe('«What did you pick up?»', () => {
       await nextTick()
 
       expect(view.get('.live').text()).toBe('')
-    })
+    }, 10_000)
   })
 
   it('does not read out an answer that lands in the pause — it is for the text before', async () => {
@@ -309,7 +308,7 @@ describe('«What did you pick up?»', () => {
       expect(view.get('.live').text()).toBe('Found 1 item')
     })
     expect(names(view)).toEqual([marianna.name])
-  }, 15_000)
+  }, 25_000)
 
   it('names the query nothing was found for', async () => {
     searchCatalogue.mockResolvedValue([])
@@ -321,7 +320,7 @@ describe('«What did you pick up?»', () => {
       expect(view.get('.not-found-text').text()).toBe(en.item.empty.body.replace('{query}', 'тан'))
     })
     expect(view.find('[role="listbox"]').exists()).toBe(false)
-  })
+  }, 10_000)
 
   describe('a far answer — rows, none of them close (MOL-46)', () => {
     const tea = entry(7, 'Чай зелёный')
@@ -343,7 +342,7 @@ describe('«What did you pick up?»', () => {
         en.item.empty.body.replace('{query}', 'пельмени'),
       )
       expect(button(view, en.item.empty.action).exists()).toBe(true)
-    })
+    }, 10_000)
 
     it('puts nothing above the rows: they stay where they were as the answer flips near and far', async () => {
       // A block above the list moved every row under the finger while a word was typed — «ореш»
@@ -352,20 +351,20 @@ describe('«What did you pick up?»', () => {
 
       const html = view.html()
       expect(html.indexOf('class="not-found')).toBeGreaterThan(html.indexOf('role="listbox"'))
-    })
+    }, 10_000)
 
     it('heads the rows as a likeness in spelling, not as a find', async () => {
       const view = await farFor('пельмени')
 
       expect(view.text()).toContain(en.item.group_similar)
       expect(view.text()).not.toContain(en.item.group_found)
-    })
+    }, 10_000)
 
     it('does not add the quiet «not here?» under them — the button is already above', async () => {
       const view = await farFor('пельмени')
 
       expect(view.text()).not.toContain(en.item.not_listed)
-    })
+    }, 10_000)
 
     it('reads out «not found» and how many look alike, not «found»', async () => {
       const view = await farFor('пельмени')
@@ -375,7 +374,7 @@ describe('«What did you pick up?»', () => {
           'Nothing found for «пельмени». 1 item with a similar spelling',
         )
       })
-    })
+    }, 10_000)
 
     it('still lets a row be picked, with the query it answered', async () => {
       const view = await farFor('малако')
@@ -383,7 +382,7 @@ describe('«What did you pick up?»', () => {
       await view.get('[role="option"]').trigger('click')
 
       expect(useItemEntryStore(pinia).picked).toEqual({ entry: tea, query: 'малако' })
-    })
+    }, 10_000)
 
     it('hands its query to a pick by another word, as a miss would (MOL-45)', async () => {
       searchCatalogue.mockImplementation((query) =>
@@ -406,7 +405,7 @@ describe('«What did you pick up?»', () => {
         query: 'картофель',
         missedQuery: 'овощи',
       })
-    }, 10_000)
+    }, 15_000)
 
     it('must not fire on a near answer: rows under «Found», the quiet line under them', async () => {
       searchCatalogue.mockResolvedValue([milk])
@@ -419,7 +418,7 @@ describe('«What did you pick up?»', () => {
       expect(view.find('.not-found').exists()).toBe(false)
       expect(view.text()).toContain(en.item.group_found)
       expect(view.text()).toContain(en.item.not_listed)
-    })
+    }, 10_000)
   })
 
   describe('a reload in the middle of a search (MOL-46, review Ж)', () => {
@@ -448,7 +447,7 @@ describe('«What did you pick up?»', () => {
       const again = await reloaded()
 
       expect(field(again).element.value).toBe('кефир')
-    })
+    }, 10_000)
 
     it('keeps the miss through an erased field, so the next pick still teaches the word (Ж1)', async () => {
       searchCatalogue.mockImplementation((query) =>
@@ -473,7 +472,7 @@ describe('«What did you pick up?»', () => {
         query: 'мацони',
         missedQuery: 'кефир',
       })
-    }, 10_000)
+    }, 15_000)
 
     it('forgets the search when the screen is left, as it always did', async () => {
       searchCatalogue.mockResolvedValue([])
@@ -501,7 +500,7 @@ describe('«What did you pick up?»', () => {
 
     expect(names(view)).toEqual([bread.name])
     expect(view.text()).toContain(en.item.group_recent)
-  })
+  }, 10_000)
 
   describe('when the server does not answer', () => {
     it('says so and tries again on «Try again»', async () => {
@@ -519,7 +518,7 @@ describe('«What did you pick up?»', () => {
         expect(names(view)).toEqual([milk.name])
       })
       expect(searchCatalogue).toHaveBeenCalledTimes(2)
-    })
+    }, 10_000)
 
     it('hands over the recent items when asked, so the trip goes on', async () => {
       remembered(bread, milk)
@@ -536,7 +535,7 @@ describe('«What did you pick up?»', () => {
       // Narrowed by what was typed, as offline (Р-12): the bread is not what «молок» asked for.
       expect(names(view)).toEqual([milk.name])
       expect(view.text()).toContain(en.item.error.title)
-    })
+    }, 10_000)
 
     it('offers no «Pick from recent» when there are none to pick', async () => {
       searchCatalogue.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 500'))
@@ -548,7 +547,7 @@ describe('«What did you pick up?»', () => {
 
       expect(view.text()).not.toContain(en.item.error.fallback)
       expect(view.text()).toContain(en.state.retry)
-    })
+    }, 10_000)
 
     it('keeps the recent items taken when the app is looked at again and the server is still down', async () => {
       remembered(milk)
@@ -569,7 +568,7 @@ describe('«What did you pick up?»', () => {
 
       expect(names(view)).toEqual([milk.name])
       expect(view.text()).not.toContain(en.item.error.fallback)
-    })
+    }, 10_000)
   })
 
   describe('offline', () => {
@@ -614,7 +613,7 @@ describe('«What did you pick up?»', () => {
       await view.findAll('[role="option"]')[1]?.trigger('click')
 
       expect(useItemEntryStore(pinia).picked).toEqual({ entry: marianna, query: ' Мол ' })
-    })
+    }, 10_000)
 
     it('takes along the query that found nothing before — the person’s own word for it (MOL-45)', async () => {
       searchCatalogue.mockImplementation((query) =>
@@ -637,7 +636,7 @@ describe('«What did you pick up?»', () => {
         query: 'арбуз',
         missedQuery: 'бахчевые',
       })
-    }, 10_000)
+    }, 15_000)
 
     it('takes nothing along when the pick is the same query cut short: «сыр косичка», then «сыр» (review Р-1)', async () => {
       searchCatalogue.mockImplementation((query) => Promise.resolve(query === 'сыр' ? [milk] : []))
@@ -654,7 +653,7 @@ describe('«What did you pick up?»', () => {
       await view.get('[role="option"]').trigger('click')
 
       expect(useItemEntryStore(pinia).picked).toEqual({ entry: milk, query: 'сыр' })
-    }, 10_000)
+    }, 15_000)
 
     it('takes nothing along from the recent items — they were not found by another word', async () => {
       searchCatalogue.mockResolvedValue([])
@@ -672,7 +671,7 @@ describe('«What did you pick up?»', () => {
       await view.get('[role="option"]').trigger('click')
 
       expect(useItemEntryStore(pinia).picked).toEqual({ entry: bread, query: '' })
-    })
+    }, 10_000)
 
     it('from a dimmed answer leaves with the query that answer is for, not the one being typed', async () => {
       let second!: (entries: CatalogueEntry[]) => void
@@ -694,7 +693,7 @@ describe('«What did you pick up?»', () => {
 
       expect(useItemEntryStore(pinia).picked).toEqual({ entry: milk, query: 'молок' })
       second([bread])
-    }, 10_000)
+    }, 15_000)
 
     it('from the recent items offline leaves with the field as typed', async () => {
       remembered(milk)
@@ -730,7 +729,7 @@ describe('«What did you pick up?»', () => {
       await view.get('[role="option"]').trigger('click')
 
       expect(useRecentItemsStore(pinia).items).toEqual([])
-    })
+    }, 10_000)
   })
 
   describe('a code scanned (MOL-99)', () => {
@@ -811,7 +810,7 @@ describe('«What did you pick up?»', () => {
       })
       await view.get('[role="option"]').trigger('click')
       expect(useItemEntryStore(pinia).picked).toEqual({ entry: milk, query: 'молоко' })
-    }, 10_000)
+    }, 15_000)
 
     it('names a code nobody holds, offers «Suggest an item», and says so out loud', async () => {
       remembered(bread)
@@ -849,7 +848,7 @@ describe('«What did you pick up?»', () => {
         expect(names(view)).toEqual([milk.name])
       })
       expect(view.get('.live').text()).not.toContain(missing)
-    })
+    }, 10_000)
 
     it('is red when the server does not answer, and «Try again» asks for the same code', async () => {
       catalogueByBarcode.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
@@ -972,7 +971,7 @@ describe('«What did you pick up?»', () => {
         await vi.waitFor(() => {
           expect(view.get('.live').text()).toBe(`${missing}. ${hintText}`)
         })
-      })
+      }, 10_000)
 
       it('must not show a hint the base did not give, nor fail when asking fails', async () => {
         catalogueByBarcode.mockResolvedValue(null)
@@ -1109,7 +1108,7 @@ describe('«What did you pick up?»', () => {
 
         expect(view.get('.live').text()).toBe(missingOf(CODE))
         expect(names(view)).toEqual([])
-      })
+      }, 10_000)
 
       it('asks for the code again once the connection is back, quietly (Ж)', async () => {
         online(false)
@@ -1198,7 +1197,7 @@ describe('«What did you pick up?»', () => {
           })
           // Proposed, the code's question is answered: its block goes (review С-5).
           expect(view.text()).not.toContain(missingOf(CODE))
-        })
+        }, 10_000)
 
         it('still takes the field’s word when proposed from the search’s own «not found» (control)', async () => {
           searchCatalogue.mockResolvedValue([])
@@ -1287,7 +1286,7 @@ describe('«What did you pick up?»', () => {
         // The ✕ goes with the strip: the field takes the focus back (adversarial О).
         await nextTick()
         expect(document.activeElement).toBe(field(view).element)
-      })
+      }, 10_000)
 
       it('asks before the purchase sheet whether the code is the row’s, and says so out loud', async () => {
         const view = await render()
@@ -1301,7 +1300,7 @@ describe('«What did you pick up?»', () => {
           expect(view.get('.live').text()).toBe(question)
         })
         expect(document.activeElement?.textContent.trim()).toBe(en.item.barcode.bind)
-      })
+      }, 10_000)
 
       it('writes the code to the row and then opens its sheet with the query it was found by', async () => {
         attachBarcode.mockResolvedValue({ entry: cream, created: true })
@@ -1315,7 +1314,7 @@ describe('«What did you pick up?»', () => {
           expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
         })
         expect(view.text()).not.toContain(pending)
-      })
+      }, 10_000)
 
       it('records without the code when asked to, and writes nothing', async () => {
         const view = await render()
@@ -1326,7 +1325,7 @@ describe('«What did you pick up?»', () => {
         expect(attachBarcode).not.toHaveBeenCalled()
         expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
         expect(view.text()).not.toContain(pending)
-      })
+      }, 10_000)
 
       it('names the item that holds the code, and takes it as found by the code', async () => {
         attachBarcode.mockResolvedValue({ taken: kefir })
@@ -1341,7 +1340,7 @@ describe('«What did you pick up?»', () => {
         })
         await button(view, en.item.propose.take.replace('{name}', kefir.name)).trigger('click')
         expect(useItemEntryStore(pinia).picked).toEqual({ entry: kefir, query: '' })
-      })
+      }, 10_000)
 
       it('offline, says the code is not linked and offers both ways on', async () => {
         attachBarcode.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'transport', false))
@@ -1357,7 +1356,7 @@ describe('«What did you pick up?»', () => {
         expect(button(view, en.state.retry).exists()).toBe(true)
         await button(view, en.item.barcode.without_code).trigger('click')
         expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
-      })
+      }, 10_000)
 
       it('must not act on the other answers while the code is on its way (review Б)', async () => {
         let land!: (written: CatalogueWrite) => void
@@ -1375,7 +1374,7 @@ describe('«What did you pick up?»', () => {
         await vi.waitFor(() => {
           expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
         })
-      })
+      }, 10_000)
 
       it('holds the field read-only while the code is on its way, and says «taken» when it lands (Р5-Б, Р6-А)', async () => {
         let land!: (written: CatalogueWrite) => void
@@ -1396,7 +1395,7 @@ describe('«What did you pick up?»', () => {
         })
         expect(field(view).attributes('readonly')).toBeUndefined()
         expect(useItemEntryStore(pinia).picked).toBeNull()
-      })
+      }, 10_000)
 
       it('leaves the focus where the person put it when «taken» lands (Р6-В)', async () => {
         let land!: (written: CatalogueWrite) => void
@@ -1415,7 +1414,7 @@ describe('«What did you pick up?»', () => {
         await nextTick()
 
         expect(document.activeElement).toBe(field(view).element)
-      })
+      }, 10_000)
 
       it('must not read another code while one is on its way (Р5-Б)', async () => {
         attachBarcode.mockReturnValue(new Promise(() => undefined))
@@ -1431,7 +1430,7 @@ describe('«What did you pick up?»', () => {
 
         expect(catalogueByBarcode).not.toHaveBeenCalled()
         expect(view.text()).toContain(question)
-      })
+      }, 10_000)
 
       it('writes nothing into the store when the answer lands after the screen was left (Р5-А)', async () => {
         let land!: (written: CatalogueWrite) => void
@@ -1447,7 +1446,7 @@ describe('«What did you pick up?»', () => {
         await new Promise((resolve) => setTimeout(resolve, 0))
 
         expect(useItemEntryStore(pinia).picked).toBeNull()
-      })
+      }, 10_000)
 
       it('asks the server about a code brought back from the draft, and lets it go when held (Р6-Б)', async () => {
         const first = await render()
@@ -1476,7 +1475,7 @@ describe('«What did you pick up?»', () => {
         const view = await render()
 
         expect(view.text()).not.toContain(pending)
-      })
+      }, 10_000)
 
       it('keeps the waiting code across a reload of the window (Р5-Г)', async () => {
         const first = await render()
@@ -1507,7 +1506,7 @@ describe('«What did you pick up?»', () => {
           en.item.barcode.without_code_named.replace('{name}', cream.name),
         ).trigger('click')
         expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
-      })
+      }, 10_000)
 
       it('is red on an error, and «Try again» asks again with the same code', async () => {
         attachBarcode
@@ -1526,7 +1525,7 @@ describe('«What did you pick up?»', () => {
         await vi.waitFor(() => {
           expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
         })
-      })
+      }, 10_000)
 
       it('carries the code into the item proposed as «a different item», named as typed', async () => {
         proposeItem.mockResolvedValue({ entry: kefir, created: true })
@@ -1542,7 +1541,7 @@ describe('«What did you pick up?»', () => {
           'сметана',
         )
         expect(view.text()).toContain(en.item.propose.code.replace('{code}', CODE))
-      })
+      }, 10_000)
 
       it('asks about the item the catalogue already holds under the name proposed (В-5)', async () => {
         searchCatalogue.mockResolvedValue([])
@@ -1613,7 +1612,7 @@ describe('«What did you pick up?»', () => {
         await vi.waitFor(() => {
           expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: '' })
         })
-      })
+      }, 10_000)
 
       it('opens «другой товар» empty, saying the name is taken — no circle (adversarial М, Н)', async () => {
         proposeItem.mockResolvedValue({ entry: cream, created: false })
@@ -1626,7 +1625,7 @@ describe('«What did you pick up?»', () => {
 
         expect(view.get<HTMLInputElement>('dialog input[type="text"]').element.value).toBe('')
         expect(view.text()).toContain(en.item.propose.name_taken.replace('{name}', cream.name))
-      })
+      }, 10_000)
 
       it('keeps the word typed for «другой товар» of a row picked by name (control)', async () => {
         vi.spyOn(performance, 'now').mockReturnValue(0)
@@ -1641,7 +1640,7 @@ describe('«What did you pick up?»', () => {
           'сметана',
         )
         expect(view.text()).not.toContain(en.item.propose.name_taken.replace('{name}', cream.name))
-      })
+      }, 10_000)
 
       it('drops the question when typing goes on, and the code still waits', async () => {
         const view = await render()
@@ -1651,7 +1650,7 @@ describe('«What did you pick up?»', () => {
 
         expect(view.text()).not.toContain(question)
         expect(view.text()).toContain(pending)
-      })
+      }, 10_000)
 
       it('must not ask when no code waits — a row is picked as it always was', async () => {
         const view = await render()
@@ -1664,7 +1663,7 @@ describe('«What did you pick up?»', () => {
 
         expect(view.text()).not.toContain(question)
         expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
-      })
+      }, 10_000)
 
       it('must not keep a code the server was not asked about — offline is no miss', async () => {
         online(false)
@@ -1707,7 +1706,7 @@ describe('«What did you pick up?»', () => {
         expect(proposeItem).toHaveBeenCalledWith(
           expect.objectContaining({ name: 'сметана ашхар', barcodes: [CODE] }),
         )
-      })
+      }, 10_000)
 
       it('lets a wrong code go from the sheet of the item found by it, and asks the code again', async () => {
         catalogueByBarcode.mockResolvedValueOnce(kefir).mockResolvedValue(null)
@@ -1782,7 +1781,7 @@ describe('«What did you pick up?»', () => {
       await vi.waitFor(() => {
         expect(useItemEntryStore(pinia).picked).toEqual({ entry: tan, query: 'тан' })
       })
-    })
+    }, 10_000)
 
     it('is a quiet line under an answer that has rows — the answer may still not be the thing', async () => {
       searchCatalogue.mockResolvedValue([milk])
@@ -1826,7 +1825,7 @@ describe('«What did you pick up?»', () => {
       await vi.waitFor(() => {
         expect(useItemEntryStore(pinia).picked).toEqual({ entry: tan, query: 'тан' })
       })
-    }, 10_000)
+    }, 15_000)
 
     it('is not offered under the recent items: they are not an answer to anything', async () => {
       remembered(bread)
@@ -1904,7 +1903,7 @@ describe('«What did you pick up?»', () => {
       expect(write).toMatchObject({ kind: 'add', tripId: TRIP, entry: milk })
       if (write?.kind === 'add') expect(write.body.query).toBe('мол')
       expect(useRecentItemsStore(pinia).items).toEqual([milk])
-    })
+    }, 10_000)
 
     it('remembers the code an item was found by once it went into the trip — offline it finds it (MOL-99)', async () => {
       catalogueByBarcode.mockResolvedValue(milk)
@@ -1957,7 +1956,7 @@ describe('«What did you pick up?»', () => {
       await view.findAll('[role="option"]')[1]?.trigger('click')
 
       expect(store.picked?.missedQuery).toBeUndefined()
-    }, 10_000)
+    }, 15_000)
 
     it('writes nothing, not even the recent items, when closed with ×', async () => {
       remembered(bread)
@@ -1973,6 +1972,6 @@ describe('«What did you pick up?»', () => {
 
       expect(useTripQueueStore(pinia).pending).toEqual([])
       expect(useRecentItemsStore(pinia).items).toEqual([bread])
-    })
+    }, 10_000)
   })
 })

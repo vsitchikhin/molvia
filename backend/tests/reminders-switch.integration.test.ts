@@ -243,7 +243,7 @@ describe('выключено — значит выключено', () => {
 
     expect(asked(await evening('2026-07-16'))).toEqual({})
     expect(await ladderOf(anna)).toEqual({ step: 1, remindedOn: '2026-07-13' })
-  })
+  }, 10_000)
 
   it('выключил между чтением кандидатов и выдачей — выдача его не помечает', async () => {
     const anna = await person()
@@ -301,6 +301,7 @@ describe('включение начинает лестницу заново (Р-
       const [day] = await db.select().from(reminderDays).where(eq(reminderDays.day, '2026-07-14'))
       expect(day).toMatchObject({ firstSteps: 1, items: 1 })
     },
+    10_000,
   )
 
   it('вечер ступени 2: выключил и включил — ни ступени 1 о том же, ни второй ступени 2', async () => {

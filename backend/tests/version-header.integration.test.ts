@@ -90,6 +90,6 @@ describe('a build named outside latin1', () => {
       expect(nowhere.status).toBe(404)
       expect(nowhere.headers.get(VERSION_HEADER)).toBe(named)
     },
-    15_000,
+    25_000,
   )
 })

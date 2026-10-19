@@ -382,7 +382,7 @@ describe('месяц «Денег» (MOL-73)', () => {
       counted.spent.minor,
     )
     expect(counted.slices.reduce((sum, slice) => sum + slice.level, 0)).toBe(1000)
-  })
+  }, 10_000)
 
   it('поход, завершённый 31 августа в 23:30 по Еревану, — в августе, а не в сентябре', async () => {
     const me = await owner()
@@ -424,7 +424,7 @@ describe('месяц «Денег» (MOL-73)', () => {
     const after = await month(me, '2026-08')
     expect(after.spentIncome).toEqual(before.spentIncome)
     expect(await db.select().from(moneyMonthRates)).toHaveLength(1)
-  })
+  }, 10_000)
 
   it('пришло — доходы месяца; остаток без счетов — нет (MOL-134); прошлый месяц для сравнения', async () => {
     const me = await owner()
@@ -443,7 +443,7 @@ describe('месяц «Денег» (MOL-73)', () => {
     expect(september).toMatchObject({ count: 1, incomeCount: 1 })
     expect(september.previousSpent).toEqual({ minor: 100000n, currency: 'AMD' })
     expect(september).toMatchObject({ rest: null, accountsFrom: null })
-  })
+  }, 10_000)
 
   it('идущий месяц — к тому же дню прошлого, закрытый — без него (MOL-183, С-12)', async () => {
     const me = await owner()
@@ -508,7 +508,7 @@ describe('месяц «Денег» (MOL-73)', () => {
     const gone = idsOf(first)[0] ?? ''
     expect((await call(me, 'DELETE', `/spendings/${gone}`)).statusCode).toBe(204)
     expect((await month(me, today.slice(0, 7))).count).toBe(44)
-  }, 10_000)
+  }, 20_000)
 })
 
 async function exchange(me: Owner, given: string, received: string, on: string): Promise<string> {
@@ -627,7 +627,7 @@ describe('курсы «Денег» (ревью MOL-73: Р-1…Р-5, адвер�
         uncounted: [{ minor: 5000n, currency: 'USD' }],
       })
     }
-  }, 10_000)
+  }, 15_000)
 
   it('официальный курс — только свежий: трата в $ с курсом трёхнедельной давности не посчитана (Р-4)', async () => {
     const me = await owner()
@@ -719,7 +719,7 @@ describe('месяц «Денег» — края (адверсариальный
     expect((await call(me, 'DELETE', `/spendings/${idsOf(first)[3] ?? ''}`)).statusCode).toBe(204)
     const again = await month(me, today.slice(0, 7), first.cursor ?? undefined)
     expect(idsOf(again)).toEqual(idsOf(second))
-  }, 15_000)
+  }, 30_000)
 
   it('курсор, который не ключ строки, — отказ, а не первая страница', async () => {
     const me = await owner()

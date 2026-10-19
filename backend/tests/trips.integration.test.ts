@@ -138,7 +138,7 @@ describe('поход у полки — фикстуры хендоффа', () =>
     ])
     expect(wire.total).toEqual([{ amount: '6493.12', currency: 'AMD' }])
     expect(await current(actor)).toEqual(trip(last))
-  }, 10_000)
+  }, 15_000)
 
   it('место, страна и город — из настроек; валюта похода — снимок валюты трат', async () => {
     const actor = await insertActor(db, { spendCurrency: 'USD', city: 'Ереван' })

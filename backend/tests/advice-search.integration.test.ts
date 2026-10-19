@@ -103,7 +103,7 @@ describe('GET /advice/search', () => {
     )
     expect(answered(await search(me, 'syr'))).toEqual(answered(exact))
     expect(answered(await search(me, 'сыыр'))).toEqual(answered(exact))
-  })
+  }, 10_000)
 
   it('оценённое за пределом списка — со своей оценкой, не «ещё не оценивали»', async () => {
     const me = await insertActor(db)

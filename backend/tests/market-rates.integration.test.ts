@@ -565,7 +565,7 @@ describe('«Курс рубля за 12 месяцев» на «Обмене д�
     const [pair] = (await read(cookie)).rateCharts?.pairs ?? []
     expect(pair?.side).toBe('bankSells')
     expect(pair?.periods[12].exchanges.map(({ rate }) => rate.scaled)).toEqual([parseRate('4.6')])
-  })
+  }, 10_000)
 
   it('купил рубли за драмы — процент точки тот же, что у места в «Обменах против рынка» (adversarial В)', async () => {
     await market.upsert([figure('bankCash', '4.350000', day, 'bankSells')])

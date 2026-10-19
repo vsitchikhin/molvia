@@ -71,7 +71,7 @@ describe('the labels of an answer', () => {
     await app.inject({ method: 'GET', url: `/trips/${randomUUID()}` })
 
     expect(requestSeries()).toEqual(['{method="GET",route="/trips/:tripId",status="4xx"} 2'])
-  })
+  }, 10_000)
 
   it('never carry the query', async () => {
     await app.inject({ method: 'GET', url: '/catalogue/search?q=молоко' })
@@ -147,7 +147,7 @@ describe('a request its client left before the answer (adversarial А1)', () => 
     expect(metrics.render()).toMatch(
       /^molvia_http_request_duration_seconds_count\{method="GET",route="\/probe-slow\/:outcome"\} 1$/m,
     )
-  }, 10_000)
+  }, 15_000)
 
   it('a failure after the client left is aborted in the metrics and recorded as a failure', async () => {
     await abandon('/probe-slow/fail', 100)
@@ -157,7 +157,7 @@ describe('a request its client left before the answer (adversarial А1)', () => 
       '{method="GET",route="/probe-slow/:outcome",status="aborted"} 1',
     ])
     expect(recordings.length).toBeGreaterThan(0)
-  }, 10_000)
+  }, 15_000)
 })
 
 describe('/metrics', () => {

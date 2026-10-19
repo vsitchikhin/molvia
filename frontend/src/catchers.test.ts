@@ -21,5 +21,5 @@ describe('ловушки стоят до вычисления модулей п�
     const error = await import('@/main').catch((caught: unknown) => caught)
     expect(String((error as Error).cause ?? error)).toContain('undefined is not a function')
     expect(listen.mock.calls.map(([type]) => type)).toContain('error')
-  }, 10_000)
+  }, 15_000)
 })

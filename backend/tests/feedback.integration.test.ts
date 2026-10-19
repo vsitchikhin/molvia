@@ -773,5 +773,5 @@ describe('тела со снимками считаются до чтения (�
     expect((await send(message(), cookie)).statusCode).toBe(201)
     const other = await signIn(db, await insertActor(db))
     expect((await send(heavy, other)).statusCode).toBe(415)
-  }, 10_000)
+  }, 15_000)
 })

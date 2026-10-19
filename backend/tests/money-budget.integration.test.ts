@@ -159,7 +159,7 @@ describe('«Бюджет» (MOL-117)', () => {
     ])
     expect(view.total).toMatchObject({ planned: amd(116100), left: amd(22600), whole: true })
     expect(shown.budget).toEqual({ planned: true, left: amd(22600) })
-  }, 10_000)
+  }, 15_000)
 
   it('план живёт с месяца правки и дальше; правка раньше снимает поздние (В-1, Р-9)', async () => {
     const me = await owner()

@@ -239,7 +239,7 @@ describe('одно правило денег записи — все читат�
 
     await receipt(me, id, null)
     expect(await readers(me, id)).toEqual(byPrices)
-  }, 10_000)
+  }, 15_000)
 
   it('ни одной цены: без суммы записи нет в «Деньгах», с суммой — есть', async () => {
     const me = await owner()
@@ -249,7 +249,7 @@ describe('одно правило денег записи — все читат�
     const seen = await readers(me, id)
     expect(seen.month).toEqual([{ amount: amd(250_000n), items: 3 }])
     expect(seen.accounts).toEqual([amd(250_000n)])
-  })
+  }, 10_000)
 
   it('сумма в долларах при ценах в драмах и рублях — одна строка в долларах везде (В-3)', async () => {
     const me = await owner()
@@ -328,7 +328,7 @@ describe('одно правило денег записи — все читат�
     expect(cleared?.receiptFirstAt).toBeNull()
     await receipt(me, id, '1450')
     expect(await hint.spentSince(me.id, 'AMD', exchange)).toBe(145_000n)
-  })
+  }, 10_000)
 
   it('сверка видит смену суммы: момент операции счёта сдвигается', async () => {
     const me = await owner()
@@ -433,7 +433,7 @@ describe('сумма по чеку и «списано» (MOL-78, Р-3)', () => 
       amount: { amount: '400', currency: 'AMD' },
     })
     expect(await debited()).toBeNull()
-  }, 10_000)
+  }, 15_000)
 
   it('«списано» у записи в драмах на драмовом счёте не нужно, если и сумма в драмах; сумма в долларах — нужно', async () => {
     const me = await owner()

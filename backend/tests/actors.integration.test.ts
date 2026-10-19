@@ -126,7 +126,7 @@ describe('the first visit', () => {
       incomeCurrency: 'RUB',
     })
     expect(actor.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
-  })
+  }, 10_000)
 
   it('sends the timestamps as ISO strings, not as whatever JSON made of a Date', async () => {
     const actor = actorIn((await firstVisit()).body)

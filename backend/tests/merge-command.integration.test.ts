@@ -11,10 +11,9 @@ import { items } from '@/db/schema'
 import { connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertItem } from './fixtures'
 
-// The 5 tests here past a second on CI carry a timeout of 20 s: the slowest took 1 506 ms there
-// (MOL-266), a process of its own, past a tenth of vitest's 5 s. Ten times that, up to whole 5 s,
-// so the time reporter names one only on a run slower than any yet seen. The 2 more here past half
-// a second carry 10 s: the slowest of them took 827 ms.
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
 
 const { db, close } = connectDrizzle()
 const root = fileURLToPath(new URL('../..', import.meta.url))
@@ -77,14 +76,14 @@ describe('dist/merge.js', () => {
     const undone = merge('unmerge', number, '--yes')
     expect([undone.status, undone.stdout]).toEqual([0, expect.stringContaining('apart again')])
     expect(await mergedInto(younger)).toBeNull()
-  }, 20_000)
+  }, 30_000)
 
   it('says why a pair was refused, and nothing changes', async () => {
     const dish = await insertItem(db, { kind: 'dish', name: 'Хаш', searchKey: 'hash' })
     const refused = merge('merge', dish, older, '--yes')
     expect([refused.status, refused.stdout]).toEqual([1, expect.stringContaining('of two kinds')])
     expect(merge('unmerge', '424242', '--yes').status).toBe(1)
-  }, 10_000)
+  }, 15_000)
 
   it('answers the usage for anything else', () => {
     for (const args of [
@@ -97,7 +96,7 @@ describe('dist/merge.js', () => {
       const wrong = merge(...args)
       expect([wrong.status, wrong.stdout]).toEqual([2, expect.stringContaining('usage: merge')])
     }
-  }, 20_000)
+  }, 30_000)
 
   it('refuses the first step of a chain, naming the one to undo first', async () => {
     const third = await insertItem(db, { name: 'Молоко 3.20%', searchKey: 'moloko 3 20' })
@@ -108,7 +107,7 @@ describe('dist/merge.js', () => {
       1,
       expect.stringContaining(`undo #${second} first`),
     ])
-  }, 20_000)
+  }, 25_000)
 
   it('lists every candidate named and still apart, with its command (review №9)', async () => {
     const [a, b] = [older, younger].sort()
@@ -121,7 +120,7 @@ describe('dist/merge.js', () => {
     expect(listed.stdout).toContain('1 candidates named and still apart')
     merge('merge', younger, older, '--yes')
     expect(merge('candidates').stdout).toContain('0 candidates named and still apart')
-  }, 20_000)
+  }, 25_000)
 
   it('says two things apart, a dry run without --yes', async () => {
     expect(merge('apart', younger, older).stdout).toContain('dry run: nothing changed')
@@ -132,7 +131,7 @@ describe('dist/merge.js', () => {
       expect.stringContaining('never merges or names'),
     ])
     expect(merge('apart', older, younger, '--yes').stdout).toContain('apart already')
-  }, 20_000)
+  }, 25_000)
 
   it('prints every pair of a night, with its command (adversarial В2)', async () => {
     expect(merge('night', '2026-10-06').status).toBe(1)
@@ -146,5 +145,5 @@ describe('dist/merge.js', () => {
     expect(listed.status).toBe(0)
     expect(listed.stdout).toContain(`make apart FROM=${younger} INTO=${older}`)
     expect(listed.stdout).toContain('1 would be merged')
-  }, 10_000)
+  }, 20_000)
 })

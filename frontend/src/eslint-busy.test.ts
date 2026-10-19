@@ -95,7 +95,7 @@ describe('eslint.config.js: a busy button says what it does (MOL-225)', () => {
     async (_, template) => {
       expect(await refused(template)).toBe(true)
     },
-    120_000,
+    235_000,
   )
 
   it.each([

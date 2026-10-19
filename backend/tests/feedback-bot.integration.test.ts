@@ -19,10 +19,9 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { aScreenshot, clearAll, insertActor, signIn } from './fixtures'
 
-// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 169 ms there
-// (MOL-266), its work, past a tenth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
-// reporter names one only on a run slower than any yet seen. The 12 more here past half a second
-// carry 10 s: the slowest of them took 879 ms.
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
 
 // MOL-148: the bot's half of «Написать разработчику» — the owner's notice, the reply, a thread
 // continued — through a real server and a real Postgres.

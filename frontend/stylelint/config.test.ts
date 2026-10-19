@@ -33,7 +33,7 @@ describe('frontend/.stylelintrc.json', () => {
           '  font: inherit;\n  font-size: 1em;\n  font-weight: var(--weight-medium);\n}\n',
       ),
     ).toEqual([])
-  }, 10_000)
+  }, 15_000)
 
   it('refuses the font shorthand with anything but inherit — Nunito or a literal past the mixin', async () => {
     expect(
@@ -119,5 +119,5 @@ describe('frontend/.stylelintrc.json', () => {
     expect(await rules(sfc('.a {\n  scroll-behavior: smooth;\n}\n'), caption)).toEqual([
       'declaration-property-value-disallowed-list',
     ])
-  })
+  }, 10_000)
 })

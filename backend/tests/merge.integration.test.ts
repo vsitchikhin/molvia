@@ -331,7 +331,7 @@ describe('the undo', () => {
       into: older,
     })
     expect(await snapshot()).toEqual(before)
-  })
+  }, 15_000)
 
   it('is done once, and the night never merges the pair again — the owner’s hand still may', async () => {
     const outcome = await merges.mergeItems(younger, older, NIGHT)
@@ -341,7 +341,7 @@ describe('the undo', () => {
     expect(await merges.unmerge(999_999)).toEqual({ refused: 'missing' })
     expect(await merges.mergeItems(older, younger, NIGHT)).toEqual({ refused: 'undone' })
     expect('id' in (await merges.mergeItems(younger, older, { by: 'hand' }))).toBe(true)
-  })
+  }, 10_000)
 })
 
 describe('the sweep', () => {
@@ -638,7 +638,7 @@ describe('the night on the real database (adversarial А1, А6)', () => {
     expect(
       queued.map((notice) => (notice.kind === 'catalogue_merged' ? notice.merged : -1)),
     ).toEqual([2])
-  })
+  }, 10_000)
 
   it('claims a night again an hour after it died, and names what it merged before', async () => {
     const { milk, milkPoint } = await twoPairs()
@@ -879,7 +879,7 @@ describe('a fan where the later merge only withdrew (review №12, adversarial �
     await merges.unmerge(first)
     await merges.unmerge(second)
     expect(await snapshot()).toEqual(before)
-  })
+  }, 10_000)
 
   it('keeps a name of the survivor its own, whatever the twins knew', async () => {
     const b = await made('Молоко', 'moloko', '2026-09-01')

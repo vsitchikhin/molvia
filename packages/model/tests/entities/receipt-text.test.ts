@@ -20,11 +20,11 @@ import {
 } from '#model/entities/receipt-text'
 import type { ReceiptText, TextRow } from '#model/entities/receipt-text'
 
-// The 3 tests here past a second on CI carry a timeout of their own, ten times their worst there
-// (MOL-266), so the time reporter names one only on a run slower than any yet seen: 15 s for 1
-// 266 ms, 20 s for «searched only as far» — 1 408 ms, under a bound on the clock of 15 s — and 45 s
-// for «cost no second search» — 4 111 ms, two readings of four hundred rows. The 4 more here past
-// half a second carry 10 s: the slowest of them took 581 ms.
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+// «Searched only as far» also holds a bound on the clock of 15 s, below its timeout; «cost no second
+// search» reads two receipts of four hundred rows.
 
 /** Armenia's card: the fixtures are Armenian tills. */
 const AM = ARMENIAN_RECEIPTS
@@ -130,7 +130,7 @@ describe('a receipt read by Tesseract, as the prototype read it', () => {
         ]),
       )
     },
-    10_000,
+    15_000,
   )
 
   it('reads the card layout with the till discount and the weight: am-03, 17 of 18 lines', () => {
@@ -145,7 +145,7 @@ describe('a receipt read by Tesseract, as the prototype read it', () => {
       309_000,
       401_354,
     ])
-  }, 10_000)
+  }, 15_000)
 
   it('reads the table layout of Dog City and lets the total decide: am-04', () => {
     const got = read(am04 as Fixture)
@@ -166,12 +166,12 @@ describe('a receipt read by Tesseract, as the prototype read it', () => {
       '2.Գազավորված ըմպելիք «Կոկա Կոլա» 1.6լ',
       '2202/096796 14տ 702,9/7,1 710',
     ])
-  }, 10_000)
+  }, 15_000)
 
   it('cuts only the figures when the number was not read — «Յ» for «3»', () => {
     const milk = read(am03 as Fixture).lines[2]!
     expect(milk.rows.map((r) => r.text)).toEqual(['0401/1163909 1Հտ 366,3/3,7 370'])
-  })
+  }, 10_000)
 
   it('cuts only the heading row of a table', () => {
     const got = read(am04 as Fixture)
@@ -360,7 +360,7 @@ describe('rows of an item’s shape above the list (review Р15)', () => {
     )
     const yoghurt = parse(text).lines.find((line) => line.sku === '1160033')!
     expect([yoghurt.sumHundredths, yoghurt.settled]).toEqual([29_000, true])
-  }, 15_000)
+  }, 30_000)
 })
 
 describe('a line printed with no discount among discounted ones (review Р5)', () => {
@@ -526,7 +526,7 @@ describe('rows of junk by the hundred (review Р18)', () => {
     expect(got.lines.filter((line) => line.settled).length).toBeLessThan(100)
     // and against a fall back to seconds a row: ten times the worst on CI, 1 408 ms (MOL-266)
     expectWithin(performance.now() - started, 15_000)
-  }, 20_000)
+  }, 30_000)
 
   it('cost no second search where the total shown is not the reading’s own (MOL-244)', () => {
     // two places vouch for 9 000,00 against the reading's 10 000,00: the reading chosen is read again as
@@ -546,7 +546,7 @@ describe('rows of junk by the hundred (review Р18)', () => {
       2 * once,
     )
     expect(got?.totalHundredths).toBe(900_000)
-  }, 45_000)
+  }, 85_000)
 })
 
 describe('the name row of the first item, which has the head above it (review Р19)', () => {
@@ -590,7 +590,7 @@ describe('the beam keeps the reading the total asks for (review П11)', () => {
     const got = parse([...body, totalRow(total)].join('\n'))
     expect(got.balanced).toBe(true)
     expect(got.lines.map((line) => line.sumHundredths)).toEqual(truth)
-  })
+  }, 10_000)
 })
 
 // Review round 4 of MOL-125.
@@ -713,7 +713,7 @@ describe('a line of a till with no shelf price whose figures OCR glued long (rev
     expect(got.lines.slice(0, 5).map((line) => line.sumHundredths)).toEqual(
       Array.from({ length: 5 }, () => 30_000),
     )
-  })
+  }, 10_000)
 })
 
 describe('two flavours of one yoghurt, numbered in a row (review Р23)', () => {
@@ -1123,7 +1123,7 @@ describe('a fiscal till read by its class code (MOL-226)', () => {
     const got = receipt(...rows, 'Ընդամենը 99999.99')
     expect([got.layout, got.lines.length]).toEqual(['class', 200])
     expect(got.lines.filter((line) => line.settled).length).toBeLessThan(100)
-  }, 10_000)
+  }, 15_000)
 })
 
 // MOL-226, review round 1: what OCR does to the class reading that the first version lost.

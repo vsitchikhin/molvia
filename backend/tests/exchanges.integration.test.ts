@@ -167,7 +167,7 @@ describe('«Обмен денег» через API (MOL-40)', () => {
     // 20 000 × 4.3123 = 86 246 ֏; the exchanger gave 13 754 more.
     expect(list[1]?.official?.difference).toEqual({ minor: 1_375_400n, currency: 'AMD' })
     expect(list[1]?.official?.rate.scaled).toBe(parseRate('4.3123'))
-  }, 10_000)
+  }, 15_000)
 
   it('без курса ЦБ на тот день обмен записан, но без сравнения', async () => {
     await rates.upsert([rub('4.3123', daysAgo(1))])
@@ -238,7 +238,7 @@ describe('«Обмен денег» через API (MOL-40)', () => {
       payload: payload({ exchangedOn: latestDay(new Date()) }),
     })
     expect(east.statusCode).toBe(201)
-  })
+  }, 10_000)
 
   it('тело чужого формата — 400 до записи', async () => {
     const { cookie } = await owner()

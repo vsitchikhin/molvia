@@ -237,7 +237,7 @@ describe('GET /catalogue/barcode/hint', () => {
     const { status, body } = await hint('?code=4850001270126&lang=ru')
     expect([status, body]).toEqual([200, { hint: null }])
     expect((await cache.get('4850001270126'))?.answer).toEqual({ found: false })
-  })
+  }, 10_000)
 
   it('база не ответила — hint: null, ничего не запомнено', async () => {
     base.answers[NUTELLA] = null

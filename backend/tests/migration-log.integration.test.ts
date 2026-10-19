@@ -174,7 +174,7 @@ describe('соединение оборвано посреди миграции 
     expect(run.exit).toBe(1)
     const line = JSON.parse(run.stdout.trim()) as Record<string, unknown>
     expect(line).toMatchObject({ msg: 'migrations failed', code: 'CONNECTION_CLOSED' })
-  }, 30_000)
+  }, 55_000)
 })
 
 describe('`make migrate` — сбой печатается так же, как API пишет его в лог', () => {

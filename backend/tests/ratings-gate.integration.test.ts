@@ -15,10 +15,9 @@ import { clearAll, insertActor, insertCounted, insertItem } from './fixtures'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { actors, verdicts as verdictsTable } from '@/db/schema'
 
-// The 3 tests here past a second on CI carry a timeout of 15 s: the slowest took 1 263 ms there
-// (MOL-266), its work, past a tenth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
-// reporter names one only on a run slower than any yet seen. The 2 more here past half a second
-// carry 10 s: the slowest of them took 822 ms.
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
 
 const { db, close } = connectDrizzle()
 const verdicts = createVerdictRepository(db)
@@ -95,17 +94,21 @@ describe('gate 0.2: five verdicts in two weeks', () => {
     [4, 0],
     [5, 1],
     [6, 1],
-  ])('with %i verdicts in the window, %i reached the threshold', async (count, reached) => {
-    await rateMany(await personSeen(), count)
+  ])(
+    'with %i verdicts in the window, %i reached the threshold',
+    async (count, reached) => {
+      await rateMany(await personSeen(), count)
 
-    await expect(gate()).resolves.toEqual({
-      cohortSize: 1,
-      reached,
-      pending: 0,
-      withoutConsent: 0,
-      optedOut: 0,
-    })
-  })
+      await expect(gate()).resolves.toEqual({
+        cohortSize: 1,
+        reached,
+        pending: 0,
+        withoutConsent: 0,
+        optedOut: 0,
+      })
+    },
+    10_000,
+  )
 
   it('counts a fifth verdict in the last hour of the second week', async () => {
     const actorId = await personSeen()

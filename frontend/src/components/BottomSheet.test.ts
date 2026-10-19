@@ -1890,7 +1890,7 @@ describe('words said inside the sheet', () => {
     expect(region.text()).toBe('')
     await settle()
     expect(added).toEqual([{ text: OFFLINE, open: true }])
-  })
+  }, 10_000)
 
   it('says them again each time it opens, and empties its region as it closes', async () => {
     const { region, added, toggle } = await renderSpeaking({ strip: true })
@@ -1902,7 +1902,7 @@ describe('words said inside the sheet', () => {
     expect(region.text()).toBe('')
     await settle()
     expect(added.map((a) => a.text)).toEqual([OFFLINE, OFFLINE])
-  })
+  }, 10_000)
 
   it('says nothing of a block gone before the opening', async () => {
     const { added, strip, toggle } = await renderSpeaking({ strip: true })
@@ -1923,7 +1923,7 @@ describe('words said inside the sheet', () => {
     await settle()
     expect(added).toEqual([])
     expect(host.get('.app-region').text()).toBe('')
-  })
+  }, 10_000)
 
   // A picker over a sheet (MOL-123): the sheet under it is inert too, so the top one takes the words —
   // and gives them back once it is down. The reason the open sheets are a list (review С-10).
@@ -1995,7 +1995,7 @@ describe('words said inside the sheet', () => {
     await settle()
     expect(region('under')).toBe('Снова наверху')
     expect(region('over')).toBe('')
-  }, 10_000)
+  }, 20_000)
 
   // Under a modal sheet everything else is inert: a sheet's wrapper speaking from its own setup,
   // above its BottomSheet, or the screen under it, is said in the sheet (adversarial А3).
@@ -2010,5 +2010,5 @@ describe('words said inside the sheet', () => {
     screen.value = 'Восстановлено'
     await settle()
     expect(host.get('.app-region').text()).toBe('Восстановлено')
-  })
+  }, 10_000)
 })

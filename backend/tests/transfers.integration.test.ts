@@ -31,10 +31,9 @@ import { buildServer } from '@/server'
 import { connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
 
-// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 409 ms there
-// (MOL-266), its work, past a tenth of vitest's 5 s. Ten times that, rounded up to 5 s, so the time
-// reporter names one only on a run slower than any yet seen. The 7 more here past half a second
-// carry 10 s: the slowest of them took 942 ms.
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
 
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
@@ -290,7 +289,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
     }
     const unassigned = await call(me, 'GET', '/money/accounts/unassigned')
     expect(unassigned.json()).toEqual({ rows: [] })
-  })
+  }, 10_000)
 
   describe('повтор и отказы', () => {
     it('тот же перевод ещё раз — 200 и один перевод; другое под тем же именем — 409', async () => {
@@ -322,7 +321,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
       }
       expect(await balanceOf(me, card)).toBe('314000 USD')
       expect(await balanceOf(me, dollars)).toBe('440000 USD')
-    })
+    }, 10_000)
 
     it('один и тот же счёт — отказ схемы; день, которого ещё нет нигде, — error.transfer_in_future', async () => {
       const { me, card, dollars } = await twoDollarAccounts()
@@ -521,7 +520,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
       const [fee] = await db.select().from(spendings).where(eq(spendings.transferId, id))
       expect(fee?.deletedAt).not.toBeNull()
       expect(await balanceOf(me, card)).toBe('314000 USD')
-    }, 15_000)
+    }, 30_000)
   })
 
   describe('удаление и «Вернуть»', () => {
@@ -661,6 +660,6 @@ describe('«Перевод» между своими счетами (MOL-253)', 
       expect(report.erased.spendings).toBe(1)
       expect(await db.select().from(accountTransfers)).toEqual([])
       expect(await db.select().from(accountTransferRevisions)).toEqual([])
-    })
+    }, 10_000)
   })
 })

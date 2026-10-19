@@ -194,7 +194,7 @@ describe('PUT — поставить оценку', () => {
       })
     }
     expect(await rows(itemId)).toHaveLength(0)
-  })
+  }, 10_000)
 
   it('Е: сотни тысяч невидимых пустых строк в голове отзыва — отказ за миллисекунды', async () => {
     // Parsing is synchronous, so a request in parallel would wait out any blockage and still answer —
@@ -451,7 +451,7 @@ describe('DELETE — снять оценку', () => {
     ])
 
     expect(replies.map((reply) => reply.status).sort()).toEqual([200, 201])
-  })
+  }, 10_000)
 
   it('21: снятая оценка не правится и не закрывает покупку', async () => {
     const actor = await insertActor(db)

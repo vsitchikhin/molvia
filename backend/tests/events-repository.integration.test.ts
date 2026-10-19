@@ -444,7 +444,7 @@ describe('week-four return: an objection to being counted (MOL-96)', () => {
       withoutConsent: 0,
       optedOut: 1,
     })
-  })
+  }, 10_000)
 
   it('keeps out someone back on after their fourth week too: that week was erased', async () => {
     const actorId = await actorSeenAt(hoursAgo(700))
@@ -619,7 +619,7 @@ describe("recording at most once a day of the person's own life", () => {
         expect(utc, at).toEqual({ written: utc.written, cohortSize: 1, returned })
       }
     }
-  }, 10_000)
+  }, 15_000)
 
   it('keeps the product and venue halves apart', async () => {
     const actorId = await insertCounted(db)

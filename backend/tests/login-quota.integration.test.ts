@@ -8,9 +8,9 @@ import { startLogin } from '@/usecases/start-login'
 import { connectDrizzle } from './db'
 import { clearAll } from './fixtures'
 
-// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 268 ms there
-// (MOL-266), its work, past a tenth of vitest's 5 s. Ten times that, so the time reporter names it
-// only on a run slower than any yet seen.
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
 
 const first = connectDrizzle()
 const second = connectDrizzle()
@@ -34,7 +34,7 @@ describe('login quota and lifetime', () => {
     expect(row).not.toBeNull()
     expect(row!.expiresAt.getTime() - row!.createdAt.getTime()).toBe(300_000)
     expect(JSON.stringify(await first.db.select().from(loginRequests))).not.toContain(secret)
-  })
+  }, 10_000)
 
   it('serialises the Nth and N+1th start and remembers the quota across repository instances', async () => {
     for (let i = 0; i < LOGIN_WINDOW_LIMIT - 1; i += 1) {

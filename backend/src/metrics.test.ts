@@ -146,7 +146,7 @@ describe('processMetrics', () => {
     // A reader by hand first, then the scraper: both see the block.
     expect(gauge(running.render(), 'nodejs_eventloop_lag_max_seconds')).toBeGreaterThan(0.25)
     expect(gauge(running.render(), 'nodejs_eventloop_lag_max_seconds')).toBeGreaterThan(0.25)
-  })
+  }, 10_000)
 
   it('sees a block that starts right after a read (adversarial А2b)', async () => {
     running = processMetrics({ tickMs: 10, windowMs: 5000 })
@@ -155,7 +155,7 @@ describe('processMetrics', () => {
     await sleep(30)
 
     expect(gauge(running.render(), 'nodejs_eventloop_lag_max_seconds')).toBeGreaterThan(0.25)
-  })
+  }, 10_000)
 
   it('lets a block go once its window has passed', async () => {
     running = processMetrics({ tickMs: 10, windowMs: 200 })
@@ -163,7 +163,7 @@ describe('processMetrics', () => {
     await sleep(400)
 
     expectWithin(gauge(running.render(), 'nodejs_eventloop_lag_max_seconds') * 1000, 100)
-  }, 10_000)
+  }, 15_000)
 
   it('reads an idle loop as on time, not as its timer’s resolution (adversarial А3)', async () => {
     // Node's monitor read the resolution itself — here the tick, 0.2 s — as the delay of an idle
@@ -172,5 +172,5 @@ describe('processMetrics', () => {
     await sleep(1100)
 
     expectWithin(gauge(running.render(), 'nodejs_eventloop_lag_p99_seconds') * 1000, 150)
-  }, 15_000)
+  }, 25_000)
 })
