@@ -95,6 +95,18 @@ function headingVariants(hs: string): string[] {
 }
 
 /**
+ * The customs heading printed on a line rules the item out (MOL-255, В-6 «б»): the item has headings and
+ * none of them is the line's, OCR's swaps allowed — the rule the matcher passes names by, for an item the
+ * search found by the gloss: «Ռոլիկ» (9603, brushes) read as «լոլիկ» found tomatoes (0702) near. A class
+ * of services or no heading rules nothing out, and nor does an item with no heading.
+ */
+export function headingRulesOut(hs: string | null, headings: readonly string[]): boolean {
+  if (!isHeading(hs) || headings.length === 0) return false
+  const allowed = headingVariants(hs)
+  return !allowed.some((h) => headings.includes(h))
+}
+
+/**
  * Builds the matcher over the catalogue's nodes, in the order given — on a tie the first wins — and a
  * dictionary of till words (Armenian → Russian).
  */
