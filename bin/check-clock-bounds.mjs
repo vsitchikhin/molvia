@@ -384,6 +384,12 @@ export function rawBounds(fileName, source) {
       // a field's own name is no mention of anything
       return ts.isPropertyAccessExpression(n) && sign(n.expression) === 1 ? 1 : 0
     }
+    // { d }: the value is the variable, not the field the binder names there
+    if (ts.isShorthandPropertyAssignment(n)) {
+      const value = checker.getShorthandAssignmentValueSymbol(n)
+      const key = value ? keyOfSymbol(value) : undefined
+      return key !== undefined && (carriers.has(key) || timers.has(key)) ? 1 : 0
+    }
     let found = 0
     ts.forEachChild(n, (child) => {
       if (found === 0 && sign(child) === 1) found = 1

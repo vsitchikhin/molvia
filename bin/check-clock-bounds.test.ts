@@ -74,6 +74,14 @@ describe('rawBounds', () => {
       `const deadline = Date.now() + 1_000\nconst inTime = deadline - Date.now() > 0\nexpect(inTime).toBe(true)`,
     ],
     [
+      'for of an entry of the array',
+      `for (const [, ms] of took.entries()) expect(ms).toBeLessThan(1_000)`,
+    ],
+    [
+      'for of the values of a shorthand',
+      `const d = took[0]\nfor (const ms of Object.values({ d })) expect(ms).toBeLessThan(1_000)`,
+    ],
+    [
       'a method of an object of the file',
       `const check = { fast: (ms: number) => ms < 1_000 }\nexpect(check.fast(took[0])).toBe(true)`,
     ],
