@@ -27,7 +27,7 @@ import {
   insertTrip,
 } from './fixtures'
 
-// The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 923 ms there
+// The 5 tests here past half a second on CI carry a timeout of 10 s: the slowest took 923 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
 // than any yet seen.
 
@@ -593,7 +593,7 @@ describe('a pair undone is never joined again by the survivor’s survivor (adve
     // Not even named: the owner said once that they are two things.
     const named = report.candidatePairs.map((pair) => [pair.fromId, pair.intoId].sort().join(' '))
     expect(named).not.toContain([a, c].sort().join(' '))
-  })
+  }, 10_000)
 })
 
 describe('the night on the real database (adversarial А1, А6)', () => {

@@ -28,7 +28,7 @@ import { buildServer } from '@/server'
 import { connect, connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtures'
 
-// The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 857 ms there
+// The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 857 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
 // than any yet seen.
 
@@ -555,6 +555,7 @@ describe('«Записать»', () => {
           await Promise.all([pool.end(), holder.end(), watcher.end()])
         }
       },
+      10_000,
     )
   })
 
@@ -996,7 +997,7 @@ describe('«Записать»', () => {
       expect((await wordsOf(me)).map((word) => word.itemId)).toEqual([kefir, kefir])
       expect(await remove(me, wrong)).toBe(true)
       expect((await wordsOf(me)).map((word) => word.itemId)).toEqual([milk, milk])
-    })
+    }, 10_000)
 
     // round 4, Р4-1: «as read» is judged at the record, never from the purchase as it is now
     it('Р4-1: keeps the shelf price after the sum paid was put right', async () => {
@@ -1274,7 +1275,7 @@ describe('«Записать»', () => {
     // C: put right the same way as A, though the memory would now show cheese
     expect((await record(me, c, body(cheese, [0]))).statusCode).toBe(200)
     expect(await db.select().from(receiptDays)).toMatchObject([{ linesEdited: 1, linesItem: 1 }])
-  })
+  }, 10_000)
 
   // MOL-222, review 2 and adversarial А7: a total put right confirms the printed sums of the lines that
   // do not add up (В-5) — one edit of the receipt, never of the lines nobody opened

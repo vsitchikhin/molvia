@@ -39,7 +39,7 @@ import {
   telegramId,
 } from './fixtures'
 
-// The 3 tests here past half a second on CI carry a timeout of 10 s: the slowest took 796 ms there
+// The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 796 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
 // than any yet seen.
 
@@ -369,7 +369,7 @@ describe('владельца, пока идёт стирание, не созд�
     } finally {
       await holder.close()
     }
-  })
+  }, 10_000)
 
   it('сборка входа тоже ждёт — и ждёт до строки запроса, так что стиранию ждать нечего', async () => {
     const tg = telegramId()

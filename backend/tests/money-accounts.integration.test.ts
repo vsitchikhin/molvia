@@ -37,7 +37,7 @@ import { recordSpending } from '@/usecases/spendings'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
-// The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 628 ms there
+// The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 628 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
 // than any yet seen.
 
@@ -501,7 +501,7 @@ describe('остаток — старт и всё после дня старта
       accountId: null,
       debited: null,
     })
-  })
+  }, 10_000)
 })
 
 describe('поход на счёте (п. 6, Р-18)', () => {
@@ -1129,7 +1129,7 @@ describe('после ревью (MOL-115, Р-3, Д1–Д6)', () => {
     )
     expect(journal.rows[0]).toMatchObject({ day: daysAgo(1), inBalance: false })
     expect((await balanceOf(me, id)).balance.minor).toBe(10_000_000n)
-  })
+  }, 10_000)
 
   it('поход без счёта и без единой цены — в «не попали» (Д6)', async () => {
     const me = await owner()

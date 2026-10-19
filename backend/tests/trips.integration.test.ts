@@ -26,7 +26,7 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, signIn, tripContext } from './fixtures'
 
-// The 13 tests here past half a second on CI carry a timeout of 10 s: the slowest took 964 ms there
+// The 15 tests here past half a second on CI carry a timeout of 10 s: the slowest took 964 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
 // than any yet seen.
 
@@ -150,7 +150,7 @@ describe('поход у полки — фикстуры хендоффа', () =>
     expect(view.converted).toBeNull()
     const [place] = await db.select().from(places).where(eq(places.id, view.place.id))
     expect(place).toMatchObject({ name: 'SAS', country: 'AM', city: 'Ереван', kind: 'store' })
-  })
+  }, 10_000)
 
   it('запись несёт город своего места — выбор открытой записи различает два города (MOL-120)', async () => {
     const actor = await insertActor(db, { city: 'Ереван' })
@@ -205,7 +205,7 @@ describe('обязательна только позиция', () => {
     })
     expect(trip(cleared).expenses[0]).toMatchObject({ amount: null, unitPrice: null })
     expect(trip(cleared).total).toEqual([])
-  })
+  }, 10_000)
 
   it('пустой патч — 400, строка не тронута', async () => {
     const actor = await insertActor(db)
