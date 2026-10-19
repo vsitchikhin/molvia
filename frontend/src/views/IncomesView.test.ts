@@ -959,6 +959,45 @@ describe('IncomesView: recording, amending and removing', () => {
     expect(document.querySelector('dialog[open] .failed[role="alert"]')).toBeNull()
   })
 
+  // Adversarial Е1: a strip standing when a sheet of the amendment opens over it cannot be pressed
+  // there, so its count stands (owner's В-2 «а») — put away unwritten, the sheet leaves it as it was.
+  it('a standing strip waits under a sheet of the amendment opened over it', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    const other = row({ id: '5d1c6a2b-3e4f-4a5b-8c6d-7e8f9a0b1c2e', receivedOn: '2026-09-10' })
+    incomes.mockResolvedValue(
+      overview({ months: [{ month: '2026-09', sums: [], incomes: [row(), other] }] }),
+    )
+    removeIncome.mockResolvedValue(
+      overview({ months: [{ month: '2026-09', sums: [], incomes: [other] }] }),
+    )
+    const view = await render()
+    await askToRemove(view)
+    sheetButton(en.income.remove_sheet.confirm).click()
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    vi.advanceTimersByTime(2_000)
+    await flushPromises()
+    expect(view.get('.undo-strip .count').text()).toBe('8')
+
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    await view.get('.cards button.body').trigger('click')
+    await risen()
+    expect(document.querySelectorAll('dialog[open]')).toHaveLength(1)
+    vi.advanceTimersByTime(15_000)
+    await flushPromises()
+    expect(view.get('.undo-strip .count').text()).toBe('8')
+
+    document
+      .querySelector<HTMLButtonElement>(`dialog[open] button[aria-label="${en.sheet.close}"]`)
+      ?.click()
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(view.get('.undo-strip .count').text()).toBe('8')
+    expect(view.get('.undo-strip button').attributes('aria-disabled')).toBeUndefined()
+  })
+
   // MOL-189 review №2, adversarial А1: the strip a failed «Bring back» leaves still runs out.
   it('a «Bring back» that failed lets the count go on, and the strip goes when it runs out', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })

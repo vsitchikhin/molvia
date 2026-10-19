@@ -201,7 +201,7 @@
         :busy-label="t('exchange.restoring')"
         :waiting="!online && !restoring"
         :waiting-action="t('exchange.restore_offline')"
-        :inactive="busy && !restoring"
+        :inactive="(busy && !restoring) || sheetUp"
         @restore="restore"
         @expire="forget"
       />
@@ -371,7 +371,9 @@ export default defineComponent({
     // from the sheet it waits behind let the first strip under both sheets (В1). One standing stays.
     const landing = ref<string[]>([])
     // The sheet of the amendment is on the screen: from its opening until `@closed`, never by the
-    // prop alone, which goes false while the sheet is still on its way out.
+    // prop alone, which goes false while the sheet is still on its way out. A strip standing under it
+    // cannot be pressed, and its count stands too (owner's В-2 «а»): run out there, it took away a
+    // removal nothing had made final (adversarial Е1).
     const sheetUp = ref(false)
     watch(sheetOpen, (open) => {
       if (open) sheetUp.value = true
@@ -543,6 +545,7 @@ export default defineComponent({
       confirmRemove,
       removeFailed,
       landing,
+      sheetUp,
       amendFailed,
       landed,
       online,

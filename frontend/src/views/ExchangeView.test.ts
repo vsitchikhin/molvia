@@ -1124,6 +1124,41 @@ describe('ExchangeView: the rate and the list', () => {
     expect(document.querySelector('dialog[open] .failed[role="alert"]')).toBeNull()
   })
 
+  // Adversarial Е1: a strip standing when a sheet of the amendment opens over it cannot be pressed
+  // there, so its count stands (owner's В-2 «а») — put away unwritten, the sheet leaves it as it was.
+  it('a standing strip waits under a sheet of the amendment opened over it', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    const other = row({ id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5e', exchangedOn: '2026-09-10' })
+    exchanges.mockResolvedValue(overview({ exchanges: [row(), other] }))
+    removeExchange.mockResolvedValue(overview({ exchanges: [other] }))
+    const view = await render()
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    vi.advanceTimersByTime(2_000)
+    await flushPromises()
+    expect(view.get('.undo-strip .count').text()).toBe('8')
+
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    await view.get('.cards button.body').trigger('click')
+    await risen()
+    expect(document.querySelectorAll('dialog[open]')).toHaveLength(1)
+    vi.advanceTimersByTime(15_000)
+    await flushPromises()
+    expect(view.get('.undo-strip .count').text()).toBe('8')
+
+    document
+      .querySelector<HTMLButtonElement>(`dialog[open] button[aria-label="${en.sheet.close}"]`)
+      ?.click()
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(view.get('.undo-strip .count').text()).toBe('8')
+    expect(view.get('.undo-strip button').attributes('aria-disabled')).toBeUndefined()
+  })
+
   // MOL-189 review №2, adversarial А1: the strip a failed «Bring back» leaves still runs out.
   it('a «Bring back» that failed lets the count go on, and the strip goes when it runs out', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
