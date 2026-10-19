@@ -615,6 +615,58 @@ describe('«Записать»', () => {
     expect(trip?.receiptMinor).toBe(215_000n)
   })
 
+  it('confirms no row of a line whose price the check took off as misread (MOL-255)', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const shampoo = await insertItem(db)
+    const id = await parsedReceipt(me, [
+      { printed: 'Շամպուն', sku: '745030', price: 624, sum: 624 },
+      ...LINES.slice(1, 2),
+    ])
+    // «624.44 624.41»: the line holds to the till's luma, the price is no figure the check verifies
+    await db
+      .update(receiptLines)
+      .set({ priceMinor: null })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 0)))
+    const response = await record(me, id, {
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        {
+          position: 0,
+          skip: false,
+          item: { id: shampoo },
+          quantity: pieces(1),
+          amount: amount(624),
+        },
+        {
+          position: 1,
+          skip: false,
+          item: { id: shampoo },
+          quantity: pieces(1),
+          amount: amount(1_450),
+        },
+      ],
+    })
+    expect(response.statusCode).toBe(200)
+    const images = await db
+      .select()
+      .from(receiptLineImages)
+      .where(eq(receiptLineImages.receiptId, id))
+    // the line as read beside it keeps its row, confirmed
+    expect(images.map((image) => [image.position, image.confirmedAt !== null])).toEqual([[1, true]])
+    const words = await db
+      .select()
+      .from(storeMemory)
+      .where(eq(storeMemory.kind, 'sku'))
+      .orderBy(asc(storeMemory.key))
+    expect(words.map((word) => [word.key, word.priceMinor])).toEqual([
+      ['1110001', 145_000n],
+      ['745030', null],
+    ])
+  })
+
   it('shows the trip as recorded from the receipt: each purchase with its line and discount', async () => {
     const me = await insertActor(db)
     const place = await insertPlace(db)
