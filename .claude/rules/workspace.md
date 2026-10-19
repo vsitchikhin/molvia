@@ -271,10 +271,11 @@ of the measure and with every test merged. So CI checks every run instead (owner
   every directory unsure (read by the check's own run, `unsureDirectories`, `vitestFlagsUnsure`; adversarial
   rounds 6–13, review №19–24) — every place a command is written, the scripts, the Makefile, the shell
   scripts, the workflows and actions; a command read by its words, a YAML value with every line under it, `\`
-  lines joined, a comment and a quoted string with vitest in it as data, a word with `$` unread, vitest by any
-  name its program goes by (`vitest@…`, `vitest.mjs`), `xargs` before it unsure, npm's `--` handing flags to
-  a script that runs vitest — npm found by its own commands, through another script — and a `-c` only to a
-  config the check reads, by its whole path. A setup file is read
+  lines joined, a comment, an assignment's value and what `echo` or `printf` prints as data — a quoted command
+  anywhere else, after `sh -c` or `eval`, still a command (review №25) — a word with `$` unread, vitest by any
+  name its program goes by (`vitest@…`, `vitest.mjs`), `xargs` before it unsure, npm's `--` and `node --run`'s
+  handing flags to a script that runs vitest — npm found by its own commands, through another script — and a
+  `-c` only to a config the check reads, by its whole path (№26). A setup file is read
   with every file it imports as one: vitest at hand in any of them and a clock, a spy, the global object or a
   module loader named in any is unsure (№24, М3) — vitest at hand by an import, `vitest/globals` or a config
   that sets `globals` (Н3) — and so is a list of setup files not written out as strings. Nor may a test file put a
@@ -282,9 +283,10 @@ of the measure and with every test merged. So CI checks every run instead (owner
   assignment to one — or under another name: a member of `vi`, `Object.defineProperty` and its kin, or the
   global object referred to without being called or read through, `vi`, `Object` or `Reflect` taken apart,
   `Object` or `Reflect` given another name, `vi` handed anywhere as a value; nor touch the timers in a default
-  of a parameter or of what it takes apart, in a field or a static block of a class — which run at the call,
-  at `new` or where the class stands — by a function of the file too; nor name `Object` or `Reflect` anywhere
-  but to read a member of it, nor assign a clock by a computed key (К1, К2, Л1, Л2, М1, М2, Н1, Н2). A function of the file that touches
+  of a parameter or of what it takes apart, in a field, a static block, the `extends` or a decorator of a class
+  — which run at the call, at `new` or where the class stands — by a function of the file too; nor name `Object`
+  or `Reflect` anywhere but to read a member of it, nor hand a clock — `performance`, `Date`, `process` — as a
+  value, nor assign one by a computed key (К1, К2, Л1, Л2, М1, М2, Н1, Н2, О1, О2). A function of the file that touches
   the timers, named anywhere but as a call or handed to a hook — in an array, a field, an alias, handed to a
   call that keeps it — is as a timer call kept there (З2, И1). A callback
   counts as run where it is written only when the call is known to run it before it settles — `vi.waitFor`,
