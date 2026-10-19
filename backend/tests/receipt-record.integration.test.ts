@@ -28,6 +28,10 @@ import { buildServer } from '@/server'
 import { connect, connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtures'
 
+// The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 857 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 /**
  * «Записать» (MOL-126): a parsed receipt written in one go as a finished trip on its own day, its
  * purchases, new items, the shop's memory, the place's tax number — and what it leaves behind.
@@ -264,7 +268,7 @@ describe('«Записать»', () => {
     ])
     const pending = await createExpenseRepository(db).pendingVerdictsFor(me, 10)
     expect(pending.total).toBe(3)
-  })
+  }, 10_000)
 
   it('answers a repeat with the same trip as before, another trip with a 409', async () => {
     const me = await insertActor(db)
@@ -291,7 +295,7 @@ describe('«Записать»', () => {
     expect([other.statusCode, codeOf(other)]).toEqual([409, ERROR.CONFLICT])
     // the repeat is the same record: counted once (MOL-222)
     expect(await db.select().from(receiptDays)).toMatchObject([{ recorded: 1, lines: 1 }])
-  })
+  }, 10_000)
 
   it('answers «recorded?» only once a record still running has ended (MOL-169, Г1)', async () => {
     const me = await insertActor(db)
@@ -348,7 +352,7 @@ describe('«Записать»', () => {
       headers: { cookie: await signIn(db, other) },
     })
     expect([theirs.statusCode, codeOf(theirs)]).toEqual([404, ERROR.NOT_FOUND])
-  })
+  }, 15_000)
 
   it('refuses the same receipt recorded before while its purchases are there (Т-11)', async () => {
     const me = await insertActor(db)
@@ -432,7 +436,7 @@ describe('«Записать»', () => {
       const again = await trip(me, second, 'restore')
       expect([again.statusCode, codeOf(again)]).toEqual([409, ERROR.RECEIPT_RECORDED_BEFORE])
       expect(await alive(me)).toEqual([first])
-    })
+    }, 10_000)
 
     it('does not refuse it for a receipt with no number: it is held by its id alone', async () => {
       const me = await insertActor(db)
@@ -440,7 +444,7 @@ describe('«Записать»', () => {
       expect((await trip(me, unnumbered, 'DELETE')).statusCode).toBe(204)
       await recorded(me, { receiptNo: null })
       expect((await trip(me, unnumbered, 'restore')).statusCode).toBe(200)
-    })
+    }, 10_000)
 
     it('does not refuse it for the same receipt recorded by another person', async () => {
       const me = await insertActor(db)
@@ -551,6 +555,7 @@ describe('«Записать»', () => {
           await Promise.all([pool.end(), holder.end(), watcher.end()])
         }
       },
+      10_000,
     )
   })
 
@@ -791,7 +796,7 @@ describe('«Записать»', () => {
       }),
     )
     expect([overflow.statusCode, codeOf(overflow)]).toEqual([400, ERROR.INVALID_AMOUNT])
-  })
+  }, 10_000)
 
   // review 1, В1, В2: the receipt row holds the trip's date on the accounts, «из чека» and the guard
   // against a second record — it goes with its trip, never before it, and never after (MOL-240, А2 of
@@ -976,7 +981,7 @@ describe('«Записать»', () => {
     expect(await wordsOf(me)).toEqual([])
     // and nobody else's word moved
     expect(await wordsOf(stranger)).toEqual(all)
-  })
+  }, 10_000)
 
   // MOL-240, adversarial round 3: the word kept is what the last line still there says — its item,
   // price and moment — and two removals at once leave no word behind either
@@ -1044,7 +1049,7 @@ describe('«Записать»', () => {
       expect((await wordsOf(me)).map((word) => word.itemId)).toEqual([kefir, kefir])
       expect(await remove(me, wrong)).toBe(true)
       expect((await wordsOf(me)).map((word) => word.itemId)).toEqual([milk, milk])
-    })
+    }, 10_000)
 
     // round 4, Р4-1: «as read» is judged at the record, never from the purchase as it is now
     it('Р4-1: keeps the shelf price after the sum paid was put right', async () => {
@@ -1062,7 +1067,7 @@ describe('«Записать»', () => {
       expect(patched.statusCode).toBe(200)
       await settleStoreMemory(db)
       expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([37_000n, 37_000n])
-    })
+    }, 10_000)
 
     // round 5, Р5-1: a line an image rolled back recorded was never judged, `as_read` null — its price
     // stays while the purchase is as the line was read, and goes once the sum was put right
@@ -1114,7 +1119,7 @@ describe('«Записать»', () => {
       await db.update(expenses).set({ amountMinor: 37_000n }).where(eq(expenses.tripId, tripId))
       await settleStoreMemory(db)
       expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([null, null])
-    })
+    }, 10_000)
 
     // round 4, Р4-1б: the word and the record share one moment — settling right after moves nothing
     it('Р4-1б: settles nothing a record has just written', async () => {
@@ -1126,7 +1131,8 @@ describe('«Записать»', () => {
       expect(await settleStoreMemory(db)).toBe(0)
     })
 
-    // round 4, Р4-2: a person at a time, by their id — thousands of sellers are no tree for the parser
+    // round 4, Р4-2: a person at a time, by their id — thousands of sellers are no tree for the parser;
+    // 3 843 ms on CI at worst, ten times that its timeout (MOL-266)
     it('Р4-2: settles a person with thousands of sellers', async () => {
       const me = await insertActor(db)
       const milk = await insertItem(db)
@@ -1146,7 +1152,7 @@ describe('«Записать»', () => {
       // no line says any of them: every word goes
       expect(await settleStoreMemory(db)).toBe(9_000)
       expect(await wordsOf(me)).toEqual([])
-    }, 30_000)
+    }, 60_000)
 
     it('Р3-3: two removals at once leave no word behind', async () => {
       const me = await insertActor(db)
@@ -1170,7 +1176,7 @@ describe('«Записать»', () => {
         await other.close()
       }
       expect(await wordsOf(me)).toEqual([])
-    })
+    }, 15_000)
   })
 
   // MOL-222: the measure of 0.2 — what the person put right against what the review showed
@@ -1282,7 +1288,7 @@ describe('«Записать»', () => {
     expect(await db.select().from(receiptDays)).toMatchObject([
       { recorded: 5, within5m: 1, within15m: 1, within1h: 1, within1d: 1, later: 1 },
     ])
-  })
+  }, 10_000)
 
   // MOL-222, adversarial А6: the memory learns from another record between the review and «Записать»;
   // only the phone knows what it showed, and it says which lines it put right
@@ -1321,7 +1327,7 @@ describe('«Записать»', () => {
     // C: put right the same way as A, though the memory would now show cheese
     expect((await record(me, c, body(cheese, [0]))).statusCode).toBe(200)
     expect(await db.select().from(receiptDays)).toMatchObject([{ linesEdited: 1, linesItem: 1 }])
-  })
+  }, 10_000)
 
   // MOL-222, review 2 and adversarial А7: a total put right confirms the printed sums of the lines that
   // do not add up (В-5) — one edit of the receipt, never of the lines nobody opened
@@ -1369,7 +1375,7 @@ describe('«Записать»', () => {
     const checked = await parsedReceipt(me, lines, { receiptNo: '3', totalMinor: 148_000n })
     expect((await record(me, checked, phoneBody(true))).statusCode).toBe(200)
     expect(await db.select().from(receiptDays)).toMatchObject([{ recorded: 1, totalsCorrected: 0 }])
-  })
+  }, 10_000)
 
   it('takes the phone’s positions only of lines recorded: a skipped or unknown one is no item edit', async () => {
     const me = await insertActor(db)

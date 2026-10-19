@@ -27,6 +27,10 @@ import {
   verdicts,
 } from '@/db/schema'
 
+// The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 809 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 
 // The codes Postgres answers with, spelled out: a test that only asserts «it threw» passes
@@ -295,7 +299,7 @@ describe('a quantity is a number and a unit together', () => {
       .insert(expenses)
       .values({ id: randomUUID(), tripId, itemId, qtyMilli: 1500n, qtyUnit: 'kg' })
     await expect(db.select().from(expenses)).resolves.toHaveLength(1)
-  })
+  }, 10_000)
 
   it('refuses half of the pair, either half', async () => {
     const { tripId, itemId } = await tripWithItem()
@@ -574,7 +578,7 @@ describe('a verdict knows what kind of thing it rates', () => {
           .values({ id: randomUUID(), actorId, itemId, itemKind, placeId, score: 1 }),
       CHECK,
     )
-  })
+  }, 10_000)
 
   it('refuses a dish rated nowhere', async () => {
     const actorId = await insertActor(db)
@@ -947,7 +951,7 @@ describe('the remembered pick', () => {
     await db.insert(searchPicks).values({ actorId, queryKey, itemId })
 
     await refuses(() => db.insert(searchPicks).values({ actorId, queryKey, itemId }), UNIQUE)
-  })
+  }, 10_000)
 
   it('keeps the pick personal: two people, one query, one item, two rows', async () => {
     const itemId = await insertItem(db)
@@ -1000,7 +1004,7 @@ describe('the remembered pick', () => {
 
     await db.insert(searchPicks).values({ actorId, queryKey: 'k'.repeat(600), itemId })
     await expect(db.select().from(searchPicks)).resolves.toHaveLength(1)
-  })
+  }, 10_000)
 })
 
 describe('the session, which is a key rather than data', () => {

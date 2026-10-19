@@ -22,6 +22,10 @@ import { useTripStore } from '@/stores/trip'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
+// The 3 tests here past half a second on CI carry a timeout of 10 s: the slowest took 910 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 // Every write fails as a dropped connection would, so what the sheet queued stays to be read.
 const offline = vi.hoisted(() => () => Promise.reject(new Error('Failed to fetch')))
 const currentTrip = vi.hoisted(() => vi.fn<() => Promise<unknown>>())
@@ -667,7 +671,7 @@ describe('ItemDetailsSheet · «Тут дешевле» (MOL-92)', () => {
     await settle()
     expect(hint(view).classes()).toContain('hint-there')
     expect(spaced(hint(view).text())).toBe('В Зовуни брали по 540,00 ֏/л — 12.09')
-  })
+  }, 10_000)
 
   it('says «как в …» at the same price and «тут дешевле» below it (В-2)', async () => {
     const { view } = await priced(history())
@@ -677,14 +681,14 @@ describe('ItemDetailsSheet · «Тут дешевле» (MOL-92)', () => {
     await typed(view, '510')
     expect(hint(view).classes()).toContain('hint-cheaper')
     expect(spaced(hint(view).text())).toBe('Тут дешевле — в Зовуни было 540,00 ֏/л, 12.09')
-  })
+  }, 20_000)
 
   it('says «здесь же» when the record’s own place was the cheapest (Р-3)', async () => {
     const { view } = await priced(history([place(HERE, 600, '2026-09-03')]))
     await typed(view, '650')
 
     expect(spaced(hint(view).text())).toBe('Здесь же брали по 600,00 ֏/л — 03.09')
-  })
+  }, 10_000)
 
   it('names a cheaper item of the kind rated no worse, second (В-3)', async () => {
     const { view } = await priced(history([place(ZOVUNI, 540)], [marianna]))
@@ -693,14 +697,14 @@ describe('ItemDetailsSheet · «Тут дешевле» (MOL-92)', () => {
     expect(spaced(hint(view, 'alternative').text())).toBe(
       'Молоко Марианна — 480,00 ֏/л в Зовуни, 28.09 · оценка 4,5',
     )
-  })
+  }, 10_000)
 
   it('says nothing of «не брать нигде» (Т-3)', async () => {
     const { view } = await priced({ itemId: milk.id, level: 'never' })
     await typed(view, '620')
 
     expect(view.find('.hint').exists()).toBe(false)
-  })
+  }, 10_000)
 
   it('stands under the fields, inside the box of the figure (В-6)', async () => {
     const { view } = await priced(history())
@@ -789,7 +793,7 @@ describe('ItemDetailsSheet · «Тут дешевле» (MOL-92)', () => {
 
       expect(hint(view).exists()).toBe(false)
       expect(hint(view, 'alternative').exists()).toBe(false)
-    })
+    }, 15_000)
 
     it('never answers an amendment from memory, and asks leaving the row out (Т-9)', async () => {
       const first = await priced(history())

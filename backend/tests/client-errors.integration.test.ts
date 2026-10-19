@@ -27,6 +27,10 @@ import {
 import { connectDrizzle } from './db'
 import { clearAll } from './fixtures'
 
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+
 const { db, close } = connectDrizzle()
 const OWNER = 4242
 
@@ -116,7 +120,7 @@ describe('POST /client-errors — сбой телефона (MOL-144)', () => {
       count: 1,
       buildCount: 1,
     })
-  })
+  }, 10_000)
 
   it('чужая cookie ничего не меняет: сбой не принадлежит человеку', async () => {
     const response = await send({ reports: [REPORT] }, '198.51.100.8', {
@@ -142,7 +146,7 @@ describe('POST /client-errors — сбой телефона (MOL-144)', () => {
         frame: REPORT.frames[0],
       }),
     ])
-  })
+  }, 10_000)
 
   it('пачка из буфера — каждый отчёт своей строкой или своим счётом', async () => {
     const other = { ...REPORT, catcher: 'vue', platform: 'android browser' }
@@ -183,7 +187,7 @@ describe('POST /client-errors — сбой телефона (MOL-144)', () => {
     expect((await send({ reports: [REPORT] }, '203.0.113.2')).statusCode).toBe(204)
     const [row] = await recorded()
     expect(row?.count).toBe(PHONE_REPORTS_PER_ADDRESS + 1)
-  })
+  }, 10_000)
 
   it('один адрес оператора — много телефонов: второй после полного буфера первого принят (А6)', async () => {
     expect((await send(buffer('A'), '100.64.12.34')).statusCode).toBe(204)
@@ -200,7 +204,7 @@ describe('POST /client-errors — сбой телефона (MOL-144)', () => {
     expect((await send({ reports: [REPORT] }, '2001:db8:1:2ff::9')).statusCode).toBe(429)
     expect((await send({ reports: [REPORT] }, '2001:db8:1:300::1')).statusCode).toBe(429)
     expect((await send({ reports: [REPORT] }, '2001:db8:2:100::1')).statusCode).toBe(204)
-  })
+  }, 10_000)
 
   it('X-Forwarded-For не от внутренней сети не верится: счёт идёт по пиру', async () => {
     const outside = (address: string) =>
@@ -216,7 +220,7 @@ describe('POST /client-errors — сбой телефона (MOL-144)', () => {
       expect((await outside(`203.0.113.${String(20 + sent)}`)).statusCode).toBe(204)
     }
     expect((await outside('203.0.113.99')).statusCode).toBe(429)
-  })
+  }, 10_000)
 
   it('адрес, по которому считается предел, не пишется ни в лог, ни в таблицу', async () => {
     await send({ reports: [REPORT] }, '198.51.100.77')
@@ -247,7 +251,7 @@ describe('поток выдуманных сбоев не топит канал 
       await recorded()
     }
     expect(await failureNotices()).toHaveLength(PHONE_NOTICES_PER_HOUR)
-  })
+  }, 10_000)
 
   it('новая сборка на каждый отчёт одного отпечатка не делает каждый «новым» сверх бюджета', async () => {
     const builds = {
@@ -283,7 +287,7 @@ describe('поток выдуманных сбоев не топит канал 
     const rows = await recorded()
     expect(rows.map((row) => row.errorName)).toContain('RealDefect')
     expect(rows.find((row) => row.errorName === 'Liar0')?.count).toBe(2)
-  })
+  }, 15_000)
 
   it('волна одного сбоя у абонентов одного оператора — все отпечатки в таблице (Г1)', async () => {
     const wave = ['advice', 'purchases', 'verdicts', 'money', 'settings', 'exchange'].flatMap(
@@ -340,5 +344,5 @@ describe('поток выдуманных сбоев не топит канал 
     )
     const [first] = await createOwnerNoticeRepository(db).claim(OWNER_NOTICES_PER_CLAIM, new Date())
     expect(first).toMatchObject({ source: 'api', route: 'GET /advice' })
-  })
+  }, 10_000)
 })

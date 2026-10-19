@@ -5,9 +5,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { expectWithin } from '@molvia/model/testing/clock'
 import { broadcasts } from '@/db/schema'
 import { connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertActor } from './fixtures'
+
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
 
 /**
  * The message about a leak is only worth anything if it can be sent where it is needed: from the
@@ -65,8 +70,10 @@ describe('dist/notify.js', () => {
     const wrong = notify(TEXT, '--force')
     expect(wrong.status).toBe(2)
     expect(wrong.stdout).toContain('usage: notify')
-  })
+  }, 30_000)
 })
+
+const SILENT_MS = 25_000
 
 describe('dist/notify.js — вход', () => {
   // Adversarial А4: over `ssh … exec -T` with the file forgotten, the input is a pipe that never ends.
@@ -83,12 +90,18 @@ describe('dist/notify.js — вход', () => {
     let output = ''
     child.stdout.on('data', (chunk: Buffer) => (output += chunk.toString()))
     const exited = new Promise<number | null>((resolve) => child.on('exit', resolve))
+    // The command waits two seconds of its own (`FIRST_BYTES_MS`) and took 2 311 ms on CI at worst
+    // (MOL-266): the test waits ten times that and more, then puts it out — silence is this test's
+    // red, never the timeout of vitest, which stands above the wait
     const started = Date.now()
-    expect(await exited).toBe(2)
-    expect(Date.now() - started).toBeLessThan(10_000)
+    const silent = setTimeout(() => child.kill(), SILENT_MS)
+    const code = await exited
+    clearTimeout(silent)
+    expectWithin(Date.now() - started, SILENT_MS)
+    expect(code).toBe(2)
     expect(output).toContain('the message comes on standard input')
     child.stdin.end()
-  }, 20_000)
+  }, 50_000)
 })
 
 describe('bin/notify.sh', () => {
@@ -110,7 +123,7 @@ describe('bin/notify.sh', () => {
       env,
     })
     expect(owner.stdout).not.toContain('usage: notify')
-  }, 60_000)
+  }, 75_000)
 })
 
 describe('make notify', () => {

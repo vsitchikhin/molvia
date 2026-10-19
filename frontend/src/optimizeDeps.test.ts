@@ -2,6 +2,10 @@ import { existsSync, globSync, readFileSync, readdirSync, statSync } from 'node:
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+
 // Through a parameter: a literal `new URL(…, import.meta.url)` is rewritten by Vite into an asset URL.
 const at = (path: string): URL => new URL(path, import.meta.url)
 const SRC = at('./')
@@ -235,5 +239,5 @@ describe('optimizeDeps.include', () => {
     expect(packages).toContain('zxing-wasm/reader')
     const missing = [...packages].filter((name) => !included().has(name))
     expect(missing, 'add them to optimizeDeps.include in vite.config.ts').toEqual([])
-  })
+  }, 35_000)
 })

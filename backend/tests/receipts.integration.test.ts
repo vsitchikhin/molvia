@@ -35,6 +35,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+
 const { db, close } = connectDrizzle()
 const repository = createReceiptRepository(db)
 let app: FastifyInstance
@@ -209,7 +213,7 @@ describe('«Отправить чек»', () => {
     expect(first.headers['cache-control']).toBe('no-store')
     const again = await send(me, receipt)
     expect([again.statusCode, again.json()]).toEqual([200, first.json()])
-  })
+  }, 10_000)
 
   it('refuses another receipt under the same id, of the owner or of someone else', async () => {
     const me = await owner()
@@ -327,7 +331,7 @@ describe('a part of the photo', () => {
     ])
     expect(photo.length).toBe(8 * 1024 * 1024)
     expect((await put(me, receipt.id, 1, photo)).statusCode).toBe(200)
-  })
+  }, 10_000)
 
   it('refuses a part over the size a part may have before reading it whole', async () => {
     const me = await owner()
@@ -396,7 +400,7 @@ describe('the queue', () => {
       1,
       'card',
     ])
-  })
+  }, 15_000)
 
   // MOL-126: what the lines are is found once, in the queue — by the catalogue's Armenian names and
   // the heading, then by the search with the gloss; a line nobody knows is a new item named by it
@@ -423,7 +427,7 @@ describe('the queue', () => {
     expect(lines[2]).toMatchObject({ itemId: milk, match: 'search', translation: 'молоко' })
     expect(lines.filter((line) => line.match === 'new').length).toBeGreaterThan(0)
     expect(lines.every((line) => line.match !== null)).toBe(true)
-  })
+  }, 15_000)
 
   it('asks for a new shot only when not one item line was found (MOL-222, В-1)', async () => {
     const me = await owner()
@@ -632,7 +636,7 @@ describe('the queue', () => {
     const columns = await db.execute<{ column_name: string; data_type: string }>(sql`
       select column_name, data_type from information_schema.columns where table_name = 'receipt_days'`)
     expect(columns.every((c) => c.data_type === 'integer' || c.column_name === 'day')).toBe(true)
-  })
+  }, 20_000)
 
   it('fails a photo the reader cannot read, and reads the next one', async () => {
     const me = await owner()
@@ -655,7 +659,7 @@ describe('the queue', () => {
       failure: 'unreadable',
     })
     expect(list.find((r) => r.id === good)).toMatchObject({ status: 'parsed' })
-  })
+  }, 15_000)
 
   it('leaves the receipt in the queue, its attempt uncounted, while the reader is away', async () => {
     const me = await owner()
@@ -672,7 +676,7 @@ describe('the queue', () => {
     expect(receiptDetailCodec.parse((await get(me, `/receipts/${id}`)).json()).receipt.status).toBe(
       'parsed',
     )
-  })
+  }, 15_000)
 
   it('sends a photo the reader drops to the end of the queue, and fails it after its attempts', async () => {
     const me = await owner()
@@ -699,7 +703,7 @@ describe('the queue', () => {
     })
     // the first drop sent it back to the queue and counted nothing; the second failed it (MOL-222)
     expect(await days()).toMatchObject([{ read: 1, unreadable: 1 }])
-  })
+  }, 15_000)
 
   it('reads each person’s oldest receipt in turn: fifty of one do not hold another’s (review А10)', async () => {
     const heavy = await owner()
@@ -720,7 +724,7 @@ describe('the queue', () => {
     }
     expect(order).toHaveLength(6)
     expect(order.indexOf(theirs)).toBe(1)
-  })
+  }, 10_000)
 
   it('gives a receipt failed before any reading no head at all (review А11)', async () => {
     const me = await owner()
@@ -755,7 +759,7 @@ describe('the queue', () => {
     const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
     expect(row?.status).toBe('parsed')
     expect(await db.select().from(receiptLineImages)).toEqual([])
-  })
+  }, 10_000)
 
   it('fails a receipt whose photo is gone — restored from a copy without photos (В-2)', async () => {
     const me = await owner()
@@ -865,7 +869,7 @@ describe('what lives how long (В-3)', () => {
       .where(eq(receipts.id, young))
     await repository.purgeStale()
     expect((await db.select().from(receipts)).map((r) => r.id)).toEqual([young])
-  })
+  }, 10_000)
 
   it('keeps a recorded receipt, drops its photo, its lines that are no purchase, and its cut-out lines 28 days after they were confirmed', async () => {
     const me = await owner()
@@ -908,7 +912,7 @@ describe('what lives how long (В-3)', () => {
     const images = await db.select().from(receiptLineImages)
     expect(images.some((image) => image.position === 0)).toBe(false)
     expect(images.some((image) => image.position === 1)).toBe(true)
-  })
+  }, 15_000)
 })
 
 describe('the queue through the server', () => {
@@ -953,5 +957,5 @@ describe('the queue through the server', () => {
     } finally {
       await reading.close()
     }
-  })
+  }, 15_000)
 })

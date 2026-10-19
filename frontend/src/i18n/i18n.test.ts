@@ -5,6 +5,10 @@ import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import { pluralRu } from '@/i18n/plural-ru'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 624 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 /** The real thing rather than the rule alone: the bug this guards against is vue-i18n's own. */
 function russian() {
   return createAppI18n('ru').global
@@ -559,7 +563,7 @@ describe('словарь: каждое сообщение компилирует
       expect(() => ruT.t(key, params), key).not.toThrow()
       expect(() => enT.t(key, params), key).not.toThrow()
     }
-  })
+  }, 15_000)
 
   it('каждая подстановка получила значение — ни одной дыры в собранной фразе', () => {
     // Сама сборка параметров из значений даёт и проверку: если имя подстановки не попало в

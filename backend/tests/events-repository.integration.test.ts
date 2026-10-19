@@ -7,6 +7,10 @@ import { createEventRepository } from '@/db/events-repository'
 import type { Conn } from '@/db/index'
 import { actors, events } from '@/db/schema'
 
+// The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 743 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const repository = createEventRepository(db)
 
@@ -440,7 +444,7 @@ describe('week-four return: an objection to being counted (MOL-96)', () => {
       withoutConsent: 0,
       optedOut: 1,
     })
-  })
+  }, 10_000)
 
   it('keeps out someone back on after their fourth week too: that week was erased', async () => {
     const actorId = await actorSeenAt(hoursAgo(700))
@@ -553,7 +557,7 @@ describe("recording at most once a day of the person's own life", () => {
       withoutConsent: 0,
       optedOut: 0,
     })
-  })
+  }, 10_000)
 
   it('counts days and weeks the same in any time zone of the session', async () => {
     // `interval '1 day'` is a calendar day in the session's zone: across a clock change
@@ -615,7 +619,7 @@ describe("recording at most once a day of the person's own life", () => {
         expect(utc, at).toEqual({ written: utc.written, cohortSize: 1, returned })
       }
     }
-  })
+  }, 15_000)
 
   it('keeps the product and venue halves apart', async () => {
     const actorId = await insertCounted(db)

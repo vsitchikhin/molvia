@@ -13,6 +13,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertCounted, insertItem, signIn } from './fixtures'
 
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+
 const { db, close } = connectDrizzle()
 const log = createEventRepository(db)
 const verdictRepository = createVerdictRepository(db)
@@ -201,7 +205,7 @@ describe('выключение', () => {
       ])
       expect(await rowsOf(me.id)).toHaveLength(0)
     }
-  })
+  }, 10_000)
 })
 
 describe('снятые оценки (MOL-97, В1)', () => {
@@ -258,7 +262,7 @@ describe('стирание', () => {
       expect(await rowsOf(me.id)).toHaveLength(0)
       expect(await moments(me.id)).toBeUndefined()
     }
-  })
+  }, 30_000)
 })
 
 describe('включение обратно', () => {

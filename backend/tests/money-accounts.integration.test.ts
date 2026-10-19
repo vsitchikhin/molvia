@@ -37,6 +37,10 @@ import { recordSpending } from '@/usecases/spendings'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
+// The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 628 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
 const accountsRepository = createMoneyAccountRepository(db)
@@ -164,7 +168,7 @@ describe('счёт: добавить, повтор, имя (MOL-115)', () => {
       lastCheckedOn: null,
       archivedAt: null,
     })
-  })
+  }, 10_000)
 
   it('не даёт второе имя без учёта регистра — среди убранных тоже (Р-21)', async () => {
     const me = await owner()
@@ -204,7 +208,7 @@ describe('счёт: добавить, повтор, имя (MOL-115)', () => {
       startOn: today,
     })
     expect(mixed.statusCode).toBe(400)
-  })
+  }, 10_000)
 
   it('держит отрицательный старт — кредитка это имя', async () => {
     const me = await owner()
@@ -257,7 +261,7 @@ describe('чужое — один 404, во всех ручках и во все
     expect((await overview(boris)).unassigned).toBe(0)
     // And the account of Anna's stays as it was.
     expect((await balanceOf(anna, id)).balance.minor).toBe(10_000_000n)
-  })
+  }, 10_000)
 
   it('чужой поход — 404, и на свой поход чужой счёт не ложится', async () => {
     const anna = await owner()
@@ -327,7 +331,7 @@ describe('счёт, заведённый на свой день, стартуе�
     })
     expect(spendingViewCodec.parse(given.json()).accountId).toBe(id)
     expect((await balanceOf(me, id)).balance).toEqual({ minor: 1_800_000n, currency: 'AMD' })
-  })
+  }, 10_000)
 
   it('считает поход, начатый до счёта и оплаченный после: деньги ушли на кассе (А1)', async () => {
     const me = await owner()
@@ -497,7 +501,7 @@ describe('остаток — старт и всё после дня старта
       accountId: null,
       debited: null,
     })
-  })
+  }, 10_000)
 })
 
 describe('поход на счёте (п. 6, Р-18)', () => {
@@ -736,7 +740,7 @@ describe('удалить или убрать (п. 2)', () => {
     })
     expect(locked.statusCode).toBe(409)
     expect(locked.json()).toMatchObject({ code: ERROR.MONEY_ACCOUNT_CURRENCY_LOCKED })
-  })
+  }, 10_000)
 })
 
 describe('сверка и «не попали» (п. 7, Р-16, Р-19)', () => {
@@ -806,7 +810,7 @@ describe('сверка и «не попали» (п. 7, Р-16, Р-19)', () => {
       unassignedOperationsCodec.parse((await call(me, 'GET', '/money/accounts/unassigned')).json())
         .rows,
     ).toEqual([])
-  })
+  }, 10_000)
 
   it('факт в чужой валюте — отказ', async () => {
     const me = await owner()
@@ -953,7 +957,7 @@ describe('итоги (п. 8, Р-22)', () => {
     const view = await overview(me)
     expect(view.incomeTotals).toEqual({ currency: 'AMD', ...view.totals })
     expect(view.totals.total).toEqual({ minor: 150_000n, currency: 'AMD' })
-  })
+  }, 10_000)
 
   it('убранный счёт не входит и в итоги валюты дохода (Р-22, MOL-183)', async () => {
     const me = await owner()
@@ -1008,7 +1012,7 @@ describe('после ревью (MOL-115, Р-3, Д1–Д6)', () => {
            as named`)
     expect(Number(rows[0]?.named)).toBe(0)
     expect(spent.response.statusCode).toBe(201)
-  })
+  }, 10_000)
 
   it('повтор «Добавить счёт» после окончательного удаления с операцией — новый счёт, не 404 (Д5)', async () => {
     const me = await owner()
@@ -1125,7 +1129,7 @@ describe('после ревью (MOL-115, Р-3, Д1–Д6)', () => {
     )
     expect(journal.rows[0]).toMatchObject({ day: daysAgo(1), inBalance: false })
     expect((await balanceOf(me, id)).balance.minor).toBe(10_000_000n)
-  })
+  }, 10_000)
 
   it('поход без счёта и без единой цены — в «не попали» (Д6)', async () => {
     const me = await owner()

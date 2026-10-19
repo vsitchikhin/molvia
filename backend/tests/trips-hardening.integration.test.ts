@@ -16,6 +16,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, signIn, tripContext } from './fixtures'
 
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+
 const { db, close } = connectDrizzle()
 // The test pool holds one connection, so a second server needs its own to run beside the first,
 // and a third holds locks the way a concurrent request would.
@@ -108,7 +112,7 @@ describe('А. цена за единицу за пределом int8 — не �
 
     expect(reply.status).toBe(201)
     expect(view(reply).expenses[0]?.unitPrice?.scaledMinor).toBe(9_223_372_037_000_000_000n)
-  })
+  }, 10_000)
 
   it('после неё поход читается, повтор — 200, следующая трата — 201', async () => {
     const actor = await insertActor(db)
@@ -136,7 +140,7 @@ describe('А. цена за единицу за пределом int8 — не �
     })
     expect(next.status).toBe(201)
     expect(await rowsOf(tripId)).toHaveLength(2)
-  })
+  }, 10_000)
 })
 
 describe('Б. итог похода держится и между двумя одновременными тратами', () => {
@@ -197,7 +201,7 @@ describe('Б. итог похода держится и между двумя о
       itemId: bread,
     })
     expect(loaf.status).toBe(201)
-  })
+  }, 15_000)
 })
 
 describe('В. id устройства — только в нижнем регистре', () => {
@@ -221,7 +225,7 @@ describe('В. id устройства — только в нижнем реги�
 
     expect([added.status, started.status]).toEqual([400, 400])
     expect(await rowsOf(tripId)).toEqual([])
-  })
+  }, 10_000)
 
   it('путь в верхнем регистре к существующей трате работает: uuid сравнивает Postgres', async () => {
     const actor = await insertActor(db)
@@ -247,7 +251,7 @@ describe('В. id устройства — только в нижнем реги�
       200,
     )
     expect(await rowsOf(tripId)).toEqual([])
-  })
+  }, 10_000)
 })
 
 describe('Г. правка и удаление наперегонки с удалением', () => {
@@ -295,7 +299,7 @@ describe('Г. правка и удаление наперегонки с уда�
 
     expect(reply.status).toBe(404)
     expect(code(reply)).toBe(ERROR.NOT_FOUND)
-  })
+  }, 15_000)
 
   it('С-8: удаление отвечает одинаково, успел ли первый — 200 наперегонки и 200 после', async () => {
     const { actor, tripId, expenseId } = await withRow()
@@ -307,7 +311,7 @@ describe('Г. правка и удаление наперегонки с уда�
 
     expect([racing.status, after.status]).toEqual([200, 200])
     expect(view(after).expenses).toEqual([])
-  })
+  }, 10_000)
 
   it('С-8: повтор удаления не трогает чужую трату и не открывает чужой поход', async () => {
     const { actor: stranger, tripId: theirTrip, expenseId: theirs } = await withRow()
@@ -322,7 +326,7 @@ describe('Г. правка и удаление наперегонки с уда�
     expect(underTheirs.status).toBe(404)
     expect(await rowsOf(theirTrip)).toHaveLength(1)
     expect((await call(app, 'GET', '/trips/current', stranger)).status).toBe(200)
-  })
+  }, 10_000)
 })
 
 describe('Д. невидимый знак по краю имени — то же место', () => {
@@ -345,19 +349,23 @@ describe('Д. невидимый знак по краю имени — то же
     ['U+00AD soft hyphen', '\u00ad'],
     ['U+2800 braille blank', '\u2800'],
     ['U+3164 hangul filler', '\u3164'],
-  ])('%s в начале и в конце — то же место', async (_label, mark) => {
-    const actor = await insertActor(db)
-    const first = await startAndFinish(actor, 'Ереван Сити')
+  ])(
+    '%s в начале и в конце — то же место',
+    async (_label, mark) => {
+      const actor = await insertActor(db)
+      const first = await startAndFinish(actor, 'Ереван Сити')
 
-    expect(await startAndFinish(actor, `Ереван Сити${mark}`)).toBe(first)
-    expect(await startAndFinish(actor, `${mark}Ереван Сити`)).toBe(first)
+      expect(await startAndFinish(actor, `Ереван Сити${mark}`)).toBe(first)
+      expect(await startAndFinish(actor, `${mark}Ереван Сити`)).toBe(first)
 
-    const recent = recentPlacesResponseSchema.parse(
-      (await call(app, 'GET', '/places/recent', actor)).body,
-    )
-    expect(recent.places.map((place) => place.name)).toEqual(['Ереван Сити'])
-    expect(await db.select().from(places)).toHaveLength(1)
-  })
+      const recent = recentPlacesResponseSchema.parse(
+        (await call(app, 'GET', '/places/recent', actor)).body,
+      )
+      expect(recent.places.map((place) => place.name)).toEqual(['Ереван Сити'])
+      expect(await db.select().from(places)).toHaveLength(1)
+    },
+    15_000,
+  )
 
   it('не должно сработать: знак внутри имени остаётся — это уже другое имя', async () => {
     const actor = await insertActor(db)
@@ -384,13 +392,17 @@ describe('Д, заход 2: невидимый знак и перевод стр
     ['U+2800 и \\r\\n в конце', 'Ереван Сити\u2800\r\n'],
     ['таб и U+00AD в начале', '\t\u00adЕреван Сити'],
     ['U+3164 и таб в конце', 'Ереван Сити\u3164\t'],
-  ])('%s — то же место', async (_label, name) => {
-    const actor = await insertActor(db)
-    const first = await placeOf(actor, 'Ереван Сити')
+  ])(
+    '%s — то же место',
+    async (_label, name) => {
+      const actor = await insertActor(db)
+      const first = await placeOf(actor, 'Ереван Сити')
 
-    expect((await placeOf(actor, name)).id).toBe(first.id)
-    expect(await db.select().from(places)).toHaveLength(1)
-  })
+      expect((await placeOf(actor, name)).id).toBe(first.id)
+      expect(await db.select().from(places)).toHaveLength(1)
+    },
+    10_000,
+  )
 
   it('«Кафе ☕\ufe0f» записано как ввёл человек — эмодзи не теряет вид (заход 2, Б)', async () => {
     const actor = await insertActor(db)
@@ -415,19 +427,24 @@ describe('заход 3: вид и тождество места — разные
     ['☕', '☕\ufe0f'],
     ['❤', '❤\ufe0f'],
     ['❤\ufe0f', '❤'],
-  ])('Б: «Кафе %s» и «Кафе %s» — одно место, имя — как ввели первым', async (a, b) => {
-    const actor = await insertActor(db)
-    const first = await placeOf(actor, `Кафе ${a}`)
-    const second = await placeOf(actor, `Кафе ${b}`)
+  ])(
+    'Б: «Кафе %s» и «Кафе %s» — одно место, имя — как ввели первым',
+    async (a, b) => {
+      const actor = await insertActor(db)
+      const first = await placeOf(actor, `Кафе ${a}`)
+      const second = await placeOf(actor, `Кафе ${b}`)
 
-    expect(second.id).toBe(first.id)
-    expect(second.name).toBe(`Кафе ${a}`)
-    expect(await db.select().from(places)).toHaveLength(1)
-  })
+      expect(second.id).toBe(first.id)
+      expect(second.name).toBe(`Кафе ${a}`)
+      expect(await db.select().from(places)).toHaveLength(1)
+    },
+    10_000,
+  )
 
   it('А: хвост из тегов на сотни килобайт — быстрый 400, API не стоит', async () => {
+    // Held by the answer, not a clock (MOL-266): trimmed before its length is checked, the tail goes
+    // and the trip starts — in milliseconds, under any bound a clock could keep
     const actor = await insertActor(db)
-    const started = performance.now()
 
     const reply = await call(app, 'POST', '/trips', actor, {
       context: await tripContext(db, actor),
@@ -436,7 +453,6 @@ describe('заход 3: вид и тождество места — разные
     })
 
     expect(reply.status).toBe(400)
-    expect(performance.now() - started).toBeLessThan(1_000)
     expect(await db.select().from(places)).toEqual([])
   })
 

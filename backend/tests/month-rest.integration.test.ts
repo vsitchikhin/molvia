@@ -8,6 +8,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
 
+// The 8 tests here past half a second on CI carry a timeout of 10 s: the slowest took 894 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
 let app: FastifyInstance
@@ -124,7 +128,7 @@ describe('«Остаток» — деньги на счетах на конец 
       operationsUncounted: { total: 0, spendable: 0 },
     })
     expect(march.accountsFrom).toBe('2025-03-10')
-  })
+  }, 10_000)
 
   it('месяц до первого счёта — без остатка, со днём старта; без счетов — ни того ни другого (В-4)', async () => {
     const me = await owner()
@@ -147,7 +151,7 @@ describe('«Остаток» — деньги на счетах на конец 
     await spend(me, '4100', '2025-03-20', card)
     expect((await call(me, 'DELETE', `/money/accounts/${card}`)).statusCode).toBe(200)
     expect((await month(me, '2025-03')).rest?.total).toEqual(rub(1000))
-  })
+  }, 10_000)
 
   it('правка траты марта двигает остаток марта: он не замораживается (Р-3)', async () => {
     const me = await owner()
@@ -162,14 +166,14 @@ describe('«Остаток» — деньги на счетах на конец 
     })
     expect(amended.statusCode, amended.body).toBe(200)
     expect((await month(me, '2025-03')).rest?.total).toEqual(rub(8000))
-  })
+  }, 10_000)
 
   it('трата без счёта в остаток не входит (Р-4)', async () => {
     const me = await owner()
     await account(me, 'AMD', '41000')
     await spend(me, '4100', '2025-03-20', null)
     expect((await month(me, '2025-03')).rest?.total).toEqual(rub(10000))
-  })
+  }, 10_000)
 
   it('счёт, который нечем пересчитать, — «не посчитано» в своей валюте, не ноль (п. 5)', async () => {
     const me = await owner()
@@ -186,7 +190,7 @@ describe('«Остаток» — деньги на счетах на конец 
       },
       operationsUncounted: { total: 0, spendable: 0 },
     })
-  })
+  }, 10_000)
 
   it('операция, которую нечем посчитать, названа числом — остаток не выглядит целым (Б)', async () => {
     const me = await owner()
@@ -224,7 +228,7 @@ describe('«Остаток» — деньги на счетах на конец 
     const again = await month(me, '2025-03')
     expect(again.rateKind).toBe('frozen')
     expect(again.rest?.total).toEqual(rub(9000))
-  })
+  }, 10_000)
 
   it('следующая страница журнала остатка не считает: телефон берёт его с первой (№3)', async () => {
     const me = await owner()
@@ -237,7 +241,7 @@ describe('«Остаток» — деньги на счетах на конец 
     expect(response.statusCode, response.body).toBe(200)
     expect(moneyMonthCodec.parse(response.json()).rest).toBeNull()
     expect((await month(me, '2025-03')).rest?.total).toEqual(rub(1000))
-  })
+  }, 10_000)
 
   it('все счета убраны — «Завести счёт» не предлагается: accountsRemoved (№4)', async () => {
     const me = await owner()
@@ -249,7 +253,7 @@ describe('«Остаток» — деньги на счетах на конец 
       accountsFrom: null,
       accountsRemoved: true,
     })
-  })
+  }, 10_000)
 
   it('чужие счета не видны', async () => {
     const me = await owner()

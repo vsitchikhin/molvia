@@ -36,6 +36,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, signIn } from './fixtures'
 
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+
 // MOL-232 — a Serbian receipt by the link of its QR code: taken at the door, asked of the tax office
 // in a queue of its own, read from its journal, reviewed and recorded as a photo's receipt is.
 
@@ -344,7 +348,7 @@ describe('the tax office’s queue', () => {
       empty: 1,
       specsSkipped: 1,
     })
-  })
+  }, 10_000)
 
   it('asks again a receipt the tax office does not show yet, the pause growing, then reads it', async () => {
     const me = await serb()
@@ -411,7 +415,7 @@ describe('the tax office’s queue', () => {
     // given up is counted once, on the day it was; the receipt still asked is nothing yet
     expect(await taxDay()).toMatchObject({ missing: 1 })
     expect(await taxDay()).not.toHaveProperty('read')
-  })
+  }, 10_000)
 
   it('fails as invalid what the tax office refuses, and as unreadable a journal with no list', async () => {
     const me = await serb()
@@ -420,7 +424,7 @@ describe('the tax office’s queue', () => {
     await round(office({ kind: 'refused' }, found({ journal: '==== ФИСКАЛНИ РАЧУН ====' })))
     expect(await row(refused)).toMatchObject({ status: 'failed', failure: 'invalid', link: null })
     expect(await row(empty)).toMatchObject({ status: 'failed', failure: 'unreadable', link: null })
-  })
+  }, 10_000)
 
   it('keeps what the link said when the tax office refuses it, and the same body again is the same answer (review 2, А1)', async () => {
     const me = await serb()
@@ -515,7 +519,7 @@ describe('the tax office’s queue', () => {
     const [askedAbout] = purs.asked
     const [borisReceipt] = await db.select().from(receipts).where(eq(receipts.actorId, boris.id))
     expect(askedAbout).toBe((await row(borisReceipt?.id ?? ''))?.link)
-  })
+  }, 10_000)
 
   it('begins again an ask the last process did not finish, the ask not counted', async () => {
     const me = await serb()
@@ -663,7 +667,7 @@ describe('«Записать» a receipt by its link', () => {
       tin: TIN,
     })
     expect(await placeOf(other)).toBeNull()
-  })
+  }, 15_000)
 
   it('proposes the premises’ place for a receipt of a town the settings have not, and the memory’s item', async () => {
     const me = await serb()
@@ -683,7 +687,7 @@ describe('«Записать» a receipt by its link', () => {
       ['memory', 'Сахар'],
       ['memory', 'Банан'],
     ])
-  })
+  }, 10_000)
 
   it('refuses the same receipt recorded before, by the seller’s tax number and the number', async () => {
     const me = await serb()
@@ -701,7 +705,7 @@ describe('«Записать» a receipt by its link', () => {
     expect(z.object({ code: z.string() }).parse(refused.json()).code).toBe(
       'error.receipt_recorded_before',
     )
-  })
+  }, 10_000)
 })
 
 describe('the server’s own queue', () => {
@@ -725,7 +729,7 @@ describe('the server’s own queue', () => {
     } finally {
       await server.close()
     }
-  })
+  }, 10_000)
 })
 
 describe('how the link came (MOL-234, owner’s В-3 «а» of MOL-233)', () => {
@@ -762,7 +766,7 @@ describe('how the link came (MOL-234, owner’s В-3 «а» of MOL-233)', () => 
       [null, null],
     ])
     expect(await days()).toEqual([])
-  })
+  }, 10_000)
 
   it('a repeat is the same receipt and counts nothing; another way under its id is a 409', async () => {
     const me = await serb()
@@ -884,7 +888,7 @@ describe('the codes of the lines, from the specification (MOL-234, owner’s В-
     await running
     expect(await row(id)).toMatchObject({ status: 'parsed', link: null })
     expect(await codes(id)).toEqual([CODE, null])
-  })
+  }, 10_000)
 
   it('a specification over the person’s share is counted as not asked (adversarial А5)', async () => {
     const me = await serb()
@@ -893,7 +897,7 @@ describe('the codes of the lines, from the specification (MOL-234, owner’s В-
     purs.specs.push({ kind: 'skipped' })
     await round(purs)
     expect(await taxDay()).toEqual({ sentUnnamed: 1, read: 1, specsSkipped: 1 })
-  })
+  }, 10_000)
 
   it('the specification asked with the receipt’s own number and person', async () => {
     const me = await serb()
@@ -1030,7 +1034,7 @@ describe('«Привязать штрихкоды?» at «Записать» (MO
     const [written] = await holders()
     expect(written).toMatchObject({ code: CODE, addedBy: me.id })
     expect(await taxDay()).toMatchObject({ recorded: 1, codesWritten: 1 })
-  })
+  }, 10_000)
 
   it('binds it to an item of the catalogue the person chose', async () => {
     const me = await serb()
@@ -1128,7 +1132,7 @@ describe('«Привязать штрихкоды?» at «Записать» (MO
     await record(me, id, payload)
     const again = receiptRecordedCodec.parse((await record(me, id, payload)).json())
     expect(again.codes).toEqual([{ position: 0, code: CODE, outcome: 'written' }])
-  })
+  }, 15_000)
 
   it('an item holding twenty takes no more, and the record stands', async () => {
     const me = await serb()
@@ -1145,7 +1149,7 @@ describe('«Привязать штрихкоды?» at «Записать» (MO
     expect(receiptRecordedCodec.parse(response.json()).codes).toEqual([
       { position: 0, code: CODE, outcome: 'full' },
     ])
-  })
+  }, 10_000)
 
   it('a position with no code, or a line left out, binds nothing', async () => {
     const me = await serb()

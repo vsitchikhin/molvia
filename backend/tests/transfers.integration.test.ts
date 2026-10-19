@@ -31,6 +31,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
 
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
 let app: FastifyInstance
@@ -168,7 +172,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
     expect(accounts.accounts.find((one) => one.id === card)?.balance.minor).toBe(112000n)
     expect(await balanceOf(me, card)).toBe('112000 USD')
     expect(await balanceOf(me, dollars)).toBe('640000 USD')
-  })
+  }, 10_000)
 
   it('в месяце «Деньги» — только комиссия: «Потрачено» +20 $ по курсу дня, «Пришло» не тронуто', async () => {
     const { me, card, dollars } = await twoDollarAccounts()
@@ -190,7 +194,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
     expect(after.spent).toEqual(before.spent)
     expect(after.count).toBe(before.count)
     expect(await balanceOf(me, card)).toBe('114000 USD')
-  })
+  }, 10_000)
 
   it('кошелёк и «мой курс» не трогает: валюта не менялась', async () => {
     const { me, card, dollars } = await twoDollarAccounts()
@@ -209,7 +213,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
     const before = await read()
     await transfer(me, transferBody(card, dollars))
     expect(await read()).toEqual(before)
-  })
+  }, 10_000)
 
   it('сбережения: «Остаток» всего тот же, «без сбережений» растёт на перевод из копилки (MOL-134)', async () => {
     const me = await owner()
@@ -285,7 +289,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
     }
     const unassigned = await call(me, 'GET', '/money/accounts/unassigned')
     expect(unassigned.json()).toEqual({ rows: [] })
-  })
+  }, 10_000)
 
   describe('повтор и отказы', () => {
     it('тот же перевод ещё раз — 200 и один перевод; другое под тем же именем — 409', async () => {
@@ -317,7 +321,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
       }
       expect(await balanceOf(me, card)).toBe('314000 USD')
       expect(await balanceOf(me, dollars)).toBe('440000 USD')
-    })
+    }, 10_000)
 
     it('один и тот же счёт — отказ схемы; день, которого ещё нет нигде, — error.transfer_in_future', async () => {
       const { me, card, dollars } = await twoDollarAccounts()
@@ -346,7 +350,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
         .accounts.find((one) => one.id === dollars)
       expect(view?.archivedAt).not.toBeNull()
       await transfer(me, transferBody(card, dollars, { amount: usd('100') }))
-    })
+    }, 10_000)
 
     it('валюту счёта с переводом не сменить', async () => {
       const { me, card, dollars } = await twoDollarAccounts()
@@ -516,7 +520,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
       const [fee] = await db.select().from(spendings).where(eq(spendings.transferId, id))
       expect(fee?.deletedAt).not.toBeNull()
       expect(await balanceOf(me, card)).toBe('314000 USD')
-    })
+    }, 30_000)
   })
 
   describe('удаление и «Вернуть»', () => {
@@ -533,7 +537,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
       expect(restored.statusCode, restored.body).toBe(200)
       expect(await balanceOf(me, card)).toBe('112000 USD')
       expect((await monthOf(me)).spent.minor - before.spent.minor).toBe(780000n)
-    })
+    }, 10_000)
 
     it('после десяти минут — окончательно, с комиссией и версиями; трата сама по себе не стирается', async () => {
       const { me, card, dollars } = await twoDollarAccounts()
@@ -562,7 +566,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
       expect(await db.select().from(spendings).where(eq(spendings.transferId, written.id))).toEqual(
         [],
       )
-    })
+    }, 10_000)
 
     it('А7: запись, которой отказано, не делает прошлое удаление окончательным', async () => {
       const { me, card, dollars } = await twoDollarAccounts()
@@ -578,7 +582,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
       await call(me, 'DELETE', `/transfers/${written.id}`)
       await transfer(me, transferBody(card, dollars, { amount: usd('1') }))
       expect((await call(me, 'POST', `/transfers/${written.id}/restore`)).statusCode).toBe(404)
-    })
+    }, 10_000)
 
     it('удаление чужого ничего не трогает', async () => {
       const { me, card, dollars } = await twoDollarAccounts()
@@ -656,6 +660,6 @@ describe('«Перевод» между своими счетами (MOL-253)', 
       expect(report.erased.spendings).toBe(1)
       expect(await db.select().from(accountTransfers)).toEqual([])
       expect(await db.select().from(accountTransferRevisions)).toEqual([])
-    })
+    }, 10_000)
   })
 })

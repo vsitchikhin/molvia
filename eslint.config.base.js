@@ -51,6 +51,7 @@ export function base({ tsconfigRootDir, browser = false }) {
     },
     {
       files: ['src/**/*.{ts,vue}'],
+      ignores: TESTS_BESIDE_SOURCE,
       rules: { 'no-restricted-imports': ['error', { patterns: [...IMPORT_SHAPE, TEST_DATA] }] },
     },
 
@@ -92,6 +93,13 @@ export const TEST_DATA = {
 }
 
 /**
+ * A test beside its source lives in `src` and never ships, so `TEST_DATA` does not reach it: the
+ * clock's `expectWithin` (MOL-266) is a testing export every module's tests take, wherever they are.
+ * A module's own boundary over `src` leaves them out the same way — through `boundary`, not `deny`.
+ */
+export const TESTS_BESIDE_SOURCE = ['src/**/*.test.ts']
+
+/**
  * Deny a group of import specifiers with the reason the boundary exists. Meant for `src`
  * globs, which is where every boundary lives.
  *
@@ -105,4 +113,27 @@ export function deny(group, message) {
       { patterns: [...IMPORT_SHAPE, TEST_DATA, { group, message }] },
     ],
   }
+}
+
+/**
+ * A module's boundary over part of `src`, as two blocks: the sources take `deny`'s patterns, and the
+ * tests beside them the same boundary without `TEST_DATA` (adversarial А6 of MOL-266: a use case's test
+ * could neither import `expectWithin` nor bound a duration any other way). A rule's options are
+ * replaced, never merged, so the later block must carry the boundary again.
+ */
+export function boundary(files, group, message) {
+  // the tests' block is the glob with `*.test.ts` for `*.ts`: any other glob would hand it the sources
+  // and take TEST_DATA off them (adversarial Б5)
+  for (const glob of files) {
+    if (!glob.endsWith('*.ts')) throw new Error(`boundary(): a glob of .ts sources, not «${glob}»`)
+  }
+  return [
+    { files, ignores: TESTS_BESIDE_SOURCE, rules: deny(group, message) },
+    {
+      files: files.map((glob) => glob.replace(/\*\.ts$/, '*.test.ts')),
+      rules: {
+        'no-restricted-imports': ['error', { patterns: [...IMPORT_SHAPE, { group, message }] }],
+      },
+    },
+  ]
 }

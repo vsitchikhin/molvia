@@ -10,6 +10,10 @@ import { createExpenseRepository } from '@/db/expenses-repository'
 import { createItemRepository } from '@/db/items-repository'
 import { createTripRepository } from '@/db/trips-repository'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 636 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const catalogue = createItemRepository(db)
 const trips = createTripRepository(db)
@@ -76,7 +80,7 @@ describe('третья валюта внутри похода', () => {
       { minor: 57_000n, currency: 'AMD' },
       { minor: 50_000n, currency: 'RUB' },
     ])
-  })
+  }, 10_000)
 })
 
 describe('позиция со штрихкодами', () => {

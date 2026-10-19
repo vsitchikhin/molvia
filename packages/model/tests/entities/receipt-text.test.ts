@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { expectWithin } from '@molvia/model/testing/clock'
 import am01 from './receipt-text.am-01.json'
 import am03 from './receipt-text.am-03.json'
 import am04 from './receipt-text.am-04.json'
@@ -11,12 +12,19 @@ import type { PhotoReading } from '#model/entities/receipt-card'
 import { readPartly } from '#model/entities/receipt-sum'
 import {
   bestReading,
+  candidateSearches,
   likeness,
   mergeParts,
   parseReceiptText,
   rowsOf,
 } from '#model/entities/receipt-text'
 import type { ReceiptText, TextRow } from '#model/entities/receipt-text'
+
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+// «Searched only as far» also holds a bound on the clock of 15 s, below its timeout; «cost no second
+// search» reads two receipts of four hundred rows.
 
 /** Armenia's card: the fixtures are Armenian tills. */
 const AM = ARMENIAN_RECEIPTS
@@ -81,50 +89,54 @@ describe('a receipt read by Tesseract, as the prototype read it', () => {
     ['am-03', am03],
     ['am-04', am04],
     ['am-05', am05],
-  ] as [string, Fixture][])('%s', (name, fixture) => {
-    const got = read(fixture)
-    const want = fixture.expected
-    expect({
-      tin: got.tin,
-      date: got.date,
-      time: got.time,
-      receiptNo: got.receiptNo,
-      total: got.totalHundredths,
-      balanced: got.balanced,
-    }).toEqual({
-      tin: want.tin,
-      date: want.date,
-      time: want.time,
-      receiptNo: want.receiptNo,
-      total: UNVOUCHED_TOTAL.includes(name) ? null : hundredths(want.total),
-      balanced: want.balanced,
-    })
-    expect(
-      got.lines.map((l) => [
-        l.printed,
-        l.hs,
-        l.sku,
-        l.quantityMilli,
-        l.unit,
-        l.priceHundredths,
-        l.sumHundredths,
-        l.discountHundredths,
-        l.settled,
-      ]),
-    ).toEqual(
-      want.lines.map((l) => [
-        l.printed,
-        l.hs,
-        l.sku ?? null,
-        thousandths(l.qty),
-        l.unit === 'kg' ? 'kg' : 'piece',
-        (BLANK_LEFT_EMPTY[name] ?? []).includes(l.printed) ? null : hundredths(l.unit_price),
-        (BLANK_LEFT_EMPTY[name] ?? []).includes(l.printed) ? null : hundredths(l.sum),
-        hundredths(l.discount),
-        l.settled && !(CHANGED_BY_TOTAL[name] ?? []).includes(l.sku ?? ''),
-      ]),
-    )
-  })
+  ] as [string, Fixture][])(
+    '%s',
+    (name, fixture) => {
+      const got = read(fixture)
+      const want = fixture.expected
+      expect({
+        tin: got.tin,
+        date: got.date,
+        time: got.time,
+        receiptNo: got.receiptNo,
+        total: got.totalHundredths,
+        balanced: got.balanced,
+      }).toEqual({
+        tin: want.tin,
+        date: want.date,
+        time: want.time,
+        receiptNo: want.receiptNo,
+        total: UNVOUCHED_TOTAL.includes(name) ? null : hundredths(want.total),
+        balanced: want.balanced,
+      })
+      expect(
+        got.lines.map((l) => [
+          l.printed,
+          l.hs,
+          l.sku,
+          l.quantityMilli,
+          l.unit,
+          l.priceHundredths,
+          l.sumHundredths,
+          l.discountHundredths,
+          l.settled,
+        ]),
+      ).toEqual(
+        want.lines.map((l) => [
+          l.printed,
+          l.hs,
+          l.sku ?? null,
+          thousandths(l.qty),
+          l.unit === 'kg' ? 'kg' : 'piece',
+          (BLANK_LEFT_EMPTY[name] ?? []).includes(l.printed) ? null : hundredths(l.unit_price),
+          (BLANK_LEFT_EMPTY[name] ?? []).includes(l.printed) ? null : hundredths(l.sum),
+          hundredths(l.discount),
+          l.settled && !(CHANGED_BY_TOTAL[name] ?? []).includes(l.sku ?? ''),
+        ]),
+      )
+    },
+    15_000,
+  )
 
   it('reads the card layout with the till discount and the weight: am-03, 17 of 18 lines', () => {
     const got = read(am03 as Fixture)
@@ -138,7 +150,7 @@ describe('a receipt read by Tesseract, as the prototype read it', () => {
       309_000,
       401_354,
     ])
-  })
+  }, 15_000)
 
   it('reads the table layout of Dog City and lets the total decide: am-04', () => {
     const got = read(am04 as Fixture)
@@ -178,12 +190,12 @@ describe('a receipt read by Tesseract, as the prototype read it', () => {
       '2.Գազավորված ըմպելիք «Կոկա Կոլա» 1.6լ',
       '2202/096796 14տ 702,9/7,1 710',
     ])
-  })
+  }, 15_000)
 
   it('cuts only the figures when the number was not read — «Յ» for «3»', () => {
     const milk = read(am03 as Fixture).lines[2]!
     expect(milk.rows.map((r) => r.text)).toEqual(['0401/1163909 1Հտ 366,3/3,7 370'])
-  })
+  }, 10_000)
 
   it('cuts only the heading row of a table', () => {
     const got = read(am04 as Fixture)
@@ -220,14 +232,17 @@ describe('a reading OCR glued into long figures', () => {
       ].join('\n'),
     ).join('\n')
 
+  // The bound is the clock's (MOL-266): without the ceilings the 20-digit figures take past a minute, and
+  // the worst on CI is 510 ms — the bound ten times that and more, the test's own timeout above it
   it.each([6, 9, 12, 20])(
     'is laid out in seconds, not minutes, with %i-digit figures',
     (digits) => {
       const started = performance.now()
       const got = parseReceiptText(AM, rowsOf(glued(digits), 0))
       expect(got.lines).toHaveLength(12)
-      expect(performance.now() - started).toBeLessThan(5_000)
+      expectWithin(performance.now() - started, 6_000)
     },
+    15_000,
   )
 })
 
@@ -401,12 +416,17 @@ describe('a till that prints no shelf price, settled against its total (review �
     return [...body, totalRow(total)].join('\n')
   }
 
-  it.each([12, 18, 30])('balances %i lines in seconds, not minutes', (count) => {
-    const started = performance.now()
-    const got = parse(receipt(count))
-    expect([got.lines.length, got.balanced]).toEqual([count, true])
-    expect(performance.now() - started).toBeLessThan(5_000)
-  })
+  // the clock's, as above: twelve lines with no ceilings balance in 12–30 s, and CI's worst is 229 ms
+  it.each([12, 18, 30])(
+    'balances %i lines in seconds, not minutes',
+    (count) => {
+      const started = performance.now()
+      const got = parse(receipt(count))
+      expect([got.lines.length, got.balanced]).toEqual([count, true])
+      expectWithin(performance.now() - started, 5_000)
+    },
+    15_000,
+  )
 })
 
 describe('rows of an item’s shape above the list (review Р15)', () => {
@@ -421,7 +441,7 @@ describe('rows of an item’s shape above the list (review Р15)', () => {
     )
     const yoghurt = parse(text).lines.find((line) => line.sku === '1160033')!
     expect([yoghurt.sumHundredths, yoghurt.settled]).toEqual([29_000, true])
-  })
+  }, 30_000)
 })
 
 describe('a line printed with no discount among discounted ones (review Р5)', () => {
@@ -585,20 +605,29 @@ describe('rows of junk by the hundred (review Р18)', () => {
     const got = parse(`${junk(400)}\n${totalRow(1_000_000)}`)
     expect(got.lines).toHaveLength(400)
     expect(got.lines.filter((line) => line.settled).length).toBeLessThan(100)
-    // and against a fall back to seconds a row, with room for a slow runner
-    expect(performance.now() - started).toBeLessThan(5_000)
-  })
+    // and against a fall back to seconds a row: ten times the worst on CI, 1 408 ms (MOL-266)
+    expectWithin(performance.now() - started, 15_000)
+  }, 30_000)
 
   it('cost no second search where the total shown is not the reading’s own (MOL-244)', () => {
     // two places vouch for 9 000,00 against the reading's 10 000,00: the reading chosen is read again as
-    // printed — its candidates found once, the judging alone repeated
+    // printed — its candidates found once, the judging alone repeated. Held by the count of searches, not a
+    // clock (MOL-265): a second search is twice the work, and twice is under any bound CI can keep.
     const tail = [totalRow(1_000_000), 'Ընդամենը: 9 000,00', 'Վճարված է Առձեռն: 9 000,00']
     const text = `${junk(400)}\n${tail.join('\n')}`
-    const started = performance.now()
-    const got = bestReading(AM, [rowsOf(text, 0), rowsOf(text, 0)])
-    expect(got.totalHundredths).toBe(900_000)
-    expect(performance.now() - started).toBeLessThan(5_000)
-  })
+    const searches = (read: () => unknown): number => {
+      const before = candidateSearches.count
+      read()
+      return candidateSearches.count - before
+    }
+    const once = searches(() => parseReceiptText(AM, rowsOf(text, 0)))
+    expect(once).toBeGreaterThan(0)
+    let got: ReceiptText | undefined
+    expect(searches(() => (got = bestReading(AM, [rowsOf(text, 0), rowsOf(text, 0)])))).toBe(
+      2 * once,
+    )
+    expect(got?.totalHundredths).toBe(900_000)
+  }, 85_000)
 })
 
 describe('the name row of the first item, which has the head above it (review Р19)', () => {
@@ -642,7 +671,7 @@ describe('the beam keeps the reading the total asks for (review П11)', () => {
     const got = parse([...body, totalRow(total)].join('\n'))
     expect(got.balanced).toBe(true)
     expect(got.lines.map((line) => line.sumHundredths)).toEqual(truth)
-  })
+  }, 10_000)
 })
 
 // Review round 4 of MOL-125.
@@ -737,29 +766,15 @@ describe('the seam with two blemishes in the overlap, or a cut row at the first 
 })
 
 describe('rows of a thousand letters after the articles (review Р22)', () => {
-  // the work, not the clock (review 12): a row is compared by its first eighty letters only
+  // the work, not the clock (review 12): a row is compared by its first eighty letters only. This is what
+  // holds the seam's cost too: without the cap two hundred rows of 700 letters merge some five times
+  // slower, under any bound a clock could keep, so the seam's own clock held nothing and went (MOL-266)
   it('are compared by their first eighty letters', () => {
     const head = 'Կաթ«Մարիան»3,2%1լ'.repeat(6).slice(0, 80)
     expect(likeness(`${head}${'Ա'.repeat(920)}`, `${head}${'Բ'.repeat(920)}`)).toBe(1)
     expect(
       likeness(`${head.slice(1)}Ա${'Ա'.repeat(920)}`, `${head}${'Ա'.repeat(920)}`),
     ).toBeLessThan(1)
-  })
-
-  it('cost a seam no more than its first eighty letters', () => {
-    let seed = 1
-    const letter = () => {
-      seed = (seed * 1103515245 + 12345) % 2147483648
-      return 'ԱԲԳԴԵԶԷԸ'.charAt((seed >> 16) % 8)
-    }
-    const long = () => Array.from({ length: 700 }, letter).join('')
-    const articles = Array.from({ length: 200 }, (_, i) => `0401/${String(1_100_000 + i * 37)}`)
-    const part1 = [...articles.map((a) => `${a} x\n${long()}`), '0401/9999999 x'].join('\n')
-    const part2 = articles.map((a) => `${a} x\n${long()}`).join('\n')
-    const started = performance.now()
-    mergeParts(AM, [rowsOf(part1, 0), rowsOf(part2, 1)])
-    // a backstop as loose as its neighbours': CI's machine is slower than any laptop
-    expect(performance.now() - started).toBeLessThan(5_000)
   })
 })
 
@@ -779,7 +794,7 @@ describe('a line of a till with no shelf price whose figures OCR glued long (rev
     expect(got.lines.slice(0, 5).map((line) => line.sumHundredths)).toEqual(
       Array.from({ length: 5 }, () => 30_000),
     )
-  })
+  }, 10_000)
 })
 
 describe('two flavours of one yoghurt, numbered in a row (review Р23)', () => {
@@ -1188,14 +1203,19 @@ describe('a fiscal till read by its class code (MOL-226)', () => {
   })
 
   it('reads four hundred coded rows of junk within the ceilings', () => {
+    // every figure a run of ones OCR may read as fours, and no line adding up: each row tries all of its
+    // swaps until the budgets stop it. The work, not a clock (MOL-266): with the ceilings some sixty lines
+    // settle and the rest are taken as read; without them all two hundred do, in a few times the time —
+    // under any bound a clock could keep on CI, and the old rows never reached the ceilings at all
     const rows = Array.from({ length: 400 }, (_, i) =>
-      i % 2 === 0 ? `Դաս. 56.10, Ն/Կ 7${String(i).padStart(5, '0')} 4 հատ 1388.89 1883.44` : 'Ֆրի',
+      i % 2 === 0
+        ? `Դաս. 56.10, Ն/Կ 7${String(i).padStart(5, '0')} 1 հատ 1111111.11 1411111.11`
+        : 'Ֆրի',
     )
-    const started = performance.now()
     const got = receipt(...rows, 'Ընդամենը 99999.99')
-    expect(got.lines).toHaveLength(200)
-    expect(performance.now() - started).toBeLessThan(5_000)
-  })
+    expect([got.layout, got.lines.length]).toEqual(['class', 200])
+    expect(got.lines.filter((line) => line.settled).length).toBeLessThan(100)
+  }, 15_000)
 })
 
 // MOL-226, review round 1: what OCR does to the class reading that the first version lost.

@@ -37,7 +37,11 @@ jobs:
           --health-retries 10
 
     steps:
+      # The merge's first parent too: the time reporter turns red only for the files the pull request
+      # changes, `HEAD^1..HEAD` (MOL-266, В-4 «а»).
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc

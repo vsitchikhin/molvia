@@ -52,6 +52,8 @@ async function refused(template: string): Promise<boolean> {
 }
 
 describe('eslint.config.js: a busy button says what it does (MOL-225)', () => {
+  // The first case loads the type-aware config: 11 564 ms on CI at worst, ten times that its timeout
+  // (MOL-266)
   it.each([
     ['bound', button(':busy="sending"')],
     ['alone', button('busy')],
@@ -93,7 +95,7 @@ describe('eslint.config.js: a busy button says what it does (MOL-225)', () => {
     async (_, template) => {
       expect(await refused(template)).toBe(true)
     },
-    60_000,
+    235_000,
   )
 
   it.each([

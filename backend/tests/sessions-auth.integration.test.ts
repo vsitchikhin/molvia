@@ -27,6 +27,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { aStrangersCookie, anHourFromNow, clearAll, insertActor, telegramId } from './fixtures'
 
+// The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 641 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const repository = createSessionRepository(db)
 
@@ -129,7 +133,7 @@ describe('четыре отказа — один ответ', () => {
     expect(new Set(answers.map((answer) => answer.status)).size).toBe(1)
     expect(new Set(answers.map((answer) => answer.raw)).size).toBe(1)
     expect(new Set(answers.map((answer) => answer.headers['www-authenticate'])).size).toBe(1)
-  })
+  }, 10_000)
 
   it('отвечает тем же на всё, чего этот сервер не мог выпустить', async () => {
     // Негодная форма отсекается до Postgres: иначе `22P02` пришёл бы пятисоткой, то есть
@@ -194,7 +198,7 @@ describe('скользящий срок через сервер', () => {
 
     const [row] = await db.select().from(sessions).where(eq(sessions.id, id))
     expect(row?.lastSeenAt.getTime()).toBeGreaterThan(Date.now() - HOUR)
-  })
+  }, 10_000)
 
   it('на границе суток минус секунда не пишет ничего', async () => {
     const { id, cookie } = await signedIn(SESSION_TOUCH_AFTER_HOURS - 1)
@@ -509,7 +513,7 @@ describe('шов помнит аккаунт браузера', () => {
         (JSON.parse(mine.body) as { id: string }).id,
       )
     }
-  })
+  }, 10_000)
 
   it('cookie аккаунта живёт дольше сессии и никем не читается из скрипта', async () => {
     const all = setCookies((await login()).headers)

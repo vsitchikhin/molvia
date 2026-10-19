@@ -5,6 +5,10 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { connectDrizzle, testDatabaseUrl } from './db'
 import { insertActor, telegramId } from './fixtures'
 
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+
 /**
  * The owner's fallback for erasure is only worth anything if it runs where it is needed: in the
  * production image, which holds one bundled file per entry and no `node_modules` (MOL-58). So the
@@ -41,7 +45,7 @@ describe('dist/forget.js', () => {
     const wrong = forget('not-an-id')
     expect(wrong.status).toBe(2)
     expect(wrong.stdout).toContain('usage: forget')
-  })
+  }, 15_000)
 })
 
 // Adversarial О-6 and П-3: the value of TG must not be able to bring its own `--yes`, quoted or
@@ -58,6 +62,7 @@ describe('make forget', () => {
       expect(run.stdout).toContain('usage: forget')
       expect(run.stdout).not.toContain('PWNED')
     },
+    55_000,
   )
 
   // MOL-112, adversarial Е: only YES=1 typed on the command line erases. `-n` prints the recipe

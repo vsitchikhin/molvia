@@ -21,6 +21,10 @@ import {
 } from './refresh-official-rates'
 import type { HomeBankFeed } from './refresh-official-rates'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 692 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 // Saturday 19.09.2026, noon in Yerevan; the central bank's latest is Friday's.
 const NOW = new Date('2026-09-19T08:00:00.000Z')
 const FRIDAY = '2026-09-18'
@@ -986,7 +990,7 @@ describe('банк страны: НБ Грузии (MOL-110)', () => {
     // Только суточный взгляд на месяц (с днями перед ним), а не проход от марта 2024.
     expect(perDay.every((asked) => asked <= ARCHIVE_RECENT_DAYS + 1 + ARCHIVE_GAP_DAYS)).toBe(true)
     expect(home.warnings).toEqual([])
-  })
+  }, 15_000)
 
   it('архив отдал завтрашний курс на сегодня — день пропущен, проход не отвергнут; позже завтра — отвергнут', async () => {
     const tomorrow = '2026-09-20'

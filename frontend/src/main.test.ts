@@ -4,6 +4,10 @@ import { ERROR } from '@molvia/model'
 import type * as Api from '@/api'
 import type * as Identity from '@/stores/identity'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 941 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 // A step of the start throws, as a browser that lacks what it calls would (adversarial А4).
 vi.mock('@/stores/identity', async (original) => ({
   ...(await original<typeof Identity>()),
@@ -38,5 +42,5 @@ describe('сбой на старте (MOL-144, адверсариальный А
       screen: string
     }[]
     expect(kept).toEqual([expect.objectContaining({ catcher: 'start', screen: 'start' })])
-  })
+  }, 20_000)
 })
