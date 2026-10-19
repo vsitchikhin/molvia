@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import {
   ERROR,
+  RECEIPT_READ_PARTLY_HEADER,
   RECEIPT_READ_TOTAL_HEADER,
   receiptDetailCodec,
   receiptSummaryCodec,
@@ -116,6 +117,18 @@ function put(me: Owner, id: string, part: number | string, photo: Buffer, type =
 
 function get(me: Owner, url: string) {
   return app.inject({ method: 'GET', url, headers: { cookie: me.cookie } })
+}
+
+/** The detail as this build asks for it: the total read in one place and «read in part» with it. */
+async function askedAll(me: Owner, id: string) {
+  const headers = {
+    cookie: me.cookie,
+    [RECEIPT_READ_TOTAL_HEADER]: '1',
+    [RECEIPT_READ_PARTLY_HEADER]: '1',
+  }
+  return receiptDetailCodec.parse(
+    (await app.inject({ method: 'GET', url: `/receipts/${id}`, headers })).json(),
+  )
 }
 
 /** A different photo for every receipt a test sends. */
@@ -491,18 +504,43 @@ describe('the queue', () => {
     expect(report?.kind === 'read' && report.lines).toBe(detail.lines.length)
     expect(await days()).toMatchObject([{ readPartly: 1, read: 0, reshoot: 0 }])
     // the total stands in one place and the lines nowhere near it: not shown, and still what says
-    // «read in part» — to a phone that asks for it alone (MOL-244)
-    expect([detail.receipt.total, detail.readTotal]).toEqual([null, undefined])
-    const asked = receiptDetailCodec.parse(
-      (
-        await app.inject({
-          method: 'GET',
-          url: `/receipts/${id}`,
-          headers: { cookie: me.cookie, [RECEIPT_READ_TOTAL_HEADER]: '1' },
-        })
-      ).json(),
-    )
+    // «read in part» — to a phone that asks for it alone (MOL-244); and the server's word that it was
+    // read in part, kept from the reading (MOL-255, А6 «а»)
+    expect([detail.receipt.total, detail.readTotal, detail.readPartly]).toEqual([
+      null,
+      undefined,
+      undefined,
+    ])
+    const asked = await askedAll(me, id)
     expect(asked.readTotal).toEqual({ minor: 1_000_000n, currency: 'AMD' })
+    expect(asked.readPartly).toBe(true)
+  })
+
+  // MOL-255, adversarial А6 «а»: the phone sees an emptied line and a lost one alike, the server does not
+  it('tells the phone a receipt is read in part though the check emptied a line of it', async () => {
+    const me = await owner()
+    const id = await queued(me)
+    // the milk of one piece whose price is its sum is emptied on a receipt not proven whole (В-2 «а»),
+    // and the lines as read still make 1 140 of 10 000: rows were lost
+    const text = [
+      '1. Կաթ',
+      '0401/1163909 1Հտ 400 400',
+      '2. Հաց',
+      '1905/1078044 2Հտ 740 370',
+      'Ընդամենը 10000.00',
+    ].join('\n')
+    const lost: ReaderReading = {
+      text,
+      rows: text.split('\n').map((row, i) => ({ text: row, box: [0, i * 40, 600, 30] })),
+      version: 'v',
+    }
+    const [report] = await readAll(benchReader({ read: () => Promise.resolve(lost) }))
+    expect(report).toMatchObject({ kind: 'read', partly: true })
+    const asked = await askedAll(me, id)
+    expect(asked.lines.map((line) => line.sum?.minor ?? null)).toEqual([null, 74_000n])
+    expect(asked.readPartly).toBe(true)
+    const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
+    expect(row?.readPartly).toBe(true)
   })
 
   it('shows the total the payment prints too, the lines short of it (MOL-244)', async () => {
@@ -529,11 +567,15 @@ describe('the queue', () => {
 
   it('counts a receipt read whole as read, by the day in Yerevan, with no id of anyone', async () => {
     const me = await owner()
-    await queued(me)
+    const id = await queued(me)
     await queued(me)
     // of what was read (MOL-255, А5 «а»): the eleven lines of am-05 the check empties were read
     const reports = await readAll(benchReader())
     expect(reports.map((r) => r.kind === 'read' && r.partly)).toEqual([false, false])
+    // and the phone, which sees them empty, is told so (А6 «а»)
+    const asked = await askedAll(me, id)
+    expect(asked.lines.some((line) => line.sum === null)).toBe(true)
+    expect(asked.readPartly).toBe(false)
     const rows = await days()
     expect(rows).toMatchObject([{ read: 2, readPartly: 0 }])
     const [{ today } = { today: '' }] = await db.execute<{ today: string }>(

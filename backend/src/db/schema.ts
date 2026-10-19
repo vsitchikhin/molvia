@@ -2680,6 +2680,10 @@ export const receipts = pgTable(
     // The total as the reading found it in one place, vouched for or not (MOL-244): only what «Прочитали
     // не всё» measures the lines against, never a total shown or recorded.
     readTotalMinor: bigint('read_total_minor', { mode: 'bigint' }),
+    // Read in part (MOL-222's `readPartly`), of the lines as read, before the check emptied any (MOL-255,
+    // А6 «а»): what the phone, which sees only the lines shown, says «Прочитали не всё» by. Null — read
+    // before it, or not read.
+    readPartly: boolean('read_partly'),
     balanced: boolean('balanced').notNull().default(false),
     // The city of the settings its address prints (MOL-126, Р-6), where its place is looked for.
     city: text('city').$type<ReceiptCity>(),
