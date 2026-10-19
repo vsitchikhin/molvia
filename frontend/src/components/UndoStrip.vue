@@ -8,19 +8,22 @@
     @pointerdown="hold(true)"
   >
     <span class="text">{{ text }}</span>
-    <span class="count" aria-hidden="true">{{ left }}</span>
-    <AppButton
-      ref="button"
-      variant="tinted"
-      class="restore"
-      :busy="busy"
-      :busy-label="busyLabel"
-      :inactive="waiting"
-      @click="restore"
-    >
-      <template #icon><IconUndo /></template>
-      {{ waiting ? waitingAction : action }}
-    </AppButton>
+    <!-- The count and «Вернуть» go together: under the words, at the right, when the strip is narrow. -->
+    <span class="tail">
+      <span class="count" aria-hidden="true">{{ left }}</span>
+      <AppButton
+        ref="button"
+        variant="tinted"
+        class="restore"
+        :busy="busy"
+        :busy-label="busyLabel"
+        :inactive="waiting"
+        @click="restore"
+      >
+        <template #icon><IconUndo /></template>
+        {{ waiting ? waitingAction : action }}
+      </AppButton>
+    </span>
   </div>
 </template>
 
@@ -137,10 +140,15 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+// The words beside the count and «Вернуть» while they have 7rem; narrower, the words take the first
+// line and the two go under them together, at the right. Kept on one line, a «Вернуть» holding «Возвращаем…»
+// left the words some 50 px at 320 and broke them a letter a line, and «Вернём, когда будет связь»
+// none at all (MOL-189).
 .undo-strip {
   @include appear;
 
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   min-height: 3.5rem;
@@ -149,6 +157,15 @@ export default defineComponent({
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow-md);
+}
+
+.tail {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  margin-left: auto;
 }
 
 .count {
@@ -166,13 +183,15 @@ export default defineComponent({
 }
 
 .text {
-  flex: 1;
+  flex: 1 1 7rem;
   min-width: 0;
   font-size: var(--text-callout);
   overflow-wrap: anywhere;
 }
 
+// May give way, its words wrapping inside it, so a long one never stands past the strip.
 .restore {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 </style>

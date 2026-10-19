@@ -294,6 +294,7 @@ async function recordOne(page: Page): Promise<void> {
  */
 test('an exchange is removed from its amendment, the question over it, «Вернуть» over the strip', async ({
   page,
+  context,
 }) => {
   await signedIn(page)
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
@@ -338,6 +339,23 @@ test('an exchange is removed from its amendment, the question over it, «Вер�
   await expect(restore).toBeFocused()
   const [strip, dock] = await Promise.all([undo.boundingBox(), page.locator('.dock').boundingBox()])
   expect((strip?.y ?? 0) + (strip?.height ?? 0)).toBeLessThanOrEqual(dock?.y ?? 0)
+
+  // On a 320 px phone the words keep their 7rem: «Вернуть» holds «Возвращаем…» under it, offline it
+  // says «Вернём, когда будет связь», and on one line with them the words broke a letter a line.
+  await page.setViewportSize({ width: 320, height: 700 })
+  for (const offline of [false, true]) {
+    await context.setOffline(offline)
+    await expect(undo.locator('button')).toHaveText(
+      offline ? 'Вернём, когда будет связь' : 'Вернуть',
+    )
+    const [words, whole] = await Promise.all([
+      undo.locator('.text').boundingBox(),
+      undo.boundingBox(),
+    ])
+    expect(words?.width ?? 0).toBeGreaterThanOrEqual(112)
+    expect((whole?.x ?? 0) + (whole?.width ?? 0)).toBeLessThanOrEqual(320)
+  }
+  await context.setOffline(false)
 
   await restore.click()
   await expect(undo).toBeHidden()

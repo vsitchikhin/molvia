@@ -73,7 +73,9 @@ describe('UndoStrip', () => {
   // 157 v2 2d, 72 v2 03: the words first, the count beside the button the finger goes to.
   it('reads «words · count · Вернуть», the count kept from screen readers', () => {
     const strip = render()
-    const parts = [...strip.element.children].map((part) => part.className.split(' ')[0])
+    const parts = [...strip.element.querySelectorAll('.text, .count, button')].map(
+      (part) => part.className.split(' ')[0],
+    )
     expect(parts).toEqual(['text', 'count', 'button'])
     expect(strip.get('.count').attributes('aria-hidden')).toBe('true')
   })
