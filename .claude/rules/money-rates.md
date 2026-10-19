@@ -401,7 +401,8 @@ device, private always. The rate is what the two amounts say and is not stored b
   what was typed and the word in the question — in the question only while it stands: put away
   meanwhile, the next question read out a failure nobody pressed for (round 2, Б1); the amendment of the
   same exchange, still up, says it instead (В2) — the screen's word is under the modal sheet — until its
-  next save, as its own word does (Г1). The strip
+  next «Сохранить», as its own word does (Г1), a field refused included: the sheet says the press
+  (`save`), since a refusal under a field never reaches the screen's write (Д1). The strip
   comes once no sheet of the amendment is up — its own, or one opened over another card while the answer
   was on its way: under a modal sheet «Вернуть» cannot be reached, and its ten seconds ran out there
   (Б2). Every strip that waits waits, not the last: a second removal from the sheet the first one waited
