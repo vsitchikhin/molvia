@@ -122,10 +122,26 @@ describe('a line paid nothing, its whole price the discount (review round 2, А7
   const gift = { quantityMilli: 1_000, priceHundredths: 50_000, sumHundredths: 0 }
 
   it('keeps its figures where the discount is the price to the hundredth: «0,00/500,00 500»', () => {
+    // of one piece on a receipt proven whole: the count and the nothing paid, no price (round 4, А11 «а»)
     const got = one({ ...gift, discountHundredths: 50_000 }, 0)
-    expect(figures(got)).toEqual([1_000, 50_000, 0, 50_000, true])
+    expect(figures(got)).toEqual([1_000, null, 0, null, true])
     const two = one({ ...gift, quantityMilli: 2_000, discountHundredths: 100_000 })
     expect(figures(two)).toEqual([2_000, 50_000, 0, 100_000, true])
+  })
+
+  it('of one piece shows no price misread alike in both places on a receipt proven whole (А11)', () => {
+    // «0,00/660,00 660» for 560 beside «300,00/0,00 300», the total 300: proven either way
+    const got = verifiedReading(
+      reading(
+        [
+          line({ ...gift, priceHundredths: 66_000, discountHundredths: 66_000 }),
+          line({ quantityMilli: 1_000, priceHundredths: 30_000, sumHundredths: 30_000 }),
+        ],
+        30_000,
+      ),
+    )
+    expect(got.balanced).toBe(true)
+    expect(figures(got.lines[0]!)).toEqual([1_000, null, 0, null, true])
   })
 
   it('of one piece or one kilogram is kept only on a receipt proven whole (round 3, А9 «а»)', () => {
@@ -162,7 +178,7 @@ describe('a line paid nothing, its whole price the discount (review round 2, А7
     )
     expect(got.balanced).toBe(true)
     expect(got.lines.map(figures)).toEqual([
-      [1_000, 50_000, 0, 50_000, true],
+      [1_000, null, 0, null, true],
       [1_000, 30_000, 30_000, 0, true],
     ])
   })
