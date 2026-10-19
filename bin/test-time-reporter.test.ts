@@ -348,9 +348,9 @@ describe('hookTimes', () => {
 })
 
 describe('describeBreach', () => {
-  it('advises the limit as the rule writes it: ten times, rounded up to 5 s (review №11)', () => {
-    expect([limitFor(1_204.2), limitFor(500), limitFor(501), limitFor(2_371)]).toEqual([
-      15_000, 5_000, 10_000, 25_000,
+  it('advises twice the rule’s ten times, rounded up to 5 s (review №11, №29)', () => {
+    expect([limitFor(1_204.2), limitFor(250), limitFor(251), limitFor(2_371)]).toEqual([
+      25_000, 5_000, 10_000, 50_000,
     ])
   })
 
@@ -363,7 +363,7 @@ describe('describeBreach', () => {
       limit: 5_000,
     }
     expect(describeBreach(breach)).toBe(
-      'a.test.ts › x › y: the test took 2 371 ms against its timeout of 5 000, its beforeEach and afterEach included — give it 25 000',
+      'a.test.ts › x › y: the test took 2 371 ms against its timeout of 5 000, its beforeEach and afterEach included — give it 50 000',
     )
   })
 })
@@ -439,9 +439,9 @@ describe('the verdict of a run', () => {
     expect(lines.filter((line) => line.startsWith('[time] '))).toEqual([
       '[time] red only in 1',
       '[time] past the rule of MOL-243 — 1, see CLAUDE.md › Testing:',
-      '[time] ours.test.ts › slow: the test took 900 ms against its timeout of 5 000, its beforeEach and afterEach included — give it 10 000',
+      '[time] ours.test.ts › slow: the test took 900 ms against its timeout of 5 000, its beforeEach and afterEach included — give it 20 000',
       '[time] past the rule of MOL-243 outside the files of the pull request, a warning — 1, see CLAUDE.md › Testing:',
-      '[time] theirs.test.ts › slow: the test took 800 ms against its timeout of 5 000, its beforeEach and afterEach included — give it 10 000',
+      '[time] theirs.test.ts › slow: the test took 800 ms against its timeout of 5 000, its beforeEach and afterEach included — give it 20 000',
     ])
   })
 

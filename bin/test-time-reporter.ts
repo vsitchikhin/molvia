@@ -429,8 +429,12 @@ export function redScope(env: NodeJS.ProcessEnv = process.env, run = git): RedSc
 /** Thousands parted by a plain space, as the project writes them — never the locale's no-break one. */
 const number = (ms: number): string => String(Math.round(ms)).replace(/\B(?=(\d{3})+$)/g, ' ')
 
-/** A limit as the rule writes it: ten times the time, rounded up to 5 s (`workspace.md`). */
-export const limitFor = (ms: number): number => Math.ceil((ms * TIMES) / 5_000) * 5_000
+/**
+ * The limit advised: twice the rule's ten times, rounded up to 5 s (`workspace.md`). A busy runner sets a
+ * new worst up to twice the last (1 201 runs of CI, review №29): a limit of ten times exactly would be red
+ * again at the next one, and the advice is what the file is given.
+ */
+export const limitFor = (ms: number): number => Math.ceil((ms * TIMES * 2) / 5_000) * 5_000
 
 export function describeBreach(breach: Breach): string {
   const where = `${breach.file} › ${breach.name}`
