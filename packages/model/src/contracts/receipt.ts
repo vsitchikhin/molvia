@@ -194,6 +194,13 @@ export const receiptDetailCodec = z.strictObject({
    * strictly, as with a line's `code`.
    */
   readTotal: moneyCodec.nullable().optional(),
+  /**
+   * Read in part, as the server measured it at the reading (MOL-255, А6 «а»): of the lines as read, before
+   * the check emptied any — a phone that sees only the lines shown cannot tell an emptied line from a
+   * lost one. `null` for a receipt read before. Sent only to a phone that asked by
+   * `RECEIPT_READ_PARTLY_HEADER`, as `readTotal`.
+   */
+  readPartly: z.boolean().nullable().optional(),
 })
 export type ReceiptDetail = z.output<typeof receiptDetailCodec>
 
@@ -311,3 +318,6 @@ export const RECEIPT_CODES_HEADER = 'X-Molvia-Receipt-Codes'
 
 /** A phone that knows the detail's `readTotal` says so by this header (MOL-244), as `RECEIPT_CODES_HEADER`. */
 export const RECEIPT_READ_TOTAL_HEADER = 'X-Molvia-Receipt-Read-Total'
+
+/** A phone that knows the detail's `readPartly` says so by this header (MOL-255), as `RECEIPT_CODES_HEADER`. */
+export const RECEIPT_READ_PARTLY_HEADER = 'X-Molvia-Receipt-Read-Partly'

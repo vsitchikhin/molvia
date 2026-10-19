@@ -1,16 +1,14 @@
 <template>
   <AppCard as="article" class="card">
-    <OperationCardHead
-      :day="head"
-      :amended="income.amendedAt ? t('income.amended', { date: dayOf(income.amendedAt) }) : null"
-      :remove-label="t('income.remove', { amount })"
-      :disabled="disabled"
-      @remove="$emit('remove', income)"
-    />
-    <!-- The way into its amendment, as an exchange's is (MOL-42, В-3). No `aria-label`: it would
-         silence the source, the amount and the note. The verb and the day are said first. -->
-    <button class="body" type="button" :disabled="disabled" @click="$emit('edit', income)">
+    <!-- The whole card is the way into its amendment, as an exchange's is (MOL-42, В-3, MOL-189): the
+         removal lives in its sheet. No `aria-label`: it would silence the source, the amount and the
+         note. The verb and the day are said first. Open without a connection too (С-19). -->
+    <button class="body" type="button" @click="$emit('edit', income)">
       <span class="verb">{{ t('income.edit_on', { date: day }) }}</span>
+      <OperationCardHead
+        :day="head"
+        :amended="income.amendedAt ? t('income.amended', { date: dayOf(income.amendedAt) }) : null"
+      />
       <span class="line">
         <span class="source">{{ t(`income.source.${income.source}`) }}</span>
         <span class="amount">{{ amount }}</span>
@@ -53,11 +51,9 @@ export default defineComponent({
     income: { type: Object as PropType<IncomeView>, required: true },
     /** The phone's today, held by the screen and asked again when it comes back (adversarial Н). */
     today: { type: String, required: true },
-    disabled: { type: Boolean, default: false },
   },
   emits: {
     edit: (income: IncomeView) => typeof income === 'object',
-    remove: (income: IncomeView) => typeof income === 'object',
   },
   setup(props) {
     const { t, locale } = useI18n()
@@ -97,25 +93,21 @@ export default defineComponent({
   flex-direction: column;
   gap: var(--space-2);
   width: 100%;
-  padding: 0 var(--space-4) var(--space-4);
+  padding: var(--space-4);
   border: 0;
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  border-radius: var(--radius-lg);
   background: transparent;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
 
-  &:hover:not(:disabled) {
+  &:hover {
     background: var(--surface-2);
   }
 
   &:focus-visible {
     @include focus-ring(-2px);
-  }
-
-  &:disabled {
-    cursor: default;
   }
 }
 

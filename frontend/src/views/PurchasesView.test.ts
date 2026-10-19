@@ -319,6 +319,33 @@ describe('PurchasesView (MOL-128)', () => {
       expect(view.text()).not.toContain('0 позиций')
     })
 
+    it('строки без цифр и несошедшиеся — одной меткой «проверьте N строк» (MOL-255)', async () => {
+      receipts.mockResolvedValue({
+        receipts: [
+          {
+            id: 'cccccccc-0000-4000-8000-000000000001',
+            status: 'parsed',
+            failure: null,
+            parts: 1,
+            received: 1,
+            capturedAt: new Date('2026-09-26T16:00:00.000Z'),
+            country: 'AM',
+            language: 'ru',
+            header: null,
+            total: { minor: 854_000n, currency: 'AMD' },
+            balanced: false,
+            lineCount: 13,
+            unsettled: 11,
+            place: null,
+            tripId: null,
+          },
+        ],
+      })
+      const { view } = await render()
+      expect(view.text()).toContain('проверьте 11 строк')
+      expect(view.text()).not.toContain('не сход')
+    })
+
     it('чек по ссылке (MOL-232): «по ссылке · спрашиваем налоговую», затем отказ налоговой', async () => {
       const serbian = {
         id: 'cccccccc-0000-4000-8000-000000000002',

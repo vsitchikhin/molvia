@@ -262,4 +262,54 @@ describe('IncomeSheet', () => {
     expect(view.get('.current').text()).toContain('Now recorded:')
     expect(view.get('.current').text()).toContain(en.income.source.salary)
   })
+
+  // MOL-189 review №1: a save after the conflict that did not land — lost on the way, refused under a
+  // field — leaves the sheet over the version the list holds, never back on the one it was opened on.
+  it('after a conflict every next save goes over the version the list holds, past a failed one', async () => {
+    const theirs: IncomeView = { ...amended, note: 'Cash', revision: 3 }
+    const state = overview({ months: [{ month: '2026-09', sums: [], incomes: [theirs] }] })
+    for (const failure of [new TypeError('network'), new ApiError(ERROR.INCOME_IN_FUTURE)]) {
+      amend.mockReset()
+      amend
+        .mockResolvedValueOnce('conflict')
+        .mockRejectedValueOnce(failure)
+        .mockResolvedValueOnce('saved')
+      const view = await render(state, amended)
+      for (let tap = 0; tap < 3; tap += 1) await save(view, en.income.sheet.save_amend)
+      expect(amend.mock.calls.map(([, body]) => body.revision)).toEqual([2, 3, 3])
+      view.unmount()
+    }
+  })
+})
+
+// MOL-189, Ф-34, owner's В-1 «а»: removing is the amendment's, and only where the screen offers
+// «Вернуть» after it — never in a new income, never from an account's journal.
+describe('IncomeSheet: removing from the amendment (MOL-189)', () => {
+  const words = (view: VueWrapper) => view.findAll('button').map((button) => button.text())
+
+  it('offers «Remove the income» in an amendment the screen can bring back, and asks it of the screen', async () => {
+    const view = await render(overview(), amended)
+    expect(words(view)).not.toContain(en.income.sheet.remove)
+    await view.setProps({ removable: true })
+    const remove = view.findAll('button').find((button) => button.text() === en.income.sheet.remove)
+    expect(remove?.classes()).toContain('danger-ghost')
+    await remove?.trigger('click')
+    expect(view.emitted('remove')).toEqual([[amended]])
+    expect(amend).not.toHaveBeenCalled()
+  })
+
+  // MOL-189 review №3: from an account's journal the sheet has no «Remove», and its words say none.
+  it('offline, the strip names removing only where the sheet offers it', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    const view = await render(overview(), amended)
+    expect(view.get('.status').text()).toContain(en.income.sheet.offline_amend)
+    await view.setProps({ removable: true })
+    expect(view.get('.status').text()).toContain(en.income.sheet.offline)
+  })
+
+  it('must not fire: no «Remove» in a new income, removable or not', async () => {
+    const view = await render()
+    await view.setProps({ removable: true })
+    expect(words(view)).not.toContain(en.income.sheet.remove)
+  })
 })

@@ -449,6 +449,13 @@
       "when": 1791530397209,
       "tag": "0063_broadcasts",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1792420719752,
+      "tag": "0064_receipt_read_partly",
+      "breakpoints": true
     }
   ]
 }

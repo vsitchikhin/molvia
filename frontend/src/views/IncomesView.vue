@@ -1,8 +1,6 @@
 <template>
   <AppScreen :title="t('income.title')">
     <template v-if="overview && phase !== 'loading'">
-      <!-- Above every branch: removing the last income leaves the empty state, and «Вернуть» must
-           still be there (В-5). -->
       <!-- The connection in one line, with the time of the answer shown (MOL-181, Ф-14). Nothing is
            kept on the phone, but an app stays open for days: «на 14:05» of yesterday would be untrue.
            What waits for the connection — «Записать доход» — says so on itself (Р-1). -->
@@ -40,18 +38,6 @@
         {{ behind ? t('income.vanished_stale') : t('income.vanished') }}
       </p>
       <p v-if="gone" class="notice" role="alert">{{ t('income.restore_gone') }}</p>
-      <div v-if="removed" ref="removedStrip" class="notice removed">
-        <span class="removed-text">{{ t('income.removed', { amount: amountOf(removed) }) }}</span>
-        <AppButton
-          variant="ghost"
-          :busy="restoring"
-          :busy-label="t('income.restoring')"
-          :inactive="!online || busy"
-          @click="restore"
-        >
-          {{ t('income.restore') }}
-        </AppButton>
-      </div>
     </template>
 
     <!-- The shape of what is coming, in the order it will stand (Ф-13): a month and two cards, then a
@@ -104,13 +90,7 @@
             <ul class="cards">
               <AppReveal group>
                 <li v-for="income in month.incomes" :key="income.id">
-                  <IncomeCard
-                    :income="income"
-                    :today="shownToday()"
-                    :disabled="!online || busy"
-                    @edit="edit"
-                    @remove="ask"
-                  />
+                  <IncomeCard :income="income" :today="shownToday()" @edit="edit" />
                 </li>
               </AppReveal>
             </ul>
@@ -122,6 +102,25 @@
     <!-- «Записать доход» stands in the strip over the tab bar, never over the last card (Ф-28):
          with incomes and on the empty screen alike, not while there is no answer yet. Without a
          connection it stays, not now, and says why on itself (Ф-6, Р-1). -->
+    <!-- «Вернуть» over the strip, ten seconds, one look for every operation of «Деньги» (MOL-189,
+         Ф-29). Whatever the screen became under it: removing the last income leaves the empty state
+         (В-5). The strip puts the focus on «Вернуть» and says the removal itself. -->
+    <template v-if="removed && !landing.includes(removed.id)" #undo>
+      <UndoStrip
+        :key="removed.id"
+        :text="t('income.removed', { amount: amountOf(removed) })"
+        :announcement="t('income.removed_announced', { amount: amountOf(removed) })"
+        :action="t('income.restore')"
+        :busy="restoring"
+        :busy-label="t('income.restoring')"
+        :waiting="!online && !restoring"
+        :waiting-action="t('income.restore_offline')"
+        :inactive="(busy && !restoring) || sheetUp"
+        @restore="restore"
+        @expire="forget"
+      />
+    </template>
+
     <template v-if="phase === 'ready' || phase === 'empty'" #docked>
       <AppButton ref="recordButton" size="large" block :inactive="!online || busy" @click="compose">
         <template #icon><IconPlus /></template>
@@ -135,13 +134,25 @@
       :overview="overview"
       :editing="editing"
       :record="record"
-      :amend="amendEditing"
+      :amend="amend"
+      removable
+      :busy="busy"
+      :behind="behind"
+      :stale="stale"
+      :attempt="attempt"
+      :remove-failed="amendFailed"
+      @remove="ask"
+      @save="saving"
+      @retry="retry"
+      @closed="landed"
     />
+    <!-- Over the sheet of the amendment, «‹» back to it (Д-1). -->
     <IncomeRemoveSheet
       v-model:open="removeOpen"
       :income="target"
       :amounts="target ? `${amountOf(target)} · ${lineOf(target)}` : ''"
       :busy="busy"
+      :failed="removeFailed"
       @confirm="confirmRemove"
     />
   </AppScreen>
@@ -150,7 +161,7 @@
 <script lang="ts">
 import { defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { IncomeAmendBody, IncomeView as Row, Money } from '@molvia/model'
+import type { IncomeView as Row, Money } from '@molvia/model'
 import IconCashPlus from '~icons/mdi/cash-plus'
 import IconPlus from '~icons/mdi/plus'
 import AppButton from '@/components/AppButton.vue'
@@ -167,9 +178,9 @@ import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
+import UndoStrip from '@/components/UndoStrip.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
-import type { AmendOutcome } from '@/composables/useExchanges'
-import { incomesOf, useIncomes } from '@/composables/useIncomes'
+import { useIncomes } from '@/composables/useIncomes'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { answeredAt, calendarDay, monthOf, shownDay } from '@/days'
 import { useAccountsStore } from '@/stores/accounts'
@@ -195,6 +206,7 @@ export default defineComponent({
     SectionCaption,
     SkeletonPart,
     StatusStrip,
+    UndoStrip,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -216,34 +228,18 @@ export default defineComponent({
       editing.value = income
       sheetOpen.value = true
     }
-    // A conflict leaves the sheet open over the version the server holds now.
-    async function amendEditing(id: string, body: IncomeAmendBody): Promise<AmendOutcome> {
-      const outcome = await incomes.amend(id, body)
-      if (outcome === 'conflict') {
-        editing.value =
-          incomesOf(incomes.overview.value).find((row) => row.id === id) ?? editing.value
-      }
-      return outcome
-    }
+    // «Удалить доход?» first, then «Вернуть» after (В-5). Asked from the sheet of the amendment and
+    // over it (MOL-189, Ф-34), «‹» back to what was typed there.
     const removeOpen = ref(false)
     const target = ref<Row | null>(null)
     function ask(income: Row): void {
       target.value = income
       removeOpen.value = true
     }
-    // The bin that opened the sheet is gone with its row: the focus goes to «Вернуть», and the
-    // removal is said out loud (MOL-40, review Н-1).
-    const removedStrip = ref<HTMLElement | null>(null)
+    // «Вернуть» goes with its strip once it worked: the focus goes to «Записать доход» (review Т-3).
+    const recordButton = ref<{ $el: HTMLElement } | null>(null)
     const announce = useAnnouncer()
     let unsay: (() => void) | undefined
-    watch(incomes.removed, async (income) => {
-      unsay?.()
-      unsay = income ? announce?.(t('income.removed', { amount: amountOf(income) })) : undefined
-      if (!income) return
-      await nextTick()
-      removedStrip.value?.querySelector('button')?.focus()
-    })
-    const recordButton = ref<{ $el: HTMLElement } | null>(null)
     watch(incomes.restored, async (back) => {
       if (!back) return
       unsay?.()
@@ -253,10 +249,61 @@ export default defineComponent({
     })
     onUnmounted(() => unsay?.())
 
-    function confirmRemove(): void {
+    // Both sheets stay up until the server answers (MOL-189, adversarial А3, А5): «Удаляем…» is seen,
+    // the card is not opened again under it, and a removal that failed leaves what was typed. The
+    // strip waits for the sheets to go, or its focus and its words land in a sheet on its way out.
+    const removeFailed = ref(false)
+    watch(removeOpen, (open) => {
+      if (!open) removeFailed.value = false
+    })
+    // The removals whose strip waits while a sheet of the amendment is up — its own, or one opened over
+    // another card while the answer was on its way: under a modal sheet «Вернуть» cannot be reached, and
+    // its ten seconds ran out there (adversarial Б2). Every one that waits, not the last: a second removal
+    // from the sheet it waits behind let the first strip under both sheets (В1). One standing stays.
+    const landing = ref<string[]>([])
+    // The sheet of the amendment is on the screen: from its opening until `@closed`, never by the
+    // prop alone, which goes false while the sheet is still on its way out. A strip standing under it
+    // cannot be pressed, and its count stands too (owner's В-2 «а»): run out there, it took away a
+    // removal nothing had made final (adversarial Е1).
+    const sheetUp = ref(false)
+    watch(sheetOpen, (open) => {
+      if (open) sheetUp.value = true
+    })
+    // A removal that failed once its question was put away, said in the amendment still up over the
+    // same income: the screen's word is under the modal sheet, read by nobody (В2).
+    const amendFailed = ref(false)
+    let removing = false
+    async function confirmRemove(): Promise<void> {
       const income = target.value
-      removeOpen.value = false
-      if (income) void incomes.remove(income)
+      if (!income || incomes.busy.value) return
+      removeFailed.value = false
+      amendFailed.value = false
+      landing.value = [...landing.value, income.id]
+      removing = true
+      await incomes.remove(income)
+      removing = false
+      const failed = incomes.removed.value?.id !== income.id
+      if (failed) {
+        landing.value = landing.value.filter((id) => id !== income.id)
+        // Said in the question only while it stands: put away meanwhile, the next one opened — of
+        // another income too — read out a failure nobody pressed for (adversarial Б1).
+        removeFailed.value = removeOpen.value
+        amendFailed.value = !removeOpen.value && sheetOpen.value && editing.value?.id === income.id
+      }
+      // Closing the amendment closes the question over it too, in one step of the history: the
+      // stack steps over the sheets above the one closed. Each closed on its own would step back twice.
+      if (!failed && sheetOpen.value && editing.value?.id === income.id) sheetOpen.value = false
+      if (!sheetUp.value) landing.value = []
+    }
+    function landed(): void {
+      sheetUp.value = false
+      amendFailed.value = false
+      if (!removing) landing.value = []
+    }
+    // The amendment's own «Сохранить» is the sheet's next write, a field refused too: the word about
+    // the removal before it goes, as the sheet's own word does (MOL-19, MOL-181; review №4, Г1, Д1).
+    function saving(): void {
+      amendFailed.value = false
     }
 
     const online = ref(navigator.onLine)
@@ -312,17 +359,21 @@ export default defineComponent({
       skeletonPlates,
       t,
       ...incomes,
+      saving,
       sheetOpen,
       editing,
       compose,
       edit,
-      amendEditing,
       removeOpen,
-      removedStrip,
       recordButton,
       target,
       ask,
       confirmRemove,
+      removeFailed,
+      landing,
+      sheetUp,
+      amendFailed,
+      landed,
       online,
       amountOf,
       lineOf,
@@ -357,17 +408,6 @@ export default defineComponent({
 .notice,
 .status {
   margin: 0 0 var(--space-4);
-}
-
-.removed {
-  align-items: center;
-  justify-content: space-between;
-  background: var(--surface-2);
-  color: var(--text);
-}
-
-.removed-text {
-  min-width: 0;
 }
 
 .failed {

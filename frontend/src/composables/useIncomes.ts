@@ -71,6 +71,11 @@ export interface Incomes {
   amend(id: string, body: IncomeAmendBody): Promise<AmendOutcome>
   remove(income: IncomeView): Promise<void>
   restore(): Promise<void>
+  /**
+   * The ten seconds of «Вернуть» ran out (MOL-189, Ф-29): the screen stops offering it. The server
+   * keeps the mark until its timer or the screen's next request, as before.
+   */
+  forget(): void
 }
 
 /** Every income of the answer, newest first — the months hold them. */
@@ -183,6 +188,9 @@ export function useIncomes(): Incomes {
     restored,
     restoring,
     retry: load,
+    forget() {
+      removed.value = null
+    },
     async record(body) {
       hush()
       try {

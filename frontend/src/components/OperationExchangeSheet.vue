@@ -7,7 +7,11 @@
     :editing="editing"
     :record="exchanges.record"
     :amend="amend"
+    :behind="exchanges.behind.value"
+    :stale="exchanges.stale.value"
+    :attempt="exchanges.attempt.value"
     @update:open="$emit('update:open', $event)"
+    @retry="exchanges.retry()"
   />
 </template>
 
