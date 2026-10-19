@@ -174,6 +174,15 @@ of the measure and with every test merged. So CI checks every run instead (owner
   for 7 119 ms. **It is a number, the third argument**: Prettier keeps
   a test's body where it is for a numeric literal there, and a constant or `{ timeout }` re-indents it — as
   does any `it.each(…)(title, fn, N)` whose title line no longer fits (5 of the 277 given 10 s on 15.10).
+- **Given twenty times, held at ten** (review №29, 19.10): ten times exactly was red again at the next new worst —
+  three tests of the pull request on one run, 506 and 525 ms against 5 s, 2 064 against 15 s. Over 1 201 runs
+  of CI a test's worst stood at most 1.9 times above the one before it (1.67 for 99 in 100 of the 232 tests
+  printed thirty times or more), so a limit of twenty times the worst holds through the next. The 228 tests of
+  the pull request's files whose worst came near half a second were given it, and the reporter advises it;
+  it turns red at ten, as the rule is written. **The price, named:** a test never printed — under 300 ms
+  everywhere — that a runner makes 1.7 times slower still turns its file red; and the clock bounds keep the
+  values MOL-243 chose against their breakages, some within twice their ten times (`notify`, «searched only as
+  far», `picture`): raising one would let its breakage through.
 - **The reporter is in the root run only** (`vitest.config.ts`): CI and `make check` run the whole suite
   there, and a module's own `npm run test -w` stays as it was. **A warning here** — the machine runs
   several copies at once, and its times say nothing of CI's. **On CI red only in a file the pull request
@@ -190,8 +199,8 @@ of the measure and with every test merged. So CI checks every run instead (owner
   carry a limit too — it costs nothing. **The price, named:** vitest gives those hooks no time of their
   own to read, and holds them by `hookTimeout`, 10 s, whatever the test's timeout — so a slow `beforeEach`
   behind a test of a long timeout is not told from the test (adversarial А2); the advice names them. A
-  timeout of 0 is vitest's «none», and such a test is not judged. **The advice is the limit as the rule
-  writes it** — ten times, rounded up to 5 s — and every run on CI opens its verdict with how many files of
+  timeout of 0 is vitest's «none», and such a test is not judged. **The advice is twenty times, rounded up
+  to 5 s** — twice what the rule asks, for the next new worst — and every run on CI opens its verdict with how many files of
   the pull request it read, so a merge read wrong shows before the first breach (review №11).
 - **A hook by the worker's own marks on the runner's tasks** (`experimental_getRunnerTask`): a suite's start
   to its first child's is its `beforeAll`, its last child's end to its own its `afterAll`. The reporter's
@@ -234,10 +243,16 @@ of the measure and with every test merged. So CI checks every run instead (owner
   fields, classes and their getters, arrays, `+=`, `push`, the answer of a helper, a helper that subtracts a
   reading it takes however it rounds, `hrtime(t0)`, `performance.measure`; a budget — a duration taken from a
   number, `200 - d`, `left -= d`, `deadline - Date.now()`, or divided into one, a rate (`1000 / ms`), kept through
-  `Math.max` and `Math.min` — whose lower bound is an upper bound on the duration;
+  `Math.max` and `Math.min` — whose lower bound is an upper bound on the duration; each element of an array of
+  durations a `for … of` or a callback of the array takes, a parameter of a function of the file handed one, the
+  entries `performance` gives back;
   bounded by vitest's, chai's and `assert`'s forms, a comparison asserted true or false (`toBe(false)`,
   `isFalse`, `!`, `&&`), `toSatisfy`, `if … throw`, a helper bounding its parameter, and a deadline — a reading
-  held below a reading plus a number. Two readings against each other are a lower bound (adversarial В4). Names are resolved by TypeScript's binder, so the age of a stamp held under a name
+  held below a reading plus a number, or a reading less a number held below a reading. **A comparison of time
+  no assertion reads where it stands** — kept in a name, returned by a callback (`took.every((d) => d < n)`), a
+  condition — **is held as a bound** (adversarial round 17): which way it is asserted is not read, and
+  `expectWithin` is its lawful spelling; a loop's condition is a wait and a duration against zero a mark.
+  Two readings against each other are a lower bound (adversarial В4). Names are resolved by TypeScript's binder, so the age of a stamp held under a name
   another test gave a reading is left alone: one side is not the clock. **Fake time is no exception** (MOL-266,
   round 15): a bound under `vi.useFakeTimers()` goes through `expectWithin` as any other, and is held as real. For fourteen rounds the parse let such a bound go raw where it read every clock
   fake at the bound — in the order vitest runs hooks, through the file's helpers, its directory's configs and
