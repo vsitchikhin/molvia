@@ -46,8 +46,8 @@ export interface ReceiptTextLine {
   /**
    * Settled with every figure as the reading printed it (MOL-255): no swap of OCR, no figure worked out
    * — a price from the sum, a weight from the money, a count the line does not print — and nothing the
-   * total gave. `settled` alone is
-   * held by a reading bent by two swaps a field; what the review is shown is decided from this.
+   * total gave. `settled` alone is held by a reading bent by two swaps a field; what the review is shown
+   * is decided from this.
    */
   readonly asPrinted: boolean
   /**

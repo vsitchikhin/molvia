@@ -476,25 +476,24 @@ scripts are kept. The cut-out lines are still kept and confirmed (В-4), with no
 
 ## «Переснимите» — only when not one line was found (MOL-222, В-1)
 
-**Every receipt with a line in it is read and goes to the review** (owner, 04.10.2026: «читать надо
-все кассы, все чеки, пытаться максимально собрать информацию»). A receipt fails as `reshoot` only when
-not one item line was found: there is nothing to correct, and only a new shot can help. What was
+**Every receipt with a line in it is read and goes to the review** (owner, 04.10.2026: «читать надо все
+кассы, все чеки, пытаться максимально собрать информацию»). A receipt fails as `reshoot` only when not
+one item line was found: there is nothing to correct, and only a new shot can help. What was
 «переснимите» before (В-4 of MOL-125) — the total read and the lines short of it (under 70 % until
-MOL-255, any shortfall since, said with its sum, of the lines as read), or no total and fewer than half the
-lines adding up —
-is **read in part** (`readPartly` in `receipt-sum.ts`, one
-function for the server and the phone): the review says «Прочитали не всё» under its count with
-«Переснять» beside it, and «Записать» stays. Before, it threw away everything read: am-06, a till whose
-print Tesseract misreads, found 14 lines of which 2 add up and showed none of them; a crumpled am-13L
-found 11 with 9 right. Now the person sees them and puts them right, and **those corrections are the
-measure of 0.2** (`receipt_days`, below) — a till read badly is one to learn (MOL-169), never one to
-refuse. **The total alone decides nothing**: OCR missed it on 9 of the bench's 16 readings, most of
-them good ones. **«Переснимите» asserts no cause it does not know** — «Не нашли ни одной строки» and the
-advice, not «смят или в тени»: the owner's three shots of 04.10 were none of those. **It names the ones it
-may be, faint print among them** (MOL-227, owner's В-2 «а»): «так бывает, когда чек смят, в тени или
-напечатан бледно» — and a retake fixes no faint print (the delivery till WIN-…, am-06, read alike on every
-shot, larger, thicker, retrained), so for that one the advice is a record by hand; «Прочитали не всё» says
-the same — «если печать бледная, переснимать не нужно — поправьте строки» — beside its «Переснять».
+MOL-255, any shortfall since, said with its sum, of the lines as read), or no total and fewer than half
+the lines adding up — is **read in part** (`readPartly` in `receipt-sum.ts`, one function for the server
+and the phone): the review says «Прочитали не всё» under its count with «Переснять» beside it, and
+«Записать» stays. Before, it threw away everything read: am-06, a till whose print Tesseract misreads,
+found 14 lines of which 2 add up and showed none of them; a crumpled am-13L found 11 with 9 right. Now
+the person sees them and puts them right, and **those corrections are the measure of 0.2**
+(`receipt_days`, below) — a till read badly is one to learn (MOL-169), never one to refuse. **The total
+alone decides nothing**: OCR missed it on 9 of the bench's 16 readings, most of them good ones.
+**«Переснимите» asserts no cause it does not know** — «Не нашли ни одной строки» and the advice, not
+«смят или в тени»: the owner's three shots of 04.10 were none of those. **It names the ones it may be,
+faint print among them** (MOL-227, owner's В-2 «а»): «так бывает, когда чек смят, в тени или напечатан
+бледно» — and a retake fixes no faint print (the delivery till WIN-…, am-06, read alike on every shot,
+larger, thicker, retrained), so for that one the advice is a record by hand; «Прочитали не всё» says the
+same — «если печать бледная, переснимать не нужно — поправьте строки» — beside its «Переснять».
 
 **What a person can do with a receipt read badly** (В-2): «Отправить чек разработчику» on the failure
 and at the foot of the review, while its photos are on this phone — they go into «Написать
@@ -753,7 +752,10 @@ is verified whole. The reading chosen, its lines and its total are as before —
 
 **One function decides what is shown, for any reader** (`verifiedReading`, `receipt-verify.ts`, owner's В-1
 «а»): a line as printed with a quantity and a sum above zero keeps its figures; any other is emptied — quantity,
-price, sum and discount `null`, `settled` false, its name, codes and rows kept. **A line of a quantity of one
+price, sum and discount `null`, `settled` false, its name, codes and rows kept. **A line paid nothing keeps its
+figures where its discount is its whole price to the hundredth** (round 2, А7 «а»): a gift by the card,
+«0,00/500,00 500», was emptied on a receipt proven whole, and nothing said why — the foot had nothing to lack;
+«0 0», or a «0,00» with no price, holds any arithmetic and is emptied still. **A line of a quantity of one
 whose price is its sum is not verified on its own** (В-2 «а», a kilogram too since round 1, А2): the till prints
 one number twice, and a digit misread alike in both columns — «660 660» for 560 — holds that arithmetic; such a
 line keeps its figures only on a receipt **proven whole** — every line as printed and their sums exactly the
@@ -788,10 +790,21 @@ on nearly every receipt.
 lost at the seams. **It is said of what OCR lost, never of what the check emptied** (round 1, А5 «а»): the
 server measures `read_partly` by the lines as read, before the check — am-05, all 13 lines found and meeting its
 total, is read whole, though 12 of them go to the review empty — so the 0.2 measure is of the photos, not of the
-check's strictness; and on the phone a receipt with an empty line has no strip and no «Переснять» beside it — a
-retake reads the same — the foot says what it lacks. **The price, named:** where OCR lost a line and the check
-emptied another, the foot lays the whole shortfall on the empty ones. «Покупки» call a receipt with lines not
-added up or empty «проверьте N строк» (№3 «а»): «не сходятся» said of a line with nothing to add up.
+check's strictness. **And the phone is told it** (`receipts.read_partly`, round 2, А6 «а»): on the review an
+emptied line and a lost one look alike, so the server keeps its measure and sends it only to a phone that asks
+(`RECEIPT_READ_PARTLY_HEADER`, as the total read in one place); with an empty line the strip says it with no sums
+— «Прочитали не всё — сверьте строки с бумагой», «Переснять» beside it — since the lines shown do not make them,
+and with none, as before. Decided on the phone alone — no strip over an empty line — it stood on no receipt of
+the bench: every one of the 35 has an empty line, and OCR lost rows on 23. By the server's word it stands on 13:
+11 that lost rows, am-04, every line found and their sums read short, and am-09, a line a luma past its total. A
+receipt read before keeps no word (`null`): its lines were shown as read, and the phone measures them as before.
+**A line found with no figures of its own is no line lost** (round 2, №9): where the rest meet the total, the
+parse gives it what the total leaves, the measure counts it, and the foot says what it lacks — counted as lost,
+the strip would say «not all read» of a receipt whose every line was found. **The price, named:** 12 receipts
+that lost rows stay unsaid — 11 have no total, and with none the measure is the share of lines that add up, which
+tells a bad reading rather than rows lost; am-28's lines as read make more than its total. «Покупки» call a
+receipt with lines not added up or empty «проверьте N строк» (№3 «а»): «не сходятся» said of a line with nothing
+to add up.
 
 **A found item the printed heading rules out is «проверьте»** (В-6 «б», `headingRulesOut`): the matcher's own
 rule — the item has headings and none is the line's, OCR's swaps allowed — now for an item the search found by

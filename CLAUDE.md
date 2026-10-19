@@ -604,7 +604,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   parse and the rows — a line as printed (`asPrinted`, never `settled`; a count not printed is worked out), a
   line of a quantity of one whose price is its sum only on a receipt proven whole, the rest empty; the total's
   rest is no line's, the foot says what the empty lines lack; «Прочитали не всё» is any shortfall of the lines
-  as read, before the check.
+  as read, before the check — the server's word (`read_partly`), since the phone cannot tell an emptied line
+  from a lost one.
 - **A total is shown only where two sources vouch for it** (MOL-244, В-1 «а»): the lines that met it every
   one as read unless two places print another sum, else two places printed — the total, the payment, a
   section's sum — by one `votedTotal` for both kinds of receipt, else the lines with one of them as read; a row
