@@ -246,13 +246,16 @@ of the measure and with every test merged. So CI checks every run instead (owner
   `Math.max` and `Math.min` — whose lower bound is an upper bound on the duration; each element of an array of
   durations a `for … of` or a callback of the array takes, under a plain name or taken apart, a parameter of a
   function of the file handed one — a method of an object or a class of the file too, by its symbol — or a
-  callback a helper of the file hands one to, what a generator of the file yields, what a store the file made
-  (`[]`, `new Map()`, `new Set()`) is written by `push`, `unshift`, `splice`, `set` or `add` and gives back
-  (`took.get('a')`), the entries `performance` gives back. **An object is followed field by field** (review №32,
-  adversarial Ф4): `report.retries` beside `report.took` is a count, and so is `.length`, `.size` and a spy's
-  `mock` — a wrapper, a logger or `vi` handed a duration hold none, as only a store the file made does. **What
-  is held as time in doubt and is none says so on its line or the one above**: `// not a duration: <why>`, read
-  by review;
+  callback a helper of the file hands one to, what a generator of the file yields, what a name of the file
+  — not an import, so not `vi` — is handed by a method of its own and gives back (`took.set('a', d)`,
+  `took.get('a')`), a store a helper of the file fills through its parameter, the entries `performance` gives
+  back. An object or a store holding one holds it whole, and its fields besides: a name taken apart from known
+  fields is its own field, `{ tries }` beside `took` a count; `.length`, `.size` and a spy's `mock` are counts
+  (review №32). **What is held as time only in doubt and is none says so** (adversarial Ф4, review №34):
+  `// not a duration: <why>` at the end of its line or on a line of its own above it — never over the clock read
+  straight, a name it was given or a difference of them — and every run prints what a note let go, for review
+  to read in the log. Field by field alone lost `rows.at(-1)?.took` and `{ ...report }.took` (adversarial Х2),
+  so `report.retries` beside `report.took` is refused, and the note is its lawful spelling;
   bounded by vitest's, chai's and `assert`'s forms, a comparison asserted true or false (`toBe(false)`,
   `isFalse`, `!`, `&&`), `toSatisfy`, `if … throw`, a helper bounding its parameter, and a deadline — a reading
   held below a reading plus a number, or a reading less a number held below a reading. **A comparison of time
@@ -260,8 +263,9 @@ of the measure and with every test merged. So CI checks every run instead (owner
   condition — **is held as a bound** (adversarial round 17): which way it is asserted is not read, and
   `expectWithin` is its lawful spelling — a lower bound is asserted where it stands instead,
   `expect(d).toBeGreaterThanOrEqual(250)` (review №31); a loop's condition is a wait, and a duration against zero
-  a mark — a name — but a budget against zero is what is left of the time, and what is made of a duration
-  against zero (`d - 1_000 > 0`) an overage: both bounds (№30, Ф1).
+  a mark — a name given a negative number, `let failAt = -1` — but a budget against zero is what is left of
+  the time, and what is made of a duration against zero (`d - 1_000 > 0`, or `over > 0` in two steps) an
+  overage: both bounds (№30, №36, Ф1, Х4).
   Two readings against each other are a lower bound (adversarial В4). Names are resolved by TypeScript's binder, so the age of a stamp held under a name
   another test gave a reading is left alone: one side is not the clock. **Fake time is no exception** (MOL-266,
   round 15): a bound under `vi.useFakeTimers()` goes through `expectWithin` as any other, and is held as real. For fourteen rounds the parse let such a bound go raw where it read every clock
