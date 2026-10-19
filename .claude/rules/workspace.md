@@ -244,14 +244,18 @@ of the measure and with every test merged. So CI checks every run instead (owner
   reading it takes however it rounds, `hrtime(t0)`, `performance.measure`; a budget — a duration taken from a
   number, `200 - d`, `left -= d`, `deadline - Date.now()`, or divided into one, a rate (`1000 / ms`), kept through
   `Math.max` and `Math.min` — whose lower bound is an upper bound on the duration; each element of an array of
-  durations a `for … of` or a callback of the array takes, a parameter of a function of the file handed one, the
+  durations a `for … of` or a callback of the array takes, under a plain name or taken apart, a parameter of a
+  function of the file handed one — a method of an object or a class of the file too, by its symbol — whatever a
+  name of the file is handed by any method of its own and gives back (`took.set('a', d)`, `took.get('a')`), the
   entries `performance` gives back;
   bounded by vitest's, chai's and `assert`'s forms, a comparison asserted true or false (`toBe(false)`,
   `isFalse`, `!`, `&&`), `toSatisfy`, `if … throw`, a helper bounding its parameter, and a deadline — a reading
   held below a reading plus a number, or a reading less a number held below a reading. **A comparison of time
   no assertion reads where it stands** — kept in a name, returned by a callback (`took.every((d) => d < n)`), a
   condition — **is held as a bound** (adversarial round 17): which way it is asserted is not read, and
-  `expectWithin` is its lawful spelling; a loop's condition is a wait and a duration against zero a mark.
+  `expectWithin` is its lawful spelling — a lower bound is asserted where it stands instead,
+  `expect(d).toBeGreaterThanOrEqual(250)` (review №31); a loop's condition is a wait, and a duration against zero
+  a mark, but a budget against zero is what is left of the time and a bound (№30).
   Two readings against each other are a lower bound (adversarial В4). Names are resolved by TypeScript's binder, so the age of a stamp held under a name
   another test gave a reading is left alone: one side is not the clock. **Fake time is no exception** (MOL-266,
   round 15): a bound under `vi.useFakeTimers()` goes through `expectWithin` as any other, and is held as real. For fourteen rounds the parse let such a bound go raw where it read every clock
