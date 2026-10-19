@@ -549,6 +549,8 @@ describe('ReceiptView (MOL-127)', () => {
     const { view } = await render()
     const strip = view.get('.partly')
     expect(strip.text()).toContain('Прочитали не всё: строки дают')
+    // what the lines leave of the total, said with it (MOL-255, В-7 «а»)
+    expect(strip.text()).toMatch(/не хватает 9\s100/)
     expect(strip.text()).toContain(ru.receipt.capture.retake)
     const record = button(view, 'Записать 2')
     expect(record.attributes('aria-disabled')).not.toBe('true')
@@ -564,6 +566,33 @@ describe('ReceiptView (MOL-127)', () => {
     const { view } = await render()
     expect(view.get('.partly').text()).toContain('строки дают')
     expect(view.get('.partly').text()).toContain('из примерно')
+    expect(view.get('.partly').text()).toMatch(/не хватает примерно 9\s100/)
+  })
+
+  it('read in part when the lines are short of the total by one luma, as by a line (MOL-255)', async () => {
+    const short = detail()
+    receipt.mockResolvedValue({ ...short, receipt: { ...short.receipt, total: amd('900.01') } })
+    const { view } = await render()
+    expect(view.get('.partly').text()).toMatch(/не хватает 0,01/)
+  })
+
+  it('leaves the figures of a line not verified empty, and says to look at the receipt (MOL-255)', async () => {
+    const one = detail()
+    const unread = {
+      ...line('ՀԱՑ', '400'),
+      quantity: null,
+      price: null,
+      sum: null,
+      settled: false,
+      amount: null,
+    }
+    receipt.mockResolvedValue({ ...one, lines: [line('ԿԱԹ', '500'), unread] })
+    const { view } = await render()
+    const [read, empty] = view.findAll('.receipt-line')
+    expect(read?.text()).not.toContain(ru.receipt.review.unread)
+    expect(empty?.text()).toContain(ru.receipt.review.unread)
+    expect(empty?.attributes('aria-label')).toContain(ru.receipt.review.unread)
+    expect(empty?.find('.sum').exists()).toBe(false)
   })
 
   it('read in part with no total: how many lines added up; half of them is enough', async () => {

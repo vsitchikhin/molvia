@@ -644,7 +644,15 @@ export default defineComponent({
           one.receipt.total === null
             ? 'receipt.review.partly_read_total'
             : 'receipt.review.partly_total',
-          { lines: formatMoney(covered, locale.value), total: formatMoney(total, locale.value) },
+          {
+            lines: formatMoney(covered, locale.value),
+            total: formatMoney(total, locale.value),
+            // what the lines leave of the total, said with it (MOL-255, В-7 «а»)
+            short: formatMoney(
+              { minor: total.minor - covered.minor, currency: total.currency },
+              locale.value,
+            ),
+          },
         )
       }
       return t('receipt.review.partly_lines', {
