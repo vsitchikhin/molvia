@@ -1096,6 +1096,9 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     expect(sheet?.textContent).not.toContain(en.exchange.sheet.current.split('{details}')[0])
     expect(sheet?.textContent).toContain(en.exchange.sheet.unanswered)
 
+    // A real millisecond, as a finger takes: Vue drops an event no later than the moment its handler
+    // was attached (`_vts` in runtime-dom), and «Try again» was drawn by the answer just landed.
+    await new Promise((resolve) => setTimeout(resolve, 5))
     sheetButton(en.state.retry).click()
     await flushPromises()
     expect(sheet?.textContent).toContain(en.exchange.sheet.amend_conflict)

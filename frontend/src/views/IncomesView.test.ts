@@ -762,6 +762,9 @@ describe('IncomesView: recording, amending and removing', () => {
     expect(sheet?.textContent).not.toContain('elsewhere')
     expect(sheet?.textContent).toContain(en.income.sheet.unanswered)
 
+    // A real millisecond, as a finger takes: Vue drops an event no later than the moment its handler
+    // was attached (`_vts` in runtime-dom), and «Try again» was drawn by the answer just landed.
+    await new Promise((resolve) => setTimeout(resolve, 5))
     sheetButton(en.state.retry).click()
     await flushPromises()
     expect(sheet?.textContent).toContain(en.income.sheet.amend_conflict)
