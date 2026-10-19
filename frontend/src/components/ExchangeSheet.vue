@@ -295,6 +295,11 @@ export default defineComponent({
     /** «Удалить обмен» — the exchange as the server holds it, to ask «Удалить обмен?» over. */
     remove: (exchange: ExchangeView) => typeof exchange === 'object',
     retry: () => true,
+    /**
+     * «Сохранить» pressed past its guard — the sheet's next write, whatever it meets, a field refused
+     * included: a word about an earlier one, `removeFailed`, goes with it, as the sheet's own does.
+     */
+    save: () => true,
   },
   setup(props, { emit }) {
     const { t, locale } = useI18n()
@@ -557,6 +562,7 @@ export default defineComponent({
       // The field's «done» submits the form too, past the button that is not now.
       if (sending.value || waiting.value || props.busy) return
       failed.value = false
+      emit('save')
       dayError.value = null
       heldError.value = null
       // Cleared, or before the year the rates begin: said under the field, not as a lost

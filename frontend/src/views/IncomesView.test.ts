@@ -929,6 +929,36 @@ describe('IncomesView: recording, amending and removing', () => {
     expect(document.querySelector('dialog[open] .failed[role="alert"]')).toBeNull()
   })
 
+  // Adversarial Д1: a save refused under a field never reaches the screen's write, and is a press of
+  // the sheet all the same — the word about the removal goes with it.
+  it('the word about a failed removal goes with a save refused under a field', async () => {
+    incomes.mockResolvedValue(overview())
+    removeIncome.mockRejectedValueOnce(new TypeError('network'))
+    const view = await render()
+    await askToRemove(view)
+    sheetButton(en.income.remove_sheet.confirm).click()
+    document
+      .querySelectorAll('dialog[open]')[1]
+      ?.querySelector<HTMLButtonElement>(`button[aria-label="${en.nav.back_label}"]`)
+      ?.click()
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    await flushPromises()
+    expect(document.querySelector('dialog[open] .failed[role="alert"]')).not.toBeNull()
+
+    const amount = document.querySelector<HTMLInputElement>(
+      'dialog[open] input[inputmode="decimal"]',
+    )
+    if (!amount) throw new Error('no amount field')
+    amount.value = ''
+    amount.dispatchEvent(new Event('input'))
+    await flushPromises()
+    sheetButton(en.income.sheet.save_amend).click()
+    await flushPromises()
+    expect(amendIncome).not.toHaveBeenCalled()
+    expect(document.querySelector('dialog[open]')?.textContent).toContain(en.error.invalid_amount)
+    expect(document.querySelector('dialog[open] .failed[role="alert"]')).toBeNull()
+  })
+
   // MOL-189 review №2, adversarial А1: the strip a failed «Bring back» leaves still runs out.
   it('a «Bring back» that failed lets the count go on, and the strip goes when it runs out', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })

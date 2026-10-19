@@ -228,6 +228,7 @@
       :attempt="attempt"
       :remove-failed="amendFailed"
       @remove="ask"
+      @save="saving"
       @retry="retry"
       @closed="landed"
     />
@@ -251,7 +252,6 @@ import { RATE_CHART_MONTHS, currencySign, yerevanDate } from '@molvia/model'
 import type {
   Currency,
   CurrencyCost,
-  ExchangeAmendBody,
   ExchangeView as Row,
   ExchangesResponse,
   RateChartMonths,
@@ -408,11 +408,10 @@ export default defineComponent({
       amendFailed.value = false
       if (!removing) landing.value = []
     }
-    // The amendment's own save is the sheet's next write: the word about the removal before it goes,
-    // as the sheet's own word does (MOL-19, MOL-181; review №4, adversarial Г1).
-    function amend(id: string, body: ExchangeAmendBody): ReturnType<typeof exchanges.amend> {
+    // The amendment's own «Сохранить» is the sheet's next write, a field refused too: the word about
+    // the removal before it goes, as the sheet's own word does (MOL-19, MOL-181; review №4, Г1, Д1).
+    function saving(): void {
       amendFailed.value = false
-      return exchanges.amend(id, body)
     }
 
     const online = ref(navigator.onLine)
@@ -529,7 +528,7 @@ export default defineComponent({
     return {
       t,
       ...exchanges,
-      amend,
+      saving,
       chartMonths,
       chooseChartMonths,
       today,
