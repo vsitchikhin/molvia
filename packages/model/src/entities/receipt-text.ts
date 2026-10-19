@@ -318,7 +318,7 @@ interface Candidate {
 }
 
 // The till rounds to a few luma: 609,97 paid for 610.
-const TOLERANCE_HUNDREDTHS = 3
+export const TOLERANCE_HUNDREDTHS = 3
 
 /**
  * Past this many combinations a line's figures are taken as read, with no reading tried: the
