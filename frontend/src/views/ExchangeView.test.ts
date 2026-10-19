@@ -171,6 +171,21 @@ async function askToRemove(view: VueWrapper): Promise<void> {
   await risen()
 }
 
+/**
+ * «‹» on the question, then × on the amendment — both sheets put away by hand while the removal is on
+ * its way. The memory history sends no `popstate`, and `stepBack` holds the next step until one.
+ */
+async function putBothAway(): Promise<void> {
+  for (const label of [en.nav.back_label, en.sheet.close]) {
+    const sheets = document.querySelectorAll('dialog[open]')
+    sheets[sheets.length - 1]
+      ?.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
+      ?.click()
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    await risen()
+  }
+}
+
 function confirmButton() {
   const found = [...document.querySelectorAll('dialog[open] button')].find(
     (button) => button.textContent.trim() === en.exchange.remove_sheet.confirm,
@@ -931,6 +946,63 @@ describe('ExchangeView: the rate and the list', () => {
     expect(document.querySelectorAll('dialog[open]')[1]?.textContent).not.toContain(
       en.exchange.failed,
     )
+  })
+
+  // Adversarial Б1: a removal that fails once its question was put away says so above the list only —
+  // the next question opens clean, of another exchange too.
+  it('a removal that fails after the sheets were put away leaves the next question clean', async () => {
+    const other = row({ id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5e', exchangedOn: '2026-09-10' })
+    exchanges.mockResolvedValue(overview({ exchanges: [row(), other] }))
+    let fail: (reason: unknown) => void = () => undefined
+    removeExchange.mockReturnValueOnce(new Promise((_, reject) => (fail = reject)))
+    const view = await render()
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+    await putBothAway()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    fail(new TypeError('network'))
+    await flushPromises()
+    expect(view.get('.notice.failed').text()).toBe(en.exchange.failed)
+
+    await view.findAll('.cards button.body')[1]?.trigger('click')
+    await risen()
+    sheetButton(en.exchange.sheet.remove).click()
+    await risen()
+    expect(document.querySelector('dialog[open] .failed[role="alert"]')).toBeNull()
+  })
+
+  // Adversarial Б2: a removal that lands under the sheet of another exchange keeps its strip until that
+  // sheet goes — under a modal sheet «Bring back» cannot be reached, and its ten seconds ran out there.
+  it('a removal that lands under another sheet: the strip comes when it goes, with its ten seconds', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    const other = row({ id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5e', exchangedOn: '2026-09-10' })
+    exchanges.mockResolvedValue(overview({ exchanges: [row(), other] }))
+    let land: (answer: ExchangesResponse) => void = () => undefined
+    removeExchange.mockReturnValueOnce(new Promise((resolve) => (land = resolve)))
+    const view = await render()
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+    await putBothAway()
+    await view.findAll('.cards button.body')[1]?.trigger('click')
+    await risen()
+
+    land(overview({ exchanges: [other] }))
+    await flushPromises()
+    expect(document.querySelectorAll('dialog[open]')).toHaveLength(1)
+    expect(view.find('.undo-strip').exists()).toBe(false)
+    vi.advanceTimersByTime(10_000)
+
+    document
+      .querySelector<HTMLButtonElement>(`dialog[open] button[aria-label="${en.sheet.close}"]`)
+      ?.click()
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(view.get('.undo-strip .count').text()).toBe('10')
+    expect(document.activeElement?.textContent.trim()).toBe(en.exchange.restore)
+    expect(restoreExchange).not.toHaveBeenCalled()
   })
 
   // MOL-189 review №2, adversarial А1: the strip a failed «Bring back» leaves still runs out.

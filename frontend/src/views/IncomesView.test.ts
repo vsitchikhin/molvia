@@ -174,6 +174,21 @@ async function askToRemove(view: VueWrapper): Promise<void> {
   await risen()
 }
 
+/**
+ * «‹» on the question, then × on the amendment — both sheets put away by hand while the removal is on
+ * its way. The memory history sends no `popstate`, and `stepBack` holds the next step until one.
+ */
+async function putBothAway(): Promise<void> {
+  for (const label of [en.nav.back_label, en.sheet.close]) {
+    const sheets = document.querySelectorAll('dialog[open]')
+    sheets[sheets.length - 1]
+      ?.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
+      ?.click()
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    await risen()
+  }
+}
+
 describe('IncomesView: the four states', () => {
   it('loads with a skeleton, nothing invented', async () => {
     incomes.mockReturnValue(new Promise(() => undefined))
@@ -760,6 +775,67 @@ describe('IncomesView: recording, amending and removing', () => {
     question?.querySelector<HTMLButtonElement>(`button[aria-label="${en.nav.back_label}"]`)?.click()
     await flushPromises()
     expect(amount.value).toBe('102345')
+  })
+
+  // Adversarial Б1: a removal that fails once its question was put away says so above the list only —
+  // the next question opens clean, of another income too.
+  it('a removal that fails after the sheets were put away leaves the next question clean', async () => {
+    const other = row({ id: '5d1c6a2b-3e4f-4a5b-8c6d-7e8f9a0b1c2e', receivedOn: '2026-09-10' })
+    incomes.mockResolvedValue(
+      overview({ months: [{ month: '2026-09', sums: [], incomes: [row(), other] }] }),
+    )
+    let fail: (reason: unknown) => void = () => undefined
+    removeIncome.mockReturnValueOnce(new Promise((_, reject) => (fail = reject)))
+    const view = await render()
+    await askToRemove(view)
+    sheetButton(en.income.remove_sheet.confirm).click()
+    await flushPromises()
+    await putBothAway()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    fail(new TypeError('network'))
+    await flushPromises()
+    expect(view.get('.notice.failed').text()).toBe(en.income.failed)
+
+    await view.findAll('.cards button.body')[1]?.trigger('click')
+    await risen()
+    sheetButton(en.income.sheet.remove).click()
+    await risen()
+    expect(document.querySelector('dialog[open] .failed[role="alert"]')).toBeNull()
+  })
+
+  // Adversarial Б2: a removal that lands under the sheet of another income keeps its strip until that
+  // sheet goes — under a modal sheet «Bring back» cannot be reached, and its ten seconds ran out there.
+  it('a removal that lands under another sheet: the strip comes when it goes, with its ten seconds', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    const other = row({ id: '5d1c6a2b-3e4f-4a5b-8c6d-7e8f9a0b1c2e', receivedOn: '2026-09-10' })
+    incomes.mockResolvedValue(
+      overview({ months: [{ month: '2026-09', sums: [], incomes: [row(), other] }] }),
+    )
+    let land: (answer: IncomesResponse) => void = () => undefined
+    removeIncome.mockReturnValueOnce(new Promise((resolve) => (land = resolve)))
+    const view = await render()
+    await askToRemove(view)
+    sheetButton(en.income.remove_sheet.confirm).click()
+    await flushPromises()
+    await putBothAway()
+    await view.findAll('.cards button.body')[1]?.trigger('click')
+    await risen()
+
+    land(overview({ months: [{ month: '2026-09', sums: [], incomes: [other] }] }))
+    await flushPromises()
+    expect(document.querySelectorAll('dialog[open]')).toHaveLength(1)
+    expect(view.find('.undo-strip').exists()).toBe(false)
+    vi.advanceTimersByTime(10_000)
+
+    document
+      .querySelector<HTMLButtonElement>(`dialog[open] button[aria-label="${en.sheet.close}"]`)
+      ?.click()
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(view.get('.undo-strip .count').text()).toBe('10')
+    expect(document.activeElement?.textContent.trim()).toBe(en.income.restore)
+    expect(restoreIncome).not.toHaveBeenCalled()
   })
 
   // MOL-189 review №2, adversarial А1: the strip a failed «Bring back» leaves still runs out.

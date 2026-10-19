@@ -254,26 +254,41 @@ export default defineComponent({
     watch(removeOpen, (open) => {
       if (!open) removeFailed.value = false
     })
-    // The one being removed: its strip waits for the sheets; one already standing stays.
+    // The one being removed: its strip waits while a sheet of the amendment is up — its own, or one
+    // opened over another card while the answer was on its way: under a modal sheet «Вернуть» cannot
+    // be reached, and its ten seconds ran out there (adversarial Б2). One already standing stays.
     const landing = ref<string | null>(null)
+    // The sheet of the amendment is on the screen: from its opening until `@closed`, never by the
+    // prop alone, which goes false while the sheet is still on its way out.
+    const sheetUp = ref(false)
+    watch(sheetOpen, (open) => {
+      if (open) sheetUp.value = true
+    })
+    let removing = false
     async function confirmRemove(): Promise<void> {
       const income = target.value
       if (!income || incomes.busy.value) return
       removeFailed.value = false
       landing.value = income.id
+      removing = true
       await incomes.remove(income)
+      removing = false
       if (incomes.removed.value?.id !== income.id) {
         landing.value = null
-        removeFailed.value = true
+        // Said in the question only while it stands: put away meanwhile, the next one opened — of
+        // another income too — read out a failure nobody pressed for (adversarial Б1). The screen
+        // says it above the list either way.
+        removeFailed.value = removeOpen.value
         return
       }
       // Closing the amendment closes the question over it too, in one step of the history: the
       // stack steps over the sheets above the one closed. Each closed on its own would step back twice.
       if (sheetOpen.value && editing.value?.id === income.id) sheetOpen.value = false
-      else landing.value = null
+      if (!sheetUp.value) landing.value = null
     }
     function landed(): void {
-      landing.value = null
+      sheetUp.value = false
+      if (!removing) landing.value = null
     }
 
     const online = ref(navigator.onLine)
