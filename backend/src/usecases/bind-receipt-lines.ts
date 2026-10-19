@@ -1,5 +1,6 @@
 import {
   createLineMatcher,
+  headingRulesOut,
   isServiceClass,
   receiptCard,
   receiptLineName,
@@ -28,8 +29,9 @@ const SHORTEST_NAME = 3
 /**
  * The lines of a parsed receipt to items, once, in the queue (MOL-126, Р-1): the catalogue's names in
  * the till's language with the line's customs heading (`createLineMatcher`), then the catalogue search
- * by the line's gloss — near is found, far is «проверьте» (MOL-124 В-4) — and nothing is a new item,
- * named by the gloss. A line of a class of services, «56.10» of food service, is a dish: whatever the
+ * by the line's gloss — near is found, far is «проверьте» (MOL-124 В-4), and so is one whose headings
+ * the line's printed heading rules out (MOL-255, В-6 «б») — and nothing is a new item, named by the
+ * gloss. A line of a class of services, «56.10» of food service, is a dish: whatever the
  * catalogue's goods give it is «проверьте» (MOL-226). The shop's memory comes before all of it, but it
  * is laid over on every reading of the receipt rather than here: it changes with every receipt recorded.
  * A country with no names of its own, Serbia, goes by the search of the line's name alone (MOL-232, В-3)
@@ -49,7 +51,10 @@ export async function bindReceiptLines(
   codes: readonly (string | null)[] = [],
 ): Promise<LineBinding[]> {
   const names = receiptCard(country).nameLanguage
-  const matcher = createLineMatcher(names === null ? [] : await items.nodes(names), TILL_WORDS_RU)
+  const nodes = names === null ? [] : await items.nodes(names)
+  const matcher = createLineMatcher(nodes, TILL_WORDS_RU)
+  // the headings the seed gave the catalogue's nodes; an item the search finds outside them has none known
+  const headings = new Map(nodes.map((node) => [node.itemId, node.headings]))
   const bound: LineBinding[] = []
   for (const [position, line] of lines.entries()) {
     if (names === null) {
@@ -85,8 +90,12 @@ export async function bindReceiptLines(
       )
       const [first] = answer.items
       if (first !== undefined) {
-        // a dish of a class of services is never sure among the catalogue's goods (MOL-226)
-        const near = answer.nearIds.includes(first.id) && !isServiceClass(line.hs)
+        // a dish of a class of services is never sure among the catalogue's goods (MOL-226), nor an
+        // item the printed heading rules out: a brush is no tomato however the gloss read (MOL-255)
+        const near =
+          answer.nearIds.includes(first.id) &&
+          !isServiceClass(line.hs) &&
+          !headingRulesOut(line.hs, headings.get(first.id) ?? [])
         bound.push({ itemId: first.id, match: near ? 'search' : 'weak', translation })
         continue
       }

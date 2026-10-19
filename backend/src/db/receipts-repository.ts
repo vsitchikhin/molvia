@@ -168,6 +168,8 @@ export interface StoredReceipt {
   readonly heard: ReceiptHeard | null
   /** The total as the reading found it in one place (MOL-244): «Прочитали не всё» alone. */
   readonly readTotal: Money | null
+  /** Read in part, of the lines as read before the check (MOL-255, А6 «а»); `null` — read before it. */
+  readonly readPartly: boolean | null
 }
 
 /**
@@ -499,6 +501,7 @@ function toStored(found: SummaryRow): StoredReceipt {
       found.row.readTotalMinor === null
         ? null
         : { minor: found.row.readTotalMinor, currency: found.row.currency },
+    readPartly: found.row.readPartly,
   }
 }
 
@@ -1193,6 +1196,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             failure: outcome.kind === 'failed' ? outcome.failure : null,
             readAt: sql`clock_timestamp()`,
             readerVersion: outcome.readerVersion,
+            readPartly: outcome.kind === 'parsed' ? outcome.partly : null,
             // no head read leaves the head there is: a photo's has none before its reading, and a
             // receipt by its link keeps what the link said — its day, number and total (review 2)
             ...(head === null

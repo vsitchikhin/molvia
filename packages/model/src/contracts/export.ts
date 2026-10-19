@@ -43,8 +43,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // `qrMissed`, how its link reached the phone, and a line's `gtin`, the package's code the tax office
 // gave it (MOL-234). 17: `transfers`, money moved between one's own accounts with its earlier versions,
 // and a spending's `transferId`, the transfer it is the fee of (MOL-253). 18: a receipt's `readTotal`,
-// the total as the reader found it in one place, which no second source vouched for (MOL-244).
-export const EXPORT_VERSION = 18
+// the total as the reader found it in one place, which no second source vouched for (MOL-244). 19: a
+// receipt's `readPartly`, whether its lines as read fell short, before the check emptied any (MOL-255).
+export const EXPORT_VERSION = 19
 
 const day = z.iso.date()
 
@@ -344,6 +345,7 @@ const receiptSchema = z.strictObject({
   receiptNo: z.string().nullable(),
   total: signedMoneyCodec.nullable(),
   readTotal: signedMoneyCodec.nullable(),
+  readPartly: z.boolean().nullable(),
   balanced: z.boolean(),
   city: z.string().nullable(),
   recordedAt: isoDate.nullable(),

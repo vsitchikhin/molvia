@@ -62,6 +62,11 @@ const CHANGED_BY_TOTAL: Readonly<Record<string, readonly string[]>> = { 'am-05':
 // And a total read in one place that no lines met is no total (MOL-244, В-1 «а»): am-03's 16 167,73
 // stands alone — paid 20 000 in cash, the lines one short of it.
 const UNVOUCHED_TOTAL: readonly string[] = ['am-03']
+// And a row of a table OCR left blank takes nothing of the total (MOL-255, В-5 «а»): am-04's softener
+// was the prototype's 2 200 by what the total left; now the review shows the difference instead.
+const BLANK_LEFT_EMPTY: Readonly<Record<string, readonly string[]>> = {
+  'am-04': ['ՏՈՖՈՒՀՈՂ ԼԱՎԱՆԴԱ 8լ(Հատ)'],
+}
 
 function read(fixture: Fixture): ReceiptText {
   return bestReading(
@@ -113,8 +118,8 @@ describe('a receipt read by Tesseract, as the prototype read it', () => {
         l.sku ?? null,
         thousandths(l.qty),
         l.unit === 'kg' ? 'kg' : 'piece',
-        hundredths(l.unit_price),
-        hundredths(l.sum),
+        (BLANK_LEFT_EMPTY[name] ?? []).includes(l.printed) ? null : hundredths(l.unit_price),
+        (BLANK_LEFT_EMPTY[name] ?? []).includes(l.printed) ? null : hundredths(l.sum),
         hundredths(l.discount),
         l.settled && !(CHANGED_BY_TOTAL[name] ?? []).includes(l.sku ?? ''),
       ]),
@@ -139,7 +144,26 @@ describe('a receipt read by Tesseract, as the prototype read it', () => {
     const got = read(am04 as Fixture)
     expect(got.layout).toBe('table')
     expect(got.totalHundredths).toBe(945_000)
-    expect(got.lines.reduce((sum, l) => sum + (l.sumHundredths ?? 0), 0)).toBe(945_000)
+    // the blank row takes nothing: 2 200 short is the review's difference (MOL-255)
+    expect(got.lines.reduce((sum, l) => sum + (l.sumHundredths ?? 0), 0)).toBe(725_000)
+  })
+
+  it('gives a blank row of a table no sum below zero, nor any (MOL-255)', () => {
+    // am-26: the rows OCR left short of figures took −182 140,00 each, the total less the rest
+    const got = parse(
+      [
+        '| ԱՆՎԱՆՈՒՄ | Քան | Գին | Գումար |',
+        '(3818) Թուղթ զուգարանի | 1 | 1380 | 1380 |',
+        '(3923) Ցելաֆոն |',
+        '(3924) Ճզմիչ |',
+        'Ընդամենը 8540.00',
+      ].join('\n'),
+    )
+    expect(got.lines.map((l) => [l.sumHundredths, l.priceHundredths, l.settled])).toEqual([
+      [138_000, 138_000, true],
+      [null, null, false],
+      [null, null, false],
+    ])
   })
 
   it('settles a receipt with no card discount by its total: am-05 adds up', () => {
@@ -259,6 +283,63 @@ describe('the figures of one line', () => {
   it('leaves a line no arithmetic holds unsettled, with the figures as printed', () => {
     const line = receipt('0401/1163909 1Հտ 100,50/1,50 999').lines[0]!
     expect([line.settled, line.sumHundredths]).toEqual([false, 10_050])
+  })
+
+  describe('as printed (MOL-255)', () => {
+    const flags = (figures: string, total?: string) => {
+      const line = receipt(figures, total).lines[0]!
+      return [line.settled, line.asPrinted]
+    }
+
+    it('is a line whose every figure adds up as read', () => {
+      expect(flags('0401/1163909 2Հտ 740 370')).toEqual([true, true])
+      expect(flags('0401/1163909 1Հտ 760,75/89,25 850')).toEqual([true, true])
+    })
+
+    it('is not a line settled by a swap of OCR', () => {
+      expect(flags('0401/1163909 1Հտ 760,75/89,25 860')).toEqual([true, false])
+    })
+
+    it('is not a line whose price was worked out of its sum: no shelf price printed', () => {
+      expect(flags('0401/1163909 1Հտ 760,75/89,25')).toEqual([true, false])
+    })
+
+    it('is not a line the total changed from its reading', () => {
+      expect(flags('3923/1122223 1Հտ 60 60', '50.00')).toEqual([false, false])
+    })
+
+    it('is a line read alike in both columns: «60 60» is as printed, right or not', () => {
+      // what the arithmetic of one piece cannot see is the review's gate, not the parse's
+      expect(flags('3923/1122223 1Հտ 60 60')).toEqual([true, true])
+    })
+
+    it('is not a line with no reading at all', () => {
+      expect(flags('0401/1163909 1Հտ 100,50/1,50 999')).toEqual([false, false])
+    })
+
+    it('is not a line whose count is not the one its row prints (adversarial А1)', () => {
+      // a till with no shelf price tries twenty counts: «400» misread «100» holds at four pieces
+      expect(flags('0401/1163909 1Հտ 400 100')).toEqual([true, false])
+      expect(flags('0401/1163909 2Հտ 800 100', '800.00')).toEqual([true, false])
+      // the count it prints is kept as printed, and a count OCR lost is no count read
+      expect(flags('0401/1163909 2Հտ 800 400', '800.00')).toEqual([true, true])
+      expect(flags('0401/1163909 Հտ 800 400')).toEqual([true, false])
+    })
+
+    it('is not a line of the class code whose count no unit was read with (adversarial А1)', () => {
+      const coded = (...texts: string[]) =>
+        parseReceiptText(AM, rowsOf(texts.join('\n'), 0)).lines.map((line) => [
+          line.quantityMilli,
+          line.settled,
+          line.asPrinted,
+        ])
+      expect(coded('Դաս. 0401 Ն/Կ 745030', 'Կաթ «Իգիթ»', '100 400', 'Ընդամենը 400.00')).toEqual([
+        [4_000, true, false],
+      ])
+      expect(coded('Դաս. 0401 Ն/Կ 745030', 'Կաթ «Իգիթ»', '4 հատ 100 400')).toEqual([
+        [4_000, true, true],
+      ])
+    })
   })
 })
 
@@ -857,6 +938,17 @@ describe('an item read twice at a seam, its article one swap of OCR off (review 
     })
     expect(wrong.length).toBeGreaterThan(0)
     expect(!got.balanced || wrong.every((line) => !line.settled)).toBe(true)
+  })
+
+  it('takes both lines of one sum across the seam as not printed (MOL-255)', () => {
+    const got = parseReceiptText(AM, [
+      ...rowsOf('1.Յոգուրտ դեղձ\n0403/1160033 1Հտ 290 290', 0),
+      ...rowsOf('2.Յոգուրտ ելակ\n0403/1160038 1Հտ 290 290', 1),
+    ])
+    expect(got.lines.map((line) => [line.sku, line.settled, line.asPrinted])).toEqual([
+      ['1160033', false, false],
+      ['1160038', false, false],
+    ])
   })
 })
 

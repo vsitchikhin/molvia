@@ -470,7 +470,7 @@ describe('словарь: плюральные формы', () => {
       'trip.rejected.orphaned',
       'trip.caveat.pending',
       'trip.unsent.title',
-      'purchases.issues_mismatch',
+      'purchases.issues_check',
       'item.results_announced',
       'item.far_announced',
       'advice.ratings_count',
@@ -500,6 +500,7 @@ describe('словарь: плюральные формы', () => {
       'accounts.account.more',
       'accounts.reconcile.cause_trip_unpriced_meta',
       'receipt.capture.parts',
+      'receipt.review.diff_blank',
       'receipt.review.record',
       'receipt.recorded.title',
     ])

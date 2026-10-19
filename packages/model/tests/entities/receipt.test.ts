@@ -25,6 +25,7 @@ const line = (over: Partial<ReceiptTextLine> = {}): ReceiptTextLine => ({
   sumHundredths: 37_000,
   discountHundredths: 0,
   settled: true,
+  asPrinted: true,
   rows: [],
   ...over,
 })

@@ -11,6 +11,7 @@ import {
   receiptTimeOf,
   receiptLineOf,
   receiptLineCodec,
+  verifiedReading,
 } from '@molvia/model'
 import type { Currency, ReceiptLine, ReceiptText, TextRow } from '@molvia/model'
 import { z } from 'zod'
@@ -125,11 +126,13 @@ async function readOne(
     readings.push(mergeParts(photoReading, parts))
   }
   const text = bestReading(photoReading, readings)
-  const head = headOf(text, currency, readings)
+  // a figure goes to the review as read only where it is verified, the rest is left empty (MOL-255)
+  const shown = verifiedReading(text)
+  const head = headOf(shown, currency, readings)
   if (needsReshoot(text))
     return { kind: 'failed', failure: 'reshoot', readerVersion: version, head }
 
-  const lines = text.lines.map((line) => receiptLineOf(line, currency))
+  const lines = shown.lines.map((line) => receiptLineOf(line, currency))
   let images: LineImage[] = []
   try {
     images = await cutLines(reader, claimed, text, boxes)
@@ -166,8 +169,19 @@ async function readOne(
     readerVersion: version ?? '',
     head,
     lines,
-    // a section with no items is read whole (MOL-227)
-    partly: lines.length > 0 && readPartly(lines, total),
+    // a section with no items is read whole (MOL-227); the sums of what was read, before the check: a
+    // line it emptied was read, and a retake reads it the same (MOL-255, А5 «а»); with no total, a line
+    // adds up only as the review shows it with its figures — settled by swaps, a count made up or one
+    // number printed twice is no line read (round 3, А10 «а»; round 4, А12 «а»)
+    partly:
+      lines.length > 0 &&
+      readPartly(
+        text.lines.map((line, i) => ({
+          ...receiptLineOf(line, currency),
+          settled: shown.lines[i]?.settled ?? false,
+        })),
+        total,
+      ),
     bindings,
     images,
   }
