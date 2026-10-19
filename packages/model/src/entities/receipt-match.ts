@@ -96,7 +96,7 @@ function headingVariants(hs: string): string[] {
 
 /**
  * The customs heading printed on a line rules the item out (MOL-255, В-6 «б»): the item has headings and
- * none of them is the line's, OCR's swaps allowed — the rule the matcher passes names by, for an item the
+ * none of them is the line's, OCR's swaps allowed. The matcher passes names by it, and so does an item the
  * search found by the gloss: «Ռոլիկ» (9603, brushes) read as «լոլիկ» found tomatoes (0702) near. A class
  * of services or no heading rules nothing out, and nor does an item with no heading.
  */
@@ -175,13 +175,10 @@ export function createLineMatcher(
 
   function match(printed: string, hs: string | null): LineMatch | null {
     const tokens = receiptWords(printed)
-    const allowed = isHeading(hs) ? headingVariants(hs) : null
     let best: { node: CatalogueNode; score: number } | null = null
     for (const entry of index) {
       const { headings } = entry.node
-      if (allowed !== null && headings.length > 0 && !allowed.some((h) => headings.includes(h))) {
-        continue
-      }
+      if (headingRulesOut(hs, headings)) continue
       const scores = entry.words.map((word) => wordScore(word, tokens))
       if (scores.some((score) => score === 0)) continue // every word of the name must be there
       // more words — more specific

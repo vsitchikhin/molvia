@@ -1013,8 +1013,11 @@ interface TableOption {
   readonly price: number | null
   readonly sum: number | null
   readonly settled: boolean
-  /** The row's last figure is its sum, as a till prints it: what the row reads with no total (MOL-244). */
-  readonly asPrinted?: boolean
+  /**
+   * The row's last figure is its sum, as a till prints it: what the row reads with no total (MOL-244). Its
+   * price is worked out, so the line it gives is never `asPrinted` (MOL-255).
+   */
+  readonly lastIsSum?: boolean
 }
 
 // Past this many combinations the total no longer chooses among the readings of a table: a long
@@ -1077,7 +1080,7 @@ function tableLines(
             price: Math.round((b * 100) / a),
             sum: Math.round(b / 10),
             settled: false,
-            asPrinted: true,
+            lastIsSum: true,
           })
         }
       }
@@ -1102,7 +1105,7 @@ function tableLines(
     let chosen: TableOption[] = options.map(
       (o) =>
         (judging === null
-          ? (o.out.find((x) => x.settled) ?? o.out.find((x) => x.asPrinted))
+          ? (o.out.find((x) => x.settled) ?? o.out.find((x) => x.lastIsSum))
           : undefined) ??
         o.out[0] ?? { qty: null, price: null, sum: null, settled: false },
     )
