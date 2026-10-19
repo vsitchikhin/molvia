@@ -9,12 +9,13 @@ import type { ReceiptLayout, ReceiptText, ReceiptTextLine } from '#model/entitie
  * printed by its nature (MOL-272).
  *
  * A line is verified when it is as printed (`asPrinted`: settled with no swap, nothing worked out,
- * nothing the total gave) with a quantity and a sum above zero — or a sum of nothing where the shelf price
- * is the discount to the hundredth, a gift by the card (review round 2, А7 «а»). **A line of a quantity of one whose price
- * is its sum is not, on its own** — a piece or a kilogram (review round 1, А2 «а»): the till prints one
- * number twice, and a digit misread alike in both columns — «660 660» for 560 — holds that arithmetic
- * (owner's В-2 «а»; 18 of the bench's 207 fields read so were wrong); it is verified only on a receipt
- * proven whole — every line as printed and their sums the total shown. **The price is kept only where
+ * nothing the total gave) with a quantity and a sum above zero — or a sum of nothing where the shelf
+ * price is the discount to the hundredth, a gift by the card (review round 2, А7 «а»). **A line of a
+ * quantity of one whose price is its sum, or its discount where it is a gift, is not, on its own** — a
+ * piece or a kilogram (review round 1, А2 «а»; round 3, А9 «а»): the till prints one number twice, and a
+ * digit misread alike in both columns — «660 660» for 560 — holds that arithmetic (owner's В-2 «а»; 18
+ * of the bench's 207 fields read so were wrong); it is verified only on a receipt proven whole — every
+ * line as printed and their sums the total shown. **The price is kept only where
  * quantity × price is the sum and the discount to the hundredth** (Т-4) — on a till that prints a shelf
  * price apart from what was paid (the card's layout), to the few luma it rounds by, «419,98/0 490/420»;
  * elsewhere one of two figures meant to be one was misread: 624,44 for a sum of 624,41.
@@ -48,10 +49,11 @@ function verifiedLine(
   const discount = line.discountHundredths ?? 0
   if (!line.asPrinted || qty === null || qty <= 0 || sum === null || sum < 0) return blank(line)
   // a gift — its whole price the discount — is nothing paid only where that holds to the hundredth
-  // (review round 2, А7 «а»): «0 0» or a stray «0,00» holds any arithmetic
+  // (review round 2, А7 «а»): «0 0» or a stray «0,00» holds any arithmetic; of a quantity of one its price
+  // and discount are one number twice, as «660 660» is (round 3, А9 «а»)
   if (sum === 0) {
     const gift = price !== null && price > 0 && Math.round((qty * price) / 1_000) === discount
-    return gift ? line : blank(line)
+    return gift && (qty !== 1_000 || proven) ? line : blank(line)
   }
   const oneAlike = qty === 1_000 && price === sum && discount === 0
   if (oneAlike && !proven) return blank(line)

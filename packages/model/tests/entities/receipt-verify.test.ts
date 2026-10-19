@@ -122,19 +122,32 @@ describe('a line paid nothing, its whole price the discount (review round 2, А7
   const gift = { quantityMilli: 1_000, priceHundredths: 50_000, sumHundredths: 0 }
 
   it('keeps its figures where the discount is the price to the hundredth: «0,00/500,00 500»', () => {
-    const got = one({ ...gift, discountHundredths: 50_000 })
+    const got = one({ ...gift, discountHundredths: 50_000 }, 0)
     expect(figures(got)).toEqual([1_000, 50_000, 0, 50_000, true])
     const two = one({ ...gift, quantityMilli: 2_000, discountHundredths: 100_000 })
     expect(figures(two)).toEqual([2_000, 50_000, 0, 100_000, true])
   })
 
+  it('of one piece or one kilogram is kept only on a receipt proven whole (round 3, А9 «а»)', () => {
+    // «0,00/660,00 660»: the price and the discount are one number twice, as «660 660» is
+    expect(figures(one({ ...gift, discountHundredths: 50_000 }))).toEqual(BLANK)
+    expect(figures(one({ ...gift, discountHundredths: 50_000 }, 1))).toEqual(BLANK)
+    const weighed = one({ ...gift, unit: 'kg', discountHundredths: 50_000 })
+    expect(figures(weighed)).toEqual(BLANK)
+    // two pieces print two numbers, 500 and 1 000: no proof asked
+    const two = one({ ...gift, quantityMilli: 2_000, discountHundredths: 100_000 })
+    expect(figures(two)).toEqual([2_000, 50_000, 0, 100_000, true])
+  })
+
   it('is emptied a hundredth off, with no discount, or with no price — the card’s rounding none', () => {
-    expect(figures(one({ ...gift, discountHundredths: 49_999 }))).toEqual(BLANK)
-    expect(figures(one({ ...gift, discountHundredths: 0 }))).toEqual(BLANK)
-    expect(figures(one({ ...gift, discountHundredths: null }))).toEqual(BLANK)
-    expect(figures(one({ ...gift, priceHundredths: null, discountHundredths: 50_000 }))).toEqual(
-      BLANK,
-    )
+    // on a receipt proven whole, its total nothing: the gift's own arithmetic is all that empties it
+    const proven = (over: Partial<ReceiptTextLine>) => figures(one({ ...gift, ...over }, 0))
+    expect(proven({ discountHundredths: 49_999 })).toEqual(BLANK)
+    expect(proven({ discountHundredths: 0 })).toEqual(BLANK)
+    expect(proven({ discountHundredths: null })).toEqual(BLANK)
+    expect(proven({ priceHundredths: null, discountHundredths: 50_000 })).toEqual(BLANK)
+    const two = { quantityMilli: 2_000, discountHundredths: 99_999 }
+    expect(figures(one({ ...gift, ...two }))).toEqual(BLANK)
   })
 
   it('proves a receipt with it: nothing and 300 are the total of 300', () => {
