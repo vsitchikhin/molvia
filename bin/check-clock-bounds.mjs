@@ -13,11 +13,14 @@
 // own, `{ now } = Date`, `.bind`); a function of the file that
 // returns one (`const now = () => performance.now()`); a name, a field, a field of a class
 // (`this.start`) or a shorthand field given one; an array of them — pushed, by index, `at()`, each element
-// `for … of` it or a callback of its own (`forEach`, `every`, `some`, `filter`, …) takes. A duration:
+// `for … of` it or a callback of its own (`forEach`, `every`, `some`, `filter`, …) takes, by a plain name or
+// taken apart; what a name of the file is handed by a method of its own and gives back (`map.set`, `map.get`).
+// A duration:
 // a subtraction of two readings, or of a deadline from a reading, and whatever is made of it — a name, a
 // field, an object or array it is put in (`=`, `+=`, `push`) or taken apart from, a function of the file,
 // a method or a getter that returns it, a call of one that subtracts a reading it takes from the clock
-// however it rounds (`since(t0)`), a parameter of a function of the file handed one, `process.hrtime(t0)`,
+// however it rounds (`since(t0)`), a parameter of a function of the file handed one — a method of an object
+// or a class of the file too, by its symbol — `process.hrtime(t0)`,
 // `performance.measure()` and the entries read back (`getEntriesByName`, `getEntriesByType`). A budget is
 // a duration taken from a number (`200 - d`, `left -= d`, `deadline - Date.now()`) or divided into one (a rate,
 // `1000 / ms`), kept through `Math.max` and `Math.min`, and a lower bound on it is an upper bound on the
@@ -31,8 +34,9 @@
 // function of the file that bounds its parameter so — and a deadline: a reading bounded by a reading plus
 // a number (`expect(Date.now()).toBeLessThan(deadline)`), or a reading less a number below a reading
 // (`expect(t1 - 1_000).toBeLessThan(t0)`). And a comparison of time no assertion reads where it stands —
-// kept in a name, returned by a callback, a condition — in doubt a bound; but a loop's condition, a wait,
-// and a duration against zero, a mark, are not. A lower bound is no breach of time, two readings
+// kept in a name, returned by a callback, a condition — in doubt a bound, a lower one asserted where it
+// stands instead; but a loop's condition, a wait, and a duration against zero, a mark, are not — a budget
+// against zero is. A lower bound is no breach of time, two readings
 // against each other included; the age of a stamp — the clock against a moment a row holds — is no
 // duration, as one side is not the clock.
 //
@@ -280,7 +284,8 @@ export function rawBounds(fileName, source) {
       if (ts.isPropertyAccessExpression(n.expression)) {
         const method = n.expression.name.text
         // new Date().getTime(), started.getTime(), calls.at(-1)
-        if (['getTime', 'valueOf', 'at'].includes(method)) return isReading(n.expression.expression)
+        if (['getTime', 'valueOf', 'at', 'get'].includes(method))
+          return isReading(n.expression.expression)
       }
       return false
     }
@@ -466,13 +471,23 @@ export function rawBounds(fileName, source) {
   const functionOf = (expression) => {
     const e = bare(expression)
     if (ts.isArrowFunction(e) || ts.isFunctionExpression(e)) return e
-    if (!ts.isIdentifier(e)) return undefined
-    const declaration = checker.getSymbolAtLocation(e)?.valueDeclaration
-    if (declaration && ts.isFunctionDeclaration(declaration)) return declaration
-    const init = declaration && ts.isVariableDeclaration(declaration) && declaration.initializer
-    return init && (ts.isArrowFunction(bare(init)) || ts.isFunctionExpression(bare(init)))
-      ? bare(init)
-      : undefined
+    if (!ts.isIdentifier(e) && !ts.isPropertyAccessExpression(e)) return undefined
+    // check.fast(d), clock.real(): a method of an object or a class of the file, by its symbol (У4)
+    const target = ts.isPropertyAccessExpression(e) ? e.name : e
+    const declaration = checker.getSymbolAtLocation(target)?.valueDeclaration
+    if (!declaration || declaration.getSourceFile() !== sf) return undefined
+    if (
+      (ts.isFunctionDeclaration(declaration) || ts.isMethodDeclaration(declaration)) &&
+      declaration.body
+    )
+      return declaration
+    const init =
+      ts.isVariableDeclaration(declaration) ||
+      ts.isPropertyAssignment(declaration) ||
+      ts.isPropertyDeclaration(declaration)
+        ? declaration.initializer && bare(declaration.initializer)
+        : undefined
+    return init && (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) ? init : undefined
   }
   /** The comparisons an assertion reads, through `!`, `&&` and `||`: each is judged there, by its truth. */
   const judged = new Set()
@@ -518,7 +533,9 @@ export function rawBounds(fileName, source) {
         (ts.isPrefixUnaryExpression(v) && v.operator === ts.SyntaxKind.MinusToken)
       )
     }
-    if (zero(n.left) || zero(n.right)) return false
+    // a budget against zero is what is left of the time, `deadline - Date.now() > 0`: a bound (№30)
+    if ((zero(n.left) && sign(n.right) !== -1) || (zero(n.right) && sign(n.left) !== -1))
+      return false
     if (sign(n.left) !== 0 || sign(n.right) !== 0) return true
     const point = (side) => isReading(side) || isDeadline(side) || isLowered(side)
     return point(n.left) && point(n.right) && !(isReading(n.left) && isReading(n.right))
@@ -623,6 +640,13 @@ export function rawBounds(fileName, source) {
       if (key === undefined || set.has(key)) return
       set.add(key)
       grown = true
+    }
+    /** Each name a binding gives — `d`, `{ took }`, `[, ms]` — as what its value is. */
+    const learnNames = (name, set) => {
+      if (ts.isIdentifier(name)) learn(symbolKey(name), set)
+      else
+        for (const element of name.elements)
+          if (ts.isBindingElement(element)) learnNames(element.name, set)
     }
     /** A name standing for a clock. */
     const alias = (id, path) => {
@@ -741,15 +765,20 @@ export function rawBounds(fileName, source) {
           learn(keyOf(root), carriers)
         }
       }
-      // took.push(d), calls.push(Date.now())
+      // took.push(d), calls.push(Date.now()), took.set('a', d): what a name of the file is handed by any
+      // method of its own holds it, and whatever is read from it back carries it (У2) — a function of the
+      // file is handed it in its parameter instead
       if (
         ts.isCallExpression(node) &&
         ts.isPropertyAccessExpression(node.expression) &&
-        ['push', 'unshift'].includes(node.expression.name.text)
+        !ITERATE.has(node.expression.name.text) &&
+        !functionOf(node.expression)
       ) {
         const into = keyOf(node.expression.expression)
-        if (node.arguments.some(isReading)) learn(into, readings)
-        else if (node.arguments.some(carries)) learn(into, carriers)
+        if (into !== undefined && !into.startsWith('global:')) {
+          if (node.arguments.some(isReading)) learn(into, readings)
+          else if (node.arguments.some(carries)) learn(into, carriers)
+        }
       }
       // const mark = { started: performance.now() }, const mark = { t0 }
       if (
@@ -818,23 +847,23 @@ export function rawBounds(fileName, source) {
       // for (const d of took): each element is what the array holds (adversarial Т1)
       if (ts.isForOfStatement(node) && ts.isVariableDeclarationList(node.initializer)) {
         const [declaration] = node.initializer.declarations
-        if (declaration && ts.isIdentifier(declaration.name)) {
-          const key = symbolKey(declaration.name)
-          if (isReading(node.expression)) learn(key, readings)
-          else if (carries(node.expression)) learn(key, carriers)
+        // for (const { took } of rows), for (const [, ms] of Object.entries(times)) (У1)
+        if (declaration) {
+          if (isReading(node.expression)) learnNames(declaration.name, readings)
+          else if (carries(node.expression)) learnNames(declaration.name, carriers)
         }
       }
       if (ts.isCallExpression(node)) {
         /** A parameter of a function given what a value is: a reading or a duration. */
         const hand = (fn, place, value) => {
           const parameter = fn.parameters[place]
-          if (!parameter || !ts.isIdentifier(parameter.name)) return
+          if (!parameter) return
           // a helper that bounds the parameter is refused where it is called, once
           const bounded = declaredKey(fn)
           if (bounded !== undefined && bounders.get(bounded)?.includes(place)) return
-          const key = symbolKey(parameter.name)
-          if (isReading(value)) learn(key, readings)
-          else if (carries(value)) learn(key, carriers)
+          // rows.every(({ took }) => took < 1_000): each name the parameter gives (У1)
+          if (isReading(value)) learnNames(parameter.name, readings)
+          else if (carries(value)) learnNames(parameter.name, carriers)
         }
         // took.forEach((d) => …), took.every(fast): the callback is handed what the array holds (Т1)
         const method = ts.isPropertyAccessExpression(node.expression)
@@ -906,7 +935,7 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()
   })
   if (problems.length > 0) {
     console.error(
-      `clock bounds: ${String(problems.length)} not through expectWithin (CLAUDE.md › Testing, MOL-266)`,
+      `clock bounds: ${String(problems.length)} not through expectWithin — a lower bound is asserted where it stands, expect(d).toBeGreaterThanOrEqual(n) (CLAUDE.md › Testing, MOL-266)`,
     )
     for (const problem of problems) console.error(problem)
     process.exitCode = 1

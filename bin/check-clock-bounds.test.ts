@@ -46,6 +46,42 @@ describe('rawBounds', () => {
     expect(rawBounds('a.test.ts', source)).not.toEqual([])
   })
 
+  // review №30 and adversarial round 18 of MOL-266, У1–У4: a name taken apart, a Map, a budget against zero, a method
+  it.each([
+    [
+      'for of, taken apart',
+      `const rows = [{ name: 'a', took: took[0] }]\nfor (const { took: ms } of rows) expect(ms).toBeLessThan(1_000)`,
+    ],
+    [
+      'for of an entry',
+      `const times = { a: took[0] }\nfor (const [, ms] of Object.entries(times)) expect(ms).toBeLessThan(1_000)`,
+    ],
+    [
+      'a callback taking apart',
+      `const rows = [{ ms: took[0] }]\nexpect(rows.every(({ ms }) => ms < 1_000)).toBe(true)`,
+    ],
+    [
+      'a Map, read back',
+      `const byName = new Map<string, number>()\nbyName.set('a', took[0])\nexpect(byName.get('a')).toBeLessThan(1_000)`,
+    ],
+    [
+      'a Map, gone through',
+      `const byName = new Map<string, number>()\nbyName.set('a', took[0])\nfor (const ms of byName.values()) expect(ms).toBeLessThan(1_000)`,
+    ],
+    ['a budget against zero in a name', `const ok = 1_000 - took[0] > 0\nexpect(ok).toBe(true)`],
+    [
+      'a deadline left against zero',
+      `const deadline = Date.now() + 1_000\nconst inTime = deadline - Date.now() > 0\nexpect(inTime).toBe(true)`,
+    ],
+    [
+      'a method of an object of the file',
+      `const check = { fast: (ms: number) => ms < 1_000 }\nexpect(check.fast(took[0])).toBe(true)`,
+    ],
+  ])('finds a bound handed on — %s', (_, bound) => {
+    const source = `it('x', () => {\nconst took: number[] = []\nconst t0 = performance.now()\ntook.push(performance.now() - t0)\n${bound}\n})`
+    expect(rawBounds('a.test.ts', source)).not.toEqual([])
+  })
+
   it('finds entries read back, a deadline the other way round and the clock as a moment (Т3–Т5)', () => {
     expect(
       lines(`
