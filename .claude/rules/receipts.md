@@ -801,25 +801,26 @@ look alike, so the server keeps its measure and sends it only to a phone that as
 as the total read in one place); with an empty line the strip says it with no sums — «Прочитали не всё — сверьте
 строки с бумагой», «Переснять» beside it — since the lines shown do not make them, and with none, as before.
 Decided on the phone alone — no strip over an empty line — it stood on no receipt of the bench: every one of the
-35 has an empty line, and OCR lost rows on 23. By the server's word it stands on 13: 11 that lost rows, am-04,
-every line found and their sums read short, and am-09, a line a luma past its total. A receipt read before keeps
-no word (`null`): its lines were shown as read, and the phone measures them as before. **A line found with no
-figures of its own is no line lost** (round 2, №9): where the rest meet the total, the parse gives it what the
-total leaves, the measure counts it, and the foot says what it lacks — counted as lost, the strip would say «not
-all read» of a receipt whose every line was found. **With no total, a line adds up only as the review shows it
-with its figures** (round 3, А10 «а»; round 4, А12 «а»): the share of lines that add up was of `settled`, and
-lines settled by swaps or a count made up — every one emptied on the review — said «read whole» of am-12, six
-lines found of seven, none of them as printed; and «1 шт, цена = сумма», as printed but emptied where no total
-proves it, said the same of am-38, 12 lines found of 22, three shown with figures. The strip now stands on 27 of
-the bench's 35: 20 of the 23 that lost rows, and seven that lost none whose lines mostly go empty — «сверьте
-строки с бумагой» is true of them too. **The price, named:** am-02 lost rows with five of its eight lines shown,
-am-12L found one line of seven and showed it, and am-28's lines as read make more than its total — those three
-stay unsaid. **And one word is both the strip and the 0.2 measure** (round 5, А13 «а»): with no total a receipt
-whose every line was found but emptied — am-30, one «1 шт, цена = сумма» as printed — is counted «in part» in
-`receipt_days` too, and offered «Переснять», which reads it the same. Two words, the measure by the lines as
-printed, moved two receipts of the bench the opposite ways — am-30 right, am-38, ten rows lost of 22, wrong — and
-were not bought. «Покупки» call a receipt with lines not added up or empty «проверьте N строк» (№3 «а»): «не
-сходятся» said of a line with nothing to add up.
+35 has an empty line, and OCR lost rows on 23. By the server's word, with no total still measured by `settled`
+(round 2), it stood on 13: 11 that lost rows, am-04, every line found and their sums read short, and am-09, a
+line a luma past its total — 27 since rounds 3 and 4, below. A receipt read before keeps no word (`null`): its
+lines were shown as read, and the phone measures them as before. **A line found with no figures of its own is no
+line lost** (round 2, №9): where the rest meet the total, the parse gives it what the total leaves, the measure
+counts it, and the foot says what it lacks — counted as lost, the strip would say «not all read» of a receipt
+whose every line was found. **With no total, a line adds up only as the review shows it with its figures** (round
+3, А10 «а»; round 4, А12 «а»): the share of lines that add up was of `settled`, and lines settled by swaps or a
+count made up — every one emptied on the review — said «read whole» of am-12, six lines found of seven, none of
+them as printed; and «1 шт, цена = сумма», as printed but emptied where no total proves it, said the same of
+am-38, 12 lines found of 22, three shown with figures. The strip now stands on 27 of the bench's 35: 20 of the 23
+that lost rows, and seven that lost none whose lines mostly go empty — «сверьте строки с бумагой» is true of them
+too. **The price, named:** am-02 lost rows with five of its eight lines shown, am-12L found one line of seven and
+showed it, and am-28's lines as read make more than its total — those three stay unsaid. **And one word is both
+the strip and the 0.2 measure** (round 5, А13 «а»): with no total a receipt whose every line was found but
+emptied — am-30, one «1 шт, цена = сумма» as printed — is counted «in part» in `receipt_days` too, and offered
+«Переснять», which reads it the same. Two words, the measure by the lines as printed, moved two receipts of the
+bench the opposite ways — am-30 right, am-38, ten rows lost of 22, wrong — and were not bought. «Покупки» call a
+receipt with lines not added up or empty «проверьте N строк» (№3 «а»): «не сходятся» said of a line with nothing
+to add up.
 
 **A found item the printed heading rules out is «проверьте»** (В-6 «б», `headingRulesOut`): the matcher's own
 rule — the item has headings and none is the line's, OCR's swaps allowed — now for an item the search found by
