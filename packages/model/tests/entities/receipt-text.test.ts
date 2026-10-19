@@ -260,6 +260,39 @@ describe('the figures of one line', () => {
     const line = receipt('0401/1163909 1Հտ 100,50/1,50 999').lines[0]!
     expect([line.settled, line.sumHundredths]).toEqual([false, 10_050])
   })
+
+  describe('as printed (MOL-255)', () => {
+    const flags = (figures: string, total?: string) => {
+      const line = receipt(figures, total).lines[0]!
+      return [line.settled, line.asPrinted]
+    }
+
+    it('is a line whose every figure adds up as read', () => {
+      expect(flags('0401/1163909 2Հտ 740 370')).toEqual([true, true])
+      expect(flags('0401/1163909 1Հտ 760,75/89,25 850')).toEqual([true, true])
+    })
+
+    it('is not a line settled by a swap of OCR', () => {
+      expect(flags('0401/1163909 1Հտ 760,75/89,25 860')).toEqual([true, false])
+    })
+
+    it('is not a line whose price was worked out of its sum: no shelf price printed', () => {
+      expect(flags('0401/1163909 1Հտ 760,75/89,25')).toEqual([true, false])
+    })
+
+    it('is not a line the total changed from its reading', () => {
+      expect(flags('3923/1122223 1Հտ 60 60', '50.00')).toEqual([false, false])
+    })
+
+    it('is a line read alike in both columns: «60 60» is as printed, right or not', () => {
+      // what the arithmetic of one piece cannot see is the review's gate, not the parse's
+      expect(flags('3923/1122223 1Հտ 60 60')).toEqual([true, true])
+    })
+
+    it('is not a line with no reading at all', () => {
+      expect(flags('0401/1163909 1Հտ 100,50/1,50 999')).toEqual([false, false])
+    })
+  })
 })
 
 describe('parts of a long receipt', () => {
@@ -857,6 +890,17 @@ describe('an item read twice at a seam, its article one swap of OCR off (review 
     })
     expect(wrong.length).toBeGreaterThan(0)
     expect(!got.balanced || wrong.every((line) => !line.settled)).toBe(true)
+  })
+
+  it('takes both lines of one sum across the seam as not printed (MOL-255)', () => {
+    const got = parseReceiptText(AM, [
+      ...rowsOf('1.Յոգուրտ դեղձ\n0403/1160033 1Հտ 290 290', 0),
+      ...rowsOf('2.Յոգուրտ ելակ\n0403/1160038 1Հտ 290 290', 1),
+    ])
+    expect(got.lines.map((line) => [line.sku, line.settled, line.asPrinted])).toEqual([
+      ['1160033', false, false],
+      ['1160038', false, false],
+    ])
   })
 })
 

@@ -44,6 +44,12 @@ export interface ReceiptTextLine {
   /** The line's own arithmetic holds for the figures given. */
   readonly settled: boolean
   /**
+   * Settled with every figure as the reading printed it (MOL-255): no swap of OCR, no figure worked out
+   * — a price from the sum, a weight from the money — and nothing the total gave. `settled` alone is
+   * held by a reading bent by two swaps a field; what the review is shown is decided from this.
+   */
+  readonly asPrinted: boolean
+  /**
    * The rows the line may be cut out from for the reader's training (MOL-169): its figures, and its
    * name only when the item's number was read on it. A name row is the first row above the figures,
    * and above the first item that is the head — the VAT, a buyer's name — when OCR lost the name: the
@@ -937,6 +943,8 @@ function cardReceipt(rows: readonly TextRow[], lx: Lexicon): Laid {
     if (byTotal) tookSlice = sliced
     const lines = found.map((f, i): ReceiptTextLine => {
       const pick = picks[i] ?? null
+      // what the total changed or could not tell apart: highlighted for the person to check
+      const settled = pick !== null && !doubt.has(i)
       return {
         printed: f.head.trim(),
         hs: f.hs.padStart(4, '0'),
@@ -946,8 +954,8 @@ function cardReceipt(rows: readonly TextRow[], lx: Lexicon): Laid {
         priceHundredths: finite(pick?.price ?? (f.priceS === null ? null : hundredthsOf(f.priceS))),
         sumHundredths: finite(pick?.paid ?? blankSum ?? hundredthsOf(f.paidS)),
         discountHundredths: finite(pick?.disc ?? hundredthsOf(f.discS)),
-        // what the total changed or could not tell apart: highlighted for the person to check
-        settled: pick !== null && !doubt.has(i),
+        settled,
+        asPrinted: settled && pick.swaps === 0,
         rows: f.rows,
       }
     })
@@ -1128,6 +1136,8 @@ function tableLines(
         sumHundredths: finite(sum),
         discountHundredths: null,
         settled: c.settled,
+        // only the split of three figures settles, and it is all printed
+        asPrinted: c.settled,
         rows: o.item.rows.slice(0, 1),
       }
     })
@@ -1529,6 +1539,7 @@ function classReceipt(rows: readonly TextRow[], lx: Lexicon): Laid {
       const pick = picks[i] ?? null
       const f = item.figures
       const sumAsRead = f.terminal ? (unpointed(f.sumS, 2)[0] ?? f.sumS) : f.sumS
+      const settled = pick !== null && !guessed.has(pick) && !doubt.has(i)
       return {
         printed: nameOf(names[i] ?? [], lx),
         hs: item.hs ?? lostHs,
@@ -1538,7 +1549,8 @@ function classReceipt(rows: readonly TextRow[], lx: Lexicon): Laid {
         priceHundredths: finite(pick?.price ?? (f.priceS === null ? null : hundredthsOf(f.priceS))),
         sumHundredths: finite(pick?.paid ?? blankSum ?? hundredthsOf(sumAsRead)),
         discountHundredths: 0,
-        settled: pick !== null && !guessed.has(pick) && !doubt.has(i),
+        settled,
+        asPrinted: settled && pick.swaps === 0,
         rows: [rows[first + item.at]].filter((row): row is TextRow => row !== undefined),
       }
     })
@@ -1808,7 +1820,9 @@ function withTwins(read: ReceiptText, lx: Lexicon): ReceiptText {
   if (!read.lines.some(twin)) return read
   return {
     ...read,
-    lines: read.lines.map((line) => (twin(line) ? { ...line, settled: false } : line)),
+    lines: read.lines.map((line) =>
+      twin(line) ? { ...line, settled: false, asPrinted: false } : line,
+    ),
   }
 }
 
