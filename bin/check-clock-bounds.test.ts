@@ -90,6 +90,84 @@ describe('rawBounds', () => {
     expect(rawBounds('a.test.ts', source)).not.toEqual([])
   })
 
+  // adversarial round 19 of MOL-266, Ф1–Ф3: an overage against zero, a generator, a callback a helper hands it
+  it.each([
+    [
+      'an overage against zero in a name',
+      `const slow = took[0] - 1_000 > 0\nexpect(slow).toBe(false)`,
+    ],
+    [
+      'a generator of the file',
+      `function* durations() {\nyield performance.now() - t0\n}\nfor (const ms of durations()) expect(ms).toBeLessThan(1_000)`,
+    ],
+    [
+      'a callback a helper of the file hands it',
+      `function timed(then: (ms: number) => void) {\nthen(performance.now() - t0)\n}\ntimed((ms) => {\nexpect(ms).toBeLessThan(1_000)\n})`,
+    ],
+  ])('finds a bound handed on — %s', (_, bound) => {
+    const source = `it('x', () => {\nconst took: number[] = []\nconst t0 = performance.now()\ntook.push(performance.now() - t0)\n${bound}\n})`
+    expect(rawBounds('a.test.ts', source)).not.toEqual([])
+  })
+
+  // review №32 and adversarial Ф4: a count beside a duration is a count, and only a store the file made holds one
+  it.each([
+    [
+      'a component handed a duration',
+      `await wrapper.setProps({ ms: d })\nexpect(wrapper.findAll('li').length).toBeLessThan(5)`,
+    ],
+    [
+      'fake time moved by one',
+      `vi.advanceTimersByTime(d)\nexpect(spy.mock.calls.length).toBeLessThan(3)`,
+    ],
+    [
+      'the size of a Map',
+      `const m = new Map<string, number>()\nm.set('a', d)\nexpect(m.size).toBeLessThan(3)`,
+    ],
+    [
+      'a logger given one',
+      `logger.info('took', d)\nexpect(logger.info.mock.calls.length).toBeLessThan(3)`,
+    ],
+    [
+      'an emitter given one',
+      `app.emit('tick', d)\nexpect(app.emit.mock.calls.length > 2).toBe(false)`,
+    ],
+    [
+      'the length of a store of durations',
+      `const rows: number[] = []\nrows.push(d)\nexpect(rows.length).toBeLessThan(3)`,
+    ],
+    [
+      'another field of an object',
+      `const report = { took: d, retries: 1 }\nexpect(report.retries).toBeLessThan(3)`,
+    ],
+    [
+      'another field of the rows, taken apart',
+      `const rows = [{ took: d, tries: 1 }]\nfor (const { tries } of rows) expect(tries).toBeLessThan(3)`,
+    ],
+    [
+      'a line that says it is no duration',
+      `// not a duration: a count of what was read\nexpect(d).toBeLessThan(3)`,
+    ],
+  ])('leaves alone what is no duration — %s', (_, code) => {
+    const source = `it('x', async () => {\nconst t0 = performance.now()\nconst d = performance.now() - t0\n${code}\n})`
+    expect(rawBounds('a.test.ts', source)).toEqual([])
+  })
+
+  it('still finds the duration a field of the same object or rows holds (Ф4)', () => {
+    expect(
+      lines(`
+        const t0 = performance.now()
+        const d = performance.now() - t0
+        const report = { took: d, retries: 1 }
+        expect(report.took).toBeLessThan(1_000)
+        const rows = [{ took: d, tries: 1 }]
+        for (const { took } of rows) expect(took).toBeLessThan(1_000)
+        for (const row of rows) expect(row.took).toBeLessThan(1_000)
+        expect(rows[0].took).toBeLessThan(1_000)
+        expect(Math.max(...rows.map((row) => row.took))).toBeLessThan(1_000)
+      `),
+    ).toEqual([5, 7, 8, 9, 10])
+  })
+
   it('finds entries read back, a deadline the other way round and the clock as a moment (Т3–Т5)', () => {
     expect(
       lines(`
