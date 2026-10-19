@@ -816,8 +816,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   ten seconds once, a live region ticking would talk over a person reaching for the button (81 v2
   asked for a label; declined, MOL-179 Р-5). **A «Вернуть» that waits for the server** — an exchange's,
   an income's (MOL-189) — is `busy` with its word, and with no connection not now saying why
-  (`waiting`); **the count stands still while it cannot be pressed** (owner's В-2 «а»), as under a
-  finger. **The words keep 7rem**: narrower, the count and «Вернуть» go under them together, at the
+  (`waiting`), or with its own word while another write of the screen is in the air (`inactive`);
+  **the count stands still while it cannot be pressed** (owner's В-2 «а»), as under a finger, and goes
+  on when `busy` ends with the strip still there — a «Вернуть» the server did not get stopped the
+  count for good, and the strip stood until the next request (review №2). **The words keep 7rem**: narrower, the count and «Вернуть» go under them together, at the
   right, and «Вернуть» wraps its own words — held on one line, the hidden «Возвращаем…» under
   «Вернуть» left the words 33 px at 320, a letter a line (MOL-189, `exchange.spec`).
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
