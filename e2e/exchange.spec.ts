@@ -417,9 +417,11 @@ test('«Как меняли» is whole on a phone, in both languages', async ({ 
   await page.locator('.dock').getByRole('button', { name: 'Записать обмен', exact: true }).click()
   const control = page.locator('dialog[open] fieldset.segmented')
   await expect(control).toContainText('Обменник')
-  const english = [
+  const english: string[] = [
     '—',
-    ...['bankCash', 'bankNoncash', 'exchanger'].map((key) => en.exchange.sheet[`channel_${key}`]),
+    ...['bankCash', 'bankNoncash', 'exchanger'].map(
+      (key) => en.exchange.sheet[`channel_${key}`] ?? '',
+    ),
   ]
   for (const width of [320, 360, 390]) {
     await page.setViewportSize({ width, height: 740 })
