@@ -121,7 +121,7 @@
     </form>
 
     <template #footer>
-      <p v-if="failed" class="failed" role="alert">{{ t('income.failed') }}</p>
+      <p v-if="failed || removeFailed" class="failed" role="alert">{{ t('income.failed') }}</p>
       <!-- Read again and not answered — the server or the connection — the version the sheet holds is
            the one from before the conflict: «Сейчас записано» by it would be untrue (MOL-188 №5). -->
       <div v-if="conflict && base" class="failed" role="alert">
@@ -271,6 +271,11 @@ export default defineComponent({
     stale: { type: Boolean, default: false },
     /** `@closed`: the sheet is put away — `BottomSheet`'s, passed on (a prop there, for its reasons). */
     onClosed: { type: Function as PropType<() => void>, default: undefined },
+    /**
+     * «Удалить» did not reach the server, its question put away meanwhile: said here, the sheet still up
+     * — the screen's word is under it (MOL-189, adversarial В2).
+     */
+    removeFailed: { type: Boolean, default: false },
     /** Reads that failed so far: a new one says the strip's same words again (MOL-181, C1). */
     attempt: { type: Number, default: 0 },
   },

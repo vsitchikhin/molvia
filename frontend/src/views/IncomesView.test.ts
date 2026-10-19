@@ -838,6 +838,71 @@ describe('IncomesView: recording, amending and removing', () => {
     expect(restoreIncome).not.toHaveBeenCalled()
   })
 
+  // Adversarial В1: a strip waiting behind the sheet of another income keeps waiting while that one
+  // is removed from it — and when that removal fails, until the sheets go.
+  it('a strip waiting behind another sheet waits through that sheet’s own failed removal', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    const other = row({ id: '5d1c6a2b-3e4f-4a5b-8c6d-7e8f9a0b1c2e', receivedOn: '2026-09-10' })
+    incomes.mockResolvedValue(
+      overview({ months: [{ month: '2026-09', sums: [], incomes: [row(), other] }] }),
+    )
+    let land: (answer: IncomesResponse) => void = () => undefined
+    let fail: (reason: unknown) => void = () => undefined
+    removeIncome
+      .mockReturnValueOnce(new Promise((resolve) => (land = resolve)))
+      .mockReturnValueOnce(new Promise((_, reject) => (fail = reject)))
+    const view = await render()
+    await askToRemove(view)
+    sheetButton(en.income.remove_sheet.confirm).click()
+    await flushPromises()
+    await putBothAway()
+    await view.findAll('.cards button.body')[1]?.trigger('click')
+    await risen()
+    land(overview({ months: [{ month: '2026-09', sums: [], incomes: [other] }] }))
+    await flushPromises()
+
+    sheetButton(en.income.sheet.remove).click()
+    await risen()
+    sheetButton(en.income.remove_sheet.confirm).click()
+    await flushPromises()
+    expect(document.querySelectorAll('dialog[open]')).toHaveLength(2)
+    expect(view.find('.undo-strip').exists()).toBe(false)
+    fail(new TypeError('network'))
+    await flushPromises()
+    expect(view.find('.undo-strip').exists()).toBe(false)
+    vi.advanceTimersByTime(10_000)
+
+    await putBothAway()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(view.get('.undo-strip .count').text()).toBe('10')
+    expect(restoreIncome).not.toHaveBeenCalled()
+  })
+
+  // Adversarial В2: «‹» while it removes, and it fails — the amendment still up says so itself; the
+  // screen's word is under the modal sheet.
+  it('a removal that fails after «‹» is said in the amendment still up', async () => {
+    incomes.mockResolvedValue(overview())
+    let fail: (reason: unknown) => void = () => undefined
+    removeIncome.mockReturnValueOnce(new Promise((_, reject) => (fail = reject)))
+    const view = await render()
+    await askToRemove(view)
+    sheetButton(en.income.remove_sheet.confirm).click()
+    await flushPromises()
+    const sheets = document.querySelectorAll('dialog[open]')
+    sheets[1]
+      ?.querySelector<HTMLButtonElement>(`button[aria-label="${en.nav.back_label}"]`)
+      ?.click()
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    await risen()
+    expect(document.querySelectorAll('dialog[open]')).toHaveLength(1)
+
+    fail(new TypeError('network'))
+    await flushPromises()
+    expect(document.querySelector('dialog[open] .failed[role="alert"]')?.textContent).toBe(
+      en.income.failed,
+    )
+  })
+
   // MOL-189 review №2, adversarial А1: the strip a failed «Bring back» leaves still runs out.
   it('a «Bring back» that failed lets the count go on, and the strip goes when it runs out', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })

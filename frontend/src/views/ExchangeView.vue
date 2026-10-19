@@ -191,7 +191,7 @@
     <!-- «Вернуть» over the strip, ten seconds, one look for every operation of «Деньги» (MOL-189,
          Ф-29). Whatever the screen became under it: removing the last exchange leaves the empty state
          (В-5). The strip puts the focus on «Вернуть» and says the removal itself. -->
-    <template v-if="removed && removed.id !== landing" #undo>
+    <template v-if="removed && !landing.includes(removed.id)" #undo>
       <UndoStrip
         :key="removed.id"
         :text="t('exchange.removed', { amounts: amountsOf(removed) })"
@@ -226,6 +226,7 @@
       :behind="behind"
       :stale="stale"
       :attempt="attempt"
+      :remove-failed="amendFailed"
       @remove="ask"
       @retry="retry"
       @closed="landed"
@@ -363,41 +364,48 @@ export default defineComponent({
     watch(removeOpen, (open) => {
       if (!open) removeFailed.value = false
     })
-    // The one being removed: its strip waits while a sheet of the amendment is up — its own, or one
-    // opened over another card while the answer was on its way: under a modal sheet «Вернуть» cannot
-    // be reached, and its ten seconds ran out there (adversarial Б2). One already standing stays.
-    const landing = ref<string | null>(null)
+    // The removals whose strip waits while a sheet of the amendment is up — its own, or one opened over
+    // another card while the answer was on its way: under a modal sheet «Вернуть» cannot be reached, and
+    // its ten seconds ran out there (adversarial Б2). Every one that waits, not the last: a second removal
+    // from the sheet it waits behind let the first strip under both sheets (В1). One standing stays.
+    const landing = ref<string[]>([])
     // The sheet of the amendment is on the screen: from its opening until `@closed`, never by the
     // prop alone, which goes false while the sheet is still on its way out.
     const sheetUp = ref(false)
     watch(sheetOpen, (open) => {
       if (open) sheetUp.value = true
     })
+    // A removal that failed once its question was put away, said in the amendment still up over the
+    // same exchange: the screen's word is under the modal sheet, read by nobody (В2).
+    const amendFailed = ref(false)
     let removing = false
     async function confirmRemove(): Promise<void> {
       const exchange = target.value
       if (!exchange || exchanges.busy.value) return
       removeFailed.value = false
-      landing.value = exchange.id
+      amendFailed.value = false
+      landing.value = [...landing.value, exchange.id]
       removing = true
       await exchanges.remove(exchange)
       removing = false
-      if (exchanges.removed.value?.id !== exchange.id) {
-        landing.value = null
+      const failed = exchanges.removed.value?.id !== exchange.id
+      if (failed) {
+        landing.value = landing.value.filter((id) => id !== exchange.id)
         // Said in the question only while it stands: put away meanwhile, the next one opened — of
-        // another exchange too — read out a failure nobody pressed for (adversarial Б1). The screen
-        // says it above the list either way.
+        // another exchange too — read out a failure nobody pressed for (adversarial Б1).
         removeFailed.value = removeOpen.value
-        return
+        amendFailed.value =
+          !removeOpen.value && sheetOpen.value && editing.value?.id === exchange.id
       }
       // Closing the amendment closes the question over it too, in one step of the history: the
       // stack steps over the sheets above the one closed. Each closed on its own would step back twice.
-      if (sheetOpen.value && editing.value?.id === exchange.id) sheetOpen.value = false
-      if (!sheetUp.value) landing.value = null
+      if (!failed && sheetOpen.value && editing.value?.id === exchange.id) sheetOpen.value = false
+      if (!sheetUp.value) landing.value = []
     }
     function landed(): void {
       sheetUp.value = false
-      if (!removing) landing.value = null
+      amendFailed.value = false
+      if (!removing) landing.value = []
     }
 
     const online = ref(navigator.onLine)
@@ -528,6 +536,7 @@ export default defineComponent({
       confirmRemove,
       removeFailed,
       landing,
+      amendFailed,
       landed,
       online,
       preferenceOptions,
