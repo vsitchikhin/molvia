@@ -398,8 +398,10 @@ device, private always. The rate is what the two amounts say and is not stored b
   MOL-253): until then the question says «Удаляем…» and the card is not opened again under it — closed
   on the tap, the removal was seen nowhere, the card opened again over an exchange the answer then
   took, and its «Сохранить правку» made the removal final; a removal that failed leaves both sheets,
-  what was typed and the word in the question. The strip comes once the sheets are gone, or its focus
-  and words land in a sheet on its way out. **Only where the screen offers «Вернуть» after it** (owner's В-1 «а»): the same sheet opened
+  what was typed and the word in the question — in the question only while it stands: put away
+  meanwhile, the next question read out a failure nobody pressed for (round 2, Б1). The strip comes once
+  no sheet of the amendment is up — its own, or one opened over another card while the answer was on
+  its way: under a modal sheet «Вернуть» cannot be reached, and its ten seconds ran out there (Б2). **Only where the screen offers «Вернуть» after it** (owner's В-1 «а»): the same sheet opened
   from an account's journal, «не попали» or a check amends and never removes. **«Вернуть» is the
   `UndoStrip` over the docked strip** (Ф-29), ten seconds, then the screen offers it no more — the
   server keeps the mark until its timer or the screen's next request, as below; at work it says
