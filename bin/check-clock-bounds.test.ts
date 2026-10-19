@@ -957,4 +957,57 @@ describe('rawBounds', () => {
       ),
     ).toBe(false)
   })
+
+  // adversarial round 12 of MOL-266: М1–М2
+  it.each([
+    [
+      'a default inside what a parameter takes apart',
+      `function realClock(): typeof vi {\nreturn vi.useRealTimers()\n}\nfunction prepare({ utils = realClock() } = {}): typeof vi {\nreturn utils\n}\nbeforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\nprepare()\n${REAL}\n})`,
+    ],
+    [
+      'a field of a class',
+      `class Clock {\nreadonly utils = vi.useRealTimers()\n}\nbeforeEach(() => {\nvi.useFakeTimers()\n})\nit('x', async () => {\nnew Clock()\n${REAL}\n})`,
+    ],
+    ...[
+      "const { stubGlobal: put } = vi\nbeforeEach(() => {\nvi.useFakeTimers()\nput('performance', REAL_CLOCK)\n})",
+      "const { defineProperty: define } = Object\nbeforeEach(() => {\nvi.useFakeTimers()\ndefine(performance, 'now', { value: realNow })\n})",
+      "const O = Object\nbeforeEach(() => {\nvi.useFakeTimers()\nO.defineProperty(performance, 'now', { value: realNow })\n})",
+    ].map((back) => [
+      `vi or Object under another name: ${back.slice(0, back.indexOf('\n'))}`,
+      `${back}\nit('x', async () => {\n${REAL}\n})`,
+    ]),
+  ])('finds a bound on real time beside fake timers — %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toHaveLength(1)
+  })
+
+  it('reads a setup file with what it imports as one, and a list of setup files written out (М3)', () => {
+    const files: Record<string, string> = {
+      'bot/setup.ts':
+        "import { afterEach } from 'vitest'\nimport { realClock } from './clock'\nafterEach(realClock)",
+      'bot/clock.ts': 'export const realClock = (): void => {\nglobalThis.performance = REAL\n}',
+    }
+    const read = (path: string): string | undefined => files[path]
+    const at = (text: string) => unsureDirectories([{ path: 'bot/vitest.config.ts', text }], read)
+    expect(at("setupFiles: ['./setup.ts']")).toEqual(['bot'])
+    expect(at('setupFiles: [SETUP]')).toEqual(['bot'])
+    expect(at('setupFiles: [`./setup.ts`]')).toEqual(['bot'])
+  })
+
+  it('reads a command line by its words (М4, М5)', () => {
+    const scripts = JSON.stringify({ scripts: { test: 'vitest run', check: 'npm run test --' } })
+    const unsure = (line: string) =>
+      vitestFlagsUnsure(
+        [scripts, line],
+        ['bot/vitest.config.ts', 'backend/vitest.integration.config.ts'],
+      )
+    expect(unsure('npx vitest run --project "bot" --sequence.concurrent')).toBe(true)
+    expect(unsure('test:\n\tnpx vitest run \\\n\t\t--sequence.concurrent')).toBe(true)
+    expect(unsure('test:\n\tnpx vitest run $(FLAGS)')).toBe(true)
+    expect(unsure('npm run -w @molvia/bot test -- --sequence.concurrent')).toBe(true)
+    expect(unsure('npm --prefix bot test -- --sequence.concurrent')).toBe(true)
+    expect(unsure('npm run check -- --sequence.concurrent')).toBe(true)
+    expect(unsure('npx vitest run -c test.config.ts')).toBe(true)
+    expect(unsure('npx vitest run -c vitest.integration.config.ts')).toBe(false)
+    expect(unsure('npm run -w @molvia/bot test')).toBe(false)
+  })
 })
