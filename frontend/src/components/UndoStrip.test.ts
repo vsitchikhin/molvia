@@ -119,4 +119,37 @@ describe('UndoStrip', () => {
     await strip.get('button').trigger('click')
     expect(strip.emitted('restore')).toBeUndefined()
   })
+
+  // MOL-189 review №2, adversarial А1: the server did not get it, the strip stays — and its ten
+  // seconds go on from where the tap stopped them, never frozen for good.
+  it('a «Вернуть» that waited and came back with nothing lets the count go on', async () => {
+    const strip = render({ busyLabel: 'Возвращаем…' })
+    await vi.advanceTimersByTimeAsync(3_000)
+    await strip.get('button').trigger('click')
+    expect(strip.emitted('restore')).toHaveLength(1)
+    await strip.setProps({ busy: true })
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(strip.find('.count').text()).toBe('7')
+    await strip.setProps({ busy: false })
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    await vi.advanceTimersByTimeAsync(6_000)
+    expect(strip.find('.count').text()).toBe('1')
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(strip.emitted('expire')).toHaveLength(1)
+  })
+
+  // Adversarial А2: another write of the screen in the air — its answer makes the removal final.
+  it('another write in the air: not now in its own words, no tap, and the count stands still', async () => {
+    const strip = render({ inactive: true })
+    await vi.advanceTimersByTimeAsync(3_000)
+    const button = strip.get('button')
+    expect(button.text()).toBe('Вернуть')
+    expect(button.attributes('aria-disabled')).toBe('true')
+    expect(strip.find('.count').text()).toBe('10')
+    await button.trigger('click')
+    expect(strip.emitted('restore')).toBeUndefined()
+    await strip.setProps({ inactive: false })
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(strip.emitted('expire')).toHaveLength(1)
+  })
 })

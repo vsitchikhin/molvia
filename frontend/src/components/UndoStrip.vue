@@ -17,7 +17,7 @@
         class="restore"
         :busy="busy"
         :busy-label="busyLabel"
-        :inactive="waiting"
+        :inactive="waiting || inactive"
         @click="restore"
       >
         <template #icon><IconUndo /></template>
@@ -28,7 +28,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { defineComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import IconUndo from '~icons/mdi/undo-variant'
 import AppButton from '@/components/AppButton.vue'
@@ -74,6 +74,11 @@ export default defineComponent({
     /** «Вернуть» cannot be pressed now — no connection — and says why in `waitingAction`. */
     waiting: { type: Boolean, default: false },
     waitingAction: { type: String, default: '' },
+    /**
+     * Another write of the screen is in the air (MOL-189, adversarial А2): its answer makes the removal
+     * final, and a «Вернуть» pressed meanwhile would be sent nowhere — not now, with its own word.
+     */
+    inactive: { type: Boolean, default: false },
   },
   /** `tick`: what is left, every second, held or not — a screen taking the strip over goes on from it. */
   emits: ['restore', 'expire', 'tick'],
@@ -87,7 +92,7 @@ export default defineComponent({
     const announce = useAnnouncer()
 
     function tick(): void {
-      if (!held && !focused && !props.waiting && !props.busy) left.value -= 1
+      if (!held && !focused && !props.waiting && !props.busy && !props.inactive) left.value -= 1
       emit('tick', left.value)
       if (left.value <= 0) {
         clearInterval(timer)
@@ -118,6 +123,17 @@ export default defineComponent({
       clearInterval(timer)
       emit('restore')
     }
+
+    // A «Вернуть» that waited for the server and did not get it back leaves the strip: the count goes
+    // on from where it stood, or the strip stayed for good, its ten seconds stopped (MOL-189 №2).
+    watch(
+      () => props.busy,
+      (busy, was) => {
+        if (busy || !was) return
+        clearInterval(timer)
+        timer = setInterval(tick, 1000)
+      },
+    )
 
     onMounted(async () => {
       timer = setInterval(tick, 1000)
