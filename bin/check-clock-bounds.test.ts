@@ -23,6 +23,58 @@ describe('rawBounds', () => {
     ).toEqual([3, 4, 6, 7, 10])
   })
 
+  // adversarial round 17 of MOL-266, Т1–Т5: what an array hands on, a comparison no assertion reads where it
+  // stands, entries read back, a deadline the other way round, the clock as a moment of the epoch
+  it.each([
+    ['for of', `for (const d of took) expect(d).toBeLessThan(1_000)`],
+    ['forEach', `took.forEach((d) => {\nexpect(d).toBeLessThan(1_000)\n})`],
+    ['every', `expect(took.every((d) => d < 1_000)).toBe(true)`],
+    ['some', `expect(took.some((d) => d > 1_000)).toBe(false)`],
+    ['filter', `expect(took.filter((d) => d > 1_000)).toHaveLength(0)`],
+    [
+      'every, by a function of the file',
+      `const fast = (d: number) => d < 1_000\nexpect(took.every(fast)).toBe(true)`,
+    ],
+    ['a comparison kept in a name', `const slow = took[0] > 1_000\nexpect(slow).toBe(false)`],
+    ['a ternary', `expect(took[0] > 1_000 ? 'slow' : 'fast').toBe('fast')`],
+    [
+      'a function of the file handed the duration',
+      `function slow(d: number) {\nreturn d > 1_000\n}\nexpect(slow(took[0])).toBe(false)`,
+    ],
+  ])('finds a bound on what an array of durations holds — %s', (_, bound) => {
+    const source = `it('x', () => {\nconst took: number[] = []\nconst t0 = performance.now()\ntook.push(performance.now() - t0)\n${bound}\n})`
+    expect(rawBounds('a.test.ts', source)).not.toEqual([])
+  })
+
+  it('finds entries read back, a deadline the other way round and the clock as a moment (Т3–Т5)', () => {
+    expect(
+      lines(`
+        performance.measure('x', 'a', 'b')
+        expect(performance.getEntriesByName('x')[0].duration).toBeLessThan(1_000)
+        const [entry] = performance.getEntriesByType('measure')
+        expect(entry.duration).toBeLessThan(1_000)
+        const t0 = performance.now()
+        const t1 = performance.now()
+        expect(t1 - 1_000).toBeLessThan(t0)
+        const e0 = performance.timeOrigin + performance.now()
+        expect(performance.timeOrigin + performance.now() - e0).toBeLessThan(1_000)
+      `),
+    ).toEqual([3, 5, 8, 10])
+  })
+
+  it('leaves alone a wait, a mark against zero and a lower bound kept apart', () => {
+    expect(
+      lines(`
+        const t0 = performance.now()
+        while (performance.now() - t0 < 300) {}
+        let failAt = -1
+        if (failAt < 0) failAt = performance.now() - t0
+        expect(failAt).toBeGreaterThanOrEqual(250)
+        expect(performance.now() - t0 >= 250).toBe(true)
+      `),
+    ).toEqual([])
+  })
+
   it('reads process.uptime() as a clock, by its own name and taken apart (adversarial round 16, Р4)', () => {
     expect(
       lines(`

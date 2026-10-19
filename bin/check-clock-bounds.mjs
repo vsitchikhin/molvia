@@ -8,15 +8,18 @@
 // scope: the age of a stamp held under a name another test gave a reading is left alone.
 //
 // A reading of the clock: `performance.now()`, `Date.now()`, `process.hrtime()` and its `bigint()`,
-// `process.uptime()`, `new Date()` and its `getTime()`, through `globalThis`, `Number()`, `Math.floor(… / 1000)`, under another
-// name (`perf_hooks`' and `node:process`' own, `{ now } = Date`, `.bind`); a function of the file that
+// `process.uptime()`, `performance.timeOrigin` plus one, `new Date()` and its `getTime()`, through
+// `globalThis`, `Number()`, `Math.floor(… / 1000)`, under another name (`perf_hooks`' and `node:process`'
+// own, `{ now } = Date`, `.bind`); a function of the file that
 // returns one (`const now = () => performance.now()`); a name, a field, a field of a class
-// (`this.start`) or a shorthand field given one; an array of them — pushed, by index, `at()`. A duration:
+// (`this.start`) or a shorthand field given one; an array of them — pushed, by index, `at()`, each element
+// `for … of` it or a callback of its own (`forEach`, `every`, `some`, `filter`, …) takes. A duration:
 // a subtraction of two readings, or of a deadline from a reading, and whatever is made of it — a name, a
 // field, an object or array it is put in (`=`, `+=`, `push`) or taken apart from, a function of the file,
 // a method or a getter that returns it, a call of one that subtracts a reading it takes from the clock
-// however it rounds (`since(t0)`), `process.hrtime(t0)`, `performance.measure()`. A budget is a duration
-// taken from a number (`200 - d`, `left -= d`, `deadline - Date.now()`) or divided into one (a rate,
+// however it rounds (`since(t0)`), a parameter of a function of the file handed one, `process.hrtime(t0)`,
+// `performance.measure()` and the entries read back (`getEntriesByName`, `getEntriesByType`). A budget is
+// a duration taken from a number (`200 - d`, `left -= d`, `deadline - Date.now()`) or divided into one (a rate,
 // `1000 / ms`), kept through `Math.max` and `Math.min`, and a lower bound on it is an upper bound on the
 // duration.
 //
@@ -26,7 +29,10 @@
 // `expect.soft` or any `assert`, asserted true or false (`toBe(false)`, `isFalse`, `!`, `&&`); `toSatisfy`
 // with a comparison, inline or a function of the file; `if (d > n)` that throws or fails; a call of a
 // function of the file that bounds its parameter so — and a deadline: a reading bounded by a reading plus
-// a number (`expect(Date.now()).toBeLessThan(deadline)`). A lower bound is no breach of time, two readings
+// a number (`expect(Date.now()).toBeLessThan(deadline)`), or a reading less a number below a reading
+// (`expect(t1 - 1_000).toBeLessThan(t0)`). And a comparison of time no assertion reads where it stands —
+// kept in a name, returned by a callback, a condition — in doubt a bound; but a loop's condition, a wait,
+// and a duration against zero, a mark, are not. A lower bound is no breach of time, two readings
 // against each other included; the age of a stamp — the clock against a moment a row holds — is no
 // duration, as one side is not the clock.
 //
@@ -59,7 +65,8 @@ const CLOCK =
 /** What a reading is still a reading through: a cast, and whole seconds of it. */
 const SAME = /^(Number|BigInt|Math\.(round|floor|ceil|trunc))$/
 /** A duration the platform measures itself. */
-const MEASURED = /^(performance\.measure|process\.hrtime)$/
+const MEASURED =
+  /^(performance\.(measure|getEntries|getEntriesByName|getEntriesByType)|process\.hrtime)$/
 /** What another name may stand for: a clock, or what holds one. */
 const CLOCK_PATHS = new Set([
   'performance',
@@ -98,6 +105,24 @@ const FALSY = new Set(['toBeFalsy', 'false', 'notOk'])
 /** What asserts its subject equal to its argument: `expect(c).toBe(false)`. */
 const EQUAL = new Set(['toBe', 'toEqual', 'toStrictEqual', 'equal', 'equals', 'eq', 'eql'])
 const EXPECT = new Set(['expect', 'expect.soft', 'chai.expect'])
+/** The methods of an array that hand each element to their callback, by the places it takes them in. */
+const ITERATE = new Map([
+  ...[
+    'forEach',
+    'every',
+    'some',
+    'filter',
+    'find',
+    'findLast',
+    'findIndex',
+    'findLastIndex',
+    'map',
+    'flatMap',
+  ].map((name) => [name, [0]]),
+  ['reduce', [1]],
+  ['reduceRight', [1]],
+  ['sort', [0, 1]],
+])
 const LESS = [ts.SyntaxKind.LessThanToken, ts.SyntaxKind.LessThanEqualsToken]
 const MORE = [ts.SyntaxKind.GreaterThanToken, ts.SyntaxKind.GreaterThanEqualsToken]
 
@@ -265,6 +290,12 @@ export function rawBounds(fileName, source) {
     // calls.at(-1) ?? Infinity
     if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken)
       return isReading(n.left)
+    // performance.timeOrigin + performance.now(): the clock as a moment of the epoch (adversarial Т5)
+    if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+      const origin = (side) =>
+        ts.isPropertyAccessExpression(bare(side)) && resolvedText(side) === 'performance.timeOrigin'
+      return (origin(n.left) && isReading(n.right)) || (origin(n.right) && isReading(n.left))
+    }
     // marks[1]
     if (ts.isElementAccessExpression(n)) return isReading(n.expression)
     const key = keyOf(n)
@@ -283,6 +314,18 @@ export function rawBounds(fileName, source) {
     }
     const key = ts.isIdentifier(n) || ts.isPropertyAccessExpression(n) ? keyOf(n) : undefined
     return key !== undefined && deadlines.has(key)
+  }
+  /** A reading less what is no clock: `t1 - 1_000`, which held below a reading is a deadline (adversarial Т4). */
+  const isLowered = (node) => {
+    const n = core(node)
+    return (
+      ts.isBinaryExpression(n) &&
+      n.operatorToken.kind === ts.SyntaxKind.MinusToken &&
+      (isReading(n.left) || isLowered(n.left)) &&
+      !isReading(n.right) &&
+      !isDeadline(n.right) &&
+      sign(n.right) === 0
+    )
   }
   /** The place of a parameter of the function `fn` that `node` names, or -1. */
   const parameterAt = (node, fn) => {
@@ -419,18 +462,88 @@ export function rawBounds(fileName, source) {
     return found
   }
 
+  /** The function of this file an expression is or names: `(d) => …`, `fast`. */
+  const functionOf = (expression) => {
+    const e = bare(expression)
+    if (ts.isArrowFunction(e) || ts.isFunctionExpression(e)) return e
+    if (!ts.isIdentifier(e)) return undefined
+    const declaration = checker.getSymbolAtLocation(e)?.valueDeclaration
+    if (declaration && ts.isFunctionDeclaration(declaration)) return declaration
+    const init = declaration && ts.isVariableDeclaration(declaration) && declaration.initializer
+    return init && (ts.isArrowFunction(bare(init)) || ts.isFunctionExpression(bare(init)))
+      ? bare(init)
+      : undefined
+  }
+  /** The comparisons an assertion reads, through `!`, `&&` and `||`: each is judged there, by its truth. */
+  const judged = new Set()
+  const judge = (node) => {
+    const n = node && bare(node)
+    if (!n) return
+    if (ts.isPrefixUnaryExpression(n) && n.operator === ts.SyntaxKind.ExclamationToken)
+      return judge(n.operand)
+    if (!ts.isBinaryExpression(n)) return
+    const op = n.operatorToken.kind
+    if (op === ts.SyntaxKind.AmpersandAmpersandToken || op === ts.SyntaxKind.BarBarToken) {
+      judge(n.left)
+      judge(n.right)
+    } else if (LESS.includes(op) || MORE.includes(op)) judged.add(n)
+  }
+  /** Whether a comparison is what a loop waits on: `while (performance.now() - t0 < 300)` is a wait, no bound. */
+  const loopCondition = (node) => {
+    let n = node
+    for (;;) {
+      const p = n.parent
+      const logical =
+        ts.isBinaryExpression(p) &&
+        [ts.SyntaxKind.AmpersandAmpersandToken, ts.SyntaxKind.BarBarToken].includes(
+          p.operatorToken.kind,
+        )
+      const not = ts.isPrefixUnaryExpression(p) && p.operator === ts.SyntaxKind.ExclamationToken
+      if (!ts.isParenthesizedExpression(p) && !logical && !not) break
+      n = p
+    }
+    const p = n.parent
+    return (
+      ((ts.isWhileStatement(p) || ts.isDoStatement(p)) && p.expression === n) ||
+      (ts.isForStatement(p) && p.condition === n)
+    )
+  }
+  /** Whether a comparison sets a duration, a budget or a deadline against something. */
+  const comparesTime = (n) => {
+    // against zero or below it a duration is told from a mark, `failAt < 0`: no time is bounded so
+    const zero = (side) => {
+      const v = bare(side)
+      return (
+        (ts.isNumericLiteral(v) && Number(v.text) === 0) ||
+        (ts.isPrefixUnaryExpression(v) && v.operator === ts.SyntaxKind.MinusToken)
+      )
+    }
+    if (zero(n.left) || zero(n.right)) return false
+    if (sign(n.left) !== 0 || sign(n.right) !== 0) return true
+    const point = (side) => isReading(side) || isDeadline(side) || isLowered(side)
+    return point(n.left) && point(n.right) && !(isReading(n.left) && isReading(n.right))
+  }
+
   /** What a node asserts, as pairs held `small < big`; a side left out is any value. */
   const boundedAbove = (node) => {
     // if (d > n) throw …, if (d > n) expect.fail(…)
-    if (ts.isIfStatement(node) && fails(node.thenStatement)) return asserted(node.expression, false)
+    if (ts.isIfStatement(node) && fails(node.thenStatement)) {
+      judge(node.expression)
+      return asserted(node.expression, false)
+    }
     const pairs = []
     if (!ts.isCallExpression(node)) return pairs
     const callee = calleeText(node)
     // expect(d < n).toBe(true), expect(d > n).toBe(false), expect.soft(n > d).toBeTruthy()
-    if (EXPECT.has(callee)) pairs.push(...asserted(node.arguments[0], expectedTruth(node)))
+    if (EXPECT.has(callee)) {
+      judge(node.arguments[0])
+      pairs.push(...asserted(node.arguments[0], expectedTruth(node)))
+    }
     // assert(d < n), assert.isFalse(d > n), assert.strictEqual(d < n, true)
-    if (/^(chai\.)?assert(\.\w+)?$/.test(callee))
+    if (/^(chai\.)?assert(\.\w+)?$/.test(callee)) {
+      judge(node.arguments[0])
       pairs.push(...asserted(node.arguments[0], assertedTruth(callee, node)))
+    }
     // assert.isBelow(d, n), assert.isAtMost(d, n), assert.isAbove(n, d), assert.isAtLeast(n, d)
     if (/^assert\.(isBelow|isAtMost)$/.test(callee) && node.arguments[0])
       pairs.push({ small: node.arguments[0], big: node.arguments[1] })
@@ -471,7 +584,11 @@ export function rawBounds(fileName, source) {
   const breaks = ({ small, big }) =>
     (small !== undefined && sign(small) === 1) ||
     (big !== undefined && sign(big) === -1) ||
-    (small !== undefined && big !== undefined && isReading(small) && isDeadline(big))
+    (small !== undefined && big !== undefined && isReading(small) && isDeadline(big)) ||
+    (small !== undefined &&
+      big !== undefined &&
+      isLowered(small) &&
+      (isReading(big) || isDeadline(big)))
 
   const enclosingFunction = (node) => {
     let n = node.parent
@@ -698,6 +815,40 @@ export function rawBounds(fileName, source) {
           }
         }
       }
+      // for (const d of took): each element is what the array holds (adversarial Т1)
+      if (ts.isForOfStatement(node) && ts.isVariableDeclarationList(node.initializer)) {
+        const [declaration] = node.initializer.declarations
+        if (declaration && ts.isIdentifier(declaration.name)) {
+          const key = symbolKey(declaration.name)
+          if (isReading(node.expression)) learn(key, readings)
+          else if (carries(node.expression)) learn(key, carriers)
+        }
+      }
+      if (ts.isCallExpression(node)) {
+        /** A parameter of a function given what a value is: a reading or a duration. */
+        const hand = (fn, place, value) => {
+          const parameter = fn.parameters[place]
+          if (!parameter || !ts.isIdentifier(parameter.name)) return
+          // a helper that bounds the parameter is refused where it is called, once
+          const bounded = declaredKey(fn)
+          if (bounded !== undefined && bounders.get(bounded)?.includes(place)) return
+          const key = symbolKey(parameter.name)
+          if (isReading(value)) learn(key, readings)
+          else if (carries(value)) learn(key, carriers)
+        }
+        // took.forEach((d) => …), took.every(fast): the callback is handed what the array holds (Т1)
+        const method = ts.isPropertyAccessExpression(node.expression)
+          ? ITERATE.get(node.expression.name.text)
+          : undefined
+        const callback = method && node.arguments[0] && functionOf(node.arguments[0])
+        if (callback) for (const place of method) hand(callback, place, node.expression.expression)
+        // slow(took): a function of the file is handed what each argument is (Т2)
+        const called = functionOf(node.expression)
+        if (called)
+          node.arguments.forEach((argument, place) => {
+            hand(called, place, argument)
+          })
+      }
       for (const { small } of boundedAbove(node)) {
         const fn = enclosingFunction(node)
         const at = fn && small !== undefined ? parameterAt(small, fn) : -1
@@ -714,6 +865,17 @@ export function rawBounds(fileName, source) {
     `${String(sf.getLineAndCharacterOfPosition(node.getStart()).line + 1)}: ${node.getText(sf).split('\n')[0]}`
   const walk = (node) => {
     let raw = boundedAbove(node).some((pair) => breaks(pair))
+    // a comparison of time no assertion reads where it stands — kept in a name, handed to a callback, a
+    // condition — is held as a bound: in doubt it is one, and `expectWithin` is its lawful spelling (Т1, Т2)
+    if (
+      !raw &&
+      ts.isBinaryExpression(node) &&
+      (LESS.includes(node.operatorToken.kind) || MORE.includes(node.operatorToken.kind)) &&
+      !judged.has(node) &&
+      !loopCondition(node) &&
+      comparesTime(node)
+    )
+      raw = true
     if (!raw && ts.isCallExpression(node)) {
       const key = keyOf(node.expression)
       const places = key === undefined ? undefined : bounders.get(key)
