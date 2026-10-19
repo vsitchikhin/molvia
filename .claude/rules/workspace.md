@@ -219,11 +219,12 @@ of the measure and with every test merged. So CI checks every run instead (owner
   none beside another running, and a bound without it is refused rather than kept on the wrong test.
   **It never refuses fake time** (review №12, adversarial В3): a number does not say which clock it came
   from, and a refusal there left a bound on the real clock of a test that fakes only `Date` with no lawful
-  spelling. A bound met where fake timers replaced every clock the module found is kept marked `fake`, printed,
-  and held to nothing; with one clock left real it is held as real. **The price, named:** with every clock
-  fake and moving with real time (`shouldAdvanceTime`), or a clock kept under another name before the fake,
-  the duration is real and still held to nothing; a bound on the fake `Date` of a test that leaves
-  `performance` real is held as real — it is an ordinary `expect`, which the parse lets through.
+  spelling. A bound met while vitest's fake timers are on (`vi.isFakeTimers()`) and have replaced every clock
+  the module found is kept marked `fake`, printed, and held to nothing; with one clock left real, or every one
+  replaced by hand with the fake timers off, it is held as real. **The price, named:** with every clock fake
+  and moving with real time (`shouldAdvanceTime`), or a clock kept under another name before the fake, the
+  duration is real and still held to nothing — the run does not say how fake time moves, and the repository's
+  `shouldAdvanceTime` fakes `Date` alone.
 - **`bin/check-clock-bounds.mjs` refuses the upper bounds on a duration it knows**, found by parsing, never by
   a line's pattern (a pattern missed three of eighteen, review of MOL-243, Р10-А1); **the lists are in its
   head**, and two rounds of review found forty spellings past the first one — so the claim is what it lists,
@@ -236,71 +237,19 @@ of the measure and with every test merged. So CI checks every run instead (owner
   bounded by vitest's, chai's and `assert`'s forms, a comparison asserted true or false (`toBe(false)`,
   `isFalse`, `!`, `&&`), `toSatisfy`, `if … throw`, a helper bounding its parameter, and a deadline — a reading
   held below a reading plus a number. Two readings against each other are a lower bound (adversarial В4). Names are resolved by TypeScript's binder, so the age of a stamp held under a name
-  another test gave a reading is left alone: one side is not the clock. **Fake time is no duration** (adversarial Б2:
-  `bot/src/assemble` bounds a retry on fake time): a bound is let go only where every clock its values are read
-  from is one fake timers hold still at the bound — each value followed to the clocks it was read from, so a
-  `process` or `performance` elsewhere in the file changes nothing (В3). What fakes a clock there is read in the
-  order vitest runs it (review №13, В2), and **in doubt a clock is real** (review №15, adversarial Г1): a bound
-  refused is still lawful through `expectWithin`, a bound let go on real time is held by nobody. The file's body
-  whole and then its suites' bodies, as vitest collects them (adversarial Д1), then the `beforeAll` of each
-  suite outwards in — both only where no other test, no other hook, no function one of them calls and not the
-  test itself touches the timers: `each`, `retry` and `repeats` run a test again from where it ended (Д3) —
-  then the `beforeEach` in the order they are registered, a helper's where it is called (Д2), then the test's
-  own statements before the bound, a helper of the file they call included. What may not run — a branch, a
-  loop, a try that may stop anywhere — keeps only what both ways hold still; a `finally` always runs; anything
-  else that may touch the timers — `? :`, `&&`, a callback handed to a call, a function called where it
-  stands — lets them go (review №17, Д4). A bound in a hook, a helper, `onTestFinished`, a callback not awaited
-  where it is written (Е4) or one handed to a function of the file that touches the timers starts from real
-  clocks: what runs around it is not read. **And a file is read so only where it touches the timers in ways
-  the order can be read in** (adversarial round 6): every mention of `useFakeTimers`, `useRealTimers` or
-  `setTimerTickMode` a call in the file's body, a callback or a function of the file — not a reference
-  handed to a hook or kept under another name, not a string, a method or a class — no hook or test imported
-  under another name, no fixture (`test.extend`, run after `beforeEach`), no hook given anything but a function
-  of the file, no `vi.setConfig` (it changes what a later `useFakeTimers()` fakes), no `it.beforeEach`, no
-  timer call handed to a call that keeps it for later (`cleanups.push(() => vi.useRealTimers())`), no
-  concurrent tests, by `.concurrent` or in the options (`{ concurrent: true }`), and no options a test or a
-  suite takes under a name or from a call, a timeout named by a number of the file excepted — the clocks are
-  one — and no config of the file's directory that names `fakeTimers`, `concurrent` anywhere but as
-  `concurrent: false`, `extends`, reads a file or takes settings from a file of this repository, or has a setup
-  file that touches the timers, itself or by what it imports — `./…`, `@/…`, a workspace package and a `#…`
-  subpath followed by their `package.json`, as Node resolves them. A config and a setup file are parsed, and
-  each counts as read only where every module it loads is a static `import … from '…'` or `import '…'`: an
-  `import()`, a `require`, `createRequire`, `vi.importActual`, `import.meta.glob`, anything that leads nowhere
-  is unsure (review №23). No command line of the repository may give vitest a setting either — a word after
-  `vitest` other than the command, a config, a project, a report or a file (`--sequence.concurrent`) leaves
-  every directory unsure (read by the check's own run, `unsureDirectories`, `vitestFlagsUnsure`; adversarial
-  rounds 6–13, review №19–24) — every place a command is written, the scripts, the Makefile, the shell
-  scripts, the workflows and actions; a command read by its words, a YAML value with every line under it, `\`
-  lines joined, a comment, an assignment's value and what `echo` or `printf` prints as data — a quoted command
-  anywhere else, after `sh -c` or `eval`, still a command (review №25) — a word with `$` unread, vitest by any
-  name its program goes by (`vitest@…`, `vitest.mjs`), `xargs` before it unsure, npm's `--` and `node --run`'s
-  handing flags to a script that runs vitest — npm found by its own commands, through another script — and a
-  `-c` only to a config the check reads, by its whole path (№26). A setup file is read
-  with every file it imports as one: vitest at hand in any of them and a clock, a spy, the global object or a
-  module loader named in any is unsure (№24, М3) — vitest at hand by an import, `vitest/globals` or a config
-  that sets `globals` (Н3) — and so is a list of setup files not written out as strings. Nor may a test file put a
-  clock back by hand — `vi.stubGlobal`, `Object.defineProperty(globalThis, …)`, a spy on a clock, an
-  assignment to one — or under another name: a member of `vi`, `Object.defineProperty` and its kin, or the
-  global object referred to without being called or read through, `vi`, `Object` or `Reflect` taken apart,
-  `Object` or `Reflect` given another name, `vi` handed anywhere as a value; nor touch the timers in a default
-  of a parameter or of what it takes apart, in a field, a static block, the `extends` or a decorator of a class
-  — which run at the call, at `new` or where the class stands — by a function of the file too; nor name `Object`
-  or `Reflect` anywhere but to read a member of it, nor hand a clock — `performance`, `Date`, `process` — as a
-  value, nor assign one by a computed key (К1, К2, Л1, Л2, М1, М2, Н1, Н2, О1, О2). A function of the file that touches
-  the timers, named anywhere but as a call or handed to a hook — in an array, a field, an alias, handed to a
-  call that keeps it — is as a timer call kept there (З2, И1). A callback
-  counts as run where it is written only when the call is known to run it before it settles — `vi.waitFor`,
-  `vi.waitUntil`, `expect.poll`, an awaited `then` on what touches no timers — not any awaited call, which may
-  only keep it (Ж4), and not a `then` on what lets go, which runs first (З1). Anywhere else no bound in the file is let go as fake. Each round found the parse reading «what touches
-  the timers» by a name, and a name has more spellings than any list: this ends the class, not a spelling. `useRealTimers()` lets
-  go, `toFake` and `toNotFake` choose, `shouldAdvanceTime` and any tick mode but `manual`
-  (`vi.setTimerTickMode`) move the fake clock with the real one, so it is real, `vi.setSystemTime` alone fakes
-  `Date`, options the parse cannot read whole — a name, a spread, a name in a list — leave every clock real, and
-  a clock taken under another name keeps the real one. **The price, named:** a
-  duration the code under test measures has no clock in the test to be found by (`metrics`' lag), a helper
-  imported from another file is not followed, a structure the lists do not name is not seen, nor fake timers
-  turned on by a helper of another file, a hook a helper registers or a test before — all go to `expectWithin`,
-  or are left, by review.
+  another test gave a reading is left alone: one side is not the clock. **Fake time is no exception** (MOL-266,
+  round 15): a bound under `vi.useFakeTimers()` goes through `expectWithin` as any other, and `expectWithin` marks
+  it `fake` as the test runs. For fourteen rounds the parse let such a bound go raw where it read every clock
+  fake at the bound — in the order vitest runs hooks, through the file's helpers, its directory's configs and
+  setup files, every command line of the repository — and every round found another way the clock stayed
+  real: a list of spellings, a lexer of the shell, a reader of YAML, each answered by one more. Whether a clock
+  is fake is a fact of the run, not of the text, and the whole repository had one such bound
+  (`bot/src/assemble.test.ts`, a retry on fake time), so the exemption cost more than it ever spared.
+  **What the check is**: a guard against a bound written the ordinary way, not against a form built to slip
+  past it. **The price, named:** a duration the code under test measures has no clock in the test to be found
+  by (`metrics`' lag), a helper imported from another file is not followed, a structure the lists do not name
+  is not seen, nor a clock reached through `vm`, `eval` or reflection — all go to `expectWithin` by review; a
+  form found that hides an ordinary bound is a new line in the check, not a reason to read the run.
 - **A test may take a testing export wherever it lives**: `TEST_DATA` keeps a package's testing export out
   of `src`, which ships, and leaves `src/**/*.test.ts` alone (`TESTS_BESIDE_SOURCE`) — a test never ships. A
   module's own boundary over part of `src` goes through `boundary()` of the base preset, which gives the
