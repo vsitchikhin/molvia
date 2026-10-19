@@ -4,8 +4,14 @@
     <template #meta>{{ t('income.sheet.meta') }}</template>
 
     <!-- First in the sheet (MOL-181). An amendment opens without a connection (MOL-189, С-19): what
-         waits for it is said once here, and the buttons say it on themselves. -->
-    <StatusStrip v-if="waiting" class="status" kind="offline" :text="t('income.sheet.offline')" />
+         waits for it is said once here, and the buttons say it on themselves. From an account's
+         journal there is no removing (В-1 «а»), and the words name only the amendment. -->
+    <StatusStrip
+      v-if="waiting"
+      class="status"
+      kind="offline"
+      :text="t(removable ? 'income.sheet.offline' : 'income.sheet.offline_amend')"
+    />
     <!-- The list read again after a conflict did not come (MOL-188 №5): «Повторить» of the screen is
          under this sheet, so the sheet has its own. -->
     <StatusStrip
@@ -287,6 +293,12 @@ export default defineComponent({
     const sending = ref(false)
     const failed = ref(false)
     const conflict = ref(false)
+    /**
+     * A conflict was met at this opening: from then on the version is the list's, whatever the next
+     * «Сохранить» met — a refusal under a field, an answer lost — until the sheet opens again. Let go
+     * with `conflict`, the words, a refused save went back over the version opened (MOL-189 №1).
+     */
+    const rebased = ref(false)
     let incomeId = newId()
     const online = useOnline()
     /**
@@ -301,7 +313,7 @@ export default defineComponent({
      */
     const base = computed(() => {
       const editing = props.editing
-      if (!editing || !conflict.value) return editing
+      if (!editing || !rebased.value) return editing
       return incomesOf(props.overview).find((row) => row.id === editing.id) ?? editing
     })
     const saveWord = computed(() => {
@@ -342,6 +354,7 @@ export default defineComponent({
         heldError.value = null
         failed.value = false
         conflict.value = false
+        rebased.value = false
         incomeId = draft?.id ?? newId()
         pickerOpen.value = false
         choice.reset(editing ? editing.accountId : draft ? draft.accountId : undefined)
@@ -474,7 +487,7 @@ export default defineComponent({
         // Said whenever there are accounts: left out, the server keeps the one it has (Р-26).
         ...(choice.shows.value ? { accountId: choice.accountId.value } : {}),
       }
-      // Taken before the conflict is let go: after one, the version the list now holds.
+      // After a conflict, the version the list now holds.
       const editing = base.value
       sending.value = true
       conflict.value = false
@@ -485,6 +498,7 @@ export default defineComponent({
           // goes over the version the screen now holds.
           if (outcome === 'conflict') {
             conflict.value = true
+            rebased.value = true
             return
           }
         } else {

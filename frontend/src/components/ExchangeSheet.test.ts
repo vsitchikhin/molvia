@@ -506,6 +506,23 @@ describe('ExchangeSheet: an amendment (MOL-42, В-3)', () => {
     await saveAmendment(view)
     expect(view.get('.current').text()).toContain('held before ֏30,000.00')
   })
+
+  // MOL-189 review №1: a save after the conflict that did not land — lost on the way, refused under a
+  // field — leaves the sheet over the version the list holds, never back on the one it was opened on.
+  it('after a conflict every next save goes over the version the list holds, past a failed one', async () => {
+    const theirs: ExchangeView = { ...amended, note: 'Cash', revision: 3 }
+    for (const failure of [new TypeError('network'), new ApiError(ERROR.INVALID_RATE)]) {
+      amend.mockReset()
+      amend
+        .mockResolvedValueOnce('conflict')
+        .mockRejectedValueOnce(failure)
+        .mockResolvedValueOnce('saved')
+      const view = await render(overview({ exchanges: [theirs] }), amended)
+      for (let tap = 0; tap < 3; tap += 1) await saveAmendment(view)
+      expect(amend.mock.calls.map(([, body]) => body.revision)).toEqual([2, 3, 3])
+      view.unmount()
+    }
+  })
 })
 
 describe('ExchangeSheet: how the money was changed (MOL-137, В-1)', () => {
@@ -601,6 +618,15 @@ describe('ExchangeSheet: removing from the amendment (MOL-189)', () => {
     await remove?.trigger('click')
     expect(view.emitted('remove')).toEqual([[base]])
     expect(amend).not.toHaveBeenCalled()
+  })
+
+  // MOL-189 review №3: from an account's journal the sheet has no «Delete», and its words say none.
+  it('offline, the strip names removing only where the sheet offers it', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    const view = await render(overview(), base)
+    expect(view.get('.status').text()).toContain(en.exchange.sheet.offline_amend)
+    await view.setProps({ removable: true })
+    expect(view.get('.status').text()).toContain(en.exchange.sheet.offline)
   })
 
   it('must not fire: no «Delete» in a new exchange, removable or not', async () => {
