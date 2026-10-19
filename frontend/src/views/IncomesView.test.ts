@@ -903,6 +903,32 @@ describe('IncomesView: recording, amending and removing', () => {
     )
   })
 
+  // Review №4, adversarial Г1: the word about the removal goes with the amendment's next save, as the
+  // sheet's own word does — it speaks of the last write of the place.
+  it('the word about a failed removal goes when the amendment saves', async () => {
+    incomes.mockResolvedValue(overview())
+    removeIncome.mockRejectedValueOnce(new TypeError('network'))
+    amendIncome.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    await askToRemove(view)
+    sheetButton(en.income.remove_sheet.confirm).click()
+    // The question put away before the answer.
+    document
+      .querySelectorAll('dialog[open]')[1]
+      ?.querySelector<HTMLButtonElement>(`button[aria-label="${en.nav.back_label}"]`)
+      ?.click()
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    await flushPromises()
+    expect(document.querySelector('dialog[open] .failed[role="alert"]')?.textContent).toBe(
+      en.income.failed,
+    )
+
+    sheetButton(en.income.sheet.save_amend).click()
+    await flushPromises()
+    expect(amendIncome).toHaveBeenCalledOnce()
+    expect(document.querySelector('dialog[open] .failed[role="alert"]')).toBeNull()
+  })
+
   // MOL-189 review №2, adversarial А1: the strip a failed «Bring back» leaves still runs out.
   it('a «Bring back» that failed lets the count go on, and the strip goes when it runs out', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })

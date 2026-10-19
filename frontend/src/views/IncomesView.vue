@@ -160,7 +160,7 @@
 <script lang="ts">
 import { defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { IncomeView as Row, Money } from '@molvia/model'
+import type { IncomeAmendBody, IncomeView as Row, Money } from '@molvia/model'
 import IconCashPlus from '~icons/mdi/cash-plus'
 import IconPlus from '~icons/mdi/plus'
 import AppButton from '@/components/AppButton.vue'
@@ -297,6 +297,12 @@ export default defineComponent({
       amendFailed.value = false
       if (!removing) landing.value = []
     }
+    // The amendment's own save is the sheet's next write: the word about the removal before it goes,
+    // as the sheet's own word does (MOL-19, MOL-181; review №4, adversarial Г1).
+    function amend(id: string, body: IncomeAmendBody): ReturnType<typeof incomes.amend> {
+      amendFailed.value = false
+      return incomes.amend(id, body)
+    }
 
     const online = ref(navigator.onLine)
     const follow = (): void => {
@@ -351,6 +357,7 @@ export default defineComponent({
       skeletonPlates,
       t,
       ...incomes,
+      amend,
       sheetOpen,
       editing,
       compose,
