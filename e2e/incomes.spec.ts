@@ -55,20 +55,31 @@ test('an income lands in its month, is amended with a trace, and comes back afte
   await sheet.getByRole('button', { name: 'Сохранить правку' }).click()
   await expect(sheet).toBeHidden()
   await expect(page.getByRole('heading', { name: /^[а-яё]+ 102 345 ₽$/ })).toBeVisible()
-  // «исправлен» stands in the card's head, beside the day, outside the button (MOL-81).
+  // «исправлен» stands in the card's head, beside the day (MOL-81) — inside its one button (MOL-189).
   await expect(page.locator('article .amended')).toContainText('исправлен')
   await row.click()
   await expect(sheet.locator('.versions')).toContainText('99 615,00 ₽')
   await page.keyboard.press('Escape')
   await expect(sheet).toBeHidden()
 
-  // Removal asks first, and «Вернуть» brings the same income back.
-  await page.getByRole('button', { name: /Удалить доход/ }).click()
-  await expect(sheet).toContainText('Удалить доход?')
+  // Removal is the amendment's, asked over it (MOL-189, Ф-34, Д-1), and «Вернуть» brings the same
+  // income back from the strip over «Записать доход» (Ф-29).
+  await expect(page.locator('article button')).toHaveCount(1)
+  await row.click()
+  await expect(sheet).toContainText('Правка дохода')
   await page.waitForTimeout(400)
   await sheet.getByRole('button', { name: 'Удалить доход' }).click()
+  const question = page.locator('dialog[open]', { hasText: 'Удалить доход?' })
+  await expect(question).toBeVisible()
+  await page.waitForTimeout(400)
+  await question.getByRole('button', { name: 'Удалить доход' }).click()
+  await expect(page.locator('dialog[open]')).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Доходов пока нет' })).toBeVisible()
-  await page.getByRole('button', { name: 'Вернуть' }).click()
+  const undo = page.locator('.undo-strip')
+  await expect(undo).toContainText('Доход удалён')
+  await expect(undo.getByRole('button', { name: 'Вернуть' })).toBeFocused()
+  await undo.getByRole('button', { name: 'Вернуть' }).click()
+  await expect(undo).toBeHidden()
   await expect(page.getByRole('heading', { name: /^[а-яё]+ 102 345 ₽$/ })).toBeVisible()
   await expect(page.locator('article .amended')).toContainText('исправлен')
 })
@@ -238,7 +249,7 @@ function monthsBack(back: number, day: number): string {
 
 /**
  * The skeleton of «Доходы» is the answer's shape in height too (MOL-188, adversarial А2, Б2; MOL-178):
- * its cards are an income's — the head of the bin, the line of the figure, a plate of the account and the
+ * its cards are an income's — the head of the day, the line of the figure, a plate of the account and the
  * note — in two months, so neither a card nor the second month comes down by what the bars lacked. A
  * person with an account has a plate on every card, since a new income lands on it untouched.
  */
