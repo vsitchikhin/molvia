@@ -1,8 +1,6 @@
 <template>
   <AppScreen :title="t('exchange.title')">
     <template v-if="overview && phase !== 'loading'">
-      <!-- Above every branch: removing the last exchange leaves the empty state, and «Вернуть»
-           must still be there (В-5). -->
       <!-- The connection in one line, with the time of the answer shown (MOL-181, Ф-14). Nothing is
            kept on the phone, but an app stays open for days: «на 14:05» of yesterday would be untrue. -->
       <!-- The switch of the rate is named only where it stands: on the empty screen and with one
@@ -45,20 +43,6 @@
         {{ behind ? t('exchange.vanished_stale') : t('exchange.vanished') }}
       </p>
       <p v-if="gone" class="notice" role="alert">{{ t('exchange.restore_gone') }}</p>
-      <div v-if="removed" ref="removedStrip" class="notice removed">
-        <span class="removed-text">{{
-          t('exchange.removed', { amounts: amountsOf(removed) })
-        }}</span>
-        <AppButton
-          variant="ghost"
-          :busy="restoring"
-          :busy-label="t('exchange.restoring')"
-          :inactive="!online || busy"
-          @click="restore"
-        >
-          {{ t('exchange.restore') }}
-        </AppButton>
-      </div>
     </template>
 
     <!-- The shape of what is coming, in the order it will stand (Ф-13): «Обмены против рынка», the
@@ -193,13 +177,7 @@
           <ul class="cards">
             <AppReveal group>
               <li v-for="exchange in overview.exchanges" :key="exchange.id">
-                <ExchangeCard
-                  :exchange="exchange"
-                  :today="today"
-                  :disabled="!online || busy"
-                  @edit="edit"
-                  @remove="ask"
-                />
+                <ExchangeCard :exchange="exchange" :today="today" @edit="edit" />
               </li>
             </AppReveal>
           </ul>
@@ -210,6 +188,24 @@
     <!-- «Записать обмен» stands in the strip over the tab bar, never over the last card (Ф-28):
          with exchanges and on the empty screen alike, not while there is no answer yet. Without a
          connection it stays, not now, and says why on itself (Ф-6, Р-1). -->
+    <!-- «Вернуть» over the strip, ten seconds, one look for every operation of «Деньги» (MOL-189,
+         Ф-29). Whatever the screen became under it: removing the last exchange leaves the empty state
+         (В-5). The strip puts the focus on «Вернуть» and says the removal itself. -->
+    <template v-if="removed" #undo>
+      <UndoStrip
+        :key="removed.id"
+        :text="t('exchange.removed', { amounts: amountsOf(removed) })"
+        :announcement="t('exchange.removed_announced', { amounts: amountsOf(removed) })"
+        :action="t('exchange.restore')"
+        :busy="restoring"
+        :busy-label="t('exchange.restoring')"
+        :waiting="!online"
+        :waiting-action="t('exchange.restore_offline')"
+        @restore="restore"
+        @expire="forget"
+      />
+    </template>
+
     <template v-if="phase === 'ready' || phase === 'empty'" #docked>
       <AppButton ref="recordButton" size="large" block :inactive="!online || busy" @click="compose">
         <template #icon><IconPlus /></template>
@@ -223,8 +219,16 @@
       :overview="overview"
       :editing="editing"
       :record="record"
-      :amend="amendEditing"
+      :amend="amend"
+      removable
+      :busy="busy"
+      :behind="behind"
+      :stale="stale"
+      :attempt="attempt"
+      @remove="ask"
+      @retry="retry"
     />
+    <!-- Over the sheet of the amendment, «‹» back to it (Д-1). -->
     <ExchangeRemoveSheet
       v-model:open="removeOpen"
       :exchange="target"
@@ -243,7 +247,6 @@ import { RATE_CHART_MONTHS, currencySign, yerevanDate } from '@molvia/model'
 import type {
   Currency,
   CurrencyCost,
-  ExchangeAmendBody,
   ExchangeView as Row,
   ExchangesResponse,
   RateChartMonths,
@@ -270,10 +273,10 @@ import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
+import UndoStrip from '@/components/UndoStrip.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExchangeWords } from '@/composables/useExchangeWords'
 import { useExchanges } from '@/composables/useExchanges'
-import type { AmendOutcome } from '@/composables/useExchanges'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 import { bankWords } from '@/components/spending'
@@ -307,6 +310,7 @@ export default defineComponent({
     SegmentedControl,
     SkeletonPart,
     StatusStrip,
+    UndoStrip,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -327,42 +331,19 @@ export default defineComponent({
       editing.value = exchange
       sheetOpen.value = true
     }
-    // A conflict leaves the sheet open over the version the server holds now, so a second
-    // «Сохранить» goes over that one and nothing typed is lost (review Ч-2).
-    async function amendEditing(id: string, body: ExchangeAmendBody): Promise<AmendOutcome> {
-      const outcome = await exchanges.amend(id, body)
-      // Gone in the meantime: the sheet keeps the old one, and its next save is told so.
-      if (outcome === 'conflict') {
-        editing.value =
-          exchanges.overview.value?.exchanges.find((row) => row.id === id) ?? editing.value
-      }
-      return outcome
-    }
-    // «Удалить обмен?» first, then «Вернуть» after (В-5): the bin never removes on its own.
+    // «Удалить обмен?» first, then «Вернуть» after (В-5): the bin never removes on its own. Asked from
+    // the sheet of the amendment and over it (MOL-189, Ф-34), «‹» back to what was typed there.
     const removeOpen = ref(false)
     const target = ref<Row | null>(null)
     function ask(exchange: Row): void {
       target.value = exchange
       removeOpen.value = true
     }
-    // The bin that opened the sheet is gone with its row, so the dialog has nowhere to give the
-    // focus back: it goes to «Вернуть», one swipe from the person, and the removal is said out
-    // loud — the reason В-5 kept the offer on screen rather than on a timer (review Н-1).
-    const removedStrip = ref<HTMLElement | null>(null)
-    const announce = useAnnouncer()
-    let unsay: (() => void) | undefined
-    watch(exchanges.removed, async (exchange) => {
-      unsay?.()
-      unsay = exchange
-        ? announce?.(t('exchange.removed', { amounts: amountsOf(exchange) }))
-        : undefined
-      if (!exchange) return
-      await nextTick()
-      removedStrip.value?.querySelector('button')?.focus()
-    })
     // «Вернуть» goes with its strip once it worked: the words say the exchange is back, and the
     // focus goes to «Записать обмен», the one button that is always there (review Т-3).
     const recordButton = ref<{ $el: HTMLElement } | null>(null)
+    const announce = useAnnouncer()
+    let unsay: (() => void) | undefined
     watch(exchanges.restored, async (back) => {
       if (!back) return
       unsay?.()
@@ -372,9 +353,11 @@ export default defineComponent({
     })
     onUnmounted(() => unsay?.())
 
+    // Closing the amendment closes the question over it too, in one step of the history: the stack
+    // steps over the sheets above the one closed. Each closed on its own would step back twice.
     function confirmRemove(): void {
       const exchange = target.value
-      removeOpen.value = false
+      sheetOpen.value = false
       if (exchange) void exchanges.remove(exchange)
     }
 
@@ -499,9 +482,7 @@ export default defineComponent({
       editing,
       compose,
       edit,
-      amendEditing,
       removeOpen,
-      removedStrip,
       recordButton,
       target,
       ask,
@@ -613,17 +594,6 @@ export default defineComponent({
 .notice {
   background: var(--warn-tint);
   color: var(--warn-ink);
-}
-
-.removed {
-  align-items: center;
-  justify-content: space-between;
-  background: var(--surface-2);
-  color: var(--text);
-}
-
-.removed-text {
-  min-width: 0;
 }
 
 .failed {

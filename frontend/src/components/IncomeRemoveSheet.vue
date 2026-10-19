@@ -1,5 +1,5 @@
 <template>
-  <BottomSheet :open="open" @update:open="$emit('update:open', $event)">
+  <BottomSheet :open="open" back @update:open="$emit('update:open', $event)">
     <template #title>{{ t('income.remove_sheet.title') }}</template>
     <template v-if="income" #meta>{{ amounts }}</template>
 
@@ -8,12 +8,15 @@
     <template #footer>
       <AppButton
         variant="danger-ghost"
+        size="large"
         block
         :busy="busy"
         :busy-label="t('income.remove_sheet.confirm_busy')"
+        :inactive="!online && !busy"
         @click="$emit('confirm')"
       >
-        {{ t('income.remove_sheet.confirm') }}
+        <template #icon><IconDelete /></template>
+        {{ online || busy ? t('income.remove_sheet.confirm') : t('income.sheet.remove_offline') }}
       </AppButton>
     </template>
   </BottomSheet>
@@ -24,8 +27,10 @@ import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { IncomeView } from '@molvia/model'
+import IconDelete from '~icons/mdi/trash-can-outline'
 import AppButton from '@/components/AppButton.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import { useOnline } from '@/composables/useOnline'
 
 /**
  * «Удалить доход?» (MOL-66, as В-5 of MOL-40): the amount, the source and the day, and what removing
@@ -33,11 +38,14 @@ import BottomSheet from '@/components/BottomSheet.vue'
  * of it**. Said as a condition, not a promise: whether it still is only the whole walk knows — an
  * income in roubles never is, one in euros is not until exchanged, and an exchange with no
  * remainder after it starts the rate afresh (self-review Ч-2, adversarial round 2, Е1). After it the
- * screen still offers «Вернуть» for ten minutes.
+ * screen still offers «Вернуть».
+ *
+ * Opened from the sheet of the amendment and over it (MOL-189, Ф-34, Д-1): «‹» back to what was
+ * typed there, no ×. Without a connection its button is not now and says why (Ф-6).
  */
 export default defineComponent({
   name: 'IncomeRemoveSheet',
-  components: { AppButton, BottomSheet },
+  components: { AppButton, BottomSheet, IconDelete },
   props: {
     open: { type: Boolean, required: true },
     income: { type: Object as PropType<IncomeView | null>, default: null },
@@ -50,7 +58,7 @@ export default defineComponent({
     confirm: () => true,
   },
   setup() {
-    return { t: useI18n().t }
+    return { t: useI18n().t, online: useOnline() }
   },
 })
 </script>

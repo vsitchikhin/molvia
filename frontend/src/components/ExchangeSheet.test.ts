@@ -582,3 +582,42 @@ describe('ExchangeSheet: the channel in the versions (MOL-137, review)', () => {
     expect(view.get('.versions li').text()).toContain(en.exchange.sheet.channel_exchanger)
   })
 })
+
+// MOL-189, Ф-34, owner's В-1 «а»: removing is the amendment's, and only where the screen offers
+// «Вернуть» after it — never in a new exchange, never from an account's journal.
+describe('ExchangeSheet: removing from the amendment (MOL-189)', () => {
+  const [base] = overview().exchanges
+  if (!base) throw new Error('the fixture has an exchange')
+  const words = (view: VueWrapper) => view.findAll('button').map((button) => button.text())
+
+  it('offers «Delete the exchange» in an amendment the screen can bring back, and asks it of the screen', async () => {
+    const view = await render(overview(), base)
+    expect(words(view)).not.toContain(en.exchange.sheet.remove)
+    await view.setProps({ removable: true })
+    const remove = view
+      .findAll('button')
+      .find((button) => button.text() === en.exchange.sheet.remove)
+    expect(remove?.classes()).toContain('danger-ghost')
+    await remove?.trigger('click')
+    expect(view.emitted('remove')).toEqual([[base]])
+    expect(amend).not.toHaveBeenCalled()
+  })
+
+  it('must not fire: no «Delete» in a new exchange, removable or not', async () => {
+    const view = await render()
+    await view.setProps({ removable: true })
+    expect(words(view)).not.toContain(en.exchange.sheet.remove)
+  })
+
+  it('a write of the screen in the air holds both buttons, in focus and saying nothing new (Р-3)', async () => {
+    const view = await render(overview(), base)
+    await view.setProps({ removable: true, busy: true })
+    for (const label of [en.exchange.sheet.save_amend, en.exchange.sheet.remove]) {
+      const button = view.findAll('button').find((one) => one.text() === label)
+      expect(button?.attributes('aria-disabled')).toBe('true')
+      await button?.trigger('click')
+    }
+    expect(view.emitted('remove')).toBeUndefined()
+    expect(amend).not.toHaveBeenCalled()
+  })
+})

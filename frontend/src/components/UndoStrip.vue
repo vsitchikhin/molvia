@@ -9,9 +9,17 @@
   >
     <span class="text">{{ text }}</span>
     <span class="count" aria-hidden="true">{{ left }}</span>
-    <AppButton ref="button" variant="tinted" class="restore" @click="restore">
+    <AppButton
+      ref="button"
+      variant="tinted"
+      class="restore"
+      :busy="busy"
+      :busy-label="busyLabel"
+      :inactive="waiting"
+      @click="restore"
+    >
       <template #icon><IconUndo /></template>
-      {{ action }}
+      {{ waiting ? waitingAction : action }}
     </AppButton>
   </div>
 </template>
@@ -36,6 +44,11 @@ import { useAnnouncer } from '@/composables/useAnnouncer'
  *
  * The words are said once as the strip comes; the focus goes to «Вернуть», since the row it was
  * opened from is gone. What happens after — back or final — is the screen's to say.
+ *
+ * A «Вернуть» that waits for the server — an exchange's, an income's (MOL-189) — says so: at work it
+ * is `busy` with its word, and with no connection not now, saying why (Ф-6). The count stands still
+ * while it cannot be pressed (owner's В-2 «а»): ten seconds are the time to take it back, and run out
+ * offline they took away a removal the server still keeps for ten minutes.
  */
 export default defineComponent({
   name: 'UndoStrip',
@@ -52,6 +65,12 @@ export default defineComponent({
      * the first time, and taking them again moved the person's focus for a thing already known.
      */
     quiet: { type: Boolean, default: false },
+    /** «Вернуть» at work — the server is asked — with the word that says so (MOL-225). */
+    busy: { type: Boolean, default: false },
+    busyLabel: { type: String, default: '' },
+    /** «Вернуть» cannot be pressed now — no connection — and says why in `waitingAction`. */
+    waiting: { type: Boolean, default: false },
+    waitingAction: { type: String, default: '' },
   },
   /** `tick`: what is left, every second, held or not — a screen taking the strip over goes on from it. */
   emits: ['restore', 'expire', 'tick'],
@@ -65,7 +84,7 @@ export default defineComponent({
     const announce = useAnnouncer()
 
     function tick(): void {
-      if (!held && !focused) left.value -= 1
+      if (!held && !focused && !props.waiting && !props.busy) left.value -= 1
       emit('tick', left.value)
       if (left.value <= 0) {
         clearInterval(timer)

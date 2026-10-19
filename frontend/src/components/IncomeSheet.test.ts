@@ -263,3 +263,26 @@ describe('IncomeSheet', () => {
     expect(view.get('.current').text()).toContain(en.income.source.salary)
   })
 })
+
+// MOL-189, Ф-34, owner's В-1 «а»: removing is the amendment's, and only where the screen offers
+// «Вернуть» after it — never in a new income, never from an account's journal.
+describe('IncomeSheet: removing from the amendment (MOL-189)', () => {
+  const words = (view: VueWrapper) => view.findAll('button').map((button) => button.text())
+
+  it('offers «Remove the income» in an amendment the screen can bring back, and asks it of the screen', async () => {
+    const view = await render(overview(), amended)
+    expect(words(view)).not.toContain(en.income.sheet.remove)
+    await view.setProps({ removable: true })
+    const remove = view.findAll('button').find((button) => button.text() === en.income.sheet.remove)
+    expect(remove?.classes()).toContain('danger-ghost')
+    await remove?.trigger('click')
+    expect(view.emitted('remove')).toEqual([[amended]])
+    expect(amend).not.toHaveBeenCalled()
+  })
+
+  it('must not fire: no «Remove» in a new income, removable or not', async () => {
+    const view = await render()
+    await view.setProps({ removable: true })
+    expect(words(view)).not.toContain(en.income.sheet.remove)
+  })
+})

@@ -14,6 +14,7 @@ import type {
   RatePreference,
 } from '@molvia/model'
 import StatusStrip from '@/components/StatusStrip.vue'
+import UndoStrip from '@/components/UndoStrip.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 
@@ -136,12 +137,37 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-/** Opens «Удалить обмен?» from the bin and waits for the sheet to rise — until then it takes no tap. */
-async function askToRemove(view: VueWrapper): Promise<void> {
-  await view.get('button.remove').trigger('click')
+/** A sheet risen — until then it takes no tap. */
+async function risen(): Promise<void> {
   await flushPromises()
   clock += 1000
   await new Promise((resolve) => setTimeout(resolve, 5))
+}
+
+/** A button of the sheet on top by its words. */
+function sheetButton(words: string): HTMLButtonElement {
+  const sheets = document.querySelectorAll('dialog[open]')
+  const found = [...(sheets[sheets.length - 1]?.querySelectorAll('button') ?? [])].find(
+    (button) => button.textContent.trim() === words,
+  )
+  if (!(found instanceof HTMLButtonElement)) throw new Error(`no «${words}» in the sheet`)
+  return found
+}
+
+/** The first card — the way into its amendment — and the sheet risen. */
+async function openCard(view: VueWrapper): Promise<void> {
+  await view.get('.cards button.body').trigger('click')
+  await risen()
+}
+
+/**
+ * «Удалить обмен?»: the card, «Удалить обмен» in the sheet of the amendment, and the question risen
+ * over it (MOL-189, Ф-34).
+ */
+async function askToRemove(view: VueWrapper): Promise<void> {
+  await openCard(view)
+  sheetButton(en.exchange.sheet.remove).click()
+  await risen()
 }
 
 function confirmButton() {
@@ -556,16 +582,36 @@ describe('ExchangeView: the rate and the list', () => {
     expect(chooseRatePreference).not.toHaveBeenCalled()
   })
 
-  it('the bin asks first, naming the exchange, and removes nothing until confirmed (В-5)', async () => {
+  // MOL-189, Ф-34, Д-1: no bin on the card; the question stands over the amendment, «‹» back to it.
+  it('removing is asked over the amendment, naming the exchange: «‹», no ×, nothing removed (В-5)', async () => {
     exchanges.mockResolvedValue(overview())
     const view = await render()
+    expect(view.find('button.remove').exists()).toBe(false)
+    expect(view.findAll('.cards li button')).toHaveLength(1)
 
-    const remove = view.get('button.remove')
-    expect(remove.attributes('aria-label')).toMatch(/^Delete the exchange ₽20,000 → ֏95,000$/)
-    await askToRemove(view)
-    const sheet = document.querySelector('dialog[open]')
-    expect(sheet?.textContent).toContain(en.exchange.remove_sheet.title)
-    expect(sheet?.textContent).toContain('₽20,000 → ֏95,000')
+    await openCard(view)
+    const amount = document.querySelector<HTMLInputElement>(
+      'dialog[open] input[inputmode="decimal"]',
+    )
+    if (!amount) throw new Error('no amount field')
+    amount.value = '21000'
+    amount.dispatchEvent(new Event('input'))
+    sheetButton(en.exchange.sheet.remove).click()
+    await risen()
+
+    const sheets = document.querySelectorAll('dialog[open]')
+    expect(sheets).toHaveLength(2)
+    const question = sheets[1]
+    expect(question?.textContent).toContain(en.exchange.remove_sheet.title)
+    expect(question?.textContent).toContain('₽20,000 → ֏95,000')
+    expect(question?.querySelector(`button[aria-label="${en.sheet.close}"]`)).toBeNull()
+    expect(removeExchange).not.toHaveBeenCalled()
+
+    // «‹» takes the question away, and what was typed in the amendment is still there.
+    question?.querySelector<HTMLButtonElement>(`button[aria-label="${en.nav.back_label}"]`)?.click()
+    await flushPromises()
+    expect(document.querySelectorAll('dialog[open]')).toHaveLength(1)
+    expect(amount.value).toBe('21000')
     expect(removeExchange).not.toHaveBeenCalled()
   })
 
@@ -579,8 +625,10 @@ describe('ExchangeView: the rate and the list', () => {
     confirmButton().click()
     await flushPromises()
     expect(removeExchange).toHaveBeenCalledWith(row().id)
-    expect(view.text()).toContain('Exchange deleted')
-    // The bin went with its row: the focus lands one swipe from undoing it (Н-1).
+    // Both sheets go at once, and «Вернуть» is the strip over the tab bar (Ф-29).
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(view.get('.undo-strip').text()).toContain('Exchange deleted')
+    // The card went with its row: the focus lands one swipe from undoing it (Н-1).
     expect(document.activeElement?.textContent.trim()).toBe(en.exchange.restore)
 
     const restore = view.findAll('button').find((button) => button.text() === en.exchange.restore)
@@ -787,6 +835,71 @@ describe('ExchangeView: the rate and the list', () => {
     expect(view.text()).not.toContain(en.exchange.restore)
   })
 
+  // The ten seconds ran out: the screen offers it no more (Ф-29).
+  it('«Bring back» goes when its ten seconds run out', async () => {
+    exchanges.mockResolvedValue(overview())
+    removeExchange.mockResolvedValue(overview({ exchanges: [], wallet: null }))
+    const view = await render()
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+    view.getComponent(UndoStrip).vm.$emit('expire')
+    await flushPromises()
+    expect(view.find('.undo-strip').exists()).toBe(false)
+    expect(restoreExchange).not.toHaveBeenCalled()
+  })
+
+  // Ф-6, owner's В-2 «а»: offline «Bring back» says why, and the ten seconds wait for the connection.
+  it('«Bring back» without a connection is not now, says why, and its count stands still', async () => {
+    exchanges.mockResolvedValue(overview())
+    removeExchange.mockResolvedValue(overview({ exchanges: [], wallet: null }))
+    const view = await render()
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+    online(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+    const strip = view.getComponent(UndoStrip)
+    expect(strip.props('waiting')).toBe(true)
+    const restore = strip.get('button')
+    expect(restore.text()).toBe(en.exchange.restore_offline)
+    expect(restore.attributes('aria-disabled')).toBe('true')
+    await restore.trigger('click')
+    await flushPromises()
+    expect(restoreExchange).not.toHaveBeenCalled()
+  })
+
+  // MOL-189, С-19: what waits for the connection says so in the sheet, not by a dead card.
+  it('without a connection a card still opens; the sheet says what waits, and both buttons wait', async () => {
+    exchanges.mockResolvedValue(overview())
+    const view = await render()
+    online(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+
+    await openCard(view)
+    const sheet = document.querySelector('dialog[open]')
+    expect(sheet?.textContent).toContain(en.exchange.sheet.offline)
+    const save = sheetButton(en.exchange.sheet.save_offline)
+    const remove = sheetButton(en.exchange.sheet.remove_offline)
+    for (const button of [save, remove]) {
+      expect(button.getAttribute('aria-disabled')).toBe('true')
+      expect(button.disabled).toBe(false)
+      button.click()
+    }
+    await flushPromises()
+    expect(amendExchange).not.toHaveBeenCalled()
+    expect(document.querySelectorAll('dialog[open]')).toHaveLength(1)
+
+    online(true)
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(sheet?.textContent).not.toContain(en.exchange.sheet.offline)
+    expect(sheetButton(en.exchange.sheet.save_amend).getAttribute('aria-disabled')).toBeNull()
+    expect(sheetButton(en.exchange.sheet.remove).getAttribute('aria-disabled')).toBeNull()
+  })
+
   it('without a connection shows what it has, and writes nothing', async () => {
     exchanges.mockResolvedValue(overview())
     const view = await render()
@@ -799,7 +912,6 @@ describe('ExchangeView: the rate and the list', () => {
     expect(strip.text()).toContain(en.exchange.offline.strip.split('{when}')[0])
     expect(strip.text()).toMatch(/\d{1,2}:\d{2}/)
     expect(strip.text()).not.toContain(en.state.retry)
-    expect(view.get('button.remove').attributes('disabled')).toBeDefined()
     // «Записать обмен» stays in the strip, not now, saying why, and a tap on it opens nothing (Ф-6).
     const record = recordButton(view)
     expect(record?.text()).toBe(en.exchange.record_offline)
@@ -968,6 +1080,55 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     }
   })
 
+  // MOL-187 №8: under the modal sheet the screen's «Try again» cannot be pressed, and the version the
+  // sheet held was the one from before — «Now recorded» by it was untrue, and the second save conflicted.
+  it('a conflict read again and not answered: the sheet says so itself, with its own «Try again»', async () => {
+    exchanges
+      .mockResolvedValueOnce(overview())
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockResolvedValue(overview({ exchanges: [row({ revision: 2, note: 'airport' })] }))
+    amendExchange.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT))
+    const view = await render()
+    await openRow(view)
+    await saveAmendment()
+    const sheet = document.querySelector('dialog[open]')
+    expect(sheet?.textContent).toContain(en.exchange.sheet.amend_conflict_stale)
+    expect(sheet?.textContent).not.toContain(en.exchange.sheet.current.split('{details}')[0])
+    expect(sheet?.textContent).toContain(en.exchange.sheet.unanswered)
+
+    sheetButton(en.state.retry).click()
+    await flushPromises()
+    expect(sheet?.textContent).toContain(en.exchange.sheet.amend_conflict)
+    expect(sheet?.textContent).toContain('airport')
+    expect(sheet?.textContent).not.toContain(en.exchange.sheet.unanswered)
+
+    amendExchange.mockResolvedValue(overview())
+    await saveAmendment()
+    expect(amendExchange.mock.calls.at(-1)?.[1]).toMatchObject({ revision: 2 })
+  })
+
+  // Б1 in the sheet: the connection gone, the sheet's own strip says so and offers nothing to retry.
+  it('the same read lost with the connection: the sheet says it is offline, with no «Try again»', async () => {
+    exchanges
+      .mockResolvedValueOnce(overview())
+      .mockImplementationOnce(() => {
+        online(false)
+        window.dispatchEvent(new Event('offline'))
+        return Promise.reject(new ApiError(ERROR.INTERNAL, 'network', false))
+      })
+      .mockResolvedValue(overview({ exchanges: [row({ revision: 2 })] }))
+    amendExchange.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT))
+    const view = await render()
+    await openRow(view)
+    await saveAmendment()
+    const sheet = document.querySelector('dialog[open]')
+    expect(sheet?.textContent).toContain(en.exchange.sheet.offline)
+    expect(sheet?.textContent).toContain(en.exchange.sheet.amend_conflict_stale)
+    expect(
+      [...(sheet?.querySelectorAll('button') ?? [])].map((b) => b.textContent.trim()),
+    ).not.toContain(en.state.retry)
+  })
+
   it('the same read lost with the connection: no «here it is now» either, until it is read (Б1)', async () => {
     // The connection goes the moment the server's answer to the write comes.
     const lostOffline = (): Promise<never> => {
@@ -1117,7 +1278,7 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     const view = await render()
     const button = view.get('button.body')
     expect(button.attributes('aria-label')).toBeUndefined()
-    // The verb and the day first — the day stands in the head, outside the button (handoff 02).
+    // The verb and the day first, unseen; the head with the day is inside the button (MOL-189).
     expect(button.text()).toMatch(/^Amend the exchange of .+:/)
     for (const words of [
       en.exchange.card_given,

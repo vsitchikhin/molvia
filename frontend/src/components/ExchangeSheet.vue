@@ -5,6 +5,23 @@
     }}</template>
     <template #meta>{{ t('exchange.sheet.meta') }}</template>
 
+    <!-- First in the sheet (MOL-181). An amendment opens without a connection (MOL-189, С-19): what
+         waits for it is said once here, and the buttons say it on themselves. -->
+    <StatusStrip v-if="waiting" class="status" kind="offline" :text="t('exchange.sheet.offline')" />
+    <!-- The list read again after a conflict did not come (MOL-187 №8): «Повторить» of the screen is
+         under this sheet, so the sheet has its own. -->
+    <StatusStrip
+      v-else-if="conflict && stale"
+      class="status"
+      kind="unanswered"
+      :text="t('exchange.sheet.unanswered')"
+      :attempt="attempt"
+    >
+      <template #action>
+        <AppButton variant="ghost" @click="$emit('retry')">{{ t('state.retry') }}</AppButton>
+      </template>
+    </StatusStrip>
+
     <form class="form" @submit.prevent="submit">
       <div v-for="side in sides" :key="side" class="pair">
         <AppField
@@ -100,18 +117,38 @@
       <p v-if="failed" class="failed" role="alert">{{ t('exchange.failed') }}</p>
       <!-- The version the other device wrote, here and not only in the list the sheet covers: a
            second «Сохранить» must not go over it unseen (round 2, Л4). -->
-      <div v-if="conflict && editing" class="failed" role="alert">
-        <p class="conflict">{{ t('exchange.sheet.amend_conflict') }}</p>
-        <p class="conflict current">{{ currentOf(editing) }}</p>
+      <!-- Read again and not answered — the server or the connection — the version the sheet holds is
+           the one from before the conflict: «Сейчас записано» by it would be untrue (MOL-187 №8). -->
+      <div v-if="conflict && base" class="failed" role="alert">
+        <p class="conflict">
+          {{
+            behind ? t('exchange.sheet.amend_conflict_stale') : t('exchange.sheet.amend_conflict')
+          }}
+        </p>
+        <p v-if="!behind" class="conflict current">{{ currentOf(base) }}</p>
       </div>
       <AppButton
         size="large"
         block
         :busy="sending"
         :busy-label="t('exchange.sheet.saving')"
+        :inactive="waiting || busy"
         @click="submit"
       >
-        {{ t(editing ? 'exchange.sheet.save_amend' : 'exchange.sheet.save') }}
+        <template v-if="editing" #icon><IconCheck /></template>
+        {{ saveWord }}
+      </AppButton>
+      <!-- Removing lives here, not on the card (MOL-189, Ф-34) — only where the screen offers
+           «Вернуть» after it (owner's В-1 «а»). Not filled: one filled button in a sheet. -->
+      <AppButton
+        v-if="editing && removable"
+        variant="danger-ghost"
+        block
+        :inactive="waiting || busy || sending"
+        @click="askRemove"
+      >
+        <template #icon><IconDelete /></template>
+        {{ waiting ? t('exchange.sheet.remove_offline') : t('exchange.sheet.remove') }}
       </AppButton>
     </template>
   </BottomSheet>
@@ -156,6 +193,8 @@ import type {
   ExchangesResponse,
   Money,
 } from '@molvia/model'
+import IconCheck from '~icons/mdi/check'
+import IconDelete from '~icons/mdi/trash-can-outline'
 import AccountPickerSheet from '@/components/AccountPickerSheet.vue'
 import AccountRow from '@/components/AccountRow.vue'
 import AppButton from '@/components/AppButton.vue'
@@ -165,7 +204,9 @@ import BottomSheet from '@/components/BottomSheet.vue'
 import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { useAccountChoice } from '@/composables/useAccountChoice'
+import { useOnline } from '@/composables/useOnline'
 import { useAccountsStore } from '@/stores/accounts'
 import { shown } from '@/composables/useItemDetails'
 import { calendarDay, localDay, purchaseDay } from '@/days'
@@ -194,8 +235,11 @@ export default defineComponent({
     AppReveal,
     BottomSheet,
     HeldFromAccounts,
+    IconCheck,
+    IconDelete,
     SectionCaption,
     SegmentedControl,
+    StatusStrip,
   },
   props: {
     open: { type: Boolean, required: true },
@@ -216,9 +260,22 @@ export default defineComponent({
     },
     /** The exchange being amended, or null for a new one. */
     editing: { type: Object as PropType<ExchangeView | null>, default: null },
+    /** The screen offers «Вернуть» after a removal, so the amendment may offer removing (В-1 «а»). */
+    removable: { type: Boolean, default: false },
+    /** A write of the screen in the air — a removal, «Вернуть»: the buttons wait for it (Р-3). */
+    busy: { type: Boolean, default: false },
+    /** The list read again failed, the server or the connection: it is the one from before. */
+    behind: { type: Boolean, default: false },
+    /** …and the connection is up: the server did not answer, and «Повторить» may help. */
+    stale: { type: Boolean, default: false },
+    /** Reads that failed so far: a new one says the strip's same words again (MOL-181, C1). */
+    attempt: { type: Number, default: 0 },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
+    /** «Удалить обмен» — the exchange as the server holds it, to ask «Удалить обмен?» over. */
+    remove: (exchange: ExchangeView) => typeof exchange === 'object',
+    retry: () => true,
   },
   setup(props, { emit }) {
     const { t, locale } = useI18n()
@@ -242,6 +299,30 @@ export default defineComponent({
     const failed = ref(false)
     const conflict = ref(false)
     let exchangeId = newId()
+    const online = useOnline()
+    /**
+     * An amendment waits for the connection, and says so (MOL-189, С-19, Ф-6) — never while it is at
+     * work: a line that drops while the write hangs is not «not now» (MOL-225, Р1-А3). A new exchange
+     * is never opened offline, and is left as it was.
+     */
+    const waiting = computed(() => !!props.editing && !online.value && !sending.value)
+    /**
+     * The version an amendment goes over: the one opened, and after a conflict the one the list now
+     * holds — which, read again and not answered, is still the old one, and `behind` says so (MOL-187
+     * №8, MOL-188 №5). Followed here, so the screens and the journal's sheets need not.
+     */
+    const base = computed(() => {
+      const editing = props.editing
+      if (!editing || !conflict.value) return editing
+      return props.overview.exchanges.find((row) => row.id === editing.id) ?? editing
+    })
+    const saveWord = computed(() => {
+      if (waiting.value) return t('exchange.sheet.save_offline')
+      return t(props.editing ? 'exchange.sheet.save_amend' : 'exchange.sheet.save')
+    })
+    function askRemove(): void {
+      if (base.value) emit('remove', base.value)
+    }
     const accounts = useAccountsStore()
     const givenChoice = useAccountChoice(toRef(currencies, 'given'), true)
     const receivedChoice = useAccountChoice(toRef(currencies, 'received'), true)
@@ -447,7 +528,8 @@ export default defineComponent({
     }
 
     async function submit(): Promise<void> {
-      if (sending.value) return
+      // The field's «done» submits the form too, past the button that is not now.
+      if (sending.value || waiting.value || props.busy) return
       failed.value = false
       dayError.value = null
       heldError.value = null
@@ -490,10 +572,11 @@ export default defineComponent({
             }
           : {}),
       }
+      // Taken before the conflict is let go: after one, the version the list now holds.
+      const editing = base.value
       sending.value = true
       conflict.value = false
       try {
-        const editing = props.editing
         if (editing) {
           const outcome = await props.amend(editing.id, { revision: editing.revision, ...fields })
           // Made over a version that moved on: what was typed stays, and the next «Сохранить»
@@ -559,12 +642,20 @@ export default defineComponent({
       sending,
       failed,
       submit,
+      waiting,
+      base,
+      saveWord,
+      askRemove,
     }
   },
 })
 </script>
 
 <style scoped lang="scss">
+.status {
+  margin-bottom: var(--space-4);
+}
+
 .form {
   /* A column, not a grid: a block of it grows and goes by `AppReveal`, which takes a flex
      column's gap back with the block — a grid's stays and jumped (MOL-151, adversarial Б2). */

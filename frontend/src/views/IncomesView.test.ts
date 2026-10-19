@@ -13,6 +13,7 @@ import type {
   MoneyAccountsResponse,
 } from '@molvia/model'
 import StatusStrip from '@/components/StatusStrip.vue'
+import UndoStrip from '@/components/UndoStrip.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -159,6 +160,17 @@ function sheetButton(text: string): HTMLButtonElement {
   )
   if (!(found instanceof HTMLButtonElement)) throw new Error(`no «${text}» in the sheet`)
   return found
+}
+
+/**
+ * «Удалить доход?»: the card, «Удалить доход» in the sheet of the amendment, and the question risen
+ * over it (MOL-189, Ф-34).
+ */
+async function askToRemove(view: VueWrapper): Promise<void> {
+  await view.get('.cards button.body').trigger('click')
+  await risen()
+  sheetButton(en.income.sheet.remove).click()
+  await risen()
 }
 
 describe('IncomesView: the four states', () => {
@@ -541,18 +553,22 @@ describe('IncomesView: recording, amending and removing', () => {
     restoreIncome.mockResolvedValue(overview())
     const view = await render()
 
-    const bin = view.get('button.remove')
-    expect(bin.attributes('aria-label')).toBe('Remove income ₽99,615')
-    await bin.trigger('click')
-    await risen()
-    expect(document.querySelector('dialog[open]')?.textContent).toContain(
-      en.income.remove_sheet.title,
-    )
+    // No bin on the card (MOL-189, Ф-34): one button, the way into the amendment.
+    expect(view.find('button.remove').exists()).toBe(false)
+    expect(view.findAll('.cards li button')).toHaveLength(1)
+    await askToRemove(view)
+    const sheets = document.querySelectorAll('dialog[open]')
+    expect(sheets).toHaveLength(2)
+    expect(sheets[1]?.textContent).toContain(en.income.remove_sheet.title)
+    expect(sheets[1]?.querySelector(`button[aria-label="${en.sheet.close}"]`)).toBeNull()
+    expect(sheets[1]?.querySelector(`button[aria-label="${en.nav.back_label}"]`)).not.toBeNull()
     expect(removeIncome).not.toHaveBeenCalled()
     sheetButton(en.income.remove_sheet.confirm).click()
     await flushPromises()
     expect(removeIncome).toHaveBeenCalledWith(row().id)
-    expect(view.text()).toContain('Income removed')
+    // Both sheets go at once, and «Вернуть» is the strip over the tab bar (Ф-29).
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(view.get('.undo-strip').text()).toContain('Income removed')
     expect(document.activeElement?.textContent.trim()).toBe(en.income.restore)
 
     const restore = view.findAll('button').find((button) => button.text() === en.income.restore)
@@ -569,8 +585,7 @@ describe('IncomesView: recording, amending and removing', () => {
     removeIncome.mockResolvedValue(overview({ months: [] }))
     restoreIncome.mockReturnValue(new Promise(() => undefined))
     const view = await render()
-    await view.get('button.remove').trigger('click')
-    await risen()
+    await askToRemove(view)
     sheetButton(en.income.remove_sheet.confirm).click()
     await flushPromises()
 
@@ -601,9 +616,8 @@ describe('IncomesView: recording, amending and removing', () => {
         overview({ months: [{ month: '2026-09', sums: [], incomes: [row({ amount })] }] }),
       )
       const view = await render()
-      await view.get('button.remove').trigger('click')
-      await risen()
-      const text = document.querySelector('dialog[open]')?.textContent ?? ''
+      await askToRemove(view)
+      const text = [...document.querySelectorAll('dialog[open]')].at(-1)?.textContent ?? ''
       expect(text).toContain(en.income.remove_sheet.body)
       expect(text).not.toMatch(/no longer counts/)
     },
@@ -614,8 +628,7 @@ describe('IncomesView: recording, amending and removing', () => {
     removeIncome.mockResolvedValue(overview({ months: [] }))
     restoreIncome.mockRejectedValue(new ApiError(ERROR.NOT_FOUND))
     const view = await render()
-    await view.get('button.remove').trigger('click')
-    await risen()
+    await askToRemove(view)
     sheetButton(en.income.remove_sheet.confirm).click()
     await flushPromises()
     const restore = view.findAll('button').find((button) => button.text() === en.income.restore)
@@ -629,8 +642,7 @@ describe('IncomesView: recording, amending and removing', () => {
     incomes.mockResolvedValue(overview())
     removeIncome.mockRejectedValue(new TypeError('network'))
     const view = await render()
-    await view.get('button.remove').trigger('click')
-    await risen()
+    await askToRemove(view)
     sheetButton(en.income.remove_sheet.confirm).click()
     await flushPromises()
     expect(view.text()).toContain(en.income.failed)
@@ -651,8 +663,6 @@ describe('IncomesView: recording, amending and removing', () => {
     expect(strip.text()).not.toContain(en.state.retry)
     expect(strip.text()).not.toContain(en.income.record_offline)
     expect(view.findAllComponents(StatusStrip)).toHaveLength(1)
-    expect(view.get('button.remove').attributes('disabled')).toBeDefined()
-    expect(view.get('button.body').attributes('disabled')).toBeDefined()
     // «Записать доход» stays in the strip, not now, saying why, and a tap on it opens nothing (Ф-6).
     const record = recordButton(view)
     expect(record?.text()).toBe(en.income.record_offline)
@@ -666,6 +676,101 @@ describe('IncomesView: recording, amending and removing', () => {
     await flushPromises()
     expect(recordButton(view)?.text()).toBe(en.income.record)
     expect(recordButton(view)?.attributes('aria-disabled')).toBeUndefined()
+  })
+
+  it('«Bring back» goes when its ten seconds run out', async () => {
+    incomes.mockResolvedValue(overview())
+    removeIncome.mockResolvedValue(overview({ months: [] }))
+    const view = await render()
+    await askToRemove(view)
+    sheetButton(en.income.remove_sheet.confirm).click()
+    await flushPromises()
+    view.getComponent(UndoStrip).vm.$emit('expire')
+    await flushPromises()
+    expect(view.find('.undo-strip').exists()).toBe(false)
+    expect(restoreIncome).not.toHaveBeenCalled()
+  })
+
+  // Ф-6, owner's В-2 «а»: offline «Bring back» says why, and the ten seconds wait for the connection.
+  it('«Bring back» without a connection is not now and says why', async () => {
+    incomes.mockResolvedValue(overview())
+    removeIncome.mockResolvedValue(overview({ months: [] }))
+    const view = await render()
+    await askToRemove(view)
+    sheetButton(en.income.remove_sheet.confirm).click()
+    await flushPromises()
+    online(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+    const strip = view.getComponent(UndoStrip)
+    expect(strip.props('waiting')).toBe(true)
+    const restore = strip.get('button')
+    expect(restore.text()).toBe(en.income.restore_offline)
+    expect(restore.attributes('aria-disabled')).toBe('true')
+    await restore.trigger('click')
+    await flushPromises()
+    expect(restoreIncome).not.toHaveBeenCalled()
+  })
+
+  // MOL-189, С-19: what waits for the connection says so in the sheet, not by a dead card.
+  it('without a connection a card still opens; the sheet says what waits, and both buttons wait', async () => {
+    incomes.mockResolvedValue(overview())
+    const view = await render()
+    online(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+
+    await view.get('.cards button.body').trigger('click')
+    await risen()
+    const sheet = document.querySelector('dialog[open]')
+    expect(sheet?.textContent).toContain(en.income.sheet.offline)
+    for (const words of [en.income.sheet.save_offline, en.income.sheet.remove_offline]) {
+      const button = sheetButton(words)
+      expect(button.getAttribute('aria-disabled')).toBe('true')
+      button.click()
+    }
+    await flushPromises()
+    expect(amendIncome).not.toHaveBeenCalled()
+    expect(document.querySelectorAll('dialog[open]')).toHaveLength(1)
+
+    online(true)
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(sheet?.textContent).not.toContain(en.income.sheet.offline)
+    expect(sheetButton(en.income.sheet.save_amend).getAttribute('aria-disabled')).toBeNull()
+    expect(sheetButton(en.income.sheet.remove).getAttribute('aria-disabled')).toBeNull()
+  })
+
+  // MOL-188 №5: under the modal sheet the screen's «Try again» cannot be pressed, and the version the
+  // sheet held was the one from before — «It now stands as below» by it was untrue.
+  it('a conflict read again and not answered: the sheet says so itself, with its own «Try again»', async () => {
+    incomes
+      .mockResolvedValueOnce(overview())
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockResolvedValue(
+        overview({
+          months: [
+            { month: '2026-09', sums: [], incomes: [row({ revision: 2, note: 'elsewhere' })] },
+          ],
+        }),
+      )
+    amendIncome.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT))
+    const view = await render()
+    await amendThroughSheet(view)
+    const sheet = document.querySelector('dialog[open]')
+    expect(sheet?.textContent).toContain(en.income.sheet.amend_conflict_stale)
+    expect(sheet?.textContent).not.toContain('elsewhere')
+    expect(sheet?.textContent).toContain(en.income.sheet.unanswered)
+
+    sheetButton(en.state.retry).click()
+    await flushPromises()
+    expect(sheet?.textContent).toContain(en.income.sheet.amend_conflict)
+    expect(sheet?.textContent).toContain('elsewhere')
+
+    amendIncome.mockResolvedValue(overview())
+    sheetButton(en.income.sheet.save_amend).click()
+    await flushPromises()
+    expect(amendIncome.mock.calls.at(-1)?.[1]).toMatchObject({ revision: 2 })
   })
 
   it('offline on the empty screen: the strip stays, not now, over the quiet circle', async () => {
@@ -810,8 +915,7 @@ describe('IncomesView: the connection in one line (MOL-181, Ф-14)', () => {
     removeIncome.mockResolvedValue(overview({ months: [] }))
     restoreIncome.mockRejectedValue(new ApiError(ERROR.NOT_FOUND))
     const view = await render()
-    await view.get('button.remove').trigger('click')
-    await risen()
+    await askToRemove(view)
     sheetButton(en.income.remove_sheet.confirm).click()
     await flushPromises()
     await view

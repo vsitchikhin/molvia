@@ -3,10 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAppI18n } from '@/i18n'
 import UndoStrip from './UndoStrip.vue'
 
-function render() {
+function render(extra: Record<string, unknown> = {}) {
   return mount(UndoStrip, {
     attachTo: document.body,
-    props: { text: 'Удалено: барбер · 5 000 ֏', announcement: 'Удалено', action: 'Вернуть' },
+    props: {
+      text: 'Удалено: барбер · 5 000 ֏',
+      announcement: 'Удалено',
+      action: 'Вернуть',
+      ...extra,
+    },
     global: { plugins: [createAppI18n('ru')] },
   })
 }
@@ -84,5 +89,32 @@ describe('UndoStrip', () => {
     await vi.advanceTimersByTimeAsync(20_000)
     expect(strip.emitted('restore')).toHaveLength(1)
     expect(strip.emitted('expire')).toBeUndefined()
+  })
+
+  // MOL-189, Ф-6, owner's В-2 «а»: an exchange's «Вернуть» needs the server; offline it says why, and
+  // the ten seconds wait for it — run out, they took away a removal the server still keeps.
+  it('without a connection: not now, says why, and the count stands still', async () => {
+    const strip = render({ waiting: true, waitingAction: 'Вернём, когда будет связь' })
+    await vi.advanceTimersByTimeAsync(3_000)
+    const button = strip.get('button')
+    expect(button.text()).toContain('Вернём, когда будет связь')
+    expect(button.attributes('aria-disabled')).toBe('true')
+    expect(strip.find('.count').text()).toBe('10')
+    await button.trigger('click')
+    expect(strip.emitted('restore')).toBeUndefined()
+    await strip.setProps({ waiting: false })
+    expect(strip.get('button').text()).toContain('Вернуть')
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(strip.emitted('expire')).toHaveLength(1)
+  })
+
+  // MOL-225: a «Вернуть» that waits for the server says it is at work, and the count waits with it.
+  it('at work: says so, takes no second tap, and the count stands still', async () => {
+    const strip = render({ busy: true, busyLabel: 'Возвращаем…' })
+    await vi.advanceTimersByTimeAsync(3_000)
+    expect(strip.get('button').text()).toContain('Возвращаем…')
+    expect(strip.find('.count').text()).toBe('10')
+    await strip.get('button').trigger('click')
+    expect(strip.emitted('restore')).toBeUndefined()
   })
 })
