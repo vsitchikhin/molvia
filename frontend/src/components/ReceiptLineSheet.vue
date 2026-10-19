@@ -337,7 +337,7 @@ export default defineComponent({
       })
     })
     const remembered = computed(() =>
-      figures.rememberedPrice && priceInDoubt(figures.price, figures.rememberedPrice)
+      figures.rememberedPrice && priceInDoubt(props.country, figures.price, figures.rememberedPrice)
         ? t('receipt.line.remembered', {
             price: formatMoney(figures.rememberedPrice, locale.value),
           })

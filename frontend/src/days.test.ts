@@ -7,6 +7,7 @@ import {
   localDay,
   monthOf,
   purchaseDay,
+  shownDay,
   timeOfDay,
 } from '@/days'
 
@@ -88,6 +89,16 @@ describe('dayOfAnyYear (MOL-57, self-review С-5)', () => {
   })
 })
 
+describe('shownDay (MOL-187, Б2; MOL-188, А1)', () => {
+  it('is the later of the screen’s day and the clock’s', () => {
+    // Past midnight, the screen not told yet: the clock's.
+    expect(shownDay('2026-12-31', new Date(2027, 0, 1, 0, 5))).toBe('2027-01-01')
+    // A screen's day ahead of the clock — a phone whose clock lags: the screen's.
+    expect(shownDay('2026-10-19', new Date(2026, 9, 18, 12))).toBe('2026-10-19')
+    expect(shownDay('2026-10-18', new Date(2026, 9, 18, 12))).toBe('2026-10-18')
+  })
+})
+
 describe('monthOf (MOL-66)', () => {
   it('names the month and the year, without the «г.» Russian adds', () => {
     expect(monthOf('2026-09', 'ru')).toBe('сентябрь 2026')
@@ -95,6 +106,15 @@ describe('monthOf (MOL-66)', () => {
     // The first and the last month: the number is a month, not an index.
     expect(monthOf('2027-01', 'ru')).toBe('январь 2027')
     expect(monthOf('2026-12', 'en')).toBe('December 2026')
+  })
+
+  it('leaves out the year of the day it is shown on, and only that year (MOL-188, В-2)', () => {
+    expect(monthOf('2026-09', 'ru', '2026-10-18')).toBe('сентябрь')
+    expect(monthOf('2026-09', 'en', '2026-10-18')).toBe('September')
+    // The year before and the one after are said, the first day of the year too.
+    expect(monthOf('2025-12', 'ru', '2026-01-01')).toBe('декабрь 2025')
+    expect(monthOf('2027-01', 'ru', '2026-12-31')).toBe('январь 2027')
+    expect(monthOf('2026-01', 'ru', '2026-01-01')).toBe('январь')
   })
 })
 

@@ -11,6 +11,10 @@ import { createTripRepository } from '@/db/trips-repository'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { verdicts as verdictsTable } from '@/db/schema'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 506 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const places = createPlaceRepository(db)
 const trips = createTripRepository(db)
@@ -148,7 +152,7 @@ describe('куплено, но не оценено', () => {
 
     await verdicts.put(actorId, { itemId, score: 4 })
     expect(await expenses.unratedFor(actorId, 10)).toHaveLength(0)
-  })
+  }, 10_000)
 
   it('снятая оценка — не мнение: покупка снова ждёт оценки', async () => {
     const actorId = await insertActor(db)

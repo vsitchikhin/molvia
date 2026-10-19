@@ -376,9 +376,10 @@ export default defineComponent({
     }
     function receiptNote(row: ReceiptRow): string | null {
       if (row.recordRefused && row.state === 'parsed') return t('purchases.record_refused')
+      // a line with no figures read is not settled either (MOL-255): one word true of both
       const unsettled = row.summary?.unsettled ?? 0
       return row.state === 'parsed' && unsettled > 0
-        ? t('purchases.issues_mismatch', { n: unsettled }, unsettled)
+        ? t('purchases.issues_check', { n: unsettled }, unsettled)
         : null
     }
     function iconOf(row: ReceiptRow) {

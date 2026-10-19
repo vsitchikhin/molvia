@@ -103,7 +103,7 @@
 import { computed, defineComponent, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ERROR, cityWhereNameRepeats, isSamePlaceName } from '@molvia/model'
-import type { CatalogueEntry } from '@molvia/model'
+import type { CatalogueEntry, WireCode } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -263,6 +263,16 @@ export default defineComponent({
         : 0
 
     /**
+     * Why a trip did not come back: another opened meanwhile, its receipt recorded again by a new shot
+     * (MOL-254) — else its ten minutes are over.
+     */
+    const restoreRefusal = (code: WireCode): string => {
+      if (code === ERROR.TRIP_OPEN) return t('trip.remove.not_restored_open')
+      if (code === ERROR.RECEIPT_RECORDED_BEFORE) return t('trip.remove.not_restored_recorded')
+      return t('trip.remove.not_restored_gone')
+    }
+
+    /**
      * Why it was refused, in the person's words where the dictionary has them. A code from the
      * `issue.*` half is a fault of the app rather than of what was typed: it is named plainly and
      * carried as the code itself, which is what a report needs.
@@ -271,9 +281,7 @@ export default defineComponent({
       const key = item.code.startsWith('error.') ? item.code : null
       const why =
         item.write.kind === 'restore'
-          ? item.code === ERROR.TRIP_OPEN
-            ? t('trip.remove.not_restored_open')
-            : t('trip.remove.not_restored_gone')
+          ? restoreRefusal(item.code)
           : key
             ? t(key)
             : t('trip.rejected.unknown', { code: item.code })

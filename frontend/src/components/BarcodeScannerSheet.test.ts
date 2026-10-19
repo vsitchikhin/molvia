@@ -10,6 +10,10 @@ import type * as ReaderModule from '@/scanner/barcodeReader'
 import type { ReaderWorker } from '@/scanner/barcodeReader'
 import type { ReaderReply } from '@/scanner/protocol'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 642 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 // The real reader over a fake worker, so what a dispose does to a warm still waiting is the app's
 // own code (adversarial Б). The worker answers a warm at once, never — a wasm still on its way — or
 // with a failure; each frame with the next of `codes`, and a frame past the end is never answered.
@@ -160,7 +164,7 @@ describe('BarcodeScannerSheet', () => {
     expect(sheet.find('video').exists()).toBe(true)
     expect(sheet.text()).toContain(en.scanner.hint)
     expect(sheet.text()).toContain(en.scanner.manual)
-  })
+  }, 10_000)
 
   it('hands over a code two frames agree on, and closes', async () => {
     const { stream, track } = fakeStream()
@@ -644,7 +648,7 @@ describe('BarcodeScannerSheet · how to stop Safari asking', () => {
     await new Promise((resolve) => setTimeout(resolve, PERMISSION_WAIT * 2))
     await settle()
     expect(getUserMedia).not.toHaveBeenCalled()
-  })
+  }, 15_000)
 
   it('asks for the camera once for one opening, however the answers cross (adversarial В)', async () => {
     // Seen before: the line, not the sheet, so nothing lies over the scanner's own buttons.
@@ -687,7 +691,7 @@ describe('BarcodeScannerSheet · how to stop Safari asking', () => {
     )
     await settle()
     expect(hintUp()).toBe(false)
-  })
+  }, 10_000)
 
   it('puts the quiet line in the footer before the camera answers, not under a live picture', async () => {
     localStorage.setItem('molvia.camera-hint', '1')

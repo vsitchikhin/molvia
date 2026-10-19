@@ -4,6 +4,10 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 510 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const root = fileURLToPath(new URL('../..', import.meta.url))
 
 /**
@@ -23,5 +27,5 @@ describe('the bundled bot', () => {
     // Either the class kept its name outright, or it was renamed and carries its own back.
     if (/\bAbortSignal\d+ = class\b/.test(bundle)) expect(renamed?.[2]).toBe('AbortSignal')
     else expect(bundle).toMatch(/\bAbortSignal = class\b|\bclass AbortSignal\b/)
-  })
+  }, 10_000)
 })

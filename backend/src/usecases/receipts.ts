@@ -240,6 +240,8 @@ export async function receiptOfOwner(
   codes = false,
   /** The phone knows the detail's `readTotal` (`RECEIPT_READ_TOTAL_HEADER`, MOL-244). */
   readTotal = false,
+  /** The phone knows the detail's `readPartly` (`RECEIPT_READ_PARTLY_HEADER`, MOL-255). */
+  readPartly = false,
 ): Promise<ReceiptDetail> {
   const found = await repositories.receipts.one(actor.id, id)
   if (found === null) throw new DomainError(ERROR.NOT_FOUND)
@@ -319,7 +321,7 @@ export async function receiptOfOwner(
               : (line.match ?? 'new'),
         translation: line.translation,
         amount: amounts[i] ?? null,
-        rememberedPrice: priceInDoubt(line.price, rememberedOf(remembered))
+        rememberedPrice: priceInDoubt(receipt.country, line.price, rememberedOf(remembered))
           ? rememberedOf(remembered)
           : null,
         ...(code === null ? {} : { code }),
@@ -328,6 +330,7 @@ export async function receiptOfOwner(
     rate: snapshot?.rate ?? null,
     duplicateOf: twin,
     ...(readTotal ? { readTotal: found.readTotal } : {}),
+    ...(readPartly ? { readPartly: found.readPartly } : {}),
   }
 }
 

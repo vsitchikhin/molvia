@@ -23,6 +23,10 @@ import {
   signIn,
 } from './fixtures'
 
+// The 5 tests here past half a second on CI carry a timeout of 10 s: the slowest took 780 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 
 let app: FastifyInstance
@@ -187,7 +191,7 @@ describe('три группы', () => {
       'review',
     ])
     expect(reply.body).not.toContain('100000')
-  })
+  }, 10_000)
 
   it('снятая оценка уходит с экрана и возвращается после повторной', async () => {
     const actorId = await insertActor(db)
@@ -260,7 +264,7 @@ describe('цены', () => {
 
     const [row] = (await screen(actorId)).rows
     expect(row?.level === 'take' && row.places).toEqual([])
-  })
+  }, 10_000)
 
   it('покупка без цены или без количества не наблюдение', async () => {
     const actorId = await insertActor(db)
@@ -316,7 +320,7 @@ describe('цены', () => {
       ['Ереван Сити', 'Гюмри'],
       ['Ереван Сити', 'Ереван'],
     ])
-  })
+  }, 10_000)
 
   it('давний чек другой пары не стоит на строке: московский сыр двухлетней давности (адверсариальный И)', async () => {
     const actorId = await insertActor(db)
@@ -405,7 +409,7 @@ describe('чужое', () => {
     expect(row?.ratingsCount).toBe(3)
     // Как на листе покупки: место открыто троими, но я там брал — моя последняя, а не чужая.
     expect(row?.level === 'take' && row.places[0]?.unitPrice.scaledMinor).toBe(perKilo(510_000))
-  })
+  }, 15_000)
 
   it('на двоих отдаёт мои цифры: из средней вычиталась бы чужая оценка', async () => {
     const me = await insertActor(db)
@@ -465,7 +469,7 @@ describe('чужое', () => {
     const reply = await ask(me)
     expect(reply.body).toContain('Мой отзыв')
     expect(reply.body).not.toContain('Чужой')
-  })
+  }, 10_000)
 })
 
 describe('журнал событий', () => {

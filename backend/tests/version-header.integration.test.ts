@@ -8,6 +8,11 @@ import { DomainError, ERROR, VERSION_HEADER } from '@molvia/model'
 import { VERSION } from '@/env'
 import { buildServer } from '@/server'
 
+// The test here past a second on CI carries a timeout of 15 s: it took 1 150 ms there at worst
+// (MOL-266), in the first attempt of a run re-run, which the first measure did not read (MOL-243,
+// round 21). Ten times that, rounded up to 5 s, so the time reporter names it only on a run slower
+// than any yet seen.
+
 let app: FastifyInstance
 
 beforeAll(async () => {
@@ -70,17 +75,21 @@ describe('a build named outside latin1', () => {
   it.each([
     ['a tag in Cyrillic', 'v0.2-бета-3-g1a2b3c4', 'v0.2-%D0%B1%D0%B5%D1%82%D0%B0-3-g1a2b3c4'],
     ['a latin tag, as it is', 'v0.2-beta-3-g1a2b3c4', 'v0.2-beta-3-g1a2b3c4'],
-  ])('%s still lets every answer through, and names it', async (_name, version, named) => {
-    vi.resetModules()
-    process.env.APP_VERSION = version
-    const { buildServer: build } = await import('@/server')
-    served = build()
-    await served.listen({ host: '127.0.0.1', port: 0 })
-    const address = served.server.address()
-    if (address === null || typeof address === 'string') throw new Error('no port')
+  ])(
+    '%s still lets every answer through, and names it',
+    async (_name, version, named) => {
+      vi.resetModules()
+      process.env.APP_VERSION = version
+      const { buildServer: build } = await import('@/server')
+      served = build()
+      await served.listen({ host: '127.0.0.1', port: 0 })
+      const address = served.server.address()
+      if (address === null || typeof address === 'string') throw new Error('no port')
 
-    const nowhere = await fetch(`http://127.0.0.1:${String(address.port)}/nowhere`)
-    expect(nowhere.status).toBe(404)
-    expect(nowhere.headers.get(VERSION_HEADER)).toBe(named)
-  })
+      const nowhere = await fetch(`http://127.0.0.1:${String(address.port)}/nowhere`)
+      expect(nowhere.status).toBe(404)
+      expect(nowhere.headers.get(VERSION_HEADER)).toBe(named)
+    },
+    25_000,
+  )
 })

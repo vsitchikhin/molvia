@@ -41,11 +41,13 @@ const sameQuantity = (a: StoredReceiptLine['quantity'], b: StoredReceiptLine['qu
 /**
  * A line recorded as it was read (В-4): it added up, and the person changed neither its quantity nor
  * what was paid. Its cut-out rows keep the text read as their confirmed text; its shelf price is what
- * the memory keeps.
+ * the memory keeps. A line that added up has no price only where the check took it off as misread
+ * (MOL-255): its row would teach the reader that misreading, so it is not read as printed.
  */
 function asRead(stored: StoredReceiptLine, line: RecordedLine): boolean {
   return (
     stored.settled &&
+    stored.price !== null &&
     sameQuantity(line.quantity, stored.quantity) &&
     sameMoney(line.amount, stored.sum)
   )
@@ -176,7 +178,8 @@ export async function recordReceipt(
     }
     // recorded: the same trip again is the same answer while it is there; a trip marked removed may
     // still come back with «Вернуть». One removed for good takes the receipt with it (MOL-240): the
-    // paper is recorded again by a new shot, its twin gone with the trip
+    // paper is recorded again by a new shot, its twin gone with the trip. A new shot is recorded
+    // while the trip is only marked too, and then that trip's «Вернуть» is refused (MOL-254)
     if (held.tripId !== null) {
       if (held.tripId === body.tripId && held.tripAlive) {
         const again = await answer(body.tripId)

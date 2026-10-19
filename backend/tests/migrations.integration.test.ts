@@ -6,6 +6,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { testDatabaseUrl } from './db'
 import { MIGRATIONS } from '@/db/migrate'
 
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+
 /**
  * The chain against a database that already used it. Every other test starts from an empty
  * database, so the one case this covers is invisible to them: rows that were legal under an
@@ -176,5 +180,5 @@ describe('the migration chain on a database that already holds rows', () => {
       select search_key from items where id = ${blankItemId}
     `
     expect(repaired?.search_key).toBe(`nokey-${blankItemId}`)
-  })
+  }, 15_000)
 })

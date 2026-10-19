@@ -10,6 +10,11 @@ import { itemBarcodes, items } from '@/db/schema'
 import { connect, connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem } from './fixtures'
 
+// The 5 tests here past half a second on CI carry a timeout of their own (MOL-266), ten times their
+// worst there, rounded up to 5 s, so the time reporter names one only on a run slower than any yet
+// seen: 10 s for 4 of them, and 15 s for «splits a name at every White_Space…», which took 1 022 ms
+// in a cancelled run, which the first measure left out (MOL-243, round 19).
+
 const sql = connect()
 const { db, close } = connectDrizzle()
 const repo = createItemRepository(db)
@@ -321,7 +326,7 @@ describe('search — a unit is a size, not a word (MOL-48)', () => {
       expect(await candidate(query, name), query).toBe(true)
       expect(await names(query), query).toEqual([])
     }
-  })
+  }, 10_000)
 
   it('still refines the ranking: «кефир 500 мл» puts its own size first', async () => {
     // The rule holds on the query's side too: `ml` of the query grounds nothing, so it does
@@ -389,7 +394,7 @@ describe('search — a unit is a size, not a word (MOL-48)', () => {
         expect(await names(prefix), prefix).toContain(name)
       }
     }
-  })
+  }, 10_000)
 
   it('reads a slip of the finger in a unit after a number as the unit: «мд», «кн»', async () => {
     await named('Кефир 500 мл')
@@ -713,7 +718,7 @@ describe('search — edges', () => {
     )
     await named('Масло сливочное')
     expect((await names('ма'))[0]).toBe('Масло сливочное')
-  })
+  }, 10_000)
 
   it('ranks every candidate: two hundred near misses do not push the right item out', async () => {
     // «малако» scores 0.429 against any «Малина» and 0.167 against the milk. Cut by
@@ -730,16 +735,15 @@ describe('search — edges', () => {
       })),
     )
     expect(await names('малако')).toEqual(['Молоко Ашхар 3.2%'])
-  })
+  }, 10_000)
 
   it('bounds the work by the query: 42 KB of words answers like the first twelve', async () => {
     await named('Молоко Ашхар')
-    const query = Array.from({ length: 6000 }, () => 'молоко').join(' ')
-    const started = performance.now()
-    expect(await names(query)).toEqual(['Молоко Ашхар'])
-    // Generous on purpose: the answer above already proves the cut; the time only guards
-    // against the unbounded cost, and a slow runner must not fail a correct build.
-    expect(performance.now() - started).toBeLessThan(5000)
+    // Every word its own: past the twelfth none of them is read, so the milk is found by the first. The
+    // answer, not a clock, holds the cut (MOL-266): read whole, these words find nothing — in the same
+    // milliseconds, and six thousand times «молоко» found the milk either way, a few times slower.
+    const words = Array.from({ length: 4399 }, (_, i) => `слово${String(i)}`)
+    expect(await names(['молоко', ...words].join(' '))).toEqual(['Молоко Ашхар'])
   })
 
   it('survives an unfinished last word longer than 255 against a longer name word', async () => {
@@ -751,7 +755,7 @@ describe('search — edges', () => {
     expect((await repo.search(`сыр ${'щ'.repeat(150)}`, 10, nobody, null)).items).toBeInstanceOf(
       Array,
     )
-  })
+  }, 10_000)
 
   it('returns exactly as many as asked: 0, 1, N, N+1', async () => {
     for (const name of ['Молоко Ашхар', 'Молоко Марианна', 'Молоко Лори']) await named(name)
@@ -903,7 +907,7 @@ describe('search — a word the shelf writes otherwise (MOL-45)', () => {
       await named(name)
       expect(await names('картошка'), code.toString(16)).toEqual([name])
     }
-  })
+  }, 25_000)
 
   it('takes a noun with an adjective ending for the kind: «Пирожное Картошка» is no potato (review Р)', async () => {
     await named('Пирожное Картошка')
@@ -963,7 +967,7 @@ describe("search — a word of the person's own (MOL-45)", () => {
     expect(await namesFor(actorId, 'бахчевые спелые')).toEqual([])
     // The key, not the spelling: the same word in another case or script is the same query.
     expect(await namesFor(actorId, 'БАХЧЕВЫЕ')).toEqual(['Арбуз'])
-  })
+  }, 10_000)
 
   it('puts the learnt item above what the search found only by a typo (review, О)', async () => {
     // «овощи» finds the flour by two edits (MOL-46); the potato learnt for it stays first.
@@ -1045,7 +1049,7 @@ describe("search — a word of the person's own (MOL-45)", () => {
     await picks.remember(actorId, 'бахчевые', melon)
 
     expect(await namesFor(actorId, 'бахчевые')).toEqual(['Арбуз'])
-  })
+  }, 10_000)
 
   it('reaches the index with a learnt word in the query', async () => {
     const actorId = await insertActor(db)
@@ -1138,22 +1142,26 @@ describe('search — what the person took before (MOL-11)', () => {
     ['молоко', 'мо', false],
     ['мо', 'мол', false],
     ['молоко', 'молоко молоко', false],
-  ])('remembered «%s», typing «%s» — lifted: %s', async (stored, typing, lifted) => {
-    const actorId = await insertActor(db)
-    const ids = new Map([
-      ['Молоко Ашхар', await named('Молоко Ашхар')],
-      ['Молоко Марианна', await named('Молоко Марианна')],
-    ])
-    const before = await plain(typing)
-    // Both milks have to be there, or a lift would have nothing to reorder and pass unseen.
-    expect(before).toHaveLength(2)
-    const lower = before.at(-1) ?? ''
+  ])(
+    'remembered «%s», typing «%s» — lifted: %s',
+    async (stored, typing, lifted) => {
+      const actorId = await insertActor(db)
+      const ids = new Map([
+        ['Молоко Ашхар', await named('Молоко Ашхар')],
+        ['Молоко Марианна', await named('Молоко Марианна')],
+      ])
+      const before = await plain(typing)
+      // Both milks have to be there, or a lift would have nothing to reorder and pass unseen.
+      expect(before).toHaveLength(2)
+      const lower = before.at(-1) ?? ''
 
-    await picks.remember(actorId, stored, ids.get(lower) ?? '')
+      await picks.remember(actorId, stored, ids.get(lower) ?? '')
 
-    const expected = lifted ? [lower, ...before.slice(0, -1)] : before
-    expect(await namesFor(actorId, typing)).toEqual(expected)
-  })
+      const expected = lifted ? [lower, ...before.slice(0, -1)] : before
+      expect(await namesFor(actorId, typing)).toEqual(expected)
+    },
+    10_000,
+  )
 
   it('matches the words before the last one exactly and the last one by its start', async () => {
     const actorId = await insertActor(db)
@@ -1276,7 +1284,7 @@ describe('search — what the person took before (MOL-11)', () => {
     await picks.remember(actorId, 'моло', secondId)
 
     expect(await namesFor(actorId, 'молоко')).toEqual([second, first])
-  })
+  }, 10_000)
 
   it('treats a malformed owner as one with no memory, not as a 500', async () => {
     const { first, second } = await twoMilks()

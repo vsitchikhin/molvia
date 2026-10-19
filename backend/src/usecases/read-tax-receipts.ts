@@ -1,5 +1,5 @@
 import {
-  RECEIPT_CURRENCY,
+  receiptCard,
   receiptClockOf,
   receiptLineCodec,
   receiptLineOf,
@@ -129,7 +129,7 @@ async function outcomeOf(
   // the tax office's own answer with no list: counted apart from a failure of ours (adversarial А7)
   if (journal === null || journal.lines.length === 0) return failed('unreadable', true)
 
-  const currency = RECEIPT_CURRENCY[claimed.country]
+  const { currency } = receiptCard(claimed.country)
   const lines = journal.lines.map((line) => receiptLineOf(line, currency))
   // the lines go out on the wire as the contract says, or the receipt is not read (Т-5 of MOL-125)
   if (!z.array(receiptLineCodec).safeEncode(lines).success) return failed('unreadable')

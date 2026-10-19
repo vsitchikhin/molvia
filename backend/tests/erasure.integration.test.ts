@@ -39,6 +39,10 @@ import {
   telegramId,
 } from './fixtures'
 
+// The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 796 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const erasure = createErasureRepository(db)
 
@@ -156,7 +160,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     expect(await rowsMentioning(exchangeId)).toEqual([])
     expect(await rowsMentioning(incomeId)).toEqual([])
     expect(await rowsMentioning(transferId)).toEqual([])
-  })
+  }, 15_000)
 
   it('товар, который человек завёл, остаётся в справочнике без автора', async () => {
     const tg = telegramId()
@@ -171,7 +175,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     const [item] = await db.select().from(items).where(eq(items.id, ownItem))
     expect(item?.createdBy).toBeNull()
     expect(item?.name).toBe('Рынок-сыр')
-  })
+  }, 10_000)
 
   it('код, который человек дописал к позиции, остаётся в справочнике без автора (MOL-100)', async () => {
     const tg = telegramId()
@@ -216,7 +220,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     expect(
       await db.select().from(loginRequests).where(eq(loginRequests.telegramUserId, boris)),
     ).toHaveLength(2)
-  })
+  }, 10_000)
 
   it('сухой прогон считает ровно то же и не меняет ни строки', async () => {
     const tg = telegramId()
@@ -228,7 +232,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
 
     expect(await snapshot(anna)).toEqual(before)
     expect(await erasure.erase(tg, { dryRun: false })).toEqual(dry)
-  })
+  }, 10_000)
 
   it('неизвестный владелец: стирает только его запросы входа', async () => {
     const tg = telegramId()
@@ -308,7 +312,7 @@ describe('подтверждение входа и стирание одного
     } finally {
       await holder.close()
     }
-  })
+  }, 10_000)
 
   it('и стирание ждёт того же замка — первым, до любой строки', async () => {
     const tg = telegramId()
@@ -325,7 +329,7 @@ describe('подтверждение входа и стирание одного
     } finally {
       await holder.close()
     }
-  })
+  }, 10_000)
 
   it('а другой аккаунт этот замок не держит', async () => {
     const tg = telegramId()
@@ -365,7 +369,7 @@ describe('владельца, пока идёт стирание, не созд�
     } finally {
       await holder.close()
     }
-  })
+  }, 10_000)
 
   it('сборка входа тоже ждёт — и ждёт до строки запроса, так что стиранию ждать нечего', async () => {
     const tg = telegramId()
@@ -389,7 +393,7 @@ describe('владельца, пока идёт стирание, не созд�
     } finally {
       await holder.close()
     }
-  })
+  }, 10_000)
 })
 
 describe('стирание не закрывает вход остальным (adversarial Р-3)', () => {

@@ -8,6 +8,10 @@ import { createExpenseRepository } from '@/db/expenses-repository'
 import { createTripRepository } from '@/db/trips-repository'
 import { transactOn } from '@/db/unit-of-work'
 
+// The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 558 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 // A second connection, for the races: one connection runs its statements one after another,
 // and two requests at once is exactly what it cannot show.
@@ -73,7 +77,7 @@ describe('trips.start: один открытый поход (MOL-21, В-4)', () 
       trips.start(actorId, { id: randomUUID(), placeId: city }, 'AMD', null),
     ).rejects.toThrow(ERROR.TRIP_OPEN)
     expect(await trips.listFor(actorId, 10)).toHaveLength(1)
-  })
+  }, 10_000)
 
   it('В-7: тот же магазин не исключение — вчерашний открытый поход тоже спрашивает', async () => {
     const actorId = await insertActor(db)
@@ -131,7 +135,7 @@ describe('trips.start: один открытый поход (MOL-21, В-4)', () 
     const refused = outcomes.find((outcome) => outcome.status === 'rejected')
     expect(refused?.status === 'rejected' && String(refused.reason)).toContain(ERROR.TRIP_OPEN)
     expect(await trips.listFor(actorId, 10)).toHaveLength(1)
-  })
+  }, 10_000)
 
   it('гонка: двойной тап одним id — один поход, оба ответа о нём', async () => {
     const actorId = await insertActor(db)
@@ -222,7 +226,7 @@ describe('expenses.add: id от устройства (MOL-21, В-2)', () => {
     await expect(expenses.add(actorId, { id, tripId, itemId: otherItem })).rejects.toThrow(
       ERROR.CONFLICT,
     )
-  })
+  }, 10_000)
 
   it('id чужой траты — CONFLICT, и чужая покупка не приходит в ответ', async () => {
     const mine = await openTrip()
@@ -248,7 +252,7 @@ describe('expenses.add: id от устройства (MOL-21, В-2)', () => {
 
     expect(created).toBe(true)
     expect(await expenses.forTrip(tripId, actorId)).toHaveLength(1)
-  })
+  }, 10_000)
 })
 
 describe('transactOn', () => {

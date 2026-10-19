@@ -3,7 +3,9 @@ import { and, asc, eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { ERROR, receiptRecordedCodec, tripHistoryCodec, tripViewCodec } from '@molvia/model'
+import { drizzle } from 'drizzle-orm/postgres-js'
 import type { FastifyInstance } from 'fastify'
+import postgres from 'postgres'
 import { createExpenseRepository } from '@/db/expenses-repository'
 import { createMoneyRepository } from '@/db/money-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
@@ -20,10 +22,15 @@ import {
   trips,
 } from '@/db/schema'
 import { settleStoreMemory } from '@/db/store-memory-repository'
+import * as schema from '@/db/schema'
 import { createTripRepository } from '@/db/trips-repository'
 import { buildServer } from '@/server'
-import { connect, connectDrizzle } from './db'
+import { connect, connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtures'
+
+// The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 857 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
 
 /**
  * «Записать» (MOL-126): a parsed receipt written in one go as a finished trip on its own day, its
@@ -261,7 +268,7 @@ describe('«Записать»', () => {
     ])
     const pending = await createExpenseRepository(db).pendingVerdictsFor(me, 10)
     expect(pending.total).toBe(3)
-  })
+  }, 10_000)
 
   it('answers a repeat with the same trip as before, another trip with a 409', async () => {
     const me = await insertActor(db)
@@ -288,7 +295,7 @@ describe('«Записать»', () => {
     expect([other.statusCode, codeOf(other)]).toEqual([409, ERROR.CONFLICT])
     // the repeat is the same record: counted once (MOL-222)
     expect(await db.select().from(receiptDays)).toMatchObject([{ recorded: 1, lines: 1 }])
-  })
+  }, 10_000)
 
   it('answers «recorded?» only once a record still running has ended (MOL-169, Г1)', async () => {
     const me = await insertActor(db)
@@ -345,7 +352,7 @@ describe('«Записать»', () => {
       headers: { cookie: await signIn(db, other) },
     })
     expect([theirs.statusCode, codeOf(theirs)]).toEqual([404, ERROR.NOT_FOUND])
-  })
+  }, 15_000)
 
   it('refuses the same receipt recorded before while its purchases are there (Т-11)', async () => {
     const me = await insertActor(db)
@@ -370,6 +377,186 @@ describe('«Записать»', () => {
     // the purchases removed, the receipt may be recorded again
     await db.update(trips).set({ deletedAt: new Date() }).where(eq(trips.id, firstBody.tripId))
     expect((await record(me, second, body())).statusCode).toBe(200)
+  })
+
+  // MOL-254: a new shot is recorded while the trip of the first lies removed, and that trip's
+  // «Вернуть» is refused — brought back, one paper was two records
+  describe('«Вернуть» of a trip whose receipt was recorded again (MOL-254)', () => {
+    let shop: { milk: string; place: string }
+    beforeEach(async () => {
+      shop = { milk: await insertItem(db), place: await insertPlace(db) }
+    })
+    const recordBody = (tripId: string) => ({
+      tripId,
+      place: { id: shop.place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        {
+          position: 0,
+          skip: false,
+          item: { id: shop.milk },
+          quantity: pieces(2),
+          amount: amount(740),
+        },
+      ],
+    })
+    const recorded = async (me: string, over: Partial<typeof receipts.$inferInsert> = {}) => {
+      const tripId = randomUUID()
+      const id = await parsedReceipt(me, LINES.slice(0, 1), over)
+      expect((await record(me, id, recordBody(tripId))).statusCode).toBe(200)
+      return tripId
+    }
+    const trip = async (me: string, tripId: string, action: 'DELETE' | 'restore') =>
+      app.inject({
+        method: action === 'DELETE' ? 'DELETE' : 'POST',
+        url: action === 'DELETE' ? `/trips/${tripId}` : `/trips/${tripId}/restore`,
+        headers: { cookie: await signIn(db, me) },
+      })
+    const alive = async (me: string) =>
+      (
+        await db
+          .select({ id: trips.id })
+          .from(trips)
+          .where(and(eq(trips.actorId, me), sql`${trips.deletedAt} is null`))
+      ).map((row) => row.id)
+
+    it('refuses it while the new record is there, and lets the other come back once it is not', async () => {
+      const me = await insertActor(db)
+      const first = await recorded(me)
+      expect((await trip(me, first, 'DELETE')).statusCode).toBe(204)
+      const second = await recorded(me)
+
+      const refused = await trip(me, first, 'restore')
+      expect([refused.statusCode, codeOf(refused)]).toEqual([409, ERROR.RECEIPT_RECORDED_BEFORE])
+      expect(await alive(me)).toEqual([second])
+
+      // the new one removed in its turn: the first comes back, and now the new one is refused
+      expect((await trip(me, second, 'DELETE')).statusCode).toBe(204)
+      expect((await trip(me, first, 'restore')).statusCode).toBe(200)
+      const again = await trip(me, second, 'restore')
+      expect([again.statusCode, codeOf(again)]).toEqual([409, ERROR.RECEIPT_RECORDED_BEFORE])
+      expect(await alive(me)).toEqual([first])
+    }, 10_000)
+
+    it('does not refuse it for a receipt with no number: it is held by its id alone', async () => {
+      const me = await insertActor(db)
+      const unnumbered = await recorded(me, { receiptNo: null })
+      expect((await trip(me, unnumbered, 'DELETE')).statusCode).toBe(204)
+      await recorded(me, { receiptNo: null })
+      expect((await trip(me, unnumbered, 'restore')).statusCode).toBe(200)
+    }, 10_000)
+
+    it('does not refuse it for the same receipt recorded by another person', async () => {
+      const me = await insertActor(db)
+      const mine = await recorded(me)
+      expect((await trip(me, mine, 'DELETE')).statusCode).toBe(204)
+      await recorded(await insertActor(db))
+      expect((await trip(me, mine, 'restore')).statusCode).toBe(200)
+    })
+
+    it('answers 404 past the ten minutes, as for any trip', async () => {
+      const me = await insertActor(db)
+      const late = await recorded(me)
+      expect((await trip(me, late, 'DELETE')).statusCode).toBe(204)
+      await recorded(me)
+      await db
+        .update(trips)
+        .set({ deletedAt: sql`clock_timestamp() - interval '11 minutes'` })
+        .where(eq(trips.id, late))
+      const gone = await trip(me, late, 'restore')
+      expect([gone.statusCode, codeOf(gone)]).toEqual([404, ERROR.NOT_FOUND])
+    })
+
+    // Т-4: the two wait on the owner's lock in an order the test sets, on a pool of their own as in
+    // production — the file's one connection would line them up and the lock would never be waited
+    // on (adversarial А1); a check read before the lock lets both through, so the first case is red
+    it.each([
+      ['«Записать»', [200, 409]],
+      ['«Вернуть»', [409, 200]],
+    ] as const)(
+      'lets one of «Записать» and «Вернуть» through, %s first',
+      async (firstIn, expected) => {
+        const me = await insertActor(db)
+        const first = await recorded(me)
+        expect((await trip(me, first, 'DELETE')).statusCode).toBe(204)
+        const shot = await parsedReceipt(me, LINES.slice(0, 1))
+        const cookie = await signIn(db, me)
+
+        const pool = postgres(testDatabaseUrl(), { max: 4, onnotice: () => undefined })
+        const racing = buildServer({ db: drizzle(pool, { schema }), receiptReader: null })
+        await racing.ready()
+        const holder = connect()
+        const watcher = connect()
+        // who waits on this owner's lock by its key — another waiter of the database never sets the
+        // order (adversarial Б1); given up within the case's 5 s, so a failure names itself (Б2)
+        const waiting = async (n: number) => {
+          const deadline = Date.now() + 2_000
+          while (Date.now() < deadline) {
+            const [row] = await watcher<{ n: number }[]>`
+            select count(*)::int as n from pg_locks
+            where locktype = 'advisory' and not granted and objsubid = 2
+              and classid = hashtext('trips')::oid and objid = hashtext(${me})::oid
+              and database = (select oid from pg_database where datname = current_database())
+          `
+            if ((row?.n ?? 0) >= n) return
+            await new Promise((resolve) => setTimeout(resolve, 10))
+          }
+          throw new Error(`fewer than ${String(n)} waiting on the owner's lock`)
+        }
+        // a request still on its way is waited for before the pool closes, never left to the next case
+        const sent: PromiseLike<unknown>[] = []
+        const send = <T>(request: PromiseLike<T>) => {
+          sent.push(request)
+          return request
+        }
+        const recordShot = () =>
+          send(
+            racing.inject({
+              method: 'POST',
+              url: `/receipts/${shot}/record`,
+              headers: { cookie, 'x-molvia-today': '2026-10-03' },
+              payload: recordBody(randomUUID()),
+            }),
+          )
+        const restoreFirst = () =>
+          send(
+            racing.inject({ method: 'POST', url: `/trips/${first}/restore`, headers: { cookie } }),
+          )
+
+        let release: () => void = () => undefined
+        let locked: () => void = () => undefined
+        const holding = new Promise<void>((resolve) => (locked = resolve))
+        const held = holder.begin(async (tx) => {
+          await tx`select pg_advisory_xact_lock(hashtext('trips'), hashtext(${me}))`
+          locked()
+          await new Promise<void>((resolve) => (release = resolve))
+        })
+        try {
+          await holding
+          const recordFirst = firstIn === '«Записать»'
+          const one = recordFirst ? recordShot() : restoreFirst()
+          await waiting(1)
+          const two = recordFirst ? restoreFirst() : recordShot()
+          await waiting(2)
+          release()
+          await held
+          const [recordedNow, restored] = recordFirst
+            ? [await one, await two]
+            : [await two, await one]
+          expect([recordedNow.statusCode, restored.statusCode]).toEqual(expected)
+          const refused = recordedNow.statusCode === 409 ? recordedNow : restored
+          expect(codeOf(refused)).toBe(ERROR.RECEIPT_RECORDED_BEFORE)
+          expect(await alive(me)).toHaveLength(1)
+        } finally {
+          release()
+          await held.catch(() => undefined)
+          await Promise.allSettled(sent)
+          await racing.close()
+          await Promise.all([pool.end(), holder.end(), watcher.end()])
+        }
+      },
+      10_000,
+    )
   })
 
   it('refuses a receipt not read yet, lines that are not the receipt’s, and a day to come', async () => {
@@ -431,6 +618,58 @@ describe('«Записать»', () => {
     expect(response.statusCode).toBe(200)
     const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
     expect(trip?.receiptMinor).toBe(215_000n)
+  })
+
+  it('confirms no row of a line whose price the check took off as misread (MOL-255)', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const shampoo = await insertItem(db)
+    const id = await parsedReceipt(me, [
+      { printed: 'Շամպուն', sku: '745030', price: 624, sum: 624 },
+      ...LINES.slice(1, 2),
+    ])
+    // «624.44 624.41»: the line holds to the till's luma, the price is no figure the check verifies
+    await db
+      .update(receiptLines)
+      .set({ priceMinor: null })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 0)))
+    const response = await record(me, id, {
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        {
+          position: 0,
+          skip: false,
+          item: { id: shampoo },
+          quantity: pieces(1),
+          amount: amount(624),
+        },
+        {
+          position: 1,
+          skip: false,
+          item: { id: shampoo },
+          quantity: pieces(1),
+          amount: amount(1_450),
+        },
+      ],
+    })
+    expect(response.statusCode).toBe(200)
+    const images = await db
+      .select()
+      .from(receiptLineImages)
+      .where(eq(receiptLineImages.receiptId, id))
+    // the line as read beside it keeps its row, confirmed
+    expect(images.map((image) => [image.position, image.confirmedAt !== null])).toEqual([[1, true]])
+    const words = await db
+      .select()
+      .from(storeMemory)
+      .where(eq(storeMemory.kind, 'sku'))
+      .orderBy(asc(storeMemory.key))
+    expect(words.map((word) => [word.key, word.priceMinor])).toEqual([
+      ['1110001', 145_000n],
+      ['745030', null],
+    ])
   })
 
   it('shows the trip as recorded from the receipt: each purchase with its line and discount', async () => {
@@ -557,7 +796,7 @@ describe('«Записать»', () => {
       }),
     )
     expect([overflow.statusCode, codeOf(overflow)]).toEqual([400, ERROR.INVALID_AMOUNT])
-  })
+  }, 10_000)
 
   // review 1, В1, В2: the receipt row holds the trip's date on the accounts, «из чека» and the guard
   // against a second record — it goes with its trip, never before it, and never after (MOL-240, А2 of
@@ -742,7 +981,7 @@ describe('«Записать»', () => {
     expect(await wordsOf(me)).toEqual([])
     // and nobody else's word moved
     expect(await wordsOf(stranger)).toEqual(all)
-  })
+  }, 10_000)
 
   // MOL-240, adversarial round 3: the word kept is what the last line still there says — its item,
   // price and moment — and two removals at once leave no word behind either
@@ -810,7 +1049,7 @@ describe('«Записать»', () => {
       expect((await wordsOf(me)).map((word) => word.itemId)).toEqual([kefir, kefir])
       expect(await remove(me, wrong)).toBe(true)
       expect((await wordsOf(me)).map((word) => word.itemId)).toEqual([milk, milk])
-    })
+    }, 10_000)
 
     // round 4, Р4-1: «as read» is judged at the record, never from the purchase as it is now
     it('Р4-1: keeps the shelf price after the sum paid was put right', async () => {
@@ -828,7 +1067,7 @@ describe('«Записать»', () => {
       expect(patched.statusCode).toBe(200)
       await settleStoreMemory(db)
       expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([37_000n, 37_000n])
-    })
+    }, 10_000)
 
     // round 5, Р5-1: a line an image rolled back recorded was never judged, `as_read` null — its price
     // stays while the purchase is as the line was read, and goes once the sum was put right
@@ -880,7 +1119,7 @@ describe('«Записать»', () => {
       await db.update(expenses).set({ amountMinor: 37_000n }).where(eq(expenses.tripId, tripId))
       await settleStoreMemory(db)
       expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([null, null])
-    })
+    }, 10_000)
 
     // round 4, Р4-1б: the word and the record share one moment — settling right after moves nothing
     it('Р4-1б: settles nothing a record has just written', async () => {
@@ -892,7 +1131,8 @@ describe('«Записать»', () => {
       expect(await settleStoreMemory(db)).toBe(0)
     })
 
-    // round 4, Р4-2: a person at a time, by their id — thousands of sellers are no tree for the parser
+    // round 4, Р4-2: a person at a time, by their id — thousands of sellers are no tree for the parser;
+    // 3 843 ms on CI at worst, ten times that its timeout (MOL-266)
     it('Р4-2: settles a person with thousands of sellers', async () => {
       const me = await insertActor(db)
       const milk = await insertItem(db)
@@ -912,7 +1152,7 @@ describe('«Записать»', () => {
       // no line says any of them: every word goes
       expect(await settleStoreMemory(db)).toBe(9_000)
       expect(await wordsOf(me)).toEqual([])
-    }, 30_000)
+    }, 60_000)
 
     it('Р3-3: two removals at once leave no word behind', async () => {
       const me = await insertActor(db)
@@ -936,7 +1176,7 @@ describe('«Записать»', () => {
         await other.close()
       }
       expect(await wordsOf(me)).toEqual([])
-    })
+    }, 15_000)
   })
 
   // MOL-222: the measure of 0.2 — what the person put right against what the review showed
@@ -1048,7 +1288,7 @@ describe('«Записать»', () => {
     expect(await db.select().from(receiptDays)).toMatchObject([
       { recorded: 5, within5m: 1, within15m: 1, within1h: 1, within1d: 1, later: 1 },
     ])
-  })
+  }, 10_000)
 
   // MOL-222, adversarial А6: the memory learns from another record between the review and «Записать»;
   // only the phone knows what it showed, and it says which lines it put right
@@ -1087,7 +1327,7 @@ describe('«Записать»', () => {
     // C: put right the same way as A, though the memory would now show cheese
     expect((await record(me, c, body(cheese, [0]))).statusCode).toBe(200)
     expect(await db.select().from(receiptDays)).toMatchObject([{ linesEdited: 1, linesItem: 1 }])
-  })
+  }, 10_000)
 
   // MOL-222, review 2 and adversarial А7: a total put right confirms the printed sums of the lines that
   // do not add up (В-5) — one edit of the receipt, never of the lines nobody opened
@@ -1135,7 +1375,7 @@ describe('«Записать»', () => {
     const checked = await parsedReceipt(me, lines, { receiptNo: '3', totalMinor: 148_000n })
     expect((await record(me, checked, phoneBody(true))).statusCode).toBe(200)
     expect(await db.select().from(receiptDays)).toMatchObject([{ recorded: 1, totalsCorrected: 0 }])
-  })
+  }, 10_000)
 
   it('takes the phone’s positions only of lines recorded: a skipped or unknown one is no item edit', async () => {
     const me = await insertActor(db)

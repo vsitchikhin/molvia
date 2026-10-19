@@ -20,6 +20,8 @@
           t('receipt.review.mismatch', { printed })
         }}</span>
       </span>
+      <!-- Figures that were not verified are left empty, never guessed (MOL-255, В-3 «а»). -->
+      <span v-else-if="unread" class="figures">{{ t('receipt.review.unread') }}</span>
       <span v-if="tags.length > 0" class="tags">
         <span v-for="tag in tags" :key="tag.key" class="tag" :class="tag.key">{{ tag.text }}</span>
       </span>
@@ -76,6 +78,9 @@ export default defineComponent({
     const sum = computed(() =>
       props.line.amount ? formatMoney(props.line.amount, locale.value) : null,
     )
+    const unread = computed(
+      () => !props.line.skip && props.line.quantity === null && props.line.amount === null,
+    )
     const tags = computed(() => [
       ...(props.line.skip ? [{ key: 'skip', text: t('receipt.review.tag_skip') }] : []),
       ...(!props.line.skip && props.line.isNew
@@ -89,13 +94,13 @@ export default defineComponent({
       [
         t('receipt.review.line_aria', {
           name: props.line.name,
-          qty: figures.value ?? '',
+          qty: figures.value ?? (unread.value ? t('receipt.review.unread') : ''),
           sum: sum.value ?? '',
         }),
         ...tags.value.map((tag) => tag.text),
       ].join(', '),
     )
-    return { t, figures, printed, sum, tags, spoken }
+    return { t, figures, printed, sum, unread, tags, spoken }
   },
 })
 </script>

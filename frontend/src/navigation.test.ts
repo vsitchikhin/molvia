@@ -18,6 +18,10 @@ import type { RouteName, Tab } from '@/router'
 import { routes } from '@/router'
 import TabBar from '@/components/TabBar.vue'
 
+// The test here past a second on CI carries a timeout of 25 s: the slowest took 2 225 ms there
+// (MOL-266), its own wait — 2.1 s of it the test sets. Not work, so the rule of MOL-243 asks no
+// timeout of it — the time reporter does, as it tells no wait from work. Ten times it.
+
 // «What to buy» still asks the server whether it is up; here nothing needs the answer.
 vi.mock('@/api', () => ({ api: { health: () => new Promise(() => undefined) } }))
 
@@ -297,7 +301,7 @@ describe('a tab tapped on a nested screen', () => {
       expect(router.currentRoute.value.name).toBe('advice')
     }
     expect(router.options.history.state.back).toBeNull()
-  })
+  }, 10_000)
 
   it('opened with no ancestor underneath, a tab acts from the screen`s section', async () => {
     const router = await fresh('/')
@@ -330,7 +334,7 @@ describe('a tab tapped on a nested screen', () => {
     await router.push('/purchases/manual/add')
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(router.currentRoute.value.name).toBe('item-search')
-  })
+  }, 45_000)
 })
 
 describe('the tab bar walks the history as В-2 decided', () => {
@@ -400,7 +404,7 @@ describe('the tab bar walks the history as В-2 decided', () => {
       expect(router.currentRoute.value.name).toBe('settings')
     })
     expect(back).toHaveBeenCalledExactlyOnceWith(-1)
-  })
+  }, 10_000)
 
   // The example the owner answered, with the new home: What to buy → Purchases → Ratings, «back».
   it('What to buy → Purchases → Ratings, back → What to buy', async () => {

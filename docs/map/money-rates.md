@@ -70,28 +70,28 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 ## frontend · views
 
 - `frontend/src/views/ExchangeView.vue` — «Обмен денег» screen under «Деньги»: «Обмены против рынка» and the line of the rate on top, the own rate, which rate trips take, and the list of exchanges beside the market.
-- `frontend/src/views/IncomesView.vue` — «Доходы» screen under «Деньги»: incomes by month with the per-currency sums, recording, amending and «Вернуть».
+- `frontend/src/views/IncomesView.vue` — «Доходы» screen under «Деньги»: incomes by month with the per-currency sums, recording from the docked strip, amending and «Вернуть»; the connection in one `StatusStrip` (MOL-188).
 
 ## frontend · components
 
-- `frontend/src/components/ExchangeCard.vue` — Card of one exchange: the day, what was given and received, the rate plate against the market of its day and the central bank, the note.
+- `frontend/src/components/ExchangeCard.vue` — Card of one exchange, one button into its amendment: the day, what was given and received, the rate plate against the market of its day and the central bank, the note.
 - `frontend/src/components/ExchangeRateChart.vue` — «Курс рубля за месяц, 6 и 12 месяцев» on «Обмен денег» (MOL-161, MOL-168): the market of all bank clients by day or week, the exchanges as dots with a mark to the market each was measured by, the reading above, the pairs and the period, hidden radios.
-- `frontend/src/components/ExchangeRemoveSheet.vue` — «Удалить обмен?» sheet: the exchange's amounts and day, and what removing does to the rate of new trips.
-- `frontend/src/components/ExchangeSheet.vue` — «Записать обмен» sheet: given, received, day, how it was changed, «сколько было до» where it weighs; also amends an exchange with its versions.
-- `frontend/src/components/IncomeCard.vue` — Card of one income: the day, the source and amount, the note on a plate below.
-- `frontend/src/components/IncomeRemoveSheet.vue` — «Удалить доход?» sheet: the income's amount, source and day, and what removing may do to the rate.
-- `frontend/src/components/IncomeSheet.vue` — «Записать доход» sheet: amount, currency, source, day, «сколько было до» where it weighs; also amends an income.
+- `frontend/src/components/ExchangeRemoveSheet.vue` — «Удалить обмен?» sheet over the amendment («‹», no ×): the exchange's amounts and day, and what removing does to the rate of new trips.
+- `frontend/src/components/ExchangeSheet.vue` — «Записать обмен» sheet: given, received, day, how it was changed, «сколько было до» where it weighs; also amends an exchange with its versions, and removes it where the screen offers «Вернуть».
+- `frontend/src/components/IncomeCard.vue` — Card of one income, one button into its amendment: the day, the source and amount, the note on a plate below.
+- `frontend/src/components/IncomeRemoveSheet.vue` — «Удалить доход?» sheet over the amendment («‹», no ×): the income's amount, source and day, and what removing may do to the rate.
+- `frontend/src/components/IncomeSheet.vue` — «Записать доход» sheet: amount, currency, source, day, «сколько было до» where it weighs; also amends an income, and removes it where the screen offers «Вернуть».
 - `frontend/src/components/MarketRatesCard.vue` — «Курсы по данным ЦБ РА» on «Обмен денег» (MOL-137): per currency the official rate and each channel's latest figures to sell and to buy, dated, the best starred and said.
-- `frontend/src/components/OperationCardHead.vue` — Head of an exchange or income card: the day, «исправлен …» and the bin, kept outside the card's button.
-- `frontend/src/components/OperationSkeleton.vue` — Loading placeholder drawn in `ScreenSkeleton`'s slot so the list does not jump: the cards of exchanges or incomes (the rows of an operation are `SkeletonPart`'s, MOL-178).
+- `frontend/src/components/OperationCardHead.vue` — Head of an exchange or income card: the day, «исправлен …» and the chevron, inside the card's one button.
+- `frontend/src/components/OperationSkeleton.vue` — Loading placeholder drawn in `ScreenSkeleton`'s slot so the list does not jump: the cards of exchanges or incomes, each in its own card's geometry (`form`) and with the lines of its plate (`plates`, MOL-188) (the rows of an operation are `SkeletonPart`'s, MOL-178).
 
 ## frontend · composables
 
 - `frontend/src/composables/useExchangeWords.ts` — Composable: the words an exchange is said in — on its card, the undo strip and the removal sheet — from the server's figures.
 - `frontend/src/composables/useExchanges.ts` — Composable: «Обмен денег» state from the server — phase, overview, writes, amend outcome and «Вернуть» after removal.
-- `frontend/src/composables/useIncomes.ts` — Composable: «Доходы» state from the server — phase, overview, record, amend, remove and «Вернуть».
+- `frontend/src/composables/useIncomes.ts` — Composable: «Доходы» state from the server — phase, overview, record, amend, remove and «Вернуть», and when the server last answered (`fetchedAt`, `stale`, `behind`, `attempt`, MOL-188).
 
 ## e2e
 
 - `e2e/exchange.spec.ts` — End-to-end: an exchange recorded on screen becomes the next trip's rate, the chain carries through, amendments and long amounts hold; the line of the rate by the finger and by period.
-- `e2e/incomes.spec.ts` — End-to-end: an income lands in its month, is amended with a trace, comes back after removal, and an unknown cost is said.
+- `e2e/incomes.spec.ts` — End-to-end: an income lands in its month, is amended with a trace, comes back after removal, and an unknown cost is said; «Записать доход» in the docked strip, not now offline; the note's hint whole at 360 in both languages; the skeleton's cards where the answer's come, over two months, with an account and without (MOL-188).

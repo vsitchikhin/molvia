@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import {
   ERROR,
+  RECEIPT_READ_PARTLY_HEADER,
   RECEIPT_READ_TOTAL_HEADER,
   receiptDetailCodec,
   receiptSummaryCodec,
@@ -33,6 +34,10 @@ import type { ReadReport } from '@/usecases/read-receipts'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
+
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
 
 const { db, close } = connectDrizzle()
 const repository = createReceiptRepository(db)
@@ -118,6 +123,18 @@ function get(me: Owner, url: string) {
   return app.inject({ method: 'GET', url, headers: { cookie: me.cookie } })
 }
 
+/** The detail as this build asks for it: the total read in one place and «read in part» with it. */
+async function askedAll(me: Owner, id: string) {
+  const headers = {
+    cookie: me.cookie,
+    [RECEIPT_READ_TOTAL_HEADER]: '1',
+    [RECEIPT_READ_PARTLY_HEADER]: '1',
+  }
+  return receiptDetailCodec.parse(
+    (await app.inject({ method: 'GET', url: `/receipts/${id}`, headers })).json(),
+  )
+}
+
 /** A different photo for every receipt a test sends. */
 let photos = 0
 
@@ -196,7 +213,7 @@ describe('«Отправить чек»', () => {
     expect(first.headers['cache-control']).toBe('no-store')
     const again = await send(me, receipt)
     expect([again.statusCode, again.json()]).toEqual([200, first.json()])
-  })
+  }, 10_000)
 
   it('refuses another receipt under the same id, of the owner or of someone else', async () => {
     const me = await owner()
@@ -314,7 +331,7 @@ describe('a part of the photo', () => {
     ])
     expect(photo.length).toBe(8 * 1024 * 1024)
     expect((await put(me, receipt.id, 1, photo)).statusCode).toBe(200)
-  })
+  }, 10_000)
 
   it('refuses a part over the size a part may have before reading it whole', async () => {
     const me = await owner()
@@ -328,7 +345,7 @@ describe('a part of the photo', () => {
 })
 
 describe('the queue', () => {
-  it('lays am-05 out into its 13 lines, balanced with the total, and cuts the item lines out', async () => {
+  it('lays am-05 out into its 13 lines, the verified figures shown, and cuts the item lines out', async () => {
     const me = await owner()
     const id = await queued(me)
     const reader = benchReader()
@@ -342,7 +359,8 @@ describe('the queue', () => {
     expect(detail.receipt).toMatchObject({
       status: 'parsed',
       failure: null,
-      balanced: true,
+      // the total met by lines the total itself changed proves nothing whole (MOL-255)
+      balanced: false,
       lineCount: 13,
       header: {
         tin: '01234567',
@@ -362,6 +380,10 @@ describe('the queue', () => {
       sum: { minor: 74_000n, currency: 'AMD' },
       settled: true,
     })
+    // «60 60» of a bag holds for 50 misread alike, and the peaches the total changed: left empty
+    for (const line of [detail.lines[0], detail.lines[9]]) {
+      expect(line).toMatchObject({ quantity: null, price: null, sum: null, settled: false })
+    }
 
     const images = await db
       .select()
@@ -378,7 +400,7 @@ describe('the queue', () => {
       1,
       'card',
     ])
-  })
+  }, 15_000)
 
   // MOL-126: what the lines are is found once, in the queue — by the catalogue's Armenian names and
   // the heading, then by the search with the gloss; a line nobody knows is a new item named by it
@@ -405,7 +427,7 @@ describe('the queue', () => {
     expect(lines[2]).toMatchObject({ itemId: milk, match: 'search', translation: 'молоко' })
     expect(lines.filter((line) => line.match === 'new').length).toBeGreaterThan(0)
     expect(lines.every((line) => line.match !== null)).toBe(true)
-  })
+  }, 15_000)
 
   it('asks for a new shot only when not one item line was found (MOL-222, В-1)', async () => {
     const me = await owner()
@@ -486,18 +508,90 @@ describe('the queue', () => {
     expect(report?.kind === 'read' && report.lines).toBe(detail.lines.length)
     expect(await days()).toMatchObject([{ readPartly: 1, read: 0, reshoot: 0 }])
     // the total stands in one place and the lines nowhere near it: not shown, and still what says
-    // «read in part» — to a phone that asks for it alone (MOL-244)
-    expect([detail.receipt.total, detail.readTotal]).toEqual([null, undefined])
-    const asked = receiptDetailCodec.parse(
-      (
-        await app.inject({
-          method: 'GET',
-          url: `/receipts/${id}`,
-          headers: { cookie: me.cookie, [RECEIPT_READ_TOTAL_HEADER]: '1' },
-        })
-      ).json(),
-    )
+    // «read in part» — to a phone that asks for it alone (MOL-244); and the server's word that it was
+    // read in part, kept from the reading (MOL-255, А6 «а»)
+    expect([detail.receipt.total, detail.readTotal, detail.readPartly]).toEqual([
+      null,
+      undefined,
+      undefined,
+    ])
+    const asked = await askedAll(me, id)
     expect(asked.readTotal).toEqual({ minor: 1_000_000n, currency: 'AMD' })
+    expect(asked.readPartly).toBe(true)
+  })
+
+  // MOL-255, adversarial А6 «а»: the phone sees an emptied line and a lost one alike, the server does not
+  it('tells the phone a receipt is read in part though the check emptied a line of it', async () => {
+    const me = await owner()
+    const id = await queued(me)
+    // the milk of one piece whose price is its sum is emptied on a receipt not proven whole (В-2 «а»),
+    // and the lines as read still make 1 140 of 10 000: rows were lost
+    const text = [
+      '1. Կաթ',
+      '0401/1163909 1Հտ 400 400',
+      '2. Հաց',
+      '1905/1078044 2Հտ 740 370',
+      'Ընդամենը 10000.00',
+    ].join('\n')
+    const lost: ReaderReading = {
+      text,
+      rows: text.split('\n').map((row, i) => ({ text: row, box: [0, i * 40, 600, 30] })),
+      version: 'v',
+    }
+    const [report] = await readAll(benchReader({ read: () => Promise.resolve(lost) }))
+    expect(report).toMatchObject({ kind: 'read', partly: true })
+    const asked = await askedAll(me, id)
+    expect(asked.lines.map((line) => line.sum?.minor ?? null)).toEqual([null, 74_000n])
+    expect(asked.readPartly).toBe(true)
+    const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
+    expect(row?.readPartly).toBe(true)
+  })
+
+  // MOL-255, adversarial А10 «а»: with no total, lines settled by a count made up are no lines read
+  it('with no total, reads in part where fewer than half the lines are shown with figures', async () => {
+    const me = await owner()
+    const reading = (rows: string[]): ReaderReading => ({
+      text: rows.join('\n'),
+      rows: rows.map((row, i) => ({ text: row, box: [0, i * 40, 600, 30] })),
+      version: 'v',
+    })
+    // «1Հտ 400 100» holds only as four at 100: settled, never as printed, and emptied
+    const madeUp = await queued(me)
+    await readAll(
+      benchReader({
+        read: () =>
+          Promise.resolve(
+            reading(['1. Կաթ', '0401/1163909 1Հտ 400 100', '2. Հաց', '1905/1078044 1Հտ 300 100']),
+          ),
+      }),
+    )
+    const told = await askedAll(me, madeUp)
+    expect(told.lines.map((line) => line.sum)).toEqual([null, null])
+    expect(told.readPartly).toBe(true)
+    // the same with both lines as printed: read whole
+    const printed = await queued(me)
+    await readAll(
+      benchReader({
+        read: () =>
+          Promise.resolve(
+            reading(['1. Կաթ', '0401/1163909 2Հտ 740 370', '2. Հաց', '1905/1078044 3Հտ 900 300']),
+          ),
+      }),
+    )
+    expect((await askedAll(me, printed)).readPartly).toBe(false)
+    // one piece whose price is its sum, as printed but emptied with no total to prove it (А12 «а»)
+    const twice = await queued(me)
+    await readAll(
+      benchReader({
+        read: () =>
+          Promise.resolve(
+            reading(['1. Կաթ', '0401/1163909 1Հտ 400 400', '2. Հաց', '1905/1078044 1Հտ 300 300']),
+          ),
+      }),
+    )
+    const emptied = await askedAll(me, twice)
+    expect(emptied.lines.map((line) => line.sum)).toEqual([null, null])
+    expect(emptied.readPartly).toBe(true)
   })
 
   it('shows the total the payment prints too, the lines short of it (MOL-244)', async () => {
@@ -524,10 +618,15 @@ describe('the queue', () => {
 
   it('counts a receipt read whole as read, by the day in Yerevan, with no id of anyone', async () => {
     const me = await owner()
+    const id = await queued(me)
     await queued(me)
-    await queued(me)
+    // of what was read (MOL-255, А5 «а»): the eleven lines of am-05 the check empties were read
     const reports = await readAll(benchReader())
     expect(reports.map((r) => r.kind === 'read' && r.partly)).toEqual([false, false])
+    // and the phone, which sees them empty, is told so (А6 «а»)
+    const asked = await askedAll(me, id)
+    expect(asked.lines.some((line) => line.sum === null)).toBe(true)
+    expect(asked.readPartly).toBe(false)
     const rows = await days()
     expect(rows).toMatchObject([{ read: 2, readPartly: 0 }])
     const [{ today } = { today: '' }] = await db.execute<{ today: string }>(
@@ -537,7 +636,7 @@ describe('the queue', () => {
     const columns = await db.execute<{ column_name: string; data_type: string }>(sql`
       select column_name, data_type from information_schema.columns where table_name = 'receipt_days'`)
     expect(columns.every((c) => c.data_type === 'integer' || c.column_name === 'day')).toBe(true)
-  })
+  }, 20_000)
 
   it('fails a photo the reader cannot read, and reads the next one', async () => {
     const me = await owner()
@@ -560,7 +659,7 @@ describe('the queue', () => {
       failure: 'unreadable',
     })
     expect(list.find((r) => r.id === good)).toMatchObject({ status: 'parsed' })
-  })
+  }, 15_000)
 
   it('leaves the receipt in the queue, its attempt uncounted, while the reader is away', async () => {
     const me = await owner()
@@ -577,7 +676,7 @@ describe('the queue', () => {
     expect(receiptDetailCodec.parse((await get(me, `/receipts/${id}`)).json()).receipt.status).toBe(
       'parsed',
     )
-  })
+  }, 15_000)
 
   it('sends a photo the reader drops to the end of the queue, and fails it after its attempts', async () => {
     const me = await owner()
@@ -604,7 +703,7 @@ describe('the queue', () => {
     })
     // the first drop sent it back to the queue and counted nothing; the second failed it (MOL-222)
     expect(await days()).toMatchObject([{ read: 1, unreadable: 1 }])
-  })
+  }, 15_000)
 
   it('reads each person’s oldest receipt in turn: fifty of one do not hold another’s (review А10)', async () => {
     const heavy = await owner()
@@ -625,7 +724,7 @@ describe('the queue', () => {
     }
     expect(order).toHaveLength(6)
     expect(order.indexOf(theirs)).toBe(1)
-  })
+  }, 10_000)
 
   it('gives a receipt failed before any reading no head at all (review А11)', async () => {
     const me = await owner()
@@ -660,7 +759,7 @@ describe('the queue', () => {
     const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
     expect(row?.status).toBe('parsed')
     expect(await db.select().from(receiptLineImages)).toEqual([])
-  })
+  }, 10_000)
 
   it('fails a receipt whose photo is gone — restored from a copy without photos (В-2)', async () => {
     const me = await owner()
@@ -770,7 +869,7 @@ describe('what lives how long (В-3)', () => {
       .where(eq(receipts.id, young))
     await repository.purgeStale()
     expect((await db.select().from(receipts)).map((r) => r.id)).toEqual([young])
-  })
+  }, 10_000)
 
   it('keeps a recorded receipt, drops its photo, its lines that are no purchase, and its cut-out lines 28 days after they were confirmed', async () => {
     const me = await owner()
@@ -813,7 +912,7 @@ describe('what lives how long (В-3)', () => {
     const images = await db.select().from(receiptLineImages)
     expect(images.some((image) => image.position === 0)).toBe(false)
     expect(images.some((image) => image.position === 1)).toBe(true)
-  })
+  }, 15_000)
 })
 
 describe('the queue through the server', () => {
@@ -858,5 +957,5 @@ describe('the queue through the server', () => {
     } finally {
       await reading.close()
     }
-  })
+  }, 15_000)
 })

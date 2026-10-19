@@ -78,6 +78,10 @@ export default defineComponent({
         { ...gap, minor: gap.minor < 0n ? -gap.minor : gap.minor },
         locale.value,
       )
+      // lines with no figures lack what the rest leaves of the total (MOL-255, В-5 «а»)
+      const { blank } = props.balance
+      if (blank > 0 && gap.minor > 0n)
+        return t('receipt.review.diff_blank', { amount, n: blank }, blank)
       return props.suspect
         ? t('receipt.review.diff', { amount, line: props.suspect })
         : t('receipt.review.diff_unknown', { amount })

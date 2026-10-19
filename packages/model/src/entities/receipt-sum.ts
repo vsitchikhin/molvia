@@ -1,7 +1,9 @@
+import { ARMENIAN_RECEIPTS, receiptCard } from '#model/entities/receipt-card'
 import { ocrSwapApart } from '#model/entities/receipt-text'
 import { divideRounded } from '#model/support/decimal'
 import { MINOR_EXPONENT, minorPerMajor } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
+import type { ReceiptCountry } from '#model/entities/receipt'
 import type { Quantity } from '#model/values/units'
 
 // MOL-126 — the arithmetic of a receipt being looked at before it is recorded. The phone calls these
@@ -93,20 +95,29 @@ export interface ReceiptEntry {
 }
 
 export interface ReceiptBalance {
-  /** «Строки»: every line, the ones left out too — they were paid for (MOL-124 Р-5). */
+  /**
+   * «Строки»: every line with an amount, the ones left out too — they were paid for (MOL-124 Р-5);
+   * `null` when one is in another currency.
+   */
   readonly lines: Money | null
-  /** Total less the lines; `null` when the total was not read or a line has no amount. */
+  /** Total less the lines; `null` when the total was not read or the lines are not summed. */
   readonly difference: Money | null
   /** The line the difference most likely sits in, by position; `null` — «не знаем». */
   readonly suspect: number | null
   /** «Записать N»: the lines not left out. */
   readonly recorded: number
+  /**
+   * The lines with no amount: no figures verified and none typed yet (MOL-255). What the lines leave of
+   * the total is theirs, said so on the review (В-5 «а»), and no line is suspected of it.
+   */
+  readonly blank: number
 }
 
 /**
  * «Строки», the difference with the printed total and the line it most likely sits in: the one whose
  * printed sum differs from what it is recorded at by exactly that difference («Разница 90 ֏ — похоже,
- * в строке «Шоколад»»). Only one such line names it; two or none — «не знаем».
+ * в строке «Шоколад»»). Only one such line names it; two or none — «не знаем». A line with no amount
+ * is left out of «Строки» and counted apart (MOL-255, В-5 «а»): the total less the rest is what it lacks.
  */
 export function receiptBalance(
   entries: readonly ReceiptEntry[],
@@ -114,18 +125,20 @@ export function receiptBalance(
   currency: Currency,
 ): ReceiptBalance {
   const recorded = entries.filter((entry) => !entry.skip).length
+  const blank = entries.filter((entry) => entry.amount === null).length
   let sum: bigint | null = 0n
   for (const entry of entries) {
-    if (sum === null || entry.amount?.currency !== currency) sum = null
+    if (entry.amount === null) continue
+    if (sum === null || entry.amount.currency !== currency) sum = null
     else sum += entry.amount.minor
   }
   const lines = sum === null ? null : { minor: sum, currency }
   if (lines === null || total?.currency !== currency) {
-    return { lines, difference: null, suspect: null, recorded }
+    return { lines, difference: null, suspect: null, recorded, blank }
   }
   const gap = total.minor - lines.minor
   const difference = { minor: gap, currency }
-  if (gap === 0n) return { lines, difference, suspect: null, recorded }
+  if (gap === 0n || blank > 0) return { lines, difference, suspect: null, recorded, blank }
   const suspects = entries.flatMap((entry, position) =>
     entry.printed !== null &&
     entry.amount !== null &&
@@ -139,14 +152,9 @@ export function receiptBalance(
     difference,
     suspect: suspects.length === 1 ? (suspects[0] ?? null) : null,
     recorded,
+    blank,
   }
 }
-
-/**
- * Below this share of the printed total a receipt is read only in part (В-4 of MOL-125): a crumpled one
- * loses its rows. Above it one or two lost lines are the review's to live with.
- */
-export const READ_PARTLY_TOTAL_SHARE = 0.7
 
 /** A line as read: whether its own arithmetic held, and what was paid for it. */
 export interface ReadFigures {
@@ -173,16 +181,18 @@ export function readCovered(lines: readonly ReadFigures[], total: Money | null):
 /**
  * Read only in part (MOL-222, В-1 — the «переснимите» of before, now a hint on the review that never
  * keeps the receipt from being recorded): no lines; or the total was read and the lines make up less
- * than `READ_PARTLY_TOTAL_SHARE` of it (`readCovered`); or the total was not read and fewer than half
- * of the lines add up by their own arithmetic. A total that was not read decides nothing alone — OCR
- * missed it on 9 of the bench's 16 readings, most of them good ones. Of what was read, never of the
- * person's edits: the server counts it at the reading, the phone shows it on the review.
+ * than it (`readCovered`) — any shortfall, said with its sum (MOL-255, В-7 «а»: 74 % of a total read in
+ * three parts went unsaid under the 70 % of before, five lines lost at the seams); or the total was not
+ * read and fewer than half of the lines add up by their own arithmetic. A total that was not read
+ * decides nothing alone — OCR missed it on 9 of the bench's 16 readings, most of them good ones. Of what
+ * was read, never of the person's edits: the server counts it at the reading, before the check empties
+ * a line (MOL-255, А5 «а»), the phone shows it on the review.
  */
 export function readPartly(lines: readonly ReadFigures[], total: Money | null): boolean {
   if (lines.length === 0) return true
   const covered = readCovered(lines, total)
   if (covered !== null && total !== null) {
-    return covered.minor * 100n < total.minor * BigInt(Math.round(READ_PARTLY_TOTAL_SHARE * 100))
+    return covered.minor < total.minor
   }
   const settled = lines.filter((line) => line.settled).length
   return settled * 2 < lines.length
@@ -190,10 +200,17 @@ export function readPartly(lines: readonly ReadFigures[], total: Money | null): 
 
 /**
  * The price read differs from the one the shop's memory holds for this article by one digit OCR confuses
- * (5↔6, 1↔4, 3↔8, 0↔9) — «60 60» read for «50 50» adds up either way, and only the memory can tell
- * (owner, В-1, 03.10.2026). A hint for the person, never a correction: the figures stay as read.
+ * in the country's tills (5↔6, 1↔4, 3↔8, 0↔9 in Armenia) — «60 60» read for «50 50» adds up either way,
+ * and only the memory can tell (owner, В-1, 03.10.2026). A hint for the person, never a correction: the
+ * figures stay as read. A receipt the tax office gave (MOL-232) keeps the Armenian swaps it was checked by
+ * before the card: whether no digit of it is in doubt is the owner's to decide (MOL-270).
  */
-export function priceInDoubt(read: Money | null, remembered: Money | null): boolean {
+export function priceInDoubt(
+  country: ReceiptCountry,
+  read: Money | null,
+  remembered: Money | null,
+): boolean {
+  const reading = receiptCard(country).photo ?? ARMENIAN_RECEIPTS
   if (read === null || read.currency !== remembered?.currency) return false
-  return ocrSwapApart(String(read.minor), String(remembered.minor))
+  return ocrSwapApart(reading, String(read.minor), String(remembered.minor))
 }

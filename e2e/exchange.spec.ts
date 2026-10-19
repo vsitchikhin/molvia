@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { actorCodec, settingsOf } from '@molvia/model'
@@ -6,6 +7,11 @@ import { standAt, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
+
+// The English words are the dictionary's, never a copy in the spec (as in `incomes.spec`).
+const en = JSON.parse(
+  readFileSync(new URL('../frontend/src/i18n/en.json', import.meta.url), 'utf8'),
+) as { exchange: { sheet: Record<string, string> } }
 
 /**
  * «Обмен денег» end to end (MOL-40): an exchange recorded on the screen becomes the rate of the
@@ -266,6 +272,185 @@ test('«Записать обмен» stands in the strip: the last card ends ab
   await expect(record).toBeVisible()
   await expect(record).not.toHaveAttribute('aria-disabled', 'true')
   await expect(strip).toBeHidden()
+})
+
+/** One exchange recorded through the strip and its sheet, the sheet gone. */
+async function recordOne(page: Page): Promise<void> {
+  const sheet = page.locator('dialog[open]')
+  await page.locator('.dock').getByRole('button', { name: 'Записать обмен', exact: true }).click()
+  await expect(sheet).toContainText('Сколько отдали и сколько получили')
+  await page.waitForTimeout(400)
+  await sheet.getByLabel('Отдал').fill('20000')
+  await sheet.getByLabel('Получил').fill('95000')
+  await sheet.getByRole('button', { name: 'Сохранить обмен' }).click()
+  await expect(sheet).toBeHidden()
+}
+
+/**
+ * Removing is the amendment's (MOL-189, Ф-34): the card is one button, «Удалить обмен» stands in its
+ * sheet, the question rises over it with «‹» and no × (Д-1) — «‹» and the system's «back» take only the
+ * question away, with what was typed kept — and «Удалить» closes both in one step, the screen staying.
+ * «Вернуть» is the strip over «Записать обмен», with the focus on it (Ф-29).
+ */
+test('an exchange is removed from its amendment, the question over it, «Вернуть» over the strip', async ({
+  page,
+  context,
+}) => {
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('link', { name: 'Обмен денег' }).click()
+  await recordOne(page)
+  await expect(page.locator('article button')).toHaveCount(1)
+
+  const sheet = page.locator('dialog[open]', { hasText: 'Правка обмена' })
+  const question = page.locator('dialog[open]', { hasText: 'Удалить обмен?' })
+  await page.getByRole('button', { name: /^Исправить обмен от/ }).click()
+  await expect(sheet).toBeVisible()
+  await page.waitForTimeout(400)
+  await sheet.getByLabel('Получил').fill('96000')
+
+  await sheet.getByRole('button', { name: 'Удалить обмен' }).click()
+  await expect(question).toBeVisible()
+  await expect(question.getByRole('button', { name: 'Закрыть' })).toHaveCount(0)
+  await page.waitForTimeout(400)
+  await question.getByRole('button', { name: 'Назад' }).click()
+  await expect(question).toBeHidden()
+  await expect(sheet.getByLabel('Получил')).toHaveValue('96000')
+
+  // The system's «back» takes the question alone, as «‹» does.
+  await sheet.getByRole('button', { name: 'Удалить обмен' }).click()
+  await expect(question).toBeVisible()
+  await page.goBack()
+  await expect(question).toBeHidden()
+  await expect(sheet).toBeVisible()
+
+  await sheet.getByRole('button', { name: 'Удалить обмен' }).click()
+  await expect(question).toBeVisible()
+  await page.waitForTimeout(400)
+  await question.getByRole('button', { name: 'Удалить', exact: true }).click()
+  await expect(page.locator('dialog[open]')).toHaveCount(0)
+  await expect(page).toHaveURL(/\/money\/exchange$/)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Обмен денег')
+  await expect(page.locator('article')).toHaveCount(0)
+
+  const undo = page.locator('.undo-strip')
+  await expect(undo).toContainText('Обмен удалён: 20 000 ₽ → 95 000 ֏')
+  const restore = undo.getByRole('button', { name: 'Вернуть' })
+  await expect(restore).toBeFocused()
+  const [strip, dock] = await Promise.all([undo.boundingBox(), page.locator('.dock').boundingBox()])
+  expect((strip?.y ?? 0) + (strip?.height ?? 0)).toBeLessThanOrEqual(dock?.y ?? 0)
+
+  // On a 320 px phone the words keep their 7rem: «Вернуть» holds «Возвращаем…» under it, offline it
+  // says «Вернём, когда будет связь», and on one line with them the words broke a letter a line.
+  await page.setViewportSize({ width: 320, height: 700 })
+  for (const offline of [false, true]) {
+    await context.setOffline(offline)
+    await expect(undo.locator('button')).toHaveText(
+      offline ? 'Вернём, когда будет связь' : 'Вернуть',
+    )
+    const [words, whole] = await Promise.all([
+      undo.locator('.text').boundingBox(),
+      undo.boundingBox(),
+    ])
+    expect(words?.width ?? 0).toBeGreaterThanOrEqual(112)
+    expect((whole?.x ?? 0) + (whole?.width ?? 0)).toBeLessThanOrEqual(320)
+  }
+  await context.setOffline(false)
+
+  await restore.click()
+  await expect(undo).toBeHidden()
+  await expect(page.locator('article')).toHaveCount(1)
+  await expect(
+    page.locator('.dock').getByRole('button', { name: 'Записать обмен', exact: true }),
+  ).toBeFocused()
+})
+
+/**
+ * Without a connection the card still opens (MOL-189, С-19): the sheet says once what waits for it,
+ * and «Сохраним / Удалим, когда будет связь» stay in the focus order and send nothing (Ф-6).
+ */
+test('without a connection the amendment opens, says what waits, and sends nothing', async ({
+  page,
+  context,
+}) => {
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('link', { name: 'Обмен денег' }).click()
+  await recordOne(page)
+
+  await context.setOffline(true)
+  const sheet = page.locator('dialog[open]')
+  await page.getByRole('button', { name: /^Исправить обмен от/ }).click()
+  await expect(sheet).toContainText('Правка обмена')
+  await page.waitForTimeout(400)
+  // The strip's own node: its words are said in the sheet's live region too (MOL-181).
+  await expect(sheet.locator('.strip')).toHaveText(
+    'Без связи · исправить и удалить обмен можно со связью — введённое останется здесь',
+  )
+  const save = sheet.getByRole('button', { name: 'Сохраним, когда будет связь' })
+  const remove = sheet.getByRole('button', { name: 'Удалим, когда будет связь' })
+  await expect(save).toHaveAttribute('aria-disabled', 'true')
+  await expect(remove).toHaveAttribute('aria-disabled', 'true')
+  // Playwright counts an `aria-disabled` button as disabled: the tap is forced, as a finger's.
+  await remove.click({ force: true })
+  await page.waitForTimeout(400)
+  await expect(page.locator('dialog[open]')).toHaveCount(1)
+
+  await context.setOffline(false)
+  await expect(sheet.getByRole('button', { name: 'Сохранить правку' })).not.toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
+  await expect(sheet.locator('.strip')).toHaveCount(0)
+})
+
+/**
+ * «Как меняли» whole on a phone (MOL-189, Е-11): four segments of equal width cut «Обменник» at 390.
+ * Each segment is as wide as its words, and a label of two breaks between them where the row is short:
+ * every word has room in its segment, and the row never stands past the field — at 320, 360 and 390,
+ * in Russian and in the English words of the dictionary, drawn in the control itself.
+ */
+test('«Как меняли» is whole on a phone, in both languages', async ({ page }) => {
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('link', { name: 'Обмен денег' }).click()
+  await page.locator('.dock').getByRole('button', { name: 'Записать обмен', exact: true }).click()
+  const control = page.locator('dialog[open] fieldset.segmented')
+  await expect(control).toContainText('Обменник')
+  const english: string[] = [
+    '—',
+    ...['bankCash', 'bankNoncash', 'exchanger'].map(
+      (key) => en.exchange.sheet[`channel_${key}`] ?? '',
+    ),
+  ]
+  for (const width of [320, 360, 390]) {
+    await page.setViewportSize({ width, height: 740 })
+    for (const words of [null, english]) {
+      const broken = await control.evaluate(async (set, words: string[] | null) => {
+        await document.fonts.ready
+        const segments = [...set.querySelectorAll<HTMLElement>('.segment')]
+        if (words)
+          segments.forEach((segment, n) => {
+            const word = segment.querySelector('.word')
+            if (word) word.textContent = words[n] ?? ''
+          })
+        const found: string[] = []
+        const track = set.querySelector<HTMLElement>('.track')
+        if (track && track.scrollWidth > track.clientWidth + 1) found.push('the row past the field')
+        for (const segment of segments) {
+          const word = segment.querySelector('.word')?.getBoundingClientRect()
+          const box = segment.getBoundingClientRect()
+          // Room on both sides, not the word flush with the edge: equal segments sized «Обменник» to
+          // the word itself, and the track's round corner cut it (frame 036).
+          if (word && (word.left - box.left < 4 || box.right - word.right < 4)) {
+            found.push(`no room in its segment: ${segment.textContent.trim()}`)
+          }
+        }
+        return found
+      }, words)
+      expect(broken, `${String(width)} px, ${words ? 'en' : 'ru'}`).toEqual([])
+    }
+  }
 })
 
 /**

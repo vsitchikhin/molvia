@@ -12,6 +12,10 @@ import { clearAll, insertActor, insertItem, insertPlace } from './fixtures'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { verdicts as verdictsTable } from '@/db/schema'
 
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+
 const { db, close } = connectDrizzle()
 const verdicts = createVerdictRepository(db)
 
@@ -168,7 +172,7 @@ describe('общие данные', () => {
 
     // Трое было, двое осталось — значит, снова мои цифры.
     expect(await rowsFor(me, 'shared')).toMatchObject([{ itemId, sum: 5, count: 1 }])
-  })
+  }, 10_000)
 
   it('отдают только мой отзыв: чужие слова нечем усреднить', async () => {
     const me = await insertActor(db)
@@ -188,7 +192,7 @@ describe('общие данные', () => {
     }
 
     expect((await rowsFor(me, 'shared'))[0]?.review).toBeNull()
-  })
+  }, 10_000)
 
   it('говорят, своя ли за строкой оценка: отзыв этого не скажет (MOL-32, А2)', async () => {
     const me = await insertActor(db)
@@ -288,7 +292,7 @@ describe('порядок и предел', () => {
     const strangers = rows.rows.filter((row) => row.count === crowd.length)
     expect(strangers).toHaveLength(reserved)
     expect(rows.rows.filter((row) => row.count === 1)).toHaveLength(page - reserved)
-  })
+  }, 10_000)
 
   it('не занимают резерв, когда предупреждений меньше: место не простаивает', async () => {
     const me = await insertActor(db)
@@ -330,7 +334,7 @@ describe('порядок и предел', () => {
     const names = (await rowsFor(me, 'shared', 2)).map((row) => row.name)
     expect(names).toEqual(['Моя тройка', 'Чужая единица'])
     expect(await totalFor(me, 'shared', 2)).toBe(4)
-  })
+  }, 10_000)
 
   it('округляет границу так же, как домен — иначе предел берёг бы не те строки (С-12)', async () => {
     // Уровень строки считает домен (`divideRounded`), а что предел не имеет права срезать —
@@ -359,5 +363,5 @@ describe('порядок и предел', () => {
 
     expect(expectedNever).toEqual(['Ровно 2,4'])
     expect(protectedRows.map((row) => row.name)).toEqual(expectedNever)
-  })
+  }, 15_000)
 })

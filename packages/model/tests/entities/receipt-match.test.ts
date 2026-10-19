@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { createLineMatcher, isServiceClass, receiptWords } from '#model/entities/receipt-match'
+import {
+  createLineMatcher,
+  headingRulesOut,
+  isServiceClass,
+  receiptWords,
+} from '#model/entities/receipt-match'
 import type { CatalogueNode } from '#model/entities/receipt-match'
 
 const node = (name: string, names: string[], headings: string[]): CatalogueNode => ({
@@ -99,5 +104,23 @@ describe('the gloss', () => {
     expect(matcher.gloss('ԿԱԹ ԻԳԻԹ')).toBe('молоко')
     expect(matcher.gloss('ավազ կատուն')).toBe('песок кошка')
     expect(matcher.gloss('ԻԳԻԹ')).toBe('')
+  })
+})
+
+describe('a printed heading ruling an item out (MOL-255, В-6 «б»)', () => {
+  it('rules out an item none of whose headings is the line’s: brushes are no tomatoes', () => {
+    expect(headingRulesOut('9603', ['0702'])).toBe(true)
+  })
+
+  it('must not rule out the line’s own heading, one OCR swap of it, or one of several', () => {
+    expect(headingRulesOut('0702', ['0702'])).toBe(false)
+    expect(headingRulesOut('0705', ['0702', '0706'])).toBe(false)
+    expect(headingRulesOut('1906', ['1905'])).toBe(false)
+  })
+
+  it('must not rule out by no heading, a class of services, or an item with none', () => {
+    expect(headingRulesOut(null, ['0702'])).toBe(false)
+    expect(headingRulesOut('56.10', ['0702'])).toBe(false)
+    expect(headingRulesOut('9603', [])).toBe(false)
   })
 })

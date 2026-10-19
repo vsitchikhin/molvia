@@ -18,6 +18,10 @@ import {
 } from './fixtures'
 import { aLife } from './life'
 
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+
 const { db, close } = connectDrizzle()
 const botSecret = randomBytes(32).toString('base64url')
 const app = buildServer({ db, login: { username: 'molvia_bot', botSecret } })
@@ -132,7 +136,7 @@ describe('DELETE /actors/me — «Удалить мои данные» в нас
       expect(Object.values(left.erased).every((n) => n === 0)).toBe(true)
     }
     expect((await db.select().from(erasures)).map((row) => row.erased)).toEqual([2])
-  })
+  }, 20_000)
 
   it('первый запрос дня: срок сдвинут и тут же погашен — одна строка Set-Cookie (ревью 3)', async () => {
     const anna = await insertActor(db)
@@ -178,7 +182,7 @@ describe('DELETE /actors/me — «Удалить мои данные» в нас
       headers: { cookie: laptop },
     })
     expect(after.statusCode).toBe(401)
-  })
+  }, 10_000)
 
   it('не трогает другого человека — ни его строк, ни его входа', async () => {
     const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
@@ -200,7 +204,7 @@ describe('DELETE /actors/me — «Удалить мои данные» в нас
       headers: { cookie: borisCookie },
     })
     expect(own.statusCode).toBe(200)
-  })
+  }, 20_000)
 
   it('повтор после потерянного ответа и запрос без сессии — 401 no_actor, никто не стёрт', async () => {
     const anna = await insertActor(db)

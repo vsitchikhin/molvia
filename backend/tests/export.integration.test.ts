@@ -46,6 +46,10 @@ import {
 } from './fixtures'
 import { aLife } from './life'
 
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+
 const { db, close } = connectDrizzle()
 const repository = createExportRepository(db)
 const erasure = createErasureRepository(db)
@@ -465,7 +469,7 @@ describe('состав экспорта — один источник правд
     expect(reaching).toContain('exchange_revisions')
     expect(reaching).toContain('expenses')
     expect(reaching).not.toContain('items')
-  })
+  }, 10_000)
 
   it('каждая колонка этих таблиц — в файле или в пропущенных с причиной', async () => {
     const rows = await db.execute<{ table_name: string; column_name: string }>(sql`
@@ -515,7 +519,7 @@ describe('состав экспорта — один источник правд
       fact: { amount: '9000.00', currency: 'AMD' },
       counted: { amount: '9500.00', currency: 'AMD' },
     })
-  })
+  }, 10_000)
 
   it('каждая ссылка файла находит свою строку в самом файле — справочник полон', async () => {
     const { tg, actorId } = await someone()
@@ -540,7 +544,7 @@ describe('состав экспорта — один источник правд
     const references = referencesIn(wire)
     expect(new Set(references.map(({ key }) => key))).toEqual(new Set(Object.keys(within)))
     expect(references.filter(({ key, id }) => !within[key]?.has(id))).toEqual([])
-  })
+  }, 15_000)
 
   it('строк в каждом разделе столько же, сколько насчитает сухой прогон стирания', async () => {
     const { tg, actorId } = await someone()
@@ -558,7 +562,7 @@ describe('состав экспорта — один источник правд
     expect(content.incomes.flatMap((income) => income.earlierVersions)).toHaveLength(1)
     expect(content.feedback.flatMap((message) => message.replies)).toHaveLength(1)
     expect(content.feedback.flatMap((message) => message.pictures)).toHaveLength(1)
-  })
+  }, 10_000)
 })
 
 describe('экспорт всего своего (MOL-93)', () => {
@@ -588,7 +592,7 @@ describe('экспорт всего своего (MOL-93)', () => {
     expect(text).not.toContain('Бориса')
     expect(content.proposedItems.map((item) => item.name)).toEqual(['Рынок-сыр'])
     expect(text).toContain(anna.actorId)
-  })
+  }, 10_000)
 
   it('тот же магазин и та же позиция у другого человека — его строк в файле нет', async () => {
     const anna = await someone()
@@ -624,7 +628,7 @@ describe('экспорт всего своего (MOL-93)', () => {
     expect(content.exchanges.filter((exchange) => exchange.removedAt !== null)).toHaveLength(1)
     expect(content.incomes.filter((income) => income.removedAt !== null)).toHaveLength(1)
     expect(content.spendings.filter((spending) => spending.removedAt !== null)).toHaveLength(1)
-  })
+  }, 10_000)
 
   it('прежняя версия обмена — внутри него, с тем, что было записано до правки', async () => {
     const { tg, actorId } = await someone()
@@ -784,7 +788,7 @@ describe('экспорт всего своего (MOL-93)', () => {
       expect.objectContaining({ type: 'advice_viewed', payload: { subject: 'product' } }),
     ])
     expect(await db.select().from(events).where(eq(events.actorId, actorId))).toHaveLength(1)
-  })
+  }, 10_000)
 
   it('нет такого владельца — нечего и выгружать', async () => {
     expect(await repository.exportOf(randomUUID(), randomUUID())).toBeNull()

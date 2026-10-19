@@ -18,6 +18,10 @@ import { localDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import MoneyChartsViewScreen from './MoneyChartsView.vue'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 502 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const moneyChartYear = vi.fn<(year: string) => Promise<MoneyChartYearView>>()
 const moneyChartMonth = vi.fn<(month: string) => Promise<MoneyChartMonthView>>()
 vi.mock('@/api', () => ({
@@ -869,7 +873,7 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     const newcomer = await render()
     const buttons = newcomer.find('.switcher').findAll('button')
     expect(buttons.map((one) => one.attributes('aria-disabled'))).toEqual(['true', 'true'])
-  })
+  }, 15_000)
 
   it('a year with no sum says nothing under its «—», and blames no rate (adversarial М)', async () => {
     moneyChartYear.mockResolvedValue(

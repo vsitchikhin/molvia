@@ -12,6 +12,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
+// The 6 tests here past half a second on CI carry a timeout of 10 s: the slowest took 868 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 let app: FastifyInstance
 
@@ -133,7 +137,7 @@ describe('PUT /trips/:id/receipt (MOL-78)', () => {
     expect(view.total).toEqual([amd(140_000n)])
     expect(view.prices).toEqual([amd(57_000n)])
     expect(view.gap).toEqual({ kind: 'unpriced', amount: amd(83_000n) })
-  })
+  }, 10_000)
 
   it('повтор той же суммы — 200 и то же состояние; null — сумма снята, итог снова по ценам', async () => {
     const me = await owner()
@@ -153,7 +157,7 @@ describe('PUT /trips/:id/receipt (MOL-78)', () => {
     const [cleared] = await db.select().from(trips).where(eq(trips.id, id))
     // Taking the sum off is a change a check has to see too.
     expect(cleared?.receiptSetAt?.getTime()).toBeGreaterThan(before?.receiptSetAt?.getTime() ?? 0)
-  })
+  }, 10_000)
 
   it('ноль и минус — 400 invalid_amount; лишнее поле и пустое тело — 400', async () => {
     const me = await owner()
@@ -191,7 +195,7 @@ describe('PUT /trips/:id/receipt (MOL-78)', () => {
     ).toBe(401)
     await call(me, 'DELETE', `/trips/${id}`)
     expect((await receipt(me, id, '1400')).statusCode).toBe(404)
-  })
+  }, 10_000)
 
   it('открытая запись тоже принимает сумму', async () => {
     const me = await owner()
@@ -235,7 +239,7 @@ describe('одно правило денег записи — все читат�
 
     await receipt(me, id, null)
     expect(await readers(me, id)).toEqual(byPrices)
-  })
+  }, 15_000)
 
   it('ни одной цены: без суммы записи нет в «Деньгах», с суммой — есть', async () => {
     const me = await owner()
@@ -245,7 +249,7 @@ describe('одно правило денег записи — все читат�
     const seen = await readers(me, id)
     expect(seen.month).toEqual([{ amount: amd(250_000n), items: 3 }])
     expect(seen.accounts).toEqual([amd(250_000n)])
-  })
+  }, 10_000)
 
   it('сумма в долларах при ценах в драмах и рублях — одна строка в долларах везде (В-3)', async () => {
     const me = await owner()
@@ -324,7 +328,7 @@ describe('одно правило денег записи — все читат�
     expect(cleared?.receiptFirstAt).toBeNull()
     await receipt(me, id, '1450')
     expect(await hint.spentSince(me.id, 'AMD', exchange)).toBe(145_000n)
-  })
+  }, 10_000)
 
   it('сверка видит смену суммы: момент операции счёта сдвигается', async () => {
     const me = await owner()
@@ -375,7 +379,7 @@ describe('сумма по чеку и «списано» (MOL-78, Р-3)', () => 
     })
     const repeated = tripViewCodec.parse((await receipt(me, id, '1400')).json())
     expect(repeated.debited).toEqual({ minor: 3_000n, currency: 'USD' })
-  })
+  }, 10_000)
 
   it('под суммой по чеку цена — не деньги записи: дописать, поправить, удалить — «списано» на месте (ревью 1)', async () => {
     const me = await owner()
@@ -429,7 +433,7 @@ describe('сумма по чеку и «списано» (MOL-78, Р-3)', () => 
       amount: { amount: '400', currency: 'AMD' },
     })
     expect(await debited()).toBeNull()
-  })
+  }, 15_000)
 
   it('«списано» у записи в драмах на драмовом счёте не нужно, если и сумма в драмах; сумма в долларах — нужно', async () => {
     const me = await owner()

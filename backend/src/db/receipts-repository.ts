@@ -5,13 +5,13 @@ import {
   DomainError,
   ERROR,
   placeSchema,
-  RECEIPT_CURRENCY,
   RECEIPT_KEEP_DAYS,
   RECEIPT_LINK_WAIT_HOURS,
   RECEIPT_READ_ATTEMPTS,
   RECEIPT_TELL_AFTER_SECONDS,
   RECEIPT_TELL_WITHIN_HOURS,
   RECEIPT_UNDO_MINUTES,
+  receiptCard,
   receiptClockOf,
   serbianReceiptLink,
   withoutItems,
@@ -168,6 +168,8 @@ export interface StoredReceipt {
   readonly heard: ReceiptHeard | null
   /** The total as the reading found it in one place (MOL-244): «Прочитали не всё» alone. */
   readonly readTotal: Money | null
+  /** Read in part, of the lines as read before the check (MOL-255, А6 «а»); `null` — read before it. */
+  readonly readPartly: boolean | null
 }
 
 /**
@@ -358,7 +360,10 @@ export interface ReceiptRepository {
   sourceOf(tripId: string): Promise<TripReceiptSource | null>
   /** Where these sellers' receipts were recorded, in a country, by anyone, the purchases still there. */
   placesOfTins(actorId: string, tins: readonly string[], country: string): Promise<TinPlace[]>
-  /** The person's receipt of this tax number and number, recorded as purchases still there (Т-11). */
+  /**
+   * The person's receipt of this tax number and number, recorded as purchases still there (Т-11):
+   * `recordedTwinOf`, the one rule a trip's «Вернуть» reads as well (MOL-254).
+   */
   recordedTwin(
     actorId: string,
     tin: string,
@@ -496,6 +501,7 @@ function toStored(found: SummaryRow): StoredReceipt {
       found.row.readTotalMinor === null
         ? null
         : { minor: found.row.readTotalMinor, currency: found.row.currency },
+    readPartly: found.row.readPartly,
   }
 }
 
@@ -555,6 +561,40 @@ function sentColumn(row: { via: ReceiptVia | null; qrMissed: boolean | null }) {
   return row.qrMissed === true ? 'sentPasteMissed' : 'sentPaste'
 }
 
+/**
+ * The one rule of a second record of a receipt (Т-11): the person's receipt of this tax number and
+ * number, recorded, its trip not marked removed — for «Записать», the review, the bot and a trip's
+ * «Вернуть» alike (MOL-254). A trip only marked removed holds no new shot: it may never come back.
+ */
+export async function recordedTwinOf(
+  db: Conn,
+  actorId: string,
+  tin: string,
+  receiptNo: string,
+  except: string,
+): Promise<RecordedTwin | null> {
+  const [twin] = await db
+    .select({
+      receiptId: receipts.id,
+      tripId: trips.id,
+      recordedAt: sql<Date>`${receipts.recordedAt}`.mapWith(receipts.recordedAt),
+    })
+    .from(receipts)
+    .innerJoin(trips, and(eq(trips.id, receipts.tripId), sql`${trips.deletedAt} is null`))
+    .where(
+      and(
+        eq(receipts.actorId, actorId),
+        eq(receipts.tin, tin),
+        eq(receipts.receiptNo, receiptNo),
+        sql`${receipts.id} <> ${except}`,
+        eq(receipts.status, 'recorded'),
+      ),
+    )
+    .orderBy(asc(receipts.recordedAt))
+    .limit(1)
+  return twin ?? null
+}
+
 export function createReceiptRepository(db: Conn): ReceiptRepository {
   async function summaryOf(conn: Conn, id: string): Promise<ReceiptSummary> {
     const [found] = await conn
@@ -587,7 +627,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
               actorId,
               country: body.country,
               language: body.language,
-              currency: RECEIPT_CURRENCY[body.country],
+              currency: receiptCard(body.country).currency,
               capturedAt: body.capturedAt,
               ...('link' in body
                 ? linkReceipt(body).row
@@ -983,26 +1023,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     },
 
     async recordedTwin(actorId, tin, receiptNo, except) {
-      const [twin] = await db
-        .select({
-          receiptId: receipts.id,
-          tripId: trips.id,
-          recordedAt: sql<Date>`${receipts.recordedAt}`.mapWith(receipts.recordedAt),
-        })
-        .from(receipts)
-        .innerJoin(trips, and(eq(trips.id, receipts.tripId), sql`${trips.deletedAt} is null`))
-        .where(
-          and(
-            eq(receipts.actorId, actorId),
-            eq(receipts.tin, tin),
-            eq(receipts.receiptNo, receiptNo),
-            sql`${receipts.id} <> ${except}`,
-            eq(receipts.status, 'recorded'),
-          ),
-        )
-        .orderBy(asc(receipts.recordedAt))
-        .limit(1)
-      return twin ?? null
+      return recordedTwinOf(db, actorId, tin, receiptNo, except)
     },
 
     async remove(actorId, id) {
@@ -1175,6 +1196,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             failure: outcome.kind === 'failed' ? outcome.failure : null,
             readAt: sql`clock_timestamp()`,
             readerVersion: outcome.readerVersion,
+            readPartly: outcome.kind === 'parsed' ? outcome.partly : null,
             // no head read leaves the head there is: a photo's has none before its reading, and a
             // receipt by its link keeps what the link said — its day, number and total (review 2)
             ...(head === null

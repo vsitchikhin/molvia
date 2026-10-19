@@ -8,6 +8,10 @@ import { startLogin } from '@/usecases/start-login'
 import { connectDrizzle } from './db'
 import { clearAll } from './fixtures'
 
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+
 const first = connectDrizzle()
 const second = connectDrizzle()
 const requests = createLoginRequestRepository(first.db)
@@ -30,7 +34,7 @@ describe('login quota and lifetime', () => {
     expect(row).not.toBeNull()
     expect(row!.expiresAt.getTime() - row!.createdAt.getTime()).toBe(300_000)
     expect(JSON.stringify(await first.db.select().from(loginRequests))).not.toContain(secret)
-  })
+  }, 10_000)
 
   it('serialises the Nth and N+1th start and remembers the quota across repository instances', async () => {
     for (let i = 0; i < LOGIN_WINDOW_LIMIT - 1; i += 1) {
@@ -54,7 +58,7 @@ describe('login quota and lifetime', () => {
     })
     await first.db.update(loginRequests).set({ createdAt: sql`now() - interval '60 seconds'` })
     await expect(requests.createLimited(randomUUID(), mint(), mint(), null)).resolves.toBeTruthy()
-  })
+  }, 15_000)
 
   it('deletes expired rows, including consumed ones, and retains live requests', async () => {
     await requests.createLimited(randomUUID(), mint(), mint(), null)

@@ -1308,6 +1308,21 @@ describe('TripView', () => {
       expect(view.text()).toContain(ru.trip.remove.not_restored_open)
     })
 
+    // MOL-254: the same receipt recorded again by a new shot — not «ten minutes are over»
+    it.each([
+      [ERROR.RECEIPT_RECORDED_BEFORE, ru.trip.remove.not_restored_recorded],
+      [ERROR.NOT_FOUND, ru.trip.remove.not_restored_gone],
+    ])('поход не вернулся с %s — своя причина', async (code, reason) => {
+      currentTrip.mockResolvedValue(null)
+      const { view, queue } = await render()
+      queue.rejected = [
+        { key: 'r1', write: { kind: 'restore', tripId: TRIP, name: 'Ереван Сити' }, code },
+      ]
+      await flushPromises()
+      expect(view.text()).toContain('Запись не вернулась: Ереван Сити')
+      expect(view.text()).toContain(reason)
+    })
+
     it('новый поход убирает полоску «Вернуть» (Р-4)', async () => {
       currentTrip.mockResolvedValue(trip())
       const { view, queue } = await render()

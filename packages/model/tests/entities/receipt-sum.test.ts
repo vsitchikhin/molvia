@@ -3,7 +3,6 @@ import {
   lineAddsUp,
   lineProduct,
   priceInDoubt,
-  READ_PARTLY_TOTAL_SHARE,
   readCovered,
   readPartly,
   receiptBalance,
@@ -169,13 +168,34 @@ describe('the balance of a receipt', () => {
     expect(balance.suspect).toBeNull()
   })
 
-  it('has no difference without a total, and nothing to sum with a line unpriced', () => {
+  it('has no difference without a total', () => {
     expect(receiptBalance(asComputed, null, 'AMD')).toMatchObject({
       lines: amd(5_543),
       difference: null,
       suspect: null,
+      blank: 0,
     })
-    expect(receiptBalance([entry(null)], amd(100), 'AMD').lines).toBeNull()
+  })
+
+  it('sums the lines with an amount and counts the blank apart, suspecting none (MOL-255)', () => {
+    // a blank line's printed sum — the reading's — names no line: it is the blank that lacks
+    const blank = [...asComputed, entry(null, amd(90))]
+    expect(receiptBalance(blank, amd(5_633), 'AMD')).toEqual({
+      lines: amd(5_543),
+      difference: amd(90),
+      suspect: null,
+      recorded: 8,
+      blank: 1,
+    })
+    // left out, a blank line still lacks: it was paid for
+    const left = receiptBalance([entry(amd(100)), entry(null, null, true)], amd(300), 'AMD')
+    expect([left.lines, left.difference, left.blank]).toEqual([amd(100), amd(200), 1])
+    // every line blank: nothing read, the whole total lacks
+    expect(receiptBalance([entry(null), entry(null)], amd(100), 'AMD')).toMatchObject({
+      lines: amd(0),
+      difference: amd(100),
+      blank: 2,
+    })
   })
 
   it('balances at zero, and does not sum a line in another currency', () => {
@@ -186,17 +206,26 @@ describe('the balance of a receipt', () => {
 
 describe('a price in doubt by the memory (В-1)', () => {
   it('doubts a price one confused digit off', () => {
-    expect(priceInDoubt(amd(60), amd(50))).toBe(true)
-    expect(priceInDoubt(amd(1_160), amd(1_190))).toBe(false)
-    expect(priceInDoubt(amd(1_160), amd(1_190.5))).toBe(false)
+    expect(priceInDoubt('AM', amd(60), amd(50))).toBe(true)
+    expect(priceInDoubt('AM', amd(1_160), amd(1_190))).toBe(false)
+    expect(priceInDoubt('AM', amd(1_160), amd(1_190.5))).toBe(false)
   })
 
   it('does not doubt the same price, another one, or one missing', () => {
-    expect(priceInDoubt(amd(50), amd(50))).toBe(false)
-    expect(priceInDoubt(amd(70), amd(50))).toBe(false)
-    expect(priceInDoubt(null, amd(50))).toBe(false)
-    expect(priceInDoubt(amd(50), null)).toBe(false)
-    expect(priceInDoubt(amd(50), rub(60))).toBe(false)
+    expect(priceInDoubt('AM', amd(50), amd(50))).toBe(false)
+    expect(priceInDoubt('AM', amd(70), amd(50))).toBe(false)
+    expect(priceInDoubt('AM', null, amd(50))).toBe(false)
+    expect(priceInDoubt('AM', amd(50), null)).toBe(false)
+    expect(priceInDoubt('AM', amd(50), rub(60))).toBe(false)
+  })
+
+  it('doubts a receipt the tax office gave by the Armenian swaps, as before the card (MOL-270)', () => {
+    const rsd = (major: number): Money => ({
+      minor: BigInt(Math.round(major * 100)),
+      currency: 'RSD',
+    })
+    expect(priceInDoubt('RS', rsd(60), rsd(50))).toBe(true)
+    expect(priceInDoubt('RS', rsd(70), rsd(50))).toBe(false)
   })
 })
 
@@ -208,13 +237,14 @@ describe('read only in part — the «переснимите» of before, a hint
     expect(readPartly([], null)).toBe(true)
   })
 
-  it(`with the total read, is below ${String(READ_PARTLY_TOTAL_SHARE * 100)} % of it: exactly the share, a luma under`, () => {
-    expect(readPartly([read(amd(700))], amd(1_000))).toBe(false)
-    expect(readPartly([read(amd(699.99))], amd(1_000))).toBe(true)
+  it('with the total read, is any shortfall of it: the total, a luma under (MOL-255, В-7 «а»)', () => {
+    expect(readPartly([read(amd(1_000))], amd(1_000))).toBe(false)
+    expect(readPartly([read(amd(999.99))], amd(1_000))).toBe(true)
   })
 
-  it('with the total read, one lost line of many is not it (am-03: 0,97)', () => {
-    expect(readPartly([read(amd(970))], amd(1_000))).toBe(false)
+  it('with the total read, is one lost line of many too (122b8e5f: 74 %, five lines at the seams)', () => {
+    expect(readPartly([read(amd(740))], amd(1_000))).toBe(true)
+    expect(readPartly([read(amd(970))], amd(1_000))).toBe(true)
   })
 
   it('with the total read, counts a line whose sum was lost as nothing', () => {

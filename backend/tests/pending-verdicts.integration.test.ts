@@ -12,6 +12,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+
 const { db, close } = connectDrizzle()
 
 let app: FastifyInstance
@@ -118,7 +122,7 @@ describe('GET /verdicts/pending', () => {
     await bought(actor, milk, place, '2026-09-18T10:00:00.000Z')
 
     expect((await queue(actor)).items.map((card) => card.name)).toEqual(['Молоко «Ашхар»', 'Хлеб'])
-  })
+  }, 10_000)
 
   it('2: оценённая позиция уходит, снятая оценка возвращает её', async () => {
     const actor = await insertActor(db)
@@ -183,7 +187,7 @@ describe('GET /verdicts/pending', () => {
     // The newest first, so the one that did not fit is the oldest.
     expect(over.items[0]?.name).toBe(`Позиция ${String(PENDING_VERDICTS_LIMIT + 1)}`)
     expect(over.items.map((card) => card.name)).not.toContain('Позиция 1')
-  })
+  }, 20_000)
 
   it('B1: дописанное в закрытый поход куплено не позже его закрытия, а не «сегодня»', async () => {
     const actor = await insertActor(db)
@@ -208,7 +212,7 @@ describe('GET /verdicts/pending', () => {
       placeName: 'SAS',
       boughtAt: new Date('2026-09-12T11:00:00.000Z'),
     })
-  })
+  }, 10_000)
 
   it('R6: в незакрытом походе сегодняшняя покупка — сегодняшняя, а не день открытия', async () => {
     const actor = await insertActor(db)
@@ -264,7 +268,7 @@ describe('GET /verdicts/pending', () => {
     expect(reply.headers['cache-control']).toBe('no-store')
     expect(JSON.parse(reply.body)).toEqual({ items: [], total: 0 })
     expect(await db.select().from(events)).toEqual([])
-  })
+  }, 10_000)
 
   it('без заголовка владельца — 401', async () => {
     expect((await pending(null)).status).toBe(401)

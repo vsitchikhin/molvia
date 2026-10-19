@@ -12,6 +12,10 @@ import * as schema from '@/db/schema'
 import { expenses, receiptLineImages, storeMemory } from '@/db/schema'
 import { settleStoreMemory } from '@/db/store-memory-repository'
 
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+
 /**
  * 0061 on a database that holds what `SET NULL` left behind (MOL-240): a recorded receipt whose trip
  * was removed for good, a line whose purchase was removed, a line not recorded at «Записать», a
@@ -213,5 +217,5 @@ describe('0061: what a removed trip or purchase left of its receipt', () => {
     await expect(
       sql`update receipts set status = 'recorded', recorded_at = now() where id = ${parsed}`,
     ).rejects.toThrow(/receipts_recorded_with_trip/)
-  })
+  }, 45_000)
 })

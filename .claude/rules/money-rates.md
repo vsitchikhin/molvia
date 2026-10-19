@@ -370,12 +370,55 @@ device, private always. The rate is what the two amounts say and is not stored b
   (round 2, Л4; round 3, М2). A
   remainder the exchange has is shown in the sheet whatever a new exchange would ask: an amendment
   replaces the exchange whole, so a field not shown was a field cleared. The row is a button named
-  by its words — an `aria-label` silenced the rate and the comparison. The row says «исправлен», the sheet shows the versions — which is what explains a trip
+  by its words — an `aria-label` silenced the rate and the comparison. **It opens without a connection
+  too** (MOL-189, С-19): the versions and the note are there to read, and what waits for the connection
+  says so — a `StatusStrip` first in the sheet, «Сохраним / Удалим, когда будет связь» not now and in
+  the focus order (Ф-6), what was typed kept until the connection comes back; opened from an account's
+  journal, where there is no removing, the strip names only the amendment (`offline_amend`, review
+  №3). **A conflict whose list
+  could not be read again is said by the sheet itself** (MOL-187 №8, MOL-188 №5): the screen's
+  «Повторить» is under the modal sheet, and the version the sheet held was the one from before — «Сейчас
+  записано» by it was untrue, and the next save conflicted again. So the sheet goes over the version the
+  list now holds (`base`), says `amend_conflict_stale` with no «Сейчас записано» while the list is
+  behind, and has a `StatusStrip` of its own — «Сервер не ответил» with «Повторить», or offline; read at
+  last, it shows that version and the next save goes over it. **Until the sheet opens again**
+  (`rebased`, review №1): held only while the words of the conflict stood, a save after it lost on the
+  way or refused under a field sent the opened version once more, and the server answered a second,
+  untrue conflict. The journal's sheets get the same.
+  The row says «исправлен», the sheet shows the versions — which is what explains a trip
   that took a rate the exchanges no longer say. The history goes with its exchange: a removal made
   final and erasure take it by cascade. «Где и заметка» is one private line, part of a repeat.
 - **Removing is still there, for an exchange that should not exist.** Trips already started keep
-  what they took. **The bin asks first, with the amounts and the day, and «Вернуть» stays offered after**
-  (owner's decision В-5). A removal marks the row (`deleted_at`) and hides it from every reader;
+  what they took. **It asks first, with the amounts and the day, and «Вернуть» stays offered after**
+  (owner's decision В-5). **It lives in the sheet of the amendment, not on the card** (MOL-189, Ф-34 of
+  MOL-118): the card is one button into the amendment, «Удалить обмен» stands under «Сохранить правку»
+  in its footer, and «Удалить обмен?» rises over that sheet with «‹» and no × (Д-1) — «‹» and «back»
+  take the question alone, with what was typed kept, and «Удалить» closes both in one step of the
+  history — **on the server's answer, not on the tap** (adversarial А3, А5; as «Удалить перевод»,
+  MOL-253): until then the question says «Удаляем…» and the card is not opened again under it — closed
+  on the tap, the removal was seen nowhere, the card opened again over an exchange the answer then
+  took, and its «Сохранить правку» made the removal final; a removal that failed leaves both sheets,
+  what was typed and the word in the question — in the question only while it stands: put away
+  meanwhile, the next question read out a failure nobody pressed for (round 2, Б1); the amendment of the
+  same exchange, still up, says it instead (В2) — the screen's word is under the modal sheet — until its
+  next «Сохранить», as its own word does (Г1), a field refused included: the sheet says the press
+  (`save`), since a refusal under a field never reaches the screen's write (Д1). The strip
+  comes once no sheet of the amendment is up — its own, or one opened over another card while the answer
+  was on its way: under a modal sheet «Вернуть» cannot be reached, and its ten seconds ran out there
+  (Б2). Every strip that waits waits, not the last: a second removal from the sheet the first one waited
+  behind let it under both sheets (В1). A strip already standing when a sheet of the amendment opens over
+  it is not now while the sheet is up, its count standing (В-2 «а», Е1): it ran out there, and the sheet
+  put away unwritten left no «Вернуть» for a removal nothing had made final. **Only where the screen offers «Вернуть» after it** (owner's В-1 «а»): the same sheet opened
+  from an account's journal, «не попали» or a check amends and never removes. **«Вернуть» is the
+  `UndoStrip` over the docked strip** (Ф-29), ten seconds, then the screen offers it no more — the
+  server keeps the mark until its timer or the screen's next request, as below; at work it says
+  «Возвращаем…», and with no connection it is not now, «Вернём, когда будет связь», **its count standing
+  still** (owner's В-2 «а»): ten seconds run out offline took away a removal the server still kept.
+  While another write of the screen is in the air — the rate switch, a second removal — it is not now
+  in its own word (`inactive`, adversarial А2), as before MOL-189: that write's answer makes the
+  removal final, and a «Вернуть» pressed meanwhile was sent nowhere. A line that drops while it works
+  leaves «Возвращаем…» alone (`!restoring`, MOL-225 Р1-А3).
+  An income is removed the same way. A removal marks the row (`deleted_at`) and hides it from every reader;
   «Вернуть» (`POST /exchanges/:id/restore`) clears the mark, so the exchange keeps its
   `created_at` — written anew it took the moment of the tap, which moved both the order of its day
   and the hint. **A removal is final after ten minutes** (`EXCHANGE_UNDO_MINUTES`, owner's decision
@@ -666,6 +709,35 @@ set of rules — the task's own «as for exchanges in MOL-40» predates MOL-42's
   sum is the model's (`incomeMonths`); one no money can hold is left out rather than thrown — the
   screen failing whole would take away the one way to remove the income that made it. «Пришло /
   потрачено» is not in 0.1: a purchase need not have a price, so «потрачено» would always be short.
+- **On the phone it stands on the frame «Обмен денег» was moved onto** (MOL-188, as MOL-187): «Записать
+  доход» in the docked strip, not now and saying why offline; the connection one `StatusStrip` with the
+  time of the last answer, and «Сервер не ответил» with «Повторить» when the list read again after a
+  write's answer did not come — the notices of a conflict, an amendment over another version and a
+  vanished income then say they will show it once the server is reached (`*_stale`, by `behind`), never
+  «показываем, как он записан» over the list from before. **A month is captioned without its year when
+  it is the phone's year** («СЕНТЯБРЬ», «ДЕКАБРЬ 2025», owner's В-2 «а»): the handoff drew no year, and
+  a journal reaches back across years. **The captions and the cards speak by one day**, the later of
+  the screen's and the clock's (`shownDay`, as `answeredAt`, adversarial А1, Б1): a screen held past
+  New Year's midnight and drawn again by a write's answer said «ЯНВАРЬ 2027» over «ДЕКАБРЬ», and then
+  «DECEMBER 2026» over a card of the 31st that said «Today». **The skeleton's cards are an income's**
+  (`OperationSkeleton form="income"`, А2), **their plates by whether a new income lands on an account**
+  (Б2, В1): the sheet starts it on the first live account of the income currency (`defaultAccount`,
+  the currency «Счета» name in `incomeTotals`), so with one every card has its plate — the account and
+  a note, the account; the account (frame incomes-light); with none — a note, nothing; a note (frame
+  incomes-loading). An account in another currency takes no income untouched: a card in drams under a
+  salary in roubles drew every plate, and the second caption came some 79 px higher than its bar (counted from the cards' heights, not measured, adversarial round 4). **The
+  shape is taken as the skeleton comes and held while it stands** (В2), from «Счета» kept on the phone:
+  with nothing kept they may answer before the incomes, and the skeleton grew some 79 px in one frame
+  (MOL-151). Drawn as an exchange's card, one with no plate stood 65 px for 95 and the second month came
+  120 px lower; drawn as a person's with no account, an owner's came some 78 px lower (counted the same way). **The price, named:**
+  with nothing kept — the first visit on a phone, after «Выйти», a page kept before MOL-183 with no
+  `incomeTotals` — the shape is a person's with no account, and an owner's cards come lower by their
+  plates; an income in a currency other than the income currency lands on its own currency's account
+  and has a plate the shape did not draw. Each card comes
+  3 px lower than its bars for every month caption above it — the caption holds its sum of 13 beside
+  words of 11, the kit's caption bar does not — and 2 px for every card above it, by the hairline the
+  bars do not draw; a card whose plate has more or fewer lines than the shape is taller or shorter by
+  that line.
 
 ## Which side a rate is printed on
 

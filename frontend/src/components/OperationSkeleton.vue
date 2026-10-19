@@ -1,15 +1,16 @@
 <template>
-  <div class="cards">
-    <div v-for="n in count" :key="n" class="entry">
-      <span class="day"></span>
+  <div class="skeleton-cards" :class="`skeleton-${form}`">
+    <div v-for="(lines, n) in plates" :key="n" class="entry">
+      <span class="head"><span class="day"></span></span>
       <span class="sums"><span class="sum"></span><span class="sum"></span></span>
-      <span v-if="plate" class="plate"></span>
+      <span v-if="lines" class="plate" :class="{ double: lines > 1 }"></span>
     </div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent } from 'vue'
+import type { PropType } from 'vue'
 
 /**
  * The cards of exchanges or incomes that are coming, drawn in the slot of `ScreenSkeleton` so the list
@@ -19,18 +20,33 @@ import { defineComponent } from 'vue'
 export default defineComponent({
   name: 'OperationSkeleton',
   props: {
-    count: { type: Number, default: 2 },
-    /** An exchange always has its plate of rates; an income only sometimes. */
-    plate: { type: Boolean, default: true },
+    /**
+     * A card a value, the lines of its plate — 0 for none: an exchange always has its plate of rates
+     * (any number but 0 draws it), an income one line for its account or its note, two for both, none
+     * for neither (MOL-188, Р-7, adversarial Б2).
+     */
+    plates: { type: Array as PropType<readonly number[]>, default: () => [1, 1] },
+    /**
+     * Whose card: an income's is as tall as `IncomeCard` — its head, the line of its figure, a
+     * plate of one line of the note (MOL-188, adversarial А2: drawn as an exchange's, the second month
+     * came 120 px below its bars).
+     */
+    form: {
+      type: String as PropType<'exchange' | 'income'>,
+      default: 'exchange',
+      validator: (form: string) => form === 'exchange' || form === 'income',
+    },
   },
 })
 </script>
 
 <style scoped lang="scss">
-.cards {
+// The root is the part's own, never a class a screen uses: a screen's scoped `.cards` landed on it and
+// set the gap by the order the sheets load in (MOL-188, self-review №1). 8, as the cards of the answer.
+.skeleton-cards {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .entry {
@@ -40,6 +56,13 @@ export default defineComponent({
   padding: var(--space-4);
   border-radius: var(--radius-lg);
   background: var(--surface);
+}
+
+// The head of `OperationCardHead`: the day and the chevron of 20 on one line (MOL-189).
+.head {
+  display: flex;
+  align-items: center;
+  min-height: var(--icon);
 }
 
 .day,
@@ -68,5 +91,31 @@ export default defineComponent({
 
   height: var(--touch-target-lg);
   border-radius: var(--radius);
+}
+
+// `IncomeCard`: `OperationCardHead`, 8 under it the source and the figure at the body's leading, then 8
+// and a plate of one line of the note in its padding.
+.skeleton-income {
+  .entry {
+    gap: 0;
+  }
+
+  .sums {
+    align-items: center;
+    height: calc(var(--text-card-figure) * var(--leading-body));
+    margin-top: var(--space-2);
+  }
+
+  .plate {
+    height: calc(var(--text-footnote) * var(--leading-body) + 2 * var(--space-2));
+    margin-top: var(--space-2);
+  }
+
+  // The account and the note under a hairline, 8 above it and 8 under it.
+  .plate.double {
+    height: calc(
+      2 * var(--text-footnote) * var(--leading-body) + 4 * var(--space-2) + var(--hairline)
+    );
+  }
 }
 </style>

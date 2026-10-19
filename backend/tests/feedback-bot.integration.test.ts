@@ -19,6 +19,10 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { aScreenshot, clearAll, insertActor, signIn } from './fixtures'
 
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+
 // MOL-148: the bot's half of «Написать разработчику» — the owner's notice, the reply, a thread
 // continued — through a real server and a real Postgres.
 
@@ -117,7 +121,7 @@ describe('сообщение из приложения — уведомлени�
     const words = JSON.stringify(queued[0]?.payload)
     expect(words).not.toContain(anna)
     expect(words).not.toContain(String(await telegramOf(anna)))
-  })
+  }, 10_000)
 
   it('повтор того же сообщения второго уведомления не ставит', async () => {
     const app = await serverFor(OWNER)
@@ -138,7 +142,7 @@ describe('сообщение из приложения — уведомлени�
 
     expect(await db.select().from(feedback)).toHaveLength(1)
     expect(await db.select().from(ownerNotices)).toHaveLength(0)
-  })
+  }, 10_000)
 
   it('бот получает его через claim — контракт читает новый вид', async () => {
     const app = await serverFor(OWNER)
@@ -304,7 +308,7 @@ describe('ответ владельца (MOL-148, Р-2, Р-3, Р-11)', () => {
 
     expect(reply.statusCode).toBe(404)
     expect(await db.select().from(feedbackReplies)).toHaveLength(0)
-  })
+  }, 10_000)
 
   it('без владельца в окружении (копии) ответа нет ни у кого', async () => {
     const app = await serverFor(null)
@@ -378,7 +382,7 @@ describe('ответ владельца (MOL-148, Р-2, Р-3, Р-11)', () => {
     })
 
     expect(reply.json()).toEqual({ outcome: 'gone', thread: continued?.id })
-  })
+  }, 10_000)
 
   it('длиннее 3500 — too_long, ничего не записано', async () => {
     const app = await serverFor(OWNER)
@@ -514,7 +518,7 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
       .from(ownerNotices)
       .where(eq(ownerNotices.kind, 'feedback_continued'))
     expect(continuedNotices).toHaveLength(1)
-  })
+  }, 10_000)
 
   it('чужая нить — 404: id сообщения в другом чате не открывает ответ', async () => {
     const app = await serverFor(OWNER)
@@ -568,7 +572,7 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
     expect((await word(9032)).json()).toEqual({ outcome: 'continued' })
     expect((await word(9033)).json()).toEqual({ outcome: 'limited' })
     expect((await send(app, cookie, message({ text: 'ещё' }))).statusCode).toBe(429)
-  })
+  }, 15_000)
 
   it('длиннее 2000 — too_long; пустые строки подряд — invisible; ничего не записано', async () => {
     const app = await serverFor(OWNER)
@@ -585,7 +589,7 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
     expect((await word('а'.repeat(2001))).json()).toEqual({ outcome: 'too_long', max: 2000 })
     expect((await word('да\n\n\nнет')).json()).toEqual({ outcome: 'invisible' })
     expect(await db.select().from(feedback).where(eq(feedback.threadId, thread))).toHaveLength(0)
-  })
+  }, 10_000)
 
   it('без отметки об отправке ответить на сообщение нельзя — 404 (названная цена)', async () => {
     const app = await serverFor(OWNER)
@@ -623,7 +627,7 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
     expect(await db.select().from(feedback)).toHaveLength(0)
     expect(await db.select().from(feedbackReplies)).toHaveLength(0)
     expect(await db.select().from(ownerNotices)).toHaveLength(0)
-  })
+  }, 10_000)
 
   it('без секрета бота — 401, ничего не записано', async () => {
     const app = await serverFor(OWNER)
@@ -749,7 +753,7 @@ describe('то же слово после «ответьте ещё раз» —
     expect(
       await db.select().from(ownerNotices).where(eq(ownerNotices.kind, 'feedback_continued')),
     ).toHaveLength(2)
-  })
+  }, 10_000)
 })
 
 describe('Telegram не принял ответ — failed (адверсариальное В4)', () => {
@@ -924,7 +928,7 @@ describe('снимки — владельцу после уведомления 
     expect((await picture(app, number, 2)).statusCode).toBe(200)
     expect((await picture(app, number, 3)).statusCode).toBe(404)
     expect((await picture(app, number, 4)).statusCode).toBe(404)
-  })
+  }, 10_000)
 
   it('без секрета бота снимка не дают', async () => {
     const app = await serverFor(OWNER)
@@ -1029,7 +1033,7 @@ describe('снимки — владельцу после уведомления 
     })
     await sentBy(app, [continued?.id ?? 0])
     expect((await picture(app, continued?.id ?? 0, 1)).statusCode).toBe(404)
-  })
+  }, 10_000)
 
   it('то же фото дважды — одно слово; другое фото или то же с подписью — новое', async () => {
     const app = await serverFor(OWNER)
@@ -1051,7 +1055,7 @@ describe('снимки — владельцу после уведомления 
       ['Вот', 1],
       ['Вот', 0],
     ])
-  })
+  }, 10_000)
 
   it('ответ владельца — только словами: фото без подписи на уведомление — ничего не записано', async () => {
     const app = await serverFor(OWNER)
@@ -1161,7 +1165,7 @@ describe('ревью и адверсариальное MOL-167', () => {
       false,
     ])
     expect(await db.select().from(feedbackPictureFiles)).toHaveLength(0)
-  })
+  }, 10_000)
 
   it('после восстановления без файлов строки снимков целы, повтор — то же сообщение (А5)', async () => {
     const app = await serverFor(OWNER)

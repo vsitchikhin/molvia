@@ -9,6 +9,10 @@ import LinkReceiptSheet from '@/components/LinkReceiptSheet.vue'
 import type { ReceiptLinkOnPhoto } from '@/receipts/qrReader'
 import { ReaderFailed } from '@/scanner/barcodeReader'
 
+// The 3 tests here past half a second on CI carry a timeout of 10 s: the slowest took 541 ms there
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const sendLink = vi.fn<(body: ReceiptLinkBody) => boolean>()
 vi.mock('@/stores/receiptQueue', () => ({
   useReceiptQueueStore: () => ({ sendLink: (body: ReceiptLinkBody) => sendLink(body) }),
@@ -155,7 +159,7 @@ describe('«Чек по ссылке» (MOL-232)', () => {
       language: 'en',
     })
     expect(sheet.emitted('update:open')).toEqual([[false]])
-  })
+  }, 15_000)
 
   it('queues one receipt for a double click, and says it is at work until the sheet goes (adversarial А3)', async () => {
     const sheet = await render()
@@ -168,7 +172,7 @@ describe('«Чек по ссылке» (MOL-232)', () => {
     expect(sheet.text()).toContain(en.receipt.capture.send_busy)
     await new Promise((resolve) => setTimeout(resolve, 350))
     expect(sheet.emitted('update:open')).toEqual([[false]])
-  })
+  }, 15_000)
 
   it('says so when the phone could keep nothing, and stays open', async () => {
     sendLink.mockReturnValue(false)
@@ -225,7 +229,7 @@ describe('the QR code read off the photo (MOL-233)', () => {
     expect(shot).toEqual({ width: 0, height: 0 })
     await new Promise((resolve) => setTimeout(resolve, 350))
     expect(sheet.emitted('update:open')).toEqual([[false]])
-  })
+  }, 15_000)
 
   it('reads a photo picked from the gallery the same way', async () => {
     onPhoto.mockResolvedValue(found)

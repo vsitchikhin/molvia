@@ -1,17 +1,17 @@
 import {
-  RECEIPT_CURRENCY,
-  RECEIPT_LANGUAGES,
   RECEIPT_PAGE_MODES,
   bestReading,
   mergeParts,
   moneyOfHundredths,
   needsReshoot,
   readPartly,
+  receiptCard,
   receiptCityOf,
   receiptDateOf,
   receiptTimeOf,
   receiptLineOf,
   receiptLineCodec,
+  verifiedReading,
 } from '@molvia/model'
 import type { Currency, ReceiptLine, ReceiptText, TextRow } from '@molvia/model'
 import { z } from 'zod'
@@ -102,20 +102,19 @@ async function readOne(
   { reader, report, bind }: ReadReceiptsDeps,
   claimed: ClaimedReceipt,
 ): Promise<ReadOutcome> {
-  const languages = RECEIPT_LANGUAGES[claimed.country]
-  if (claimed.parts.length === 0 || languages === undefined) {
+  const { currency, photo: photoReading } = receiptCard(claimed.country)
+  if (claimed.parts.length === 0 || photoReading === null) {
     // restored from a nightly copy, which holds no photos (В-2); a country read by its link has no
-    // languages of the reader and never reaches it (MOL-232)
+    // reading off a photo on its card and never reaches the reader (MOL-232)
     return { kind: 'failed', failure: 'unreadable', readerVersion: null, head: null }
   }
-  const currency = RECEIPT_CURRENCY[claimed.country]
   const boxes = new Map<TextRow, Box | null>()
   let version: string | null = null
   const readings: TextRow[][] = []
   for (const mode of RECEIPT_PAGE_MODES) {
     const parts: TextRow[][] = []
     for (const [index, part] of claimed.parts.entries()) {
-      const reading = await reader.read(part.photo, languages, mode)
+      const reading = await reader.read(part.photo, photoReading.languages, mode)
       version ??= reading.version
       const rows = reading.rows.map((row, line) => {
         const text: TextRow = { text: row.text, part: index, line }
@@ -124,14 +123,16 @@ async function readOne(
       })
       parts.push(rows)
     }
-    readings.push(mergeParts(parts))
+    readings.push(mergeParts(photoReading, parts))
   }
-  const text = bestReading(readings)
-  const head = headOf(text, currency, readings)
+  const text = bestReading(photoReading, readings)
+  // a figure goes to the review as read only where it is verified, the rest is left empty (MOL-255)
+  const shown = verifiedReading(text)
+  const head = headOf(shown, currency, readings)
   if (needsReshoot(text))
     return { kind: 'failed', failure: 'reshoot', readerVersion: version, head }
 
-  const lines = text.lines.map((line) => receiptLineOf(line, currency))
+  const lines = shown.lines.map((line) => receiptLineOf(line, currency))
   let images: LineImage[] = []
   try {
     images = await cutLines(reader, claimed, text, boxes)
@@ -168,8 +169,19 @@ async function readOne(
     readerVersion: version ?? '',
     head,
     lines,
-    // a section with no items is read whole (MOL-227)
-    partly: lines.length > 0 && readPartly(lines, total),
+    // a section with no items is read whole (MOL-227); the sums of what was read, before the check: a
+    // line it emptied was read, and a retake reads it the same (MOL-255, А5 «а»); with no total, a line
+    // adds up only as the review shows it with its figures — settled by swaps, a count made up or one
+    // number printed twice is no line read (round 3, А10 «а»; round 4, А12 «а»)
+    partly:
+      lines.length > 0 &&
+      readPartly(
+        text.lines.map((line, i) => ({
+          ...receiptLineOf(line, currency),
+          settled: shown.lines[i]?.settled ?? false,
+        })),
+        total,
+      ),
     bindings,
     images,
   }

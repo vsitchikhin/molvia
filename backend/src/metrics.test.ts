@@ -1,7 +1,13 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { afterEach, describe, expect, it } from 'vitest'
+import { expectWithin } from '@molvia/model/testing/clock'
 import { DURATION_BUCKETS, httpMetrics, processMetrics } from './metrics'
 import type { ProcessMetrics } from './metrics'
+
+// The test here past a second on CI carries a timeout of 15 s: the slowest took 1 109 ms there
+// (MOL-266), its own wait, the sleep the loop is read after. Not work, so the rule of MOL-243 asks
+// no timeout of it — the time reporter does, as it tells no wait from work. Ten times it. One more
+// here past half a second carries 10 s: it took 555 ms at worst.
 
 /** The lines of a rendering that carry a figure, comments left out. */
 function figures(text: string): string[] {
@@ -140,7 +146,7 @@ describe('processMetrics', () => {
     // A reader by hand first, then the scraper: both see the block.
     expect(gauge(running.render(), 'nodejs_eventloop_lag_max_seconds')).toBeGreaterThan(0.25)
     expect(gauge(running.render(), 'nodejs_eventloop_lag_max_seconds')).toBeGreaterThan(0.25)
-  })
+  }, 10_000)
 
   it('sees a block that starts right after a read (adversarial А2b)', async () => {
     running = processMetrics({ tickMs: 10, windowMs: 5000 })
@@ -149,15 +155,15 @@ describe('processMetrics', () => {
     await sleep(30)
 
     expect(gauge(running.render(), 'nodejs_eventloop_lag_max_seconds')).toBeGreaterThan(0.25)
-  })
+  }, 10_000)
 
   it('lets a block go once its window has passed', async () => {
     running = processMetrics({ tickMs: 10, windowMs: 200 })
     holdTheLoop(150)
     await sleep(400)
 
-    expect(gauge(running.render(), 'nodejs_eventloop_lag_max_seconds')).toBeLessThan(0.1)
-  })
+    expectWithin(gauge(running.render(), 'nodejs_eventloop_lag_max_seconds') * 1000, 100)
+  }, 15_000)
 
   it('reads an idle loop as on time, not as its timer’s resolution (adversarial А3)', async () => {
     // Node's monitor read the resolution itself — here the tick, 0.2 s — as the delay of an idle
@@ -165,6 +171,6 @@ describe('processMetrics', () => {
     running = processMetrics({ tickMs: 200, windowMs: 5000 })
     await sleep(1100)
 
-    expect(gauge(running.render(), 'nodejs_eventloop_lag_p99_seconds')).toBeLessThan(0.15)
-  })
+    expectWithin(gauge(running.render(), 'nodejs_eventloop_lag_p99_seconds') * 1000, 150)
+  }, 25_000)
 })

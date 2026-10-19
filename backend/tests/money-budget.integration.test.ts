@@ -18,6 +18,11 @@ import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
+// The 5 tests here past half a second on CI carry a timeout of their own (MOL-266), ten times their
+// worst there, rounded up to 5 s, so the time reporter names one only on a run slower than any yet
+// seen: 10 s for 4 of them, and 15 s for «план живёт с месяца правки…», which took 1 058 ms in the
+// first attempt of a run re-run, which the first measure did not read (MOL-243, round 21).
+
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
 let app: FastifyInstance
@@ -154,7 +159,7 @@ describe('«Бюджет» (MOL-117)', () => {
     ])
     expect(view.total).toMatchObject({ planned: amd(116100), left: amd(22600), whole: true })
     expect(shown.budget).toEqual({ planned: true, left: amd(22600) })
-  })
+  }, 15_000)
 
   it('план живёт с месяца правки и дальше; правка раньше снимает поздние (В-1, Р-9)', async () => {
     const me = await owner()
@@ -176,7 +181,7 @@ describe('«Бюджет» (MOL-117)', () => {
     expect((await budget(me, current)).rows).toEqual([])
     expect(await planned(m1)).toEqual(amd(260000))
     expect((await month(me, current)).budget).toEqual({ planned: false, left: null })
-  })
+  }, 15_000)
 
   it('процент — от «Пришло» по курсу закрытого месяца, и чтение замораживает его, как «Деньги»', async () => {
     await cacheRates()
@@ -223,7 +228,7 @@ describe('«Бюджет» (MOL-117)', () => {
     })
     expect(waiting.total).toMatchObject({ whole: false })
     expect((await month(me, m2)).budget).toEqual({ planned: true, left: null })
-  })
+  }, 10_000)
 
   it('поход — в «Продуктах»: строка плана видит его деньги, как месяц «Денег»', async () => {
     const me = await owner()
@@ -264,7 +269,7 @@ describe('«Бюджет» (MOL-117)', () => {
       difference: { minor: 7_500_000n, currency: 'RUB' },
       actual: 75,
     })
-  })
+  }, 10_000)
 
   it('убранная категория держит план и видна, только пока в ней есть траты (Р-5)', async () => {
     const me = await owner()
@@ -283,7 +288,7 @@ describe('«Бюджет» (MOL-117)', () => {
     expect(await db.select().from(budgetPlans).where(eq(budgetPlans.actorId, me.id))).toHaveLength(
       1,
     )
-  })
+  }, 10_000)
 
   it('сумма — в валюте трат; чужая и несуществующая категория — 404, как одна', async () => {
     const me = await owner()

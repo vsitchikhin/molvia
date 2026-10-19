@@ -5,6 +5,10 @@ import { fileURLToPath } from 'node:url'
 import stylelint from 'stylelint'
 import { describe, expect, it } from 'vitest'
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 639 ms there at worst
+// (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
+// than any yet seen.
+
 const FRONTEND = fileURLToPath(new URL('..', import.meta.url))
 const COMPONENT = `${FRONTEND}src/components/Probe.scss`
 const MIXINS = `${FRONTEND}src/styles/_mixins.scss`
@@ -29,7 +33,7 @@ describe('frontend/.stylelintrc.json', () => {
           '  font: inherit;\n  font-size: 1em;\n  font-weight: var(--weight-medium);\n}\n',
       ),
     ).toEqual([])
-  })
+  }, 15_000)
 
   it('refuses the font shorthand with anything but inherit — Nunito or a literal past the mixin', async () => {
     expect(
@@ -115,5 +119,5 @@ describe('frontend/.stylelintrc.json', () => {
     expect(await rules(sfc('.a {\n  scroll-behavior: smooth;\n}\n'), caption)).toEqual([
       'declaration-property-value-disallowed-list',
     ])
-  })
+  }, 10_000)
 })

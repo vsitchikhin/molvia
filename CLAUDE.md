@@ -341,7 +341,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   ones that hold is set aside, never retried. A receipt — its parts, removal, «Записать» — goes
   through a queue of its own by the same rules (`receiptQueue`, MOL-127).
 - **A removed trip is marked** (MOL-76): «Вернуть» for ten minutes, **every reader filters the
-  mark** except erasure, the timer and an account's «удалить или убрать».
+  mark** except erasure, the timer and an account's «удалить или убрать». **A new shot of its
+  receipt is recorded meanwhile, and then its «Вернуть» is a 409** (MOL-254): one paper, one record.
 - **A trip names its own geography** (`context`, MOL-65): a start without one is
   `error.trip_context_required`, held by the queue without a timer; the settings are settled
   choice by choice inside the `UPDATE`.
@@ -587,6 +588,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   database and no disk; the API holds the queue, the photos and the parse, one receipt at a time.
 - **The parse is MOL-114's prototype, measured on the bench** (`receipt-text.ts`, `score.mjs`): a rule
   changed is run on the bench's truth before and after; amounts in hundredths, never floats.
+- **A country's words are its card's, never a literal of the parse** (MOL-247, `receipt-card.ts`): currency,
+  languages, swaps, the words of the total, the payment, the tax and the head; the tills' layouts stay hints, and
+  a card names only what the parse reads — a probe card holds it.
 - **Every receipt with a line in it is read** (MOL-222, В-1): «переснимите» only when not one line was
   found, and it asserts no cause it does not know — faint print named among those it may be (MOL-227,
   В-2); read in part (`readPartly`, the model's) is a hint on the review, never a refusal — the person's
@@ -596,6 +600,13 @@ that are easiest to break; the file holds every rule of the area and the reason 
   receipt with no lines (`withoutItems`), its head the terminal's — the tax number after «ՀՎՀՀ» first,
   never the receipt's own «ԿՀ» — its total two sources of three, none where two receipts show (a head
   under a fiscal number among them); neither «Записать» nor «Убрать сумму» makes a finished trip empty.
+- **Only what is verified goes to the review as read** (MOL-255): `verifiedReading` at the seam between the
+  parse and the rows — a line as printed (`asPrinted`, never `settled`; a count not printed is worked out), a
+  line of a quantity of one whose price is its sum only on a receipt proven whole, the rest empty; the total's
+  rest is no line's, the foot says what the empty lines lack; «Прочитали не всё» is any shortfall of the lines
+  as read against the total, before the check — with none, of the lines shown — the server's word
+  (`read_partly`), the strip and the 0.2 measure alike, since the phone cannot tell an emptied line from a lost
+  one.
 - **A total is shown only where two sources vouch for it** (MOL-244, В-1 «а»): the lines that met it every
   one as read unless two places print another sum, else two places printed — the total, the payment, a
   section's sum — by one `votedTotal` for both kinds of receipt, else the lines with one of them as read; a row
@@ -993,7 +1004,14 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
   worst there; a hook likewise against its 10 s; a duration a test asserts is bound the same way and
   below the timeout, and a clock bound stays only where each breakage it guards, made on purpose and
   no wider, crosses it** (MOL-243). A wait the test sets itself is not work, and the age of a stamp
-  is not a duration. Why ten, and how a bound is judged — `.claude/rules/testing.md`.
+  is not a duration. **CI holds it on every run** (MOL-266): `bin/test-time-reporter.ts` names each
+  test, hook or bound on the clock whose time, ten times over, passes its limit, and turns the run red
+  only where it stands in a file the pull request changes — elsewhere it warns, since a busy runner
+  sets a new worst now and then. A bound on a duration goes only through `expectWithin`
+  (`@molvia/model/testing/clock`); `bin/check-clock-bounds.mjs` in `npm run lint` refuses the other
+  spellings it knows, found by parsing; under `vi.useFakeTimers()` a bound is held as real too, so a test
+  there bounds the time it moves the timers by, never a clock. Why ten and how a bound is judged —
+  `.claude/rules/testing.md`; how CI holds it and its prices — `.claude/rules/workspace.md`.
 - **Maximize corner cases.** Mandatory checklist:
   - NULL / legacy — the field is empty but the entity still falls under the rule
   - alternative write path — the same outcome reached by a different route

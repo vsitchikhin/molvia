@@ -15,6 +15,10 @@ import { clearAll, insertActor, insertCounted, insertItem } from './fixtures'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { actors, verdicts as verdictsTable } from '@/db/schema'
 
+// The tests here that come near half a second on CI carry a timeout of their own, at least twenty
+// times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
+// time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
+
 const { db, close } = connectDrizzle()
 const verdicts = createVerdictRepository(db)
 
@@ -90,17 +94,21 @@ describe('gate 0.2: five verdicts in two weeks', () => {
     [4, 0],
     [5, 1],
     [6, 1],
-  ])('with %i verdicts in the window, %i reached the threshold', async (count, reached) => {
-    await rateMany(await personSeen(), count)
+  ])(
+    'with %i verdicts in the window, %i reached the threshold',
+    async (count, reached) => {
+      await rateMany(await personSeen(), count)
 
-    await expect(gate()).resolves.toEqual({
-      cohortSize: 1,
-      reached,
-      pending: 0,
-      withoutConsent: 0,
-      optedOut: 0,
-    })
-  })
+      await expect(gate()).resolves.toEqual({
+        cohortSize: 1,
+        reached,
+        pending: 0,
+        withoutConsent: 0,
+        optedOut: 0,
+      })
+    },
+    10_000,
+  )
 
   it('counts a fifth verdict in the last hour of the second week', async () => {
     const actorId = await personSeen()
@@ -216,7 +224,7 @@ describe('gate 0.2: five verdicts in two weeks', () => {
       withoutConsent: 0,
       optedOut: 0,
     })
-  })
+  }, 10_000)
 
   it('takes a cohort from `from` inclusive to `to` exclusive', async () => {
     const start = daysAgo(40)
@@ -410,7 +418,7 @@ describe('gate 0.2: no consent to the statistics (MOL-236)', () => {
       withoutConsent: 2,
       optedOut: 0,
     })
-  })
+  }, 15_000)
 
   it('counts the verdicts already there once edition 2 is accepted: the count is done at reading', async () => {
     const actorId = await insertActor(db, { createdAt: daysAgo(30) })
@@ -422,7 +430,7 @@ describe('gate 0.2: no consent to the statistics (MOL-236)', () => {
       .set({ consentVersion: STATISTICS_CONSENT_EDITION, consentedAt: new Date() })
       .where(eq(actors.id, actorId))
     await expect(gate()).resolves.toMatchObject({ cohortSize: 1, reached: 1, withoutConsent: 0 })
-  })
+  }, 15_000)
 
   it('time first: one without consent inside their window is waiting, not «no consent»', async () => {
     await insertActor(db, { createdAt: daysAgo(5) })
@@ -433,7 +441,7 @@ describe('gate 0.2: no consent to the statistics (MOL-236)', () => {
       withoutConsent: 0,
       optedOut: 0,
     })
-  })
+  }, 10_000)
 
   it('consent before the objection: one who neither consented nor is on is named once', async () => {
     await insertActor(db, { createdAt: daysAgo(30), analyticsOffAt: new Date() })
@@ -457,7 +465,7 @@ describe('gate 0.2: an objection to being counted (MOL-96, В-2)', () => {
       withoutConsent: 0,
       optedOut: 2,
     })
-  })
+  }, 15_000)
 
   it('names someone off inside their window as waiting: time first', async () => {
     await insertCounted(db, { createdAt: daysAgo(5), analyticsOffAt: new Date() })

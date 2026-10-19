@@ -506,6 +506,23 @@ describe('ExchangeSheet: an amendment (MOL-42, В-3)', () => {
     await saveAmendment(view)
     expect(view.get('.current').text()).toContain('held before ֏30,000.00')
   })
+
+  // MOL-189 review №1: a save after the conflict that did not land — lost on the way, refused under a
+  // field — leaves the sheet over the version the list holds, never back on the one it was opened on.
+  it('after a conflict every next save goes over the version the list holds, past a failed one', async () => {
+    const theirs: ExchangeView = { ...amended, note: 'Cash', revision: 3 }
+    for (const failure of [new TypeError('network'), new ApiError(ERROR.INVALID_RATE)]) {
+      amend.mockReset()
+      amend
+        .mockResolvedValueOnce('conflict')
+        .mockRejectedValueOnce(failure)
+        .mockResolvedValueOnce('saved')
+      const view = await render(overview({ exchanges: [theirs] }), amended)
+      for (let tap = 0; tap < 3; tap += 1) await saveAmendment(view)
+      expect(amend.mock.calls.map(([, body]) => body.revision)).toEqual([2, 3, 3])
+      view.unmount()
+    }
+  })
 })
 
 describe('ExchangeSheet: how the money was changed (MOL-137, В-1)', () => {
@@ -580,5 +597,53 @@ describe('ExchangeSheet: the channel in the versions (MOL-137, review)', () => {
     }
     const view = await render(overview({ exchanges: [amended] }), amended)
     expect(view.get('.versions li').text()).toContain(en.exchange.sheet.channel_exchanger)
+  })
+})
+
+// MOL-189, Ф-34, owner's В-1 «а»: removing is the amendment's, and only where the screen offers
+// «Вернуть» after it — never in a new exchange, never from an account's journal.
+describe('ExchangeSheet: removing from the amendment (MOL-189)', () => {
+  const [base] = overview().exchanges
+  if (!base) throw new Error('the fixture has an exchange')
+  const words = (view: VueWrapper) => view.findAll('button').map((button) => button.text())
+
+  it('offers «Delete the exchange» in an amendment the screen can bring back, and asks it of the screen', async () => {
+    const view = await render(overview(), base)
+    expect(words(view)).not.toContain(en.exchange.sheet.remove)
+    await view.setProps({ removable: true })
+    const remove = view
+      .findAll('button')
+      .find((button) => button.text() === en.exchange.sheet.remove)
+    expect(remove?.classes()).toContain('danger-ghost')
+    await remove?.trigger('click')
+    expect(view.emitted('remove')).toEqual([[base]])
+    expect(amend).not.toHaveBeenCalled()
+  })
+
+  // MOL-189 review №3: from an account's journal the sheet has no «Delete», and its words say none.
+  it('offline, the strip names removing only where the sheet offers it', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    const view = await render(overview(), base)
+    expect(view.get('.status').text()).toContain(en.exchange.sheet.offline_amend)
+    await view.setProps({ removable: true })
+    expect(view.get('.status').text()).toContain(en.exchange.sheet.offline)
+  })
+
+  it('must not fire: no «Delete» in a new exchange, removable or not', async () => {
+    const view = await render()
+    await view.setProps({ removable: true })
+    expect(words(view)).not.toContain(en.exchange.sheet.remove)
+  })
+
+  it('a write of the screen in the air holds both buttons, in focus and saying nothing new (Р-3)', async () => {
+    const view = await render(overview(), base)
+    await view.setProps({ removable: true, busy: true })
+    for (const label of [en.exchange.sheet.save_amend, en.exchange.sheet.remove]) {
+      const button = view.findAll('button').find((one) => one.text() === label)
+      expect(button?.attributes('aria-disabled')).toBe('true')
+      await button?.trigger('click')
+    }
+    expect(view.emitted('remove')).toBeUndefined()
+    expect(amend).not.toHaveBeenCalled()
   })
 })

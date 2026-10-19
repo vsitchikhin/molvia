@@ -13,6 +13,11 @@ import { clearAll, insertActor, insertPlace, signIn, tripContext } from './fixtu
 // The lari (MOL-110): its pairs are the National Bank of Georgia's, everything else stays the
 // Central Bank of Armenia's, and the database holds the two to the same rule as the domain.
 
+// The test here past half a second on CI carries a timeout of 10 s: it took 551 ms there at worst
+// (MOL-266), in the first attempt of a run re-run, which the first measure did not read (MOL-243,
+// round 21). Ten times that, rounded up to 5 s, so the time reporter names it only on a run slower
+// than any yet seen.
+
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
 let app: FastifyInstance
@@ -96,7 +101,7 @@ describe('поход в лари', () => {
     const trip = await start(await tbilisi())
     expect(trip.rate).toMatchObject({ scaled: parseRate('0.030935'), source: 'fallback' })
     expect(trip.rateProvider).toBe('cba')
-  })
+  }, 10_000)
 
   it('поход в драмах строки НБ Грузии не трогают — ЦБ РА, официальный', async () => {
     await rates.upsert([...georgian(daysAgo(1)), ...armenian(daysAgo(2))])

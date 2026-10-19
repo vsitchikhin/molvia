@@ -33,6 +33,20 @@ export interface IncomeDraft {
 export interface Incomes {
   readonly phase: ComputedRef<IncomesPhase>
   readonly overview: Ref<IncomesResponse | null>
+  /** When the server last answered with the screen — what «доходы на …» of the strip names. */
+  readonly fetchedAt: Ref<Date | null>
+  /**
+   * The list is shown and reading it again failed with the connection up: after a conflict, a
+   * vanished income, a late «Вернуть» — what is shown may not be what the server holds now.
+   */
+  readonly stale: ComputedRef<boolean>
+  /**
+   * The list is shown and reading it again failed, whatever the cause — the server or the
+   * connection (MOL-187, Б1): the list is the one from before the last write.
+   */
+  readonly behind: ComputedRef<boolean>
+  /** Reads that failed so far: a new one says the strip's same words again (MOL-181, C1). */
+  readonly attempt: Ref<number>
   /** A write in the air: a removal, «Вернуть». The form of the sheet keeps its own. */
   readonly busy: Ref<boolean>
   /** A write that failed — said once, above the list, and cleared by the next one. */
@@ -57,6 +71,11 @@ export interface Incomes {
   amend(id: string, body: IncomeAmendBody): Promise<AmendOutcome>
   remove(income: IncomeView): Promise<void>
   restore(): Promise<void>
+  /**
+   * The ten seconds of «Вернуть» ran out (MOL-189, Ф-29): the screen stops offering it. The server
+   * keeps the mark until its timer or the screen's next request, as before.
+   */
+  forget(): void
 }
 
 /** Every income of the answer, newest first — the months hold them. */
@@ -76,7 +95,9 @@ export function incomesOf(overview: IncomesResponse | null): IncomeView[] {
 export function useIncomes(): Incomes {
   const actor = useActorStore()
   const overview = ref<IncomesResponse | null>(null)
+  const fetchedAt = ref<Date | null>(null)
   const failure = ref<'offline' | 'error' | null>(null)
+  const attempt = ref(0)
   const busy = ref(false)
   const failed = ref(false)
   const removed = ref<IncomeView | null>(null)
@@ -91,6 +112,7 @@ export function useIncomes(): Incomes {
   function land(answer: IncomesResponse): void {
     latest += 1
     overview.value = answer
+    fetchedAt.value = new Date()
     failure.value = null
   }
 
@@ -101,10 +123,12 @@ export function useIncomes(): Incomes {
       const answer = await api.incomes()
       if (mine !== latest) return
       overview.value = answer
+      fetchedAt.value = new Date()
       failure.value = null
     } catch (error) {
       reportFailure(error, 'screen')
       if (mine !== latest) return
+      attempt.value += 1
       // Decided after the failure, never before the request (MOL-19, A1).
       failure.value = navigator.onLine ? 'error' : 'offline'
     }
@@ -115,6 +139,9 @@ export function useIncomes(): Incomes {
     if (overview.value) return overview.value.months.length > 0 ? 'ready' : 'empty'
     return failure.value ?? 'loading'
   })
+
+  const stale = computed(() => overview.value !== null && failure.value === 'error')
+  const behind = computed(() => overview.value !== null && failure.value !== null)
 
   /** Every word above the list is about the last write; a new one takes them all away. */
   function hush(): void {
@@ -132,7 +159,9 @@ export function useIncomes(): Incomes {
     () => {
       // Everything of the last owner goes with them, «Вернуть» with their amounts first.
       overview.value = null
+      fetchedAt.value = null
       failure.value = null
+      attempt.value = 0
       hush()
       removed.value = null
       void load()
@@ -145,6 +174,10 @@ export function useIncomes(): Incomes {
   return {
     phase,
     overview,
+    fetchedAt,
+    stale,
+    behind,
+    attempt,
     busy,
     failed,
     removed,
@@ -155,6 +188,9 @@ export function useIncomes(): Incomes {
     restored,
     restoring,
     retry: load,
+    forget() {
+      removed.value = null
+    },
     async record(body) {
       hush()
       try {
