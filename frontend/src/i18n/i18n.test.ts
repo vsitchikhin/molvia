@@ -470,7 +470,7 @@ describe('словарь: плюральные формы', () => {
       'trip.rejected.orphaned',
       'trip.caveat.pending',
       'trip.unsent.title',
-      'purchases.issues_mismatch',
+      'purchases.issues_check',
       'item.results_announced',
       'item.far_announced',
       'advice.ratings_count',

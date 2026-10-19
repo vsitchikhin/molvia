@@ -218,7 +218,7 @@
     "sending": "{parts} · sending",
     "parsing_unknown": "reading · we’ll get the place from the receipt",
     "parsing_known": "{day}, {time} · reading lines…",
-    "issues_mismatch": "{n} line doesn’t add up | {n} lines don’t add up",
+    "issues_check": "check {n} line | check {n} lines",
     "failed_meta": "couldn’t be read",
     "reshoot_meta": "no lines found — retake it",
     "no_items_meta": "no items · {day}",
