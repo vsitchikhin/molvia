@@ -483,7 +483,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   goes when a full shared shelf refused a choice and lost its past, or the storage was cleared, and
   read as «Системная» it put every other window in a scheme nobody chose (adversarial Б′) — the
   window keeps its own, as its reload does. The control is `SegmentedControl` with `fit` — each
-  segment the width of its word, the semibold reserved under it so a tap moves nothing; the word
+  segment the width of its word (two words of a label break between them where the row is short,
+  never a word: «Как меняли» stood past the field at 320, MOL-189, Е-11), the semibold reserved under it so a tap moves nothing; the word
   lies over its segment's hit area, so a tap on it lands on the label, **inside the track's own
   stacking context** (`isolation`) — lifted without it, it rose over the pinned header too, drawn
   through it and taking its taps (adversarial Д); even thirds on a 320 px phone left «Системная» (91
@@ -813,7 +814,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   8 would overlap), until its task moves the action into the strip. `UndoStrip` reads «words ·
   count · Вернуть», the count in a ring of `--graphic`, `aria-hidden` — the announcement says the
   ten seconds once, a live region ticking would talk over a person reaching for the button (81 v2
-  asked for a label; declined, MOL-179 Р-5).
+  asked for a label; declined, MOL-179 Р-5). **A «Вернуть» that waits for the server** — an exchange's,
+  an income's (MOL-189) — is `busy` with its word, and with no connection not now saying why
+  (`waiting`); **the count stands still while it cannot be pressed** (owner's В-2 «а»), as under a
+  finger.
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
   frame — pinned row, large title that collapses past 24px, back chevron, room under the tab
   bar — is drawn once; a screen fills its slots. A nested route names its `meta.parent` and

@@ -370,12 +370,32 @@ device, private always. The rate is what the two amounts say and is not stored b
   (round 2, Л4; round 3, М2). A
   remainder the exchange has is shown in the sheet whatever a new exchange would ask: an amendment
   replaces the exchange whole, so a field not shown was a field cleared. The row is a button named
-  by its words — an `aria-label` silenced the rate and the comparison. The row says «исправлен», the sheet shows the versions — which is what explains a trip
+  by its words — an `aria-label` silenced the rate and the comparison. **It opens without a connection
+  too** (MOL-189, С-19): the versions and the note are there to read, and what waits for the connection
+  says so — a `StatusStrip` first in the sheet, «Сохраним / Удалим, когда будет связь» not now and in
+  the focus order (Ф-6), what was typed kept until the connection comes back. **A conflict whose list
+  could not be read again is said by the sheet itself** (MOL-187 №8, MOL-188 №5): the screen's
+  «Повторить» is under the modal sheet, and the version the sheet held was the one from before — «Сейчас
+  записано» by it was untrue, and the next save conflicted again. So the sheet goes over the version the
+  list now holds (`base`), says `amend_conflict_stale` with no «Сейчас записано» while the list is
+  behind, and has a `StatusStrip` of its own — «Сервер не ответил» with «Повторить», or offline; read at
+  last, it shows that version and the next save goes over it. The journal's sheets get the same.
+  The row says «исправлен», the sheet shows the versions — which is what explains a trip
   that took a rate the exchanges no longer say. The history goes with its exchange: a removal made
   final and erasure take it by cascade. «Где и заметка» is one private line, part of a repeat.
 - **Removing is still there, for an exchange that should not exist.** Trips already started keep
-  what they took. **The bin asks first, with the amounts and the day, and «Вернуть» stays offered after**
-  (owner's decision В-5). A removal marks the row (`deleted_at`) and hides it from every reader;
+  what they took. **It asks first, with the amounts and the day, and «Вернуть» stays offered after**
+  (owner's decision В-5). **It lives in the sheet of the amendment, not on the card** (MOL-189, Ф-34 of
+  MOL-118): the card is one button into the amendment, «Удалить обмен» stands under «Сохранить правку»
+  in its footer, and «Удалить обмен?» rises over that sheet with «‹» and no × (Д-1) — «‹» and «back»
+  take the question alone, with what was typed kept, and «Удалить» closes both in one step of the
+  history. **Only where the screen offers «Вернуть» after it** (owner's В-1 «а»): the same sheet opened
+  from an account's journal, «не попали» or a check amends and never removes. **«Вернуть» is the
+  `UndoStrip` over the docked strip** (Ф-29), ten seconds, then the screen offers it no more — the
+  server keeps the mark until its timer or the screen's next request, as below; at work it says
+  «Возвращаем…», and with no connection it is not now, «Вернём, когда будет связь», **its count standing
+  still** (owner's В-2 «а»): ten seconds run out offline took away a removal the server still kept.
+  An income is removed the same way. A removal marks the row (`deleted_at`) and hides it from every reader;
   «Вернуть» (`POST /exchanges/:id/restore`) clears the mark, so the exchange keeps its
   `created_at` — written anew it took the moment of the tap, which moved both the order of its day
   and the hint. **A removal is final after ten minutes** (`EXCHANGE_UNDO_MINUTES`, owner's decision
