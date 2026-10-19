@@ -631,16 +631,19 @@ export default defineComponent({
     /**
      * Read in part (MOL-222, В-1): the model's own rule, of what the server read — never of the edits —
      * said with what it read against the printed total, or how many lines added up without one. A total
-     * read in one place is not shown, and still measures the lines, as «примерно» (MOL-244).
+     * read in one place is not shown, and still measures the lines, as «примерно» (MOL-244). The server's
+     * word where it gave one (MOL-255, А6 «а»): it measured the lines as read, before the check emptied
+     * any, and an emptied line here cannot be told from a lost one — so with an empty line it is said
+     * with no sums, which the lines shown do not make.
      */
     const partly = computed(() => {
       const one = detail.value
       if (!one || one.lines.length === 0) return null
-      // a line the check left with no figures was read: what it lacks is the foot's to say, and a
-      // retake would read it the same (MOL-255, А5 «а»)
-      if (one.lines.some((line) => line.sum === null)) return null
       const total = one.receipt.total ?? one.readTotal ?? null
-      if (!readPartly(one.lines, total)) return null
+      const blank = one.lines.some((line) => line.sum === null)
+      // a receipt read before keeps no word, and no line the check emptied (А5 «а»)
+      if (!(one.readPartly ?? (!blank && readPartly(one.lines, total)))) return null
+      if (blank) return t('receipt.review.partly_check')
       const covered = readCovered(one.lines, total)
       if (covered !== null && total !== null) {
         return t(

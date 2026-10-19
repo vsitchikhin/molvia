@@ -2229,6 +2229,7 @@
       "no_items": "This receipt lists no items — we will save its total. You can add the purchases later, in the record",
       "partly_read_total": "Not all of it was read: the lines make {lines} of about {total}, about {short} short. If the print is faint, a retake will not help — correct the lines",
       "partly_lines": "Not all of it was read: {n} of {total} lines add up. If the print is faint, a retake will not help — correct the lines",
+      "partly_check": "Not all of it was read — check the lines against the paper. If the print is faint, a retake will not help: add what is missing later, in the record",
       "to_developer": "Send the receipt to the developer",
       "record": "Save {n} purchase | Save {n} purchases",
       "record_busy": "Saving…",
