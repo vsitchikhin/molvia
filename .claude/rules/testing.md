@@ -43,9 +43,9 @@ under 300 ms in 296 of the 301 runs of 03–09.10, and once 1169 ms — ×3.9 at
 measure is written beside it, and the measure reads every test that finished, whatever became of its
 run, in every attempt of it: a run re-run on a red lists only its last attempt, and a new push cancels
 the whole run, often with its tests done or halfway — each is a measure like any other. The first
-measure of MOL-266 left out 43 cancelled runs and with them `spendings`' 1482 ms; the first attempt of
-a re-run held `seed-catalogue`'s 7119 ms, which no measure saw until MOL-266 raised the tests they put
-past ten times, on 18.10.
+measure of MOL-266 left out all 98 cancelled runs of its window, 67 of them with a test that finished,
+and with them `spendings`' 1482 ms; the first attempt of a re-run held `seed-catalogue`'s 7119 ms, which
+no measure saw. MOL-266 raised the timeouts these put below ten times on 18.10.
 
 **A hook is held the same way against its 10 s.** The CI log prints a test's time only past 300 ms,
 and never a hook's, so the hooks and the short tests are measured by the time reporter — the
