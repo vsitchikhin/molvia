@@ -87,4 +87,20 @@ describe('expectWithin under fake timers', () => {
     expect(task.meta.clockBounds).toEqual([{ elapsed: 1, bound: 10 }])
     delete task.meta.clockBounds
   })
+
+  // round 15: whether a clock is fake is the run's to say, and the parse no longer guesses it — every clock
+  // replaced by hand, with vitest's fake timers off, is still the real time
+  it('holds a bound as real where every clock is replaced by hand, fake timers off', ({ task }) => {
+    vi.spyOn(Date, 'now').mockImplementation(() => 0)
+    vi.stubGlobal('performance', { now: () => 0 })
+    vi.spyOn(process, 'hrtime').mockImplementation(() => [0, 0])
+    try {
+      expectWithin(1, 10)
+      expect(task.meta.clockBounds).toEqual([{ elapsed: 1, bound: 10 }])
+    } finally {
+      vi.restoreAllMocks()
+      vi.unstubAllGlobals()
+      delete task.meta.clockBounds
+    }
+  })
 })

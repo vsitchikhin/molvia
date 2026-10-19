@@ -1,4 +1,4 @@
-import { expect, TestRunner, type TestContext } from 'vitest'
+import { expect, TestRunner, vi, type TestContext } from 'vitest'
 
 /** What a test asserted of a duration, kept for the time reporter (`bin/test-time-reporter.ts`). */
 export interface ClockBound {
@@ -21,6 +21,7 @@ const REAL = {
   hrtime: globalThis.process.hrtime,
 }
 const everyClockFake = (): boolean =>
+  vi.isFakeTimers() &&
   Date.now !== REAL.date &&
   globalThis.performance !== REAL.performance &&
   globalThis.process.hrtime !== REAL.hrtime
@@ -37,10 +38,11 @@ const everyClockFake = (): boolean =>
  * beside another test running it is that other test, or none (adversarial А7). Without the context
  * a bound there is refused rather than kept on the wrong test.
  *
- * Fake time is no duration: no runner moves it, so a bound on it is an ordinary `expect` (adversarial
- * Б2). A number does not say which clock it came from, so a bound is never refused here (review №12,
- * adversarial В3): met where fake timers replaced every clock the module found, it is kept marked
- * `fake`, and the reporter holds it to nothing; where one clock is left real, it is held as real.
+ * Fake time is no duration: no runner moves it, yet a bound on it comes here as any other (MOL-266,
+ * round 15) — whether a clock is fake is known only as the test runs. A number does not say which clock
+ * it came from, so a bound is never refused here (review №12, adversarial В3): met while vitest's fake
+ * timers are on and have replaced every clock the module found, it is kept marked `fake`, and the
+ * reporter holds it to nothing; a clock left real, or replaced by hand, holds it as real.
  */
 export function expectWithin(
   elapsed: number,

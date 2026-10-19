@@ -208,7 +208,7 @@ describe('кто бот — до раннера (MOL-142)', () => {
     expect(bot.isInited()).toBe(true)
     // grammY's own retry doubled its pause to twenty minutes; growing by a tenth of a second a
     // try, half an hour of refusals leaves it at some twenty seconds.
-    expect((calls.at(-1) ?? Infinity) - back).toBeLessThan(30_000)
+    expectWithin((calls.at(-1) ?? Infinity) - back, 30_000)
     expect(new Set(lines)).toEqual(new Set(['[molvia] telegram getMe: 502']))
   })
 
