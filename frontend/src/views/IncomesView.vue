@@ -105,7 +105,7 @@
     <!-- «Вернуть» over the strip, ten seconds, one look for every operation of «Деньги» (MOL-189,
          Ф-29). Whatever the screen became under it: removing the last income leaves the empty state
          (В-5). The strip puts the focus on «Вернуть» and says the removal itself. -->
-    <template v-if="removed" #undo>
+    <template v-if="removed && removed.id !== landing" #undo>
       <UndoStrip
         :key="removed.id"
         :text="t('income.removed', { amount: amountOf(removed) })"
@@ -113,8 +113,9 @@
         :action="t('income.restore')"
         :busy="restoring"
         :busy-label="t('income.restoring')"
-        :waiting="!online"
+        :waiting="!online && !restoring"
         :waiting-action="t('income.restore_offline')"
+        :inactive="busy && !restoring"
         @restore="restore"
         @expire="forget"
       />
@@ -141,6 +142,7 @@
       :attempt="attempt"
       @remove="ask"
       @retry="retry"
+      @closed="landed"
     />
     <!-- Over the sheet of the amendment, «‹» back to it (Д-1). -->
     <IncomeRemoveSheet
@@ -148,6 +150,7 @@
       :income="target"
       :amounts="target ? `${amountOf(target)} · ${lineOf(target)}` : ''"
       :busy="busy"
+      :failed="removeFailed"
       @confirm="confirmRemove"
     />
   </AppScreen>
@@ -244,12 +247,33 @@ export default defineComponent({
     })
     onUnmounted(() => unsay?.())
 
-    // Closing the amendment closes the question over it too, in one step of the history: the stack
-    // steps over the sheets above the one closed. Each closed on its own would step back twice.
-    function confirmRemove(): void {
+    // Both sheets stay up until the server answers (MOL-189, adversarial А3, А5): «Удаляем…» is seen,
+    // the card is not opened again under it, and a removal that failed leaves what was typed. The
+    // strip waits for the sheets to go, or its focus and its words land in a sheet on its way out.
+    const removeFailed = ref(false)
+    watch(removeOpen, (open) => {
+      if (!open) removeFailed.value = false
+    })
+    // The one being removed: its strip waits for the sheets; one already standing stays.
+    const landing = ref<string | null>(null)
+    async function confirmRemove(): Promise<void> {
       const income = target.value
-      sheetOpen.value = false
-      if (income) void incomes.remove(income)
+      if (!income || incomes.busy.value) return
+      removeFailed.value = false
+      landing.value = income.id
+      await incomes.remove(income)
+      if (incomes.removed.value?.id !== income.id) {
+        landing.value = null
+        removeFailed.value = true
+        return
+      }
+      // Closing the amendment closes the question over it too, in one step of the history: the
+      // stack steps over the sheets above the one closed. Each closed on its own would step back twice.
+      if (sheetOpen.value && editing.value?.id === income.id) sheetOpen.value = false
+      else landing.value = null
+    }
+    function landed(): void {
+      landing.value = null
     }
 
     const online = ref(navigator.onLine)
@@ -314,6 +338,9 @@ export default defineComponent({
       target,
       ask,
       confirmRemove,
+      removeFailed,
+      landing,
+      landed,
       online,
       amountOf,
       lineOf,

@@ -132,6 +132,7 @@ beforeEach(() => {
   vi.spyOn(performance, 'now').mockImplementation(() => clock)
 })
 afterEach(() => {
+  vi.useRealTimers()
   for (const view of views.splice(0)) view.unmount()
   window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
   document.body.innerHTML = ''
@@ -817,6 +818,12 @@ describe('ExchangeView: the rate and the list', () => {
     confirmButton().click()
     await flushPromises()
     expect(view.text()).toContain(en.exchange.failed)
+    // The sheets stay with the word in them (adversarial А5); put away, it stays above the list.
+    document
+      .querySelector<HTMLButtonElement>(`dialog[open] button[aria-label="${en.sheet.close}"]`)
+      ?.click()
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
 
     await recordThroughSheet(view)
     expect(recordExchange).toHaveBeenCalledTimes(1)
@@ -868,6 +875,139 @@ describe('ExchangeView: the rate and the list', () => {
     await restore.trigger('click')
     await flushPromises()
     expect(restoreExchange).not.toHaveBeenCalled()
+  })
+
+  // MOL-189, adversarial А3: both sheets wait for the server — «Deleting…» is seen, and the card is
+  // not opened again under them; the answer closes them, and the strip comes after.
+  it('«Delete» keeps both sheets up and at work until the server answers', async () => {
+    exchanges.mockResolvedValue(overview())
+    let land: (answer: ExchangesResponse) => void = () => undefined
+    removeExchange.mockReturnValue(new Promise((resolve) => (land = resolve)))
+    const view = await render()
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+    const sheets = document.querySelectorAll('dialog[open]')
+    expect(sheets).toHaveLength(2)
+    expect(sheets[1]?.querySelector('button[aria-busy="true"]')?.textContent).toContain(
+      en.exchange.remove_sheet.confirm_busy,
+    )
+    expect(view.find('.undo-strip').exists()).toBe(false)
+
+    land(overview({ exchanges: [], wallet: null }))
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(view.findAll('.cards button.body')).toHaveLength(0)
+    expect(view.find('.undo-strip').exists()).toBe(true)
+    expect(document.activeElement?.textContent.trim()).toBe(en.exchange.restore)
+  })
+
+  // Adversarial А5: nothing was removed, so nothing typed is lost — both sheets stay and say why.
+  it('a removal that failed leaves both sheets and what was typed, the word in the question', async () => {
+    exchanges.mockResolvedValue(overview())
+    removeExchange.mockRejectedValue(new TypeError('network'))
+    const view = await render()
+    await openCard(view)
+    const amount = document.querySelector<HTMLInputElement>(
+      'dialog[open] input[inputmode="decimal"]',
+    )
+    if (!amount) throw new Error('no amount field')
+    amount.value = '21000'
+    amount.dispatchEvent(new Event('input'))
+    sheetButton(en.exchange.sheet.remove).click()
+    await risen()
+    confirmButton().click()
+    await flushPromises()
+
+    const question = document.querySelectorAll('dialog[open]')[1]
+    expect(question?.querySelector('[role="alert"]')?.textContent).toBe(en.exchange.failed)
+    expect(view.find('.undo-strip').exists()).toBe(false)
+    question?.querySelector<HTMLButtonElement>(`button[aria-label="${en.nav.back_label}"]`)?.click()
+    await flushPromises()
+    expect(amount.value).toBe('21000')
+    // Asked again, the question starts clean.
+    sheetButton(en.exchange.sheet.remove).click()
+    await risen()
+    expect(document.querySelectorAll('dialog[open]')[1]?.textContent).not.toContain(
+      en.exchange.failed,
+    )
+  })
+
+  // MOL-189 review №2, adversarial А1: the strip a failed «Bring back» leaves still runs out.
+  it('a «Bring back» that failed lets the count go on, and the strip goes when it runs out', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    exchanges.mockResolvedValue(overview())
+    removeExchange.mockResolvedValue(overview({ exchanges: [], wallet: null }))
+    restoreExchange.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render()
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    vi.advanceTimersByTime(3_000)
+    await view.get('.undo-strip button').trigger('click')
+    await flushPromises()
+    expect(restoreExchange).toHaveBeenCalledOnce()
+    expect(view.text()).toContain(en.exchange.failed)
+
+    await view.get('.undo-strip').trigger('pointerleave')
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    vi.advanceTimersByTime(6_000)
+    await flushPromises()
+    expect(view.get('.undo-strip .count').text()).toBe('1')
+    vi.advanceTimersByTime(1_000)
+    await flushPromises()
+    expect(view.find('.undo-strip').exists()).toBe(false)
+  })
+
+  // Adversarial А2: the rate switch in the air makes the removal final when it lands; «Bring back»
+  // meanwhile is not now, as before MOL-189, never a tap that sends nothing.
+  it('«Bring back» waits, its count standing, while another write of the screen is in the air', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    const other = row({ id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5e', exchangedOn: '2026-09-10' })
+    exchanges.mockResolvedValue(overview({ exchanges: [row(), other] }))
+    removeExchange.mockResolvedValue(overview({ exchanges: [other] }))
+    let land: (answer: ExchangesResponse) => void = () => undefined
+    chooseRatePreference.mockReturnValue(new Promise((resolve) => (land = resolve)))
+    const view = await render()
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 5))
+
+    await view.get('input[value="official"]').setValue(true)
+    await flushPromises()
+    const restore = view.get('.undo-strip button')
+    expect(restore.attributes('aria-disabled')).toBe('true')
+    expect(restore.text()).toBe(en.exchange.restore)
+    vi.advanceTimersByTime(3_000)
+    await flushPromises()
+    expect(view.get('.undo-strip .count').text()).toBe('10')
+    await restore.trigger('click')
+    expect(restoreExchange).not.toHaveBeenCalled()
+
+    land(overview({ exchanges: [other], preference: 'official' }))
+    await flushPromises()
+    expect(view.find('.undo-strip').exists()).toBe(false)
+  })
+
+  // Adversarial А4, MOL-225 Р1-А3: a line that drops while «Bring back» works is not «not now».
+  it('«Bring back» at work keeps its words when the line drops', async () => {
+    exchanges.mockResolvedValue(overview())
+    removeExchange.mockResolvedValue(overview({ exchanges: [], wallet: null }))
+    restoreExchange.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+    const restore = view.get('.undo-strip button')
+    await restore.trigger('click')
+    await flushPromises()
+    online(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+    expect(restore.attributes('aria-busy')).toBe('true')
+    expect(restore.get('.words > [aria-hidden="true"]').text()).toBe(en.exchange.restore)
   })
 
   // MOL-189, С-19: what waits for the connection says so in the sheet, not by a dead card.

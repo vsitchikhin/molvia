@@ -142,6 +142,7 @@ beforeEach(() => {
   vi.spyOn(performance, 'now').mockImplementation(() => clock)
 })
 afterEach(() => {
+  vi.useRealTimers()
   for (const view of views.splice(0)) view.unmount()
   window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
   document.body.innerHTML = ''
@@ -710,6 +711,134 @@ describe('IncomesView: recording, amending and removing', () => {
     await restore.trigger('click')
     await flushPromises()
     expect(restoreIncome).not.toHaveBeenCalled()
+  })
+
+  // MOL-189, adversarial А3, А5 — as on «Обмен денег»: both sheets wait for the server; the answer
+  // closes them and the strip comes after, a failure leaves them with what was typed and says why.
+  it('«Remove» keeps both sheets up and at work until the server answers', async () => {
+    incomes.mockResolvedValue(overview())
+    let land: (answer: IncomesResponse) => void = () => undefined
+    removeIncome.mockReturnValue(new Promise((resolve) => (land = resolve)))
+    const view = await render()
+    await askToRemove(view)
+    sheetButton(en.income.remove_sheet.confirm).click()
+    await flushPromises()
+    const sheets = document.querySelectorAll('dialog[open]')
+    expect(sheets).toHaveLength(2)
+    expect(sheets[1]?.querySelector('button[aria-busy="true"]')?.textContent).toContain(
+      en.income.remove_sheet.confirm_busy,
+    )
+    expect(view.find('.undo-strip').exists()).toBe(false)
+
+    land(overview({ months: [] }))
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(view.find('.undo-strip').exists()).toBe(true)
+    expect(document.activeElement?.textContent.trim()).toBe(en.income.restore)
+  })
+
+  it('a removal that failed leaves both sheets and what was typed, the word in the question', async () => {
+    incomes.mockResolvedValue(overview())
+    removeIncome.mockRejectedValue(new TypeError('network'))
+    const view = await render()
+    await view.get('.cards button.body').trigger('click')
+    await risen()
+    const amount = document.querySelector<HTMLInputElement>(
+      'dialog[open] input[inputmode="decimal"]',
+    )
+    if (!amount) throw new Error('no amount field')
+    amount.value = '102345'
+    amount.dispatchEvent(new Event('input'))
+    sheetButton(en.income.sheet.remove).click()
+    await risen()
+    sheetButton(en.income.remove_sheet.confirm).click()
+    await flushPromises()
+
+    const question = document.querySelectorAll('dialog[open]')[1]
+    expect(question?.querySelector('[role="alert"]')?.textContent).toBe(en.income.failed)
+    expect(view.find('.undo-strip').exists()).toBe(false)
+    question?.querySelector<HTMLButtonElement>(`button[aria-label="${en.nav.back_label}"]`)?.click()
+    await flushPromises()
+    expect(amount.value).toBe('102345')
+  })
+
+  // MOL-189 review №2, adversarial А1: the strip a failed «Bring back» leaves still runs out.
+  it('a «Bring back» that failed lets the count go on, and the strip goes when it runs out', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    incomes.mockResolvedValue(overview())
+    removeIncome.mockResolvedValue(overview({ months: [] }))
+    restoreIncome.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render()
+    await askToRemove(view)
+    sheetButton(en.income.remove_sheet.confirm).click()
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    vi.advanceTimersByTime(4_000)
+    await view.get('.undo-strip button').trigger('click')
+    await flushPromises()
+    expect(restoreIncome).toHaveBeenCalledOnce()
+
+    await view.get('.undo-strip').trigger('pointerleave')
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    vi.advanceTimersByTime(5_000)
+    await flushPromises()
+    expect(view.get('.undo-strip .count').text()).toBe('1')
+    vi.advanceTimersByTime(1_000)
+    await flushPromises()
+    expect(view.find('.undo-strip').exists()).toBe(false)
+  })
+
+  // Adversarial А2: a second removal in the air makes the first final when it lands — the first
+  // strip's «Bring back» meanwhile is not now, never a tap that sends nothing.
+  it('«Bring back» waits while a second removal is in the air', async () => {
+    const other = row({ id: '5d1c6a2b-3e4f-4a5b-8c6d-7e8f9a0b1c2e', receivedOn: '2026-09-10' })
+    incomes.mockResolvedValue(
+      overview({ months: [{ month: '2026-09', sums: [], incomes: [row(), other] }] }),
+    )
+    let second: (answer: IncomesResponse) => void = () => undefined
+    removeIncome
+      .mockResolvedValueOnce(
+        overview({ months: [{ month: '2026-09', sums: [], incomes: [other] }] }),
+      )
+      .mockReturnValueOnce(new Promise((resolve) => (second = resolve)))
+    const view = await render()
+    await askToRemove(view)
+    sheetButton(en.income.remove_sheet.confirm).click()
+    await flushPromises()
+    // The step back of that close lands: the memory history the tests run on fires no `popstate`.
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    await askToRemove(view)
+    sheetButton(en.income.remove_sheet.confirm).click()
+    await flushPromises()
+    expect(removeIncome).toHaveBeenCalledTimes(2)
+
+    const restore = view.get('.undo-strip button')
+    expect(restore.attributes('aria-disabled')).toBe('true')
+    expect(restore.text()).toBe(en.income.restore)
+    await restore.trigger('click')
+    expect(restoreIncome).not.toHaveBeenCalled()
+    second(overview({ months: [] }))
+    await flushPromises()
+    expect(view.findAll('.undo-strip')).toHaveLength(1)
+  })
+
+  // Adversarial А4, MOL-225 Р1-А3: a line that drops while «Bring back» works is not «not now».
+  it('«Bring back» at work keeps its words when the line drops', async () => {
+    incomes.mockResolvedValue(overview())
+    removeIncome.mockResolvedValue(overview({ months: [] }))
+    restoreIncome.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    await askToRemove(view)
+    sheetButton(en.income.remove_sheet.confirm).click()
+    await flushPromises()
+    const restore = view.get('.undo-strip button')
+    await restore.trigger('click')
+    await flushPromises()
+    online(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+    expect(restore.attributes('aria-busy')).toBe('true')
+    expect(restore.get('.words > [aria-hidden="true"]').text()).toBe(en.income.restore)
   })
 
   // MOL-189, С-19: what waits for the connection says so in the sheet, not by a dead card.

@@ -1,5 +1,10 @@
 <template>
-  <BottomSheet :open="open" :back="back" @update:open="$emit('update:open', $event)">
+  <BottomSheet
+    :open="open"
+    :back="back"
+    :on-closed="onClosed"
+    @update:open="$emit('update:open', $event)"
+  >
     <template #title>{{ t(editing ? 'income.sheet.title_amend' : 'income.sheet.title') }}</template>
     <template #meta>{{ t('income.sheet.meta') }}</template>
 
@@ -264,6 +269,8 @@ export default defineComponent({
     behind: { type: Boolean, default: false },
     /** …and the connection is up: the server did not answer, and «Повторить» may help. */
     stale: { type: Boolean, default: false },
+    /** `@closed`: the sheet is put away — `BottomSheet`'s, passed on (a prop there, for its reasons). */
+    onClosed: { type: Function as PropType<() => void>, default: undefined },
     /** Reads that failed so far: a new one says the strip's same words again (MOL-181, C1). */
     attempt: { type: Number, default: 0 },
   },

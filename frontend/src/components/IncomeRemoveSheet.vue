@@ -6,6 +6,7 @@
     <p class="words">{{ t('income.remove_sheet.body') }}</p>
 
     <template #footer>
+      <p v-if="failed" class="failed" role="alert">{{ t('income.failed') }}</p>
       <AppButton
         variant="danger-ghost"
         size="large"
@@ -52,6 +53,8 @@ export default defineComponent({
     /** The income named as the list names it. */
     amounts: { type: String, default: '' },
     busy: { type: Boolean, default: false },
+    /** The last «Удалить» did not reach the server: nothing removed, the sheets stay (MOL-189, А5). */
+    failed: { type: Boolean, default: false },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
@@ -68,5 +71,11 @@ export default defineComponent({
   margin: 0;
   color: var(--text-muted);
   font-size: var(--text-callout);
+}
+
+.failed {
+  margin: 0 0 var(--space-3);
+  color: var(--bad-ink);
+  font-size: var(--text-footnote);
 }
 </style>
