@@ -1,6 +1,6 @@
 // Run by `test-time-reporter.test.ts` through vitest itself, never collected on its own: the hooks
 // wait set times, so the reporter's reading of the worker's marks can be checked against them.
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { expectWithin } from '@molvia/model/testing/clock'
 
 const wait = (ms: number): Promise<void> =>
@@ -43,17 +43,5 @@ describe('quick', () => {
 
   it('runs', () => {
     expect(true).toBe(true)
-  })
-})
-
-// with every clock fake, a bound is printed and held to nothing (adversarial В3, review №12)
-describe('fake', () => {
-  it('bounds fake time', () => {
-    vi.useFakeTimers()
-    try {
-      expectWithin(5, 6)
-    } finally {
-      vi.useRealTimers()
-    }
   })
 })

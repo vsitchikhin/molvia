@@ -1,11 +1,9 @@
-import { expect, TestRunner, vi, type TestContext } from 'vitest'
+import { expect, TestRunner, type TestContext } from 'vitest'
 
 /** What a test asserted of a duration, kept for the time reporter (`bin/test-time-reporter.ts`). */
 export interface ClockBound {
   readonly elapsed: number
   readonly bound: number
-  /** Met where fake timers held every clock still: no duration, and the reporter holds it to nothing. */
-  readonly fake?: true
 }
 
 declare module 'vitest' {
@@ -13,18 +11,6 @@ declare module 'vitest' {
     clockBounds?: ClockBound[]
   }
 }
-
-/** The clocks as this module found them: fake timers replace each one they hold still. */
-const REAL = {
-  date: Date.now,
-  performance: globalThis.performance,
-  hrtime: globalThis.process.hrtime,
-}
-const everyClockFake = (): boolean =>
-  vi.isFakeTimers() &&
-  Date.now !== REAL.date &&
-  globalThis.performance !== REAL.performance &&
-  globalThis.process.hrtime !== REAL.hrtime
 
 /**
  * The one way a test bounds a duration from above (MOL-243, MOL-266): asserts `elapsed < bound`, in
@@ -38,11 +24,10 @@ const everyClockFake = (): boolean =>
  * beside another test running it is that other test, or none (adversarial А7). Without the context
  * a bound there is refused rather than kept on the wrong test.
  *
- * Fake time is no duration: no runner moves it, yet a bound on it comes here as any other (MOL-266,
- * round 15) — whether a clock is fake is known only as the test runs. A number does not say which clock
- * it came from, so a bound is never refused here (review №12, adversarial В3): met while vitest's fake
- * timers are on and have replaced every clock the module found, it is kept marked `fake`, and the
- * reporter holds it to nothing; a clock left real, or replaced by hand, holds it as real.
+ * Every bound is held as real (MOL-266, round 16): whether a clock stood still while it measured is the
+ * run's fact, and no mark read at the bound tells it — fake timers that move with the real ones, a clock
+ * they never replaced, a fake turned on after the measure. Under fake timers a test bounds the schedule
+ * by the time it moves them by (`vi.advanceTimersByTime(n)`, then the outcome), never by a clock.
  */
 export function expectWithin(
   elapsed: number,
@@ -55,10 +40,6 @@ export function expectWithin(
       'expectWithin outside a test, or in a concurrent one without its context: expectWithin(elapsed, bound, context)',
     )
   }
-  ;(test.meta.clockBounds ??= []).push({
-    elapsed,
-    bound,
-    ...(everyClockFake() ? { fake: true as const } : {}),
-  })
+  ;(test.meta.clockBounds ??= []).push({ elapsed, bound })
   expect(elapsed).toBeLessThan(bound)
 }

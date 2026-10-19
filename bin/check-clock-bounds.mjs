@@ -8,7 +8,7 @@
 // scope: the age of a stamp held under a name another test gave a reading is left alone.
 //
 // A reading of the clock: `performance.now()`, `Date.now()`, `process.hrtime()` and its `bigint()`,
-// `new Date()` and its `getTime()`, through `globalThis`, `Number()`, `Math.floor(… / 1000)`, under another
+// `process.uptime()`, `new Date()` and its `getTime()`, through `globalThis`, `Number()`, `Math.floor(… / 1000)`, under another
 // name (`perf_hooks`' and `node:process`' own, `{ now } = Date`, `.bind`); a function of the file that
 // returns one (`const now = () => performance.now()`); a name, a field, a field of a class
 // (`this.start`) or a shorthand field given one; an array of them — pushed, by index, `at()`. A duration:
@@ -31,10 +31,11 @@
 // duration, as one side is not the clock.
 //
 // Fake time is no exception here: a bound under `vi.useFakeTimers()` goes through `expectWithin` as any
-// other, which marks it `fake` and the reporter holds it to nothing. Whether a clock is fake is a fact of
-// the run, not of the text — a command line, a config, a setup file, the order vitest runs hooks in, each
-// can leave it real — and fourteen rounds of review never closed reading it from the text (MOL-266, round
-// 15); the whole repository had one such bound.
+// other, and is held as real. Whether a clock stood still while it measured is a fact of the run, not of
+// the text — a command line, a config, a setup file, the order vitest runs hooks in, each can leave it
+// real — and fourteen rounds of review never closed reading it from the text (MOL-266, round 15), nor two
+// more from a mark read at the bound (round 16). Under fake timers a test bounds the schedule by the time
+// it moves them by, never by a clock.
 //
 // What this is: a guard against a bound written the ordinary way, not against a form built to slip past
 // it. What the lists above do not name is not seen — a duration the code under test measures
@@ -53,7 +54,8 @@ import ts from 'typescript'
 const FILES = ['*.test.ts', '*.test.mts', 'backend/tests/*.ts', 'packages/*/tests/*.ts']
 
 /** A reading of the clock, with `globalThis.`, `window.` or `self.` taken off and other names resolved. */
-const CLOCK = /^(performance\.now|Date\.now|process\.hrtime\.bigint|process\.hrtime)$/
+const CLOCK =
+  /^(performance\.now|Date\.now|process\.hrtime\.bigint|process\.hrtime|process\.uptime)$/
 /** What a reading is still a reading through: a cast, and whole seconds of it. */
 const SAME = /^(Number|BigInt|Math\.(round|floor|ceil|trunc))$/
 /** A duration the platform measures itself. */
@@ -67,6 +69,7 @@ const CLOCK_PATHS = new Set([
   'performance.now',
   'Date.now',
   'process.hrtime.bigint',
+  'process.uptime',
 ])
 /** A matcher that bounds its subject from above — and, under `not`, from below. */
 const UPPER = new Set([

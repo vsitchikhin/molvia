@@ -194,21 +194,19 @@ describe('кто бот — до раннера (MOL-142)', () => {
       lines.push(format(...args))
     })
     let down = true
-    const { bot, calls } = botAsking(() => (down ? { code: 502 } : 'up'))
+    const { bot } = botAsking(() => (down ? { code: 502 } : 'up'))
 
     const introduced = introduce(bot)
     await vi.advanceTimersByTimeAsync(30 * 60_000)
     expect(bot.isInited()).toBe(false)
 
     down = false
-    const back = Date.now()
-    await vi.advanceTimersByTimeAsync(30_000)
-    await introduced
-
-    expect(bot.isInited()).toBe(true)
     // grammY's own retry doubled its pause to twenty minutes; growing by a tenth of a second a
-    // try, half an hour of refusals leaves it at some twenty seconds.
-    expectWithin((calls.at(-1) ?? Infinity) - back, 30_000)
+    // try, half an hour of refusals leaves it at some twenty seconds. The bound is the thirty seconds
+    // the timers are moved by, never a clock: fake time is no duration (MOL-266, round 16).
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(bot.isInited()).toBe(true)
+    await introduced
     expect(new Set(lines)).toEqual(new Set(['[molvia] telegram getMe: 502']))
   })
 

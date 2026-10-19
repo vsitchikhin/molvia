@@ -23,6 +23,17 @@ describe('rawBounds', () => {
     ).toEqual([3, 4, 6, 7, 10])
   })
 
+  it('reads process.uptime() as a clock, by its own name and taken apart (adversarial round 16, Р4)', () => {
+    expect(
+      lines(`
+        const t0 = process.uptime()
+        expect(process.uptime() - t0).toBeLessThan(1)
+        const { uptime } = process
+        expect(uptime() - t0).toBeLessThan(1)
+      `),
+    ).toEqual([3, 5])
+  })
+
   it('follows a duration through a helper of the file, a mention of it and an object it is put in', () => {
     // picture's `timed`, bot/assemble's `lagBetween` (review of MOL-243, Р10-А1)
     expect(
@@ -239,7 +250,7 @@ describe('rawBounds', () => {
 
   it('refuses a bound on fake time as any other: whether a clock is fake is the run’s (MOL-266, round 15)', () => {
     // bot/src/assemble.test.ts › «Telegram лежал полчаса…»: readings in a helper's answer, under fake timers —
-    // the bound goes through expectWithin, which marks it fake as the test runs
+    // the bound goes through expectWithin and is held as real, or the timers moved say it (round 16)
     const helper = `function asking() { const calls: number[] = []; work(() => calls.push(Date.now())); return { calls } }\n`
     const bound = `const { calls } = asking()\nconst back = Date.now()\nawait vi.advanceTimersByTimeAsync(30_000)\nexpect((calls.at(-1) ?? Infinity) - back).toBeLessThan(30_000)`
     expect(lines(`${helper}it('x', async () => {\nvi.useFakeTimers()\n${bound}\n})`)).toEqual([7])

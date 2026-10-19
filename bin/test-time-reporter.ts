@@ -15,8 +15,8 @@
 //     project's, and the advice asks for a number; a timeout of 0 or `Infinity` is none. The
 //     reporter's own hook events come in batches, 100–200 ms late;
 //   - a bound on the clock — what `expectWithin` kept in the test's meta: the duration against the
-//     bound, and the bound against the test's timeout, which must stand above it; one met with every
-//     clock fake is printed and held to nothing.
+//     bound, and the bound against the test's timeout, which must stand above it — fake timers or not
+//     (round 16: no mark read at the bound says the clock stood still while it measured).
 //
 // A breach is printed always, and fails the run only where `fail` says so — on CI — and only in a file
 // the pull request changes (owner's decision В-4 «а», 15.10.2026): a run on a busy runner sets a new
@@ -57,8 +57,6 @@ export interface Breach {
 interface ClockBound {
   readonly elapsed: number
   readonly bound: number
-  /** Met with every clock fake: no duration (`expectWithin`). */
-  readonly fake?: true
 }
 
 const isClockBound = (value: unknown): value is ClockBound =>
@@ -80,8 +78,7 @@ export function testBreaches(
   const timed = timeout > 0 && Number.isFinite(timeout)
   if (timed && duration * TIMES > timeout)
     found.push({ what: 'test', file, name, ms: duration, limit: timeout })
-  for (const { elapsed, bound, fake } of clockBounds) {
-    if (fake) continue
+  for (const { elapsed, bound } of clockBounds) {
     if (elapsed * TIMES > bound)
       found.push({ what: 'clock', file, name, ms: elapsed, limit: bound })
     if (timed && bound >= timeout)
@@ -477,11 +474,10 @@ export default class TestTimeReporter implements Reporter {
     if (!diagnostic || timeout === undefined) return
     const file = this.fileOf(test.module.moduleId)
     const bounds = (test.meta().clockBounds ?? []).filter(isClockBound)
-    for (const { elapsed, bound, fake } of bounds) {
+    for (const { elapsed, bound } of bounds)
       this.measured.push(
-        `clock ${file} › ${test.fullName}: ${number(elapsed)} of ${number(bound)} ms${fake ? ', every clock fake — held to nothing' : ''}`,
+        `clock ${file} › ${test.fullName}: ${number(elapsed)} of ${number(bound)} ms`,
       )
-    }
     this.breaches.push(...testBreaches(file, test.fullName, diagnostic.duration, timeout, bounds))
   }
 

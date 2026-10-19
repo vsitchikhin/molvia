@@ -37,12 +37,6 @@ describe('testBreaches', () => {
     expect(testBreaches('a.test.ts', 't', 10, 30_000, [{ elapsed: 300, bound: 5_000 }])).toEqual([])
   })
 
-  it('holds a bound met with every clock fake to nothing (adversarial round 3, В3)', () => {
-    expect(
-      testBreaches('a.test.ts', 't', 10, 5_000, [{ elapsed: 20_000, bound: 30_000, fake: true }]),
-    ).toEqual([])
-  })
-
   it('judges no time against a timeout of 0 or Infinity: vitest gives such a test none', () => {
     // adversarial round 1 of MOL-266, А8
     expect(testBreaches('a.test.ts', 't', 5, 0, [{ elapsed: 1, bound: 100 }])).toEqual([])
@@ -518,9 +512,6 @@ describe('a run of vitest', () => {
     )
     expect(measured).toContain(
       '[time] clock bin/test-time-reporter.fixture.ts › inner > keeps what it bounded: 1 of 15 ms',
-    )
-    expect(measured).toContain(
-      '[time] clock bin/test-time-reporter.fixture.ts › fake > bounds fake time: 5 of 6 ms, every clock fake — held to nothing',
     )
     // a bound at vitest's limit, a quick hook past its own limit, and nothing else of the fixture
     expect(measured.filter((l) => l.includes('past the rule'))).toEqual([
