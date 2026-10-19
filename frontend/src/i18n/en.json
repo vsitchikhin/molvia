@@ -2222,6 +2222,7 @@
       "approx": "≈ {amount} at the {day} rate",
       "diff": "{amount} off — probably in the “{line}” line. You can save it anyway",
       "diff_unknown": "{amount} off — we couldn’t find the line. You can save it anyway",
+      "diff_blank": "{amount} short — {n} line has no figures. You can save it anyway | {amount} short — {n} lines have no figures. You can save it anyway",
       "photo_note": "We delete the photo after saving — the lines stay",
       "photo_note_sum": "We delete the photo after saving",
       "partly_total": "Not all of it was read: the lines make {lines} of {total}, {short} short. If the print is faint, a retake will not help — correct the lines",

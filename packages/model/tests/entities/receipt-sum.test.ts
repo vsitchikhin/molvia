@@ -168,13 +168,34 @@ describe('the balance of a receipt', () => {
     expect(balance.suspect).toBeNull()
   })
 
-  it('has no difference without a total, and nothing to sum with a line unpriced', () => {
+  it('has no difference without a total', () => {
     expect(receiptBalance(asComputed, null, 'AMD')).toMatchObject({
       lines: amd(5_543),
       difference: null,
       suspect: null,
+      blank: 0,
     })
-    expect(receiptBalance([entry(null)], amd(100), 'AMD').lines).toBeNull()
+  })
+
+  it('sums the lines with an amount and counts the blank apart, suspecting none (MOL-255)', () => {
+    // a blank line's printed sum — the reading's — names no line: it is the blank that lacks
+    const blank = [...asComputed, entry(null, amd(90))]
+    expect(receiptBalance(blank, amd(5_633), 'AMD')).toEqual({
+      lines: amd(5_543),
+      difference: amd(90),
+      suspect: null,
+      recorded: 8,
+      blank: 1,
+    })
+    // left out, a blank line still lacks: it was paid for
+    const left = receiptBalance([entry(amd(100)), entry(null, null, true)], amd(300), 'AMD')
+    expect([left.lines, left.difference, left.blank]).toEqual([amd(100), amd(200), 1])
+    // every line blank: nothing read, the whole total lacks
+    expect(receiptBalance([entry(null), entry(null)], amd(100), 'AMD')).toMatchObject({
+      lines: amd(0),
+      difference: amd(100),
+      blank: 2,
+    })
   })
 
   it('balances at zero, and does not sum a line in another currency', () => {

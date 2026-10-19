@@ -457,7 +457,7 @@ export default defineComponent({
     const balance = computed(() =>
       detail.value
         ? reviewBalance(detail.value, lines.value, draft.value)
-        : { lines: null, difference: null, suspect: null, recorded: 0 },
+        : { lines: null, difference: null, suspect: null, recorded: 0, blank: 0 },
     )
     const place = computed(() => (detail.value ? reviewPlace(detail.value, draft.value) : null))
     const placeChosen = computed(() => !!draft.value?.place)
@@ -636,6 +636,9 @@ export default defineComponent({
     const partly = computed(() => {
       const one = detail.value
       if (!one || one.lines.length === 0) return null
+      // a line the check left with no figures was read: what it lacks is the foot's to say, and a
+      // retake would read it the same (MOL-255, А5 «а»)
+      if (one.lines.some((line) => line.sum === null)) return null
       const total = one.receipt.total ?? one.readTotal ?? null
       if (!readPartly(one.lines, total)) return null
       const covered = readCovered(one.lines, total)

@@ -531,20 +531,8 @@ describe('the queue', () => {
     const me = await owner()
     await queued(me)
     await queued(me)
-    // every line as printed and their sums the total: proven whole (MOL-255)
-    const text = [
-      '1. Կաթ',
-      '0401/1163909 2Հտ 740 370',
-      '2. Հաց',
-      '1905/1078044 1Հտ 99,1/0,9 100',
-      'Ընդամենը 839.10',
-    ].join('\n')
-    const whole: ReaderReading = {
-      text,
-      rows: text.split('\n').map((row, i) => ({ text: row, box: [0, i * 40, 600, 30] })),
-      version: 'v',
-    }
-    const reports = await readAll(benchReader({ read: () => Promise.resolve(whole) }))
+    // of what was read (MOL-255, А5 «а»): the eleven lines of am-05 the check empties were read
+    const reports = await readAll(benchReader())
     expect(reports.map((r) => r.kind === 'read' && r.partly)).toEqual([false, false])
     const rows = await days()
     expect(rows).toMatchObject([{ read: 2, readPartly: 0 }])
@@ -620,9 +608,8 @@ describe('the queue', () => {
       failure: 'unreadable',
       attempts: 2,
     })
-    // the first drop sent it back to the queue and counted nothing; the second failed it (MOL-222) —
-    // am-05 is read in part since its unverified figures are left empty (MOL-255)
-    expect(await days()).toMatchObject([{ readPartly: 1, unreadable: 1 }])
+    // the first drop sent it back to the queue and counted nothing; the second failed it (MOL-222)
+    expect(await days()).toMatchObject([{ read: 1, unreadable: 1 }])
   })
 
   it('reads each person’s oldest receipt in turn: fifty of one do not hold another’s (review А10)', async () => {

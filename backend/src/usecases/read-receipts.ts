@@ -169,8 +169,14 @@ async function readOne(
     readerVersion: version ?? '',
     head,
     lines,
-    // a section with no items is read whole (MOL-227)
-    partly: lines.length > 0 && readPartly(lines, total),
+    // a section with no items is read whole (MOL-227); of what was read, before the check: a line it
+    // emptied was read, and a retake reads it the same (MOL-255, А5 «а»)
+    partly:
+      lines.length > 0 &&
+      readPartly(
+        text.lines.map((line) => receiptLineOf(line, currency)),
+        total,
+      ),
     bindings,
     images,
   }

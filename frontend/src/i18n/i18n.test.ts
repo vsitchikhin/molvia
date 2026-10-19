@@ -500,6 +500,7 @@ describe('словарь: плюральные формы', () => {
       'accounts.account.more',
       'accounts.reconcile.cause_trip_unpriced_meta',
       'receipt.capture.parts',
+      'receipt.review.diff_blank',
       'receipt.review.record',
       'receipt.recorded.title',
     ])

@@ -595,6 +595,28 @@ describe('ReceiptView (MOL-127)', () => {
     expect(empty?.find('.sum').exists()).toBe(false)
   })
 
+  it('says at the foot what lines with no figures lack, and no «Прочитали не всё» (MOL-255, А4, А5)', async () => {
+    const one = detail()
+    const unread = {
+      ...line('ՀԱՑ', '400'),
+      quantity: null,
+      price: null,
+      sum: null,
+      settled: false,
+      amount: null,
+    }
+    receipt.mockResolvedValue({
+      ...one,
+      receipt: { ...one.receipt, total: amd('900') },
+      lines: [line('ԿԱԹ', '500'), unread],
+    })
+    const { view } = await render()
+    // read whole by OCR: a retake reads the same, so neither the hint nor «Переснять» stand over it
+    expect(view.find('.partly').exists()).toBe(false)
+    expect(view.text()).toMatch(/Строки\s*500/)
+    expect(view.get('.difference').text()).toMatch(/Не хватает 400,00\s֏ — у 1 строки нет цифр/)
+  })
+
   it('read in part with no total: how many lines added up; half of them is enough', async () => {
     const one = detail()
     const first = line('ԿԱԹ', '500')
