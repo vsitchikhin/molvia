@@ -269,13 +269,17 @@ of the measure and with every test merged. So CI checks every run instead (owner
   is unsure (review №23). No command line of the repository may give vitest a setting either — a word after
   `vitest` other than the command, a config, a project, a report or a file (`--sequence.concurrent`) leaves
   every directory unsure (read by the check's own run, `unsureDirectories`, `vitestFlagsUnsure`; adversarial
-  rounds 6–11, review №19–24) — npm's `--` handing flags to a script that runs vitest included, and a
-  `-c` only to a config the check reads. A setup file, or a file it imports, that has vitest at hand and
-  names a clock, a spy, the global object or a module loader is unsure too (№24). Nor may a test file put a
+  rounds 6–12, review №19–24) — a command read by its words, quotes off, `\` lines joined, a word with `$`
+  unread, npm's `--` handing flags to a script that runs vitest, through another script and past npm's own
+  options with a value, and a `-c` only to a config the check reads, by its whole path. A setup file is read
+  with every file it imports as one: vitest at hand in any of them and a clock, a spy, the global object or a
+  module loader named in any is unsure (№24, М3), and so is a list of setup files not written out as strings. Nor may a test file put a
   clock back by hand — `vi.stubGlobal`, `Object.defineProperty(globalThis, …)`, a spy on a clock, an
   assignment to one — or under another name: a member of `vi`, `Object.defineProperty` and its kin, or the
-  global object referred to without being called or read through; nor touch the timers in a default of a
-  parameter, which runs at the call, by a function of the file too (К1, К2, Л1, Л2). A function of the file that touches
+  global object referred to without being called or read through, `vi`, `Object` or `Reflect` taken apart,
+  `Object` or `Reflect` given another name, `vi` handed anywhere as a value; nor touch the timers in a default
+  of a parameter or of what it takes apart, or in a field of a class — which run at the call or at `new` — by
+  a function of the file too (К1, К2, Л1, Л2, М1, М2). A function of the file that touches
   the timers, named anywhere but as a call or handed to a hook — in an array, a field, an alias, handed to a
   call that keeps it — is as a timer call kept there (З2, И1). A callback
   counts as run where it is written only when the call is known to run it before it settles — `vi.waitFor`,
