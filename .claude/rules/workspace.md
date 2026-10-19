@@ -253,7 +253,8 @@ of the measure and with every test merged. So CI checks every run instead (owner
   fields is its own field, `{ tries }` beside `took` a count; `.length`, `.size` and a spy's `mock` are counts
   (review №32). **What is held as time only in doubt and is none says so** (adversarial Ф4, review №34):
   `// not a duration: <why>` at the end of its line or on a line of its own above it — never over the clock read
-  straight, a name it was given or a difference of them — and every run prints what a note let go, for review
+  straight, a name it was given, a difference of them, a function of the file that is one (`since(t0)`) or a
+  method of one (`d.toFixed()`, №37) — and every run prints what a note let go, for review
   to read in the log. Field by field alone lost `rows.at(-1)?.took` and `{ ...report }.took` (adversarial Х2),
   so `report.retries` beside `report.took` is refused, and the note is its lawful spelling;
   bounded by vitest's, chai's and `assert`'s forms, a comparison asserted true or false (`toBe(false)`,
@@ -263,9 +264,9 @@ of the measure and with every test merged. So CI checks every run instead (owner
   condition — **is held as a bound** (adversarial round 17): which way it is asserted is not read, and
   `expectWithin` is its lawful spelling — a lower bound is asserted where it stands instead,
   `expect(d).toBeGreaterThanOrEqual(250)` (review №31); a loop's condition is a wait, and a duration against zero
-  a mark — a name given a negative number, `let failAt = -1` — but a budget against zero is what is left of
-  the time, and what is made of a duration against zero (`d - 1_000 > 0`, or `over > 0` in two steps) an
-  overage: both bounds (№30, №36, Ф1, Х4).
+  a duration against zero says time has passed or is a mark (`if (d > 0)`, `failAt < 0`, `firstAt <= 0`), but
+  a budget against zero is what is left of the time, and a duration less a number against zero (`d - 1_000 > 0`,
+  or `over > 0` in two steps) an overage: both bounds (№30, №36, №38, Ф1, Х4, Ц2).
   Two readings against each other are a lower bound (adversarial В4). Names are resolved by TypeScript's binder, so the age of a stamp held under a name
   another test gave a reading is left alone: one side is not the clock. **Fake time is no exception** (MOL-266,
   round 15): a bound under `vi.useFakeTimers()` goes through `expectWithin` as any other, and is held as real. For fourteen rounds the parse let such a bound go raw where it read every clock
