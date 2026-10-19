@@ -601,9 +601,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   never the receipt's own «ԿՀ» — its total two sources of three, none where two receipts show (a head
   under a fiscal number among them); neither «Записать» nor «Убрать сумму» makes a finished trip empty.
 - **Only what is verified goes to the review as read** (MOL-255): `verifiedReading` at the seam between the
-  parse and the rows — a line as printed (`asPrinted`, never `settled`), a line of one piece whose price is its
-  sum only on a receipt proven whole, the rest empty; the total's rest is no line's; «Прочитали не всё» is any
-  shortfall.
+  parse and the rows — a line as printed (`asPrinted`, never `settled`; a count not printed is worked out), a
+  line of a quantity of one whose price is its sum only on a receipt proven whole, the rest empty; the total's
+  rest is no line's, the foot says what the empty lines lack; «Прочитали не всё» is any shortfall of the lines
+  as read, before the check.
 - **A total is shown only where two sources vouch for it** (MOL-244, В-1 «а»): the lines that met it every
   one as read unless two places print another sum, else two places printed — the total, the payment, a
   section's sum — by one `votedTotal` for both kinds of receipt, else the lines with one of them as read; a row
