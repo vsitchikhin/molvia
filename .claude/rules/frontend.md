@@ -817,7 +817,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   asked for a label; declined, MOL-179 Р-5). **A «Вернуть» that waits for the server** — an exchange's,
   an income's (MOL-189) — is `busy` with its word, and with no connection not now saying why
   (`waiting`); **the count stands still while it cannot be pressed** (owner's В-2 «а»), as under a
-  finger.
+  finger. **The words keep 7rem**: narrower, the count and «Вернуть» go under them together, at the
+  right, and «Вернуть» wraps its own words — held on one line, the hidden «Возвращаем…» under
+  «Вернуть» left the words 33 px at 320, a letter a line (MOL-189, `exchange.spec`).
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
   frame — pinned row, large title that collapses past 24px, back chevron, room under the tab
   bar — is drawn once; a screen fills its slots. A nested route names its `meta.parent` and
