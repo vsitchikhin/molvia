@@ -1010,4 +1010,63 @@ describe('rawBounds', () => {
     expect(unsure('npx vitest run -c vitest.integration.config.ts')).toBe(false)
     expect(unsure('npm run -w @molvia/bot test')).toBe(false)
   })
+
+  // adversarial round 13 of MOL-266: Н1–Н5
+  it.each([
+    [
+      'a static block of a class',
+      `vi.useFakeTimers()\nclass Clock {\nreadonly n = 1\nstatic {\nvi.useRealTimers()\n}\n}\nit('x', async () => {\n${REAL}\n})`,
+    ],
+    [
+      'a clock assigned by a computed key',
+      `const KEY = 'now'\nbeforeEach(() => {\nvi.useFakeTimers()\nperformance[KEY] = realNow\n})\nit('x', async () => {\n${REAL}\n})`,
+    ],
+    [
+      'Object in a field',
+      `const tools = { O: Object }\nbeforeEach(() => {\nvi.useFakeTimers()\ntools.O.defineProperty(performance, 'now', { value: realNow })\n})\nit('x', async () => {\n${REAL}\n})`,
+    ],
+    [
+      'Object handed to a call',
+      `const put = (o: ObjectConstructor): void => {\no.defineProperty(performance, 'now', { value: realNow })\n}\nbeforeEach(() => {\nvi.useFakeTimers()\nput(Object)\n})\nit('x', async () => {\n${REAL}\n})`,
+    ],
+  ])('finds a bound on real time beside fake timers — %s', (_, source) => {
+    expect(rawBounds('a.test.ts', source)).toHaveLength(1)
+  })
+
+  it('reads vitest at hand by globals in the config (Н3)', () => {
+    const files: Record<string, string> = {
+      'bot/setup.ts':
+        '/// <reference types="vitest/globals" />\nafterEach(() => {\nglobalThis.performance = REAL\n})',
+    }
+    const read = (path: string): string | undefined => files[path]
+    expect(
+      unsureDirectories(
+        [
+          {
+            path: 'bot/vitest.config.ts',
+            text: "test: { globals: true, setupFiles: ['./setup.ts'] }",
+          },
+        ],
+        read,
+      ),
+    ).toEqual(['bot'])
+  })
+
+  it('reads a YAML value whole, every spelling of vitest, npm past any option, and xargs (Н4, Н5)', () => {
+    const scripts = JSON.stringify({ scripts: { test: 'vitest run' } })
+    const unsure = (text: string) => vitestFlagsUnsure([scripts, text], ['bot/vitest.config.ts'])
+    expect(
+      unsure(
+        'jobs:\n  t:\n    steps:\n      - run: >\n          npx vitest run\n          --sequence.concurrent',
+      ),
+    ).toBe(true)
+    expect(unsure('      - run: npx vitest run\n          --sequence.concurrent')).toBe(true)
+    expect(unsure('node node_modules/vitest/vitest.mjs run --sequence.concurrent')).toBe(true)
+    expect(unsure('npx vitest@5.0.2 run --sequence.concurrent')).toBe(true)
+    expect(unsure('echo --sequence.concurrent | xargs npx vitest run')).toBe(true)
+    expect(unsure('npm --loglevel warn run test -- --sequence.concurrent')).toBe(true)
+    // a comment and a string holding the word are no command — the lock's own text
+    expect(unsure('# vitest finds its command past options (`-c … watch`)')).toBe(false)
+    expect(unsure('    watch) endless="vitest $arg" ;;')).toBe(false)
+  })
 })

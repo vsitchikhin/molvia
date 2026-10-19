@@ -1323,6 +1323,8 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
         touchesTimers(n.initializer)
       )
         ok = false
+      // a static block of a class runs where the class is declared, which the parse steps over (Н1)
+      if (ts.isClassStaticBlockDeclaration(n) && touchesTimers(n.body)) ok = false
       // vi, Object or Reflect taken apart, and Object or Reflect under another name (М2)
       if (
         ts.isVariableDeclaration(n) &&
@@ -1331,14 +1333,28 @@ export function rawBounds(fileName, source, { setupTouchesTimers = false } = {})
         /^(vi|Object|Reflect)$/.test(bare(n.initializer).getText(sf))
       )
         ok = false
+      // Object or Reflect anywhere but read through — kept, in a field, handed to a call (М2, Н2)
       if (ts.isIdentifier(n) && /^(Object|Reflect)$/.test(n.text)) {
         const parent = n.parent
-        if (
-          (ts.isVariableDeclaration(parent) && parent.initializer === n) ||
-          (ts.isBinaryExpression(parent) && parent.right === n)
-        )
-          ok = false
+        const read = ts.isPropertyAccessExpression(parent) && parent.expression === n
+        const named =
+          ts.isTypeReferenceNode(parent) ||
+          ts.isQualifiedName(parent) ||
+          ts.isExpressionWithTypeArguments(parent) ||
+          ts.isImportSpecifier(parent)
+        if (!read && !named) ok = false
       }
+      // a clock assigned by a computed key: performance[KEY] = realNow (Н2)
+      if (
+        ts.isBinaryExpression(n) &&
+        n.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+        n.operatorToken.kind <= ts.SyntaxKind.LastAssignment &&
+        ts.isElementAccessExpression(bare(n.left)) &&
+        /^(globalThis|window|self|global|performance|Date|process(\.hrtime)?)(\.|$)/.test(
+          resolvedText(bare(n.left).expression),
+        )
+      )
+        ok = false
       // vi itself handed or kept anywhere but read through — in a type or an import it is no value
       if (ts.isIdentifier(n) && n.text === 'vi') {
         const parent = n.parent
@@ -1435,7 +1451,8 @@ export function unsureDirectories(configs, read) {
   const TOUCH = /useFakeTimers|useRealTimers|setTimerTickMode|setConfig|stubGlobal/
   const HOOKED =
     /defineProperty|\bDate\b|performance|hrtime|spyOn|globalThis|\bwindow\b|\bassign\b|importActual|importMock|\brequire\b|\bimport\s*\(/
-  const VITEST = /['"]vitest['"]|\bglobals\s*:\s*true/
+  // vitest at hand: imported, its globals referenced — or, below, a config that sets `globals` (Н3)
+  const VITEST = /['"]vitest(\/[\w-]+)?['"]|\bglobals\b/
   /** The setup files a config names, each a string written out; `undefined` where the list is not read. */
   const setupFilesOf = (text, path) => {
     const sf = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true)
@@ -1572,11 +1589,13 @@ export function unsureDirectories(configs, read) {
    * one of them and a clock, a spy, the global object or a loader named in any: the hook and what it runs
    * may stand in two files (adversarial М3).
    */
-  const setupTouches = (file, root) => {
+  const setupTouches = (file, root, globals) => {
     const texts = []
     const unread = touches(file, root, new Set(), texts)
     return (
-      unread || (texts.some((text) => VITEST.test(text)) && texts.some((text) => HOOKED.test(text)))
+      unread ||
+      ((globals || texts.some((text) => VITEST.test(text))) &&
+        texts.some((text) => HOOKED.test(text)))
     )
   }
   const touches = (file, root, seen, texts) => {
@@ -1617,7 +1636,11 @@ export function unsureDirectories(configs, read) {
       if (loose || specs.some(local)) return true
       // the list of setup files, every one a string written out, or the directory is unsure (М3)
       const list = setupFilesOf(text, path)
-      return list === undefined || list.some((setup) => setupTouches(join(root, setup), root))
+      // a config that sets `globals` puts vitest at hand in every setup file without an import (Н3)
+      const globals = /\bglobals\b(?!\s*:\s*false\b)/.test(text)
+      return (
+        list === undefined || list.some((setup) => setupTouches(join(root, setup), root, globals))
+      )
     })
     .map(({ path }) => dirname(path))
 }
@@ -1669,35 +1692,59 @@ export function vitestFlagsUnsure(texts, configs = []) {
         scripts.set(name, [...(scripts.get(name) ?? []), String(command)])
         lines.push(String(command))
       }
-    } else lines.push(...text.replace(/\\\r?\n/g, ' ').split('\n'))
+    } else {
+      // a YAML key's value with every line under it, as YAML folds a plain or `>` scalar into one
+      // (adversarial Н4) — `|` keeps its lines, and joining them is only more unsure
+      // a comment is no command, and a quoted string with vitest in it is data — `endless="vitest $arg"`
+      // of the lock — while quotes around an argument come off, so a flag in them is still read
+      const joined = text
+        .replace(/\\\r?\n/g, ' ')
+        .split('\n')
+        .filter((line) => !/^\s*#/.test(line))
+        .map((line) =>
+          line
+            .replace(/^(\s*(?:-\s+)?["']?[\w:-]+["']?:\s*)(["'])(.*)\2,?\s*$/, '$1$3')
+            .replace(/"([^"]*)"|'([^']*)'/g, (_, double, single) => {
+              const inner = String(double ?? single ?? '')
+              return /\bvitest\b/.test(inner) ? ' ' : inner
+            }),
+        )
+      for (let i = 0; i < joined.length; i++) {
+        const line = joined[i] ?? ''
+        const key = /^(\s*)(?:-\s+)?[\w-]+:\s*(.*)$/.exec(line)
+        if (!key) {
+          lines.push(line)
+          continue
+        }
+        const indent = (key[1] ?? '').length
+        const value = [key[2] ?? '']
+        while (i + 1 < joined.length) {
+          const next = joined[i + 1] ?? ''
+          const own = /^(\s*)/.exec(next)?.[1]?.length ?? 0
+          if (next.trim() === '' || own <= indent) break
+          value.push(next.trim())
+          i++
+        }
+        lines.push(line, value.join(' '))
+      }
+    }
   }
   const simple = (line) => line.split(/&&|\|\||;|\|/).map(words)
-  // npm [options] run <script> [options] -- <args>: options with a value take the next word (М5)
-  const WITH_VALUE = new Set(['-w', '--workspace', '--prefix', '-C', '--userconfig'])
+  // npm [options] run <script> [options] -- <args>: found by npm's own commands, not by which options
+  // take a value — any word after `run` may be the script (М5, Н5)
   const npm = (list) => {
     const at = list.findIndex((word) => word === 'npm' || word.endsWith('/npm'))
     if (at < 0) return undefined
     const rest = list.slice(at + 1)
     const dash = rest.indexOf('--')
-    const head = dash < 0 ? rest : rest.slice(0, dash)
-    const positional = []
-    for (let i = 0; i < head.length; i++) {
-      const word = head[i] ?? ''
-      if (word.startsWith('-')) {
-        if (WITH_VALUE.has(word)) i++
-        continue
-      }
-      positional.push(word)
-    }
-    const [command, name] = positional
-    const script =
-      command === 'run' || command === 'run-script'
-        ? name
-        : command === 'test' || command === 't'
-          ? 'test'
-          : undefined
-    return script === undefined ? undefined : { script, args: dash < 0 ? [] : rest.slice(dash + 1) }
+    const head = (dash < 0 ? rest : rest.slice(0, dash)).filter((word) => !word.startsWith('-'))
+    const command = head.findIndex((word) => /^(run|run-script|rum|urn|test|tst|t)$/.test(word))
+    if (command < 0) return undefined
+    const scripts = /^(test|tst|t)$/.test(head[command] ?? '') ? ['test'] : head.slice(command + 1)
+    return { scripts, args: dash < 0 ? [] : rest.slice(dash + 1) }
   }
+  /** vitest by any name its program goes by: `vitest`, `vitest@5.0.2`, `node_modules/vitest/vitest.mjs`. */
+  const VITEST_WORD = /(^|\/)vitest(@[^/\s]*)?(\.[cm]?js)?$/
   // the scripts that run vitest, through other scripts too
   const runsVitest = new Set()
   for (let grown = true; grown;) {
@@ -1707,9 +1754,10 @@ export function vitestFlagsUnsure(texts, configs = []) {
       const runs = commands.some((command) =>
         simple(command).some(
           (list) =>
-            list.some((word) => /(^|\/)vitest$/.test(word)) ||
-            runsVitest.has(npm(list)?.script ?? '') ||
-            npm(list)?.script === 'test',
+            list.some((word) => VITEST_WORD.test(word)) ||
+            (npm(list)?.scripts ?? []).some(
+              (script) => runsVitest.has(script) || script === 'test',
+            ),
         ),
       )
       if (runs) {
@@ -1720,12 +1768,14 @@ export function vitestFlagsUnsure(texts, configs = []) {
   }
   return lines.some((line) =>
     simple(line).some((list) => {
-      const at = list.findIndex((word) => /(^|\/)vitest$/.test(word))
+      const at = list.findIndex((word) => VITEST_WORD.test(word))
+      // xargs hands vitest words the line does not show (Н5)
+      if (at >= 0 && list.slice(0, at).includes('xargs')) return true
       if (at >= 0 && flagsUnsure(list.slice(at + 1))) return true
       const call = npm(list)
       return (
         call !== undefined &&
-        (runsVitest.has(call.script) || call.script === 'test') &&
+        call.scripts.some((script) => runsVitest.has(script) || script === 'test') &&
         flagsUnsure(call.args)
       )
     }),
@@ -1747,7 +1797,17 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()
   )
   const commands = execFileSync(
     'git',
-    ['ls-files', 'package.json', '*/package.json', 'Makefile', '.github/workflows/*.yml'],
+    // every place a command is written: the scripts, the Makefile, the shell scripts it runs, the workflows
+    // and actions (Н4)
+    [
+      'ls-files',
+      'package.json',
+      '*/package.json',
+      'Makefile',
+      '*.sh',
+      '.github/*.yml',
+      '.github/*.yaml',
+    ],
     { encoding: 'utf8' },
   )
     .trim()
