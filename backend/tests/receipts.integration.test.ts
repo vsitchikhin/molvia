@@ -543,6 +543,40 @@ describe('the queue', () => {
     expect(row?.readPartly).toBe(true)
   })
 
+  // MOL-255, adversarial А10 «а»: with no total, lines settled by a count made up are no lines read
+  it('with no total, reads in part where fewer than half the lines are as printed', async () => {
+    const me = await owner()
+    const reading = (rows: string[]): ReaderReading => ({
+      text: rows.join('\n'),
+      rows: rows.map((row, i) => ({ text: row, box: [0, i * 40, 600, 30] })),
+      version: 'v',
+    })
+    // «1Հտ 400 100» holds only as four at 100: settled, never as printed, and emptied
+    const madeUp = await queued(me)
+    await readAll(
+      benchReader({
+        read: () =>
+          Promise.resolve(
+            reading(['1. Կաթ', '0401/1163909 1Հտ 400 100', '2. Հաց', '1905/1078044 1Հտ 300 100']),
+          ),
+      }),
+    )
+    const told = await askedAll(me, madeUp)
+    expect(told.lines.map((line) => line.sum)).toEqual([null, null])
+    expect(told.readPartly).toBe(true)
+    // the same with both lines as printed: read whole
+    const printed = await queued(me)
+    await readAll(
+      benchReader({
+        read: () =>
+          Promise.resolve(
+            reading(['1. Կաթ', '0401/1163909 2Հտ 740 370', '2. Հաց', '1905/1078044 3Հտ 900 300']),
+          ),
+      }),
+    )
+    expect((await askedAll(me, printed)).readPartly).toBe(false)
+  })
+
   it('shows the total the payment prints too, the lines short of it (MOL-244)', async () => {
     const me = await owner()
     const id = await queued(me)

@@ -169,12 +169,13 @@ async function readOne(
     readerVersion: version ?? '',
     head,
     lines,
-    // a section with no items is read whole (MOL-227); of what was read, before the check: a line it
-    // emptied was read, and a retake reads it the same (MOL-255, А5 «а»)
+    // a section with no items is read whole (MOL-227); the sums of what was read, before the check: a
+    // line it emptied was read, and a retake reads it the same (MOL-255, А5 «а»); with no total, a line
+    // adds up only as printed — settled by swaps or a count made up is no line read (round 3, А10 «а»)
     partly:
       lines.length > 0 &&
       readPartly(
-        text.lines.map((line) => receiptLineOf(line, currency)),
+        text.lines.map((line) => ({ ...receiptLineOf(line, currency), settled: line.asPrinted })),
         total,
       ),
     bindings,
