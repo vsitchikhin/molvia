@@ -316,6 +316,30 @@ describe('the figures of one line', () => {
     it('is not a line with no reading at all', () => {
       expect(flags('0401/1163909 1Հտ 100,50/1,50 999')).toEqual([false, false])
     })
+
+    it('is not a line whose count is not the one its row prints (adversarial А1)', () => {
+      // a till with no shelf price tries twenty counts: «400» misread «100» holds at four pieces
+      expect(flags('0401/1163909 1Հտ 400 100')).toEqual([true, false])
+      expect(flags('0401/1163909 2Հտ 800 100', '800.00')).toEqual([true, false])
+      // the count it prints is kept as printed, and a count OCR lost is no count read
+      expect(flags('0401/1163909 2Հտ 800 400', '800.00')).toEqual([true, true])
+      expect(flags('0401/1163909 Հտ 800 400')).toEqual([true, false])
+    })
+
+    it('is not a line of the class code whose count no unit was read with (adversarial А1)', () => {
+      const coded = (...texts: string[]) =>
+        parseReceiptText(AM, rowsOf(texts.join('\n'), 0)).lines.map((line) => [
+          line.quantityMilli,
+          line.settled,
+          line.asPrinted,
+        ])
+      expect(coded('Դաս. 0401 Ն/Կ 745030', 'Կաթ «Իգիթ»', '100 400', 'Ընդամենը 400.00')).toEqual([
+        [4_000, true, false],
+      ])
+      expect(coded('Դաս. 0401 Ն/Կ 745030', 'Կաթ «Իգիթ»', '4 հատ 100 400')).toEqual([
+        [4_000, true, true],
+      ])
+    })
   })
 })
 

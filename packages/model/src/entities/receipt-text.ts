@@ -45,7 +45,8 @@ export interface ReceiptTextLine {
   readonly settled: boolean
   /**
    * Settled with every figure as the reading printed it (MOL-255): no swap of OCR, no figure worked out
-   * — a price from the sum, a weight from the money — and nothing the total gave. `settled` alone is
+   * — a price from the sum, a weight from the money, a count the line does not print — and nothing the
+   * total gave. `settled` alone is
    * held by a reading bent by two swaps a field; what the review is shown is decided from this.
    */
   readonly asPrinted: boolean
@@ -315,6 +316,8 @@ interface Candidate {
   readonly rate: number
   /** A sign read as a digit taken off (MOL-246): the total's to take, never a line's own reading. */
   readonly sliced?: true
+  /** A count no figure of the line printed, one of the twenty tried: worked out, never as printed (MOL-255). */
+  readonly counted?: true
 }
 
 // The till rounds to a few luma: 609,97 paid for 610.
@@ -782,6 +785,8 @@ interface Found {
   readonly sku: string
   readonly qtyS: string
   readonly weighed: boolean
+  /** The count of pieces a plain row prints before its unit, «2Հտ»; null where OCR lost it. */
+  readonly count: number | null
   readonly plain: readonly string[] | null
   readonly paidS: string
   readonly discS: string
@@ -836,7 +841,13 @@ function plainCandidates(budget: Budget, found: Found): Candidate[] {
         ...byWeight(budget, paidS, priceS),
       )
     else
-      for (let q = 1; q <= 20; q++) out.push(...candidates(budget, String(q), paidS, '0', priceS))
+      for (let q = 1; q <= 20; q++)
+        // the count is tried, not read: one the row does not print is worked out (MOL-255)
+        out.push(
+          ...candidates(budget, String(q), paidS, '0', priceS).map((x) =>
+            x.qty === (found.count ?? 0) * 1000 ? x : { ...x, counted: true as const },
+          ),
+        )
   }
   // with no discount the paid sum is qty × price to the luma, not «about» it
   return out.filter((x) => Math.round((x.qty * x.price) / 1000) === x.paid)
@@ -891,6 +902,7 @@ function cardReceipt(rows: readonly TextRow[], lx: Lexicon): Laid {
         sku: figures[2] ?? '',
         qtyS: weighed ? (weight[1] ?? '').replace('.', ',') : '1',
         weighed,
+        count: null,
         plain: null,
         paidS: (figures[4] ?? '').trim(),
         discS: (figures[5] ?? '').replace(/\s/g, ''),
@@ -907,6 +919,7 @@ function cardReceipt(rows: readonly TextRow[], lx: Lexicon): Laid {
         sku: plain[2] ?? '',
         qtyS: weighed ? (weight[1] ?? '').replace('.', ',') : '1',
         weighed,
+        count: Number(/^(\d{1,2})\D/.exec(mid.trim())?.[1] ?? Number.NaN) || null,
         plain: (plain[4] ?? '').trim().split(/\s+/),
         paidS: (plain[4] ?? '').trim(),
         discS: '0',
@@ -955,7 +968,7 @@ function cardReceipt(rows: readonly TextRow[], lx: Lexicon): Laid {
         sumHundredths: finite(pick?.paid ?? blankSum ?? hundredthsOf(f.paidS)),
         discountHundredths: finite(pick?.disc ?? hundredthsOf(f.discS)),
         settled,
-        asPrinted: settled && pick.swaps === 0,
+        asPrinted: settled && pick.swaps === 0 && pick.counted !== true,
         rows: f.rows,
       }
     })
@@ -1283,7 +1296,9 @@ function classCandidates(budget: Budget, f: ClassFigures, guessed: Set<Candidate
       for (const price of prices) {
         for (const qty of qtys) {
           for (const x of find(budget, qty.text, sum.text, '0', price.text)) {
-            found.push({ ...x, swaps: x.swaps + sum.cost + price.cost + qty.cost })
+            const swaps = x.swaps + sum.cost + price.cost + qty.cost
+            // a count no unit was read with is one of twenty tried: worked out, never as printed (MOL-255)
+            found.push(f.qtyS === null ? { ...x, swaps, counted: true } : { ...x, swaps })
           }
         }
       }
@@ -1545,7 +1560,7 @@ function classReceipt(rows: readonly TextRow[], lx: Lexicon): Laid {
         sumHundredths: finite(pick?.paid ?? blankSum ?? hundredthsOf(sumAsRead)),
         discountHundredths: 0,
         settled,
-        asPrinted: settled && pick.swaps === 0,
+        asPrinted: settled && pick.swaps === 0 && pick.counted !== true,
         rows: [rows[first + item.at]].filter((row): row is TextRow => row !== undefined),
       }
     })
