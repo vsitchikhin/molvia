@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rawBounds } from './check-clock-bounds.mjs'
+import { boundsOf, rawBounds } from './check-clock-bounds.mjs'
 
 const START = `const started = performance.now()\nwork()\n`
 
@@ -109,6 +109,46 @@ describe('rawBounds', () => {
     expect(rawBounds('a.test.ts', source)).not.toEqual([])
   })
 
+  // review №35–36 and adversarial round 20 of MOL-266, Х1–Х5: a store made anywhere, a field of what a store
+  // or a copy gives, an overage in two steps, a store a helper fills
+  it.each([
+    [
+      'a store made in beforeEach',
+      `let durations: number[] = []\nbeforeEach(() => {\ndurations = []\n})\ndurations.push(d)\nexpect(durations[0]).toBeLessThan(1_000)`,
+    ],
+    [
+      'a store in a field',
+      `const state = { durations: [] as number[] }\nstate.durations.push(d)\nexpect(state.durations[0]).toBeLessThan(1_000)`,
+    ],
+    [
+      'a store from Array.from',
+      `const took = Array.from<number>([])\ntook.push(d)\nexpect(took[0]).toBeLessThan(1_000)`,
+    ],
+    [
+      'the last of the rows',
+      `const rows: { took: number }[] = []\nrows.push({ took: d })\nexpect(rows.at(-1)?.took).toBeLessThan(1_000)`,
+    ],
+    [
+      'a copy of the object',
+      `const report = { took: d }\nconst copy = { ...report }\nexpect(copy.took).toBeLessThan(1_000)`,
+    ],
+    [
+      'a field of what a Map gives',
+      `const byName = new Map<string, { took: number }>()\nbyName.set('a', { took: d })\nexpect(byName.get('a')?.took).toBeLessThan(1_000)`,
+    ],
+    [
+      'an overage in two steps',
+      `const over = d - 1_000\nconst slow = over > 0\nexpect(slow).toBe(false)`,
+    ],
+    [
+      'a store a helper fills',
+      `const record = (into: number[]) => {\ninto.push(performance.now() - t0)\n}\nconst ds: number[] = []\nrecord(ds)\nexpect(ds[0]).toBeLessThan(1_000)`,
+    ],
+  ])('finds a bound held in a store or a field — %s', (_, bound) => {
+    const source = `it('x', () => {\nconst t0 = performance.now()\nconst d = performance.now() - t0\n${bound}\n})`
+    expect(rawBounds('a.test.ts', source)).not.toEqual([])
+  })
+
   // review №32 and adversarial Ф4: a count beside a duration is a count, and only a store the file made holds one
   it.each([
     [
@@ -136,20 +176,33 @@ describe('rawBounds', () => {
       `const rows: number[] = []\nrows.push(d)\nexpect(rows.length).toBeLessThan(3)`,
     ],
     [
-      'another field of an object',
-      `const report = { took: d, retries: 1 }\nexpect(report.retries).toBeLessThan(3)`,
+      'another field of an object, said so',
+      `const report = { took: d, retries: 1 }\n// not a duration: a count of retries\nexpect(report.retries).toBeLessThan(3)`,
     ],
     [
-      'another field of the rows, taken apart',
-      `const rows = [{ took: d, tries: 1 }]\nfor (const { tries } of rows) expect(tries).toBeLessThan(3)`,
-    ],
-    [
-      'a line that says it is no duration',
-      `// not a duration: a count of what was read\nexpect(d).toBeLessThan(3)`,
+      'another field of the rows, said so',
+      `const rows = [{ took: d, tries: 1 }]\nfor (const { tries } of rows) expect(tries).toBeLessThan(3) // not a duration: tries`,
     ],
   ])('leaves alone what is no duration — %s', (_, code) => {
     const source = `it('x', async () => {\nconst t0 = performance.now()\nconst d = performance.now() - t0\n${code}\n})`
     expect(rawBounds('a.test.ts', source)).toEqual([])
+  })
+
+  // review №34, adversarial Х3: a note never lets go the clock read straight, nor the line under a line of code
+  it('lets a note take only what is held as time in doubt, and says what it let go', () => {
+    const source = `it('x', () => {
+const t0 = performance.now()
+const d = performance.now() - t0
+const report = { took: d, retries: 1 }
+expect(performance.now() - t0).toBeLessThan(1_000) // not a duration: x
+// not a duration: x
+expect(d).toBeLessThan(1_000)
+expect(report.retries).toBeLessThan(3) // not a duration: a count
+expect(report.took).toBeLessThan(1_000)
+})`
+    const { found, noted } = boundsOf('a.test.ts', source)
+    expect(found.map((line) => Number(line.split(':')[0]))).toEqual([5, 7, 9])
+    expect(noted.map((line) => Number(line.split(':')[0]))).toEqual([8])
   })
 
   it('still finds the duration a field of the same object or rows holds (Ф4)', () => {
