@@ -68,6 +68,7 @@
         v-model="channel"
         :options="channelOptions"
         :legend="t('exchange.sheet.channel')"
+        fit
       />
 
       <AppReveal>
