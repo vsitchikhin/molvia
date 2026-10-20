@@ -367,7 +367,8 @@ nothing up.
   month not read yet: «Добавить трату» stands while the month loads, when it failed and offline on
   the first of a month (review Т-5, Т-6) — and does not, where no category is known at all. **Any
   answer that lands names them**, of a month left before it came too (MOL-183): turned a month back
-  before the running one answered, and that month failing, the screen had none and lost the strip. The row
+  before the running one answered, and that month failing, the screen had none and lost the strip — e2e
+  holds that order on every run, the running month's answer held back, never left to the runner (MOL-262). The row
   «Категории» stands before anything is spent too (Т-7). This month on the phone (MOL-121) is looked
   at again whenever the app comes back into view (adversarial З).
 - **«Пусто» is read off the answer** (Р-6): the running month empty, no income, nothing the month
