@@ -305,3 +305,30 @@ describe('cheaperHint · another item of the same kind (В-3, В-7…В-9)', () 
     expect(hint(item, 620).alternative?.itemId).toBe(MARIANNA)
   })
 })
+
+describe('cheaperHint · a gift typed at 0 is no price (MOL-274, В-2 «а»)', () => {
+  const history = rated([place(ZOVUNI, 540), place(CITY, 600, { day: '2026-09-03' })])
+  const marianna = alternative(MARIANNA, '4.5', [place(ZOVUNI, 480)])
+
+  it('reads as nothing typed — the cheapest place said plainly, never «тут дешевле»', () => {
+    expect(hint(history, 0)).toEqual(hint(history, null))
+    expect(hint(history, 0).item).toMatchObject({ kind: 'best', place: { placeId: ZOVUNI } })
+  })
+
+  it('compares an alternative with the item’s own cheapest place, as before a price is typed', () => {
+    expect(hint(rated([place(ZOVUNI, 540)], [marianna]), 0).alternative?.itemId).toBe(MARIANNA)
+    expect(hint(rated([place(ZOVUNI, 470)], [marianna]), 0).alternative).toBeNull()
+  })
+
+  it('takes the least price above zero as a price', () => {
+    const least: UnitPrice = { scaledMinor: 1n, currency: 'AMD', unit: 'l' }
+    expect(hint(history, null, { typed: least }).item?.kind).toBe('cheaper')
+  })
+
+  it('a gift of a quantity is still no price', () => {
+    const gift = unitPrice({ minor: 0n, currency: 'AMD' }, { milli: 2500n, unit: 'l' })
+    expect(
+      hint(history, null, { typed: gift, typedQuantity: { milli: 2500n, unit: 'l' } }).item?.kind,
+    ).toBe('best')
+  })
+})
