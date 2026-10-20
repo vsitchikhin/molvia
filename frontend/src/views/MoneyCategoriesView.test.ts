@@ -1,0 +1,345 @@
+import { flushPromises, mount } from '@vue/test-utils'
+import type { VueWrapper } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { createMemoryHistory, createRouter } from 'vue-router'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@molvia/client'
+import { ERROR } from '@molvia/model'
+import type {
+  SpendingCategoriesResponse,
+  SpendingCategoryBody,
+  SpendingCategoryView,
+} from '@molvia/model'
+import ListRow from '@/components/ListRow.vue'
+import { createAppI18n } from '@/i18n'
+import en from '@/i18n/en.json'
+import { routes } from '@/router'
+import { useActorStore } from '@/stores/actor'
+import { useSpendingQueueStore } from '@/stores/spendingQueue'
+import MoneyCategoriesView from './MoneyCategoriesView.vue'
+
+const spendingCategories = vi.fn<() => Promise<SpendingCategoriesResponse>>()
+const addSpendingCategory =
+  vi.fn<(body: SpendingCategoryBody) => Promise<SpendingCategoriesResponse>>()
+const archiveSpendingCategory = vi.fn<(id: string) => Promise<SpendingCategoriesResponse>>()
+const restoreSpendingCategory = vi.fn<(id: string) => Promise<SpendingCategoriesResponse>>()
+vi.mock('@/api', () => ({
+  api: {
+    spendingCategories: () => spendingCategories(),
+    addSpendingCategory: (body: SpendingCategoryBody) => addSpendingCategory(body),
+    archiveSpendingCategory: (id: string) => archiveSpendingCategory(id),
+    restoreSpendingCategory: (id: string) => restoreSpendingCategory(id),
+  },
+}))
+
+const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
+const GROCERIES = 'ffffffff-0000-4000-8000-000000000001'
+const CAFE = 'ffffffff-0000-4000-8000-000000000002'
+const HEALTH = 'ffffffff-0000-4000-8000-000000000008'
+const OWN = 'ffffffff-0000-4000-8000-000000000020'
+
+const preset = (id: string, key: string, archived = false): SpendingCategoryView => ({
+  id,
+  preset: key as 'groceries',
+  name: null,
+  colour: null,
+  archived,
+})
+const own = (id: string, name: string, archived = false): SpendingCategoryView => ({
+  id,
+  preset: null,
+  name,
+  colour: 0,
+  archived,
+})
+
+const LIST: SpendingCategoryView[] = [
+  preset(GROCERIES, 'groceries'),
+  preset(CAFE, 'cafe'),
+  own(OWN, 'Armenian lessons'),
+  preset(HEALTH, 'health', true),
+]
+
+const views: VueWrapper[] = []
+async function render(): Promise<VueWrapper> {
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  const actor = useActorStore()
+  actor.id = ACTOR
+  actor.state = 'ready'
+  const router = createRouter({ history: createMemoryHistory(), routes })
+  await router.push('/money/categories')
+  const view = mount(MoneyCategoriesView, {
+    attachTo: document.body,
+    global: { plugins: [pinia, router, createAppI18n('en')] },
+  })
+  views.push(view)
+  await flushPromises()
+  return view
+}
+
+function online(value: boolean): void {
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(value)
+}
+
+let clock = 0
+
+/** Waits for a sheet to rise — until then it takes no tap. */
+async function risen(): Promise<void> {
+  await flushPromises()
+  clock += 1000
+  await new Promise((resolve) => setTimeout(resolve, 5))
+}
+
+function sheetButton(text: string): HTMLButtonElement {
+  const found = [...document.querySelectorAll('dialog[open] button')].find(
+    (button) => button.textContent.trim() === text,
+  )
+  if (!(found instanceof HTMLButtonElement)) throw new Error(`no «${text}» in the sheet`)
+  return found
+}
+
+/** What stands in the strip over the tab bar. */
+function strip(view: VueWrapper): string[] {
+  return view.findAll('.screen > .dock button').map((button) => button.text())
+}
+
+function addButton(view: VueWrapper) {
+  return view
+    .findAll('.screen > .dock button')
+    .find((button) => button.text() === en.spending.categories.add)
+}
+
+/** «Добавить категорию» → the sheet → a name → «Добавить». */
+async function addThroughSheet(view: VueWrapper, name: string): Promise<void> {
+  await addButton(view)?.trigger('click')
+  await risen()
+  const input = document.querySelector<HTMLInputElement>('dialog[open] input')
+  if (!input) throw new Error('no field')
+  input.value = name
+  input.dispatchEvent(new Event('input'))
+  await flushPromises()
+  sheetButton(en.spending.new_category.save).click()
+  await flushPromises()
+}
+
+beforeEach(() => {
+  vi.restoreAllMocks()
+  for (const mock of [
+    spendingCategories,
+    addSpendingCategory,
+    archiveSpendingCategory,
+    restoreSpendingCategory,
+  ]) {
+    mock.mockReset()
+  }
+  localStorage.clear()
+  sessionStorage.clear()
+  online(true)
+  clock = 0
+  vi.spyOn(performance, 'now').mockImplementation(() => clock)
+})
+afterEach(() => {
+  for (const view of views.splice(0)) view.unmount()
+  window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+  document.body.innerHTML = ''
+})
+
+describe('MoneyCategoriesView: «Добавить категорию» in the strip (MOL-191, Ф-28)', () => {
+  it('stands in the strip, and the list has no button of its own over it', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    expect(strip(view)).toEqual([en.spending.categories.add])
+    expect(view.find('.content').text()).not.toContain(en.spending.categories.add)
+  })
+
+  it('must not fire: no strip under the skeleton, so no sheet without the list (В-2 «а»)', async () => {
+    let answer: (value: SpendingCategoriesResponse) => void = () => undefined
+    spendingCategories.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    const view = await render()
+    expect(view.find('.skeleton').exists()).toBe(true)
+    expect(view.find('.screen > .dock').exists()).toBe(false)
+
+    answer({ categories: LIST })
+    await flushPromises()
+    expect(strip(view)).toEqual([en.spending.categories.add])
+  })
+
+  it('one’s own name is refused in the sheet, never sent: the sheet opens over the list', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    await addThroughSheet(view, 'Armenian lessons')
+    expect(document.querySelector('dialog[open]')?.textContent).toContain(
+      en.spending.new_category.bad_taken,
+    )
+    expect(addSpendingCategory).not.toHaveBeenCalled()
+    expect(useSpendingQueueStore().pending).toHaveLength(0)
+  })
+
+  it('must not fire: offline with no list ever shown, there is no strip (7h)', async () => {
+    online(false)
+    spendingCategories.mockRejectedValue(new TypeError('network'))
+    const view = await render()
+    expect(view.text()).toContain(en.spending.categories.offline.body)
+    expect(view.find('.screen > .dock').exists()).toBe(false)
+  })
+
+  it('an error takes the strip for «Try again», and the answer gives it back', async () => {
+    spendingCategories.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+    const view = await render()
+    expect(view.text()).toContain(en.spending.categories.load_error.title)
+    expect(strip(view)).toContain(en.state.retry)
+    expect(addButton(view)).toBeUndefined()
+
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    await view
+      .findAll('.screen > .dock button')
+      .find((button) => button.text() === en.state.retry)
+      ?.trigger('click')
+    await flushPromises()
+    expect(strip(view)).toEqual([en.spending.categories.add])
+  })
+
+  it('offline over a list shown, a category is made through the queue and waits', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    online(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+    expect(strip(view)).toEqual([en.spending.categories.add])
+
+    await addThroughSheet(view, 'Gifts')
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(addSpendingCategory).not.toHaveBeenCalled()
+    expect(useSpendingQueueStore().pending).toHaveLength(1)
+    const row = view.findAll('li').find((one) => one.text().includes('Gifts'))
+    expect(row?.text()).toContain(en.spending.pending)
+  })
+})
+
+describe('MoneyCategoriesView: «Убрать» is quiet (MOL-191, Ф-34)', () => {
+  it('«Remove» is a ghost, never the red one; «Bring back» stands on the removed', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    const remove = view
+      .findAll('button')
+      .filter((button) => button.text() === en.spending.categories.remove)
+    expect(remove).toHaveLength(3)
+    for (const button of remove) {
+      expect(button.classes()).toContain('ghost')
+      expect(button.classes()).not.toContain('danger-ghost')
+    }
+    expect(view.findAll('button.danger-ghost')).toHaveLength(0)
+    const restore = view.findAll('button').filter((button) => button.text() === en.spending.restore)
+    expect(restore).toHaveLength(1)
+    expect(restore[0]?.classes()).toContain('ghost')
+  })
+})
+
+describe('MoneyCategoriesView: a row is the kit’s ListRow (MOL-191, MOL-175)', () => {
+  it('every category of both groups is a row with its circle, «Remove» or «Bring back» its tail', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    const rows = view.findAllComponents(ListRow)
+    expect(rows).toHaveLength(4)
+    for (const row of rows) {
+      expect(row.element.tagName).toBe('DIV')
+      expect(row.find('.circle').exists()).toBe(true)
+      expect(row.classes()).toContain('wrap')
+      expect(row.find('.tail button').exists()).toBe(true)
+    }
+    expect(rows[0]?.find('.circle').attributes('style')).toContain('var(--cat-groceries)')
+    expect(rows[2]?.find('.circle').attributes('style')).toContain('var(--cat-own-0)')
+  })
+
+  it('«own» stands under one’s own category only, never under a preset', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    const metas = view
+      .findAllComponents(ListRow)
+      .map((row) => (row.find('.meta').exists() ? row.find('.meta').text() : ''))
+    expect(metas).toEqual(['', '', en.spending.categories.own, ''])
+  })
+
+  it('«Sending…» is a tag on the category that waits, and on no other row', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    online(false)
+    await addThroughSheet(view, 'Gifts')
+    const tagged = view
+      .findAllComponents(ListRow)
+      .filter((row) => row.text().includes(en.spending.pending))
+    expect(tagged).toHaveLength(1)
+    expect(tagged[0]?.text()).toContain('Gifts')
+    expect(tagged[0]?.find('.below .tag.warn').exists()).toBe(true)
+  })
+
+  it('a long name of one’s own is the row’s whole title, and the row wraps it', async () => {
+    const long = 'Lessons of Armenian with a teacher at home'.slice(0, 40)
+    spendingCategories.mockResolvedValue({ categories: [own(OWN, long)] })
+    const view = await render()
+    const row = view.getComponent(ListRow)
+    expect(row.find('.title').text()).toBe(long)
+    expect(row.classes()).toContain('wrap')
+  })
+
+  it('no removed category, no group; the last brought back takes the group away', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST.filter((one) => !one.archived) })
+    const none = await render()
+    expect(none.text()).not.toContain(en.spending.categories.archived)
+
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const one = await render()
+    expect(one.text()).toContain(en.spending.categories.archived)
+    const restored = LIST.map((category) => ({ ...category, archived: false }))
+    restoreSpendingCategory.mockResolvedValue({ categories: restored })
+    spendingCategories.mockResolvedValue({ categories: restored })
+    await one
+      .findAll('button')
+      .find((button) => button.text() === en.spending.restore)
+      ?.trigger('click')
+    await flushPromises()
+    expect(one.text()).not.toContain(en.spending.categories.archived)
+    expect(one.findAllComponents(ListRow)).toHaveLength(4)
+  })
+
+  it('a refused category stands over the lists; a refused spending is not this screen’s', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    const queue = useSpendingQueueStore()
+    queue.rejected = [
+      {
+        key: 'k1',
+        write: { kind: 'category-add', body: { id: OWN, name: 'Gifts' } },
+        code: ERROR.CONFLICT,
+      },
+      { key: 'k2', write: { kind: 'remove', id: CAFE }, code: ERROR.CONFLICT },
+    ]
+    await flushPromises()
+    const notices = view.findAll('.state.inline')
+    expect(notices).toHaveLength(1)
+    const lists = view.get('.lists').element
+    const before = notices[0]?.element.compareDocumentPosition(lists) ?? 0
+    expect(before & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    await notices[0]
+      ?.findAll('button')
+      .find((button) => button.text() === en.spending.sheet.dismiss)
+      ?.trigger('click')
+    await flushPromises()
+    expect(view.findAll('.state.inline')).toHaveLength(0)
+  })
+})
+
+describe('MoneyCategoriesView: the skeleton is the answer’s shape (MOL-191, Ф-13)', () => {
+  it('a caption and a card of six rows «circle · name · button», no bare lines', async () => {
+    spendingCategories.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    expect(view.findAll('.skeleton-caption')).toHaveLength(1)
+    const rows = view.findAll('.skeleton-rows .item')
+    expect(rows).toHaveLength(6)
+    for (const row of rows) expect(row.find('.circle').exists()).toBe(true)
+    expect(view.find('.skeleton-rows').classes()).not.toContain('skeleton-narrow')
+    expect(view.find('.skeleton-lines').exists()).toBe(false)
+  })
+})
