@@ -362,8 +362,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   square fill stood out past the round ring at every corner (adversarial В1). Only a `div` row takes a button into its tail — a button
   inside a button is no HTML — **and a button there does not make the row taller**: its 44 stands over
   the row's padding by 4 a side, so the row is 64 as its skeleton is (MOL-191: «Категории» came 68);
-  its sides are 8, so beside a circle of 40 a word of a name fits at 320 (adversarial А2: «Развлечения»
-  broke in its middle at 16). `NavRow` without `to` is a button that opens a sheet and says so
+  its sides are 8 and it stands 8 into the row's padding at the right, so beside a circle of 40 a word of
+  a name fits at 320 under the widest word of the tail (adversarial А2: «Развлечения» broke in its middle
+  at 16; Б1: under «Вернуть» with the sides alone). `NavRow` without `to` is a button that opens a sheet and says so
   (`aria-haspopup="dialog"`). **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
   handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
   its tint, in the strip's shape and never a live region; a tag a pill of 13/600, plain, warn or bad
