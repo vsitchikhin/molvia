@@ -101,6 +101,30 @@ const envSchema = z.object({
     .optional()
     .transform((url) => (url === '' ? undefined : url)),
   /**
+   * The key of the model that reads receipts (MOL-272, Т-7): in the API's environment alone — never the
+   * repository, a log or an answer. Unset or empty, Tesseract reads every receipt, as before.
+   */
+  CLAUDE_API_KEY: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.string().min(1).optional(),
+  ),
+  /**
+   * The workspace a person's key is named with (`anthropic-workspace-id`): a key made inside a workspace
+   * needs none, a person's key is refused without it.
+   */
+  CLAUDE_WORKSPACE_ID: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.string().min(1).optional(),
+  ),
+  /**
+   * What the model may cost a calendar month, in dollars (MOL-272, owner's decision 19.10.2026): $200.
+   * The console's limit of the workspace holds the same from the other side (Р-10).
+   */
+  RECEIPT_MODEL_MONTHLY_CAP_USD: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.coerce.number().positive().max(100_000).default(200),
+  ),
+  /**
    * Whom the bot writes about failures (MOL-143, Р-9 of MOL-149): the owner's Telegram id. Set in
    * production only — without it nothing is queued for anyone, so a copy's failures go to its table
    * and stay there. Empty is unset, as compose passes a variable it was not given.

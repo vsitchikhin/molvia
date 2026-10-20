@@ -7,7 +7,14 @@ import { sql } from 'drizzle-orm'
 import { connectDrizzle } from './db'
 import { clearAll, insertCounted } from './fixtures'
 import { createGatesReader } from '@/db/gates-reader'
-import { erasures, loginDays, receiptDays, reminderDays, taxReceiptDays } from '@/db/schema'
+import {
+  erasures,
+  loginDays,
+  modelReceiptDays,
+  receiptDays,
+  reminderDays,
+  taxReceiptDays,
+} from '@/db/schema'
 
 const { db, close } = connectDrizzle()
 const reader = createGatesReader(db)
@@ -205,6 +212,32 @@ describe('the gates reader', () => {
       codesWritten: 1,
     })
     expect(report.receipts).toMatchObject({ read: 1, lines: 4, linesEdited: 1, recorded: 0 })
+  })
+
+  // MOL-272: the model's receipts, over the same days and apart from Tesseract's
+  it('sums the model’s receipts apart, Tesseract’s block not moved by them', async () => {
+    const counts = { read: 3, recorded: 2, lines: 12, linesEdited: 1 }
+    await db.insert(modelReceiptDays).values([
+      { day: '2026-10-06', ...counts }, // the day before
+      { day: '2026-10-07', ...counts },
+      { day: '2026-10-18', ...counts, reshoot: 1 },
+      { day: '2026-10-19', ...counts }, // the day after
+    ])
+    await db.insert(receiptDays).values({ day: '2026-10-07', read: 1, lines: 4, linesEdited: 2 })
+    const report = await reader.read({
+      from: new Date('2026-10-07T12:00:00+04:00'),
+      to: new Date('2026-10-19T00:00:00+04:00'),
+    })
+    expect(report.modelReceipts).toMatchObject({
+      firstDay: '2026-10-07',
+      lastDay: '2026-10-18',
+      read: 6,
+      reshoot: 1,
+      recorded: 4,
+      lines: 24,
+      linesEdited: 2,
+    })
+    expect(report.receipts).toMatchObject({ read: 1, lines: 4, linesEdited: 2, recorded: 0 })
   })
 
   it('reads zeros for days without a receipt', async () => {

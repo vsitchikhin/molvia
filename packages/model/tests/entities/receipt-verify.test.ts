@@ -226,6 +226,57 @@ describe('a line of one piece or one kilogram whose price is its sum (MOL-255, �
   })
 })
 
+describe('a model’s line of one piece whose price is within the rounding of its sum (MOL-272)', () => {
+  // «389,99 390» answered as price 389,99 and sum 390: the model names the columns, and either way holds
+  const swapped = { quantityMilli: 1_000, priceHundredths: 38_999, sumHundredths: 39_000 }
+  const byModel = { byModel: true }
+
+  it('is emptied on its own, as one number printed twice', () => {
+    expect(figures(verifiedReading(reading([line(swapped)]), byModel).lines[0]!)).toEqual(BLANK)
+    const apart = { ...swapped, priceHundredths: 39_003 }
+    expect(figures(verifiedReading(reading([line(apart)]), byModel).lines[0]!)).toEqual(BLANK)
+  })
+
+  it('is no such line a luma past the rounding: its price goes, its sum stays', () => {
+    const past = { ...swapped, priceHundredths: 39_004 }
+    const got = verifiedReading(reading([line(past)]), byModel).lines[0]!
+    expect(figures(got)).toEqual([1_000, null, 39_000, null, true])
+  })
+
+  it('is kept on a receipt proven whole', () => {
+    const got = verifiedReading(reading([line(swapped), line()], 113_000), byModel)
+    expect(got.lines.map(figures)).toEqual([
+      [1_000, 38_999, 39_000, 0, true],
+      [2_000, 37_000, 74_000, 0, true],
+    ])
+  })
+
+  it('is OCR’s rounding, kept, where the columns are the paper’s: «419,98/0 490/420»', () => {
+    const rounded = { quantityMilli: 1_000, priceHundredths: 42_000, sumHundredths: 41_998 }
+    expect(figures(verifiedReading(reading([line(rounded)])).lines[0]!)).toEqual([
+      1_000,
+      42_000,
+      41_998,
+      0,
+      true,
+    ])
+    expect(figures(verifiedReading(reading([line(rounded)]), byModel).lines[0]!)).toEqual(BLANK)
+  })
+
+  it('is no rule of a line with a discount, nor of a layout with no rounding', () => {
+    const discounted = { ...swapped, priceHundredths: 39_400, discountHundredths: 400 }
+    expect(figures(verifiedReading(reading([line(discounted)]), byModel).lines[0]!)).toEqual([
+      1_000,
+      39_400,
+      39_000,
+      400,
+      true,
+    ])
+    const classLine = verifiedReading({ ...reading([line(swapped)]), layout: 'class' }, byModel)
+    expect(figures(classLine.lines[0]!)).toEqual([1_000, null, 39_000, null, true])
+  })
+})
+
 describe('the receipt as a whole', () => {
   it('is balanced only when proven, whatever the parse said', () => {
     expect(verifiedReading(reading([line()], 74_000)).balanced).toBe(true)

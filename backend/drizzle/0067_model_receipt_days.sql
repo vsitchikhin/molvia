@@ -1,0 +1,22 @@
+CREATE TABLE "model_receipt_days" (
+	"day" date PRIMARY KEY NOT NULL,
+	"read" integer DEFAULT 0 NOT NULL,
+	"read_partly" integer DEFAULT 0 NOT NULL,
+	"reshoot" integer DEFAULT 0 NOT NULL,
+	"no_items" integer DEFAULT 0 NOT NULL,
+	"unreadable" integer DEFAULT 0 NOT NULL,
+	"recorded" integer DEFAULT 0 NOT NULL,
+	"lines" integer DEFAULT 0 NOT NULL,
+	"lines_edited" integer DEFAULT 0 NOT NULL,
+	"lines_skipped" integer DEFAULT 0 NOT NULL,
+	"lines_item" integer DEFAULT 0 NOT NULL,
+	"lines_figures" integer DEFAULT 0 NOT NULL,
+	"totals_corrected" integer DEFAULT 0 NOT NULL,
+	"within_5m" integer DEFAULT 0 NOT NULL,
+	"within_15m" integer DEFAULT 0 NOT NULL,
+	"within_1h" integer DEFAULT 0 NOT NULL,
+	"within_1d" integer DEFAULT 0 NOT NULL,
+	"later" integer DEFAULT 0 NOT NULL,
+	CONSTRAINT "model_receipt_days_counts_non_negative" CHECK (least("model_receipt_days"."read", "model_receipt_days"."read_partly", "model_receipt_days"."reshoot", "model_receipt_days"."no_items", "model_receipt_days"."unreadable", "model_receipt_days"."recorded", "model_receipt_days"."lines", "model_receipt_days"."lines_edited", "model_receipt_days"."lines_skipped", "model_receipt_days"."lines_item", "model_receipt_days"."lines_figures", "model_receipt_days"."totals_corrected", "model_receipt_days"."within_5m", "model_receipt_days"."within_15m", "model_receipt_days"."within_1h", "model_receipt_days"."within_1d", "model_receipt_days"."later") >= 0),
+	CONSTRAINT "model_receipt_days_edited_within_lines" CHECK ("model_receipt_days"."lines_edited" <= "model_receipt_days"."lines")
+);

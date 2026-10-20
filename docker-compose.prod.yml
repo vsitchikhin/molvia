@@ -68,6 +68,10 @@ services:
       PURS_CONTACT: ${PURS_CONTACT:-}
       # The receipt reader below (MOL-125); while it is down, receipts wait in the queue.
       RECEIPT_READER_URL: http://receipt-reader:8080
+      # The model that reads the receipts of those it is granted to (MOL-272); empty, Tesseract reads all.
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY:-}
+      CLAUDE_WORKSPACE_ID: ${CLAUDE_WORKSPACE_ID:-}
+      RECEIPT_MODEL_MONTHLY_CAP_USD: ${RECEIPT_MODEL_MONTHLY_CAP_USD:-200}
       # Whom the bot tells of a new failure (MOL-143): the owner's Telegram id, digits only. Required
       # and filled since MOL-145 — the alarms of the metrics go to it too, so empty is no longer a way
       # to tell nobody: compose refuses to start (review №3).

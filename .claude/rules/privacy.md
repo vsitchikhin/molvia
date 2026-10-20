@@ -278,7 +278,14 @@ The detail behind the privacy lines of `CLAUDE.md`.
   parties.
 - **A receipt is read on our own server, and its photo lives days** (MOL-125, the owner's decisions of
   27.09 and 02.10.2026): Tesseract in `services/receipt-reader`, a container with no database, no
-  disk and no log, asked over the compose network only — no third party sees a receipt. The photo
+  disk and no log, asked over the compose network only — no third party sees a receipt. **Except a
+  receipt the model reads** (MOL-272): Anthropic, in the USA, gets its photo whole — a customer's name
+  printed on it included — only for whoever it is granted to (`actors.receipts_model_until`) **and who
+  accepted edition 3** (`MODEL_CONSENT_EDITION`), which names Anthropic among the recipients and the
+  transfer abroad on that consent; anyone else's receipt never leaves the server, whatever is granted.
+  What the model gives back is kept as any reading is; the grant is the person's — in the copy
+  (version 20), gone with the row — and its row in the record of processing (12091393); what the model
+  cost is nobody's (`model_spend`). The page says it under «Чеки» and among the recipients. The photo
   carries a customer's name and goes once the receipt is recorded, a receipt not recorded goes whole
   after 28 days, a recorded one with its trip and a line with its purchase — and the person's word on
   it in the shops' memory, unless another purchase of theirs says it (MOL-240) — an item line cut

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { POLICY_VERSION } from '@molvia/model'
 import { ACCEPT, AGE, DEV_SEAM, asBrowser } from './session'
 
 test.use({ reducedMotion: 'reduce' })
@@ -58,7 +59,7 @@ test('a newcomer accepts the terms once, with the age ticked, and comes in', asy
   expect(asked).toBe(false)
 })
 
-test('whoever accepted edition 1 is asked again, told what changed in 2, and comes in (MOL-236)', async ({
+test('whoever accepted edition 1 is asked again, told what changed in 2 and 3, and comes in (MOL-236, MOL-272)', async ({
   page,
 }) => {
   await newcomer(page)
@@ -73,6 +74,7 @@ test('whoever accepted edition 1 is asked again, told what changed in 2, and com
   await expect(page.getByRole('heading', { name: 'The terms have changed' })).toBeVisible()
   await expect(page.getByText('What changed', { exact: true })).toBeVisible()
   await expect(page.getByText(/The person responsible for your data is named/)).toBeVisible()
+  await expect(page.getByText(/A new recipient — Anthropic \(USA\)/)).toBeVisible()
   // The consent to the statistics stands on the step itself, apart from the pages (В-2).
   await expect(page.getByText('Statistics', { exact: true })).toBeVisible()
   await expect(page.getByText(/while «Count me in the statistics» is on/)).toBeVisible()
@@ -82,7 +84,7 @@ test('whoever accepted edition 1 is asked again, told what changed in 2, and com
   )
   await page.getByRole('checkbox', { name: AGE }).check()
   await page.getByRole('button', { name: ACCEPT }).click()
-  expect((await accepted).postDataJSON()).toEqual({ version: 2 })
+  expect((await accepted).postDataJSON()).toEqual({ version: POLICY_VERSION })
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('What to buy')
 })
 
