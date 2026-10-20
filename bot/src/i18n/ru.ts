@@ -223,6 +223,14 @@ export const ru = {
   'owner.merge.moreLater': '…и ещё {count} — назову в следующие утра',
   'owner.merge.undo': 'Отменить — make unmerge ID=номер',
   /**
+   * What reading receipts by a model has cost (MOL-272, В-2 «а»): half the month's cap, nine tenths, and
+   * the stop — a receipt that would not fit under it — each once a month, the month in UTC.
+   */
+  'owner.model.half': '💸 Чеки моделью за {month}: потрачено ${spent} — половина потолка ${cap}',
+  'owner.model.most': '💸 Чеки моделью за {month}: потрачено ${spent} — 90 % потолка ${cap}',
+  'owner.model.stop':
+    '🛑 Чеки моделью за {month} остановлены: потрачено ${spent}, следующий чек не влезает под потолок ${cap}. До конца месяца чеки читает Tesseract.',
+  /**
    * «Написать разработчику» in the bot (MOL-148). The frame is what the person gets around the
    * owner's reply, in the language of their message (Р-12 of MOL-150); the rest answers a text
    * written as a reply to the bot, in the writer's language, under their message.

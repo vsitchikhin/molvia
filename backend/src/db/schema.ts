@@ -2242,6 +2242,29 @@ export const taxReceiptDays = pgTable(
 )
 
 /**
+ * What reading receipts by a model has cost, by the calendar month in UTC — the month of Anthropic's bill
+ * (MOL-272, Т-3): every call at its own `usage` and the model's price in the code, an answer we did not
+ * take too. Nobody's: no key to `actors`, so neither erasure nor the copy reaches it (Р-8). **A call
+ * reserves its worst price before it goes and settles at its own after**, so the cap holds across a
+ * process lost in between — the worst stays counted, never less than was spent. `noticed` is the last
+ * step of the cap the owner heard of this month (В-2): 50, 90, 100 at the stop.
+ */
+export const modelSpend = pgTable(
+  'model_spend',
+  {
+    month: date('month').primaryKey(),
+    spentMicroUsd: bigint('spent_micro_usd', { mode: 'number' }).notNull().default(0),
+    calls: integer('calls').notNull().default(0),
+    noticed: smallint('noticed').notNull().default(0),
+  },
+  (table) => [
+    check('model_spend_month_first_day', sql`extract(day from ${table.month}) = 1`),
+    check('model_spend_non_negative', sql`least(${table.spentMicroUsd}, ${table.calls}) >= 0`),
+    check('model_spend_noticed_step', sql`${table.noticed} in (0, 50, 90, 100)`),
+  ],
+)
+
+/**
  * «Написать разработчику» (MOL-147): what a person wrote to the one who builds the app. Not a
  * review — `verdicts.review` is that — so nothing reads it but the owner. The `id` is the number the
  * owner sees, `#fb42`, so it is the server's and counts up.

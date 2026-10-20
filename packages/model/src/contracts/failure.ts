@@ -7,6 +7,7 @@ import {
   feedbackRouteSchema,
 } from './feedback'
 import { catalogueMergedNoticeSchema } from './merge'
+import { modelSpendNoticeSchema } from './model-spend'
 import { telegramUserIdSchema } from '#model/entities/actor'
 import { FAILURE_FRAMES, PHONE_SCRIPT_PATH } from '#model/support/failure'
 
@@ -189,7 +190,8 @@ export const failureMutedNoticeSchema = z.strictObject({
 /**
  * One message the API has queued for the owner (MOL-143, Р-9 of MOL-149) and handed to the bot. A
  * union by `kind`: the feedback of MOL-148 joins as two more branches rather than a second channel,
- * the morning's report of the nightly merge (MOL-106) as one more.
+ * the morning's report of the nightly merge (MOL-106) as one more, and what reading receipts by a model
+ * has cost (MOL-272) as another.
  */
 export const ownerNoticeSchema = z.discriminatedUnion('kind', [
   failureNoticeSchema,
@@ -198,6 +200,7 @@ export const ownerNoticeSchema = z.discriminatedUnion('kind', [
   feedbackNoticeSchema,
   feedbackContinuedNoticeSchema,
   catalogueMergedNoticeSchema,
+  modelSpendNoticeSchema,
 ])
 export type OwnerNotice = z.infer<typeof ownerNoticeSchema>
 export type OwnerNoticeKind = OwnerNotice['kind']
@@ -208,6 +211,7 @@ export const OWNER_NOTICE_KINDS = [
   'feedback',
   'feedback_continued',
   'catalogue_merged',
+  'model_spend',
 ] as const satisfies readonly OwnerNoticeKind[]
 
 /** The notices about a message to the developer: they name it, and go with it (MOL-148, Р-5). */

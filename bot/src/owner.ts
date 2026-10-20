@@ -6,6 +6,7 @@ import type {
   CatalogueMergedNotice,
   FeedbackContinuedNotice,
   FeedbackNotice,
+  ModelSpendNotice,
   OwnerNotice,
 } from '@molvia/model'
 import { t } from './i18n'
@@ -22,6 +23,7 @@ export function ownerText(notice: OwnerNotice): string {
   if (notice.kind === 'feedback') return feedbackText(notice)
   if (notice.kind === 'feedback_continued') return continuedText(notice)
   if (notice.kind === 'catalogue_merged') return mergedText(notice)
+  if (notice.kind === 'model_spend') return spendText(notice)
   if (notice.kind === 'failure_muted') {
     // Said only what is so (review №10, adversarial Г2): no «скрыто: 0», and `make failures` only for
     // the held ones — the unwritten are in no table.
@@ -98,6 +100,23 @@ const MERGE_TEXT_TAIL = 300
  * are printed while the message holds them; the rest are counted, and a candidate cut for length is
  * named by `make merge-candidates`, which lists every one named and still apart.
  */
+const MODEL_SPEND_KEYS = {
+  50: 'owner.model.half',
+  90: 'owner.model.most',
+  100: 'owner.model.stop',
+} as const
+
+/** Dollars of micro-dollars, to the cent: the owner reads a bill, not a ledger. */
+const dollars = (micro: number): string => (micro / 1_000_000).toFixed(2)
+
+function spendText(notice: ModelSpendNotice): string {
+  return t(undefined, MODEL_SPEND_KEYS[notice.step], {
+    month: notice.month.slice(0, 7),
+    spent: dollars(notice.spentMicroUsd),
+    cap: dollars(notice.capMicroUsd),
+  })
+}
+
 function mergedText(notice: CatalogueMergedNotice): string {
   const on = notice.mode === 'on'
   const lines = [
