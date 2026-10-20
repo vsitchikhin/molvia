@@ -117,6 +117,27 @@ test('«only if cheap» says where it was bought, the price beside the place (MO
   await expect(cheap.getByText('Worth buying below')).toHaveCount(0)
 })
 
+test('a name longer than the card breaks inside it on a phone of 320 (MOL-200)', async ({
+  page,
+}) => {
+  const who = await person(page)
+  // One word of 24/800 wider than the card: beside the rating it must neither push the rating out
+  // nor leave the card.
+  const name = `Молоко ультрапастеризованное ${tag}`
+  await ratedPurchase(who, name, 5)
+
+  await page.setViewportSize({ width: 320, height: 800 })
+  await page.goto('/')
+
+  const card = page.locator('section.take article')
+  await expect(card.getByText(name)).toBeVisible()
+  const cardBox = await card.boundingBox()
+  for (const part of [card.getByText(name), card.getByText('5.0 out of 5', { exact: true })]) {
+    const box = await part.boundingBox()
+    expect(box && cardBox && box.x + box.width <= cardBox.x + cardBox.width).toBe(true)
+  }
+})
+
 test('a bad verdict carries no price and no place: there is nothing to be cheap with', async ({
   page,
 }) => {
