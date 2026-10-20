@@ -356,6 +356,32 @@ describe('rateChart', () => {
     })
   })
 
+  it('gives the sign of the money, which 0,00 % does not say (MOL-190, Р-4 of MOL-187)', () => {
+    // A bank's own rate rounded to the dram: −0,30 ֏ of 10 000 ֏ reads «0,00 %», and it is worse.
+    const chart = rateChart(
+      [rub],
+      [
+        exchange('2026-09-21', {
+          best: { rate: '4.20', difference: 0 },
+          measured: { difference: -30n, expected: 1_000_000n },
+        }),
+        exchange('2026-09-22', {
+          best: { rate: '4.20', difference: 0 },
+          measured: { difference: 0n, expected: 1_000_000n },
+        }),
+        exchange('2026-09-23', { best: { rate: '4.11', difference: 400 } }),
+        exchange('2026-09-24', { best: { rate: '4.11', difference: 400 }, measured: null }),
+      ],
+      TODAY,
+    )
+    expect(year(chart)?.exchanges.map(({ percent, sign }) => ({ percent, sign }))).toEqual([
+      { percent: 0, sign: -1 },
+      { percent: 0, sign: 0 },
+      { percent: 97, sign: 1 },
+      { percent: null, sign: null },
+    ])
+  })
+
   it('keeps two exchanges of one day in the order they were made, whatever their ids', () => {
     // The list comes newest first: the evening's exchange, then the morning's.
     const chart = rateChart(

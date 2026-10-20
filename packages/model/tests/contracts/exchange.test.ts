@@ -259,6 +259,7 @@ describe('exchangesResponseCodec', () => {
                   level: 1000,
                   place: 'Ардшинбанк',
                   percent: 1255,
+                  sign: 1,
                   market: {
                     rate: { ...rate, scaled: 4_224_000n, source: 'official' },
                     level: 160,
@@ -296,6 +297,27 @@ describe('exchangesResponseCodec', () => {
     expect(decoded.rateCharts).toBeNull()
     expect(decoded.exchanges[0]?.market).toBeNull()
     expect(decoded.exchanges[0]?.channel).toBeNull()
+  })
+
+  it('reads a point of a server before MOL-190 with no sign of its own', () => {
+    const wire = z.encode(exchangesResponseCodec, response)
+    const point: Record<string, unknown> | undefined = {
+      ...wire.rateCharts?.pairs[0]?.periods[12].exchanges[0],
+    }
+    delete point.sign
+    const year = wire.rateCharts?.pairs[0]?.periods[12]
+    const decoded = exchangesResponseCodec.parse({
+      ...wire,
+      rateCharts: {
+        pairs: [
+          {
+            ...wire.rateCharts?.pairs[0],
+            periods: { 1: null, 6: null, 12: { ...year, exchanges: [point] } },
+          },
+        ],
+      },
+    })
+    expect(decoded.rateCharts?.pairs[0]?.periods[12].exchanges[0]?.sign).toBeNull()
   })
 
   it('reads the year alone of a server before MOL-168 and draws nothing of it (Р-4)', () => {

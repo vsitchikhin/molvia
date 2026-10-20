@@ -33,6 +33,10 @@ function daysFrom(from: string, day: string): number {
   return Math.round((Date.parse(day) - Date.parse(from)) / DAY_MS)
 }
 
+function signOf(minor: bigint): -1 | 0 | 1 {
+  return minor < 0n ? -1 : minor > 0n ? 1 : 0
+}
+
 /** A market figure beside an exchange, as the list of «Обмен денег» already carries it. */
 interface QuoteInput {
   readonly basis: MarketChannel
@@ -103,6 +107,11 @@ export interface RateChartPeriod {
     readonly place: string | null
     /** Hundredths of a percent against the market it was measured by; null — no market that day. */
     readonly percent: number | null
+    /**
+     * The sign of the money beside it, which its tone is (MOL-190, Р-4 of MOL-187): the percent is
+     * rounded to hundredths and may read 0,00 % over money that is there. Null where the percent is.
+     */
+    readonly sign: -1 | 0 | 1 | null
     /** That market (В-1): where the mark from the point ends. */
     readonly market: {
       readonly rate: ExchangeRate
@@ -337,10 +346,12 @@ function ratePeriod(
           exchange,
           scaled,
           market: measure && market !== null ? { scaled: market, measure } : null,
-          percent:
-            measured && measured.expected > 0n
-              ? hundredthsOf(measured.difference, measured.expected)
-              : null,
+          ...(measured && measured.expected > 0n
+            ? {
+                percent: hundredthsOf(measured.difference, measured.expected),
+                sign: signOf(measured.difference),
+              }
+            : { percent: null, sign: null }),
         },
       ]
     })
@@ -374,7 +385,7 @@ function ratePeriod(
       x: xOf(day),
       level: row && levelAt(row.scaled),
     })),
-    exchanges: own.map(({ exchange, scaled, market, percent }) => ({
+    exchanges: own.map(({ exchange, scaled, market, percent, sign }) => ({
       id: exchange.id,
       day: exchange.exchangedOn,
       step: ends.findIndex((end) => end >= exchange.exchangedOn),
@@ -385,6 +396,7 @@ function ratePeriod(
       // Named as «Обмены против рынка» names its place.
       place: exchange.note?.trim() ?? null,
       percent,
+      sign,
       market: market && {
         rate: market.measure.rate,
         level: levelAt(market.scaled),

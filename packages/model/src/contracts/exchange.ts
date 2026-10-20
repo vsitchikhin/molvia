@@ -294,6 +294,14 @@ const ratePeriodCodec = z.strictObject({
       place: z.string().nullable(),
       /** Hundredths of a percent: −40 is «−0,40 %». */
       percent: z.int().nullable(),
+      /**
+       * The sign of the money, which the tone is (MOL-190). Defaulted so that an answer of the
+       * server before it still reads: the phone then takes the sign of the percent.
+       */
+      sign: z
+        .union([z.literal(-1), z.literal(0), z.literal(1)])
+        .nullable()
+        .default(null),
       market: z
         .strictObject({ rate: rateCodec, level: chartLevel, basis: marketChannelSchema })
         .nullable(),

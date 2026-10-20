@@ -35,6 +35,7 @@ function point(id: string, day: string, step: number, x: number, of: Partial<Poi
     level: 400,
     place: 'Ардшинбанк',
     percent: -40,
+    sign: -1,
     market: { rate: rate('4.598', day), level: 430, basis: 'bankCash' },
     ...of,
   }
@@ -67,6 +68,7 @@ function year(of: Partial<Period> = {}): Period {
       point('a0000000-0000-4000-8000-000000000001', '2026-02-10', 1, 71, { place: null }),
       point('a0000000-0000-4000-8000-000000000002', '2026-02-14', 1, 214, {
         percent: null,
+        sign: null,
         market: null,
       }),
       point('a0000000-0000-4000-8000-000000000003', '2026-02-28', 3, 714),
@@ -324,7 +326,10 @@ describe('ExchangeRateChart (MOL-161)', () => {
     const { view } = chart([
       rouble({
         exchanges: [
-          point('a0000000-0000-4000-8000-000000000009', '2026-02-28', 3, 714, { percent: null }),
+          point('a0000000-0000-4000-8000-000000000009', '2026-02-28', 3, 714, {
+            percent: null,
+            sign: null,
+          }),
         ],
       }),
     ])
