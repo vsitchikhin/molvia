@@ -417,6 +417,12 @@ describe('словарь: повторяющиеся тексты', () => {
       Cancel: ['item.cancel', 'trip.finish_confirm.cancel'],
       // Отметка строки и заголовок «Не приняты» над такими строками: число есть только в русском.
       'Not accepted': ['spending.list.refused', 'spending.refused'],
+      // День месяца на графике и день обмена в плашке под ним (MOL-190): по-русски «за этот день» и
+      // «того дня», английский говорит одно.
+      'No market that day': [
+        'exchange.rate_chart.mine_no_market',
+        'exchange.rate_chart.no_market_day',
+      ],
       'amended {date}': ['exchange.amended', 'income.amended'],
       'Bring back': ['exchange.restore', 'income.restore'],
       'The server did not answer properly. Try again': [
