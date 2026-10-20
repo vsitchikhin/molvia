@@ -390,6 +390,7 @@
     "also_at": "Also: {places}",
     "also_place": "{place} {price}",
     "threshold": "Worth buying below {price}",
+    "price_at": "{price} · {place}",
     "no_price_shown": "The price is left out on purpose: there is nothing to compare",
     "rating": "{value} out of 5",
     "ratings_count": "{n} rating | {n} ratings",

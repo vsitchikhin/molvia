@@ -42,25 +42,36 @@ async function person(page: Page): Promise<Person> {
 const tag = randomUUID().slice(0, 8)
 
 /** Bought once in «SAS», at 520 ֏ for 0,9 l, and rated — which is the whole path to this screen. */
-async function ratedPurchase(who: Person, name: string, score: number): Promise<void> {
-  const tripId = randomUUID()
-  await who.call('POST', '/trips', {
-    context: settingsOf(actorCodec.parse(await who.call('GET', '/actors/me'))),
-    id: tripId,
-    place: { kind: 'store', name: 'SAS' },
-  })
+async function ratedPurchase(
+  who: Person,
+  name: string,
+  score: number,
+  place = 'SAS',
+): Promise<string> {
   const entry = (await who.call('POST', '/catalogue/items', {
     kind: 'product',
     name,
     defaultUnit: 'l',
   })) as { id: string }
+  await purchase(who, entry.id, place, '520')
+  await who.call('PUT', `/verdicts/${entry.id}`, { score })
+  return entry.id
+}
+
+/** One more purchase of the item, 0,9 l for the amount given, in a trip of its own. */
+async function purchase(who: Person, itemId: string, place: string, amount: string): Promise<void> {
+  const tripId = randomUUID()
+  await who.call('POST', '/trips', {
+    context: settingsOf(actorCodec.parse(await who.call('GET', '/actors/me'))),
+    id: tripId,
+    place: { kind: 'store', name: place },
+  })
   await who.call('POST', `/trips/${tripId}/expenses`, {
     id: randomUUID(),
-    itemId: entry.id,
+    itemId,
     quantity: { value: '0.9', unit: 'l' },
-    amount: { amount: '520', currency: 'AMD' },
+    amount: { amount, currency: 'AMD' },
   })
-  await who.call('PUT', `/verdicts/${entry.id}`, { score })
   // Finished, so a second purchase can open a trip of its own: one open at a time.
   await who.call('POST', `/trips/${tripId}/finish`, {
     finishedOnDeviceAt: new Date().toISOString(),
@@ -94,6 +105,121 @@ test('a rated purchase becomes a recommendation with the place and the price per
   // The own mode leaves the count out: it is always one, and the subtitle says so (МР-12).
   await expect(take.getByText('5.0 out of 5', { exact: true })).toBeVisible()
   await expect(take.getByText('1 rating')).toHaveCount(0)
+  // A sentence is never smaller than 13 (Ф-8), and the card does not repeat the verdict: the pill's
+  // word was «BUY», the group's caption says «Buy it» (Ф-26).
+  await expect(take.getByText('5.0 out of 5', { exact: true })).toHaveCSS('font-size', '13px')
+  await expect(take.getByRole('button').getByText('BUY', { exact: true })).toHaveCount(0)
+})
+
+test('«only if cheap» says where it was bought, the price beside the place (MOL-200)', async ({
+  page,
+}) => {
+  const who = await person(page)
+  const name = `Сметана «Ташир» ${tag}`
+  await ratedPurchase(who, name, 3)
+
+  await page.goto('/')
+
+  const cheap = page.locator('section.if-cheap')
+  await expect(cheap.getByText(name)).toBeVisible()
+  // One purchase: no threshold yet (MOL-33), and the place stands with its price, with no word
+  // before it — one place is named, and nothing is claimed of the others (Ф-21).
+  await expect(cheap.getByText('֏577.78/l · SAS', { exact: true })).toBeVisible()
+  await expect(cheap.getByText('Bought here')).toHaveCount(0)
+  await expect(cheap.getByText('Worth buying below')).toHaveCount(0)
+})
+
+test('on a phone of 320 a long name stays in its row in all three forms, shared mode too (MOL-200)', async ({
+  page,
+}) => {
+  const who = await person(page)
+  // One word wider than what is left beside the rating: «1.0 out of 5 · 12 ratings» of the shared
+  // mode is the widest figure there is, so it is asked for by rewriting the answer — a grant of
+  // access is no business of this spec.
+  const names = {
+    take: `Молоко ультрапастеризованное ${tag}`,
+    'if-cheap': `Сливки гомогенизированные ${tag}`,
+    never: `Кефир ультрапастеризованный ${tag}`,
+  }
+  // A receipt's head in capitals: one word narrower than the plate, wider than what the price leaves.
+  const word = 'ՍՈՒՊԵՐՄԱՐԿԵՏՆԵՐԻ'
+  // The same head read with its spaces lost: one word wider than any row of the card.
+  const glued = 'ՍՈՒՊԵՐՄԱՐԿԵՏՆԵՐԻՑԱՆՑԳՅՈՒՄՐԻՈՒՄՆԵՐ'
+  // A place of short words, as the handoff draws it: the price stays beside it.
+  const short = `Лаваш ${tag}`
+  await ratedPurchase(who, names.take, 5, `${word} ՑԱՆՑ`)
+  await ratedPurchase(who, names['if-cheap'], 3, glued)
+  await ratedPurchase(who, names.never, 1)
+  // Dearer in the glued place, so it stands under «Ещё».
+  await purchase(who, await ratedPurchase(who, short, 5, 'Ереван Сити'), glued, '560')
+  await page.route(/\/api\/advice$/, async (route) => {
+    const response = await route.fetch()
+    const json = (await response.json()) as { scope: string; rows: { ratingsCount: number }[] }
+    json.scope = 'shared'
+    for (const row of json.rows) row.ratingsCount = 12
+    await route.fulfill({ response, json })
+  })
+
+  await page.setViewportSize({ width: 320, height: 800 })
+  await page.goto('/')
+  await expect(page.getByText('Reviews and prices are yours alone')).toBeVisible()
+
+  for (const [group, name] of Object.entries(names)) {
+    const row = page.locator(`section.${group}`).locator('article, .row').filter({ hasText: name })
+    await expect(row.getByText(name), group).toBeVisible()
+    const fits = await row.evaluate((element) => {
+      const name = element.querySelector('.name')!
+      const rating = element.querySelector('.rating')!.getBoundingClientRect()
+      return {
+        // The text, not its box: a box squeezed by `min-width: 0` stays inside while a word that
+        // does not break runs out of it.
+        name: name.scrollWidth <= name.clientWidth,
+        rating: rating.right <= element.getBoundingClientRect().right,
+      }
+    })
+    expect(fits, group).toEqual({ name: true, rating: true })
+  }
+  // The place stays whole and the price inside the card: the price goes under the place instead.
+  const take = page.locator('section.take article')
+  const plate = await take.filter({ hasText: names.take }).evaluate((card, whole) => {
+    const where = card.querySelector('.where')!
+    const text = where.firstChild!
+    const range = document.createRange()
+    const at = text.textContent!.indexOf(whole)
+    range.setStart(text, at)
+    range.setEnd(text, at + whole.length)
+    return {
+      wordLines: range.getClientRects().length,
+      price:
+        card.querySelector('.price')!.getBoundingClientRect().right <=
+        card.getBoundingClientRect().right,
+    }
+  }, word)
+  expect(plate).toEqual({ wordLines: 1, price: true })
+  // Each word of «Cheapest at Ереван Сити» fits beside the price, so the price stays on the place's
+  // first line — not under the place because the whole of it does not fit there (MOL-200, №6).
+  const beside = await take.filter({ hasText: short }).evaluate((card) => {
+    const where = card.querySelector('.where')!.getBoundingClientRect()
+    const price = card.querySelector('.price')!.getBoundingClientRect()
+    return price.top < where.top + where.height / 2
+  })
+  expect(beside).toBe(true)
+  // A word wider than its row breaks inside it — in «Ещё: …» and in «price · place» of «only if
+  // cheap» as in the plate.
+  for (const [where, text] of [
+    [take.filter({ hasText: short }), '.more'],
+    [page.locator('section.if-cheap .row'), '.at'],
+  ] as const) {
+    const fits = await where.evaluate((element, selector) => {
+      const line = element.querySelector(selector)!
+      return line.scrollWidth <= line.clientWidth
+    }, text)
+    expect(fits, text).toBe(true)
+  }
+  // Nothing pushes the page sideways: only the page scrolls, and only up and down.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(
+    0,
+  )
 })
 
 test('a bad verdict carries no price and no place: there is nothing to be cheap with', async ({
@@ -108,6 +234,7 @@ test('a bad verdict carries no price and no place: there is nothing to be cheap 
   const never = page.locator('section.never')
   await expect(never.getByText(name)).toBeVisible()
   await expect(never.getByText('The price is left out on purpose')).toBeVisible()
+  await expect(never.getByText('The price is left out on purpose')).toHaveCSS('font-size', '13px')
   // The row was bought for 520 ֏ at 577,78 ֏/l in SAS, and none of it is anywhere on the screen.
   await expect(page.getByText('577.78')).toHaveCount(0)
   await expect(page.getByText('SAS')).toHaveCount(0)

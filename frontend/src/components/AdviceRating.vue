@@ -51,7 +51,7 @@ export default defineComponent({
 <style scoped lang="scss">
 .rating {
   color: var(--text-muted);
-  font-size: var(--text-caption);
+  font-size: var(--text-footnote);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

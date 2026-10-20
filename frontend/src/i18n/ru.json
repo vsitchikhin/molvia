@@ -390,6 +390,7 @@
     "also_at": "Ещё: {places}",
     "also_place": "{place} {price}",
     "threshold": "Стоит брать дешевле {price}",
+    "price_at": "{price} · {place}",
     "no_price_shown": "Цены нет намеренно: сравнивать нечего",
     "rating": "{value} из 5",
     "ratings_count": "{n} оценка | {n} оценки | {n} оценок",

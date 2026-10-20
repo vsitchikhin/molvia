@@ -356,14 +356,14 @@ export default defineComponent({
   margin: var(--space-2) 0 0;
   padding: 0 var(--space-1);
   color: var(--text-muted);
-  font-size: var(--text-caption);
+  font-size: var(--text-footnote);
   font-style: italic;
 }
 
 .foot {
   margin: var(--space-4) 0 0;
   color: var(--text-muted);
-  font-size: var(--text-caption);
+  font-size: var(--text-footnote);
   text-align: center;
 }
 </style>

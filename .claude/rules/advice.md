@@ -352,7 +352,10 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   decides by comparing the prices, not by counting the places** (MOL-32, А1): the list comes
   own city first and only then by price (Р-26), so the first place is the one to name but not
   always the cheapest — and «Дешевле всего» over 4 790 ֏/кг with «Ещё: 3 000 ֏/кг» under it was
-  a lie the screen printed for a person who shops in two cities. And a review is always the
+  a lie the screen printed for a person who shops in two cities. **«Только если дёшево» says no
+  word at all** (MOL-200, Ф-21): «1 290 ֏/кг · Ереван Сити» over its threshold — one place, its
+  own price, nothing claimed of the others; the place used to stand only where there was no
+  threshold, and a row with one never said where it was bought. And a review is always the
   asker's own: words are not an aggregate, there is nothing in them to average and nothing to
   hide behind.
 - **Every row says whose verdict stands behind it** (`isMine`, MOL-32, А2). Nothing else in it
