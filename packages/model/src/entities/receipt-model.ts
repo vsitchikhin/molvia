@@ -77,13 +77,16 @@ const clockOf = (time: string | null): string | null => {
 /**
  * A line as the model wrote it. Its figures are printed by the model's nature — it copies, the arithmetic
  * is ours — so a line is as printed exactly where it settles: quantity × price = sum + discount, to the
- * hundredth or, on a till that prints a shelf price apart from what was paid, to its rounding.
+ * hundredth or, where the line itself prints a discount — a till that prints a shelf price apart from what
+ * was paid — to that till's rounding. Never by another line's word: a «0» the model wrote under the bread
+ * gave the milk's 3 × 130 its 389,97 (adversarial А4).
  */
-function lineOf(line: ModelReceipt['lines'][number], rounding: number): ReceiptTextLine {
+function lineOf(line: ModelReceipt['lines'][number]): ReceiptTextLine {
   const quantityMilli = figureOf(line.quantity, 3)
   const priceHundredths = figureOf(line.unit_price, 2)
   const sumHundredths = figureOf(line.sum, 2)
   const discountHundredths = figureOf(line.discount, 2)
+  const rounding = discountHundredths === null ? 0 : TOLERANCE_HUNDREDTHS
   const settled =
     quantityMilli !== null &&
     priceHundredths !== null &&
@@ -162,8 +165,7 @@ function totalOf(
  */
 export function receiptTextOfModel(reading: PhotoReading, answer: ModelReceipt): ReceiptText {
   const discounted = answer.lines.some((line) => figureOf(line.discount, 2) !== null)
-  const rounding = discounted ? TOLERANCE_HUNDREDTHS : 0
-  const lines = answer.lines.map((line) => lineOf(line, rounding))
+  const lines = answer.lines.map(lineOf)
   const { total, read, met } = totalOf(reading, answer, lines)
   // a receipt with no line is a sum to record where it prints a section or two places vouch for its
   // total (MOL-227) — the model names a sole trader's «Բաժին 1» as a total no more often than not; with

@@ -90,6 +90,23 @@ describe('a model’s answer as the parse’s reading (MOL-272)', () => {
     expect(read(answer({ lines: [swapped] })).lines[0]?.settled).toBe(false)
   })
 
+  it('gives the rounding only to a line that prints a discount itself, never by another’s (adversarial А4)', () => {
+    // 3 × 130 is 390,00, not 389,97: the «0» under the bread is no word about the milk
+    const milk = line({ quantity: '3', unit_price: '130', discount: null, sum: '389.97' })
+    const bread = line({
+      printed: 'Հաց',
+      quantity: '1',
+      unit_price: '290',
+      discount: '0',
+      sum: '290',
+    })
+    const text = read(answer({ lines: [milk, bread] }))
+    expect(text.layout).toBe('card')
+    expect(text.lines.map((l) => l.settled)).toEqual([false, true])
+    const shown = verifiedReading(text, { byModel: true })
+    expect(shown.lines[0]?.priceHundredths).toBeNull()
+  })
+
   it('keeps the class code and the article as the parse does', () => {
     const coded = (code: string | null, article: string | null) =>
       read(answer({ lines: [line({ code, article })] })).lines[0]
