@@ -428,11 +428,5 @@ export const exchangesResponseCodec = z.strictObject({
    * reads.
    */
   rateCharts: exchangeRateChartCodec.nullable().default(null),
-  /**
-   * The chart of the year alone, as the server before MOL-168 sent it (Р-4): read so that its answer
-   * is not refused whole, and never used — a new page against it shows no chart. Goes with the next
-   * task of money.
-   */
-  rateChart: z.unknown().optional(),
 })
 export type ExchangesResponse = z.output<typeof exchangesResponseCodec>
