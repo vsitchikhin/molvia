@@ -170,8 +170,8 @@ describe('useMoneyMonth', () => {
 
   // A move before the running month answered: its answer lands for a month no longer on screen, and
   // the month now shown fails — the categories are the owner's, so «Добавить трату» still has some
-  // (MOL-183, e2e «a summary that did not load»).
-  it('takes the categories from an answer of the month just left, landed after the move', async () => {
+  // (MOL-183, e2e «a summary that did not load»), and its sheet today's rate (MOL-262, А1).
+  it('takes the categories and today’s rate from an answer of the month just left, landed after the move', async () => {
     sessionStorage.clear()
     const pinia = createPinia()
     setActivePinia(pinia)
@@ -188,12 +188,21 @@ describe('useMoneyMonth', () => {
     await flushPromises()
     // Nothing kept on this phone: the month on screen has no categories of its own yet.
     expect(month.knownCategories.value).toEqual([])
-    give(page([], null))
+    expect(month.todayRate.value).toBeNull()
+    const rate = {
+      base: 'RUB' as const,
+      quote: 'AMD' as const,
+      scaled: 4_160_000n,
+      source: 'personal' as const,
+      asOf: new Date('2026-09-27T00:00:00Z'),
+    }
+    give({ ...page([], null), rate })
     await flushPromises()
     fail(new TypeError('500'))
     await flushPromises()
     expect(month.phase.value).toBe('error')
     expect(month.knownCategories.value.map((one) => one.id)).toEqual([BEAUTY])
+    expect(month.todayRate.value?.scaled).toBe(4_160_000n)
   })
 
   it('a month kept before the ring reads offline, its categories whole and no ring (MOL-156, review 9)', async () => {

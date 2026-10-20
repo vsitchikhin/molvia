@@ -179,8 +179,10 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
         remember(id, first, firstAt, askedAt)
         // The categories are the owner's, not a month's: an answer of the month just left names them
         // for the one now on screen too — read before it came, that one had none to write a spending
-        // into until it was read itself (MOL-183, e2e «a summary that did not load»).
+        // into until it was read itself (MOL-183, e2e «a summary that did not load»). Today's rate
+        // likewise, from the running month's answer: a spending is written today (MOL-262, А1).
         kept.value = first.categories
+        if (first.rateKind === 'live') keptRate.value = first.rate
       }
       let answer = first
       for (let page = 1; page < wanted && answer.cursor; page++) {
