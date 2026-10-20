@@ -377,14 +377,19 @@ nothing up.
 - **«Пусто» is read off the answer** (Р-6): the running month empty, no income, nothing the month
   before and nothing waiting. The server does not say «no history», and an empty August after a
   full July is «В этом месяце трат нет», not a newcomer.
-- **The month is in the address and moves by `replace`**; there is no lower bound, since the
-  server names no first month (Р-1). The last three first pages read are kept per owner
-  (`molvia.money`), so offline is a strip over them — the running month always among them once read, since
-  it holds today's rate for a sheet opened on any month: pushed out by older ones, four months back the
-  sheet had no «≈» (MOL-262, adversarial А3). Opened on another month, the screen reads the running one
-  too, after its own: an exchange is written on its own screen and tells «Деньги» nothing, and the kept
-  answer gave the sheet the rate from before it (MOL-262, А5) — one more read on such an opening. A next page asked for while the month is read
-  again from the start is asked again from the fresh answer (adversarial Е).
+- **The month is in the address and moves by `replace`**; there is no lower bound, since the server
+  names no first month (Р-1). The last three first pages read are kept per owner (`molvia.money`),
+  so offline is a strip over them — the running month always among them once read, since it holds
+  today's rate for a sheet opened on any month: pushed out by older ones, four months back the sheet
+  had no «≈» (MOL-262, adversarial А3). Opened on another month, the screen reads the running one
+  too, after its own: an exchange is written on its own screen and tells «Деньги» nothing, and the
+  kept answer gave the sheet the rate from before it (MOL-262, А5) — one more read on such an
+  opening, its first page alone, beside the screen's reads (self-review 9). **A month is never kept
+  over an answer that set out later** (`askedAt`, А6): that read and a screen left behind land out
+  of turn, and the older answer, landed last, put the rate from before the exchange back on the
+  phone after the screen had shown the new one; one kept from a moment still to come is a clock set
+  back since, and is read over. A next page asked for while the month is read again from the start
+  is asked again from the fresh answer (adversarial Е).
 - **A finished trip opened from «Деньги» leads back there** (owner's decision В-3):
   `?from=money` — `?from=money-spendings` since its row is on «Траты» (MOL-159) — and the route
   lists which `from` it takes (`meta.from`): an address must not make any screen the parent of any
