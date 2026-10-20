@@ -94,6 +94,27 @@ test('a rated purchase becomes a recommendation with the place and the price per
   // The own mode leaves the count out: it is always one, and the subtitle says so (МР-12).
   await expect(take.getByText('5.0 out of 5', { exact: true })).toBeVisible()
   await expect(take.getByText('1 rating')).toHaveCount(0)
+  // A sentence is never smaller than 13 (Ф-8), and the card does not repeat the group's word (Ф-26).
+  await expect(take.getByText('5.0 out of 5', { exact: true })).toHaveCSS('font-size', '13px')
+  await expect(take.getByRole('button').getByText('Buy it')).toHaveCount(0)
+})
+
+test('«only if cheap» says where it was bought, the price beside the place (MOL-200)', async ({
+  page,
+}) => {
+  const who = await person(page)
+  const name = `Сметана «Ташир» ${tag}`
+  await ratedPurchase(who, name, 3)
+
+  await page.goto('/')
+
+  const cheap = page.locator('section.if-cheap')
+  await expect(cheap.getByText(name)).toBeVisible()
+  // One purchase: no threshold yet (MOL-33), and the place stands with its price, with no word
+  // before it — one place is named, and nothing is claimed of the others (Ф-21).
+  await expect(cheap.getByText('֏577.78/l · SAS', { exact: true })).toBeVisible()
+  await expect(cheap.getByText('Bought here')).toHaveCount(0)
+  await expect(cheap.getByText('Worth buying below')).toHaveCount(0)
 })
 
 test('a bad verdict carries no price and no place: there is nothing to be cheap with', async ({
@@ -108,6 +129,7 @@ test('a bad verdict carries no price and no place: there is nothing to be cheap 
   const never = page.locator('section.never')
   await expect(never.getByText(name)).toBeVisible()
   await expect(never.getByText('The price is left out on purpose')).toBeVisible()
+  await expect(never.getByText('The price is left out on purpose')).toHaveCSS('font-size', '13px')
   // The row was bought for 520 ֏ at 577,78 ֏/l in SAS, and none of it is anywhere on the screen.
   await expect(page.getByText('577.78')).toHaveCount(0)
   await expect(page.getByText('SAS')).toHaveCount(0)
