@@ -10,6 +10,7 @@ import type {
   SpendingCategoryBody,
   SpendingCategoryView,
 } from '@molvia/model'
+import ListRow from '@/components/ListRow.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -220,5 +221,100 @@ describe('MoneyCategoriesView: «Убрать» is quiet (MOL-191, Ф-34)', () =
     const restore = view.findAll('button').filter((button) => button.text() === en.spending.restore)
     expect(restore).toHaveLength(1)
     expect(restore[0]?.classes()).toContain('ghost')
+  })
+})
+
+describe('MoneyCategoriesView: a row is the kit’s ListRow (MOL-191, MOL-175)', () => {
+  it('every category of both groups is a row with its circle, «Remove» or «Bring back» its tail', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    const rows = view.findAllComponents(ListRow)
+    expect(rows).toHaveLength(4)
+    for (const row of rows) {
+      expect(row.element.tagName).toBe('DIV')
+      expect(row.find('.circle').exists()).toBe(true)
+      expect(row.classes()).toContain('wrap')
+      expect(row.find('.tail button').exists()).toBe(true)
+    }
+    expect(rows[0]?.find('.circle').attributes('style')).toContain('var(--cat-groceries)')
+    expect(rows[2]?.find('.circle').attributes('style')).toContain('var(--cat-own-0)')
+  })
+
+  it('«own» stands under one’s own category only, never under a preset', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    const metas = view
+      .findAllComponents(ListRow)
+      .map((row) => (row.find('.meta').exists() ? row.find('.meta').text() : ''))
+    expect(metas).toEqual(['', '', en.spending.categories.own, ''])
+  })
+
+  it('«Sending…» is a tag on the category that waits, and on no other row', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    online(false)
+    await addThroughSheet(view, 'Gifts')
+    const tagged = view
+      .findAllComponents(ListRow)
+      .filter((row) => row.text().includes(en.spending.pending))
+    expect(tagged).toHaveLength(1)
+    expect(tagged[0]?.text()).toContain('Gifts')
+    expect(tagged[0]?.find('.below .tag.warn').exists()).toBe(true)
+  })
+
+  it('a long name of one’s own is wrapped whole, never cut', async () => {
+    const long = 'Lessons of Armenian with a teacher at home'.slice(0, 40)
+    spendingCategories.mockResolvedValue({ categories: [own(OWN, long)] })
+    const view = await render()
+    const row = view.getComponent(ListRow)
+    expect(row.find('.title').text()).toBe(long)
+    expect(row.classes()).toContain('wrap')
+  })
+
+  it('no removed category, no group; the last brought back takes the group away', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST.filter((one) => !one.archived) })
+    const none = await render()
+    expect(none.text()).not.toContain(en.spending.categories.archived)
+
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const one = await render()
+    expect(one.text()).toContain(en.spending.categories.archived)
+    const restored = LIST.map((category) => ({ ...category, archived: false }))
+    restoreSpendingCategory.mockResolvedValue({ categories: restored })
+    spendingCategories.mockResolvedValue({ categories: restored })
+    await one
+      .findAll('button')
+      .find((button) => button.text() === en.spending.restore)
+      ?.trigger('click')
+    await flushPromises()
+    expect(one.text()).not.toContain(en.spending.categories.archived)
+    expect(one.findAllComponents(ListRow)).toHaveLength(4)
+  })
+
+  it('a refused category stands over the lists; a refused spending is not this screen’s', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    const queue = useSpendingQueueStore()
+    queue.rejected = [
+      {
+        key: 'k1',
+        write: { kind: 'category-add', body: { id: OWN, name: 'Gifts' } },
+        code: ERROR.CONFLICT,
+      },
+      { key: 'k2', write: { kind: 'remove', id: CAFE }, code: ERROR.CONFLICT },
+    ]
+    await flushPromises()
+    const notices = view.findAll('.state.inline')
+    expect(notices).toHaveLength(1)
+    const lists = view.get('.lists').element
+    const before = notices[0]?.element.compareDocumentPosition(lists) ?? 0
+    expect(before & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    await notices[0]
+      ?.findAll('button')
+      .find((button) => button.text() === en.spending.sheet.dismiss)
+      ?.trigger('click')
+    await flushPromises()
+    expect(view.findAll('.state.inline')).toHaveLength(0)
   })
 })

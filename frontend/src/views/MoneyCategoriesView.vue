@@ -37,62 +37,70 @@
           </ScreenState>
         </AppReveal>
 
-        <section class="group">
-          <SectionCaption class="caption">{{ t('spending.categories.live') }}</SectionCaption>
-          <AppCard as="ul" list>
-            <AppReveal group>
-              <li v-for="category in live" :key="category.id" class="row">
-                <span
-                  class="dot"
-                  :style="{ background: colourOf(category) }"
-                  aria-hidden="true"
-                ></span>
-                <span class="name">
-                  {{ nameOf(category) }}
-                  <span v-if="!category.preset" class="own">{{
-                    t('spending.categories.own')
-                  }}</span>
-                  <span v-if="waiting(category.id)" class="waiting">{{
-                    t('spending.pending')
-                  }}</span>
-                </span>
-                <AppButton
-                  variant="ghost"
-                  :aria-label="t('spending.categories.remove_label', { name: nameOf(category) })"
-                  @click="queue.archiveCategory(category.id, true)"
-                >
-                  {{ t('spending.categories.remove') }}
-                </AppButton>
-              </li>
-            </AppReveal>
-          </AppCard>
-        </section>
-
-        <template v-if="archived.length > 0">
+        <div class="lists">
           <section class="group">
-            <SectionCaption class="caption">{{ t('spending.categories.archived') }}</SectionCaption>
+            <SectionCaption>{{ t('spending.categories.live') }}</SectionCaption>
             <AppCard as="ul" list>
               <AppReveal group>
-                <li v-for="category in archived" :key="category.id" class="row">
-                  <span
-                    class="dot"
-                    :style="{ background: colourOf(category) }"
-                    aria-hidden="true"
-                  ></span>
-                  <span class="name">{{ nameOf(category) }}</span>
-                  <AppButton
-                    variant="ghost"
-                    :aria-label="t('spending.categories.restore_label', { name: nameOf(category) })"
-                    @click="queue.archiveCategory(category.id, false)"
+                <li v-for="category in live" :key="category.id">
+                  <ListRow
+                    as="div"
+                    :icon="iconOf(category)"
+                    :tint="colourOf(category)"
+                    :title="nameOf(category)"
+                    :meta="category.preset ? '' : t('spending.categories.own')"
+                    wrap
                   >
-                    {{ t('spending.restore') }}
-                  </AppButton>
+                    <template v-if="waiting(category.id)" #below>
+                      <AppTag tone="warn" :icon="IconUpload">{{ t('spending.pending') }}</AppTag>
+                    </template>
+                    <template #tail>
+                      <AppButton
+                        variant="ghost"
+                        :aria-label="
+                          t('spending.categories.remove_label', { name: nameOf(category) })
+                        "
+                        @click="queue.archiveCategory(category.id, true)"
+                      >
+                        {{ t('spending.categories.remove') }}
+                      </AppButton>
+                    </template>
+                  </ListRow>
                 </li>
               </AppReveal>
             </AppCard>
           </section>
-        </template>
-        <p class="note">{{ t('spending.categories.note') }}</p>
+
+          <section v-if="archived.length > 0" class="group">
+            <SectionCaption>{{ t('spending.categories.archived') }}</SectionCaption>
+            <AppCard as="ul" list>
+              <AppReveal group>
+                <li v-for="category in archived" :key="category.id">
+                  <ListRow
+                    as="div"
+                    :icon="iconOf(category)"
+                    :tint="colourOf(category)"
+                    :title="nameOf(category)"
+                    wrap
+                  >
+                    <template #tail>
+                      <AppButton
+                        variant="ghost"
+                        :aria-label="
+                          t('spending.categories.restore_label', { name: nameOf(category) })
+                        "
+                        @click="queue.archiveCategory(category.id, false)"
+                      >
+                        {{ t('spending.restore') }}
+                      </AppButton>
+                    </template>
+                  </ListRow>
+                </li>
+              </AppReveal>
+            </AppCard>
+          </section>
+          <p class="note">{{ t('spending.categories.note') }}</p>
+        </div>
       </template>
     </div>
 
@@ -111,8 +119,9 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, ref, watch } from 'vue'
+import { computed, defineComponent, markRaw, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import IconUpload from '~icons/mdi/cloud-upload-outline'
 import IconPlus from '~icons/mdi/plus'
 import type { SpendingCategoryView, WireCode } from '@molvia/model'
 import { api } from '@/api'
@@ -120,10 +129,12 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
+import AppTag from '@/components/AppTag.vue'
+import ListRow from '@/components/ListRow.vue'
 import NewCategorySheet from '@/components/NewCategorySheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
-import { categoriesWith, categoryColour } from '@/components/spending'
+import { categoriesWith, categoryColour, categoryIcon } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
@@ -143,7 +154,9 @@ export default defineComponent({
     AppCard,
     AppReveal,
     AppScreen,
+    AppTag,
     IconPlus,
+    ListRow,
     NewCategorySheet,
     ScreenSkeleton,
     ScreenState,
@@ -218,6 +231,8 @@ export default defineComponent({
       refusals,
       reasonOf,
       colourOf: categoryColour,
+      iconOf: categoryIcon,
+      IconUpload: markRaw(IconUpload),
       load,
     }
   },
@@ -225,58 +240,27 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* The field is `AppScreen`'s 16 (С-23); between the refusals and the lists, 24. */
 .content {
   display: flex;
   flex-direction: column;
   flex: 1;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-6);
 }
 
-/* A caption and its card stand in a block of their own: in the content's gap the 8 under it would be 20. */
-.caption {
-  margin-top: var(--space-3);
-}
-
-.row {
+/* A caption and its card stand in a block of their own, its 8 the caption's; 24 between the groups
+   and 8 from the last card to the note (handoff 06). */
+.lists {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--touch-target-lg);
-  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
-
-  & + & {
-    border-top: var(--hairline) solid var(--border);
-  }
+  flex-direction: column;
 }
 
-.dot {
-  flex: none;
-  width: 0.625rem;
-  height: 0.625rem;
-  border-radius: var(--radius-pill);
-}
-
-.name {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--text-body);
-  overflow-wrap: anywhere;
-}
-
-.own,
-.waiting {
-  margin-left: var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
-.waiting {
-  color: var(--warn-ink);
+.group + .group {
+  margin-top: var(--space-6);
 }
 
 .note {
-  margin: 0;
+  margin: var(--space-2) 0 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
 }
