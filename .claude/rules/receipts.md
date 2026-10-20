@@ -31,8 +31,10 @@ reader was measured in MOL-169 and not built (below).
 
 ## How a receipt is read
 
-**No model reads a receipt.** A model by the picture on the server's processor took 6–12 minutes and
-made the names up (MOL-114). What reads is a chain of cheap parts:
+**No model reads a receipt on our processor.** A model by the picture on the server's processor took
+6–12 minutes and made the names up (MOL-114). **A model in the cloud reads the receipts of those it is
+granted to** (MOL-272, below); for everyone else, and whenever the model is not the one to, what reads
+is a chain of cheap parts:
 
 | Step          | What                                                                                     | Where                     |
 | ------------- | ---------------------------------------------------------------------------------------- | ------------------------- |
@@ -155,6 +157,74 @@ seventy milliseconds, not two seconds of CI.
 **What is printed at the head is checked as a calendar and a clock** (Р10, Р12, Р13): a date of
 the calendar from 2000 to the server's tomorrow, a time `HH:MM` — OCR makes up «01.01.0000», which
 Postgres refuses, «2099» and «99:99».
+
+## The model reads (MOL-272)
+
+**Claude Haiku 5.5 reads the receipts of those it is granted to** (owner, 18.10.2026; the cap 19.10;
+the decisions В-1…В-6 of 20.10 in `.scratch/tasks/requirements/MOL-272.md`). `backend/src/receipts/model-reader.ts`:
+every part in one message, the answer by a schema (structured output), `effort: medium`, the prompt
+`model-prompt.ts` — its version beside the model in `reader_version`, `claude-haiku-5-5@v3`.
+
+**Who it reads for is a column and an edition** (В-4, Р-12): `actors.receipts_model_until` still to come —
+a moment, as `shared_until` is, set by hand with `psql` until the paid layer (MOL-271) — and
+`MODEL_CONSENT_EDITION` (3) accepted, since the photo goes to Anthropic in the USA (Т-9). Empty, past,
+ending now or an older edition: Tesseract. **Without `CLAUDE_API_KEY` nobody is read by it.** A person's
+key (`sk-ant-usr-…`) is refused by the API without its workspace, so `CLAUDE_WORKSPACE_ID` names it.
+
+**The model copies, our code decides** (MOL-268, «Дальше»): every number of a line in its place — the
+quantity and unit, the shelf price, the line's discount, what was paid — and every amount of the summary
+with its word. `receiptTextOfModel` makes the parse's `ReceiptText` of it: a figure is a decimal string of
+its kind or none, never a float; a line is as printed where its own arithmetic holds; the layout is the
+card's where any line prints a discount — a zero one too, «Ереван Сити» rounds what was paid off its shelf
+price — the class code's otherwise; **the total is the card's words, by MOL-244's rule** — the lines that met
+a printed total every one as read, else one amount two places print — and a prepayment is no payment.
+**No line is a sum to record only where a section is printed or two places vouch for the total**; with
+neither it is «переснимите». Then **the one check, `verifiedReading(text, { byModel: true })`**, and
+everything after it is Tesseract's path: `readPartly`, the lines' items, the wire. No line is cut out for
+training (Р-4): there are no boxes.
+
+**`byModel` widens one rule, and only for the model**: a line of one piece with no discount whose price is
+within the card's rounding of its sum is «one number printed twice» — kept only on a receipt proven whole.
+The model names the columns itself, and «389,99 390» holds either way round (lit-9295 of the bench);
+Tesseract takes the columns off the paper, so its «419,98 / 420» stays read (MOL-255, Т-4) — the Tesseract
+bench is 105 / 0 as before.
+
+**The bench** (`.scratch/tasks/research/MOL-272.md`, 54 receipts, 1 038 fields, through the product's own
+converter and check): v3 at medium 576–626 right, 1–3 made up; Tesseract 105 / 0; Haiku by Claude Code's
+helpers (MOL-268) 225 / 9. Totals 26 right, none wrong. $0,0022 a receipt, 13 s at the median, 45 s the
+worst. **The price, named** (В-7, the owner's to decide on the pull request): the 1–3 made up are all of one
+faded «Ереван Сити», am-34, where 5 and 6 are one glyph — a leading digit misread alike in a price and a sum
+(640 / 5,4 / 634,6 as 540 / 5,4 / 534,6) holds the line's arithmetic, and a second reading repeated it. Closing
+it to none costs two thirds of what is read: the model's figures only on a receipt proven whole gave 171–195.
+The receipt is not proven whole, so its review says «Прочитали не всё». `low` effort copied a sum into the
+price on a receipt proven whole — three prices the check lets through by MOL-255's rule — so it is `medium`.
+
+**What it costs is counted, and the cap cannot be passed** (Т-3, Т-4, В-2 «а»): `model_spend`, by the
+calendar month in UTC — Anthropic's bill's — in integer micro-dollars, at the price written in the code
+(`RECEIPT_MODEL_PRICE`), from each answer's `usage`, an answer we did not take too. **Before a call its worst
+is reserved in one statement**: the input at most — an image's pixels over 750, the prompt's bytes — and the
+whole output it may take; a month that would pass `RECEIPT_MODEL_MONTHLY_CAP_USD` ($200) refuses it, and
+Tesseract reads. After the answer its own price is put in place of the worst; **a process lost in between
+leaves the worst counted**, never less than was spent. A request past `RECEIPT_MODEL_INPUT_MAX` tokens is
+priced otherwise and is never sent. The owner hears of half the cap, nine tenths and the stop, each once a
+month (`model_spend` notices, the bot's dollars to the cent). The workspace's monthly limit in the Anthropic
+console is set to the same (Р-10): a price wrong in the code is held there too. **Nobody's**: no key to
+`actors`, so neither erasure nor the copy reaches it.
+
+**When the model is not the one to read, Tesseract reads, as before** (В-1 «а»): the cap, photos past the
+price, a refusal of the model, an answer cut by its length or of no schema — each paid — and a request the
+API refuses for what it is (4xx, `ModelRejected`, paid nothing, a failure the owner hears of as
+`job:receipt-model`). **The model away is waited for ten minutes** (Р-9, `RECEIPT_MODEL_WAIT_MS`): a 429, a
+5xx, an overload, no connection or a time out leave the receipt queued with its attempt uncounted and stop
+the round; past ten minutes since it was queued, Tesseract. A time out may have been paid, so its worst
+stays counted. **The price, named**: an answer not taken whose Tesseract is away is asked of the model again
+the next minute, and paid again, until the reader is back.
+
+**The log carries counts** (Т-8): who read (`reader`), what it cost, why the model was passed — never its
+answer, a line or a tax number. **The measure of 0.2 is the reader's** (В-6 «а»): a receipt the model read
+counts in `model_receipt_days` — read and recorded alike, by its `reader_version` — a table of its own for
+MOL-234's reason, and `make gates` prints its block under Tesseract's, with the same stop. A receipt that
+failed for its attempts has no reader and counts in `receipt_days`.
 
 ## The class code (MOL-226)
 
@@ -1056,10 +1126,12 @@ receipt queued without a photo fails as `unreadable`.
 go by the cascade. **The copy carries receipts and their lines, never a photo** (`EXPORT_COLUMNS` says
 why for every column left out).
 
-**The log carries counts, never a receipt**: status, parts, lines, milliseconds. No text, no tax
-number, no photo — not in the API's log, not in the reader's, which logs nothing at all: whatever
-breaks in it answers 500 with no traceback, and a connection broken under a request is not printed
-(review А12).
+**The log carries counts, never a receipt**: status, parts, lines, milliseconds, the reader and what
+the model cost. No text, no tax number, no photo — not in the API's log, not in the reader's, which
+logs nothing at all: whatever breaks in it answers 500 with no traceback, and a connection broken under
+a request is not printed (review А12). **The photo of a receipt the model reads goes to Anthropic**
+(MOL-272) — whole, the customer's name with it where the shop prints one — only for whoever accepted
+edition 3; what comes back is kept as any reading is.
 
 **How the person learned it was read is kept** (MOL-129, `receipts.heard`): `app` once the list or the
 review handed it over read **to a phone that asked with its page in view** (`?shown=1`), `bot` once the
