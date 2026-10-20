@@ -318,3 +318,16 @@ describe('MoneyCategoriesView: a row is the kit’s ListRow (MOL-191, MOL-175)',
     expect(view.findAll('.state.inline')).toHaveLength(0)
   })
 })
+
+describe('MoneyCategoriesView: the skeleton is the answer’s shape (MOL-191, Ф-13)', () => {
+  it('a caption and a card of six rows «circle · name · button», no bare lines', async () => {
+    spendingCategories.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    expect(view.findAll('.skeleton-caption')).toHaveLength(1)
+    const rows = view.findAll('.skeleton-rows .item')
+    expect(rows).toHaveLength(6)
+    for (const row of rows) expect(row.find('.circle').exists()).toBe(true)
+    expect(view.find('.skeleton-rows').classes()).not.toContain('skeleton-narrow')
+    expect(view.find('.skeleton-lines').exists()).toBe(false)
+  })
+})

@@ -1,7 +1,12 @@
 <template>
   <AppScreen :title="t('spending.categories.title')">
     <div class="content">
-      <ScreenSkeleton v-if="phase === 'loading'" :groups="[56, 72, 64, 48, 60]" />
+      <!-- The answer's shape (Ф-13, 7f): the caption of «В выборе» and six rows of a circle, a name and
+           the button — a `ListRow` in a plain `li`, so its tail stays beside the words at any width. -->
+      <ScreenSkeleton v-if="phase === 'loading'">
+        <SkeletonPart kind="caption" :width="22" />
+        <SkeletonPart kind="rows" :count="6" lead="circle" :meta="false" tail :narrow="false" />
+      </ScreenSkeleton>
 
       <ScreenState
         v-else-if="phase === 'error'"
@@ -136,6 +141,7 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { categoriesWith, categoryColour, categoryIcon } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
@@ -161,6 +167,7 @@ export default defineComponent({
     ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    SkeletonPart,
   },
   setup() {
     const { t } = useI18n()
