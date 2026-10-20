@@ -59,7 +59,7 @@
           }}</span>
         </span>
       </p>
-      <p v-else-if="period" class="none">
+      <p v-else-if="period" class="none held">
         {{
           period.exchanges.length === 0
             ? t('exchange.rate_chart.none_period', { period: periodIn })
@@ -798,11 +798,18 @@ export default defineComponent({
 
   /* A sentence in the figure's place, not a figure: the text's face (Ф-7 keeps Nunito for figures). */
   &.missing {
+    min-height: calc(var(--text-title) * var(--leading-body));
     color: var(--text-muted);
     font-family: var(--font);
     font-size: var(--text-callout);
     font-weight: var(--weight-medium);
   }
+}
+
+/* The plate's three lines held by a week without an exchange: the chart under the finger stays where
+   it was (MOL-190, adversarial А2). */
+.held {
+  min-height: calc(3lh + 2 * var(--space-2));
 }
 
 .mine {

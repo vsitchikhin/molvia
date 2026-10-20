@@ -640,11 +640,18 @@ test('the rate of twelve months: no market — no card; the latest exchange firs
   await expect(card.locator('.mine-place')).toHaveText('Ардшинбанк')
   await expect(card.locator('.mine-diff')).toHaveText(/\+1,21\s%\s·\sлучше рынка/)
 
-  // A finger lifted at the left edge: the first week, which had no exchange.
+  // Where the line stands in its card: the reading above it holds the plate's three lines, so a week
+  // with no exchange or no market leaves it under the finger (MOL-190, adversarial А2).
   const area = card.locator('.area')
+  const lineTop = async () =>
+    ((await area.boundingBox())?.y ?? NaN) - ((await card.boundingBox())?.y ?? NaN)
+  const withPlate = await lineTop()
+
+  // A finger lifted at the left edge: the first week, which had no exchange.
   await area.tap({ position: { x: 2, y: 60 } })
   await expect(card.locator('.reading')).toContainText('Неделя по 8 февр. · рынок')
   await expect(card.locator('.none')).toHaveText('Обменов на этой неделе не было')
+  expect(await lineTop()).toBe(withPlate)
 
   // The keys walk the radios: one more step brings the second week.
   await card.getByRole('radio', { name: /Неделя по 8 февраля/ }).focus()
@@ -652,6 +659,7 @@ test('the rate of twelve months: no market — no card; the latest exchange firs
   await expect(card.locator('.figure')).toHaveText('4,80 ֏/₽')
   await page.keyboard.press('ArrowRight')
   await expect(card.locator('.figure')).toHaveText('Рынка за эту неделю нет')
+  expect(await lineTop()).toBe(withPlate)
 })
 
 /**
