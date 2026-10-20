@@ -592,6 +592,74 @@ test('a category of one’s own is made from the sheet, and a preset’s name is
   await expect(page.getByRole('heading', { name: 'Убранные' })).toBeHidden()
 })
 
+test('a category is made from the strip of «Категории», removed quietly and brought back', async ({
+  page,
+}) => {
+  await openMoney(page)
+  await page.getByRole('link', { name: /^Категории/ }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Категории')
+
+  // The main action stands in the strip over the tab bar, not over the list (MOL-191, Ф-28).
+  const add = page.locator('.dock').getByRole('button', { name: 'Добавить категорию' })
+  await add.click()
+  const sheet = page.locator('dialog[open]')
+  await expect(sheet).toContainText('Новая категория')
+  await page.waitForTimeout(400)
+  await sheet.getByLabel('Название').fill('Подарки')
+  await sheet.getByRole('button', { name: 'Добавить' }).click()
+  await expect(sheet).toBeHidden()
+  await expect(add).toBeFocused()
+
+  const live = page.locator('section', { has: page.getByRole('heading', { name: 'В выборе' }) })
+  await expect(live.getByText('Подарки')).toBeVisible()
+  await expect(live.getByText('Отправляем…')).toBeHidden()
+  await page.getByRole('button', { name: 'Убрать категорию «Подарки»' }).click()
+  const archived = page.locator('section', { has: page.getByRole('heading', { name: 'Убранные' }) })
+  await expect(archived.getByText('Подарки')).toBeVisible()
+  await page.getByRole('button', { name: 'Вернуть категорию «Подарки»' }).click()
+  await expect(page.getByRole('heading', { name: 'Убранные' })).toBeHidden()
+  await expect(live.getByText('Подарки')).toBeVisible()
+})
+
+// The skeleton is the answer's shape (Ф-13, MOL-178): its rows as tall as the rows that come, a button of
+// 44 in their tail — and the strip's action stands while they come (7f).
+test('the skeleton of «Категории» is as tall, row by row, as the list that comes', async ({
+  page,
+}) => {
+  let release: () => void = () => undefined
+  let hold = false
+  await page.route('**/api/spending-categories', async (route) => {
+    if (hold) await new Promise<void>((resolve) => (release = resolve))
+    await route.continue()
+  })
+  await openMoney(page)
+  hold = true
+  await page.getByRole('link', { name: /^Категории/ }).click()
+  const skeleton = page.locator('.skeleton-rows .item')
+  await expect(skeleton).toHaveCount(6)
+  await expect(
+    page.locator('.dock').getByRole('button', { name: 'Добавить категорию' }),
+  ).toBeVisible()
+  const bars = await skeleton.evaluateAll((rows) =>
+    rows.map((row) => row.getBoundingClientRect().height),
+  )
+  hold = false
+  release()
+  const rows = page.locator('.list-row')
+  await expect(rows.first()).toBeVisible()
+  const answer = await rows.evaluateAll((all) =>
+    all.slice(0, 6).map((row) => row.parentElement?.getBoundingClientRect().height ?? 0),
+  )
+  expect(answer).toHaveLength(6)
+  for (const [index, height] of bars.entries()) expect(height).toBeCloseTo(answer[index] ?? 0, 0)
+  // The row keeps 64 by its button standing over its padding, and the button keeps its 44.
+  const target = await page
+    .getByRole('button', { name: /^Убрать категорию/ })
+    .first()
+    .boundingBox()
+  expect(target?.height).toBeCloseTo(44, 0)
+})
+
 async function fitsNarrowPhone(page: Page, money: string): Promise<void> {
   await page.setViewportSize({ width: 320, height: 640 })
   await signedIn(page)
