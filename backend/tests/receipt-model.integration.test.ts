@@ -174,7 +174,7 @@ function benchReader(): ReceiptReader & { asked: number } {
 /** The model as a test wants it: an answer, or a throw. */
 function fakeModel(
   answer: () => Promise<ModelReading>,
-  input = 10_000,
+  input: number | null = 10_000,
 ): ReceiptModel & { asked: number } {
   const model = {
     asked: 0,
@@ -188,8 +188,10 @@ function fakeModel(
   return model
 }
 
+const TOKENS = { input: 5_909, output: 3_177 }
+
 const read = (cost = 2_180): Promise<ModelReading> =>
-  Promise.resolve({ kind: 'read', answer: ANSWER, costMicroUsd: cost })
+  Promise.resolve({ kind: 'read', answer: ANSWER, costMicroUsd: cost, tokens: TOKENS })
 
 async function readAll(
   reader: ReceiptReader,
@@ -247,6 +249,7 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
     expect(reports.find((r) => r.kind === 'read')).toMatchObject({
       reader: 'model',
       costMicroUsd: 2_180,
+      tokens: TOKENS,
     })
   }, 30_000)
 
@@ -311,6 +314,16 @@ describe('the month’s cap (Т-4, В-2 «а»)', () => {
     expect([model.asked, await month()]).toEqual([0, null])
     expect(reports).toContainEqual({ kind: 'model_passed', reason: 'size' })
   }, 30_000)
+
+  it('leaves to Tesseract photos past what the API takes, telling no failure (review №3)', async () => {
+    const me = await person(LATER)
+    await queued(me)
+    const model = fakeModel(() => read(), null)
+    const reports = await readAll(benchReader(), model)
+    expect([model.asked, await month()]).toEqual([0, null])
+    expect(reports).toContainEqual({ kind: 'model_passed', reason: 'size' })
+    expect(reports.some((r) => r.kind === 'error' || r.kind === 'model_rejected')).toBe(false)
+  }, 30_000)
 })
 
 describe('an answer not taken is paid and read by Tesseract (Т-3, В-1 «а»)', () => {
@@ -319,12 +332,16 @@ describe('an answer not taken is paid and read by Tesseract (Т-3, В-1 «а»)'
       const me = await person(LATER)
       const id = await queued(me)
       const reader = benchReader()
-      const model = fakeModel(() => Promise.resolve({ kind, costMicroUsd: 3_000 }))
+      const model = fakeModel(() => Promise.resolve({ kind, costMicroUsd: 3_000, tokens: TOKENS }))
       const reports = await readAll(reader, model)
       expect(reader.asked).toBe(2)
       expect((await receiptOf(id))?.readerVersion).toBe('tesseract 5.5.0 · test')
       expect((await month())?.spentMicroUsd).toBe(3_000)
-      expect(reports).toContainEqual({ kind: 'model_passed', reason: kind })
+      expect(reports).toContainEqual({
+        kind: 'model_passed',
+        reason: kind,
+        paid: { costMicroUsd: 3_000, tokens: TOKENS },
+      })
     }, 30_000)
   }
 
@@ -336,6 +353,20 @@ describe('an answer not taken is paid and read by Tesseract (Т-3, В-1 «а»)'
     expect((await receiptOf(id))?.readerVersion).toBe('tesseract 5.5.0 · test')
     expect((await month())?.spentMicroUsd).toBe(0)
     expect(reports.some((r) => r.kind === 'model_rejected')).toBe(true)
+  }, 30_000)
+})
+
+describe('a failure of the model’s own client (review №4)', () => {
+  it('reads the receipt by Tesseract, tells the owner, and keeps the worst counted', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    const reader = benchReader()
+    const model = fakeModel(() => Promise.reject(new TypeError('a bug of ours')))
+    const reports = await readAll(reader, model)
+    expect(reader.asked).toBe(2)
+    expect((await receiptOf(id))?.readerVersion).toBe('tesseract 5.5.0 · test')
+    expect(reports.some((r) => r.kind === 'error')).toBe(true)
+    expect((await month())?.spentMicroUsd).toBe(9_000)
   }, 30_000)
 })
 
@@ -392,6 +423,7 @@ describe('what the model read', () => {
           kind: 'read',
           answer: { ...ANSWER, lines: [], totals: [] },
           costMicroUsd: 1_000,
+          tokens: TOKENS,
         }),
       ),
     )
@@ -408,6 +440,7 @@ describe('what the model read', () => {
           kind: 'read',
           answer: { ...ANSWER, lines: [], totals },
           costMicroUsd: 1_000,
+          tokens: TOKENS,
         }),
       ),
     )
@@ -474,7 +507,9 @@ describe('the measure of 0.2r by its reader (MOL-272, В-6 «а»)', () => {
     const nothing = { ...ANSWER, lines: [], totals: [] }
     await readAll(
       benchReader(),
-      fakeModel(() => Promise.resolve({ kind: 'read', answer: nothing, costMicroUsd: 1_000 })),
+      fakeModel(() =>
+        Promise.resolve({ kind: 'read', answer: nothing, costMicroUsd: 1_000, tokens: TOKENS }),
+      ),
     )
     const [row] = await db.select().from(modelReceiptDays)
     expect(row?.reshoot).toBe(1)

@@ -30,7 +30,7 @@ import type {
   ReceiptRepository,
 } from '@/db/receipts-repository'
 import { ModelRejected, ModelUnavailable } from '@/receipts/model-reader'
-import type { ReceiptModel } from '@/receipts/model-reader'
+import type { ModelReading, ReceiptModel } from '@/receipts/model-reader'
 import { PhotoUnreadable, ReaderDropped, ReaderUnavailable } from '@/receipts/reader'
 import { TILL_KINDS_LATIN } from '@/receipts/till-kinds-latin'
 import { TILL_WORDS_RU } from '@/receipts/till-words-ru'
@@ -55,6 +55,9 @@ const STRIPS_PER_REQUEST = 32
  * was queued, Tesseract reads it (В-1 «а»).
  */
 export const RECEIPT_MODEL_WAIT_MS = 10 * 60 * 1000
+
+/** What a call of the model cost and used. */
+export type ModelPaid = Pick<ModelReading, 'costMicroUsd' | 'tokens'>
 
 /** The model that reads receipts, and its month's spending under the cap (MOL-272). */
 export interface ReceiptModelDeps {
@@ -90,9 +93,10 @@ export type ReadReport =
       /** Read only in part: the review says so (В-1). */
       readonly partly: boolean
       readonly ms: number
-      /** Who read it (MOL-272), and what the model cost where it was asked, answered or not. */
+      /** Who read it (MOL-272), and what the model cost and used where it read it (Т-8). */
       readonly reader: 'model' | 'ocr'
       readonly costMicroUsd: number | null
+      readonly tokens: ModelPaid['tokens'] | null
     }
   | { readonly kind: 'reader_unavailable'; readonly reason: string }
   /**
@@ -102,6 +106,8 @@ export type ReadReport =
   | {
       readonly kind: 'model_passed'
       readonly reason: 'cap' | 'size' | 'refused' | 'cut' | 'invalid' | 'away'
+      /** What an answer not taken cost and used: paid all the same (review №6). */
+      readonly paid?: ModelPaid
     }
   | { readonly kind: 'model_unavailable'; readonly reason: string }
   | { readonly kind: 'model_rejected'; readonly error: unknown }
@@ -139,7 +145,7 @@ function headOf(
 async function readOne(
   deps: ReadReceiptsDeps,
   claimed: ClaimedReceipt,
-): Promise<{ outcome: ReadOutcome; costMicroUsd: number | null } | 'wait'> {
+): Promise<{ outcome: ReadOutcome; paid: ModelPaid | null } | 'wait'> {
   const { photo: photoReading } = receiptCard(claimed.country)
   if (claimed.parts.length === 0 || photoReading === null) {
     // restored from a nightly copy, which holds no photos (В-2); a country read by its link has no
@@ -150,13 +156,13 @@ async function readOne(
       readerVersion: null,
       head: null,
     }
-    return { outcome, costMicroUsd: null }
+    return { outcome, paid: null }
   }
   if (claimed.byModel && deps.model) {
     const byModel = await readByModel(deps, deps.model, claimed, photoReading)
     if (byModel !== null) return byModel
   }
-  return { outcome: await readByOcr(deps, claimed, photoReading), costMicroUsd: null }
+  return { outcome: await readByOcr(deps, claimed, photoReading), paid: null }
 }
 
 /**
@@ -172,7 +178,7 @@ async function readByModel(
   { reader: model, spend, capMicroUsd }: ReceiptModelDeps,
   claimed: ClaimedReceipt,
   photoReading: PhotoReading,
-): Promise<{ outcome: ReadOutcome; costMicroUsd: number } | 'wait' | null> {
+): Promise<{ outcome: ReadOutcome; paid: ModelPaid } | 'wait' | null> {
   const { report } = deps
   const now = deps.now ?? (() => new Date())
   const parts = claimed.parts.map((part) => part.photo)
@@ -208,18 +214,21 @@ async function readByModel(
       report({ kind: 'model_rejected', error })
       return null
     }
-    throw error
+    // anything else is ours, and the receipt is not at fault: the owner hears of it, Tesseract reads, and the
+    // worst stays counted — whether it was paid is not known (review №4)
+    report({ kind: 'error', error })
+    return null
   }
+  const paid: ModelPaid = { costMicroUsd: reading.costMicroUsd, tokens: reading.tokens }
   await spend.settle(month, worst, reading.costMicroUsd, capMicroUsd, now())
   if (reading.kind !== 'read') {
-    report({ kind: 'model_passed', reason: reading.kind })
+    report({ kind: 'model_passed', reason: reading.kind, paid })
     return null
   }
   const { currency } = receiptCard(claimed.country)
   const text = receiptTextOfModel(photoReading, reading.answer)
   const shown = verifiedReading(text, { byModel: true })
   const head = headOf(shown, currency, [modelHeadRows(reading.answer)])
-  const costMicroUsd = reading.costMicroUsd
   if (needsReshoot(text)) {
     const outcome: ReadOutcome = {
       kind: 'failed',
@@ -227,7 +236,7 @@ async function readByModel(
       readerVersion: model.version,
       head,
     }
-    return { outcome, costMicroUsd }
+    return { outcome, paid }
   }
   // no boxes: a model's lines are cut out for no training (Р-4)
   const outcome = await parsed(deps, claimed, {
@@ -237,7 +246,7 @@ async function readByModel(
     version: model.version,
     images: [],
   })
-  return { outcome, costMicroUsd }
+  return { outcome, paid }
 }
 
 /**
@@ -400,7 +409,7 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
     if (claimed === null) return read
     const started = performance.now()
     let outcome: ReadOutcome
-    let costMicroUsd: number | null = null
+    let paid: ModelPaid | null = null
     try {
       const done = await readOne(deps, claimed)
       if (done === 'wait') {
@@ -410,7 +419,7 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
         return read
       }
       outcome = done.outcome
-      costMicroUsd = done.costMicroUsd
+      paid = done.paid
     } catch (error) {
       if (error instanceof ReaderUnavailable) {
         await deps.receipts.release(claimed.id)
@@ -444,8 +453,9 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
       settled: outcome.kind === 'parsed' ? outcome.lines.filter((line) => line.settled).length : 0,
       partly: outcome.kind === 'parsed' && outcome.partly,
       ms: Math.round(performance.now() - started),
-      reader: costMicroUsd === null ? 'ocr' : 'model',
-      costMicroUsd,
+      reader: paid === null ? 'ocr' : 'model',
+      costMicroUsd: paid?.costMicroUsd ?? null,
+      tokens: paid?.tokens ?? null,
     })
   }
 }

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { ModelReceipt } from '@molvia/model'
-import { ModelRejected, ModelUnavailable, receiptModel } from './model-reader'
+import {
+  MODEL_IMAGE_BYTES_MAX,
+  MODEL_REQUEST_BYTES_MAX,
+  ModelRejected,
+  ModelUnavailable,
+  receiptModel,
+} from './model-reader'
 
 // The reader against a fake of the Messages API: what goes out, and each way an answer comes back.
 
@@ -75,13 +81,18 @@ const failing = (status: number): Response =>
   Response.json({ type: 'error', error: { type: 'x', message: 'nope' } }, { status })
 
 const model = (fake: typeof fetch, workspaceId?: string) =>
-  receiptModel({ apiKey: 'sk-ant-test', workspaceId, fetch: fake, maxRetries: 0 })
+  receiptModel({ apiKey: 'sk-ant-test', workspaceId, fetch: fake })
 
 describe('the model that reads receipts (MOL-272)', () => {
   it('sends every part in one message, by the schema, at medium effort, with the workspace named', async () => {
     const { fetch, sent } = api(() => message())
     const got = await model(fetch, 'wrkspc_1').read([jpeg(1_000, 3_000), jpeg(1_000, 2_000)])
-    expect(got).toEqual({ kind: 'read', answer: ANSWER, costMicroUsd: 1_654 })
+    expect(got).toEqual({
+      kind: 'read',
+      answer: ANSWER,
+      costMicroUsd: 1_654,
+      tokens: { input: 5_321, output: 2_242 },
+    })
     const [one] = sent
     expect(one?.headers.get('anthropic-workspace-id')).toBe('wrkspc_1')
     expect(one?.body).toMatchObject({
@@ -117,34 +128,95 @@ describe('the model that reads receipts (MOL-272)', () => {
     ]
     for (const [over, kind] of cases) {
       const { fetch } = api(() => message(over))
-      expect(await model(fetch).read([jpeg(10, 10)])).toEqual({ kind, costMicroUsd: 1_654 })
+      expect(await model(fetch).read([jpeg(10, 10)])).toEqual({
+        kind,
+        costMicroUsd: 1_654,
+        tokens: { input: 5_321, output: 2_242 },
+      })
     }
   })
 
-  it('is unavailable at a 429, a 5xx, an overload and no connection — nothing paid', async () => {
+  it('is unavailable at a 429, a 5xx and an overload — nothing paid, and asked once', async () => {
     for (const status of [429, 500, 503, 529]) {
-      const { fetch } = api(() => failing(status))
+      const { fetch, sent } = api(() => failing(status))
       const got = model(fetch).read([jpeg(10, 10)])
       await expect(got).rejects.toBeInstanceOf(ModelUnavailable)
       await expect(got).rejects.toMatchObject({ costMicroUsd: 0 })
+      // the queue asks again, never the client: each call reserves its own (adversarial А2)
+      expect(sent).toHaveLength(1)
     }
-    const down = (() => Promise.reject(new TypeError('fetch failed'))) as typeof fetch
-    await expect(model(down).read([jpeg(10, 10)])).rejects.toMatchObject({
-      reason: 'unreachable',
-      costMicroUsd: 0,
-    })
   })
 
-  it('is unavailable at its time out, at a price not known: the worst reserved stays', async () => {
-    const hung = ((_input: unknown, init?: RequestInit) =>
-      new Promise<Response>((_resolve, reject) => {
+  it('is unavailable with no connection, at a price not known: the request may have gone (review №2)', async () => {
+    let asked = 0
+    const down = (() => {
+      asked += 1
+      return Promise.reject(new TypeError('fetch failed'))
+    }) as typeof fetch
+    await expect(model(down).read([jpeg(10, 10)])).rejects.toMatchObject({
+      reason: 'unreachable',
+      costMicroUsd: null,
+    })
+    expect(asked).toBe(1)
+  })
+
+  const hung = (count: { asked: number }) =>
+    ((_input: unknown, init?: RequestInit) => {
+      count.asked += 1
+      return new Promise<Response>((_resolve, reject) => {
         init?.signal?.addEventListener('abort', () => {
           reject(new DOMException('aborted', 'AbortError'))
         })
-      })) as typeof fetch
-    const reader = receiptModel({ apiKey: 'k', fetch: hung, maxRetries: 0, timeoutMs: 20 })
+      })
+    }) as typeof fetch
+
+  it('is unavailable at its time out, at a price not known, asked once: the worst reserved stays', async () => {
+    const count = { asked: 0 }
+    const reader = receiptModel({ apiKey: 'k', fetch: hung(count), timeoutMs: 20 })
     await expect(reader.read([jpeg(10, 10)])).rejects.toMatchObject({
       reason: 'timeout',
+      costMicroUsd: null,
+    })
+    expect(count.asked).toBe(1)
+  })
+
+  /** The answer's head, and a body that tears, or never comes. */
+  const torn = (tear: boolean) =>
+    (() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode('{"id":"msg_1","type":"mess'))
+              if (tear) controller.error(new TypeError('terminated'))
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )) as typeof fetch
+
+  it('is unavailable with its answer torn under the body, at a price not known (adversarial А3)', async () => {
+    await expect(model(torn(true)).read([jpeg(10, 10)])).rejects.toMatchObject({
+      reason: 'dropped',
+      costMicroUsd: null,
+    })
+  })
+
+  it('times the whole call out, a body that stalls too (adversarial А3 «б»)', async () => {
+    const reader = receiptModel({ apiKey: 'k', fetch: torn(false), timeoutMs: 30 })
+    await expect(reader.read([jpeg(10, 10)])).rejects.toMatchObject({
+      reason: 'timeout',
+      costMicroUsd: null,
+    })
+  }, 5_000)
+
+  it('is unavailable at an answer of 200 with no body', async () => {
+    const empty = (() =>
+      Promise.resolve(
+        new Response('', { status: 200, headers: { 'content-type': 'application/json' } }),
+      )) as typeof fetch
+    await expect(model(empty).read([jpeg(10, 10)])).rejects.toMatchObject({
+      reason: 'dropped',
       costMicroUsd: null,
     })
   })
@@ -163,5 +235,26 @@ describe('the model that reads receipts (MOL-272)', () => {
     expect(reader.inputTokensMax([jpeg(750, 1), jpeg(750, 2)])).toBe((one ?? 0) + 2)
     expect(reader.inputTokensMax([jpeg(10, 10), Buffer.from('no photo')])).toBeNull()
     expect(reader.version).toBe('claude-haiku-5-5@v3')
+  })
+
+  it('sends no part past the API’s image and no request past its whole, counted in base64 (review №3)', () => {
+    const { fetch } = api(() => message())
+    const reader = model(fetch)
+    // a JPEG of `bytes` as base64 counts it: its frame, then data up to the size
+    const sized = (base64: number) => {
+      const head = jpeg(1_000, 1_000)
+      const raw = (base64 / 4) * 3
+      return Buffer.concat([
+        head.subarray(0, -2),
+        Buffer.alloc(raw - head.length, 0x55),
+        head.subarray(-2),
+      ])
+    }
+    expect(reader.inputTokensMax([sized(MODEL_IMAGE_BYTES_MAX)])).not.toBeNull()
+    expect(reader.inputTokensMax([sized(MODEL_IMAGE_BYTES_MAX + 4)])).toBeNull()
+    const parts = Math.ceil(MODEL_REQUEST_BYTES_MAX / MODEL_IMAGE_BYTES_MAX)
+    expect(
+      reader.inputTokensMax(Array.from({ length: parts }, () => sized(MODEL_IMAGE_BYTES_MAX))),
+    ).toBeNull()
   })
 })

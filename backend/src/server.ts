@@ -778,11 +778,21 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                 ms: event.ms,
                 reader: event.reader,
                 costMicroUsd: event.costMicroUsd,
+                inputTokens: event.tokens?.input,
+                outputTokens: event.tokens?.output,
               },
               'receipt read',
             )
           } else if (event.kind === 'model_passed') {
-            instance.log.info({ reason: event.reason }, 'receipt not read by the model')
+            instance.log.info(
+              {
+                reason: event.reason,
+                costMicroUsd: event.paid?.costMicroUsd,
+                inputTokens: event.paid?.tokens.input,
+                outputTokens: event.paid?.tokens.output,
+              },
+              'receipt not read by the model',
+            )
           } else if (event.kind === 'model_unavailable') {
             instance.log.warn({ reason: event.reason }, 'receipt model unavailable')
           } else if (event.kind === 'model_rejected') {
