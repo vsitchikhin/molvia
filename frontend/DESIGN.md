@@ -494,7 +494,7 @@ Three forms, readable without colour: **Брать** — filled `good`, ✓, wor
 `warn` outline 1.5, ~; **Не брать** — `bad` outline 1.5, ✕, struck-through word. A pill with the
 word, or a 22 dot (24 beside a group title). There is no price beside "Не брать нигде" — no number,
 no dash: comparing a bad thing by price is exactly what the product refuses. Inside the "Брать"
-group the card does not repeat the badge **(target)**.
+group the card does not repeat the badge.
 
 ### Screen states
 
