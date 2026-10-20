@@ -381,7 +381,9 @@ nothing up.
   server names no first month (Р-1). The last three first pages read are kept per owner
   (`molvia.money`), so offline is a strip over them — the running month always among them once read, since
   it holds today's rate for a sheet opened on any month: pushed out by older ones, four months back the
-  sheet had no «≈» (MOL-262, adversarial А3). A next page asked for while the month is read
+  sheet had no «≈» (MOL-262, adversarial А3). Opened on another month, the screen reads the running one
+  too, after its own: an exchange is written on its own screen and tells «Деньги» nothing, and the kept
+  answer gave the sheet the rate from before it (MOL-262, А5) — one more read on such an opening. A next page asked for while the month is read
   again from the start is asked again from the fresh answer (adversarial Е).
 - **A finished trip opened from «Деньги» leads back there** (owner's decision В-3):
   `?from=money` — `?from=money-spendings` since its row is on «Траты» (MOL-159) — and the route
