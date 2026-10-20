@@ -1018,25 +1018,45 @@ test('the spending sheet rises as high as the keys leave it, before they come (M
 
 // The summary broke, the connection did not: a section's quiet card with its «Повторить», and
 // «Добавить трату» keeps the strip — a spending goes through the queue with the server down
-// (MOL-180, В-1, 157 v2 1k).
+// (MOL-180, В-1, 157 v2 1k). The month is turned back before this month answers — the order that
+// lost the strip before MOL-183 — and the test holds that order itself, not the runner (MOL-262).
 test('a summary that did not load is a quiet card, and the strip still adds a spending', async ({
   page,
 }) => {
-  await openMoney(page)
-  // Last month is read for the first time and fails; this month's answer has named the categories.
+  // This month's answer is held until the month before is asked for; last month is read for the
+  // first time and fails. Both laid before the page opens (MOL-249).
+  let answer: () => void = () => undefined
+  const answered = new Promise<void>((resolve) => (answer = resolve))
+  const current = `**/api/money/months/${yerevanDay().slice(0, 7)}*`
+  await page.route(current, async (route) => {
+    await answered
+    await route.continue()
+  })
   const last = `**/api/money/months/${lastMonthDay().slice(0, 7)}*`
   await page.route(last, (route) => route.fulfill({ status: 500, body: '{}' }))
+  await openMoney(page)
+  const add = page.locator('.dock').getByRole('button', { name: /Добавить трату/ })
   await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
+  await expect(page).toHaveURL(/month=/)
+  // Nothing kept on this phone and nothing answered: no category is known, so no strip at the move.
+  // Looked at once, not over the hold — a strip come a moment later with no category would pass here.
+  await expect(add).toHaveCount(0)
 
-  await expect(page.getByText('Не удалось загрузить траты')).toBeVisible()
+  // This month's answer lands for a month no longer on screen, and still names the categories. Waited
+  // for as an answer, not within a check's five seconds: on a loaded machine it came later (MOL-262).
+  const landed = page.waitForResponse(current)
+  answer()
+  await landed
+  const failed = page.getByRole('heading', { name: 'Не удалось загрузить траты' })
+  await expect(failed).toBeVisible()
   const retry = page.getByRole('button', { name: 'Повторить' })
   await expect(retry).toHaveCount(1)
   await expect(page.locator('.dock').getByRole('button', { name: 'Повторить' })).toHaveCount(0)
-  await expect(page.locator('.dock').getByRole('button', { name: /Добавить трату/ })).toBeVisible()
+  await expect(add).toBeVisible()
 
   await page.unroute(last)
   await retry.click()
-  await expect(page.getByText('Не удалось загрузить траты')).toHaveCount(0)
+  await expect(failed).toHaveCount(0)
 })
 
 /**
