@@ -229,7 +229,7 @@ export const ru = {
   'owner.model.half': '💸 Чеки моделью за {month}: потрачено ${spent} — половина потолка ${cap}',
   'owner.model.most': '💸 Чеки моделью за {month}: потрачено ${spent} — 90 % потолка ${cap}',
   'owner.model.stop':
-    '🛑 Чеки моделью за {month} остановлены: потрачено ${spent}, следующий чек не влезает под потолок ${cap}. До конца месяца чеки читает Tesseract.',
+    '🛑 Чеки моделью за {month}: потрачено ${spent}, чек не влез под потолок ${cap} и прочитан Tesseract. Дальше модель читает только то, что ещё влезает, остальное — Tesseract.',
   /**
    * «Написать разработчику» in the bot (MOL-148). The frame is what the person gets around the
    * owner's reply, in the language of their message (Р-12 of MOL-150); the rest answers a text

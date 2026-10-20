@@ -79,7 +79,8 @@ export function worstCallMicroUsd(inputTokens: number): number {
 
 /**
  * The shares of the month's cap the owner hears of, each once a month (В-2 «а»): half, nine tenths, and
- * the stop — a call that would not fit under the cap, after which no call goes until the month ends.
+ * the stop — the first call that would not fit under the cap. It stops that call, not the month: the model
+ * reads up to the last call that still fits (В-2 «а»), and a smaller receipt after it may (adversarial А1).
  */
 export const MODEL_SPEND_STEPS = [50, 90, 100] as const
 export type ModelSpendStep = (typeof MODEL_SPEND_STEPS)[number]
