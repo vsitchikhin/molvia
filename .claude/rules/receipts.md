@@ -163,7 +163,7 @@ Postgres refuses, «2099» and «99:99».
 **Claude Haiku 5.5 reads the receipts of those it is granted to** (owner, 18.10.2026; the cap 19.10;
 the decisions В-1…В-6 of 20.10 in `.scratch/tasks/requirements/MOL-272.md`). `backend/src/receipts/model-reader.ts`:
 every part in one message, the answer by a schema (structured output), `effort: medium`, the prompt
-`model-prompt.ts` — its version beside the model in `reader_version`, `claude-haiku-5-5@v3`.
+`model-prompt.ts` — its version beside the model in `reader_version`, `claude-haiku-5-5@v4`.
 
 **Who it reads for is a column and an edition** (В-4, Р-12): `actors.receipts_model_until` still to come —
 a moment, as `shared_until` is, set by hand with `psql` until the paid layer (MOL-271) — and
@@ -192,51 +192,68 @@ Tesseract takes the columns off the paper, so its «419,98 / 420» stays read (M
 bench is 105 / 0 as before.
 
 **The bench** (`.scratch/tasks/research/MOL-272.md`, 54 receipts, 1 038 fields, through the product's own
-converter and check): v3 at medium 576–626 right, 1–3 made up; Tesseract 105 / 0; Haiku by Claude Code's
-helpers (MOL-268) 225 / 9. Totals 26 right, none wrong. $0,0022 a receipt, 13 s at the median, 45 s the
-worst. **The price, named** (В-7, the owner's to decide on the pull request): the 1–3 made up are all of one
-faded «Ереван Сити», am-34, where 5 and 6 are one glyph — a leading digit misread alike in a price and a sum
-(640 / 5,4 / 634,6 as 540 / 5,4 / 534,6) holds the line's arithmetic, and a second reading repeated it. Closing
-it to none costs two thirds of what is read: the model's figures only on a receipt proven whole gave 171–195.
-The receipt is not proven whole, so its review says «Прочитали не всё». `low` effort copied a sum into the
-price on a receipt proven whole — three prices the check lets through by MOL-255's rule — so it is `medium`.
+converter and check): v3 at medium 576–626 right, 1–3 made up, totals 26 right and none wrong; v4 573 / 3,
+totals 28 / 0; Tesseract 105 / 0; Haiku by Claude Code's helpers (MOL-268) 225 / 9. $0,0022 a receipt, 13 s at
+the median, 45 s the worst. **The price, named** (В-7, the owner's to decide on the pull request): the 1–3
+made up are all of one faded «Ереван Сити», am-34, where 5 and 6 are one glyph — a leading digit misread alike
+in a price and a sum (640 / 5,4 / 634,6 as 540 / 5,4 / 534,6) holds the line's arithmetic, and a second
+reading repeated it. Closing it to none costs two thirds of what is read: the model's figures only on a
+receipt proven whole gave 171–195. The receipt is not proven whole, so its review says «Прочитали не всё».
+`low` effort copied a sum into the price on a receipt proven whole — three prices the check lets through by
+MOL-255's rule — so it is `medium`.
 
-**What it costs is counted, and the cap cannot be passed** (Т-3, Т-4, В-2 «а»): `model_spend`, by the
-calendar month in UTC — Anthropic's bill's — in integer micro-dollars, at the price written in the code
+**What it costs is counted, and the cap cannot be passed** (Т-3, Т-4, В-2 «а»): `model_spend`, by the calendar
+month in UTC — Anthropic's bill's — in integer micro-dollars, at the price written in the code
 (`RECEIPT_MODEL_PRICE`), from each answer's `usage`, an answer we did not take too. **Before a call its worst
-is reserved in one statement**: the input at most — an image's pixels over 750, the prompt's bytes — and the
-whole output it may take — the schema sent with it counted among the text's bytes; a month that would
-pass `RECEIPT_MODEL_MONTHLY_CAP_USD` ($200) refuses it, and Tesseract reads. After the answer its own price is
-put in place of the worst; **a process lost in between leaves the worst counted**, never less than was
-spent. **So the client never repeats a request** (`maxRetries: 0`, adversarial А2): a request repeated inside
-it is two paid and one counted, and the time out doubled held the queue; the queue asks again itself, each
-call with a reserve of its own. **And an answer whose price is not known keeps the worst**: a time out, a
-connection lost — it may have broken after the request went — an answer torn under its body or of no body
-at all. A request past `RECEIPT_MODEL_INPUT_MAX` tokens is priced otherwise and is never sent, nor one past
-what the API takes — a part over 5 MB or a request over 32 MB in base64 (`MODEL_IMAGE_BYTES_MAX`, review
-№3): `size`, Tesseract, no failure. The owner hears of half the cap, nine tenths and **the stop — the first
-call that does not fit** — each once a month (`model_spend` notices, the bot's dollars to the cent). **The
-stop is that call's, not the month's** (В-2 «а», adversarial А1): the model reads up to the last call that
-still fits, so a smaller receipt after it may go, and the bot says so rather than «until the month ends». The workspace's monthly limit in the Anthropic
+is reserved in one statement**: the input at most — an image's pixels over 750, the prompt's bytes and the
+schema sent with it — and the whole output it may take; a month that would pass
+`RECEIPT_MODEL_MONTHLY_CAP_USD` ($200) refuses it, and Tesseract reads. After the answer its own price is put
+in place of the worst; **a process lost in between leaves the worst counted**, never less than was spent. **So
+the client never repeats a request** (`maxRetries: 0`, adversarial А2): a request repeated inside it is two
+paid and one counted, and the time out doubled held the queue; the queue asks again itself, each call with a
+reserve of its own. **And an answer whose price is not known keeps the worst**: a time out, a connection lost
+— it may have broken after the request went — an answer torn under its body or of no body at all. A request
+past `RECEIPT_MODEL_INPUT_MAX` tokens is priced otherwise and is never sent, nor one past what the API takes —
+a part over 5 MB or a request over 32 MB in base64 (`MODEL_IMAGE_BYTES_MAX`, review №3): `size`, Tesseract, no
+failure.
+
+The owner hears of half the cap, nine tenths and **the stop — the first call that does not fit** — each once a
+month (`model_spend` notices, the bot's dollars to the cent). **The stop is that call's, not the month's**
+(В-2 «а», adversarial А1): the model reads up to the last call that still fits, so a smaller receipt after it
+may go, and the bot says so rather than «until the month ends». The workspace's monthly limit in the Anthropic
 console is set to the same (Р-10): a price wrong in the code is held there too. **Nobody's**: no key to
 `actors`, so neither erasure nor the copy reaches it.
 
 **When the model is not the one to read, Tesseract reads, as before** (В-1 «а»): the cap, photos past the
-price, a refusal of the model, an answer cut by its length or of no schema — each paid — and a request the
-API refuses for what it is (4xx, `ModelRejected`, paid nothing, a failure the owner hears of as
-`job:receipt-model`), and anything else the client throws — a fault of ours, the owner hears of it as
-`receipt-reading` and the worst stays (review №4); never «не разобран» on a receipt Tesseract would read. **The model away is waited for ten minutes** (Р-9, `RECEIPT_MODEL_WAIT_MS`): a 429, a
-5xx, an overload, no connection, a time out or an answer torn on its way (adversarial А3) leave the receipt
-queued with its attempt uncounted and stop the round; **the time out is the whole call's**, its body too —
-the client arms its own around `fetch` alone, and a body that stalled held the queue past it; past ten minutes since it was queued, Tesseract. A time out may have been paid, so its worst
-stays counted. **The price, named**: an answer not taken whose Tesseract is away is asked of the model again
-the next minute, and paid again, until the reader is back.
+price, a refusal of the model, an answer cut by its length or of no schema — each paid — a request the API
+refuses for what it is (4xx, `ModelRejected`, paid nothing, a failure the owner hears of as
+`job:receipt-model`), and anything else the queue's call throws — a fault of ours, heard of as
+`receipt-reading`, the worst kept (review №4); never «не разобран» on a receipt Tesseract would read.
+
+**The model away is waited for ten minutes** (Р-9, `RECEIPT_MODEL_WAIT_MS`): a 429, a 5xx, an overload, no
+connection, a time out or an answer torn on its way (adversarial А3) leave the receipt queued with its attempt
+uncounted and stop the round; past ten minutes since it was queued, Tesseract. **The time out is the whole
+call's**, its body too: the client arms its own around `fetch` alone, and a body that stalled held the queue
+past it. **A torn answer is also a failure the owner hears of** (`model_broken`, `job:receipt-model`, review
+№8): what the client throws while the answer comes cannot be told from a fault of ours — a broken client would
+make every receipt wait — and the fingerprint's first time in a build and its 10, 100, 1000 keep a chance tear
+quiet. **The price, named**: an answer not taken whose Tesseract is away is asked of the model again the next
+minute, and paid again, until the reader is back.
+
+**The key against a second record is Tesseract's** (Т-11, adversarial А5): the fiscal number, eight digits as
+printed, which the model gives apart (`fiscal_no`, prompt v4) — **never the tax number**, which it put there
+three times on the bench and which is every receipt of the shop, **never «ԿՀ»**, a till's own count the shop's
+other tills repeat, and no label or barcode. Anything else is no number, and the receipt is held by its id
+alone. On the bench the two readers give one key on 17 receipts, two on 4 — two of them a digit misread, two a
+table whose fiscal number Tesseract did not read; two readings by the model agree on 29 of 37. **The price,
+named**: one paper read twice may still be two keys, and so two records — as it may by Tesseract.
 
 **The log carries counts** (Т-8): who read (`reader`), what it cost and the tokens in and out, why the model
-was passed and what an answer not taken cost (review №6) — never its answer, a line or a tax number. **The measure of 0.2 is the reader's** (В-6 «а»): a receipt the model read
-counts in `model_receipt_days` — read and recorded alike, by its `reader_version` — a table of its own for
-MOL-234's reason, and `make gates` prints its block under Tesseract's, with the same stop. A receipt that
-failed for its attempts has no reader and counts in `receipt_days`.
+was passed and what an answer not taken cost (review №6) — never its answer, a line or a tax number. **The
+measure of 0.2 is the reader's** (В-6 «а»): a receipt the model read counts in `model_receipt_days` — read and
+recorded alike, by its `reader_version` — a table of its own for MOL-234's reason, and `make gates` prints its
+block under Tesseract's, with the same stop. A receipt that failed for its attempts has no reader and counts
+in `receipt_days`.
 
 ## The class code (MOL-226)
 
