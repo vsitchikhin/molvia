@@ -681,9 +681,9 @@ rate exactly as before.
   `--surface`; the chosen dot and the cursor `--accent` — the dots were all terracotta, which is «press
   here», and the cursor `--border-strong`, decoration. The legend keeps its words (С-4) with a stroke
   of `--graphic` and a dot of `--text`: the two differ in shape. **The mark to the market is `--bad` or
-  `--good` by the sign of the money, never of the percent** — the rule of «Обмены против рынка» (Р-4
-  of MOL-187): a point carries `sign`, since 0,00 % may stand over −0,30 ֏ and the card of that
-  exchange says «хуже». **The sign is the card's** — of its market's difference in the currency
+  `--good` by the sign of the money, never of the percent** — the rule of the card of that exchange
+  (Р-4 of MOL-187: one sign a row, the money's): a point carries `sign`, since 0,00 % may stand over
+  −0,30 ֏ and the card says «хуже». **The sign is the card's** — of its market's difference in the currency
   received — never of `measured`, the same money in the spending currency rounded to its cent:
   spent in dollars, −1,00 ֏ is 0,00 $, and the point said nothing where the card said «хуже»
   (adversarial А1). **The price, named:** «Обмены против рынка» sums the money in the spending
@@ -696,12 +696,16 @@ rate exactly as before.
   «−0,40 % · хуже рынка» in `bad-ink` or `good-ink` at 600 (`rate_chart.diff`) — the colour never
   alone; nothing is «0,00 %» with no word; no comparison is a quiet line, «Рынка того дня нет» or
   «Без сравнения: курса ЦБ РА того дня нет». The radio of the point says the word too. **The reading
-  holds the plate's height** (adversarial А2): a week with no exchange keeps three lines for it and a
-  week with no market the figure's line, so the chart under the finger never moves — the three lines
-  doubled a jump of 19 px master already had, to 38. **The price, named:** on a phone of 320 «Без
-  сравнения: курса ЦБ РА того дня нет» takes a fourth line and the chart moves by it, 19 px — a day
-  with no rate of the bank is rare, and four lines held for it would leave a blank line under every
-  other plate.
+  holds the tallest plate of the period** (adversarial А2, Б1, Б2): every plate stands in one cell,
+  unseen and `aria-hidden` but the chosen one's, as the words of «Графики» do (MOL-186) — so a week
+  with no exchange leaves the chart under the finger where it was, however long a note runs or a line
+  wraps on a phone of 320, and a period with no exchange holds nothing; a week with no market keeps the
+  figure's line. Three lines held by a number missed both ways: a note of a sentence took a fourth
+  (the place is the person's own note, up to 200 signs), and a period with no exchange kept 55 px of
+  nothing; the three lines had doubled a jump of 19 px master already had, to 38. Not cut with «…»: the
+  note is the person's, and what they see of it is not the chart's to decide. **The price, named:** a
+  plate in the page for each exchange of the period, unseen — some fifty in a year of weekly ones —
+  and another period may stand the chart a line higher or lower, a change of the screen's own query.
 
 ## Incomes
 
