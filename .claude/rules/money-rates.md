@@ -700,7 +700,9 @@ rate exactly as before.
   unseen and `aria-hidden` but the chosen one's, as the words of «Графики» do (MOL-186) — so a week
   with no exchange leaves the chart under the finger where it was, however long a note runs or a line
   wraps on a phone of 320, and a period with no exchange holds nothing; a week with no market keeps the
-  figure's line. Three lines held by a number missed both ways: a note of a sentence took a fourth
+  figure's line. The plate shown keeps its own height (`align-items: start`) — stretched, it stood a
+  grey line of nothing under three lines beside a note of a sentence — and a note with no spaces, a
+  link to a map, wraps anywhere: unseen, it pushed the page aside on every week (adversarial В1, В2). Three lines held by a number missed both ways: a note of a sentence took a fourth
   (the place is the person's own note, up to 200 signs), and a period with no exchange kept 55 px of
   nothing; the three lines had doubled a jump of 19 px master already had, to 38. Not cut with «…»: the
   note is the person's, and what they see of it is not the chart's to decide. **The price, named:** a
