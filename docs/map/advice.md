@@ -64,7 +64,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 ## frontend · components
 
 - `frontend/src/components/AdviceCheapRow.vue` — Row of «Только если дёшево»: the name and rating, then «price · place» and the price threshold, each only when there is one.
-- `frontend/src/components/AdviceGroup.vue` — Group of «Что брать»: the caption with the verdict's dot of «Брать», «Только если дёшево» or «Не брать нигде», a hairline before the last two; «Ещё не оценивали» for the search.
+- `frontend/src/components/AdviceGroup.vue` — Group of «Что брать»: the caption with the verdict's dot of «Брать», «Только если дёшево» or «Не брать нигде»; «Ещё не оценивали» for the search; a hairline before «Не брать нигде» and «Ещё не оценивали», only under another group.
 - `frontend/src/components/AdviceHomeNew.vue` — «Что брать» of a newcomer (MOL-128): «Запишите первые покупки» or «Осталось оценить», the cycle of three steps, the line about trust.
 - `frontend/src/components/AdviceNeverRow.vue` — Row of «Не брать нигде»: struck-through name, rating and own review, with no price or place.
 - `frontend/src/components/AdviceSearch.vue` — The search on «Что брать»: the kit's `SearchField` with «Очистить», and what is found laid out by the list's groups and shapes, «Ещё не оценивали» last with «Оценить».
