@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
 import {
+  OWN_ALTERNATIVES_MAX,
   ZONE_HEADER,
   yerevanDate,
   adviceResponseSchema,
@@ -14,6 +15,7 @@ import {
   ownNeverResponseSchema,
   ownPricesResponseSchema,
   toSearchKey,
+  tripViewCodec,
   unitPrice,
 } from '@molvia/model'
 import type { Money, OwnPrices, OwnPricesResponse, Quantity } from '@molvia/model'
@@ -680,6 +682,144 @@ describe('GET /advice/prices — another item of the kind (В-3, В-7)', () => {
       level: 'unrated',
       alternatives: [{ itemId: marianna, rating: '4.0' }],
     })
+  })
+})
+
+describe('GET /advice/prices — a purchase at 0 is no price (MOL-274)', () => {
+  /** A purchase as the sheet writes it, through the trip's own route. */
+  async function typed(actor: string, tripId: string, itemId: string, amount: string) {
+    const reply = await app.inject({
+      method: 'POST',
+      url: `/trips/${tripId}/expenses`,
+      headers: { cookie: await signIn(db, actor) },
+      payload: {
+        id: randomUUID(),
+        itemId,
+        quantity: { value: '1', unit: 'l' },
+        amount: { amount, currency: 'AMD' },
+      },
+    })
+    expect(reply.statusCode, reply.body).toBe(201)
+  }
+
+  it('names the price before a gift typed on the sheet, and none where a gift is all there is', async () => {
+    const me = await insertActor(db)
+    const milk = await item('Молоко Ашхар 1 л')
+    const city = await erevan('Ереван Сити')
+    await bought(me, milk, city, 500, { on: '2026-10-02' })
+    const gift = await insertTrip(db, { actorId: me, placeId: city, startedOn: '2026-10-14' })
+    await typed(me, gift, milk, '0')
+    const kefir = await item('Кефир Марианна 1 л')
+    await typed(me, gift, kefir, '0')
+    await typed(me, gift, await item('Кефир Ашхар 1 л'), '500')
+
+    expect(placesOf(await prices(me, { item: milk }))).toEqual([
+      { name: 'Ереван Сити', price: perLitre(500), day: '2026-10-02', observations: 1 },
+    ])
+    expect(placesOf(await prices(me, { item: kefir }))).toEqual([])
+    // Must not fire: the gifts are still purchases of the record, and its money is 0 + 0 + 500.
+    const view = await app.inject({
+      method: 'GET',
+      url: `/trips/${gift}`,
+      headers: { cookie: await signIn(db, me) },
+    })
+    expect(view.statusCode, view.body).toBe(200)
+    const record = tripViewCodec.parse(view.json())
+    expect(record.expenses.map((expense) => expense.amount?.minor).sort()).toEqual([
+      0n,
+      0n,
+      50_000n,
+    ])
+    expect(record.total).toEqual([amd(50_000)])
+  })
+
+  it('leaves a purchase out once its sum is put right to 0', async () => {
+    const me = await insertActor(db)
+    const milk = await item('Молоко Ашхар 1 л')
+    const city = await erevan('Ереван Сити')
+    await bought(me, milk, await erevan('Зовуни'), 560, { on: '2026-10-01' })
+    const later = await bought(me, milk, city, 500, { on: '2026-10-14' })
+    expect(placesOf(await prices(me, { item: milk })).map((place) => place.name)).toEqual([
+      'Ереван Сити',
+      'Зовуни',
+    ])
+
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: `/trips/${later.tripId}/expenses/${later.id}`,
+      headers: { cookie: await signIn(db, me) },
+      payload: { amount: { amount: '0', currency: 'AMD' } },
+    })
+    expect(patched.statusCode, patched.body).toBe(200)
+    expect(placesOf(await prices(me, { item: milk })).map((place) => place.name)).toEqual([
+      'Зовуни',
+    ])
+  })
+
+  it('offers no alternative bought only as a gift, and one bought at a price', async () => {
+    const me = await insertActor(db)
+    const ashhar = await item('Молоко Ашхар 1 л')
+    const marianna = await item('Молоко Марианна 1 л')
+    const zovuni = await erevan('Зовуни')
+    await bought(me, ashhar, zovuni, 620)
+    await bought(me, marianna, zovuni, 0)
+    await rate(me, marianna, 5)
+
+    const gifted = await prices(me, { item: ashhar })
+    expect(gifted.level !== 'never' && gifted.alternatives).toEqual([])
+
+    await bought(me, marianna, zovuni, 480, { on: '2026-09-01' })
+    const priced = await prices(me, { item: ashhar })
+    expect(priced.level !== 'never' && priced.alternatives).toEqual([
+      expect.objectContaining({
+        itemId: marianna,
+        places: [expect.objectContaining({ day: '2026-09-01' })],
+      }),
+    ])
+  })
+
+  it('takes no item of the kind got only as a gift into the cut of the alternatives (adversarial А1)', async () => {
+    const me = await insertActor(db)
+    const ashhar = await item('Молоко Ашхар 1 л')
+    const marianna = await item('Молоко Марианна 1 л')
+    const zovuni = await erevan('Зовуни')
+    await bought(me, ashhar, zovuni, 600)
+    await rate(me, ashhar, 4)
+    await bought(me, marianna, zovuni, 480)
+    await rate(me, marianna, 4)
+    // As many gifts of the kind as the cut holds, each rated above Marianna: taken in before any
+    // price was read, they filled it, and dropped for having no place, took her with them.
+    const gifts = await Promise.all(
+      Array.from({ length: OWN_ALTERNATIVES_MAX }, (_, n) =>
+        item(`Молоко Акция ${String.fromCharCode(0x0410 + n)}`),
+      ),
+    )
+    const tripId = await insertTrip(db, { actorId: me, placeId: zovuni, startedOn: '2026-09-12' })
+    await db.insert(expenses).values(
+      gifts.map((itemId) => ({
+        id: randomUUID(),
+        tripId,
+        itemId,
+        qtyMilli: litre.milli,
+        qtyUnit: litre.unit,
+        amountMinor: 0n,
+        amountCurrency: 'AMD' as const,
+      })),
+    )
+    await db.insert(verdicts).values(
+      gifts.map((itemId) => ({
+        id: randomUUID(),
+        actorId: me,
+        itemId,
+        itemKind: 'product' as const,
+        score: 5,
+      })),
+    )
+
+    const answer = await prices(me, { item: ashhar })
+    expect(answer.level !== 'never' && answer.alternatives.map((other) => other.itemId)).toEqual([
+      marianna,
+    ])
   })
 })
 

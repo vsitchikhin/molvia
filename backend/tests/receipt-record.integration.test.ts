@@ -620,6 +620,55 @@ describe('«Записать»', () => {
     expect(trip?.receiptMinor).toBe(215_000n)
   })
 
+  it('records a gift at 0 as a purchase of the trip, and as no price of its place (MOL-274, А8)', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db)
+    const bread = await insertItem(db)
+    const id = await parsedReceipt(me, [
+      { printed: 'Կաթ «Իգիթ» 3.2% 1լ', sku: '1163909', price: 500, sum: 0 },
+      { printed: 'Հաց', sku: '1110004', price: 300, sum: 300 },
+    ])
+    // «0,00/500,00 500» as the check keeps it on a receipt proven whole: the count and nothing paid
+    await db
+      .update(receiptLines)
+      .set({ priceMinor: null, settled: true })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 0)))
+    const response = await record(me, id, {
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        { position: 0, skip: false, item: { id: milk }, quantity: pieces(1), amount: amount(0) },
+        { position: 1, skip: false, item: { id: bread }, quantity: pieces(1), amount: amount(300) },
+      ],
+    })
+    expect(response.statusCode, response.body).toBe(200)
+    const rows = await db.select().from(expenses).where(eq(expenses.itemId, milk))
+    expect(rows.map((row) => row.amountMinor)).toEqual([0n])
+
+    const prices = await app.inject({
+      method: 'GET',
+      url: `/advice/prices?item=${milk}&country=AM&city=${encodeURIComponent('Гюмри')}`,
+      headers: { cookie: await signIn(db, me) },
+    })
+    expect(prices.statusCode, prices.body).toBe(200)
+    expect(prices.json()).toMatchObject({ prices: { itemId: milk, places: [] } })
+    // Must not fire: the receipt's total stays the one recorded, and the gift still waits for a
+    // verdict (Р-4). The gift's 0 in a trip's money is held on the manual path, by `/trips/:id`.
+    const [trip] = await db
+      .select()
+      .from(trips)
+      .where(eq(trips.id, rows[0]?.tripId ?? ''))
+    expect(trip?.receiptMinor).toBe(30_000n)
+    const pending = await app.inject({
+      method: 'GET',
+      url: '/verdicts/pending',
+      headers: { cookie: await signIn(db, me) },
+    })
+    expect(pending.body).toContain(milk)
+  })
+
   it('confirms no row of a line whose price the check took off as misread (MOL-255)', async () => {
     const me = await insertActor(db)
     const place = await insertPlace(db)
