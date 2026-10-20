@@ -163,7 +163,7 @@ Postgres refuses, «2099» and «99:99».
 **Claude Haiku 5.5 reads the receipts of those it is granted to** (owner, 18.10.2026; the cap 19.10;
 the decisions В-1…В-6 of 20.10 in `.scratch/tasks/requirements/MOL-272.md`). `backend/src/receipts/model-reader.ts`:
 every part in one message, the answer by a schema (structured output), `effort: medium`, the prompt
-`model-prompt.ts` — its version beside the model in `reader_version`, `claude-haiku-5-5@v4`.
+`model-prompt.ts` — its version beside the model in `reader_version`, `claude-haiku-5-5@v5`.
 
 **Who it reads for is a column and an edition** (В-4, Р-12): `actors.receipts_model_until` still to come —
 a moment, as `shared_until` is, set by hand with `psql` until the paid layer (MOL-271) — and
@@ -193,8 +193,8 @@ bench is 105 / 0 as before.
 
 **The bench** (`.scratch/tasks/research/MOL-272.md`, 54 receipts, 1 038 fields, through the product's own
 converter and check): v3 at medium 576–626 right, 1–3 made up, totals 26 right and none wrong; v4 573 / 3,
-totals 28 / 0; Tesseract 105 / 0; Haiku by Claude Code's helpers (MOL-268) 225 / 9. $0,0022 a receipt, 13 s at
-the median, 45 s the worst. **The price, named** (В-7, the owner's to decide on the pull request): the 1–3
+totals 28 / 0; v5 646–656 / 1–2, totals 26–27 / 0; Tesseract 105 / 0; Haiku by Claude Code's helpers (MOL-268)
+225 / 9. $0,0022–0,0025 a receipt, 13–17 s at the median, 45–55 s the worst. **The price, named** (В-7, the owner's to decide on the pull request): the 1–3
 made up are all of one faded «Ереван Сити», am-34, where 5 and 6 are one glyph — a leading digit misread alike
 in a price and a sum (640 / 5,4 / 634,6 as 540 / 5,4 / 534,6) holds the line's arithmetic, and a second
 reading repeated it. Closing it to none costs two thirds of what is read: the model's figures only on a
@@ -240,13 +240,23 @@ make every receipt wait — and the fingerprint's first time in a build and its 
 quiet. **The price, named**: an answer not taken whose Tesseract is away is asked of the model again the next
 minute, and paid again, until the reader is back.
 
-**The key against a second record is Tesseract's** (Т-11, adversarial А5): the fiscal number, eight digits as
-printed, which the model gives apart (`fiscal_no`, prompt v4) — **never the tax number**, which it put there
-three times on the bench and which is every receipt of the shop, **never «ԿՀ»**, a till's own count the shop's
-other tills repeat, and no label or barcode. Anything else is no number, and the receipt is held by its id
-alone. On the bench the two readers give one key on 17 receipts, two on 4 — two of them a digit misread, two a
-table whose fiscal number Tesseract did not read; two readings by the model agree on 29 of 37. **The price,
-named**: one paper read twice may still be two keys, and so two records — as it may by Tesseract.
+**The key against a second record is Tesseract's, read by its words** (Т-11, adversarial А5, А6, review №10):
+the model copies every row that prints a number after its label, as printed (`id_rows`, prompt v5), and our
+code takes the tax number after «ՀՎՀՀ» and the fiscal number, eight digits after «Ֆիսկալ», each only where the
+rows give one — two fiscal numbers, a prepayment slip or two receipts on a photo, are none. Asked for the
+fields themselves (v4), the model put «Ереван Сити»'s till registration «ԳՀ» in the tax number on 26 answers
+of 94 and the shop's tax number in the fiscal one — two constants of the till, the key of every receipt there,
+and the next one «recorded before»: copying, it moves a label too, but onto another label («ԳՀ:01282006»,
+«ՀԴՄ:01282006»), and then there is no key. **Never «ԿՀ»**, a till's own count the shop's other tills repeat,
+**never the tax number as the number**, no barcode, no «ՖՀ». Anything else is no key, and the receipt is held
+by its id alone. On the bench (v5, two runs): the tax number 32 right, 3 wrong, 11 none — against 40 wrong of
+94 in v4; two readings by the model give one key on 21 receipts and two on none (v4: 23 and 11); the model
+and Tesseract one on 7, two on 1, a digit of Tesseract's; no fiscal number is a constant of a till.
+**The prices, named**: one paper read twice may still be two keys, and so two records — as it may by
+Tesseract; of 46 papers only one of the two readers keys 24; and a constant key needs the model to put the
+till's number under «ՀՎՀՀ» and the shop's under «Ֆիսկալ» on one answer with no other fiscal row — it moved
+the till's under «ՀՎՀՀ» twice in 108 answers, on receipts of two fiscal numbers, and never the shop's under
+«Ֆիսկալ».
 
 **The log carries counts** (Т-8): who read (`reader`), what it cost and the tokens in and out, why the model
 was passed and what an answer not taken cost (review №6) — never its answer, a line or a tax number. **The
