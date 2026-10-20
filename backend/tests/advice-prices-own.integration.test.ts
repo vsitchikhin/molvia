@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
 import {
+  OWN_ALTERNATIVES_MAX,
   ZONE_HEADER,
   yerevanDate,
   adviceResponseSchema,
@@ -759,6 +760,50 @@ describe('GET /advice/prices — a purchase at 0 is no price (MOL-274)', () => {
         itemId: marianna,
         places: [expect.objectContaining({ day: '2026-09-01' })],
       }),
+    ])
+  })
+
+  it('takes no item of the kind got only as a gift into the cut of the alternatives (adversarial А1)', async () => {
+    const me = await insertActor(db)
+    const ashhar = await item('Молоко Ашхар 1 л')
+    const marianna = await item('Молоко Марианна 1 л')
+    const zovuni = await erevan('Зовуни')
+    await bought(me, ashhar, zovuni, 600)
+    await rate(me, ashhar, 4)
+    await bought(me, marianna, zovuni, 480)
+    await rate(me, marianna, 4)
+    // As many gifts of the kind as the cut holds, each rated above Marianna: taken in before any
+    // price was read, they filled it, and dropped for having no place, took her with them.
+    const gifts = await Promise.all(
+      Array.from({ length: OWN_ALTERNATIVES_MAX }, (_, n) =>
+        item(`Молоко Акция ${String.fromCharCode(0x0410 + n)}`),
+      ),
+    )
+    const tripId = await insertTrip(db, { actorId: me, placeId: zovuni, startedOn: '2026-09-12' })
+    await db.insert(expenses).values(
+      gifts.map((itemId) => ({
+        id: randomUUID(),
+        tripId,
+        itemId,
+        qtyMilli: litre.milli,
+        qtyUnit: litre.unit,
+        amountMinor: 0n,
+        amountCurrency: 'AMD' as const,
+      })),
+    )
+    await db.insert(verdicts).values(
+      gifts.map((itemId) => ({
+        id: randomUUID(),
+        actorId: me,
+        itemId,
+        itemKind: 'product' as const,
+        score: 5,
+      })),
+    )
+
+    const answer = await prices(me, { item: ashhar })
+    expect(answer.level !== 'never' && answer.alternatives.map((other) => other.itemId)).toEqual([
+      marianna,
     ])
   })
 })
