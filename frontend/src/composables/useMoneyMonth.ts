@@ -45,7 +45,8 @@ export interface MoneyMonth {
 /**
  * The last months read, per owner — the first page of each, the one the screen opens on. Three:
  * this month, the one before, and one more looked at; offline is a strip over them, not an empty
- * screen (handoff 04). Read back through the strict codec — a change of the contract empties it,
+ * screen (handoff 04). This month stays among them however far back the person looked: it holds
+ * today's rate for a sheet opened on any month (MOL-262, adversarial А3). Read back through the strict codec — a change of the contract empties it,
  * but for a field added with a default, which reads as the default: a month kept before the ring
  * (MOL-156) has none until it is read again, and «Куда ушли» says so — the phone adds nothing up.
  */
@@ -110,13 +111,17 @@ function remember(owner: string, answer: MoneyMonthView, fetchedAt: Date, askedA
     fetchedAt: fetchedAt.toISOString(),
     askedAt: askedAt.toISOString(),
   }
+  const running = monthOf(localDay())
   const newest = Object.entries(all)
     .flatMap(([month, value]) =>
       isRecord(value) && typeof value.fetchedAt === 'string'
         ? [{ month, value, at: value.fetchedAt }]
         : [],
     )
-    .sort((a, b) => b.at.localeCompare(a.at))
+    .sort(
+      (a, b) =>
+        Number(b.month === running) - Number(a.month === running) || b.at.localeCompare(a.at),
+    )
     .slice(0, KEPT_MONTHS)
     .map(({ month, value }) => [month, value])
   write(`${KEY}.${owner}`, JSON.stringify(Object.fromEntries(newest)))

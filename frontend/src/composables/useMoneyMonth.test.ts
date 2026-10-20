@@ -284,4 +284,38 @@ describe('useMoneyMonth', () => {
       vi.useRealTimers()
     }
   })
+
+  // Kept are three months, and older ones read after it pushed this month out: four months back, the
+  // sheet lost today's rate — on a reload too, which a screen mounted anew is (MOL-262, adversarial А3).
+  it('А3: this month stays kept however far back the months were read, and with it today’s rate', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-09-27T08:00:00Z'))
+    try {
+      const pinia = createPinia()
+      setActivePinia(pinia)
+      useActorStore().id = ACTOR
+      const rate = {
+        base: 'RUB' as const,
+        quote: 'AMD' as const,
+        scaled: 4_620_000n,
+        source: 'personal' as const,
+        asOf: new Date('2026-09-27T00:00:00Z'),
+      }
+      moneyMonth.mockResolvedValueOnce({ ...page([], null), rate })
+      host(pinia)
+      await flushPromises()
+      for (const [minute, month] of ['2026-08', '2026-07', '2026-06', '2026-05'].entries()) {
+        vi.setSystemTime(new Date(`2026-09-27T08:0${minute + 1}:00Z`))
+        moneyMonth.mockResolvedValueOnce({ ...page([], null), month, rateKind: 'frozen' })
+        host(pinia, month)
+        await flushPromises()
+      }
+      moneyMonth.mockRejectedValueOnce(new TypeError('network'))
+      const april = host(pinia, '2026-04')
+      await flushPromises()
+      expect(april.todayRate.value?.scaled).toBe(4_620_000n)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
