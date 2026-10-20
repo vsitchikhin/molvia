@@ -81,8 +81,8 @@ $row-narrow: 22rem;
 /// word a line beside its rating read as a list), `word` — while each word of it does (a place: wrapped
 /// by words beside its price, as the handoff draws «Дешевле всего: Ереван Сити»). A word wider than the
 /// whole row breaks rather than leaves it: under `word` the automatic minimum of the name is its longest
-/// word, capped by `max-width` at the row — Chromium and WebKit break such a word without the cap, an engine
-/// that keeps the whole word as the minimum would not.
+/// word, and `max-width` caps it at the row — without the cap a glued receipt head of 33 capitals stood
+/// past the card in Chromium and WebKit alike, and the page scrolled sideways.
 @mixin name-beside-figure($until: name) {
   display: flex;
   flex-wrap: wrap;

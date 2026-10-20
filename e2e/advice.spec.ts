@@ -196,7 +196,7 @@ test('on a phone of 320 a long name stays in its row in all three forms, shared 
     }
   }, word)
   expect(plate).toEqual({ wordLines: 1, price: true })
-  // Each word of «Bought here: Ереван Сити» fits beside the price, so the price stays on the place's
+  // Each word of «Cheapest at Ереван Сити» fits beside the price, so the price stays on the place's
   // first line — not under the place because the whole of it does not fit there (MOL-200, №6).
   const beside = await take.filter({ hasText: short }).evaluate((card) => {
     const where = card.querySelector('.where')!.getBoundingClientRect()
