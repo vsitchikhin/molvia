@@ -657,9 +657,9 @@ rate exactly as before.
   is three charts in the answer — some 26 KB of JSON for a year of monthly exchanges, before gzip.
   The series is read once, for the year. **A period with no figure while the year has one is null,
   and the card stays** with its switches and says so in the height of the chart (Р-6): gone with the
-  card, the switch would have gone too, and the year with it. **The old field `rateChart` is read
-  and never used** (`z.unknown().optional()`, Р-4): the answer is strict, and changed in shape it
-  would refuse the answer of a server before MOL-168 whole; it goes with the next task of money. On
+  card, the switch would have gone too, and the year with it. The old field `rateChart` was read and
+  never used for one release (`z.unknown().optional()`, Р-4), so a page of MOL-168 read the answer of
+  the server before it; MOL-190 took it away once that server was gone. On
   the phone the period is the screen's address (`?months=1`, `?months=6`, the year with none,
   anything else the year, Р-5) and changes by `replace` — not scrolled, not animated, nothing asked;
   **the switch is always there, under the pairs** (В-3 «а»); an exchange chosen by hand stays chosen
@@ -675,6 +675,20 @@ rate exactly as before.
   «апр» and «май» 10 px apart; on a 320 px phone «28 сент.» laid from the edge lay over «5 окт.»,
   which a threshold in thousandths, `LABEL_GAP`, knew nothing of. With no chart in a period the note
   under it goes too: it speaks of a tap.
+- **Terracotta on the chart is the chosen one's and the cursor's alone; the mark has the tone of the
+  money** (MOL-190, Ф-4 and Ф-30 of MOL-118, owner's В-1 «а» of 20.10.2026). The line and the ring of
+  the reading are `--graphic`, the data without a colour of its own; the dots `--text`, ringed by
+  `--surface`; the chosen dot and the cursor `--accent` — the dots were all terracotta, which is «press
+  here», and the cursor `--border-strong`, decoration. The legend keeps its words (С-4) with a stroke
+  of `--graphic` and a dot of `--text`: the two differ in shape. **The mark to the market is `--bad` or
+  `--good` by the sign of the money, never of the percent** — the rule of «Обмены против рынка» (Р-4
+  of MOL-187): a point carries `sign`, the sign of `measured.difference`, since 0,00 % may stand over
+  −0,30 ֏ and the card of that exchange says «хуже». No comparison and nothing at all are `--graphic`.
+  An answer of a server before it has no `sign` (`default(null)`) and the phone takes the percent's.
+  **The plate under the reading is three lines**: the exchange and its rate, the place, and «−0,40 % ·
+  хуже рынка» in `bad-ink` or `good-ink` at 600 (`rate_chart.diff`) — the colour never alone; nothing
+  is «0,00 %» with no word; no comparison is a quiet line, «Рынка того дня нет» or «Без сравнения:
+  курса ЦБ РА того дня нет». The radio of the point says the word too.
 
 ## Incomes
 
