@@ -147,10 +147,14 @@ export default defineComponent({
   background: var(--good-tint);
 }
 
+/* A place of one long word — a receipt's head in capitals, «ՍՈՒՊԵՐՄԱՐԿԵՏՆԵՐԻ ՑԱՆՑ» — breaks rather than
+   pushes the price out of the card. */
 .where {
+  min-width: 0;
   color: var(--good-ink);
   font-size: var(--text-footnote);
   font-weight: var(--weight-medium);
+  overflow-wrap: break-word;
 }
 
 .price {
