@@ -109,14 +109,13 @@ function recallTodayRate(owner: string): MoneyMonthView['rate'] {
  * Keeps a first page unless one that set out later is kept already, and says whether it did: two
  * reads of a month may land out of turn — the running month's read for today's rate goes beside the
  * screen's own, and a screen left still hears its answer (MOL-262, adversarial А6). A read kept from
- * a moment still to come is a clock set back since, and is no later one.
+ * a moment still to come is a clock set back since, and is no later one; nor is one the phone cannot
+ * read back — another build's — which knows nothing a refusal could take (self-review 12).
  */
 function remember(owner: string, answer: MoneyMonthView, fetchedAt: Date, askedAt: Date): boolean {
-  const all = recallAll(owner)
-  const before = all[answer.month]
-  const keptAsked = isRecord(before) && typeof before.askedAt === 'string' ? before.askedAt : null
-  const later = keptAsked ? Date.parse(keptAsked) : Number.NaN
+  const later = recall(owner, answer.month)?.askedAt?.getTime() ?? Number.NaN
   if (later > askedAt.getTime() && later <= Date.now()) return false
+  const all = recallAll(owner)
   all[answer.month] = {
     answer: moneyMonthCodec.encode(answer),
     fetchedAt: fetchedAt.toISOString(),

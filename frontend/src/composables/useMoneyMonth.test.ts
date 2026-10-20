@@ -20,6 +20,7 @@ enableAutoUnmount(afterEach)
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const BEAUTY = 'ffffffff-0000-4000-8000-000000000001'
+const TAXI = 'ffffffff-0000-4000-8000-000000000002'
 const amd = (text: string) => parseMoney(text, 'AMD')
 
 function entry(id: string, day: string, note: string) {
@@ -445,6 +446,86 @@ describe('useMoneyMonth', () => {
       giveOpened({ ...page([], null), rate: rate(4_900_000n) })
       await flushPromises()
       expect(opened.todayRate.value?.scaled).toBe(5_000_000n)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // What a refusal takes from the phone is the owner's categories too: a screen with no answer of its
+  // own goes by them for «Добавить трату» (MOL-262, adversarial А8).
+  it('А7: a screen with no answer whose read the phone refused takes the categories from the phone', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-09-27T08:00:00Z'))
+    try {
+      const pinia = createPinia()
+      setActivePinia(pinia)
+      useActorStore().id = ACTOR
+      moneyMonth.mockResolvedValueOnce(page([], null))
+      host(pinia)
+      await flushPromises()
+      // August fails, and its read of the running month is slow.
+      let give: (value: MoneyMonthView) => void = () => undefined
+      vi.setSystemTime(new Date('2026-09-27T08:01:00Z'))
+      moneyMonth
+        .mockRejectedValueOnce(new TypeError('500'))
+        .mockImplementationOnce(() => new Promise((resolve) => (give = resolve)))
+      const august = host(pinia, '2026-08')
+      await flushPromises()
+      // Meanwhile another screen reads the running month later, with a category made since.
+      vi.setSystemTime(new Date('2026-09-27T08:02:00Z'))
+      const categories = [
+        ...page([], null).categories,
+        { id: TAXI, preset: 'transport' as const, name: null, colour: null, archived: false },
+      ]
+      moneyMonth.mockResolvedValueOnce({ ...page([], null), categories })
+      host(pinia)
+      await flushPromises()
+      give(page([], null))
+      await flushPromises()
+      expect(august.phase.value).toBe('error')
+      expect(august.knownCategories.value.map((one) => one.id)).toEqual([BEAUTY, TAXI])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // Another build may keep a month this one cannot read: it is no later answer, and the first one
+  // landed is kept over it (MOL-262, self-review 12).
+  it('А6: a month the phone cannot read back refuses no answer', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-09-27T08:00:00Z'))
+    try {
+      const pinia = createPinia()
+      setActivePinia(pinia)
+      useActorStore().id = ACTOR
+      const rate = {
+        base: 'RUB' as const,
+        quote: 'AMD' as const,
+        scaled: 5_000_000n,
+        source: 'personal' as const,
+        asOf: new Date('2026-09-27T00:00:00Z'),
+      }
+      let give: (value: MoneyMonthView) => void = () => undefined
+      moneyMonth.mockImplementationOnce(() => new Promise((resolve) => (give = resolve)))
+      host(pinia)
+      await flushPromises()
+      vi.setSystemTime(new Date('2026-09-27T08:02:00Z'))
+      localStorage.setItem(
+        `molvia.money.${ACTOR}`,
+        JSON.stringify({
+          '2026-09': {
+            answer: { month: '2026-09', shape: 'another build' },
+            fetchedAt: '2026-09-27T08:01:00.000Z',
+            askedAt: '2026-09-27T08:01:00.000Z',
+          },
+        }),
+      )
+      give({ ...page([], null), rate })
+      await flushPromises()
+      moneyMonth.mockRejectedValue(new TypeError('network'))
+      const august = host(pinia, '2026-08')
+      await flushPromises()
+      expect(august.todayRate.value?.scaled).toBe(5_000_000n)
     } finally {
       vi.useRealTimers()
     }
