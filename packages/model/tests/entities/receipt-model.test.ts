@@ -15,6 +15,7 @@ const answer = (over: Partial<ModelReceipt> = {}): ModelReceipt => ({
   shop: 'Խանութ «Օրինակ»',
   address: 'Գորկու 1, Գյումրի',
   tin: '01234567',
+  fiscal_no: '27410811',
   receipt_no: '000123',
   date: '2026-10-08',
   time: '19:57',
@@ -121,10 +122,29 @@ describe('a model’s answer as the parse’s reading (MOL-272)', () => {
       tin: '01234567',
       date: '2026-10-08',
       time: '19:57',
-      receiptNo: '000123',
+      receiptNo: '27410811',
     })
-    const odd = read(answer({ tin: '0123456', date: '08.10.2026', time: '25:10', receipt_no: ' ' }))
+    const odd = read(answer({ tin: '0123456', date: '08.10.2026', time: '25:10', fiscal_no: ' ' }))
     expect([odd.tin, odd.date, odd.time, odd.receiptNo]).toEqual([null, null, null, null])
+  })
+
+  it('keys a second record by the fiscal number in Tesseract’s form, never the tax number or «ԿՀ» (adversarial А5)', () => {
+    const number = (
+      fiscal_no: string | null,
+      receipt_no: string | null = '15429',
+      tin = '01234567',
+    ) => read(answer({ fiscal_no, receipt_no, tin })).receiptNo
+    expect(number('27410811')).toBe('27410811')
+    expect(number('00410811')).toBe('00410811')
+    expect(number('27 410 811')).toBe('27410811')
+    // the tax number is every receipt of the shop: no key
+    expect(number('01234567')).toBeNull()
+    // a label, a barcode's number, a digit lost or one too many, «ԿՀ» alone: no key
+    expect(number('ՖՀ 27410811')).toBeNull()
+    expect(number('GY0000927265')).toBeNull()
+    expect(number('2741081')).toBeNull()
+    expect(number('274108111')).toBeNull()
+    expect(number(null, '00000049')).toBeNull()
   })
 
   it('names the city where the head’s address does', () => {

@@ -25,6 +25,7 @@ export const modelReceiptSchema = z.strictObject({
   shop: text,
   address: text,
   tin: text,
+  fiscal_no: text,
   receipt_no: text,
   date: text,
   time: text,
@@ -72,6 +73,18 @@ const dayOf = (date: string | null): string | null =>
 const clockOf = (time: string | null): string | null => {
   const found = /^(\d{2}):(\d{2})$/.exec(time ?? '')
   return found !== null && Number(found[1]) < 24 && Number(found[2]) < 60 ? (time ?? null) : null
+}
+
+/**
+ * The receipt's number as the key against a second record (Т-11), in Tesseract's form — or one paper read by
+ * the two readers is two keys and recorded twice (adversarial А5): the fiscal number, eight digits as printed,
+ * leading zeros kept. **Never the tax number** — the model put it there three times on the bench, and every
+ * receipt of the shop would be «recorded before» — **and never «ԿՀ»**: a till's own count, repeated by the
+ * shop's other tills. Anything else is no number, and the receipt is held by its id alone.
+ */
+function numberOf(answer: ModelReceipt, tin: string | null): string | null {
+  const fiscal = (answer.fiscal_no ?? '').replace(/\s/g, '')
+  return /^\d{8}$/.test(fiscal) && fiscal !== tin ? fiscal : null
 }
 
 /**
@@ -179,15 +192,13 @@ export function receiptTextOfModel(reading: PhotoReading, answer: ModelReceipt):
       : discounted
         ? 'card'
         : 'class'
+  const tin = /^\d{8}$/.test(answer.tin?.trim() ?? '') ? (answer.tin?.trim() ?? null) : null
   return {
     layout,
-    tin: /^\d{8}$/.test(answer.tin?.trim() ?? '') ? (answer.tin?.trim() ?? null) : null,
+    tin,
     date: dayOf(answer.date),
     time: clockOf(answer.time),
-    receiptNo:
-      answer.receipt_no === null || answer.receipt_no.trim() === ''
-        ? null
-        : answer.receipt_no.trim(),
+    receiptNo: numberOf(answer, tin),
     totalHundredths: total,
     readTotalHundredths: read,
     balanced: met,
