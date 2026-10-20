@@ -295,6 +295,12 @@ export const actors = pgTable(
      */
     sharedUntil: timestamp('shared_until', { withTimezone: true }),
     /**
+     * Until when a model reads this person's receipts (MOL-272, Р-12; owner's В-4): a moment, as
+     * `shared_until` is — set by hand with `psql` for the owner and whoever it is granted to, by the paid
+     * layer later (MOL-271). Empty and a past date are one answer: Tesseract reads, as before.
+     */
+    receiptsModelUntil: timestamp('receipts_model_until', { withTimezone: true }),
+    /**
      * Which rate a new trip takes (MOL-40, В-3): `personal` — the person's own, from their
      * exchanges, when there is one for the pair, and the official one otherwise — or always
      * `official`. Beside the settings rather than among them: it is switched on the screen of

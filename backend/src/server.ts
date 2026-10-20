@@ -79,7 +79,9 @@ import {
   sendReceipt,
 } from '@/usecases/receipts'
 import { receiptRoutes } from '@/routes/receipts'
+import { createModelSpendRepository } from '@/db/model-spend-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
+import type { ReceiptModel } from '@/receipts/model-reader'
 import type { ReceiptReader } from '@/receipts/reader'
 import { recentPlaces } from '@/usecases/recent-places'
 import { rateFromBot } from '@/usecases/rate-from-bot'
@@ -365,6 +367,14 @@ export interface ServerOptions {
    */
   readonly receiptReader?: ReceiptReader | null
   /**
+   * The model that reads the receipts of those it is granted to (MOL-272). Absent or `null`, Tesseract
+   * reads every receipt: the API's entry builds the real one from `CLAUDE_API_KEY`, and a test hands in
+   * a fake — no test asks the model.
+   */
+  readonly receiptModel?: ReceiptModel | null
+  /** The month's cap of the model in micro-dollars; absent, `RECEIPT_MODEL_MONTHLY_CAP_USD`'s. */
+  readonly receiptModelCapMicroUsd?: number
+  /**
    * The owner's Telegram id the failures are queued for (MOL-143). Absent, it is the environment's
    * — set in production only; a test names one, or `null` for none.
    */
@@ -589,6 +599,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const removedTransfers = createTransferRepository(db)
     const receipts = createReceiptRepository(db)
     const reader = options.receiptReader ?? null
+    const model = options.receiptModel ?? null
+    const modelSpend = createModelSpendRepository(db, owner !== null)
     const taxOffice =
       options.purs === undefined
         ? pursOf(instance.log, (error) => {
@@ -753,8 +765,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
               instance.log.warn({ reason: event.reason }, 'receipt reader unavailable')
             readerDown = true
           } else if (event.kind === 'read') {
-            if (readerDown) instance.log.info('receipt reader back')
-            readerDown = false
+            if (readerDown && event.reader === 'ocr') instance.log.info('receipt reader back')
+            if (event.reader === 'ocr') readerDown = false
             instance.log.info(
               {
                 status: event.status,
@@ -764,9 +776,18 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                 settled: event.settled,
                 partly: event.partly,
                 ms: event.ms,
+                reader: event.reader,
+                costMicroUsd: event.costMicroUsd,
               },
               'receipt read',
             )
+          } else if (event.kind === 'model_passed') {
+            instance.log.info({ reason: event.reason }, 'receipt not read by the model')
+          } else if (event.kind === 'model_unavailable') {
+            instance.log.warn({ reason: event.reason }, 'receipt model unavailable')
+          } else if (event.kind === 'model_rejected') {
+            // a request the API refuses for what it is: ours to fix, so the owner hears of it
+            failures.report(event.error, job('receipt-model'), 'receipt model refused the request')
           } else if (event.kind === 'reader_dropped') {
             // every time: a photo that fells the reader is what this line is there to show
             instance.log.warn({ reason: event.reason }, 'receipt reader dropped a photo')
@@ -786,6 +807,16 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
               receipts,
               reader,
               report,
+              model:
+                model === null
+                  ? null
+                  : {
+                      reader: model,
+                      spend: modelSpend,
+                      capMicroUsd:
+                        options.receiptModelCapMicroUsd ??
+                        Math.round(env.RECEIPT_MODEL_MONTHLY_CAP_USD * 1_000_000),
+                    },
               bind: (claimed, lines) =>
                 bindReceiptLines(
                   { items: createItemRepository(db), embedder },

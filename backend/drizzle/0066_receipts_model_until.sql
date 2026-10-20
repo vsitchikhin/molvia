@@ -1,0 +1,1 @@
+ALTER TABLE "actors" ADD COLUMN "receipts_model_until" timestamp with time zone;

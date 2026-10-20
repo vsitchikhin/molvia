@@ -4,6 +4,7 @@ import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import {
   DomainError,
   ERROR,
+  MODEL_CONSENT_EDITION,
   placeSchema,
   RECEIPT_KEEP_DAYS,
   RECEIPT_LINK_WAIT_HOURS,
@@ -66,6 +67,14 @@ export interface ClaimedReceipt {
   readonly country: ReceiptSummary['country']
   readonly language: ReceiptSummary['language']
   readonly parts: readonly { readonly position: number; readonly photo: Buffer }[]
+  /**
+   * The model may read it (MOL-272): granted to its owner until a moment still to come
+   * (`receipts_model_until`, Р-12) and edition `MODEL_CONSENT_EDITION` accepted — by the database's clock,
+   * as the claim reads it.
+   */
+  readonly byModel: boolean
+  /** When it was queued: the model away longer than its wait leaves it to Tesseract (Р-9). */
+  readonly queuedAt: Date | null
 }
 
 /**
@@ -1152,14 +1161,23 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             actorId: receipts.actorId,
             country: receipts.country,
             language: receipts.language,
+            queuedAt: receipts.queuedAt,
           })
+        const [owner] = await tx
+          .select({
+            byModel: sql<boolean>`coalesce(${actors.receiptsModelUntil} > clock_timestamp()
+              and ${actors.consentVersion} >= ${MODEL_CONSENT_EDITION}, false)`,
+          })
+          .from(actors)
+          .innerJoin(receipts, eq(receipts.actorId, actors.id))
+          .where(eq(receipts.id, next.id))
         const parts = await tx
           .select({ position: receiptParts.position, photo: receiptParts.photo })
           .from(receiptParts)
           .where(eq(receiptParts.receiptId, next.id))
           .orderBy(asc(receiptParts.position))
         const row = theRow(claimed, 'receipts')
-        return { ...row, parts }
+        return { ...row, parts, byModel: owner?.byModel ?? false }
       })
     },
 

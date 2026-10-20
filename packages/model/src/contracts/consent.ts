@@ -24,6 +24,13 @@ export const POLICY_VERSION = 2
 export const STATISTICS_CONSENT_EDITION = 2
 
 /**
+ * The first edition that names Anthropic among the recipients (MOL-272, Т-9): a receipt's photo — which
+ * may print a customer's name — goes to the model in the United States only for whoever accepted it.
+ * Who accepted an older edition is read by Tesseract, whatever was granted to them.
+ */
+export const MODEL_CONSENT_EDITION = 3
+
+/**
  * `GET` and the answer of `PUT /actors/me/consent` (MOL-95): the edition this person accepted, or
  * none. Its own address and never a field of `/actors/me` (Р-5): an installed app reads that answer
  * strictly, and a field it did not know would fail every older build. No upper bound: a server newer
