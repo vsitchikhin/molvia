@@ -1,11 +1,12 @@
 /**
- * What the model is asked (MOL-272, prompt v4 of the bench, `.scratch/tasks/research/MOL-272.md`): every
+ * What the model is asked (MOL-272, prompt v5 of the bench, `.scratch/tasks/research/MOL-272.md`): every
  * number of a line in its place and every amount of the summary with its word — which is paid and which is
- * the total is decided by our code, never by the model — and the fiscal number apart, the key against a
- * second record as Tesseract reads it (adversarial А5). A change here is run on the bench before and after,
- * as a rule of the parse is: the version goes into `receipts.reader_version`.
+ * the total is decided by our code, never by the model — and the rows of numbers with their labels as
+ * printed, whose tax number and fiscal number our code reads by the card's words, as Tesseract's (review
+ * №10, adversarial А6). A change here is run on the bench before and after, as a rule of the parse is: the
+ * version goes into `receipts.reader_version`.
  */
-export const RECEIPT_PROMPT_VERSION = 'v4'
+export const RECEIPT_PROMPT_VERSION = 'v5'
 
 export const RECEIPT_SYSTEM = `You transcribe photographed shop receipts for a price-tracking app. You copy what is printed; you never compute, correct or guess a number. A wrong number is far worse than an empty one: if a digit is not clearly legible, write null for that value.`
 
@@ -24,5 +25,6 @@ Fill the JSON:
   Numbers are strings with a decimal point and no thousands separators: «5 403,12» → "5403.12".
   - Read the columns by the header row where the receipt prints one. A receipt with the header «Անվանում | Քանակ | Գումար/Զեղչ | Հին/Նոր գին» prints each item on two rows: the name, then «code/article», the quantity with its unit («1հտ», «2հտ», «1.524կգ»), the pair «sum/discount» («760,75/89,25»: sum "760.75", discount "89.25"; «1200» with no slash: sum "1200", discount null) and, last on the row, the shelf price («850»: unit_price "850"; «490/390»: unit_price "390"). The sum is the FIRST number of the pair, the price the LAST number of the row: never put the price into sum.
 - totals: every amount of the receipt's summary block with its label exactly as printed — the total («Ընդամենը», «Итого», «Total»), cash and card payments, change, prepayment («Կանխավճար»), discounts, taxes («ԱԱՀ»), a section's sum («Բաժին 1»). Same number format.
-- tin: the seller's tax number (Armenian «ՀՎՀՀ»), digits only. fiscal_no: the fiscal number, after «Ֆիսկալ համար» / «ՖԻՍԿԱԼ ՀԱՄԱՐ» / «ՖՀ», digits only, else null. receipt_no: the receipt's own number («ԿՀ», «Чек №»), digits only, else null. Neither is a barcode's number nor the till's registration number. date "YYYY-MM-DD", time "HH:MM". shop and address: the seller's, as printed.
+- id_rows: every row outside the items and the summary that prints a number after its label — the seller's tax number («ՀՎՀՀ»), the till's registration («ԳՀ», «ՀԴՄ»), the fiscal number («Ֆիսկալ համար»), the receipt's number («ԿՀ», «Чек №») and the like — each row exactly as printed, its label and its number together («ՀՎՀՀ: 01282006»), in printed order. Copy the rows; never decide which number is which, never move a number to another label.
+- date "YYYY-MM-DD", time "HH:MM". shop and address: the seller's, as printed.
 - Never write a customer's name, phone or card number anywhere.`

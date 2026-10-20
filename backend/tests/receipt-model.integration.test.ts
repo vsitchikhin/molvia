@@ -54,9 +54,7 @@ afterAll(async () => {
 const ANSWER: ModelReceipt = {
   shop: 'Խանութ «Օրինակ»',
   address: 'Գորկու 1, Գյումրի',
-  tin: '01234567',
-  fiscal_no: '27410811',
-  receipt_no: '000123',
+  id_rows: ['ՀՎՀՀ: 01234567', 'ԳՀ: 55512345', 'ԿՀ: 000123', 'Ֆիսկալ համար 27410811'],
   date: '2026-10-08',
   time: '19:57',
   lines: [
@@ -179,7 +177,7 @@ function fakeModel(
 ): ReceiptModel & { asked: number } {
   const model = {
     asked: 0,
-    version: 'claude-haiku-5-5@v4',
+    version: 'claude-haiku-5-5@v5',
     inputTokensMax: () => input,
     read: () => {
       model.asked += 1
@@ -233,7 +231,7 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
     const row = await receiptOf(id)
     expect(row).toMatchObject({
       status: 'parsed',
-      readerVersion: 'claude-haiku-5-5@v4',
+      readerVersion: 'claude-haiku-5-5@v5',
       layout: 'card',
       tin: '01234567',
       totalMinor: 102_710n,
@@ -486,6 +484,71 @@ describe('what the model read', () => {
     await db.execute(sql`delete from ${actors} where id = ${me.id}::uuid`)
     expect(await db.select().from(receipts)).toEqual([])
     expect((await month())?.spentMicroUsd).toBe(2_180)
+  }, 30_000)
+})
+
+describe('the key against a second record (Т-11, adversarial А5, А6, review №10)', () => {
+  const as = (id_rows: string[], over: Partial<ModelReceipt> = {}) =>
+    fakeModel(() =>
+      Promise.resolve({
+        kind: 'read',
+        answer: { ...ANSWER, id_rows, ...over },
+        costMicroUsd: 2_180,
+        tokens: TOKENS,
+      }),
+    )
+  const refused = fakeModel(() =>
+    Promise.resolve({ kind: 'refused', costMicroUsd: 1_000, tokens: TOKENS }),
+  )
+  let places = 0
+  const record = async (receiptId: string, actorId: string) => {
+    const placeId = await insertPlace(db, { name: `Օրինակ ${String(++places)}` })
+    const tripId = await insertTrip(db, { actorId, placeId })
+    await repository.markRecorded(receiptId, {
+      tripId,
+      expenses: [],
+      confirmed: [],
+      edits: { lines: 1, edited: 0, skipped: 0, item: 0, figures: 0, totalCorrected: false },
+      source: 'photo',
+      codesWritten: 0,
+    })
+  }
+  const twinOf = async (id: string, actorId: string) => {
+    const row = await receiptOf(id)
+    if (row?.tin == null || row.receiptNo == null) return 'no key'
+    return (await repository.recordedTwin(actorId, row.tin, row.receiptNo, id)) === null
+      ? 'none'
+      : 'found'
+  }
+
+  it('is one for one paper read by Tesseract and by the model', async () => {
+    const me = await person(LATER)
+    const first = await queued(me)
+    await readAll(benchReader(), refused)
+    expect(await receiptOf(first)).toMatchObject({ tin: '01234567', receiptNo: '12345678' })
+    await record(first, me.id)
+    const second = await queued(me)
+    await readAll(
+      benchReader(),
+      as(['ՀՎՀՀ:01234567', 'ԳՀ:55512345', 'ԿՀ: 90264', 'Ֆիսկալ համար 12345678']),
+    )
+    expect(await twinOf(second, me.id)).toBe('found')
+  }, 30_000)
+
+  it('is none where the model copied the shop’s tax number under another label, as on the bench: two receipts of the till are both recorded', async () => {
+    const me = await person(LATER)
+    // am-10 and lit-9296 of v5: the till's registration and the shop's tax number, neither under «ՀՎՀՀ»
+    const mixed = ['ԳՀ:55512345', 'ՀԴՄ:01234567', 'ԿՀ: 90264']
+    const first = await queued(me)
+    await readAll(benchReader(), as([...mixed, 'Ֆիսկալ համար 43542455']))
+    expect(await receiptOf(first)).toMatchObject({ tin: null, receiptNo: '43542455' })
+    await record(first, me.id)
+    const second = await queued(me)
+    await readAll(
+      benchReader(),
+      as([...mixed, 'Ֆիսկալ համար 99784818'], { date: '2026-10-09', time: '10:05' }),
+    )
+    expect(await twinOf(second, me.id)).toBe('no key')
   }, 30_000)
 })
 

@@ -13,6 +13,8 @@ import { z } from 'zod'
 export const MODEL_RECEIPT_LINES_MAX = 300
 /** The most summary amounts: the bench's longest summary has 12. */
 export const MODEL_RECEIPT_TOTALS_MAX = 40
+/** The most rows of numbers with their labels: a receipt prints four or five, two receipts on a photo ten. */
+export const MODEL_RECEIPT_ID_ROWS_MAX = 20
 
 // what the model writes is read, never trusted: a figure that is no number of its kind is no figure
 const text = z.string().max(300).nullable()
@@ -24,9 +26,7 @@ const text = z.string().max(300).nullable()
 export const modelReceiptSchema = z.strictObject({
   shop: text,
   address: text,
-  tin: text,
-  fiscal_no: text,
-  receipt_no: text,
+  id_rows: z.array(z.string().max(300)).max(MODEL_RECEIPT_ID_ROWS_MAX),
   date: text,
   time: text,
   lines: z
@@ -76,15 +76,37 @@ const clockOf = (time: string | null): string | null => {
 }
 
 /**
- * The receipt's number as the key against a second record (Т-11), in Tesseract's form — or one paper read by
- * the two readers is two keys and recorded twice (adversarial А5): the fiscal number, eight digits as printed,
- * leading zeros kept. **Never the tax number** — the model put it there three times on the bench, and every
- * receipt of the shop would be «recorded before» — **and never «ԿՀ»**: a till's own count, repeated by the
- * shop's other tills. Anything else is no number, and the receipt is held by its id alone.
+ * The one number the rows the model copied give after a word of the card, or none — two receipts on a photo,
+ * a prepayment slip over the receipt, print two. The model copies the rows with their labels and never says
+ * which number is which (review №10, adversarial А6): asked for the tax number, it gave «Ереван Сити»'s till
+ * registration «ԳՀ» printed under it, and the shop's tax number as the fiscal one — the key of every receipt
+ * of that till, and the next one «recorded before».
  */
-function numberOf(answer: ModelReceipt, tin: string | null): string | null {
-  const fiscal = (answer.fiscal_no ?? '').replace(/\s/g, '')
-  return /^\d{8}$/.test(fiscal) && fiscal !== tin ? fiscal : null
+function labelled(answer: ModelReceipt, word: string, between: string): string | null {
+  const pattern = new RegExp(`(?:${word})${between}(?<!\\d)(\\d{8})(?!\\d)`, 'iu')
+  const found = new Set(
+    answer.id_rows.flatMap((row) => {
+      const number = pattern.exec(row)?.[1]
+      return number === undefined ? [] : [number]
+    }),
+  )
+  return found.size === 1 ? ([...found][0] ?? null) : null
+}
+
+/**
+ * The seller's tax number and the receipt's number, the key against a second record (Т-11), in Tesseract's
+ * form and by its words — or one paper read by the two readers is two keys and recorded twice (adversarial
+ * А5, А6): the eight digits after «ՀՎՀՀ», and the fiscal number, eight digits after «Ֆիսկալ», leading zeros
+ * kept. **Never «ԿՀ»**: a till's own count, repeated by the shop's other tills. **Never the tax number** as
+ * the receipt's number: every receipt of the shop would be «recorded before».
+ */
+function keyOf(
+  reading: PhotoReading,
+  answer: ModelReceipt,
+): { tin: string | null; number: string | null } {
+  const tin = labelled(answer, reading.words.tin, '\\S{0,2}\\s*')
+  const fiscal = labelled(answer, reading.words.fiscal, '\\S*(?:\\s+\\S*)?\\s*')
+  return { tin, number: fiscal !== null && fiscal !== tin ? fiscal : null }
 }
 
 /**
@@ -192,13 +214,13 @@ export function receiptTextOfModel(reading: PhotoReading, answer: ModelReceipt):
       : discounted
         ? 'card'
         : 'class'
-  const tin = /^\d{8}$/.test(answer.tin?.trim() ?? '') ? (answer.tin?.trim() ?? null) : null
+  const { tin, number } = keyOf(reading, answer)
   return {
     layout,
     tin,
     date: dayOf(answer.date),
     time: clockOf(answer.time),
-    receiptNo: numberOf(answer, tin),
+    receiptNo: number,
     totalHundredths: total,
     readTotalHundredths: read,
     balanced: met,

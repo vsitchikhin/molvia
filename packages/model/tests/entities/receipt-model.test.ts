@@ -14,9 +14,7 @@ import type { ModelReceipt } from '#model/entities/receipt-model'
 const answer = (over: Partial<ModelReceipt> = {}): ModelReceipt => ({
   shop: 'Խանութ «Օրինակ»',
   address: 'Գորկու 1, Գյումրի',
-  tin: '01234567',
-  fiscal_no: '27410811',
-  receipt_no: '000123',
+  id_rows: ['ՀՎՀՀ: 01234567', 'ԳՀ: 55512345', 'ԿՀ: 000123', 'Ֆիսկալ համար 27410811'],
   date: '2026-10-08',
   time: '19:57',
   lines: [],
@@ -124,27 +122,42 @@ describe('a model’s answer as the parse’s reading (MOL-272)', () => {
       time: '19:57',
       receiptNo: '27410811',
     })
-    const odd = read(answer({ tin: '0123456', date: '08.10.2026', time: '25:10', fiscal_no: ' ' }))
+    const odd = read(
+      answer({ id_rows: ['ՀՎՀՀ: 0123456', 'Ֆիսկալ համար'], date: '08.10.2026', time: '25:10' }),
+    )
     expect([odd.tin, odd.date, odd.time, odd.receiptNo]).toEqual([null, null, null, null])
   })
 
-  it('keys a second record by the fiscal number in Tesseract’s form, never the tax number or «ԿՀ» (adversarial А5)', () => {
-    const number = (
-      fiscal_no: string | null,
-      receipt_no: string | null = '15429',
-      tin = '01234567',
-    ) => read(answer({ fiscal_no, receipt_no, tin })).receiptNo
-    expect(number('27410811')).toBe('27410811')
-    expect(number('00410811')).toBe('00410811')
-    expect(number('27 410 811')).toBe('27410811')
-    // the tax number is every receipt of the shop: no key
-    expect(number('01234567')).toBeNull()
-    // a label, a barcode's number, a digit lost or one too many, «ԿՀ» alone: no key
-    expect(number('ՖՀ 27410811')).toBeNull()
-    expect(number('GY0000927265')).toBeNull()
-    expect(number('2741081')).toBeNull()
-    expect(number('274108111')).toBeNull()
-    expect(number(null, '00000049')).toBeNull()
+  it('keys a second record by the words of the card, as Tesseract reads it (adversarial А5, А6, review №10)', () => {
+    const key = (...id_rows: string[]) => {
+      const text = read(answer({ id_rows }))
+      return [text.tin, text.receiptNo]
+    }
+    expect(key('ՀՎՀՀ:01234567', 'Ֆիսկալ համար 00410811')).toEqual(['01234567', '00410811'])
+    expect(key('ՀՎՀՀ 01234567 Գ/Հ 55512345', 'ՖԻՍԿԱԼ ՀԱՄԱՐ: 27410811')).toEqual([
+      '01234567',
+      '27410811',
+    ])
+    // the till's registration and the shop's tax number under labels the model mixed up: neither is a key, so
+    // two receipts of the till are never one (review №10: am-07b and am-10 of the bench, `51691957/01282006`)
+    expect(key('ԳՀ:51691957', 'ԳՀ:01282006', 'ԿՀ: 90264')).toEqual([null, null])
+    expect(key('ՀԴՄ:01282006', 'ԳՀ:61691957', 'Ֆիսկալ համար 43542455')).toEqual([null, '43542455'])
+    // the tax number is every receipt of the shop: never the receipt's number
+    expect(key('ՀՎՀՀ:01234567', 'Ֆիսկալ համար 01234567')).toEqual(['01234567', null])
+    // two fiscal numbers — a prepayment slip, two receipts on a photo — or two tax numbers: none is the key
+    expect(key('ՀՎՀՀ:01234567', 'Ֆիսկալ համար 27410811', 'Ֆիսկալ համար 27410812')).toEqual([
+      '01234567',
+      null,
+    ])
+    expect(key('ՀՎՀՀ:01234567', 'ՀՎՀՀ:01234568', 'Ֆիսկալ համար 27410811')).toEqual([
+      null,
+      '27410811',
+    ])
+    // the same number read twice is one
+    expect(key('Ֆիսկալ համար 27410811', 'Ֆիսկալ համար: 27410811')).toEqual([null, '27410811'])
+    // «ԿՀ», a barcode's number, «ՖՀ», a digit lost or one too many: no key
+    expect(key('ԿՀ: 00000049', 'GY0000927265', 'ՖՀ 27410811')).toEqual([null, null])
+    expect(key('Ֆիսկալ համար 2741081', 'Ֆիսկալ համար 274108111')).toEqual([null, null])
   })
 
   it('names the city where the head’s address does', () => {

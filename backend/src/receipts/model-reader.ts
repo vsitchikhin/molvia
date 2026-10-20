@@ -22,7 +22,7 @@ import {
 } from '@/receipts/model-prompt'
 
 /**
- * A call the model may take, its answer's body included: the bench's longest was 45 s (MOL-272). Past it the
+ * A call the model may take, its answer's body included: the bench's longest was 55 s (MOL-272). Past it the
  * answer is lost, not the receipt — it waits in the queue as for Tesseract away.
  */
 export const MODEL_TIMEOUT_MS = 120_000
