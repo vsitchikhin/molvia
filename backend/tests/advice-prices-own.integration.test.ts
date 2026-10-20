@@ -25,7 +25,8 @@ import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } fr
 
 // The 6 tests here past half a second on CI carry a timeout of 10 s: the slowest took 644 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
-// than any yet seen.
+// than any yet seen. The two of MOL-274 through the trip's routes carry the same, not yet measured
+// there.
 
 const { db, close } = connectDrizzle()
 
@@ -680,6 +681,85 @@ describe('GET /advice/prices — another item of the kind (В-3, В-7)', () => {
       level: 'unrated',
       alternatives: [{ itemId: marianna, rating: '4.0' }],
     })
+  })
+})
+
+describe('GET /advice/prices — a purchase at 0 is no price (MOL-274)', () => {
+  /** A purchase as the sheet writes it, through the trip's own route. */
+  async function typed(actor: string, tripId: string, itemId: string, amount: string) {
+    const reply = await app.inject({
+      method: 'POST',
+      url: `/trips/${tripId}/expenses`,
+      headers: { cookie: await signIn(db, actor) },
+      payload: {
+        id: randomUUID(),
+        itemId,
+        quantity: { value: '1', unit: 'l' },
+        amount: { amount, currency: 'AMD' },
+      },
+    })
+    expect(reply.statusCode, reply.body).toBe(201)
+  }
+
+  it('names the price before a gift typed on the sheet, and none where a gift is all there is', async () => {
+    const me = await insertActor(db)
+    const milk = await item('Молоко Ашхар 1 л')
+    const city = await erevan('Ереван Сити')
+    await bought(me, milk, city, 500, { on: '2026-10-02' })
+    const gift = await insertTrip(db, { actorId: me, placeId: city, startedOn: '2026-10-14' })
+    await typed(me, gift, milk, '0')
+    const kefir = await item('Кефир Марианна 1 л')
+    await typed(me, gift, kefir, '0')
+
+    expect(placesOf(await prices(me, { item: milk }))).toEqual([
+      { name: 'Ереван Сити', price: perLitre(500), day: '2026-10-02', observations: 1 },
+    ])
+    expect(placesOf(await prices(me, { item: kefir }))).toEqual([])
+  }, 10_000)
+
+  it('leaves a purchase out once its sum is put right to 0', async () => {
+    const me = await insertActor(db)
+    const milk = await item('Молоко Ашхар 1 л')
+    const city = await erevan('Ереван Сити')
+    await bought(me, milk, await erevan('Зовуни'), 560, { on: '2026-10-01' })
+    const later = await bought(me, milk, city, 500, { on: '2026-10-14' })
+    expect(placesOf(await prices(me, { item: milk })).map((place) => place.name)).toEqual([
+      'Ереван Сити',
+      'Зовуни',
+    ])
+
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: `/trips/${later.tripId}/expenses/${later.id}`,
+      headers: { cookie: await signIn(db, me) },
+      payload: { amount: { amount: '0', currency: 'AMD' } },
+    })
+    expect(patched.statusCode, patched.body).toBe(200)
+    expect(placesOf(await prices(me, { item: milk })).map((place) => place.name)).toEqual([
+      'Зовуни',
+    ])
+  }, 10_000)
+
+  it('offers no alternative bought only as a gift, and one bought at a price', async () => {
+    const me = await insertActor(db)
+    const ashhar = await item('Молоко Ашхар 1 л')
+    const marianna = await item('Молоко Марианна 1 л')
+    const zovuni = await erevan('Зовуни')
+    await bought(me, ashhar, zovuni, 620)
+    await bought(me, marianna, zovuni, 0)
+    await rate(me, marianna, 5)
+
+    const gifted = await prices(me, { item: ashhar })
+    expect(gifted.level !== 'never' && gifted.alternatives).toEqual([])
+
+    await bought(me, marianna, zovuni, 480, { on: '2026-09-01' })
+    const priced = await prices(me, { item: ashhar })
+    expect(priced.level !== 'never' && priced.alternatives).toEqual([
+      expect.objectContaining({
+        itemId: marianna,
+        places: [expect.objectContaining({ day: '2026-09-01' })],
+      }),
+    ])
   })
 })
 

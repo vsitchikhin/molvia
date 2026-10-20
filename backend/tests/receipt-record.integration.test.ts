@@ -30,7 +30,7 @@ import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtur
 
 // The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 857 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
-// than any yet seen.
+// than any yet seen. The one of MOL-274 carries the same, not yet measured there.
 
 /**
  * «Записать» (MOL-126): a parsed receipt written in one go as a finished trip on its own day, its
@@ -619,6 +619,54 @@ describe('«Записать»', () => {
     const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
     expect(trip?.receiptMinor).toBe(215_000n)
   })
+
+  it('records a gift at 0 as a purchase of the trip, and as no price of its place (MOL-274, А8)', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db)
+    const bread = await insertItem(db)
+    const id = await parsedReceipt(me, [
+      { printed: 'Կաթ «Իգիթ» 3.2% 1լ', sku: '1163909', price: 500, sum: 0 },
+      { printed: 'Հաց', sku: '1110004', price: 300, sum: 300 },
+    ])
+    // «0,00/500,00 500» as the check keeps it on a receipt proven whole: the count and nothing paid
+    await db
+      .update(receiptLines)
+      .set({ priceMinor: null, settled: true })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 0)))
+    const response = await record(me, id, {
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        { position: 0, skip: false, item: { id: milk }, quantity: pieces(1), amount: amount(0) },
+        { position: 1, skip: false, item: { id: bread }, quantity: pieces(1), amount: amount(300) },
+      ],
+    })
+    expect(response.statusCode, response.body).toBe(200)
+    const rows = await db.select().from(expenses).where(eq(expenses.itemId, milk))
+    expect(rows.map((row) => row.amountMinor)).toEqual([0n])
+
+    const prices = await app.inject({
+      method: 'GET',
+      url: `/advice/prices?item=${milk}&country=AM&city=${encodeURIComponent('Гюмри')}`,
+      headers: { cookie: await signIn(db, me) },
+    })
+    expect(prices.statusCode, prices.body).toBe(200)
+    expect(prices.json()).toMatchObject({ prices: { itemId: milk, places: [] } })
+    // Must not fire: the gift is still the trip's 0 and still waits for a verdict.
+    const [trip] = await db
+      .select()
+      .from(trips)
+      .where(eq(trips.id, rows[0]?.tripId ?? ''))
+    expect(trip?.receiptMinor).toBe(30_000n)
+    const pending = await app.inject({
+      method: 'GET',
+      url: '/verdicts/pending',
+      headers: { cookie: await signIn(db, me) },
+    })
+    expect(pending.body).toContain(milk)
+  }, 10_000)
 
   it('confirms no row of a line whose price the check took off as misread (MOL-255)', async () => {
     const me = await insertActor(db)

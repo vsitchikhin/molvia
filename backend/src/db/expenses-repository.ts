@@ -534,6 +534,10 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
               -- An observation without a price or without a quantity says nothing about a
               -- unit price, so it is skipped by an explicit condition rather than silently.
               and ${expenses.amountMinor} is not null
+              -- Nor is a purchase paid nothing (MOL-274): a gift by the card, «the second free»
+              -- is no price of the item, and it is not a buyer, a visit or a weight of anything
+              -- here either — counted as a buyer, two prices opened a place as three (В-1).
+              and ${expenses.amountMinor} > 0
               and ${expenses.qtyMilli} is not null
               and (${visible})${except}
           ),
