@@ -136,25 +136,22 @@ export default defineComponent({
   line-height: var(--leading-tight);
 }
 
+/* A place of one long word — a receipt's head in capitals, «ՍՈՒՊԵՐՄԱՐԿԵՏՆԵՐԻ ՑԱՆՑ» — pushed the price out of
+   the card: the place and its price follow the name and its rating. */
 .best {
-  display: flex;
-  gap: var(--space-2);
-  align-items: baseline;
-  justify-content: space-between;
+  @include name-beside-figure;
+
+  gap: var(--space-1) var(--space-2);
   margin-top: var(--space-3);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   background: var(--good-tint);
 }
 
-/* A place of one long word — a receipt's head in capitals, «ՍՈՒՊԵՐՄԱՐԿԵՏՆԵՐԻ ՑԱՆՑ» — breaks rather than
-   pushes the price out of the card. */
 .where {
-  min-width: 0;
   color: var(--good-ink);
   font-size: var(--text-footnote);
   font-weight: var(--weight-medium);
-  overflow-wrap: break-word;
 }
 
 .price {
