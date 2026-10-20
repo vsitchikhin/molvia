@@ -109,7 +109,10 @@ export interface RateChartPeriod {
     readonly percent: number | null
     /**
      * The sign of the money beside it, which its tone is (MOL-190, Р-4 of MOL-187): the percent is
-     * rounded to hundredths and may read 0,00 % over money that is there. Null where the percent is.
+     * rounded to hundredths and may read 0,00 % over money that is there. The card's money, in the
+     * currency received — never `measured`'s, which is in the spending currency and rounded to its
+     * cent: −1,00 ֏ is 0,00 $ there while the card says «хуже» (adversarial А1). Null where the
+     * percent is.
      */
     readonly sign: -1 | 0 | 1 | null
     /** That market (В-1): where the mark from the point ends. */
@@ -346,10 +349,10 @@ function ratePeriod(
           exchange,
           scaled,
           market: measure && market !== null ? { scaled: market, measure } : null,
-          ...(measured && measured.expected > 0n
+          ...(measured && measured.expected > 0n && offered
             ? {
                 percent: hundredthsOf(measured.difference, measured.expected),
-                sign: signOf(measured.difference),
+                sign: signOf(offered.difference.minor),
               }
             : { percent: null, sign: null }),
         },
