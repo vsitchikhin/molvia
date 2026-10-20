@@ -282,10 +282,10 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   one price; with access the home may name the town's where the sheet names one's own, dated (Б2,
   changed by О).
 - **A purchase paid nothing is no price** (MOL-274, the owner's «б» on А8 of MOL-255): a gift by the
-  card, «the second free», a 0 typed by hand. `pricedRows` leaves it out beside a purchase with no
-  price, so no reader takes it — not a place's last price, not a share of a median, not one of the
-  three buyers who open a place, not a weight of a pair, not a visit that makes a place one's own or
-  fresh (В-1 «а»): counted as a buyer, a gift opened a place on two prices, and their lower median was
+  card, «the second free», a 0 typed by hand. `PRICED_PURCHASE` leaves it out beside a purchase with
+  no price — one fragment for `pricedRows` and the candidates of «Тут дешевле» — so no reader takes
+  it: not a place's last price, not a share of a median, not one of the three buyers who open a
+  place, not a weight of a pair, not a visit that makes a place one's own or fresh (В-1 «а»): counted as a buyer, a gift opened a place on two prices, and their lower median was
   one person's receipt. A buyer's last price is the one before the gift, and the window counts from
   it; one minor unit is a price. The purchase stays a purchase — the trip's 0, «Оценки», the copy.
   **The price, named:** an answer remembered on the phone keeps its 0 until the next one with a signal.
@@ -445,8 +445,10 @@ decisions of 02.10.2026 are В-1…В-10 of `requirements/MOL-92.md`.
   `adviceRowsFor` and `describe` as «Что брать», in its own mode. With access the two may disagree:
   the screen says the town's «не брать нигде», the sheet the person's own «5» — named, on purpose.
   A withdrawn verdict is no verdict: prices again.
-- **Another item of the kind** (В-3, В-7…В-9): one's own products bought with a price in the city
-  whose word of the kind is the item's (`kindKey`, MOL-45 — the SQL spelling is `kindAt`, one
+- **Another item of the kind** (В-3, В-7…В-9): one's own products bought with a price — above 0, by
+  `PRICED_PURCHASE` (MOL-274, adversarial А1: rated gifts of the kind filled the cut of
+  `OWN_ALTERNATIVES_MAX` before any price was read, and the alternative with a price went) — in the
+  city whose word of the kind is the item's (`kindKey`, MOL-45 — the SQL spelling is `kindAt`, one
   fragment for the search and for this). Shown when strictly cheaper than the price typed — before
   one is, than the item's own cheapest — and rated no worse by the printed tenth (Р-22); beside an
   item not rated, only one in «Брать» (В-8); an unrated alternative never (Р-11). Of those that
