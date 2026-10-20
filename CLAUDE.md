@@ -218,6 +218,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   reads (`latestFirst`) — with access, while one bought there within `SHARED_PRICE_FRESH_DAYS` or
   nobody else opened it; a place opened by others — the lower median of each buyer's last within
   the window.
+- **A purchase at 0 is no price for any reader** (MOL-274): `PRICED_PURCHASE` leaves it out beside one
+  with no price, for `pricedRows` and the kind's candidates alike — not a place's price, a median's
+  share, one of the three buyers or a visit; the purchase stays, and a 0 typed on the sheet is
+  nothing typed (`cheaperHint`).
 - **«Только если дёшево» is the lower median from three purchases**; per item the «currency +
   unit» of most purchases first, the other pairs' places after it, never compared (MOL-166); order
   by rating down, then name.

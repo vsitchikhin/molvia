@@ -858,9 +858,9 @@ where its discount is its whole price to the hundredth** (round 2, А7 «а»): 
 one number printed twice, and it is kept only on a receipt proven whole, as «660 660» below (round 3, А9 «а») —
 and then with its count and its nothing paid alone (round 4, А11 «а»): misread alike, the price and the discount
 leave every sum as it was, so the total vouches for neither, and a price kept would go to the shop's memory and
-confirm its strip. **The price, named** (№11, А8): recorded, it is a purchase at 0, and every reader of a price
-takes it — the place's last price «0 ֏», a median's share — as master did; the readers' rule for any purchase at
-0 is MOL-274 (owner's «б»). **A line of a quantity of one whose price is its sum is not verified on its own**
+confirm its strip. **Recorded, it is a purchase at 0, and no reader of a price takes it** (№11, А8, owner's «б»;
+MOL-274): the trip's money holds its 0, «Оценки» ask about it, and «Что брать» and «Тут дешевле» leave it out as
+they leave any purchase at 0 (`advice.md`). **A line of a quantity of one whose price is its sum is not verified on its own**
 (В-2 «а», a kilogram too since round 1, А2): the till prints one number twice, and a digit misread alike in both
 columns — «660 660» for 560 — holds that arithmetic; such a line keeps its figures only on a receipt **proven
 whole** — every line as printed and their sums exactly the total shown. **The price is kept only where quantity ×
@@ -1015,7 +1015,8 @@ near is `search`, far `weak`, nothing `new`, named so. **Measured on the 98 line
 its first two words and its first, the search added 34 far lines, some 30 wrong — «UBRUS», paper towels, a
 vinegar — and a wrong «проверьте» taken at a glance is a wrong purchase, so it is not done. **A service is no product** (adversarial А6): «Достава» at 0,00, a tip «Напојница», a «Услуга» —
 `serbianServiceLine`, either script — is not searched for and goes «проверьте» with no item, for the
-person to leave out or record; a delivery at 0 recorded in silence would be an item's lowest price. **82 new of 98
+person to leave out or record; a delivery at 0 recorded in silence was an item's lowest price until MOL-274,
+and is still a purchase of an item nobody bought. **82 new of 98
 is the case for a dictionary of Serbian till words** as the Armenian one, a task of its own. The memory
 needs nothing new: the tax office prints a line the same every time, and the second receipt of a chain
 knows what the first was taught.
