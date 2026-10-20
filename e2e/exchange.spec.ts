@@ -573,7 +573,7 @@ function rateMonth(id: string) {
 }
 
 /** Puts the line into the answer on its way (`page.route`): this run has no market of its own. */
-async function withRateCharts(page: Page, id: string): Promise<void> {
+async function withRateCharts(page: Page, id: string, before: object[] = []): Promise<void> {
   await page.route('**/api/exchanges', async (route) => {
     if (route.request().method() !== 'GET') return route.continue()
     const response = await route.fetch()
@@ -583,7 +583,11 @@ async function withRateCharts(page: Page, id: string): Promise<void> {
         {
           currency: 'RUB',
           side: 'bankBuys',
-          periods: { 1: rateMonth(id), 6: null, 12: rateYear(id) },
+          periods: {
+            1: rateMonth(id),
+            6: null,
+            12: { ...rateYear(id), exchanges: [...before, ...rateYear(id).exchanges] },
+          },
         },
       ],
     }
@@ -660,6 +664,45 @@ test('the rate of twelve months: no market — no card; the latest exchange firs
   await page.keyboard.press('ArrowRight')
   await expect(card.locator('.figure')).toHaveText('Рынка за эту неделю нет')
   expect(await lineTop()).toBe(withPlate)
+})
+
+/**
+ * Every plate of the period stands unseen in one cell, holding the place (MOL-190): a note of another
+ * exchange — a link to a map, no spaces — neither stretches the plate shown nor pushes the page aside,
+ * on the week of an exchange or on one without (adversarial В1, В2).
+ */
+test('a long note of another exchange: the plate keeps its height, the page its width', async ({
+  page,
+}) => {
+  await signedIn(page)
+  const id = await exchangeOfFebruary(page)
+  const link = {
+    ...rateYear(id).exchanges[0],
+    id: randomUUID(),
+    day: '2026-02-14',
+    step: 1,
+    x: 260,
+    level: 700,
+    place: 'https://yandex.ru/maps/org/ardshinbank/1234567890/?ll=43.8453,40.7894&z=17',
+  }
+  await withRateCharts(page, id, [link])
+
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('link', { name: 'Обмен денег' }).click()
+  const card = page.locator('.rate-chart')
+  await expect(card.locator('.mine-place')).toHaveText('Ардшинбанк')
+
+  const wide = () =>
+    page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  const box = async (selector: string) =>
+    (await card.locator(selector).boundingBox())?.height ?? NaN
+  // The plate is its three lines and its padding (8 above, 8 below), not the link's four or more.
+  expect(await box('.mine')).toBeCloseTo((await box('.mine .plate-text')) + 16, 0)
+  expect(await wide()).toBe(0)
+
+  await card.locator('.area').tap({ position: { x: 2, y: 60 } })
+  await expect(card.locator('.none')).toHaveText('Обменов на этой неделе не было')
+  expect(await wide()).toBe(0)
 })
 
 /**

@@ -831,10 +831,12 @@ export default defineComponent({
   }
 }
 
-/* The plates of the period in one cell: the tallest decides, the one shown is the exchange chosen. */
+/* The plates of the period in one cell: the tallest decides, the one shown is the exchange chosen —
+   at its own height, never stretched to the tallest (adversarial В1). */
 .stack {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  align-items: start;
 
   > * {
     grid-area: 1 / 1;
@@ -865,9 +867,13 @@ export default defineComponent({
   background: var(--accent);
 }
 
+/* A note with no spaces — a link to a map — wraps: unseen, it would push the page aside on every week
+   of the period (adversarial В2). */
 .plate-text {
   display: grid;
+  min-width: 0;
   font-size: var(--text-footnote);
+  overflow-wrap: anywhere;
 }
 
 .plate-rate {
