@@ -125,29 +125,15 @@ export default defineComponent({
   margin-top: var(--space-2);
 }
 
-/* The name and the rating share a line while the whole name fits beside it; otherwise the rating
-   goes under the name, at the right. Squeezed beside it instead, the name broke mid-word on a phone
-   of 320 in the shared mode — «4,8 из 5 · 12 оценок» left «армянский» room for «армянс». A word
-   wider than the whole line breaks rather than leaves the card. */
 .title {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-3);
-  align-items: baseline;
-
-  > :last-child {
-    margin-left: auto;
-  }
+  @include name-beside-figure;
 }
 
 .name {
   @include display-type;
 
-  flex: 1 1 auto;
-  min-width: 0;
   font-size: var(--text-title);
   line-height: var(--leading-tight);
-  overflow-wrap: break-word;
 }
 
 .best {

@@ -73,6 +73,28 @@ $row-narrow: 22rem;
   background: var(--surface);
 }
 
+/// A name and its figure on one row of «Что брать» (MOL-200) — on the row, the name its first child and
+/// the figure its last. One line while the whole name fits beside the figure; otherwise the figure goes
+/// under the name, at the right. Squeezed beside it instead, the name broke mid-word on a phone of 320 in
+/// the shared mode — «4,8 из 5 · 12 оценок» left «армянский» room for «армянс». A word wider than the
+/// whole row breaks rather than leaves it.
+@mixin name-beside-figure {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  align-items: baseline;
+
+  > :first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+
+  > :last-child {
+    margin-left: auto;
+  }
+}
+
 /// Read by a screen reader, never drawn. For words the screen already says with a picture —
 /// the «Back» in front of the chevron's label.
 @mixin visually-hidden {

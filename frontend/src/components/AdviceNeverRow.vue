@@ -72,10 +72,7 @@ export default defineComponent({
 }
 
 .line {
-  display: flex;
-  gap: var(--space-3);
-  align-items: baseline;
-  justify-content: space-between;
+  @include name-beside-figure;
 }
 
 .name {
