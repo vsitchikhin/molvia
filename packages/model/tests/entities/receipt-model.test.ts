@@ -142,8 +142,16 @@ describe('a model’s answer as the parse’s reading (MOL-272)', () => {
     // two receipts of the till are never one (review №10: am-07b and am-10 of the bench, `51691957/01282006`)
     expect(key('ԳՀ:51691957', 'ԳՀ:01282006', 'ԿՀ: 90264')).toEqual([null, null])
     expect(key('ՀԴՄ:01282006', 'ԳՀ:61691957', 'Ֆիսկալ համար 43542455')).toEqual([null, '43542455'])
-    // the tax number is every receipt of the shop: never the receipt's number
+    // a number printed under another label too is the shop's or the till's, on every receipt of the till: never
+    // the receipt's number (adversarial А6, round 4) — the tax number under «Ֆիսկալ», the till's registration
     expect(key('ՀՎՀՀ:01234567', 'Ֆիսկալ համար 01234567')).toEqual(['01234567', null])
+    expect(key('ԳՀ:55512345', 'ՀՎՀՀ:01234567', 'Ֆիսկալ համար 55512345')).toEqual(['01234567', null])
+    expect(key('ԳՀ:55512345 Ֆիսկալ համար 55512345', 'ՀՎՀՀ:01234567')).toEqual(['01234567', null])
+    // the tax number keeps no such guard: am-07b of the bench printed it under «ՀՎՀՀ» and «ՀԴՄ», both right
+    expect(key('ՀՎՀՀ:01282006', 'ՀԴՄ:01282006', 'Ֆիսկալ համար:99784818')).toEqual([
+      '01282006',
+      '99784818',
+    ])
     // two fiscal numbers — a prepayment slip, two receipts on a photo — or two tax numbers: none is the key
     expect(key('ՀՎՀՀ:01234567', 'Ֆիսկալ համար 27410811', 'Ֆիսկալ համար 27410812')).toEqual([
       '01234567',

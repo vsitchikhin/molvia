@@ -550,6 +550,19 @@ describe('the key against a second record (Т-11, adversarial А5, А6, review �
     )
     expect(await twinOf(second, me.id)).toBe('no key')
   }, 30_000)
+
+  it('is none where the model put the till’s registration under «Ֆիսկալ» and lost the fiscal row: the next receipt of the till is recorded', async () => {
+    const me = await person(LATER)
+    // adversarial А6, round 4: the tax number right, one label moved — the till's number is printed under «ԳՀ» too
+    const moved = ['ԳՀ:55512345', 'ԿՀ: 90264', 'ՀՎՀՀ:01234567', 'Ֆիսկալ համար 55512345']
+    const first = await queued(me)
+    await readAll(benchReader(), as(moved))
+    expect(await receiptOf(first)).toMatchObject({ tin: '01234567', receiptNo: null })
+    await record(first, me.id)
+    const second = await queued(me)
+    await readAll(benchReader(), as(moved, { date: '2026-10-09', time: '10:05' }))
+    expect(await twinOf(second, me.id)).toBe('no key')
+  }, 30_000)
 })
 
 describe('the measure of 0.2r by its reader (MOL-272, В-6 «а»)', () => {

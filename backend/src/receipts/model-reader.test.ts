@@ -117,6 +117,16 @@ describe('the model that reads receipts (MOL-272)', () => {
     expect(text).toContain('"additionalProperties":false')
   })
 
+  it('reads an answer of any number of rows of numbers: a bank slip under the receipt never throws it away', async () => {
+    // adversarial А7: the rows give only the key, and a ceiling of the schema sank the whole paid reading
+    const id_rows = Array.from({ length: 60 }, (_, i) => `RRN ${String(600_000_000_001 + i)}`)
+    const answer = { ...ANSWER, id_rows }
+    const { fetch } = api(() =>
+      message({ content: [{ type: 'text', text: JSON.stringify(answer) }] }),
+    )
+    expect(await model(fetch).read([jpeg(10, 10)])).toMatchObject({ kind: 'read', answer })
+  })
+
   it('counts a refusal, an answer cut by its length and one of no schema — each paid', async () => {
     const cases: [Record<string, unknown>, string][] = [
       [{ stop_reason: 'refusal' }, 'refused'],
