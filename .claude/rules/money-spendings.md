@@ -385,7 +385,12 @@ nothing up.
   underneath with its own parents — «Траты» of the running month over «Деньги».
 - **One's own category is made from the chips** («+ Своя», a sheet over the sheet, chosen as soon
   as it exists) **and kept on «Деньги → Категории»** (В-1): «Убрать» asks nothing, since it erases
-  nothing, and «Вернуть» stands right under it. **A category that landed stays on the chips until the
+  nothing — and is a `ghost`, never red (MOL-191, Ф-34: thirteen red words stood in a column) — and
+  «Вернуть» stands right under it. **«Добавить категорию» is the strip** (`#docked`, Ф-28), while the
+  list comes too and offline over a list shown, since the queue makes it either way; offline with no
+  list ever shown there is none (handoff 7h). **A row is the kit's `ListRow`** (owner's В-1 «а» of
+  MOL-191): the category's icon in a circle of its colour, as on «Траты» — one's own all the tag
+  (`categoryIcon`), told apart by colour alone; choosing either is MOL-285. **A category that landed stays on the chips until the
   server's list names it** (`arrived`, found by e2e in MOL-123): it leaves the queue on its answer and
   the list is read again only after, and in between «Сохранить трату» said «Выберите категорию» over
   the one just made and chosen. A name equal to a preset in the language of the

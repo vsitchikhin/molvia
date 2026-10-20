@@ -360,7 +360,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   **Active** is the row the keyboard stands on in a list a field owns (К-4): the fill without the
   ring, since the focus is in the field; on a chosen row the fill is the layer's alone — the row's own
   square fill stood out past the round ring at every corner (adversarial В1). Only a `div` row takes a button into its tail — a button
-  inside a button is no HTML. `NavRow` without `to` is a button that opens a sheet and says so
+  inside a button is no HTML — **and a button there does not make the row taller**: its 44 stands over
+  the row's padding by 4 a side, so the row is 64 as its skeleton is (MOL-191: «Категории» came 68). `NavRow` without `to` is a button that opens a sheet and says so
   (`aria-haspopup="dialog"`). **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
   handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
   its tint, in the strip's shape and never a live region; a tag a pill of 13/600, plain, warn or bad
