@@ -47,25 +47,31 @@ async function ratedPurchase(
   name: string,
   score: number,
   place = 'SAS',
-): Promise<void> {
+): Promise<string> {
+  const entry = (await who.call('POST', '/catalogue/items', {
+    kind: 'product',
+    name,
+    defaultUnit: 'l',
+  })) as { id: string }
+  await purchase(who, entry.id, place, '520')
+  await who.call('PUT', `/verdicts/${entry.id}`, { score })
+  return entry.id
+}
+
+/** One more purchase of the item, 0,9 l for the amount given, in a trip of its own. */
+async function purchase(who: Person, itemId: string, place: string, amount: string): Promise<void> {
   const tripId = randomUUID()
   await who.call('POST', '/trips', {
     context: settingsOf(actorCodec.parse(await who.call('GET', '/actors/me'))),
     id: tripId,
     place: { kind: 'store', name: place },
   })
-  const entry = (await who.call('POST', '/catalogue/items', {
-    kind: 'product',
-    name,
-    defaultUnit: 'l',
-  })) as { id: string }
   await who.call('POST', `/trips/${tripId}/expenses`, {
     id: randomUUID(),
-    itemId: entry.id,
+    itemId,
     quantity: { value: '0.9', unit: 'l' },
-    amount: { amount: '520', currency: 'AMD' },
+    amount: { amount, currency: 'AMD' },
   })
-  await who.call('PUT', `/verdicts/${entry.id}`, { score })
   // Finished, so a second purchase can open a trip of its own: one open at a time.
   await who.call('POST', `/trips/${tripId}/finish`, {
     finishedOnDeviceAt: new Date().toISOString(),
@@ -137,9 +143,15 @@ test('on a phone of 320 a long name stays in its row in all three forms, shared 
   }
   // A receipt's head in capitals: one word narrower than the plate, wider than what the price leaves.
   const word = 'ՍՈՒՊԵՐՄԱՐԿԵՏՆԵՐԻ'
+  // The same head read with its spaces lost: one word wider than any row of the card.
+  const glued = 'ՍՈՒՊԵՐՄԱՐԿԵՏՆԵՐԻՑԱՆՑԳՅՈՒՄՐԻՈՒՄՆԵՐ'
+  // A place of short words, as the handoff draws it: the price stays beside it.
+  const short = `Лаваш ${tag}`
   await ratedPurchase(who, names.take, 5, `${word} ՑԱՆՑ`)
-  await ratedPurchase(who, names['if-cheap'], 3)
+  await ratedPurchase(who, names['if-cheap'], 3, glued)
   await ratedPurchase(who, names.never, 1)
+  // Dearer in the glued place, so it stands under «Ещё».
+  await purchase(who, await ratedPurchase(who, short, 5, 'Ереван Сити'), glued, '560')
   await page.route(/\/api\/advice$/, async (route) => {
     const response = await route.fetch()
     const json = (await response.json()) as { scope: string; rows: { ratingsCount: number }[] }
@@ -153,7 +165,7 @@ test('on a phone of 320 a long name stays in its row in all three forms, shared 
   await expect(page.getByText('Reviews and prices are yours alone')).toBeVisible()
 
   for (const [group, name] of Object.entries(names)) {
-    const row = page.locator(`section.${group}`).locator('article, .row').first()
+    const row = page.locator(`section.${group}`).locator('article, .row').filter({ hasText: name })
     await expect(row.getByText(name), group).toBeVisible()
     const fits = await row.evaluate((element) => {
       const name = element.querySelector('.name')!
@@ -168,7 +180,8 @@ test('on a phone of 320 a long name stays in its row in all three forms, shared 
     expect(fits, group).toEqual({ name: true, rating: true })
   }
   // The place stays whole and the price inside the card: the price goes under the place instead.
-  const plate = await page.locator('section.take article').evaluate((card, whole) => {
+  const take = page.locator('section.take article')
+  const plate = await take.filter({ hasText: names.take }).evaluate((card, whole) => {
     const where = card.querySelector('.where')!
     const text = where.firstChild!
     const range = document.createRange()
@@ -183,6 +196,26 @@ test('on a phone of 320 a long name stays in its row in all three forms, shared 
     }
   }, word)
   expect(plate).toEqual({ wordLines: 1, price: true })
+  // Each word of «Bought here: Ереван Сити» fits beside the price, so the price stays on the place's
+  // first line — not under the place because the whole of it does not fit there (MOL-200, №6).
+  const beside = await take.filter({ hasText: short }).evaluate((card) => {
+    const where = card.querySelector('.where')!.getBoundingClientRect()
+    const price = card.querySelector('.price')!.getBoundingClientRect()
+    return price.top < where.top + where.height / 2
+  })
+  expect(beside).toBe(true)
+  // A word wider than its row breaks inside it — in «Ещё: …» and in «price · place» of «only if
+  // cheap» as in the plate.
+  for (const [where, text] of [
+    [take.filter({ hasText: short }), '.more'],
+    [page.locator('section.if-cheap .row'), '.at'],
+  ] as const) {
+    const fits = await where.evaluate((element, selector) => {
+      const line = element.querySelector(selector)!
+      return line.scrollWidth <= line.clientWidth
+    }, text)
+    expect(fits, text).toBe(true)
+  }
   // Nothing pushes the page sideways: only the page scrolls, and only up and down.
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(
     0,
