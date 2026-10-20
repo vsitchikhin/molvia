@@ -388,10 +388,11 @@ nothing up.
   over an answer that set out later** (`askedAt`, А6): that read and a screen left behind land out
   of turn, and the older answer, landed last, put the rate from before the exchange back on the
   phone after the screen had shown the new one; one kept from a moment still to come is a clock set
-  back since, and is read over. The screen whose answer is refused takes the categories and today's
-  rate from the phone, never leaves them as read at its opening (А7): the later answer is a screen
-  left meanwhile or another window's, and this one has not seen it. A next page asked for while the
-  month is read again from the start is asked again from the fresh answer (adversarial Е).
+  back since, and is read over, and so is one the phone cannot read back — another build's
+  (self-review 12). The screen whose answer is refused takes the categories and today's rate from
+  the phone, never leaves them as read at its opening (А7): the later answer is a screen left
+  meanwhile or another window's, and this one has not seen it. A next page asked for while the month
+  is read again from the start is asked again from the fresh answer (adversarial Е).
 - **A finished trip opened from «Деньги» leads back there** (owner's decision В-3):
   `?from=money` — `?from=money-spendings` since its row is on «Траты» (MOL-159) — and the route
   lists which `from` it takes (`meta.from`): an address must not make any screen the parent of any
