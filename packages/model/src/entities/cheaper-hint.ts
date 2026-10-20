@@ -134,7 +134,9 @@ function kindOf(
  * owner's comment to В-9: «если Марианна дешевле, но оценена ниже — показываем Анелик».
  */
 export function cheaperHint(input: CheaperHintInput): CheaperHint {
-  const { answer, typed, here } = input
+  const { answer, here } = input
+  // A gift typed at 0 is no price (MOL-274, В-2 «а»): read as nothing typed, not «тут дешевле».
+  const typed = input.typed && input.typed.scaledMinor > 0n ? input.typed : null
   // Required of every caller (adversarial round 4): left out, the till's rounding of a small sum
   // went uncounted without a word, and 0,15 kg of tomatoes read «дороже» again.
   const typedQuantity = typed ? input.typedQuantity : null

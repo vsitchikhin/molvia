@@ -118,9 +118,9 @@ export interface ExpenseRepository {
    */
   ownLatestFor(query: OwnLatestQuery): Promise<OwnLatestPrice[]>
   /**
-   * The other products this person bought with a price in the city whose word of the kind is
-   * `kind` (`kindKey`, MOL-45; MOL-92, В-7) — the candidates for «другое молоко». Ids only, at
-   * most `limit`: whether they are rated, and how, is the verdicts' to say.
+   * The other products this person bought with a price — above 0 (MOL-274) — in the city whose
+   * word of the kind is `kind` (`kindKey`, MOL-45; MOL-92, В-7) — the candidates for «другое
+   * молоко». Ids only, at most `limit`: whether they are rated, and how, is the verdicts' to say.
    */
   ownItemsOfKind(query: OwnKindQuery): Promise<string[]>
 }
@@ -278,6 +278,15 @@ export interface PriceMedian {
 function asDate(value: Date | string): Date {
   return value instanceof Date ? value : new Date(value)
 }
+
+/**
+ * A purchase that says something about a unit price: with a quantity, and with a price above 0. A
+ * purchase paid nothing — a gift by the card, «the second free» — is no price of the item (MOL-274), and
+ * stands beside one with no price: not a buyer, a visit or a weight in `pricedRows`, and not an item
+ * «bought with a price» for `ownItemsOfKind` either — there, gifts of the kind took the places of the
+ * alternatives before any price was read (adversarial А1). One fragment, so the two cannot drift.
+ */
+const PRICED_PURCHASE = sql`${expenses.amountMinor} > 0 and ${expenses.qtyMilli} is not null`
 
 /**
  * Which purchase in a place is the last one (MOL-92, В-3): the record's own day as the phone named
@@ -532,9 +541,10 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
               -- A removed trip is no observation, one's own or anyone else's (MOL-76).
               and ${trips.deletedAt} is null
               -- An observation without a price or without a quantity says nothing about a
-              -- unit price, so it is skipped by an explicit condition rather than silently.
-              and ${expenses.amountMinor} is not null
-              and ${expenses.qtyMilli} is not null
+              -- unit price, so it is skipped by an explicit condition rather than silently —
+              -- and so is one paid nothing (MOL-274): counted as a buyer, a gift opened a place
+              -- on two prices as three (В-1).
+              and ${PRICED_PURCHASE}
               and (${visible})${except}
           ),
           -- A grouped count rather than a window: Postgres has no DISTINCT inside one.
@@ -1038,8 +1048,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           and(
             eq(trips.actorId, actorId),
             isNull(trips.deletedAt),
-            sql`${expenses.amountMinor} is not null`,
-            sql`${expenses.qtyMilli} is not null`,
+            PRICED_PURCHASE,
             eq(places.country, country),
             sql`${placeIdentity(places.city)} = ${identityOf(city)}`,
             // A dish is the venue's own (MOL-28): «cheaper in another restaurant» is another dish.
