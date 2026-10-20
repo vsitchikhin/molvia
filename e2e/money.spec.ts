@@ -622,7 +622,7 @@ test('a category is made from the strip of «Категории», removed quiet
 })
 
 // The skeleton is the answer's shape (Ф-13, MOL-178): its rows as tall as the rows that come, a button of
-// 44 in their tail — and the strip's action stands while they come (7f).
+// 44 in their tail — and no strip under it: the sheet knows one's own names from the list alone (В-2 «а»).
 test('the skeleton of «Категории» is as tall, row by row, as the list that comes', async ({
   page,
 }) => {
@@ -637,9 +637,8 @@ test('the skeleton of «Категории» is as tall, row by row, as the list
   await page.getByRole('link', { name: /^Категории/ }).click()
   const skeleton = page.locator('.skeleton-rows .item')
   await expect(skeleton).toHaveCount(6)
-  await expect(
-    page.locator('.dock').getByRole('button', { name: 'Добавить категорию' }),
-  ).toBeVisible()
+  const add = page.locator('.dock').getByRole('button', { name: 'Добавить категорию' })
+  await expect(add).toBeHidden()
   const bars = await skeleton.evaluateAll((rows) =>
     rows.map((row) => row.getBoundingClientRect().height),
   )
@@ -647,6 +646,7 @@ test('the skeleton of «Категории» is as tall, row by row, as the list
   release()
   const rows = page.locator('.list-row')
   await expect(rows.first()).toBeVisible()
+  await expect(add).toBeVisible()
   const answer = await rows.evaluateAll((all) =>
     all.slice(0, 6).map((row) => row.parentElement?.getBoundingClientRect().height ?? 0),
   )
@@ -659,6 +659,44 @@ test('the skeleton of «Категории» is as tall, row by row, as the list
     .boundingBox()
   expect(target?.height).toBeCloseTo(44, 0)
 })
+
+/** The words of the names of «Категории» that stand on two lines: broken in their middle. */
+async function brokenWords(page: Page): Promise<string[]> {
+  await expect(page.locator('.lists .title').first()).toBeVisible()
+  await page.evaluate(() => document.fonts.ready)
+  return page.evaluate(() =>
+    [...document.querySelectorAll('.lists .title')].flatMap((title) => {
+      const text = [...title.childNodes].find(
+        (node): node is Text => node instanceof Text && node.data.trim() !== '',
+      )
+      if (!text) return []
+      return [...text.data.matchAll(/\S+/g)].flatMap((match) => {
+        const range = document.createRange()
+        range.setStart(text, match.index)
+        range.setEnd(text, match.index + match[0].length)
+        const lines = new Set(
+          [...range.getClientRects()]
+            .filter((rect) => rect.width > 0)
+            .map((rect) => Math.round(rect.top)),
+        )
+        return lines.size > 1 ? [match[0]] : []
+      })
+    }),
+  )
+}
+
+// At 320 the words of a row had some 100 px beside a circle of 40 and a button of 90, and «Развлечения»
+// broke in its middle (adversarial А2 of MOL-191): the button's sides in a row are 8.
+for (const locale of ['ru-RU', 'en-US'])
+  test.describe(`at 320 in ${locale}`, () => {
+    test.use({ locale, viewport: { width: 320, height: 844 } })
+
+    test('no name of a category breaks in the middle of a word', async ({ page }) => {
+      await signedIn(page)
+      await page.goto('/money/categories')
+      expect(await brokenWords(page)).toEqual([])
+    })
+  })
 
 async function fitsNarrowPhone(page: Page, money: string): Promise<void> {
   await page.setViewportSize({ width: 320, height: 640 })

@@ -109,10 +109,13 @@
       </template>
     </div>
 
-    <!-- The main action in the strip over the tab bar, as on every screen of «Деньги» (Ф-28): while the
-         list is coming too — the queue makes a category with or without the answer (В-4) — but not
-         offline with nothing ever shown (7h). An error takes the strip for «Повторить» by itself. -->
-    <template v-if="phase === 'loading' || phase === 'ready'" #docked>
+    <!-- The main action in the strip over the tab bar, as on every screen of «Деньги» (Ф-28), over a list
+         shown only — offline over it too, since the queue makes a category either way (В-4). Not under the
+         skeleton (owner's В-2 «а» of MOL-191): the sheet knows one's own names from the list alone, and
+         opened before it, it let one taken through to the server's refusal (adversarial А1); nor offline
+         with nothing ever shown (7h), which took the strip from under an open sheet and its focus with it
+         (А3). An error takes the strip for «Повторить» by itself. -->
+    <template v-if="phase === 'ready'" #docked>
       <AppButton size="large" block @click="newOpen = true">
         <template #icon><IconPlus /></template>
         {{ t('spending.categories.add') }}

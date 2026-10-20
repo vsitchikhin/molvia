@@ -153,15 +153,27 @@ describe('MoneyCategoriesView: «Добавить категорию» in the st
     expect(view.find('.content').text()).not.toContain(en.spending.categories.add)
   })
 
-  it('stands while the list is coming, and opens the sheet then too (7f)', async () => {
-    spendingCategories.mockReturnValue(new Promise(() => undefined))
+  it('must not fire: no strip under the skeleton, so no sheet without the list (В-2 «а»)', async () => {
+    let answer: (value: SpendingCategoriesResponse) => void = () => undefined
+    spendingCategories.mockReturnValue(new Promise((resolve) => (answer = resolve)))
     const view = await render()
     expect(view.find('.skeleton').exists()).toBe(true)
-    await addButton(view)?.trigger('click')
-    await risen()
+    expect(view.find('.screen > .dock').exists()).toBe(false)
+
+    answer({ categories: LIST })
+    await flushPromises()
+    expect(strip(view)).toEqual([en.spending.categories.add])
+  })
+
+  it('one’s own name is refused in the sheet, never sent: the sheet opens over the list', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    await addThroughSheet(view, 'Armenian lessons')
     expect(document.querySelector('dialog[open]')?.textContent).toContain(
-      en.spending.new_category.title,
+      en.spending.new_category.bad_taken,
     )
+    expect(addSpendingCategory).not.toHaveBeenCalled()
+    expect(useSpendingQueueStore().pending).toHaveLength(0)
   })
 
   it('must not fire: offline with no list ever shown, there is no strip (7h)', async () => {
@@ -262,7 +274,7 @@ describe('MoneyCategoriesView: a row is the kit’s ListRow (MOL-191, MOL-175)',
     expect(tagged[0]?.find('.below .tag.warn').exists()).toBe(true)
   })
 
-  it('a long name of one’s own is wrapped whole, never cut', async () => {
+  it('a long name of one’s own is the row’s whole title, and the row wraps it', async () => {
     const long = 'Lessons of Armenian with a teacher at home'.slice(0, 40)
     spendingCategories.mockResolvedValue({ categories: [own(OWN, long)] })
     const view = await render()
