@@ -305,7 +305,7 @@ describe('useMoneyMonth', () => {
       host(pinia)
       await flushPromises()
       for (const [minute, month] of ['2026-08', '2026-07', '2026-06', '2026-05'].entries()) {
-        vi.setSystemTime(new Date(`2026-09-27T08:0${minute + 1}:00Z`))
+        vi.setSystemTime(new Date(Date.UTC(2026, 8, 27, 8, minute + 1)))
         moneyMonth.mockResolvedValueOnce({ ...page([], null), month, rateKind: 'frozen' })
         host(pinia, month)
         await flushPromises()
