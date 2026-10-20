@@ -42,12 +42,17 @@ async function person(page: Page): Promise<Person> {
 const tag = randomUUID().slice(0, 8)
 
 /** Bought once in «SAS», at 520 ֏ for 0,9 l, and rated — which is the whole path to this screen. */
-async function ratedPurchase(who: Person, name: string, score: number): Promise<void> {
+async function ratedPurchase(
+  who: Person,
+  name: string,
+  score: number,
+  place = 'SAS',
+): Promise<void> {
   const tripId = randomUUID()
   await who.call('POST', '/trips', {
     context: settingsOf(actorCodec.parse(await who.call('GET', '/actors/me'))),
     id: tripId,
-    place: { kind: 'store', name: 'SAS' },
+    place: { kind: 'store', name: place },
   })
   const entry = (await who.call('POST', '/catalogue/items', {
     kind: 'product',
@@ -130,7 +135,9 @@ test('on a phone of 320 a long name stays in its row in all three forms, shared 
     'if-cheap': `Сливки гомогенизированные ${tag}`,
     never: `Кефир ультрапастеризованный ${tag}`,
   }
-  await ratedPurchase(who, names.take, 5)
+  // A receipt's head in capitals: one word narrower than the plate, wider than what the price leaves.
+  const word = 'ՍՈՒՊԵՐՄԱՐԿԵՏՆԵՐԻ'
+  await ratedPurchase(who, names.take, 5, `${word} ՑԱՆՑ`)
   await ratedPurchase(who, names['if-cheap'], 3)
   await ratedPurchase(who, names.never, 1)
   await page.route(/\/api\/advice$/, async (route) => {
@@ -160,6 +167,22 @@ test('on a phone of 320 a long name stays in its row in all three forms, shared 
     })
     expect(fits, group).toEqual({ name: true, rating: true })
   }
+  // The place stays whole and the price inside the card: the price goes under the place instead.
+  const plate = await page.locator('section.take article').evaluate((card, whole) => {
+    const where = card.querySelector('.where')!
+    const text = where.firstChild!
+    const range = document.createRange()
+    const at = text.textContent!.indexOf(whole)
+    range.setStart(text, at)
+    range.setEnd(text, at + whole.length)
+    return {
+      wordLines: range.getClientRects().length,
+      price:
+        card.querySelector('.price')!.getBoundingClientRect().right <=
+        card.getBoundingClientRect().right,
+    }
+  }, word)
+  expect(plate).toEqual({ wordLines: 1, price: true })
   // Nothing pushes the page sideways: only the page scrolls, and only up and down.
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(
     0,
