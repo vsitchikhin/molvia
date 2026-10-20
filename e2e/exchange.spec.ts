@@ -544,6 +544,7 @@ function rateYear(id: string) {
         level: 300,
         place: 'Ардшинбанк',
         percent: 121,
+        sign: 1,
         market: { rate: wireRate('4.110180', '2026-02-28'), level: 200, basis: 'bankCash' },
       },
     ],
@@ -572,7 +573,7 @@ function rateMonth(id: string) {
 }
 
 /** Puts the line into the answer on its way (`page.route`): this run has no market of its own. */
-async function withRateCharts(page: Page, id: string): Promise<void> {
+async function withRateCharts(page: Page, id: string, before: object[] = []): Promise<void> {
   await page.route('**/api/exchanges', async (route) => {
     if (route.request().method() !== 'GET') return route.continue()
     const response = await route.fetch()
@@ -582,7 +583,11 @@ async function withRateCharts(page: Page, id: string): Promise<void> {
         {
           currency: 'RUB',
           side: 'bankBuys',
-          periods: { 1: rateMonth(id), 6: null, 12: rateYear(id) },
+          periods: {
+            1: rateMonth(id),
+            6: null,
+            12: { ...rateYear(id), exchanges: [...before, ...rateYear(id).exchanges] },
+          },
         },
       ],
     }
@@ -636,13 +641,21 @@ test('the rate of twelve months: no market — no card; the latest exchange firs
   expect(chartTop).toBeLessThan(rateTop)
 
   await expect(card.locator('.mine-rate')).toHaveText('Мой обмен 28 февр. · 4,16 ֏/₽')
-  await expect(card.locator('.mine-place')).toHaveText(/Ардшинбанк · \+1,21\s%\sк рынку/)
+  await expect(card.locator('.mine-place')).toHaveText('Ардшинбанк')
+  await expect(card.locator('.mine-diff')).toHaveText(/\+1,21\s%\s·\sлучше рынка/)
+
+  // Where the line stands in its card: the reading above it holds the plate's three lines, so a week
+  // with no exchange or no market leaves it under the finger (MOL-190, adversarial А2).
+  const area = card.locator('.area')
+  const lineTop = async () =>
+    ((await area.boundingBox())?.y ?? NaN) - ((await card.boundingBox())?.y ?? NaN)
+  const withPlate = await lineTop()
 
   // A finger lifted at the left edge: the first week, which had no exchange.
-  const area = card.locator('.area')
   await area.tap({ position: { x: 2, y: 60 } })
   await expect(card.locator('.reading')).toContainText('Неделя по 8 февр. · рынок')
   await expect(card.locator('.none')).toHaveText('Обменов на этой неделе не было')
+  expect(await lineTop()).toBe(withPlate)
 
   // The keys walk the radios: one more step brings the second week.
   await card.getByRole('radio', { name: /Неделя по 8 февраля/ }).focus()
@@ -650,6 +663,46 @@ test('the rate of twelve months: no market — no card; the latest exchange firs
   await expect(card.locator('.figure')).toHaveText('4,80 ֏/₽')
   await page.keyboard.press('ArrowRight')
   await expect(card.locator('.figure')).toHaveText('Рынка за эту неделю нет')
+  expect(await lineTop()).toBe(withPlate)
+})
+
+/**
+ * Every plate of the period stands unseen in one cell, holding the place (MOL-190): a note of another
+ * exchange — a link to a map, no spaces — neither stretches the plate shown nor pushes the page aside,
+ * on the week of an exchange or on one without (adversarial В1, В2).
+ */
+test('a long note of another exchange: the plate keeps its height, the page its width', async ({
+  page,
+}) => {
+  await signedIn(page)
+  const id = await exchangeOfFebruary(page)
+  const link = {
+    ...rateYear(id).exchanges[0],
+    id: randomUUID(),
+    day: '2026-02-14',
+    step: 1,
+    x: 260,
+    level: 700,
+    place: 'https://yandex.ru/maps/org/ardshinbank/1234567890/?ll=43.8453,40.7894&z=17',
+  }
+  await withRateCharts(page, id, [link])
+
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('link', { name: 'Обмен денег' }).click()
+  const card = page.locator('.rate-chart')
+  await expect(card.locator('.mine-place')).toHaveText('Ардшинбанк')
+
+  const wide = () =>
+    page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  const box = async (selector: string) =>
+    (await card.locator(selector).boundingBox())?.height ?? NaN
+  // The plate is its three lines and its padding (8 above, 8 below), not the link's four or more.
+  expect(await box('.mine')).toBeCloseTo((await box('.mine .plate-text')) + 16, 0)
+  expect(await wide()).toBe(0)
+
+  await card.locator('.area').tap({ position: { x: 2, y: 60 } })
+  await expect(card.locator('.none')).toHaveText('Обменов на этой неделе не было')
+  expect(await wide()).toBe(0)
 })
 
 /**

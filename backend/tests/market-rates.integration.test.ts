@@ -585,6 +585,25 @@ describe('«Курс рубля за 12 месяцев» на «Обмене д�
     const [point] = answer.rateCharts?.pairs[0]?.periods[12].exchanges ?? []
     expect(group?.percent).toBe(-66)
     expect(point?.percent).toBe(group?.percent)
+    // The tone is the money's, as the card's (MOL-190).
+    expect(point?.sign).toBe(-1)
+  })
+
+  it('траты в рублях — знак точки у карточки, хотя в валюте трат разница округлилась в 0 (adversarial А1)', async () => {
+    const id = await insertActor(db, { spendCurrency: 'RUB' })
+    const answer = overviewOf(
+      (
+        await record(await signIn(db, id), {
+          given: { amount: '1000', currency: 'RUB' },
+          received: { amount: '4221.60', currency: 'AMD' },
+        })
+      ).json(),
+    )
+    // −0,01 ֏ on the card is −0,23 kopeck spent in roubles: 0 in «Обмены против рынка», «хуже» on the card.
+    expect(answer.exchanges[0]?.market?.best.difference).toEqual({ minor: -1n, currency: 'AMD' })
+    expect(answer.losses?.total.minor).toBe(0n)
+    const [point] = answer.rateCharts?.pairs[0]?.periods[12].exchanges ?? []
+    expect(point).toMatchObject({ percent: 0, sign: -1 })
   })
 
   it('чужие обмены не видны; удалённый уходит с графика, «Вернуть» его возвращает', async () => {
