@@ -51,7 +51,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 
 - `frontend/src/views/MoneyBudgetView.vue` — «Бюджет» screen (MOL-117): the month in the address by `replace`, what is left of the plan, the rows in the order of the chips, «Без плана», the savings target; four states.
 - `frontend/src/views/MoneyCategoriesView.vue` — «Деньги → Категории» screen: the owner's category list as `ListRow`s, quiet «Убрать» and «Вернуть», «Добавить категорию» in the strip, through the queue.
-- `frontend/src/views/MoneyCategoriesView.test.ts` — Component test: the strip by phase, the error holding it, a category made offline through the queue, quiet «Убрать», the rows of both groups, refusals, the skeleton's shape (MOL-191).
+- `frontend/src/views/MoneyCategoriesView.test.ts` — Component test: the strip over a list shown only, one's own name refused in the sheet, the error holding the strip, a category made offline through the queue, quiet «Убрать», the rows of both groups, refusals, the skeleton's shape (MOL-191).
 - `frontend/src/views/MoneyChartsView.vue` — «Графики» screen: «Месяц · Год», the month and the year in the address by `replace`, a bookmark of the old period opening the year.
 - `frontend/src/views/MoneyView.vue` — «Деньги» screen: «На счетах сейчас» over the month, the summary of one month counted by the server — spent, came in, «Куда ушли» — and the ways out with one figure each; the four states.
 - `frontend/src/views/MoneySpendingsView.vue` — «Траты» screen (MOL-159): the journal of the month by day, a page at a time, queued rows marked, the server's count and sum on top.
