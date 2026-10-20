@@ -37,11 +37,6 @@
           </ScreenState>
         </AppReveal>
 
-        <AppButton block @click="newOpen = true">
-          <template #icon><IconPlus /></template>
-          {{ t('spending.categories.add') }}
-        </AppButton>
-
         <section class="group">
           <SectionCaption class="caption">{{ t('spending.categories.live') }}</SectionCaption>
           <AppCard as="ul" list>
@@ -62,7 +57,7 @@
                   }}</span>
                 </span>
                 <AppButton
-                  variant="danger-ghost"
+                  variant="ghost"
                   :aria-label="t('spending.categories.remove_label', { name: nameOf(category) })"
                   @click="queue.archiveCategory(category.id, true)"
                 >
@@ -101,6 +96,16 @@
       </template>
     </div>
 
+    <!-- The main action in the strip over the tab bar, as on every screen of «Деньги» (Ф-28): while the
+         list is coming too — the queue makes a category with or without the answer (В-4) — but not
+         offline with nothing ever shown (7h). An error takes the strip for «Повторить» by itself. -->
+    <template v-if="phase === 'loading' || phase === 'ready'" #docked>
+      <AppButton size="large" block @click="newOpen = true">
+        <template #icon><IconPlus /></template>
+        {{ t('spending.categories.add') }}
+      </AppButton>
+    </template>
+
     <NewCategorySheet v-model:open="newOpen" :categories="all" />
   </AppScreen>
 </template>
@@ -128,7 +133,7 @@ import { reportFailure } from '@/failures'
 /**
  * «Деньги → Категории» (MOL-82, В-1): the person's own list. «Убрать» takes a category out of the
  * choice and erases nothing — the spendings in it keep it, past months keep their sums (MOL-73,
- * В-3) — so it asks nothing, and «Вернуть» stands right under it. Every change goes through the
+ * В-3) — so it asks nothing, is no red word (Ф-34), and «Вернуть» stands right under it. Every change goes through the
  * queue (В-4); the list is the server's with what waits laid over it.
  */
 export default defineComponent({
