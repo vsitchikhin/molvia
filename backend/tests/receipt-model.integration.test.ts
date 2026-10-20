@@ -8,7 +8,15 @@ import type { FastifyInstance } from 'fastify'
 import { createItemRepository } from '@/db/items-repository'
 import { createModelSpendRepository } from '@/db/model-spend-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
-import { actors, ownerNotices, receiptLineImages, receiptLines, receipts } from '@/db/schema'
+import {
+  actors,
+  modelReceiptDays,
+  ownerNotices,
+  receiptDays,
+  receiptLineImages,
+  receiptLines,
+  receipts,
+} from '@/db/schema'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
 import { ModelRejected, ModelUnavailable } from '@/receipts/model-reader'
 import type { ModelReading, ReceiptModel } from '@/receipts/model-reader'
@@ -18,7 +26,7 @@ import { RECEIPT_MODEL_WAIT_MS, readQueuedReceipts } from '@/usecases/read-recei
 import type { ReadReport } from '@/usecases/read-receipts'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, signIn } from './fixtures'
+import { clearAll, insertActor, insertPlace, insertTrip, signIn } from './fixtures'
 
 // Which reader reads a receipt (MOL-272): the model for whoever it is granted to and accepted edition 3,
 // under the month's cap, Tesseract otherwise and whenever the model is not the one to (В-1 «а»).
@@ -420,5 +428,56 @@ describe('what the model read', () => {
     await db.execute(sql`delete from ${actors} where id = ${me.id}::uuid`)
     expect(await db.select().from(receipts)).toEqual([])
     expect((await month())?.spentMicroUsd).toBe(2_180)
+  }, 30_000)
+})
+
+describe('the measure of 0.2r by its reader (MOL-272, В-6 «а»)', () => {
+  const sums = async (table: typeof receiptDays | typeof modelReceiptDays) => {
+    const rows = await db.select().from(table)
+    return {
+      read: rows.reduce((all, row) => all + row.read, 0),
+      recorded: rows.reduce((all, row) => all + row.recorded, 0),
+      lines: rows.reduce((all, row) => all + row.lines, 0),
+      edited: rows.reduce((all, row) => all + row.linesEdited, 0),
+    }
+  }
+
+  it('counts a reading and a record of the model in its own table, and Tesseract’s in its own', async () => {
+    const granted = await person(LATER)
+    const byModel = await queued(granted)
+    const other = await person(null)
+    await queued(other)
+    await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+    )
+    expect(await sums(modelReceiptDays)).toEqual({ read: 1, recorded: 0, lines: 0, edited: 0 })
+    expect((await sums(receiptDays)).read + (await sums(receiptDays)).recorded).toBe(1)
+
+    const placeId = await insertPlace(db, { name: 'Օրինակ' })
+    const tripId = await insertTrip(db, { actorId: granted.id, placeId })
+    await repository.markRecorded(byModel, {
+      tripId,
+      expenses: [],
+      confirmed: [],
+      edits: { lines: 2, edited: 1, skipped: 0, item: 1, figures: 0, totalCorrected: false },
+      source: 'photo',
+      codesWritten: 0,
+    })
+    expect(await sums(modelReceiptDays)).toEqual({ read: 1, recorded: 1, lines: 2, edited: 1 })
+    expect((await sums(receiptDays)).recorded).toBe(0)
+  }, 30_000)
+
+  it('counts a «переснимите» of the model in its own table', async () => {
+    const me = await person(LATER)
+    await queued(me)
+    const nothing = { ...ANSWER, lines: [], totals: [] }
+    await readAll(
+      benchReader(),
+      fakeModel(() => Promise.resolve({ kind: 'read', answer: nothing, costMicroUsd: 1_000 })),
+    )
+    const [row] = await db.select().from(modelReceiptDays)
+    expect(row?.reshoot).toBe(1)
+    expect(await db.select().from(receiptDays)).toEqual([])
   }, 30_000)
 })

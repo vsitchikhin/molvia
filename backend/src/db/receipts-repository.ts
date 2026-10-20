@@ -5,6 +5,7 @@ import {
   DomainError,
   ERROR,
   MODEL_CONSENT_EDITION,
+  RECEIPT_MODEL,
   placeSchema,
   RECEIPT_KEEP_DAYS,
   RECEIPT_LINK_WAIT_HOURS,
@@ -46,6 +47,7 @@ import {
   receiptLineImages,
   receiptLines,
   receiptLinks,
+  modelReceiptDays,
   receiptDays,
   receiptParts,
   receipts,
@@ -281,7 +283,7 @@ type TaxReceiptDayCounts = Partial<
  */
 async function addToDay(
   db: Conn,
-  table: typeof receiptDays | typeof taxReceiptDays,
+  table: typeof receiptDays | typeof modelReceiptDays | typeof taxReceiptDays,
   counts: Readonly<Record<string, SQL | undefined>>,
   day: SQL,
   source: SQL,
@@ -309,9 +311,20 @@ async function addToDay(
     )}`)
 }
 
-/** Adds to `receipt_days`: the reader's measure, photos only. */
-const tally = (db: Conn, counts: ReceiptDayCounts, day: SQL, source: SQL = sql``) =>
-  addToDay(db, receiptDays, counts, day, source)
+/**
+ * Adds to the reader's measure, photos only: `receipt_days` of Tesseract, or `model_receipt_days` of a
+ * receipt the model read (MOL-272, В-6) — by the reader's version, the one fact on the row that says it.
+ */
+const tally = (
+  db: Conn,
+  counts: ReceiptDayCounts,
+  day: SQL,
+  source: SQL = sql``,
+  readerVersion: string | null = null,
+) => addToDay(db, byModel(readerVersion) ? modelReceiptDays : receiptDays, counts, day, source)
+
+const byModel = (readerVersion: string | null): boolean =>
+  readerVersion?.startsWith(`${RECEIPT_MODEL}@`) ?? false
 
 /** Adds to `tax_receipt_days`: the receipts by their link (MOL-234). */
 const tallyTax = (db: Conn, counts: TaxReceiptDayCounts, day: SQL, source: SQL = sql``) =>
@@ -870,10 +883,11 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     },
 
     async markRecorded(id, recorded) {
-      await db
+      const [marked] = await db
         .update(receipts)
         .set({ status: 'recorded', recordedAt: sql`now()`, tripId: recorded.tripId })
         .where(eq(receipts.id, id))
+        .returning({ readerVersion: receipts.readerVersion })
       for (const { position, expenseId } of recorded.expenses) {
         await db
           .update(receiptLines)
@@ -942,7 +956,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           day,
           source,
         )
-      } else await tally(db, counts, day, source)
+      } else await tally(db, counts, day, source, marked?.readerVersion ?? null)
     },
 
     async sourceOf(tripId) {
@@ -1257,7 +1271,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             return
           }
           const failed = outcome.failure === 'reshoot' ? 'reshoot' : 'unreadable'
-          await tally(tx, { [failed]: sql`1` }, today())
+          await tally(tx, { [failed]: sql`1` }, today(), sql``, outcome.readerVersion)
           return
         }
         if (outcome.lines.length > 0) {
@@ -1305,7 +1319,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             },
             today(),
           )
-        } else await tally(tx, read, today())
+        } else await tally(tx, read, today(), sql``, outcome.readerVersion)
       })
     },
 
