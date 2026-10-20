@@ -131,9 +131,11 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
+/* A place of one word wider than the row breaks rather than leaves it, as it does in the plate of «Брать». */
 .at {
   font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
+  overflow-wrap: break-word;
 }
 
 .threshold {

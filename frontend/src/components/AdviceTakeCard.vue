@@ -163,10 +163,12 @@ export default defineComponent({
   font-variant-numeric: tabular-nums;
 }
 
+/* A place of one word wider than the card breaks rather than leaves it, as it does in the plate. */
 .more {
   display: block;
   margin-top: var(--space-2);
   color: var(--text-muted);
   font-size: var(--text-footnote);
+  overflow-wrap: break-word;
 }
 </style>
