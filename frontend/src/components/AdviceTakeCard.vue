@@ -137,9 +137,10 @@ export default defineComponent({
 }
 
 /* A place of one long word — a receipt's head in capitals, «ՍՈՒՊԵՐՄԱՐԿԵՏՆԵՐԻ ՑԱՆՑ» — pushed the price out of
-   the card: the place and its price follow the name and its rating. */
+   the card: the price stays beside the place while each word of it fits, and goes under it once one does
+   not. */
 .best {
-  @include name-beside-figure;
+  @include name-beside-figure(word);
 
   gap: var(--space-1) var(--space-2);
   margin-top: var(--space-3);
