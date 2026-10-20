@@ -46,9 +46,10 @@ export interface MoneyMonth {
  * The last months read, per owner — the first page of each, the one the screen opens on. Three:
  * this month, the one before, and one more looked at; offline is a strip over them, not an empty
  * screen (handoff 04). This month stays among them however far back the person looked: it holds
- * today's rate for a sheet opened on any month (MOL-262, adversarial А3). Read back through the strict codec — a change of the contract empties it,
- * but for a field added with a default, which reads as the default: a month kept before the ring
- * (MOL-156) has none until it is read again, and «Куда ушли» says so — the phone adds nothing up.
+ * today's rate for a sheet opened on any month (MOL-262, adversarial А3). Read back through the
+ * strict codec — a change of the contract empties it, but for a field added with a default, which
+ * reads as the default: a month kept before the ring (MOL-156) has none until it is read again,
+ * and «Куда ушли» says so — the phone adds nothing up.
  */
 const KEY = 'molvia.money'
 const KEPT_MONTHS = 3
@@ -270,8 +271,20 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
     () => [queue.landed, trips.landed, accounts.transfers],
     () => void load(),
   )
-  onMounted(() => void load())
-  useReconnect(() => void load())
+  /**
+   * Opened on another month, the screen reads the running one too, after its own: today's rate there
+   * is that month's answer kept on the phone, and an exchange written meanwhile — on its own screen,
+   * which tells «Деньги» nothing — left the sheet the rate from before it (MOL-262, adversarial А5).
+   * Its answer lands for a month not on screen: it moves only what is kept (`ask`).
+   */
+  async function loadWithToday(): Promise<void> {
+    await load()
+    const id = actor.id
+    const today = monthOf(localDay())
+    if (id && selected.value !== today) await ask(id, today)
+  }
+  onMounted(() => void loadWithToday())
+  useReconnect(() => void loadWithToday())
 
   const phase = computed<MoneyPhase>(() => {
     if (!actor.id) return 'idle'

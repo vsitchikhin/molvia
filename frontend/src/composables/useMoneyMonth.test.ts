@@ -318,4 +318,42 @@ describe('useMoneyMonth', () => {
       vi.useRealTimers()
     }
   })
+
+  // An exchange is written on its own screen and tells «Деньги» nothing: opened on another month, the
+  // screen reads the running one after its own, or the sheet kept the rate from before it (MOL-262,
+  // adversarial А5).
+  it('А5: opened on another month, the screen reads the running one too, for today’s rate', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-09-27T08:00:00Z'))
+    try {
+      const pinia = createPinia()
+      setActivePinia(pinia)
+      useActorStore().id = ACTOR
+      const rate = (scaled: bigint) => ({
+        base: 'RUB' as const,
+        quote: 'AMD' as const,
+        scaled,
+        source: 'personal' as const,
+        asOf: new Date('2026-09-27T00:00:00Z'),
+      })
+      moneyMonth.mockResolvedValueOnce({ ...page([], null), rate: rate(4_620_000n) })
+      host(pinia)
+      await flushPromises()
+      // An exchange since: the server's rate today is another.
+      moneyMonth
+        .mockResolvedValueOnce({ ...page([], null), month: '2026-08', rateKind: 'frozen' })
+        .mockResolvedValueOnce({ ...page([], null), rate: rate(4_480_000n) })
+      const august = host(pinia, '2026-08')
+      await flushPromises()
+      expect(moneyMonth.mock.calls.map(([month]) => month)).toEqual([
+        '2026-09',
+        '2026-08',
+        '2026-09',
+      ])
+      expect(august.month.value?.month).toBe('2026-08')
+      expect(august.todayRate.value?.scaled).toBe(4_480_000n)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
