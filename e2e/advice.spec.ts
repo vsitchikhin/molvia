@@ -94,9 +94,10 @@ test('a rated purchase becomes a recommendation with the place and the price per
   // The own mode leaves the count out: it is always one, and the subtitle says so (МР-12).
   await expect(take.getByText('5.0 out of 5', { exact: true })).toBeVisible()
   await expect(take.getByText('1 rating')).toHaveCount(0)
-  // A sentence is never smaller than 13 (Ф-8), and the card does not repeat the group's word (Ф-26).
+  // A sentence is never smaller than 13 (Ф-8), and the card does not repeat the verdict: the pill's
+  // word was «BUY», the group's caption says «Buy it» (Ф-26).
   await expect(take.getByText('5.0 out of 5', { exact: true })).toHaveCSS('font-size', '13px')
-  await expect(take.getByRole('button').getByText('Buy it')).toHaveCount(0)
+  await expect(take.getByRole('button').getByText('BUY', { exact: true })).toHaveCount(0)
 })
 
 test('«only if cheap» says where it was bought, the price beside the place (MOL-200)', async ({
@@ -117,25 +118,52 @@ test('«only if cheap» says where it was bought, the price beside the place (MO
   await expect(cheap.getByText('Worth buying below')).toHaveCount(0)
 })
 
-test('a name longer than the card breaks inside it on a phone of 320 (MOL-200)', async ({
+test('on a phone of 320 a long name stays in its row in all three forms, shared mode too (MOL-200)', async ({
   page,
 }) => {
   const who = await person(page)
-  // One word of 24/800 wider than the card: beside the rating it must neither push the rating out
-  // nor leave the card.
-  const name = `Молоко ультрапастеризованное ${tag}`
-  await ratedPurchase(who, name, 5)
+  // One word wider than what is left beside the rating: «1.0 out of 5 · 12 ratings» of the shared
+  // mode is the widest figure there is, so it is asked for by rewriting the answer — a grant of
+  // access is no business of this spec.
+  const names = {
+    take: `Молоко ультрапастеризованное ${tag}`,
+    'if-cheap': `Сливки гомогенизированные ${tag}`,
+    never: `Кефир ультрапастеризованный ${tag}`,
+  }
+  await ratedPurchase(who, names.take, 5)
+  await ratedPurchase(who, names['if-cheap'], 3)
+  await ratedPurchase(who, names.never, 1)
+  await page.route(/\/api\/advice$/, async (route) => {
+    const response = await route.fetch()
+    const json = (await response.json()) as { scope: string; rows: { ratingsCount: number }[] }
+    json.scope = 'shared'
+    for (const row of json.rows) row.ratingsCount = 12
+    await route.fulfill({ response, json })
+  })
 
   await page.setViewportSize({ width: 320, height: 800 })
   await page.goto('/')
+  await expect(page.getByText('Reviews and prices are yours alone')).toBeVisible()
 
-  const card = page.locator('section.take article')
-  await expect(card.getByText(name)).toBeVisible()
-  const cardBox = await card.boundingBox()
-  for (const part of [card.getByText(name), card.getByText('5.0 out of 5', { exact: true })]) {
-    const box = await part.boundingBox()
-    expect(box && cardBox && box.x + box.width <= cardBox.x + cardBox.width).toBe(true)
+  for (const [group, name] of Object.entries(names)) {
+    const row = page.locator(`section.${group}`).locator('article, .row').first()
+    await expect(row.getByText(name), group).toBeVisible()
+    const fits = await row.evaluate((element) => {
+      const name = element.querySelector('.name')!
+      const rating = element.querySelector('.rating')!.getBoundingClientRect()
+      return {
+        // The text, not its box: a box squeezed by `min-width: 0` stays inside while a word that
+        // does not break runs out of it.
+        name: name.scrollWidth <= name.clientWidth,
+        rating: rating.right <= element.getBoundingClientRect().right,
+      }
+    })
+    expect(fits, group).toEqual({ name: true, rating: true })
   }
+  // Nothing pushes the page sideways: only the page scrolls, and only up and down.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(
+    0,
+  )
 })
 
 test('a bad verdict carries no price and no place: there is nothing to be cheap with', async ({
