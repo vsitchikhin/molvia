@@ -170,6 +170,15 @@ name hint is off; nothing else depends on it.
 of a receipt by the link of its QR code (MOL-232). Empty or absent, such receipts are taken and wait
 in the queue until it is set.
 
+`CLAUDE_API_KEY` is the key of the model that reads the receipts of those it is granted to
+(MOL-272): `actors.receipts_model_until` in the future and edition 3 accepted. Empty or absent,
+Tesseract reads every receipt, as before. A person's key (`sk-ant-usr-…`) is refused without
+`CLAUDE_WORKSPACE_ID`; a key made inside a workspace needs none. `RECEIPT_MODEL_MONTHLY_CAP_USD`,
+200 by default, is what the model may cost a calendar month in UTC; the workspace's monthly limit in
+the Anthropic console is set to the same, so a price the code got wrong is held there too. Granting
+the model is one statement, as access is:
+`update actors set receipts_model_until = '2027-01-01' where telegram_user_id = …`.
+
 Set `TELEGRAM_BOT_USERNAME` without `@` and generate `BOT_API_SECRET` using the command in
 `.env.prod.example`. This secret belongs to the internal API channel and is **not** the
 Telegram bot token. The backend and bot receive the same internal secret; only the bot

@@ -1604,7 +1604,7 @@ function classReceipt(rows: readonly TextRow[], lx: Lexicon): Laid {
 //   ՖԻՍԿԱԼ ՀԱՄԱՐ 16013344
 
 // «Բաժին 1», as OCR reads it: «Ււսժին 1]», «Բայժին 11» — the section and its number.
-const DEPARTMENT = /(?:Բա|Բայ|Ււս)ժին\s*\d/u
+export const DEPARTMENT = /(?:Բա|Բայ|Ււս)ժին\s*\d/u
 // The tax number: after its word first, anywhere; else before the till's registration number on the same
 // row, however OCR read the word, «CUCC: 57311783 9/С: 31028805» — never the receipt's own number
 // «ԿՀ: 00000049» on the row above it (review 1, № 1).

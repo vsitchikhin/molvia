@@ -124,6 +124,7 @@ async function aFullLife(actorId: string, telegramUserId: number) {
       analyticsOffAt: at(4),
       analyticsOnAt: at(5),
       sharedUntil: at(1),
+      receiptsModelUntil: at(6),
     })
     .where(eq(actors.id, actorId))
   await insertSession(db, { actorId, deviceName: 'iPhone · Safari' })

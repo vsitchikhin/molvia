@@ -89,9 +89,10 @@ The log's writer, the cohort and both gate queries are pinned in `.claude/rules/
   put right — the phone's word (`edited`), since only it knows what its review showed — a total put
   right as the receipt's own edit, the first record only, and the time from the server taking the
   receipt — by day, no id; read as the block «0.2r» of `make gates`, stop above a third of the lines
-  after four weeks. **A receipt from the tax office never counts there: `tax_receipt_days`** (MOL-234), a
-  table of its own — a key moved would break a rollback — with how its link came (`via`, a miss of the
-  camera before), its own block under «0.2r», no stop.
+  after four weeks. **A receipt the model read counts in `model_receipt_days`** (MOL-272), by its
+  `reader_version`, its own block of «0.2r» with the same stop. **A receipt from the tax office never
+  counts there: `tax_receipt_days`** (MOL-234), a table of its own — a key moved would break a rollback —
+  with how its link came (`via`, a miss of the camera before), its own block under «0.2r», no stop.
 - **The login's funnel is `login_days`** (MOL-68): counted in each step's own transaction, by the
   day the login began, with no id at all; a device's repeat says `again=1`, so «began» is people
   rather than taps; a second way in is filed above `LOGIN_SECOND_WAY_PERCENT` (25 %) lost, read as
@@ -130,7 +131,7 @@ the load is I/O-bound, with three orders of magnitude of headroom.
 | DB                | PostgreSQL + Drizzle                                    | schema in TS, generated migrations, honest drop into raw SQL                               |
 | Bot               | grammY + `@grammyjs/runner`                             | distribution, auth, rating reminders; the runner is what makes it serve two people at once |
 | Search by meaning | EmbeddingGemma q4 on `onnxruntime-node`, in the API     | a pinned model, no service of its own; 45 ms a query on the VPS (MOL-105)                  |
-| Receipt reader    | Tesseract 5 behind Python's own HTTP server             | no model reads a receipt on the server's CPU in time (MOL-114); the parse is TS            |
+| Receipt reader    | Claude Haiku via `@anthropic-ai/sdk`, else Tesseract 5  | the model for those granted it, under a cap (MOL-272); Tesseract for the rest (MOL-114)    |
 | Tests             | Vitest (domain, use case, component) + Playwright (e2e) | three vitest projects, so the domain keeps running without a DOM                           |
 | Lint              | ESLint 9 type-aware + Stylelint + Prettier              | strictest tier; SFCs go through the same type checker as `.ts`                             |
 
@@ -589,8 +590,14 @@ that are easiest to break; the file holds every rule of the area and the reason 
 
 ### Receipts — `.claude/rules/receipts.md`
 
-- **No model reads a receipt** (MOL-114): Tesseract in `services/receipt-reader`, a container with no
-  database and no disk; the API holds the queue, the photos and the parse, one receipt at a time.
+- **Claude Haiku reads the receipts of those it is granted to, Tesseract the rest** (MOL-272): the model
+  only while `actors.receipts_model_until` is to come and edition 3 is accepted, under the month's cap
+  (`model_spend`: the worst price reserved before a call, its own after); refused, cut, malformed, over
+  the cap or away past its wait — Tesseract in `services/receipt-reader`, a container with no database
+  and no disk. The API holds the queue, the photos and the parse, one receipt at a time.
+- **A model's answer goes through the parse's own gate** (MOL-272): `receiptTextOfModel` into
+  `ReceiptText`, then `verifiedReading(text, { byModel: true })` — every number as printed, the layout and
+  the total our code's by the card's words, never the model's.
 - **The parse is MOL-114's prototype, measured on the bench** (`receipt-text.ts`, `score.mjs`): a rule
   changed is run on the bench's truth before and after; amounts in hundredths, never floats.
 - **A country's words are its card's, never a literal of the parse** (MOL-247, `receipt-card.ts`): currency,

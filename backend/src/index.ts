@@ -19,6 +19,7 @@ import { refreshAtBoot, startSchedule } from '@/rates/schedule'
 import { apiFailureReporter } from '@/failure-reporter'
 import { marketRatesRefresh } from '@/usecases/refresh-market-rates'
 import { officialRatesRefresh } from '@/usecases/refresh-official-rates'
+import { receiptModel } from '@/receipts/model-reader'
 import { receiptReader } from '@/receipts/reader'
 import { httpMetrics, processMetrics } from '@/metrics'
 import { buildMetricsServer } from '@/metrics-server'
@@ -40,6 +41,11 @@ const app = buildServer({
     : {}),
   receiptReader:
     env.RECEIPT_READER_URL === undefined ? null : receiptReader(env.RECEIPT_READER_URL),
+  // the model reads only the receipts it is granted to (MOL-272), and only where its key is set
+  receiptModel:
+    env.CLAUDE_API_KEY === undefined
+      ? null
+      : receiptModel({ apiKey: env.CLAUDE_API_KEY, workspaceId: env.CLAUDE_WORKSPACE_ID }),
 })
 
 // Migrations run at boot rather than as a separate deploy step: there is one instance,

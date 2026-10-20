@@ -86,6 +86,27 @@ const REPORT: GatesReport = {
     within1d: 5,
     later: 1,
   },
+  modelReceipts: {
+    firstDay: '2026-10-05',
+    lastDay: '2026-11-20',
+    read: 11,
+    readPartly: 2,
+    reshoot: 0,
+    noItems: 1,
+    unreadable: 0,
+    recorded: 12,
+    lines: 120,
+    linesEdited: 9,
+    linesSkipped: 3,
+    linesItem: 5,
+    linesFigures: 2,
+    totalsCorrected: 1,
+    within5m: 8,
+    within15m: 3,
+    within1h: 1,
+    within1d: 0,
+    later: 0,
+  },
   taxReceipts: {
     firstDay: '2026-10-05',
     lastDay: '2026-11-20',
@@ -179,6 +200,21 @@ describe('gates — чтение ворот вручную', () => {
     const edited = lines.find((line) => line.includes('lines put right'))
     expect(edited).toContain('1000 of 3000')
     expect(edited).toContain('33.4 %')
+  })
+
+  it('чеки модели — своим блоком со своей чертой, между Tesseract и налоговой (MOL-272, В-6)', async () => {
+    const { exit, lines } = run(['--from', '2026-10-05'], REPORT)
+    await exit
+    const ocr = lines.findIndex((line) => line.startsWith('0.2r does the scanner'))
+    const model = lines.findIndex((line) => line.startsWith('0.2r · read by the model'))
+    const tax = lines.findIndex((line) => line.startsWith('0.2r · the Serbian tax office'))
+    expect([ocr < model, model < tax]).toEqual([true, true])
+    expect(lines[model]).toContain('stop above')
+    const put = (from: number, to: number) =>
+      lines.slice(from, to).find((line) => line.includes('lines put right'))
+    expect(put(ocr, model)).toContain('61 of 214')
+    expect(put(model, tax)).toContain('9 of 120')
+    expect(lines.slice(model, tax).find((line) => line.includes('receipts read'))).toContain('14')
   })
 
   it('чеки налоговой — своим блоком, мера OCR их не видит (MOL-234)', async () => {
@@ -363,6 +399,25 @@ describe('gates — чтение ворот вручную', () => {
       '       1 hour                            4',
       '       1 day                             5',
       '       later                             1',
+      '',
+      '0.2r · read by the model (MOL-272)                  stop above 33.3 % after 4 weeks',
+      '     receipts read                       14         days 2026-10-05 … 2026-11-20 in Yerevan',
+      '       with their lines                  11',
+      '       in part                           2          to the review all the same',
+      '       not one line found                0          «переснимите»',
+      '       no items on it                    1          a sum to record (MOL-227)',
+      '       unreadable                        0',
+      '     receipts recorded                   12',
+      '     lines put right                     9 of 120     7.5 %',
+      '       left out                          3',
+      '       another item                      5',
+      '       quantity or sum                   2',
+      '     total put right                     1          receipts',
+      '     sent to recorded, within 5 min      8          receipts',
+      '       15 min                            3',
+      '       1 hour                            1',
+      '       1 day                             0',
+      '       later                             0',
       '',
       "0.2r · the Serbian tax office                       no stop: the lines are the tax office's",
       '     links sent                          9          days 2026-10-05 … 2026-11-20 in Yerevan',

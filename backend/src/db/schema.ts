@@ -295,6 +295,12 @@ export const actors = pgTable(
      */
     sharedUntil: timestamp('shared_until', { withTimezone: true }),
     /**
+     * Until when a model reads this person's receipts (MOL-272, Р-12; owner's В-4): a moment, as
+     * `shared_until` is — set by hand with `psql` for the owner and whoever it is granted to, by the paid
+     * layer later (MOL-271). Empty and a past date are one answer: Tesseract reads, as before.
+     */
+    receiptsModelUntil: timestamp('receipts_model_until', { withTimezone: true }),
+    /**
      * Which rate a new trip takes (MOL-40, В-3): `personal` — the person's own, from their
      * exchanges, when there is one for the pair, and the official one otherwise — or always
      * `official`. Beside the settings rather than among them: it is switched on the screen of
@@ -2138,46 +2144,57 @@ export const reminderDays = pgTable(
  * A reading counts on the day it ended, a record on the day it was written, both in Yerevan. A line
  * is edited once however many things changed in it; the kinds beside it may add up past it.
  */
-export const receiptDays = pgTable(
-  'receipt_days',
-  {
-    day: date('day').primaryKey(),
-    /** Read with its lines, and the lines cover the receipt (`readPartly` is false). */
-    read: integer('read').notNull().default(0),
-    /** Read with its lines, but they make up too little of it — the «переснимите» of before (В-1). */
-    readPartly: integer('read_partly').notNull().default(0),
-    /** Not one item line found. */
-    reshoot: integer('reshoot').notNull().default(0),
-    /** Read whole with no items on it: a sole trader's section and its sum (MOL-227). */
-    noItems: integer('no_items').notNull().default(0),
-    unreadable: integer('unreadable').notNull().default(0),
-    recorded: integer('recorded').notNull().default(0),
-    /** Every line of the receipts recorded, the ones left out included. */
-    lines: integer('lines').notNull().default(0),
-    linesEdited: integer('lines_edited').notNull().default(0),
-    /** «Не записывать». */
-    linesSkipped: integer('lines_skipped').notNull().default(0),
-    /** Another item than the review showed. */
-    linesItem: integer('lines_item').notNull().default(0),
-    /** The quantity or the sum changed. */
-    linesFigures: integer('lines_figures').notNull().default(0),
-    /** Receipts whose total the person put right — one edit of the receipt, never of its lines. */
-    totalsCorrected: integer('totals_corrected').notNull().default(0),
-    /** From the server taking the receipt to its record — never the phone's clock. */
-    within5m: integer('within_5m').notNull().default(0),
-    within15m: integer('within_15m').notNull().default(0),
-    within1h: integer('within_1h').notNull().default(0),
-    within1d: integer('within_1d').notNull().default(0),
-    later: integer('later').notNull().default(0),
-  },
-  (table) => [
-    check(
-      'receipt_days_counts_non_negative',
-      sql`least(${table.read}, ${table.readPartly}, ${table.reshoot}, ${table.noItems}, ${table.unreadable}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
-    ),
-    check('receipt_days_edited_within_lines', sql`${table.linesEdited} <= ${table.lines}`),
-  ],
-)
+const readerDays = <const Name extends string>(name: Name) =>
+  pgTable(
+    name,
+    {
+      day: date('day').primaryKey(),
+      /** Read with its lines, and the lines cover the receipt (`readPartly` is false). */
+      read: integer('read').notNull().default(0),
+      /** Read with its lines, but they make up too little of it — the «переснимите» of before (В-1). */
+      readPartly: integer('read_partly').notNull().default(0),
+      /** Not one item line found. */
+      reshoot: integer('reshoot').notNull().default(0),
+      /** Read whole with no items on it: a sole trader's section and its sum (MOL-227). */
+      noItems: integer('no_items').notNull().default(0),
+      unreadable: integer('unreadable').notNull().default(0),
+      recorded: integer('recorded').notNull().default(0),
+      /** Every line of the receipts recorded, the ones left out included. */
+      lines: integer('lines').notNull().default(0),
+      linesEdited: integer('lines_edited').notNull().default(0),
+      /** «Не записывать». */
+      linesSkipped: integer('lines_skipped').notNull().default(0),
+      /** Another item than the review showed. */
+      linesItem: integer('lines_item').notNull().default(0),
+      /** The quantity or the sum changed. */
+      linesFigures: integer('lines_figures').notNull().default(0),
+      /** Receipts whose total the person put right — one edit of the receipt, never of its lines. */
+      totalsCorrected: integer('totals_corrected').notNull().default(0),
+      /** From the server taking the receipt to its record — never the phone's clock. */
+      within5m: integer('within_5m').notNull().default(0),
+      within15m: integer('within_15m').notNull().default(0),
+      within1h: integer('within_1h').notNull().default(0),
+      within1d: integer('within_1d').notNull().default(0),
+      later: integer('later').notNull().default(0),
+    },
+    (table) => [
+      check(
+        `${name}_counts_non_negative`,
+        sql`least(${table.read}, ${table.readPartly}, ${table.reshoot}, ${table.noItems}, ${table.unreadable}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
+      ),
+      check(`${name}_edited_within_lines`, sql`${table.linesEdited} <= ${table.lines}`),
+    ],
+  )
+export const receiptDays = readerDays('receipt_days')
+
+/**
+ * The same measure of the receipts a model read (MOL-272, owner's В-6 «а»): a table of its own beside
+ * `receipt_days`, never a column of its key — a key moved would break the `on conflict (day)` of the
+ * image a failed deploy puts back (MOL-234's reason). Which table a receipt counts in is its reader's,
+ * `receipts.reader_version`; the stop of 0.2r — more than a third of the lines put right after four
+ * weeks — is read of this block while the model reads.
+ */
+export const modelReceiptDays = readerDays('model_receipt_days')
 
 /**
  * The receipts from the Serbian tax office (MOL-234), counted as `receipt_days` is and beside it, never
@@ -2238,6 +2255,29 @@ export const taxReceiptDays = pgTable(
       sql`least(${table.sentQr}, ${table.sentQrMissed}, ${table.sentPaste}, ${table.sentPasteMissed}, ${table.sentUnnamed}, ${table.read}, ${table.missing}, ${table.invalid}, ${table.empty}, ${table.unreadable}, ${table.specsOk}, ${table.specsFailed}, ${table.specsSkipped}, ${table.linesCoded}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.codesWritten}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
     ),
     check('tax_receipt_days_edited_within_lines', sql`${table.linesEdited} <= ${table.lines}`),
+  ],
+)
+
+/**
+ * What reading receipts by a model has cost, by the calendar month in UTC — the month of Anthropic's bill
+ * (MOL-272, Т-3): every call at its own `usage` and the model's price in the code, an answer we did not
+ * take too. Nobody's: no key to `actors`, so neither erasure nor the copy reaches it (Р-8). **A call
+ * reserves its worst price before it goes and settles at its own after**, so the cap holds across a
+ * process lost in between — the worst stays counted, never less than was spent. `noticed` is the last
+ * step of the cap the owner heard of this month (В-2): 50, 90, 100 at the stop.
+ */
+export const modelSpend = pgTable(
+  'model_spend',
+  {
+    month: date('month').primaryKey(),
+    spentMicroUsd: bigint('spent_micro_usd', { mode: 'number' }).notNull().default(0),
+    calls: integer('calls').notNull().default(0),
+    noticed: smallint('noticed').notNull().default(0),
+  },
+  (table) => [
+    check('model_spend_month_first_day', sql`extract(day from ${table.month}) = 1`),
+    check('model_spend_non_negative', sql`least(${table.spentMicroUsd}, ${table.calls}) >= 0`),
+    check('model_spend_noticed_step', sql`${table.noticed} in (0, 50, 90, 100)`),
   ],
 )
 
