@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ARMENIAN_RECEIPTS } from '#model/entities/receipt-card'
-import { receiptCityOf } from '#model/entities/receipt'
+import { needsReshoot, receiptCityOf } from '#model/entities/receipt'
 import {
   MODEL_RECEIPT_LINES_MAX,
   modelHeadRows,
@@ -173,6 +173,17 @@ describe('the total of a model’s reading (MOL-244 by the card’s words)', () 
     ]
     const text = read(answer({ totals }))
     expect([text.layout, text.totalHundredths]).toEqual(['department', 170_000])
+    expect(needsReshoot(text)).toBe(false)
+    // no section named, the total and the payment agreeing: still a sum to record
+    const paid = read(answer({ totals: [totals[1]!, { label: 'Առձեռն', amount: '1700.00' }] }))
+    expect([paid.layout, paid.totalHundredths, needsReshoot(paid)]).toEqual([
+      'department',
+      170_000,
+      false,
+    ])
+    // no line, no section and one place: a reading of nothing, «переснимите», never a sum to record
+    const nothing = read(answer({ totals: totals.slice(1) }))
+    expect([nothing.layout, needsReshoot(nothing)]).toEqual(['class', true])
     // with items the section is no place: their lines vouch
     expect(
       read(answer({ lines: [{ ...lines[0]!, sum: '741' }], totals })).totalHundredths,

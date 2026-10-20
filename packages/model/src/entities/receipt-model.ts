@@ -156,19 +156,27 @@ function totalOf(
 /**
  * The model's answer as the parse's reading of the receipt (MOL-272, Т-2). The layout is the card's where
  * any line prints a discount, a zero one too — «Ереван Сити»'s till rounds what was paid off its shelf
- * price, «250 249,99» — the class code's where lines print none, and a section's where there is no line.
+ * price, «250 249,99» — the class code's where lines print none, and a section's where there is no line
+ * and a section «Բաժին» is printed or a total vouched for; no line and neither is a reading of nothing.
  * Then `verifiedReading(text, { byModel: true })`, as for Tesseract's reading.
  */
 export function receiptTextOfModel(reading: PhotoReading, answer: ModelReceipt): ReceiptText {
-  const layout =
-    answer.lines.length === 0
-      ? 'department'
-      : answer.lines.some((line) => figureOf(line.discount, 2) !== null)
-        ? 'card'
-        : 'class'
-  const rounding = layout === 'card' ? TOLERANCE_HUNDREDTHS : 0
+  const discounted = answer.lines.some((line) => figureOf(line.discount, 2) !== null)
+  const rounding = discounted ? TOLERANCE_HUNDREDTHS : 0
   const lines = answer.lines.map((line) => lineOf(line, rounding))
   const { total, read, met } = totalOf(reading, answer, lines)
+  // a receipt with no line is a sum to record where it prints a section or two places vouch for its
+  // total (MOL-227) — the model names a sole trader's «Բաժին 1» as a total no more often than not; with
+  // neither it is a reading of nothing, «переснимите» as Tesseract's (`needsReshoot`)
+  const section = answer.totals.some(({ label }) => DEPARTMENT.test(label))
+  const layout =
+    lines.length === 0
+      ? section || total !== null
+        ? 'department'
+        : 'class'
+      : discounted
+        ? 'card'
+        : 'class'
   return {
     layout,
     tin: /^\d{8}$/.test(answer.tin?.trim() ?? '') ? (answer.tin?.trim() ?? null) : null,
