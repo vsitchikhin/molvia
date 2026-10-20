@@ -19,14 +19,16 @@ import type { ReceiptLayout, ReceiptText, ReceiptTextLine } from '#model/entitie
  * as printed and their sums the total shown. **The price is kept only where quantity × price is the sum
  * and the discount to the hundredth** (Т-4) — on a till that prints a shelf price apart from what was
  * paid (the card's layout), to the few luma it rounds by, «419,98/0 490/420»; elsewhere one of two
- * figures meant to be one was misread: 624,44 for a sum of 624,41.
+ * figures meant to be one was misread: 624,44 for a sum of 624,41. **A model's line of a quantity of one
+ * whose price is within that rounding of its sum is one alike too** (MOL-272, `byModel`): the model
+ * names the columns itself, and «389,99 390» holds either way round.
  *
  * The bench, 54 receipts and 1 038 fields: 478 right and 166 made up before, 105 right and none after
  * (`.scratch/tasks/research/MOL-255.md`). A receipt by the tax office's link is not read and not judged.
  */
-export function verifiedReading(text: ReceiptText): ReceiptText {
+export function verifiedReading(text: ReceiptText, { byModel = false } = {}): ReceiptText {
   const proven = provenWhole(text)
-  const lines = text.lines.map((line) => verifiedLine(line, proven, text.layout))
+  const lines = text.lines.map((line) => verifiedLine(line, proven, text.layout, byModel))
   return { ...text, lines, balanced: proven }
 }
 
@@ -45,6 +47,7 @@ function verifiedLine(
   line: ReceiptTextLine,
   proven: boolean,
   layout: ReceiptLayout,
+  byModel: boolean,
 ): ReceiptTextLine {
   const { quantityMilli: qty, priceHundredths: price, sumHundredths: sum } = line
   const discount = line.discountHundredths ?? 0
@@ -60,9 +63,13 @@ function verifiedLine(
     // was (round 4, А11 «а») — kept on a receipt proven whole, with no price and no discount
     return proven ? { ...line, priceHundredths: null, discountHundredths: null } : blank(line)
   }
-  const oneAlike = qty === 1_000 && price === sum && discount === 0
-  if (oneAlike && !proven) return blank(line)
   const rounding = layout === 'card' ? TOLERANCE_HUNDREDTHS : 0
+  // within the rounding a price and a sum hold either way round: OCR takes the columns from the paper,
+  // a model names them itself — «389,99 390» answered as price 389,99 and sum 390 (MOL-272)
+  const apart = byModel ? rounding : 0
+  const oneAlike =
+    qty === 1_000 && discount === 0 && price !== null && Math.abs(price - sum) <= apart
+  if (oneAlike && !proven) return blank(line)
   const holds =
     price !== null && Math.abs(Math.round((qty * price) / 1_000) - (sum + discount)) <= rounding
   return holds ? line : { ...line, priceHundredths: null, discountHundredths: null }

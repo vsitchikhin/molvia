@@ -5,7 +5,7 @@ import type { CohortReturn } from './events-repository'
 import type { Conn, Db } from './index'
 import type { CohortReached } from './verdicts-repository'
 import { createEventRepository } from './events-repository'
-import { loginDays, receiptDays, reminderDays, taxReceiptDays } from './schema'
+import { loginDays, modelReceiptDays, receiptDays, reminderDays, taxReceiptDays } from './schema'
 import { createVerdictRepository } from './verdicts-repository'
 import { yerevanDay, yerevanWeek } from './yerevan-week'
 
@@ -25,6 +25,8 @@ export interface GatesReport {
   readonly logins: LoginsInWindow
   readonly reminders: RemindersInWindow
   readonly receipts: ReceiptsInWindow
+  /** The same of the receipts the model read (MOL-272, В-6): `model_receipt_days`. */
+  readonly modelReceipts: ReceiptsInWindow
   readonly taxReceipts: TaxReceiptsInWindow
 }
 
@@ -157,7 +159,8 @@ export function createGatesReader(db: Db): GatesReader {
             erased: await erasedIn(tx, from, to),
             logins: await loginsIn(tx, from, to),
             reminders: await remindersIn(tx, from, to),
-            receipts: await receiptsIn(tx, from, to),
+            receipts: await receiptsIn(tx, from, to, receiptDays),
+            modelReceipts: await receiptsIn(tx, from, to, modelReceiptDays),
             taxReceipts: await taxReceiptsIn(tx, from, to),
           }
         },
@@ -244,31 +247,36 @@ async function remindersIn(tx: Conn, from: Date, to: Date): Promise<RemindersInW
   }
 }
 
-async function receiptsIn(tx: Conn, from: Date, to: Date): Promise<ReceiptsInWindow> {
+async function receiptsIn(
+  tx: Conn,
+  from: Date,
+  to: Date,
+  table: typeof receiptDays | typeof modelReceiptDays,
+): Promise<ReceiptsInWindow> {
   const { firstDay, lastDay } = await daysOf(tx, from, to)
   const sum = (column: SQLWrapper) => sql<number>`coalesce(sum(${column}), 0)::int`
   const [sums] = await tx
     .select({
-      read: sum(receiptDays.read),
-      readPartly: sum(receiptDays.readPartly),
-      reshoot: sum(receiptDays.reshoot),
-      noItems: sum(receiptDays.noItems),
-      unreadable: sum(receiptDays.unreadable),
-      recorded: sum(receiptDays.recorded),
-      lines: sum(receiptDays.lines),
-      linesEdited: sum(receiptDays.linesEdited),
-      linesSkipped: sum(receiptDays.linesSkipped),
-      linesItem: sum(receiptDays.linesItem),
-      linesFigures: sum(receiptDays.linesFigures),
-      totalsCorrected: sum(receiptDays.totalsCorrected),
-      within5m: sum(receiptDays.within5m),
-      within15m: sum(receiptDays.within15m),
-      within1h: sum(receiptDays.within1h),
-      within1d: sum(receiptDays.within1d),
-      later: sum(receiptDays.later),
+      read: sum(table.read),
+      readPartly: sum(table.readPartly),
+      reshoot: sum(table.reshoot),
+      noItems: sum(table.noItems),
+      unreadable: sum(table.unreadable),
+      recorded: sum(table.recorded),
+      lines: sum(table.lines),
+      linesEdited: sum(table.linesEdited),
+      linesSkipped: sum(table.linesSkipped),
+      linesItem: sum(table.linesItem),
+      linesFigures: sum(table.linesFigures),
+      totalsCorrected: sum(table.totalsCorrected),
+      within5m: sum(table.within5m),
+      within15m: sum(table.within15m),
+      within1h: sum(table.within1h),
+      within1d: sum(table.within1d),
+      later: sum(table.later),
     })
-    .from(receiptDays)
-    .where(sql`${receiptDays.day} between ${firstDay}::date and ${lastDay}::date`)
+    .from(table)
+    .where(sql`${table.day} between ${firstDay}::date and ${lastDay}::date`)
   const zero = {
     read: 0,
     readPartly: 0,

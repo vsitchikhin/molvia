@@ -122,6 +122,10 @@ export const en: Dictionary = {
   'owner.merge.moreNight': '…and {count} more — all: make merge-night DAY={day}',
   'owner.merge.moreLater': '…and {count} more — on the mornings to come',
   'owner.merge.undo': 'Undo — make unmerge ID=number',
+  'owner.model.half': '💸 Receipts by the model in {month}: ${spent} spent — half the ${cap} cap',
+  'owner.model.most': '💸 Receipts by the model in {month}: ${spent} spent — 90% of the ${cap} cap',
+  'owner.model.stop':
+    '🛑 Receipts by the model in {month}: ${spent} spent, a receipt did not fit under the ${cap} cap and was read by Tesseract. From now on the model reads only what still fits, Tesseract the rest.',
   'feedback.frame': 'A reply to your message of {date}:',
   'feedback.howToAnswer': 'To answer, reply to this message.',
   'feedback.passed': 'Passed on to the developer.',

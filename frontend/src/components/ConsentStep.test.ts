@@ -144,11 +144,14 @@ describe('«Условия и приватность» (MOL-95)', () => {
     expect(view.find('.changes').exists()).toBe(false)
   })
 
-  it('whoever accepted edition 1 is told what changed in 2, and sees the statistics too', async () => {
+  it('whoever accepted edition 1 is told what changed in 2 and in 3, and sees the statistics too', async () => {
     consent.mockResolvedValue({ version: 1 })
     const { view } = await render()
     expect(view.text()).toContain(en.consent.updated.title)
-    expect(view.get('.changes').text()).toContain(en.consent.changes['2'])
+    expect(view.findAll('.changes-text').map((p) => p.text())).toEqual([
+      en.consent.changes['2'],
+      en.consent.changes['3'],
+    ])
     // It is told what edition 1 told it wrong: the catalogue and a receipt's word have no threshold (Р3-А1).
     expect(en.consent.changes['2']).toMatch(/with no threshold/)
     expect(ru.consent.changes['2']).toMatch(/без имени, но и без порога/)
@@ -157,7 +160,15 @@ describe('«Условия и приватность» (MOL-95)', () => {
     await view.get('input[type="checkbox"]').setValue(true)
     await button(view, en.consent.accept).trigger('click')
     await flushPromises()
-    expect(acceptConsent).toHaveBeenCalledWith(2)
+    expect(acceptConsent).toHaveBeenCalledWith(POLICY_VERSION)
+  })
+
+  it('whoever accepted edition 2 is told only what changed in 3: Anthropic, a new recipient (MOL-272)', async () => {
+    consent.mockResolvedValue({ version: 2 })
+    const { view } = await render()
+    expect(view.findAll('.changes-text').map((p) => p.text())).toEqual([en.consent.changes['3']])
+    expect(en.consent.changes['3']).toMatch(/Anthropic/)
+    expect(ru.consent.changes['3']).toMatch(/Anthropic/)
   })
 
   it('sends nothing of the age: the edition alone is the answer', async () => {

@@ -4,6 +4,8 @@ import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import {
   DomainError,
   ERROR,
+  MODEL_CONSENT_EDITION,
+  RECEIPT_MODEL,
   placeSchema,
   RECEIPT_KEEP_DAYS,
   RECEIPT_LINK_WAIT_HOURS,
@@ -45,6 +47,7 @@ import {
   receiptLineImages,
   receiptLines,
   receiptLinks,
+  modelReceiptDays,
   receiptDays,
   receiptParts,
   receipts,
@@ -66,6 +69,14 @@ export interface ClaimedReceipt {
   readonly country: ReceiptSummary['country']
   readonly language: ReceiptSummary['language']
   readonly parts: readonly { readonly position: number; readonly photo: Buffer }[]
+  /**
+   * The model may read it (MOL-272): granted to its owner until a moment still to come
+   * (`receipts_model_until`, Р-12) and edition `MODEL_CONSENT_EDITION` accepted — by the database's clock,
+   * as the claim reads it.
+   */
+  readonly byModel: boolean
+  /** When it was queued: the model away longer than its wait leaves it to Tesseract (Р-9). */
+  readonly queuedAt: Date | null
 }
 
 /**
@@ -272,7 +283,7 @@ type TaxReceiptDayCounts = Partial<
  */
 async function addToDay(
   db: Conn,
-  table: typeof receiptDays | typeof taxReceiptDays,
+  table: typeof receiptDays | typeof modelReceiptDays | typeof taxReceiptDays,
   counts: Readonly<Record<string, SQL | undefined>>,
   day: SQL,
   source: SQL,
@@ -300,9 +311,20 @@ async function addToDay(
     )}`)
 }
 
-/** Adds to `receipt_days`: the reader's measure, photos only. */
-const tally = (db: Conn, counts: ReceiptDayCounts, day: SQL, source: SQL = sql``) =>
-  addToDay(db, receiptDays, counts, day, source)
+/**
+ * Adds to the reader's measure, photos only: `receipt_days` of Tesseract, or `model_receipt_days` of a
+ * receipt the model read (MOL-272, В-6) — by the reader's version, the one fact on the row that says it.
+ */
+const tally = (
+  db: Conn,
+  counts: ReceiptDayCounts,
+  day: SQL,
+  source: SQL = sql``,
+  readerVersion: string | null = null,
+) => addToDay(db, byModel(readerVersion) ? modelReceiptDays : receiptDays, counts, day, source)
+
+const byModel = (readerVersion: string | null): boolean =>
+  readerVersion?.startsWith(`${RECEIPT_MODEL}@`) ?? false
 
 /** Adds to `tax_receipt_days`: the receipts by their link (MOL-234). */
 const tallyTax = (db: Conn, counts: TaxReceiptDayCounts, day: SQL, source: SQL = sql``) =>
@@ -861,10 +883,11 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     },
 
     async markRecorded(id, recorded) {
-      await db
+      const [marked] = await db
         .update(receipts)
         .set({ status: 'recorded', recordedAt: sql`now()`, tripId: recorded.tripId })
         .where(eq(receipts.id, id))
+        .returning({ readerVersion: receipts.readerVersion })
       for (const { position, expenseId } of recorded.expenses) {
         await db
           .update(receiptLines)
@@ -933,7 +956,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           day,
           source,
         )
-      } else await tally(db, counts, day, source)
+      } else await tally(db, counts, day, source, marked?.readerVersion ?? null)
     },
 
     async sourceOf(tripId) {
@@ -1152,14 +1175,23 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             actorId: receipts.actorId,
             country: receipts.country,
             language: receipts.language,
+            queuedAt: receipts.queuedAt,
           })
+        const [owner] = await tx
+          .select({
+            byModel: sql<boolean>`coalesce(${actors.receiptsModelUntil} > clock_timestamp()
+              and ${actors.consentVersion} >= ${MODEL_CONSENT_EDITION}, false)`,
+          })
+          .from(actors)
+          .innerJoin(receipts, eq(receipts.actorId, actors.id))
+          .where(eq(receipts.id, next.id))
         const parts = await tx
           .select({ position: receiptParts.position, photo: receiptParts.photo })
           .from(receiptParts)
           .where(eq(receiptParts.receiptId, next.id))
           .orderBy(asc(receiptParts.position))
         const row = theRow(claimed, 'receipts')
-        return { ...row, parts }
+        return { ...row, parts, byModel: owner?.byModel ?? false }
       })
     },
 
@@ -1239,7 +1271,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             return
           }
           const failed = outcome.failure === 'reshoot' ? 'reshoot' : 'unreadable'
-          await tally(tx, { [failed]: sql`1` }, today())
+          await tally(tx, { [failed]: sql`1` }, today(), sql``, outcome.readerVersion)
           return
         }
         if (outcome.lines.length > 0) {
@@ -1287,7 +1319,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             },
             today(),
           )
-        } else await tally(tx, read, today())
+        } else await tally(tx, read, today(), sql``, outcome.readerVersion)
       })
     },
 

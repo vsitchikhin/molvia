@@ -45,7 +45,8 @@ export const EXPORT_FORMAT = 'molvia-export'
 // and a spending's `transferId`, the transfer it is the fee of (MOL-253). 18: a receipt's `readTotal`,
 // the total as the reader found it in one place, which no second source vouched for (MOL-244). 19: a
 // receipt's `readPartly`, whether its lines as read fell short, before the check emptied any (MOL-255).
-export const EXPORT_VERSION = 19
+// 20: the account's `receiptsModelUntil`, until when a model reads the person's receipts (MOL-272).
+export const EXPORT_VERSION = 20
 
 const day = z.iso.date()
 
@@ -128,6 +129,7 @@ const accountSchema = z.strictObject({
   analyticsOffAt: isoDate.nullable(),
   analyticsOnAt: isoDate.nullable(),
   sharedUntil: isoDate.nullable(),
+  receiptsModelUntil: isoDate.nullable(),
   createdAt: isoDate,
   updatedAt: isoDate,
 })

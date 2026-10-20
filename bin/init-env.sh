@@ -40,10 +40,15 @@ fi
 kept_token=""
 kept_bot_secret=""
 kept_bot_username=""
+# Ключ модели чеков (MOL-272) вписан руками так же, как токен бота: --force его не теряет.
+kept_claude_key=""
+kept_claude_workspace=""
 if [ -e "$env_path" ]; then
   kept_token="$(sed -n 's/^TELEGRAM_BOT_TOKEN=//p' "$env_path" | head -n 1)"
   kept_bot_secret="$(sed -n 's/^BOT_API_SECRET=//p' "$env_path" | head -n 1)"
   kept_bot_username="$(sed -n 's/^TELEGRAM_BOT_USERNAME=//p' "$env_path" | head -n 1)"
+  kept_claude_key="$(sed -n 's/^CLAUDE_API_KEY=//p' "$env_path" | head -n 1)"
+  kept_claude_workspace="$(sed -n 's/^CLAUDE_WORKSPACE_ID=//p' "$env_path" | head -n 1)"
 fi
 if [ -z "$kept_bot_secret" ]; then
   kept_bot_secret="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')"
@@ -108,6 +113,10 @@ CBA_RATES_URL=https://cb.am/latest.json.php
 # Читатель чеков (MOL-125), поднимается make reader. Не запущен — чеки ждут в очереди.
 RECEIPT_READER_PORT=${reader_port}
 RECEIPT_READER_URL=http://127.0.0.1:${reader_port}
+
+# Модель, которая читает чеки тех, кому выдано (MOL-272). Пусто — читает Tesseract.
+CLAUDE_API_KEY=${kept_claude_key}
+CLAUDE_WORKSPACE_ID=${kept_claude_workspace}
 ENV
 
 echo ".env создан: CLONE_INDEX=$index, api=$api_port pwa=$pwa_port postgres=$pg_port, база molvia_$index"

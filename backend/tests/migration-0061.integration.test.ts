@@ -5,7 +5,7 @@ import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { testDatabaseUrl } from './db'
-import { insertActor, insertItem, insertPlace, insertTrip } from './fixtures'
+import { insertItem, insertPlace, insertTrip, telegramId } from './fixtures'
 import { storeMemoryWords } from '@molvia/model'
 import { MIGRATIONS } from '@/db/migrate'
 import * as schema from '@/db/schema'
@@ -24,7 +24,8 @@ import { settleStoreMemory } from '@/db/store-memory-repository'
  *
  * Its own database, created and dropped here, as in `migration-0012.integration.test.ts`: the chain
  * has to be left one step short of 0061. The rows are written with the schema as it is now, but for
- * the lines and the receipts: 0061 adds a column to the lines, 0062 to the receipts.
+ * the lines and the receipts: 0061 adds a column to the lines, 0062 to the receipts — and the owner,
+ * whose table 0066 adds to.
  */
 interface JournalEntry {
   readonly idx: number
@@ -75,7 +76,11 @@ describe('0061: what a removed trip or purchase left of its receipt', () => {
     for (const entry of before) await apply(entry)
     const db = drizzle(sql, { schema })
 
-    const me = await insertActor(db)
+    // the owner by SQL of its own: `actors` has columns since 0061 (0066, MOL-272) the schema would name
+    const me = randomUUID()
+    await sql`
+      insert into actors (id, telegram_user_id, country, city, spend_currency, income_currency)
+      values (${me}, ${telegramId()}, 'AM', 'Гюмри', 'AMD', 'RUB')`
     const milk = await insertItem(db)
     const place = await insertPlace(db)
     const trip = await insertTrip(db, { actorId: me, placeId: place })

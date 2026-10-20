@@ -456,6 +456,27 @@
       "when": 1792420719752,
       "tag": "0064_receipt_read_partly",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1792496209436,
+      "tag": "0065_model_spend",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1792496997843,
+      "tag": "0066_receipts_model_until",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1792497630013,
+      "tag": "0067_model_receipt_days",
+      "breakpoints": true
     }
   ]
 }

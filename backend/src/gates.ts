@@ -162,7 +162,9 @@ function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
     '',
     ...reminderLines(report.reminders),
     '',
-    ...receiptLines(report.receipts),
+    ...receiptLines(report.receipts, '0.2r', 'does the scanner spare typing?'),
+    '',
+    ...receiptLines(report.modelReceipts, '0.2r', '· read by the model (MOL-272)'),
     '',
     ...taxReceiptLines(report.taxReceipts),
   ]
@@ -173,14 +175,16 @@ function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
  * before recording — above a third after four weeks, the question of the reader comes back. Beside it
  * the readings that never reached a record, since the share counts recorded receipts only and would
  * read better than the scanner is. A line put right is counted once; its kinds may add up past it.
+ * Tesseract's block and the model's, each of its own reader (MOL-272, В-6): the stop is the model's
+ * while it reads.
  */
-function receiptLines(receipts: ReceiptsInWindow): string[] {
+function receiptLines(receipts: ReceiptsInWindow, gate: string, question: string): string[] {
   const { firstDay, lastDay } = receipts
   const span = firstDay === lastDay ? `the day ${firstDay}` : `days ${firstDay} … ${lastDay}`
   const readings =
     receipts.read + receipts.readPartly + receipts.reshoot + receipts.noItems + receipts.unreadable
   return [
-    `0.2r ${'does the scanner spare typing?'.padEnd(47)}stop above ${String(RECEIPT_EDITS_STOP_PERCENT)} % after 4 weeks`,
+    `${gate} ${question.padEnd(47)}stop above ${String(RECEIPT_EDITS_STOP_PERCENT)} % after 4 weeks`,
     row('receipts read', [String(readings), `${span} in Yerevan`]),
     row('  with their lines', [String(receipts.read), '']),
     row('  in part', [String(receipts.readPartly), 'to the review all the same']),

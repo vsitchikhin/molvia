@@ -24,9 +24,9 @@
     :body="updated ? t('consent.updated.body') : t('consent.body')"
   >
     <div class="step">
-      <AppCard v-if="changes" class="changes">
+      <AppCard v-if="changes.length > 0" class="changes">
         <p class="changes-title">{{ t('consent.updated.changes') }}</p>
-        <p class="changes-text">{{ changes }}</p>
+        <p v-for="change in changes" :key="change" class="changes-text">{{ change }}</p>
       </AppCard>
       <nav class="documents">
         <RouterLink :to="{ name: 'terms' }">
@@ -158,9 +158,15 @@ export default defineComponent({
 
     // An edition accepted before is the person coming back to a text that changed.
     const updated = computed(() => consent.accepted !== null)
+    // What changed in every edition since the one accepted, oldest first (MOL-272): one who accepted
+    // edition 1 is told of the consent to the statistics of 2 as well as of the recipient of 3.
     const changes = computed(() => {
-      const key = `consent.changes.${String(POLICY_VERSION)}`
-      return updated.value && i18n.te(key) ? t(key) : null
+      const accepted = consent.accepted
+      if (accepted === null) return []
+      return Array.from({ length: POLICY_VERSION - accepted }, (_, i) => accepted + 1 + i)
+        .map((edition) => `consent.changes.${String(edition)}`)
+        .filter((key) => i18n.te(key))
+        .map((key) => t(key))
     })
 
     // The way out is a sheet of its own, opened once this one is put away (`onClosed`).

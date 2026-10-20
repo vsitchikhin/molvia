@@ -13,7 +13,7 @@ import { z } from 'zod'
  * not exist yet. Which edition to ask about is the phone's (Р-3): the person accepts the text they
  * are shown, and that is the text of their build.
  */
-export const POLICY_VERSION = 2
+export const POLICY_VERSION = 3
 
 /**
  * The first edition whose text asks consent to the statistics (MOL-236): Armenia's law knows no
@@ -22,6 +22,13 @@ export const POLICY_VERSION = 2
  * build not yet updated) or none is neither written nor counted.
  */
 export const STATISTICS_CONSENT_EDITION = 2
+
+/**
+ * The first edition that names Anthropic among the recipients (MOL-272, Т-9): a receipt's photo — which
+ * may print a customer's name — goes to the model in the United States only for whoever accepted it.
+ * Who accepted an older edition is read by Tesseract, whatever was granted to them.
+ */
+export const MODEL_CONSENT_EDITION = 3
 
 /**
  * `GET` and the answer of `PUT /actors/me/consent` (MOL-95): the edition this person accepted, or
