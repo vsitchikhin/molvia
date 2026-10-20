@@ -48,50 +48,67 @@ const render = (
   })
 
 describe('AdviceCheapRow', () => {
-  it('says from what price the thing is worth taking, and at what it is sold', () => {
+  it('Ф-21: the price and its place first, the threshold under them', () => {
     const view = render([sas], price(300_000_000_000n))
 
-    expect(plain(view.get('.second').text())).toBe('Стоит брать дешевле 3 000,00 ֏/кг')
-    expect(plain(view.get('.price').text())).toBe('3 200,00 ֏/кг')
+    expect(plain(view.get('.at').text())).toBe('3 200,00 ֏/кг · SAS')
+    expect(plain(view.get('.threshold').text())).toBe('Стоит брать дешевле 3 000,00 ֏/кг')
+    expect(plain(view.get('.title').text())).toBe('Сыр «Чанах»2,8 из 5 · 4 оценки')
   })
 
-  it('under three purchases there is no threshold, and the line names the place instead', () => {
-    // A median of two is a number with nothing under it (MOL-33), and a line left empty would
-    // leave the row without an answer to «where did I buy this» (В-2).
-    expect(plain(render([sas], null).get('.second').text())).toBe('Брали здесь: SAS')
-    expect(plain(render([sas, market], null).get('.second').text())).toBe('Дешевле всего: SAS')
+  it('under three purchases there is no threshold: the price and the place alone', () => {
+    // A median of two is a number with nothing under it (MOL-33).
+    const view = render([sas], null)
+
+    expect(plain(view.get('.at').text())).toBe('3 200,00 ֏/кг · SAS')
+    expect(view.find('.threshold').exists()).toBe(false)
+  })
+
+  it('rated but never bought with a price: the threshold alone, and no line for a place', () => {
+    const view = render([], price(300_000_000_000n))
+
+    expect(view.find('.at').exists()).toBe(false)
+    expect(plain(view.get('.threshold').text())).toBe('Стоит брать дешевле 3 000,00 ֏/кг')
+  })
+
+  it('neither a threshold nor a place: the name and the rating, and no empty line', () => {
+    const view = render([], null)
+
+    expect(view.find('.at').exists()).toBe(false)
+    expect(view.find('.threshold').exists()).toBe(false)
+    expect(plain(view.get('.title').text())).toBe('Сыр «Чанах»2,8 из 5 · 4 оценки')
   })
 
   it('MOL-120: the place named is told from a namesake of another city on the row', () => {
     const gyumri = { ...place('SAS', 320_000_000_000n), city: 'Гюмри' }
     const yerevan = { ...place('sas', 335_000_000_000n), city: 'Ереван' }
 
-    expect(plain(render([gyumri, yerevan], null).get('.second').text())).toBe(
-      'Дешевле всего: SAS в Гюмри',
+    expect(plain(render([gyumri, yerevan], null).get('.at').text())).toBe(
+      '3 200,00 ֏/кг · SAS в Гюмри',
     )
-    expect(plain(render([gyumri], null).get('.second').text())).toBe('Брали здесь: SAS')
+    expect(plain(render([gyumri], null).get('.at').text())).toBe('3 200,00 ֏/кг · SAS')
   })
 
-  it('neither a threshold nor a place: the name and the rating, and no empty line', () => {
-    const view = render([], null)
+  it('А1: the price shown is the named place`s, and no word claims anything of the others', () => {
+    // Own city first, then by price: the first place can be the dearer one. Its own price is
+    // printed beside it, and with no «Дешевле всего» there is nothing to be false.
+    const dearerFirst = render([market, sas], null)
+    const cheaperFirst = render([sas, market], null)
 
-    expect(view.find('.second').exists()).toBe(false)
-    expect(view.find('.price').exists()).toBe(false)
-    expect(plain(view.text())).toContain('2,8 из 5 · 4 оценки')
-  })
-
-  it('А1: the price shown belongs to the place named, and the word matches the prices', () => {
-    // Own city first, then by price: the first place can be the dearer one, and then it is
-    // «Брали здесь» rather than «Дешевле всего».
-    const view = render([market, sas], null)
-
-    expect(plain(view.get('.second').text())).toBe('Брали здесь: Рынок в Гюмри')
-    expect(plain(view.get('.price').text())).toBe('3 350,00 ֏/кг')
+    expect(plain(dearerFirst.get('.at').text())).toBe('3 350,00 ֏/кг · Рынок в Гюмри')
+    expect(plain(cheaperFirst.get('.at').text())).toBe('3 200,00 ֏/кг · SAS')
+    for (const view of [dearerFirst, cheaperFirst]) {
+      expect(view.text()).not.toMatch(/Дешевле всего|Брали здесь/)
+    }
   })
 
   it('carries the verdict as a circle, so the row reads without colour', () => {
     expect(render([sas], null).get('[role="img"]').attributes('aria-label')).toBe(
       'Только если дёшево',
     )
+  })
+
+  it('says that a tap changes the rating — the row is a button with no other name', () => {
+    expect(render([sas], null).get('button .hidden').text()).toBe('Изменить оценку')
   })
 })
