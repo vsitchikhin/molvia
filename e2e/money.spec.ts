@@ -686,14 +686,29 @@ async function brokenWords(page: Page): Promise<string[]> {
 }
 
 // At 320 the words of a row had some 100 px beside a circle of 40 and a button of 90, and «Развлечения»
-// broke in its middle (adversarial А2 of MOL-191): the button's sides in a row are 8.
+// broke in its middle (adversarial А2 of MOL-191) — and under «Вернуть», wider than «Убрать», with the
+// button's sides of 8 alone still (Б1). So the longest word is taken out first: both tails are measured.
 for (const locale of ['ru-RU', 'en-US'])
   test.describe(`at 320 in ${locale}`, () => {
     test.use({ locale, viewport: { width: 320, height: 844 } })
 
-    test('no name of a category breaks in the middle of a word', async ({ page }) => {
+    test('no name of a category breaks in the middle of a word, in either group', async ({
+      page,
+    }) => {
       await signedIn(page)
+      const headers = await asBrowser(page)
+      const { categories } = (await (
+        await page.request.get('/api/spending-categories', { headers })
+      ).json()) as { categories: { id: string; preset: string | null }[] }
+      const leisure = categories.find((category) => category.preset === 'leisure')
+      expect(leisure).toBeDefined()
+      const removed = await page.request.delete(`/api/spending-categories/${leisure?.id ?? ''}`, {
+        headers,
+      })
+      expect(removed.ok()).toBe(true)
+
       await page.goto('/money/categories')
+      await expect(page.locator('.lists .group')).toHaveCount(2)
       expect(await brokenWords(page)).toEqual([])
     })
   })

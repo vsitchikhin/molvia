@@ -292,11 +292,13 @@ export default defineComponent({
 
 /* A button of 44 in the tail stands over the row's padding of 12 by 4 a side, so a row with a button is
    64 as every row is (DESIGN.md), its target still 44: grown by it, the rows of «Категории» were 68 and
-   their skeleton 64 (MOL-191). Its sides are 8, not a button's 16: beside a circle of 40 a phone of 320
-   left the words 100 px, and «Развлечения» of 107 broke in the middle (adversarial А2); its word now ends
-   24 from the card's edge, the handoff's 20 nearer than 32. */
+   their skeleton 64 (MOL-191). Its sides are 8, not a button's 16, and it stands 8 into the row's padding
+   at the right — its pill 8 from the card's edge, its word 16, the handoff's 8 and 20: beside a circle of
+   40 a phone of 320 left the words 100 px, and «Развлечения» of 107 broke in the middle (adversarial А2),
+   under «Вернуть», wider than «Убрать», with the sides alone still (Б1); now 113. */
 .tail > :slotted(.button) {
   margin-block: calc(var(--space-1) * -1);
+  margin-inline-end: calc(var(--space-2) * -1);
   padding-inline: var(--space-2);
 }
 
