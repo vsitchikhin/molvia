@@ -185,8 +185,15 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
 
   /** A first page landed: the phone keeps it, and what is the owner's rather than a month's. */
   function keep(id: string, first: MoneyMonthView, firstAt: Date, askedAt: Date): void {
-    // Not over an answer that set out later: it knows more (MOL-262, adversarial А6).
-    if (actor.id !== id || !remember(id, first, firstAt, askedAt)) return
+    if (actor.id !== id) return
+    // Not over an answer that set out later: it knows more (MOL-262, adversarial А6). A screen left
+    // meanwhile, or another window, kept it, and this screen has not seen it — so what is the owner's
+    // is taken from the phone, not left as read at the opening (А7).
+    if (!remember(id, first, firstAt, askedAt)) {
+      kept.value = recallCategories(id)
+      keptRate.value = recallTodayRate(id)
+      return
+    }
     // The categories are the owner's, not a month's: an answer of the month just left names them
     // for the one now on screen too — read before it came, that one had none to write a spending
     // into until it was read itself (MOL-183, e2e «a summary that did not load»). Today's rate

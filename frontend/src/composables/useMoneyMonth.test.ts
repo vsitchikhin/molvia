@@ -401,6 +401,55 @@ describe('useMoneyMonth', () => {
     }
   })
 
+  // A screen left while its own month was on its way reads the running one after it, later than the
+  // screen opened anew: that screen's answer is refused, and it must not keep the rate it read at
+  // the opening, from before the exchange (MOL-262, adversarial А7).
+  it('А7: a screen whose answer the phone refused takes today’s rate from the phone', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-09-27T08:00:00Z'))
+    try {
+      const pinia = createPinia()
+      setActivePinia(pinia)
+      useActorStore().id = ACTOR
+      const rate = (scaled: bigint) => ({
+        base: 'RUB' as const,
+        quote: 'AMD' as const,
+        scaled,
+        source: 'personal' as const,
+        asOf: new Date('2026-09-27T00:00:00Z'),
+      })
+      const august = { ...page([], null), month: '2026-08', rateKind: 'frozen' as const }
+      moneyMonth.mockResolvedValueOnce({ ...page([], null), rate: rate(4_160_000n) })
+      host(pinia)
+      await flushPromises()
+      // S1 opened on August, its month slow; an exchange; S2 opened anew, its running month slow too.
+      let giveLeft: (value: MoneyMonthView) => void = () => undefined
+      let giveOpened: (value: MoneyMonthView) => void = () => undefined
+      vi.setSystemTime(new Date('2026-09-27T08:01:00Z'))
+      moneyMonth.mockImplementationOnce(() => new Promise((resolve) => (giveLeft = resolve)))
+      host(pinia, '2026-08')
+      await flushPromises()
+      vi.setSystemTime(new Date('2026-09-27T08:02:00Z'))
+      moneyMonth
+        .mockResolvedValueOnce(august)
+        .mockImplementationOnce(() => new Promise((resolve) => (giveOpened = resolve)))
+      const opened = host(pinia, '2026-08')
+      await flushPromises()
+      expect(opened.todayRate.value?.scaled).toBe(4_160_000n)
+      // S1's month lands; its read of the running month sets out after S2's and is kept.
+      vi.setSystemTime(new Date('2026-09-27T08:03:00Z'))
+      moneyMonth.mockResolvedValueOnce({ ...page([], null), rate: rate(5_000_000n) })
+      giveLeft(august)
+      await flushPromises()
+      // Refused: the phone's answer set out later, and it is the one the screen goes by.
+      giveOpened({ ...page([], null), rate: rate(4_900_000n) })
+      await flushPromises()
+      expect(opened.todayRate.value?.scaled).toBe(5_000_000n)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('А6: a month kept from a clock that ran ahead is read over, not held for good', async () => {
     vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true })
     vi.setSystemTime(new Date('2026-09-30T08:00:00Z'))
