@@ -281,6 +281,14 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   holds only where nobody else goes — without access always, and then the sheet and the home name
   one price; with access the home may name the town's where the sheet names one's own, dated (Б2,
   changed by О).
+- **A purchase paid nothing is no price** (MOL-274, the owner's «б» on А8 of MOL-255): a gift by the
+  card, «the second free», a 0 typed by hand. `pricedRows` leaves it out beside a purchase with no
+  price, so no reader takes it — not a place's last price, not a share of a median, not one of the
+  three buyers who open a place, not a weight of a pair, not a visit that makes a place one's own or
+  fresh (В-1 «а»): counted as a buyer, a gift opened a place on two prices, and their lower median was
+  one person's receipt. A buyer's last price is the one before the gift, and the window counts from
+  it; one minor unit is a price. The purchase stays a purchase — the trip's 0, «Оценки», the copy.
+  **The price, named:** an answer remembered on the phone keeps its 0 until the next one with a signal.
 - **The threshold of «только если дёшево» is the lower median, from three purchases**
   (`PRICE_MEDIAN_MIN_OBSERVATIONS`, MOL-33's answer) — `percentile_disc(0.5)`, a price someone
   actually paid, the same rule `isRateJump` follows. Fewer than three and the field is `null`,
@@ -466,6 +474,10 @@ decisions of 02.10.2026 are В-1…В-10 of `requirements/MOL-92.md`.
   read in the request's zone — the zone its printed day is counted in (review №3) — and a zone
   Postgres does not know, though `Intl` does, is read as Yerevan's rather than answering 500
   (adversarial Ж).
+- **A 0 typed is nothing typed** (MOL-274, В-2 «а»): a gift is no price, so the sheet says where it was
+  cheapest, as before a price is typed, never «тут дешевле», and an alternative is weighed against that
+  place — `cheaperHint`, for the purchase's sheet and a receipt line's alike. Its own past gifts the
+  server never sends (above).
 - **It writes nothing**: no `advice_viewed`, no pick. The person looks at their own prices.
 - **A hint, not a screen**: no loading, no error. With a signal it waits for the server — a
   remembered answer may predate a verdict given since. With none, **or when the connection goes
