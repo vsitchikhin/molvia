@@ -96,10 +96,16 @@ describe('AdviceTakeCard', () => {
     expect(view.text()).toContain('4,8 из 5')
   })
 
-  it('names the verdict and the figure it stands on', () => {
-    expect(plain(render([market]).get('.head').text())).toBe('БРАТЬ4,8 из 5 · 3 оценки')
+  it('Ф-26: the name and the figure it stands on in one line, and no badge — the group says «Брать»', () => {
+    const view = render([market])
+
+    expect(plain(view.get('.title').text())).toBe('Говядина, вырезка4,8 из 5 · 3 оценки')
+    expect(view.find('.badge').exists()).toBe(false)
+    expect(view.text()).not.toMatch(/брать/i)
     // In the own mode the count is always one, and the subtitle above already says so.
-    expect(plain(render([market], null, 'own').get('.head').text())).toBe('БРАТЬ4,8 из 5')
+    expect(plain(render([market], null, 'own').get('.title').text())).toBe(
+      'Говядина, вырезка4,8 из 5',
+    )
   })
 
   it('says that a tap changes the rating — the row is a button with no other name', () => {

@@ -2,12 +2,10 @@
   <AppCard as="article" tone="take" class="card">
     <button class="tap" type="button" @click="$emit('edit')">
       <span class="hidden">{{ t('advice.edit_action') }}</span>
-      <span class="head">
-        <VerdictBadge level="take" />
+      <span class="title">
+        <span class="name">{{ row.name }}</span>
         <AdviceRating :rating="row.rating" :count="row.ratingsCount" :scope="scope" />
       </span>
-
-      <span class="name">{{ row.name }}</span>
 
       <template v-if="places.kind !== 'none'">
         <span class="best">
@@ -28,15 +26,17 @@ import { cityWhereNameRepeats } from '@molvia/model'
 import type { AdvicePlace, AdviceScope } from '@molvia/model'
 import AdviceRating from '@/components/AdviceRating.vue'
 import AppCard from '@/components/AppCard.vue'
-import VerdictBadge from '@/components/VerdictBadge.vue'
 import { placesView, unitPriceText, whereKey } from '@/components/adviceRow'
 import { placeLabel } from '@/components/placeLabel'
 import type { TakeRow } from '@/components/adviceRow'
 
 /**
  * «Брать»: the densest of the three forms, because this is the row a person acts on — the
- * verdict, the figure it stands on, the name, where it is cheapest and at what price per unit
+ * name, the figure the verdict stands on, where it is cheapest and at what price per unit
  * (MOL-32).
+ *
+ * **The card does not repeat the verdict** (MOL-200, Ф-26): the group's caption above already
+ * says «Брать», and a pill saying it again on every card was the loudest thing in the list.
  *
  * Nothing here marks one shop out: no logo, no accent colour, no order but the price. Terracotta
  * means «tap this», and in a list of results it reads as a promoted place — there are no paid
@@ -47,7 +47,7 @@ import type { TakeRow } from '@/components/adviceRow'
  */
 export default defineComponent({
   name: 'AdviceTakeCard',
-  components: { AdviceRating, AppCard, VerdictBadge },
+  components: { AdviceRating, AppCard },
   props: {
     row: { type: Object as PropType<TakeRow>, required: true },
     /** Whose figures the row carries: in the own mode the count of one is not worth printing. */
@@ -122,20 +122,21 @@ export default defineComponent({
 }
 
 .card + .card {
-  margin-top: var(--space-3);
+  margin-top: var(--space-2);
 }
 
-.head {
+/* The name wraps, the rating never does: it stands at the right of the name's first line. */
+.title {
   display: flex;
-  gap: var(--space-2);
-  align-items: center;
-  margin-bottom: var(--space-2);
+  gap: var(--space-3);
+  align-items: baseline;
+  justify-content: space-between;
 }
 
 .name {
   @include display-type;
 
-  display: block;
+  min-width: 0;
   font-size: var(--text-title);
   line-height: var(--leading-tight);
 }
@@ -169,6 +170,6 @@ export default defineComponent({
   display: block;
   margin-top: var(--space-2);
   color: var(--text-muted);
-  font-size: var(--text-caption);
+  font-size: var(--text-footnote);
 }
 </style>
