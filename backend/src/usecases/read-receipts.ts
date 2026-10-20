@@ -110,6 +110,12 @@ export type ReadReport =
       readonly paid?: ModelPaid
     }
   | { readonly kind: 'model_unavailable'; readonly reason: string }
+  /**
+   * An answer torn on its way, or a fault of ours in the client that looks just like one (review №8): the
+   * receipt still waits, and the owner hears of it as a failure — the first time in a build, then at 10,
+   * 100, 1000, so a chance tear makes no noise and a broken client is not silent.
+   */
+  | { readonly kind: 'model_broken'; readonly error: unknown }
   | { readonly kind: 'model_rejected'; readonly error: unknown }
   | { readonly kind: 'reader_dropped'; readonly reason: string }
   | { readonly kind: 'strips_failed'; readonly reason: string }
@@ -203,6 +209,7 @@ async function readByModel(
         await spend.settle(month, worst, error.costMicroUsd, capMicroUsd, now())
       }
       report({ kind: 'model_unavailable', reason: error.reason })
+      if (error.broken !== undefined) report({ kind: 'model_broken', error: error.broken })
       const waited = now().getTime() - (claimed.queuedAt ?? now()).getTime()
       if (waited < RECEIPT_MODEL_WAIT_MS) return 'wait'
       report({ kind: 'model_passed', reason: 'away' })

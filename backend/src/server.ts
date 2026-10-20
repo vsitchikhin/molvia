@@ -795,6 +795,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
             )
           } else if (event.kind === 'model_unavailable') {
             instance.log.warn({ reason: event.reason }, 'receipt model unavailable')
+          } else if (event.kind === 'model_broken') {
+            failures.report(event.error, job('receipt-model'), 'receipt model answer torn')
           } else if (event.kind === 'model_rejected') {
             // a request the API refuses for what it is: ours to fix, so the owner hears of it
             failures.report(event.error, job('receipt-model'), 'receipt model refused the request')

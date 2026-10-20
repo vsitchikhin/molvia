@@ -60,6 +60,8 @@ export class ModelUnavailable extends Error {
   constructor(
     readonly reason: string,
     readonly costMicroUsd: number | null,
+    /** What broke, for `dropped`: a torn answer and a fault of ours look alike (review №8). */
+    readonly broken?: unknown,
   ) {
     super(`receipt model unavailable: ${reason}`)
   }
@@ -206,15 +208,14 @@ export function receiptModel(options: {
         }
         // no answer, or one torn under its head or its body (adversarial А3): the request may have gone, and
         // been paid (review №2)
-        throw new ModelUnavailable(
-          error instanceof APIConnectionError ? 'unreachable' : 'dropped',
-          null,
-        )
+        throw error instanceof APIConnectionError
+          ? new ModelUnavailable('unreachable', null)
+          : new ModelUnavailable('dropped', null, error)
       }
       // an answer of 200 with no body is one torn too: the SDK hands it over as nothing
       const answered: unknown = message
       if (typeof answered !== 'object' || answered === null || !('usage' in answered)) {
-        throw new ModelUnavailable('dropped', null)
+        throw new ModelUnavailable('dropped', null, new TypeError('an answer with no body'))
       }
       const paid = {
         costMicroUsd: modelCallMicroUsd(message.usage),

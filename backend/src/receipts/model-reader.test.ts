@@ -27,6 +27,7 @@ const ANSWER: ModelReceipt = {
   shop: 'Խանութ «Օրինակ»',
   address: 'Գորկու 1, Գյումրի',
   tin: '01234567',
+  fiscal_no: '27410811',
   receipt_no: '1',
   date: '2026-10-08',
   time: '19:57',
@@ -196,10 +197,10 @@ describe('the model that reads receipts (MOL-272)', () => {
       )) as typeof fetch
 
   it('is unavailable with its answer torn under the body, at a price not known (adversarial А3)', async () => {
-    await expect(model(torn(true)).read([jpeg(10, 10)])).rejects.toMatchObject({
-      reason: 'dropped',
-      costMicroUsd: null,
-    })
+    const got = model(torn(true)).read([jpeg(10, 10)])
+    await expect(got).rejects.toMatchObject({ reason: 'dropped', costMicroUsd: null })
+    // what broke goes with it, for the owner to hear of (review №8)
+    await expect(got).rejects.toHaveProperty('broken')
   })
 
   it('times the whole call out, a body that stalls too (adversarial А3 «б»)', async () => {
@@ -234,7 +235,7 @@ describe('the model that reads receipts (MOL-272)', () => {
     const one = reader.inputTokensMax([jpeg(750, 1)])
     expect(reader.inputTokensMax([jpeg(750, 1), jpeg(750, 2)])).toBe((one ?? 0) + 2)
     expect(reader.inputTokensMax([jpeg(10, 10), Buffer.from('no photo')])).toBeNull()
-    expect(reader.version).toBe('claude-haiku-5-5@v3')
+    expect(reader.version).toBe('claude-haiku-5-5@v4')
   })
 
   it('sends no part past the API’s image and no request past its whole, counted in base64 (review №3)', () => {

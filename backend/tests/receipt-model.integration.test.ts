@@ -18,7 +18,7 @@ import {
   receipts,
 } from '@/db/schema'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
-import { ModelRejected, ModelUnavailable } from '@/receipts/model-reader'
+import { ModelRejected, ModelUnavailable, receiptModel } from '@/receipts/model-reader'
 import type { ModelReading, ReceiptModel } from '@/receipts/model-reader'
 import type { ReaderReading, ReceiptReader } from '@/receipts/reader'
 import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
@@ -55,6 +55,7 @@ const ANSWER: ModelReceipt = {
   shop: 'Խանութ «Օրինակ»',
   address: 'Գորկու 1, Գյումրի',
   tin: '01234567',
+  fiscal_no: '27410811',
   receipt_no: '000123',
   date: '2026-10-08',
   time: '19:57',
@@ -178,7 +179,7 @@ function fakeModel(
 ): ReceiptModel & { asked: number } {
   const model = {
     asked: 0,
-    version: 'claude-haiku-5-5@v3',
+    version: 'claude-haiku-5-5@v4',
     inputTokensMax: () => input,
     read: () => {
       model.asked += 1
@@ -232,7 +233,7 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
     const row = await receiptOf(id)
     expect(row).toMatchObject({
       status: 'parsed',
-      readerVersion: 'claude-haiku-5-5@v3',
+      readerVersion: 'claude-haiku-5-5@v4',
       layout: 'card',
       tin: '01234567',
       totalMinor: 102_710n,
@@ -371,6 +372,30 @@ describe('a failure of the model’s own client (review №4)', () => {
 })
 
 describe('the model away (Р-9)', () => {
+  it('waits for an answer torn under its body, and the owner hears of it — a torn one and a fault of ours look alike (review №8)', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    const torn = (() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode('{"id":"msg_1",'))
+              controller.error(new TypeError('terminated'))
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )) as typeof fetch
+    const real = receiptModel({ apiKey: 'sk-ant-test', fetch: torn })
+    const model = Object.assign(real, { inputTokensMax: () => 10_000 })
+    const reports = await readAll(benchReader(), model)
+    expect(await receiptOf(id)).toMatchObject({ status: 'queued', attempts: 0 })
+    expect(reports).toContainEqual({ kind: 'model_unavailable', reason: 'dropped' })
+    expect(reports.some((r) => r.kind === 'model_broken')).toBe(true)
+    expect((await month())?.spentMicroUsd).toBe(9_000)
+  }, 30_000)
+
   it('keeps the receipt queued, its attempt uncounted, while it is within its wait', async () => {
     const me = await person(LATER)
     const id = await queued(me)
