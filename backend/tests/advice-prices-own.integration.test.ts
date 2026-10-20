@@ -15,6 +15,7 @@ import {
   ownNeverResponseSchema,
   ownPricesResponseSchema,
   toSearchKey,
+  tripViewCodec,
   unitPrice,
 } from '@molvia/model'
 import type { Money, OwnPrices, OwnPricesResponse, Quantity } from '@molvia/model'
@@ -26,8 +27,7 @@ import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } fr
 
 // The 6 tests here past half a second on CI carry a timeout of 10 s: the slowest took 644 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
-// than any yet seen. The two of MOL-274 through the trip's routes carry the same, not yet measured
-// there.
+// than any yet seen.
 
 const { db, close } = connectDrizzle()
 
@@ -711,12 +711,27 @@ describe('GET /advice/prices — a purchase at 0 is no price (MOL-274)', () => {
     await typed(me, gift, milk, '0')
     const kefir = await item('Кефир Марианна 1 л')
     await typed(me, gift, kefir, '0')
+    await typed(me, gift, await item('Кефир Ашхар 1 л'), '500')
 
     expect(placesOf(await prices(me, { item: milk }))).toEqual([
       { name: 'Ереван Сити', price: perLitre(500), day: '2026-10-02', observations: 1 },
     ])
     expect(placesOf(await prices(me, { item: kefir }))).toEqual([])
-  }, 10_000)
+    // Must not fire: the gifts are still purchases of the record, and its money is 0 + 0 + 500.
+    const view = await app.inject({
+      method: 'GET',
+      url: `/trips/${gift}`,
+      headers: { cookie: await signIn(db, me) },
+    })
+    expect(view.statusCode, view.body).toBe(200)
+    const record = tripViewCodec.parse(view.json())
+    expect(record.expenses.map((expense) => expense.amount?.minor).sort()).toEqual([
+      0n,
+      0n,
+      50_000n,
+    ])
+    expect(record.total).toEqual([amd(50_000)])
+  })
 
   it('leaves a purchase out once its sum is put right to 0', async () => {
     const me = await insertActor(db)
@@ -739,7 +754,7 @@ describe('GET /advice/prices — a purchase at 0 is no price (MOL-274)', () => {
     expect(placesOf(await prices(me, { item: milk })).map((place) => place.name)).toEqual([
       'Зовуни',
     ])
-  }, 10_000)
+  })
 
   it('offers no alternative bought only as a gift, and one bought at a price', async () => {
     const me = await insertActor(db)

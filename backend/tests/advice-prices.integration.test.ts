@@ -16,8 +16,7 @@ import { expenses as expensesTable } from '@/db/schema'
 
 // The 6 tests here past half a second on CI carry a timeout of 10 s: the slowest took 686 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
-// than any yet seen. The three of MOL-274 in the shared mode write as many rows and carry the same,
-// not yet measured there.
+// than any yet seen.
 
 const { db, close } = connectDrizzle()
 const expenses = createExpenseRepository(db)
@@ -744,6 +743,25 @@ describe('покупка за 0 — не цена ни для одного чи�
     expect(latest?.startedOn).toBe('2026-10-02')
   })
 
+  it('своё место: подарок в другой паре — место по-прежнему в кило по 500, пара «шт» ничего не весит', async () => {
+    const me = await insertActor(db)
+    const placeId = await insertPlace(db)
+    const itemId = await insertItem(db)
+    await bought(me, itemId, placeId, amd(500_000), kilo, { on: '2026-10-02' })
+    // Последняя покупка места — «1 шт» за 0: до правки она называла место «0 ֏/шт» (`place_last`
+    // не смотрит на пару) и отдавала вес ряда паре «шт» (Р-4).
+    await bought(me, itemId, placeId, amd(0), piece, { on: '2026-10-14' })
+
+    const rows = await expenses.placePricesFor(ownPrices(me, [itemId]))
+    expect(
+      rows.map((row) => [row.unit, row.scaledMinor, row.observations, row.pairObservations]),
+    ).toEqual([['kg', price(500_000), 1, 1]])
+    const latest = await expenses.ownLatestFor(own(me, [itemId]))
+    expect(latest.map((row) => [row.unit, row.scaledMinor, row.startedOn])).toEqual([
+      ['kg', price(500_000), '2026-10-02'],
+    ])
+  })
+
   it('одна покупка за 0 — цены нет нигде; одна минорная единица — уже цена', async () => {
     const me = await insertActor(db)
     const placeId = await insertPlace(db)
@@ -787,7 +805,7 @@ describe('покупка за 0 — не цена ни для одного чи�
     await bought(await insertActor(db), itemId, theirs, amd(540_000), kilo, { on: ago(4) })
     const [open] = await expenses.placePricesFor(sharedPrices(me, [itemId]))
     expect(open?.scaledMinor).toBe(price(520_000))
-  }, 10_000)
+  })
 
   it('общий режим: последняя цена покупателя — до его подарка, и окно считается от неё', async () => {
     const me = await insertActor(db)
@@ -815,7 +833,7 @@ describe('покупка за 0 — не цена ни для одного чи�
     })
     await bought(boris, other, theirs, amd(0), kilo, { on: ago(1) })
     expect(await expenses.placePricesFor(sharedPrices(me, [other]))).toEqual([])
-  }, 10_000)
+  })
 
   it('общий режим: мой подарок не делает место моим — его называют трое свежих (адверсариальный О)', async () => {
     const me = await insertActor(db)
@@ -833,5 +851,5 @@ describe('покупка за 0 — не цена ни для одного чи�
     expect((await expenses.placePricesFor(sharedPrices(me, [itemId])))[0]?.scaledMinor).toBe(
       price(610_000),
     )
-  }, 10_000)
+  })
 })

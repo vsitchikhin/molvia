@@ -30,7 +30,7 @@ import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtur
 
 // The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 857 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
-// than any yet seen. The one of MOL-274 carries the same, not yet measured there.
+// than any yet seen.
 
 /**
  * «Записать» (MOL-126): a parsed receipt written in one go as a finished trip on its own day, its
@@ -654,7 +654,8 @@ describe('«Записать»', () => {
     })
     expect(prices.statusCode, prices.body).toBe(200)
     expect(prices.json()).toMatchObject({ prices: { itemId: milk, places: [] } })
-    // Must not fire: the gift is still the trip's 0 and still waits for a verdict.
+    // Must not fire: the receipt's total stays the one recorded, and the gift still waits for a
+    // verdict (Р-4). The gift's 0 in a trip's money is held on the manual path, by `/trips/:id`.
     const [trip] = await db
       .select()
       .from(trips)
@@ -666,7 +667,7 @@ describe('«Записать»', () => {
       headers: { cookie: await signIn(db, me) },
     })
     expect(pending.body).toContain(milk)
-  }, 10_000)
+  })
 
   it('confirms no row of a line whose price the check took off as misread (MOL-255)', async () => {
     const me = await insertActor(db)
