@@ -42,30 +42,35 @@
         <p v-if="chosenStep.rate" class="figure">{{ rateOf(chosenStep.rate) }}</p>
         <p v-else class="figure missing">{{ t(words.noMarket) }}</p>
       </template>
-      <p v-if="chosen?.exchange" class="mine">
-        <span class="mine-dot" aria-hidden="true"></span>
-        <span class="mine-text">
-          <span class="mine-rate">{{
-            t('exchange.rate_chart.mine', {
-              day: shortDay(chosen.exchange.day),
-              rate: rateOf(chosen.exchange.rate),
-            })
-          }}</span>
-          <span class="mine-place">{{
-            chosen.exchange.place ?? t('exchange.vs_market.no_place')
-          }}</span>
-          <span :class="['mine-diff', diffClassOf(chosen.exchange)]">{{
-            diffOf(chosen.exchange)
-          }}</span>
-        </span>
-      </p>
-      <p v-else-if="period" class="none held">
-        {{
-          period.exchanges.length === 0
-            ? t('exchange.rate_chart.none_period', { period: periodIn })
-            : t(words.none)
-        }}
-      </p>
+      <!-- Every plate of the period in one cell, the chosen one seen: the tallest holds the place, so a
+           week with no exchange leaves the chart under the finger where it was (adversarial А2, Б1). -->
+      <div v-if="period" class="stack">
+        <p v-if="chosenPlate" class="plate mine">
+          <span class="plate-dot" aria-hidden="true"></span>
+          <span class="plate-text">
+            <span class="plate-rate mine-rate">{{ chosenPlate.rate }}</span>
+            <span class="plate-place mine-place">{{ chosenPlate.place }}</span>
+            <span :class="['plate-diff', 'mine-diff', chosenPlate.tone]">{{
+              chosenPlate.diff
+            }}</span>
+          </span>
+        </p>
+        <p v-else class="none">
+          {{
+            period.exchanges.length === 0
+              ? t('exchange.rate_chart.none_period', { period: periodIn })
+              : t(words.none)
+          }}
+        </p>
+        <p v-for="plate in plates" :key="plate.id" class="plate ghost" aria-hidden="true">
+          <span class="plate-dot"></span>
+          <span class="plate-text">
+            <span class="plate-rate">{{ plate.rate }}</span>
+            <span class="plate-place">{{ plate.place }}</span>
+            <span :class="['plate-diff', plate.tone]">{{ plate.diff }}</span>
+          </span>
+        </p>
+      </div>
     </div>
 
     <fieldset v-if="period" class="chart">
@@ -357,6 +362,21 @@ export default defineComponent({
     }
     const diffClassOf = (point: Point) => (point.percent === null ? 'quiet' : toneOf(point))
 
+    /** The plate under the reading: the exchange and its rate, the place, the difference (Р-4). */
+    function plateOf(point: Point) {
+      return {
+        id: point.id,
+        rate: t('exchange.rate_chart.mine', {
+          day: shortDay(point.day),
+          rate: rateOf(point.rate),
+        }),
+        place: point.place ?? t('exchange.vs_market.no_place'),
+        diff: diffOf(point),
+        tone: diffClassOf(point),
+      }
+    }
+    const plates = computed(() => period.value?.exchanges.map(plateOf) ?? [])
+
     const items = computed<Item[]>(() => {
       const shown = period.value
       if (!shown) return []
@@ -407,6 +427,9 @@ export default defineComponent({
       return found === -1 ? defaultIndex() : found
     })
     const chosen = computed(() => items.value[chosenIndex.value] ?? null)
+    const chosenPlate = computed(() =>
+      chosen.value?.exchange ? plateOf(chosen.value.exchange) : null,
+    )
     /** The step chosen: its day, its market and where it is drawn. */
     const chosenStep = computed(
       () => (chosen.value ? period.value?.steps[chosen.value.step] : null) ?? null,
@@ -706,6 +729,8 @@ export default defineComponent({
       pair,
       items,
       chosen,
+      chosenPlate,
+      plates,
       chosenIndex,
       chosenStep,
       step,
@@ -806,13 +831,21 @@ export default defineComponent({
   }
 }
 
-/* The plate's three lines held by a week without an exchange: the chart under the finger stays where
-   it was (MOL-190, adversarial А2). */
-.held {
-  min-height: calc(3lh + 2 * var(--space-2));
+/* The plates of the period in one cell: the tallest decides, the one shown is the exchange chosen. */
+.stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+
+  > * {
+    grid-area: 1 / 1;
+  }
 }
 
-.mine {
+.ghost {
+  visibility: hidden;
+}
+
+.plate {
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
@@ -823,7 +856,7 @@ export default defineComponent({
   background: var(--surface-2);
 }
 
-.mine-dot {
+.plate-dot {
   flex-shrink: 0;
   width: 0.5rem;
   height: 0.5rem;
@@ -832,22 +865,22 @@ export default defineComponent({
   background: var(--accent);
 }
 
-.mine-text {
+.plate-text {
   display: grid;
   font-size: var(--text-footnote);
 }
 
-.mine-rate {
+.plate-rate {
   font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
 }
 
-.mine-place {
+.plate-place {
   color: var(--text-muted);
 }
 
 /* The tone with its sign and its word, never alone (Ф-30); with no comparison, a quiet line. */
-.mine-diff {
+.plate-diff {
   &.quiet {
     color: var(--text-muted);
   }

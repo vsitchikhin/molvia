@@ -375,7 +375,7 @@ describe('ExchangeRateChart (MOL-161)', () => {
     const shown = async (index: number) => {
       await mine()[index]?.setValue(true)
       const diff = view.find('.mine-diff')
-      return [plain(diff.text()), diff.classes().filter((one) => one !== 'mine-diff')]
+      return [plain(diff.text()), diff.classes().filter((one) => !one.endsWith('-diff'))]
     }
     expect(await shown(0)).toEqual(['+1,21 % · лучше рынка', ['good']])
     expect(await shown(1)).toEqual(['0,00 % · хуже рынка', ['bad']])
@@ -712,6 +712,21 @@ describe('ExchangeRateChart (MOL-161)', () => {
     const { view } = chart([rouble({ exchanges: [] })])
     expect(view.find('.none').text()).toBe('Обменов за 12 месяцев не было')
     expect(view.findAll('.point')).toHaveLength(0)
+    // No plate to hold the place of (adversarial Б2 of MOL-190).
+    expect(view.findAll('.ghost')).toHaveLength(0)
+  })
+
+  it('holds a plate of every exchange of the period unseen, so the tallest keeps the place (MOL-190, Б1)', async () => {
+    const { view, area } = chart()
+    const ghosts = view.findAll('.plate.ghost')
+    expect(ghosts).toHaveLength(view.findAll('.point').length)
+    expect(ghosts.every((ghost) => ghost.attributes('aria-hidden') === 'true')).toBe(true)
+    expect(ghosts.map((ghost) => ghost.find('.plate-place').text())).toContain('Без места')
+    await tap(view, area, 3)
+    // A week with no exchange: the words in place of the plate, the plates still held.
+    expect(view.find('.none').text()).toBe('Обменов на этой неделе не было')
+    expect(view.findAll('.plate.ghost')).toHaveLength(ghosts.length)
+    expect(view.findAll('.mine')).toHaveLength(0)
   })
 })
 
