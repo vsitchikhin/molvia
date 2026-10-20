@@ -682,13 +682,23 @@ rate exactly as before.
   here», and the cursor `--border-strong`, decoration. The legend keeps its words (С-4) with a stroke
   of `--graphic` and a dot of `--text`: the two differ in shape. **The mark to the market is `--bad` or
   `--good` by the sign of the money, never of the percent** — the rule of «Обмены против рынка» (Р-4
-  of MOL-187): a point carries `sign`, the sign of `measured.difference`, since 0,00 % may stand over
-  −0,30 ֏ and the card of that exchange says «хуже». No comparison and nothing at all are `--graphic`.
-  An answer of a server before it has no `sign` (`default(null)`) and the phone takes the percent's.
-  **The plate under the reading is three lines**: the exchange and its rate, the place, and «−0,40 % ·
-  хуже рынка» in `bad-ink` or `good-ink` at 600 (`rate_chart.diff`) — the colour never alone; nothing
-  is «0,00 %» with no word; no comparison is a quiet line, «Рынка того дня нет» or «Без сравнения:
-  курса ЦБ РА того дня нет». The radio of the point says the word too.
+  of MOL-187): a point carries `sign`, since 0,00 % may stand over −0,30 ֏ and the card of that
+  exchange says «хуже». **The sign is the card's** — of its market's difference in the currency
+  received — never of `measured`, the same money in the spending currency rounded to its cent:
+  spent in dollars, −1,00 ֏ is 0,00 $, and the point said nothing where the card said «хуже»
+  (adversarial А1). **The price, named:** «Обмены против рынка» sums the money in the spending
+  currency, so its place may read «0,00 $» with no tone beside a mark of `--bad`; the chart is the
+  exchange's, not the place's. No comparison and nothing at all are `--graphic`. An answer of a server
+  before it has no `sign` (`default(null)`) and the phone takes the percent's; a page before it reads
+  `sign` by the strict codec of its time and refuses the answer of «Обмен денег» whole, as one before
+  MOL-168 refused `rateCharts`, until it takes the new version (the price of `frontend.md`'s strict
+  reading). **The plate under the reading is three lines**: the exchange and its rate, the place, and
+  «−0,40 % · хуже рынка» in `bad-ink` or `good-ink` at 600 (`rate_chart.diff`) — the colour never
+  alone; nothing is «0,00 %» with no word; no comparison is a quiet line, «Рынка того дня нет» or
+  «Без сравнения: курса ЦБ РА того дня нет». The radio of the point says the word too. **The reading
+  holds the plate's height** (adversarial А2): a week with no exchange keeps three lines for it and a
+  week with no market the figure's line, so the chart under the finger never moves — the three lines
+  doubled a jump of 19 px master already had, to 38.
 
 ## Incomes
 
