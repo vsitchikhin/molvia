@@ -932,7 +932,8 @@ test('a summary that did not load is a quiet card, and the strip still adds a sp
   const add = page.locator('.dock').getByRole('button', { name: /Добавить трату/ })
   await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
   await expect(page).toHaveURL(/month=/)
-  // Nothing kept on this phone and nothing answered: no category is known, so no strip.
+  // Nothing kept on this phone and nothing answered: no category is known, so no strip at the move.
+  // Looked at once, not over the hold — a strip come a moment later with no category would pass here.
   await expect(add).toHaveCount(0)
 
   // This month's answer lands for a month no longer on screen, and still names the categories. Waited

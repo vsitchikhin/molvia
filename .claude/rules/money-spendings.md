@@ -368,8 +368,9 @@ nothing up.
   the first of a month (review Т-5, Т-6) — and does not, where no category is known at all. **Any
   answer that lands names them**, of a month left before it came too (MOL-183): turned a month back
   before the running one answered, and that month failing, the screen had none and lost the strip — e2e
-  holds that order on every run, the running month's answer held back, never left to the runner (MOL-262). The row
-  «Категории» stands before anything is spent too (Т-7). This month on the phone (MOL-121) is looked
+  holds that order on every run, the running month's answer held back, never left to the runner (MOL-262). That
+  answer gives the sheet today's rate as well (MOL-262, adversarial А1): taken only for the month on screen, the
+  strip in that very order opened a sheet with no «≈ … по моему курсу». The row «Категории» stands before anything is spent too (Т-7). This month on the phone (MOL-121) is looked
   at again whenever the app comes back into view (adversarial З).
 - **«Пусто» is read off the answer** (Р-6): the running month empty, no income, nothing the month
   before and nothing waiting. The server does not say «no history», and an empty August after a
