@@ -544,6 +544,7 @@ function rateYear(id: string) {
         level: 300,
         place: 'Ардшинбанк',
         percent: 121,
+        sign: 1,
         market: { rate: wireRate('4.110180', '2026-02-28'), level: 200, basis: 'bankCash' },
       },
     ],
@@ -636,7 +637,8 @@ test('the rate of twelve months: no market — no card; the latest exchange firs
   expect(chartTop).toBeLessThan(rateTop)
 
   await expect(card.locator('.mine-rate')).toHaveText('Мой обмен 28 февр. · 4,16 ֏/₽')
-  await expect(card.locator('.mine-place')).toHaveText(/Ардшинбанк · \+1,21\s%\sк рынку/)
+  await expect(card.locator('.mine-place')).toHaveText('Ардшинбанк')
+  await expect(card.locator('.mine-diff')).toHaveText(/\+1,21\s%\s·\sлучше рынка/)
 
   // A finger lifted at the left edge: the first week, which had no exchange.
   const area = card.locator('.area')

@@ -51,7 +51,12 @@
               rate: rateOf(chosen.exchange.rate),
             })
           }}</span>
-          <span class="mine-place">{{ placeLineOf(chosen.exchange) }}</span>
+          <span class="mine-place">{{
+            chosen.exchange.place ?? t('exchange.vs_market.no_place')
+          }}</span>
+          <span :class="['mine-diff', diffClassOf(chosen.exchange)]">{{
+            diffOf(chosen.exchange)
+          }}</span>
         </span>
       </p>
       <p v-else-if="period" class="none">
@@ -124,11 +129,12 @@
               />
             </template>
             <!-- The mark ends at the market the exchange was measured by (В-1), never at the line:
-                 a cash exchange is set beside cash, which the line of all bank clients is not. -->
+                 a cash exchange is set beside cash, which the line of all bank clients is not. Its
+                 tone is the money's (MOL-190); with no comparison or nothing to tell, none. -->
             <template v-for="point in period.exchanges" :key="`mark-${point.id}`">
               <template v-if="point.market">
                 <line
-                  class="mark"
+                  :class="['mark', toneOf(point)]"
                   :x1="point.x"
                   :y1="yOf(point.level)"
                   :x2="point.x"
@@ -136,7 +142,7 @@
                   vector-effect="non-scaling-stroke"
                 />
                 <line
-                  class="mark end"
+                  :class="['mark', 'end', toneOf(point)]"
                   :x1="point.x - TICK"
                   :y1="yOf(point.market.level)"
                   :x2="point.x + TICK"
@@ -323,21 +329,33 @@ export default defineComponent({
     const shortDay = (day: string) =>
       calendarDay(day, locale.value, { day: 'numeric', month: 'short' })
     const longDay = (day: string) => calendarDay(day, locale.value)
-    const changeOf = (point: Point) =>
-      point.percent === null
-        ? t('exchange.rate_chart.no_change')
-        : signedPercent(point.percent, locale.value, true)
+    /**
+     * «Хуже / лучше рынка» by the sign of the money, never of the percent (MOL-190, Р-4 of MOL-187):
+     * 0,00 % may stand over money that is there. A server before it sends no sign: the percent's.
+     */
+    function toneOf(point: Point): 'bad' | 'good' | null {
+      const sign = point.sign ?? (point.percent === null ? null : Math.sign(point.percent))
+      return sign === -1 ? 'bad' : sign === 1 ? 'good' : null
+    }
+
+    const wordOf = { bad: 'exchange.vs_market.worse', good: 'exchange.vs_market.better' } as const
+
+    /** «−0,40 % · хуже рынка»; nothing is the percent alone, no word (`key` — seen or spoken). */
+    function changeOf(point: Point, key = 'exchange.rate_chart.diff'): string {
+      if (point.percent === null) return t('exchange.rate_chart.no_change')
+      const change = signedPercent(point.percent, locale.value, true)
+      const tone = toneOf(point)
+      return tone ? t(key, { change, word: t(wordOf[tone]) }) : change
+    }
 
     /** A market and no percent: it is the central bank's rate of the day that is missing (К). */
-    function placeLineOf(point: Point): string {
-      const place = point.place ?? t('exchange.vs_market.no_place')
-      if (point.percent !== null) {
-        return t('exchange.rate_chart.mine_place', { place, change: changeOf(point) })
-      }
+    function diffOf(point: Point): string {
+      if (point.percent !== null) return changeOf(point)
       return point.market
-        ? t('exchange.rate_chart.mine_no_rate', { place })
-        : t('exchange.rate_chart.mine_no_market', { place })
+        ? t('exchange.rate_chart.mine_no_rate')
+        : t('exchange.rate_chart.mine_no_market')
     }
+    const diffClassOf = (point: Point) => (point.percent === null ? 'quiet' : toneOf(point))
 
     const items = computed<Item[]>(() => {
       const shown = period.value
@@ -367,7 +385,7 @@ export default defineComponent({
             market,
             date: longDay(point.day),
             mine: rateOf(point.rate),
-            change: changeOf(point),
+            change: changeOf(point, 'exchange.rate_chart.spoken_diff'),
           }),
         }))
       })
@@ -709,7 +727,9 @@ export default defineComponent({
       rateOf,
       shortDay,
       tickOf,
-      placeLineOf,
+      toneOf,
+      diffOf,
+      diffClassOf,
       choose,
       choosePair,
       choosePeriod,
@@ -744,18 +764,15 @@ export default defineComponent({
 .swatch.line {
   width: 1rem;
   height: 2px;
-  background: var(--text-muted);
+  background: var(--graphic);
 }
 
-/* The series differ in shape — a line and a ringed dot — not in colour alone. */
+/* The series differ in shape — a line and a dot — not in colour alone. */
 .swatch.dot {
   width: 0.625rem;
   height: 0.625rem;
   border-radius: 50%;
-  background: var(--accent);
-  box-shadow:
-    0 0 0 2px var(--surface),
-    0 0 0 3px var(--accent);
+  background: var(--text);
 }
 
 .reading {
@@ -822,6 +839,26 @@ export default defineComponent({
   color: var(--text-muted);
 }
 
+/* The tone with its sign and its word, never alone (Ф-30); with no comparison, a quiet line. */
+.mine-diff {
+  &.quiet {
+    color: var(--text-muted);
+  }
+
+  &.bad,
+  &.good {
+    font-weight: var(--weight-medium);
+  }
+
+  &.bad {
+    color: var(--bad-ink);
+  }
+
+  &.good {
+    color: var(--good-ink);
+  }
+}
+
 .chart {
   min-width: 0;
   margin: 0;
@@ -865,13 +902,13 @@ export default defineComponent({
 }
 
 .cursor {
-  stroke: var(--border-strong);
+  stroke: var(--accent);
   stroke-width: 1.5;
 }
 
 .line {
   fill: none;
-  stroke: var(--text-muted);
+  stroke: var(--graphic);
   stroke-width: 2;
   stroke-linejoin: round;
   stroke-linecap: round;
@@ -883,17 +920,25 @@ export default defineComponent({
 }
 
 .mark {
-  stroke: var(--text);
+  stroke: var(--graphic);
   stroke-width: 1.5;
 
   &.end {
     stroke-width: 2;
   }
+
+  &.bad {
+    stroke: var(--bad);
+  }
+
+  &.good {
+    stroke: var(--good);
+  }
 }
 
 .ring,
 .hole {
-  stroke: var(--text-muted);
+  stroke: var(--graphic);
   stroke-width: 9;
   stroke-linecap: round;
 }
@@ -918,10 +963,12 @@ export default defineComponent({
 }
 
 .point {
-  stroke: var(--accent);
+  stroke: var(--text);
   stroke-width: 10;
 
+  /* Terracotta is the chosen one's and the cursor's alone (Ф-4). */
   &.chosen {
+    stroke: var(--accent);
     stroke-width: 13;
   }
 }

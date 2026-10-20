@@ -166,7 +166,9 @@ describe('ExchangeRateChart (MOL-161)', () => {
     expect(reading(view)).toContain('Неделя по 1 мар. · рынок')
     expect(view.find('.figure').text()).toBe('4,60 ֏/₽')
     expect(view.find('.mine-rate').text()).toBe('Мой обмен 28 февр. · 4,58 ֏/₽')
-    expect(plain(view.find('.mine-place').text())).toBe('Ардшинбанк · −0,40 % к рынку')
+    expect(view.find('.mine-place').text()).toBe('Ардшинбанк')
+    expect(plain(view.find('.mine-diff').text())).toBe('−0,40 % · хуже рынка')
+    expect(view.find('.mine-diff').classes()).toContain('bad')
     expect(view.findAll('.point.chosen')).toHaveLength(1)
   })
 
@@ -183,10 +185,13 @@ describe('ExchangeRateChart (MOL-161)', () => {
     // 64 px of 300 is x 213: the exchange of 14 February, the second of its week.
     await tap(view, area, 64)
     expect(view.find('.mine-rate').text()).toContain('14 февр.')
-    expect(plain(view.find('.mine-place').text())).toBe('Ардшинбанк · рынка того дня нет')
+    expect(view.find('.mine-place').text()).toBe('Ардшинбанк')
+    expect(view.find('.mine-diff').text()).toBe('Рынка того дня нет')
+    expect(view.find('.mine-diff').classes()).toContain('quiet')
     await tap(view, area, 21)
     expect(view.find('.mine-rate').text()).toContain('10 февр.')
-    expect(plain(view.find('.mine-place').text())).toBe('Без места · −0,40 % к рынку')
+    expect(view.find('.mine-place').text()).toBe('Без места')
+    expect(plain(view.find('.mine-diff').text())).toBe('−0,40 % · хуже рынка')
   })
 
   it('a tap right on an exchange of a Monday chooses it, not the week ending the day before', async () => {
@@ -333,10 +338,50 @@ describe('ExchangeRateChart (MOL-161)', () => {
         ],
       }),
     ])
+    // The mark is drawn, with no tone: nothing measured it (MOL-190).
     expect(view.findAll('.mark')).toHaveLength(2)
-    expect(view.find('.mine-place').text()).toBe(
-      'Ардшинбанк · без сравнения: курса ЦБ РА того дня нет',
-    )
+    expect(view.findAll('.mark.bad, .mark.good')).toHaveLength(0)
+    expect(view.find('.mine-place').text()).toBe('Ардшинбанк')
+    expect(view.find('.mine-diff').text()).toBe('Без сравнения: курса ЦБ РА того дня нет')
+    expect(view.find('.mine-diff').classes()).toContain('quiet')
+  })
+
+  it('tones the mark and the line by the sign of the money, the percent alone for nothing (MOL-190)', async () => {
+    const dot = (id: string, day: string, x: number, of: Partial<Point>) =>
+      point(`a0000000-0000-4000-8000-00000000001${id}`, day, 3, x, of)
+    const { view } = chart([
+      rouble({
+        exchanges: [
+          dot('1', '2026-02-23', 536, { percent: 121, sign: 1 }),
+          // −0,30 ֏ of 10 000 ֏: «0,00 %», and still worse — the money says so, as its card does.
+          dot('2', '2026-02-24', 571, { percent: 0, sign: -1 }),
+          dot('3', '2026-02-25', 607, { percent: 0, sign: 0 }),
+          // A server before MOL-190 sends no sign: the percent's.
+          dot('4', '2026-02-26', 643, { percent: 75, sign: null }),
+        ],
+      }),
+    ])
+    const tones = () =>
+      view
+        .findAll('.mark:not(.end)')
+        .map((mark) => ['bad', 'good'].find((tone) => mark.classes().includes(tone)) ?? '—')
+    expect(tones()).toEqual(['good', 'bad', '—', 'good'])
+    expect(view.findAll('.mark.end.bad')).toHaveLength(1)
+    // The radios of the exchanges, in the order of their days.
+    const mine = () =>
+      view
+        .findAll('.chart input')
+        .filter((radio) => radio.attributes('aria-label')?.includes('мой'))
+    const shown = async (index: number) => {
+      await mine()[index]?.setValue(true)
+      const diff = view.find('.mine-diff')
+      return [plain(diff.text()), diff.classes().filter((one) => one !== 'mine-diff')]
+    }
+    expect(await shown(0)).toEqual(['+1,21 % · лучше рынка', ['good']])
+    expect(await shown(1)).toEqual(['0,00 % · хуже рынка', ['bad']])
+    expect(await shown(2)).toEqual(['0,00 %', []])
+    expect(await shown(3)).toEqual(['+0,75 % · лучше рынка', ['good']])
+    expect(plain(mine()[1]?.attributes('aria-label'))).toContain('0,00 %, хуже рынка')
   })
 
   it('a tap anywhere on a dot chooses it, not the week whose end lies nearer (adversarial Л)', async () => {
@@ -599,7 +644,7 @@ describe('ExchangeRateChart (MOL-161)', () => {
     )
     expect(radios[3]?.attributes('aria-label')).toBe('Неделя по 22 февраля: рынка нет')
     expect(plain(radios[4]?.attributes('aria-label'))).toBe(
-      'Неделя по 1 марта: рынок 4,60 ֏/₽; мой обмен 28 февраля: 4,58 ֏/₽, −0,40 %',
+      'Неделя по 1 марта: рынок 4,60 ֏/₽; мой обмен 28 февраля: 4,58 ֏/₽, −0,40 %, хуже рынка',
     )
     expect((radios[4]?.element as HTMLInputElement).checked).toBe(true)
     await radios[3]?.setValue(true)
