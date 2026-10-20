@@ -259,6 +259,7 @@ describe('exchangesResponseCodec', () => {
                   level: 1000,
                   place: 'Ардшинбанк',
                   percent: 1255,
+                  sign: 1,
                   market: {
                     rate: { ...rate, scaled: 4_224_000n, source: 'official' },
                     level: 160,
@@ -298,13 +299,25 @@ describe('exchangesResponseCodec', () => {
     expect(decoded.exchanges[0]?.channel).toBeNull()
   })
 
-  it('reads the year alone of a server before MOL-168 and draws nothing of it (Р-4)', () => {
-    const wire: Record<string, unknown> = { ...z.encode(exchangesResponseCodec, response) }
-    delete wire.rateCharts
-    // The chart as MOL-161 sent it: the weeks of the year, a shape this page no longer reads.
-    wire.rateChart = { pairs: [{ currency: 'RUB', side: 'bankBuys', weeks: [], exchanges: [] }] }
-    const decoded = exchangesResponseCodec.parse(wire)
-    expect(decoded.rateCharts).toBeNull()
+  it('reads a point of a server before MOL-190 with no sign of its own', () => {
+    const wire = z.encode(exchangesResponseCodec, response)
+    const point: Record<string, unknown> | undefined = {
+      ...wire.rateCharts?.pairs[0]?.periods[12].exchanges[0],
+    }
+    delete point.sign
+    const year = wire.rateCharts?.pairs[0]?.periods[12]
+    const decoded = exchangesResponseCodec.parse({
+      ...wire,
+      rateCharts: {
+        pairs: [
+          {
+            ...wire.rateCharts?.pairs[0],
+            periods: { 1: null, 6: null, 12: { ...year, exchanges: [point] } },
+          },
+        ],
+      },
+    })
+    expect(decoded.rateCharts?.pairs[0]?.periods[12].exchanges[0]?.sign).toBeNull()
   })
 
   it('is strict: a field the screen never reads fails rather than travelling past it', () => {

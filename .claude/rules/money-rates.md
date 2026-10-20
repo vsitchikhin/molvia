@@ -657,9 +657,9 @@ rate exactly as before.
   is three charts in the answer — some 26 KB of JSON for a year of monthly exchanges, before gzip.
   The series is read once, for the year. **A period with no figure while the year has one is null,
   and the card stays** with its switches and says so in the height of the chart (Р-6): gone with the
-  card, the switch would have gone too, and the year with it. **The old field `rateChart` is read
-  and never used** (`z.unknown().optional()`, Р-4): the answer is strict, and changed in shape it
-  would refuse the answer of a server before MOL-168 whole; it goes with the next task of money. On
+  card, the switch would have gone too, and the year with it. The old field `rateChart` was read and
+  never used for one release (`z.unknown().optional()`, Р-4), so a page of MOL-168 read the answer of
+  the server before it; MOL-190 took it away once that server was gone. On
   the phone the period is the screen's address (`?months=1`, `?months=6`, the year with none,
   anything else the year, Р-5) and changes by `replace` — not scrolled, not animated, nothing asked;
   **the switch is always there, under the pairs** (В-3 «а»); an exchange chosen by hand stays chosen
@@ -675,6 +675,40 @@ rate exactly as before.
   «апр» and «май» 10 px apart; on a 320 px phone «28 сент.» laid from the edge lay over «5 окт.»,
   which a threshold in thousandths, `LABEL_GAP`, knew nothing of. With no chart in a period the note
   under it goes too: it speaks of a tap.
+- **Terracotta on the chart is the chosen one's and the cursor's alone; the mark has the tone of the
+  money** (MOL-190, Ф-4 and Ф-30 of MOL-118, owner's В-1 «а» of 20.10.2026). The line and the ring of
+  the reading are `--graphic`, the data without a colour of its own; the dots `--text`, ringed by
+  `--surface`; the chosen dot and the cursor `--accent` — the dots were all terracotta, which is «press
+  here», and the cursor `--border-strong`, decoration. The legend keeps its words (С-4) with a stroke
+  of `--graphic` and a dot of `--text`: the two differ in shape. **The mark to the market is `--bad` or
+  `--good` by the sign of the money, never of the percent** — the rule of the card of that exchange
+  (Р-4 of MOL-187: one sign a row, the money's): a point carries `sign`, since 0,00 % may stand over
+  −0,30 ֏ and the card says «хуже». **The sign is the card's** — of its market's difference in the currency
+  received — never of `measured`, the same money in the spending currency rounded to its cent:
+  spent in dollars, −1,00 ֏ is 0,00 $, and the point said nothing where the card said «хуже»
+  (adversarial А1). **The price, named:** «Обмены против рынка» sums the money in the spending
+  currency, so its place may read «0,00 $» with no tone beside a mark of `--bad`; the chart is the
+  exchange's, not the place's. No comparison and nothing at all are `--graphic`. An answer of a server
+  before it has no `sign` (`default(null)`) and the phone takes the percent's; a page before it reads
+  `sign` by the strict codec of its time and refuses the answer of «Обмен денег» whole, as one before
+  MOL-168 refused `rateCharts`, until it takes the new version (the price of `frontend.md`'s strict
+  reading). **The plate under the reading is three lines**: the exchange and its rate, the place, and
+  «−0,40 % · хуже рынка» in `bad-ink` or `good-ink` at 600 (`rate_chart.diff`) — the colour never
+  alone; nothing is «0,00 %» with no word; no comparison is a quiet line, «Рынка того дня нет» or
+  «Без сравнения: курса ЦБ РА того дня нет». The radio of the point says the word too. **The reading
+  holds the tallest plate of the period** (adversarial А2, Б1, Б2): every plate stands in one cell,
+  unseen and `aria-hidden` but the chosen one's, as the words of «Графики» do (MOL-186) — so a week
+  with no exchange leaves the chart under the finger where it was, however long a note runs or a line
+  wraps on a phone of 320, and a period with no exchange holds nothing; a week with no market keeps the
+  figure's line. The plate shown keeps its own height (`align-items: start`) — stretched, it stood a
+  grey line of nothing under three lines beside a note of a sentence — and a note with no spaces, a
+  link to a map, wraps anywhere: unseen, it pushed the page aside on every week (adversarial В1, В2).
+  Three lines held by a number missed both ways: a note of a sentence took a fourth
+  (the place is the person's own note, up to 200 signs), and a period with no exchange kept 55 px of
+  nothing; the three lines had doubled a jump of 19 px master already had, to 38. Not cut with «…»: the
+  note is the person's, and what they see of it is not the chart's to decide. **The price, named:** a
+  plate in the page for each exchange of the period, unseen — some fifty in a year of weekly ones —
+  and another period may stand the chart a line higher or lower, a change of the screen's own query.
 
 ## Incomes
 

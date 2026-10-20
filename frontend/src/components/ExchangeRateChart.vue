@@ -42,25 +42,35 @@
         <p v-if="chosenStep.rate" class="figure">{{ rateOf(chosenStep.rate) }}</p>
         <p v-else class="figure missing">{{ t(words.noMarket) }}</p>
       </template>
-      <p v-if="chosen?.exchange" class="mine">
-        <span class="mine-dot" aria-hidden="true"></span>
-        <span class="mine-text">
-          <span class="mine-rate">{{
-            t('exchange.rate_chart.mine', {
-              day: shortDay(chosen.exchange.day),
-              rate: rateOf(chosen.exchange.rate),
-            })
-          }}</span>
-          <span class="mine-place">{{ placeLineOf(chosen.exchange) }}</span>
-        </span>
-      </p>
-      <p v-else-if="period" class="none">
-        {{
-          period.exchanges.length === 0
-            ? t('exchange.rate_chart.none_period', { period: periodIn })
-            : t(words.none)
-        }}
-      </p>
+      <!-- Every plate of the period in one cell, the chosen one seen: the tallest holds the place, so a
+           week with no exchange leaves the chart under the finger where it was (adversarial А2, Б1). -->
+      <div v-if="period" class="stack">
+        <p v-if="chosenPlate" class="plate mine">
+          <span class="plate-dot" aria-hidden="true"></span>
+          <span class="plate-text">
+            <span class="plate-rate mine-rate">{{ chosenPlate.rate }}</span>
+            <span class="plate-place mine-place">{{ chosenPlate.place }}</span>
+            <span :class="['plate-diff', 'mine-diff', chosenPlate.tone]">{{
+              chosenPlate.diff
+            }}</span>
+          </span>
+        </p>
+        <p v-else class="none">
+          {{
+            period.exchanges.length === 0
+              ? t('exchange.rate_chart.none_period', { period: periodIn })
+              : t(words.none)
+          }}
+        </p>
+        <p v-for="plate in plates" :key="plate.id" class="plate ghost" aria-hidden="true">
+          <span class="plate-dot"></span>
+          <span class="plate-text">
+            <span class="plate-rate">{{ plate.rate }}</span>
+            <span class="plate-place">{{ plate.place }}</span>
+            <span :class="['plate-diff', plate.tone]">{{ plate.diff }}</span>
+          </span>
+        </p>
+      </div>
     </div>
 
     <fieldset v-if="period" class="chart">
@@ -124,11 +134,12 @@
               />
             </template>
             <!-- The mark ends at the market the exchange was measured by (В-1), never at the line:
-                 a cash exchange is set beside cash, which the line of all bank clients is not. -->
+                 a cash exchange is set beside cash, which the line of all bank clients is not. Its
+                 tone is the money's (MOL-190); with no comparison or nothing to tell, none. -->
             <template v-for="point in period.exchanges" :key="`mark-${point.id}`">
               <template v-if="point.market">
                 <line
-                  class="mark"
+                  :class="['mark', toneOf(point)]"
                   :x1="point.x"
                   :y1="yOf(point.level)"
                   :x2="point.x"
@@ -136,7 +147,7 @@
                   vector-effect="non-scaling-stroke"
                 />
                 <line
-                  class="mark end"
+                  :class="['mark', 'end', toneOf(point)]"
                   :x1="point.x - TICK"
                   :y1="yOf(point.market.level)"
                   :x2="point.x + TICK"
@@ -323,21 +334,48 @@ export default defineComponent({
     const shortDay = (day: string) =>
       calendarDay(day, locale.value, { day: 'numeric', month: 'short' })
     const longDay = (day: string) => calendarDay(day, locale.value)
-    const changeOf = (point: Point) =>
-      point.percent === null
-        ? t('exchange.rate_chart.no_change')
-        : signedPercent(point.percent, locale.value, true)
+    /**
+     * «Хуже / лучше рынка» by the sign of the money, never of the percent (MOL-190, Р-4 of MOL-187):
+     * 0,00 % may stand over money that is there. A server before it sends no sign: the percent's.
+     */
+    function toneOf(point: Point): 'bad' | 'good' | null {
+      const sign = point.sign ?? (point.percent === null ? null : Math.sign(point.percent))
+      return sign === -1 ? 'bad' : sign === 1 ? 'good' : null
+    }
+
+    const wordOf = { bad: 'exchange.vs_market.worse', good: 'exchange.vs_market.better' } as const
+
+    /** «−0,40 % · хуже рынка»; nothing is the percent alone, no word (`key` — seen or spoken). */
+    function changeOf(point: Point, key = 'exchange.rate_chart.diff'): string {
+      if (point.percent === null) return t('exchange.rate_chart.no_change')
+      const change = signedPercent(point.percent, locale.value, true)
+      const tone = toneOf(point)
+      return tone ? t(key, { change, word: t(wordOf[tone]) }) : change
+    }
 
     /** A market and no percent: it is the central bank's rate of the day that is missing (К). */
-    function placeLineOf(point: Point): string {
-      const place = point.place ?? t('exchange.vs_market.no_place')
-      if (point.percent !== null) {
-        return t('exchange.rate_chart.mine_place', { place, change: changeOf(point) })
-      }
+    function diffOf(point: Point): string {
+      if (point.percent !== null) return changeOf(point)
       return point.market
-        ? t('exchange.rate_chart.mine_no_rate', { place })
-        : t('exchange.rate_chart.mine_no_market', { place })
+        ? t('exchange.rate_chart.mine_no_rate')
+        : t('exchange.rate_chart.mine_no_market')
     }
+    const diffClassOf = (point: Point) => (point.percent === null ? 'quiet' : toneOf(point))
+
+    /** The plate under the reading: the exchange and its rate, the place, the difference (Р-4). */
+    function plateOf(point: Point) {
+      return {
+        id: point.id,
+        rate: t('exchange.rate_chart.mine', {
+          day: shortDay(point.day),
+          rate: rateOf(point.rate),
+        }),
+        place: point.place ?? t('exchange.vs_market.no_place'),
+        diff: diffOf(point),
+        tone: diffClassOf(point),
+      }
+    }
+    const plates = computed(() => period.value?.exchanges.map(plateOf) ?? [])
 
     const items = computed<Item[]>(() => {
       const shown = period.value
@@ -367,7 +405,7 @@ export default defineComponent({
             market,
             date: longDay(point.day),
             mine: rateOf(point.rate),
-            change: changeOf(point),
+            change: changeOf(point, 'exchange.rate_chart.spoken_diff'),
           }),
         }))
       })
@@ -389,6 +427,9 @@ export default defineComponent({
       return found === -1 ? defaultIndex() : found
     })
     const chosen = computed(() => items.value[chosenIndex.value] ?? null)
+    const chosenPlate = computed(() =>
+      chosen.value?.exchange ? plateOf(chosen.value.exchange) : null,
+    )
     /** The step chosen: its day, its market and where it is drawn. */
     const chosenStep = computed(
       () => (chosen.value ? period.value?.steps[chosen.value.step] : null) ?? null,
@@ -688,6 +729,8 @@ export default defineComponent({
       pair,
       items,
       chosen,
+      chosenPlate,
+      plates,
       chosenIndex,
       chosenStep,
       step,
@@ -709,7 +752,9 @@ export default defineComponent({
       rateOf,
       shortDay,
       tickOf,
-      placeLineOf,
+      toneOf,
+      diffOf,
+      diffClassOf,
       choose,
       choosePair,
       choosePeriod,
@@ -744,18 +789,15 @@ export default defineComponent({
 .swatch.line {
   width: 1rem;
   height: 2px;
-  background: var(--text-muted);
+  background: var(--graphic);
 }
 
-/* The series differ in shape — a line and a ringed dot — not in colour alone. */
+/* The series differ in shape — a line and a dot — not in colour alone. */
 .swatch.dot {
   width: 0.625rem;
   height: 0.625rem;
   border-radius: 50%;
-  background: var(--accent);
-  box-shadow:
-    0 0 0 2px var(--surface),
-    0 0 0 3px var(--accent);
+  background: var(--text);
 }
 
 .reading {
@@ -781,6 +823,7 @@ export default defineComponent({
 
   /* A sentence in the figure's place, not a figure: the text's face (Ф-7 keeps Nunito for figures). */
   &.missing {
+    min-height: calc(var(--text-title) * var(--leading-body));
     color: var(--text-muted);
     font-family: var(--font);
     font-size: var(--text-callout);
@@ -788,7 +831,23 @@ export default defineComponent({
   }
 }
 
-.mine {
+/* The plates of the period in one cell: the tallest decides, the one shown is the exchange chosen —
+   at its own height, never stretched to the tallest (adversarial В1). */
+.stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+
+  > * {
+    grid-area: 1 / 1;
+  }
+}
+
+.ghost {
+  visibility: hidden;
+}
+
+.plate {
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
@@ -799,7 +858,7 @@ export default defineComponent({
   background: var(--surface-2);
 }
 
-.mine-dot {
+.plate-dot {
   flex-shrink: 0;
   width: 0.5rem;
   height: 0.5rem;
@@ -808,18 +867,42 @@ export default defineComponent({
   background: var(--accent);
 }
 
-.mine-text {
+/* A note with no spaces — a link to a map — wraps: unseen, it would push the page aside on every week
+   of the period (adversarial В2). */
+.plate-text {
   display: grid;
+  min-width: 0;
   font-size: var(--text-footnote);
+  overflow-wrap: anywhere;
 }
 
-.mine-rate {
+.plate-rate {
   font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
 }
 
-.mine-place {
+.plate-place {
   color: var(--text-muted);
+}
+
+/* The tone with its sign and its word, never alone (Ф-30); with no comparison, a quiet line. */
+.plate-diff {
+  &.quiet {
+    color: var(--text-muted);
+  }
+
+  &.bad,
+  &.good {
+    font-weight: var(--weight-medium);
+  }
+
+  &.bad {
+    color: var(--bad-ink);
+  }
+
+  &.good {
+    color: var(--good-ink);
+  }
 }
 
 .chart {
@@ -865,13 +948,13 @@ export default defineComponent({
 }
 
 .cursor {
-  stroke: var(--border-strong);
+  stroke: var(--accent);
   stroke-width: 1.5;
 }
 
 .line {
   fill: none;
-  stroke: var(--text-muted);
+  stroke: var(--graphic);
   stroke-width: 2;
   stroke-linejoin: round;
   stroke-linecap: round;
@@ -883,17 +966,25 @@ export default defineComponent({
 }
 
 .mark {
-  stroke: var(--text);
+  stroke: var(--graphic);
   stroke-width: 1.5;
 
   &.end {
     stroke-width: 2;
   }
+
+  &.bad {
+    stroke: var(--bad);
+  }
+
+  &.good {
+    stroke: var(--good);
+  }
 }
 
 .ring,
 .hole {
-  stroke: var(--text-muted);
+  stroke: var(--graphic);
   stroke-width: 9;
   stroke-linecap: round;
 }
@@ -918,10 +1009,12 @@ export default defineComponent({
 }
 
 .point {
-  stroke: var(--accent);
+  stroke: var(--text);
   stroke-width: 10;
 
+  /* Terracotta is the chosen one's and the cursor's alone (Ф-4). */
   &.chosen {
+    stroke: var(--accent);
     stroke-width: 13;
   }
 }
