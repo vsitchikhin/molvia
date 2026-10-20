@@ -698,7 +698,10 @@ rate exactly as before.
   «Без сравнения: курса ЦБ РА того дня нет». The radio of the point says the word too. **The reading
   holds the plate's height** (adversarial А2): a week with no exchange keeps three lines for it and a
   week with no market the figure's line, so the chart under the finger never moves — the three lines
-  doubled a jump of 19 px master already had, to 38.
+  doubled a jump of 19 px master already had, to 38. **The price, named:** on a phone of 320 «Без
+  сравнения: курса ЦБ РА того дня нет» takes a fourth line and the chart moves by it, 19 px — a day
+  with no rate of the bank is rare, and four lines held for it would leave a blank line under every
+  other plate.
 
 ## Incomes
 
