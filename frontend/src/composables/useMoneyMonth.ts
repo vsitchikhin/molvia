@@ -105,8 +105,18 @@ function recallTodayRate(owner: string): MoneyMonthView['rate'] {
   return running?.answer.rateKind === 'live' ? running.answer.rate : null
 }
 
-function remember(owner: string, answer: MoneyMonthView, fetchedAt: Date, askedAt: Date): void {
+/**
+ * Keeps a first page unless one that set out later is kept already, and says whether it did: two
+ * reads of a month may land out of turn — the running month's read for today's rate goes beside the
+ * screen's own, and a screen left still hears its answer (MOL-262, adversarial А6). A read kept from
+ * a moment still to come is a clock set back since, and is no later one.
+ */
+function remember(owner: string, answer: MoneyMonthView, fetchedAt: Date, askedAt: Date): boolean {
   const all = recallAll(owner)
+  const before = all[answer.month]
+  const keptAsked = isRecord(before) && typeof before.askedAt === 'string' ? before.askedAt : null
+  const later = keptAsked ? Date.parse(keptAsked) : Number.NaN
+  if (later > askedAt.getTime() && later <= Date.now()) return false
   all[answer.month] = {
     answer: moneyMonthCodec.encode(answer),
     fetchedAt: fetchedAt.toISOString(),
@@ -126,6 +136,7 @@ function remember(owner: string, answer: MoneyMonthView, fetchedAt: Date, askedA
     .slice(0, KEPT_MONTHS)
     .map(({ month, value }) => [month, value])
   write(`${KEY}.${owner}`, JSON.stringify(Object.fromEntries(newest)))
+  return true
 }
 
 /**
@@ -172,6 +183,18 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
   let moreAfterRead = false
   let asks = 0
 
+  /** A first page landed: the phone keeps it, and what is the owner's rather than a month's. */
+  function keep(id: string, first: MoneyMonthView, firstAt: Date, askedAt: Date): void {
+    // Not over an answer that set out later: it knows more (MOL-262, adversarial А6).
+    if (actor.id !== id || !remember(id, first, firstAt, askedAt)) return
+    // The categories are the owner's, not a month's: an answer of the month just left names them
+    // for the one now on screen too — read before it came, that one had none to write a spending
+    // into until it was read itself (MOL-183, e2e «a summary that did not load»). Today's rate
+    // likewise, from the running month's answer: a spending is written today (MOL-262, А1).
+    kept.value = first.categories
+    if (first.rateKind === 'live') keptRate.value = first.rate
+  }
+
   async function ask(id: string, month: string): Promise<void> {
     const mine = ++latest
     const wanted = pages
@@ -181,15 +204,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
       // The first page is what is kept, as a first read answers it: the cursor of a later page
       // is the server's to work out, not the phone's.
       const firstAt = new Date()
-      if (actor.id === id) {
-        remember(id, first, firstAt, askedAt)
-        // The categories are the owner's, not a month's: an answer of the month just left names them
-        // for the one now on screen too — read before it came, that one had none to write a spending
-        // into until it was read itself (MOL-183, e2e «a summary that did not load»). Today's rate
-        // likewise, from the running month's answer: a spending is written today (MOL-262, А1).
-        kept.value = first.categories
-        if (first.rateKind === 'live') keptRate.value = first.rate
-      }
+      keep(id, first, firstAt, askedAt)
       let answer = first
       for (let page = 1; page < wanted && answer.cursor; page++) {
         answer = mergePages(answer, await api.moneyMonth(month, answer.cursor))
@@ -275,13 +290,20 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
    * Opened on another month, the screen reads the running one too, after its own: today's rate there
    * is that month's answer kept on the phone, and an exchange written meanwhile — on its own screen,
    * which tells «Деньги» nothing — left the sheet the rate from before it (MOL-262, adversarial А5).
-   * Its answer lands for a month not on screen: it moves only what is kept (`ask`).
+   * Its first page alone, and beside the screen's reads: it moves only what is kept, never the month
+   * shown or a page on its way (MOL-262, self-review 9).
    */
   async function loadWithToday(): Promise<void> {
     await load()
     const id = actor.id
     const today = monthOf(localDay())
-    if (id && selected.value !== today) await ask(id, today)
+    if (!id || selected.value === today) return
+    const askedAt = new Date()
+    try {
+      keep(id, await api.moneyMonth(today), new Date(), askedAt)
+    } catch (error) {
+      reportFailure(error, 'screen')
+    }
   }
   onMounted(() => void loadWithToday())
   useReconnect(() => void loadWithToday())

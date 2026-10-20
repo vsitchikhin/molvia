@@ -1,8 +1,8 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h, ref } from 'vue'
 import type { Ref } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { donutSlices, parseMoney } from '@molvia/model'
 import type { JournalKey, MoneyMonthView } from '@molvia/model'
 import { useMoneyMonth } from '@/composables/useMoneyMonth'
@@ -14,6 +14,9 @@ const moneyMonth = vi.fn<(month: string, cursor?: JournalKey) => Promise<MoneyMo
 vi.mock('@/api', () => ({
   api: { moneyMonth: (month: string, cursor?: JournalKey) => moneyMonth(month, cursor) },
 }))
+
+// A screen left mounted would hear the next test's `online` too.
+enableAutoUnmount(afterEach)
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const BEAUTY = 'ffffffff-0000-4000-8000-000000000001'
@@ -100,6 +103,7 @@ function host(
 describe('useMoneyMonth', () => {
   beforeEach(() => {
     localStorage.clear()
+    sessionStorage.clear()
     moneyMonth.mockReset()
     setActivePinia(createPinia())
   })
@@ -172,7 +176,6 @@ describe('useMoneyMonth', () => {
   // the month now shown fails — the categories are the owner's, so «Добавить трату» still has some
   // (MOL-183, e2e «a summary that did not load»), and its sheet today's rate (MOL-262, А1).
   it('takes the categories and today’s rate from an answer of the month just left, landed after the move', async () => {
-    sessionStorage.clear()
     const pinia = createPinia()
     setActivePinia(pinia)
     useActorStore().id = ACTOR
@@ -352,6 +355,104 @@ describe('useMoneyMonth', () => {
       ])
       expect(august.month.value?.month).toBe('2026-08')
       expect(august.todayRate.value?.scaled).toBe(4_480_000n)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // That read goes beside the screen's own, and a screen left still hears its answer: one from before
+  // an exchange, landed after a later one, put the old rate back on the phone (MOL-262, adversarial А6).
+  it('А6: an answer of the running month landed after one that set out later is not kept over it', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-09-27T08:00:00Z'))
+    try {
+      const pinia = createPinia()
+      setActivePinia(pinia)
+      useActorStore().id = ACTOR
+      const rate = (scaled: bigint) => ({
+        base: 'RUB' as const,
+        quote: 'AMD' as const,
+        scaled,
+        source: 'personal' as const,
+        asOf: new Date('2026-09-27T00:00:00Z'),
+      })
+      const august = { ...page([], null), month: '2026-08', rateKind: 'frozen' as const }
+      let give: (value: MoneyMonthView) => void = () => undefined
+      moneyMonth
+        .mockResolvedValueOnce(august)
+        .mockImplementationOnce(() => new Promise((resolve) => (give = resolve)))
+      host(pinia, '2026-08')
+      await flushPromises()
+      // An exchange, then «Деньги» opened anew: its read of this month sets out later and lands first.
+      vi.setSystemTime(new Date('2026-09-27T08:01:00Z'))
+      moneyMonth
+        .mockResolvedValueOnce(august)
+        .mockResolvedValueOnce({ ...page([], null), rate: rate(5_000_000n) })
+      host(pinia, '2026-08')
+      await flushPromises()
+      give({ ...page([], null), rate: rate(4_160_000n) })
+      await flushPromises()
+      moneyMonth.mockRejectedValue(new TypeError('network'))
+      const july = host(pinia, '2026-07')
+      await flushPromises()
+      expect(july.todayRate.value?.scaled).toBe(5_000_000n)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('А6: a month kept from a clock that ran ahead is read over, not held for good', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-09-30T08:00:00Z'))
+    try {
+      const pinia = createPinia()
+      setActivePinia(pinia)
+      useActorStore().id = ACTOR
+      moneyMonth.mockResolvedValueOnce({ ...page([], null), count: 1 })
+      host(pinia)
+      await flushPromises()
+      // The clock put right, three days back: the month read now is the later read.
+      vi.setSystemTime(new Date('2026-09-27T08:00:00Z'))
+      moneyMonth.mockResolvedValueOnce({ ...page([], null), count: 2 })
+      host(pinia)
+      await flushPromises()
+      moneyMonth.mockRejectedValue(new TypeError('network'))
+      const offline = host(pinia)
+      await flushPromises()
+      expect(offline.month.value?.count).toBe(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // After «Показать ещё» on another month the screen keeps two pages open; the running month's read
+  // keeps its first alone, so it asks for no more (MOL-262, self-review 9).
+  it('the running month is read for today’s rate one page only, whatever pages the screen keeps', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-09-27T08:00:00Z'))
+    try {
+      const pinia = createPinia()
+      setActivePinia(pinia)
+      useActorStore().id = ACTOR
+      const cursor: JournalKey = {
+        day: '2026-08-20',
+        moment: 1,
+        id: 'eeeeeeee-0000-4000-8000-00000000000a',
+      }
+      moneyMonth.mockImplementation((month, after) =>
+        Promise.resolve({ ...page([], after ? null : cursor), month }),
+      )
+      const august = host(pinia, '2026-08')
+      await flushPromises()
+      await august.loadMore()
+      moneyMonth.mockClear()
+      window.dispatchEvent(new Event('online'))
+      await flushPromises()
+      expect(moneyMonth.mock.calls.map(([month, after]) => [month, Boolean(after)])).toEqual([
+        ['2026-08', false],
+        ['2026-08', true],
+        ['2026-09', false],
+      ])
     } finally {
       vi.useRealTimers()
     }
