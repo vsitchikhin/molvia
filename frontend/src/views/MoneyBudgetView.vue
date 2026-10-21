@@ -1,21 +1,27 @@
 <template>
   <AppScreen :title="t('budget.title')">
     <div class="content">
-      <MonthSwitcher :month="month" :current="currentMonth" @change="chooseMonth" />
+      <div class="month">
+        <MonthSwitcher :month="month" :current="currentMonth" @change="chooseMonth" />
 
-      <!-- Under the switcher: they belong to the month's answer (MOL-138, owner's В-2). -->
-      <p v-if="stale === 'offline' && fetchedAt" class="strip">
-        <IconCloudOff class="strip-icon" aria-hidden="true" />
-        {{ t('budget.offline_strip', { when: when(fetchedAt) }) }}
-      </p>
-      <ScreenState
-        v-else-if="stale === 'error'"
-        kind="error"
-        inline
-        :title="t('budget.load_error.title')"
-        :body="t('budget.load_error.body')"
-        @retry="retry"
-      />
+        <!-- Under the switcher: they belong to the month's answer (MOL-138, owner's В-2). -->
+        <StatusStrip
+          v-if="stale === 'offline' && fetchedAt"
+          kind="offline"
+          :text="t('budget.offline_strip', { when: when(fetchedAt) })"
+        />
+        <StatusStrip
+          v-else-if="stale === 'error' && fetchedAt"
+          kind="unanswered"
+          :text="t('budget.error_strip', { when: when(fetchedAt) })"
+          :attempt="attempt"
+        >
+          <!-- The strip holds «Задать план категории», so «Повторить» is here (К-5, MOL-181). -->
+          <template #action>
+            <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+          </template>
+        </StatusStrip>
+      </div>
 
       <ScreenSkeleton v-if="phase === 'loading'" :groups="[64, 100, 72, 72, 72, 48, 60]" />
 
@@ -100,7 +106,7 @@
 
         <template v-if="unplanned.length > 0">
           <div>
-            <SectionCaption class="group">{{ t('budget.unplanned') }}</SectionCaption>
+            <SectionCaption>{{ t('budget.unplanned') }}</SectionCaption>
             <AppCard as="ul" list>
               <li v-for="row in unplanned" :key="row.categoryId">
                 <!-- A removed category is no choice (review 7): its spending is shown, a plan is not offered. -->
@@ -123,11 +129,6 @@
           </div>
         </template>
 
-        <AppButton v-if="choosable.length > 0" variant="secondary" block @click="choose">
-          <template #icon><IconPlus /></template>
-          {{ t('budget.add') }}
-        </AppButton>
-
         <AppCard as="section" list :aria-labelledby="`${id}-savings`">
           <button type="button" class="row" @click="editSavings">
             <span class="head">
@@ -146,6 +147,17 @@
         </AppCard>
       </template>
     </div>
+
+    <!-- The main action is the strip (Ф-28), over an answer only: before one the sheet knows nothing
+         to choose (MOL-191, В-2), and with every live category planned there is nothing to offer. A
+         plan is written with a connection only (Р-8 of MOL-117), so offline it is not now, saying why
+         (Ф-6). An error takes the strip for «Повторить» by itself. -->
+    <template v-if="phase === 'ready' && choosable.length > 0" #docked>
+      <AppButton size="large" block :inactive="!online" @click="choose">
+        <template #icon><IconPlus v-if="online" /><IconCloudOff v-else /></template>
+        {{ online ? t('budget.add') : t('budget.add_offline') }}
+      </AppButton>
+    </template>
 
     <BudgetPlanSheet
       v-model:open="sheetOpen"
@@ -182,6 +194,7 @@ import ScreenState from '@/components/ScreenState.vue'
 import { countedWhen } from '@/components/accounts'
 import { budgetAmount, categoryColour } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useMoneyBudget } from '@/composables/useMoneyBudget'
@@ -205,6 +218,7 @@ export default defineComponent({
     ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    StatusStrip,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -230,7 +244,7 @@ export default defineComponent({
       })
     }
 
-    const { phase, budget, stale, fetchedAt, retry, save } = useMoneyBudget(month)
+    const { phase, budget, stale, fetchedAt, attempt, retry, save } = useMoneyBudget(month)
 
     const online = ref(navigator.onLine)
     const onLine = () => (online.value = true)
@@ -410,6 +424,7 @@ export default defineComponent({
       budget,
       stale,
       fetchedAt,
+      attempt,
       retry,
       save,
       online,
@@ -437,32 +452,19 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* The field is `AppScreen`'s 16 (С-23); 24 between the groups of the answer, 8 under the switcher
+   for what belongs to it (Ф-10). */
 .content {
   display: flex;
   flex-direction: column;
   flex: 1;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-6);
 }
 
-.strip {
-  @include appear;
-
+.month {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
   gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--warn-tint);
-  color: var(--warn-ink);
-  font-size: var(--text-footnote);
-}
-
-.strip-icon {
-  @include icon;
-
-  font-size: var(--icon-sm);
 }
 
 .total {
@@ -513,11 +515,6 @@ export default defineComponent({
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
   }
-}
-
-/* The caption and its card stand in a block of their own: in the content's gap the 8 under it would be 20. */
-.group {
-  margin-top: var(--space-3);
 }
 
 li + li {

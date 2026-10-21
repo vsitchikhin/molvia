@@ -130,6 +130,18 @@ function online(value: boolean): void {
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(value)
 }
 
+/** The main action of the strip over the tab bar, in either of its words. */
+function addButton(view: VueWrapper) {
+  return view
+    .findAll('.dock button')
+    .find((one) => [en.budget.add, en.budget.add_offline].includes(one.text().trim()))
+}
+
+/** The connection's lines of the screen, not of the sheet mounted closed under it. */
+function strips(view: VueWrapper) {
+  return view.findAll('.strip').filter((one) => !one.element.closest('dialog'))
+}
+
 function rowTexts(view: VueWrapper): string[] {
   return view.findAll('li .row').map((row) => plain(row.text()))
 }
@@ -207,7 +219,8 @@ describe('MoneyBudgetView: the four states (MOL-117)', () => {
     online(false)
     moneyBudget.mockRejectedValue(new TypeError('network'))
     const view = await render()
-    expect(view.find('.strip').exists()).toBe(true)
+    expect(strips(view)).toHaveLength(1)
+    expect(view.find('.strip.offline').text()).toContain('Offline · budget as of')
     expect(rowTexts(view)).toHaveLength(4)
   })
 
@@ -223,6 +236,98 @@ describe('MoneyBudgetView: the four states (MOL-117)', () => {
     const view = await render()
     expect(view.text()).toContain(en.budget.empty.title)
     expect(view.text()).toContain(en.budget.add)
+  })
+})
+
+describe('MoneyBudgetView: «Задать план» is the strip, the connection a line (MOL-192)', () => {
+  it('the strip stands over an answer only, and opens a new plan', async () => {
+    moneyBudget.mockReturnValue(new Promise(() => undefined))
+    expect(addButton(await render())).toBeUndefined()
+
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    const add = addButton(view)
+    expect(add?.text()).toBe(en.budget.add)
+    // Not in the list any more: one main action, in one place (Ф-28).
+    expect(view.find('.content').text()).not.toContain(en.budget.add)
+    await add?.trigger('click')
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')?.textContent).toContain(
+      en.budget.sheet.title_choose,
+    )
+  })
+
+  it('offline it is not now and says why; a tap opens nothing', async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    online(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+    const add = addButton(view)
+    expect(add?.text()).toBe(en.budget.add_offline)
+    expect(add?.attributes('aria-disabled')).toBe('true')
+    expect(add?.attributes('disabled')).toBeUndefined()
+    await add?.trigger('click')
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+
+    online(true)
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(addButton(view)?.text()).toBe(en.budget.add)
+  })
+
+  it('must not fire: with every live category planned there is nothing to offer', async () => {
+    moneyBudget.mockResolvedValue(
+      budget({
+        categories: [
+          category(GROCERIES, 'groceries'),
+          category(CAFE, 'cafe'),
+          category(RENT, 'rent'),
+          { ...category(TRANSPORT, 'transport'), archived: true },
+        ],
+      }),
+    )
+    const view = await render()
+    expect(addButton(view)).toBeUndefined()
+    expect(view.find('.dock').exists()).toBe(false)
+  })
+
+  it('an error with nothing kept takes the strip for «Повторить»', async () => {
+    moneyBudget.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render()
+    expect(addButton(view)).toBeUndefined()
+    const retry = view.findAll('.dock button').find((one) => one.text() === en.state.retry)
+    expect(retry).toBeDefined()
+    moneyBudget.mockResolvedValue(budget())
+    await retry?.trigger('click')
+    await flushPromises()
+    expect(addButton(view)?.text()).toBe(en.budget.add)
+  })
+
+  it('offline with nothing kept has no strip: no answer, nothing to plan', async () => {
+    online(false)
+    moneyBudget.mockRejectedValue(new TypeError('network'))
+    const view = await render()
+    expect(view.text()).toContain(en.budget.offline_body)
+    expect(addButton(view)).toBeUndefined()
+  })
+
+  it('the server silent over a kept month is one line with «Повторить», the strip kept', async () => {
+    moneyBudget.mockResolvedValue(budget())
+    await render()
+    moneyBudget.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render()
+    expect(strips(view)).toHaveLength(1)
+    const strip = view.find('.strip.unanswered')
+    expect(strip.text()).toContain('The server did not answer — budget as of')
+    expect(view.text()).not.toContain(en.budget.load_error.title)
+    expect(addButton(view)?.text()).toBe(en.budget.add)
+    moneyBudget.mockResolvedValue(budget())
+    await strip.find('button').trigger('click')
+    await flushPromises()
+    expect(moneyBudget).toHaveBeenCalledTimes(3)
+    expect(strips(view)).toHaveLength(0)
   })
 })
 

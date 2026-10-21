@@ -2091,7 +2091,8 @@
   },
   "budget": {
     "title": "Budget",
-    "offline_strip": "No connection. Figures as of {when}",
+    "offline_strip": "Offline · budget as of {when}",
+    "error_strip": "The server did not answer — budget as of {when}",
     "offline_body": "This month's budget has not been loaded on this phone yet. It will appear once the connection is back",
     "load_error": {
       "title": "The budget did not load",
@@ -2118,6 +2119,7 @@
     },
     "unplanned": "No plan",
     "add": "Set a category plan",
+    "add_offline": "Setting a plan needs a connection",
     "savings": {
       "title": "Put aside",
       "target": "Target — {percent} % of income",

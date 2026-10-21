@@ -10,6 +10,7 @@ export interface MoneyBudgetState {
   readonly budget: ComputedRef<MoneyBudgetView | null>
   readonly stale: ComputedRef<'loading' | 'offline' | 'error' | null>
   readonly fetchedAt: ComputedRef<Date | null>
+  readonly attempt: ComputedRef<number>
   readonly retry: () => Promise<void>
   /** A plan from its month on (В-1): the month's budget it came back with is shown (review 6). */
   readonly save: (body: BudgetPlanBody) => Promise<MoneyBudgetView>
