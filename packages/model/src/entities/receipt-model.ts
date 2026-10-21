@@ -435,6 +435,9 @@ function choicesOf(
   }
   const totals = cheapest.map((one) => one.sum)
   if (Math.max(...totals) - Math.min(...totals) > TOLERANCE_HUNDREDTHS) return []
+  // the cheapest readings differ by the sum alone, or the line is a doubt: 0,61 × 515 = 314,15 and 0,51 × 616 =
+  // 314,16, two swaps each, are a quantity the total would choose (review round 5, Г4)
+  if (new Set(cheapest.map((one) => `${String(one.qty)}|${String(one.price)}`)).size > 1) return []
   // the same sum split another way stays, a doubt (0,6 × 550 beside 0,5 × 660); a luma off only at the fewest
   // swaps' quantity and price — the total chooses a luma, never a quantity (review round 4, Г3: 0,51 × 665 = 339,15
   // read as 0,61 × 556 = 339,16)

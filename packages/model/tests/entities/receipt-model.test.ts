@@ -553,17 +553,14 @@ describe('a line put right by the font’s 5↔6, the receipt whole (MOL-290)', 
   })
 
   it('moves the total by every sum a line read whole gives at its fewest swaps (review round 4, №9)', () => {
-    // «505.56 / 505.56» read whole as copied reads whole as 505,55, 505,66 or 506,56 too, one swap each: the luma
-    // it may be off makes «205.05 / 205.06» meet the total at 205,05 as well — a doubt
-    const plain = (price: string, sum: string) =>
-      carded({ quantity: '1', unit_price: price, discount: null, sum })
-    const juice = plain('205.05', '205.06')
-    expect(
-      read2([plain('505.56', '505.56'), juice], owed('710.61')).text.lines[1]?.repaired,
-    ).toBeUndefined()
-    // the total it meets as copied: 205,06
-    const put = read2([plain('505.56', '505.56'), juice], owed('710.62')).shown.lines[1]
-    expect([put?.sumHundredths, put?.repaired]).toEqual([20_506, true])
+    // «505.56 / 505.56» read whole as copied reads whole as 505,55, 505,66 or 506,56 too, two swaps each: the luma
+    // it may be off makes the eggs, 519,75 or a luma off within the till's rounding, meet the total either way
+    const plain = carded({ quantity: '1', unit_price: '505.56', discount: null, sum: '505.56' })
+    const eggs = carded({ quantity: '6', unit_price: '105', discount: '5.25', sum: '519.75' })
+    expect(read2([bread, plain, eggs], owed('1312.41')).text.lines[2]?.repaired).toBeUndefined()
+    // the total it meets with the line as copied alone: 519,76
+    const put = read2([bread, plain, eggs], owed('1312.42')).shown.lines[2]
+    expect([put?.sumHundredths, put?.repaired]).toEqual([51_976, true])
   })
 
   it('lets the total choose a luma of the sum alone, never another quantity (review round 4, Г3)', () => {
@@ -584,6 +581,17 @@ describe('a line put right by the font’s 5↔6, the receipt whole (MOL-290)', 
       null,
       33_915,
     ])
+    // printed 0,61 kg × 515 = 314,15, the price copied «616»: two swaps read it back, two 0,51 × 616 = 314,16 — the
+    // cheapest readings apart by their quantity are a doubt, the bent neighbour or not (review round 5, Г4)
+    const veal = carded({
+      quantity: '0.61',
+      unit: 'kg',
+      unit_price: '616',
+      discount: null,
+      sum: '314.15',
+    })
+    expect(read2([bent, veal], owed('601.24')).text.lines[1]?.repaired).toBeUndefined()
+    expect(read2([bread, veal], owed('601.25')).text.lines[1]?.repaired).toBeUndefined()
   })
 
   it('puts nothing right past the ways the lines read whole may move', () => {
