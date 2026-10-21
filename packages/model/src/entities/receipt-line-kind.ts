@@ -138,9 +138,7 @@ export function receiptLineParts(printed: string): ReceiptLineParts {
   )
   // a capital past the first word on a line of small letters is a name — a sort, a brand printed bare: the kind
   // only where nothing else is, «Լեզու տավարի Արցախ» is a tongue (adversarial Г3)
-  const loud = words.every((word) => word === word.toUpperCase())
-  const named = (word: string): boolean =>
-    !loud && words.indexOf(word) > 0 && word.slice(0, 1) !== word.slice(0, 1).toLowerCase()
+  const named = (word: string): boolean => hasSmall(head) && words.indexOf(word) > 0 && titled(word)
   const kind =
     plain.find((word) => !CASE.test(keyed(word)) && !inSoftCase(keyed(word)) && !named(word)) ??
     plain.find((word) => !CASE.test(keyed(word)) && !named(word)) ??
@@ -170,6 +168,8 @@ const PAIRS: readonly (readonly [string, string])[] = [
   ['յա', 'я'],
   ['յու', 'ю'],
   ['և', 'ев'],
+  // «և» spelt as of old, «Երեւան» (review 5, Д1)
+  ['եւ', 'ев'],
 ]
 const LETTERS: Readonly<Record<string, string>> = {
   ա: 'а',
@@ -236,6 +236,23 @@ function spellWord(word: string, capitals = true): string {
 }
 
 /** A line printed in capitals all through says nothing by them: «ԴԱՐԱՆ ԿԼԵՅ». */
+/**
+ * A capital says a name only on a line the till printed a small first letter in, a unit's included — «Բանան
+ * Սաբրոսթար կգ» is a sort; in «Ազնվամորու Մուրաբա», every word a capital, it says nothing (review 5, №1).
+ */
+const hasSmall = (tokens: readonly string[]): boolean =>
+  tokens.some((token) => {
+    const first = token.slice(0, 1)
+    return ARMENIAN.test(first) && first !== first.toUpperCase()
+  })
+
+/** A word with a capital and small letters after it, «Արցախ»: «ԱՐՑԱԽ» in capitals is shouted, never a name. */
+const titled = (word: string): boolean => {
+  const first = word.slice(0, 1)
+  const rest = word.slice(1)
+  return first !== first.toLowerCase() && rest !== rest.toUpperCase()
+}
+
 const shouting = (parts: ReceiptLineParts): boolean =>
   [...parts.before, ...parts.after].every(
     (token) => !ARMENIAN.test(token) || token === token.toUpperCase(),
@@ -253,10 +270,10 @@ export const armenianInRussian = (text: string): string =>
  * takes. An abbreviation by its own entry first, «գազ.» — «газированный», then as a word.
  */
 function sensesOf(word: string, dictionary: Readonly<Record<string, string>>): string[] {
-  // the dictionary keys «և» as one letter, «սև»; a reading may spell it «եվ»
+  // the dictionary keys «և» as one letter, «սև»; a reading may spell it «եվ», or «եւ», as of old (review 5, Д1)
   const spellings = [word, word.replace(/\.$/u, '')].flatMap((one) => {
     const lower = one.toLowerCase()
-    return [lower, lower.replace(/եվ/gu, 'և')]
+    return [lower, lower.replace(/եվ|եւ/gu, 'և')]
   })
   const gloss = spellings.map((one) => dictionary[one]).find((one) => one !== undefined) ?? ''
   return gloss
@@ -461,6 +478,26 @@ function figuresOf(text: string): string[] {
 const QUALITY_ENDINGS = ['ый', 'ий', 'ой', 'ая', 'яя']
 
 /**
+ * Latin a till prints for a standard or a size, never a thing (adversarial Г2): a list, since a brand has the same
+ * form — «MARS», «LAYS» are things (review 5, №2).
+ */
+const STANDARDS = new Set([
+  'UHT',
+  'LED',
+  'USB',
+  'HD',
+  'AA',
+  'AAA',
+  'XS',
+  'S',
+  'M',
+  'L',
+  'XL',
+  'XXL',
+  'XXXL',
+])
+
+/**
  * A gloss names a thing, not a quality: «таблетки», «мороженое», «пастила фруктовая» — a word of it no adjective
  * (adversarial В2) — never «средний», «без запаха».
  */
@@ -497,12 +534,11 @@ function nextThing(
     (sense !== undefined && (CASE.test(key) || inSoftCase(key)))
   if (qualifies) return null
   if (sense !== undefined) return isThingSense(sense) ? next : null
-  // Latin capitals of a few letters are a standard or a size, «UHT», «LED», «AA», «L» (adversarial Г2)
-  if (LATIN.test(next) && next === next.toUpperCase() && next.length <= ABBREVIATION) return null
+  if (STANDARDS.has(next)) return null
   // Latin is capitalised, a brand and a word alike: «Ելակ Smoothie» is a thing
-  const first = next.slice(0, 1)
-  const capital = ARMENIAN.test(first) && first !== first.toLowerCase()
-  return capital && !shouting(parts) ? null : next
+  return ARMENIAN.test(next) && titled(next) && hasSmall([...parts.before, ...parts.after])
+    ? null
+    : next
 }
 
 /** Whether a fitter takes an item of the seed: the seed names no brand, so it takes no branded line. */
@@ -575,7 +611,7 @@ function sameArmenian(
   word: string,
   dictionary: Readonly<Record<string, string>>,
 ): boolean {
-  const line = printed.toLowerCase().replace(/և/gu, 'եվ')
+  const line = printed.toLowerCase().replace(/և|եւ/gu, 'եվ')
   if (line === word) return true
   const [short, long] = line.length < word.length ? [line, word] : [word, line]
   if (short.length >= 3 && long.startsWith(short) && ENDINGS.includes(long.slice(short.length)))

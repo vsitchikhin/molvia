@@ -51,7 +51,7 @@ const MATCH_SCORE = 0.7
 export function receiptWords(text: string): string[] {
   return text
     .toLowerCase()
-    .replace(/և/gu, 'եվ')
+    .replace(/և|եւ/gu, 'եվ')
     .split(/[^ա-ևԱ-Ֆa-zа-яё0-9%]+/u)
     .filter((word) => word.length >= 2 && /[ա-և]/u.test(word))
 }

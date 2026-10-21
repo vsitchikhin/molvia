@@ -174,6 +174,12 @@ describe('a line whose words do not settle its kind, or lost a letter (MOL-293, 
     expect((await bind('Մարտկոց AA')).name).toBe('Батарейки')
   }, 15_000)
 
+  it('reads a line of capitals all through, a brand in Latin capitals and «և» of old (review 5)', async () => {
+    expect(await bind('Ազնվամորու Մուրաբա')).toMatchObject({ name: 'Варенье', match: 'search' })
+    expect((await bind('Շոկոլադ MARS')).itemId).toBeNull()
+    expect(await bind('Մուրաբա սերկեւիլի')).toMatchObject({ name: 'Варенье', match: 'search' })
+  }, 15_000)
+
   it('finds nothing for a letter misread: a roller is no tomato', async () => {
     expect((await bind('Ռոլիկ')).itemId).toBeNull()
   })
