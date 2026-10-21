@@ -1,6 +1,7 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { nextTick } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
@@ -13,6 +14,7 @@ import type {
 } from '@molvia/model'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
+import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
@@ -94,6 +96,21 @@ function online(value: boolean): void {
 const broke = () => new ApiError(ERROR.INTERNAL, 'HTTP 502')
 
 const mounted: VueWrapper[] = []
+
+/** The strips of the connection on the screen, by kind and words: one a screen (MOL-181). */
+function strips(view: VueWrapper): { kind: string; text: string }[] {
+  return view.findAllComponents(StatusStrip).map((strip) => ({
+    kind: strip.props('kind') as string,
+    text: strip.props('text') as string,
+  }))
+}
+
+/** Every «Try again» on the screen, wherever it stands — the strip of the screen included. */
+function retries(): Element[] {
+  return [...document.body.querySelectorAll('button')].filter(
+    (button) => button.textContent.trim() === en.state.retry,
+  )
+}
 
 async function render({ identity = true, country = 'AM' } = {}) {
   localStorage.setItem('molvia.actor', ME)
@@ -362,9 +379,13 @@ describe('AdviceView', () => {
     const { view } = await render()
 
     expect(view.text()).toContain(milk.name)
-    expect(view.text()).toContain('The list as of today at')
+    // One strip, the cloud, under the field — never red (Ф-14).
+    expect(strips(view)).toEqual([
+      { kind: 'offline', text: expect.stringContaining('Offline · the list as of today,') },
+    ])
+    expect(view.find('.head .strip').exists()).toBe(true)
     // The connection will come back by itself, so the strip offers nothing to press.
-    expect(view.findAll('button').map((button) => button.text())).not.toContain(en.state.retry)
+    expect(retries()).toHaveLength(0)
   })
 
   it('the server broke with a list remembered: the strip offers the retry the screen cannot make', async () => {
@@ -374,9 +395,21 @@ describe('AdviceView', () => {
     advice.mockRejectedValue(broke())
     const { view } = await render()
 
-    expect(view.text()).toContain('the server did not answer')
-    const retry = view.findAll('button').find((button) => button.text() === en.state.retry)
-    expect(retry).toBeDefined()
+    expect(strips(view)).toEqual([
+      {
+        kind: 'unanswered',
+        text: expect.stringContaining('The server did not answer — the list as of today,'),
+      },
+    ])
+    // One «Try again» on the screen, in the strip: the docked strip holds the camera (Ф-15).
+    expect(retries()).toHaveLength(1)
+    expect(view.get('.strip .action').text()).toBe(en.state.retry)
+
+    // A retry that failed the same way is an answer still: the strip says it again (C1).
+    const before = view.findComponent(StatusStrip).props('attempt') as number
+    await view.get('.strip .action button').trigger('click')
+    await flushPromises()
+    expect(view.findComponent(StatusStrip).props('attempt')).toBe(before + 1)
   })
 
   it('a tap on a row opens the sheet on that row, and a save asks the server again', async () => {
@@ -434,18 +467,54 @@ describe('AdviceView', () => {
     expect(view.findComponent({ name: 'VerdictEditSheet' }).props('mine')).toBe(false)
   })
 
-  it('А4: the age of a remembered list is on the screen while the answer is still coming', async () => {
+  it('А4: the age of a remembered list is on the screen once the answer is late', async () => {
     advice.mockResolvedValue(answer([milk]))
     await render()
 
-    advice.mockReturnValue(new Promise<AdviceResponse>(() => undefined))
-    const { view } = await render()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      advice.mockReturnValue(new Promise<AdviceResponse>(() => undefined))
+      const { view } = await render()
 
-    expect(view.text()).toContain(milk.name)
-    expect(view.find('.stale').exists()).toBe(true)
-    expect(view.text()).toContain('The list as of today at')
-    // Nothing to press: the request it is waiting for is already in the air.
-    expect(view.findAll('button').map((button) => button.text())).not.toContain(en.state.retry)
+      // A quick answer would replace the list in silence: nothing flashes under the field (В-1 «а»).
+      expect(view.text()).toContain(milk.name)
+      expect(strips(view)).toEqual([])
+
+      vi.advanceTimersByTime(STRIP_LATE_MS - 1)
+      await nextTick()
+      expect(strips(view)).toEqual([])
+
+      vi.advanceTimersByTime(1)
+      await nextTick()
+      expect(strips(view)).toEqual([
+        { kind: 'refreshing', text: expect.stringContaining('Refreshing · the list as of today,') },
+      ])
+      // Nothing to press: the request it is waiting for is already in the air.
+      expect(retries()).toHaveLength(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('must not fire: an answer in time puts no strip up at all', async () => {
+    advice.mockResolvedValue(answer([milk]))
+    await render()
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      let answered: (value: AdviceResponse) => void = () => undefined
+      advice.mockReturnValue(new Promise<AdviceResponse>((resolve) => (answered = resolve)))
+      const { view } = await render()
+
+      vi.advanceTimersByTime(STRIP_LATE_MS - 1)
+      answered(answer([milk]))
+      await flushPromises()
+      vi.advanceTimersByTime(STRIP_LATE_MS)
+      await nextTick()
+      expect(strips(view)).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('С-4: an empty list from the phone is dated too', async () => {
@@ -457,7 +526,10 @@ describe('AdviceView', () => {
     const { view } = await render()
 
     expect(view.text()).toContain(en.advice.home.new_capture.title)
-    expect(view.text()).toContain('The list as of today at')
+    // No field over the newcomer: the strip stands under the header.
+    expect(strips(view)).toEqual([
+      { kind: 'offline', text: expect.stringContaining('Offline · the list as of today,') },
+    ])
   })
 
   it('without an identity the screen asks for nothing and shows no failure of its own', async () => {
@@ -587,7 +659,12 @@ describe('AdviceView', () => {
       expect(adviceSearch).not.toHaveBeenCalled()
       expect(view.findAllComponents({ name: 'AdviceCheapRow' })).toHaveLength(1)
       expect(view.text()).not.toContain(milk.name)
-      expect(view.text()).toContain('Without a connection we search only the list as of')
+      expect(strips(view)).toEqual([
+        {
+          kind: 'offline',
+          text: expect.stringContaining('Offline · searching only the list as of'),
+        },
+      ])
       expect(view.text()).toContain(en.advice.search.offline_more)
     })
 
@@ -788,12 +865,54 @@ describe('AdviceView after the review', () => {
     online(false)
     advice.mockRejectedValue(broke())
     const view = await renderIn('Гюмри')
-    expect(view.find('.stale').exists()).toBe(true)
+    expect(strips(view).map((strip) => strip.text)).toEqual([
+      expect.stringContaining('Offline · the list as of'),
+    ])
 
     await view.get('input[type="search"]').setValue('мол')
     await flushPromises()
 
-    expect(view.find('.stale').exists()).toBe(false)
-    expect(view.text()).toContain('Without a connection we search only the list as of')
+    expect(strips(view)).toEqual([
+      { kind: 'offline', text: expect.stringContaining('Offline · searching only the list as of') },
+    ])
+  })
+
+  it('a list of another city, offline: one strip, the cloud, naming both cities', async () => {
+    advice.mockResolvedValue(answer([milk], { geography: { country: 'AM', city: 'Ереван' } }))
+    await renderIn('Ереван')
+    for (const view of mounted.splice(0)) view.unmount()
+    online(false)
+    advice.mockRejectedValue(broke())
+    const view = await renderIn('Гюмри')
+
+    expect(view.text()).toContain(milk.name)
+    expect(strips(view)).toEqual([
+      {
+        kind: 'offline',
+        text: expect.stringMatching(/^Offline · the list for .+ as of today, .+\. Prices for /u),
+      },
+    ])
+  })
+
+  it('a city changed, its list late: «reloading» in one strip over the skeleton', async () => {
+    advice.mockResolvedValue(answer([milk], { geography: { country: 'AM', city: 'Ереван' } }))
+    await renderIn('Ереван')
+    for (const view of mounted.splice(0)) view.unmount()
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      advice.mockReturnValue(new Promise<AdviceResponse>(() => undefined))
+      const view = await renderIn('Гюмри')
+      expect(view.find('.skeleton').exists()).toBe(true)
+      expect(strips(view)).toEqual([])
+
+      vi.advanceTimersByTime(STRIP_LATE_MS)
+      await nextTick()
+      expect(strips(view)).toEqual([
+        { kind: 'refreshing', text: 'City changed to Гюмри — reloading the list' },
+      ])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

@@ -4,9 +4,20 @@
       {{ scope === 'shared' ? t('advice.shared_data') : t('advice.own_data_only') }}
     </template>
 
-    <p v-if="cityReloading" class="city-reloading">
-      <IconSync aria-hidden="true" />{{ t('advice.city_reloading', { city: cityReloading }) }}
-    </p>
+    <!-- The connection in one line, once (MOL-181, Ф-14). Over a list it stands under the field, which
+         chooses what is shown; over the skeleton and the newcomer there is no field, and it stands
+         under the header. -->
+    <StatusStrip
+      v-if="strip && phase !== 'ready'"
+      class="status"
+      :kind="strip.kind"
+      :text="strip.text"
+      :attempt="attempt"
+    >
+      <template #action>
+        <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+      </template>
+    </StatusStrip>
     <ScreenSkeleton v-if="phase === 'loading'" :groups="[40, 78, 62, 78]" />
 
     <!-- Without an identity there is nobody to advise; the notice above says why. -->
@@ -23,31 +34,15 @@
         :refreshes="refreshes"
         @edit="edit"
         @rate="rate"
-      />
-
-      <!-- The rows come from the phone, and the strip says how old they are — while the
-           request is still on its way as well, not only once it has failed (А4). Above the
-           branch, so an empty list from memory is dated too (С-4). Not while something is typed:
-           the list is out of sight then, and the search dates what it searched itself. -->
-      <div v-if="stale && fetchedAt && !searching" class="stale">
-        <p class="stale-text">
-          <IconCloud v-if="otherCity" aria-hidden="true" />
-          {{
-            otherCity
-              ? t('advice.stale_other_city', {
-                  oldCity: cityGenitive(otherCity.oldCity),
-                  city: cityGenitive(otherCity.city),
-                  day: day(fetchedAt),
-                  time: time(fetchedAt),
-                })
-              : t(STALE[stale], { day: day(fetchedAt), time: time(fetchedAt) })
-          }}
-        </p>
-        <!-- Only the server breaking leaves nothing that would fire again by itself. -->
-        <AppButton v-if="stale === 'error'" variant="ghost" @click="retry">
-          {{ t('state.retry') }}
-        </AppButton>
-      </div>
+      >
+        <template v-if="strip" #strip>
+          <StatusStrip :kind="strip.kind" :text="strip.text" :attempt="attempt">
+            <template #action>
+              <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+            </template>
+          </StatusStrip>
+        </template>
+      </AdviceSearch>
 
       <!-- With receipts the strip photographs one with the server down, through the queue, and stays
            the screen's: the error is a section's (127_128_129 v2, 1k; MOL-180, В-1). Without, the
@@ -154,12 +149,10 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref } from 'vue'
+import { computed, defineComponent, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { drawsNothing } from '@molvia/model'
 import type { AdviceFound, AdviceRow, AdviceScope } from '@molvia/model'
-import IconCloud from '~icons/mdi/cloud-off-outline'
-import IconSync from '~icons/mdi/sync'
 import AdviceCheapRow from '@/components/AdviceCheapRow.vue'
 import AdviceGroup from '@/components/AdviceGroup.vue'
 import AdviceHomeNew from '@/components/AdviceHomeNew.vue'
@@ -173,23 +166,14 @@ import AppScreen from '@/components/AppScreen.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
+import type { StripKind } from '@/components/StatusStrip.vue'
 import VerdictEditSheet from '@/components/VerdictEditSheet.vue'
 import { ownScore } from '@/components/adviceRow'
 import type { Score } from '@/components/rating'
 import { useAdvice } from '@/composables/useAdvice'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { purchaseDay, timeOfDay } from '@/days'
-
-/**
- * What the strip over a remembered list says, by what became of the request behind it.
- * Written out rather than assembled: a key built out of a string is invisible to the linter
- * and to `vue-tsc` alike (MOL-16, О-12).
- */
-const STALE = {
-  loading: 'advice.stale_loading',
-  offline: 'advice.stale',
-  error: 'advice.stale_error',
-} as const
 
 /**
  * «Что брать» (MOL-32) — the screen the whole product exists for. The other three fill its
@@ -222,11 +206,10 @@ export default defineComponent({
     AppButton,
     AppReveal,
     AppScreen,
-    IconCloud,
-    IconSync,
     ManualEntryButton,
     ScreenSkeleton,
     ScreenState,
+    StatusStrip,
     VerdictEditSheet,
   },
   setup() {
@@ -241,6 +224,65 @@ export default defineComponent({
     /** A sheet of «Записать покупки» is up. */
     const entering = ref(false)
     const { country } = useReceiptCapture()
+    const day = (when: Date) => purchaseDay(when, locale.value)
+    const time = (when: Date) => timeOfDay(when, locale.value)
+    const cityGenitive = (city: string) =>
+      i18n.te(`advice.cities_genitive.${city}`) ? t(`advice.cities_genitive.${city}`) : city
+
+    /**
+     * An answer on its way for longer than a moment: only then does the strip say so — a quick one
+     * replaces what is shown in silence (MOL-201, В-1 «а»).
+     */
+    const late = ref(false)
+    let lateTimer: ReturnType<typeof setTimeout> | undefined
+    watch(
+      () => advice.stale.value === 'loading' || advice.cityReloading.value !== null,
+      (waiting) => {
+        clearTimeout(lateTimer)
+        late.value = false
+        if (waiting) {
+          lateTimer = setTimeout(() => {
+            late.value = true
+          }, STRIP_LATE_MS)
+        }
+      },
+      { immediate: true },
+    )
+    onUnmounted(() => {
+      clearTimeout(lateTimer)
+    })
+
+    /**
+     * What the strip says, by what became of the request behind the list on the screen. The rows
+     * come from the phone, and the strip says how old they are — while the request is late as well,
+     * not only once it has failed (А4); an empty list from memory is dated too (С-4). Not while
+     * something is typed: the list is out of sight, and the search dates what it searched itself.
+     */
+    const strip = computed<{ kind: StripKind; text: string } | null>(() => {
+      const at = advice.fetchedAt.value
+      const stale = advice.stale.value
+      if (stale && at && !searching.value) {
+        const when = { day: day(at), time: time(at) }
+        // Only the server breaking leaves nothing that would fire again by itself: the one with «Повторить».
+        if (stale === 'error') return { kind: 'unanswered', text: t('advice.stale_error', when) }
+        if (stale === 'offline') {
+          const other = advice.otherCity.value
+          const text = other
+            ? t('advice.stale_other_city', {
+                ...when,
+                oldCity: cityGenitive(other.oldCity),
+                city: cityGenitive(other.city),
+              })
+            : t('advice.stale', when)
+          return { kind: 'offline', text }
+        }
+        return late.value ? { kind: 'refreshing', text: t('advice.stale_loading', when) } : null
+      }
+      const city = advice.cityReloading.value
+      return city && late.value
+        ? { kind: 'refreshing', text: t('advice.city_reloading', { city }) }
+        : null
+    })
     /** The row whose verdict is being amended, as the last answer described it. */
     const editing = ref<{
       itemId: string
@@ -287,8 +329,8 @@ export default defineComponent({
 
     return {
       t,
-      STALE,
       query,
+      strip,
       searching,
       entering,
       country,
@@ -299,12 +341,8 @@ export default defineComponent({
       groups: advice.groups,
       shown: advice.shown,
       total: advice.total,
-      stale: advice.stale,
       fetchedAt: advice.fetchedAt,
-      cityReloading: advice.cityReloading,
-      otherCity: advice.otherCity,
-      cityGenitive: (city: string) =>
-        i18n.te(`advice.cities_genitive.${city}`) ? t(`advice.cities_genitive.${city}`) : city,
+      attempt: advice.attempt,
       editing,
       edit,
       rate,
@@ -316,40 +354,14 @@ export default defineComponent({
         editing.value = null
       },
       retry: () => void advice.retry(),
-      day: (when: Date) => purchaseDay(when, locale.value),
-      time: (when: Date) => timeOfDay(when, locale.value),
     }
   },
 })
 </script>
 
 <style scoped lang="scss">
-.stale {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-3);
-}
-
-.city-reloading,
-.stale-text {
-  svg {
-    @include icon;
-
-    font-size: var(--icon-sm);
-    vertical-align: middle;
-    margin-right: var(--space-2);
-  }
-
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
-.city-reloading {
-  margin-bottom: var(--space-3);
+.status {
+  margin-bottom: var(--space-6);
 }
 
 .tail {

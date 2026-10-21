@@ -1,18 +1,23 @@
 <template>
-  <SearchField
-    class="field"
-    :model-value="modelValue"
-    :label="t('advice.search.label')"
-    :placeholder="t('advice.search.placeholder')"
-    clearable
-    @update:model-value="$emit('update:modelValue', $event)"
-  />
+  <!-- The field and the one strip of the connection under it, 8 apart (handoff `01`): while something
+       is typed, the search's — what it searched, as of when — otherwise the list's, the screen's own. -->
+  <div class="head">
+    <SearchField
+      :model-value="modelValue"
+      :label="t('advice.search.label')"
+      :placeholder="t('advice.search.placeholder')"
+      clearable
+      @update:model-value="$emit('update:modelValue', $event)"
+    />
+    <StatusStrip
+      v-if="phase === 'memory' && fetchedAt"
+      kind="offline"
+      :text="t('advice.search.offline', { day: day(fetchedAt), time: time(fetchedAt) })"
+    />
+    <slot v-else-if="phase === 'idle'" name="strip" />
+  </div>
 
   <template v-if="phase !== 'idle'">
-    <p v-if="phase === 'memory' && fetchedAt" class="note">
-      {{ t('advice.search.offline', { day: day(fetchedAt), time: time(fetchedAt) }) }}
-    </p>
-
     <ScreenSkeleton v-if="phase === 'loading'" :groups="[62, 62]" />
 
     <ScreenState
@@ -112,6 +117,7 @@ import AppCard from '@/components/AppCard.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SearchField from '@/components/SearchField.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import type { CheapRow, NeverRow, TakeRow } from '@/components/adviceRow'
 import { useAdviceSearch } from '@/composables/useAdviceSearch'
 import { useAnnouncer } from '@/composables/useAnnouncer'
@@ -158,6 +164,7 @@ export default defineComponent({
     ScreenSkeleton,
     ScreenState,
     SearchField,
+    StatusStrip,
   },
   props: {
     modelValue: { type: String, required: true },
@@ -223,8 +230,11 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.field {
-  margin-bottom: var(--space-4);
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
 }
 
 .note,
