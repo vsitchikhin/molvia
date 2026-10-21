@@ -164,6 +164,15 @@ describe('a line whose words do not settle its kind, or lost a letter (MOL-293, 
     expect(await bind(printed)).toMatchObject({ name: own, match: 'search' })
   })
 
+  it('takes a sort printed bare for no kind, and a standard in Latin for no thing (adversarial Г2, Г3)', async () => {
+    expect(await bind('Լեզու տավարի Արցախ')).toMatchObject({
+      name: 'Язык говяжий',
+      match: 'search',
+    })
+    expect(await bind('Կաթ UHT 3.2%')).toMatchObject({ name: 'Молоко 3,2%', match: 'search' })
+    expect((await bind('Մարտկոց AA')).name).toBe('Батарейки')
+  })
+
   it('finds nothing for a letter misread: a roller is no tomato', async () => {
     expect((await bind('Ռոլիկ')).itemId).toBeNull()
   })

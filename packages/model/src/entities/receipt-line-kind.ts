@@ -136,8 +136,14 @@ export function receiptLineParts(printed: string): ReceiptLineParts {
     (word) =>
       NOUNS.has(keyed(word)) || (!QUALIFIERS.has(keyed(word)) && !ADJECTIVE.test(keyed(word))),
   )
+  // a capital past the first word on a line of small letters is a name — a sort, a brand printed bare: the kind
+  // only where nothing else is, «Լեզու տավարի Արցախ» is a tongue (adversarial Г3)
+  const loud = words.every((word) => word === word.toUpperCase())
+  const named = (word: string): boolean =>
+    !loud && words.indexOf(word) > 0 && word.slice(0, 1) !== word.slice(0, 1).toLowerCase()
   const kind =
-    plain.find((word) => !CASE.test(keyed(word)) && !inSoftCase(keyed(word))) ??
+    plain.find((word) => !CASE.test(keyed(word)) && !inSoftCase(keyed(word)) && !named(word)) ??
+    plain.find((word) => !CASE.test(keyed(word)) && !named(word)) ??
     plain.find((word) => !CASE.test(keyed(word))) ??
     plain[0] ??
     words[0] ??
@@ -203,6 +209,8 @@ const LETTERS: Readonly<Record<string, string>> = {
   ք: 'к',
   օ: 'о',
   ֆ: 'ф',
+  // a lone «ւ» is «ու» Tesseract broke: «կլւոոր»
+  ւ: 'у',
 }
 
 /**
@@ -489,6 +497,8 @@ function nextThing(
     (sense !== undefined && (CASE.test(key) || inSoftCase(key)))
   if (qualifies) return null
   if (sense !== undefined) return isThingSense(sense) ? next : null
+  // Latin capitals of a few letters are a standard or a size, «UHT», «LED», «AA», «L» (adversarial Г2)
+  if (LATIN.test(next) && next === next.toUpperCase() && next.length <= ABBREVIATION) return null
   // Latin is capitalised, a brand and a word alike: «Ելակ Smoothie» is a thing
   const first = next.slice(0, 1)
   const capital = ARMENIAN.test(first) && first !== first.toLowerCase()

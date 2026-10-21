@@ -134,6 +134,13 @@ describe('a line taken apart (MOL-293)', () => {
     expect(kind('ՏՈՖՈՒ ՀՈՂ ԴԵՂՁ 6լ(հատ)')).toBe('ՀՈՂ')
   })
 
+  it('takes a capital past the first word for a name, the kind only where nothing else is (adversarial Г3)', () => {
+    expect(kind('Լեզու տավարի Արցախ')).toBe('Լեզու')
+    expect(kind('Կաղամբի չորաթթու Դաչա')).toBe('չորաթթու')
+    expect(kind('Հավի Կրծքամիս')).toBe('Կրծքամիս')
+    expect(kind('ԼԵԶՈՒ ՏԱՎԱՐԻ ԱՐՑԱԽ')).toBe('ԱՐՑԱԽ')
+  })
+
   it('has no brand in a «…» with no letter, and a brand a till cut before its end', () => {
     expect(receiptLineParts('Իրիս «…» սերուցքային 140գր').brand).toBeNull()
     expect(receiptLineParts('Նուշ «22/24» կգ').brand).toBeNull()
@@ -251,6 +258,8 @@ describe('a new item’s name (MOL-293, В-1 «б»)', () => {
     expect(named('Ձեռնոց «Վերդե Վիտա» M')?.name).toBe('Перчатки «Верде Вита» M')
     expect(named('Պաղպաղակ «Թամարա» ԳՕՍՏ')?.name).toBe('Мороженое «Тамара» ГОСТ')
     expect(named('ԴԱՐԱՆ ԿԼԵՅ')?.name).toBe('Даран клей')
+    // a lone «ւ» Tesseract left is no Armenian letter in a Russian name (adversarial Г4)
+    expect(named('Կլւոր')?.name).toBe('Клуор')
     expect(named('Կուպատի «ԳԵԳ» կգ')?.name).toBe('Купати «ГЕГ»')
   })
 
@@ -292,6 +301,9 @@ describe('an item standing on a line (MOL-293, В-1 «а», В-2 «а»)', () =>
     expect(fits('Ելակ սմուզի', 'Смузи клубничный')).toBe(true)
     // a sort, by its capital
     expect(fits('Բանան Սաբրոսթար', 'Бананы', true)).toBe(true)
+    // Latin capitals of a few letters are a standard or a size (adversarial Г2)
+    expect(fits('Կաթ UHT 3.2%', 'Молоко 3,2%', true)).toBe(true)
+    expect(fits('Մարտկոց AA', 'Батарейки', true)).toBe(true)
   })
 
   it('takes a gloss of a thing and its quality for a thing (adversarial В2)', () => {
