@@ -323,6 +323,15 @@ describe('the total of a model’s reading (MOL-244 by the card’s words)', () 
       // a payment that is not the total less it: the bonus is not read
       const apart = summary({ 'Կանխավճարի մարում:': '150.00', 'Վճարված է PosTerminal:': '1700.00' })
       expect(shown(answer({ lines: carded, totals: apart }))).toEqual([170_000, 1_700, null, true])
+      // no total vouched for — a line off, the sum taxed misread — and the printed total less the bonus is what the
+      // card paid: the bonus kept, the trip of the lines and the cashback the less (review round 6, Г5)
+      const off = [carded[0]!, { ...carded[1]!, sum: '930.4' }]
+      const totals = summary({
+        '/ԱԱՀ-ով հարկվող/ =': '1683.02',
+        'Կանխավճարի մարում:': '150.00',
+        'Վճարված է PosTerminal:': '1550.00',
+      })
+      expect(shown(answer({ lines: off, totals }))).toEqual([null, 1_700, 15_000, false])
     })
 
     it('is as before on a receipt that sends nothing to the card', () => {

@@ -935,6 +935,14 @@ describe('«Записать»', () => {
       receiptNo: '4',
     })
     expect(await moneyOf(unvouched, body())).toBe(221_190n)
+    // and less the bonus the card was paid with, where the printed total less it was the payment (review round 6, Г5)
+    const unvouchedBonus = await parsedReceipt(me, LINES.slice(0, 2), {
+      totalMinor: null,
+      cashbackMinor: 2_190n,
+      redeemedMinor: 10_000n,
+      receiptNo: '8',
+    })
+    expect(await moneyOf(unvouchedBonus, body())).toBe(211_190n)
     // a total vouched for below the lines — a till that takes the discount off on the spot — is the lines alone,
     // as before: never the lines and the cashback, two discounts over what left the card (review round 2, Б4)
     const below = await parsedReceipt(me, LINES.slice(0, 2), {

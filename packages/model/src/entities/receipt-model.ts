@@ -177,7 +177,8 @@ const sole = (amounts: ReadonlySet<number>): number | null =>
  * total and a payment equal to it to the luma, as before (review round 1, А2). The total
  * under the list, 0,02 off the lines where the till rounds a price with its discount (am-39, am-44), is no
  * place of it. The bonus a receipt is partly paid with, «Կանխավճարի մարում», is kept only where the card's
- * payment is the total less it, to the dram: the trip's money is then what left the card.
+ * payment is the total less it, to the dram — the total shown, else one printed — and the trip's money is then what
+ * left the card.
  *
  * `owed` is what the lines must make for the font's swaps to put any right: the total, less what went to the card
  * only where a second place vouches for that difference — the lines or «ԱԱՀ-ով հարկվող» (review round 2, owner's Б1
@@ -259,12 +260,18 @@ function totalOf(
     lined === null ? vote([new Set(totals), places.get('paid') ?? new Set()]) : lined + cashback
   const bonus = sole(spent)
   const payments = [...(places.get('paid') ?? [])]
+  // the total less the bonus is what the card paid, to the dram: the total shown, else the one printed — a trip of
+  // the lines and the cashback, no total vouched for, is the bonus less too (review round 6, Г5)
+  const before = shown === null ? totals : [shown]
   const redeemed =
-    shown === null || bonus === null || bonus >= shown
-      ? null
-      : payments.some((one) => Math.abs(shown - bonus - one) <= PAYMENT_ROUNDING_HUNDREDTHS)
-        ? bonus
-        : null
+    bonus !== null &&
+    before.some(
+      (total) =>
+        bonus < total &&
+        payments.some((one) => Math.abs(total - bonus - one) <= PAYMENT_ROUNDING_HUNDREDTHS),
+    )
+      ? bonus
+      : null
   return { total: shown, read, met, owed: lined, cashback, redeemed }
 }
 
