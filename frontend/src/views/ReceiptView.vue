@@ -474,7 +474,10 @@ export default defineComponent({
       const at = balance.value.suspect
       return at === null ? null : (lines.value[at]?.name ?? null)
     })
-    const checks = computed(() => lines.value.filter((one) => one.check && !one.skip).length)
+    // «проверьте» of an item or of figures the font's swaps put right (review round 1, №2)
+    const checks = computed(
+      () => lines.value.filter((one) => (one.check || one.repaired) && !one.skip).length,
+    )
     const recordLabel = computed(() =>
       noItems.value
         ? t('receipt.review.record_sum')

@@ -602,6 +602,8 @@ describe('ReceiptView (MOL-127)', () => {
     expect(put?.attributes('aria-label')).toContain(ru.receipt.review.tag_check)
     expect(plain?.text()).not.toContain(ru.receipt.review.repaired_note)
     expect(plain?.find('.tag.check').exists()).toBe(false)
+    // and the count over the list says it: one to check (review round 1, №2)
+    expect(view.text()).toContain(ru.receipt.review.issues_check.replace('{n}', '1'))
   })
 
   it('read in part when the lines are short of the total by one luma, as by a line (MOL-255)', async () => {
