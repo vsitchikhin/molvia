@@ -2293,6 +2293,8 @@
       "check_warn": "Not a sure match: the receipt says “{text}”. Check the item or pick another",
       "name": "Name it",
       "name_note": "The catalogue has no such item — saving adds it",
+      "spelled_note": "Words our dictionary lacks are spelt in the receipt's letters",
+      "unspell": "Drop the name — keep it as printed",
       "find": "Find in the catalogue",
       "price": "Price for all, as on the receipt",
       "weight_hint": "{qty} × {price} — we work out the unit price",

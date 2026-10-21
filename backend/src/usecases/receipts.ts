@@ -247,6 +247,8 @@ export async function receiptOfOwner(
   cashback = false,
   /** The phone knows a line's `repaired` (`RECEIPT_REPAIRED_HEADER`, MOL-290). */
   repaired = false,
+  /** The phone knows a line's `spelled` (`RECEIPT_SPELLED_HEADER`, MOL-293). */
+  spelled = false,
 ): Promise<ReceiptDetail> {
   const found = await repositories.receipts.one(actor.id, id)
   if (found === null) throw new DomainError(ERROR.NOT_FOUND)
@@ -340,6 +342,8 @@ export async function receiptOfOwner(
               ? 'new'
               : (line.match ?? 'new'),
         translation: line.translation,
+        // a proposal only while the line is still a new item: the memory may have named it since
+        ...(spelled && line.spelled && known === null ? { spelled: true } : {}),
         amount: amounts[i] ?? null,
         rememberedPrice: priceInDoubt(receipt.country, line.price, rememberedOf(remembered))
           ? rememberedOf(remembered)

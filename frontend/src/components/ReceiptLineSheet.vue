@@ -41,6 +41,13 @@
           >
         </AppField>
         <p class="hint">{{ t('receipt.line.name_note') }}</p>
+        <!-- A name spelt in letters is a proposal: one press puts the line back as printed (MOL-293, В-4). -->
+        <template v-if="spelled">
+          <p class="hint">{{ t('receipt.line.spelled_note') }}</p>
+          <AppButton variant="ghost" block @click="unspell">{{
+            t('receipt.line.unspell')
+          }}</AppButton>
+        </template>
         <AppButton variant="ghost" block @click="picking = true">
           <template #icon><IconMagnify /></template>
           {{ t('receipt.line.find') }}
@@ -133,6 +140,7 @@ import {
   parseQuantity,
   pastedLine,
   priceInDoubt,
+  receiptLineName,
   unitPrice,
 } from '@molvia/model'
 import type {
@@ -451,6 +459,16 @@ export default defineComponent({
       remembered,
       mismatch,
       checking: computed(() => start.check && !settled.value && item.value.id === start.itemId),
+      // while the name proposed stands: typed over or another chosen, it is the person's
+      spelled: computed(
+        () => start.line.spelled === true && item.value.id === null && name.value === start.name,
+      ),
+      unspell: () => {
+        name.value = receiptLineName(start.line.printed, props.country)
+        item.value = { id: null, name: name.value }
+        settled.value = true
+        finish(false, true)
+      },
       sign: computed(() => currencySign(props.currency, locale.value)),
       meta: computed(() =>
         props.place
