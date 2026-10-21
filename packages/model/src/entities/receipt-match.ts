@@ -128,6 +128,9 @@ export function createLineMatcher(
       .map(
         (token) =>
           words.get(token) ??
+          // the dictionary keys «և» as one letter, and as of old «եւ»: «սերկեւիլ», «սերկևիլի» (review 6, Е3)
+          words.get(token.replace(/եվ/gu, 'և')) ??
+          words.get(token.replace(/եվ/gu, 'եւ')) ??
           fuzzyWords.find(([word]) => levenshtein(word, token) <= 1)?.[1] ??
           null,
       )

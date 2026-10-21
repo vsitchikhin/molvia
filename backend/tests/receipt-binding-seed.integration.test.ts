@@ -178,6 +178,9 @@ describe('a line whose words do not settle its kind, or lost a letter (MOL-293, 
     expect(await bind('Ազնվամորու Մուրաբա')).toMatchObject({ name: 'Варенье', match: 'search' })
     expect((await bind('Շոկոլադ MARS')).itemId).toBeNull()
     expect(await bind('Մուրաբա սերկեւիլի')).toMatchObject({ name: 'Варенье', match: 'search' })
+    // a unit printed small, a standard of the list (review 6)
+    expect(await bind('Ազնվամորու Մուրաբա կգ')).toMatchObject({ name: 'Варенье', match: 'search' })
+    expect(await bind('Կաթ BIO 3.2%')).toMatchObject({ name: 'Молоко 3,2%', match: 'search' })
   }, 15_000)
 
   it('finds nothing for a letter misread: a roller is no tomato', async () => {

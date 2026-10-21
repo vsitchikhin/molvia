@@ -138,7 +138,9 @@ export function receiptLineParts(printed: string): ReceiptLineParts {
   )
   // a capital past the first word on a line of small letters is a name — a sort, a brand printed bare: the kind
   // only where nothing else is, «Լեզու տավարի Արցախ» is a tongue (adversarial Г3)
-  const named = (word: string): boolean => hasSmall(head) && words.indexOf(word) > 0 && titled(word)
+  // a unit is small however the till writes its words, «Ազնվամորու Մուրաբա կգ» (review 6, №1)
+  const small = hasSmall(head.filter((token) => !UNIT_WORDS.has(keyed(token))))
+  const named = (word: string): boolean => small && words.indexOf(word) > 0 && titled(word)
   const kind =
     plain.find((word) => !CASE.test(keyed(word)) && !inSoftCase(keyed(word)) && !named(word)) ??
     plain.find((word) => !CASE.test(keyed(word)) && !named(word)) ??
@@ -235,10 +237,10 @@ function spellWord(word: string, capitals = true): string {
   return capital ? out.charAt(0).toUpperCase() + out.slice(1) : out
 }
 
-/** A line printed in capitals all through says nothing by them: «ԴԱՐԱՆ ԿԼԵՅ». */
 /**
- * A capital says a name only on a line the till printed a small first letter in, a unit's included — «Բանան
- * Սաբրոսթար կգ» is a sort; in «Ազնվամորու Մուրաբա», every word a capital, it says nothing (review 5, №1).
+ * A capital says a name only on a line the till printed a small first letter in: in «Ազնվամորու Մուրաբա», every
+ * word a capital, it says nothing (review 5, №1). A unit's counts for a sort after the kind — «Բանան Սաբրոսթար կգ» —
+ * never for the kind itself, which a genitive must not take (review 6, №1).
  */
 const hasSmall = (tokens: readonly string[]): boolean =>
   tokens.some((token) => {
@@ -253,6 +255,7 @@ const titled = (word: string): boolean => {
   return first !== first.toLowerCase() && rest !== rest.toUpperCase()
 }
 
+/** A line printed in capitals all through says nothing by them: «ԴԱՐԱՆ ԿԼԵՅ». */
 const shouting = (parts: ReceiptLineParts): boolean =>
   [...parts.before, ...parts.after].every(
     (token) => !ARMENIAN.test(token) || token === token.toUpperCase(),
@@ -482,6 +485,14 @@ const QUALITY_ENDINGS = ['ый', 'ий', 'ой', 'ая', 'яя']
  * form — «MARS», «LAYS» are things (review 5, №2).
  */
 const STANDARDS = new Set([
+  'BIO',
+  'ECO',
+  'ICE',
+  'MIX',
+  'ZERO',
+  'PET',
+  'MINI',
+  'MAX',
   'UHT',
   'LED',
   'USB',

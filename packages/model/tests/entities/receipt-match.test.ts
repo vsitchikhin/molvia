@@ -40,6 +40,12 @@ const WORDS = {
 const matcher = createLineMatcher(NODES, WORDS)
 
 describe('the words of a line', () => {
+  it('glosses «և» spelt any way the dictionary keys it, «եւ» of old too (review 6, Е3)', () => {
+    const old = createLineMatcher([], { սերկեւիլ: 'айва', սերկևիլի: 'айва', մուրաբա: 'варенье' })
+    expect(old.gloss('Մուրաբա սերկեւիլի')).toBe('варенье айва')
+    expect(old.gloss('Սերկեւիլ')).toBe('айва')
+  })
+
   it('keeps Armenian words of two letters or more, lower case, «և» spelt out', () => {
     expect(receiptWords('0401/1163909 Կաթ «Իգիթ» 3.2% 1լ')).toEqual(['կաթ', 'իգիթ', '1լ'])
     expect(receiptWords('ԵՐԵՎԱՆ և')).toEqual(['երեվան', 'եվ'])
