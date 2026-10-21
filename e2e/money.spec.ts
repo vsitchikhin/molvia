@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import { fakeKeyboard } from './keyboard'
-import { standAt, topOf } from './scroll'
+import { facesIn, standAt, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -439,6 +439,8 @@ test('offline, a month not read keeps the switcher where it was, at the top of t
   // (adversarial round 2, Г).
   const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
   expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  // No scene to set, so the faces are waited for here, as `standAt` waits for them (MOL-267).
+  await facesIn(page)
   const before = await topOf(previous)
   await previous.click()
   await expect(page).toHaveURL(/month=/)
