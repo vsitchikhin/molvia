@@ -340,8 +340,8 @@ describe('MoneyBudgetView: the month counted by the server', () => {
     expect(total).toContain('֏22,600')
     expect(total).toContain('≈ ₽5,256')
     expect(rowTexts(view).slice(0, 3)).toEqual([
-      'Groceries֏25,100֏52,300 of ≈ ֏77,400 · 10 % of income · 68%',
-      'Cafés and restaurants֏2,500֏41,200 of ≈ ֏38,700 · 5 % of income · over the plan',
+      'Groceries֏25,100֏52,300 of ≈ ֏77,400 · 68%10 % of income',
+      'Cafés and restaurants֏2,500֏41,200 of ≈ ֏38,700 · over the plan5 % of income',
       'Rent֏0֏250,000 of ֏250,000 · 100%',
     ])
     expect(view.findAll('.fill.over')).toHaveLength(1)
@@ -440,11 +440,11 @@ describe("MoneyBudgetView: the total and the skeleton in the answer's shape (MOL
     expect(view.findAll('.skeleton-rows .circle')).toHaveLength(3)
   })
 
-  it('the total is the card of a sum: a caption, the figure, three tiles', async () => {
+  it('the total is the card of a sum: a caption, the figure, three figures a line each', async () => {
     moneyBudget.mockResolvedValue(budget())
     const card = (await render()).find('.total')
     expect(card.find('.section-caption').text()).toBe(en.budget.total.left)
-    const tiles = card.findAll('.tile').map((tile) => plain(tile.text()))
+    const tiles = card.findAll('.plate-row').map((tile) => plain(tile.text()))
     expect(tiles).toEqual(['Plan֏366,100', 'Spent֏343,500', 'Outside the plan֏6,500'])
   })
 })
@@ -572,7 +572,7 @@ describe('MoneyBudgetView: what the review found (MOL-117)', () => {
       }),
     )
     const view = await render()
-    expect(rowTexts(view)[0]).toBe('Groceries—֏52,300 of — · 10 % of income · nothing came in yet')
+    expect(rowTexts(view)[0]).toBe('Groceries—֏52,300 of —10 % of income · nothing came in yet')
     expect(view.findAll('.over')).toHaveLength(0)
     expect(view.find('.total').text()).toContain(en.budget.total.awaiting)
   })
@@ -730,7 +730,7 @@ describe('MoneyBudgetView: round 2 of the review (MOL-117)', () => {
     // Not a button and no chevron, and the row says why it does not open (MOL-192).
     expect(removed.element.tagName).toBe('DIV')
     expect(removed.find('.chevron').exists()).toBe(false)
-    expect(removed.find('.meta').text()).toContain(en.budget.row.archived)
+    expect(removed.find('.note').text()).toContain(en.budget.row.archived)
     expect(removed.find('.track').exists()).toBe(true)
     await removed.trigger('click')
     await flushPromises()

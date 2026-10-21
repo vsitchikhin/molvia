@@ -52,12 +52,14 @@
         <ScreenState
           v-if="!budget.total && budget.savings.target === null"
           kind="empty"
+          class="planless"
           :icon="IconTarget"
           :title="t('budget.empty.title')"
           :body="t('budget.empty.body')"
         />
         <!-- The card of a sum, as the month's on «Деньгах» (MOL-183): its caption, the figure, «≈» at
-             the headline's size, and the three figures as tiles. -->
+             the headline's size, and the three figures on a plate, a line each — three tiles across
+             broke «330 000 ֏» in its middle on a phone of 320, and a sum of seven digits at 390. -->
         <AppCard v-else-if="budget.total" class="total">
           <SectionCaption as="p" inset>
             {{ overall.over ? t('budget.total.over') : t('budget.total.left') }}
@@ -70,16 +72,16 @@
                spending some rate did not count (adversarial М of round 4). -->
           <p v-if="awaiting" class="footnote">{{ t('budget.total.awaiting') }}</p>
           <p v-if="short" class="footnote">{{ t('budget.total.not_whole') }}</p>
-          <dl class="tiles">
-            <div class="tile">
+          <dl class="plate">
+            <div class="plate-row">
               <dt>{{ t('budget.total.planned') }}</dt>
               <dd>{{ plannedWords }}</dd>
             </div>
-            <div class="tile">
+            <div class="plate-row">
               <dt>{{ t('spending.spent') }}</dt>
               <dd>{{ amount(budget.total.spent) }}</dd>
             </div>
-            <div class="tile">
+            <div class="plate-row">
               <dt>{{ t('budget.total.unplanned') }}</dt>
               <dd>{{ amount(budget.total.unplanned) }}</dd>
             </div>
@@ -109,7 +111,7 @@
                 </span>
               </template>
               <template #meta>
-                <span>{{ row.meta }}</span
+                <span>{{ row.of }}</span
                 ><span v-if="row.used" :class="{ over: row.over }">{{ row.used }}</span>
               </template>
               <template v-if="row.archived" #tail><span class="no-chevron"></span></template>
@@ -121,6 +123,7 @@
                     :style="{ width: row.width, background: row.over ? undefined : row.fill }"
                   ></span>
                 </span>
+                <span v-if="row.notes" class="note">{{ row.notes }}</span>
               </template>
             </ListRow>
           </li>
@@ -157,7 +160,7 @@
           <ListRow
             :icon="IconPiggyBank"
             tint="muted"
-            :meta="savings.meta"
+            :meta="savings.goal"
             next
             wrap
             @click="editSavings"
@@ -168,11 +171,12 @@
                 <span class="amount">{{ savings.actual }}</span>
               </span>
             </template>
-            <template v-if="savings.width !== null" #below>
-              <span class="track" aria-hidden="true">
+            <template #below>
+              <span v-if="savings.width !== null" class="track" aria-hidden="true">
                 <span class="fill" :style="{ width: savings.width }"></span>
                 <span v-if="savings.target" class="mark" :style="{ left: savings.target }"></span>
               </span>
+              <span class="note">{{ savings.of }}</span>
             </template>
           </ListRow>
         </AppCard>
@@ -367,12 +371,10 @@ export default defineComponent({
           over,
           // Over the plan is said by the words beside it, never by a minus (Р-7, review 5).
           left: row.left === null ? '—' : amount(row.left),
-          // Why a removed one does not open is said on it (MOL-192).
-          meta: [
-            t('budget.row.of', { spent: amount(row.spent), planned }),
-            ...notes,
-            ...(archived ? [t('budget.row.archived')] : []),
-          ].join(' · '),
+          of: t('budget.row.of', { spent: amount(row.spent), planned }),
+          // A line of its own under the bar: in the meta, cut at two lines, a phone of 320 lost them.
+          // Why a removed one does not open is said there too (MOL-192).
+          notes: [...notes, ...(archived ? [t('budget.row.archived')] : [])].join(' · '),
           used: used ? ` · ${used}` : '',
           // The share is the server's; the phone only stops the bar at the card's edge.
           width: `${String(Math.min(row.used ?? (over ? 100 : 0), 100))}%`,
@@ -406,7 +408,7 @@ export default defineComponent({
     const running = computed(() => month.value === currentMonth.value)
     const savings = computed(() => {
       const value = budget.value?.savings
-      if (!value) return { actual: '', meta: '', width: null, target: null }
+      if (!value) return { actual: '', goal: '', of: '', width: null, target: null }
       const actual =
         value.actual === null
           ? '—'
@@ -430,7 +432,8 @@ export default defineComponent({
           : t('budget.savings.not_whole')
       return {
         actual,
-        meta: `${goal} · ${of}`,
+        goal,
+        of,
         width:
           value.actual === null ? null : `${String(Math.max(0, Math.min(value.actual, 100)))}%`,
         target: value.target === null ? null : `${String(value.target)}%`,
@@ -550,22 +553,26 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
-/* The tiles of the month's card (MOL-183), three across: a figure that cannot fit a third of a phone
-   of 320 breaks rather than stand past its tile. */
-.tiles {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
-  margin: var(--space-3) 0 0;
+/* «Отложить» stands under it: grown to the free height, the empty state took the card to the bottom of
+   the page, a screen's height away from the words it belongs with (MOL-192). */
+.planless {
+  flex: none;
 }
 
-.tile {
+.plate {
   display: grid;
-  align-content: start;
   gap: var(--space-1);
-  padding: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius);
   background: var(--surface-2);
+}
+
+.plate-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
 
   dt {
     color: var(--text-muted);
@@ -577,7 +584,7 @@ export default defineComponent({
     font-size: var(--text-callout);
     font-weight: var(--weight-medium);
     font-variant-numeric: tabular-nums;
-    overflow-wrap: anywhere;
+    text-align: end;
   }
 }
 
@@ -622,6 +629,13 @@ export default defineComponent({
   bottom: calc(var(--space-1) * -1);
   width: calc(var(--hairline) * 2);
   background: var(--text);
+}
+
+.note {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
 }
 
 .over {
