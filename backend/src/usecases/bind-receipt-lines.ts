@@ -2,8 +2,11 @@ import {
   createLineMatcher,
   headingRulesOut,
   isServiceClass,
+  lineFitter,
+  newLineName,
   receiptCard,
   receiptLineName,
+  receiptLineParts,
   serbianServiceLine,
 } from '@molvia/model'
 import type { AppLocale, ReceiptCountry, ReceiptLine } from '@molvia/model'
@@ -20,8 +23,11 @@ export interface BindReceiptLinesDeps {
   readonly embedder: Pick<Embedder, 'model' | 'query'>
 }
 
-/** The search is asked for its first item only; a few more lets its order settle the same way. */
-const SEARCH_ROWS = 5
+/**
+ * The search's first items the line's kind and brand are looked for among (MOL-293): the owner's «Сметана
+ * «Тамара» 18%» stood past the fifth for «сметана», and ten found 116 lines of the bench right against 87.
+ */
+const SEARCH_ROWS = 10
 
 /** A name shorter than this is no item to search by: «Ko», a unit's cut that stood alone. */
 const SHORTEST_NAME = 3
@@ -81,6 +87,7 @@ export async function bindReceiptLines(
       bound.push({ itemId: found.itemId, match: found.far ? 'weak' : 'search', translation })
       continue
     }
+    const parts = receiptLineParts(line.printed)
     if (gloss !== '') {
       const answer = await items.search(
         gloss,
@@ -88,19 +95,29 @@ export async function bindReceiptLines(
         actorId,
         await queryMeaning(embedder, gloss),
       )
-      const [first] = answer.items
+      // the first the line's kind and brand let stand (MOL-293, В-1 «а»): «йогурт клубника» found
+      // «Клубника» first, and an item that names a flavour, a brand or a size the line has not is another;
+      // nor one the printed heading rules out — a brush is no tomato however the gloss read (MOL-255) —
+      // which was «проверьте» and is now a new item, as the rest
+      const fits = lineFitter(parts, TILL_WORDS_RU)
+      const first = answer.items.find(
+        (item) => fits(item.name) && !headingRulesOut(line.hs, headings.get(item.id) ?? []),
+      )
       if (first !== undefined) {
-        // a dish of a class of services is never sure among the catalogue's goods (MOL-226), nor an
-        // item the printed heading rules out: a brush is no tomato however the gloss read (MOL-255)
-        const near =
-          answer.nearIds.includes(first.id) &&
-          !isServiceClass(line.hs) &&
-          !headingRulesOut(line.hs, headings.get(first.id) ?? [])
+        // a dish of a class of services is never sure among the catalogue's goods (MOL-226)
+        const near = answer.nearIds.includes(first.id) && !isServiceClass(line.hs)
         bound.push({ itemId: first.id, match: near ? 'search' : 'weak', translation })
         continue
       }
     }
-    bound.push({ itemId: null, match: 'new', translation })
+    // a new item, named in full from the line and offered under «проверьте»: a guess (MOL-293, В-1 «а»)
+    const named = language === 'ru' ? newLineName(parts, TILL_WORDS_RU) : null
+    bound.push({
+      itemId: null,
+      match: 'weak',
+      translation: named?.name ?? translation,
+      spelled: named?.spelled ?? false,
+    })
   }
   return bound
 

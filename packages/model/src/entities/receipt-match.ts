@@ -5,6 +5,7 @@
 // for line (`.scratch/tasks/status/MOL-126/parity.mjs`), so the measured figure — 54 of 70 lines of
 // receipts its rules never saw — still holds.
 
+import { lineFitter, receiptLineParts } from '#model/entities/receipt-line-kind'
 import { levenshtein } from '#model/support/edits'
 
 /** An item as a receipt reaches it: its own name, its names in the till's language, its headings. */
@@ -134,22 +135,29 @@ export function createLineMatcher(
       .join(' ')
   }
 
+  // An item names the line's kind and nothing the line does not print (MOL-293, В-1 «а»): a word of a
+  // flavour found «Клубника» for a strawberry yoghurt.
+  type Fits = (name: string) => boolean
+
   // A fat or a strength printed on the line picks the variety: «Կաթ 3.2%» is «Молоко 3,2%».
-  function refine(found: CatalogueNode, printed: string): CatalogueNode {
+  function refine(found: CatalogueNode, printed: string, fits: Fits): CatalogueNode {
     const percent = /(\d+(?:[.,]\d+)?)\s*%/u.exec(printed)?.[1]?.replace('.', ',')
     if (percent === undefined) return found
     const kind = found.name.replace(/\s+\d.*$/u, '')
     return (
-      nodes.find((node) => node.name.startsWith(kind) && node.name.includes(`${percent}%`)) ?? found
+      nodes.find(
+        (node) =>
+          node.name.startsWith(kind) && node.name.includes(`${percent}%`) && fits(node.name),
+      ) ?? found
     )
   }
 
   // No name matched: the heading alone, when it leaves one item, or the item whose own name shares a
   // stem with the line's gloss («кошка» → «Корм для кошек»). Bound far — «проверьте».
-  function byHeading(printed: string, hs: string | null): LineMatch | null {
+  function byHeading(printed: string, hs: string | null, fits: Fits): LineMatch | null {
     if (!isHeading(hs)) return null
     // the exact heading only: a swapped digit is fine for ruling out, not for choosing (3506 → 8506)
-    const candidates = nodes.filter((node) => node.headings.includes(hs))
+    const candidates = nodes.filter((node) => node.headings.includes(hs) && fits(node.name))
     if (candidates.length === 0) return null
     const stems = gloss(printed)
       .toLowerCase()
@@ -175,6 +183,7 @@ export function createLineMatcher(
 
   function match(printed: string, hs: string | null): LineMatch | null {
     const tokens = receiptWords(printed)
+    const fits = lineFitter(receiptLineParts(printed), dictionary)
     let best: { node: CatalogueNode; score: number } | null = null
     for (const entry of index) {
       const { headings } = entry.node
@@ -184,12 +193,14 @@ export function createLineMatcher(
       // more words — more specific
       const score =
         scores.reduce((sum, x) => sum + x, 0) / entry.words.length + 0.05 * (entry.words.length - 1)
-      if (best === null || score > best.score) best = { node: entry.node, score }
+      // asked last, and only of a name that would win: the line is read against the item's whole name
+      if ((best === null || score > best.score) && fits(entry.node.name))
+        best = { node: entry.node, score }
     }
     if (best !== null && best.score >= MATCH_SCORE) {
-      return { itemId: refine(best.node, printed).itemId, far: isServiceClass(hs) }
+      return { itemId: refine(best.node, printed, fits).itemId, far: isServiceClass(hs) }
     }
-    return byHeading(printed, hs)
+    return byHeading(printed, hs, fits)
   }
 
   return { match, gloss }

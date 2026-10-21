@@ -125,6 +125,8 @@ export interface LineBinding {
   readonly itemId: string | null
   readonly match: ReceiptParsedMatch
   readonly translation: string | null
+  /** The new item's name spells a word in letters the dictionary has not (MOL-293, В-4): a proposal. */
+  readonly spelled?: boolean
 }
 
 export interface LineImage {
@@ -168,6 +170,8 @@ export interface StoredReceiptLine extends ReceiptLine {
   /** `null` for a line read before MOL-126: nothing was looked for. */
   readonly match: ReceiptParsedMatch | null
   readonly translation: string | null
+  /** `translation` spells a word in letters (MOL-293, В-4). */
+  readonly spelled: boolean
   /** The package's code the tax office's specification gave the line (MOL-234). */
   readonly gtin: string | null
 }
@@ -549,6 +553,7 @@ function toLine(row: typeof receiptLines.$inferSelect, currency: Currency): Stor
     itemId: row.itemId,
     match: row.match,
     translation: row.translation,
+    spelled: row.spelled,
     gtin: row.gtin,
     printed: row.printed,
     hs: row.hs,
@@ -1313,6 +1318,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
               itemId: outcome.bindings[position]?.itemId ?? null,
               match: outcome.bindings[position]?.match ?? null,
               translation: outcome.bindings[position]?.translation ?? null,
+              spelled: outcome.bindings[position]?.spelled === true,
               gtin: outcome.codes?.[position] ?? null,
             })),
           )
