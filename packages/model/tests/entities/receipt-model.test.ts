@@ -224,6 +224,19 @@ describe('the total of a model’s reading (MOL-244 by the card’s words)', () 
     expect(read(answer({ lines, totals })).readTotalHundredths).toBe(2_345_920)
   })
 
+  it('takes no sum since the start of the year for the total, read or voted (MOL-288)', () => {
+    const totals = [
+      { label: 'Ընդամենը', amount: '19097.86' },
+      { label: 'Ընդամենը ամվա սկզբից:', amount: '139432.00' },
+      { label: 'Առևտուր ամսվա սկզբից:', amount: '139432.00' },
+    ]
+    const text = read(answer({ lines, totals }))
+    expect([text.totalHundredths, text.readTotalHundredths]).toEqual([null, 1_909_786])
+    // nor is it one of two places: alone the total's word gives nothing to vote with
+    const alone = read(answer({ lines, totals: totals.slice(1) }))
+    expect([alone.totalHundredths, alone.readTotalHundredths]).toEqual([null, null])
+  })
+
   it('is the section’s on a receipt with no items, by the vote of MOL-227', () => {
     const totals = [
       { label: 'Բաժին 1', amount: '1700.00' },

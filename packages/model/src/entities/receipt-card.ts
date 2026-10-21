@@ -38,6 +38,11 @@ export interface ReceiptWords {
   readonly totalKept: string
   /** What OCR keeps of the discount's word: a row of the total with it is the discount's. */
   readonly discountKept: string
+  /**
+   * A sum since the start of the year or the month — «Ընդամենը ամվա սկզբից», what a card bought there this
+   * year: never the receipt's total, neither read nor a vote (MOL-288).
+   */
+  readonly sinceStart: string
   /** The payment, in cash or by card. */
   readonly paid: readonly string[]
   /** The tax a section prints its sum beside: the section's sum, read again. */
@@ -114,6 +119,8 @@ export const ARMENIAN_RECEIPTS: PhotoReading = {
     totalKept: 'դամե',
     // «զեղչ», «Զեղչ», «qեղչ» — as loosely as the total's word
     discountKept: 'եղչ',
+    // «ամվա սկզբից», «ամսվա սկզբից»
+    sinceStart: 'սկզբ',
     // «Առձեռն» as OCR reads it, «Կանխիկ», «Անկանխիկ», «Վճարված»
     paid: ['ձեռն', 'ձեոն', 'ձեդն', 'Կանխիկ', 'Անկանխ', 'Վճար'],
     // «Շրջանառության հարկ», its «կ» read «լ»

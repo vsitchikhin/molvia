@@ -171,6 +171,9 @@ function totalOf(
   const w = reading.words
   const total = new RegExp(`(?:${w.totalKept})`, 'u')
   const discount = new RegExp(`(?:${w.discountKept})`, 'u')
+  // a sum since the start of the year is what a card bought this year (MOL-288): the largest the total's word
+  // stands by, it was the total read — «Прочитали не всё» short by 120 000 ֏
+  const sinceStart = new RegExp(`(?:${w.sinceStart})`, 'u')
   const paid = new RegExp(`(?:${w.paid.join('|')})`, 'u')
   const places = new Map<string, Set<number>>([
     ['total', new Set()],
@@ -180,7 +183,8 @@ function totalOf(
   for (const { label, amount } of answer.totals) {
     const hundredths = figureOf(amount, 2)
     if (hundredths === null || hundredths <= 0) continue
-    if (total.test(label) && !discount.test(label)) places.get('total')?.add(hundredths)
+    if (total.test(label) && !discount.test(label) && !sinceStart.test(label))
+      places.get('total')?.add(hundredths)
     else if (paid.test(label)) places.get('paid')?.add(hundredths)
     else if (lines.length === 0 && DEPARTMENT.test(label)) places.get('section')?.add(hundredths)
   }

@@ -138,6 +138,7 @@ interface Lexicon {
   readonly sectionTax: RegExp
   readonly totalKept: RegExp
   readonly discountKept: RegExp
+  readonly sinceStart: RegExp
   readonly paid: RegExp
 }
 
@@ -160,8 +161,9 @@ function lexiconOf(reading: PhotoReading): Lexicon {
   // a word that captures moves the figures the parse reads after it by their groups: the total read as the
   // word, NaN (adversarial А1) — refused, as a format it cannot read is
   const fragments = [
-    ...[w.total, w.totalKept, w.discountKept, w.control, w.fiscalSign, w.tin, w.fiscal],
-    ...[w.fiscalNumber, w.receiptNumber, w.sumSign, ...w.paid, ...w.sectionTax, ...w.tinMisread],
+    ...[w.total, w.totalKept, w.discountKept, w.sinceStart, w.control, w.fiscalSign, w.tin],
+    ...[w.fiscal, w.fiscalNumber, w.receiptNumber, w.sumSign, ...w.paid, ...w.sectionTax],
+    ...w.tinMisread,
     ...[...w.head, ...w.currency, ...Object.values(u)],
   ]
   const captures = fragments.find(
@@ -261,6 +263,7 @@ function lexiconOf(reading: PhotoReading): Lexicon {
     sectionTax: new RegExp(any(w.sectionTax), 'u'),
     totalKept: new RegExp(word(w.totalKept), 'u'),
     discountKept: new RegExp(word(w.discountKept), 'u'),
+    sinceStart: new RegExp(word(w.sinceStart), 'u'),
     paid: new RegExp(any(w.paid), 'u'),
   }
   lexicons.set(reading, lexicon)
@@ -1614,8 +1617,9 @@ const DEPARTMENT_DATE = /(?<!\d)(\d{2})[-.]\s?(\d{2})[-.]\s?(\d{2})\s+(\d{2}):(\
 const DEPARTMENT_MOMENT = new RegExp(DEPARTMENT_DATE.source)
 // The total's row as OCR reads its word, «Ընդամենը», «/չդամենը», «Կղդամեկը» — and not its discount,
 // «Ընդամենը զեղչ», however OCR spells the discount's first letter.
+// a sum since the start of the year is what a card bought this year, never the receipt's (MOL-288)
 const totalRow = (text: string, lx: Lexicon): boolean =>
-  lx.totalKept.test(text) && !lx.discountKept.test(text)
+  lx.totalKept.test(text) && !lx.discountKept.test(text) && !lx.sinceStart.test(text)
 // An amount with its hundredths: «1700.00», «1800 00», and with its thousands apart before a point,
 // «2 050,01» — the card's payment, which read digit by digit was 50,01 in two places at once (MOL-244). A
 // figure that lost its point is no vote.
