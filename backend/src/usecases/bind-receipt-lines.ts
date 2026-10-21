@@ -21,6 +21,19 @@ export interface BindReceiptLinesDeps {
   readonly items: Pick<ItemRepository, 'nodes' | 'search' | 'byBarcode'>
   /** The model of the search by meaning (MOL-105); without one, letters alone. */
   readonly embedder: Pick<Embedder, 'model' | 'query'>
+  /**
+   * The catalogue holds no names in the till's language where the country has them (MOL-293): only the
+   * manual seed writes them, and production went nineteen days without — every line by the gloss alone.
+   */
+  readonly namesMissing?: (error: CatalogueNamesMissing) => void
+}
+
+/** The catalogue has no names in a till's language: a fault of ours the owner hears of (MOL-293). */
+export class CatalogueNamesMissing extends Error {
+  constructor(language: string) {
+    super(`the catalogue has no item names in ${language}`)
+    this.name = 'CatalogueNamesMissing'
+  }
 }
 
 /**
@@ -48,7 +61,7 @@ const SHORTEST_NAME = 3
  * the search asks it whatever the receipt's language.
  */
 export async function bindReceiptLines(
-  { items, embedder }: BindReceiptLinesDeps,
+  { items, embedder, namesMissing }: BindReceiptLinesDeps,
   actorId: string,
   country: ReceiptCountry,
   language: AppLocale,
@@ -58,6 +71,7 @@ export async function bindReceiptLines(
 ): Promise<LineBinding[]> {
   const names = receiptCard(country).nameLanguage
   const nodes = names === null ? [] : await items.nodes(names)
+  if (names !== null && nodes.length === 0) namesMissing?.(new CatalogueNamesMissing(names))
   const matcher = createLineMatcher(nodes, TILL_WORDS_RU)
   // the headings the seed gave the catalogue's nodes; an item the search finds outside them has none known
   const headings = new Map(nodes.map((node) => [node.itemId, node.headings]))

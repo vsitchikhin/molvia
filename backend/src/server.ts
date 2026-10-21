@@ -832,7 +832,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                     },
               bind: (claimed, lines) =>
                 bindReceiptLines(
-                  { items: createItemRepository(db), embedder },
+                  {
+                    items: createItemRepository(db),
+                    embedder,
+                    // the lines are bound by the gloss alone: the seed's names are missing (MOL-293)
+                    namesMissing: (error) => {
+                      failures.report(error, job('receipt-binding'), 'catalogue has no till names')
+                    },
+                  },
                   claimed.actorId,
                   claimed.country,
                   claimed.language,

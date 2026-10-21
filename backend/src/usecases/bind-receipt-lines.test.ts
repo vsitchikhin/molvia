@@ -3,6 +3,7 @@ import { itemSchema } from '@molvia/model'
 import type { CatalogueNode, Item, ReceiptLine } from '@molvia/model'
 import type { ItemRepository, SearchAnswer } from '@/db/items-repository'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
+import type { CatalogueNamesMissing } from './bind-receipt-lines'
 import { bindReceiptLines } from './bind-receipt-lines'
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
@@ -216,6 +217,53 @@ describe('binding the lines of a parsed receipt (MOL-126)', () => {
       line('ԹԹՎԱՍԵՐ 20%'),
     ])
     expect(line0).toEqual({ itemId: null, match: 'weak', translation: null, spelled: false })
+  })
+})
+
+describe('a catalogue with no names of the tills (MOL-293)', () => {
+  it('tells it once a receipt and binds by the gloss all the same', async () => {
+    const heard: CatalogueNamesMissing[] = []
+    const search = vi.fn<ItemRepository['search']>(() =>
+      Promise.resolve({ items: [item(MILK, 'Молоко')], near: true, nearIds: [MILK] }),
+    )
+    const bound = await bindReceiptLines(
+      {
+        items: { nodes: () => Promise.resolve([]), search, byBarcode: NONE },
+        embedder: NO_EMBEDDER,
+        namesMissing: (error) => heard.push(error),
+      },
+      ACTOR,
+      'AM',
+      'ru',
+      [line('Կաթ 1լ'), line('Կաթ 1լ')],
+    )
+    expect(heard.map((error) => error.name)).toEqual(['CatalogueNamesMissing'])
+    expect(bound.map((one) => one.itemId)).toEqual([MILK, MILK])
+  })
+
+  it('must not tell it with the names there, nor for a country that has none (Serbia)', async () => {
+    const heard: unknown[] = []
+    const namesMissing = (error: unknown) => heard.push(error)
+    await bindReceiptLines(
+      { items: fakeItems().items, embedder: NO_EMBEDDER, namesMissing },
+      ACTOR,
+      'AM',
+      'ru',
+      [line('Կաթ 1լ')],
+    )
+    const serbian = {
+      nodes: () => Promise.resolve([]),
+      search: fakeItems().search,
+      byBarcode: NONE,
+    }
+    await bindReceiptLines(
+      { items: serbian, embedder: NO_EMBEDDER, namesMissing },
+      ACTOR,
+      'RS',
+      'ru',
+      [line('BANANA KG')],
+    )
+    expect(heard).toEqual([])
   })
 })
 
