@@ -143,7 +143,7 @@ function strips(view: VueWrapper) {
 }
 
 function rowTexts(view: VueWrapper): string[] {
-  return view.findAll('li .row').map((row) => plain(row.text()))
+  return view.findAll('li .list-row').map((row) => plain(row.text()))
 }
 
 /** Presses a button of the open sheet until what it does has happened: it takes no tap until up. */
@@ -340,9 +340,9 @@ describe('MoneyBudgetView: the month counted by the server', () => {
     expect(total).toContain('֏22,600')
     expect(total).toContain('≈ ₽5,256')
     expect(rowTexts(view).slice(0, 3)).toEqual([
-      'Groceries֏25,100֏52,300 of ≈ ֏77,400 · 10 % of income68%',
-      'Cafés and restaurants֏2,500֏41,200 of ≈ ֏38,700 · 5 % of incomeover the plan',
-      'Rent֏0֏250,000 of ֏250,000100%',
+      'Groceries֏25,100֏52,300 of ≈ ֏77,400 · 10 % of income · 68%',
+      'Cafés and restaurants֏2,500֏41,200 of ≈ ֏38,700 · 5 % of income · over the plan',
+      'Rent֏0֏250,000 of ֏250,000 · 100%',
     ])
     expect(view.findAll('.fill.over')).toHaveLength(1)
     expect(view.text()).toContain(en.budget.unplanned)
@@ -369,7 +369,7 @@ describe('MoneyBudgetView: the month counted by the server', () => {
   it('the savings: the target, what is put aside so far in a running month', async () => {
     moneyBudget.mockResolvedValue(budget())
     const view = await render()
-    const savings = plain(view.find('section .row').text())
+    const savings = plain(view.find('section .list-row').text())
     expect(savings).toContain(en.budget.savings.title)
     expect(savings).toContain('52% so far')
     expect(savings).toContain('Target — 25 % of income')
@@ -377,11 +377,64 @@ describe('MoneyBudgetView: the month counted by the server', () => {
   })
 })
 
+describe("MoneyBudgetView: the rows are the kit's (MOL-192)", () => {
+  it("a live row is a button with a chevron, its circle and bar in its category's colour", async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    const rows = view.findAll('li .list-row')
+    expect(rows).toHaveLength(4)
+    for (const row of rows) {
+      expect(row.element.tagName).toBe('BUTTON')
+      expect(row.find('.chevron').exists()).toBe(true)
+    }
+    const groceries = rows[0]
+    expect(groceries?.find('.circle').attributes('style')).toContain('var(--cat-groceries)')
+    expect(groceries?.find('.fill').attributes('style')).toContain(
+      'background: var(--cat-groceries)',
+    )
+    expect(groceries?.find('.fill').attributes('style')).toContain('width: 68%')
+    // Never the accent: terracotta is «press here» (Ф-4).
+    expect(view.html()).not.toContain('var(--accent)')
+  })
+
+  it("over the plan the bar is the warning's, to the edge, and the words say so", async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    const cafe = view.findAll('li .list-row')[1]
+    const fill = cafe?.find('.fill')
+    expect(fill?.classes()).toContain('over')
+    expect(fill?.attributes('style')).toContain('width: 100%')
+    expect(fill?.attributes('style')).not.toContain('background')
+    expect(cafe?.find('.amount').classes()).toContain('over')
+    expect(cafe?.find('.meta .over').text()).toBe('· over the plan')
+  })
+
+  it('a row of «Без плана» opens the plan of its own category', async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    await view.findAll('li .list-row')[3]?.trigger('click')
+    await flushPromises()
+    const sheet = document.querySelector('dialog[open]')
+    expect(sheet?.textContent).toContain('Transport')
+    expect(sheet?.querySelector('select')).toBeNull()
+  })
+
+  it("the savings: a quiet circle, the bar data's own grey, the target a mark", async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    const savings = view.find('section .list-row')
+    expect(savings.find('.circle').classes()).toContain('muted')
+    expect(savings.find('.chevron').exists()).toBe(true)
+    expect(savings.find('.fill').attributes('style')).not.toContain('background')
+    expect(savings.find('.mark').attributes('style')).toContain('left: 25%')
+  })
+})
+
 describe('MoneyBudgetView: a plan written from the month on (В-1)', () => {
   it('a row opens its plan, and «Save» sends the sum from this month, then reads it again', async () => {
     moneyBudget.mockResolvedValue(budget())
     const view = await render()
-    await view.findAll('li .row')[2]?.trigger('click')
+    await view.findAll('li .list-row')[2]?.trigger('click')
     await flushPromises()
     expect(document.querySelector('dialog[open]')?.textContent).toContain(
       'From September on. August stays as it was',
@@ -406,7 +459,7 @@ describe('MoneyBudgetView: a plan written from the month on (В-1)', () => {
   it('a share is a whole percent; past a hundred is refused under the field', async () => {
     moneyBudget.mockResolvedValue(budget())
     const view = await render()
-    await view.findAll('li .row')[0]?.trigger('click')
+    await view.findAll('li .list-row')[0]?.trigger('click')
     await flushPromises()
     type('input[inputmode=numeric]', '101')
     await pressUntil(en.budget.sheet.save, () => {
@@ -428,7 +481,7 @@ describe('MoneyBudgetView: a plan written from the month on (В-1)', () => {
   it('«Убрать план» sends no plan from this month on', async () => {
     moneyBudget.mockResolvedValue(budget())
     const view = await render()
-    await view.findAll('li .row')[1]?.trigger('click')
+    await view.findAll('li .list-row')[1]?.trigger('click')
     await flushPromises()
     await pressUntil(en.budget.sheet.remove, () => {
       expect(setBudgetPlan).toHaveBeenCalledWith({ categoryId: CAFE, from: '2026-09', plan: null })
@@ -438,7 +491,7 @@ describe('MoneyBudgetView: a plan written from the month on (В-1)', () => {
   it('the savings target is a percent with no category, and no choice of a sum', async () => {
     moneyBudget.mockResolvedValue(budget())
     const view = await render()
-    await view.find('section .row').trigger('click')
+    await view.find('section .list-row').trigger('click')
     await flushPromises()
     expect(document.querySelector('dialog[open] fieldset')).toBeNull()
     type('input[inputmode=numeric]', '30')
@@ -468,7 +521,7 @@ describe('MoneyBudgetView: a plan written from the month on (В-1)', () => {
     const view = await render()
     online(false)
     window.dispatchEvent(new Event('offline'))
-    await view.findAll('li .row')[2]?.trigger('click')
+    await view.findAll('li .list-row')[2]?.trigger('click')
     await flushPromises()
     const save = [...document.querySelectorAll('dialog[open] button')].find((one) =>
       one.textContent.includes(en.budget.sheet.wait_online),
@@ -523,8 +576,9 @@ describe('MoneyBudgetView: what the review found (MOL-117)', () => {
       }),
     )
     const view = await render()
-    expect(view.find('.row.still').text()).toContain('Pets')
-    expect(view.find('button.row.still').exists()).toBe(false)
+    expect(view.find('div.list-row').text()).toContain('Pets')
+    expect(view.find('button .no-chevron').exists()).toBe(false)
+    expect(view.find('div.list-row .meta').text()).toBe(en.budget.row.archived)
   })
 
   it('the savings target alone is a plan: no «No plan yet» over it (adversarial Д)', async () => {
@@ -545,7 +599,7 @@ describe('MoneyBudgetView: what the review found (MOL-117)', () => {
     )
     const view = await render()
     expect(rowTexts(view)[0]).toContain('of ≈ ')
-    await view.findAll('li .row')[0]?.trigger('click')
+    await view.findAll('li .list-row')[0]?.trigger('click')
     await flushPromises()
     const sheet = document.querySelector('dialog[open]')
     expect(sheet?.querySelector<HTMLInputElement>('input[inputmode=decimal]')?.value).toBe('')
@@ -576,7 +630,7 @@ describe('MoneyBudgetView: round 2 of the review (MOL-117)', () => {
         answer = resolve
       }),
     )
-    await view.findAll('li .row')[2]?.trigger('click')
+    await view.findAll('li .list-row')[2]?.trigger('click')
     await flushPromises()
     await pressUntil(en.budget.sheet.save, () => {
       expect(setBudgetPlan).toHaveBeenCalled()
@@ -649,8 +703,15 @@ describe('MoneyBudgetView: round 2 of the review (MOL-117)', () => {
       }),
     )
     const view = await render()
-    expect(view.find('li .row.still').text()).toContain('Pets')
-    await view.find('li .row.still').trigger('click')
+    const removed = view.find('li div.list-row')
+    expect(removed.text()).toContain('Pets')
+    expect(removed.find('.no-chevron').exists()).toBe(true)
+    // Not a button and no chevron, and the row says why it does not open (MOL-192).
+    expect(removed.element.tagName).toBe('DIV')
+    expect(removed.find('.chevron').exists()).toBe(false)
+    expect(removed.find('.meta').text()).toContain(en.budget.row.archived)
+    expect(removed.find('.track').exists()).toBe(true)
+    await removed.trigger('click')
     await flushPromises()
     expect(document.querySelector('dialog[open]')).toBeNull()
   })
@@ -782,7 +843,7 @@ describe('MoneyBudgetView: round 6 of the review (MOL-117)', () => {
   it('refuses a plan past ten trillion under the field, and sends nothing (Н)', async () => {
     moneyBudget.mockResolvedValue(budget())
     const view = await render()
-    await view.findAll('li .row')[2]?.trigger('click')
+    await view.findAll('li .list-row')[2]?.trigger('click')
     await flushPromises()
     type('input[inputmode=decimal]', '10000000000001')
     await pressUntil(en.budget.sheet.save, () => {

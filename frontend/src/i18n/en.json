@@ -2115,7 +2115,8 @@
       "of": "{spent} of {planned}",
       "share": "{percent} % of income",
       "over": "over the plan",
-      "awaiting": "nothing came in yet"
+      "awaiting": "nothing came in yet",
+      "archived": "category removed"
     },
     "unplanned": "No plan",
     "add": "Set a category plan",

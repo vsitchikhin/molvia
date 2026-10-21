@@ -78,72 +78,95 @@
           </dl>
         </AppCard>
 
-        <AppCard v-if="budget.rows.length > 0" as="ul" list>
+        <!-- A row is the kit's (MOL-175), its circle the category's as on «Категории» and «Траты»
+             (owner's В-1 «а»). «Осталось» stands in the title's line, not in the tail: a tail of its
+             own width would make every bar another length, and bars side by side are read against
+             each other. A removed category is offered no plan, with one or not (review 7, adversarial
+             И): no button and no chevron, its place kept so the figures and the bars stay in one
+             column. -->
+        <AppCard v-if="rows.length > 0" as="ul" list>
           <li v-for="row in rows" :key="row.categoryId">
-            <!-- A removed category is offered no plan, with one or not (review 7, adversarial И). -->
-            <component
-              :is="row.archived ? 'div' : 'button'"
-              :type="row.archived ? undefined : 'button'"
-              class="row"
-              :class="{ still: row.archived }"
+            <ListRow
+              :as="row.archived ? 'div' : 'button'"
+              :icon="row.icon"
+              :tint="row.tint"
+              :next="!row.archived"
+              wrap
               @click="row.archived || edit(row.categoryId, row.plan)"
             >
-              <span class="head">
-                <span class="dot" :style="{ background: row.colour }" aria-hidden="true"></span>
-                <span class="name">{{ row.name }}</span>
-                <span class="left" :class="{ over: row.over }">{{ row.left }}</span>
-              </span>
-              <span class="track" aria-hidden="true">
-                <span class="fill" :class="{ over: row.over }" :style="{ width: row.width }"></span>
-              </span>
-              <span class="meta">
-                <span>{{ row.of }}</span>
-                <span :class="{ over: row.over }">{{ row.used }}</span>
-              </span>
-            </component>
+              <template #title>
+                <span class="head">
+                  <span>{{ row.name }}</span>
+                  <span class="amount" :class="{ over: row.over }">{{ row.left }}</span>
+                </span>
+              </template>
+              <template #meta>
+                <span>{{ row.meta }}</span
+                ><span v-if="row.used" :class="{ over: row.over }">{{ row.used }}</span>
+              </template>
+              <template v-if="row.archived" #tail><span class="no-chevron"></span></template>
+              <template #below>
+                <span class="track" aria-hidden="true">
+                  <span
+                    class="fill"
+                    :class="{ over: row.over }"
+                    :style="{ width: row.width, background: row.over ? undefined : row.fill }"
+                  ></span>
+                </span>
+              </template>
+            </ListRow>
           </li>
         </AppCard>
 
-        <template v-if="unplanned.length > 0">
-          <div>
-            <SectionCaption>{{ t('budget.unplanned') }}</SectionCaption>
-            <AppCard as="ul" list>
-              <li v-for="row in unplanned" :key="row.categoryId">
-                <!-- A removed category is no choice (review 7): its spending is shown, a plan is not offered. -->
-                <div v-if="row.archived" class="row still">
+        <div v-if="unplanned.length > 0">
+          <SectionCaption>{{ t('budget.unplanned') }}</SectionCaption>
+          <AppCard as="ul" list>
+            <li v-for="row in unplanned" :key="row.categoryId">
+              <ListRow
+                :as="row.archived ? 'div' : 'button'"
+                :icon="row.icon"
+                :tint="row.tint"
+                :meta="row.meta"
+                :next="!row.archived"
+                wrap
+                @click="row.archived || edit(row.categoryId, null)"
+              >
+                <template #title>
                   <span class="head">
-                    <span class="dot" :style="{ background: row.colour }" aria-hidden="true"></span>
-                    <span class="name">{{ row.name }}</span>
-                    <span class="left">{{ row.spent }}</span>
+                    <span>{{ row.name }}</span>
+                    <span class="amount">{{ row.spent }}</span>
                   </span>
-                </div>
-                <button v-else type="button" class="row" @click="edit(row.categoryId, null)">
-                  <span class="head">
-                    <span class="dot" :style="{ background: row.colour }" aria-hidden="true"></span>
-                    <span class="name">{{ row.name }}</span>
-                    <span class="left">{{ row.spent }}</span>
-                  </span>
-                </button>
-              </li>
-            </AppCard>
-          </div>
-        </template>
+                </template>
+                <template v-if="row.archived" #tail><span class="no-chevron"></span></template>
+              </ListRow>
+            </li>
+          </AppCard>
+        </div>
 
+        <!-- The target has no category's colour: its circle is quiet, its bar `--graphic` — data
+             without a colour of its own — and the mark of the target the ink of the text. -->
         <AppCard as="section" list :aria-labelledby="`${id}-savings`">
-          <button type="button" class="row" @click="editSavings">
-            <span class="head">
-              <span :id="`${id}-savings`" class="name">{{ t('budget.savings.title') }}</span>
-              <span class="left">{{ savings.actual }}</span>
-            </span>
-            <span v-if="savings.width !== null" class="track" aria-hidden="true">
-              <span class="fill" :style="{ width: savings.width }"></span>
-              <span v-if="savings.target" class="mark" :style="{ left: savings.target }"></span>
-            </span>
-            <span class="meta">
-              <span>{{ savings.goal }}</span>
-              <span>{{ savings.of }}</span>
-            </span>
-          </button>
+          <ListRow
+            :icon="IconPiggyBank"
+            tint="muted"
+            :meta="savings.meta"
+            next
+            wrap
+            @click="editSavings"
+          >
+            <template #title>
+              <span class="head">
+                <span :id="`${id}-savings`">{{ t('budget.savings.title') }}</span>
+                <span class="amount">{{ savings.actual }}</span>
+              </span>
+            </template>
+            <template v-if="savings.width !== null" #below>
+              <span class="track" aria-hidden="true">
+                <span class="fill" :style="{ width: savings.width }"></span>
+                <span v-if="savings.target" class="mark" :style="{ left: savings.target }"></span>
+              </span>
+            </template>
+          </ListRow>
         </AppCard>
       </template>
     </div>
@@ -179,6 +202,7 @@ import { computed, defineComponent, onMounted, onUnmounted, ref, useId } from 'v
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
+import IconPiggyBank from '~icons/mdi/piggy-bank-outline'
 import IconPlus from '~icons/mdi/plus'
 import IconTarget from '~icons/mdi/target'
 import { monthSchema } from '@molvia/model'
@@ -186,13 +210,14 @@ import type { BudgetPlanValue, Money, SpendingCategoryView } from '@molvia/model
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
+import ListRow from '@/components/ListRow.vue'
 import BudgetPlanSheet from '@/components/BudgetPlanSheet.vue'
 import type { BudgetOutcome, BudgetSubject } from '@/components/BudgetPlanSheet.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { countedWhen } from '@/components/accounts'
-import { budgetAmount, categoryColour } from '@/components/spending'
+import { budgetAmount, spendingLook } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
@@ -214,6 +239,7 @@ export default defineComponent({
     BudgetPlanSheet,
     IconCloudOff,
     IconPlus,
+    ListRow,
     MonthSwitcher,
     ScreenSkeleton,
     ScreenState,
@@ -266,9 +292,10 @@ export default defineComponent({
       if (!category) return ''
       return category.preset ? t(`spending.category.${category.preset}`) : (category.name ?? '')
     }
-    const colourOf = (categoryId: string) => {
-      const category = categoryOf(categoryId)
-      return category ? categoryColour(category) : 'var(--text-muted)'
+    /** The circle of a row, and its bar in the category's colour (Ф-4) — `--graphic` for none known. */
+    const lookOf = (categoryId: string) => {
+      const look = spendingLook(categoryOf(categoryId) ?? null)
+      return { ...look, fill: look.tint === 'muted' ? 'var(--graphic)' : look.tint }
     }
 
     /** A figure without its sign — the words around it say which way (Р-7, adversarial Г). */
@@ -319,17 +346,24 @@ export default defineComponent({
             ? [t('spending.charts.difference_uncounted')]
             : []),
         ]
+        const archived = categoryOf(row.categoryId)?.archived === true
+        const used = over ? t('budget.row.over') : row.used === null ? '' : percent(row.used)
         return {
           categoryId: row.categoryId,
           plan: row.plan,
           name: nameOf(row.categoryId),
-          colour: colourOf(row.categoryId),
-          archived: categoryOf(row.categoryId)?.archived === true,
+          ...lookOf(row.categoryId),
+          archived,
           over,
           // Over the plan is said by the words beside it, never by a minus (Р-7, review 5).
           left: row.left === null ? '—' : amount(row.left),
-          of: [t('budget.row.of', { spent: amount(row.spent), planned }), ...notes].join(' · '),
-          used: over ? t('budget.row.over') : row.used === null ? '' : percent(row.used),
+          // Why a removed one does not open is said on it (MOL-192).
+          meta: [
+            t('budget.row.of', { spent: amount(row.spent), planned }),
+            ...notes,
+            ...(archived ? [t('budget.row.archived')] : []),
+          ].join(' · '),
+          used: used ? ` · ${used}` : '',
           // The share is the server's; the phone only stops the bar at the card's edge.
           width: `${String(Math.min(row.used ?? (over ? 100 : 0), 100))}%`,
         }
@@ -337,15 +371,20 @@ export default defineComponent({
     )
 
     const unplanned = computed(() =>
-      (budget.value?.unplanned ?? []).map((row) => ({
-        categoryId: row.categoryId,
-        name: nameOf(row.categoryId),
-        colour: colourOf(row.categoryId),
-        archived: categoryOf(row.categoryId)?.archived === true,
-        spent: row.spentWhole
-          ? amount(row.spent)
-          : `${amount(row.spent)} · ${t('spending.charts.difference_uncounted')}`,
-      })),
+      (budget.value?.unplanned ?? []).map((row) => {
+        const archived = categoryOf(row.categoryId)?.archived === true
+        return {
+          categoryId: row.categoryId,
+          name: nameOf(row.categoryId),
+          ...lookOf(row.categoryId),
+          archived,
+          spent: amount(row.spent),
+          meta: [
+            ...(row.spentWhole ? [] : [t('spending.charts.difference_uncounted')]),
+            ...(archived ? [t('budget.row.archived')] : []),
+          ].join(' · '),
+        }
+      }),
     )
 
     /** Live categories with no row yet: the ones «Задать план» offers. */
@@ -357,30 +396,31 @@ export default defineComponent({
     const running = computed(() => month.value === currentMonth.value)
     const savings = computed(() => {
       const value = budget.value?.savings
-      if (!value) return { actual: '', goal: '', of: '', width: null, target: null }
+      if (!value) return { actual: '', meta: '', width: null, target: null }
       const actual =
         value.actual === null
           ? '—'
           : running.value
             ? t('budget.savings.so_far', { percent: percent(value.actual) })
             : percent(value.actual)
+      const goal =
+        value.target === null
+          ? t('budget.savings.no_target')
+          : t('budget.savings.target', { percent: value.target })
+      const of = value.difference
+        ? t('budget.savings.of', {
+            difference:
+              value.difference.minor < 0n
+                ? `−${amount(value.difference)}`
+                : amount(value.difference),
+            income: amount(value.income),
+          })
+        : value.income.minor === 0n
+          ? t('budget.savings.no_income')
+          : t('budget.savings.not_whole')
       return {
         actual,
-        goal:
-          value.target === null
-            ? t('budget.savings.no_target')
-            : t('budget.savings.target', { percent: value.target }),
-        of: value.difference
-          ? t('budget.savings.of', {
-              difference:
-                value.difference.minor < 0n
-                  ? `−${amount(value.difference)}`
-                  : amount(value.difference),
-              income: amount(value.income),
-            })
-          : value.income.minor === 0n
-            ? t('budget.savings.no_income')
-            : t('budget.savings.not_whole'),
+        meta: `${goal} · ${of}`,
         width:
           value.actual === null ? null : `${String(Math.max(0, Math.min(value.actual, 100)))}%`,
         target: value.target === null ? null : `${String(value.target)}%`,
@@ -416,6 +456,7 @@ export default defineComponent({
     return {
       t,
       id,
+      IconPiggyBank,
       IconTarget,
       month,
       currentMonth,
@@ -517,71 +558,39 @@ export default defineComponent({
   }
 }
 
-li + li {
-  border-top: var(--hairline) solid var(--border);
-}
-
-.row {
-  display: grid;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: var(--touch-target-lg);
-  padding: var(--space-3) var(--space-4);
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--surface-2);
-  }
-
-  &:focus-visible {
-    @include focus-ring(-2px);
-  }
-}
-
+/* The name and its figure on the title's line; the figure goes under it, at the right, once the
+   whole name no longer fits beside it (MOL-200). */
 .head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+  @include name-beside-figure;
 }
 
-.dot {
-  flex: none;
-  width: 0.625rem;
-  height: 0.625rem;
-  border-radius: var(--radius-pill);
-}
-
-.name {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  font-size: var(--text-body);
-  font-weight: var(--weight-medium);
-  overflow-wrap: anywhere;
-}
-
-.left {
+.amount {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
+/* A removed category's row keeps the chevron's place empty, so its figure and its bar end where the
+   live rows' do. */
+.no-chevron {
+  width: var(--icon);
+}
+
 .track {
   position: relative;
+  display: block;
   height: var(--space-2);
+  margin-top: var(--space-1);
   border-radius: var(--radius-pill);
   background: var(--surface-2);
 }
 
+/* A category's bar is its colour, set on the row (Ф-4); the target's, with no colour of its own,
+   is data's (`--graphic`). */
 .fill {
   display: block;
   height: 100%;
   border-radius: var(--radius-pill);
-  background: var(--accent);
+  background: var(--graphic);
 }
 
 .mark {
@@ -592,24 +601,8 @@ li + li {
   background: var(--text);
 }
 
-.meta {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
 .over {
   color: var(--warn-ink);
-}
-
-.still {
-  cursor: default;
-
-  &:hover {
-    background: none;
-  }
 }
 
 .fill.over {
