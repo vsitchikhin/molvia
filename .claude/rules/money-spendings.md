@@ -853,5 +853,23 @@ task did not: five plans of six there are a percent of the month's income — «
   have counted before it or after, so then the month is read once more (adversarial Ж of round 2).
   Numbered on arrival, the write's older answer put back a spending landed meanwhile.
   The sheet works no plan out of «Пришло» — what a percent comes to is the server's, on the row.
+- **The screen is the kit's since MOL-192** (Т-Д1-11 of MOL-118; no handoff drew it, owner's В-1 «а»).
+  **«Задать план категории» is the strip** (`#docked`, Ф-28), over an answer only — before one the sheet
+  knows nothing to choose (MOL-191, В-2) — and only while a live category has no row; offline it is not
+  now, «Задать план можно со связью» (Ф-6), and the sheet of a row says the same of «Сохранить» and
+  «Убрать план» under a `StatusStrip` of its own. **The connection is one line under the switcher**:
+  offline over a month kept, «сервер не ответил» with «Повторить» in it, since the strip holds «Задать
+  план» (К-5). **A row is `ListRow`** with the category's circle, as on «Категории» and «Траты»; the
+  chevron on every live row — each opens the sheet of its plan — and **«осталось» in the title's line,
+  never the tail** (`name-beside-figure`): a tail of its own width made every bar another length, and
+  bars one under another are read against each other. **The bar is the category's colour**, never the
+  accent (Ф-4), over the plan `--warn` to the edge; the target's bar is `--graphic`, its mark `--text`.
+  **What the row says besides is a line under the bar** — the share, «пока ничего не пришло», «не всё
+  посчитано», «категория убрана» — and so is «Разница … из …» of «Отложить»: in the meta, cut at two
+  lines, a phone of 320 lost them. **A removed category's row is a `div` with the chevron's place kept
+  empty**, so its figure and bar stand in the column of the others, and it says why it does not open.
+  **The three figures of the total are a line each on one plate**: three tiles across broke «330 000
+  ֏» in its middle at 320 and a sum of seven digits at 390. «Плана пока нет» does not grow to the
+  free height — «Отложить» stands under it.
 - **Private, and it goes with its owner** (Р-13): erasure takes `budget_plans` before the categories
   they point at, and the copy of one's data has them (`budgetPlans`, version 7).
