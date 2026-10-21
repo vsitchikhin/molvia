@@ -430,6 +430,25 @@ describe("MoneyBudgetView: the rows are the kit's (MOL-192)", () => {
   })
 })
 
+describe("MoneyBudgetView: the total and the skeleton in the answer's shape (MOL-192)", () => {
+  it('loads as the answer stands: the card of a sum, then three rows with their bar', async () => {
+    moneyBudget.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    expect(view.find('.skeleton-figure .plate').exists()).toBe(true)
+    expect(view.findAll('.skeleton-rows .item')).toHaveLength(3)
+    expect(view.findAll('.skeleton-rows .track-bar')).toHaveLength(3)
+    expect(view.findAll('.skeleton-rows .circle')).toHaveLength(3)
+  })
+
+  it('the total is the card of a sum: a caption, the figure, three tiles', async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const card = (await render()).find('.total')
+    expect(card.find('.section-caption').text()).toBe(en.budget.total.left)
+    const tiles = card.findAll('.tile').map((tile) => plain(tile.text()))
+    expect(tiles).toEqual(['Plan֏366,100', 'Spent֏343,500', 'Outside the plan֏6,500'])
+  })
+})
+
 describe('MoneyBudgetView: a plan written from the month on (В-1)', () => {
   it('a row opens its plan, and «Save» sends the sum from this month, then reads it again', async () => {
     moneyBudget.mockResolvedValue(budget())

@@ -23,7 +23,13 @@
         </StatusStrip>
       </div>
 
-      <ScreenSkeleton v-if="phase === 'loading'" :groups="[64, 100, 72, 72, 72, 48, 60]" />
+      <!-- The answer's shape (Ф-13, MOL-178): the total with its tiles, then rows with their bar. «≈»
+           is drawn: the person this screen is for earns in one currency and spends in another, and a
+           skeleton taller than a one-currency answer is what the hold of MOL-138 allows. -->
+      <ScreenSkeleton v-if="phase === 'loading'">
+        <SkeletonPart kind="figure" approx plate />
+        <SkeletonPart kind="rows" :count="3" lead="circle" track next :narrow="false" />
+      </ScreenSkeleton>
 
       <ScreenState
         v-else-if="phase === 'error'"
@@ -50,10 +56,12 @@
           :title="t('budget.empty.title')"
           :body="t('budget.empty.body')"
         />
+        <!-- The card of a sum, as the month's on «Деньгах» (MOL-183): its caption, the figure, «≈» at
+             the headline's size, and the three figures as tiles. -->
         <AppCard v-else-if="budget.total" class="total">
-          <p class="caption">
+          <SectionCaption as="p" inset>
             {{ overall.over ? t('budget.total.over') : t('budget.total.left') }}
-          </p>
+          </SectionCaption>
           <p class="figure" :class="{ over: overall.over }">{{ overall.figure }}</p>
           <p v-if="budget.total.leftIncome" class="approx">
             ≈ {{ amount(budget.total.leftIncome) }}
@@ -62,16 +70,16 @@
                spending some rate did not count (adversarial М of round 4). -->
           <p v-if="awaiting" class="footnote">{{ t('budget.total.awaiting') }}</p>
           <p v-if="short" class="footnote">{{ t('budget.total.not_whole') }}</p>
-          <dl class="trio">
-            <div>
+          <dl class="tiles">
+            <div class="tile">
               <dt>{{ t('budget.total.planned') }}</dt>
               <dd>{{ plannedWords }}</dd>
             </div>
-            <div>
+            <div class="tile">
               <dt>{{ t('spending.spent') }}</dt>
               <dd>{{ amount(budget.total.spent) }}</dd>
             </div>
-            <div>
+            <div class="tile">
               <dt>{{ t('budget.total.unplanned') }}</dt>
               <dd>{{ amount(budget.total.unplanned) }}</dd>
             </div>
@@ -219,6 +227,7 @@ import ScreenState from '@/components/ScreenState.vue'
 import { countedWhen } from '@/components/accounts'
 import { budgetAmount, spendingLook } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useLocalDay } from '@/composables/useLocalDay'
@@ -244,6 +253,7 @@ export default defineComponent({
     ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    SkeletonPart,
     StatusStrip,
   },
   setup() {
@@ -513,36 +523,49 @@ export default defineComponent({
   gap: var(--space-1);
 }
 
-.caption {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
 .figure {
   @include display-type;
 
   margin: 0;
   font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
+  line-height: var(--leading-tight);
 
   &.over {
     color: var(--warn-ink);
   }
 }
 
-.approx,
+.approx {
+  margin: 0;
+  font-size: var(--text-headline);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-tight);
+}
+
 .footnote {
   margin: 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
 }
 
-.trio {
+/* The tiles of the month's card (MOL-183), three across: a figure that cannot fit a third of a phone
+   of 320 breaks rather than stand past its tile. */
+.tiles {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
   margin: var(--space-3) 0 0;
+}
+
+.tile {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius);
+  background: var(--surface-2);
 
   dt {
     color: var(--text-muted);
