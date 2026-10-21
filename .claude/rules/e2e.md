@@ -116,8 +116,9 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   runs of a runner that wanders, so a cost likely rather than measured; a spec that needs it says
   `test.use({ trace: { mode: 'retain-on-first-failure', screenshots: false } })` under `CI`, as
   `verdicts.spec` does. A describe cannot say it — Playwright refuses `use({ trace })` there, since it
-  would take a worker of its own — so the focus block of `scanner.spec` (MOL-249) starts the context's
-  tracing on the first attempt itself and keeps it only when the attempt failed — and steps aside when
+  would take a worker of its own — so the focus block of `scanner.spec` (MOL-249) and «a line gone under
+  the category of «Год»» (MOL-267) call `firstAttemptTrace` (`e2e/trace.ts`): it starts the context's
+  tracing on the first attempt itself, keeps it only when the attempt failed, and steps aside when
   the run already traces that attempt (`--trace on`, a config's `retain-on-first-failure`), whose
   second start threw in every test of the block (review Р2-А1); for the whole file it would have traced
   the camera's reads as well. Not without the DOM of each step: Playwright records the network only with
@@ -179,6 +180,30 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   the question's or the focus's — the check after them never ran and the failure was the old
   `Received: ''`; a test of the spec holds it, the button pressed as soon as it is drawn. The other routes laid after
   `open()` — some fifty — stay as they are until one of them fails so.
+- **A position is measured once the faces have come** (MOL-63, MOL-267): `standAt` and `toTheEnd` of
+  `e2e/scroll.ts` lay the page out and wait for `document.fonts.ready` (`facesIn`) before they set the
+  scene; `topOf` only measures, so a measure with no scene set waits with `facesIn` itself (`money.spec`,
+  «offline, a month not read…», at the top of the page). Every face is `font-display: swap` with a
+  `unicode-range`, so its file is asked for only when a glyph of its range is first laid out — on «Год»
+  the answer brings Onest 700 and ֏ — and the text stands in the fallback until it comes. On a Mac a
+  late face moved the choice of «Год» half a pixel (456.19 → 456.70), which `topOf`'s rounding shows or
+  hides by chance. **The price, named:** a face first needed after the action — a glyph only the next
+  answer brings — still moves what is measured after it; on «Год» every face is on the page before the
+  choice, the other screens were not checked for it.
+- **«A line gone under the category of «Год»» keeps its first attempt's trace in CI** (MOL-267,
+  `firstAttemptTrace` of `e2e/trace.ts`), since its one failure was never explained (run 37911189456,
+  09.10, `scrollY` 1151 → 1132 with the choice where it was). Late faces were not it: held a second with
+  the scene set without waiting, CI stayed green (run 39575601047), and held in the very window of the
+  failure, in Chromium on Linux with DejaVu as the runner has, they moved no block on the failing head,
+  on master or after this task (adversarial А1). On the failing head a calm page in that browser stands
+  at 1132 (П2): the scene was set on a page 19 px longer than it settles to — something over the choice
+  gave way between `toTheEnd` and the first `topOf`, two `evaluate`s, and Chromium's scroll anchoring
+  kept the view; the choice of a category had no part in it. Which block was never caught — of forty runs
+  at four times slower CPU seven reached the measure, and none failed so; the failure came two days
+  before MOL-186 remade the blocks over the choice, and not in some 176 runs since. The trace has the DOM before and after each
+  `evaluate`, that window included. **The prices, named:** a shift that changes no DOM is not in it —
+  it keeps no screenshots; and the artifact lives seven days (`retention-days` of `ci.yml`), so the
+  failure is read the week it comes.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**
   (MOL-64). The app has one polite region, in `App.vue` above the router, and **eight things write
   to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the

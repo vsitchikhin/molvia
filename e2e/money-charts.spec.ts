@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto'
 import { actorCodec, settingsOf } from '@molvia/model'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
-import { standAt, topOf } from './scroll'
+import { standAt, toTheEnd, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
+import { firstAttemptTrace } from './trace'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
@@ -284,17 +285,8 @@ test('the day of «Темп» is a slider in sight: the arrows move it and it sa
 })
 
 // The category card of «Год» is the third: a choice that took the page to the top took the chart away
-// from the person who asked for it (MOL-136). Where the card stands on the screen is what the eye sees.
-/** Scrolls to the very end of the page, where the category card stands when it is the last one. */
-async function toTheEnd(page: Page): Promise<number> {
-  await page.evaluate(() => {
-    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' })
-  })
-  const scrolled = await page.evaluate(() => window.scrollY)
-  expect(scrolled).toBeGreaterThan(0)
-  return scrolled
-}
-
+// from the person who asked for it (MOL-136). Where the card stands on the screen is what the eye sees;
+// `toTheEnd` takes the page to where it stands when it is the last one.
 test('a category chosen at the end of «Год» stays under the thumb', async ({ page }) => {
   await seed(page)
   await page.goto('/money/charts?mode=year')
@@ -345,25 +337,32 @@ test('a month read for the first time keeps the switcher where it was under the 
   expect(await topOf(previous)).toBe(at)
 })
 
-test('a line gone under the category of «Год» keeps the choice and the page where they were', async ({
-  page,
-}) => {
-  await seed(page)
-  // An address that names a category the charts do not have: said on the card, under the choice
-  // (MOL-74, MOL-138 В-2). Chosen another, the line goes and the card is shorter at the very end of
-  // the page: held, not brought up.
-  await page.goto(`/money/charts?mode=year&category=${randomUUID()}`)
-  const card = page.getByRole('region', { name: 'Категория по месяцам' })
-  const choice = page.getByRole('combobox', { name: 'Категория' })
-  await expect(card).toContainText('Этой категории на графиках нет')
+test.describe('a line gone under the category', () => {
+  // The first attempt's trace in CI (MOL-267): this test failed once (run 37911189456, `scrollY`
+  // 1151 → 1132 with the choice where it was) and left only that message; faces arriving late were
+  // suspected and refuted. The DOM before and after each step shows which block gave way.
+  firstAttemptTrace()
 
-  const scrolled = await toTheEnd(page)
-  const before = await topOf(choice)
-  await choice.selectOption({ label: 'Кафе и рестораны' })
-  await expect(card).not.toContainText('Этой категории на графиках нет')
-  await expect(card).toContainText(/30\s000\s֏/)
-  expect(await topOf(choice)).toBe(before)
-  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
+  test('a line gone under the category of «Год» keeps the choice and the page where they were', async ({
+    page,
+  }) => {
+    await seed(page)
+    // An address that names a category the charts do not have: said on the card, under the choice
+    // (MOL-74, MOL-138 В-2). Chosen another, the line goes and the card is shorter at the very end of
+    // the page: held, not brought up.
+    await page.goto(`/money/charts?mode=year&category=${randomUUID()}`)
+    const card = page.getByRole('region', { name: 'Категория по месяцам' })
+    const choice = page.getByRole('combobox', { name: 'Категория' })
+    await expect(card).toContainText('Этой категории на графиках нет')
+
+    const scrolled = await toTheEnd(page)
+    const before = await topOf(choice)
+    await choice.selectOption({ label: 'Кафе и рестораны' })
+    await expect(card).not.toContainText('Этой категории на графиках нет')
+    await expect(card).toContainText(/30\s000\s֏/)
+    expect(await topOf(choice)).toBe(before)
+    expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
+  })
 })
 
 // The strip belongs to the month and stands under the switcher: neither its going with a month not
