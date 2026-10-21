@@ -406,7 +406,7 @@ describe("MoneyBudgetView: the rows are the kit's (MOL-192)", () => {
     expect(fill?.attributes('style')).toContain('width: 100%')
     expect(fill?.attributes('style')).not.toContain('background')
     expect(cafe?.find('.amount').classes()).toContain('over')
-    expect(cafe?.find('.meta .over').text()).toBe('· over the plan')
+    expect(cafe?.find('.meta .over').text()).toBe('over the plan')
   })
 
   it('a row of «Без плана» opens the plan of its own category', async () => {
@@ -871,5 +871,141 @@ describe('MoneyBudgetView: round 6 of the review (MOL-117)', () => {
       expect(document.querySelector('dialog[open]')?.textContent).toContain(en.budget.sheet.too_big)
     })
     expect(setBudgetPlan).not.toHaveBeenCalled()
+  })
+})
+
+describe('MoneyBudgetView: review of MOL-192, round 1', () => {
+  /** The app back into view: what an iOS PWA frozen in the background gets instead of `online`. */
+  async function backIntoView(): Promise<void> {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+  }
+
+  // Adversarial А1: the connection came back while the app was frozen, and `online` was missed.
+  it('the connection back unheard: the return into view makes the strip live again', async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    online(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+    expect(addButton(view)?.attributes('aria-disabled')).toBe('true')
+
+    online(true)
+    await backIntoView()
+    expect(addButton(view)?.text()).toBe(en.budget.add)
+    expect(addButton(view)?.attributes('aria-disabled')).toBeUndefined()
+    expect(strips(view)).toHaveLength(0)
+  })
+
+  // Adversarial А1′, its mirror: the connection gone while frozen, `offline` missed.
+  it('the connection gone unheard: the strip is not now and the line says why', async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    online(false)
+    moneyBudget.mockRejectedValue(new TypeError('network'))
+    await backIntoView()
+    const add = addButton(view)
+    expect(add?.attributes('aria-disabled')).toBe('true')
+    await add?.trigger('click')
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(strips(view)).toHaveLength(1)
+    expect(view.find('.strip.offline').exists()).toBe(true)
+  })
+
+  // Adversarial А3: the connection dropped over the answer of this visit.
+  it("the connection dropped over this visit's answer: one line says it, as on «Деньги»", async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    expect(strips(view)).toHaveLength(0)
+    online(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+    expect(strips(view)).toHaveLength(1)
+    expect(view.find('.strip.offline').text()).toContain('Offline · budget as of')
+  })
+
+  // Adversarial А2a, self-review 1: the last free category planned takes the strip with it.
+  it('the last category planned from the strip: the focus goes to its row, never the body', async () => {
+    const categories = budget().categories.filter((one) => one.id !== PETS)
+    moneyBudget.mockResolvedValue(
+      budget({
+        categories: [
+          ...categories.filter((one) => one.id !== TRANSPORT),
+          { ...category(TRANSPORT, 'transport'), archived: false },
+        ],
+      }),
+    )
+    const view = await render()
+    await addButton(view)?.trigger('click')
+    await flushPromises()
+    type('input[inputmode=decimal]', '20000')
+    const [rent] = budget().rows
+    if (!rent) throw new Error('no row')
+    setBudgetPlan.mockResolvedValue(
+      budget({
+        rows: [...budget().rows, { ...rent, categoryId: TRANSPORT }],
+        unplanned: [],
+        categories: categories,
+      }),
+    )
+    await pressUntil(en.budget.sheet.save, () => {
+      expect(setBudgetPlan).toHaveBeenCalled()
+    })
+    await vi.waitFor(() => {
+      expect(document.querySelector('dialog[open]')).toBeNull()
+      expect(addButton(view)).toBeUndefined()
+      expect(document.activeElement?.getAttribute('data-category')).toBe(TRANSPORT)
+    })
+  })
+
+  // Adversarial А2b: a row of «Без плана» given a plan is another row, in the card of the plans.
+  it('a plan for a row of «Без плана»: the focus follows the category into the plans', async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    await view.findAll('li .list-row')[3]?.trigger('click')
+    await flushPromises()
+    type('input[inputmode=decimal]', '20000')
+    const [, , rent] = budget().rows
+    if (!rent) throw new Error('no row')
+    setBudgetPlan.mockResolvedValue(
+      budget({ rows: [...budget().rows, { ...rent, categoryId: TRANSPORT }], unplanned: [] }),
+    )
+    await pressUntil(en.budget.sheet.save, () => {
+      expect(setBudgetPlan).toHaveBeenCalled()
+    })
+    await vi.waitFor(() => {
+      expect(document.querySelector('dialog[open]')).toBeNull()
+      // The row the sheet was opened from is gone with «Без плана»; this is the plan's.
+      expect(view.text()).not.toContain(en.budget.unplanned)
+      expect(document.activeElement?.getAttribute('data-category')).toBe(TRANSPORT)
+    })
+  })
+
+  // Adversarial А2c: a plan removed moves its row out of the plans.
+  it('a plan removed: the focus goes to its row in «Без плана», else to the strip', async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    await view.findAll('li .list-row')[1]?.trigger('click')
+    await flushPromises()
+    const [groceries, , rent] = budget().rows
+    if (!groceries || !rent) throw new Error('no row')
+    setBudgetPlan.mockResolvedValue(
+      budget({
+        rows: [groceries, rent],
+        unplanned: [
+          ...budget().unplanned,
+          { categoryId: CAFE, spent: amd('41200'), spentWhole: true },
+        ],
+      }),
+    )
+    await pressUntil(en.budget.sheet.remove, () => {
+      expect(setBudgetPlan).toHaveBeenCalledWith({ categoryId: CAFE, from: '2026-09', plan: null })
+    })
+    await vi.waitFor(() => {
+      expect(document.querySelector('dialog[open]')).toBeNull()
+      expect(document.activeElement?.getAttribute('data-category')).toBe(CAFE)
+    })
   })
 })

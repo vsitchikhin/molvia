@@ -1,12 +1,14 @@
 <template>
   <AppScreen :title="t('budget.title')">
-    <div class="content">
+    <div ref="content" class="content">
       <div class="month">
         <MonthSwitcher :month="month" :current="currentMonth" @change="chooseMonth" />
 
         <!-- Under the switcher: they belong to the month's answer (MOL-138, owner's В-2). -->
+        <!-- Offline over a month kept, or the connection gone over this visit's answer — as the other
+             screens of «Деньги» say it; the strip «… можно со связью» must not stand alone (adversarial А3). -->
         <StatusStrip
-          v-if="stale === 'offline' && fetchedAt"
+          v-if="(stale === 'offline' || !online) && fetchedAt"
           kind="offline"
           :text="t('budget.offline_strip', { when: when(fetchedAt) })"
         />
@@ -102,6 +104,7 @@
               :tint="row.tint"
               :next="!row.archived"
               wrap
+              :data-category="row.categoryId"
               @click="row.archived || edit(row.categoryId, row.plan)"
             >
               <template #title>
@@ -140,6 +143,7 @@
                 :meta="row.meta"
                 :next="!row.archived"
                 wrap
+                :data-category="row.categoryId"
                 @click="row.archived || edit(row.categoryId, null)"
               >
                 <template #title>
@@ -188,7 +192,7 @@
          plan is written with a connection only (Р-8 of MOL-117), so offline it is not now, saying why
          (Ф-6). An error takes the strip for «Повторить» by itself. -->
     <template v-if="phase === 'ready' && choosable.length > 0" #docked>
-      <AppButton size="large" block :inactive="!online" @click="choose">
+      <AppButton ref="addButton" size="large" block :inactive="!online" @click="choose">
         <template #icon><IconPlus v-if="online" /><IconCloudOff v-else /></template>
         {{ online ? t('budget.add') : t('budget.add_offline') }}
       </AppButton>
@@ -210,7 +214,8 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, onUnmounted, ref, useId } from 'vue'
+import { computed, defineComponent, ref, useId } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
@@ -236,6 +241,7 @@ import StatusStrip from '@/components/StatusStrip.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useMoneyBudget } from '@/composables/useMoneyBudget'
+import { useOnline } from '@/composables/useOnline'
 
 /**
  * «Бюджет» (MOL-117, В-3): the month's plans against what was spent — every figure the server's,
@@ -286,17 +292,7 @@ export default defineComponent({
 
     const { phase, budget, stale, fetchedAt, attempt, retry, save } = useMoneyBudget(month)
 
-    const online = ref(navigator.onLine)
-    const onLine = () => (online.value = true)
-    const offLine = () => (online.value = false)
-    onMounted(() => {
-      window.addEventListener('online', onLine)
-      window.addEventListener('offline', offLine)
-    })
-    onUnmounted(() => {
-      window.removeEventListener('online', onLine)
-      window.removeEventListener('offline', offLine)
-    })
+    const online = useOnline()
 
     const categories = computed(() => budget.value?.categories ?? [])
     const categoryOf = (categoryId: string): SpendingCategoryView | undefined =>
@@ -371,11 +367,13 @@ export default defineComponent({
           over,
           // Over the plan is said by the words beside it, never by a minus (Р-7, review 5).
           left: row.left === null ? '—' : amount(row.left),
-          of: t('budget.row.of', { spent: amount(row.spent), planned }),
+          // The dot is the meta's, not the warning's, and bound to both sides: a line too long breaks
+          // before «60 000 ֏ · 36 %» whole rather than leave «36 %» alone at 320 (MOL-192).
+          of: `${t('budget.row.of', { spent: amount(row.spent), planned })}${used ? '\u00a0·\u00a0' : ''}`,
           // A line of its own under the bar: in the meta, cut at two lines, a phone of 320 lost them.
           // Why a removed one does not open is said there too (MOL-192).
           notes: [...notes, ...(archived ? [t('budget.row.archived')] : [])].join(' · '),
-          used: used ? ` · ${used}` : '',
+          used,
           // The share is the server's; the phone only stops the bar at the card's edge.
           width: `${String(Math.min(row.used ?? (over ? 100 : 0), 100))}%`,
         }
@@ -459,11 +457,34 @@ export default defineComponent({
       plan.value = target == null ? null : { kind: 'share', percent: target }
       sheetOpen.value = true
     }
-    /** The write's answer is already shown by `save` (review 6); the outcome is only said. */
+    const content = ref<HTMLElement | null>(null)
+    const addButton = ref<ComponentPublicInstance | null>(null)
+    /**
+     * The write's answer is already shown by `save` (review 6); the outcome is said. The sheet gives the
+     * focus back to what opened it only while that is still there, and the write may take it away: the
+     * last category planned takes the strip, a row of «Без плана» moves into the plans, a plan removed
+     * moves its row out (adversarial А2, self-review 1). Then the focus goes to the row of that category
+     * wherever it stands now, else to the strip — never left on the page's body, where a screen reader
+     * starts from the top.
+     */
     function done(outcome: BudgetOutcome): void {
       announce?.(
         t(outcome.kind === 'saved' ? 'budget.saved' : 'budget.removed', { name: outcome.name }),
       )
+      const current = document.activeElement
+      const lost =
+        current === null ||
+        current === document.body ||
+        current.closest('dialog:not([open])') !== null
+      if (!lost) return
+      const row =
+        outcome.categoryId === null
+          ? null
+          : content.value?.querySelector<HTMLElement>(
+              `[data-category="${CSS.escape(outcome.categoryId)}"]`,
+            )
+      const strip = addButton.value?.$el as HTMLElement | undefined
+      ;(row ?? strip)?.focus({ preventScroll: true })
     }
 
     return {
@@ -499,6 +520,8 @@ export default defineComponent({
       edit,
       choose,
       editSavings,
+      content,
+      addButton,
       done,
     }
   },

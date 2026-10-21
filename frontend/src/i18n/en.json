@@ -2153,7 +2153,7 @@
       "bad_percent": "Enter a whole number from 0 to {max}",
       "category_gone": "This category is gone — refresh the screen",
       "failed": "Not saved. Try again",
-      "offline": "Offline · a plan is saved or removed with a connection — what you typed stays here",
+      "offline": "Offline · a plan is saved with a connection",
       "save": "Save",
       "saving": "Saving…",
       "save_offline": "Saving needs a connection",

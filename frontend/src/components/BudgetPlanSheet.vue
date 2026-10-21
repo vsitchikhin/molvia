@@ -122,6 +122,8 @@ export type BudgetSubject =
 export interface BudgetOutcome {
   readonly kind: 'saved' | 'removed'
   readonly name: string
+  /** The category the plan is of; null for the savings target. */
+  readonly categoryId: string | null
 }
 
 /**
@@ -297,6 +299,7 @@ export default defineComponent({
         finished({
           kind: plan ? 'saved' : 'removed',
           name: id === null ? t('budget.savings.title') : props.nameOf(id),
+          categoryId: id,
         })
       } catch (caught) {
         const code = caught instanceof ApiError ? caught.code : null
