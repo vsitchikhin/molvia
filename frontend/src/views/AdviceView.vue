@@ -12,10 +12,11 @@
     </template>
 
     <!-- The connection in one line, once (MOL-181, Ф-14). Over a list it stands under the field, which
-         chooses what is shown, and over the skeleton under the field's well; over the newcomer there
-         is no field, and it stands under the header. -->
+         chooses what is shown, and over the skeleton under the field's well; over the newcomer it
+         stands under the header — unless the focus holds the field there, and then under the field
+         too (adversarial В2: drawn in both places, the first stood over the field). -->
     <StatusStrip
-      v-if="strip && phase === 'empty'"
+      v-if="strip && phase === 'empty' && !fieldShown"
       class="status"
       :kind="strip.kind"
       :text="strip.text"
@@ -253,7 +254,6 @@ export default defineComponent({
     /** A sheet of «Записать покупки» is up. */
     const entering = ref(false)
     const { country } = useReceiptCapture()
-    /** The field is over a list, in the cold offline, and anywhere while something is typed in it. */
     /** The focus is in the field or its «Очистить». */
     const fieldFocused = ref(false)
     /**

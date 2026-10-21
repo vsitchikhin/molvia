@@ -286,6 +286,108 @@ describe('AdviceView', () => {
       expect(document.activeElement).toBe(document.body)
     })
 
+    /** The cold offline, «мол» typed, the connection back with the list failed, the text erased. */
+    async function heldEmpty() {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const rendered = await render({ country: 'GE' })
+      const field = rendered.view.get<HTMLInputElement>('input[type="search"]')
+      field.element.focus()
+      await field.setValue('мол')
+      await flushPromises()
+      online(true)
+      adviceSearch.mockResolvedValue({
+        geography: { country: 'GE', city: 'Гюмри' },
+        scope: 'own',
+        near: true,
+        items: [],
+      })
+      window.dispatchEvent(new Event('online'))
+      await flushPromises()
+      await field.setValue('')
+      await flushPromises()
+      expect(document.activeElement).toBe(field.element)
+      return { ...rendered, field }
+    }
+
+    // A press under the field takes the focus as it lands; the field goes once the press is over,
+    // or what was pressed rose from under the finger before the release (owner's В-5 «а», В1).
+    it('В-5: the focus taken by a press — the empty field goes only after the release', async () => {
+      const { view, field } = await heldEmpty()
+
+      document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+      field.element.blur()
+      await flushPromises()
+      expect(view.find('input[type="search"]').exists()).toBe(true)
+
+      document.body.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+      await flushPromises()
+      expect(view.find('input[type="search"]').exists()).toBe(true)
+      await new Promise((resolve) => setTimeout(resolve))
+      await flushPromises()
+      expect(view.find('input[type="search"]').exists()).toBe(false)
+      expect(view.text()).toContain(en.advice.error.title)
+      expect(document.activeElement?.tagName).not.toBe('H1')
+    })
+
+    // «Очистить» pressed takes the focus for a moment and gives it back: the press is no leaving.
+    it('must not fire: a press on «Clear» keeps the empty field', async () => {
+      const { view, field } = await heldEmpty()
+      await field.setValue('сыр')
+      await flushPromises()
+
+      const clear = view.get('.clear')
+      clear.element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+      ;(clear.element as HTMLButtonElement).focus()
+      await clear.trigger('click')
+      clear.element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+      await new Promise((resolve) => setTimeout(resolve))
+      await flushPromises()
+
+      expect(view.get('input[type="search"]').element).toBe(field.element)
+      expect(document.activeElement).toBe(field.element)
+    })
+
+    // Gone to another app to copy a name: the page lost the system's focus, not the person the field.
+    it('must not fire: the page losing the system`s focus keeps the empty field', async () => {
+      const { view, field } = await heldEmpty()
+      const away = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+
+      field.element.blur()
+      await flushPromises()
+      away.mockRestore()
+
+      expect(view.get('input[type="search"]').element).toBe(field.element)
+    })
+
+    // The strip of a list remembered empty — another window kept it — stands under the field the
+    // focus holds over the newcomer, never above it as well (adversarial В2).
+    it('В2: over the newcomer with the field held, one strip, under the field', async () => {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+      const field = view.get<HTMLInputElement>('input[type="search"]')
+      field.element.focus()
+      await flushPromises()
+
+      // Another window kept an empty list meanwhile; this one, back in view, cannot ask.
+      localStorage.setItem(
+        `molvia.advice.${ME}`,
+        JSON.stringify({
+          answer: answer([], { geography: { country: 'GE', city: 'Гюмри' } }),
+          fetchedAt: new Date('2026-10-21T09:00:00Z').toISOString(),
+        }),
+      )
+      document.dispatchEvent(new Event('visibilitychange'))
+      await flushPromises()
+
+      expect(view.text()).toContain(en.advice.home.new.title)
+      expect(view.get('input[type="search"]').element).toBe(field.element)
+      expect(strips(view)).toHaveLength(1)
+      const under = view.get('.strip').element.closest('.head')
+      expect(under?.contains(field.element)).toBe(true)
+    })
+
     // The connection back: the list comes under the very field being typed in.
     it('the connection back brings the list under the same field, the text kept', async () => {
       online(false)

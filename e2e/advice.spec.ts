@@ -412,6 +412,48 @@ test('the connection back without a list keeps the field typed in; left empty, i
   await expect(field).toHaveCount(0)
 })
 
+// The empty field held by its focus goes once the tap that took the focus is over: gone on the
+// press, everything under it rose by its height and the release landed elsewhere — the first tap on
+// «Try again» or a step of the cycle did nothing (owner's В-5 «а» on adversarial В1).
+for (const failing of [true, false]) {
+  test(`the field emptied over ${failing ? 'a failure' : 'the newcomer'}: the first tap under it counts`, async ({
+    page,
+    context,
+  }) => {
+    await person(page)
+    await coldOffline(page, context)
+    const field = page.getByRole('searchbox', { name: 'Search the catalogue' })
+    await field.click()
+    await field.pressSequentially('мол')
+    if (failing) {
+      await page.route('**/api/advice', (route) => route.fulfill({ status: 500, body: '{}' }))
+    }
+    const searched = page.waitForResponse((response) =>
+      response.url().includes('/api/advice/search'),
+    )
+    await context.setOffline(false)
+    await searched
+    while ((await field.inputValue()) !== '') await page.keyboard.press('Backspace')
+    await expect(field).toBeFocused()
+
+    if (failing) {
+      const retry = page.locator('.state').getByRole('button', { name: 'Try again' })
+      await expect(retry).toBeVisible()
+      const asked = page.waitForRequest(
+        (request) => new URL(request.url()).pathname === '/api/advice',
+      )
+      await retry.tap()
+      await asked
+    } else {
+      const step = page.locator('.home').getByRole('button').first()
+      await expect(step).toBeVisible()
+      await step.tap()
+      await expect.poll(() => new URL(page.url()).pathname).not.toBe('/')
+    }
+    await expect(field).toHaveCount(0)
+  })
+}
+
 // 1l-0: where no receipt is read, the cold offline records purchases from the strip (Ф-14).
 test('the cold offline without receipts offers «Record purchases» below, never red', async ({
   page,

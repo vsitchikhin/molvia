@@ -1,7 +1,7 @@
 <template>
   <!-- The field and the one strip of the connection under it, 8 apart (handoff `01`): while something
        is typed, the search's — what it searched, as of when — otherwise the list's, the screen's own. -->
-  <div class="head" @focusin="$emit('focused', true)" @focusout="$emit('focused', false)">
+  <div class="head" @focusin="entered" @focusout="left">
     <SearchField
       :model-value="modelValue"
       :label="t('advice.search.label')"
@@ -104,7 +104,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onUnmounted, toRef, watch } from 'vue'
+import { computed, defineComponent, onMounted, onUnmounted, toRef, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconNotFound from '~icons/mdi/magnify'
@@ -181,10 +181,13 @@ export default defineComponent({
     /** With the scope of the answer the row came in: the list's may be another (review Р-13, Е). */
     edit: (row: AdviceRow, scope: AdviceScope) => typeof row === 'object' && !!scope,
     rate: (item: AdviceFound, scope: AdviceScope) => typeof item === 'object' && !!scope,
-    /** The focus came into the field or its «Очистить», or left them: «Что брать» keeps it then. */
+    /**
+     * The focus came into the field or its «Очистить», or left them: «Что брать» keeps it then. Left
+     * by a press, it is told once the press is over; left for another app, not at all.
+     */
     focused: (inside: boolean) => typeof inside === 'boolean',
   },
-  setup(props) {
+  setup(props, { emit }) {
     const { t, locale } = useI18n()
     const search = useAdviceSearch(toRef(props, 'modelValue'), () => props.remembered)
     const { phase, found, stale, answered } = search
@@ -216,6 +219,45 @@ export default defineComponent({
       withdraw?.()
     })
 
+    // A press takes the focus out of the field as it lands, and the field over a failure or a
+    // newcomer goes with it (В-4 «а») — told then, it went before the finger lifted, everything
+    // under it rose by its height, and the release landed on something else: the first tap on
+    // «Повторить» or a step of the cycle did nothing (adversarial В1). So the leaving is told a task
+    // after the release, past its click (owner's В-5 «а»); a focus moved by the keys, at once.
+    let pressed = false
+    let leaving = false
+    const press = () => {
+      pressed = true
+    }
+    const lift = () => {
+      setTimeout(() => {
+        pressed = false
+        if (!leaving) return
+        leaving = false
+        emit('focused', false)
+      })
+    }
+    onMounted(() => {
+      document.addEventListener('mousedown', press, true)
+      document.addEventListener('mouseup', lift, true)
+    })
+    onUnmounted(() => {
+      document.removeEventListener('mousedown', press, true)
+      document.removeEventListener('mouseup', lift, true)
+      leaving = false
+    })
+    function entered(): void {
+      leaving = false
+      emit('focused', true)
+    }
+    function left(): void {
+      // The page lost the system's focus — another app, to copy a name — and the field keeps it:
+      // the focus comes back to it with the person.
+      if (!document.hasFocus()) return
+      if (pressed) leaving = true
+      else emit('focused', false)
+    }
+
     return {
       t,
       IconNotFound,
@@ -226,6 +268,8 @@ export default defineComponent({
       scope: search.scope,
       groups: computed(() => laidOut(found.value)),
       retry: search.retry,
+      entered,
+      left,
       day: (when: Date) => purchaseDay(when, locale.value),
       time: (when: Date) => timeOfDay(when, locale.value),
     }
