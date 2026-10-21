@@ -1,4 +1,5 @@
 import {
+  linesTotalOf,
   receiptBalance,
   receiptCard,
   receiptDigits,
@@ -31,6 +32,11 @@ export interface ReviewLine {
   readonly isNew: boolean
   /** «проверьте» — found from far (`match: weak`), until the person settled the item. */
   readonly check: boolean
+  /**
+   * «проверьте» of the figures — put right by the digits the till's font confuses (MOL-290) — until the
+   * person typed their own.
+   */
+  readonly repaired: boolean
   /** The printed sum differs from quantity × price — highlighted, never refused (Р-3 of MOL-113). */
   readonly mismatch: boolean
   readonly quantity: Quantity | null
@@ -81,7 +87,8 @@ function amountsOf(detail: ReceiptDetail, draft: ReceiptDraft | null) {
     total,
     ...detail.lines.flatMap((line) => [line.price, line.sum, line.discount]),
   ])
-  return recordedSums(figures, total, digits)
+  // the lines make the total less what a card sent to the card (MOL-289)
+  return recordedSums(figures, linesTotalOf(total, detail.cashback ?? null), digits)
 }
 
 export function reviewLines(
@@ -106,6 +113,7 @@ export function reviewLines(
         isNew: itemId === null,
         // «проверьте» goes only once the person chose the item, not with any edit (review 16).
         check: line.match === 'weak' && edit.confirmed !== true && itemId === line.itemId,
+        repaired: line.repaired === true && figures === undefined,
         // Figures typed are what was paid, and «≠» of the reading no longer describes the line; an
         // item chosen alone leaves the figures, and the sum, to the reading (review 28).
         mismatch: figures ? false : !line.settled && line.sum !== null,
@@ -138,6 +146,7 @@ export function reviewLines(
       name: isNew ? newName(line, country) : (line.itemName ?? newName(line, country)),
       isNew,
       check: line.match === 'weak',
+      repaired: line.repaired === true,
       mismatch: !line.settled && line.sum !== null,
       quantity: line.quantity,
       amount,
@@ -157,7 +166,7 @@ export function reviewBalance(
 ): ReceiptBalance {
   return receiptBalance(
     lines.map((one) => ({ printed: one.line.sum, amount: one.amount, skip: one.skip })),
-    draft?.total ?? detail.receipt.total,
+    linesTotalOf(draft?.total ?? detail.receipt.total, detail.cashback ?? null),
     receiptCard(detail.receipt.country).currency,
   )
 }

@@ -2181,6 +2181,10 @@ describe('the total of a receipt with items: the lines that met it, or two place
     ['the discount with OCR’s Latin «q» for «զ»', ['Ընդամենը qեղչ: 500,00', 'Առձեռն 500,00']],
     ['one row with both words, read alike twice (adversarial А2)', ['Ընդամենը Վճարված 2060.01']],
     [
+      'a sum since the start of the year, beside a payment of it (MOL-288)',
+      ['Ընդամենը ամվա սկզբից 139 432,00', 'Վճարված է PosTerminal: 139 432,00'],
+    ],
+    [
       'two sums each in two places',
       ['Ընդամենը 500.00', 'Առձեռն 500.00', 'Ընդամենը 300.00', 'Առձեռն 300.00'],
     ],

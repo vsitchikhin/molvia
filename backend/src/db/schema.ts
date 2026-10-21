@@ -2720,6 +2720,11 @@ export const receipts = pgTable(
     // The total as the reading found it in one place, vouched for or not (MOL-244): only what «Прочитали
     // не всё» measures the lines against, never a total shown or recorded.
     readTotalMinor: bigint('read_total_minor', { mode: 'bigint' }),
+    // A card that sends its discount to the card (MOL-289, «Զեղչ գործարքից»): the lines make the total
+    // less it, and the total is what left the card. The bonus a receipt is partly paid with
+    // («Կանխավճարի մարում»): the trip's money is the total less it. Only a model's reading names them.
+    cashbackMinor: bigint('cashback_minor', { mode: 'bigint' }),
+    redeemedMinor: bigint('redeemed_minor', { mode: 'bigint' }),
     // Read in part (MOL-222's `readPartly`), of the lines as read, before the check emptied any (MOL-255,
     // А6 «а»): what the phone, which sees only the lines shown, says «Прочитали не всё» by. Null — read
     // before it, or not read.
@@ -2830,6 +2835,14 @@ export const receipts = pgTable(
       'receipts_read_total_non_negative',
       sql`${table.readTotalMinor} is null or ${table.readTotalMinor} >= 0`,
     ),
+    check(
+      'receipts_cashback_positive',
+      sql`${table.cashbackMinor} is null or ${table.cashbackMinor} > 0`,
+    ),
+    check(
+      'receipts_redeemed_positive',
+      sql`${table.redeemedMinor} is null or ${table.redeemedMinor} > 0`,
+    ),
   ],
 )
 
@@ -2919,6 +2932,9 @@ export const receiptLines = pgTable(
     // once, at the record: a sum put right later is what was paid, never the shelf. `null` — no record of
     // this build judged it: read and not recorded, or recorded by an image rolled back (round 6, Р6-1).
     asRead: boolean('as_read'),
+    // Put right by the digits the till's font confuses, on a model's reading the lines then proved whole
+    // (MOL-290): shown with «проверьте», never as read — so never a shelf price for the shops' memory.
+    repaired: boolean('repaired').notNull().default(false),
   },
   (table) => [
     primaryKey({ columns: [table.receiptId, table.position] }),

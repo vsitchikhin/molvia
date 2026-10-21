@@ -942,6 +942,141 @@ rule — the item has headings and none is the line's, OCR's swaps allowed — n
 the gloss too: «Ռոլիկ» (9603, brushes) glossed one letter off «լոլիկ» found tomatoes (0702) near. Only the
 headings the seed gave the catalogue's nodes are known; an item with none is ruled out by nothing.
 
+## A card that sends its discount to the card (MOL-289)
+
+**«Ереван Сити» does not take its card's discount off at the till: it sends it to the card.** The lines are
+what was paid with the discount, «Ընդամենը:» is the sum without it — what left the card — and the discount is
+printed apart as «Զեղչ գործարքից», a prepayment slip of the same sum over the receipt (am-35…39, am-44). Read as
+before, the lines never met the total: no total shown, «Прочитали не всё — не хватает 191,02» on every such
+receipt, and the 0.2 measure counted it read in part.
+
+**The lines meet «Ընդամենը» less «Զեղչ գործարքից»** (`linesTotalOf`), and **its second place is the sum taxed with VAT,
+«ԱԱՀ-ով հարկվող»** (the card's `cashback` and `taxed` words): the lines as read every one meet it, else those two vote;
+else **the total itself where two places print it — the total and a payment equal to it to the luma** — as before the
+cashback (review round 1, А2: «ԱԱՀ-ով հարկվող» misread alike lost a total master showed); **that last one puts no line
+right** (review round 2, owner's Б1 «а»): it vouches for the total and says nothing of the cashback, one figure copied
+with the same 5↔6 — 54,00 for 64,00 made water at 160 the line that met 6 550 less it, «ԱԱՀ-ով հարկվող» saying 6 486. A
+payment rounded to the dram is no place, and nor is «Ընդամենը» under the list, 0,02 off the lines where the till rounds
+a price with its discount (am-39, am-44). **The total shown is what left the card** (owner's В-5 «а»: «с карты
+списывается 19 097 — записывать надо именно эту сумму»), and the discount stands beside it (`receipts.cashback_minor`):
+every comparison of the lines with the total takes it off — the sums В-5 records, the review's difference, «Прочитали не
+всё», «proven whole» — and the trip's money never does. **A bonus a receipt is partly paid with, «Կանխավճարի մարում»**,
+is the trip's money taken off (`receiptPaidOf`, `redeemed_minor`): what the bonus covered was recorded when it was sent
+to the card, «когда покроется, тогда и запишем». It is kept only where the card's payment is the total less it, to the
+dram — the total shown, else one printed: with no total vouched for, the trip of the lines and the cashback is the bonus
+less too (review round 6, Г5). **The price, named:** no receipt with a bonus spent has been seen — the rule is the label
+every receipt prints with a 0, and the vouch by the payment keeps a misread one out; a bonus spent where the payment is
+cash, change printed, is not kept, and the trip counts the total. Two discounts of the transaction printed apart are a
+doubt, and the receipt reads as before. **With no total vouched for, the trip is the lines and the cashback** (review
+round 1, А3) — what left the card, as В-5 «а» asks; a total vouched for below the lines is the lines alone, as before
+(review round 2, Б4). **The price, named** (А2б): a till that takes «Զեղչ գործարքից» off on the spot, lines before it,
+is read as one that sends it to the card — its total is shown by its two places, the review says the lines miss it by
+twice the discount, and the trip is the lines, the discount over what left the card, as on master; none has been seen.
+
+**Only a model's reading names them** (`receiptTextOfModel`): Tesseract reads its total after the word under the list,
+the lines' own sum, and on the bench shows none of these receipts' totals; reading the cashback there is a change of the
+parse, measured on its own. **The price, named:** a receipt Tesseract reads whole records the lines' sum, the bonus
+sent to the card unrecorded. **The phone hears the cashback by `RECEIPT_CASHBACK_HEADER`**: the foot says «Кэшбэк на
+карту» under «Строки» and «Оплачено бонусом карты» under the total, «≈» of what left the card; an installed app of an
+earlier build reads the detail strictly and knows no cashback: it is sent the lines' total as the receipt's, so it
+says no «Разница» of lines read right (review round 1, А4). **That total sent back is the printed one** (review round 2,
+№5): «Итог» opened and saved as it was sends exactly the lines' total, and «Записать» takes it as the total printed —
+what left the card, and no total put right in the 0.2 measure; any other figure sent is the person's word. **The
+price, named** (review round 3, №7): the record carries no build, so a phone of this build that has the lines' total
+typed on purpose is taken the same way — the trip what left the card, as В-5 «а» asks, but the edit uncounted.
+
+**«Ընդամենը ամվա սկզբից» is never a total** (MOL-288, the card's `sinceStart`): what the card bought this year, the
+largest amount the total's word stood by, it was the total read — «Прочитали не всё» short by 120 000 ֏. Neither read
+nor a vote, for either reader.
+
+On the bench (`.scratch/tasks/research/MOL-290.md`): totals shown 27 → 34 and 26 → 33 of 54, none wrong; am-44's.
+
+## A model's line put right by the font's 5↔6 (MOL-290)
+
+**«Ереван Сити»'s «5» has a flat top, and the model copies it as «6»**: the owner's first receipt read by the model on
+production (am-44) found all 39 lines and lost six to it, the check emptying them rightly; a faded receipt (am-34) and
+am-38/39 do the same. **A line whose arithmetic does not hold as the model copied it is tried with the card's
+`modelSwaps`** — only 5↔6, measured; Tesseract's pairs are its own — at most two swaps a figure («550» copied «660»,
+owner's note to В-2) in any of its four figures (am-44's line 27 needed one in each of three). A reading holds the
+line's arithmetic as `lineOf` judges it, and **gives a discount at the card's rate of the shelf price**, the rate the
+lines as copied share, to the till's three luma: «exactly the percentage, rounded up» holds on 233 of the bench's 254
+lines, not all — 395 gives 3,96 — and without the rate three wrong readings passed where one did. **A line that prints
+a discount on a receipt whose lines share no rate is not tried** (review round 1, №3): nothing would hold its discount.
+
+**The total chooses among a line's readings, never the fewest swaps** (review round 1, owner's А1 «а»): every reading of
+the quantity, price and sum stays, and of all the choices across the lines exactly one may meet the total. The fewest
+swaps chose wrong where the model erred twice in one figure — the very case of В-2: 0,6 kg × 550 copied «660» read as
+0,5 × 660, one swap in the quantity, the same sum at the same 1 % — and the total, the sum being one, could not see it;
+the review showed 0,5 kg at 660. On the reviewer's brute force (205 498 copies): wrong quantities and prices 63 → 0,
+lines put right 178 065 → 188 086 — the total now also tells a sum a luma off (am-39's 567,15 and 567,16). **The
+discount of one quantity, price and sum is the one at the fewest swaps; two there are a doubt.** **The price, named**
+(А1 «а»): a discount the till's rounding lets read two ways — 2,55 or 2,56 of 255 — may stand a luma off the paper, on 8
+539 of the brute force's lines (4,1 %), and on 15 461 of 106 161 copies of three swaps a line (14,6 %, review round 6 —
+am-44's line 27 took three); the sum, the quantity and the price are right, the line under «проверьте», and the memory
+takes nothing of it. Holding it too (every reading one way, «б») loses am-44 whole: its line 18 prints 5,56 where 1 % of
+555 is 5,55, and nothing tells them. A line read two ways with one sum — «0,6 × 650» reads as printed and as 0,5 × 660 —
+is not put right: a doubt, not a choice. **The price, named:** a receipt whose card gives two rates (am-34: 1 % on 30
+lines, 0,5 % on two) holds every line to the commoner one, and a broken line at the other is not put right.
+
+**The total chooses only among the fewest swaps' sums** (review round 2, owner's Б2 «а»): the readings of a line it
+chooses among are those whose sum is, to the till's rounding, one its fewest swaps give — the same sum split another way
+(0,6 × 550, 0,5 × 660), a luma off (567,15, 567,16). A reading further off is not the total's to choose: a line the
+model bent to fit, 99,00 short (am-34), made the cottage cheese's 615,78 — three swaps where one reads it as printed —
+the one choice that met the total, and «proven whole» hid the difference that pointed at the butter. **A line read whole
+that the swaps read whole too** (a bun copied 96 / 96 for 95 / 95) is a second way: a choice that meets the total with
+it moved is a doubt, and the one choice must meet it with every such line as copied; past `REPAIR_SHIFTS_MAX` (4 096)
+ways of moving them nothing is put right. **And never between two sums** (review round 3, owner's Г1 «а»): where the
+fewest swaps give sums more than the till's rounding apart — «160» at 150, or «622 / 6.22» at 516,78 read back or with
+its sum swapped — the line is a doubt; the total confirms a line's one sum and chooses only a luma — of the sum alone,
+at the fewest swaps' quantity and price (review round 4, Г3: 0,51 × 665 = 339,15 read as 0,61 × 556 = 339,16 beside a
+line a luma short); the same sum split another way stays, a doubt. The fewest swaps must read one quantity and one price
+besides (review round 5, Г4): 0,61 × 515 = 314,15 with its price copied «616» reads, two swaps either way, as 0,51 × 616
+= 314,16 too — a quantity a luma would have chosen, so a doubt; on a till that prints no discount a luma is therefore
+never chosen, the quantity times the price being the sum to the luma. A line read whole is moved by every sum its fewest
+swaps give, apart or not (№9): Г1 held to it lost «505.56»'s luma, and «205.05 / 205.06» beside it was put right at
+205,05. Two readings equally cheap let the cottage cheese's 615,78 pay for am-34 again, Б2 dodged by one more error of
+the model. **The price, named:** such a line stays empty as before MOL-290, copied right beside it or not — lines put
+right on the brute force 187 801 → 186 157 (−0,9 %), none wrong, the bench as before. The shifts cost lines put right on
+the brute force 188 086 → 187 801 (−0,15 %), none wrong; on the class code's tills each neighbour that reads whole both
+ways costs some 0,5 % more (440 of 84 056 beside 1 × 560); on the card's, two neighbours at 1 % whose sum ends in a 5 or
+6 read a luma off within the till's rounding, and the reviewer's synthetic (review round 3, №8) puts right 112 878 → 101
+421 of 124 932 (−10 %), the discounts a luma off 9 919 → 6 675 among them; the bench as before. **The price, named**
+(review round 4, owner's Г2 «а»): a line the model misread twice where one swap explains it too — 0,6 kg × 1 050 = 630
+copied «0.5 / 1060 / 630», read as 0,5 × 1 060 = 530 — has its one cheap sum wrong, and a neighbour bent by just that
+much the other way, no 5 or 6 to swap (a bun 380 copied 480), meets the total with it: the receipt «proven whole», two
+lines made up, the repaired one under «проверьте». It is the edge the check by the sum has on master — two lines misread
+by +d and −d — met by one more pair; the reviewer's search puts 327 copies of round 1's space a total away from such a
+repair, every one of two errors in its line and wanting a neighbour off by exactly the difference.
+
+**It is taken only with the whole receipt** (owner's В-1 «а»): every line as copied or put right, and their sum
+exactly the total two places vouch for, less what went to the card — a second source a misread line cannot fake. Short
+of it nothing changes: the lines are as copied, and the check empties them as before. **A line put right is never as
+read** (`repaired`, `receipt_lines.repaired`): «проверьте» with «Цифры поправили по итогу чека — сверьте с бумагой»
+until the person types their own; the shops' memory takes no shelf price from it (`as_read` false); the phone hears it
+by `RECEIPT_REPAIRED_HEADER`; **an earlier build, which cannot say it, gets the line empty**, as the check left it
+before (review round 1, А4). «Покупки» count it among the lines to check («проверьте N строк»), and so does the
+review's «проверьте: N» (№2). A line misread alike in its price and sum (am-34: 540 / 5,4 / 534,6 for 640 / 6,4 /
+633,6) holds as copied and is not tried; the total, which it does not meet, keeps every other line of the receipt as it
+was.
+
+**The model is never asked to do the sum** (MOL-268): copying, it bends the digits to fit, and the check has nothing
+left to catch. Asked only to mark the figures where a 5 or a 6 may be the other (prompt v6, owner's В-4 «а»), it marked
+85 % of the lines that have one and copied worse — 769 → 732 right fields; an image of the till's own 5 and 6 before the
+receipt, 745. Both measured and not taken: the prompt is v5.
+
+**Every search has a ceiling** (Р-8): `REPAIR_COMBINATIONS_MAX` 20 000 readings of a line's quantity, price and
+discount, past which the line is not tried and its receipt not put right; `REPAIR_RECEIPT_COMBINATIONS_MAX` 200 000 a
+receipt; `REPAIR_ASSIGNMENTS_MAX` 100 000 steps of the total's choice among the lines' readings — twelve lines read
+four ways each are 16 million ways, given up in ~10 ms. **A figure that is no number is not walked** (review round 1,
+№1): a swap of a digit for a digit keeps its form, and three hundred fives of junk in four fields took 0,4 s past
+every ceiling. The worst shape — 300 lines of 2 233 readings each — stops at the 90th line after some 30 ms; a line of
+the bench tries a few hundred. `repairTries` counts the work for the tests.
+
+On the bench: right fields 646 → 652 and 656 → 686, am-44 99 → 117, made up 2, 1, 0 as before; proven whole 18 → 19
+and 17 → 19, am-44 whole. **The price, named:** a receipt with one line no swap of the pair explains — a 3 for an 8, a
+digit lost — stays as copied, its five other lines too; and am-35/36, whose sum taxed with VAT the model misread with
+the same 5→6, have no second place and are not put right.
+
 ## A Serbian receipt by its link (MOL-232)
 
 **A Serbian receipt is not read off a photo: it is asked of the tax office** (MOL-223, `.scratch/tasks/research/MOL-223.md`).

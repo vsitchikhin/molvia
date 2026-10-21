@@ -2,6 +2,7 @@ import {
   RECEIPT_MODEL_INPUT_MAX,
   RECEIPT_PAGE_MODES,
   bestReading,
+  linesTotalOf,
   mergeParts,
   modelHeadRows,
   moneyOfHundredths,
@@ -134,6 +135,8 @@ function headOf(
     receiptNo: text.receiptNo,
     totalMinor: moneyOfHundredths(text.totalHundredths, currency)?.minor ?? null,
     readTotalMinor: moneyOfHundredths(text.readTotalHundredths, currency)?.minor ?? null,
+    cashbackMinor: moneyOfHundredths(text.cashbackHundredths ?? null, currency)?.minor ?? null,
+    redeemedMinor: moneyOfHundredths(text.redeemedHundredths ?? null, currency)?.minor ?? null,
     balanced: text.balanced,
     layout: text.layout,
     city:
@@ -341,7 +344,12 @@ async function parsed(
   }
   // a total no second source vouched for is not shown, and still says the lines are too few (MOL-244)
   const measured = head.totalMinor ?? head.readTotalMinor
-  const total = measured === null ? null : { minor: measured, currency }
+  const cashback = head.cashbackMinor ?? null
+  // the lines make the total less what a card sent to the card (MOL-289)
+  const total = linesTotalOf(
+    measured === null ? null : { minor: measured, currency },
+    cashback === null ? null : { minor: cashback, currency },
+  )
   return {
     kind: 'parsed',
     readerVersion: version,
