@@ -2153,12 +2153,13 @@
       "bad_percent": "Enter a whole number from 0 to {max}",
       "category_gone": "This category is gone — refresh the screen",
       "failed": "Not saved. Try again",
-      "offline": "No connection. A plan is saved only online",
+      "offline": "Offline · a plan is saved or removed with a connection — what you typed stays here",
       "save": "Save",
       "saving": "Saving…",
-      "wait_online": "Waiting for connection",
+      "save_offline": "Saving needs a connection",
       "remove": "Remove the plan",
       "removing": "Removing the plan…",
+      "remove_offline": "Removing needs a connection",
       "other_currency": "The plan was {amount}, before the spending currency changed. Enter a sum in {sign}",
       "too_big": "Too large a sum for a month's plan"
     }

@@ -3,11 +3,11 @@
     <template #title>{{ title }}</template>
     <template #meta>{{ t('budget.sheet.meta') }}</template>
 
-    <form class="form" novalidate @submit.prevent="submit">
-      <p v-if="!online" class="strip">
-        <IconCloudOff class="strip-icon" aria-hidden="true" />{{ t('budget.sheet.offline') }}
-      </p>
+    <!-- The connection is the kit's line, first in the sheet, said in the sheet's own region
+         (MOL-181). A plan is written with a connection only (Р-8 of MOL-117). -->
+    <StatusStrip v-if="!online" class="status" kind="offline" :text="t('budget.sheet.offline')" />
 
+    <form class="form" novalidate @submit.prevent="submit">
       <AppField
         v-if="subject.kind === 'choose'"
         v-model="chosen"
@@ -57,12 +57,11 @@
         block
         :busy="sending && !removing"
         :busy-label="t('budget.sheet.saving')"
-        :inactive="removing"
-        :disabled="!online && !sending"
+        :inactive="removing || (!online && !sending)"
         @click="submit"
       >
         <template #icon><IconCheck v-if="online || sending" /><IconCloudOff v-else /></template>
-        {{ online ? t('budget.sheet.save') : t('budget.sheet.wait_online') }}
+        {{ online || sending ? t('budget.sheet.save') : t('budget.sheet.save_offline') }}
       </AppButton>
       <AppButton
         v-if="plan"
@@ -70,12 +69,11 @@
         block
         :busy="removing"
         :busy-label="t('budget.sheet.removing')"
-        :inactive="sending && !removing"
-        :disabled="!online && !sending"
+        :inactive="(sending && !removing) || (!online && !sending)"
         @click="send(null)"
       >
         <template #icon><IconClose /></template>
-        {{ t('budget.sheet.remove') }}
+        {{ online || sending ? t('budget.sheet.remove') : t('budget.sheet.remove_offline') }}
       </AppButton>
     </template>
   </BottomSheet>
@@ -110,6 +108,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { monthGenitive, monthName } from '@/components/charts'
 import { shown } from '@/composables/useItemDetails'
 
@@ -142,6 +141,7 @@ export default defineComponent({
     IconClose,
     IconCloudOff,
     SegmentedControl,
+    StatusStrip,
   },
   props: {
     open: { type: Boolean, required: true },
@@ -348,24 +348,8 @@ export default defineComponent({
   gap: var(--space-4);
 }
 
-.strip {
-  @include appear;
-
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--warn-tint);
-  color: var(--warn-ink);
-  font-size: var(--text-footnote);
-}
-
-.strip-icon {
-  @include icon;
-
-  font-size: var(--icon-sm);
+.status {
+  margin-bottom: var(--space-4);
 }
 
 .hint,

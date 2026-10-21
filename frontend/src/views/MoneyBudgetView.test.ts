@@ -535,7 +535,7 @@ describe('MoneyBudgetView: a plan written from the month on (В-1)', () => {
     expect(options).toEqual(['Transport', 'Pets'])
   })
 
-  it('must not fire: offline, a plan is not sent and the button says it waits', async () => {
+  it('must not fire: offline, a plan is not sent and the button says why', async () => {
     moneyBudget.mockResolvedValue(budget())
     const view = await render()
     online(false)
@@ -543,9 +543,11 @@ describe('MoneyBudgetView: a plan written from the month on (В-1)', () => {
     await view.findAll('li .list-row')[2]?.trigger('click')
     await flushPromises()
     const save = [...document.querySelectorAll('dialog[open] button')].find((one) =>
-      one.textContent.includes(en.budget.sheet.wait_online),
+      one.textContent.includes(en.budget.sheet.save_offline),
     )
-    expect(save?.hasAttribute('disabled')).toBe(true)
+    expect(save?.getAttribute('aria-disabled')).toBe('true')
+    ;(save as HTMLButtonElement | undefined)?.click()
+    await flushPromises()
     expect(setBudgetPlan).not.toHaveBeenCalled()
   })
 })
