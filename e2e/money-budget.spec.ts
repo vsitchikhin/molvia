@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { signedIn } from './session'
+import { goOffline, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
@@ -71,18 +71,83 @@ test('a plan from this month on: «осталось» on the screen and on «Д�
   await expect(page.locator('.total')).not.toContainText('Сверх плана')
 })
 
-test('must not fire: with no connection a plan is not sent, and the button waits', async ({
+test('must not fire: with no connection a plan is not sent, and both ways say why', async ({
   page,
-  context,
 }) => {
   await openMoney(page)
   await openBudget(page)
   await expect(page.getByRole('heading', { name: 'Плана пока нет' })).toBeVisible()
-
-  await context.setOffline(true)
-  await page.evaluate(() => window.dispatchEvent(new Event('offline')))
-  await page.getByRole('button', { name: 'Задать план категории' }).click()
   const sheet = page.locator('dialog[open]')
-  await expect(sheet).toContainText('План сохраняется только с интернетом')
-  await expect(sheet.getByRole('button', { name: 'Ждём связь' })).toBeDisabled()
+
+  // A plan to open, written while there is a connection.
+  await page.getByRole('button', { name: 'Задать план категории' }).click()
+  await expect(sheet).toContainText('Новый план')
+  await page.waitForTimeout(400)
+  await sheet.getByLabel('Категория').selectOption({ label: 'Аренда жилья' })
+  await sheet.getByLabel('Сумма в месяц').fill('250000')
+  await sheet.getByRole('button', { name: 'Сохранить' }).click()
+  await expect(sheet).toBeHidden()
+
+  let sent = false
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname.endsWith('/budget/plans')) sent = true
+  })
+  await goOffline(page)
+  await page.evaluate(() => window.dispatchEvent(new Event('offline')))
+  // The strip is not now, in the focus order and saying why (Ф-6): a tap opens nothing (MOL-192).
+  const add = page.getByRole('button', { name: 'Задать план можно со связью' })
+  await expect(add).toHaveAttribute('aria-disabled', 'true')
+  await add.click()
+  await expect(sheet).toHaveCount(0)
+
+  // The row still opens, and the sheet says in one line what waits for the connection.
+  await page.getByRole('button', { name: /Аренда жилья/ }).click()
+  await expect(sheet.locator('.strip.offline')).toContainText('со связью')
+  await page.waitForTimeout(400)
+  const save = sheet.getByRole('button', { name: 'Сохранить можно со связью' })
+  await expect(save).toHaveAttribute('aria-disabled', 'true')
+  await expect(save).toBeEnabled()
+  await save.click()
+  await expect(sheet.getByRole('button', { name: 'Убрать можно со связью' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
+  expect(sent).toBe(false)
+})
+
+test('the rows stand in one column: every bar as long, at 390 and at 320 (MOL-192)', async ({
+  page,
+}) => {
+  await openMoney(page)
+  await openBudget(page)
+  const sheet = page.locator('dialog[open]')
+  for (const [category, sum] of [
+    ['Аренда жилья', '250000'],
+    ['Кафе и рестораны', '50000'],
+  ] as const) {
+    await page.getByRole('button', { name: 'Задать план категории' }).click()
+    await expect(sheet).toContainText('Новый план')
+    await page.waitForTimeout(400)
+    await sheet.getByLabel('Категория').selectOption({ label: category })
+    await sheet.getByLabel('Сумма в месяц').fill(sum)
+    await sheet.getByRole('button', { name: 'Сохранить' }).click()
+    await expect(sheet).toBeHidden()
+  }
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 800 })
+    const tracks = page.locator('.list-row .track')
+    await expect(tracks).toHaveCount(2)
+    const boxes = await tracks.evaluateAll((all) =>
+      all.map((one) => {
+        const box = one.getBoundingClientRect()
+        return { left: Math.round(box.left), right: Math.round(box.right) }
+      }),
+    )
+    // A circle, a chevron and a gap on every row, so the bars are one length.
+    expect(new Set(boxes.map((box) => `${String(box.left)}:${String(box.right)}`)).size).toBe(1)
+    // Nothing stands past the page.
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width,
+    )
+  }
 })
