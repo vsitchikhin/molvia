@@ -413,7 +413,9 @@ the genitive (`receiptLineParts`; «խորոված», a shashlik, is a noun of a
 a participle) — the genitive of a noun in «-ի» too, in «-ու» («ազնվամորու մուրաբա» is raspberry jam, never raspberries),
 and the few in «-ան» the dictionary holds («ձկան»), behind any other word, since a nominative ends so too («կատու»,
 «չորաթթու»; review 2, №2). A capital past the first word on a line of small letters is a name — a sort or a brand
-printed bare — and the kind only where nothing else is: «Լեզու տավարի Արցախ» is a tongue (adversarial Г3). Then:
+printed bare — and the kind only where nothing else is: «Լեզու տավարի Արցախ» is a tongue (adversarial Г3). A capital
+says so only with small letters after it, on a line the till printed a small first letter in, a unit's included:
+«Բանան Սաբրոսթար կգ» is a sort, while in «Ազնվամորու Մուրաբա», every word a capital, it says nothing (review 5, №1). Then:
 
 - **A name of the seed in the till's language stands only where it says the kind** (`seedNameFits`), the seed's own
   word against the printed one — «Ատամի պաստա» is «Паста зубная» by the seed's name, which the dictionary's Russian
@@ -431,8 +433,10 @@ printed bare — and the kind only where nothing else is: «Լեզու տավա�
   thing; a gloss with a thing in it is one, «պաստեղ» — «пастила фруктовая» (В2). **A word the dictionary has not is a
   thing too** — a dessert or a drink of loans, «Ելակ սմուզի», «Խնձոր շտրուդել», «Ելակ Smoothie» (В1) — said by its
   letters («Смузи»), and «-ի», «-ու» are a case only of a word the dictionary has, since a loan ends so; a name only
-  where an Armenian capital says so on a line of small letters, «Բանան Սաբրոսթար», a sort; Latin capitals of up to
-  four letters are a standard or a size, «Կաթ UHT 3.2%», «Մարտկոց AA», «Լամպ LED» (Г2). Of 527 lines «flavour kind»
+  where an Armenian capital says so on a line of small letters, «Բանան Սաբրոսթար», a sort; a standard or a size in
+  Latin is no thing, «Կաթ UHT 3.2%», «Մարտկոց AA», «Լամպ LED» (Г2) — by a list, since a brand has the same form:
+  «Շոկոլադ MARS» is a thing (review 5, №2). «և» spelt as of old, «եւ» («Երեւան»), is «և» for the dictionary, the
+  seed's names and the letters of a name (Д1). Of 527 lines «flavour kind»
   made of the seed's words, the first round bound 459 to the fruit, sure; now none.
 - **Any other item stands where `lineFitter` lets it** — a heading's far match, each of the search's first ten:
   **every word of its name is the line's**, by a **form** of the dictionary's Russian — an adjective in any gender,
@@ -476,8 +480,8 @@ not print keeps it away from the search — «Огурцы маринованн�
 the kind of the order a till prints — «Йогурт» for «Յոգուրտ ելակ», 407 of those 527 lines in the first round, 55 now
 («Хлеб» for «Հաց Պումպերնիկել» on the bench), a new item instead, and so do a word after the kind the dictionary has
 not — with master's dictionary «Помидоры» for «Լոլիկ ջերմոցի», «Салфетки влажные» for «… անտիբակտերիալ», 96 → 93
-right on the bench — and a Latin brand printed bare after it («Պահպանակ Durex»); a loan kind with a capital is a sort, so its flavour
-stands — «Ելակ Սմուզի» is «Клубника», as on master: on the bench every capital past the kind is a sort or a brand
+right on the bench — and a Latin brand printed bare after it («Պահպանակ Durex»); a loan kind with a capital on a line of small letters is a sort, so its flavour
+stands — «Ելակ Սմուզի կգ» is «Клубника», as on master: on the bench every capital past the kind is a sort or a brand
 (12 of 12; adversarial Г1); a kind cut by the till or the reader
 past one letter finds nothing, and its new name is the cut spelt in letters — «Թխվածքաբլ» is «Тхвацкабл», for one
 press to take away (review 3, №1); a genitive before the kind is asked of no seed's name
