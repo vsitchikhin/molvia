@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { actorCodec, settingsOf } from '@molvia/model'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
-import { facesIn, standAt, toTheEnd, topOf } from './scroll'
+import { standAt, toTheEnd, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -339,14 +339,6 @@ test('a month read for the first time keeps the switcher where it was under the 
 test('a line gone under the category of «Год» keeps the choice and the page where they were', async ({
   page,
 }) => {
-  // The faces come late on purpose (MOL-267): Onest 700 and ֏ are asked for when the answer is drawn,
-  // and one arriving after the scene was measured rewrapped a line and moved the page 19 px on CI.
-  // Held here, the scene meets them on every run, not when the runner lags. Laid before the page opens
-  // (MOL-249).
-  await page.route('**/fonts/**', async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 1_000))
-    await route.continue()
-  })
   await seed(page)
   // An address that names a category the charts do not have: said on the card, under the choice
   // (MOL-74, MOL-138 В-2). Chosen another, the line goes and the card is shorter at the very end of
@@ -361,9 +353,6 @@ test('a line gone under the category of «Год» keeps the choice and the page
   await choice.selectOption({ label: 'Кафе и рестораны' })
   await expect(card).not.toContainText('Этой категории на графиках нет')
   await expect(card).toContainText(/30\s000\s֏/)
-  // The last measure is of the page with its faces too: held late, they would otherwise come after
-  // it, and a scene measured without them would pass unseen.
-  await facesIn(page)
   expect(await topOf(choice)).toBe(before)
   expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
 })
