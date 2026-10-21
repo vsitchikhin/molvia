@@ -157,7 +157,10 @@ export const receiptSummaryCodec = z.strictObject({
    * recorded goes at «Записать», and one whose purchase was removed with it (MOL-240).
    */
   lineCount: z.int().min(0),
-  /** Lines whose own arithmetic does not hold — highlighted, never refused (Р-3 of MOL-113). */
+  /**
+   * Lines to check: whose own arithmetic does not hold — highlighted, never refused (Р-3 of MOL-113) — and those
+   * the font's swaps put right (MOL-290).
+   */
   unsettled: z.int().min(0),
   place: receiptPlaceCodec.nullable(),
   /**

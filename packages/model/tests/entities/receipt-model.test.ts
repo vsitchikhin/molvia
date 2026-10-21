@@ -3,6 +3,7 @@ import { ARMENIAN_RECEIPTS } from '#model/entities/receipt-card'
 import { needsReshoot, receiptCityOf } from '#model/entities/receipt'
 import {
   MODEL_RECEIPT_LINES_MAX,
+  REPAIR_ASSIGNMENTS_MAX,
   repairTries,
   modelHeadRows,
   modelReceiptSchema,
@@ -283,12 +284,17 @@ describe('the total of a model’s reading (MOL-244 by the card’s words)', () 
         null,
         false,
       ])
-      // the total under the list, 0,02 off where the till rounds a price with its discount, is no place
+      // the total under the list, 0,02 off where the till rounds a price with its discount, is no place;
+      // with the sum taxed misread too, the total and a card's payment equal to it vouch, as on master (round 1, А2)
       const taxedOff = summary({ '/ԱԱՀ-ով հարկվող/ =': '1683.02' })
-      expect(shown(answer({ lines: off, totals: taxedOff }))).toEqual([null, 1_700, null, false])
-      // nor is the payment, rounded to the dram
-      const noTaxed = summary({ '/ԱԱՀ-ով հարկվող/ =': '0' })
-      expect(shown(answer({ lines: off, totals: noTaxed }))).toEqual([null, 1_700, null, false])
+      expect(shown(answer({ lines: off, totals: taxedOff }))).toEqual([170_000, 1_700, null, false])
+      // a payment rounded to the dram is no place of it: nothing vouches
+      const rounded = summary({
+        '/ԱԱՀ-ով հարկվող/ =': '0',
+        'Ընդամենը:': '1700.40',
+        'Վճարված է PosTerminal:': '1700.00',
+      })
+      expect(shown(answer({ lines: off, totals: rounded }))).toEqual([null, 1_700, null, false])
     })
 
     it('reads as before where the discount is printed twice apart: two are a doubt, not a choice', () => {
@@ -408,24 +414,69 @@ describe('a line put right by the font’s 5↔6, the receipt whole (MOL-290)', 
     expect([shown.lines[1]?.sumHundredths, shown.balanced]).toEqual([null, false])
   })
 
-  it('puts nothing right where a line reads two ways at its fewest swaps', () => {
-    // 65 and 56 copied for one number printed twice: 55, 56, 65 or 66 both times — two swaps each
+  it('lets the total choose among a line’s readings, its sum told by the total', () => {
+    // 65 and 56 copied for one number printed twice: 55, 56, 65 or 66 both times, each a sum of its own
     const twice = carded({ quantity: '1', unit_price: '65', discount: null, sum: '56' })
-    for (const total of ['342.10', '343.10', '352.10', '353.10']) {
-      const { text } = read2([bread, twice], owed(total))
-      expect({ total, repaired: text.lines.some((l) => l.repaired === true) }).toEqual({
+    for (const [total, price] of [
+      ['342.10', 5_500],
+      ['343.10', 5_600],
+      ['352.10', 6_500],
+      ['353.10', 6_600],
+    ] as const) {
+      const line = read2([bread, twice], owed(total)).text.lines[1]
+      expect({ total, price: line?.priceHundredths, repaired: line?.repaired }).toEqual({
         total,
-        repaired: false,
+        price,
+        repaired: true,
       })
     }
+  })
+
+  it('puts nothing right where two readings of a line make one sum — 660 copied for 550 (review round 1, А1)', () => {
+    // printed 0,6 kg × 550 − 3,3 = 326,7, the price copied 660: 0,5 × 660 − 3,3 is the same sum at the same 1 %
+    const cheese = carded({
+      quantity: '0.6',
+      unit: 'kg',
+      unit_price: '660',
+      discount: '3.3',
+      sum: '326.7',
+    })
+    const { text, shown } = read2([bread, cheese], owed('613.80'))
+    expect([text.lines[1]?.repaired, shown.lines[1]?.quantityMilli, shown.balanced]).toEqual([
+      undefined,
+      null,
+      false,
+    ])
+    // five pieces at 660 copied as 550 alike
+    const eggs6 = carded({ quantity: '5', unit_price: '550', discount: '33', sum: '3267' })
+    expect(read2([bread, eggs6], owed('3554.10')).text.lines[1]?.repaired).toBeUndefined()
+    // «0.6 × 650» reads as printed 0,6 × 550 and as 0,5 × 660 — one sum again: a doubt too
+    const near = carded({
+      quantity: '0.6',
+      unit: 'kg',
+      unit_price: '650',
+      discount: '3.3',
+      sum: '326.7',
+    })
+    expect(read2([bread, near], owed('613.80')).text.lines[1]?.repaired).toBeUndefined()
+    // one piece at «650» for 550: one reading meets the total, as printed
+    const once = carded({ quantity: '1', unit_price: '650', discount: '5.5', sum: '544.5' })
+    const put = read2([bread, once], owed('831.60')).shown.lines[1]
+    expect([put?.quantityMilli, put?.priceHundredths, put?.repaired]).toEqual([1_000, 55_000, true])
   })
 
   it('takes no reading whose discount is not the card’s rate', () => {
     // 1 × 400 − 56 copied, 334 paid: only a discount of 66 holds, 16,5 % where the card gives 1 %
     const off = carded({ quantity: '1', unit_price: '400', discount: '56', sum: '334' })
     expect(read2([bread, off], owed('621.10')).text.lines[1]?.repaired).toBeUndefined()
-    // with no line printing the rate, the arithmetic alone and the total decide
-    expect(read2([off], owed('334.00')).text.lines[0]?.discountHundredths).toBe(6_600)
+    // with no line printing the rate, nothing holds the discount: not put right (review round 1, №3)
+    expect(read2([off], owed('334.00')).text.lines[0]?.repaired).toBeUndefined()
+    // a line that prints no discount needs no rate
+    const plain = carded({ quantity: '2', unit_price: '155', discount: null, sum: '330' })
+    expect(read2([plain], owed('330.00')).text.lines[0]).toMatchObject({
+      priceHundredths: 16_500,
+      repaired: true,
+    })
   })
 
   it('confirms no line misread alike in its price and sum: the total does not meet it (am-34)', () => {
@@ -484,6 +535,26 @@ describe('a line put right by the font’s 5↔6, the receipt whole (MOL-290)', 
     }
     expect(of(89)).toEqual([89, 198_737])
     expect(of(90)).toEqual([0, 198_737])
+  })
+
+  it('walks no figure that is no number: three hundred fives of junk (review round 1, №1)', () => {
+    const junk = '5'.repeat(300)
+    const wild = carded({ quantity: junk, unit_price: junk, discount: junk, sum: junk })
+    const before = repairTries.walked
+    const { text } = read2([bread, wild], owed('287.10'))
+    expect([repairTries.walked - before, text.lines[1]?.repaired]).toEqual([0, undefined])
+  })
+
+  it('gives up choosing past its steps: twelve lines each read four ways', () => {
+    // 1 × 65 = 56 copied: 55, 56, 65 or 66 — 16 777 216 ways for twelve such lines
+    const twice = carded({ quantity: '1', unit_price: '65', discount: null, sum: '56' })
+    const before = repairTries.chose
+    const { text } = read2(
+      Array.from({ length: 12 }, () => twice),
+      owed('660.00'),
+    )
+    expect(text.lines.some((l) => l.repaired === true)).toBe(false)
+    expect(repairTries.chose - before).toBeLessThanOrEqual(REPAIR_ASSIGNMENTS_MAX + 1)
   })
 
   it('takes away the mark of a line the check emptied', () => {
