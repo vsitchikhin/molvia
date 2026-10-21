@@ -103,6 +103,12 @@ export const receiptLineCodec = z.strictObject({
   discount: moneyCodec.nullable(),
   /** The line's own arithmetic holds: quantity × price = paid + discount. */
   settled: z.boolean(),
+  /**
+   * Put right by the digits the till's font confuses, on a model's reading the lines then proved whole
+   * (MOL-290): «проверьте», never as read. Sent only when it is, and only to a phone that asked by
+   * `RECEIPT_REPAIRED_HEADER` — an installed app of an earlier build reads a line strictly.
+   */
+  repaired: z.boolean().optional(),
 })
 export type ReceiptLineView = z.output<typeof receiptLineCodec>
 
@@ -329,6 +335,9 @@ export const RECEIPT_READ_TOTAL_HEADER = 'X-Molvia-Receipt-Read-Total'
 
 /** A phone that knows the detail's `readPartly` says so by this header (MOL-255), as `RECEIPT_CODES_HEADER`. */
 export const RECEIPT_READ_PARTLY_HEADER = 'X-Molvia-Receipt-Read-Partly'
+
+/** A phone that knows a line's `repaired` says so by this header (MOL-290), as `RECEIPT_CODES_HEADER`. */
+export const RECEIPT_REPAIRED_HEADER = 'X-Molvia-Receipt-Repaired'
 
 /** A phone that knows the detail's `cashback` and `redeemed` says so by this header (MOL-289). */
 export const RECEIPT_CASHBACK_HEADER = 'X-Molvia-Receipt-Cashback'

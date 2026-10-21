@@ -49,6 +49,8 @@ const sameQuantity = (a: StoredReceiptLine['quantity'], b: StoredReceiptLine['qu
 function asRead(stored: StoredReceiptLine, line: RecordedLine): boolean {
   return (
     stored.settled &&
+    // put right by the font's swaps, it was not read so: no shelf price for the memory (MOL-290, Р-7)
+    stored.repaired !== true &&
     stored.price !== null &&
     sameQuantity(line.quantity, stored.quantity) &&
     sameMoney(line.amount, stored.sum)

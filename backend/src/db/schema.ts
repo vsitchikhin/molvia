@@ -2932,6 +2932,9 @@ export const receiptLines = pgTable(
     // once, at the record: a sum put right later is what was paid, never the shelf. `null` — no record of
     // this build judged it: read and not recorded, or recorded by an image rolled back (round 6, Р6-1).
     asRead: boolean('as_read'),
+    // Put right by the digits the till's font confuses, on a model's reading the lines then proved whole
+    // (MOL-290): shown with «проверьте», never as read — so never a shelf price for the shops' memory.
+    repaired: boolean('repaired').notNull().default(false),
   },
   (table) => [
     primaryKey({ columns: [table.receiptId, table.position] }),

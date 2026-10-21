@@ -560,6 +560,7 @@ function toLine(row: typeof receiptLines.$inferSelect, currency: Currency): Stor
     sum: cash(row.sumMinor),
     discount: cash(row.discountMinor),
     settled: row.settled,
+    repaired: row.repaired,
   }
 }
 
@@ -1307,6 +1308,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
               sumMinor: line.sum?.minor ?? null,
               discountMinor: line.discount?.minor ?? null,
               settled: line.settled,
+              repaired: line.repaired === true,
               itemId: outcome.bindings[position]?.itemId ?? null,
               match: outcome.bindings[position]?.match ?? null,
               translation: outcome.bindings[position]?.translation ?? null,

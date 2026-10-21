@@ -47,7 +47,7 @@ export const EXPORT_FORMAT = 'molvia-export'
 // receipt's `readPartly`, whether its lines as read fell short, before the check emptied any (MOL-255).
 // 20: the account's `receiptsModelUntil`, until when a model reads the person's receipts (MOL-272). 21:
 // a receipt's `cashback` and `redeemed`, what a card sent to the card and the bonus it was paid with
-// (MOL-289).
+// (MOL-289), and a line's `repaired`, put right by the digits the till's font confuses (MOL-290).
 export const EXPORT_VERSION = 21
 
 const day = z.iso.date()
@@ -370,6 +370,7 @@ const receiptSchema = z.strictObject({
       sum: signedMoneyCodec.nullable(),
       discount: signedMoneyCodec.nullable(),
       settled: z.boolean(),
+      repaired: z.boolean(),
       itemId: z.uuid().nullable(),
       match: z.string().nullable(),
       translation: z.string().nullable(),

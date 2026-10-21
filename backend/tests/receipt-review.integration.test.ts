@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   RECEIPT_CASHBACK_HEADER,
+  RECEIPT_REPAIRED_HEADER,
   receiptDetailCodec,
   receiptsResponseCodec,
   storeMemoryWords,
@@ -255,6 +256,33 @@ describe('the review of a receipt', () => {
     })
     const asked = receiptDetailCodec.parse(response.json())
     expect([asked.cashback, asked.redeemed]).toEqual([amd(15.11), amd(100)])
+  })
+
+  it('tells a line the font’s swaps put right only to a phone that asks (MOL-290)', async () => {
+    const me = await insertActor(db)
+    const id = await parsedReceipt(me, [
+      { printed: 'A', price: 531, sum: 531 },
+      { printed: 'B', price: 1_032, sum: 1_032 },
+    ])
+    await db
+      .update(receiptLines)
+      .set({ repaired: true })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 1)))
+    expect((await review(me, id)).lines.map((line) => line.repaired)).toEqual([
+      undefined,
+      undefined,
+    ])
+    const response = await app.inject({
+      method: 'GET',
+      url: `/receipts/${id}`,
+      headers: {
+        cookie: await signIn(db, me),
+        'x-molvia-today': '2026-10-03',
+        [RECEIPT_REPAIRED_HEADER]: '1',
+      },
+    })
+    const asked = receiptDetailCodec.parse(response.json())
+    expect(asked.lines.map((line) => line.repaired)).toEqual([undefined, true])
   })
 
   it('doubts a price one confused digit off the memory’s, and only then names it (В-1)', async () => {

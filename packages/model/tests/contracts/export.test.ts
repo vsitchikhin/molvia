@@ -250,6 +250,7 @@ const file: ExportFile = {
           sum: money(74_000n, 'AMD'),
           discount: money(0n, 'AMD'),
           settled: true,
+          repaired: false,
           itemId: id(8),
           match: 'search',
           translation: 'молоко',

@@ -245,6 +245,8 @@ export async function receiptOfOwner(
   readPartly = false,
   /** The phone knows the detail's `cashback` and `redeemed` (`RECEIPT_CASHBACK_HEADER`, MOL-289). */
   cashback = false,
+  /** The phone knows a line's `repaired` (`RECEIPT_REPAIRED_HEADER`, MOL-290). */
+  repaired = false,
 ): Promise<ReceiptDetail> {
   const found = await repositories.receipts.one(actor.id, id)
   if (found === null) throw new DomainError(ERROR.NOT_FOUND)
@@ -315,6 +317,7 @@ export async function receiptOfOwner(
         sum: line.sum,
         discount: line.discount,
         settled: line.settled,
+        ...(repaired && line.repaired === true ? { repaired: true } : {}),
         itemId: known === null ? null : itemId,
         itemName: known,
         match:

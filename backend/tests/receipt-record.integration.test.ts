@@ -669,6 +669,50 @@ describe('«Записать»', () => {
     expect(pending.body).toContain(milk)
   })
 
+  it('records a line the font’s swaps put right as not read: no shelf price for the memory (MOL-290, Р-7)', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const cheese = await insertItem(db)
+    const id = await parsedReceipt(me, LINES.slice(1, 3))
+    await db
+      .update(receiptLines)
+      .set({ repaired: true })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 0)))
+    const line = (position: number, drams: number) => ({
+      position,
+      skip: false,
+      item: { id: cheese },
+      quantity: pieces(1),
+      amount: amount(drams),
+    })
+    const response = await record(me, id, {
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [line(0, 1_450), line(1, 980)],
+    })
+    expect(response.statusCode).toBe(200)
+    const rows = await db
+      .select()
+      .from(receiptLines)
+      .where(eq(receiptLines.receiptId, id))
+      .orderBy(asc(receiptLines.position))
+    expect(rows.map((row) => [row.position, row.repaired, row.asRead])).toEqual([
+      [0, true, false],
+      [1, false, false],
+    ])
+    // the chocolate, 890 × 1 for 980, is not as read either: neither gives the shelf a price
+    const words = await db
+      .select()
+      .from(storeMemory)
+      .where(eq(storeMemory.kind, 'sku'))
+      .orderBy(asc(storeMemory.key))
+    expect(words.map((word) => [word.key, word.priceMinor])).toEqual([
+      ['1110001', null],
+      ['1110002', null],
+    ])
+  })
+
   it('confirms no row of a line whose price the check took off as misread (MOL-255)', async () => {
     const me = await insertActor(db)
     const place = await insertPlace(db)

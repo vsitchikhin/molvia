@@ -1,5 +1,5 @@
 {
-  "id": "7bd95157-2245-4c8d-b2c5-877b8c3cf3ee",
+  "id": "a21065b8-c74c-4eee-9280-fd5b14477690",
   "prevId": "ab89d8f1-839f-40ec-b2c4-1a8c5fef4bde",
   "version": "7",
   "dialect": "postgresql",
@@ -4835,6 +4835,13 @@
           "type": "boolean",
           "primaryKey": false,
           "notNull": false
+        },
+        "repaired": {
+          "name": "repaired",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         }
       },
       "indexes": {

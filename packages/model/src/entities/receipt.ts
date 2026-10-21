@@ -494,6 +494,8 @@ export interface ReceiptLine {
   readonly sum: Money | null
   readonly discount: Money | null
   readonly settled: boolean
+  /** Put right by the digits the till's font confuses, the receipt proved whole by it (MOL-290). */
+  readonly repaired?: boolean
 }
 
 /**
@@ -529,6 +531,7 @@ export function receiptLineOf(line: ReceiptTextLine, currency: Currency): Receip
     sum: moneyOfHundredths(line.sumHundredths, currency),
     discount: moneyOfHundredths(line.discountHundredths, currency),
     settled: line.settled,
+    ...(line.repaired === true ? { repaired: true } : {}),
   }
 }
 
