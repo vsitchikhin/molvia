@@ -385,9 +385,12 @@ test('the connection back without a list keeps the field typed in; cleared, it g
   await expect(page.locator('.state').getByText('No «молоко» found')).toBeVisible()
 
   await page.route('**/api/advice', (route) => route.fulfill({ status: 500, body: '{}' }))
+  const searched = page.waitForResponse((response) => response.url().includes('/api/advice/search'))
   await context.setOffline(false)
-  // The search is asked of the server now: its answer stands where the phone's did.
-  await expect(page.locator('.state').getByText('The catalogue has no such item yet')).toBeVisible()
+  // The search is asked of the server now, and its answer — whatever the shared catalogue holds —
+  // stands where the phone's «offline» did.
+  await searched
+  await expect(page.getByText('Without a connection we search only what was rated')).toHaveCount(0)
   await expect(field).toHaveValue('молоко')
   await expect(field).toBeFocused()
   await expect(page.getByRole('heading', { name: 'The server did not answer' })).toHaveCount(0)
