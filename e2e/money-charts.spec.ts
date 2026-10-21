@@ -4,6 +4,7 @@ import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import { standAt, toTheEnd, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
+import { firstAttemptTrace } from './trace'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
@@ -337,29 +338,10 @@ test('a month read for the first time keeps the switcher where it was under the 
 })
 
 test.describe('a line gone under the category', () => {
-  // The first attempt's trace in CI (MOL-267, as the focus block of `scanner.spec`, MOL-249): this test
-  // failed once (run 37911189456, `scrollY` 1151 → 1132 with the choice where it was) and left only that
-  // message; faces arriving late were suspected and refuted in CI. The DOM before and after each step
-  // shows which block over the choice gave way. Started by hand: `test.use({ trace })` is refused in a
-  // describe, and for the whole file it would trace eighteen tests. The retry is the config's.
-  let ownTrace = false
-  test.beforeEach(async ({ context }, info) => {
-    ownTrace = false
-    if (!process.env.CI || info.retry > 0) return
-    try {
-      await context.tracing.start({ snapshots: true, screenshots: false })
-      ownTrace = true
-    } catch (error) {
-      if (!String(error).includes('Tracing has been already started')) throw error
-    }
-  })
-  test.afterEach(async ({ context }, info) => {
-    if (!ownTrace) return
-    if (info.status === info.expectedStatus) return context.tracing.stop()
-    const path = info.outputPath('trace.zip')
-    await context.tracing.stop({ path })
-    await info.attach('trace', { path, contentType: 'application/zip' })
-  })
+  // The first attempt's trace in CI (MOL-267): this test failed once (run 37911189456, `scrollY`
+  // 1151 → 1132 with the choice where it was) and left only that message; faces arriving late were
+  // suspected and refuted. The DOM before and after each step shows which block gave way.
+  firstAttemptTrace()
 
   test('a line gone under the category of «Год» keeps the choice and the page where they were', async ({
     page,
