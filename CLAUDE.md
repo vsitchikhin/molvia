@@ -237,7 +237,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   before.
 - **The search on «Что брать» is answered by the server** (`GET /advice/search`, MOL-128): the
   list's own statement and rules for what is found, never glued on the phone; it writes no visit and
-  no pick; offline — the remembered list by the start of words.
+  no pick; offline — the remembered list by the start of words, and with none remembered the field
+  stays and says so (MOL-201).
 - **«Тут дешевле» is one's own history only** (`GET /advice/prices`, MOL-92): a place's last price,
   the record's city, «не брать нигде» with no price; another item of the kind (`kindKey`) when
   cheaper and rated no worse; it writes nothing; offline — the answer remembered, let go by a verdict.
