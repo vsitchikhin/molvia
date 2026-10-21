@@ -82,7 +82,7 @@ export function receiptPaidOf(total: Money | null, redeemed: Money | null): Mone
 
 // A total less a part of it in its currency; a part that is the whole of it or more is no reading.
 function less(total: Money | null, part: Money | null): Money | null {
-  if (total === null || part === null || part.currency !== total.currency) return total
+  if (total === null || part?.currency !== total.currency) return total
   const minor = total.minor - part.minor
   return minor > 0n ? { minor, currency: total.currency } : total
 }

@@ -51,6 +51,12 @@ export interface ReceiptTextLine {
    */
   readonly asPrinted: boolean
   /**
+   * Put right by the digits the till's font confuses, on a model's reading proven whole by it (MOL-290):
+   * the one reading of the line that holds its arithmetic and the card's rate, every line then meeting a
+   * total two places vouch for. Shown with «проверьте», never as printed.
+   */
+  readonly repaired?: boolean
+  /**
    * The rows the line may be cut out from for the reader's training (MOL-169): its figures, and its
    * name only when the item's number was read on it. A name row is the first row above the figures,
    * and above the first item that is the head — the VAT, a buyer's name — when OCR lost the name: the

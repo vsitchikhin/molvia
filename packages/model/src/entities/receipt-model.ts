@@ -257,6 +257,159 @@ function totalOf(
   return { total: shown, read, met, cashback, redeemed }
 }
 
+/** The most swaps in one figure: «550» copied as «660» is two (owner, В-2 of MOL-290). */
+export const REPAIR_SWAPS_PER_FIGURE = 2
+
+/**
+ * Past this many readings of one line's quantity, price and discount the line is not put right, and nor is
+ * its receipt; past `REPAIR_RECEIPT_COMBINATIONS_MAX` over a receipt, none is. A figure of nine digits all
+ * fives and sixes reads 46 ways with two swaps, three of them 97 336 — and it runs in the API's process.
+ * A line of the bench tries at most a few hundred.
+ */
+export const REPAIR_COMBINATIONS_MAX = 20_000
+export const REPAIR_RECEIPT_COMBINATIONS_MAX = 200_000
+
+/** The readings of lines tried in this process — read by tests alone: a ceiling is held by the work it saves. */
+export const repairTries = { count: 0 }
+
+/** A figure as the model wrote it and each way the font's swaps read it, with how many each took. */
+function readingsOf(
+  swaps: Readonly<Record<string, string>>,
+  value: string | null,
+  digits: number,
+): { value: number | null; swaps: number }[] {
+  if (value === null) return [{ value: null, swaps: 0 }]
+  // a figure is digits and a point: a character is a code unit
+  const at: number[] = []
+  for (let i = 0; i < value.length; i += 1) if (swaps[value.charAt(i)] !== undefined) at.push(i)
+  const out: { value: number | null; swaps: number }[] = []
+  const walk = (text: string, from: number, taken: number): void => {
+    out.push({ value: figureOf(text, digits), swaps: taken })
+    if (taken === REPAIR_SWAPS_PER_FIGURE) return
+    for (const i of at.filter((one) => one >= from)) {
+      const swapped = swaps[text.charAt(i)] ?? text.charAt(i)
+      walk(text.slice(0, i) + swapped + text.slice(i + 1), i + 1, taken + 1)
+    }
+  }
+  walk(value, 0, 0)
+  return out.filter((one) => one.value !== null)
+}
+
+/**
+ * The card's rate the lines as copied share: the discount over the shelf price, to a tenth of a per cent,
+ * most of them at it — «Ереван Сити»'s 1 %, 0,5 %. None where no line prints a discount.
+ */
+function cardRate(lines: readonly ReceiptTextLine[]): number | null {
+  const counts = new Map<number, number>()
+  for (const line of lines) {
+    const { quantityMilli: qty, priceHundredths: price, discountHundredths: discount } = line
+    if (!line.settled || qty === null || price === null || discount === null || discount <= 0)
+      continue
+    const shelf = Math.round((qty * price) / 1_000)
+    if (shelf <= 0) continue
+    const rate = Math.round((discount * 1_000) / shelf) / 1_000
+    counts.set(rate, (counts.get(rate) ?? 0) + 1)
+  }
+  return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+}
+
+/**
+ * The one reading of a line whose arithmetic does not hold as the model copied it, by the font's swaps
+ * (MOL-290): it holds as `lineOf` judges a line — to the till's rounding only where the line prints a
+ * discount — and its discount is the card's rate of its shelf price, to that rounding, where it prints one
+ * (the till's discount is not the rate rounded either way on 21 of the bench's 254 lines: 395 → 3,96). Of the
+ * readings with the fewest swaps there must be one; two are a doubt, and the line is not put right.
+ */
+function repairOf(
+  swaps: Readonly<Record<string, string>>,
+  line: ModelReceipt['lines'][number],
+  rate: number | null,
+  budget: { left: number },
+): { qty: number; price: number; discount: number | null; sum: number } | null {
+  const qtys = readingsOf(swaps, line.quantity, 3)
+  const prices = readingsOf(swaps, line.unit_price, 2)
+  const discounts = readingsOf(swaps, line.discount, 2)
+  const sums = new Map<number, number>()
+  for (const one of readingsOf(swaps, line.sum, 2)) {
+    if (one.value === null) continue
+    sums.set(one.value, Math.min(sums.get(one.value) ?? Infinity, one.swaps))
+  }
+  const combinations = qtys.length * prices.length * discounts.length
+  if (combinations > REPAIR_COMBINATIONS_MAX || combinations > budget.left) return null
+  budget.left -= combinations
+  repairTries.count += combinations
+  const rounding = line.discount === null ? 0 : TOLERANCE_HUNDREDTHS
+  let fewest = Infinity
+  const found = new Map<
+    string,
+    { qty: number; price: number; discount: number | null; sum: number }
+  >()
+  for (const q of qtys) {
+    for (const p of prices) {
+      for (const d of discounts) {
+        if (q.value === null || p.value === null || q.value <= 0 || p.value <= 0) continue
+        const shelf = Math.round((q.value * p.value) / 1_000)
+        const off = d.value ?? 0
+        if (rate !== null && off > 0 && Math.abs(off - Math.round(shelf * rate)) > rounding)
+          continue
+        for (let sum = shelf - off - rounding; sum <= shelf - off + rounding; sum += 1) {
+          const sumSwaps = sums.get(sum)
+          if (sumSwaps === undefined || sum < 0) continue
+          const swapped = q.swaps + p.swaps + d.swaps + sumSwaps
+          if (swapped === 0 || swapped > fewest) continue
+          if (swapped < fewest) {
+            fewest = swapped
+            found.clear()
+          }
+          const reading = { qty: q.value, price: p.value, discount: d.value, sum }
+          found.set(JSON.stringify(reading), reading)
+        }
+      }
+    }
+  }
+  return found.size === 1 ? ([...found.values()][0] ?? null) : null
+}
+
+/**
+ * A model's reading put right by the digits the till's font confuses (MOL-290, owner's В-1…В-4): every
+ * line whose arithmetic does not hold as copied takes its one reading by the font's swaps, and the lines then
+ * meet, to the hundredth, the total two places vouch for (`owed`, less what went to the card) — the second
+ * source. Anything short of it — one line with no reading or two, the sum off by a luma — and the reading is
+ * as the model copied it, its lines emptied by the check as before. The model is never asked to do the sum:
+ * copying, it bends the digits to fit (MOL-268); the arithmetic is ours.
+ */
+function repaired(
+  reading: PhotoReading,
+  answer: ModelReceipt,
+  lines: readonly ReceiptTextLine[],
+  owed: number,
+): ReceiptTextLine[] | null {
+  if (lines.length === 0 || lines.every((line) => line.settled)) return null
+  const rate = cardRate(lines)
+  const budget = { left: REPAIR_RECEIPT_COMBINATIONS_MAX }
+  const out: ReceiptTextLine[] = []
+  for (const [i, line] of lines.entries()) {
+    const copied = answer.lines[i]
+    if (line.settled) {
+      out.push(line)
+      continue
+    }
+    const found = copied === undefined ? null : repairOf(reading.modelSwaps, copied, rate, budget)
+    if (found === null) return null
+    out.push({
+      ...line,
+      quantityMilli: found.qty,
+      priceHundredths: found.price,
+      discountHundredths: found.discount,
+      sumHundredths: found.sum,
+      settled: true,
+      asPrinted: false,
+      repaired: true,
+    })
+  }
+  return out.reduce((all, line) => all + (line.sumHundredths ?? 0), 0) === owed ? out : null
+}
+
 /**
  * The model's answer as the parse's reading of the receipt (MOL-272, Т-2). The layout is the card's where
  * any line prints a discount, a zero one too — «Ереван Сити»'s till rounds what was paid off its shelf
@@ -266,8 +419,12 @@ function totalOf(
  */
 export function receiptTextOfModel(reading: PhotoReading, answer: ModelReceipt): ReceiptText {
   const discounted = answer.lines.some((line) => figureOf(line.discount, 2) !== null)
-  const lines = answer.lines.map(lineOf)
-  const { total, read, met, cashback, redeemed } = totalOf(reading, answer, lines)
+  const copied = answer.lines.map(lineOf)
+  const { total, read, met, cashback, redeemed } = totalOf(reading, answer, copied)
+  // a total two places vouch for that the lines as copied do not meet: put right by the font's swaps, or not
+  const fixed =
+    total === null || met ? null : repaired(reading, answer, copied, total - (cashback ?? 0))
+  const lines = fixed ?? copied
   // a receipt with no line is a sum to record where it prints a section or two places vouch for its
   // total (MOL-227) — the model names a sole trader's «Բաժին 1» as a total no more often than not; with
   // neither it is a reading of nothing, «переснимите» as Tesseract's (`needsReshoot`)
@@ -289,7 +446,7 @@ export function receiptTextOfModel(reading: PhotoReading, answer: ModelReceipt):
     receiptNo: number,
     totalHundredths: total,
     readTotalHundredths: read,
-    balanced: met,
+    balanced: met || fixed !== null,
     cashbackHundredths: cashback,
     redeemedHundredths: redeemed,
     lines,

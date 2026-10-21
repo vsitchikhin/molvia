@@ -3,6 +3,7 @@ import { ARMENIAN_RECEIPTS } from '#model/entities/receipt-card'
 import { needsReshoot, receiptCityOf } from '#model/entities/receipt'
 import {
   MODEL_RECEIPT_LINES_MAX,
+  repairTries,
   modelHeadRows,
   modelReceiptSchema,
   receiptTextOfModel,
@@ -274,7 +275,8 @@ describe('the total of a model’s reading (MOL-244 by the card’s words)', () 
     })
 
     it('takes the sum taxed with VAT for the second place where a line is not as read', () => {
-      const off = [carded[0]!, { ...carded[1]!, sum: '960.4' }]
+      // a 3 copied for the 5: no pair the model confuses, so nothing puts it right (MOL-290)
+      const off = [carded[0]!, { ...carded[1]!, sum: '930.4' }]
       expect(shown(answer({ lines: off, totals: summary() }))).toEqual([
         170_000,
         1_700,
@@ -344,6 +346,150 @@ describe('the total of a model’s reading (MOL-244 by the card’s words)', () 
     expect(
       read(answer({ lines: [{ ...lines[0]!, sum: '741' }], totals })).totalHundredths,
     ).toBeNull()
+  })
+})
+
+// MOL-290: «Ереван Сити»'s «5» has a flat top, and the model copies it as «6» — am-44's six lines, as printed
+// under a made-up head (the repository is public)
+describe('a line put right by the font’s 5↔6, the receipt whole (MOL-290)', () => {
+  const carded = (over: Partial<Line>) => line({ code: '0401', unit: 'pcs', ...over })
+  // as read: 1 × 290 − 2,9 = 287,1 — the card's 1 %
+  const bread = carded({ quantity: '1', unit_price: '290', discount: '2.9', sum: '287.1' })
+  // printed 1 × 530 − 5,3 = 524,7, copied with a discount of 6,3
+  const curd = carded({ quantity: '1', unit_price: '530', discount: '6.3', sum: '524.7' })
+  // printed 0,252 × 205 − 0,52 = 51,14, copied 0,262 / 0,62 / 61,14: a swap in three figures
+  const apples = carded({
+    quantity: '0.252'.replace('5', '6'),
+    unit: 'kg',
+    unit_price: '205',
+    discount: '0.62',
+    sum: '61.14',
+  })
+  // printed 3 × 185 − 5,56 = 549,44, copied 6,56 and 649,44
+  const eggs = carded({ quantity: '3', unit_price: '185', discount: '6.56', sum: '649.44' })
+  const owed = (amount: string) => [
+    { label: 'Ընդամենը', amount },
+    { label: 'Վճարված է Առձեռն', amount },
+  ]
+  const read2 = (lines: Line[], totals: { label: string; amount: string }[]) => {
+    const text = read(answer({ lines, totals }))
+    return { text, shown: verifiedReading(text, { byModel: true }) }
+  }
+  const figuresOf = (text: ReturnType<typeof read>) =>
+    text.lines.map((l) => [
+      l.quantityMilli,
+      l.priceHundredths,
+      l.discountHundredths,
+      l.sumHundredths,
+    ])
+
+  it('puts every line right by its one reading, the lines then meeting a total two places print', () => {
+    const { text, shown } = read2([bread, curd, apples, eggs], owed('1412.38'))
+    expect(figuresOf(shown)).toEqual([
+      [1_000, 29_000, 290, 28_710],
+      [1_000, 53_000, 530, 52_470],
+      [252, 20_500, 52, 5_114],
+      [3_000, 18_500, 556, 54_944],
+    ])
+    expect(shown.lines.map((l) => l.repaired === true)).toEqual([false, true, true, true])
+    expect(shown.lines.map((l) => l.asPrinted)).toEqual([true, false, false, false])
+    expect([text.totalHundredths, text.balanced, shown.balanced]).toEqual([141_238, true, true])
+  })
+
+  it('puts nothing right where only one place prints the total', () => {
+    const { text, shown } = read2([bread, curd], owed('811.80').slice(0, 1))
+    expect(text.lines.some((l) => l.repaired === true)).toBe(false)
+    expect(shown.lines[1]?.sumHundredths).toBeNull()
+  })
+
+  it('puts nothing right where the lines put right miss the total by a luma', () => {
+    const { text, shown } = read2([bread, curd], owed('811.81'))
+    expect(text.lines.some((l) => l.repaired === true)).toBe(false)
+    expect([shown.lines[1]?.sumHundredths, shown.balanced]).toEqual([null, false])
+  })
+
+  it('puts nothing right where a line reads two ways at its fewest swaps', () => {
+    // 65 and 56 copied for one number printed twice: 55, 56, 65 or 66 both times — two swaps each
+    const twice = carded({ quantity: '1', unit_price: '65', discount: null, sum: '56' })
+    for (const total of ['342.10', '343.10', '352.10', '353.10']) {
+      const { text } = read2([bread, twice], owed(total))
+      expect({ total, repaired: text.lines.some((l) => l.repaired === true) }).toEqual({
+        total,
+        repaired: false,
+      })
+    }
+  })
+
+  it('takes no reading whose discount is not the card’s rate', () => {
+    // 1 × 400 − 56 copied, 334 paid: only a discount of 66 holds, 16,5 % where the card gives 1 %
+    const off = carded({ quantity: '1', unit_price: '400', discount: '56', sum: '334' })
+    expect(read2([bread, off], owed('621.10')).text.lines[1]?.repaired).toBeUndefined()
+    // with no line printing the rate, the arithmetic alone and the total decide
+    expect(read2([off], owed('334.00')).text.lines[0]?.discountHundredths).toBe(6_600)
+  })
+
+  it('confirms no line misread alike in its price and sum: the total does not meet it (am-34)', () => {
+    // printed 1 × 640 − 6,4 = 633,6, copied 540 / 5,4 / 534,6 — it holds as copied
+    const alike = carded({ quantity: '1', unit_price: '540', discount: '5.4', sum: '534.6' })
+    const { text, shown } = read2([alike, curd], owed('1158.30'))
+    expect(text.lines.some((l) => l.repaired === true)).toBe(false)
+    expect([shown.balanced, shown.lines[0]?.sumHundredths, shown.lines[1]?.sumHundredths]).toEqual([
+      false,
+      53_460,
+      null,
+    ])
+  })
+
+  it('swaps only the card’s pair: a 1 for a 4 is not put right', () => {
+    // printed 1 × 140 − 1,4 = 138,6, copied 110: Tesseract confuses 1 and 4, the model is not measured on it
+    const four = carded({ quantity: '1', unit_price: '110', discount: '1.4', sum: '138.6' })
+    expect(read2([bread, four], owed('425.70')).text.lines[1]?.repaired).toBeUndefined()
+  })
+
+  it('tries two swaps in one figure — 550 copied as 660 — and no more', () => {
+    const twice = carded({ quantity: '1', unit_price: '660', discount: '5.5', sum: '544.5' })
+    expect(read2([bread, twice], owed('831.60')).text.lines[1]?.priceHundredths).toBe(55_000)
+    // printed 2 × 555 = 1 110, copied 666: one reading, of three swaps in the price
+    const thrice = carded({ quantity: '2', unit_price: '666', discount: null, sum: '1110' })
+    expect(read2([bread, thrice], owed('1397.10')).text.lines[1]?.repaired).toBeUndefined()
+  })
+
+  it('leaves a line past its ceiling as copied, trying none of its readings', () => {
+    // 67 readings of the price, 46 of the discount, 11 of the quantity: 33 902, past 20 000
+    const wide = carded({
+      quantity: '5.565',
+      unit_price: '565656565.56',
+      discount: '5656565.56',
+      sum: '1',
+    })
+    const before = repairTries.count
+    const { text } = read2([bread, wide], owed('288.10'))
+    expect([repairTries.count - before, text.lines[1]?.repaired]).toEqual([0, undefined])
+  })
+
+  it('puts no receipt right past the budget of its readings: 89 dear lines, and not 90', () => {
+    // printed 5,565 × 65 666,66 − 3 654,35, copied 6,565: 2 233 readings a line, 200 000 a receipt
+    const dear = carded({
+      quantity: '6.565',
+      unit: 'kg',
+      unit_price: '65666.66',
+      discount: '3654.35',
+      sum: '361780.61',
+    })
+    const of = (n: number) => {
+      const total = ((28_710 + n * 36_178_061) / 100).toFixed(2)
+      const before = repairTries.count
+      const { text } = read2([bread, ...Array.from({ length: n }, () => dear)], owed(total))
+      return [text.lines.filter((l) => l.repaired === true).length, repairTries.count - before]
+    }
+    expect(of(89)).toEqual([89, 198_737])
+    expect(of(90)).toEqual([0, 198_737])
+  })
+
+  it('takes away the mark of a line the check emptied', () => {
+    const repaired = read(answer({ lines: [bread, curd], totals: owed('811.80') }))
+    const unproven = verifiedReading({ ...repaired, totalHundredths: null }, { byModel: true })
+    expect(unproven.lines[1]).toMatchObject({ repaired: false, sumHundredths: null })
   })
 })
 

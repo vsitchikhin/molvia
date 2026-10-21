@@ -100,6 +100,12 @@ export interface PhotoReading {
   readonly numbers: readonly NumberFormat[]
   /** Digits OCR confuses in the tills' font: a figure is tried with each of them swapped in. */
   readonly swaps: Readonly<Record<string, string>>
+  /**
+   * Digits a model confuses in the tills' font (MOL-290): a line whose arithmetic does not hold as the model
+   * copied it is tried with them swapped in. Only the pairs measured on the model's bench: Tesseract's
+   * `swaps` are its own, and a pair joins here with a measure of its own.
+   */
+  readonly modelSwaps: Readonly<Record<string, string>>
   /** Letters Tesseract puts where the font has digits, before a digit or a point. */
   readonly digitLike: Readonly<Record<string, string>>
   readonly words: ReceiptWords
@@ -122,6 +128,8 @@ export const ARMENIAN_RECEIPTS: PhotoReading = {
   // «5 403,12 ֏», «688.09դրամ»: a point or a comma before the hundredths, thousands apart by a space
   numbers: [{ fractionDigits: 2 }],
   swaps: { 5: '6', 6: '5', 1: '4', 4: '1', 3: '8', 8: '3', 0: '9', 9: '0' },
+  // «Ереван Сити»'s «5» has a flat top: am-44's six lines the model lost, am-34 faded
+  modelSwaps: { 5: '6', 6: '5' },
   digitLike: { Յ: '3', З: '3', б: '6', О: '0', O: '0', o: '0' },
   words: {
     total: 'Ընդամենը',

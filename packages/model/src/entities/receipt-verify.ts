@@ -38,7 +38,7 @@ function provenWhole(text: ReceiptText): boolean {
   const total = text.totalHundredths - (text.cashbackHundredths ?? 0)
   let sum = 0
   for (const line of text.lines) {
-    if (!line.asPrinted || line.sumHundredths === null) return false
+    if (!(line.asPrinted || line.repaired === true) || line.sumHundredths === null) return false
     sum += line.sumHundredths
   }
   return sum === total
@@ -52,7 +52,9 @@ function verifiedLine(
 ): ReceiptTextLine {
   const { quantityMilli: qty, priceHundredths: price, sumHundredths: sum } = line
   const discount = line.discountHundredths ?? 0
-  if (!line.asPrinted || qty === null || qty <= 0 || sum === null || sum < 0) return blank(line)
+  // a line put right by the font's swaps stands only on the receipt it proved whole (MOL-290)
+  const read = line.asPrinted || (line.repaired === true && proven)
+  if (!read || qty === null || qty <= 0 || sum === null || sum < 0) return blank(line)
   // a gift — its whole price the discount — is nothing paid only where that holds to the hundredth
   // (review round 2, А7 «а»): «0 0» or a stray «0,00» holds any arithmetic
   if (sum === 0) {
@@ -79,6 +81,8 @@ function verifiedLine(
 function blank(line: ReceiptTextLine): ReceiptTextLine {
   return {
     ...line,
+    // emptied, a line put right is no longer one
+    ...(line.repaired === true ? { repaired: false } : {}),
     quantityMilli: null,
     priceHundredths: null,
     sumHundredths: null,
