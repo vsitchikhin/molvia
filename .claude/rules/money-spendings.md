@@ -858,8 +858,14 @@ task did not: five plans of six there are a percent of the month's income — «
   knows nothing to choose (MOL-191, В-2) — and only while a live category has no row; offline it is not
   now, «Задать план можно со связью» (Ф-6), and the sheet of a row says the same of «Сохранить» and
   «Убрать план» under a `StatusStrip` of its own. **The connection is one line under the switcher**:
-  offline over a month kept, «сервер не ответил» with «Повторить» in it, since the strip holds «Задать
-  план» (К-5). **A row is `ListRow`** with the category's circle, as on «Категории» and «Траты»; the
+  offline over a month kept or over this visit's answer — the strip saying «можно со связью» with
+  nothing above it was the screen's own contradiction (adversarial А3) — «сервер не ответил» with
+  «Повторить» in it, since the strip holds «Задать план» (К-5). **«Offline» is read again when the app
+  comes back into view** (`useOnline`, adversarial А1, А1′): a frozen PWA missed `online` and the strip
+  stood «можно со связью» over the answer the server had just given. **A write that takes away what
+  opened its sheet hands the focus on** (adversarial А2): the last category planned takes the strip, a
+  row of «Без плана» moves into the plans, a plan removed moves its row out — the focus goes to that
+  category's row wherever it stands, else to the strip, never to the page's body. **A row is `ListRow`** with the category's circle, as on «Категории» and «Траты»; the
   chevron on every live row — each opens the sheet of its plan — and **«осталось» in the title's line,
   never the tail** (`name-beside-figure`): a tail of its own width made every bar another length, and
   bars one under another are read against each other. **The bar is the category's colour**, never the
