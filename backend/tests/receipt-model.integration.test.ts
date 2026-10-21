@@ -249,7 +249,39 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
       reader: 'model',
       costMicroUsd: 2_180,
       tokens: TOKENS,
+      unparsed: 0,
     })
+  }, 30_000)
+
+  it('reads a discount with its minus and a sum with its comma, and counts what it could not (MOL-294)', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    const [milk, bread] = ANSWER.lines
+    const spelt: ModelReceipt = {
+      ...ANSWER,
+      lines: [
+        { ...milk!, sum: '740,00', article: null },
+        { ...bread!, discount: '-2.90', sum: '287,1' },
+        { ...milk!, printed: 'Թեյ «Օրինակ»', quantity: '1', unit_price: '7,4,0', sum: '740' },
+      ],
+      totals: [
+        { label: 'Ընդամենը', amount: '1 767,10' },
+        { label: 'Վճարված է Առձեռն', amount: '1 767.10' },
+      ],
+    }
+    const model = fakeModel(() =>
+      Promise.resolve({ kind: 'read', answer: spelt, costMicroUsd: 2_180, tokens: TOKENS }),
+    )
+    const reports = await readAll(benchReader(), model)
+    const lines = await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id))
+    expect(lines.map((line) => [line.printed, line.sumMinor, line.discountMinor])).toEqual([
+      ['Կաթ «Օրինակ» 3.2% 1լ', 74_000n, null],
+      ['Հաց «Օրինակ»', 28_710n, 290n],
+      ['Թեյ «Օրինակ»', null, null],
+    ])
+    // the count alone, never the figure (Т-8)
+    expect(reports.find((r) => r.kind === 'read')).toMatchObject({ reader: 'model', unparsed: 1 })
+    expect(JSON.stringify(reports)).not.toContain('7,4,0')
   }, 30_000)
 
   it('leaves to Tesseract whoever has no grant, a grant past or ending now, or no edition 3', async () => {
@@ -263,8 +295,12 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
     for (const one of people) await queued(one)
     const reader = benchReader()
     const model = fakeModel(() => read())
-    await readAll(reader, model)
+    const reports = await readAll(reader, model)
     expect(model.asked).toBe(0)
+    // Tesseract's figures are no model's: no count at all
+    expect(reports.filter((r) => r.kind === 'read').map((r) => r.unparsed)).toEqual(
+      Array(5).fill(null),
+    )
     const rows = await db.select({ version: receipts.readerVersion }).from(receipts)
     expect(rows.map((row) => row.version)).toEqual(Array(5).fill('tesseract 5.5.0 · test'))
     expect(await month()).toBeNull()

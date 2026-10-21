@@ -780,6 +780,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                 costMicroUsd: event.costMicroUsd,
                 inputTokens: event.tokens?.input,
                 outputTokens: event.tokens?.output,
+                unparsed: event.unparsed,
               },
               'receipt read',
             )
