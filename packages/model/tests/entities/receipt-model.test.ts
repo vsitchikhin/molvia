@@ -156,9 +156,23 @@ describe('a model’s answer as the parse’s reading (MOL-272)', () => {
       '01282006',
       '99784818',
     ])
-    // two fiscal numbers — a prepayment slip, two receipts on a photo — or two tax numbers: none is the key
-    expect(key('ՀՎՀՀ:01234567', 'Ֆիսկալ համար 27410811', 'Ֆիսկալ համար 27410812')).toEqual([
+    // two fiscal numbers — a prepayment slip over «Ереван Сити»'s receipt — are the pair, in whichever order the
+    // model copied them (MOL-293, В-3 «а»); three are none, and two tax numbers no tax number
+    expect(key('ՀՎՀՀ:01234567', 'Ֆիսկալ համար 58899619', 'Ֆիսկալ համար 34408642')).toEqual([
       '01234567',
+      '34408642+58899619',
+    ])
+    expect(key('Ֆիսկալ համար 34408642', 'ԿՀ: 70548', 'Ֆիսկալ համար 58899619')).toEqual([
+      null,
+      '34408642+58899619',
+    ])
+    expect(key('Ֆիսկալ համար 27410811', 'Ֆիսկալ համար 27410812', 'Ֆիսկալ համար 27410813')).toEqual([
+      null,
+      null,
+    ])
+    // either of the pair printed under another label too is a constant of the till: no key (А6, round 4)
+    expect(key('ԳՀ:55512345', 'Ֆիսկալ համար 55512345', 'Ֆիսկալ համար 27410812')).toEqual([
+      null,
       null,
     ])
     expect(key('ՀՎՀՀ:01234567', 'ՀՎՀՀ:01234568', 'Ֆիսկալ համար 27410811')).toEqual([

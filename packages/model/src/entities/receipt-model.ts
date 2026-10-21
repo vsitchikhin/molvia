@@ -137,7 +137,7 @@ function labelled(answer: ModelReceipt, word: string, between: string): string[]
   return answer.id_rows.flatMap((row) => [...row.matchAll(pattern)].map((found) => found[1] ?? ''))
 }
 
-/** The one number of them, or none — two receipts on a photo, a prepayment slip over the receipt, print two. */
+/** The one number of them, or none — two tax numbers are two sellers. */
 const oneOf = (numbers: string[]): string | null =>
   numbers.length > 0 && numbers.every((number) => number === numbers[0])
     ? (numbers[0] ?? null)
@@ -156,17 +156,24 @@ const timesPrinted = (answer: ModelReceipt, number: string): number =>
  * print under another label too** — the shop's tax number, the till's registration: the same on every
  * receipt of the till, and every one after the first «recorded before» (adversarial А6, round 4). The tax
  * number keeps no such guard: it is the same on every receipt anyway, and the bench's one number under two
- * labels was the tax number under «ՀՎՀՀ» and «ՀԴՄ» both, right.
+ * labels was the tax number under «ՀՎՀՀ» and «ՀԴՄ» both, right. Two fiscal numbers are a pair (MOL-293);
+ * three are none.
  */
 function keyOf(
   reading: PhotoReading,
   answer: ModelReceipt,
 ): { tin: string | null; number: string | null } {
   const fiscals = labelled(answer, reading.words.fiscal, '\\S*(?:\\s+\\S*)?\\s*')
-  const fiscal = oneOf(fiscals)
+  const distinct = [...new Set(fiscals)].sort()
+  // each under its own label alone: one printed under another too is a constant of the till (А6, round 4)
+  const own = distinct.every(
+    (fiscal) => timesPrinted(answer, fiscal) === fiscals.filter((one) => one === fiscal).length,
+  )
   return {
     tin: oneOf(labelled(answer, reading.words.tin, '\\S{0,2}\\s*')),
-    number: fiscal !== null && timesPrinted(answer, fiscal) === fiscals.length ? fiscal : null,
+    // a prepayment slip printed over «Ереван Сити»'s receipt has a fiscal number of its own, and the model
+    // copies the two in either order: the pair is the paper's key, as either alone would be (MOL-293, В-3 «а»)
+    number: !own || distinct.length === 0 || distinct.length > 2 ? null : distinct.join('+'),
   }
 }
 
