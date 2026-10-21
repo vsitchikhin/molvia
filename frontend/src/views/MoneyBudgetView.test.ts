@@ -1388,3 +1388,24 @@ describe('MoneyBudgetView: review of MOL-192, round 6', () => {
     })
   }
 })
+
+describe('MoneyBudgetView: review of MOL-192, round 7', () => {
+  // Adversarial Д2, self-review 7 №6: the identity holds the queues on the device, never a write made by
+  // hand in a sheet (MOL-56) — the app shown by the drawer with `me()` unanswered still writes a plan.
+  for (const state of ['error', 'loading', 'offline'] as const) {
+    it(`a plan is written while the identity is ${state}, by the same person`, async () => {
+      moneyBudget.mockResolvedValue(budget())
+      const view = await render()
+      useActorStore().state = state
+      await view.findAll('li .list-row')[1]?.trigger('click')
+      await flushPromises()
+      type('input[inputmode=numeric]', '6')
+      await pressUntil(en.budget.sheet.save, () => {
+        expect(setBudgetPlan).toHaveBeenCalledTimes(1)
+      })
+      await vi.waitFor(() => {
+        expect(document.querySelector('dialog[open]')).toBeNull()
+      })
+    })
+  }
+})

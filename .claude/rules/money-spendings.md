@@ -877,10 +877,13 @@ task did not: five plans of six there are a percent of the month's income — «
   row opened again and saved while the swept write was on its way left the older sum on the server.
   **The queue is `useMoneyBudget`'s, not the screen's** (Г2): a step back and in again mounts a new
   screen while the old one's write is on its way, and kept in the sheet, the new one's went first.
-  **Outliving the screen, it outlives the person: a write goes only while the server still names the
-  one who tapped** (adversarial Д1, MOL-56's rule for every queue) — else it is refused unsent: the door
-  shut by a `401` takes the screens away with no reload, and the savings target of one person, waiting
-  behind a hung write, went into the account of the next. The prices, named: a refusal of a write whose
+  **Outliving the screen, it outlives the person: a write goes only while the one who tapped is still
+  the one here and the door is open** (adversarial Д1) — else it is refused unsent: the door shut by a
+  `401` takes the screens away with no reload, and the savings target of one person, waiting behind a
+  hung write, went into the account of the next. **Not «once the server has named them»** (Д2,
+  self-review 7): that is MOL-56's rule for the queues on the device, and a write made by hand in a
+  sheet is not held by it — held, every plan was refused unsent while `me()` went unanswered at the
+  launch, with the server answering everything else. The prices, named: a refusal of a write whose
   sheet was swept away is said nowhere, as before; a write waits, «Сохраняем…», while the one before it
   hangs, up to the client's 15 s — whoever made that one. **A row is `ListRow`**
   with the category's circle, as on «Категории» and «Траты»; the chevron on every live row — each opens

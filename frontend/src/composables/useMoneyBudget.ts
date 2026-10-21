@@ -20,10 +20,12 @@ export interface MoneyBudgetState {
 // The write of a plan before, answered or not. A plan is the last write the server got, with no
 // revision, so the writes go in the order of the taps (adversarial Г1 of MOL-192) — kept here, not in
 // the screen: a step back and in again mounts a new screen while the write of the old one is on its
-// way, and the new one's went first (Г2). It outlives the screen, so it outlives the person too: a write
-// goes only while the server still says it is the one who tapped (MOL-56), or it would land in the
-// account of whoever came in through the door meanwhile (adversarial Д1). One for the whole module, the
-// tests' too: a write a test leaves on its way holds every write after it.
+// way, and the new one's went first (Г2). It outlives the screen, so it outlives the person too: a
+// write goes only while the one who tapped is still the one here and the door is open, or it would
+// land in the account of whoever came in meanwhile (adversarial Д1). Not «once the server has named
+// them»: that holds the queues on the device, never a write made by hand in a sheet (MOL-56), and with
+// the identity unanswered at the launch every plan was refused unsent (Д2). One for the whole module,
+// the tests' too: a write a test leaves on its way holds every write after it.
 let previous: Promise<unknown> = Promise.resolve()
 
 function inTurn(
@@ -32,8 +34,8 @@ function inTurn(
   owner: string | null,
 ): Promise<MoneyBudgetView> {
   const written = previous.then(() => {
-    if (actor.state !== 'ready' || owner === null || actor.id !== owner)
-      throw new Error('the plan was tapped by someone the server no longer names')
+    if (owner === null || actor.id !== owner || actor.state === 'signed-out')
+      throw new Error('the plan was tapped by someone no longer here')
     return api.setBudgetPlan(body)
   })
   previous = written.catch(() => undefined)
