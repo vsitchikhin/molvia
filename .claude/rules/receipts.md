@@ -1030,7 +1030,10 @@ ways of moving them nothing is put right. **And never between two sums** (review
 fewest swaps give sums more than the till's rounding apart — «160» at 150, or «622 / 6.22» at 516,78 read back or with
 its sum swapped — the line is a doubt; the total confirms a line's one sum and chooses only a luma — of the sum alone,
 at the fewest swaps' quantity and price (review round 4, Г3: 0,51 × 665 = 339,15 read as 0,61 × 556 = 339,16 beside a
-line a luma short); the same sum split another way stays, a doubt. A line read whole is moved by every sum its fewest
+line a luma short); the same sum split another way stays, a doubt. The fewest swaps must read one quantity and one price
+besides (review round 5, Г4): 0,61 × 515 = 314,15 with its price copied «616» reads, two swaps either way, as 0,51 × 616
+= 314,16 too — a quantity a luma would have chosen, so a doubt; on a till that prints no discount a luma is therefore
+never chosen, the quantity times the price being the sum to the luma. A line read whole is moved by every sum its fewest
 swaps give, apart or not (№9): Г1 held to it lost «505.56»'s luma, and «205.05 / 205.06» beside it was put right at
 205,05. Two readings equally cheap let the cottage cheese's 615,78 pay for am-34 again, Б2 dodged by one more error of
 the model. **The price, named:** such a line stays empty as before MOL-290, copied right beside it or not — lines put
