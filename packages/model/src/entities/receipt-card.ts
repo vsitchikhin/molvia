@@ -43,6 +43,15 @@ export interface ReceiptWords {
    * year: never the receipt's total, neither read nor a vote (MOL-288).
    */
   readonly sinceStart: string
+  /**
+   * The card's discount of the transaction, sent to the card instead of taken off — «Զեղչ գործարքից», told
+   * from a line's discount by this word beside the discount's (MOL-289): the lines make the total less it.
+   */
+  readonly cashback: string
+  /** The sum taxed with VAT, «ԱԱՀ-ով հարկվող»: the lines' sum, a second place of it (MOL-289). */
+  readonly taxed: string
+  /** The card's bonus this receipt is partly paid with, «Կանխավճարի մարում» (MOL-289). */
+  readonly redeemed: string
   /** The payment, in cash or by card. */
   readonly paid: readonly string[]
   /** The tax a section prints its sum beside: the section's sum, read again. */
@@ -121,6 +130,9 @@ export const ARMENIAN_RECEIPTS: PhotoReading = {
     discountKept: 'եղչ',
     // «ամվա սկզբից», «ամսվա սկզբից»
     sinceStart: 'սկզբ',
+    cashback: 'գործարք',
+    taxed: 'հարկվող',
+    redeemed: 'մարում',
     // «Առձեռն» as OCR reads it, «Կանխիկ», «Անկանխիկ», «Վճարված»
     paid: ['ձեռն', 'ձեոն', 'ձեդն', 'Կանխիկ', 'Անկանխ', 'Վճար'],
     // «Շրջանառության հարկ», its «կ» read «լ»

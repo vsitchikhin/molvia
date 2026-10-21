@@ -156,34 +156,65 @@ function lineOf(line: ModelReceipt['lines'][number]): ReceiptTextLine {
   }
 }
 
+/** What a till rounds a card's payment by: to the dram, «19 098,00» paid for 19 097,86. */
+const PAYMENT_ROUNDING_HUNDREDTHS = 50
+
+/** The one amount of them, or none — two are a doubt, not a choice. */
+const sole = (amounts: ReadonlySet<number>): number | null =>
+  amounts.size === 1 ? ([...amounts][0] ?? null) : null
+
 /**
  * The total two places vouch for (MOL-244), as the parse's `votedTotal` decides it: the lines that met a
  * printed total every one as read, else the one amount at least two of the total, the payment and — on a
  * receipt with no items — the section printed. A prepayment («Կանխավճար») is none of them: the card's
  * payment words are a till's, and a prepayment slip printed above the receipt names its own total, which
  * meets neither the lines nor the payment.
+ *
+ * **A card that sends its discount to the card** (MOL-289, «Ереван Сити»): the lines are what was paid with
+ * the discount, and the total «Ընդամենը:» is without it — what left the card, the trip's money (owner, В-5
+ * «а») — the discount printed apart as «Զեղչ գործարքից». So the lines meet the total less it, and its second
+ * place is the sum taxed with VAT, «ԱԱՀ-ով հարկվող»; the payment, rounded to the dram, is none. The total
+ * under the list, 0,02 off the lines where the till rounds a price with its discount (am-39, am-44), is no
+ * place of it. The bonus a receipt is partly paid with, «Կանխավճարի մարում», is kept only where the card's
+ * payment is the total less it, to the dram: the trip's money is then what left the card.
  */
 function totalOf(
   reading: PhotoReading,
   answer: ModelReceipt,
   lines: readonly ReceiptTextLine[],
-): { total: number | null; read: number | null; met: boolean } {
+): {
+  total: number | null
+  read: number | null
+  met: boolean
+  cashback: number | null
+  redeemed: number | null
+} {
   const w = reading.words
-  const total = new RegExp(`(?:${w.totalKept})`, 'u')
-  const discount = new RegExp(`(?:${w.discountKept})`, 'u')
+  const word = (fragment: string): RegExp => new RegExp(`(?:${fragment})`, 'u')
+  const [total, discount, cashbacks, taxedSum, redemption] = [
+    word(w.totalKept),
+    word(w.discountKept),
+    word(w.cashback),
+    word(w.taxed),
+    word(w.redeemed),
+  ]
   // a sum since the start of the year is what a card bought this year (MOL-288): the largest the total's word
   // stands by, it was the total read — «Прочитали не всё» short by 120 000 ֏
-  const sinceStart = new RegExp(`(?:${w.sinceStart})`, 'u')
-  const paid = new RegExp(`(?:${w.paid.join('|')})`, 'u')
+  const sinceStart = word(w.sinceStart)
+  const paid = word(w.paid.join('|'))
   const places = new Map<string, Set<number>>([
     ['total', new Set()],
     ['paid', new Set()],
     ['section', new Set()],
   ])
+  const [sentToCard, taxed, spent] = [new Set<number>(), new Set<number>(), new Set<number>()]
   for (const { label, amount } of answer.totals) {
     const hundredths = figureOf(amount, 2)
     if (hundredths === null || hundredths <= 0) continue
-    if (total.test(label) && !discount.test(label) && !sinceStart.test(label))
+    if (discount.test(label) && cashbacks.test(label)) sentToCard.add(hundredths)
+    else if (redemption.test(label)) spent.add(hundredths)
+    else if (taxedSum.test(label)) taxed.add(hundredths)
+    else if (total.test(label) && !discount.test(label) && !sinceStart.test(label))
       places.get('total')?.add(hundredths)
     else if (paid.test(label)) places.get('paid')?.add(hundredths)
     else if (lines.length === 0 && DEPARTMENT.test(label)) places.get('section')?.add(hundredths)
@@ -192,17 +223,38 @@ function totalOf(
   // the largest the total's word stands by: a prepayment slip's total is smaller and the one before the
   // card's discount larger, so «Прочитали не всё» errs only towards being said (MOL-244)
   const read = totals.length === 0 ? null : Math.max(...totals)
+  const cashback = sole(sentToCard)
   const sum = lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0)
-  const met = lines.length > 0 && lines.every((line) => line.asPrinted) && totals.includes(sum)
-  if (met) return { total: sum, read, met }
-  const votes = new Map<number, number>()
-  for (const amounts of places.values()) {
-    for (const amount of amounts) votes.set(amount, (votes.get(amount) ?? 0) + 1)
+  const asPrinted = lines.length > 0 && lines.every((line) => line.asPrinted)
+  const vote = (all: Iterable<ReadonlySet<number>>): number | null => {
+    const votes = new Map<number, number>()
+    for (const amounts of all) {
+      for (const amount of amounts) votes.set(amount, (votes.get(amount) ?? 0) + 1)
+    }
+    const backed = [...votes].filter(([, n]) => n >= 2)
+    const most = Math.max(0, ...backed.map(([, n]) => n))
+    const voted = backed.filter(([, n]) => n === most)
+    return voted.length === 1 ? (voted[0]?.[0] ?? null) : null
   }
-  const backed = [...votes].filter(([, n]) => n >= 2)
-  const most = Math.max(0, ...backed.map(([, n]) => n))
-  const voted = backed.filter(([, n]) => n === most)
-  return { total: voted.length === 1 ? (voted[0]?.[0] ?? null) : null, read, met }
+  if (cashback === null) {
+    const met = asPrinted && totals.includes(sum)
+    if (met) return { total: sum, read, met, cashback, redeemed: null }
+    return { total: vote(places.values()), read, met, cashback, redeemed: null }
+  }
+  // what the lines make: a total less what went to the card
+  const owed = new Set(totals.map((one) => one - cashback).filter((one) => one > 0))
+  const met = asPrinted && owed.has(sum)
+  const lined = met ? sum : vote([owed, taxed])
+  const shown = lined === null ? null : lined + cashback
+  const bonus = sole(spent)
+  const payments = [...(places.get('paid') ?? [])]
+  const redeemed =
+    shown === null || bonus === null || bonus >= shown
+      ? null
+      : payments.some((one) => Math.abs(shown - bonus - one) <= PAYMENT_ROUNDING_HUNDREDTHS)
+        ? bonus
+        : null
+  return { total: shown, read, met, cashback, redeemed }
 }
 
 /**
@@ -215,7 +267,7 @@ function totalOf(
 export function receiptTextOfModel(reading: PhotoReading, answer: ModelReceipt): ReceiptText {
   const discounted = answer.lines.some((line) => figureOf(line.discount, 2) !== null)
   const lines = answer.lines.map(lineOf)
-  const { total, read, met } = totalOf(reading, answer, lines)
+  const { total, read, met, cashback, redeemed } = totalOf(reading, answer, lines)
   // a receipt with no line is a sum to record where it prints a section or two places vouch for its
   // total (MOL-227) — the model names a sole trader's «Բաժին 1» as a total no more often than not; with
   // neither it is a reading of nothing, «переснимите» as Tesseract's (`needsReshoot`)
@@ -238,6 +290,8 @@ export function receiptTextOfModel(reading: PhotoReading, answer: ModelReceipt):
     totalHundredths: total,
     readTotalHundredths: read,
     balanced: met,
+    cashbackHundredths: cashback,
+    redeemedHundredths: redeemed,
     lines,
   }
 }

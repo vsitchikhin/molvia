@@ -62,6 +62,18 @@ function computedSum(line: ReceiptFigures, digits: number): Money | null {
 }
 
 /**
+ * What the lines of a receipt come to by its total (MOL-289): the total less what a card sent to the card
+ * as a bonus — «Ереван Сити» prints the total without the card's discount, what left the card, and the
+ * lines with it («Զեղչ գործարքից»). Every comparison of the lines with the total goes through it — the
+ * sums recorded, the difference on the review, «Прочитали не всё» — and the trip's money never does.
+ */
+export function linesTotalOf(total: Money | null, cashback: Money | null): Money | null {
+  if (total === null || cashback === null || cashback.currency !== total.currency) return total
+  const minor = total.minor - cashback.minor
+  return minor > 0n ? { minor, currency: total.currency } : total
+}
+
+/**
  * What each line is recorded at, the person's corrections aside (MOL-124 В-5, owner, 27.09.2026): a line
  * that adds up — what was paid; one that does not — the printed sum when the printed total confirms it
  * (the lines with it come to the total), else quantity × price. «1 шт × 890», 980 printed, a total that

@@ -87,6 +87,17 @@ export interface ReceiptText {
   readonly readTotalHundredths: number | null
   /** The lines add up to the printed total. */
   readonly balanced: boolean
+  /**
+   * The card's discount of the transaction, sent to the card as a bonus rather than taken off at the till
+   * («Զեղչ գործարքից», «Ереван Сити», MOL-289): the lines make the total less it, and the total is what
+   * left the card. Only a model's reading names it.
+   */
+  readonly cashbackHundredths?: number | null
+  /**
+   * The bonus this receipt is partly paid with («Կանխավճարի մարում», MOL-289): the trip's money is the
+   * total less it — what the card's bonus covered was recorded when it was sent to the card.
+   */
+  readonly redeemedHundredths?: number | null
   readonly lines: readonly ReceiptTextLine[]
 }
 
@@ -161,7 +172,8 @@ function lexiconOf(reading: PhotoReading): Lexicon {
   // a word that captures moves the figures the parse reads after it by their groups: the total read as the
   // word, NaN (adversarial А1) — refused, as a format it cannot read is
   const fragments = [
-    ...[w.total, w.totalKept, w.discountKept, w.sinceStart, w.control, w.fiscalSign, w.tin],
+    ...[w.total, w.totalKept, w.discountKept, w.sinceStart, w.cashback, w.taxed, w.redeemed],
+    ...[w.control, w.fiscalSign, w.tin],
     ...[w.fiscal, w.fiscalNumber, w.receiptNumber, w.sumSign, ...w.paid, ...w.sectionTax],
     ...w.tinMisread,
     ...[...w.head, ...w.currency, ...Object.values(u)],

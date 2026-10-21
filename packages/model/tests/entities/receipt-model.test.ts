@@ -237,6 +237,91 @@ describe('the total of a model’s reading (MOL-244 by the card’s words)', () 
     expect([alone.totalHundredths, alone.readTotalHundredths]).toEqual([null, null])
   })
 
+  describe('a card that sends its discount to the card (MOL-289)', () => {
+    // two lines with the card's 1 %: 732,60 + 950,40 = 1 683,00 paid, 17,00 sent to the card
+    const carded = [
+      line({ quantity: '2', unit_price: '370', discount: '7.4', sum: '732.6' }),
+      line({ quantity: '1', unit_price: '960', discount: '9.6', sum: '950.4' }),
+    ]
+    const summary = (over: Record<string, string> = {}) =>
+      Object.entries({
+        Ընդամենը: '1683.02',
+        '/ԱԱՀ-ով հարկվող/ =': '1683.00',
+        'Որից ԱԱՀ =': '280.50',
+        'Ընդամենը:': '1700.00',
+        'Վճարված է PosTerminal:': '1700.00',
+        'Կանխավճարի մարում:': '0',
+        'Զեղչ գործարքից:': '17.00',
+        'Կանխավճարի մնացորդ:': '1520.35',
+        ...over,
+      }).map(([label, amount]) => ({ label, amount }))
+    const shown = (a: ModelReceipt) => {
+      const text = read(a)
+      return [text.totalHundredths, text.cashbackHundredths, text.redeemedHundredths, text.balanced]
+    }
+
+    it('shows what left the card, the lines meeting it less the discount sent to the card', () => {
+      expect(shown(answer({ lines: carded, totals: summary() }))).toEqual([
+        170_000,
+        1_700,
+        null,
+        true,
+      ])
+      // the check proves it whole by the total less the discount
+      expect(verifiedReading(read(answer({ lines: carded, totals: summary() }))).balanced).toBe(
+        true,
+      )
+    })
+
+    it('takes the sum taxed with VAT for the second place where a line is not as read', () => {
+      const off = [carded[0]!, { ...carded[1]!, sum: '960.4' }]
+      expect(shown(answer({ lines: off, totals: summary() }))).toEqual([
+        170_000,
+        1_700,
+        null,
+        false,
+      ])
+      // the total under the list, 0,02 off where the till rounds a price with its discount, is no place
+      const taxedOff = summary({ '/ԱԱՀ-ով հարկվող/ =': '1683.02' })
+      expect(shown(answer({ lines: off, totals: taxedOff }))).toEqual([null, 1_700, null, false])
+      // nor is the payment, rounded to the dram
+      const noTaxed = summary({ '/ԱԱՀ-ով հարկվող/ =': '0' })
+      expect(shown(answer({ lines: off, totals: noTaxed }))).toEqual([null, 1_700, null, false])
+    })
+
+    it('reads as before where the discount is printed twice apart: two are a doubt, not a choice', () => {
+      const twice = [...summary(), { label: 'Զեղչ գործարքից', amount: '18.00' }]
+      // the total and the payment vote for 1 700,00, and the lines fall short of it by the discount
+      expect(shown(answer({ lines: carded, totals: twice }))).toEqual([170_000, null, null, false])
+    })
+
+    it('keeps the bonus a receipt is paid with only where the card paid the total less it', () => {
+      const spent = summary({ 'Կանխավճարի մարում:': '150.00', 'Վճարված է PosTerminal:': '1550.00' })
+      expect(shown(answer({ lines: carded, totals: spent }))).toEqual([
+        170_000,
+        1_700,
+        15_000,
+        true,
+      ])
+      // the card's payment rounded to the dram
+      const rounded = summary({
+        'Ընդամենը:': '1700.40',
+        '/ԱԱՀ-ով հարկվող/ =': '1683.40',
+        'Կանխավճարի մարում:': '150.00',
+        'Վճարված է PosTerminal:': '1550.00',
+      })
+      expect(shown(answer({ lines: carded, totals: rounded }))[2]).toBe(15_000)
+      // a payment that is not the total less it: the bonus is not read
+      const apart = summary({ 'Կանխավճարի մարում:': '150.00', 'Վճարված է PosTerminal:': '1700.00' })
+      expect(shown(answer({ lines: carded, totals: apart }))).toEqual([170_000, 1_700, null, true])
+    })
+
+    it('is as before on a receipt that sends nothing to the card', () => {
+      const plain = summary({ 'Զեղչ գործարքից:': '0', 'Ընդամենը:': '1683.00' })
+      expect(shown(answer({ lines: carded, totals: plain }))).toEqual([168_300, null, null, true])
+    })
+  })
+
   it('is the section’s on a receipt with no items, by the vote of MOL-227', () => {
     const totals = [
       { label: 'Բաժին 1', amount: '1700.00' },

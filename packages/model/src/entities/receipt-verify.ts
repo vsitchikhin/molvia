@@ -33,8 +33,9 @@ export function verifiedReading(text: ReceiptText, { byModel = false } = {}): Re
 }
 
 function provenWhole(text: ReceiptText): boolean {
-  const total = text.totalHundredths
-  if (total === null || text.lines.length === 0) return false
+  if (text.totalHundredths === null || text.lines.length === 0) return false
+  // a card that sends its discount to the card prints the total without it (MOL-289)
+  const total = text.totalHundredths - (text.cashbackHundredths ?? 0)
   let sum = 0
   for (const line of text.lines) {
     if (!line.asPrinted || line.sumHundredths === null) return false
