@@ -20,6 +20,10 @@
           t('receipt.review.mismatch', { printed })
         }}</span>
       </span>
+      <!-- Figures put right by the font's 5↔6, the receipt whole by them: «проверьте» (MOL-290). -->
+      <span v-if="line.repaired && figures" class="figures">{{
+        t('receipt.review.repaired_note')
+      }}</span>
       <!-- Figures that were not verified are left empty, never guessed (MOL-255, В-3 «а»). -->
       <span v-else-if="unread" class="figures">{{ t('receipt.review.unread') }}</span>
       <span v-if="tags.length > 0" class="tags">
@@ -42,7 +46,8 @@ import type { ReviewLine } from '@/receipts/review'
 /**
  * One line of a receipt on the review (handoff 05): the item in the person's language, the line as
  * printed, «кол-во × цена», the printed sum where it disagrees («≠ 980», a highlight that refuses
- * nothing), the marks «новый товар», «проверьте», «не записываем», and on the right what the line
+ * nothing), the marks «новый товар», «проверьте» — of the item, or of figures the font's swaps put right
+ * (MOL-290) — «не записываем», and on the right what the line
  * will be recorded at. A screen reader hears «товар, кол-во × цена, сумма, метка».
  */
 export default defineComponent({
@@ -86,7 +91,8 @@ export default defineComponent({
       ...(!props.line.skip && props.line.isNew
         ? [{ key: 'new', text: t('receipt.review.tag_new') }]
         : []),
-      ...(!props.line.skip && props.line.check
+      // one «проверьте» for the item and the figures alike: the note under the figures says which
+      ...(!props.line.skip && (props.line.check || props.line.repaired)
         ? [{ key: 'check', text: t('receipt.review.tag_check') }]
         : []),
     ])

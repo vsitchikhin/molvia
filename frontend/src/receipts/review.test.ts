@@ -146,6 +146,32 @@ describe('the balance — the model’s, not a sum of the phone’s', () => {
   })
 })
 
+describe('a line put right by the font’s swaps (MOL-290)', () => {
+  it('says «проверьте» of its figures until the person typed their own', () => {
+    const detail = receiptA()
+    const put = {
+      ...detail,
+      lines: detail.lines.map((l, i) => (i === 0 ? { ...l, repaired: true } : l)),
+    }
+    expect(reviewLines(put, null).map((l) => l.repaired)).toEqual([true, false, false, false])
+    // an item chosen leaves the figures to the reading, and their «проверьте» with them
+    const chosen: ReceiptDraft = {
+      lines: { 0: { item: { id: MILK, name: 'Молоко' }, skip: false } },
+    }
+    expect(reviewLines(put, chosen)[0]?.repaired).toBe(true)
+    const typed: ReceiptDraft = {
+      lines: {
+        0: {
+          item: { id: MILK, name: 'Молоко' },
+          skip: false,
+          figures: { quantity: parseQuantity('1', 'piece'), amount: amd('531') },
+        },
+      },
+    }
+    expect(reviewLines(put, typed)[0]?.repaired).toBe(false)
+  })
+})
+
 describe('a card that sends its discount to the card (MOL-289)', () => {
   // the lines come to 3 663 with the chocolate's 980, and 36,63 went to the card: «Ընդամենը» 3 699,63
   const carded = (cashback: string | null): ReceiptDetail => ({

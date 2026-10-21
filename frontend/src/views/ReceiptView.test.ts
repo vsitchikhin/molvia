@@ -589,6 +589,21 @@ describe('ReceiptView (MOL-127)', () => {
     expect(foot).toMatch(/≈ 202/)
   })
 
+  it('says «проверьте» of figures the font’s swaps put right, and why (MOL-290)', async () => {
+    const one = detail()
+    receipt.mockResolvedValue({
+      ...one,
+      lines: [{ ...line('ԿԱԹ', '500'), repaired: true }, line('ՀԱՑ', '400')],
+    })
+    const { view } = await render()
+    const [put, plain] = view.findAll('.receipt-line')
+    expect(put?.text()).toContain(ru.receipt.review.repaired_note)
+    expect(put?.find('.tag.check').text()).toBe(ru.receipt.review.tag_check)
+    expect(put?.attributes('aria-label')).toContain(ru.receipt.review.tag_check)
+    expect(plain?.text()).not.toContain(ru.receipt.review.repaired_note)
+    expect(plain?.find('.tag.check').exists()).toBe(false)
+  })
+
   it('read in part when the lines are short of the total by one luma, as by a line (MOL-255)', async () => {
     const short = detail()
     receipt.mockResolvedValue({ ...short, receipt: { ...short.receipt, total: amd('900.01') } })
