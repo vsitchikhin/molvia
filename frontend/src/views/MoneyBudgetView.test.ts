@@ -1008,4 +1008,131 @@ describe('MoneyBudgetView: review of MOL-192, round 1', () => {
       expect(document.activeElement?.getAttribute('data-category')).toBe(CAFE)
     })
   })
+
+  // Self-review 2 №5: a plan removed from a category nothing was spent in — its row is gone altogether.
+  it('a plan removed and its row gone: the focus goes to the strip', async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    await view.findAll('li .list-row')[1]?.trigger('click')
+    await flushPromises()
+    const [groceries, , rent] = budget().rows
+    if (!groceries || !rent) throw new Error('no row')
+    setBudgetPlan.mockResolvedValue(budget({ rows: [groceries, rent] }))
+    await pressUntil(en.budget.sheet.remove, () => {
+      expect(setBudgetPlan).toHaveBeenCalled()
+    })
+    await vi.waitFor(() => {
+      expect(document.querySelector('dialog[open]')).toBeNull()
+      expect(view.find(`[data-category="${CAFE}"]`).exists()).toBe(false)
+      expect(document.activeElement?.textContent.trim()).toBe(en.budget.add)
+    })
+  })
+
+  // Adversarial Б2: the category removed on another device while its sheet was open — its row is a
+  // `div`, which takes no focus; the strip, or with nothing to offer the screen's title, takes it.
+  it('a plan saved for a category removed meanwhile: never the body, the title if nothing else', async () => {
+    moneyBudget.mockResolvedValue(
+      budget({
+        categories: budget().categories.filter((one) => one.id !== PETS),
+      }),
+    )
+    const view = await render()
+    await view.findAll('li .list-row')[3]?.trigger('click')
+    await flushPromises()
+    type('input[inputmode=decimal]', '20000')
+    const [, , rent] = budget().rows
+    if (!rent) throw new Error('no row')
+    setBudgetPlan.mockResolvedValue(
+      budget({
+        rows: [...budget().rows, { ...rent, categoryId: TRANSPORT }],
+        unplanned: [],
+        categories: budget()
+          .categories.filter((one) => one.id !== PETS)
+          .map((one) => (one.id === TRANSPORT ? { ...one, archived: true } : one)),
+      }),
+    )
+    await pressUntil(en.budget.sheet.save, () => {
+      expect(setBudgetPlan).toHaveBeenCalled()
+    })
+    await vi.waitFor(() => {
+      expect(document.querySelector('dialog[open]')).toBeNull()
+      expect(view.find(`div[data-category="${TRANSPORT}"]`).exists()).toBe(true)
+      expect(addButton(view)).toBeUndefined()
+      expect(document.activeElement?.tagName).toBe('H1')
+    })
+  })
+
+  // Adversarial Б1, self-review 2 №4: the row the focus goes to is brought into view, only when not in sight.
+  it('the row out of sight is brought into view before it takes the focus; one in sight does not move', async () => {
+    const scrolled: Element[] = []
+    vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(function (this: Element) {
+      scrolled.push(this)
+    })
+    let seen: (row: Element) => Element | null = () => null
+    vi.spyOn(document, 'elementFromPoint').mockImplementation(() => {
+      const row = document.querySelector(`button[data-category="${TRANSPORT}"]`)
+      return row ? seen(row) : null
+    })
+    const [, , rent] = budget().rows
+    if (!rent) throw new Error('no row')
+    const planned = budget({
+      rows: [...budget().rows, { ...rent, categoryId: TRANSPORT }],
+      unplanned: [],
+    })
+
+    for (const [visible, expected] of [
+      [false, 1],
+      [true, 0],
+    ] as const) {
+      seen = (row) => (visible ? (row.querySelector('.title') ?? row) : null)
+      scrolled.length = 0
+      moneyBudget.mockResolvedValue(budget())
+      setBudgetPlan.mockResolvedValue(planned)
+      const view = await render()
+      await view.findAll('li .list-row')[3]?.trigger('click')
+      await flushPromises()
+      type('input[inputmode=decimal]', '20000')
+      await pressUntil(en.budget.sheet.save, () => {
+        expect(setBudgetPlan).toHaveBeenCalled()
+      })
+      await vi.waitFor(() => {
+        expect(document.activeElement?.getAttribute('data-category')).toBe(TRANSPORT)
+      })
+      expect(scrolled).toHaveLength(expected)
+      if (expected) expect(scrolled[0]?.getAttribute('data-category')).toBe(TRANSPORT)
+      for (const one of views.splice(0)) one.unmount()
+      window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+      document.body.innerHTML = ''
+      setBudgetPlan.mockReset()
+    }
+  })
+
+  // Self-review 2: a sheet swept away while the write was on its way — the outcome comes before the redraw.
+  it('a sheet swept away before the answer: the focus goes to the strip the answer drew', async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    await view.findAll('li .list-row')[1]?.trigger('click')
+    await flushPromises()
+    const [groceries, , rent] = budget().rows
+    if (!groceries || !rent) throw new Error('no row')
+    let answer: (value: MoneyBudgetView) => void = () => undefined
+    setBudgetPlan.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+    await pressUntil(en.budget.sheet.remove, () => {
+      expect(setBudgetPlan).toHaveBeenCalled()
+    })
+    router.back()
+    await vi.waitFor(() => {
+      expect(document.querySelector('dialog[open]')).toBeNull()
+    })
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    answer(budget({ rows: [groceries, rent] }))
+    await vi.waitFor(() => {
+      expect(view.find(`[data-category="${CAFE}"]`).exists()).toBe(false)
+      expect(document.activeElement?.textContent.trim()).toBe(en.budget.add)
+    })
+  })
 })

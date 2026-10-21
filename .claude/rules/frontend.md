@@ -568,8 +568,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   commonest break at a shelf, and drawing it red was the first consumer's bug (MOL-19, A1).
   Back online, a screen tries again by itself, as the identity does — through `useReconnect`,
   which also hears the app coming back into view: an iOS PWA frozen in the background misses
-  `online`. **`useOnline` reads the browser again at that same return** (MOL-192, adversarial А1): its
-  word «no connection ahead of time» outlived the connection a frozen PWA got back unheard. Polite states do not carry `role="status"`: they hand their words to the app's one
+  `online`. **`useOnline` reads the browser again at that same return** (MOL-192, adversarial А1):
+  its word «no connection ahead of time» outlived the connection a frozen PWA got back unheard.
+  Polite states do not carry `role="status"`: they hand their words to the app's one
   live region in `App.vue`, above the router, since a region born with its words is often not
   read. Each announcement is a node added a task later, taken back when its block goes and
   gone by itself after seconds — a hidden region is still read in browse mode. Only an error

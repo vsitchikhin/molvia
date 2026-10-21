@@ -865,7 +865,11 @@ task did not: five plans of six there are a percent of the month's income — «
   stood «можно со связью» over the answer the server had just given. **A write that takes away what
   opened its sheet hands the focus on** (adversarial А2): the last category planned takes the strip, a
   row of «Без плана» moves into the plans, a plan removed moves its row out — the focus goes to that
-  category's row wherever it stands, else to the strip, never to the page's body. **A row is `ListRow`** with the category's circle, as on «Категории» and «Траты»; the
+  category's row wherever it stands, a button only — a category removed meanwhile on another device
+  is a row that takes none (Б2) — else to the strip, else to the screen's title, never to the page's
+  body; **a row out of sight is brought into view first** (Б1), as «Траты» bring a refusal, and one
+  in sight does not move. **A row is `ListRow`** with the category's circle, as on «Категории» and
+  «Траты»; the
   chevron on every live row — each opens the sheet of its plan — and **«осталось» in the title's line,
   never the tail** (`name-beside-figure`): a tail of its own width made every bar another length, and
   bars one under another are read against each other. **The bar is the category's colour**, never the

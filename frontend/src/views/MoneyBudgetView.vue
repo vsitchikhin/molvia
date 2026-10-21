@@ -214,7 +214,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, useId } from 'vue'
+import { computed, defineComponent, nextTick, ref, useId } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -464,13 +464,16 @@ export default defineComponent({
      * focus back to what opened it only while that is still there, and the write may take it away: the
      * last category planned takes the strip, a row of «Без плана» moves into the plans, a plan removed
      * moves its row out (adversarial А2, self-review 1). Then the focus goes to the row of that category
-     * wherever it stands now, else to the strip — never left on the page's body, where a screen reader
-     * starts from the top.
+     * wherever it stands now — a button only: a category removed meanwhile on another device is a row
+     * that takes no focus (adversarial Б2) — else to the strip, else to the screen's title; never left
+     * on the page's body, where a screen reader starts from the top.
      */
-    function done(outcome: BudgetOutcome): void {
+    async function done(outcome: BudgetOutcome): Promise<void> {
       announce?.(
         t(outcome.kind === 'saved' ? 'budget.saved' : 'budget.removed', { name: outcome.name }),
       )
+      // A sheet swept away while the write was on its way says so before the screen has redrawn.
+      await nextTick()
       const current = document.activeElement
       const lost =
         current === null ||
@@ -481,10 +484,26 @@ export default defineComponent({
         outcome.categoryId === null
           ? null
           : content.value?.querySelector<HTMLElement>(
-              `[data-category="${CSS.escape(outcome.categoryId)}"]`,
+              `button[data-category="${CSS.escape(outcome.categoryId)}"]`,
             )
       const strip = addButton.value?.$el as HTMLElement | undefined
-      ;(row ?? strip)?.focus({ preventScroll: true })
+      const title = document.querySelector<HTMLElement>('h1[tabindex]')
+      const target = row ?? strip ?? title
+      if (!target) return
+      // A row elsewhere on the page is brought into view, as «Траты» bring a refusal (MOL-159): the
+      // focus of a keyboard out of the window is no focus. Only when it is not in sight — under the
+      // header, the strip or past an edge — so a row in view does not move.
+      if (target === row && !inSight(row)) {
+        const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        row.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' })
+      }
+      target.focus({ preventScroll: true })
+    }
+    /** Whether the middle of the element is what the page shows there: nothing over it, not off-screen. */
+    function inSight(element: HTMLElement): boolean {
+      const box = element.getBoundingClientRect()
+      const seen = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+      return seen !== null && element.contains(seen)
     }
 
     return {
