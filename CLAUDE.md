@@ -598,7 +598,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   and no disk. The API holds the queue, the photos and the parse, one receipt at a time.
 - **A model's answer goes through the parse's own gate** (MOL-272): `receiptTextOfModel` into
   `ReceiptText`, then `verifiedReading(text, { byModel: true })` — every number as printed, the layout and
-  the total our code's by the card's words, never the model's.
+  the total our code's by the card's words, never the model's; a figure in any spelling it writes it, a
+  discount's minus its size, and the log counts what was not read (`unparsed`, MOL-294).
 - **The parse is MOL-114's prototype, measured on the bench** (`receipt-text.ts`, `score.mjs`): a rule
   changed is run on the bench's truth before and after; amounts in hundredths, never floats.
 - **A country's words are its card's, never a literal of the parse** (MOL-247, `receipt-card.ts`): currency,
@@ -648,6 +649,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **A line finds its item: the shop's memory by article, by the line, the country's names with the
   heading, the search by the gloss, else new** (MOL-126); names and search once in the queue, the memory
   on every reading. The matcher is MOL-114's `dict-match.mjs`, held to the bench.
+- **An item stands on a line only by its kind and its brand** (MOL-293, `lineFitter`): every word of its name
+  the line's, the line's brand in «…» in it, its name the line's kind — or all of it that brand; a heading's
+  item it rules out is none. Else a new item named in full, «проверьте» — a word spelt in letters taken away by
+  one press (`spelled`). A dictionary's word is read exactly, never one edit off.
 - **The shops' memory is shared** (owner, 30.09.2026): the person's own word first, else the item most
   people said, the later on a tie; the erased still count; nobody's word is shown as someone's, and
   another person's shelf price only with access and from three prices, their lower median. **A person's word

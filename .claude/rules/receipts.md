@@ -185,6 +185,17 @@ neither it is «переснимите». Then **the one check, `verifiedReading
 everything after it is Tesseract's path: `readPartly`, the lines' items, the wire. No line is cut out for
 training (Р-4): there are no boxes.
 
+**A figure is read in every spelling the model writes it** (MOL-294): thousands grouped by a space, a no-break or a
+narrow one («1 000,00»), a comma for the point where it is the only one and no point stands («0,50»), and a minus
+before a line's or the summary's discount — its size. A minus before a quantity, a price, a sum or a total is no
+figure: a negative total is a refund, never a purchase. The answer is put in that one form at the door of
+`receiptTextOfModel`, so the repair of the font's swaps and the total read what the lines read. **Why**: production's
+36f99484 came with 39 lines, the total, and not one figure in a line, «Прочитали не всё» silent — exactly what every
+line's discount written «-0.50» gives: no line holds its arithmetic, the check empties all of them, and the sums as read
+still meet the total. The answer is not kept (Т-8), so the spelling is not proven; on the bench no line's figure ever
+came signed. **So the log of a reading counts what was not read** (`unparsed`, a number, never the figures): the next
+such receipt shows in the log, not by a guess.
+
 **`byModel` widens one rule, and only for the model**: a line of one piece with no discount whose price is
 within the card's rounding of its sum is «one number printed twice» — kept only on a receipt proven whole.
 The model names the columns itself, and «389,99 390» holds either way round (lit-9295 of the bench);
@@ -252,8 +263,18 @@ and the next one «recorded before»: copying, it moves a label too, mostly onto
 **never a number the rows print under another label too** (adversarial А6, round 4) — the shop's tax number,
 the till's «ԳՀ» moved under «Ֆիսկալ»: a constant of the till, every receipt after the first «recorded
 before»; no barcode, no «ՖՀ». The tax number keeps no such guard — it is a constant anyway, and the bench's
-one number under two labels was the tax number under «ՀՎՀՀ» and «ՀԴՄ» both, right. Anything else is no key,
-and the receipt is held by its id alone. **The rows have no ceiling**: they give only the key, and a bank slip
+one number under two labels was the tax number under «ՀՎՀՀ» and «ՀԴՄ» both, right. **Two fiscal numbers are the key as a pair** (MOL-293, owner's В-3 «а»): «Ереван Сити» prints a prepayment slip of
+the card's cashback over the receipt, with a fiscal number of its own, so every receipt of the owner's shop with the
+card was keyless and could be recorded twice. The pair, in ascending order («34408642+58899619»), does not care which
+the model copied first; each number is still held to its own label (А6), and three are none. On the bench (v5) two
+readings by the model gave one key on 24 receipts against 21. **The price, named:** a reading that caught one of the
+two is another key than one that caught both (am-13) — as one paper read twice may be two keys anyway. Anything else
+is no key, and the receipt is held by its id alone. **The tax number stays the model's to copy, and v6 was measured
+and not taken** (MOL-293): asked never to leave «ՀՎՀՀ» out and to copy every label letter by letter — the model had
+written «ՀԿՀ:01282006» and «ՀԴՄ:01282006» for it on am-44 — three runs against three of v5 on the same photos gave
+the tax number right 41, 34, 33 of 46 against 29, 30, 33, and the lines' fields 777, 803, 770 right, 3, 7, 1 made up
+against 801, 833, 827 and 0, 4, 1: every run of it below the worst of v5. A line misread is worse than a tax number
+missing, so v5 stays; the shop's memory of a model's receipt with no tax number is the price. **The rows have no ceiling**: they give only the key, and a bank slip
 under the receipt, a row too many, threw the paid reading away (adversarial А7); the output's cap bounds them.
 On the bench (v5, two runs): the tax number 32 right, 3 wrong, 11 none — against 40 wrong of 94 in v4; two
 readings by the model give one key on 21 receipts and two on none (v4: 23 and 11); the model and Tesseract one
@@ -265,7 +286,8 @@ two receipts of that till. Each part is seen apart: it moved the till's number u
 in 6 answers of 108 — «ՀՎՀՀ» five times, «ՖՍ» once — and lost the fiscal number's label in 3; together, never.
 
 **The log carries counts** (Т-8): who read (`reader`), what it cost and the tokens in and out, why the model
-was passed and what an answer not taken cost (review №6) — never its answer, a line or a tax number. **The
+was passed and what an answer not taken cost (review №6), how many of its figures no rule read (`unparsed`,
+MOL-294) — never its answer, a line or a tax number. **The
 measure of 0.2 is the reader's** (В-6 «а»): a receipt the model read counts in `model_receipt_days` — read and
 recorded alike, by its `reader_version` — a table of its own for MOL-234's reason, and `make gates` prints its
 block under Tesseract's, with the same stop. A receipt that failed for its attempts has no reader and counts
@@ -381,6 +403,46 @@ nothing — a new item named by the gloss. The answer's `match` is the handoff's
 person's one action is to check and correct — and `weak` is a search found far (`near = false`, MOL-124
 В-4) or an item chosen by the heading alone.
 
+**An item stands on a line only by the line's kind and brand** (MOL-293, owner's В-1 «а», 21.10.2026). The first
+receipt the model read on production (b8a76f31, «Ереван Сити», 39 lines) bound 7 lines to another thing altogether
+and 4 to another brand or sort — a strawberry yoghurt «Клубника», a pizza base «Пицца», crab chips «Креветки», a
+Fanta «Лимонад» — all of them sure, and «Записать» recorded them: «в 10 раз хуже, чем если бы они не распознались».
+Both the names and the search took an item when **any** word of its name stood in the line, so a word of a flavour
+or a filling found the fruit. Now `lineFitter` (`receipt-line-kind.ts`) asks of every item either path offers — a
+name of the seed, a heading's far match, each of the search's first ten:
+
+- **every word of its name is the line's** — by the dictionary's senses, the letters of its Armenian through the
+  search key, its figures: an item that names a flavour, a fat or a package the line has not is another item;
+- **the line's brand in «…» is in its name**, compared by the search key across scripts («Կոկա Կոլա» is «Coca-Cola»
+  and «Кока Кола»): a line printing a brand takes no item without it — the seed has no brands, so a branded line
+  finds only an item somebody named with that brand;
+- **its name says the line's kind** — the head word before the brand, past adjectives, participles and the
+  genitive, `receiptLineParts` — **unless all of it is that brand** (В-2 «а»: the owner's «Coca-Cola»). A kind the
+  dictionary has not takes nothing but its brand. **A word of the dictionary is read exactly**, never one edit
+  off: «լոշիկ», a flatbread, was «լոլիկ», a tomato.
+
+**An item the printed heading rules out is no item now**, where MOL-255 made it «проверьте»: the new item beside
+it is «проверьте» too, and a wrong item offered is worse than a name to check (Tesseract's «(3824) ՏՈՖՈՒ ՀՈՂ», a
+cat's litter, found «Тофу»). **The shop's memory is above all of it**: the person's own word, unchanged.
+
+**Anything else is a new item, named in full and «проверьте»** (`match: weak` with no item, В-1 «а»): `newLineName`
+— the kind first, as a shelf names it, the other words before the brand in order, the brand in «…» in Russian
+letters (`armenianInRussian`), the words after it, the fat and the package — «Йогурт «Еремян Продактс» клубника 2%
+130 г» (В-1 «б»: the weight is in the name, so a package is an item). A word the dictionary has not is spelt in
+letters, and the line says so (`receipt_lines.spelled`, 0069, В-4 «а» with the owner's note): the review offers the
+name, and «Убрать имя — оставить как в чеке» takes it away in one press. Units, counts, packaging marks and an
+abbreviation the dictionary has not are no words of it. On a receipt read out in English there is no Russian name,
+as there is no gloss. «Записать» puts a new name that is an item's already on that item (`createUnlessNamed`).
+
+**The bench** (`.scratch/tasks/status/MOL-293/`, `research/MOL-293.md`): MOL-114's 321 lines of 34 receipts, through
+the product's own `bindReceiptLines` on the seed and the owner's items of am-34…43, each pair «line → item» judged.
+Master: 47 right, 203 «general» (the kind with no brand or sort), **42 wrong**, 29 new. Now: **116 right, 0 wrong**,
+5 general, 184 new with meaning (192 by letters alone) — every new one «проверьте». **The prices, named:** a line whose
+brand nobody named is new however near the seed's item stands, so the first receipt of a shop is mostly «проверьте»
+until the person's words fill the shop's memory, which needs the tax number (below); and a word the item names
+that the line does not print keeps it away — «Лук репчатый» for «Սոխ (հայկական)», «Перец болгарский» for a sweet
+pepper of many colours, the two lines of the bench master had right — new, never wrong.
+
 **The names and the search are found once, in the queue; the memory on every reading** (Р-1). A search
 with its meaning costs tens of milliseconds a line, nothing in the background and a second on every
 opening of a receipt; the memory changes with every receipt recorded, and the second receipt of a shop
@@ -388,7 +450,8 @@ must know what the first taught without anything read again. Hence no `revision`
 record carries the whole receipt as the phone holds it (Р-4), and nothing the server suggested since is
 written in silently.
 
-**The matcher is MOL-114's `dict-match.mjs`, ported without improvements** (Р-7): on the bench's 152
+**The matcher is MOL-114's `dict-match.mjs`, ported without improvements** (Р-7) — until MOL-293 put the kind and
+brand before it: on the bench's 152
 lines it gives the prototype's item and gloss line for line, in the seed's order and by name alike
 (`.scratch/tasks/status/MOL-126/parity.mjs`) — so the figure measured on receipts its rules never saw,
 54 of 70, still holds. The nodes come by name bytewise, so a tie is decided the same on every database.
