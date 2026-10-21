@@ -15,6 +15,7 @@ import type {
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
+import IconMagnify from '~icons/mdi/magnify'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
@@ -687,7 +688,13 @@ describe('AdviceView', () => {
         expect(view.text()).toContain(en.advice.search.rate)
       })
 
-      await view.get('.unrated-row').trigger('click')
+      // A row of the kit, its name the title and nothing under it: the caption says «not rated» (С-9).
+      const row = view.getComponent({ name: 'ListRow' })
+      expect(row.props('title')).toBe(plait.name)
+      expect(row.props('meta')).toBe('')
+      expect(row.props('next')).toBe(false)
+      expect(row.text()).not.toContain(en.advice.search.group_unrated)
+      await row.trigger('click')
       await flushPromises()
       const sheet = view.findComponent({ name: 'VerdictEditSheet' })
       expect(sheet.props('itemId')).toBe(plait.itemId)
@@ -713,6 +720,7 @@ describe('AdviceView', () => {
         expect(view.text()).toContain('No «кускус» found')
       })
       expect(view.get('.state').classes()).toContain('quiet')
+      expect(view.getComponent({ name: 'ScreenState' }).props('icon')).toBe(IconMagnify)
       expect(view.get('.state').find('button').exists()).toBe(false)
     })
 

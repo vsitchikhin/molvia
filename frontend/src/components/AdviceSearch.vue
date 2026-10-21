@@ -81,20 +81,20 @@
       </AdviceGroup>
 
       <AdviceGroup v-if="groups.unrated.length > 0" level="unrated">
+        <!-- No meta: «Ещё не оценивали» is the caption's already (С-9 of MOL-118). No chevron: the
+             word in the tail opens the sheet, as a card of a group does with none. -->
         <AppCard list>
-          <button
+          <ListRow
             v-for="item in groups.unrated"
             :key="item.itemId"
-            class="unrated-row"
-            type="button"
+            :title="item.name"
+            wrap
             @click="$emit('rate', item, scope)"
           >
-            <span class="text">
-              <span class="name">{{ item.name }}</span>
-              <span class="sub">{{ t('advice.search.group_unrated') }}</span>
-            </span>
-            <span class="rate">{{ t('advice.search.rate') }}</span>
-          </button>
+            <template #tail
+              ><span class="rate">{{ t('advice.search.rate') }}</span></template
+            >
+          </ListRow>
         </AppCard>
       </AdviceGroup>
 
@@ -107,7 +107,7 @@
 import { computed, defineComponent, onUnmounted, toRef, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import IconNotFound from '~icons/mdi/magnify-close'
+import IconNotFound from '~icons/mdi/magnify'
 import type { AdviceFound, AdviceResponse, AdviceRow, AdviceScope } from '@molvia/model'
 import AdviceCheapRow from '@/components/AdviceCheapRow.vue'
 import AdviceGroup from '@/components/AdviceGroup.vue'
@@ -115,6 +115,7 @@ import AdviceNeverRow from '@/components/AdviceNeverRow.vue'
 import AdviceSkeleton from '@/components/AdviceSkeleton.vue'
 import AdviceTakeCard from '@/components/AdviceTakeCard.vue'
 import AppCard from '@/components/AppCard.vue'
+import ListRow from '@/components/ListRow.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SearchField from '@/components/SearchField.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
@@ -162,6 +163,7 @@ export default defineComponent({
     AdviceSkeleton,
     AdviceTakeCard,
     AppCard,
+    ListRow,
     ScreenState,
     SearchField,
     StatusStrip,
@@ -264,52 +266,7 @@ export default defineComponent({
   }
 }
 
-.unrated-row {
-  display: flex;
-  gap: var(--space-3);
-  align-items: center;
-  width: 100%;
-  min-height: calc(var(--touch-target-lg) + var(--space-3));
-  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
-  border: 0;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--surface-2);
-  }
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-}
-
-.text {
-  flex: 1;
-  min-width: 0;
-}
-
-.name,
-.sub {
-  display: block;
-  overflow-wrap: anywhere;
-}
-
-.name {
-  font-size: var(--text-headline);
-  font-weight: var(--weight-medium);
-}
-
-.sub {
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
 .rate {
-  flex: none;
   color: var(--accent-ink);
   font-size: var(--text-callout);
   font-weight: var(--weight-medium);
