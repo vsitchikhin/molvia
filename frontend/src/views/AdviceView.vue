@@ -1,14 +1,21 @@
 <template>
   <AppScreen :title="t('advice.title')">
-    <template v-if="phase === 'ready'" #subtitle>
-      {{ scope === 'shared' ? t('advice.shared_data') : t('advice.own_data_only') }}
+    <!-- The line is the screen's in every state, so the field under it never moves (owner's В-2 «а»
+         on review № 1): whose figures these are only the answer can say — access is the server's —
+         so while it is on its way the line is a bar, and with no answer at all it is held empty; so is
+         the newcomer's, who has nobody's figures to speak of. -->
+    <template v-if="phase !== 'idle'" #subtitle>
+      <template v-if="phase === 'ready'">
+        {{ scope === 'shared' ? t('advice.shared_data') : t('advice.own_data_only') }}
+      </template>
+      <span v-else class="subtitle-hold" :class="{ 'subtitle-bar': phase === 'loading' }"></span>
     </template>
 
     <!-- The connection in one line, once (MOL-181, Ф-14). Over a list it stands under the field, which
-         chooses what is shown; over the skeleton and the newcomer there is no field, and it stands
-         under the header. -->
+         chooses what is shown, and over the skeleton under the field's well; over the newcomer there
+         is no field, and it stands under the header. -->
     <StatusStrip
-      v-if="strip && phase !== 'ready'"
+      v-if="strip && phase === 'empty'"
       class="status"
       :kind="strip.kind"
       :text="strip.text"
@@ -18,7 +25,18 @@
         <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
       </template>
     </StatusStrip>
-    <AdviceSkeleton v-if="phase === 'loading'" field />
+
+    <!-- The well stands where the field will, the strip under it as under the field — the head of
+         `AdviceSearch` drawn still (review № 2): over the well the strip took the field's place, and
+         the field came 60 px higher with the answer. Out of the frame, so the strip is not hidden
+         with its bars; the frame's first caption has no 24 above it, which this head gives. -->
+    <template v-if="phase === 'loading'">
+      <div class="ghost-head">
+        <SkeletonPart kind="field" />
+        <StatusStrip v-if="strip" :kind="strip.kind" :text="strip.text" :attempt="attempt" />
+      </div>
+      <AdviceSkeleton />
+    </template>
 
     <!-- Without an identity there is nobody to advise; the notice above says why. -->
     <template v-else-if="phase !== 'idle'">
@@ -170,6 +188,7 @@ import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import type { StripKind } from '@/components/StatusStrip.vue'
 import VerdictEditSheet from '@/components/VerdictEditSheet.vue'
@@ -213,6 +232,7 @@ export default defineComponent({
     AppScreen,
     ManualEntryButton,
     ScreenState,
+    SkeletonPart,
     StatusStrip,
     VerdictEditSheet,
   },
@@ -374,6 +394,30 @@ export default defineComponent({
 <style scoped lang="scss">
 .status {
   margin-bottom: var(--space-6);
+}
+
+/* `.head` of `AdviceSearch`, still. */
+.ghost-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+
+/* An empty line of the subtitle: an atomic inline keeps the line box, and the strut its height. */
+.subtitle-hold {
+  display: inline-block;
+  width: 46%;
+  height: var(--skeleton-sub);
+  vertical-align: middle;
+  visibility: hidden;
+}
+
+.subtitle-bar {
+  @include skeleton-bar;
+
+  display: inline-block;
+  visibility: visible;
 }
 
 .tail {

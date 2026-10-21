@@ -286,9 +286,11 @@ test('a connection lost mid-request is offline, not an error', async ({ page, co
     if (request.url().includes('/api/advice/search')) searches.push(request.url())
   })
   await page.getByRole('searchbox', { name: 'Search the catalogue' }).fill('молоко')
-  await expect(page.getByText('No «молоко» found')).toBeVisible()
+  // Taken from the block, not the live region, which says the same words (e2e rule).
+  const found = page.locator('.state')
+  await expect(found.getByText('No «молоко» found')).toBeVisible()
   await expect(
-    page.getByText('Without a connection we search only what was rated. The whole catalogue'),
+    found.getByText('Without a connection we search only what was rated. The whole catalogue'),
   ).toBeVisible()
   await expect(
     page.getByRole('heading', { name: 'The list will show up once you are online' }),
@@ -298,6 +300,51 @@ test('a connection lost mid-request is offline, not an error', async ({ page, co
     page.locator('.dock').getByRole('button', { name: 'Photograph a receipt' }),
   ).toBeVisible()
   expect(searches).toEqual([])
+})
+
+// The field stands in one place whatever came (owner's В-2 «а» on review № 1 of MOL-201): the line
+// under the title is held while the answer is on its way and when there is none, so the well, the
+// field in the cold offline and the field over the list stand at one height.
+async function topOf(page: Page, selector: string): Promise<number> {
+  const box = page.locator(selector)
+  await expect(box).toBeVisible()
+  await page.evaluate(() =>
+    Promise.allSettled(document.getAnimations().map((animation) => animation.finished)),
+  )
+  return box.evaluate((element) => element.getBoundingClientRect().top)
+}
+
+test('the field over the list stands where its well stood', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const who = await person(page)
+  await ratedPurchase(who, `Тан ${tag}`, 5)
+  await page.route('**/api/advice', () => new Promise(() => undefined))
+  await page.goto('/')
+  const well = await topOf(page, '.skeleton-field')
+
+  await page.unroute('**/api/advice')
+  await page.goto('/')
+  await expect(page.locator('section.take')).toBeVisible()
+  expect(await topOf(page, '.search-field .well')).toBe(well)
+})
+
+test('the field of the cold offline stands where its well stood', async ({ page, context }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await person(page)
+  await page.route('**/api/advice', () => new Promise(() => undefined))
+  await page.goto('/')
+  const well = await topOf(page, '.skeleton-field')
+
+  // Nothing kept, and no connection: back on the screen, the field and the cloud.
+  await page.unroute('**/api/advice')
+  await context.setOffline(true)
+  const tabs = page.locator('.tabbar')
+  await tabs.getByRole('link', { name: 'Purchases' }).click()
+  await tabs.getByRole('link', { name: 'What to buy' }).click()
+  await expect(
+    page.getByRole('heading', { name: 'The list will show up once you are online' }),
+  ).toBeVisible()
+  expect(await topOf(page, '.search-field .well')).toBe(well)
 })
 
 // A list remembered is dated by one strip under the field (MOL-201, Ф-14): offline the cloud and

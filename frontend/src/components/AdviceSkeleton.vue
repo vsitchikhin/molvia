@@ -1,6 +1,5 @@
 <template>
   <ScreenSkeleton>
-    <SkeletonPart v-if="field" kind="field" />
     <SkeletonPart kind="caption" :width="22" />
     <!-- A card of «Брать»: its name at the size of a title, and the plate of the place and the price. -->
     <AppCard class="ghost-take">
@@ -20,17 +19,14 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import SkeletonPart from '@/components/SkeletonPart.vue'
 
 /**
- * «Что брать» while its answer is on its way (Ф-13, handoff `01`, 1j): the field's well, then the
- * groups as they will stand — a card of «Брать», a row of «Только если дёшево», the caption of «Не
- * брать нигде». The search, waiting for its first answer, draws the same without the field: what it
- * finds is laid out by the same groups.
+ * «Что брать» while its answer is on its way (Ф-13, handoff `01`, 1j): the groups as they will stand —
+ * a card of «Брать», a row of «Только если дёшево», the caption of «Не брать нигде». The screen puts the
+ * field's well above it, with the strip under the well as under the field; the search, waiting for its
+ * first answer, draws the same under its own field: what it finds is laid out by the same groups.
  */
 export default defineComponent({
   name: 'AdviceSkeleton',
   components: { AppCard, ScreenSkeleton, SkeletonPart },
-  props: {
-    field: { type: Boolean, default: false },
-  },
 })
 </script>
 

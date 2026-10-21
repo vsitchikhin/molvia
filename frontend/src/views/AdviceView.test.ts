@@ -312,11 +312,32 @@ describe('AdviceView', () => {
     const { view } = await render()
 
     expect(view.find('.skeleton').exists()).toBe(true)
-    expect(view.get('.skeleton .bars').element.firstElementChild?.classList).toContain(
-      'skeleton-field',
-    )
+    // The well where the field will stand, above the frame (review № 2).
+    const head = view.get('.ghost-head').element
+    expect(head.firstElementChild?.classList).toContain('skeleton-field')
+    expect(head.nextElementSibling?.classList).toContain('skeleton')
     expect(view.findAll('.skeleton .ghost-take')).toHaveLength(1)
     expect(view.findAll('.skeleton .skeleton-caption')).toHaveLength(3)
+    // The subtitle's line is held, as a bar (owner's В-2 «а»).
+    expect(view.find('.subtitle .subtitle-bar').exists()).toBe(true)
+  })
+
+  // The line under the title stands in every state, so the field under it never moves (В-2 «а»): a
+  // bar while the answer is on its way, empty with none, the words once they are known.
+  it('В-2: the subtitle`s line stands in every state, words only with the answer', async () => {
+    online(false)
+    advice.mockRejectedValue(broke())
+    const cold = await render({ country: 'GE' })
+    expect(cold.view.find('.subtitle .subtitle-hold').exists()).toBe(true)
+    expect(cold.view.find('.subtitle-bar').exists()).toBe(false)
+
+    online(true)
+    const failed = await render({ country: 'GE' })
+    expect(failed.view.find('.subtitle .subtitle-hold').exists()).toBe(true)
+
+    advice.mockResolvedValue(answer([milk]))
+    const ready = await render()
+    expect(ready.view.get('.subtitle').text()).toBe(en.advice.own_data_only)
   })
 
   it('three groups, each in its own shape, in the order the answer arrived', async () => {
