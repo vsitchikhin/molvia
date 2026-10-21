@@ -58,6 +58,57 @@ function figureOf(value: string | null, digits: number): number | null {
   return Number(whole) * 10 ** digits + Number(part.padEnd(digits, '0'))
 }
 
+// thousands grouped by a space as printed, a no-break or a narrow one: «1 000,00», «19 097.86»
+const GROUPED = /^\d{1,3}(?:[   ]\d{3})+(?:[.,]\d+)?$/u
+
+/**
+ * A figure as the model wrote it in the one form `figureOf` reads (MOL-294): thousands grouped by spaces,
+ * a comma for the point where it is the only one and no point stands («0,50»), and a minus before a
+ * discount — its size, «-0.50» for 0,50 off. A minus before anything else is no figure: a negative sum or
+ * total is a refund, never a purchase. Anything else is left as written, and stays no figure.
+ */
+function canonicalFigure(value: string | null, signed: boolean): string | null {
+  if (value === null) return null
+  let text = value.trim()
+  if (signed) text = text.replace(/^[-−]\s*/u, '')
+  if (GROUPED.test(text)) text = text.replace(/[   ]/gu, '')
+  if (/^\d+,\d+$/u.test(text)) text = text.replace(',', '.')
+  return /^\d{1,9}(?:\.\d+)?$/u.test(text) ? text : value
+}
+
+/**
+ * The answer with its figures in the one form, and how many of them are still no figure of their kind — a
+ * count for the log, never the figures (Т-8): the next spelling we do not read shows there, not by a guess.
+ */
+function canonicalAnswer(
+  reading: PhotoReading,
+  answer: ModelReceipt,
+): { answer: ModelReceipt; unparsed: number } {
+  let unparsed = 0
+  const one = (value: string | null, digits: number, signed = false): string | null => {
+    const figure = canonicalFigure(value, signed)
+    if (figure !== null && figureOf(figure, digits) === null) unparsed += 1
+    return figure
+  }
+  const discount = new RegExp(`(?:${reading.words.discountKept})`, 'u')
+  const lines = answer.lines.map((line) => ({
+    ...line,
+    quantity: one(line.quantity, 3),
+    unit_price: one(line.unit_price, 2),
+    discount: one(line.discount, 2, true),
+    sum: one(line.sum, 2),
+  }))
+  const totals = answer.totals.map(({ label, amount }) => ({
+    label,
+    amount: one(amount, 2, discount.test(label)) ?? amount,
+  }))
+  return { answer: { ...answer, lines, totals }, unparsed }
+}
+
+/** How many of the model's figures no rule reads (MOL-294): the count the log of a reading carries. */
+export const unparsedFigures = (reading: PhotoReading, answer: ModelReceipt): number =>
+  canonicalAnswer(reading, answer).unparsed
+
 /** The class code of a line as the parse keeps it: a heading of four digits, a service class «56.10». */
 function classOf(code: string | null): string | null {
   return /(?<![\d.])(\d{2}\.\d{2}|\d{4})(?![\d.])/.exec(code ?? '')?.[1] ?? null
@@ -574,7 +625,8 @@ function repaired(
  * and a section «Բաժին» is printed or a total vouched for; no line and neither is a reading of nothing.
  * Then `verifiedReading(text, { byModel: true })`, as for Tesseract's reading.
  */
-export function receiptTextOfModel(reading: PhotoReading, answer: ModelReceipt): ReceiptText {
+export function receiptTextOfModel(reading: PhotoReading, written: ModelReceipt): ReceiptText {
+  const { answer } = canonicalAnswer(reading, written)
   const discounted = answer.lines.some((line) => figureOf(line.discount, 2) !== null)
   const copied = answer.lines.map(lineOf)
   const { total, read, met, owed, cashback, redeemed } = totalOf(reading, answer, copied)
