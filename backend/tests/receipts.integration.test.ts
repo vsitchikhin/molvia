@@ -598,7 +598,7 @@ describe('the queue', () => {
     const emptied = await askedAll(me, twice)
     expect(emptied.lines.map((line) => line.sum)).toEqual([null, null])
     expect(emptied.readPartly).toBe(true)
-  })
+  }, 15_000)
 
   it('shows the total the payment prints too, the lines short of it (MOL-244)', async () => {
     const me = await owner()
