@@ -1,3 +1,4 @@
+import { expect } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 
 /**
@@ -18,11 +19,26 @@ export async function facesIn(page: Page): Promise<void> {
   })
 }
 
-/** Scrolls the page so that the top of the element stands this far below the top of the window. */
+/**
+ * Scrolls the page so that the top of the element stands this far below the top of the window — once
+ * the faces have come, so that what is measured after is the page that stays.
+ */
 export async function standAt(element: Locator, below: number): Promise<void> {
+  await facesIn(element.page())
   await element.evaluate((node, offset) => {
     window.scrollBy({ top: node.getBoundingClientRect().top - offset, behavior: 'instant' })
   }, below)
+}
+
+/** Scrolls to the very end of the page, once the faces have come, and says how far that is. */
+export async function toTheEnd(page: Page): Promise<number> {
+  await facesIn(page)
+  await page.evaluate(() => {
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' })
+  })
+  const scrolled = await page.evaluate(() => window.scrollY)
+  expect(scrolled).toBeGreaterThan(0)
+  return scrolled
 }
 
 export async function topOf(element: Locator): Promise<number> {
