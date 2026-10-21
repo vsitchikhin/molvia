@@ -427,7 +427,11 @@ and the few in «-ան» the dictionary holds («ձկան»), behind any other w
 - **Two things side by side, neither in a case, do not say which is the kind** (adversarial Б1): a till prints the
   kind first («Պանիր չեդդեր»), Armenian the head last («Ելակ յոգուրտ», a strawberry yoghurt), so an item — and a
   seed's name — stands only where it says both. A quality the dictionary glosses as one («միջին», средний) is no
-  thing. Of 527 lines «flavour kind» made of the seed's words, the first round bound 459 to the fruit, sure; now none.
+  thing; a gloss with a thing in it is one, «պաստեղ» — «пастила фруктовая» (В2). **A word the dictionary has not is a
+  thing too** — a dessert or a drink of loans, «Ելակ սմուզի», «Խնձոր շտրուդել», «Ելակ Smoothie» (В1) — said by its
+  letters («Смузи»), and «-ի», «-ու» are a case only of a word the dictionary has, since a loan ends so; a name only
+  where an Armenian capital says so on a line of small letters, «Բանան Սաբրոսթար», a sort. Of 527 lines «flavour kind»
+  made of the seed's words, the first round bound 459 to the fruit, sure; now none.
 - **Any other item stands where `lineFitter` lets it** — a heading's far match, each of the search's first ten:
   **every word of its name is the line's**, by a **form** of the dictionary's Russian — an adjective in any gender,
   number and case, a noun in any number and case, the adjective a noun makes («оливки» — «оливковый», «молоко» —
@@ -460,7 +464,7 @@ item's already on that item (`createUnlessNamed`).
 the product's own `bindReceiptLines` on the seed and the owner's items of am-34…43, each pair «line → item» judged.
 Master: 47 right, 203 «general» (the kind with no brand or sort), **42 wrong**, 29 new. Now: **136 right, 0 wrong**,
 4 general, 181 new with meaning (124 / 0 / 4 / 193 by letters alone) — every new one «проверьте». **The dictionary grew
-by the words of these very lines**, so the honest figure is lower: with master's dictionary 96 right, 0 wrong — the
+by the words of these very lines**, so the honest figure is lower: with master's dictionary 93 right, 0 wrong — the
 first receipts of the owner's the bench never saw will tell. **The seed's own 2 000 till names**, as lines: 1 972 to
 their own item, 28 to another — as on master; by the search alone, the names path off, 1 045 own, 88 another (a kind
 for a sort: «Молоко» for «Կաթ 3,2%», «Рыба» for a hake), 867 new. **The prices, named:** a line whose brand nobody
@@ -468,7 +472,11 @@ named is new however near the seed's item stands, so the first receipt of a shop
 person's words fill the shop's memory, which needs the tax number (below); a word the item names that the line does
 not print keeps it away from the search — «Огурцы маринованные» for «Վարունգ ընտիր»; two things side by side lose
 the kind of the order a till prints — «Йогурт» for «Յոգուրտ ելակ», 407 of those 527 lines in the first round, 55 now
-(«Хлеб» for «Հաց Պումպերնիկել» on the bench), a new item instead; a genitive before the kind is asked of no seed's name
+(«Хлеб» for «Հաց Պումպերնիկել» on the bench), a new item instead, and so do a word after the kind the dictionary has
+not — with master's dictionary «Помидоры» for «Լոլիկ ջերմոցի», «Салфетки влажные» for «… անտիբակտերիալ», 96 → 93
+right on the bench — and a Latin brand printed bare after it («Պահպանակ Durex»); a kind cut by the till or the reader
+past one letter finds nothing, and its new name is the cut spelt in letters — «Թխվածքաբլ» is «Тхвацкабл», for one
+press to take away (review 3, №1); a genitive before the kind is asked of no seed's name
 — «Թեյի տոպրակ», a tea bag, is «Пакеты фасовочные», sure (review 2, №4); a diminutive is another word — «16 Թև» is
 no «Крылья куриные» (`թևիկներ`), as «թել» is no «թելիկ»; a brand two letters off is another — the owner's «Бисквит
 Kinder Délice» for «Բիսքվիթ «Կինդեր» դելիս» is a new item beside it; a Russian word of a form these rules do not make
