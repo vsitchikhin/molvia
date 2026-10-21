@@ -44,11 +44,13 @@
            from the top of the screen (handoff `01`). Over a list, and with no connection and no list
            remembered (Ф-14, С-1 of MOL-118): the cold offline is not empty, the field answers from
            what the phone has — nothing, and says why. Not over a failure or a newcomer, whose search
-           could only answer «not rated yet» (question 1). One place in the template for both, so
-           the list that comes with the connection comes under the field being typed in, focus and
-           all. Above the strip of the list's age, as the handoff draws it (review Р-16). -->
+           could only answer «not rated yet» (question 1) — unless something is typed in it: the
+           connection back without a list, the field stays under the thumb with what it holds, and goes
+           once cleared (owner's В-3 «а» on adversarial А1). One place in the template for all, so the
+           list that comes with the connection comes under the field being typed in, focus and all.
+           Above the strip of the list's age, as the handoff draws it (review Р-16). -->
       <AdviceSearch
-        v-if="phase === 'ready' || phase === 'offline'"
+        v-if="fieldShown"
         v-model="query"
         :remembered="remembered"
         :fetched-at="fetchedAt"
@@ -70,7 +72,7 @@
            strip is the error's «Повторить» (1k-0) — but not under «Где вы?» opened from it: taken, the
            strip took the sheet and what was typed in it along (adversarial А1, as Р-15 of MOL-128). -->
       <ScreenState
-        v-if="phase === 'error'"
+        v-if="phase === 'error' && !searching"
         kind="error"
         :inline="Boolean(country) || entering"
         :title="t('advice.error.title')"
@@ -94,7 +96,7 @@
       <!-- Kept while its «Записать вручную» has a sheet up: an answer with rows arriving under «Где
            вы?» would take the sheet with it (review Р-15 of MOL-128, review 6 of MOL-127). -->
       <AdviceHomeNew
-        v-else-if="phase === 'empty' || (country && entering)"
+        v-else-if="(phase === 'empty' && !searching) || (country && entering)"
         @busy="entering = $event"
       />
 
@@ -197,6 +199,7 @@ import type { Score } from '@/components/rating'
 import { useAdvice } from '@/composables/useAdvice'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { purchaseDay, timeOfDay } from '@/days'
+import { focusScreenTitle } from '@/transitions'
 
 /**
  * «Что брать» (MOL-32) — the screen the whole product exists for. The other three fill its
@@ -248,6 +251,22 @@ export default defineComponent({
     /** A sheet of «Записать покупки» is up. */
     const entering = ref(false)
     const { country } = useReceiptCapture()
+    /** The field is over a list, in the cold offline, and anywhere while something is typed in it. */
+    const fieldShown = computed(
+      () =>
+        advice.phase.value === 'ready' ||
+        advice.phase.value === 'offline' ||
+        (searching.value && (advice.phase.value === 'error' || advice.phase.value === 'empty')),
+    )
+    // A field cleared over a failure or a newcomer goes, and the focus with it: given to the screen's
+    // heading, where a screen reader starts reading what took its place, never left on <body>.
+    watch(
+      fieldShown,
+      (shown) => {
+        if (!shown && document.activeElement === document.body) focusScreenTitle()
+      },
+      { flush: 'post' },
+    )
     const day = (when: Date) => purchaseDay(when, locale.value)
     const time = (when: Date) => timeOfDay(when, locale.value)
     const cityGenitive = (city: string) =>
@@ -363,6 +382,7 @@ export default defineComponent({
       t,
       query,
       strip,
+      fieldShown,
       searching,
       entering,
       country,

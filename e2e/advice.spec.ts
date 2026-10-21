@@ -1,7 +1,7 @@
 import { actorCodec, settingsOf } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { BrowserContext, Page } from '@playwright/test'
 import { liveRegion, recordLiveRegion } from './live-region'
 import { asBrowser, signedIn } from './session'
 
@@ -331,20 +331,92 @@ test('the field over the list stands where its well stood', async ({ page }) => 
 test('the field of the cold offline stands where its well stood', async ({ page, context }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await person(page)
-  await page.route('**/api/advice', () => new Promise(() => undefined))
+  // The first answer held and then lost with the connection: nothing is ever kept.
+  let release: () => void = () => undefined
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('**/api/advice', async (route) => {
+    await held
+    await route.abort('internetdisconnected')
+  })
   await page.goto('/')
   const well = await topOf(page, '.skeleton-field')
 
-  // Nothing kept, and no connection: back on the screen, the field and the cloud.
-  await page.unroute('**/api/advice')
   await context.setOffline(true)
-  const tabs = page.locator('.tabbar')
-  await tabs.getByRole('link', { name: 'Purchases' }).click()
-  await tabs.getByRole('link', { name: 'What to buy' }).click()
+  release()
   await expect(
     page.getByRole('heading', { name: 'The list will show up once you are online' }),
   ).toBeVisible()
   expect(await topOf(page, '.search-field .well')).toBe(well)
+})
+
+/** Cold offline: the first answer lost with the connection, the cloud on the screen. */
+async function coldOffline(page: Page, context: BrowserContext): Promise<void> {
+  let release: () => void = () => undefined
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('**/api/advice', async (route) => {
+    await held
+    await route.abort('internetdisconnected')
+  })
+  await page.goto('/')
+  await expect(page.locator('.skeleton')).toBeVisible()
+  await context.setOffline(true)
+  release()
+  await expect(
+    page.getByRole('heading', { name: 'The list will show up once you are online' }),
+  ).toBeVisible()
+  await page.unroute('**/api/advice')
+}
+
+// The connection back without a list: the field being typed in stays under the thumb with what it
+// holds, and goes once cleared, the focus given to the heading (owner's В-3 «а» on adversarial А1).
+test('the connection back without a list keeps the field typed in; cleared, it goes', async ({
+  page,
+  context,
+}) => {
+  await person(page)
+  await coldOffline(page, context)
+  const field = page.getByRole('searchbox', { name: 'Search the catalogue' })
+  await field.click()
+  await field.pressSequentially('молоко')
+  await expect(page.locator('.state').getByText('No «молоко» found')).toBeVisible()
+
+  await page.route('**/api/advice', (route) => route.fulfill({ status: 500, body: '{}' }))
+  await context.setOffline(false)
+  // The search is asked of the server now: its answer stands where the phone's did.
+  await expect(page.locator('.state').getByText('The catalogue has no such item yet')).toBeVisible()
+  await expect(field).toHaveValue('молоко')
+  await expect(field).toBeFocused()
+  await expect(page.getByRole('heading', { name: 'The server did not answer' })).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Clear' }).click()
+  await expect(page.getByRole('heading', { name: 'The server did not answer' })).toBeVisible()
+  await expect(field).toHaveCount(0)
+  await expect(page.getByRole('heading', { level: 1 })).toBeFocused()
+})
+
+// 1l-0: where no receipt is read, the cold offline records purchases from the strip (Ф-14).
+test('the cold offline without receipts offers «Record purchases» below, never red', async ({
+  page,
+  context,
+}) => {
+  const who = await person(page)
+  const previous = settingsOf(actorCodec.parse(await who.call('GET', '/actors/me')))
+  await who.call('PUT', '/actors/me/settings', {
+    previous,
+    settings: { ...previous, country: 'GE', city: 'Тбилиси' },
+  })
+  await coldOffline(page, context)
+
+  await expect(page.getByRole('searchbox', { name: 'Search the catalogue' })).toBeVisible()
+  const dock = page.locator('.dock')
+  await expect(dock.getByRole('button', { name: 'Record purchases' })).toBeVisible()
+  await expect(dock.getByRole('button', { name: 'Photograph a receipt' })).toHaveCount(0)
+  await expect(page.locator('.state.bad')).toHaveCount(0)
+  await expect(page.locator('[role="alert"]')).toHaveCount(0)
 })
 
 // A list remembered is dated by one strip under the field (MOL-201, Ф-14): offline the cloud and

@@ -202,6 +202,58 @@ describe('AdviceView', () => {
       expect(view.getComponent({ name: 'ScreenState' }).props('kind')).toBe('offline')
     })
 
+    // The connection back without a list — the server failed, or nothing is rated yet: the field
+    // being typed in stays under the thumb with what it holds, and answers from the server; cleared,
+    // it goes and the focus is given to the heading (owner's В-3 «а» on adversarial А1).
+    for (const [kind, reply] of [
+      ['fails', () => advice.mockRejectedValue(broke())],
+      [
+        'is empty',
+        () => advice.mockResolvedValue(answer([], { geography: { country: 'GE', city: 'Гюмри' } })),
+      ],
+    ] as const) {
+      it(`В-3: back online, the list ${kind} — the field typed in stays, cleared it goes`, async () => {
+        online(false)
+        advice.mockRejectedValue(broke())
+        const { view } = await render({ country: 'GE' })
+        const field = view.get<HTMLInputElement>('input[type="search"]')
+        field.element.focus()
+        await field.setValue('молоко')
+        await flushPromises()
+
+        online(true)
+        reply()
+        adviceSearch.mockResolvedValue({
+          geography: { country: 'GE', city: 'Гюмри' },
+          scope: 'own',
+          near: true,
+          items: [{ itemId: milk.itemId, name: milk.name, advice: null }],
+        })
+        window.dispatchEvent(new Event('online'))
+        await flushPromises()
+        await vi.waitFor(() => {
+          expect(adviceSearch).toHaveBeenCalledWith('молоко')
+        })
+        await flushPromises()
+
+        expect(view.get('input[type="search"]').element).toBe(field.element)
+        expect(field.element.value).toBe('молоко')
+        expect(document.activeElement).toBe(field.element)
+        expect(view.text()).toContain(milk.name)
+        // What the list's answer put up waits for the field to be cleared.
+        expect(view.text()).not.toContain(en.advice.error.title)
+        expect(view.text()).not.toContain(en.advice.home.new.title)
+
+        await view.get('.clear').trigger('click')
+        await flushPromises()
+        expect(view.find('input[type="search"]').exists()).toBe(false)
+        expect(view.text()).toContain(
+          kind === 'fails' ? en.advice.error.title : en.advice.home.new.title,
+        )
+        expect(document.activeElement?.tagName).toBe('H1')
+      })
+    }
+
     // The connection back: the list comes under the very field being typed in.
     it('the connection back brings the list under the same field, the text kept', async () => {
       online(false)
