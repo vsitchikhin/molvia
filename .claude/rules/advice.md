@@ -368,8 +368,38 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
 
 **The home of the app is «Что брать», with a search at its top** — at the shelf a person looks an
 item up rather than scrolls. The field is in the page and scrolls with it, never pinned, and is
-there only over a list: loading, a failure and the newcomer have none (the newcomer's search could
-only ever answer «not rated yet», and would teach that it is useless).
+there over a list **and in the cold offline** — no connection and nothing remembered (MOL-201, Ф-14,
+С-1): the screen is not empty there, the field answers from what the phone has — nothing — and says
+why, «Без связи ищем только среди оценённого», in place of the cloud; it is the same field as over the
+list, so the list the connection brings comes under the one being typed in. A failure and the
+newcomer have none (the newcomer's search could only ever answer «not rated yet», and would teach
+that it is useless) — **unless something is typed in it or the focus is in it** (owner's В-3 «а» on
+adversarial А1, В-4 «а» on Б2): the connection back with a failure or an empty list took the field from
+under the thumb with what it held and left the focus on `<body>`; it stays, answered by the server's
+search, erased to nothing too — the last Backspace took it and the keyboard with it, and the next word
+had nowhere to go — and goes once the person left it, the focus where they put it. **Left by a press,
+it goes once the press is over** (owner's В-5 «а» on adversarial В1): gone as the finger landed, it
+took what was under it up by its height before the release, and the first tap on «Повторить» or a
+step of the newcomer's cycle landed elsewhere; so the leaving is told a task after the release, past
+its click — by the keys, at once — and the page losing the system's focus, another app, is no leaving.
+The price: after that tap what is under the field still rises by its height, the tap already done —
+and a «Повторить» that failed again stands that much higher, so a second tap at the same place lands
+on nothing (adversarial round 4). A touch on the field's own pill keeps it (`SearchField`, Г1). Only a field that
+goes with the focus in it — a city moved in another tab — gives the focus to the heading, and only that
+focus (review № 8, Б1: on a phone nobody touched, `<body>` is no focus to give). The prices, named: a
+newcomer who typed in the cold offline is searched for on this one path; and while the field holds
+words over a failure, the screen does not say the list failed and offers no «Повторить» — cleared and
+left, the failure is back with it. Loading draws the well where the field will stand, and **the line under the title is
+held in every state** (В-2 «а», review № 1): whose figures these are is the answer's to say, so it is
+a bar while the answer is on its way and empty with none — read only once the answer came, it moved
+the field a line down under the thumb. **One strip of the connection stands
+under the field** (`StatusStrip`, MOL-201): the search's while something is typed, else the list's —
+offline, another city's list offline, «Сервер не ответил» with its «Повторить», and «Обновляем» only
+once the answer is late (`STRIP_LATE_MS`, owner's В-1 «а») — timed by what is waited for, so a city
+moved after a refresh already late waits its own second (adversarial А2); under the well of the
+skeleton after a change of city, «Обновляем · список для Гюмри»; with no field — the newcomer from
+memory — under the header, and under the field the focus holds there (adversarial В2: drawn in both,
+the first stood over the field).
 
 - **The answer for what is found is the server's, never glued on the phone** (`GET /advice/search`,
   В-1). The list is cut at `ADVICE_LIMIT`, so an item rated past the cut would read «ещё не
@@ -391,9 +421,9 @@ only ever answer «not rated yet», and would teach that it is useless).
   that comes back over a list asked again searches what it holds (adversarial Г, Д).
 - **It writes nothing** (В-2): no `advice_viewed` — the one writer stays `GET /advice`, which the
   screen asks for whenever it opens and whenever the connection comes back, and the field is not
-  shown without a list; the one visit missed (the list failed, the search then worked) errs towards
-  «stop». And no pick into `search_picks`: a pick teaches the entry of a purchase, and nothing was
-  bought here.
+  shown over a failure; the one visit missed (the list failed, the search then worked) errs towards
+  «stop». In the cold offline it asks nothing at all — the phone answers. And no pick into
+  `search_picks`: a pick teaches the entry of a purchase, and nothing was bought here.
 - **The found are laid out by the list's groups and shapes, «Ещё не оценивали» last**; inside a
   group, in the order of the search. «Не брать нигде» has no price and no place here either, and no
   tail «Цены нет намеренно». No «Предложить товар»: nothing was bought. «Оценить» on an item not

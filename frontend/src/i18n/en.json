@@ -396,9 +396,9 @@
     "ratings_count": "{n} rating | {n} ratings",
     "rating_line": "{rating} · {count}",
     "truncated": "Showing {shown} of {total}",
-    "stale": "The list as of {day} at {time} — we will refresh once you are back online",
-    "stale_error": "The list as of {day} at {time} — the server did not answer",
-    "stale_loading": "The list as of {day} at {time} — refreshing",
+    "stale": "Offline · the list as of {day}, {time}",
+    "stale_error": "The server did not answer — the list as of {day}, {time}",
+    "stale_loading": "Refreshing · the list as of {day}, {time}",
     "edit_action": "Change the rating",
     "edit": {
       "meta": "Only your own rating changes",
@@ -416,16 +416,16 @@
     },
     "error": {
       "title": "The server did not answer",
-      "body": "Verdicts are worked out on the server, there is no local copy",
+      "body": "The list didn’t load. Try again",
       "body_capture": "The list didn’t load. You can still photograph a receipt"
     },
     "offline": {
       "title": "The list will show up once you are online",
-      "body": "Verdicts are worked out on the server — we will show the list the moment you are back",
+      "body": "We’ll show the list as soon as you’re back online. You can record purchases now",
       "body_capture": "We’ll show the list as soon as you’re back online. You can photograph a receipt now"
     },
-    "city_reloading": "City changed to {city} — reloading the list",
-    "stale_other_city": "List for {oldCity} from {day} at {time}. Prices for {city} will appear when the connection returns.",
+    "city_reloading": "Refreshing · the list for {city}",
+    "stale_other_city": "Offline · the list for {oldCity} as of {day}, {time}. Prices for {city} will appear once you are back online",
     "cities_genitive": {
       "Гюмри": "Gyumri",
       "Ереван": "Yerevan",
@@ -445,7 +445,7 @@
         "body_offline": "Without a connection we search only what was rated. The whole catalogue — with a connection"
       },
       "error_body": "The search did not go through. Try again — or clear the field: the list is still there",
-      "offline": "Without a connection we search only the list as of {day} at {time}",
+      "offline": "Offline · searching only the list as of {day}, {time}",
       "offline_more": "Unrated items and the whole catalogue — once there is a connection"
     },
     "home": {
@@ -1332,6 +1332,7 @@
       "strip_offline": "Offline · charts as of 14:05",
       "strip_offline_long": "Offline · settings as of 14:05. Changes can be saved once the internet is back",
       "strip_unanswered": "The list as of yesterday 21:40 — the server did not answer",
+      "strip_refreshing": "Refreshing · the list as of yesterday, 21:40",
       "caption_goes_on": "Goes on",
       "caption_acts": "Acts at once or asks",
       "row_link_inactive": "A link while offline",
