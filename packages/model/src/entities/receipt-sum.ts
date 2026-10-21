@@ -68,8 +68,22 @@ function computedSum(line: ReceiptFigures, digits: number): Money | null {
  * sums recorded, the difference on the review, «Прочитали не всё» — and the trip's money never does.
  */
 export function linesTotalOf(total: Money | null, cashback: Money | null): Money | null {
-  if (total === null || cashback === null || cashback.currency !== total.currency) return total
-  const minor = total.minor - cashback.minor
+  return less(total, cashback)
+}
+
+/**
+ * What left the card for a receipt (MOL-289, owner's В-5 «а»): its total less the card's bonus it was
+ * partly paid with («Կանխավճարի մարում») — what that bonus covered was recorded when it was sent to the
+ * card. The trip's money, and what the review says it is in the person's currency.
+ */
+export function receiptPaidOf(total: Money | null, redeemed: Money | null): Money | null {
+  return less(total, redeemed)
+}
+
+// A total less a part of it in its currency; a part that is the whole of it or more is no reading.
+function less(total: Money | null, part: Money | null): Money | null {
+  if (total === null || part === null || part.currency !== total.currency) return total
+  const minor = total.minor - part.minor
   return minor > 0n ? { minor, currency: total.currency } : total
 }
 

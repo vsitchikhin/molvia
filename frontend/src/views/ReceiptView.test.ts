@@ -569,6 +569,26 @@ describe('ReceiptView (MOL-127)', () => {
     expect(view.get('.partly').text()).toMatch(/не хватает примерно 9\s100/)
   })
 
+  // MOL-289: «Ереван Сити» prints the total without the card's discount, sent to the card
+  it('sets the lines against the total less the cashback, and says the bonus spent at the foot', async () => {
+    const carded = detail()
+    receipt.mockResolvedValue({
+      ...carded,
+      receipt: { ...carded.receipt, total: amd('909') },
+      cashback: amd('9'),
+      redeemed: amd('100'),
+      rate: { base: 'RUB', quote: 'AMD', scaled: 4_000_000n, source: 'official', asOf: new Date() },
+    })
+    const { view } = await render()
+    expect(view.find('.partly').exists()).toBe(false)
+    expect(view.find('.difference').exists()).toBe(false)
+    const foot = view.get('.total').text()
+    expect(foot).toMatch(/Кэшбэк на карту\s*9,00/)
+    expect(foot).toMatch(/Оплачено бонусом карты\s*100,00/)
+    // what left the card, 809 ֏ at 4 ֏ the rouble — never the total's 909
+    expect(foot).toMatch(/≈ 202/)
+  })
+
   it('read in part when the lines are short of the total by one luma, as by a line (MOL-255)', async () => {
     const short = detail()
     receipt.mockResolvedValue({ ...short, receipt: { ...short.receipt, total: amd('900.01') } })

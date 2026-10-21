@@ -173,6 +173,8 @@
           class="block"
           :balance="balance"
           :total="shownTotal"
+          :cashback="detail.cashback ?? null"
+          :redeemed="detail.redeemed ?? null"
           :rate="detail.rate"
           :day="rateDay"
           :suspect="suspect"
@@ -329,6 +331,7 @@ import { ApiError } from '@molvia/client'
 import {
   ERROR,
   formatMoney,
+  linesTotalOf,
   readCovered,
   readPartly,
   receiptCard,
@@ -639,7 +642,8 @@ export default defineComponent({
     const partly = computed(() => {
       const one = detail.value
       if (!one || one.lines.length === 0) return null
-      const total = one.receipt.total ?? one.readTotal ?? null
+      // the lines make the total less what a card sent to the card (MOL-289)
+      const total = linesTotalOf(one.receipt.total ?? one.readTotal ?? null, one.cashback ?? null)
       const blank = one.lines.some((line) => line.sum === null)
       // a receipt read before keeps no word, and no line the check emptied (А5 «а»)
       if (!(one.readPartly ?? (!blank && readPartly(one.lines, total)))) return null

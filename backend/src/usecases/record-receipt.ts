@@ -9,6 +9,7 @@ import {
   nameIdentity,
   receiptDigits,
   receiptMomentOf,
+  receiptPaidOf,
   recordedSums,
   settingsCityOf,
   storeMemoryWords,
@@ -115,13 +116,7 @@ function editsOf(
  * with (MOL-289).
  */
 function receiptMoney(held: ReceiptToRecord, body: ReceiptRecordBody): Money | null {
-  const total = receiptTotal(held, body)
-  const { redeemed } = held
-  // what the card's bonus covered was recorded when the bonus was sent to the card (owner, В-5 «а»):
-  // the trip is what left the card now, the total less it
-  if (total === null || redeemed?.currency !== total.currency) return total
-  const minor = total.minor - redeemed.minor
-  return minor > 0n ? { minor, currency: total.currency } : total
+  return receiptPaidOf(receiptTotal(held, body), held.redeemed)
 }
 
 /**

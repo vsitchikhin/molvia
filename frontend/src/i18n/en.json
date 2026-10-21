@@ -2242,6 +2242,8 @@
       "lines": "Lines",
       "total": "Receipt total",
       "total_missing": "Total not read · set it",
+      "cashback": "Cashback to the card",
+      "redeemed": "Paid with the card’s bonus",
       "approx": "≈ {amount} at the {day} rate",
       "diff": "{amount} off — probably in the “{line}” line. You can save it anyway",
       "diff_unknown": "{amount} off — we couldn’t find the line. You can save it anyway",

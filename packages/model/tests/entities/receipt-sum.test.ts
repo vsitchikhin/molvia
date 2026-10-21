@@ -3,6 +3,7 @@ import {
   lineAddsUp,
   lineProduct,
   linesTotalOf,
+  receiptPaidOf,
   priceInDoubt,
   readCovered,
   readPartly,
@@ -119,6 +120,19 @@ describe('what the lines come to by the total (MOL-289)', () => {
     expect(recordedSums(lines, total, 2)).toEqual([amd(980), amd(495)])
     const read = lines.map((line) => ({ settled: true, sum: line.sum }))
     expect([readPartly(read, total), readPartly(read, amd(1_489))]).toEqual([false, true])
+  })
+})
+
+describe('what left the card (MOL-289, В-5 «а»)', () => {
+  it('is the total less the bonus it was partly paid with', () => {
+    expect(receiptPaidOf(amd(19_097.86), amd(191.02))).toEqual(amd(18_906.84))
+    expect(receiptPaidOf(amd(1_700), null)).toEqual(amd(1_700))
+    expect(receiptPaidOf(null, amd(17))).toBeNull()
+  })
+
+  it('is the total where the bonus is the whole of it or more, or of another currency', () => {
+    expect(receiptPaidOf(amd(17), amd(17))).toEqual(amd(17))
+    expect(receiptPaidOf(amd(1_700), rub(17))).toEqual(amd(1_700))
   })
 })
 

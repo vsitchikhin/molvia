@@ -1,4 +1,5 @@
 import {
+  linesTotalOf,
   receiptBalance,
   receiptCard,
   receiptDigits,
@@ -81,7 +82,8 @@ function amountsOf(detail: ReceiptDetail, draft: ReceiptDraft | null) {
     total,
     ...detail.lines.flatMap((line) => [line.price, line.sum, line.discount]),
   ])
-  return recordedSums(figures, total, digits)
+  // the lines make the total less what a card sent to the card (MOL-289)
+  return recordedSums(figures, linesTotalOf(total, detail.cashback ?? null), digits)
 }
 
 export function reviewLines(
@@ -157,7 +159,7 @@ export function reviewBalance(
 ): ReceiptBalance {
   return receiptBalance(
     lines.map((one) => ({ printed: one.line.sum, amount: one.amount, skip: one.skip })),
-    draft?.total ?? detail.receipt.total,
+    linesTotalOf(draft?.total ?? detail.receipt.total, detail.cashback ?? null),
     receiptCard(detail.receipt.country).currency,
   )
 }
