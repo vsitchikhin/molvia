@@ -18,7 +18,7 @@
         <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
       </template>
     </StatusStrip>
-    <ScreenSkeleton v-if="phase === 'loading'" :groups="[40, 78, 62, 78]" />
+    <AdviceSkeleton v-if="phase === 'loading'" field />
 
     <!-- Without an identity there is nobody to advise; the notice above says why. -->
     <template v-else-if="phase !== 'idle'">
@@ -163,12 +163,12 @@ import AdviceHomeNew from '@/components/AdviceHomeNew.vue'
 import CaptureButton from '@/components/CaptureButton.vue'
 import AdviceNeverRow from '@/components/AdviceNeverRow.vue'
 import AdviceSearch from '@/components/AdviceSearch.vue'
+import AdviceSkeleton from '@/components/AdviceSkeleton.vue'
 import AdviceTakeCard from '@/components/AdviceTakeCard.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
-import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import type { StripKind } from '@/components/StatusStrip.vue'
@@ -206,12 +206,12 @@ export default defineComponent({
     CaptureButton,
     AdviceNeverRow,
     AdviceSearch,
+    AdviceSkeleton,
     AdviceTakeCard,
     AppButton,
     AppReveal,
     AppScreen,
     ManualEntryButton,
-    ScreenSkeleton,
     ScreenState,
     StatusStrip,
     VerdictEditSheet,

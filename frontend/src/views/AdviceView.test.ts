@@ -305,11 +305,17 @@ describe('AdviceView', () => {
     for (const view of mounted.splice(0)) view.unmount()
   })
 
-  it('draws the skeleton while the answer is on its way', async () => {
+  // The answer's shape, with the field's well where the field will stand (Ф-13, 1j).
+  it('draws the skeleton while the answer is on its way, the field`s well first', async () => {
     advice.mockReturnValue(new Promise(() => undefined))
     const { view } = await render()
 
     expect(view.find('.skeleton').exists()).toBe(true)
+    expect(view.get('.skeleton .bars').element.firstElementChild?.classList).toContain(
+      'skeleton-field',
+    )
+    expect(view.findAll('.skeleton .ghost-take')).toHaveLength(1)
+    expect(view.findAll('.skeleton .skeleton-caption')).toHaveLength(3)
   })
 
   it('three groups, each in its own shape, in the order the answer arrived', async () => {
@@ -742,6 +748,20 @@ describe('AdviceView', () => {
         },
       ])
       expect(view.text()).toContain(en.advice.search.offline_more)
+    })
+
+    it('waiting for its first answer: the groups` shape, no second well', async () => {
+      advice.mockResolvedValue(answer([milk]))
+      adviceSearch.mockReturnValue(new Promise(() => undefined))
+      const { view } = await render()
+
+      await view.get('input[type="search"]').setValue('сыр')
+      await vi.waitFor(() => {
+        expect(adviceSearch).toHaveBeenCalled()
+      })
+
+      expect(view.find('.skeleton .ghost-take').exists()).toBe(true)
+      expect(view.find('.skeleton-field').exists()).toBe(false)
     })
 
     it('clearing the field brings the list back and asks nothing', async () => {

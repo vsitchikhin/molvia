@@ -18,7 +18,7 @@
   </div>
 
   <template v-if="phase !== 'idle'">
-    <ScreenSkeleton v-if="phase === 'loading'" :groups="[62, 62]" />
+    <AdviceSkeleton v-if="phase === 'loading'" />
 
     <ScreenState
       v-else-if="phase === 'error'"
@@ -112,9 +112,9 @@ import type { AdviceFound, AdviceResponse, AdviceRow, AdviceScope } from '@molvi
 import AdviceCheapRow from '@/components/AdviceCheapRow.vue'
 import AdviceGroup from '@/components/AdviceGroup.vue'
 import AdviceNeverRow from '@/components/AdviceNeverRow.vue'
+import AdviceSkeleton from '@/components/AdviceSkeleton.vue'
 import AdviceTakeCard from '@/components/AdviceTakeCard.vue'
 import AppCard from '@/components/AppCard.vue'
-import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SearchField from '@/components/SearchField.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
@@ -159,9 +159,9 @@ export default defineComponent({
     AdviceCheapRow,
     AdviceGroup,
     AdviceNeverRow,
+    AdviceSkeleton,
     AdviceTakeCard,
     AppCard,
-    ScreenSkeleton,
     ScreenState,
     SearchField,
     StatusStrip,
