@@ -92,7 +92,7 @@ describe('binding the lines of a parsed receipt (MOL-126)', () => {
       nearIds: [MILK],
     })
     const [yoghurt] = await bindReceiptLines({ items, embedder: NO_EMBEDDER }, ACTOR, 'AM', 'ru', [
-      line('Յոգուրտ ելակ 2%'),
+      line('Յոգուրտ ելակով 2%'),
     ])
     expect(yoghurt).toMatchObject({ itemId: MILK, match: 'search' })
   })

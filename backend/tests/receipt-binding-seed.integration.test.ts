@@ -104,3 +104,52 @@ describe('a line by the search, an item of another thing never (MOL-293, adversa
     expect([roller.itemId, roller.translation]).toEqual([null, null])
   })
 })
+
+// two things side by side, a genitive, a word that only starts as the kind, a letter lost (adversarial, round 2)
+const FLAVOUR_FIRST: readonly (readonly [string, string])[] = [
+  ['Ելակ յոգուրտ', 'Клубника'],
+  ['Շոկոլադ պաղպաղակ', 'Шоколад'],
+  ['Բալ մուրաբա', 'Вишня'],
+]
+const ONLY_A_START: readonly (readonly [string, string])[] = [
+  ['Տուշ թարթիչների', 'Тушёнка'],
+  ['Թել կարի', 'Вермишель'],
+  ['Հավի վերևի մաս', 'Маслины'],
+  ['Դեղ գլխացավի', 'Персики'],
+]
+const LETTER_LOST: readonly (readonly [string, string])[] = [
+  ['Սուս չիլի', 'Соус острый'],
+  ['Կոլասա եփած', 'Колбаса варёная'],
+  ['Սալոաչիր', 'Чернослив'],
+  ['Մակա', 'Манка'],
+]
+
+describe('a line whose words do not settle its kind, or lost a letter (MOL-293, adversarial Б1–Б4)', () => {
+  it.each(FLAVOUR_FIRST)(
+    'takes no flavour for the kind of «%s», two things side by side',
+    async (printed, flavour) => {
+      expect((await bind(printed)).name).not.toBe(flavour)
+    },
+  )
+
+  it('takes no thing of a genitive in «-ու» or «-ան» for the kind (review 2, №2)', async () => {
+    expect(await bind('Ազնվամորու մուրաբա')).toMatchObject({ name: 'Варенье', match: 'search' })
+    expect(await bind('Գինու քացախ')).toMatchObject({ name: 'Уксус', match: 'search' })
+    expect((await bind('Ձկան սոուս')).name).not.toBe('Рыба')
+  })
+
+  it.each(ONLY_A_START)(
+    'takes for «%s» no «%s», whose word only starts as the kind does',
+    async (printed, other) => {
+      expect((await bind(printed)).name).not.toBe(other)
+    },
+  )
+
+  it.each(LETTER_LOST)('finds for «%s», a letter lost, its own «%s»', async (printed, own) => {
+    expect(await bind(printed)).toMatchObject({ name: own, match: 'search' })
+  })
+
+  it('finds nothing for a letter misread: a roller is no tomato', async () => {
+    expect((await bind('Ռոլիկ')).itemId).toBeNull()
+  })
+})

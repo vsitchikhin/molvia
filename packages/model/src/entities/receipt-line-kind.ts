@@ -56,8 +56,11 @@ const QUALIFIERS = new Set([
   'ստանդարտ',
 ])
 
-/** An adjective or a participle by its ending: «Գազավորված ըմպելիք», «Աշխատանքային ձեռնոց». */
-const ADJECTIVE = /(?:ային|ական|ավոր|ված|ած|ող|յան)$/u
+/**
+ * An adjective or a participle by its ending: «Գազավորված ըմպելիք», «Աշխատանքային ձեռնոց». Two letters of a stem
+ * at least: «հող», soil, is a noun.
+ */
+const ADJECTIVE = /^.{2,}(?:ային|ական|ավոր|ված|ած|ող|յան)$/u
 // nouns of an adjective's ending: «Խորոված խոզի» is a shashlik of pork, not a pig (adversarial А4)
 const NOUNS = new Set(['խորոված'])
 /**
@@ -65,6 +68,15 @@ const NOUNS = new Set(['խորոված'])
  * noun's too — «Ֆրի», «Բուլկի», «սպեղանի» — so such a word is the head where nothing else is.
  */
 const CASE = /(?:ի|ով|ից)$/u
+/**
+ * The genitive of a noun in «-ի», «ազնվամորու մուրաբա» — raspberry jam, never raspberries (review 2, №2): a
+ * nominative ends so too, «կատու», «թթու», «լեզու», so such a word is the head before one in a case. «ձու» is
+ * too short to be one, «-յու» a loan's own end («քեշյու»).
+ */
+const SOFT_CASE = /.[^յ]ու$/u
+// genitives of no ending a rule could read: of fish, of a pomegranate, of a lamb, of a dog
+const GENITIVES = new Set(['ձկան', 'ձողաձկան', 'նռան', 'գառան', 'շան'])
+const inSoftCase = (word: string): boolean => SOFT_CASE.test(word) || GENITIVES.has(word)
 
 // a till's unit after a count: never a word of the name
 const UNIT_WORDS = new Set(['կգ', 'գր', 'գ', 'լ', 'մլ', 'հտ', 'հատ', 'հ', 'մ', 'սմ'])
@@ -76,8 +88,8 @@ const keyed = (word: string): string => word.toLowerCase()
 
 /** A word of a name: letters with no digit, not a packaging mark («ա/տ», «թ/տ»), not a code («#0-1»). */
 function isNameWord(token: string): boolean {
-  // a lone Latin letter is a sign — «x 24», a pack's count — or a size, never a word of the name
-  const latin = LATIN.test(token) && token.length > 1
+  // a lone «x» is a pack's count, «x 24»; any other Latin letter is a size, «M», and a word (review 2, №3)
+  const latin = LATIN.test(token) && !/^[xX]$/u.test(token)
   return !/\d/u.test(token) && !token.includes('/') && (ARMENIAN.test(token) || latin)
 }
 
@@ -114,13 +126,22 @@ export function receiptLineParts(printed: string): ReceiptLineParts {
   const after = brand === null || close < 0 ? [] : tokensOf(printed.slice(close + 1))
   const head = brand === null ? [...before, ...after] : before.length > 0 ? before : after
   const words = head.filter(
-    (token) => isNameWord(token) && ARMENIAN.test(token) && !token.endsWith('.'),
+    (token) =>
+      isNameWord(token) &&
+      ARMENIAN.test(token) &&
+      !token.endsWith('.') &&
+      !UNIT_WORDS.has(keyed(token)),
   )
   const plain = words.filter(
     (word) =>
       NOUNS.has(keyed(word)) || (!QUALIFIERS.has(keyed(word)) && !ADJECTIVE.test(keyed(word))),
   )
-  const kind = plain.find((word) => !CASE.test(keyed(word))) ?? plain[0] ?? words[0] ?? null
+  const kind =
+    plain.find((word) => !CASE.test(keyed(word)) && !inSoftCase(keyed(word))) ??
+    plain.find((word) => !CASE.test(keyed(word))) ??
+    plain[0] ??
+    words[0] ??
+    null
   const percent = /(\d+(?:[.,]\d+)?)\s*%/u.exec(printed)?.[1]
   const size = SIZE.exec(printed)
   return {
@@ -186,9 +207,10 @@ const LETTERS: Readonly<Record<string, string>> = {
 
 /**
  * One word's Armenian letters in Russian ones; anything else as it is. A capital stays a capital; a word all in
- * capitals stays so in a brand («ԳԵԳ»), and is a word like any other in a name («ԸՆԴԱԼԹ», review №5).
+ * capitals stays so in a brand («ԳԵԳ») and an abbreviation (`capitals`), and is a word like any other in a name
+ * («ԸՆԴԱԼԹ», review №5).
  */
-function spellWord(word: string, brand = true): string {
+function spellWord(word: string, capitals = true): string {
   const lower = word.toLowerCase()
   let out = ''
   for (let i = 0; i < lower.length;) {
@@ -201,9 +223,12 @@ function spellWord(word: string, brand = true): string {
   const first = word.slice(0, 1)
   const capital = first !== first.toLowerCase()
   const whole = word.length > 1 && word === word.toUpperCase() && ARMENIAN.test(word)
-  if (whole) return brand ? out.toUpperCase() : out
+  if (whole) return capitals ? out.toUpperCase() : out
   return capital ? out.charAt(0).toUpperCase() + out.slice(1) : out
 }
+
+/** A word in capitals of up to four letters is an abbreviation on a line of small ones: «ԱԱ», «ԳՕՍՏ» (review 2, №3). */
+const ABBREVIATION = 4
 
 /** A brand or a word in Russian letters, word by word: «Երեմյան Փրոդաքթս» — «Еремян Продактс». */
 export const armenianInRussian = (text: string): string =>
@@ -248,6 +273,10 @@ export function newLineName(
 ): LineName | null {
   let spelled = false
   const said: string[] = []
+  // a line printed in capitals all through says nothing by them: «ԴԱՐԱՆ ԿԼԵՅ»
+  const shouting = [...parts.before, ...parts.after].every(
+    (token) => !ARMENIAN.test(token) || token === token.toUpperCase(),
+  )
   const words = (tokens: readonly string[]): string[] =>
     tokens.flatMap((token) => {
       if (!isNameWord(token) || UNIT_WORDS.has(keyed(token))) return []
@@ -256,7 +285,7 @@ export function newLineName(
       // an abbreviation the dictionary has not, «անտ.», is no word to spell
       if (gloss === null && token.endsWith('.')) return []
       if (gloss === null) spelled = true
-      const word = gloss ?? spellWord(token, false)
+      const word = gloss ?? spellWord(token, !shouting && token.length <= ABBREVIATION)
       // «Հավկիթ «Արզնի» հավկիթ» is eggs once, «Կարագ սերուցքային» butter that is creamy once
       const own = wordsOf(word)
       if (own.length > 0 && own.every((one) => said.some((was) => sameRussian(one, was)))) return []
@@ -355,9 +384,11 @@ function formsOf(word: string): Set<string> {
     : word.endsWith('ец') || word.endsWith('ок')
       ? [word, `${word.slice(0, -2)}${word.slice(-1)}`]
       : [word]
+  // «-ой» is a feminine's case alone: «рыбой», never «сыр» — «сырой» is raw
+  const endings = /[ая]$/u.test(word) ? NOUN_ENDINGS : NOUN_ENDINGS.filter((one) => one !== 'ой')
   for (const stem of stems) {
     if (stem.length < 3) continue
-    for (const one of NOUN_ENDINGS) out.add(stem + one)
+    for (const one of endings) out.add(stem + one)
   }
   // the adjective of a noun: «оливк» — «оливков», «шоколад» — «шоколадн», «молок» — «молочн»
   const root = stems[0] ?? word
@@ -415,6 +446,40 @@ function figuresOf(text: string): string[] {
   return out
 }
 
+// a dictionary's adjective is masculine or feminine, «средний», «докторская»; «мороженое» is a thing
+const QUALITY_ENDINGS = ['ый', 'ий', 'ой', 'ая', 'яя']
+
+/** A gloss names a thing, not a quality: «таблетки», «мороженое» — never «средний», «без запаха». */
+function isThingSense(sense: string): boolean {
+  const words = sense.toLowerCase().split(/\s+/u)
+  const last = words.at(-1) ?? ''
+  return !NO_WORD.has(words[0] ?? '') && !QUALITY_ENDINGS.some((ending) => last.endsWith(ending))
+}
+
+/**
+ * The thing printed right after the kind with no case of its own, «Ելակ յոգուրտ»: of two things side by side
+ * a till does not say which the line is — a yoghurt of strawberries, or strawberries — so an item must say
+ * both (adversarial Б1). A word the dictionary has not is a name, «Բանան Սաբրոսթար», and no thing.
+ */
+function nextThing(
+  parts: ReceiptLineParts,
+  dictionary: Readonly<Record<string, string>>,
+): string | null {
+  const at = parts.kind === null ? -1 : parts.before.indexOf(parts.kind)
+  const next = at < 0 ? undefined : parts.before[at + 1]
+  if (next === undefined || !isNameWord(next) || !ARMENIAN.test(next) || next.endsWith('.'))
+    return null
+  const key = keyed(next)
+  const qualifies =
+    UNIT_WORDS.has(key) ||
+    QUALIFIERS.has(key) ||
+    ADJECTIVE.test(key) ||
+    CASE.test(key) ||
+    inSoftCase(key)
+  const sense = sensesOf(next, dictionary)[0]
+  return !qualifies && sense !== undefined && isThingSense(sense) ? next : null
+}
+
 /** Whether a fitter takes an item of the seed: the seed names no brand, so it takes no branded line. */
 export interface FitOptions {
   /** The item is the seed's own — a kind, never a brand: «Бекон», «Энергетик». */
@@ -444,6 +509,13 @@ export function lineFitter(
   const brand = wordsOf(parts.brand ?? '')
   // any of the kind's senses: «հրուշակեղեն» is pastry and confectionery
   const kinds = parts.kind === null ? [] : sensesOf(parts.kind, dictionary).map(wordsOf)
+  const next = nextThing(parts, dictionary)
+  const nexts = next === null ? [] : sensesOf(next, dictionary).map(wordsOf)
+  const says = (senses: readonly (readonly string[])[], item: readonly string[]): boolean =>
+    senses.some(
+      (sense) =>
+        sense.length > 0 && sense.every((word) => item.some((one) => sameRussian(word, one))),
+    )
   const lineHas = (word: string): boolean =>
     glossed.some((one) => sameRussian(word, one)) || spelt.some((one) => sameLetters(word, one))
   return (itemName, options = {}) => {
@@ -455,26 +527,56 @@ export function lineFitter(
     if (!brand.every((word) => item.some((one) => sameLetters(word, one)))) return false
     if (brand.length > 0 && item.every((word) => brand.some((one) => sameLetters(word, one))))
       return true
-    return kinds.some(
-      (kind) => kind.length > 0 && kind.every((word) => item.some((one) => sameRussian(word, one))),
-    )
+    return says(kinds, item) && (next === null || says(nexts, item))
   }
+}
+
+// what a word of the till's language takes on the end of a seed's: a plural, a case, a collective —
+// «կոնֆետներ», «հրուշակեղեն»; any other end is another word, «տուշ» is no «տուշոնկա» (adversarial Б3)
+const ENDINGS = ['ներ', 'եր', 'ի', 'ու', 'ը', 'ն', 'ով', 'ից', 'եղեն']
+
+/**
+ * A word of the line as a word of a seed's name in the till's language: the same, the one inflected past the
+ * other, or — a word the dictionary has not, from four letters — the name's word with one letter lost, as
+ * Tesseract and the model lose one: «Կոլասա» is «կոլբասա» (adversarial Б4). A letter misread is not forgiven,
+ * «Ռոլիկ» is no «լոլիկ», nor a word the dictionary has: «լոշիկ» is a flat bread.
+ */
+function sameArmenian(
+  printed: string,
+  word: string,
+  dictionary: Readonly<Record<string, string>>,
+): boolean {
+  const line = printed.toLowerCase().replace(/և/gu, 'եվ')
+  if (line === word) return true
+  const [short, long] = line.length < word.length ? [line, word] : [word, line]
+  if (short.length >= 3 && long.startsWith(short) && ENDINGS.includes(long.slice(short.length)))
+    return true
+  return (
+    line.length >= 4 &&
+    line.length === word.length - 1 &&
+    sensesOf(printed, dictionary).length === 0 &&
+    levenshtein(line, word) === 1
+  )
 }
 
 /**
  * Whether a name of the seed in the till's language says the line's kind (MOL-293): the names path matches
  * the catalogue's own Armenian name, whose Russian one the dictionary need not know — «Ատամի պաստա» is
- * «Паста зубная» by the seed's word, not the gloss. A branded line takes no name of the seed.
+ * «Паста зубная» by the seed's word, not the gloss. A branded line takes no name of the seed, and a line of
+ * two things side by side one that says both.
  */
-export function seedNameFits(parts: ReceiptLineParts, nameWords: readonly string[]): boolean {
+export function seedNameFits(
+  parts: ReceiptLineParts,
+  nameWords: readonly string[],
+  dictionary: Readonly<Record<string, string>>,
+): boolean {
   if (parts.brand !== null || parts.kind === null) return false
-  const kind = parts.kind.toLowerCase().replace(/և/gu, 'եվ')
-  // as the names are matched: the printed word inflected past the name's («հրուշակ», «հրուշակեղեն»), or cut
-  // by the till before its end
-  return nameWords.some(
-    (word) =>
-      word === kind ||
-      (word.length >= 4 && kind.startsWith(word)) ||
-      (kind.length >= 3 && word.startsWith(kind)),
-  )
+  // «Կուս-կուս», «Բալզամ-ողողիչ»: the names are matched hyphen apart
+  const says = (printed: string): boolean =>
+    printed
+      .split('-')
+      .filter((piece) => piece !== '')
+      .every((piece) => nameWords.some((word) => sameArmenian(piece, word, dictionary)))
+  const next = nextThing(parts, dictionary)
+  return says(parts.kind) && (next === null || says(next))
 }

@@ -194,7 +194,7 @@ export function createLineMatcher(
         scores.reduce((sum, x) => sum + x, 0) / entry.words.length + 0.05 * (entry.words.length - 1)
       // asked last, and only of a name that would win: the seed's own name in the till's language says the
       // line's kind — its Russian one the dictionary need not know, «Ատամի պաստա» is «Паста зубная»
-      if ((best === null || score > best.score) && seedNameFits(parts, entry.words))
+      if ((best === null || score > best.score) && seedNameFits(parts, entry.words, dictionary))
         best = { node: entry.node, score }
     }
     if (best !== null && best.score >= MATCH_SCORE) {

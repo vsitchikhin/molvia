@@ -52,6 +52,22 @@ const WORDS = {
   մասուր: 'шиповник',
   երշիկ: 'колбаса',
   չորիզո: 'чоризо',
+  ազնվամորու: 'малина',
+  մուրաբա: 'варенье',
+  լոբու: 'фасоль',
+  ապուր: 'суп',
+  ձկան: 'рыба',
+  յուղ: 'масло',
+  գինու: 'вино',
+  բաժակ: 'стакан',
+  նռան: 'гранат',
+  միջին: 'средний',
+  պանիր: 'сыр',
+  չեդդեր: 'чеддер',
+  պաղպաղակ: 'мороженое',
+  մարտկոց: 'батарейка',
+  սուպեր: 'супер',
+  ձեռնոց: 'перчатки',
 }
 
 const kind = (printed: string) => receiptLineParts(printed).kind
@@ -101,6 +117,19 @@ describe('a line taken apart (MOL-293)', () => {
     expect(kind('Կուպատի «ԳԵԳ» կգ')).toBe('Կուպատի')
   })
 
+  it('takes a genitive in «-ու» or «-ան» for no head, a nominative of that end where nothing else is (review 2, №2)', () => {
+    expect(kind('Ազնվամորու մուրաբա')).toBe('մուրաբա')
+    expect(kind('Գինու քացախ')).toBe('քացախ')
+    expect(kind('Ձկան յուղ')).toBe('յուղ')
+    expect(kind('Նռան հյութ')).toBe('հյութ')
+    expect(kind('Կաղամբի չորաթթու')).toBe('չորաթթու')
+    // «ձու» is too short for a genitive, a unit no word
+    expect(kind('Ձու հավի')).toBe('Ձու')
+    expect(kind('Թուզ կգ')).toBe('Թուզ')
+    // «հող», soil, is no participle in «-ող»
+    expect(kind('ՏՈՖՈՒ ՀՈՂ ԴԵՂՁ 6լ(հատ)')).toBe('ՀՈՂ')
+  })
+
   it('has no brand in a «…» with no letter, and a brand a till cut before its end', () => {
     expect(receiptLineParts('Իրիս «…» սերուցքային 140գր').brand).toBeNull()
     expect(receiptLineParts('Նուշ «22/24» կգ').brand).toBeNull()
@@ -122,15 +151,44 @@ describe('a line taken apart (MOL-293)', () => {
 
 describe('a name of the seed in the till’s language for the line’s kind (MOL-293, adversarial А1)', () => {
   const name = (hy: string) => receiptWords(hy)
-  it('takes the seed’s own name that says the kind, inflected past it or cut before its end', () => {
-    expect(seedNameFits(receiptLineParts('Ատամի պաստա'), name('ատամի պաստա'))).toBe(true)
-    expect(seedNameFits(receiptLineParts('Ֆրանսիական հրուշակեղեն'), name('հրուշակ'))).toBe(true)
+  const says = (printed: string, hy: string, dictionary: Record<string, string> = WORDS) =>
+    seedNameFits(receiptLineParts(printed), name(hy), dictionary)
+
+  it('takes the seed’s own name that says the kind, inflected past it', () => {
+    expect(says('Ատամի պաստա', 'ատամի պաստա')).toBe(true)
+    expect(says('Ֆրանսիական հրուշակեղեն', 'հրուշակ')).toBe(true)
+    expect(says('Կոնֆետներ', 'կոնֆետ')).toBe(true)
+    expect(says('Կուս-կուս', 'կուս-կուս')).toBe(true)
   })
 
   it('takes no name without the kind, and none for a branded line', () => {
-    expect(seedNameFits(receiptLineParts('Յոգուրտ ելակ'), name('ելակ'))).toBe(false)
-    expect(seedNameFits(receiptLineParts('Կաթ «Իգիթ» 3.2%'), name('կաթ'))).toBe(false)
-    expect(seedNameFits(receiptLineParts('Պիցցայի լոշիկ'), name('լոլիկ'))).toBe(false)
+    expect(says('Յոգուրտ ելակի', 'ելակ')).toBe(false)
+    expect(says('Կաթ «Իգիթ» 3.2%', 'կաթ')).toBe(false)
+  })
+
+  it('takes no name whose word only starts as the kind does (adversarial Б3)', () => {
+    expect(says('Տուշ թարթիչների', 'տուշոնկա')).toBe(false)
+    expect(says('Թել կարի', 'թելիկ')).toBe(false)
+    expect(says('Հավի վերևի մաս', 'մասլինա')).toBe(false)
+    expect(says('Դեղ գլխացավի', 'դեղձ')).toBe(false)
+  })
+
+  it('forgives a letter lost of a word the dictionary has not, never one misread (adversarial Б4)', () => {
+    expect(says('Սուս չիլի', 'սոուս չիլի')).toBe(true)
+    expect(says('Կոլասա եփած', 'կոլբասա եփած')).toBe(true)
+    expect(says('Կոլասա եփած', 'կոլա')).toBe(false)
+    expect(says('Ռոլիկ', 'լոլիկ')).toBe(false)
+    // «լոշիկ», a flat bread, is a word of its own and one letter from a tomato
+    expect(says('Պիցցայի լոշիկ', 'լոլիկ', { ...WORDS, լոշիկ: 'лепёшка' })).toBe(false)
+  })
+
+  it('takes for two things side by side only a name that says both (adversarial Б1)', () => {
+    expect(says('Ելակ յոգուրտ', 'ելակ')).toBe(false)
+    expect(says('Ելակ յոգուրտ', 'յոգուրտ')).toBe(false)
+    expect(says('Յոգուրտ ելակ', 'յոգուրտ')).toBe(false)
+    expect(says('Յոգուրտ ելակ', 'յոգուրտ ելակի')).toBe(true)
+    // a quality is no thing: «Լոլիկ միջին» is a tomato
+    expect(says('Լոլիկ միջին', 'լոլիկ')).toBe(true)
   })
 })
 
@@ -184,6 +242,11 @@ describe('a new item’s name (MOL-293, В-1 «б»)', () => {
   it('drops a lone sign before a figure, and writes a word in capitals as a word (review №5)', () => {
     expect(named('Չիպս x 24')?.name).toBe('Чипсы')
     expect(named('ԸՆԴԱԼԹ ՉԻՊՍ')?.name).toBe('Ындалт чипсы')
+    // an abbreviation keeps its capitals, a size its letter (review 2, №3)
+    expect(named('Մարտկոց «Էներջի» Սուպեր ԱԱ')?.name).toBe('Батарейка «Энерджи» супер АА')
+    expect(named('Ձեռնոց «Վերդե Վիտա» M')?.name).toBe('Перчатки «Верде Вита» M')
+    expect(named('Պաղպաղակ «Թամարա» ԳՕՍՏ')?.name).toBe('Мороженое «Тамара» ГОСТ')
+    expect(named('ԴԱՐԱՆ ԿԼԵՅ')?.name).toBe('Даран клей')
     expect(named('Կուպատի «ԳԵԳ» կգ')?.name).toBe('Купати «ГЕГ»')
   })
 
@@ -205,7 +268,30 @@ describe('an item standing on a line (MOL-293, В-1 «а», В-2 «а»)', () =>
   it('never takes the fruit for a fruit yoghurt, nor an item without the line’s brand', () => {
     expect(fits(yoghurt, 'Клубника')).toBe(false)
     expect(fits(yoghurt, 'Йогурт')).toBe(false)
-    expect(fits('Յոգուրտ ելակ', 'Йогурт')).toBe(true)
+    expect(fits('Յոգուրտ ելակի', 'Йогурт')).toBe(true)
+  })
+
+  it('takes for two things side by side only an item that says both (adversarial Б1)', () => {
+    for (const printed of ['Ելակ յոգուրտ', 'Յոգուրտ ելակ']) {
+      expect(fits(printed, 'Клубника')).toBe(false)
+      expect(fits(printed, 'Йогурт')).toBe(false)
+      expect(fits(printed, 'Йогурт клубничный')).toBe(true)
+    }
+    expect(fits('Ելակ պաղպաղակ', 'Клубника')).toBe(false)
+    expect(fits('Պանիր չեդդեր', 'Сыр чеддер')).toBe(true)
+    expect(fits('Պանիր չեդդեր', 'Сыр')).toBe(false)
+  })
+
+  it('never takes the thing of a genitive in «-ու» or «-ան» for the kind (review 2, №2)', () => {
+    const pairs: [string, string][] = [
+      ['Ազնվամորու մուրաբա', 'Малина'],
+      ['Լոբու ապուր', 'Фасоль'],
+      ['Ձկան յուղ', 'Рыба'],
+      ['Գինու բաժակ', 'Вино'],
+      ['Նռան հյութ', 'Гранат'],
+    ]
+    for (const [printed, item] of pairs) expect(fits(printed, item, true), printed).toBe(false)
+    expect(fits('Ազնվամորու մուրաբա', 'Варенье', true)).toBe(true)
   })
 
   it('takes an item named by the brand alone, the brand compared across scripts (В-2 «а»)', () => {
