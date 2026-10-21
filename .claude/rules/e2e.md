@@ -179,6 +179,20 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   the question's or the focus's — the check after them never ran and the failure was the old
   `Received: ''`; a test of the spec holds it, the button pressed as soon as it is drawn. The other routes laid after
   `open()` — some fifty — stay as they are until one of them fails so.
+- **A position is measured once the faces have come** (MOL-63, MOL-267): `standAt` and `toTheEnd` of
+  `e2e/scroll.ts` lay the page out and wait for `document.fonts.ready` (`facesIn`) before they set the
+  scene; `topOf` only measures. Every face is `font-display: swap` with a `unicode-range`, so its file is
+  asked for only when a glyph of its range is first laid out — on «Год» the answer brings Onest 700 and
+  ֏ — and the text stands in the fallback until it comes. On a Mac a late face moved the choice of «Год»
+  half a pixel (456.19 → 456.70), which `topOf`'s rounding shows or hides by chance. **It is not what
+  failed «a line gone under the category of «Год»»** (run 37911189456, `scrollY` 1151 → 1132 with the
+  choice where it was): with the faces held a second and the scene set without waiting, CI was green
+  (run 39575601047) — on Ubuntu they move nothing there. The numbers say something over the choice gave
+  way by a line of small text and Chromium's scroll anchoring kept the view, moving `scrollY`; which
+  block was never shown. It failed once, on 09.10, two days before MOL-186 remade the blocks over the
+  choice, and not in some 176 runs since. So that test keeps its first attempt's trace in CI, as the
+  focus block of `scanner.spec` does: should it fail again, the DOM before and after each step names the
+  block — the price, named.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**
   (MOL-64). The app has one polite region, in `App.vue` above the router, and **eight things write
   to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the
