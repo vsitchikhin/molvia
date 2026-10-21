@@ -552,6 +552,40 @@ describe('a line put right by the font’s 5↔6, the receipt whole (MOL-290)', 
     expect(read2([bread, butter, cottage], owed('1437.48')).text.lines[2]?.repaired).toBeUndefined()
   })
 
+  it('moves the total by every sum a line read whole gives at its fewest swaps (review round 4, №9)', () => {
+    // «505.56 / 505.56» read whole as copied reads whole as 505,55, 505,66 or 506,56 too, one swap each: the luma
+    // it may be off makes «205.05 / 205.06» meet the total at 205,05 as well — a doubt
+    const plain = (price: string, sum: string) =>
+      carded({ quantity: '1', unit_price: price, discount: null, sum })
+    const juice = plain('205.05', '205.06')
+    expect(
+      read2([plain('505.56', '505.56'), juice], owed('710.61')).text.lines[1]?.repaired,
+    ).toBeUndefined()
+    // the total it meets as copied: 205,06
+    const put = read2([plain('505.56', '505.56'), juice], owed('710.62')).shown.lines[1]
+    expect([put?.sumHundredths, put?.repaired]).toEqual([20_506, true])
+  })
+
+  it('lets the total choose a luma of the sum alone, never another quantity (review round 4, Г3)', () => {
+    // printed 0,51 kg × 665 = 339,15, the price copied «565»: one swap reads it, four 0,61 × 556 = 339,16
+    const ham = carded({
+      quantity: '0.51',
+      unit: 'kg',
+      unit_price: '565',
+      discount: null,
+      sum: '339.15',
+    })
+    // beside a line bent a luma short (290 − 2,91 = 287,09 for 287,10), the total meets 0,61 × 556 alone
+    const bent = carded({ quantity: '1', unit_price: '290', discount: '2.91', sum: '287.09' })
+    expect(read2([bent, ham], owed('626.25')).text.lines[1]?.repaired).toBeUndefined()
+    expect(figuresOf(read2([bread, ham], owed('626.25')).shown)[1]).toEqual([
+      510,
+      66_500,
+      null,
+      33_915,
+    ])
+  })
+
   it('puts nothing right past the ways the lines read whole may move', () => {
     // a line of one at 0,05, 0,5, 5 or 50 reads whole a figure up by its swap — 7 of each move the lines 8⁴ ways
     const plain = carded({ quantity: '2', unit_price: '155', discount: null, sum: '330' })

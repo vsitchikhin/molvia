@@ -371,13 +371,15 @@ interface LineReading {
  * short) made the curd's 615,78 the one choice that met the total. **And the total chooses no sum** (review round 3,
  * owner's Г1 «а»): where the fewest swaps give sums more than the till's rounding apart — «160» at 150 read either
  * way, «622 / 6.22» at 516,78 — the line is a doubt. The total confirms the line's one sum, never picks it: with two
- * readings equally cheap, the curd's 615,78 still paid for am-34.
+ * readings equally cheap, the curd's 615,78 still paid for am-34. Both hold the line put right (`broken`); a line
+ * read whole is asked only how its swaps may move it, every sum of its fewest (review round 4, №9).
  */
 function choicesOf(
   swaps: Readonly<Record<string, string>>,
   line: ModelReceipt['lines'][number],
   rate: number | null,
   budget: { left: number },
+  broken: boolean,
 ): LineReading[] | null {
   // a discount of 0 is no card's and needs no rate (review round 2, №6), as in `cardRate`
   const discount = figureOf(line.discount, 2)
@@ -422,10 +424,27 @@ function choicesOf(
   }
   const kept = [...found.values()].filter((one) => !one.tied)
   const fewest = Math.min(...kept.map((one) => one.swaps))
-  const least = kept.filter((one) => one.swaps === fewest).map((one) => one.reading.sum)
-  if (Math.max(...least) - Math.min(...least) > TOLERANCE_HUNDREDTHS) return []
+  const cheapest = kept.filter((one) => one.swaps === fewest).map((one) => one.reading)
+  const near = (one: LineReading, to: LineReading): boolean =>
+    Math.abs(one.sum - to.sum) <= TOLERANCE_HUNDREDTHS
+  // a line read whole: every way its fewest swaps may move it, two sums apart too (review round 4, №9)
+  if (!broken) {
+    return kept
+      .filter((one) => cheapest.some((to) => near(one.reading, to)))
+      .map((one) => one.reading)
+  }
+  const totals = cheapest.map((one) => one.sum)
+  if (Math.max(...totals) - Math.min(...totals) > TOLERANCE_HUNDREDTHS) return []
+  // the same sum split another way stays, a doubt (0,6 × 550 beside 0,5 × 660); a luma off only at the fewest
+  // swaps' quantity and price — the total chooses a luma, never a quantity (review round 4, Г3: 0,51 × 665 = 339,15
+  // read as 0,61 × 556 = 339,16)
   return kept
-    .filter((one) => least.some((sum) => Math.abs(one.reading.sum - sum) <= TOLERANCE_HUNDREDTHS))
+    .filter(({ reading: one }) =>
+      cheapest.some(
+        (to) =>
+          one.sum === to.sum || (one.qty === to.qty && one.price === to.price && near(one, to)),
+      ),
+    )
     .map((one) => one.reading)
 }
 
@@ -470,7 +489,7 @@ function repaired(
       options.push(null)
       if (copied === undefined || line.sumHundredths === null) continue
       if (!swappable(reading.modelSwaps, copied)) continue
-      const other = choicesOf(reading.modelSwaps, copied, rate, budget)
+      const other = choicesOf(reading.modelSwaps, copied, rate, budget, false)
       if (other === null) return null
       const offs = new Set(other.map((one) => one.sum - own).filter((off) => off !== 0))
       if (offs.size === 0) continue
@@ -480,7 +499,8 @@ function repaired(
       if (shifts.size > REPAIR_SHIFTS_MAX) return null
       continue
     }
-    const found = copied === undefined ? null : choicesOf(reading.modelSwaps, copied, rate, budget)
+    const found =
+      copied === undefined ? null : choicesOf(reading.modelSwaps, copied, rate, budget, true)
     if (found === null || found.length === 0) return null
     options.push(found)
   }
