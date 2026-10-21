@@ -376,7 +376,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   review Р1-3: a scanner of 44 in a pill of 44 would lie over the edge), a magnifier of 20, at the right the screen's action —
   the scanner — **or** «Очистить» while there is text and the field is not read-only, never both, the
   focus of a kit field and a hint of 13 (adversarial А2: read-only kept the keys out and let the button
-  empty the field). **In an open dialog the field gives Esc to the dialog**: Chromium takes a search
+  empty the field). **The pill is the field**: a press on its magnifier, its gap or its padding — some
+  64 px beside the input at 390 — keeps the focus and gives it to the input; the input and a button in
+  the well keep their own press (MOL-201, adversarial Г1: the focus went to `<body>`, and «Что брать»'s
+  field held by its focus went with it as it was touched). **In an open dialog the field gives Esc to the dialog**: Chromium takes a search
   field's Esc for itself — it clears the text, and the dialog never hears `cancel` — so «Выбрать товар»
   lost the receipt's words and stayed open (adversarial А3); the field prevents that Esc and makes the
   close request the platform would have: a `cancel` the dialog may prevent — a sheet does, and closes

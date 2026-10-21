@@ -382,7 +382,9 @@ it goes once the press is over** (owner's В-5 «а» on adversarial В1): gone 
 took what was under it up by its height before the release, and the first tap on «Повторить» or a
 step of the newcomer's cycle landed elsewhere; so the leaving is told a task after the release, past
 its click — by the keys, at once — and the page losing the system's focus, another app, is no leaving.
-The price: after that tap what is under the field still rises by its height, the tap already done. Only a field that
+The price: after that tap what is under the field still rises by its height, the tap already done —
+and a «Повторить» that failed again stands that much higher, so a second tap at the same place lands
+on nothing (adversarial round 4). A touch on the field's own pill keeps it (`SearchField`, Г1). Only a field that
 goes with the focus in it — a city moved in another tab — gives the focus to the heading, and only that
 focus (review № 8, Б1: on a phone nobody touched, `<body>` is no focus to give). The prices, named: a
 newcomer who typed in the cold offline is searched for on this one path; and while the field holds
