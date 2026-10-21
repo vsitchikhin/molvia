@@ -244,15 +244,47 @@ describe('AdviceView', () => {
         expect(view.text()).not.toContain(en.advice.error.title)
         expect(view.text()).not.toContain(en.advice.home.new.title)
 
+        // Erased to nothing to type another word: the field stays, with the focus (В-4 «а», Б2).
+        for (const text of ['мо', 'м', '']) await field.setValue(text)
+        await flushPromises()
+        expect(view.get('input[type="search"]').element).toBe(field.element)
+        expect(document.activeElement).toBe(field.element)
+        await field.setValue('сыр')
+        await flushPromises()
+        expect(field.element.value).toBe('сыр')
+
+        // «Очистить» gives the focus back to the field (Р-12), so it stays too.
         await view.get('.clear').trigger('click')
+        await flushPromises()
+        expect(view.get('input[type="search"]').element).toBe(field.element)
+
+        // Left empty, it goes; the focus is where the person put it, never pulled to the heading.
+        field.element.blur()
         await flushPromises()
         expect(view.find('input[type="search"]').exists()).toBe(false)
         expect(view.text()).toContain(
           kind === 'fails' ? en.advice.error.title : en.advice.home.new.title,
         )
-        expect(document.activeElement?.tagName).toBe('H1')
+        expect(document.activeElement?.tagName).not.toBe('H1')
       })
     }
+
+    // Nobody touched the field: the connection back without a list takes it, and the focus stays
+    // where it was — <body> on a phone nobody touched is no focus to give away (Б1, review № 8).
+    it('must not fire: the field nobody touched goes, the focus is not pulled to the heading', async () => {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+      expect(document.activeElement).toBe(document.body)
+
+      online(true)
+      window.dispatchEvent(new Event('online'))
+      await flushPromises()
+
+      expect(view.find('input[type="search"]').exists()).toBe(false)
+      expect(view.text()).toContain(en.advice.error.title)
+      expect(document.activeElement).toBe(document.body)
+    })
 
     // The connection back: the list comes under the very field being typed in.
     it('the connection back brings the list under the same field, the text kept', async () => {
@@ -1069,6 +1101,33 @@ describe('AdviceView after the review', () => {
         text: expect.stringMatching(/^Offline · the list for .+ as of today, .+\. Prices for /u),
       },
     ])
+  })
+
+  // The field goes with the focus in it — a city moved in another tab: the focus is given to the
+  // heading, never left on <body> (Б1: only a focus that was in the field).
+  it('the city moved with the focus in the field: the focus goes to the heading', async () => {
+    advice.mockResolvedValue(answer([milk]))
+    const view = await renderIn('Гюмри')
+    view.get<HTMLInputElement>('input[type="search"]').element.focus()
+    await flushPromises()
+
+    advice.mockReturnValue(new Promise<AdviceResponse>(() => undefined))
+    const key = `molvia.settings.${ME}`
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        country: 'AM',
+        city: 'Ереван',
+        spendCurrency: 'AMD',
+        incomeCurrency: 'RUB',
+      }),
+    )
+    window.dispatchEvent(new StorageEvent('storage', { key }))
+    await flushPromises()
+
+    expect(view.find('.skeleton').exists()).toBe(true)
+    expect(view.find('input[type="search"]').exists()).toBe(false)
+    expect(document.activeElement?.tagName).toBe('H1')
   })
 
   it('a city changed, its list late: «refreshing» for that city in one strip with the skeleton', async () => {

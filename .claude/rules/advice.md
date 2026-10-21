@@ -373,11 +373,16 @@ there over a list **and in the cold offline** — no connection and nothing reme
 why, «Без связи ищем только среди оценённого», in place of the cloud; it is the same field as over the
 list, so the list the connection brings comes under the one being typed in. A failure and the
 newcomer have none (the newcomer's search could only ever answer «not rated yet», and would teach
-that it is useless) — **unless something is typed in it** (owner's В-3 «а» on adversarial А1): the
-connection back with a failure or an empty list took the field from under the thumb with what it held
-and left the focus on `<body>`; it stays, answered by the server's search, and goes once cleared, the
-focus given to the heading. The price, named: a newcomer who typed in the cold offline is searched for
-on this one path. Loading draws the well where the field will stand, and **the line under the title is
+that it is useless) — **unless something is typed in it or the focus is in it** (owner's В-3 «а» on
+adversarial А1, В-4 «а» on Б2): the connection back with a failure or an empty list took the field from
+under the thumb with what it held and left the focus on `<body>`; it stays, answered by the server's
+search, erased to nothing too — the last Backspace took it and the keyboard with it, and the next word
+had nowhere to go — and goes once the person left it, the focus where they put it. Only a field that
+goes with the focus in it — a city moved in another tab — gives the focus to the heading, and only that
+focus (review № 8, Б1: on a phone nobody touched, `<body>` is no focus to give). The prices, named: a
+newcomer who typed in the cold offline is searched for on this one path; and while the field holds
+words over a failure, the screen does not say the list failed and offers no «Повторить» — cleared and
+left, the failure is back with it. Loading draws the well where the field will stand, and **the line under the title is
 held in every state** (В-2 «а», review № 1): whose figures these are is the answer's to say, so it is
 a bar while the answer is on its way and empty with none — read only once the answer came, it moved
 the field a line down under the thumb. **One strip of the connection stands

@@ -1,7 +1,7 @@
 <template>
   <!-- The field and the one strip of the connection under it, 8 apart (handoff `01`): while something
        is typed, the search's — what it searched, as of when — otherwise the list's, the screen's own. -->
-  <div class="head">
+  <div class="head" @focusin="$emit('focused', true)" @focusout="$emit('focused', false)">
     <SearchField
       :model-value="modelValue"
       :label="t('advice.search.label')"
@@ -181,6 +181,8 @@ export default defineComponent({
     /** With the scope of the answer the row came in: the list's may be another (review Р-13, Е). */
     edit: (row: AdviceRow, scope: AdviceScope) => typeof row === 'object' && !!scope,
     rate: (item: AdviceFound, scope: AdviceScope) => typeof item === 'object' && !!scope,
+    /** The focus came into the field or its «Очистить», or left them: «Что брать» keeps it then. */
+    focused: (inside: boolean) => typeof inside === 'boolean',
   },
   setup(props) {
     const { t, locale } = useI18n()
@@ -232,6 +234,7 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* `.ghost-head` of «Что брать» draws this still over the skeleton: a change here goes there too. */
 .head {
   display: flex;
   flex-direction: column;

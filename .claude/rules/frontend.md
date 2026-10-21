@@ -660,7 +660,12 @@ The detail behind the frontend lines of `CLAUDE.md`.
   screen's scope too, and a scoped `.caption` of «Бюджет» set its size on the caption's bar
   (adversarial А3) — a class of a root is never a word a screen uses for its own, and `SkeletonPart.test`
   holds it against the styles of every component (adversarial Б1: «Настройки» drew their fields as
-  `.skeleton-field`, now `ghost-*`). **A root is an element of the part's own, never `AppCard`**: the card
+  `.skeleton-field`, now `ghost-*`). **A screen's head stands over the frame, not in it** (MOL-201,
+  review № 9): the well of a field whose strip of the connection goes under it — «Что брать», «город
+  сменился» while the list is late — is a part put above `ScreenSkeleton`, in the field's own head
+  (gap 8, 24 under it), since inside the frame the strip would be hidden from a screen reader with the
+  bars; the line under the title is held by a bar of `skeleton-bar` in the subtitle. e2e holds the
+  well's top to the field's. **A root is an element of the part's own, never `AppCard`**: the card
   carried `card`, `plain` and `list` on the root too, and a `.card` of «Графики» gave the rows a padding of
   16 and the paragraphs a gap of 4 (adversarial В1); the scope goes down to the root alone, so a card one
   level in is the part's, and the test holds that every class of a root is `skeleton-*`. **A bar is `@include skeleton-bar`** — `border-strong` at

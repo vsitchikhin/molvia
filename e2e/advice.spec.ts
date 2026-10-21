@@ -372,8 +372,9 @@ async function coldOffline(page: Page, context: BrowserContext): Promise<void> {
 }
 
 // The connection back without a list: the field being typed in stays under the thumb with what it
-// holds, and goes once cleared, the focus given to the heading (owner's В-3 «а» on adversarial А1).
-test('the connection back without a list keeps the field typed in; cleared, it goes', async ({
+// holds — erased to nothing too, while the focus is in it — and goes once the person left it
+// (owner's В-3 «а» on adversarial А1, В-4 «а» on Б2).
+test('the connection back without a list keeps the field typed in; left empty, it goes', async ({
   page,
   context,
 }) => {
@@ -395,10 +396,20 @@ test('the connection back without a list keeps the field typed in; cleared, it g
   await expect(field).toBeFocused()
   await expect(page.getByRole('heading', { name: 'The server did not answer' })).toHaveCount(0)
 
+  // Erased to type another word: the field and the keyboard stay, and «сыр» goes in.
+  // A letter at a time, as on a phone: each step a query of its own, the last one empty.
+  while ((await field.inputValue()) !== '') await page.keyboard.press('Backspace')
+  await expect(field).toHaveValue('')
+  await expect(field).toBeFocused()
+  await page.keyboard.type('сыр')
+  await expect(field).toHaveValue('сыр')
+
+  // «Clear» gives the focus back to the field, which stays; left, the empty field goes.
   await page.getByRole('button', { name: 'Clear' }).click()
+  await expect(field).toBeFocused()
+  await page.getByRole('heading', { level: 1 }).click()
   await expect(page.getByRole('heading', { name: 'The server did not answer' })).toBeVisible()
   await expect(field).toHaveCount(0)
-  await expect(page.getByRole('heading', { level: 1 })).toBeFocused()
 })
 
 // 1l-0: where no receipt is read, the cold offline records purchases from the strip (Ф-14).

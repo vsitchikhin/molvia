@@ -57,6 +57,8 @@
         :refreshes="refreshes"
         @edit="edit"
         @rate="rate"
+        @focused="fieldFocused = $event"
+        @vue:unmounted="fieldFocused = false"
       >
         <template v-if="strip" #strip>
           <StatusStrip :kind="strip.kind" :text="strip.text" :attempt="attempt">
@@ -173,7 +175,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onUnmounted, ref, watch } from 'vue'
+import { computed, defineComponent, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { drawsNothing } from '@molvia/model'
 import type { AdviceFound, AdviceRow, AdviceScope } from '@molvia/model'
@@ -252,21 +254,31 @@ export default defineComponent({
     const entering = ref(false)
     const { country } = useReceiptCapture()
     /** The field is over a list, in the cold offline, and anywhere while something is typed in it. */
+    /** The focus is in the field or its «Очистить». */
+    const fieldFocused = ref(false)
+    /**
+     * The field is over a list and in the cold offline; over a failure or a newcomer only while
+     * something is typed in it or the focus is in it (owner's В-3 «а», В-4 «а»): erased to nothing
+     * to type another word, it stays under the thumb with the keyboard, and goes once the person
+     * left it — the focus is then where they put it.
+     */
     const fieldShown = computed(
       () =>
         advice.phase.value === 'ready' ||
         advice.phase.value === 'offline' ||
-        (searching.value && (advice.phase.value === 'error' || advice.phase.value === 'empty')),
+        ((searching.value || fieldFocused.value) &&
+          (advice.phase.value === 'error' || advice.phase.value === 'empty')),
     )
-    // A field cleared over a failure or a newcomer goes, and the focus with it: given to the screen's
-    // heading, where a screen reader starts reading what took its place, never left on <body>.
-    watch(
-      fieldShown,
-      (shown) => {
-        if (!shown && document.activeElement === document.body) focusScreenTitle()
-      },
-      { flush: 'post' },
-    )
+    // The one way left for a field to go with the focus in it — a city moved in another tab, the
+    // skeleton in its place: the focus is given to the heading, never left on <body>. Only a focus
+    // that was in the field (review № 8, adversarial Б1): on a phone nobody touched, <body> is where
+    // it always is, and taking it to the heading pulled a screen reader to the top for nothing.
+    watch(fieldShown, async (shown) => {
+      if (shown) return
+      const held = document.activeElement?.closest('.search-field') != null
+      await nextTick()
+      if (held && document.activeElement === document.body) focusScreenTitle()
+    })
     const day = (when: Date) => purchaseDay(when, locale.value)
     const time = (when: Date) => timeOfDay(when, locale.value)
     const cityGenitive = (city: string) =>
@@ -383,6 +395,7 @@ export default defineComponent({
       query,
       strip,
       fieldShown,
+      fieldFocused,
       searching,
       entering,
       country,
@@ -416,7 +429,7 @@ export default defineComponent({
   margin-bottom: var(--space-6);
 }
 
-/* `.head` of `AdviceSearch`, still. */
+/* `.head` of `AdviceSearch`, still: its gap and its margin, which move together (review № 9). */
 .ghost-head {
   display: flex;
   flex-direction: column;
