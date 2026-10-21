@@ -59,7 +59,7 @@ function figureOf(value: string | null, digits: number): number | null {
 }
 
 // thousands grouped by a space as printed, a no-break or a narrow one: «1 000,00», «19 097.86»
-const GROUPED = /^\d{1,3}(?:[   ]\d{3})+(?:[.,]\d+)?$/u
+const GROUPED = /^\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?$/u
 
 /**
  * A figure as the model wrote it in the one form `figureOf` reads (MOL-294): thousands grouped by spaces,
@@ -71,7 +71,7 @@ function canonicalFigure(value: string | null, signed: boolean): string | null {
   if (value === null) return null
   let text = value.trim()
   if (signed) text = text.replace(/^[-−]\s*/u, '')
-  if (GROUPED.test(text)) text = text.replace(/[   ]/gu, '')
+  if (GROUPED.test(text)) text = text.replace(/[ \u00a0\u202f]/gu, '')
   if (/^\d+,\d+$/u.test(text)) text = text.replace(',', '.')
   return /^\d{1,9}(?:\.\d+)?$/u.test(text) ? text : value
 }
