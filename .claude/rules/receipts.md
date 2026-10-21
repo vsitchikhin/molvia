@@ -950,29 +950,28 @@ printed apart as «Զեղչ գործարքից», a prepayment slip of the same 
 before, the lines never met the total: no total shown, «Прочитали не всё — не хватает 191,02» on every such
 receipt, and the 0.2 measure counted it read in part.
 
-**The lines meet «Ընդամենը» less «Զեղչ գործարքից»** (`linesTotalOf`), and **its second place is the sum taxed
-with VAT, «ԱԱՀ-ով հարկվող»** (the card's `cashback` and `taxed` words): the lines as read every one meet it, else
-those two vote; else **the total itself where two places print it — the total and a payment equal to it to the
-luma** — as before the cashback (review round 1, А2: «ԱԱՀ-ով հարկվող» misread alike lost a total master showed);
-**that last one puts no line right** (review round 2, owner's Б1 «а»): it vouches for the total and says nothing of the
-cashback, one figure copied with the same 5↔6 — 54,00 for 64,00 made water at 160 the line that met 6 550 less it,
-«ԱԱՀ-ով հարկվող» saying 6 486. A
-payment rounded to the dram is no place, and nor is «Ընդամենը» under the list, 0,02 off the lines where the till
-rounds a price with its discount (am-39, am-44). **The total shown is what left the card**
-(owner's В-5 «а»: «с карты списывается 19 097 — записывать надо именно эту сумму»), and the discount stands beside
-it (`receipts.cashback_minor`): every comparison of the lines with the total takes it off — the sums В-5 records, the
-review's difference, «Прочитали не всё», «proven whole» — and the trip's money never does. **A bonus a receipt is
-partly paid with, «Կանխավճարի մարում»**, is the trip's money taken off (`receiptPaidOf`, `redeemed_minor`): what the
-bonus covered was recorded when it was sent to the card, «когда покроется, тогда и запишем». It is kept only where the
-card's payment is the total less it, to the dram. **The price, named:** no receipt with a bonus spent has been seen —
-the rule is the label every receipt prints with a 0, and the vouch by the payment keeps a misread one out; a bonus
-spent where the payment is cash, change printed, is not kept, and the trip counts the total. Two discounts of the
-transaction printed apart are a doubt, and the receipt reads as before. **With no total vouched for, the trip is the
-lines and the cashback** (review round 1, А3) — what left the card, as В-5 «а» asks; a total vouched for below the
-lines is the lines alone, as before (review round 2, Б4). **The price, named** (А2б): a till that takes «Զեղչ
-գործարքից» off on the spot, lines before it, is read as one that sends it to the card — its total is shown by its two
-places, the review says the lines miss it by twice the discount, and the trip is the lines, the discount over what left
-the card, as on master; none has been seen.
+**The lines meet «Ընդամենը» less «Զեղչ գործարքից»** (`linesTotalOf`), and **its second place is the sum taxed with VAT,
+«ԱԱՀ-ով հարկվող»** (the card's `cashback` and `taxed` words): the lines as read every one meet it, else those two vote;
+else **the total itself where two places print it — the total and a payment equal to it to the luma** — as before the
+cashback (review round 1, А2: «ԱԱՀ-ով հարկվող» misread alike lost a total master showed); **that last one puts no line
+right** (review round 2, owner's Б1 «а»): it vouches for the total and says nothing of the cashback, one figure copied
+with the same 5↔6 — 54,00 for 64,00 made water at 160 the line that met 6 550 less it, «ԱԱՀ-ով հարկվող» saying 6 486. A
+payment rounded to the dram is no place, and nor is «Ընդամենը» under the list, 0,02 off the lines where the till rounds
+a price with its discount (am-39, am-44). **The total shown is what left the card** (owner's В-5 «а»: «с карты
+списывается 19 097 — записывать надо именно эту сумму»), and the discount stands beside it (`receipts.cashback_minor`):
+every comparison of the lines with the total takes it off — the sums В-5 records, the review's difference, «Прочитали не
+всё», «proven whole» — and the trip's money never does. **A bonus a receipt is partly paid with, «Կանխավճարի մարում»**,
+is the trip's money taken off (`receiptPaidOf`, `redeemed_minor`): what the bonus covered was recorded when it was sent
+to the card, «когда покроется, тогда и запишем». It is kept only where the card's payment is the total less it, to the
+dram — the total shown, else one printed: with no total vouched for, the trip of the lines and the cashback is the bonus
+less too (review round 6, Г5). **The price, named:** no receipt with a bonus spent has been seen — the rule is the label
+every receipt prints with a 0, and the vouch by the payment keeps a misread one out; a bonus spent where the payment is
+cash, change printed, is not kept, and the trip counts the total. Two discounts of the transaction printed apart are a
+doubt, and the receipt reads as before. **With no total vouched for, the trip is the lines and the cashback** (review
+round 1, А3) — what left the card, as В-5 «а» asks; a total vouched for below the lines is the lines alone, as before
+(review round 2, Б4). **The price, named** (А2б): a till that takes «Զեղչ գործարքից» off on the spot, lines before it,
+is read as one that sends it to the card — its total is shown by its two places, the review says the lines miss it by
+twice the discount, and the trip is the lines, the discount over what left the card, as on master; none has been seen.
 
 **Only a model's reading names them** (`receiptTextOfModel`): Tesseract reads its total after the word under the list,
 the lines' own sum, and on the bench shows none of these receipts' totals; reading the cashback there is a change of the
@@ -1004,20 +1003,20 @@ lines as copied share, to the till's three luma: «exactly the percentage, round
 lines, not all — 395 gives 3,96 — and without the rate three wrong readings passed where one did. **A line that prints
 a discount on a receipt whose lines share no rate is not tried** (review round 1, №3): nothing would hold its discount.
 
-**The total chooses among a line's readings, never the fewest swaps** (review round 1, owner's А1 «а»): every reading
-of the quantity, price and sum stays, and of all the choices across the lines exactly one may meet the total. The
-fewest swaps chose wrong where the model erred twice in one figure — the very case of В-2: 0,6 kg × 550 copied «660»
-read as 0,5 × 660, one swap in the quantity, the same sum at the same 1 % — and the total, the sum being one, could not
-see it; the review showed 0,5 kg at 660. On the reviewer's brute force (205 498 copies): wrong quantities and prices
-63 → 0, lines put right 178 065 → 188 086 — the total now also tells a sum a luma off (am-39's 567,15 and 567,16).
-**The discount of one quantity, price and sum is the one at the fewest swaps; two there are a doubt.** **The price,
-named** (А1 «а»): a discount the till's rounding lets read two ways — 2,55 or 2,56 of 255 — may stand a luma off the
-paper, on 8 539 of the brute force's lines; the sum, the quantity and the price are right, the line under «проверьте»,
-and the memory takes nothing of it. Holding it too (every reading one way, «б») loses am-44 whole: its line 18 prints
-5,56 where 1 % of 555 is 5,55, and nothing tells them. A line read two ways with one sum — «0,6 × 650» reads as
-printed and as 0,5 × 660 — is not put right: a doubt, not a choice. **The price, named:** a receipt whose card gives
-two rates (am-34: 1 % on 30 lines, 0,5 % on two) holds every line to the commoner one, and a broken line at the other
-is not put right.
+**The total chooses among a line's readings, never the fewest swaps** (review round 1, owner's А1 «а»): every reading of
+the quantity, price and sum stays, and of all the choices across the lines exactly one may meet the total. The fewest
+swaps chose wrong where the model erred twice in one figure — the very case of В-2: 0,6 kg × 550 copied «660» read as
+0,5 × 660, one swap in the quantity, the same sum at the same 1 % — and the total, the sum being one, could not see it;
+the review showed 0,5 kg at 660. On the reviewer's brute force (205 498 copies): wrong quantities and prices 63 → 0,
+lines put right 178 065 → 188 086 — the total now also tells a sum a luma off (am-39's 567,15 and 567,16). **The
+discount of one quantity, price and sum is the one at the fewest swaps; two there are a doubt.** **The price, named**
+(А1 «а»): a discount the till's rounding lets read two ways — 2,55 or 2,56 of 255 — may stand a luma off the paper, on 8
+539 of the brute force's lines (4,1 %), and on 15 461 of 106 161 copies of three swaps a line (14,6 %, review round 6 —
+am-44's line 27 took three); the sum, the quantity and the price are right, the line under «проверьте», and the memory
+takes nothing of it. Holding it too (every reading one way, «б») loses am-44 whole: its line 18 prints 5,56 where 1 % of
+555 is 5,55, and nothing tells them. A line read two ways with one sum — «0,6 × 650» reads as printed and as 0,5 × 660 —
+is not put right: a doubt, not a choice. **The price, named:** a receipt whose card gives two rates (am-34: 1 % on 30
+lines, 0,5 % on two) holds every line to the commoner one, and a broken line at the other is not put right.
 
 **The total chooses only among the fewest swaps' sums** (review round 2, owner's Б2 «а»): the readings of a line it
 chooses among are those whose sum is, to the till's rounding, one its fewest swaps give — the same sum split another way
