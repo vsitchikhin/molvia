@@ -415,21 +415,26 @@ describe('a line put right by the font’s 5↔6, the receipt whole (MOL-290)', 
     expect([shown.lines[1]?.sumHundredths, shown.balanced]).toEqual([null, false])
   })
 
-  it('lets the total choose among a line’s readings, its sum told by the total', () => {
-    // 65 and 56 copied for one number printed twice: 55, 56, 65 or 66 both times, each a sum of its own
+  it('lets the total confirm a line’s one sum, never choose among two (review round 3, Г1)', () => {
+    // 65 and 56 copied for one number printed twice: 55, 56, 65 or 66, each of two swaps and a sum of its own
     const twice = carded({ quantity: '1', unit_price: '65', discount: null, sum: '56' })
-    for (const [total, price] of [
-      ['342.10', 5_500],
-      ['343.10', 5_600],
-      ['352.10', 6_500],
-      ['353.10', 6_600],
+    for (const total of ['342.10', '343.10', '352.10', '353.10']) {
+      expect(read2([bread, twice], owed(total)).text.lines[1]?.repaired).toBeUndefined()
+    }
+    // printed 5 × 105 − 5,25 = 519,75, the quantity copied «6»: one swap reads it, and the till's rounding lets
+    // 519,76 stand a luma off — the total tells them, as am-39's 567,15 and 567,16
+    const eggs = carded({ quantity: '6', unit_price: '105', discount: '5.25', sum: '519.75' })
+    for (const [total, sum] of [
+      ['806.85', 51_975],
+      ['806.86', 51_976],
     ] as const) {
-      const line = read2([bread, twice], owed(total)).text.lines[1]
-      expect({ total, price: line?.priceHundredths, repaired: line?.repaired }).toEqual({
+      const line = read2([bread, eggs], owed(total)).shown.lines[1]
+      expect([total, line?.quantityMilli, line?.sumHundredths, line?.repaired]).toEqual([
         total,
-        price,
-        repaired: true,
-      })
+        5_000,
+        sum,
+        true,
+      ])
     }
   })
 
@@ -513,22 +518,38 @@ describe('a line put right by the font’s 5↔6, the receipt whole (MOL-290)', 
   })
 
   it('puts nothing right where a line read whole, swapped, meets the total too (review round 2, Б2)', () => {
-    // the class code's till: a bun printed 1 × 95 copied 96 / 96, the juice 1 × 106 with its price copied «105» —
-    // 105 meets the total with the bun as copied, 106 with the bun read 95: two choices, a doubt
+    // printed 5 × 105 − 5,25 = 519,75, copied «6»: 519,75 or, a luma off, 519,76. Beside it 1 × 1 234 − 12,34 =
+    // 1 221,66 reads whole as copied and, its last 6 a 5, as 1 221,65 within the till's rounding: 519,76 meets the
+    // total with it moved — two choices, a doubt
+    const eggs = carded({ quantity: '6', unit_price: '105', discount: '5.25', sum: '519.75' })
+    const flour = carded({ quantity: '1', unit_price: '1234', discount: '12.34', sum: '1221.66' })
+    const { text, shown } = read2([flour, eggs], owed('1741.41'))
+    expect(text.lines.some((l) => l.repaired === true)).toBe(false)
+    expect([shown.balanced, shown.lines[1]?.sumHundredths]).toEqual([false, null])
+    // a line no swap moves takes nothing away
+    expect(read2([bread, eggs], owed('806.85')).shown.lines[1]?.repaired).toBe(true)
+  })
+
+  it('lets the total pay for no line bent to fit with a reading as cheap (review round 3, Г1)', () => {
+    // the butter bent to fit, 99,00 short (am-34: a 3 for a 4, no swap of the pair); the cottage cheese printed
+    // 1 × 522 − 5,22 = 516,78 with its price and discount copied «622» and «6.22»: two swaps read it as printed,
+    // two as 622 − 6,22 = 615,78 — 99,00 over, which the total would have taken
+    const alike = carded({ quantity: '1', unit_price: '540', discount: '5.4', sum: '534.6' })
+    const cottage = carded({ quantity: '1', unit_price: '622', discount: '6.22', sum: '516.78' })
+    const { text, shown } = read2([bread, alike, cottage], owed('1437.48'))
+    expect(text.lines.some((l) => l.repaired === true)).toBe(false)
+    expect([shown.balanced, shown.lines[2]?.sumHundredths]).toEqual([false, null])
+    // the class code's till: the bun 380 bent to 480 / 480, the juice 1 × 660 with its price copied «560»
     const plain = (price: string, sum: string) =>
       carded({ quantity: '1', unit_price: price, discount: null, sum })
-    const milk = plain('420', '420')
-    const juice = plain('105', '106')
-    const { text, shown } = read2([milk, plain('96', '96'), juice], owed('621.00'))
-    expect(text.lines.some((l) => l.repaired === true)).toBe(false)
-    expect([shown.balanced, shown.lines[1]?.sumHundredths, shown.lines[2]?.sumHundredths]).toEqual([
-      false,
-      null,
-      null,
-    ])
-    // a line whose swaps move it by what no choice needs takes nothing away: 150 read 160 is 10 ֏, not 1
-    const put = read2([milk, plain('150', '150'), juice], owed('676.00')).shown.lines[2]
-    expect([put?.priceHundredths, put?.repaired]).toEqual([10_600, true])
+    const classed = read2(
+      [plain('420', '420'), plain('480', '480'), plain('560', '660')],
+      owed('1460.00'),
+    )
+    expect([classed.shown.balanced, classed.shown.lines[1]?.sumHundredths]).toEqual([false, null])
+    // the price, named: copied right beside them, the same lines are a doubt too
+    const butter = carded({ quantity: '1', unit_price: '640', discount: '6.4', sum: '633.6' })
+    expect(read2([bread, butter, cottage], owed('1437.48')).text.lines[2]?.repaired).toBeUndefined()
   })
 
   it('puts nothing right past the ways the lines read whole may move', () => {
@@ -552,34 +573,33 @@ describe('a line put right by the font’s 5↔6, the receipt whole (MOL-290)', 
   })
 
   it('puts nothing right by a cashback nothing vouches for (review round 2, Б1)', () => {
-    // printed 2 × 1 200 − 24 and 1 × 4 000 − 40, water 1 × 150 with a discount of 0: 6 486,00 paid, 64,00 sent to
-    // the card, 6 550,00 left it; the water's price copied «160»
+    // printed 1 × 291 − 2,91 = 288,09 and 5 × 105 − 5,25 = 519,75, the quantity copied «6»: 807,84 paid, 15,16
+    // sent to the card, 823,00 left it
     const lines = [
-      carded({ quantity: '2', unit_price: '1200', discount: '24', sum: '2376' }),
-      carded({ quantity: '1', unit_price: '4000', discount: '40', sum: '3960' }),
-      carded({ quantity: '1', unit_price: '160', discount: '0', sum: '150' }),
+      carded({ quantity: '1', unit_price: '291', discount: '2.91', sum: '288.09' }),
+      carded({ quantity: '6', unit_price: '105', discount: '5.25', sum: '519.75' }),
     ]
     const summary = (cashback: string, taxed: string) =>
       Object.entries({
         '/ԱԱՀ-ով հարկվող/ =': taxed,
-        'Ընդամենը:': '6550.00',
-        'Վճարված է PosTerminal:': '6550.00',
+        'Ընդամենը:': '823.00',
+        'Վճարված է PosTerminal:': '823.00',
         'Զեղչ գործարքից:': cashback,
       }).map(([label, amount]) => ({ label, amount }))
-    // «Զեղչ գործարքից» copied 54,00: the total stands by itself and the card's payment, but 6 550 less 54 is no
-    // place's — water at 160 met it, and «ԱԱՀ-ով հարկվող», 6 486, said otherwise
-    const misread = read2(lines, summary('54.00', '6486.00'))
-    expect([misread.text.totalHundredths, misread.text.lines[2]?.repaired]).toEqual([
-      655_000,
+    // read right, the sum taxed vouches for the lines' 807,84: the eggs put right as printed
+    expect(figuresOf(read2(lines, summary('15.16', '807.84')).shown)[1]).toEqual([
+      5_000, 10_500, 525, 51_975,
+    ])
+    // «Զեղչ գործարքից» copied 15,15: the total stands by itself and the card's payment, but 823 less 15,15 is no
+    // place's — the eggs at 519,76 met it, and «ԱԱՀ-ով հարկվող», 807,84, said otherwise
+    const misread = read2(lines, summary('15.15', '807.84'))
+    expect([misread.text.totalHundredths, misread.text.lines[1]?.repaired]).toEqual([
+      82_300,
       undefined,
     ])
-    expect([misread.shown.balanced, misread.shown.lines[2]?.sumHundredths]).toEqual([false, null])
-    // read right, the sum taxed vouches for the lines' 6 486,00: water put right as printed
-    expect(figuresOf(read2(lines, summary('64.00', '6486.00')).shown)[2]).toEqual([
-      1_000, 15_000, 0, 15_000,
-    ])
+    expect([misread.shown.balanced, misread.shown.lines[1]?.sumHundredths]).toEqual([false, null])
     // read right with the sum taxed misread too: the total shown, nothing put right
-    expect(read2(lines, summary('64.00', '6586.00')).text.lines[2]?.repaired).toBeUndefined()
+    expect(read2(lines, summary('15.16', '807.94')).text.lines[1]?.repaired).toBeUndefined()
   })
 
   it('swaps only the card’s pair: a 1 for a 4 is not put right', () => {

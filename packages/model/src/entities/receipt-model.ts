@@ -367,8 +367,11 @@ interface LineReading {
  *
  * **Only among the fewest swaps' sums** (review round 2, owner's Б2 «а»): the readings kept are those whose sum is,
  * to the till's rounding, one a reading with the fewest swaps gives — 0,6 × 550 beside 0,5 × 660, 567,15 beside
- * 567,16, «160» at 150 read either way. A reading three swaps off is the total's to choose no more: a line the model
- * bent to fit (am-34, 99,00 short) made the curd's 615,78 the one choice that met the total.
+ * 567,16. A reading three swaps off is the total's to choose no more: a line the model bent to fit (am-34, 99,00
+ * short) made the curd's 615,78 the one choice that met the total. **And the total chooses no sum** (review round 3,
+ * owner's Г1 «а»): where the fewest swaps give sums more than the till's rounding apart — «160» at 150 read either
+ * way, «622 / 6.22» at 516,78 — the line is a doubt. The total confirms the line's one sum, never picks it: with two
+ * readings equally cheap, the curd's 615,78 still paid for am-34.
  */
 function choicesOf(
   swaps: Readonly<Record<string, string>>,
@@ -420,6 +423,7 @@ function choicesOf(
   const kept = [...found.values()].filter((one) => !one.tied)
   const fewest = Math.min(...kept.map((one) => one.swaps))
   const least = kept.filter((one) => one.swaps === fewest).map((one) => one.reading.sum)
+  if (Math.max(...least) - Math.min(...least) > TOLERANCE_HUNDREDTHS) return []
   return kept
     .filter((one) => least.some((sum) => Math.abs(one.reading.sum - sum) <= TOLERANCE_HUNDREDTHS))
     .map((one) => one.reading)
