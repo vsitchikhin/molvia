@@ -97,7 +97,8 @@ test('must not fire: with no connection a plan is not sent, and both ways say wh
   // The strip is not now, in the focus order and saying why (Ф-6): a tap opens nothing (MOL-192).
   const add = page.getByRole('button', { name: 'Задать план можно со связью' })
   await expect(add).toHaveAttribute('aria-disabled', 'true')
-  await add.click()
+  // Playwright itself counts an `aria-disabled` button as disabled: the tap is forced, as a finger's.
+  await add.click({ force: true })
   await expect(sheet).toHaveCount(0)
 
   // The row still opens, and the sheet says in one line what waits for the connection.
@@ -106,8 +107,9 @@ test('must not fire: with no connection a plan is not sent, and both ways say wh
   await page.waitForTimeout(400)
   const save = sheet.getByRole('button', { name: 'Сохранить можно со связью' })
   await expect(save).toHaveAttribute('aria-disabled', 'true')
-  await expect(save).toBeEnabled()
-  await save.click()
+  // Not a native `disabled`: the button keeps its place in the focus order (Ф-6).
+  await expect(save).not.toHaveAttribute('disabled')
+  await save.click({ force: true })
   await expect(sheet.getByRole('button', { name: 'Убрать можно со связью' })).toHaveAttribute(
     'aria-disabled',
     'true',
