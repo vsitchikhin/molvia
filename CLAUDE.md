@@ -626,6 +626,12 @@ that are easiest to break; the file holds every rule of the area and the reason 
   again as printed, a table too — two places shown included (В-2 «а»). Read in one place it is
   `read_total_minor`, what «Прочитали не всё» measures by alone, sent only to a phone that asks
   (`RECEIPT_READ_TOTAL_HEADER`).
+- **A card that sends its discount to the card** (MOL-289): the lines meet «Ընդամենը» less «Զեղչ գործարքից»
+  (`linesTotalOf`), its second place «ԱԱՀ-ով հարկվող»; the total shown is what left the card, and the trip's money that
+  less a bonus spent (`receiptPaidOf`); a model's reading only. «Ընդամենը ամվա սկզբից» is never a total (MOL-288).
+- **A model's line is put right by the font's 5↔6 only with the whole receipt** (MOL-290): its one reading at the
+  fewest swaps, two a figure, the card's rate, and every line then exactly the total two places vouch for; shown
+  «проверьте», never as read (`repaired`), no shelf price for the memory; the model is never asked to do the sum.
 - **The reader away leaves a receipt queued; a photo it drops goes to the end with its attempt
   counted; a photo it cannot read fails** — never lost, never read forever; people read in turn.
 - **The class code is a boundary, not a layout** (MOL-226): «Դաս. 56.10» opens an item on any fiscal till,
