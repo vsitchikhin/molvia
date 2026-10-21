@@ -424,7 +424,7 @@
       "body": "We’ll show the list as soon as you’re back online. You can record purchases now",
       "body_capture": "We’ll show the list as soon as you’re back online. You can photograph a receipt now"
     },
-    "city_reloading": "City changed to {city} — reloading the list",
+    "city_reloading": "Refreshing · the list for {city}",
     "stale_other_city": "Offline · the list for {oldCity} as of {day}, {time}. Prices for {city} will appear once you are back online",
     "cities_genitive": {
       "Гюмри": "Gyumri",

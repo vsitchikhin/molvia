@@ -235,12 +235,20 @@ export default defineComponent({
 
     /**
      * An answer on its way for longer than a moment: only then does the strip say so — a quick one
-     * replaces what is shown in silence (MOL-201, В-1 «а»).
+     * replaces what is shown in silence (MOL-201, В-1 «а»). Timed by what is waited for, not by
+     * whether anything is: a refresh already late and then a city moved are two requests, and one
+     * flag for both put «город сменился» up at once for one asked a moment ago (adversarial А2).
      */
     const late = ref(false)
     let lateTimer: ReturnType<typeof setTimeout> | undefined
     watch(
-      () => advice.stale.value === 'loading' || advice.cityReloading.value !== null,
+      () => {
+        if (advice.stale.value === 'loading') {
+          return `list ${String(advice.fetchedAt.value?.getTime())}`
+        }
+        const city = advice.cityReloading.value
+        return city === null ? '' : `city ${city}`
+      },
       (waiting) => {
         clearTimeout(lateTimer)
         late.value = false
@@ -284,7 +292,7 @@ export default defineComponent({
       }
       const city = advice.cityReloading.value
       return city && late.value
-        ? { kind: 'refreshing', text: t('advice.city_reloading', { city }) }
+        ? { kind: 'refreshing', text: t('advice.city_reloading', { city: cityGenitive(city) }) }
         : null
     })
     /** The row whose verdict is being amended, as the last answer described it. */

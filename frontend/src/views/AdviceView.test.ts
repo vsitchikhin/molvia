@@ -998,7 +998,7 @@ describe('AdviceView after the review', () => {
     ])
   })
 
-  it('a city changed, its list late: «reloading» in one strip over the skeleton', async () => {
+  it('a city changed, its list late: «refreshing» for that city in one strip with the skeleton', async () => {
     advice.mockResolvedValue(answer([milk], { geography: { country: 'AM', city: 'Ереван' } }))
     await renderIn('Ереван')
     for (const view of mounted.splice(0)) view.unmount()
@@ -1013,8 +1013,59 @@ describe('AdviceView after the review', () => {
       vi.advanceTimersByTime(STRIP_LATE_MS)
       await nextTick()
       expect(strips(view)).toEqual([
-        { kind: 'refreshing', text: 'City changed to Гюмри — reloading the list' },
+        { kind: 'refreshing', text: 'Refreshing · the list for Gyumri' },
       ])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // Two waits are two requests: a refresh already late, then a city moved in another tab — the new
+  // city's list was asked a moment ago, and its strip waits its own second (adversarial А2).
+  it('А2: a city moved after a late refresh — its strip waits its own second', async () => {
+    advice.mockResolvedValue(answer([milk]))
+    await renderIn('Гюмри')
+    for (const view of mounted.splice(0)) view.unmount()
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      advice.mockReturnValue(new Promise<AdviceResponse>(() => undefined))
+      const view = await renderIn('Гюмри')
+      vi.advanceTimersByTime(STRIP_LATE_MS)
+      await nextTick()
+      expect(strips(view).map((strip) => strip.kind)).toEqual(['refreshing'])
+
+      let answered: (value: AdviceResponse) => void = () => undefined
+      advice.mockReturnValue(new Promise<AdviceResponse>((resolve) => (answered = resolve)))
+      const key = `molvia.settings.${ME}`
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          country: 'AM',
+          city: 'Ереван',
+          spendCurrency: 'AMD',
+          incomeCurrency: 'RUB',
+        }),
+      )
+      window.dispatchEvent(new StorageEvent('storage', { key }))
+      await nextTick()
+      await nextTick()
+      expect(view.find('.skeleton').exists()).toBe(true)
+      expect(strips(view)).toEqual([])
+
+      vi.advanceTimersByTime(STRIP_LATE_MS - 1)
+      await nextTick()
+      expect(strips(view)).toEqual([])
+      vi.advanceTimersByTime(1)
+      await nextTick()
+      expect(strips(view)).toEqual([
+        { kind: 'refreshing', text: 'Refreshing · the list for Yerevan' },
+      ])
+
+      // A quick answer to a city never shows it: here it answers late, and the strip goes with it.
+      answered(answer([milk], { geography: { country: 'AM', city: 'Ереван' } }))
+      await flushPromises()
+      expect(strips(view)).toEqual([])
     } finally {
       vi.useRealTimers()
     }
