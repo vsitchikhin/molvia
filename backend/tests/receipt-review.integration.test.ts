@@ -236,8 +236,9 @@ describe('the review of a receipt', () => {
     const id = await parsedReceipt(me, lines, carded)
     const shown = await review(me, id)
     expect(shown.lines[1]?.amount).toEqual(amd(980))
+    // an earlier build, which knows no cashback, is told what the lines come to (review round 1, А4)
     expect([shown.receipt.total, shown.cashback, shown.redeemed]).toEqual([
-      { minor: 152_611n, currency: 'AMD' },
+      { minor: 151_100n, currency: 'AMD' },
       undefined,
       undefined,
     ])
@@ -256,6 +257,7 @@ describe('the review of a receipt', () => {
     })
     const asked = receiptDetailCodec.parse(response.json())
     expect([asked.cashback, asked.redeemed]).toEqual([amd(15.11), amd(100)])
+    expect(asked.receipt.total).toEqual({ minor: 152_611n, currency: 'AMD' })
   })
 
   it('tells a line the font’s swaps put right only to a phone that asks (MOL-290)', async () => {
@@ -268,9 +270,23 @@ describe('the review of a receipt', () => {
       .update(receiptLines)
       .set({ repaired: true })
       .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 1)))
-    expect((await review(me, id)).lines.map((line) => line.repaired)).toEqual([
-      undefined,
-      undefined,
+    // «Покупки» ask to check it, as a line that does not add up (review round 1, №2)
+    const cookie = await signIn(db, me)
+    const listed = receiptsResponseCodec.parse(
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/receipts',
+          headers: { cookie, 'x-molvia-today': '2026-10-03' },
+        })
+      ).json(),
+    )
+    expect(listed.receipts.find((one) => one.id === id)?.unsettled).toBe(1)
+    // an earlier build cannot say «проверьте»: the line goes to it empty (review round 1, А4)
+    const earlier = await review(me, id)
+    expect(earlier.lines.map((line) => [line.repaired, line.sum, line.amount])).toEqual([
+      [undefined, amd(531), amd(531)],
+      [undefined, null, null],
     ])
     const response = await app.inject({
       method: 'GET',
@@ -282,7 +298,10 @@ describe('the review of a receipt', () => {
       },
     })
     const asked = receiptDetailCodec.parse(response.json())
-    expect(asked.lines.map((line) => line.repaired)).toEqual([undefined, true])
+    expect(asked.lines.map((line) => [line.repaired, line.sum])).toEqual([
+      [undefined, amd(531)],
+      [true, amd(1_032)],
+    ])
   })
 
   it('doubts a price one confused digit off the memory’s, and only then names it (В-1)', async () => {

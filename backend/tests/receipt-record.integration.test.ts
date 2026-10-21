@@ -928,6 +928,13 @@ describe('«Записать»', () => {
       receiptNo: '3',
     })
     expect(await moneyOf(typed, body({ total: amount(2_211.9) }))).toBe(211_190n)
+    // no total vouched for: the lines and what went to the card (review round 1, А3)
+    const unvouched = await parsedReceipt(me, LINES.slice(0, 2), {
+      totalMinor: null,
+      cashbackMinor: 2_190n,
+      receiptNo: '4',
+    })
+    expect(await moneyOf(unvouched, body())).toBe(221_190n)
   }, 10_000)
 
   // review 1, В1, В2: the receipt row holds the trip's date on the accounts, «из чека» and the guard

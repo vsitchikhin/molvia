@@ -465,7 +465,8 @@ const undoFrom = () => sql`clock_timestamp() - make_interval(mins => ${RECEIPT_U
 // The parts held and the lines read, beside the row: what «Покупки» shows of a receipt.
 const received = sql<number>`(select count(*)::int from ${receiptParts} where ${receiptParts.receiptId} = ${receipts.id})`
 const lineCount = sql<number>`(select count(*)::int from ${receiptLines} where ${receiptLines.receiptId} = ${receipts.id})`
-const unsettled = sql<number>`(select count(*)::int from ${receiptLines} where ${receiptLines.receiptId} = ${receipts.id} and not ${receiptLines.settled})`
+// «проверьте N строк»: a line that does not add up, and one the font's swaps put right (MOL-290, review round 1, №2)
+const unsettled = sql<number>`(select count(*)::int from ${receiptLines} where ${receiptLines.receiptId} = ${receipts.id} and (not ${receiptLines.settled} or ${receiptLines.repaired}))`
 
 // The purchases it was recorded as and their place, while they are there (MOL-126): a trip removed,
 // even within its «Вернуть», is no record of the receipt.

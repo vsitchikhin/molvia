@@ -126,7 +126,8 @@ function receiptMoney(held: ReceiptToRecord, body: ReceiptRecordBody): Money | n
  * printed one, or the person's correction of what OCR misread; without it the printed total where it is
  * not below the lines — what was paid, the lines left out and those OCR lost included, while a lost line
  * only ever raises a total, so one below the lines was misread — else the sum of every line: a recorded
- * one at what the person settled on, one left out at what it would have been recorded at (В-5). `null`
+ * one at what the person settled on, one left out at what it would have been recorded at (В-5), and what a card
+ * sent to the card (MOL-289). `null`
  * when nothing is known: the trip then counts its prices (MOL-78).
  */
 function receiptTotal(held: ReceiptToRecord, body: ReceiptRecordBody): Money | null {
@@ -153,7 +154,10 @@ function receiptTotal(held: ReceiptToRecord, body: ReceiptRecordBody): Money | n
   if (printed !== null && printed.minor > 0n && (lines === null || printed.minor >= lines.minor)) {
     return printed
   }
-  return lines
+  // what a card sent to the card left it too: the lines and it, where no total was vouched for (review round 1,
+  // А3; owner's В-5 «а» of MOL-289 — «записывать, сколько списалось»)
+  const { cashback } = held
+  return lines === null || cashback?.currency !== lines.currency ? lines : addMoney(lines, cashback)
 }
 
 /**

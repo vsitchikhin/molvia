@@ -253,7 +253,16 @@ export async function receiptOfOwner(
   if (shown) await handedOver(repositories.receipts, actor.id, [found])
   const [receipt] = await withPlaces(repositories.receipts, actor, [found])
   if (receipt === undefined) throw new DomainError(ERROR.NOT_FOUND)
-  const { lines, currency } = found
+  const { currency } = found
+  // an earlier build cannot say «проверьте»: a line put right goes to it empty, as the check left it before
+  // (review round 1, А4; MOL-255, owner's В-1 «а» of MOL-290 — the mark is what lets it be shown)
+  const lines = repaired
+    ? found.lines
+    : found.lines.map((line) =>
+        line.repaired === true
+          ? { ...line, quantity: null, price: null, sum: null, discount: null, settled: false }
+          : line,
+      )
   const tin = receipt.header?.tin ?? null
 
   const { memory, itemIds, names, barcodes, amounts } = await shownLines(
@@ -302,7 +311,11 @@ export async function receiptOfOwner(
   }
 
   return {
-    receipt,
+    // an earlier build sets the lines against `total`, knowing no cashback: it is told what the lines come to,
+    // or it says «Разница» of every line read right (review round 1, А4); the trip's money is the server's
+    receipt: cashback
+      ? receipt
+      : { ...receipt, total: linesTotalOf(receipt.total, found.cashback) },
     lines: lines.map((line, i) => {
       const remembered = memory[i] ?? null
       const itemId = itemIds[i] ?? null
