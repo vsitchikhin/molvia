@@ -875,10 +875,13 @@ task did not: five plans of six there are a percent of the month's income — «
   said as for a closed sheet. **The writes go in the order of the taps** (Г1): a plan is the last write
   the server got, with no revision, so a write waits for the one before it, answered or not — the same
   row opened again and saved while the swept write was on its way left the older sum on the server.
-  The prices, named: a refusal of a write whose sheet was swept away is said nowhere, as before; a write
+  **The queue is `useMoneyBudget`'s, not the screen's** (Г2): a step back and in again mounts a new
+  screen while the old one's write is on its way, and kept in the sheet, the new one's went first. The
+  prices, named: a refusal of a write whose sheet was swept away is said nowhere, as before; a write
   waits, «Сохраняем…», while the one before it hangs, up to the client's 15 s. **A row is `ListRow`**
   with the category's circle, as on «Категории» and «Траты»; the chevron on every live row — each opens
-  the sheet of its plan — and **«осталось» in the title's line, never the tail** (`name-beside-figure`): a tail of its own width made every bar another length, and
+  the sheet of its plan — and **«осталось» in the title's line, never the tail**
+  (`name-beside-figure`): a tail of its own width made every bar another length, and
   bars one under another are read against each other. **The bar is the category's colour**, never the
   accent (Ф-4), over the plan `--warn` to the edge; the target's bar is `--graphic`, its mark `--text`.
   **What the row says besides is a line under the bar** — the share, «пока ничего не пришло», «не всё

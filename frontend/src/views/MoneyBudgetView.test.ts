@@ -1293,4 +1293,49 @@ describe('MoneyBudgetView: review of MOL-192, round 4', () => {
       { kind: 'share', percent: 7 },
     ])
   })
+
+  // Adversarial Г2: a step back and in again mounts a new screen while the old one's write is on its way.
+  it('a write from the screen opened anew waits for the one the screen left behind', async () => {
+    moneyBudget.mockResolvedValue(budget())
+    let view = await render()
+    await view.findAll('li .list-row')[1]?.trigger('click')
+    await flushPromises()
+    type('input[inputmode=numeric]', '6')
+    let answer: (value: MoneyBudgetView) => void = () => undefined
+    setBudgetPlan.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+    await pressUntil(en.budget.sheet.save, () => {
+      expect(setBudgetPlan).toHaveBeenCalledTimes(1)
+    })
+    router.back()
+    await vi.waitFor(() => {
+      expect(document.querySelector('dialog[open]')).toBeNull()
+    })
+    for (const one of views.splice(0)) one.unmount()
+
+    view = await render()
+    await view.findAll('li .list-row')[1]?.trigger('click')
+    await vi.waitFor(() => {
+      expect(document.querySelector('dialog[open]')).not.toBeNull()
+    })
+    type('input[inputmode=numeric]', '7')
+    await pressUntil(en.budget.sheet.save, () => {
+      expect(document.querySelector('dialog[open]')?.textContent).toContain(en.budget.sheet.saving)
+    })
+    await flushPromises()
+    // Must not fire: the new screen's write is not sent while the old one's is on its way.
+    expect(setBudgetPlan).toHaveBeenCalledTimes(1)
+
+    answer(budget())
+    await vi.waitFor(() => {
+      expect(setBudgetPlan).toHaveBeenCalledTimes(2)
+    })
+    expect(setBudgetPlan.mock.calls.map((call) => call[0].plan)).toEqual([
+      { kind: 'share', percent: 6 },
+      { kind: 'share', percent: 7 },
+    ])
+  })
 })

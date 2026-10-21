@@ -184,10 +184,6 @@ export default defineComponent({
     // swept away may be answered while it is open again for another (adversarial В1 of MOL-192): the
     // write belongs to the opening it was sent from, never to the one on screen when it lands.
     let opening = 0
-    // The write before, answered or not. A plan is the last write the server got, with no revision, so
-    // the writes go in the order of the taps (adversarial Г1): the sheet opened again for the same row
-    // and saved while the swept one was on its way left the older sum on the server.
-    let previous: Promise<unknown> = Promise.resolve()
 
     watch(
       () => props.open,
@@ -304,13 +300,10 @@ export default defineComponent({
         return
       }
       const from = opening
-      const body = { categoryId: id, from: props.month, plan }
       sending.value = true
       removing.value = plan === null
-      const written = previous.then(() => props.save(body))
-      previous = written.catch(() => undefined)
       try {
-        await written
+        await props.save({ categoryId: id, from: props.month, plan })
         finished(
           {
             kind: plan ? 'saved' : 'removed',
