@@ -5,6 +5,7 @@ import type { Locator, Page, Route } from '@playwright/test'
 import { randomInt } from 'node:crypto'
 import { BARCODE } from './barcode-video'
 import { asBrowser, open } from './session'
+import { firstAttemptTrace } from './trace'
 
 /**
  * The scanner in a real Chromium with a camera that films a barcode (MOL-98) — what the
@@ -434,30 +435,9 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
    */
   test.describe('the focus through the code’s blocks', () => {
     // The first attempt's trace in CI (MOL-249): the flake of «an item full of codes» left nothing
-    // behind but «Received: ''», and the API's log had to tell what the screen had done. Started by
-    // hand: `test.use({ trace })` is refused in a describe, and for the whole file it would trace the
-    // camera's reads too. The retry is traced by the config (`on-first-retry`).
-    // A run that traces the first attempt itself — `--trace on`, a config's `retain-on-first-failure`
-    // — has started it already: that trace is the run's to keep, and the block's own is not started
-    // (review Р2-А1: a second start threw in every test of the block).
-    let ownTrace = false
-    test.beforeEach(async ({ context }, info) => {
-      ownTrace = false
-      if (!process.env.CI || info.retry > 0) return
-      try {
-        await context.tracing.start({ snapshots: true, screenshots: false })
-        ownTrace = true
-      } catch (error) {
-        if (!String(error).includes('Tracing has been already started')) throw error
-      }
-    })
-    test.afterEach(async ({ context }, info) => {
-      if (!ownTrace) return
-      if (info.status === info.expectedStatus) return context.tracing.stop()
-      const path = info.outputPath('trace.zip')
-      await context.tracing.stop({ path })
-      await info.attach('trace', { path, contentType: 'application/zip' })
-    })
+    // behind but «Received: ''», and the API's log had to tell what the screen had done. For the block
+    // alone: for the whole file it would trace the camera's reads too.
+    firstAttemptTrace()
 
     const LINKS = '**/api/catalogue/items/*/barcodes'
     const LINK = /\/api\/catalogue\/items\/[^/]+\/barcodes$/
