@@ -935,6 +935,23 @@ describe('«Записать»', () => {
       receiptNo: '4',
     })
     expect(await moneyOf(unvouched, body())).toBe(221_190n)
+    // a total vouched for below the lines — a till that takes the discount off on the spot — is the lines alone,
+    // as before: never the lines and the cashback, two discounts over what left the card (review round 2, Б4)
+    const below = await parsedReceipt(me, LINES.slice(0, 2), {
+      totalMinor: 217_000n,
+      cashbackMinor: 2_190n,
+      receiptNo: '5',
+    })
+    expect(await moneyOf(below, body())).toBe(219_000n)
+    // an earlier build is shown the lines' total, 2 190,00, and sends it back with «Итог» saved as it was: the
+    // printed total, what left the card, and no total put right (review round 2, №5)
+    const echoed = await parsedReceipt(me, LINES.slice(0, 2), { ...carded, receiptNo: '6' })
+    expect(await moneyOf(echoed, body({ total: amount(2_190) }))).toBe(221_190n)
+    const days = await db.select().from(receiptDays)
+    expect(days.reduce((all, day) => all + day.totalsCorrected, 0)).toBe(0)
+    // any other figure it sends is the person's word, taken as it is
+    const typedOver = await parsedReceipt(me, LINES.slice(0, 2), { ...carded, receiptNo: '7' })
+    expect(await moneyOf(typedOver, body({ total: amount(2_200) }))).toBe(220_000n)
   }, 10_000)
 
   // review 1, В1, В2: the receipt row holds the trip's date on the accounts, «из чека» and the guard

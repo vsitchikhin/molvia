@@ -114,6 +114,19 @@ function editsOf(
 }
 
 /**
+ * The body with the total the phone sent read as the paper's (MOL-289, review round 2, №5): a build before it is
+ * shown the lines' total for the receipt's — the total less what went to the card — and sends exactly that back
+ * when «Итог» is opened and saved as it was. That echo is the printed total, neither the trip's money nor a
+ * correction; anything else it sends is the person's own word.
+ */
+function echoed(held: ReceiptToRecord, body: ReceiptRecordBody): ReceiptRecordBody {
+  const { total, cashback } = held
+  if (body.total === undefined || total === null || cashback === null || cashback.minor <= 0n)
+    return body
+  return sameMoney(body.total, linesTotalOf(total, cashback)) ? { ...body, total } : body
+}
+
+/**
  * The money of the trip: the receipt's total (`receiptTotal`), less the card's bonus it was partly paid
  * with (MOL-289).
  */
@@ -155,9 +168,12 @@ function receiptTotal(held: ReceiptToRecord, body: ReceiptRecordBody): Money | n
     return printed
   }
   // what a card sent to the card left it too: the lines and it, where no total was vouched for (review round 1,
-  // А3; owner's В-5 «а» of MOL-289 — «записывать, сколько списалось»)
+  // А3; owner's В-5 «а» of MOL-289 — «записывать, сколько списалось»). A total vouched for below the lines — a
+  // till that takes the discount off on the spot among them — is the lines alone, as before (review round 2, Б4)
   const { cashback } = held
-  return lines === null || cashback?.currency !== lines.currency ? lines : addMoney(lines, cashback)
+  return lines === null || printed !== null || cashback?.currency !== lines.currency
+    ? lines
+    : addMoney(lines, cashback)
 }
 
 /**
@@ -174,7 +190,7 @@ export async function recordReceipt(
   transact: Transact,
   actor: Actor & Today,
   id: string,
-  body: ReceiptRecordBody,
+  sent: ReceiptRecordBody,
   now: Date = new Date(),
 ): Promise<ReceiptRecorded> {
   return transact(async (repositories) => {
@@ -184,6 +200,7 @@ export async function recordReceipt(
     await trips.lockOwner(actor.id)
     const held = await receipts.lockForRecord(actor.id, id)
     if (held === null) throw new DomainError(ERROR.NOT_FOUND)
+    const body = echoed(held, sent)
     const answer = async (tripId: string): Promise<ReceiptRecorded> => {
       const found = await receipts.one(actor.id, held.id)
       if (found === null) throw new DomainError(ERROR.NOT_FOUND)
