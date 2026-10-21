@@ -23,11 +23,14 @@
     <!-- Without an identity there is nobody to advise; the notice above says why. -->
     <template v-else-if="phase !== 'idle'">
       <!-- At the top of the list and scrolled with it, never pinned: at a shelf a person starts
-           from the top of the screen (handoff `01`). Only over a list: with none — loading, a
-           failure, a newcomer — there is nothing to say about what is found (question 1). Above
-           the strip of the list's age, as the handoff draws it (review Р-16). -->
+           from the top of the screen (handoff `01`). Over a list, and with no connection and no list
+           remembered (Ф-14, С-1 of MOL-118): the cold offline is not empty, the field answers from
+           what the phone has — nothing, and says why. Not over a failure or a newcomer, whose search
+           could only answer «not rated yet» (question 1). One place in the template for both, so
+           the list that comes with the connection comes under the field being typed in, focus and
+           all. Above the strip of the list's age, as the handoff draws it (review Р-16). -->
       <AdviceSearch
-        v-if="phase === 'ready'"
+        v-if="phase === 'ready' || phase === 'offline'"
         v-model="query"
         :remembered="remembered"
         :fetched-at="fetchedAt"
@@ -58,9 +61,9 @@
       />
 
       <!-- No button: nothing is remembered yet, and the screen loads by itself when the
-           connection is back. -->
+           connection is back. Gives way to what the field found, as the list does. -->
       <ScreenState
-        v-else-if="phase === 'offline'"
+        v-else-if="phase === 'offline' && !searching"
         kind="offline"
         tone="warn"
         :title="t('advice.offline.title')"
@@ -125,10 +128,11 @@
     <template v-if="country" #docked>
       <CaptureButton :country="country" />
     </template>
-    <!-- Without (Д-3): the newcomer's one action, under the thumb (MOL-128, В-5). Kept while a
-         sheet of its own is up: an answer with rows arriving under «Где вы?» took the strip and
-         the sheet with it (review Р-15). -->
-    <template v-else-if="phase === 'empty' || entering" #docked>
+    <!-- Without (Д-3): the newcomer's one action, under the thumb (MOL-128, В-5), and the cold
+         offline's — purchases are recorded with no connection, whoever this is (Ф-14, 1l-0). Kept
+         while a sheet of its own is up: an answer with rows arriving under «Где вы?» took the strip
+         and the sheet with it (review Р-15). -->
+    <template v-else-if="phase === 'empty' || phase === 'offline' || entering" #docked>
       <ManualEntryButton @busy="entering = $event" />
     </template>
 

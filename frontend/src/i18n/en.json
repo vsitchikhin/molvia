@@ -416,12 +416,12 @@
     },
     "error": {
       "title": "The server did not answer",
-      "body": "Verdicts are worked out on the server, there is no local copy",
+      "body": "The list didn’t load. Try again",
       "body_capture": "The list didn’t load. You can still photograph a receipt"
     },
     "offline": {
       "title": "The list will show up once you are online",
-      "body": "Verdicts are worked out on the server — we will show the list the moment you are back",
+      "body": "We’ll show the list as soon as you’re back online. You can record purchases now",
       "body_capture": "We’ll show the list as soon as you’re back online. You can photograph a receipt now"
     },
     "city_reloading": "City changed to {city} — reloading the list",

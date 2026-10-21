@@ -149,6 +149,82 @@ describe('AdviceView', () => {
       expect(newcomer.view.text()).not.toContain(en.purchases.capture)
     })
 
+    // 1k-0: the strip has nothing to do without a list, so it is the error's — the one «Try again»
+    // of the screen (Ф-15), and the words are a person's, not a developer's (Ф-19).
+    it('no answer and nothing remembered: one «Try again», in the strip', async () => {
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+
+      expect(view.text()).toContain(en.advice.error.body)
+      expect(retries()).toHaveLength(1)
+      expect(view.get('.dock').text()).toContain(en.state.retry)
+      expect(view.find('input[type="search"]').exists()).toBe(false)
+    })
+
+    // 1l-0: the cold offline is not empty (Ф-14) — the field, the cloud, and purchases recorded
+    // from the strip, since a purchase needs no list.
+    it('offline with nothing remembered: the field, the cloud, and «Record purchases» below', async () => {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+
+      expect(view.find('input[type="search"]').exists()).toBe(true)
+      const state = view.getComponent({ name: 'ScreenState' })
+      expect(state.props('kind')).toBe('offline')
+      expect(state.props('tone')).toBe('warn')
+      expect(state.props('body')).toBe(en.advice.offline.body)
+      expect(view.get('.dock').text()).toContain(en.purchases.manual)
+      expect(strips(view)).toEqual([])
+      expect(retries()).toHaveLength(0)
+    })
+
+    // С-1: nothing on the phone to search, and the answer says so and why — in place of the cloud,
+    // as the list gives way to what is found; the server is not asked.
+    it('offline with nothing remembered: a query is answered «offline», and the cloud gives way', async () => {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+
+      await view.get('input[type="search"]').setValue('молоко')
+      await flushPromises()
+
+      expect(adviceSearch).not.toHaveBeenCalled()
+      const states = view.findAllComponents({ name: 'ScreenState' })
+      expect(states).toHaveLength(1)
+      expect(states[0]?.props('kind')).toBe('empty')
+      expect(states[0]?.props('body')).toBe(en.advice.search.empty.body_offline)
+      expect(view.get('.dock').text()).toContain(en.purchases.manual)
+
+      // Cleared, the cloud is back.
+      await view.get('.clear').trigger('click')
+      await flushPromises()
+      expect(view.getComponent({ name: 'ScreenState' }).props('kind')).toBe('offline')
+    })
+
+    // The connection back: the list comes under the very field being typed in.
+    it('the connection back brings the list under the same field, the text kept', async () => {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+      const field = view.get<HTMLInputElement>('input[type="search"]')
+      await field.setValue('мол')
+      await flushPromises()
+
+      online(true)
+      const georgia = { geography: { country: 'GE', city: 'Гюмри' } }
+      advice.mockResolvedValue(answer([milk], georgia))
+      adviceSearch.mockResolvedValue({ ...georgia, scope: 'own', near: true, items: [] })
+      window.dispatchEvent(new Event('online'))
+      await flushPromises()
+
+      expect(view.get('input[type="search"]').element).toBe(field.element)
+      expect(field.element.value).toBe('мол')
+      await field.setValue('')
+      await flushPromises()
+      expect(view.text()).toContain(milk.name)
+      expect(view.find('.dock').exists()).toBe(false)
+    })
+
     // A failure under «Где вы?» opened from the strip: the error is a section's while the sheet is
     // up, so the strip — and the sheet and what was typed in it — stays (MOL-180, adversarial А1,
     // as Р-15 of MOL-128). Taken by the error, the sheet went, and `entering` stuck.
