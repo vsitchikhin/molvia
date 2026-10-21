@@ -1028,14 +1028,23 @@ that the swaps read whole too** (a bun copied 96 / 96 for 95 / 95) is a second w
 it moved is a doubt, and the one choice must meet it with every such line as copied; past `REPAIR_SHIFTS_MAX` (4 096)
 ways of moving them nothing is put right. **And never between two sums** (review round 3, owner's Г1 «а»): where the
 fewest swaps give sums more than the till's rounding apart — «160» at 150, or «622 / 6.22» at 516,78 read back or with
-its sum swapped — the line is a doubt; the total confirms a line's one sum and chooses only a luma. Two readings equally
-cheap let the cottage cheese's 615,78 pay for am-34 again, Б2 dodged by one more error of the model. **The price,
-named:** such a line stays empty as before MOL-290, copied right beside it or not — lines put right on the brute force
-187 801 → 186 157 (−0,9 %), none wrong, the bench as before. The shifts cost lines put right on the brute force 188 086
-→ 187 801 (−0,15 %), none wrong; on the class code's tills each neighbour that reads whole both ways costs some 0,5 %
-more (440 of 84 056 beside 1 × 560); on the card's, two neighbours at 1 % whose sum ends in a 5 or 6 read a luma off
-within the till's rounding, and the reviewer's synthetic (review round 3, №8) puts right 112 878 → 101 421 of 124 932
-(−10 %), the discounts a luma off 9 919 → 6 675 among them; the bench as before.
+its sum swapped — the line is a doubt; the total confirms a line's one sum and chooses only a luma — of the sum alone,
+at the fewest swaps' quantity and price (review round 4, Г3: 0,51 × 665 = 339,15 read as 0,61 × 556 = 339,16 beside a
+line a luma short); the same sum split another way stays, a doubt. A line read whole is moved by every sum its fewest
+swaps give, apart or not (№9): Г1 held to it lost «505.56»'s luma, and «205.05 / 205.06» beside it was put right at
+205,05. Two readings equally cheap let the cottage cheese's 615,78 pay for am-34 again, Б2 dodged by one more error of
+the model. **The price, named:** such a line stays empty as before MOL-290, copied right beside it or not — lines put
+right on the brute force 187 801 → 186 157 (−0,9 %), none wrong, the bench as before. The shifts cost lines put right on
+the brute force 188 086 → 187 801 (−0,15 %), none wrong; on the class code's tills each neighbour that reads whole both
+ways costs some 0,5 % more (440 of 84 056 beside 1 × 560); on the card's, two neighbours at 1 % whose sum ends in a 5 or
+6 read a luma off within the till's rounding, and the reviewer's synthetic (review round 3, №8) puts right 112 878 → 101
+421 of 124 932 (−10 %), the discounts a luma off 9 919 → 6 675 among them; the bench as before. **The price, named**
+(review round 4, owner's Г2 «а»): a line the model misread twice where one swap explains it too — 0,6 kg × 1 050 = 630
+copied «0.5 / 1060 / 630», read as 0,5 × 1 060 = 530 — has its one cheap sum wrong, and a neighbour bent by just that
+much the other way, no 5 or 6 to swap (a bun 380 copied 480), meets the total with it: the receipt «proven whole», two
+lines made up, the repaired one under «проверьте». It is the edge the check by the sum has on master — two lines misread
+by +d and −d — met by one more pair; the reviewer's search puts 327 copies of round 1's space a total away from such a
+repair, every one of two errors in its line and wanting a neighbour off by exactly the difference.
 
 **It is taken only with the whole receipt** (owner's В-1 «а»): every line as copied or put right, and their sum
 exactly the total two places vouch for, less what went to the card — a second source a misread line cannot fake. Short
