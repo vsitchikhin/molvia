@@ -373,11 +373,20 @@ there over a list **and in the cold offline** — no connection and nothing reme
 why, «Без связи ищем только среди оценённого», in place of the cloud; it is the same field as over the
 list, so the list the connection brings comes under the one being typed in. A failure and the
 newcomer have none (the newcomer's search could only ever answer «not rated yet», and would teach
-that it is useless); loading draws its well in the skeleton. **One strip of the connection stands
+that it is useless) — **unless something is typed in it** (owner's В-3 «а» on adversarial А1): the
+connection back with a failure or an empty list took the field from under the thumb with what it held
+and left the focus on `<body>`; it stays, answered by the server's search, and goes once cleared, the
+focus given to the heading. The price, named: a newcomer who typed in the cold offline is searched for
+on this one path. Loading draws the well where the field will stand, and **the line under the title is
+held in every state** (В-2 «а», review № 1): whose figures these are is the answer's to say, so it is
+a bar while the answer is on its way and empty with none — read only once the answer came, it moved
+the field a line down under the thumb. **One strip of the connection stands
 under the field** (`StatusStrip`, MOL-201): the search's while something is typed, else the list's —
 offline, another city's list offline, «Сервер не ответил» with its «Повторить», and «Обновляем» only
-once the answer is late (`STRIP_LATE_MS`, owner's В-1 «а»); with no field — the newcomer from memory,
-the skeleton after a change of city — under the header.
+once the answer is late (`STRIP_LATE_MS`, owner's В-1 «а») — timed by what is waited for, so a city
+moved after a refresh already late waits its own second (adversarial А2); under the well of the
+skeleton after a change of city, «Обновляем · список для Гюмри»; with no field — the newcomer from
+memory — under the header.
 
 - **The answer for what is found is the server's, never glued on the phone** (`GET /advice/search`,
   В-1). The list is cut at `ADVICE_LIMIT`, so an item rated past the cut would read «ещё не
