@@ -376,7 +376,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   review Р1-3: a scanner of 44 in a pill of 44 would lie over the edge), a magnifier of 20, at the right the screen's action —
   the scanner — **or** «Очистить» while there is text and the field is not read-only, never both, the
   focus of a kit field and a hint of 13 (adversarial А2: read-only kept the keys out and let the button
-  empty the field). **In an open dialog the field gives Esc to the dialog**: Chromium takes a search
+  empty the field). **The pill is the field**: a press on its magnifier, its gap or its padding — some
+  64 px beside the input at 390 — keeps the focus and gives it to the input; the input and a button in
+  the well keep their own press (MOL-201, adversarial Г1: the focus went to `<body>`, and «Что брать»'s
+  field held by its focus went with it as it was touched). **In an open dialog the field gives Esc to the dialog**: Chromium takes a search
   field's Esc for itself — it clears the text, and the dialog never hears `cancel` — so «Выбрать товар»
   lost the receipt's words and stayed open (adversarial А3); the field prevents that Esc and makes the
   close request the platform would have: a `cancel` the dialog may prevent — a sheet does, and closes
@@ -608,10 +611,15 @@ The detail behind the frontend lines of `CLAUDE.md`.
   chooses the answer (the month, the search field — never above it, the rule below) or first in a
   sheet; **in the screen's words, whole**, the time inside them — where «на 14:05» stands in the
   sentence is the screen's and the language's, and a prop of time would have the kit glue a sentence
-  of pieces; where a memory keeps no time, the key has none. **Two kinds, and the kit draws the
+  of pieces; where a memory keeps no time, the key has none. **Three kinds, and the kit draws the
   glyph:** `offline`, the cloud; `unanswered` — the server did not answer and the last answer is shown
   — the circle of frame 6h (owner's В-1 «а»): the form says «the server's error», the yellow says
-  «what is shown still holds»; never red. The kind is required — offline or error is the screen's,
+  «what is shown still holds»; never red. **`refreshing`, `sync`** (MOL-201, owner's В-1 «а»): an
+  answer kept on the phone stands while the next is on its way — «Что брать» shows yesterday's list at
+  once and asks — and neither of the two was true of it: the connection is there and the server has
+  not failed. **It is put up only once the answer is late** (`STRIP_LATE_MS`, a second): a quick one
+  replaces what is shown in silence, where a strip at once flashed for a fifth of a second under the
+  field and said «обновляем» into the region at every opening. No button: the request is in the air. The kind is required — offline or error is the screen's,
   decided after the failure. **«Повторить» only in `unanswered`'s `#action`** (К-5), a ghost, and only
   where the screen's strip does not hold one: without a connection there is nothing to try, so an
   offline strip draws no slot whatever it is given; the button takes the strip's padding, and the
@@ -657,7 +665,12 @@ The detail behind the frontend lines of `CLAUDE.md`.
   screen's scope too, and a scoped `.caption` of «Бюджет» set its size on the caption's bar
   (adversarial А3) — a class of a root is never a word a screen uses for its own, and `SkeletonPart.test`
   holds it against the styles of every component (adversarial Б1: «Настройки» drew their fields as
-  `.skeleton-field`, now `ghost-*`). **A root is an element of the part's own, never `AppCard`**: the card
+  `.skeleton-field`, now `ghost-*`). **A screen's head stands over the frame, not in it** (MOL-201,
+  review № 9): the well of a field whose strip of the connection goes under it — «Что брать», «город
+  сменился» while the list is late — is a part put above `ScreenSkeleton`, in the field's own head
+  (gap 8, 24 under it), since inside the frame the strip would be hidden from a screen reader with the
+  bars; the line under the title is held by a bar of `skeleton-bar` in the subtitle. e2e holds the
+  well's top to the field's. **A root is an element of the part's own, never `AppCard`**: the card
   carried `card`, `plain` and `list` on the root too, and a `.card` of «Графики» gave the rows a padding of
   16 and the paragraphs a gap of 4 (adversarial В1); the scope goes down to the root alone, so a card one
   level in is the part's, and the test holds that every class of a root is `skeleton-*`. **A bar is `@include skeleton-bar`** — `border-strong` at

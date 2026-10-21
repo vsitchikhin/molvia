@@ -3,6 +3,7 @@ import { defineComponent, h, nextTick, ref, watch } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import IconUnanswered from '~icons/mdi/alert-circle-outline'
 import IconOffline from '~icons/mdi/cloud-off-outline'
+import IconRefreshing from '~icons/mdi/sync'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
 
@@ -16,10 +17,11 @@ describe('StatusStrip', () => {
   })
 
   // The cloud says «no connection»; the server not answering is another thing, and its glyph is
-  // the frame's 6h (owner's В-1 «а»).
+  // the frame's 6h (owner's В-1 «а»); an answer late is neither (MOL-201, В-1 «а»).
   it.each([
     ['offline', IconOffline],
     ['unanswered', IconUnanswered],
+    ['refreshing', IconRefreshing],
   ] as const)('draws %s with its own glyph', (kind, icon) => {
     const view = mount(StatusStrip, { props: { kind, text: 'Words' } })
     expect(view.classes()).toContain(kind)
@@ -45,6 +47,15 @@ describe('StatusStrip', () => {
       })
       expect(view.find('.action').exists()).toBe(false)
       expect(view.find('button').exists()).toBe(false)
+    })
+
+    // Its request is in the air already: there is nothing to try again.
+    it('is never drawn while refreshing', () => {
+      const view = mount(StatusStrip, {
+        props: { kind: 'refreshing', text: 'Обновляем' },
+        slots: action,
+      })
+      expect(view.find('.action').exists()).toBe(false)
     })
 
     it('leaves no empty place when none is given', () => {

@@ -40,6 +40,8 @@ export interface Advice {
   readonly cityReloading: ComputedRef<string | null>
   readonly otherCity: ComputedRef<{ oldCity: string; city: string } | null>
   readonly fetchedAt: ComputedRef<Date | null>
+  /** How many answers have failed: a retry that failed the same way is said again (MOL-181, C1). */
+  readonly attempt: ComputedRef<number>
   /** The answer on screen, remembered or fresh: the search reads it with no connection (MOL-128). */
   readonly answer: ComputedRef<AdviceResponse | null>
   retry(): Promise<void>
@@ -131,6 +133,7 @@ export function useAdvice(): Advice {
   const owner = ref<string | null>(null)
   const remembered = ref<Remembered | null>(null)
   const failure = ref<'offline' | 'error' | null>(null)
+  const failures = ref(0)
   /** Whether what is shown came from an answer of this session, rather than from the phone. */
   const confirmed = ref(false)
 
@@ -219,6 +222,7 @@ export function useAdvice(): Advice {
       // connection lost while the answer was on its way is the commonest break at a shelf,
       // and it is not the server's fault and never red.
       failure.value = navigator.onLine ? 'error' : 'offline'
+      failures.value += 1
       if (!navigator.onLine && !remembered.value) remembered.value = recall(`${KEY}.${id}`)
     }
   }
@@ -294,6 +298,7 @@ export function useAdvice(): Advice {
         : null,
     ),
     fetchedAt: computed(() => remembered.value?.fetchedAt ?? null),
+    attempt: computed(() => failures.value),
     answer: computed(() => remembered.value?.answer ?? null),
     retry: load,
   }

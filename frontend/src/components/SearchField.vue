@@ -1,6 +1,7 @@
 <template>
   <div class="search-field" v-bind="rootAttrs()">
-    <div class="well" :class="{ trailed }">
+    <!-- The pill is the field: a press on its magnifier or its edge is a press on the input. -->
+    <div class="well" :class="{ trailed }" @mousedown="hold">
       <IconMagnify class="glyph" aria-hidden="true" />
       <input
         ref="input"
@@ -149,6 +150,16 @@ export default defineComponent({
         if (!dialog?.open || closedBy(dialog) === 'none' || popoverOpen()) return
         event.preventDefault()
         if (dialog.dispatchEvent(new Event('cancel', { cancelable: true }))) dialog.close()
+      },
+      // The pill is drawn as the field and is some 64 px wider than its input — the magnifier, the
+      // gap, the padding: pressed there, the focus went to <body>, and a field held by its focus on
+      // «Что брать» went with the keyboard as the person touched it (MOL-201, adversarial Г1). So the
+      // press keeps the focus and gives it to the input; the input itself and a button in the well —
+      // «Очистить», the scanner — keep their own.
+      hold: (event: MouseEvent) => {
+        if (!(event.target instanceof Element) || event.target.closest('input, button, a')) return
+        event.preventDefault()
+        focus()
       },
       type: (event: Event) => {
         emit('update:modelValue', (event.target as HTMLInputElement).value)

@@ -1,6 +1,7 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { nextTick } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
@@ -13,6 +14,8 @@ import type {
 } from '@molvia/model'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
+import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
+import IconMagnify from '~icons/mdi/magnify'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
@@ -95,6 +98,21 @@ const broke = () => new ApiError(ERROR.INTERNAL, 'HTTP 502')
 
 const mounted: VueWrapper[] = []
 
+/** The strips of the connection on the screen, by kind and words: one a screen (MOL-181). */
+function strips(view: VueWrapper): { kind: string; text: string }[] {
+  return view.findAllComponents(StatusStrip).map((strip) => ({
+    kind: strip.props('kind') as string,
+    text: strip.props('text') as string,
+  }))
+}
+
+/** Every «Try again» on the screen, wherever it stands — the strip of the screen included. */
+function retries(): Element[] {
+  return [...document.body.querySelectorAll('button')].filter(
+    (button) => button.textContent.trim() === en.state.retry,
+  )
+}
+
 async function render({ identity = true, country = 'AM' } = {}) {
   localStorage.setItem('molvia.actor', ME)
   localStorage.setItem(
@@ -130,6 +148,270 @@ describe('AdviceView', () => {
       expect(newcomer.view.text()).toContain(en.advice.home.new.title)
       expect(newcomer.view.get('.dock').text()).toContain(en.purchases.manual)
       expect(newcomer.view.text()).not.toContain(en.purchases.capture)
+    })
+
+    // 1k-0: the strip has nothing to do without a list, so it is the error's — the one «Try again»
+    // of the screen (Ф-15), and the words are a person's, not a developer's (Ф-19).
+    it('no answer and nothing remembered: one «Try again», in the strip', async () => {
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+
+      expect(view.text()).toContain(en.advice.error.body)
+      expect(retries()).toHaveLength(1)
+      expect(view.get('.dock').text()).toContain(en.state.retry)
+      expect(view.find('input[type="search"]').exists()).toBe(false)
+    })
+
+    // 1l-0: the cold offline is not empty (Ф-14) — the field, the cloud, and purchases recorded
+    // from the strip, since a purchase needs no list.
+    it('offline with nothing remembered: the field, the cloud, and «Record purchases» below', async () => {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+
+      expect(view.find('input[type="search"]').exists()).toBe(true)
+      const state = view.getComponent({ name: 'ScreenState' })
+      expect(state.props('kind')).toBe('offline')
+      expect(state.props('tone')).toBe('warn')
+      expect(state.props('body')).toBe(en.advice.offline.body)
+      expect(view.get('.dock').text()).toContain(en.purchases.manual)
+      expect(strips(view)).toEqual([])
+      expect(retries()).toHaveLength(0)
+    })
+
+    // С-1: nothing on the phone to search, and the answer says so and why — in place of the cloud,
+    // as the list gives way to what is found; the server is not asked.
+    it('offline with nothing remembered: a query is answered «offline», and the cloud gives way', async () => {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+
+      await view.get('input[type="search"]').setValue('молоко')
+      await flushPromises()
+
+      expect(adviceSearch).not.toHaveBeenCalled()
+      const states = view.findAllComponents({ name: 'ScreenState' })
+      expect(states).toHaveLength(1)
+      expect(states[0]?.props('kind')).toBe('empty')
+      expect(states[0]?.props('body')).toBe(en.advice.search.empty.body_offline)
+      expect(view.get('.dock').text()).toContain(en.purchases.manual)
+
+      // Cleared, the cloud is back.
+      await view.get('.clear').trigger('click')
+      await flushPromises()
+      expect(view.getComponent({ name: 'ScreenState' }).props('kind')).toBe('offline')
+    })
+
+    // The connection back without a list — the server failed, or nothing is rated yet: the field
+    // being typed in stays under the thumb with what it holds, and answers from the server; cleared,
+    // it goes and the focus is given to the heading (owner's В-3 «а» on adversarial А1).
+    for (const [kind, reply] of [
+      ['fails', () => advice.mockRejectedValue(broke())],
+      [
+        'is empty',
+        () => advice.mockResolvedValue(answer([], { geography: { country: 'GE', city: 'Гюмри' } })),
+      ],
+    ] as const) {
+      it(`В-3: back online, the list ${kind} — the field typed in stays, cleared it goes`, async () => {
+        online(false)
+        advice.mockRejectedValue(broke())
+        const { view } = await render({ country: 'GE' })
+        const field = view.get<HTMLInputElement>('input[type="search"]')
+        field.element.focus()
+        await field.setValue('молоко')
+        await flushPromises()
+
+        online(true)
+        reply()
+        adviceSearch.mockResolvedValue({
+          geography: { country: 'GE', city: 'Гюмри' },
+          scope: 'own',
+          near: true,
+          items: [{ itemId: milk.itemId, name: milk.name, advice: null }],
+        })
+        window.dispatchEvent(new Event('online'))
+        await flushPromises()
+        await vi.waitFor(() => {
+          expect(adviceSearch).toHaveBeenCalledWith('молоко')
+        })
+        await flushPromises()
+
+        expect(view.get('input[type="search"]').element).toBe(field.element)
+        expect(field.element.value).toBe('молоко')
+        expect(document.activeElement).toBe(field.element)
+        expect(view.text()).toContain(milk.name)
+        // What the list's answer put up waits for the field to be cleared.
+        expect(view.text()).not.toContain(en.advice.error.title)
+        expect(view.text()).not.toContain(en.advice.home.new.title)
+
+        // Erased to nothing to type another word: the field stays, with the focus (В-4 «а», Б2).
+        for (const text of ['мо', 'м', '']) await field.setValue(text)
+        await flushPromises()
+        expect(view.get('input[type="search"]').element).toBe(field.element)
+        expect(document.activeElement).toBe(field.element)
+        await field.setValue('сыр')
+        await flushPromises()
+        expect(field.element.value).toBe('сыр')
+
+        // «Очистить» gives the focus back to the field (Р-12), so it stays too.
+        await view.get('.clear').trigger('click')
+        await flushPromises()
+        expect(view.get('input[type="search"]').element).toBe(field.element)
+
+        // Left empty, it goes; the focus is where the person put it, never pulled to the heading.
+        field.element.blur()
+        await flushPromises()
+        expect(view.find('input[type="search"]').exists()).toBe(false)
+        expect(view.text()).toContain(
+          kind === 'fails' ? en.advice.error.title : en.advice.home.new.title,
+        )
+        expect(document.activeElement?.tagName).not.toBe('H1')
+      })
+    }
+
+    // Nobody touched the field: the connection back without a list takes it, and the focus stays
+    // where it was — <body> on a phone nobody touched is no focus to give away (Б1, review № 8).
+    it('must not fire: the field nobody touched goes, the focus is not pulled to the heading', async () => {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+      expect(document.activeElement).toBe(document.body)
+
+      online(true)
+      window.dispatchEvent(new Event('online'))
+      await flushPromises()
+
+      expect(view.find('input[type="search"]').exists()).toBe(false)
+      expect(view.text()).toContain(en.advice.error.title)
+      expect(document.activeElement).toBe(document.body)
+    })
+
+    /** The cold offline, «мол» typed, the connection back with the list failed, the text erased. */
+    async function heldEmpty() {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const rendered = await render({ country: 'GE' })
+      const field = rendered.view.get<HTMLInputElement>('input[type="search"]')
+      field.element.focus()
+      await field.setValue('мол')
+      await flushPromises()
+      online(true)
+      adviceSearch.mockResolvedValue({
+        geography: { country: 'GE', city: 'Гюмри' },
+        scope: 'own',
+        near: true,
+        items: [],
+      })
+      window.dispatchEvent(new Event('online'))
+      await flushPromises()
+      await field.setValue('')
+      await flushPromises()
+      expect(document.activeElement).toBe(field.element)
+      return { ...rendered, field }
+    }
+
+    // A press under the field takes the focus as it lands; the field goes once the press is over,
+    // or what was pressed rose from under the finger before the release (owner's В-5 «а», В1).
+    it('В-5: the focus taken by a press — the empty field goes only after the release', async () => {
+      const { view, field } = await heldEmpty()
+
+      document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+      field.element.blur()
+      await flushPromises()
+      expect(view.find('input[type="search"]').exists()).toBe(true)
+
+      // Still there until the task after the release, where its click is dispatched — `flushPromises`
+      // waits a task itself, so the render is awaited without one.
+      document.body.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+      await nextTick()
+      expect(view.find('input[type="search"]').exists()).toBe(true)
+      await new Promise((resolve) => setTimeout(resolve))
+      await flushPromises()
+      expect(view.find('input[type="search"]').exists()).toBe(false)
+      expect(view.text()).toContain(en.advice.error.title)
+      expect(document.activeElement?.tagName).not.toBe('H1')
+    })
+
+    // «Очистить» pressed takes the focus for a moment and gives it back: the press is no leaving.
+    it('must not fire: a press on «Clear» keeps the empty field', async () => {
+      const { view, field } = await heldEmpty()
+      await field.setValue('сыр')
+      await flushPromises()
+
+      const clear = view.get('.clear')
+      clear.element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+      ;(clear.element as HTMLButtonElement).focus()
+      await clear.trigger('click')
+      clear.element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+      await new Promise((resolve) => setTimeout(resolve))
+      await flushPromises()
+
+      expect(view.get('input[type="search"]').element).toBe(field.element)
+      expect(document.activeElement).toBe(field.element)
+    })
+
+    // Gone to another app to copy a name: the page lost the system's focus, not the person the field.
+    it('must not fire: the page losing the system`s focus keeps the empty field', async () => {
+      const { view, field } = await heldEmpty()
+      const away = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+
+      field.element.blur()
+      await flushPromises()
+      away.mockRestore()
+
+      expect(view.get('input[type="search"]').element).toBe(field.element)
+    })
+
+    // The strip of a list remembered empty — another window kept it — stands under the field the
+    // focus holds over the newcomer, never above it as well (adversarial В2).
+    it('В2: over the newcomer with the field held, one strip, under the field', async () => {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+      const field = view.get<HTMLInputElement>('input[type="search"]')
+      field.element.focus()
+      await flushPromises()
+
+      // Another window kept an empty list meanwhile; this one, back in view, cannot ask.
+      localStorage.setItem(
+        `molvia.advice.${ME}`,
+        JSON.stringify({
+          answer: answer([], { geography: { country: 'GE', city: 'Гюмри' } }),
+          fetchedAt: new Date('2026-10-21T09:00:00Z').toISOString(),
+        }),
+      )
+      document.dispatchEvent(new Event('visibilitychange'))
+      await flushPromises()
+
+      expect(view.text()).toContain(en.advice.home.new.title)
+      expect(view.get('input[type="search"]').element).toBe(field.element)
+      expect(strips(view)).toHaveLength(1)
+      const under = view.get('.strip').element.closest('.head')
+      expect(under?.contains(field.element)).toBe(true)
+    })
+
+    // The connection back: the list comes under the very field being typed in.
+    it('the connection back brings the list under the same field, the text kept', async () => {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+      const field = view.get<HTMLInputElement>('input[type="search"]')
+      await field.setValue('мол')
+      await flushPromises()
+
+      online(true)
+      const georgia = { geography: { country: 'GE', city: 'Гюмри' } }
+      advice.mockResolvedValue(answer([milk], georgia))
+      adviceSearch.mockResolvedValue({ ...georgia, scope: 'own', near: true, items: [] })
+      window.dispatchEvent(new Event('online'))
+      await flushPromises()
+
+      expect(view.get('input[type="search"]').element).toBe(field.element)
+      expect(field.element.value).toBe('мол')
+      await field.setValue('')
+      await flushPromises()
+      expect(view.text()).toContain(milk.name)
+      expect(view.find('.dock').exists()).toBe(false)
     })
 
     // A failure under «Где вы?» opened from the strip: the error is a section's while the sheet is
@@ -212,11 +494,38 @@ describe('AdviceView', () => {
     for (const view of mounted.splice(0)) view.unmount()
   })
 
-  it('draws the skeleton while the answer is on its way', async () => {
+  // The answer's shape, with the field's well where the field will stand (Ф-13, 1j).
+  it('draws the skeleton while the answer is on its way, the field`s well first', async () => {
     advice.mockReturnValue(new Promise(() => undefined))
     const { view } = await render()
 
     expect(view.find('.skeleton').exists()).toBe(true)
+    // The well where the field will stand, above the frame (review № 2).
+    const head = view.get('.ghost-head').element
+    expect(head.firstElementChild?.classList).toContain('skeleton-field')
+    expect(head.nextElementSibling?.classList).toContain('skeleton')
+    expect(view.findAll('.skeleton .ghost-take')).toHaveLength(1)
+    expect(view.findAll('.skeleton .skeleton-caption')).toHaveLength(3)
+    // The subtitle's line is held, as a bar (owner's В-2 «а»).
+    expect(view.find('.subtitle .subtitle-bar').exists()).toBe(true)
+  })
+
+  // The line under the title stands in every state, so the field under it never moves (В-2 «а»): a
+  // bar while the answer is on its way, empty with none, the words once they are known.
+  it('В-2: the subtitle`s line stands in every state, words only with the answer', async () => {
+    online(false)
+    advice.mockRejectedValue(broke())
+    const cold = await render({ country: 'GE' })
+    expect(cold.view.find('.subtitle .subtitle-hold').exists()).toBe(true)
+    expect(cold.view.find('.subtitle-bar').exists()).toBe(false)
+
+    online(true)
+    const failed = await render({ country: 'GE' })
+    expect(failed.view.find('.subtitle .subtitle-hold').exists()).toBe(true)
+
+    advice.mockResolvedValue(answer([milk]))
+    const ready = await render()
+    expect(ready.view.get('.subtitle').text()).toBe(en.advice.own_data_only)
   })
 
   it('three groups, each in its own shape, in the order the answer arrived', async () => {
@@ -362,9 +671,13 @@ describe('AdviceView', () => {
     const { view } = await render()
 
     expect(view.text()).toContain(milk.name)
-    expect(view.text()).toContain('The list as of today at')
+    // One strip, the cloud, under the field — never red (Ф-14).
+    expect(strips(view)).toEqual([
+      { kind: 'offline', text: expect.stringContaining('Offline · the list as of today,') },
+    ])
+    expect(view.find('.head .strip').exists()).toBe(true)
     // The connection will come back by itself, so the strip offers nothing to press.
-    expect(view.findAll('button').map((button) => button.text())).not.toContain(en.state.retry)
+    expect(retries()).toHaveLength(0)
   })
 
   it('the server broke with a list remembered: the strip offers the retry the screen cannot make', async () => {
@@ -374,9 +687,21 @@ describe('AdviceView', () => {
     advice.mockRejectedValue(broke())
     const { view } = await render()
 
-    expect(view.text()).toContain('the server did not answer')
-    const retry = view.findAll('button').find((button) => button.text() === en.state.retry)
-    expect(retry).toBeDefined()
+    expect(strips(view)).toEqual([
+      {
+        kind: 'unanswered',
+        text: expect.stringContaining('The server did not answer — the list as of today,'),
+      },
+    ])
+    // One «Try again» on the screen, in the strip: the docked strip holds the camera (Ф-15).
+    expect(retries()).toHaveLength(1)
+    expect(view.get('.strip .action').text()).toBe(en.state.retry)
+
+    // A retry that failed the same way is an answer still: the strip says it again (C1).
+    const before = view.findComponent(StatusStrip).props('attempt') as number
+    await view.get('.strip .action button').trigger('click')
+    await flushPromises()
+    expect(view.findComponent(StatusStrip).props('attempt')).toBe(before + 1)
   })
 
   it('a tap on a row opens the sheet on that row, and a save asks the server again', async () => {
@@ -434,18 +759,54 @@ describe('AdviceView', () => {
     expect(view.findComponent({ name: 'VerdictEditSheet' }).props('mine')).toBe(false)
   })
 
-  it('А4: the age of a remembered list is on the screen while the answer is still coming', async () => {
+  it('А4: the age of a remembered list is on the screen once the answer is late', async () => {
     advice.mockResolvedValue(answer([milk]))
     await render()
 
-    advice.mockReturnValue(new Promise<AdviceResponse>(() => undefined))
-    const { view } = await render()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      advice.mockReturnValue(new Promise<AdviceResponse>(() => undefined))
+      const { view } = await render()
 
-    expect(view.text()).toContain(milk.name)
-    expect(view.find('.stale').exists()).toBe(true)
-    expect(view.text()).toContain('The list as of today at')
-    // Nothing to press: the request it is waiting for is already in the air.
-    expect(view.findAll('button').map((button) => button.text())).not.toContain(en.state.retry)
+      // A quick answer would replace the list in silence: nothing flashes under the field (В-1 «а»).
+      expect(view.text()).toContain(milk.name)
+      expect(strips(view)).toEqual([])
+
+      vi.advanceTimersByTime(STRIP_LATE_MS - 1)
+      await nextTick()
+      expect(strips(view)).toEqual([])
+
+      vi.advanceTimersByTime(1)
+      await nextTick()
+      expect(strips(view)).toEqual([
+        { kind: 'refreshing', text: expect.stringContaining('Refreshing · the list as of today,') },
+      ])
+      // Nothing to press: the request it is waiting for is already in the air.
+      expect(retries()).toHaveLength(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('must not fire: an answer in time puts no strip up at all', async () => {
+    advice.mockResolvedValue(answer([milk]))
+    await render()
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      let answered: (value: AdviceResponse) => void = () => undefined
+      advice.mockReturnValue(new Promise<AdviceResponse>((resolve) => (answered = resolve)))
+      const { view } = await render()
+
+      vi.advanceTimersByTime(STRIP_LATE_MS - 1)
+      answered(answer([milk]))
+      await flushPromises()
+      vi.advanceTimersByTime(STRIP_LATE_MS)
+      await nextTick()
+      expect(strips(view)).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('С-4: an empty list from the phone is dated too', async () => {
@@ -457,7 +818,10 @@ describe('AdviceView', () => {
     const { view } = await render()
 
     expect(view.text()).toContain(en.advice.home.new_capture.title)
-    expect(view.text()).toContain('The list as of today at')
+    // No field over the newcomer: the strip stands under the header.
+    expect(strips(view)).toEqual([
+      { kind: 'offline', text: expect.stringContaining('Offline · the list as of today,') },
+    ])
   })
 
   it('without an identity the screen asks for nothing and shows no failure of its own', async () => {
@@ -533,7 +897,13 @@ describe('AdviceView', () => {
         expect(view.text()).toContain(en.advice.search.rate)
       })
 
-      await view.get('.unrated-row').trigger('click')
+      // A row of the kit, its name the title and nothing under it: the caption says «not rated» (С-9).
+      const row = view.getComponent({ name: 'ListRow' })
+      expect(row.props('title')).toBe(plait.name)
+      expect(row.props('meta')).toBe('')
+      expect(row.props('next')).toBe(false)
+      expect(row.text()).not.toContain(en.advice.search.group_unrated)
+      await row.trigger('click')
       await flushPromises()
       const sheet = view.findComponent({ name: 'VerdictEditSheet' })
       expect(sheet.props('itemId')).toBe(plait.itemId)
@@ -559,6 +929,7 @@ describe('AdviceView', () => {
         expect(view.text()).toContain('No «кускус» found')
       })
       expect(view.get('.state').classes()).toContain('quiet')
+      expect(view.getComponent({ name: 'ScreenState' }).props('icon')).toBe(IconMagnify)
       expect(view.get('.state').find('button').exists()).toBe(false)
     })
 
@@ -587,8 +958,27 @@ describe('AdviceView', () => {
       expect(adviceSearch).not.toHaveBeenCalled()
       expect(view.findAllComponents({ name: 'AdviceCheapRow' })).toHaveLength(1)
       expect(view.text()).not.toContain(milk.name)
-      expect(view.text()).toContain('Without a connection we search only the list as of')
+      expect(strips(view)).toEqual([
+        {
+          kind: 'offline',
+          text: expect.stringContaining('Offline · searching only the list as of'),
+        },
+      ])
       expect(view.text()).toContain(en.advice.search.offline_more)
+    })
+
+    it('waiting for its first answer: the groups` shape, no second well', async () => {
+      advice.mockResolvedValue(answer([milk]))
+      adviceSearch.mockReturnValue(new Promise(() => undefined))
+      const { view } = await render()
+
+      await view.get('input[type="search"]').setValue('сыр')
+      await vi.waitFor(() => {
+        expect(adviceSearch).toHaveBeenCalled()
+      })
+
+      expect(view.find('.skeleton .ghost-take').exists()).toBe(true)
+      expect(view.find('.skeleton-field').exists()).toBe(false)
     })
 
     it('clearing the field brings the list back and asks nothing', async () => {
@@ -788,12 +1178,132 @@ describe('AdviceView after the review', () => {
     online(false)
     advice.mockRejectedValue(broke())
     const view = await renderIn('Гюмри')
-    expect(view.find('.stale').exists()).toBe(true)
+    expect(strips(view).map((strip) => strip.text)).toEqual([
+      expect.stringContaining('Offline · the list as of'),
+    ])
 
     await view.get('input[type="search"]').setValue('мол')
     await flushPromises()
 
-    expect(view.find('.stale').exists()).toBe(false)
-    expect(view.text()).toContain('Without a connection we search only the list as of')
+    expect(strips(view)).toEqual([
+      { kind: 'offline', text: expect.stringContaining('Offline · searching only the list as of') },
+    ])
+  })
+
+  it('a list of another city, offline: one strip, the cloud, naming both cities', async () => {
+    advice.mockResolvedValue(answer([milk], { geography: { country: 'AM', city: 'Ереван' } }))
+    await renderIn('Ереван')
+    for (const view of mounted.splice(0)) view.unmount()
+    online(false)
+    advice.mockRejectedValue(broke())
+    const view = await renderIn('Гюмри')
+
+    expect(view.text()).toContain(milk.name)
+    expect(strips(view)).toEqual([
+      {
+        kind: 'offline',
+        text: expect.stringMatching(/^Offline · the list for .+ as of today, .+\. Prices for /u),
+      },
+    ])
+  })
+
+  // The field goes with the focus in it — a city moved in another tab: the focus is given to the
+  // heading, never left on <body> (Б1: only a focus that was in the field).
+  it('the city moved with the focus in the field: the focus goes to the heading', async () => {
+    advice.mockResolvedValue(answer([milk]))
+    const view = await renderIn('Гюмри')
+    view.get<HTMLInputElement>('input[type="search"]').element.focus()
+    await flushPromises()
+
+    advice.mockReturnValue(new Promise<AdviceResponse>(() => undefined))
+    const key = `molvia.settings.${ME}`
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        country: 'AM',
+        city: 'Ереван',
+        spendCurrency: 'AMD',
+        incomeCurrency: 'RUB',
+      }),
+    )
+    window.dispatchEvent(new StorageEvent('storage', { key }))
+    await flushPromises()
+
+    expect(view.find('.skeleton').exists()).toBe(true)
+    expect(view.find('input[type="search"]').exists()).toBe(false)
+    expect(document.activeElement?.tagName).toBe('H1')
+  })
+
+  it('a city changed, its list late: «refreshing» for that city in one strip with the skeleton', async () => {
+    advice.mockResolvedValue(answer([milk], { geography: { country: 'AM', city: 'Ереван' } }))
+    await renderIn('Ереван')
+    for (const view of mounted.splice(0)) view.unmount()
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      advice.mockReturnValue(new Promise<AdviceResponse>(() => undefined))
+      const view = await renderIn('Гюмри')
+      expect(view.find('.skeleton').exists()).toBe(true)
+      expect(strips(view)).toEqual([])
+
+      vi.advanceTimersByTime(STRIP_LATE_MS)
+      await nextTick()
+      expect(strips(view)).toEqual([
+        { kind: 'refreshing', text: 'Refreshing · the list for Gyumri' },
+      ])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // Two waits are two requests: a refresh already late, then a city moved in another tab — the new
+  // city's list was asked a moment ago, and its strip waits its own second (adversarial А2).
+  it('А2: a city moved after a late refresh — its strip waits its own second', async () => {
+    advice.mockResolvedValue(answer([milk]))
+    await renderIn('Гюмри')
+    for (const view of mounted.splice(0)) view.unmount()
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      advice.mockReturnValue(new Promise<AdviceResponse>(() => undefined))
+      const view = await renderIn('Гюмри')
+      vi.advanceTimersByTime(STRIP_LATE_MS)
+      await nextTick()
+      expect(strips(view).map((strip) => strip.kind)).toEqual(['refreshing'])
+
+      let answered: (value: AdviceResponse) => void = () => undefined
+      advice.mockReturnValue(new Promise<AdviceResponse>((resolve) => (answered = resolve)))
+      const key = `molvia.settings.${ME}`
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          country: 'AM',
+          city: 'Ереван',
+          spendCurrency: 'AMD',
+          incomeCurrency: 'RUB',
+        }),
+      )
+      window.dispatchEvent(new StorageEvent('storage', { key }))
+      await nextTick()
+      await nextTick()
+      expect(view.find('.skeleton').exists()).toBe(true)
+      expect(strips(view)).toEqual([])
+
+      vi.advanceTimersByTime(STRIP_LATE_MS - 1)
+      await nextTick()
+      expect(strips(view)).toEqual([])
+      vi.advanceTimersByTime(1)
+      await nextTick()
+      expect(strips(view)).toEqual([
+        { kind: 'refreshing', text: 'Refreshing · the list for Yerevan' },
+      ])
+
+      // A quick answer to a city never shows it: here it answers late, and the strip goes with it.
+      answered(answer([milk], { geography: { country: 'AM', city: 'Ереван' } }))
+      await flushPromises()
+      expect(strips(view)).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

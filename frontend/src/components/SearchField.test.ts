@@ -282,6 +282,27 @@ describe('SearchField', () => {
     })
   })
 
+  // The pill is the field: pressed by its magnifier or its edge, the focus stays and goes to the
+  // input — it had gone to <body>, and a field held by its focus went with it (MOL-201, Г1).
+  it('a press on the pill beside the input is a press on the input', () => {
+    const view = render({ clearable: true, modelValue: 'syr' })
+    const press = (target: Element) => {
+      const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true })
+      target.dispatchEvent(event)
+      return event.defaultPrevented
+    }
+
+    expect(press(view.get('.well > .glyph').element)).toBe(true)
+    expect(document.activeElement).toBe(view.get('input').element)
+    expect(press(view.get('.well').element)).toBe(true)
+
+    // The input and a button in the well keep their own press.
+    expect(press(view.get('input').element)).toBe(false)
+    expect(press(view.get('.clear').element)).toBe(false)
+    expect(press(view.get('.clear .glyph').element)).toBe(false)
+    view.unmount()
+  })
+
   it('takes the focus when its owner asks, and lets it go', () => {
     const view = render()
     const field = view.vm as unknown as { focus: () => void; blur: () => void }

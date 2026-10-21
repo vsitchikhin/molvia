@@ -13,10 +13,19 @@ import { computed, defineComponent, onBeforeUnmount, onMounted, watch } from 'vu
 import type { PropType } from 'vue'
 import IconUnanswered from '~icons/mdi/alert-circle-outline'
 import IconOffline from '~icons/mdi/cloud-off-outline'
+import IconRefreshing from '~icons/mdi/sync'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 
-/** `offline` — no connection; `unanswered` — the server did not answer, and the last answer is shown. */
-export type StripKind = 'offline' | 'unanswered'
+/**
+ * `offline` — no connection; `unanswered` — the server did not answer, and the last answer is shown;
+ * `refreshing` — the next answer is late, and the last one is shown meanwhile (MOL-201, В-1 «а»).
+ */
+export type StripKind = 'offline' | 'unanswered' | 'refreshing'
+
+const GLYPHS = { offline: IconOffline, unanswered: IconUnanswered, refreshing: IconRefreshing }
+
+/** How long an answer is on its way before a `refreshing` strip goes up: a quick one never shows it. */
+export const STRIP_LATE_MS = 1000
 
 /**
  * The connection in one line (MOL-181, Ф-14): what the screen shows while the server cannot give
@@ -27,7 +36,11 @@ export type StripKind = 'offline' | 'unanswered'
  * screen's and the language's. Never red — what is on the screen is still worth reading.
  *
  * «Повторить» (`#action`) only for `unanswered` (К-5): without a connection there is nothing to
- * try, so an offline strip draws no slot whatever is given.
+ * try, so an offline strip draws no slot whatever is given; a refreshing one has its request in the
+ * air already.
+ *
+ * `refreshing` is for an answer kept on the phone while the next is on its way: the screen puts it up
+ * only once that answer is late, or a quick one would make it flash and speak at every opening.
  *
  * The words go to the live region of the app or the sheet (К-14), never a `role` of its own: a
  * region born with its words is often not read. A retry that failed the same way leaves the same
@@ -44,7 +57,7 @@ export default defineComponent({
   },
   setup(props) {
     const announce = useAnnouncer()
-    const glyph = computed(() => (props.kind === 'offline' ? IconOffline : IconUnanswered))
+    const glyph = computed(() => GLYPHS[props.kind])
 
     // Outside the app — a component mounted on its own — the strip speaks for itself.
     const role = computed(() => (announce ? undefined : 'status'))
