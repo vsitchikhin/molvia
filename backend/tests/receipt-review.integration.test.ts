@@ -10,7 +10,14 @@ import {
   storeMemoryWords,
 } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
-import { actors, officialRates, receiptLines, receipts, trips as tripsTable } from '@/db/schema'
+import {
+  actors,
+  items,
+  officialRates,
+  receiptLines,
+  receipts,
+  trips as tripsTable,
+} from '@/db/schema'
 import { createStoreMemoryRepository, memoryKey } from '@/db/store-memory-repository'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
@@ -302,6 +309,23 @@ describe('the review of a receipt', () => {
     expect(asked.lines.map((line) => [line.repaired, line.sum])).toEqual([
       [undefined, amd(531)],
       [true, amd(1_032)],
+    ])
+  })
+
+  it('sends a new item the binding marked «проверьте» as such, and a line whose item is gone as new (MOL-293, А6)', async () => {
+    const me = await insertActor(db)
+    const gone = await insertItem(db, { name: 'Сметана', searchKey: 'smetana' })
+    const id = await parsedReceipt(me, [
+      { printed: 'Յոգուրտ «Երեմյան Փրոդաքթս» ելակ', price: 300, sum: 300, match: 'weak' },
+      { printed: 'Թթվասեր 20%', price: 500, sum: 500, itemId: gone, match: 'search' },
+      { printed: 'ՔՍՅԶՔ', price: 100, sum: 100, match: 'new' },
+    ])
+    await db.delete(items).where(eq(items.id, gone))
+    const detail = await review(me, id)
+    expect(detail.lines.map((line) => [line.itemId, line.match])).toEqual([
+      [null, 'weak'],
+      [null, 'new'],
+      [null, 'new'],
     ])
   })
 

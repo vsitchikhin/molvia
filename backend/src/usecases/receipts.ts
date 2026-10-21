@@ -335,11 +335,15 @@ export async function receiptOfOwner(
         ...(repaired && line.repaired === true ? { repaired: true } : {}),
         itemId: known === null ? null : itemId,
         itemName: known,
+        // a new item the binding named and marked «проверьте» stays so (MOL-293, В-1 «а»); a line whose item
+        // is gone since — removed, merged away — is new, with no mark (adversarial А6, review №1)
         match:
           remembered !== null && known !== null
             ? 'memory'
             : known === null
-              ? 'new'
+              ? line.match === 'weak' && line.itemId === null
+                ? 'weak'
+                : 'new'
               : (line.match ?? 'new'),
         translation: line.translation,
         // a proposal only while the line is still a new item: the memory may have named it since

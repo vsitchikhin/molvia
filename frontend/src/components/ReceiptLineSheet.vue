@@ -403,7 +403,12 @@ export default defineComponent({
         // alone follows the reading and the total, in whatever order the edits came (review 28).
         ...(start.ownFigures || !sameFigures(figures) ? { figures } : {}),
         skip: skipped,
-        ...(settled.value || (start.edited && !start.check) ? { confirmed: true as const } : {}),
+        // a new item's name typed over the proposal is the person's answer to «проверьте» (MOL-293)
+        ...(settled.value ||
+        (start.edited && !start.check) ||
+        (chosen !== null && !('id' in chosen) && chosen.name !== start.name)
+          ? { confirmed: true as const }
+          : {}),
       }
     }
 
@@ -459,9 +464,13 @@ export default defineComponent({
       remembered,
       mismatch,
       checking: computed(() => start.check && !settled.value && item.value.id === start.itemId),
-      // while the name proposed stands: typed over or another chosen, it is the person's
+      // while the name proposed stands: typed over, taken away or another chosen, it is the person's — a
+      // draft's own name is no proposal (review №3)
       spelled: computed(
-        () => start.line.spelled === true && item.value.id === null && name.value === start.name,
+        () =>
+          start.line.spelled === true &&
+          item.value.id === null &&
+          name.value === start.line.translation,
       ),
       unspell: () => {
         name.value = receiptLineName(start.line.printed, props.country)
