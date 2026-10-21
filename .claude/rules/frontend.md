@@ -606,10 +606,15 @@ The detail behind the frontend lines of `CLAUDE.md`.
   chooses the answer (the month, the search field — never above it, the rule below) or first in a
   sheet; **in the screen's words, whole**, the time inside them — where «на 14:05» stands in the
   sentence is the screen's and the language's, and a prop of time would have the kit glue a sentence
-  of pieces; where a memory keeps no time, the key has none. **Two kinds, and the kit draws the
+  of pieces; where a memory keeps no time, the key has none. **Three kinds, and the kit draws the
   glyph:** `offline`, the cloud; `unanswered` — the server did not answer and the last answer is shown
   — the circle of frame 6h (owner's В-1 «а»): the form says «the server's error», the yellow says
-  «what is shown still holds»; never red. The kind is required — offline or error is the screen's,
+  «what is shown still holds»; never red. **`refreshing`, `sync`** (MOL-201, owner's В-1 «а»): an
+  answer kept on the phone stands while the next is on its way — «Что брать» shows yesterday's list at
+  once and asks — and neither of the two was true of it: the connection is there and the server has
+  not failed. **It is put up only once the answer is late** (`STRIP_LATE_MS`, a second): a quick one
+  replaces what is shown in silence, where a strip at once flashed for a fifth of a second under the
+  field and said «обновляем» into the region at every opening. No button: the request is in the air. The kind is required — offline or error is the screen's,
   decided after the failure. **«Повторить» only in `unanswered`'s `#action`** (К-5), a ghost, and only
   where the screen's strip does not hold one: without a connection there is nothing to try, so an
   offline strip draws no slot whatever it is given; the button takes the strip's padding, and the
