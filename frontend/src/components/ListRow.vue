@@ -93,8 +93,9 @@ const SELECTED = new Set([
  *              the fill without the ring, since the focus is in the field, and read out as selected, as
  *              the ARIA combobox has its active option.
  *
- * The slot `below` stands under the meta, in the column of the words — a tag, «Отправляем…»: in the
- * meta it would be cut with it at two lines.
+ * The slot `below` stands under the meta, in the column of the words and as wide as it — a tag,
+ * «Отправляем…», at its own width, since it is inline; a bar of «Бюджет» across the column (MOL-192):
+ * in the meta either would be cut with it at two lines.
  */
 export default defineComponent({
   name: 'ListRow',
@@ -271,7 +272,6 @@ export default defineComponent({
 }
 
 .below {
-  justify-self: start;
   margin-top: var(--space-1);
 }
 

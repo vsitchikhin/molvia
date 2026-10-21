@@ -49,7 +49,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 
 ## frontend · views
 
-- `frontend/src/views/MoneyBudgetView.vue` — «Бюджет» screen (MOL-117): the month in the address by `replace`, what is left of the plan, the rows in the order of the chips, «Без плана», the savings target; four states.
+- `frontend/src/views/MoneyBudgetView.vue` — «Бюджет» screen (MOL-117, kit's since MOL-192): the month in the address by `replace`, what is left of the plan, the rows on `ListRow` in the order of the chips with a bar in the category's colour, «Без плана», the savings target, «Задать план» in the strip; four states.
 - `frontend/src/views/MoneyCategoriesView.vue` — «Деньги → Категории» screen: the owner's category list as `ListRow`s, quiet «Убрать» and «Вернуть», «Добавить категорию» in the strip, through the queue.
 - `frontend/src/views/MoneyCategoriesView.test.ts` — Component test: the strip over a list shown only, one's own name refused in the sheet, the error holding the strip, a category made offline through the queue, quiet «Убрать», the rows of both groups, refusals, the skeleton's shape (MOL-191).
 - `frontend/src/views/MoneyChartsView.vue` — «Графики» screen: «Месяц · Год», the month and the year in the address by `replace`, a bookmark of the old period opening the year.
@@ -85,7 +85,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `frontend/src/composables/useMoneyScreen.ts` — Composable: what «Деньги» and «Траты» share — the month in the address by `replace`, the journal and refusals, the spending sheet, «Вернуть», the skeleton's «≈» line.
 - `frontend/src/composables/useMoneyMonth.ts` — Composable: one month of «Деньги» from the server, its later pages, re-read when the queue lands; remembered categories.
 - `frontend/src/composables/useChartPointer.ts` — Composable: a choice made on a chart by the whole area — a mouse on press, a finger on lifting or going sideways, a scroll never.
-- `frontend/src/composables/useMoneyBudget.ts` — Composable: «Бюджет» of a month from the server through `useKeptAnswer`, the last three months kept per owner.
+- `frontend/src/composables/useMoneyBudget.ts` — Composable: «Бюджет» of a month from the server through `useKeptAnswer`, the last three months kept per owner; the writes of a plan in the order of the taps, whatever screen sent them.
 - `frontend/src/composables/useMoneyCharts.ts` — Composable: «Графики» of a month (MOL-158) and of a year (MOL-160) from the server, through `useKeptAnswer`.
 - `frontend/src/composables/useKeptAnswer.ts` — Composable: an answer of «Графики» or «Бюджет» kept per owner and subject, only the latest read, offline or error decided after the failure, re-read when a write lands, or taken from a write's own answer, numbered when the write sets out (`write`).
 - `frontend/src/composables/useSalaryShift.ts` — Composable: the «Зарплата — в следующий месяц» setting through `useTapSetting`, read and saved on the tap.
@@ -98,5 +98,5 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 ## e2e
 
 - `e2e/money.spec.ts` — End-to-end: a spending lands in the month through the queue, offline too; «Вернуть», own categories, «Остаток» and the salary shift.
-- `e2e/money-budget.spec.ts` — End-to-end: a plan set on «Бюджет», a spending written on «Деньги», the server's «осталось» on the screen and on the way into it, a share of an empty «Пришло» over the plan; offline the plan waits.
+- `e2e/money-budget.spec.ts` — End-to-end: a plan set on «Бюджет», a spending written on «Деньги», the server's «осталось» on the screen and on the way into it, a share of an empty «Пришло» over the plan; offline the strip and the sheet are not now and send nothing; the bars one length at 390 and 320.
 - `e2e/money-charts.spec.ts` — End-to-end: «Графики → Месяц» from the ring of «Куда ушли», the month by `replace`, a sector, the usual from three months, a day of the pace; «Год» of the calendar year — the year by `replace` back to the first with data, its average across the new year, a sector choosing the category; offline; the slider of «Темп», one «Повторить», the bars held under the thumb between months (MOL-186).

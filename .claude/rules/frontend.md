@@ -571,7 +571,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   commonest break at a shelf, and drawing it red was the first consumer's bug (MOL-19, A1).
   Back online, a screen tries again by itself, as the identity does — through `useReconnect`,
   which also hears the app coming back into view: an iOS PWA frozen in the background misses
-  `online`. Polite states do not carry `role="status"`: they hand their words to the app's one
+  `online`. **`useOnline` reads the browser again at that same return** (MOL-192, adversarial А1):
+  its word «no connection ahead of time» outlived the connection a frozen PWA got back unheard.
+  Polite states do not carry `role="status"`: they hand their words to the app's one
   live region in `App.vue`, above the router, since a region born with its words is often not
   read. Each announcement is a node added a task later, taken back when its block goes and
   gone by itself after seconds — a hidden region is still read in browse mode. Only an error
@@ -720,8 +722,15 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the two currencies** — a new pair, a closed month with none frozen — has no «≈» (`spentApprox`)
   while the bars, which cannot know it before the answer, drew one: the page shrinks by that line
   under the switcher, as for the empty month above (adversarial А4 of MOL-184). The total of 77 v2 2a (`TripTotal`) is no card until
-  MOL-206 makes it one, and the sums of «Счета», an account, «Обмен» and «Бюджет» still stand at the
-  body's leading, some 8 px taller than the part — their tasks set the part against their answer. **The price:** a card adds its padding and
+  MOL-206 makes it one, and the sums of «Счета», an account and «Обмен» still stand at the
+  body's leading, some 8 px taller than the part — their tasks set the part against their answer.
+  **«Бюджет» takes the part with «≈» and its plate** (MOL-192): its three figures a line each stand
+  some 40 px taller than the plate of 44, and the page grows by that as the answer comes, below the
+  switcher; a person of one currency has no «≈», which takes some 20 px of it back. **The price, named
+  besides** (self-review 1 of MOL-192): the frame stands its parts 8 apart where the answer stands its
+  groups 24, so the card of rows comes 16 px lower; and a row with a line under its bar — a share of
+  «Пришло», as five plans of the owner's six are — is some 20 px taller than its bars. All of it growth
+  below the switcher, which MOL-138's hold allows. **The price:** a card adds its padding and
   edge, so a skeleton of `groups` is some 34 px taller than before — taller, not shorter, which the hold
   of MOL-138 needs.
 - **An installed app takes a new version only when nobody can lose anything to it: hidden, and

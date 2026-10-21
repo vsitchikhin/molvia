@@ -2092,7 +2092,8 @@
   },
   "budget": {
     "title": "Budget",
-    "offline_strip": "No connection. Figures as of {when}",
+    "offline_strip": "Offline · budget as of {when}",
+    "error_strip": "The server did not answer — budget as of {when}",
     "offline_body": "This month's budget has not been loaded on this phone yet. It will appear once the connection is back",
     "load_error": {
       "title": "The budget did not load",
@@ -2115,10 +2116,12 @@
       "of": "{spent} of {planned}",
       "share": "{percent} % of income",
       "over": "over the plan",
-      "awaiting": "nothing came in yet"
+      "awaiting": "nothing came in yet",
+      "archived": "category removed"
     },
     "unplanned": "No plan",
     "add": "Set a category plan",
+    "add_offline": "Setting a plan needs a connection",
     "savings": {
       "title": "Put aside",
       "target": "Target — {percent} % of income",
@@ -2151,12 +2154,13 @@
       "bad_percent": "Enter a whole number from 0 to {max}",
       "category_gone": "This category is gone — refresh the screen",
       "failed": "Not saved. Try again",
-      "offline": "No connection. A plan is saved only online",
+      "offline": "Offline · a plan is saved with a connection",
       "save": "Save",
       "saving": "Saving…",
-      "wait_online": "Waiting for connection",
+      "save_offline": "Saving needs a connection",
       "remove": "Remove the plan",
       "removing": "Removing the plan…",
+      "remove_offline": "Removing needs a connection",
       "other_currency": "The plan was {amount}, before the spending currency changed. Enter a sum in {sign}",
       "too_big": "Too large a sum for a month's plan"
     }

@@ -107,6 +107,18 @@ describe('SkeletonPart', () => {
       expect(row.findAll('.line')).toHaveLength(1)
     })
 
+    // «Бюджет» (MOL-192): the bar of a plan under the meta, in the column of the words.
+    it('draws the bar of a plan under the meta only when asked', () => {
+      expect(render({ kind: 'rows', count: 1 }).find('.track-bar').exists()).toBe(false)
+      const words = render({ kind: 'rows', count: 2, track: true }).findAll('.words')
+      expect(words).toHaveLength(2)
+      for (const one of words) {
+        const parts = one.findAll(':scope > *').map((part) => part.classes())
+        expect(parts.at(-1)).toContain('track-bar')
+        expect(parts.at(-2)).toContain('small')
+      }
+    })
+
     // The widths are the part's cycle, in its style, not the screen's: no bar of a row carries one.
     it('gives the screen no width to set on a row', () => {
       const view = render({ kind: 'rows', lead: 'circle', tail: true, under: true, next: true })

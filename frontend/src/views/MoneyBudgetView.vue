@@ -1,23 +1,37 @@
 <template>
   <AppScreen :title="t('budget.title')">
-    <div class="content">
-      <MonthSwitcher :month="month" :current="currentMonth" @change="chooseMonth" />
+    <div ref="content" class="content">
+      <div class="month">
+        <MonthSwitcher :month="month" :current="currentMonth" @change="chooseMonth" />
 
-      <!-- Under the switcher: they belong to the month's answer (MOL-138, owner's В-2). -->
-      <p v-if="stale === 'offline' && fetchedAt" class="strip">
-        <IconCloudOff class="strip-icon" aria-hidden="true" />
-        {{ t('budget.offline_strip', { when: when(fetchedAt) }) }}
-      </p>
-      <ScreenState
-        v-else-if="stale === 'error'"
-        kind="error"
-        inline
-        :title="t('budget.load_error.title')"
-        :body="t('budget.load_error.body')"
-        @retry="retry"
-      />
+        <!-- Under the switcher: they belong to the month's answer (MOL-138, owner's В-2). -->
+        <!-- Offline over a month kept, or the connection gone over this visit's answer — as the other
+             screens of «Деньги» say it; the strip «… можно со связью» must not stand alone (adversarial А3). -->
+        <StatusStrip
+          v-if="(stale === 'offline' || !online) && fetchedAt"
+          kind="offline"
+          :text="t('budget.offline_strip', { when: when(fetchedAt) })"
+        />
+        <StatusStrip
+          v-else-if="stale === 'error' && fetchedAt"
+          kind="unanswered"
+          :text="t('budget.error_strip', { when: when(fetchedAt) })"
+          :attempt="attempt"
+        >
+          <!-- The strip holds «Задать план категории», so «Повторить» is here (К-5, MOL-181). -->
+          <template #action>
+            <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+          </template>
+        </StatusStrip>
+      </div>
 
-      <ScreenSkeleton v-if="phase === 'loading'" :groups="[64, 100, 72, 72, 72, 48, 60]" />
+      <!-- The answer's shape (Ф-13, MOL-178): the total with its tiles, then rows with their bar. «≈»
+           is drawn: the person this screen is for earns in one currency and spends in another, and a
+           skeleton taller than a one-currency answer is what the hold of MOL-138 allows. -->
+      <ScreenSkeleton v-if="phase === 'loading'">
+        <SkeletonPart kind="figure" approx plate />
+        <SkeletonPart kind="rows" :count="3" lead="circle" track next :narrow="false" />
+      </ScreenSkeleton>
 
       <ScreenState
         v-else-if="phase === 'error'"
@@ -40,14 +54,18 @@
         <ScreenState
           v-if="!budget.total && budget.savings.target === null"
           kind="empty"
+          class="planless"
           :icon="IconTarget"
           :title="t('budget.empty.title')"
           :body="t('budget.empty.body')"
         />
+        <!-- The card of a sum, as the month's on «Деньгах» (MOL-183): its caption, the figure, «≈» at
+             the headline's size, and the three figures on a plate, a line each — three tiles across
+             broke «330 000 ֏» in its middle on a phone of 320, and a sum of seven digits at 390. -->
         <AppCard v-else-if="budget.total" class="total">
-          <p class="caption">
+          <SectionCaption as="p" inset>
             {{ overall.over ? t('budget.total.over') : t('budget.total.left') }}
-          </p>
+          </SectionCaption>
           <p class="figure" :class="{ over: overall.over }">{{ overall.figure }}</p>
           <p v-if="budget.total.leftIncome" class="approx">
             ≈ {{ amount(budget.total.leftIncome) }}
@@ -56,96 +74,129 @@
                spending some rate did not count (adversarial М of round 4). -->
           <p v-if="awaiting" class="footnote">{{ t('budget.total.awaiting') }}</p>
           <p v-if="short" class="footnote">{{ t('budget.total.not_whole') }}</p>
-          <dl class="trio">
-            <div>
+          <dl class="plate">
+            <div class="plate-row">
               <dt>{{ t('budget.total.planned') }}</dt>
               <dd>{{ plannedWords }}</dd>
             </div>
-            <div>
+            <div class="plate-row">
               <dt>{{ t('spending.spent') }}</dt>
               <dd>{{ amount(budget.total.spent) }}</dd>
             </div>
-            <div>
+            <div class="plate-row">
               <dt>{{ t('budget.total.unplanned') }}</dt>
               <dd>{{ amount(budget.total.unplanned) }}</dd>
             </div>
           </dl>
         </AppCard>
 
-        <AppCard v-if="budget.rows.length > 0" as="ul" list>
+        <!-- A row is the kit's (MOL-175), its circle the category's as on «Категории» and «Траты»
+             (owner's В-1 «а»). «Осталось» stands in the title's line, not in the tail: a tail of its
+             own width would make every bar another length, and bars side by side are read against
+             each other. A removed category is offered no plan, with one or not (review 7, adversarial
+             И): no button and no chevron, its place kept so the figures and the bars stay in one
+             column. -->
+        <AppCard v-if="rows.length > 0" as="ul" list>
           <li v-for="row in rows" :key="row.categoryId">
-            <!-- A removed category is offered no plan, with one or not (review 7, adversarial И). -->
-            <component
-              :is="row.archived ? 'div' : 'button'"
-              :type="row.archived ? undefined : 'button'"
-              class="row"
-              :class="{ still: row.archived }"
+            <ListRow
+              :as="row.archived ? 'div' : 'button'"
+              :icon="row.icon"
+              :tint="row.tint"
+              :next="!row.archived"
+              wrap
+              :data-category="row.categoryId"
               @click="row.archived || edit(row.categoryId, row.plan)"
             >
-              <span class="head">
-                <span class="dot" :style="{ background: row.colour }" aria-hidden="true"></span>
-                <span class="name">{{ row.name }}</span>
-                <span class="left" :class="{ over: row.over }">{{ row.left }}</span>
-              </span>
-              <span class="track" aria-hidden="true">
-                <span class="fill" :class="{ over: row.over }" :style="{ width: row.width }"></span>
-              </span>
-              <span class="meta">
-                <span>{{ row.of }}</span>
-                <span :class="{ over: row.over }">{{ row.used }}</span>
-              </span>
-            </component>
+              <template #title>
+                <span class="head">
+                  <span>{{ row.name }}</span>
+                  <span class="amount" :class="{ over: row.over }">{{ row.left }}</span>
+                </span>
+              </template>
+              <template #meta>
+                <span>{{ row.of }}</span
+                ><span v-if="row.used" :class="{ over: row.over }">{{ row.used }}</span>
+              </template>
+              <template v-if="row.archived" #tail><span class="no-chevron"></span></template>
+              <template #below>
+                <span class="track" aria-hidden="true">
+                  <span
+                    class="fill"
+                    :class="{ over: row.over }"
+                    :style="{ width: row.width, background: row.over ? undefined : row.fill }"
+                  ></span>
+                </span>
+                <span v-if="row.notes" class="note">{{ row.notes }}</span>
+              </template>
+            </ListRow>
           </li>
         </AppCard>
 
-        <template v-if="unplanned.length > 0">
-          <div>
-            <SectionCaption class="group">{{ t('budget.unplanned') }}</SectionCaption>
-            <AppCard as="ul" list>
-              <li v-for="row in unplanned" :key="row.categoryId">
-                <!-- A removed category is no choice (review 7): its spending is shown, a plan is not offered. -->
-                <div v-if="row.archived" class="row still">
+        <div v-if="unplanned.length > 0">
+          <SectionCaption>{{ t('budget.unplanned') }}</SectionCaption>
+          <AppCard as="ul" list>
+            <li v-for="row in unplanned" :key="row.categoryId">
+              <ListRow
+                :as="row.archived ? 'div' : 'button'"
+                :icon="row.icon"
+                :tint="row.tint"
+                :meta="row.meta"
+                :next="!row.archived"
+                wrap
+                :data-category="row.categoryId"
+                @click="row.archived || edit(row.categoryId, null)"
+              >
+                <template #title>
                   <span class="head">
-                    <span class="dot" :style="{ background: row.colour }" aria-hidden="true"></span>
-                    <span class="name">{{ row.name }}</span>
-                    <span class="left">{{ row.spent }}</span>
+                    <span>{{ row.name }}</span>
+                    <span class="amount">{{ row.spent }}</span>
                   </span>
-                </div>
-                <button v-else type="button" class="row" @click="edit(row.categoryId, null)">
-                  <span class="head">
-                    <span class="dot" :style="{ background: row.colour }" aria-hidden="true"></span>
-                    <span class="name">{{ row.name }}</span>
-                    <span class="left">{{ row.spent }}</span>
-                  </span>
-                </button>
-              </li>
-            </AppCard>
-          </div>
-        </template>
+                </template>
+                <template v-if="row.archived" #tail><span class="no-chevron"></span></template>
+              </ListRow>
+            </li>
+          </AppCard>
+        </div>
 
-        <AppButton v-if="choosable.length > 0" variant="secondary" block @click="choose">
-          <template #icon><IconPlus /></template>
-          {{ t('budget.add') }}
-        </AppButton>
-
+        <!-- The target has no category's colour: its circle is quiet, its bar `--graphic` — data
+             without a colour of its own — and the mark of the target the ink of the text. -->
         <AppCard as="section" list :aria-labelledby="`${id}-savings`">
-          <button type="button" class="row" @click="editSavings">
-            <span class="head">
-              <span :id="`${id}-savings`" class="name">{{ t('budget.savings.title') }}</span>
-              <span class="left">{{ savings.actual }}</span>
-            </span>
-            <span v-if="savings.width !== null" class="track" aria-hidden="true">
-              <span class="fill" :style="{ width: savings.width }"></span>
-              <span v-if="savings.target" class="mark" :style="{ left: savings.target }"></span>
-            </span>
-            <span class="meta">
-              <span>{{ savings.goal }}</span>
-              <span>{{ savings.of }}</span>
-            </span>
-          </button>
+          <ListRow
+            :icon="IconPiggyBank"
+            tint="muted"
+            :meta="savings.goal"
+            next
+            wrap
+            @click="editSavings"
+          >
+            <template #title>
+              <span class="head">
+                <span :id="`${id}-savings`">{{ t('budget.savings.title') }}</span>
+                <span class="amount">{{ savings.actual }}</span>
+              </span>
+            </template>
+            <template #below>
+              <span v-if="savings.width !== null" class="track" aria-hidden="true">
+                <span class="fill" :style="{ width: savings.width }"></span>
+                <span v-if="savings.target" class="mark" :style="{ left: savings.target }"></span>
+              </span>
+              <span class="note">{{ savings.of }}</span>
+            </template>
+          </ListRow>
         </AppCard>
       </template>
     </div>
+
+    <!-- The main action is the strip (Ф-28), over an answer only: before one the sheet knows nothing
+         to choose (MOL-191, В-2), and with every live category planned there is nothing to offer. A
+         plan is written with a connection only (Р-8 of MOL-117), so offline it is not now, saying why
+         (Ф-6). An error takes the strip for «Повторить» by itself. -->
+    <template v-if="phase === 'ready' && choosable.length > 0" #docked>
+      <AppButton ref="addButton" size="large" block :inactive="!online" @click="choose">
+        <template #icon><IconPlus v-if="online" /><IconCloudOff v-else /></template>
+        {{ online ? t('budget.add') : t('budget.add_offline') }}
+      </AppButton>
+    </template>
 
     <BudgetPlanSheet
       v-model:open="sheetOpen"
@@ -163,10 +214,12 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, onUnmounted, ref, useId } from 'vue'
+import { computed, defineComponent, nextTick, ref, useId } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
+import IconPiggyBank from '~icons/mdi/piggy-bank-outline'
 import IconPlus from '~icons/mdi/plus'
 import IconTarget from '~icons/mdi/target'
 import { monthSchema } from '@molvia/model'
@@ -174,17 +227,21 @@ import type { BudgetPlanValue, Money, SpendingCategoryView } from '@molvia/model
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
+import ListRow from '@/components/ListRow.vue'
 import BudgetPlanSheet from '@/components/BudgetPlanSheet.vue'
 import type { BudgetOutcome, BudgetSubject } from '@/components/BudgetPlanSheet.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { countedWhen } from '@/components/accounts'
-import { budgetAmount, categoryColour } from '@/components/spending'
+import { budgetAmount, spendingLook } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useMoneyBudget } from '@/composables/useMoneyBudget'
+import { useOnline } from '@/composables/useOnline'
 
 /**
  * «Бюджет» (MOL-117, В-3): the month's plans against what was spent — every figure the server's,
@@ -201,10 +258,13 @@ export default defineComponent({
     BudgetPlanSheet,
     IconCloudOff,
     IconPlus,
+    ListRow,
     MonthSwitcher,
     ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    SkeletonPart,
+    StatusStrip,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -230,19 +290,9 @@ export default defineComponent({
       })
     }
 
-    const { phase, budget, stale, fetchedAt, retry, save } = useMoneyBudget(month)
+    const { phase, budget, stale, fetchedAt, attempt, retry, save } = useMoneyBudget(month)
 
-    const online = ref(navigator.onLine)
-    const onLine = () => (online.value = true)
-    const offLine = () => (online.value = false)
-    onMounted(() => {
-      window.addEventListener('online', onLine)
-      window.addEventListener('offline', offLine)
-    })
-    onUnmounted(() => {
-      window.removeEventListener('online', onLine)
-      window.removeEventListener('offline', offLine)
-    })
+    const online = useOnline()
 
     const categories = computed(() => budget.value?.categories ?? [])
     const categoryOf = (categoryId: string): SpendingCategoryView | undefined =>
@@ -252,9 +302,10 @@ export default defineComponent({
       if (!category) return ''
       return category.preset ? t(`spending.category.${category.preset}`) : (category.name ?? '')
     }
-    const colourOf = (categoryId: string) => {
-      const category = categoryOf(categoryId)
-      return category ? categoryColour(category) : 'var(--text-muted)'
+    /** The circle of a row, and its bar in the category's colour (Ф-4) — `--graphic` for none known. */
+    const lookOf = (categoryId: string) => {
+      const look = spendingLook(categoryOf(categoryId) ?? null)
+      return { ...look, fill: look.tint === 'muted' ? 'var(--graphic)' : look.tint }
     }
 
     /** A figure without its sign — the words around it say which way (Р-7, adversarial Г). */
@@ -305,17 +356,24 @@ export default defineComponent({
             ? [t('spending.charts.difference_uncounted')]
             : []),
         ]
+        const archived = categoryOf(row.categoryId)?.archived === true
+        const used = over ? t('budget.row.over') : row.used === null ? '' : percent(row.used)
         return {
           categoryId: row.categoryId,
           plan: row.plan,
           name: nameOf(row.categoryId),
-          colour: colourOf(row.categoryId),
-          archived: categoryOf(row.categoryId)?.archived === true,
+          ...lookOf(row.categoryId),
+          archived,
           over,
           // Over the plan is said by the words beside it, never by a minus (Р-7, review 5).
           left: row.left === null ? '—' : amount(row.left),
-          of: [t('budget.row.of', { spent: amount(row.spent), planned }), ...notes].join(' · '),
-          used: over ? t('budget.row.over') : row.used === null ? '' : percent(row.used),
+          // The dot is the meta's, not the warning's, and bound to both sides: a line too long breaks
+          // before «60 000 ֏ · 36 %» whole rather than leave «36 %» alone at 320 (MOL-192).
+          of: `${t('budget.row.of', { spent: amount(row.spent), planned })}${used ? '\u00a0·\u00a0' : ''}`,
+          // A line of its own under the bar: in the meta, cut at two lines, a phone of 320 lost them.
+          // Why a removed one does not open is said there too (MOL-192).
+          notes: [...notes, ...(archived ? [t('budget.row.archived')] : [])].join(' · '),
+          used,
           // The share is the server's; the phone only stops the bar at the card's edge.
           width: `${String(Math.min(row.used ?? (over ? 100 : 0), 100))}%`,
         }
@@ -323,15 +381,20 @@ export default defineComponent({
     )
 
     const unplanned = computed(() =>
-      (budget.value?.unplanned ?? []).map((row) => ({
-        categoryId: row.categoryId,
-        name: nameOf(row.categoryId),
-        colour: colourOf(row.categoryId),
-        archived: categoryOf(row.categoryId)?.archived === true,
-        spent: row.spentWhole
-          ? amount(row.spent)
-          : `${amount(row.spent)} · ${t('spending.charts.difference_uncounted')}`,
-      })),
+      (budget.value?.unplanned ?? []).map((row) => {
+        const archived = categoryOf(row.categoryId)?.archived === true
+        return {
+          categoryId: row.categoryId,
+          name: nameOf(row.categoryId),
+          ...lookOf(row.categoryId),
+          archived,
+          spent: amount(row.spent),
+          meta: [
+            ...(row.spentWhole ? [] : [t('spending.charts.difference_uncounted')]),
+            ...(archived ? [t('budget.row.archived')] : []),
+          ].join(' · '),
+        }
+      }),
     )
 
     /** Live categories with no row yet: the ones «Задать план» offers. */
@@ -350,23 +413,25 @@ export default defineComponent({
           : running.value
             ? t('budget.savings.so_far', { percent: percent(value.actual) })
             : percent(value.actual)
+      const goal =
+        value.target === null
+          ? t('budget.savings.no_target')
+          : t('budget.savings.target', { percent: value.target })
+      const of = value.difference
+        ? t('budget.savings.of', {
+            difference:
+              value.difference.minor < 0n
+                ? `−${amount(value.difference)}`
+                : amount(value.difference),
+            income: amount(value.income),
+          })
+        : value.income.minor === 0n
+          ? t('budget.savings.no_income')
+          : t('budget.savings.not_whole')
       return {
         actual,
-        goal:
-          value.target === null
-            ? t('budget.savings.no_target')
-            : t('budget.savings.target', { percent: value.target }),
-        of: value.difference
-          ? t('budget.savings.of', {
-              difference:
-                value.difference.minor < 0n
-                  ? `−${amount(value.difference)}`
-                  : amount(value.difference),
-              income: amount(value.income),
-            })
-          : value.income.minor === 0n
-            ? t('budget.savings.no_income')
-            : t('budget.savings.not_whole'),
+        goal,
+        of,
         width:
           value.actual === null ? null : `${String(Math.max(0, Math.min(value.actual, 100)))}%`,
         target: value.target === null ? null : `${String(value.target)}%`,
@@ -392,16 +457,61 @@ export default defineComponent({
       plan.value = target == null ? null : { kind: 'share', percent: target }
       sheetOpen.value = true
     }
-    /** The write's answer is already shown by `save` (review 6); the outcome is only said. */
-    function done(outcome: BudgetOutcome): void {
+    const content = ref<HTMLElement | null>(null)
+    const addButton = ref<ComponentPublicInstance | null>(null)
+    /**
+     * The write's answer is already shown by `save` (review 6); the outcome is said. The sheet gives the
+     * focus back to what opened it only while that is still there, and the write may take it away: the
+     * last category planned takes the strip, a row of «Без плана» moves into the plans, a plan removed
+     * moves its row out (adversarial А2, self-review 1). Then the focus goes to the row of that category
+     * wherever it stands now — a button only: a category removed meanwhile on another device is a row
+     * that takes no focus (adversarial Б2) — else to the strip, else to the screen's title; never left
+     * on the page's body, where a screen reader starts from the top. Whatever takes it is brought into
+     * view first when it is out of sight (Б1, Б3).
+     */
+    async function done(outcome: BudgetOutcome): Promise<void> {
       announce?.(
         t(outcome.kind === 'saved' ? 'budget.saved' : 'budget.removed', { name: outcome.name }),
       )
+      // A sheet swept away while the write was on its way says so before the screen has redrawn.
+      await nextTick()
+      const current = document.activeElement
+      const lost =
+        current === null ||
+        current === document.body ||
+        current.closest('dialog:not([open])') !== null
+      if (!lost) return
+      const row =
+        outcome.categoryId === null
+          ? null
+          : content.value?.querySelector<HTMLElement>(
+              `button[data-category="${CSS.escape(outcome.categoryId)}"]`,
+            )
+      const strip = addButton.value?.$el as HTMLElement | undefined
+      const title = document.querySelector<HTMLElement>('h1[tabindex]')
+      const target = row ?? strip ?? title
+      if (!target) return
+      // A row elsewhere on the page is brought into view, as «Траты» bring a refusal (MOL-159): the
+      // focus of a keyboard out of the window is no focus. Only when it is not in sight — under the
+      // header, the strip or past an edge — so a row in view does not move. The title too: the large
+      // one scrolls away with the page (adversarial Б3). The strip is pinned and always in sight.
+      if (target !== strip && !inSight(target)) {
+        const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        target.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' })
+      }
+      target.focus({ preventScroll: true })
+    }
+    /** Whether the middle of the element is what the page shows there: nothing over it, not off-screen. */
+    function inSight(element: HTMLElement): boolean {
+      const box = element.getBoundingClientRect()
+      const seen = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+      return seen !== null && element.contains(seen)
     }
 
     return {
       t,
       id,
+      IconPiggyBank,
       IconTarget,
       month,
       currentMonth,
@@ -410,6 +520,7 @@ export default defineComponent({
       budget,
       stale,
       fetchedAt,
+      attempt,
       retry,
       save,
       online,
@@ -430,6 +541,8 @@ export default defineComponent({
       edit,
       choose,
       editSavings,
+      content,
+      addButton,
       done,
     }
   },
@@ -437,43 +550,24 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* The field is `AppScreen`'s 16 (С-23); 24 between the groups of the answer, 8 under the switcher
+   for what belongs to it (Ф-10). */
 .content {
   display: flex;
   flex-direction: column;
   flex: 1;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-6);
 }
 
-.strip {
-  @include appear;
-
+.month {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
   gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--warn-tint);
-  color: var(--warn-ink);
-  font-size: var(--text-footnote);
-}
-
-.strip-icon {
-  @include icon;
-
-  font-size: var(--icon-sm);
 }
 
 .total {
   display: grid;
   gap: var(--space-1);
-}
-
-.caption {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
 }
 
 .figure {
@@ -482,24 +576,47 @@ export default defineComponent({
   margin: 0;
   font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
+  line-height: var(--leading-tight);
 
   &.over {
     color: var(--warn-ink);
   }
 }
 
-.approx,
+.approx {
+  margin: 0;
+  font-size: var(--text-headline);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-tight);
+}
+
 .footnote {
   margin: 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
 }
 
-.trio {
+/* «Отложить» stands under it: grown to the free height, the empty state took the card to the bottom of
+   the page, a screen's height away from the words it belongs with (MOL-192). */
+.planless {
+  flex: none;
+}
+
+.plate {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
+  gap: var(--space-1);
   margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.plate-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
 
   dt {
     color: var(--text-muted);
@@ -511,80 +628,43 @@ export default defineComponent({
     font-size: var(--text-callout);
     font-weight: var(--weight-medium);
     font-variant-numeric: tabular-nums;
-    overflow-wrap: anywhere;
+    text-align: end;
   }
 }
 
-/* The caption and its card stand in a block of their own: in the content's gap the 8 under it would be 20. */
-.group {
-  margin-top: var(--space-3);
-}
-
-li + li {
-  border-top: var(--hairline) solid var(--border);
-}
-
-.row {
-  display: grid;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: var(--touch-target-lg);
-  padding: var(--space-3) var(--space-4);
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--surface-2);
-  }
-
-  &:focus-visible {
-    @include focus-ring(-2px);
-  }
-}
-
+/* The name and its figure on the title's line; the figure goes under it, at the right, once the
+   whole name no longer fits beside it (MOL-200). */
 .head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+  @include name-beside-figure;
 }
 
-.dot {
-  flex: none;
-  width: 0.625rem;
-  height: 0.625rem;
-  border-radius: var(--radius-pill);
-}
-
-.name {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  font-size: var(--text-body);
-  font-weight: var(--weight-medium);
-  overflow-wrap: anywhere;
-}
-
-.left {
+.amount {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
+/* A removed category's row keeps the chevron's place empty, so its figure and its bar end where the
+   live rows' do. */
+.no-chevron {
+  width: var(--icon);
+}
+
 .track {
   position: relative;
+  display: block;
   height: var(--space-2);
+  margin-top: var(--space-1);
   border-radius: var(--radius-pill);
   background: var(--surface-2);
 }
 
+/* A category's bar is its colour, set on the row (Ф-4); the target's, with no colour of its own,
+   is data's (`--graphic`). */
 .fill {
   display: block;
   height: 100%;
   border-radius: var(--radius-pill);
-  background: var(--accent);
+  background: var(--graphic);
 }
 
 .mark {
@@ -595,24 +675,15 @@ li + li {
   background: var(--text);
 }
 
-.meta {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-2);
+.note {
+  display: block;
+  margin-top: var(--space-1);
   color: var(--text-muted);
   font-size: var(--text-footnote);
 }
 
 .over {
   color: var(--warn-ink);
-}
-
-.still {
-  cursor: default;
-
-  &:hover {
-    background: none;
-  }
 }
 
 .fill.over {

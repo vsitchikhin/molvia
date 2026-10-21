@@ -853,5 +853,50 @@ task did not: five plans of six there are a percent of the month's income — «
   have counted before it or after, so then the month is read once more (adversarial Ж of round 2).
   Numbered on arrival, the write's older answer put back a spending landed meanwhile.
   The sheet works no plan out of «Пришло» — what a percent comes to is the server's, on the row.
+- **The screen is the kit's since MOL-192** (Т-Д1-11 of MOL-118; no handoff drew it, owner's В-1 «а»).
+  **«Задать план категории» is the strip** (`#docked`, Ф-28), over an answer only — before one the sheet
+  knows nothing to choose (MOL-191, В-2) — and only while a live category has no row; offline it is not
+  now, «Задать план можно со связью» (Ф-6), and the sheet of a row says the same of «Сохранить» and
+  «Убрать план» under a `StatusStrip` of its own. **The connection is one line under the switcher**:
+  offline over a month kept or over this visit's answer — the strip saying «можно со связью» with
+  nothing above it was the screen's own contradiction (adversarial А3) — «сервер не ответил» with
+  «Повторить» in it, since the strip holds «Задать план» (К-5). **«Offline» is read again when the app
+  comes back into view** (`useOnline`, adversarial А1, А1′): a frozen PWA missed `online` and the strip
+  stood «можно со связью» over the answer the server had just given. **A write that takes away what
+  opened its sheet hands the focus on** (adversarial А2): the last category planned takes the strip, a
+  row of «Без плана» moves into the plans, a plan removed moves its row out — the focus goes to that
+  category's row wherever it stands, a button only — a category removed meanwhile on another device
+  is a row that takes none (Б2) — else to the strip, else to the screen's title, never to the page's
+  body; **whatever takes it, out of sight, is brought into view first** (Б1, Б3) — the row, as «Траты»
+  bring a refusal, and the large title, which scrolls away with the page — and one in sight does not
+  move. **A write belongs to the opening of the sheet it was sent from** (adversarial В1): one sheet
+  serves every row, and a write from a sheet swept away may land while it is open again for another
+  row — that sheet is not closed by it, not «at work» for it and shows no refusal of it; its outcome is
+  said as for a closed sheet. **The writes go in the order of the taps** (Г1): a plan is the last write
+  the server got, with no revision, so a write waits for the one before it, answered or not — the same
+  row opened again and saved while the swept write was on its way left the older sum on the server.
+  **The queue is `useMoneyBudget`'s, not the screen's** (Г2): a step back and in again mounts a new
+  screen while the old one's write is on its way, and kept in the sheet, the new one's went first.
+  **Outliving the screen, it outlives the person: a write goes only while the one who tapped is still
+  the one here and the door is open** (adversarial Д1) — else it is refused unsent: the door shut by a
+  `401` takes the screens away with no reload, and the savings target of one person, waiting behind a
+  hung write, went into the account of the next. **Not «once the server has named them»** (Д2,
+  self-review 7): that is MOL-56's rule for the queues on the device, and a write made by hand in a
+  sheet is not held by it — held, every plan was refused unsent while `me()` went unanswered at the
+  launch, with the server answering everything else. The prices, named: a refusal of a write whose
+  sheet was swept away is said nowhere, as before; a write waits, «Сохраняем…», while the one before it
+  hangs, up to the client's 15 s — whoever made that one. **A row is `ListRow`**
+  with the category's circle, as on «Категории» and «Траты»; the chevron on every live row — each opens
+  the sheet of its plan — and **«осталось» in the title's line, never the tail**
+  (`name-beside-figure`): a tail of its own width made every bar another length, and
+  bars one under another are read against each other. **The bar is the category's colour**, never the
+  accent (Ф-4), over the plan `--warn` to the edge; the target's bar is `--graphic`, its mark `--text`.
+  **What the row says besides is a line under the bar** — the share, «пока ничего не пришло», «не всё
+  посчитано», «категория убрана» — and so is «Разница … из …» of «Отложить»: in the meta, cut at two
+  lines, a phone of 320 lost them. **A removed category's row is a `div` with the chevron's place kept
+  empty**, so its figure and bar stand in the column of the others, and it says why it does not open.
+  **The three figures of the total are a line each on one plate**: three tiles across broke «330 000
+  ֏» in its middle at 320 and a sum of seven digits at 390. «Плана пока нет» does not grow to the
+  free height — «Отложить» stands under it.
 - **Private, and it goes with its owner** (Р-13): erasure takes `budget_plans` before the categories
   they point at, and the copy of one's data has them (`budgetPlans`, version 7).

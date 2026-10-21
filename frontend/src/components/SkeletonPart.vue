@@ -18,6 +18,7 @@
           <span class="words">
             <span class="line"><span class="bar title"></span></span>
             <span v-if="meta" class="line small"><span class="bar meta"></span></span>
+            <span v-if="track" class="bar track-bar"></span>
           </span>
           <span v-if="tail || under" class="tail">
             <span class="line"><span class="bar amount"></span></span>
@@ -77,9 +78,10 @@ export function isWidths(value: unknown): boolean {
  *   field   — the empty pill of a `SearchField`: a well, not a bar, so it stands still while the bars
  *             breathe — a field is not text that is coming;
  *   rows    — a list card of `count` rows of 64, the geometry of `ListRow` and `OperationRow`: `lead`
- *             an icon of 24, a circle of 40 or nothing; `meta`, a line under the title; `tail`, an
- *             amount; `under`, a line under the amount, which brings the amount with it; `next`, the
- *             place of the chevron. Each bar in a line of the size and leading of the words it stands
+ *             an icon of 24, a circle of 40 or nothing; `meta`, a line under the title; `track`, the
+ *             bar of a plan under it, across the words (MOL-192, «Бюджет»); `tail`, an amount; `under`,
+ *             a line under the amount, which brings the amount with it; `next`, the place of the
+ *             chevron. Each bar in a line of the size and leading of the words it stands
  *             for, so a row is as tall as the answer's. `narrow` is the answer's own: below
  *             `$row-narrow` the tail goes under the words, as in a row of `OperationRow`, whose `li` is
  *             the container `row` — a `ListRow` in a plain `li` stays wide at any width, and bars that
@@ -127,6 +129,7 @@ export default defineComponent({
       validator: (lead: string) => (LEADS as readonly string[]).includes(lead),
     },
     meta: { type: Boolean, default: true },
+    track: { type: Boolean, default: false },
     tail: { type: Boolean, default: false },
     under: { type: Boolean, default: false },
     next: { type: Boolean, default: false },
@@ -232,6 +235,14 @@ export default defineComponent({
 .meta {
   width: 34%;
   height: var(--skeleton-sub);
+}
+
+/* The bar of «Бюджет»'s row: 8 high, 8 under the meta — the 4 of `ListRow`'s `below` and the 4 of the
+   bar's own (MOL-192). */
+.track-bar {
+  display: block;
+  height: var(--space-2);
+  margin-top: var(--space-2);
 }
 
 /* The handoff's cycle (77 v2 2a): 52 / 38 / 60 for the title, 34 / 26 / 30 for the meta. */

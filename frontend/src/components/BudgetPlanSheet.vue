@@ -3,11 +3,11 @@
     <template #title>{{ title }}</template>
     <template #meta>{{ t('budget.sheet.meta') }}</template>
 
-    <form class="form" novalidate @submit.prevent="submit">
-      <p v-if="!online" class="strip">
-        <IconCloudOff class="strip-icon" aria-hidden="true" />{{ t('budget.sheet.offline') }}
-      </p>
+    <!-- The connection is the kit's line, first in the sheet, said in the sheet's own region
+         (MOL-181). A plan is written with a connection only (Р-8 of MOL-117). -->
+    <StatusStrip v-if="!online" class="status" kind="offline" :text="t('budget.sheet.offline')" />
 
+    <form class="form" novalidate @submit.prevent="submit">
       <AppField
         v-if="subject.kind === 'choose'"
         v-model="chosen"
@@ -57,12 +57,11 @@
         block
         :busy="sending && !removing"
         :busy-label="t('budget.sheet.saving')"
-        :inactive="removing"
-        :disabled="!online && !sending"
+        :inactive="removing || (!online && !sending)"
         @click="submit"
       >
         <template #icon><IconCheck v-if="online || sending" /><IconCloudOff v-else /></template>
-        {{ online ? t('budget.sheet.save') : t('budget.sheet.wait_online') }}
+        {{ online || sending ? t('budget.sheet.save') : t('budget.sheet.save_offline') }}
       </AppButton>
       <AppButton
         v-if="plan"
@@ -70,12 +69,11 @@
         block
         :busy="removing"
         :busy-label="t('budget.sheet.removing')"
-        :inactive="sending && !removing"
-        :disabled="!online && !sending"
+        :inactive="(sending && !removing) || (!online && !sending)"
         @click="send(null)"
       >
         <template #icon><IconClose /></template>
-        {{ t('budget.sheet.remove') }}
+        {{ online || sending ? t('budget.sheet.remove') : t('budget.sheet.remove_offline') }}
       </AppButton>
     </template>
   </BottomSheet>
@@ -110,6 +108,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { monthGenitive, monthName } from '@/components/charts'
 import { shown } from '@/composables/useItemDetails'
 
@@ -123,6 +122,8 @@ export type BudgetSubject =
 export interface BudgetOutcome {
   readonly kind: 'saved' | 'removed'
   readonly name: string
+  /** The category the plan is of; null for the savings target. */
+  readonly categoryId: string | null
 }
 
 /**
@@ -142,6 +143,7 @@ export default defineComponent({
     IconClose,
     IconCloudOff,
     SegmentedControl,
+    StatusStrip,
   },
   props: {
     open: { type: Boolean, required: true },
@@ -178,11 +180,18 @@ export default defineComponent({
     const removing = ref(false)
     const valueField = ref<ComponentPublicInstance | null>(null)
     let outcome: BudgetOutcome | null = null
+    // Which opening of the sheet this is. One sheet serves every row, and a write sent from a sheet
+    // swept away may be answered while it is open again for another (adversarial В1 of MOL-192): the
+    // write belongs to the opening it was sent from, never to the one on screen when it lands.
+    let opening = 0
 
     watch(
       () => props.open,
       (open) => {
         if (!open) return
+        opening++
+        sending.value = false
+        removing.value = false
         const plan = props.plan
         kind.value = props.subject.kind === 'savings' || plan?.kind === 'share' ? 'share' : 'amount'
         // A sum kept from another currency of spending — a move — is never put in the field as if it
@@ -268,8 +277,8 @@ export default defineComponent({
       }
     }
 
-    function finished(done: BudgetOutcome): void {
-      if (!props.open) {
+    function finished(done: BudgetOutcome, from: number): void {
+      if (!props.open || from !== opening) {
         emit('done', done)
         return
       }
@@ -290,21 +299,29 @@ export default defineComponent({
         failed.value = t('spending.sheet.bad_category')
         return
       }
+      const from = opening
       sending.value = true
       removing.value = plan === null
       try {
         await props.save({ categoryId: id, from: props.month, plan })
-        finished({
-          kind: plan ? 'saved' : 'removed',
-          name: id === null ? t('budget.savings.title') : props.nameOf(id),
-        })
+        finished(
+          {
+            kind: plan ? 'saved' : 'removed',
+            name: id === null ? t('budget.savings.title') : props.nameOf(id),
+            categoryId: id,
+          },
+          from,
+        )
       } catch (caught) {
+        if (from !== opening) return
         const code = caught instanceof ApiError ? caught.code : null
         failed.value =
           code === ERROR.NOT_FOUND ? t('budget.sheet.category_gone') : t('budget.sheet.failed')
       } finally {
-        sending.value = false
-        removing.value = false
+        if (from === opening) {
+          sending.value = false
+          removing.value = false
+        }
       }
     }
 
@@ -348,24 +365,8 @@ export default defineComponent({
   gap: var(--space-4);
 }
 
-.strip {
-  @include appear;
-
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--warn-tint);
-  color: var(--warn-ink);
-  font-size: var(--text-footnote);
-}
-
-.strip-icon {
-  @include icon;
-
-  font-size: var(--icon-sm);
+.status {
+  margin-bottom: var(--space-4);
 }
 
 .hint,
