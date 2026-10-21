@@ -377,7 +377,12 @@ that it is useless) — **unless something is typed in it or the focus is in it*
 adversarial А1, В-4 «а» on Б2): the connection back with a failure or an empty list took the field from
 under the thumb with what it held and left the focus on `<body>`; it stays, answered by the server's
 search, erased to nothing too — the last Backspace took it and the keyboard with it, and the next word
-had nowhere to go — and goes once the person left it, the focus where they put it. Only a field that
+had nowhere to go — and goes once the person left it, the focus where they put it. **Left by a press,
+it goes once the press is over** (owner's В-5 «а» on adversarial В1): gone as the finger landed, it
+took what was under it up by its height before the release, and the first tap on «Повторить» or a
+step of the newcomer's cycle landed elsewhere; so the leaving is told a task after the release, past
+its click — by the keys, at once — and the page losing the system's focus, another app, is no leaving.
+The price: after that tap what is under the field still rises by its height, the tap already done. Only a field that
 goes with the focus in it — a city moved in another tab — gives the focus to the heading, and only that
 focus (review № 8, Б1: on a phone nobody touched, `<body>` is no focus to give). The prices, named: a
 newcomer who typed in the cold offline is searched for on this one path; and while the field holds
@@ -391,7 +396,8 @@ offline, another city's list offline, «Сервер не ответил» with 
 once the answer is late (`STRIP_LATE_MS`, owner's В-1 «а») — timed by what is waited for, so a city
 moved after a refresh already late waits its own second (adversarial А2); under the well of the
 skeleton after a change of city, «Обновляем · список для Гюмри»; with no field — the newcomer from
-memory — under the header.
+memory — under the header, and under the field the focus holds there (adversarial В2: drawn in both,
+the first stood over the field).
 
 - **The answer for what is found is the server's, never glued on the phone** (`GET /advice/search`,
   В-1). The list is cut at `ADVICE_LIMIT`, so an item rated past the cut would read «ещё не
