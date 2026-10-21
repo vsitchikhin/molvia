@@ -409,13 +409,25 @@ and 4 to another brand or sort — a strawberry yoghurt «Клубника», a 
 Fanta «Лимонад» — all of them sure, and «Записать» recorded them: «в 10 раз хуже, чем если бы они не распознались».
 Both the names and the search took an item when **any** word of its name stood in the line, so a word of a flavour
 or a filling found the fruit. The line's **kind** is its head word before the brand, past adjectives, participles and
-the genitive (`receiptLineParts`; «խորոված», a shashlik, is a noun of an adjective's ending). Then:
+the genitive (`receiptLineParts`; «խորոված», a shashlik, is a noun of an adjective's ending; «հող», soil, too short for
+a participle) — the genitive of a noun in «-ի» too, in «-ու» («ազնվամորու մուրաբա» is raspberry jam, never raspberries),
+and the few in «-ան» the dictionary holds («ձկան»), behind any other word, since a nominative ends so too («կատու»,
+«չորաթթու»; review 2, №2). Then:
 
 - **A name of the seed in the till's language stands only where it says the kind** (`seedNameFits`), the seed's own
   word against the printed one — «Ատամի պաստա» is «Паста зубная» by the seed's name, which the dictionary's Russian
   need not cover — and never on a branded line: the seed names no brand. Judged by the Russian name instead, the
   first round turned 333 of the seed's 2 000 till names away from their own items and 163 onto others' (adversarial
-  А1, А2); now all 2 000 bind as master bound them.
+  А1, А2); now all 2 000 bind as master bound them. The words are the same, one inflected past the other («կոնֆետներ»,
+  «հրուշակեղեն»), or — a printed word the dictionary has not, from four letters — the seed's with **one letter lost**,
+  as Tesseract and the model lose one: «Կոլասա» is «կոլբասա». Exact alone, the first fix of round 1 left 228 of the
+  seed's 1 523 names with a letter dropped on their own items, master 1 296; now 1 386, and not one master put on its
+  own is on another (adversarial Б4). **Never a common start** — «Տուշ», mascara, was «Тушёнка», «Թել», a thread,
+  «Вермишель», «Դեղ», a medicine, «Персики» (Б3) — **nor a letter misread**: «Ռոլիկ», a roller, is no «լոլիկ».
+- **Two things side by side, neither in a case, do not say which is the kind** (adversarial Б1): a till prints the
+  kind first («Պանիր չեդդեր»), Armenian the head last («Ելակ յոգուրտ», a strawberry yoghurt), so an item — and a
+  seed's name — stands only where it says both. A quality the dictionary glosses as one («միջին», средний) is no
+  thing. Of 527 lines «flavour kind» made of the seed's words, the first round bound 459 to the fruit, sure; now none.
 - **Any other item stands where `lineFitter` lets it** — a heading's far match, each of the search's first ten:
   **every word of its name is the line's**, by a **form** of the dictionary's Russian — an adjective in any gender,
   number and case, a noun in any number and case, the adjective a noun makes («оливки» — «оливковый», «молоко» —
@@ -439,21 +451,27 @@ the name, so a package is an item). A word the dictionary has not is spelt in le
 (`receipt_lines.spelled`, 0069, В-4 «а» with the owner's note): the review offers the name, and «Убрать имя — оставить
 как в чеке» takes it away in one press — while the proposal stands, never over a name of the person's own. A name
 typed over the proposal answers «проверьте». Units, counts, a lone sign («x 24»), packaging marks and an abbreviation
-the dictionary has not are no words of it; with no word left there is no name at all, never the gloss (А7). On a
+the dictionary has not are no words of it; a word in capitals of up to four letters on a line of small ones keeps
+them («АА», «ГОСТ»), and a lone Latin letter is a size («M»; review 2, №3); with no word left there is no name at all, never the gloss (А7). On a
 receipt read out in English there is no Russian name, as there is no gloss. «Записать» puts a new name that is an
 item's already on that item (`createUnlessNamed`).
 
 **The bench** (`.scratch/tasks/status/MOL-293/`, `research/MOL-293.md`): MOL-114's 321 lines of 34 receipts, through
 the product's own `bindReceiptLines` on the seed and the owner's items of am-34…43, each pair «line → item» judged.
 Master: 47 right, 203 «general» (the kind with no brand or sort), **42 wrong**, 29 new. Now: **136 right, 0 wrong**,
-6 general, 179 new with meaning (124 / 0 / 191 by letters alone) — every new one «проверьте». **The dictionary grew
+4 general, 181 new with meaning (124 / 0 / 4 / 193 by letters alone) — every new one «проверьте». **The dictionary grew
 by the words of these very lines**, so the honest figure is lower: with master's dictionary 96 right, 0 wrong — the
 first receipts of the owner's the bench never saw will tell. **The seed's own 2 000 till names**, as lines: 1 972 to
 their own item, 28 to another — as on master; by the search alone, the names path off, 1 045 own, 88 another (a kind
 for a sort: «Молоко» for «Կաթ 3,2%», «Рыба» for a hake), 867 new. **The prices, named:** a line whose brand nobody
 named is new however near the seed's item stands, so the first receipt of a shop is mostly «проверьте» until the
 person's words fill the shop's memory, which needs the tax number (below); a word the item names that the line does
-not print keeps it away — «Лук репчатый» for «Սոխ (հայկական)»; a Russian word of a form these rules do not make
+not print keeps it away from the search — «Огурцы маринованные» for «Վարունգ ընտիր»; two things side by side lose
+the kind of the order a till prints — «Йогурт» for «Յոգուրտ ելակ», 407 of those 527 lines in the first round, 55 now
+(«Хлеб» for «Հաց Պումպերնիկել» on the bench), a new item instead; a genitive before the kind is asked of no seed's name
+— «Թեյի տոպրակ», a tea bag, is «Пакеты фасовочные», sure (review 2, №4); a diminutive is another word — «16 Թև» is
+no «Крылья куриные» (`թևիկներ`), as «թել» is no «թելիկ»; a brand two letters off is another — the owner's «Бисквит
+Kinder Délice» for «Բիսքվիթ «Կինդեր» դելիս» is a new item beside it; a Russian word of a form these rules do not make
 («крылья» for «крылышко») is another word; and the new item's name is the dictionary's words as they stand, an
 adjective unagreed («Плёнка пищевой») — under «проверьте», for the person to put right. **And the measure of 0.2
 moves with it** (review №6): a new line the person binds to an item of the catalogue is an item put right, so the
