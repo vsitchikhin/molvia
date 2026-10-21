@@ -982,7 +982,9 @@ sent to the card unrecorded. **The phone hears the cashback by `RECEIPT_CASHBACK
 earlier build reads the detail strictly and knows no cashback: it is sent the lines' total as the receipt's, so it
 says no «Разница» of lines read right (review round 1, А4). **That total sent back is the printed one** (review round 2,
 №5): «Итог» opened and saved as it was sends exactly the lines' total, and «Записать» takes it as the total printed —
-what left the card, and no total put right in the 0.2 measure; any other figure sent is the person's word.
+what left the card, and no total put right in the 0.2 measure; any other figure sent is the person's word. **The
+price, named** (review round 3, №7): the record carries no build, so a phone of this build that has the lines' total
+typed on purpose is taken the same way — the trip what left the card, as В-5 «а» asks, but the edit uncounted.
 
 **«Ընդամենը ամվա սկզբից» is never a total** (MOL-288, the card's `sinceStart`): what the card bought this year, the
 largest amount the total's word stood by, it was the total read — «Прочитали не всё» short by 120 000 ֏. Neither read
@@ -1018,15 +1020,22 @@ two rates (am-34: 1 % on 30 lines, 0,5 % on two) holds every line to the commone
 is not put right.
 
 **The total chooses only among the fewest swaps' sums** (review round 2, owner's Б2 «а»): the readings of a line it
-chooses among are those whose sum is, to the till's rounding, one its fewest swaps give — the same sum split another
-way (0,6 × 550, 0,5 × 660), a luma off (567,15, 567,16), «160» at 150 read either way. A reading further off is not
-the total's to choose: a line the model bent to fit, 99,00 short (am-34), made the cottage cheese's 615,78 — three
-swaps where one reads it as printed — the one choice that met the total, and «proven whole» hid the difference that
-pointed at the butter. **A line read whole that the swaps read whole too** (a bun copied 96 / 96 for 95 / 95) is a
-second way: a choice that meets the total with it moved is a doubt, and the one choice must meet it with every such
-line as copied; past `REPAIR_SHIFTS_MAX` (4 096) ways of moving them nothing is put right. **The price, named:** lines
-put right on the brute force 188 086 → 187 801 (−0,15 %), none wrong; on the class code's tills each neighbour that
-reads whole both ways costs some 0,5 % more (440 of 84 056 beside 1 × 560), on the card's none; the bench as before.
+chooses among are those whose sum is, to the till's rounding, one its fewest swaps give — the same sum split another way
+(0,6 × 550, 0,5 × 660), a luma off (567,15, 567,16). A reading further off is not the total's to choose: a line the
+model bent to fit, 99,00 short (am-34), made the cottage cheese's 615,78 — three swaps where one reads it as printed —
+the one choice that met the total, and «proven whole» hid the difference that pointed at the butter. **A line read whole
+that the swaps read whole too** (a bun copied 96 / 96 for 95 / 95) is a second way: a choice that meets the total with
+it moved is a doubt, and the one choice must meet it with every such line as copied; past `REPAIR_SHIFTS_MAX` (4 096)
+ways of moving them nothing is put right. **And never between two sums** (review round 3, owner's Г1 «а»): where the
+fewest swaps give sums more than the till's rounding apart — «160» at 150, or «622 / 6.22» at 516,78 read back or with
+its sum swapped — the line is a doubt; the total confirms a line's one sum and chooses only a luma. Two readings equally
+cheap let the cottage cheese's 615,78 pay for am-34 again, Б2 dodged by one more error of the model. **The price,
+named:** such a line stays empty as before MOL-290, copied right beside it or not — lines put right on the brute force
+187 801 → 186 157 (−0,9 %), none wrong, the bench as before. The shifts cost lines put right on the brute force 188 086
+→ 187 801 (−0,15 %), none wrong; on the class code's tills each neighbour that reads whole both ways costs some 0,5 %
+more (440 of 84 056 beside 1 × 560); on the card's, two neighbours at 1 % whose sum ends in a 5 or 6 read a luma off
+within the till's rounding, and the reviewer's synthetic (review round 3, №8) puts right 112 878 → 101 421 of 124 932
+(−10 %), the discounts a luma off 9 919 → 6 675 among them; the bench as before.
 
 **It is taken only with the whole receipt** (owner's В-1 «а»): every line as copied or put right, and their sum
 exactly the total two places vouch for, less what went to the card — a second source a misread line cannot fake. Short

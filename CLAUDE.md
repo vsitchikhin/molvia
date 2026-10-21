@@ -630,9 +630,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   (`linesTotalOf`), its second place «ԱԱՀ-ով հարկվող»; the total shown is what left the card, and the trip's money that
   less a bonus spent (`receiptPaidOf`); a model's reading only. «Ընդամենը ամվա սկզբից» is never a total (MOL-288).
 - **A model's line is put right by the font's 5↔6 only with the whole receipt** (MOL-290): two swaps a figure, the
-  card's rate, and of the lines' readings at their fewest swaps' sums exactly one choice meets the total two places
-  vouch for (А1, Б2 «а»), every line read whole as copied, a cashback vouched for (Б1 «а»); shown «проверьте», never
-  as read (`repaired`), empty to an earlier build, no shelf price for the memory; the model is never asked to do the sum.
+  card's rate, a line's fewest swaps giving one sum the total confirms, never chooses — but a luma (А1, Б2, Г1 «а»),
+  every line read whole as copied, a cashback vouched for (Б1 «а»); shown «проверьте», never as read (`repaired`), empty
+  to an earlier build, no shelf price for the memory; the model is never asked to do the sum.
 - **The reader away leaves a receipt queued; a photo it drops goes to the end with its attempt
   counted; a photo it cannot read fails** — never lost, never read forever; people read in turn.
 - **The class code is a boundary, not a layout** (MOL-226): «Դաս. 56.10» opens an item on any fiscal till,
