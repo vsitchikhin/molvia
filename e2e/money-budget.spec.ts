@@ -1,6 +1,7 @@
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { goOffline, signedIn } from './session'
+import { asBrowser, goOffline, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
@@ -117,36 +118,58 @@ test('must not fire: with no connection a plan is not sent, and both ways say wh
   expect(sent).toBe(false)
 })
 
-test('the rows stand in one column: every bar as long, at 390 and at 320 (MOL-192)', async ({
+test("the rows stand in one column at 390 and 320, a removed category's too (MOL-192)", async ({
   page,
 }) => {
-  await openMoney(page)
-  await openBudget(page)
-  const sheet = page.locator('dialog[open]')
-  for (const [category, sum] of [
-    ['Аренда жилья', '250000'],
-    ['Кафе и рестораны', '50000'],
-  ] as const) {
-    await page.getByRole('button', { name: 'Задать план категории' }).click()
-    await expect(sheet).toContainText('Новый план')
-    await page.waitForTimeout(400)
-    await sheet.getByLabel('Категория').selectOption({ label: category })
-    await sheet.getByLabel('Сумма в месяц').fill(sum)
-    await sheet.getByRole('button', { name: 'Сохранить' }).click()
-    await expect(sheet).toBeHidden()
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  const { categories } = (await (
+    await page.request.get('/api/spending-categories', { headers })
+  ).json()) as { categories: { id: string; preset: string | null }[] }
+  const idOf = (preset: string) => categories.find((one) => one.preset === preset)?.id ?? ''
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(new Date())
+  for (const preset of ['rent', 'cafe']) {
+    const planned = await page.request.put('/api/budget/plans', {
+      headers,
+      data: {
+        categoryId: idOf(preset),
+        from: today.slice(0, 7),
+        plan: { kind: 'amount', amount: { amount: '50000', currency: 'AMD' } },
+      },
+    })
+    expect(planned.ok(), await planned.text()).toBe(true)
   }
+  // A removed category keeps its row only in a month something was spent in it (MOL-117, Р-5).
+  const spent = await page.request.post('/api/spendings', {
+    headers,
+    data: {
+      id: randomUUID(),
+      spentOn: today,
+      amount: { amount: '6500', currency: 'AMD' },
+      categoryId: idOf('cafe'),
+    },
+  })
+  expect(spent.status(), await spent.text()).toBe(201)
+  const removed = await page.request.delete(`/api/spending-categories/${idOf('cafe')}`, {
+    headers,
+  })
+  expect(removed.ok()).toBe(true)
+
+  await page.goto('/money/budget')
+  const rows = page.locator('li .list-row')
+  await expect(rows.locator('.track')).toHaveCount(2)
+  await expect(page.locator('li div.list-row')).toHaveCount(1)
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 800 })
-    const tracks = page.locator('.list-row .track')
-    await expect(tracks).toHaveCount(2)
-    const boxes = await tracks.evaluateAll((all) =>
-      all.map((one) => {
-        const box = one.getBoundingClientRect()
-        return { left: Math.round(box.left), right: Math.round(box.right) }
+    const edges = await rows.evaluateAll((all) =>
+      all.map((row) => {
+        const bar = row.querySelector('.track')?.getBoundingClientRect()
+        const figure = row.querySelector('.amount')?.getBoundingClientRect()
+        return `${String(Math.round(bar?.left ?? 0))}:${String(Math.round(bar?.right ?? 0))}:${String(Math.round(figure?.right ?? 0))}`
       }),
     )
-    // A circle, a chevron and a gap on every row, so the bars are one length.
-    expect(new Set(boxes.map((box) => `${String(box.left)}:${String(box.right)}`)).size).toBe(1)
+    // A circle, a chevron or its empty place, and a gap on every row: one bar, one column of figures.
+    expect(new Set(edges).size).toBe(1)
     // Nothing stands past the page.
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       width,
