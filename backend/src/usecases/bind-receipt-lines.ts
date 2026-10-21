@@ -13,6 +13,7 @@ import type { AppLocale, ReceiptCountry, ReceiptLine } from '@molvia/model'
 import type { ItemRepository } from '@/db/items-repository'
 import type { LineBinding } from '@/db/receipts-repository'
 import type { Embedder } from '@/embeddings/embedder'
+import { CATALOGUE_SEED } from '@/catalogue-seed'
 import { TILL_WORDS_RU } from '@/receipts/till-words-ru'
 import { findByBarcode } from '@/usecases/find-by-barcode'
 import { queryMeaning } from '@/usecases/query-meaning'
@@ -41,6 +42,9 @@ export class CatalogueNamesMissing extends Error {
  * «Тамара» 18%» stood past the fifth for «сметана», and ten found 116 lines of the bench right against 87.
  */
 const SEARCH_ROWS = 10
+
+/** The seed's names: kinds, never brands — no branded line stands on one (MOL-293, «Бекон» for a sausage of «Բեկոն»). */
+const SEED_NAMES = new Set(CATALOGUE_SEED.map(([name]) => name))
 
 /** A name shorter than this is no item to search by: «Ko», a unit's cut that stood alone. */
 const SHORTEST_NAME = 3
@@ -115,7 +119,9 @@ export async function bindReceiptLines(
       // which was «проверьте» and is now a new item, as the rest
       const fits = lineFitter(parts, TILL_WORDS_RU)
       const first = answer.items.find(
-        (item) => fits(item.name) && !headingRulesOut(line.hs, headings.get(item.id) ?? []),
+        (item) =>
+          fits(item.name, { generic: SEED_NAMES.has(item.name) }) &&
+          !headingRulesOut(line.hs, headings.get(item.id) ?? []),
       )
       if (first !== undefined) {
         // a dish of a class of services is never sure among the catalogue's goods (MOL-226)
@@ -129,7 +135,8 @@ export async function bindReceiptLines(
     bound.push({
       itemId: null,
       match: 'weak',
-      translation: named?.name ?? translation,
+      // never the gloss, which reads a word one edit off: «Ռոլիկ.» was a «помидор» (adversarial А7)
+      translation: named?.name ?? null,
       spelled: named?.spelled ?? false,
     })
   }

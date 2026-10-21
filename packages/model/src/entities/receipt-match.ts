@@ -5,7 +5,7 @@
 // for line (`.scratch/tasks/status/MOL-126/parity.mjs`), so the measured figure — 54 of 70 lines of
 // receipts its rules never saw — still holds.
 
-import { lineFitter, receiptLineParts } from '#model/entities/receipt-line-kind'
+import { lineFitter, receiptLineParts, seedNameFits } from '#model/entities/receipt-line-kind'
 import { levenshtein } from '#model/support/edits'
 
 /** An item as a receipt reaches it: its own name, its names in the till's language, its headings. */
@@ -136,19 +136,16 @@ export function createLineMatcher(
   }
 
   // An item names the line's kind and nothing the line does not print (MOL-293, В-1 «а»): a word of a
-  // flavour found «Клубника» for a strawberry yoghurt.
+  // flavour found «Клубника» for a strawberry yoghurt. An item of the seed is a kind, never a brand.
   type Fits = (name: string) => boolean
 
   // A fat or a strength printed on the line picks the variety: «Կաթ 3.2%» is «Молоко 3,2%».
-  function refine(found: CatalogueNode, printed: string, fits: Fits): CatalogueNode {
+  function refine(found: CatalogueNode, printed: string): CatalogueNode {
     const percent = /(\d+(?:[.,]\d+)?)\s*%/u.exec(printed)?.[1]?.replace('.', ',')
     if (percent === undefined) return found
     const kind = found.name.replace(/\s+\d.*$/u, '')
     return (
-      nodes.find(
-        (node) =>
-          node.name.startsWith(kind) && node.name.includes(`${percent}%`) && fits(node.name),
-      ) ?? found
+      nodes.find((node) => node.name.startsWith(kind) && node.name.includes(`${percent}%`)) ?? found
     )
   }
 
@@ -183,7 +180,9 @@ export function createLineMatcher(
 
   function match(printed: string, hs: string | null): LineMatch | null {
     const tokens = receiptWords(printed)
-    const fits = lineFitter(receiptLineParts(printed), dictionary)
+    const parts = receiptLineParts(printed)
+    const fitter = lineFitter(parts, dictionary)
+    const fits: Fits = (name) => fitter(name, { generic: true })
     let best: { node: CatalogueNode; score: number } | null = null
     for (const entry of index) {
       const { headings } = entry.node
@@ -193,12 +192,13 @@ export function createLineMatcher(
       // more words — more specific
       const score =
         scores.reduce((sum, x) => sum + x, 0) / entry.words.length + 0.05 * (entry.words.length - 1)
-      // asked last, and only of a name that would win: the line is read against the item's whole name
-      if ((best === null || score > best.score) && fits(entry.node.name))
+      // asked last, and only of a name that would win: the seed's own name in the till's language says the
+      // line's kind — its Russian one the dictionary need not know, «Ատամի պաստա» is «Паста зубная»
+      if ((best === null || score > best.score) && seedNameFits(parts, entry.words))
         best = { node: entry.node, score }
     }
     if (best !== null && best.score >= MATCH_SCORE) {
-      return { itemId: refine(best.node, printed, fits).itemId, far: isServiceClass(hs) }
+      return { itemId: refine(best.node, printed).itemId, far: isServiceClass(hs) }
     }
     return byHeading(printed, hs, fits)
   }

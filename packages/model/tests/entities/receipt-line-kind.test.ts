@@ -4,7 +4,9 @@ import {
   lineFitter,
   newLineName,
   receiptLineParts,
+  seedNameFits,
 } from '#model/entities/receipt-line-kind'
+import { receiptWords } from '#model/entities/receipt-match'
 
 const WORDS = {
   յոգուրտ: 'йогурт',
@@ -30,10 +32,31 @@ const WORDS = {
   հրուշակեղեն: 'кондитерские изделия/пирожное',
   ծովախեցգետին: 'креветка/краб',
   չիպս: 'чипсы',
+  լյարդ: 'печень',
+  ատամի: 'зуб',
+  պաստա: 'паста',
+  չերի: 'черри',
+  բատոնչիկ: 'батончик',
+  սիռոկ: 'сырок',
+  սերուցք: 'сливки',
+  կիտրոն: 'лимон',
+  նուռ: 'гранат',
+  շամպինիոն: 'шампиньон',
+  համեմ: 'кинза',
+  խորոված: 'шашлык',
+  խոզի: 'свиной',
+  կեֆիր: 'кефир',
+  ձիթապտղի: 'оливки',
+  մայոնեզ: 'майонез',
+  հյութ: 'сок',
+  մասուր: 'шиповник',
+  երշիկ: 'колбаса',
+  չորիզո: 'чоризо',
 }
 
 const kind = (printed: string) => receiptLineParts(printed).kind
-const fits = (printed: string, item: string) => lineFitter(receiptLineParts(printed), WORDS)(item)
+const fits = (printed: string, item: string, generic = false) =>
+  lineFitter(receiptLineParts(printed), WORDS)(item, { generic })
 const named = (printed: string) => newLineName(receiptLineParts(printed), WORDS)
 
 describe('a line taken apart (MOL-293)', () => {
@@ -63,6 +86,15 @@ describe('a line taken apart (MOL-293)', () => {
     expect(kind('16 Թև')).toBe('Թև')
   })
 
+  it('takes «խորոված», a shashlik, for the head: no adjective of its ending (adversarial А4)', () => {
+    expect(kind('Խորոված խոզի կգ')).toBe('Խորոված')
+    expect(fits('Խորոված խոզի կգ', 'Свинина')).toBe(false)
+  })
+
+  it('keeps the text of a «…» with no letter a word of the line: «22/24»', () => {
+    expect(receiptLineParts('Նուշ «22/24» կգ').before).toEqual(['Նուշ', '22/24', 'կգ'])
+  })
+
   it('takes a word of a case ending for the head where nothing else is', () => {
     expect(kind('Ֆրի ստանդարտ')).toBe('Ֆրի')
     expect(kind('Բուլկի կրեմով 90գր')).toBe('Բուլկի')
@@ -85,6 +117,20 @@ describe('a line taken apart (MOL-293)', () => {
     expect(receiptLineParts('Շամպինիոն «Սպիտակ Գլխարկ» 0.3կգ').size).toBe('0,3 кг')
     expect(receiptLineParts('Գազար կգ').size).toBeNull()
     expect(receiptLineParts('Մագնեզիումի գլիցինատ 120մգ').size).toBeNull()
+  })
+})
+
+describe('a name of the seed in the till’s language for the line’s kind (MOL-293, adversarial А1)', () => {
+  const name = (hy: string) => receiptWords(hy)
+  it('takes the seed’s own name that says the kind, inflected past it or cut before its end', () => {
+    expect(seedNameFits(receiptLineParts('Ատամի պաստա'), name('ատամի պաստա'))).toBe(true)
+    expect(seedNameFits(receiptLineParts('Ֆրանսիական հրուշակեղեն'), name('հրուշակ'))).toBe(true)
+  })
+
+  it('takes no name without the kind, and none for a branded line', () => {
+    expect(seedNameFits(receiptLineParts('Յոգուրտ ելակ'), name('ելակ'))).toBe(false)
+    expect(seedNameFits(receiptLineParts('Կաթ «Իգիթ» 3.2%'), name('կաթ'))).toBe(false)
+    expect(seedNameFits(receiptLineParts('Պիցցայի լոշիկ'), name('լոլիկ'))).toBe(false)
   })
 })
 
@@ -133,6 +179,12 @@ describe('a new item’s name (MOL-293, В-1 «б»)', () => {
 
   it('takes a word’s first sense: «креветка/краб» is a shrimp', () => {
     expect(named('Չիպս «Մախեև» ծովախեցգետին 80գր')?.name).toBe('Чипсы «Махеев» креветка 80 г')
+  })
+
+  it('drops a lone sign before a figure, and writes a word in capitals as a word (review №5)', () => {
+    expect(named('Չիպս x 24')?.name).toBe('Чипсы')
+    expect(named('ԸՆԴԱԼԹ ՉԻՊՍ')?.name).toBe('Ындалт чипсы')
+    expect(named('Կուպատի «ԳԵԳ» կգ')?.name).toBe('Купати «ГЕГ»')
   })
 
   it('is none for a line with no word', () => {
@@ -189,6 +241,48 @@ describe('an item standing on a line (MOL-293, В-1 «а», В-2 «а»)', () =>
     const dessert = 'Աղանդեր «Դոն Դանտես» 130գր'
     expect(fits(dessert, 'Десерт «Дон Дантес»')).toBe(false)
     expect(fits(dessert, 'Дон Дантес')).toBe(true)
+  })
+
+  it('never takes another thing by a common start or one edit (adversarial А1, А3, review №2)', () => {
+    const pairs: [string, string][] = [
+      ['Լյարդ', 'Печенье'],
+      ['Ատամի պաստա', 'Пастила'],
+      ['Չերի', 'Черника'],
+      ['Բատոնչիկ', 'Батон'],
+      ['Սիռոկ', 'Сироп'],
+      ['Սերուցք', 'Сливы'],
+      ['Կիտրոն', 'Лимонад'],
+      ['Նուռ', 'Гранола'],
+      ['Շամպինիոն 0.5կգ', 'Шампунь'],
+      ['Համեմ հտ', 'Киноа'],
+      ['Ֆրանսիական հրուշակեղեն, հատապտղային կրեմով', 'Пирожки'],
+    ]
+    for (const [printed, other] of pairs)
+      expect(fits(printed, other), `${printed} → ${other}`).toBe(false)
+  })
+
+  it('takes a word in its forms: a plural, a case, the adjective a noun makes', () => {
+    expect(fits('Լյարդ', 'Печень')).toBe(true)
+    expect(fits('Ատամի պաստա', 'Паста зубная')).toBe(true)
+    expect(fits('Հյութ «Արտֆուդ» մասուր 250մլ', 'Сок шиповника «Артфуд»')).toBe(true)
+    expect(fits('Մայոնեզ «Սլոբոդա» ձիթապտղի 67% 400մլ', 'Майонез «Слобода» оливковый 67%')).toBe(
+      true,
+    )
+    expect(fits('Կիտրոն', 'Лимоны')).toBe(true)
+  })
+
+  it('never takes the seed’s item, a kind, for a branded line: «Бекон» for a sausage of «Բեկոն»', () => {
+    const chorizo = 'Երշիկ չորիզո «Բեկոն» 192գր'
+    expect(fits(chorizo, 'Бекон', true)).toBe(false)
+    expect(fits(chorizo, 'Колбаса чоризо «Бекон»')).toBe(true)
+    expect(fits('Մարտկոց «Էներջի» 4հտ', 'Энергетик', true)).toBe(false)
+  })
+
+  it('reads a figure with its unit: a fat is never a litre (adversarial А5)', () => {
+    const kefir = 'Կեֆիր «Մարիաննա» 2.5% 1լ'
+    expect(fits(kefir, 'Кефир «Марианна» 1%')).toBe(false)
+    expect(fits(kefir, 'Кефир «Марианна» 2,5%')).toBe(true)
+    expect(fits(kefir, 'Кефир «Марианна» 2,5% 1 л')).toBe(true)
   })
 
   it('takes nothing for a name of no word', () => {

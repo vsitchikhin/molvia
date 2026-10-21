@@ -58,6 +58,8 @@ const QUALIFIERS = new Set([
 
 /** An adjective or a participle by its ending: «Գազավորված ըմպելիք», «Աշխատանքային ձեռնոց». */
 const ADJECTIVE = /(?:ային|ական|ավոր|ված|ած|ող|յան)$/u
+// nouns of an adjective's ending: «Խորոված խոզի» is a shashlik of pork, not a pig (adversarial А4)
+const NOUNS = new Set(['խորոված'])
 /**
  * A noun in the genitive, instrumental or ablative: «Կաղամբի չորաթթու», «Հաց … ցորենից». Its ending is a
  * noun's too — «Ֆրի», «Բուլկի», «սպեղանի» — so such a word is the head where nothing else is.
@@ -74,7 +76,9 @@ const keyed = (word: string): string => word.toLowerCase()
 
 /** A word of a name: letters with no digit, not a packaging mark («ա/տ», «թ/տ»), not a code («#0-1»). */
 function isNameWord(token: string): boolean {
-  return !/\d/u.test(token) && !token.includes('/') && (ARMENIAN.test(token) || LATIN.test(token))
+  // a lone Latin letter is a sign — «x 24», a pack's count — or a size, never a word of the name
+  const latin = LATIN.test(token) && token.length > 1
+  return !/\d/u.test(token) && !token.includes('/') && (ARMENIAN.test(token) || latin)
 }
 
 /** The tokens of a name: spaces and commas apart, «Գազ.ըմպելիք» at its point, parentheses dropped. */
@@ -106,13 +110,16 @@ export function receiptLineParts(printed: string): ReceiptLineParts {
   const quoted = open < 0 ? null : printed.slice(open + 1, close < 0 ? undefined : close).trim()
   // «…» a till cut, «22/24» a calibre: no letter, no brand — its text stays a word of the line
   const brand = quoted !== null && /\p{L}/u.test(quoted) ? quoted : null
-  const before = tokensOf(open < 0 ? printed : printed.slice(0, open))
-  const after = open < 0 || close < 0 ? [] : tokensOf(printed.slice(close + 1))
+  const before = tokensOf(brand === null ? printed.replace(/[«»]/gu, ' ') : printed.slice(0, open))
+  const after = brand === null || close < 0 ? [] : tokensOf(printed.slice(close + 1))
   const head = brand === null ? [...before, ...after] : before.length > 0 ? before : after
   const words = head.filter(
     (token) => isNameWord(token) && ARMENIAN.test(token) && !token.endsWith('.'),
   )
-  const plain = words.filter((word) => !QUALIFIERS.has(keyed(word)) && !ADJECTIVE.test(keyed(word)))
+  const plain = words.filter(
+    (word) =>
+      NOUNS.has(keyed(word)) || (!QUALIFIERS.has(keyed(word)) && !ADJECTIVE.test(keyed(word))),
+  )
   const kind = plain.find((word) => !CASE.test(keyed(word))) ?? plain[0] ?? words[0] ?? null
   const percent = /(\d+(?:[.,]\d+)?)\s*%/u.exec(printed)?.[1]
   const size = SIZE.exec(printed)
@@ -177,8 +184,11 @@ const LETTERS: Readonly<Record<string, string>> = {
   ֆ: 'ф',
 }
 
-/** One word's Armenian letters in Russian ones; anything else as it is. A capital stays a capital. */
-function spellWord(word: string): string {
+/**
+ * One word's Armenian letters in Russian ones; anything else as it is. A capital stays a capital; a word all in
+ * capitals stays so in a brand («ԳԵԳ»), and is a word like any other in a name («ԸՆԴԱԼԹ», review №5).
+ */
+function spellWord(word: string, brand = true): string {
   const lower = word.toLowerCase()
   let out = ''
   for (let i = 0; i < lower.length;) {
@@ -191,7 +201,7 @@ function spellWord(word: string): string {
   const first = word.slice(0, 1)
   const capital = first !== first.toLowerCase()
   const whole = word.length > 1 && word === word.toUpperCase() && ARMENIAN.test(word)
-  if (whole) return out.toUpperCase()
+  if (whole) return brand ? out.toUpperCase() : out
   return capital ? out.charAt(0).toUpperCase() + out.slice(1) : out
 }
 
@@ -246,11 +256,11 @@ export function newLineName(
       // an abbreviation the dictionary has not, «անտ.», is no word to spell
       if (gloss === null && token.endsWith('.')) return []
       if (gloss === null) spelled = true
-      const word = gloss ?? spellWord(token)
+      const word = gloss ?? spellWord(token, false)
       // «Հավկիթ «Արզնի» հավկիթ» is eggs once, «Կարագ սերուցքային» butter that is creamy once
-      const keys = keysOf(word)
-      if (keys.length > 0 && keys.every((key) => said.some((one) => sameWord(key, one)))) return []
-      said.push(...keys)
+      const own = wordsOf(word)
+      if (own.length > 0 && own.every((one) => said.some((was) => sameRussian(one, was)))) return []
+      said.push(...own)
       return [word]
     })
   // the kind first, as a shelf names it: «Капуста квашеная», «Напиток газированный»
@@ -270,65 +280,201 @@ export function newLineName(
   return { name: name.charAt(0).toUpperCase() + name.slice(1), spelled }
 }
 
-// a preposition or a unit of an item's name asks nothing of the line: «Рулет … с фруктовой начинкой»
-const NO_WORD = new Set(['dlia', 'bez'])
+// a preposition of an item's name asks nothing of the line: «Рулет … с фруктовой начинкой»
+const NO_WORD = new Set(['для', 'без', 'из', 'на', 'по', 'со', 'во'])
+
+/** A name's words, lower case, «ё» as «е»: Cyrillic, Latin and Armenian alike, figures apart. */
+const wordsOf = (text: string): string[] =>
+  text
+    .toLowerCase()
+    .replace(/ё/gu, 'е')
+    .split(/[^\p{L}]+/u)
+    .filter((word) => word.length > 2 && !NO_WORD.has(word))
+
+const ADJECTIVE_ENDINGS = [
+  'ый',
+  'ий',
+  'ой',
+  'ая',
+  'яя',
+  'ое',
+  'ее',
+  'ые',
+  'ие',
+  'ого',
+  'его',
+  'ому',
+  'ему',
+  'ым',
+  'им',
+  'ую',
+  'юю',
+  'ых',
+  'их',
+  'ыми',
+  'ими',
+]
+const NOUN_ENDINGS = [
+  'а',
+  'у',
+  'е',
+  'ом',
+  'ой',
+  'ы',
+  'и',
+  'ов',
+  'ам',
+  'ами',
+  'ах',
+  'ю',
+  'ей',
+  'ем',
+  'я',
+]
 
 /**
- * A name's words by the search key, each its own — «Coca-Cola» is «koka» and «kola» — and its figures
- * whole, «3,2» for «3.2%», «3,2 %» and «3.2»: a fat or a size the line does not print is another item.
+ * A Russian word's forms an item may name it by: an adjective in any gender, number and case — «сливочное»,
+ * «сливочный»; a noun in any number and case — «огурец», «огурцы»; «яйцо», «яйца»; «шиповник», «шиповника»;
+ * and the adjective a noun makes — «оливки», «оливковый»; «шоколад», «шоколадный»; «молоко», «молочный».
+ * Nothing else: a common start found «Пастила» for a toothpaste and «Печенье» for a liver (adversarial А1, А3).
  */
-function keysOf(text: string): string[] {
-  const figures = (text.match(/\d+(?:[.,]\d+)?/gu) ?? []).map((figure) => figure.replace('.', ','))
-  const words = toSearchKey(text.replace(/\d+(?:[.,]\d+)?/gu, ' '))
-    .split(/[^\p{L}]+/u)
-    .filter((key) => key.length > 2 && !NO_WORD.has(key))
-  return [...words, ...figures]
+function formsOf(word: string): Set<string> {
+  const out = new Set([word])
+  const adjective = ADJECTIVE_ENDINGS.filter(
+    (one) => word.endsWith(one) && word.length > one.length + 2,
+  )
+    .sort((a, b) => b.length - a.length)
+    .at(0)
+  if (adjective !== undefined) {
+    for (const one of ADJECTIVE_ENDINGS) out.add(word.slice(0, -adjective.length) + one)
+    return out
+  }
+  // the stem: less its last vowel or soft sign, «ец» and «ок» losing their vowel — «огурц», «сырк»
+  const stems = /[аяоеиыйь]$/u.test(word)
+    ? [word.slice(0, -1)]
+    : word.endsWith('ец') || word.endsWith('ок')
+      ? [word, `${word.slice(0, -2)}${word.slice(-1)}`]
+      : [word]
+  for (const stem of stems) {
+    if (stem.length < 3) continue
+    for (const one of NOUN_ENDINGS) out.add(stem + one)
+  }
+  // the adjective of a noun: «оливк» — «оливков», «шоколад» — «шоколадн», «молок» — «молочн»
+  const root = stems[0] ?? word
+  const roots = [root, ...(root.endsWith('к') ? [`${root.slice(0, -1)}ч`] : [])]
+  for (const one of roots) {
+    if (one.length < 3) continue
+    for (const suffix of ['н', 'ов', 'ев']) {
+      for (const ending of ADJECTIVE_ENDINGS) out.add(one + suffix + ending)
+    }
+  }
+  return out
 }
 
+/** Two Russian words one word by its forms, either way. */
+const sameRussian = (a: string, b: string): boolean => formsOf(a).has(b) || formsOf(b).has(a)
+
 /**
- * One word of an item found among the line's: the same by the key, one edit from five letters — the
- * search's own tolerance — or a common start that leaves at most two letters of the shorter: Russian
- * endings, «клубника» and «клубничный», «огурцы» and «огурец».
+ * Two names one by their letters — a brand, a word of no dictionary spelt across scripts: the same by the
+ * search key, or one edit from five letters («Pringles», «Принглс»; «Пейпер», «Փեյփր»). Never a common start:
+ * «паста» and «пастила» are two edits.
  */
-function sameWord(a: string, b: string): boolean {
-  if (a === b) return true
-  if (/\d/u.test(a) || /\d/u.test(b)) return false
-  // the key has no short word, so a word of three letters is whole: «чай», «сок»
-  if (Math.min(a.length, b.length) <= 3) return false
-  if (Math.min(a.length, b.length) >= 5 && levenshtein(a, b) <= 1) return true
-  let common = 0
-  while (common < Math.min(a.length, b.length) && a[common] === b[common]) common += 1
-  return common >= Math.max(4, Math.min(a.length, b.length) - 2)
+function sameLetters(a: string, b: string): boolean {
+  const [x, y] = [toSearchKey(a), toSearchKey(b)]
+  if (x === y) return true
+  return Math.min(x.length, y.length) >= 5 && levenshtein(x, y) <= 1
+}
+
+const HY_UNITS: Readonly<Record<string, string>> = {
+  գր: 'г',
+  գ: 'г',
+  կգ: 'кг',
+  մլ: 'мл',
+  լ: 'л',
+  հտ: 'шт',
+  հատ: 'шт',
+  միկրոն: 'мкм',
+  միկր: 'мкм',
+  սմ: 'см',
+  մ: 'м',
+}
+const RU_UNITS = new Set(['г', 'гр', 'кг', 'мл', 'л', 'шт', 'мкм', 'см', 'м'])
+
+/**
+ * The figures of a text with their units, «2,5%», «130г», «1л»: a fat is never a litre (adversarial А5). A
+ * figure with no unit stands alone.
+ */
+function figuresOf(text: string): string[] {
+  const out: string[] = []
+  for (const found of text.matchAll(/(\d+(?:[.,]\d+)?)\s*(%|[\p{L}]+)?/gu)) {
+    const figure = (found[1] ?? '').replace('.', ',')
+    const unit = (found[2] ?? '').toLowerCase()
+    const named = unit === '%' ? '%' : (HY_UNITS[unit] ?? (RU_UNITS.has(unit) ? unit : ''))
+    out.push(`${figure}${named === 'гр' ? 'г' : named}`)
+  }
+  return out
+}
+
+/** Whether a fitter takes an item of the seed: the seed names no brand, so it takes no branded line. */
+export interface FitOptions {
+  /** The item is the seed's own — a kind, never a brand: «Бекон», «Энергетик». */
+  readonly generic?: boolean
 }
 
 /**
  * Whether an item may stand on the line (MOL-293, В-1 «а», В-2 «а»): every word of its name is the line's —
- * by the dictionary's Russian, the letters of its Armenian, its figures — so it names no flavour, brand or
- * size the line has not; the line's brand is in its name; and its name says the line's kind, unless all of
- * it is that brand: «Coca-Cola» for «Գազավորված ըմպելիք «Կոկա Կոլա»». A line whose kind the dictionary has
- * not takes nothing but its brand. The line is read once, for every item asked about.
+ * by a form of the dictionary's Russian, or by its letters where the line spells it — and every figure with
+ * its unit, so it names no flavour, brand, fat or size the line has not; the line's brand is in its name; and
+ * its name says the line's kind, unless all of it is that brand: «Coca-Cola» for «Գազավորված ըմպելիք «Կոկա
+ * Կոլա»». An item of the seed is a kind, and takes no branded line. A line whose kind the dictionary has not
+ * takes nothing but its brand. The line is read once, for every item asked about.
  */
 export function lineFitter(
   parts: ReceiptLineParts,
   dictionary: Readonly<Record<string, string>>,
-): (itemName: string) => boolean {
+): (itemName: string, options?: FitOptions) => boolean {
   const tokens = [...parts.before, ...(parts.brand === null ? [] : [parts.brand]), ...parts.after]
-  const line = [
-    ...tokens.flatMap((token) => keysOf(token)),
-    ...tokens.flatMap((token) => sensesOf(token, dictionary).flatMap(keysOf)),
-    ...keysOf(parts.percent ?? ''),
-    ...keysOf(parts.size ?? ''),
+  const glossed = tokens.flatMap((token) => sensesOf(token, dictionary).flatMap(wordsOf))
+  const spelt = tokens.flatMap(wordsOf)
+  const figures = [
+    ...tokens.flatMap(figuresOf),
+    ...figuresOf(parts.percent ?? ''),
+    ...figuresOf(parts.size ?? ''),
   ]
-  const brand = keysOf(parts.brand ?? '')
+  const brand = wordsOf(parts.brand ?? '')
   // any of the kind's senses: «հրուշակեղեն» is pastry and confectionery
-  const kinds = parts.kind === null ? [] : sensesOf(parts.kind, dictionary).map(keysOf)
-  return (itemName) => {
-    const item = keysOf(itemName)
+  const kinds = parts.kind === null ? [] : sensesOf(parts.kind, dictionary).map(wordsOf)
+  const lineHas = (word: string): boolean =>
+    glossed.some((one) => sameRussian(word, one)) || spelt.some((one) => sameLetters(word, one))
+  return (itemName, options = {}) => {
+    const item = wordsOf(itemName)
     if (item.length === 0) return false
-    if (!item.every((word) => line.some((one) => sameWord(word, one)))) return false
-    if (!brand.every((word) => item.some((one) => sameWord(word, one)))) return false
-    if (brand.length > 0 && item.every((word) => brand.some((one) => sameWord(word, one))))
+    if (parts.brand !== null && options.generic === true) return false
+    if (!item.every(lineHas)) return false
+    if (!figuresOf(itemName).every((figure) => figures.includes(figure))) return false
+    if (!brand.every((word) => item.some((one) => sameLetters(word, one)))) return false
+    if (brand.length > 0 && item.every((word) => brand.some((one) => sameLetters(word, one))))
       return true
-    return kinds.some((kind) => kind.every((word) => item.some((one) => sameWord(word, one))))
+    return kinds.some(
+      (kind) => kind.length > 0 && kind.every((word) => item.some((one) => sameRussian(word, one))),
+    )
   }
+}
+
+/**
+ * Whether a name of the seed in the till's language says the line's kind (MOL-293): the names path matches
+ * the catalogue's own Armenian name, whose Russian one the dictionary need not know — «Ատամի պաստա» is
+ * «Паста зубная» by the seed's word, not the gloss. A branded line takes no name of the seed.
+ */
+export function seedNameFits(parts: ReceiptLineParts, nameWords: readonly string[]): boolean {
+  if (parts.brand !== null || parts.kind === null) return false
+  const kind = parts.kind.toLowerCase().replace(/և/gu, 'եվ')
+  // as the names are matched: the printed word inflected past the name's («հրուշակ», «հրուշակեղեն»), or cut
+  // by the till before its end
+  return nameWords.some(
+    (word) =>
+      word === kind ||
+      (word.length >= 4 && kind.startsWith(word)) ||
+      (kind.length >= 3 && word.startsWith(kind)),
+  )
 }

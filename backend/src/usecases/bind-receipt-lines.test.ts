@@ -60,7 +60,7 @@ describe('binding the lines of a parsed receipt (MOL-126)', () => {
     expect(bound).toEqual([
       { itemId: MILK, match: 'search', translation: 'молоко' },
       // glue's heading names no word of the line: a new item, spelt as printed and «проверьте»
-      { itemId: null, match: 'weak', translation: 'ДАРАН КЛЕЙ', spelled: true },
+      { itemId: null, match: 'weak', translation: 'Даран клей', spelled: true },
     ])
     expect(search).not.toHaveBeenCalled()
   })
@@ -189,7 +189,7 @@ describe('binding the lines of a parsed receipt (MOL-126)', () => {
     expect(bound).toEqual([
       { itemId: null, match: 'weak', translation: 'Сметана 20%', spelled: false },
       // a word the dictionary has not is spelt in letters, and offered as such (В-4)
-      { itemId: null, match: 'weak', translation: 'КСЙЗК', spelled: true },
+      { itemId: null, match: 'weak', translation: 'Ксйзк', spelled: true },
       { itemId: null, match: 'weak', translation: null, spelled: false },
     ])
   })
