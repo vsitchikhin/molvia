@@ -872,11 +872,13 @@ task did not: five plans of six there are a percent of the month's income — «
   move. **A write belongs to the opening of the sheet it was sent from** (adversarial В1): one sheet
   serves every row, and a write from a sheet swept away may land while it is open again for another
   row — that sheet is not closed by it, not «at work» for it and shows no refusal of it; its outcome is
-  said as for a closed sheet. The price, named: a refusal of a write whose sheet was swept away is said
-  nowhere, as before. **A row is `ListRow`** with the category's circle, as on «Категории» and
-  «Траты»; the
-  chevron on every live row — each opens the sheet of its plan — and **«осталось» in the title's line,
-  never the tail** (`name-beside-figure`): a tail of its own width made every bar another length, and
+  said as for a closed sheet. **The writes go in the order of the taps** (Г1): a plan is the last write
+  the server got, with no revision, so a write waits for the one before it, answered or not — the same
+  row opened again and saved while the swept write was on its way left the older sum on the server.
+  The prices, named: a refusal of a write whose sheet was swept away is said nowhere, as before; a write
+  waits, «Сохраняем…», while the one before it hangs, up to the client's 15 s. **A row is `ListRow`**
+  with the category's circle, as on «Категории» and «Траты»; the chevron on every live row — each opens
+  the sheet of its plan — and **«осталось» in the title's line, never the tail** (`name-beside-figure`): a tail of its own width made every bar another length, and
   bars one under another are read against each other. **The bar is the category's colour**, never the
   accent (Ф-4), over the plan `--warn` to the edge; the target's bar is `--graphic`, its mark `--text`.
   **What the row says besides is a line under the bar** — the share, «пока ничего не пришло», «не всё

@@ -1249,3 +1249,48 @@ describe('MoneyBudgetView: review of MOL-192, round 3', () => {
     )
   })
 })
+
+describe('MoneyBudgetView: review of MOL-192, round 4', () => {
+  // Adversarial Г1: a plan is the last write the server got; the same row saved again while the swept
+  // write was on its way must not leave the older sum there.
+  it('a second write of the same row goes only once the first is answered', async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    await view.findAll('li .list-row')[1]?.trigger('click')
+    await flushPromises()
+    type('input[inputmode=numeric]', '6')
+    let answer: (value: MoneyBudgetView) => void = () => undefined
+    setBudgetPlan.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+    await pressUntil(en.budget.sheet.save, () => {
+      expect(setBudgetPlan).toHaveBeenCalledTimes(1)
+    })
+    router.back()
+    await vi.waitFor(() => {
+      expect(document.querySelector('dialog[open]')).toBeNull()
+    })
+    await view.findAll('li .list-row')[1]?.trigger('click')
+    await vi.waitFor(() => {
+      expect(document.querySelector('dialog[open]')).not.toBeNull()
+    })
+    type('input[inputmode=numeric]', '7')
+    await pressUntil(en.budget.sheet.save, () => {
+      expect(document.querySelector('dialog[open]')?.textContent).toContain(en.budget.sheet.saving)
+    })
+    await flushPromises()
+    // Must not fire: the second is not sent while the first is on its way.
+    expect(setBudgetPlan).toHaveBeenCalledTimes(1)
+
+    answer(budget())
+    await vi.waitFor(() => {
+      expect(setBudgetPlan).toHaveBeenCalledTimes(2)
+    })
+    expect(setBudgetPlan.mock.calls.map((call) => call[0].plan)).toEqual([
+      { kind: 'share', percent: 6 },
+      { kind: 'share', percent: 7 },
+    ])
+  })
+})
