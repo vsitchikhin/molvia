@@ -876,9 +876,13 @@ task did not: five plans of six there are a percent of the month's income — «
   the server got, with no revision, so a write waits for the one before it, answered or not — the same
   row opened again and saved while the swept write was on its way left the older sum on the server.
   **The queue is `useMoneyBudget`'s, not the screen's** (Г2): a step back and in again mounts a new
-  screen while the old one's write is on its way, and kept in the sheet, the new one's went first. The
-  prices, named: a refusal of a write whose sheet was swept away is said nowhere, as before; a write
-  waits, «Сохраняем…», while the one before it hangs, up to the client's 15 s. **A row is `ListRow`**
+  screen while the old one's write is on its way, and kept in the sheet, the new one's went first.
+  **Outliving the screen, it outlives the person: a write goes only while the server still names the
+  one who tapped** (adversarial Д1, MOL-56's rule for every queue) — else it is refused unsent: the door
+  shut by a `401` takes the screens away with no reload, and the savings target of one person, waiting
+  behind a hung write, went into the account of the next. The prices, named: a refusal of a write whose
+  sheet was swept away is said nowhere, as before; a write waits, «Сохраняем…», while the one before it
+  hangs, up to the client's 15 s — whoever made that one. **A row is `ListRow`**
   with the category's circle, as on «Категории» and «Траты»; the chevron on every live row — each opens
   the sheet of its plan — and **«осталось» in the title's line, never the tail**
   (`name-beside-figure`): a tail of its own width made every bar another length, and

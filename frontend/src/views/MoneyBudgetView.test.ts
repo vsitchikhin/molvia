@@ -1339,3 +1339,52 @@ describe('MoneyBudgetView: review of MOL-192, round 4', () => {
     ])
   })
 })
+
+describe('MoneyBudgetView: review of MOL-192, round 6', () => {
+  // Adversarial Д1: the queue outlives the screen, and so the person; a write waiting in it while the door
+  // closed and someone else came in must not go into their account.
+  for (const [what, change] of [
+    ['someone else came in', (actor: ReturnType<typeof useActorStore>) => (actor.id = 'other')],
+    ['the door closed', (actor: ReturnType<typeof useActorStore>) => (actor.state = 'signed-out')],
+  ] as const) {
+    it(`a write waiting in the queue is not sent once ${what}`, async () => {
+      moneyBudget.mockResolvedValue(budget())
+      const view = await render()
+      await view.findAll('li .list-row')[1]?.trigger('click')
+      await flushPromises()
+      type('input[inputmode=numeric]', '6')
+      let answer: (value: MoneyBudgetView) => void = () => undefined
+      setBudgetPlan.mockReturnValueOnce(
+        new Promise((resolve) => {
+          answer = resolve
+        }),
+      )
+      await pressUntil(en.budget.sheet.save, () => {
+        expect(setBudgetPlan).toHaveBeenCalledTimes(1)
+      })
+      router.back()
+      await vi.waitFor(() => {
+        expect(document.querySelector('dialog[open]')).toBeNull()
+      })
+      await view.findAll('li .list-row')[2]?.trigger('click')
+      await vi.waitFor(() => {
+        expect(document.querySelector('dialog[open]')).not.toBeNull()
+      })
+      type('input[inputmode=decimal]', '70000')
+      await pressUntil(en.budget.sheet.save, () => {
+        expect(document.querySelector('dialog[open]')?.textContent).toContain(
+          en.budget.sheet.saving,
+        )
+      })
+
+      change(useActorStore())
+      answer(budget())
+      await vi.waitFor(() => {
+        expect(document.querySelector('dialog[open]')?.textContent).toContain(
+          en.budget.sheet.failed,
+        )
+      })
+      expect(setBudgetPlan).toHaveBeenCalledTimes(1)
+    })
+  }
+})
