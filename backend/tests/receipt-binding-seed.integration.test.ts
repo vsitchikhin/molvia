@@ -44,6 +44,7 @@ const line = (printed: string, hs: string | null = null): ReceiptLine => ({
   settled: false,
 })
 
+// a line against the whole seed is some 170 ms on CI: a test of three takes 15 s (MOL-243)
 async function bind(printed: string, hs: string | null = null) {
   const [bound] = await bindReceiptLines(
     { items: createItemRepository(db), embedder: NO_EMBEDDER },
@@ -88,7 +89,7 @@ describe('a line by the search, an item of another thing never (MOL-293, adversa
       const shashlik = await bind(printed)
       expect(['Свинина', 'Курица']).not.toContain(shashlik.name)
     }
-  })
+  }, 15_000)
 
   it('takes no 1 % kefir for a 2,5 % one of a litre', async () => {
     await insertItem(db, {
@@ -151,7 +152,7 @@ describe('a line whose words do not settle its kind, or lost a letter (MOL-293, 
     expect(await bind('Ազնվամորու մուրաբա')).toMatchObject({ name: 'Варенье', match: 'search' })
     expect(await bind('Գինու քացախ')).toMatchObject({ name: 'Уксус', match: 'search' })
     expect((await bind('Ձկան սոուս')).name).not.toBe('Рыба')
-  })
+  }, 15_000)
 
   it.each(ONLY_A_START)(
     'takes for «%s» no «%s», whose word only starts as the kind does',
@@ -171,7 +172,7 @@ describe('a line whose words do not settle its kind, or lost a letter (MOL-293, 
     })
     expect(await bind('Կաթ UHT 3.2%')).toMatchObject({ name: 'Молоко 3,2%', match: 'search' })
     expect((await bind('Մարտկոց AA')).name).toBe('Батарейки')
-  })
+  }, 15_000)
 
   it('finds nothing for a letter misread: a roller is no tomato', async () => {
     expect((await bind('Ռոլիկ')).itemId).toBeNull()
