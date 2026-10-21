@@ -408,40 +408,56 @@ receipt the model read on production (b8a76f31, «Ереван Сити», 39 li
 and 4 to another brand or sort — a strawberry yoghurt «Клубника», a pizza base «Пицца», crab chips «Креветки», a
 Fanta «Лимонад» — all of them sure, and «Записать» recorded them: «в 10 раз хуже, чем если бы они не распознались».
 Both the names and the search took an item when **any** word of its name stood in the line, so a word of a flavour
-or a filling found the fruit. Now `lineFitter` (`receipt-line-kind.ts`) asks of every item either path offers — a
-name of the seed, a heading's far match, each of the search's first ten:
+or a filling found the fruit. The line's **kind** is its head word before the brand, past adjectives, participles and
+the genitive (`receiptLineParts`; «խորոված», a shashlik, is a noun of an adjective's ending). Then:
 
-- **every word of its name is the line's** — by the dictionary's senses, the letters of its Armenian through the
-  search key, its figures: an item that names a flavour, a fat or a package the line has not is another item;
-- **the line's brand in «…» is in its name**, compared by the search key across scripts («Կոկա Կոլա» is «Coca-Cola»
-  and «Кока Кола»): a line printing a brand takes no item without it — the seed has no brands, so a branded line
-  finds only an item somebody named with that brand;
-- **its name says the line's kind** — the head word before the brand, past adjectives, participles and the
-  genitive, `receiptLineParts` — **unless all of it is that brand** (В-2 «а»: the owner's «Coca-Cola»). A kind the
-  dictionary has not takes nothing but its brand. **A word of the dictionary is read exactly**, never one edit
-  off: «լոշիկ», a flatbread, was «լոլիկ», a tomato.
+- **A name of the seed in the till's language stands only where it says the kind** (`seedNameFits`), the seed's own
+  word against the printed one — «Ատամի պաստա» is «Паста зубная» by the seed's name, which the dictionary's Russian
+  need not cover — and never on a branded line: the seed names no brand. Judged by the Russian name instead, the
+  first round turned 333 of the seed's 2 000 till names away from their own items and 163 onto others' (adversarial
+  А1, А2); now all 2 000 bind as master bound them.
+- **Any other item stands where `lineFitter` lets it** — a heading's far match, each of the search's first ten:
+  **every word of its name is the line's**, by a **form** of the dictionary's Russian — an adjective in any gender,
+  number and case, a noun in any number and case, the adjective a noun makes («оливки» — «оливковый», «молоко» —
+  «молочный») — or by its **letters** where the line spells it, the search key's one edit from five letters at most
+  («Pringles», «Принглс»); never a common start, which found «Пастила» for a toothpaste, «Печенье» for a liver and
+  «Лимонад» for a lemon (А1, А3, review №2). **Every figure with its unit**: a fat is never a litre (А5). **The line's
+  brand in «…» is in its name**, by the letters across scripts («Կոկա Կոլա» is «Coca-Cola»); an item of the seed is a
+  kind and takes no branded line («Бекон» for a sausage of «Բեկոն»). **Its name says the line's kind**, unless all of
+  it is that brand (В-2 «а»: the owner's «Coca-Cola»). A kind the dictionary has not takes nothing but its brand. **A
+  word of the dictionary is read exactly**, never one edit off: «լոշիկ», a flatbread, was «լոլիկ», a tomato.
 
 **An item the printed heading rules out is no item now**, where MOL-255 made it «проверьте»: the new item beside
 it is «проверьте» too, and a wrong item offered is worse than a name to check (Tesseract's «(3824) ՏՈՖՈՒ ՀՈՂ», a
 cat's litter, found «Тофу»). **The shop's memory is above all of it**: the person's own word, unchanged.
 
-**Anything else is a new item, named in full and «проверьте»** (`match: weak` with no item, В-1 «а»): `newLineName`
-— the kind first, as a shelf names it, the other words before the brand in order, the brand in «…» in Russian
-letters (`armenianInRussian`), the words after it, the fat and the package — «Йогурт «Еремян Продактс» клубника 2%
-130 г» (В-1 «б»: the weight is in the name, so a package is an item). A word the dictionary has not is spelt in
-letters, and the line says so (`receipt_lines.spelled`, 0069, В-4 «а» with the owner's note): the review offers the
-name, and «Убрать имя — оставить как в чеке» takes it away in one press. Units, counts, packaging marks and an
-abbreviation the dictionary has not are no words of it. On a receipt read out in English there is no Russian name,
-as there is no gloss. «Записать» puts a new name that is an item's already on that item (`createUnlessNamed`).
+**Anything else is a new item, named in full and «проверьте»** (`match: weak` with no item, В-1 «а», on the wire too —
+the review sends `new` only for a line whose item is gone since, adversarial А6): `newLineName` — the kind first, as a
+shelf names it, the other words before the brand in order, the brand in «…» in Russian letters (`armenianInRussian`),
+the words after it, the fat and the package — «Йогурт «Еремян Продактс» клубника 2% 130 г» (В-1 «б»: the weight is in
+the name, so a package is an item). A word the dictionary has not is spelt in letters, and the line says so
+(`receipt_lines.spelled`, 0069, В-4 «а» with the owner's note): the review offers the name, and «Убрать имя — оставить
+как в чеке» takes it away in one press — while the proposal stands, never over a name of the person's own. A name
+typed over the proposal answers «проверьте». Units, counts, a lone sign («x 24»), packaging marks and an abbreviation
+the dictionary has not are no words of it; with no word left there is no name at all, never the gloss (А7). On a
+receipt read out in English there is no Russian name, as there is no gloss. «Записать» puts a new name that is an
+item's already on that item (`createUnlessNamed`).
 
 **The bench** (`.scratch/tasks/status/MOL-293/`, `research/MOL-293.md`): MOL-114's 321 lines of 34 receipts, through
 the product's own `bindReceiptLines` on the seed and the owner's items of am-34…43, each pair «line → item» judged.
-Master: 47 right, 203 «general» (the kind with no brand or sort), **42 wrong**, 29 new. Now: **116 right, 0 wrong**,
-5 general, 184 new with meaning (192 by letters alone) — every new one «проверьте». **The prices, named:** a line whose
-brand nobody named is new however near the seed's item stands, so the first receipt of a shop is mostly «проверьте»
-until the person's words fill the shop's memory, which needs the tax number (below); and a word the item names
-that the line does not print keeps it away — «Лук репчатый» for «Սոխ (հայկական)», «Перец болгарский» for a sweet
-pepper of many colours, the two lines of the bench master had right — new, never wrong.
+Master: 47 right, 203 «general» (the kind with no brand or sort), **42 wrong**, 29 new. Now: **136 right, 0 wrong**,
+6 general, 179 new with meaning (124 / 0 / 191 by letters alone) — every new one «проверьте». **The dictionary grew
+by the words of these very lines**, so the honest figure is lower: with master's dictionary 96 right, 0 wrong — the
+first receipts of the owner's the bench never saw will tell. **The seed's own 2 000 till names**, as lines: 1 972 to
+their own item, 28 to another — as on master; by the search alone, the names path off, 1 045 own, 88 another (a kind
+for a sort: «Молоко» for «Կաթ 3,2%», «Рыба» for a hake), 867 new. **The prices, named:** a line whose brand nobody
+named is new however near the seed's item stands, so the first receipt of a shop is mostly «проверьте» until the
+person's words fill the shop's memory, which needs the tax number (below); a word the item names that the line does
+not print keeps it away — «Лук репчатый» for «Սոխ (հայկական)»; a Russian word of a form these rules do not make
+(«крылья» for «крылышко») is another word; and the new item's name is the dictionary's words as they stand, an
+adjective unagreed («Плёнка пищевой») — under «проверьте», for the person to put right. **And the measure of 0.2
+moves with it** (review №6): a new line the person binds to an item of the catalogue is an item put right, so the
+share of «0.2r» may rise by the caution of this rule, not by the reading.
 
 **The names and the search are found once, in the queue; the memory on every reading** (Р-1). A search
 with its meaning costs tens of milliseconds a line, nothing in the background and a second on every
