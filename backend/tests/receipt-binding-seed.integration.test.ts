@@ -111,6 +111,14 @@ const FLAVOUR_FIRST: readonly (readonly [string, string])[] = [
   ['Շոկոլադ պաղպաղակ', 'Шоколад'],
   ['Բալ մուրաբա', 'Вишня'],
 ]
+const UNKNOWN_KIND: readonly (readonly [string, string])[] = [
+  ['Ելակ սմուզի', 'Клубника'],
+  ['Ելակ սորբետ', 'Клубника'],
+  ['Ելակ Smoothie', 'Клубника'],
+  ['Խնձոր շտրուդել', 'Яблоки'],
+  ['Խնձոր պաստեղ', 'Яблоки'],
+  ['Շոկոլադ կեքսիկ', 'Шоколад'],
+]
 const ONLY_A_START: readonly (readonly [string, string])[] = [
   ['Տուշ թարթիչների', 'Тушёнка'],
   ['Թել կարի', 'Вермишель'],
@@ -127,6 +135,13 @@ const LETTER_LOST: readonly (readonly [string, string])[] = [
 describe('a line whose words do not settle its kind, or lost a letter (MOL-293, adversarial Б1–Б4)', () => {
   it.each(FLAVOUR_FIRST)(
     'takes no flavour for the kind of «%s», two things side by side',
+    async (printed, flavour) => {
+      expect((await bind(printed)).name).not.toBe(flavour)
+    },
+  )
+
+  it.each(UNKNOWN_KIND)(
+    'takes no flavour for «%s», a kind the dictionary has not or glossed with its quality (adversarial В1, В2)',
     async (printed, flavour) => {
       expect((await bind(printed)).name).not.toBe(flavour)
     },

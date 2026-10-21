@@ -227,6 +227,12 @@ function spellWord(word: string, capitals = true): string {
   return capital ? out.charAt(0).toUpperCase() + out.slice(1) : out
 }
 
+/** A line printed in capitals all through says nothing by them: «ԴԱՐԱՆ ԿԼԵՅ». */
+const shouting = (parts: ReceiptLineParts): boolean =>
+  [...parts.before, ...parts.after].every(
+    (token) => !ARMENIAN.test(token) || token === token.toUpperCase(),
+  )
+
 /** A word in capitals of up to four letters is an abbreviation on a line of small ones: «ԱԱ», «ԳՕՍՏ» (review 2, №3). */
 const ABBREVIATION = 4
 
@@ -273,10 +279,7 @@ export function newLineName(
 ): LineName | null {
   let spelled = false
   const said: string[] = []
-  // a line printed in capitals all through says nothing by them: «ԴԱՐԱՆ ԿԼԵՅ»
-  const shouting = [...parts.before, ...parts.after].every(
-    (token) => !ARMENIAN.test(token) || token === token.toUpperCase(),
-  )
+
   const words = (tokens: readonly string[]): string[] =>
     tokens.flatMap((token) => {
       if (!isNameWord(token) || UNIT_WORDS.has(keyed(token))) return []
@@ -285,7 +288,7 @@ export function newLineName(
       // an abbreviation the dictionary has not, «անտ.», is no word to spell
       if (gloss === null && token.endsWith('.')) return []
       if (gloss === null) spelled = true
-      const word = gloss ?? spellWord(token, !shouting && token.length <= ABBREVIATION)
+      const word = gloss ?? spellWord(token, !shouting(parts) && token.length <= ABBREVIATION)
       // «Հավկիթ «Արզնի» հավկիթ» is eggs once, «Կարագ սերուցքային» butter that is creamy once
       const own = wordsOf(word)
       if (own.length > 0 && own.every((one) => said.some((was) => sameRussian(one, was)))) return []
@@ -449,17 +452,24 @@ function figuresOf(text: string): string[] {
 // a dictionary's adjective is masculine or feminine, «средний», «докторская»; «мороженое» is a thing
 const QUALITY_ENDINGS = ['ый', 'ий', 'ой', 'ая', 'яя']
 
-/** A gloss names a thing, not a quality: «таблетки», «мороженое» — never «средний», «без запаха». */
+/**
+ * A gloss names a thing, not a quality: «таблетки», «мороженое», «пастила фруктовая» — a word of it no adjective
+ * (adversarial В2) — never «средний», «без запаха».
+ */
 function isThingSense(sense: string): boolean {
   const words = sense.toLowerCase().split(/\s+/u)
-  const last = words.at(-1) ?? ''
-  return !NO_WORD.has(words[0] ?? '') && !QUALITY_ENDINGS.some((ending) => last.endsWith(ending))
+  return (
+    !NO_WORD.has(words[0] ?? '') &&
+    words.some((word) => !QUALITY_ENDINGS.some((ending) => word.endsWith(ending)))
+  )
 }
 
 /**
  * The thing printed right after the kind with no case of its own, «Ելակ յոգուրտ»: of two things side by side
  * a till does not say which the line is — a yoghurt of strawberries, or strawberries — so an item must say
- * both (adversarial Б1). A word the dictionary has not is a name, «Բանան Սաբրոսթար», and no thing.
+ * both (adversarial Б1). A word the dictionary has not is a name where a capital says so on a line of small
+ * Armenian letters, «Բանան Սաբրոսթար», a sort; else a thing it does not know, «Ելակ սմուզի», «Ելակ Smoothie»
+ * (adversarial В1).
  */
 function nextThing(
   parts: ReceiptLineParts,
@@ -467,17 +477,22 @@ function nextThing(
 ): string | null {
   const at = parts.kind === null ? -1 : parts.before.indexOf(parts.kind)
   const next = at < 0 ? undefined : parts.before[at + 1]
-  if (next === undefined || !isNameWord(next) || !ARMENIAN.test(next) || next.endsWith('.'))
-    return null
+  if (next === undefined || !isNameWord(next) || next.endsWith('.')) return null
   const key = keyed(next)
+  const sense = sensesOf(next, dictionary)[0]
+  // «-ի» and «-ու» end a loan as well as a genitive, «սմուզի»: a case only of a word the dictionary has
   const qualifies =
     UNIT_WORDS.has(key) ||
     QUALIFIERS.has(key) ||
     ADJECTIVE.test(key) ||
-    CASE.test(key) ||
-    inSoftCase(key)
-  const sense = sensesOf(next, dictionary)[0]
-  return !qualifies && sense !== undefined && isThingSense(sense) ? next : null
+    /(?:ով|ից)$/u.test(key) ||
+    (sense !== undefined && (CASE.test(key) || inSoftCase(key)))
+  if (qualifies) return null
+  if (sense !== undefined) return isThingSense(sense) ? next : null
+  // Latin is capitalised, a brand and a word alike: «Ելակ Smoothie» is a thing
+  const first = next.slice(0, 1)
+  const capital = ARMENIAN.test(first) && first !== first.toLowerCase()
+  return capital && !shouting(parts) ? null : next
 }
 
 /** Whether a fitter takes an item of the seed: the seed names no brand, so it takes no branded line. */
@@ -511,6 +526,10 @@ export function lineFitter(
   const kinds = parts.kind === null ? [] : sensesOf(parts.kind, dictionary).map(wordsOf)
   const next = nextThing(parts, dictionary)
   const nexts = next === null ? [] : sensesOf(next, dictionary).map(wordsOf)
+  // a thing the dictionary has not is said by its letters: «Смузи» for «սմուզի»
+  const saysNext = (item: readonly string[]): boolean =>
+    next === null ||
+    (nexts.length > 0 ? says(nexts, item) : item.some((one) => sameLetters(next, one)))
   const says = (senses: readonly (readonly string[])[], item: readonly string[]): boolean =>
     senses.some(
       (sense) =>
@@ -527,7 +546,7 @@ export function lineFitter(
     if (!brand.every((word) => item.some((one) => sameLetters(word, one)))) return false
     if (brand.length > 0 && item.every((word) => brand.some((one) => sameLetters(word, one))))
       return true
-    return says(kinds, item) && (next === null || says(nexts, item))
+    return says(kinds, item) && saysNext(item)
   }
 }
 

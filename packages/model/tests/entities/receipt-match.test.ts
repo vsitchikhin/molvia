@@ -34,6 +34,8 @@ const WORDS = {
   սոսինձ: 'клей',
   յոգուրտ: 'йогурт',
   ելակ: 'клубника',
+  ելակի: 'клубника',
+  դառը: 'горький',
 }
 const matcher = createLineMatcher(NODES, WORDS)
 

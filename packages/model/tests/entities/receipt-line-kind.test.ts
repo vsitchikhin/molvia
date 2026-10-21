@@ -11,6 +11,10 @@ import { receiptWords } from '#model/entities/receipt-match'
 const WORDS = {
   յոգուրտ: 'йогурт',
   ելակ: 'клубника',
+  ելակի: 'клубника',
+  բանան: 'банан',
+  խնձոր: 'яблоко',
+  պաստեղ: 'пастила фруктовая',
   դեղձ: 'персик',
   ըմպելի: 'питьевой',
   կաղամբի: 'капуста',
@@ -280,6 +284,19 @@ describe('an item standing on a line (MOL-293, В-1 «а», В-2 «а»)', () =>
     expect(fits('Ելակ պաղպաղակ', 'Клубника')).toBe(false)
     expect(fits('Պանիր չեդդեր', 'Сыр чеддер')).toBe(true)
     expect(fits('Պանիր չեդդեր', 'Сыр')).toBe(false)
+  })
+
+  it('takes a thing the dictionary has not for a thing, a capital for a name (adversarial В1)', () => {
+    for (const printed of ['Ելակ սորբետ', 'Ելակ սմուզի', 'Ելակ Smoothie', 'Խնձոր շտրուդել'])
+      expect(fits(printed, 'Клубника', true) || fits(printed, 'Яблоки', true), printed).toBe(false)
+    expect(fits('Ելակ սմուզի', 'Смузи клубничный')).toBe(true)
+    // a sort, by its capital
+    expect(fits('Բանան Սաբրոսթար', 'Бананы', true)).toBe(true)
+  })
+
+  it('takes a gloss of a thing and its quality for a thing (adversarial В2)', () => {
+    expect(fits('Խնձոր պաստեղ', 'Яблоки', true)).toBe(false)
+    expect(fits('Խնձոր պաստեղ', 'Пастила фруктовая яблочная')).toBe(true)
   })
 
   it('never takes the thing of a genitive in «-ու» or «-ան» for the kind (review 2, №2)', () => {
