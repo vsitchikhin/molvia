@@ -4,8 +4,8 @@ import { test } from '@playwright/test'
  * Keeps the first attempt's trace in CI for the tests of the describe it is called in (MOL-249,
  * MOL-267): a flake passes its retry, and the retry's trace — the config's `on-first-retry` — shows
  * nothing of the failure. Started by hand: `test.use({ trace })` is refused in a describe, and for a
- * whole file it would trace every test of it. Kept only when the attempt failed, and kept when the
- * retry passed — CI uploads `test-results/` whenever the job fails, for seven days.
+ * whole file it would trace every test of it. Kept only when the first attempt failed — the retry
+ * passing included: CI uploads `test-results/` whenever the job fails, for seven days.
  *
  * A run that traces the first attempt itself — `--trace on`, a config's `retain-on-first-failure` —
  * has started it already: that trace is the run's to keep, and this one is not started (review Р2-А1

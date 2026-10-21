@@ -198,9 +198,9 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   on master or after this task (adversarial А1). On the failing head a calm page in that browser stands
   at 1132 (П2): the scene was set on a page 19 px longer than it settles to — something over the choice
   gave way between `toTheEnd` and the first `topOf`, two `evaluate`s, and Chromium's scroll anchoring
-  kept the view; the choice of a category had no part in it. Which block was never caught — forty runs
-  at four times slower CPU did not fail once; the failure came two days before MOL-186 remade the blocks
-  over the choice, and not in some 176 runs since. The trace has the DOM before and after each
+  kept the view; the choice of a category had no part in it. Which block was never caught — of forty runs
+  at four times slower CPU seven reached the measure, and none failed so; the failure came two days
+  before MOL-186 remade the blocks over the choice, and not in some 176 runs since. The trace has the DOM before and after each
   `evaluate`, that window included. **The prices, named:** a shift that changes no DOM is not in it —
   it keeps no screenshots; and the artifact lives seven days (`retention-days` of `ci.yml`), so the
   failure is read the week it comes.
