@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { receiptDetailCodec, receiptsResponseCodec, storeMemoryWords } from '@molvia/model'
+import {
+  RECEIPT_CASHBACK_HEADER,
+  receiptDetailCodec,
+  receiptsResponseCodec,
+  storeMemoryWords,
+} from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { actors, officialRates, receiptLines, receipts, trips as tripsTable } from '@/db/schema'
 import { createStoreMemoryRepository, memoryKey } from '@/db/store-memory-repository'
@@ -217,6 +222,39 @@ describe('the review of a receipt', () => {
     expect(confirmed.lines[4]?.amount).toEqual(amd(980))
     const unread = await review(me, await parsedReceipt(me, lines, { totalMinor: null }))
     expect(unread.lines[4]?.amount).toEqual(amd(890))
+  })
+
+  it('confirms the printed sum by the total less what a card sent to the card, and tells the phone that asks (MOL-289)', async () => {
+    const me = await insertActor(db)
+    const lines: Line[] = [
+      { printed: 'A', price: 531, sum: 531 },
+      { printed: 'Шоколад', price: 890, sum: 980 },
+    ]
+    // 1 511 of lines, 15,11 sent to the card: «Ընդամենը» 1 526,11
+    const carded = { totalMinor: 152_611n, cashbackMinor: 1_511n, redeemedMinor: 10_000n }
+    const id = await parsedReceipt(me, lines, carded)
+    const shown = await review(me, id)
+    expect(shown.lines[1]?.amount).toEqual(amd(980))
+    expect([shown.receipt.total, shown.cashback, shown.redeemed]).toEqual([
+      { minor: 152_611n, currency: 'AMD' },
+      undefined,
+      undefined,
+    ])
+    // the same total with nothing sent to the card: the lines fall short of it, and the figures stand
+    const plain = await review(me, await parsedReceipt(me, lines, { totalMinor: 152_611n }))
+    expect(plain.lines[1]?.amount).toEqual(amd(890))
+    // an installed app of an earlier build reads the detail strictly: only a phone that asks is told
+    const response = await app.inject({
+      method: 'GET',
+      url: `/receipts/${id}`,
+      headers: {
+        cookie: await signIn(db, me),
+        'x-molvia-today': '2026-10-03',
+        [RECEIPT_CASHBACK_HEADER]: '1',
+      },
+    })
+    const asked = receiptDetailCodec.parse(response.json())
+    expect([asked.cashback, asked.redeemed]).toEqual([amd(15.11), amd(100)])
   })
 
   it('doubts a price one confused digit off the memory’s, and only then names it (В-1)', async () => {

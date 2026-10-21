@@ -201,6 +201,14 @@ export const receiptDetailCodec = z.strictObject({
    * `RECEIPT_READ_PARTLY_HEADER`, as `readTotal`.
    */
   readPartly: z.boolean().nullable().optional(),
+  /**
+   * What a card sent to the card instead of taking it off (MOL-289, «Զեղչ գործարքից»): the lines make the
+   * total less it — `linesTotalOf` — and the total is what left the card. With it the bonus the receipt is
+   * partly paid with, which the trip's money takes off the total. Sent only to a phone that asked by
+   * `RECEIPT_CASHBACK_HEADER`, as `readTotal`.
+   */
+  cashback: moneyCodec.nullable().optional(),
+  redeemed: moneyCodec.nullable().optional(),
 })
 export type ReceiptDetail = z.output<typeof receiptDetailCodec>
 
@@ -321,3 +329,6 @@ export const RECEIPT_READ_TOTAL_HEADER = 'X-Molvia-Receipt-Read-Total'
 
 /** A phone that knows the detail's `readPartly` says so by this header (MOL-255), as `RECEIPT_CODES_HEADER`. */
 export const RECEIPT_READ_PARTLY_HEADER = 'X-Molvia-Receipt-Read-Partly'
+
+/** A phone that knows the detail's `cashback` and `redeemed` says so by this header (MOL-289). */
+export const RECEIPT_CASHBACK_HEADER = 'X-Molvia-Receipt-Cashback'

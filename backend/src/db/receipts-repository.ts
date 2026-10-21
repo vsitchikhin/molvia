@@ -104,6 +104,12 @@ export interface ReceiptHead {
    * alone. A receipt by its link has none — its total is the tax office's.
    */
   readonly readTotalMinor: bigint | null
+  /**
+   * What a card sent to the card instead of taking it off, and the bonus the receipt is partly paid with
+   * (MOL-289): only a model's reading names them; none — nothing read, or a head of before.
+   */
+  readonly cashbackMinor?: bigint | null
+  readonly redeemedMinor?: bigint | null
   readonly balanced: boolean
   /** How a photo's lines were laid out; a receipt by its link has none. */
   readonly layout: ReceiptLayout | null
@@ -179,6 +185,10 @@ export interface StoredReceipt {
   readonly heard: ReceiptHeard | null
   /** The total as the reading found it in one place (MOL-244): «Прочитали не всё» alone. */
   readonly readTotal: Money | null
+  /** What a card sent to the card: the lines make the total less it (MOL-289). */
+  readonly cashback: Money | null
+  /** The bonus the receipt is partly paid with: the trip's money is the total less it (MOL-289). */
+  readonly redeemed: Money | null
   /** Read in part, of the lines as read before the check (MOL-255, А6 «а»); `null` — read before it. */
   readonly readPartly: boolean | null
 }
@@ -230,6 +240,9 @@ export interface ReceiptToRecord {
   readonly printedOn: string | null
   readonly printedTime: string | null
   readonly total: Money | null
+  /** What a card sent to the card, and the bonus the receipt is partly paid with (MOL-289). */
+  readonly cashback: Money | null
+  readonly redeemed: Money | null
   readonly city: ReceiptCity | null
   /** The trip it was recorded as; `null` — not recorded: a trip removed for good takes it (MOL-240). */
   readonly tripId: string | null
@@ -511,6 +524,9 @@ function toSummary({
   }
 }
 
+const cashOf = (minor: bigint | null, currency: Currency): Money | null =>
+  minor === null ? null : { minor, currency }
+
 function toStored(found: SummaryRow): StoredReceipt {
   return {
     receipt: toSummary(found),
@@ -519,10 +535,9 @@ function toStored(found: SummaryRow): StoredReceipt {
     shopUnit: found.row.shopUnit,
     source: found.row.source,
     heard: found.row.heard,
-    readTotal:
-      found.row.readTotalMinor === null
-        ? null
-        : { minor: found.row.readTotalMinor, currency: found.row.currency },
+    readTotal: cashOf(found.row.readTotalMinor, found.row.currency),
+    cashback: cashOf(found.row.cashbackMinor, found.row.currency),
+    redeemed: cashOf(found.row.redeemedMinor, found.row.currency),
     readPartly: found.row.readPartly,
   }
 }
@@ -875,6 +890,8 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         printedOn: row.printedOn,
         printedTime: row.printedTime,
         total: row.totalMinor === null ? null : { minor: row.totalMinor, currency: row.currency },
+        cashback: cashOf(row.cashbackMinor, row.currency),
+        redeemed: cashOf(row.redeemedMinor, row.currency),
         city: row.city,
         tripId: row.tripId,
         tripAlive,
@@ -1241,6 +1258,8 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
                   receiptNo: head.receiptNo,
                   totalMinor: head.totalMinor,
                   readTotalMinor: head.readTotalMinor,
+                  cashbackMinor: head.cashbackMinor ?? null,
+                  redeemedMinor: head.redeemedMinor ?? null,
                   balanced: head.balanced,
                   city: head.city,
                   shopUnit: head.shopUnit ?? null,

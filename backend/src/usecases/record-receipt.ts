@@ -5,6 +5,7 @@ import {
   addMoney,
   geographyAllowed,
   latestDay,
+  linesTotalOf,
   nameIdentity,
   receiptDigits,
   receiptMomentOf,
@@ -110,19 +111,29 @@ function editsOf(
 }
 
 /**
- * The money of the trip (MOL-126 Т-10, В-3; В-5 of the review): the total the phone sent — the printed
- * one, or the person's correction of what OCR misread; without it the printed total where it is not
- * below the lines — what was paid, the lines left out and those OCR lost included, while a lost line
+ * The money of the trip: the receipt's total (`receiptTotal`), less the card's bonus it was partly paid
+ * with (MOL-289).
+ */
+function receiptMoney(held: ReceiptToRecord, body: ReceiptRecordBody): Money | null {
+  const total = receiptTotal(held, body)
+  const { redeemed } = held
+  // what the card's bonus covered was recorded when the bonus was sent to the card (owner, В-5 «а»):
+  // the trip is what left the card now, the total less it
+  if (total === null || redeemed?.currency !== total.currency) return total
+  const minor = total.minor - redeemed.minor
+  return minor > 0n ? { minor, currency: total.currency } : total
+}
+
+/**
+ * The receipt's total for its trip (MOL-126 Т-10, В-3; В-5 of the review): the total the phone sent — the
+ * printed one, or the person's correction of what OCR misread; without it the printed total where it is
+ * not below the lines — what was paid, the lines left out and those OCR lost included, while a lost line
  * only ever raises a total, so one below the lines was misread — else the sum of every line: a recorded
  * one at what the person settled on, one left out at what it would have been recorded at (В-5). `null`
  * when nothing is known: the trip then counts its prices (MOL-78).
  */
-function receiptMoney(
-  printed: Money | null,
-  stored: readonly StoredReceiptLine[],
-  body: ReceiptRecordBody,
-  currency: Money['currency'],
-): Money | null {
+function receiptTotal(held: ReceiptToRecord, body: ReceiptRecordBody): Money | null {
+  const { total: printed, lines: stored, currency } = held
   if (body.total !== undefined) {
     // the receipt's currency is printed on it: a total in another is the phone's mistake (Р2-В2)
     if (body.total.currency !== currency) throw new DomainError(ERROR.CURRENCY_MISMATCH)
@@ -132,7 +143,8 @@ function receiptMoney(
     printed,
     ...stored.flatMap((line) => [line.price, line.sum, line.discount]),
   ])
-  const left = recordedSums(stored, printed, digits)
+  // the lines make the total less what a card sent to the card (MOL-289)
+  const left = recordedSums(stored, linesTotalOf(printed, held.cashback), digits)
   let sum: Money | null = { minor: 0n, currency }
   for (const line of body.lines) {
     const amount = line.skip ? (left[line.position] ?? null) : line.amount
@@ -232,14 +244,14 @@ export async function recordReceipt(
       actor.id,
       held.tin,
       held.lines,
-      body.total ?? held.total,
+      linesTotalOf(body.total ?? held.total, held.cashback),
       held.currency,
     )
 
     const recorded = body.lines
       .filter((line): line is RecordedLine => !line.skip)
       .sort((a, b) => a.position - b.position)
-    const money = receiptMoney(held.total, held.lines, body, held.currency)
+    const money = receiptMoney(held, body)
     // a trip with no money and no purchase is an empty row of «Деньги»: a receipt with no items needs
     // its total, read or typed (MOL-227, Р-4)
     if (money === null && recorded.length === 0) {

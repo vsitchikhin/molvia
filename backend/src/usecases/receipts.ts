@@ -8,6 +8,7 @@ import {
   AGGREGATE_MIN_CONTRIBUTIONS,
   barcodeTwins,
   hasSharedAccess,
+  linesTotalOf,
   placeNameIdentity,
   priceInDoubt,
   receiptDigits,
@@ -242,6 +243,8 @@ export async function receiptOfOwner(
   readTotal = false,
   /** The phone knows the detail's `readPartly` (`RECEIPT_READ_PARTLY_HEADER`, MOL-255). */
   readPartly = false,
+  /** The phone knows the detail's `cashback` and `redeemed` (`RECEIPT_CASHBACK_HEADER`, MOL-289). */
+  cashback = false,
 ): Promise<ReceiptDetail> {
   const found = await repositories.receipts.one(actor.id, id)
   if (found === null) throw new DomainError(ERROR.NOT_FOUND)
@@ -256,7 +259,8 @@ export async function receiptOfOwner(
     actor.id,
     tin,
     lines,
-    receipt.total,
+    // the lines make the total less what a card sent to the card (MOL-289)
+    linesTotalOf(receipt.total, found.cashback),
     currency,
   )
 
@@ -331,6 +335,7 @@ export async function receiptOfOwner(
     duplicateOf: twin,
     ...(readTotal ? { readTotal: found.readTotal } : {}),
     ...(readPartly ? { readPartly: found.readPartly } : {}),
+    ...(cashback ? { cashback: found.cashback, redeemed: found.redeemed } : {}),
   }
 }
 

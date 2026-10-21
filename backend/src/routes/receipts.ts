@@ -2,6 +2,7 @@ import { z } from 'zod'
 import {
   receiptReadQuerySchema,
   DomainError,
+  RECEIPT_CASHBACK_HEADER,
   RECEIPT_CODES_HEADER,
   RECEIPT_READ_PARTLY_HEADER,
   RECEIPT_READ_TOTAL_HEADER,
@@ -37,7 +38,8 @@ export interface ReceiptsApi {
    * The review reads the rate of the receipt's day, and «today» is the phone's (MOL-121). `codes` — the
    * phone knows a line's `code` (`RECEIPT_CODES_HEADER`, MOL-234, adversarial А3); `readTotal` — the
    * detail's `readTotal` (`RECEIPT_READ_TOTAL_HEADER`, MOL-244); `readPartly` — its `readPartly`
-   * (`RECEIPT_READ_PARTLY_HEADER`, MOL-255).
+   * (`RECEIPT_READ_PARTLY_HEADER`, MOL-255); `cashback` — its `cashback` and `redeemed`
+   * (`RECEIPT_CASHBACK_HEADER`, MOL-289).
    */
   one(
     actor: Actor & Today,
@@ -46,6 +48,7 @@ export interface ReceiptsApi {
     codes: boolean,
     readTotal: boolean,
     readPartly: boolean,
+    cashback: boolean,
   ): Promise<ReceiptDetail>
   remove(actorId: string, id: string): Promise<void>
   restore(actorId: string, id: string): Promise<ReceiptSummary>
@@ -78,6 +81,11 @@ function readTotalOf(request: FastifyRequest): boolean {
 /** Whether the phone knows the detail's `readPartly` (MOL-255). */
 function readPartlyOf(request: FastifyRequest): boolean {
   return request.headers[RECEIPT_READ_PARTLY_HEADER.toLowerCase()] === '1'
+}
+
+/** Whether the phone knows the detail's `cashback` and `redeemed` (MOL-289). */
+function cashbackOf(request: FastifyRequest): boolean {
+  return request.headers[RECEIPT_CASHBACK_HEADER.toLowerCase()] === '1'
 }
 
 function ownerOf(request: FastifyRequest): string {
@@ -192,6 +200,7 @@ export function receiptRoutes(app: FastifyInstance, api: ReceiptsApi): void {
               codesOf(request),
               readTotalOf(request),
               readPartlyOf(request),
+              cashbackOf(request),
             ),
           ),
         ),

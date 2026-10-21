@@ -436,6 +436,43 @@ describe('the model away (Р-9)', () => {
 })
 
 describe('what the model read', () => {
+  it('keeps what a card sent to the card, and calls such a receipt read whole (MOL-289)', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    // the lines make 1 027,10; 10,27 went to the card; «Ընդամենը:» 1 037,37 left it, 100,00 of the
+    // bonus spent and the rest paid by card, rounded to the dram
+    const totals = [
+      { label: 'Ընդամենը', amount: '1027.12' },
+      { label: '/ԱԱՀ-ով հարկվող/ =', amount: '1027.10' },
+      { label: 'Ընդամենը:', amount: '1037.37' },
+      { label: 'Վճարված է PosTerminal:', amount: '937.00' },
+      { label: 'Կանխավճարի մարում:', amount: '100.00' },
+      { label: 'Զեղչ գործարքից:', amount: '10.27' },
+      { label: 'Ընդամենը ամվա սկզբից:', amount: '139432.00' },
+    ]
+    const reports = await readAll(
+      benchReader(),
+      fakeModel(() =>
+        Promise.resolve({
+          kind: 'read',
+          answer: { ...ANSWER, totals },
+          costMicroUsd: 1_000,
+          tokens: TOKENS,
+        }),
+      ),
+    )
+    expect(await receiptOf(id)).toMatchObject({
+      status: 'parsed',
+      totalMinor: 103_737n,
+      readTotalMinor: 103_737n,
+      cashbackMinor: 1_027n,
+      redeemedMinor: 10_000n,
+      balanced: true,
+      readPartly: false,
+    })
+    expect(reports.find((r) => r.kind === 'read')).toMatchObject({ partly: false })
+  }, 30_000)
+
   it('is «переснимите» where it read nothing, and a sum to record where it read a section', async () => {
     const me = await person(LATER)
     const nothing = await queued(me)

@@ -847,6 +847,45 @@ describe('«Записать»', () => {
     expect([overflow.statusCode, codeOf(overflow)]).toEqual([400, ERROR.INVALID_AMOUNT])
   }, 10_000)
 
+  it('takes what left the card for a card that sends its discount to it, less a bonus spent (MOL-289)', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db)
+    const body = (over: Record<string, unknown> = {}) => ({
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        { position: 0, skip: false, item: { id: milk }, quantity: pieces(2), amount: amount(740) },
+        { position: 1, skip: true },
+      ],
+      ...over,
+    })
+    const moneyOf = async (receipt: string, payload: ReturnType<typeof body>) => {
+      expect((await record(me, receipt, payload)).statusCode).toBe(200)
+      const [trip] = await db.select().from(trips).where(eq(trips.id, payload.tripId))
+      return trip?.receiptMinor
+    }
+    // 2 190 of lines and 21,90 sent to the card: «Ընդամենը» 2 211,90 left the card
+    const carded = { totalMinor: 221_190n, cashbackMinor: 2_190n }
+    const sent = await parsedReceipt(me, LINES.slice(0, 2), { ...carded, receiptNo: '1' })
+    expect(await moneyOf(sent, body())).toBe(221_190n)
+    // 100,00 of it paid with the bonus sent before: that was recorded then, and the card paid the rest
+    const spent = await parsedReceipt(me, LINES.slice(0, 2), {
+      ...carded,
+      redeemedMinor: 10_000n,
+      receiptNo: '2',
+    })
+    expect(await moneyOf(spent, body())).toBe(211_190n)
+    // the total the person typed is the receipt's too: the bonus comes off it as well
+    const typed = await parsedReceipt(me, LINES.slice(0, 2), {
+      ...carded,
+      redeemedMinor: 10_000n,
+      receiptNo: '3',
+    })
+    expect(await moneyOf(typed, body({ total: amount(2_211.9) }))).toBe(211_190n)
+  }, 10_000)
+
   // review 1, В1, В2: the receipt row holds the trip's date on the accounts, «из чека» and the guard
   // against a second record — it goes with its trip, never before it, and never after (MOL-240, А2 of
   // the adversarial review of MOL-97): nobody sees a recorded receipt without its trip
