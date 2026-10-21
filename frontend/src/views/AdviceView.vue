@@ -1,60 +1,81 @@
 <template>
   <AppScreen :title="t('advice.title')">
-    <template v-if="phase === 'ready'" #subtitle>
-      {{ scope === 'shared' ? t('advice.shared_data') : t('advice.own_data_only') }}
+    <!-- The line is the screen's in every state, so the field under it never moves (owner's В-2 «а»
+         on review № 1): whose figures these are only the answer can say — access is the server's —
+         so while it is on its way the line is a bar, and with no answer at all it is held empty; so is
+         the newcomer's, who has nobody's figures to speak of. -->
+    <template v-if="phase !== 'idle'" #subtitle>
+      <template v-if="phase === 'ready'">
+        {{ scope === 'shared' ? t('advice.shared_data') : t('advice.own_data_only') }}
+      </template>
+      <span v-else class="subtitle-hold" :class="{ 'subtitle-bar': phase === 'loading' }"></span>
     </template>
 
-    <p v-if="cityReloading" class="city-reloading">
-      <IconSync aria-hidden="true" />{{ t('advice.city_reloading', { city: cityReloading }) }}
-    </p>
-    <ScreenSkeleton v-if="phase === 'loading'" :groups="[40, 78, 62, 78]" />
+    <!-- The connection in one line, once (MOL-181, Ф-14). Over a list it stands under the field, which
+         chooses what is shown, and over the skeleton under the field's well; over the newcomer it
+         stands under the header — unless the focus holds the field there, and then under the field
+         too (adversarial В2: drawn in both places, the first stood over the field). -->
+    <StatusStrip
+      v-if="strip && phase === 'empty' && !fieldShown"
+      class="status"
+      :kind="strip.kind"
+      :text="strip.text"
+      :attempt="attempt"
+    >
+      <template #action>
+        <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+      </template>
+    </StatusStrip>
+
+    <!-- The well stands where the field will, the strip under it as under the field — the head of
+         `AdviceSearch` drawn still (review № 2): over the well the strip took the field's place, and
+         the field came 60 px higher with the answer. Out of the frame, so the strip is not hidden
+         with its bars; the frame's first caption has no 24 above it, which this head gives. -->
+    <template v-if="phase === 'loading'">
+      <div class="ghost-head">
+        <SkeletonPart kind="field" />
+        <StatusStrip v-if="strip" :kind="strip.kind" :text="strip.text" :attempt="attempt" />
+      </div>
+      <AdviceSkeleton />
+    </template>
 
     <!-- Without an identity there is nobody to advise; the notice above says why. -->
     <template v-else-if="phase !== 'idle'">
       <!-- At the top of the list and scrolled with it, never pinned: at a shelf a person starts
-           from the top of the screen (handoff `01`). Only over a list: with none — loading, a
-           failure, a newcomer — there is nothing to say about what is found (question 1). Above
-           the strip of the list's age, as the handoff draws it (review Р-16). -->
+           from the top of the screen (handoff `01`). Over a list, and with no connection and no list
+           remembered (Ф-14, С-1 of MOL-118): the cold offline is not empty, the field answers from
+           what the phone has — nothing, and says why. Not over a failure or a newcomer, whose search
+           could only answer «not rated yet» (question 1) — unless something is typed in it: the
+           connection back without a list, the field stays under the thumb with what it holds, and goes
+           once cleared (owner's В-3 «а» on adversarial А1). One place in the template for all, so the
+           list that comes with the connection comes under the field being typed in, focus and all.
+           Above the strip of the list's age, as the handoff draws it (review Р-16). -->
       <AdviceSearch
-        v-if="phase === 'ready'"
+        v-if="fieldShown"
         v-model="query"
         :remembered="remembered"
         :fetched-at="fetchedAt"
         :refreshes="refreshes"
         @edit="edit"
         @rate="rate"
-      />
-
-      <!-- The rows come from the phone, and the strip says how old they are — while the
-           request is still on its way as well, not only once it has failed (А4). Above the
-           branch, so an empty list from memory is dated too (С-4). Not while something is typed:
-           the list is out of sight then, and the search dates what it searched itself. -->
-      <div v-if="stale && fetchedAt && !searching" class="stale">
-        <p class="stale-text">
-          <IconCloud v-if="otherCity" aria-hidden="true" />
-          {{
-            otherCity
-              ? t('advice.stale_other_city', {
-                  oldCity: cityGenitive(otherCity.oldCity),
-                  city: cityGenitive(otherCity.city),
-                  day: day(fetchedAt),
-                  time: time(fetchedAt),
-                })
-              : t(STALE[stale], { day: day(fetchedAt), time: time(fetchedAt) })
-          }}
-        </p>
-        <!-- Only the server breaking leaves nothing that would fire again by itself. -->
-        <AppButton v-if="stale === 'error'" variant="ghost" @click="retry">
-          {{ t('state.retry') }}
-        </AppButton>
-      </div>
+        @focused="fieldFocused = $event"
+        @vue:unmounted="fieldFocused = false"
+      >
+        <template v-if="strip" #strip>
+          <StatusStrip :kind="strip.kind" :text="strip.text" :attempt="attempt">
+            <template #action>
+              <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+            </template>
+          </StatusStrip>
+        </template>
+      </AdviceSearch>
 
       <!-- With receipts the strip photographs one with the server down, through the queue, and stays
            the screen's: the error is a section's (127_128_129 v2, 1k; MOL-180, В-1). Without, the
            strip is the error's «Повторить» (1k-0) — but not under «Где вы?» opened from it: taken, the
            strip took the sheet and what was typed in it along (adversarial А1, as Р-15 of MOL-128). -->
       <ScreenState
-        v-if="phase === 'error'"
+        v-if="phase === 'error' && !searching"
         kind="error"
         :inline="Boolean(country) || entering"
         :title="t('advice.error.title')"
@@ -63,9 +84,9 @@
       />
 
       <!-- No button: nothing is remembered yet, and the screen loads by itself when the
-           connection is back. -->
+           connection is back. Gives way to what the field found, as the list does. -->
       <ScreenState
-        v-else-if="phase === 'offline'"
+        v-else-if="phase === 'offline' && !searching"
         kind="offline"
         tone="warn"
         :title="t('advice.offline.title')"
@@ -78,7 +99,7 @@
       <!-- Kept while its «Записать вручную» has a sheet up: an answer with rows arriving under «Где
            вы?» would take the sheet with it (review Р-15 of MOL-128, review 6 of MOL-127). -->
       <AdviceHomeNew
-        v-else-if="phase === 'empty' || (country && entering)"
+        v-else-if="(phase === 'empty' && !searching) || (country && entering)"
         @busy="entering = $event"
       />
 
@@ -130,10 +151,11 @@
     <template v-if="country" #docked>
       <CaptureButton :country="country" />
     </template>
-    <!-- Without (Д-3): the newcomer's one action, under the thumb (MOL-128, В-5). Kept while a
-         sheet of its own is up: an answer with rows arriving under «Где вы?» took the strip and
-         the sheet with it (review Р-15). -->
-    <template v-else-if="phase === 'empty' || entering" #docked>
+    <!-- Without (Д-3): the newcomer's one action, under the thumb (MOL-128, В-5), and the cold
+         offline's — purchases are recorded with no connection, whoever this is (Ф-14, 1l-0). Kept
+         while a sheet of its own is up: an answer with rows arriving under «Где вы?» took the strip
+         and the sheet with it (review Р-15). -->
+    <template v-else-if="phase === 'empty' || phase === 'offline' || entering" #docked>
       <ManualEntryButton @busy="entering = $event" />
     </template>
 
@@ -154,42 +176,33 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref } from 'vue'
+import { computed, defineComponent, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { drawsNothing } from '@molvia/model'
 import type { AdviceFound, AdviceRow, AdviceScope } from '@molvia/model'
-import IconCloud from '~icons/mdi/cloud-off-outline'
-import IconSync from '~icons/mdi/sync'
 import AdviceCheapRow from '@/components/AdviceCheapRow.vue'
 import AdviceGroup from '@/components/AdviceGroup.vue'
 import AdviceHomeNew from '@/components/AdviceHomeNew.vue'
 import CaptureButton from '@/components/CaptureButton.vue'
 import AdviceNeverRow from '@/components/AdviceNeverRow.vue'
 import AdviceSearch from '@/components/AdviceSearch.vue'
+import AdviceSkeleton from '@/components/AdviceSkeleton.vue'
 import AdviceTakeCard from '@/components/AdviceTakeCard.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
-import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
+import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
+import type { StripKind } from '@/components/StatusStrip.vue'
 import VerdictEditSheet from '@/components/VerdictEditSheet.vue'
 import { ownScore } from '@/components/adviceRow'
 import type { Score } from '@/components/rating'
 import { useAdvice } from '@/composables/useAdvice'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { purchaseDay, timeOfDay } from '@/days'
-
-/**
- * What the strip over a remembered list says, by what became of the request behind it.
- * Written out rather than assembled: a key built out of a string is invisible to the linter
- * and to `vue-tsc` alike (MOL-16, О-12).
- */
-const STALE = {
-  loading: 'advice.stale_loading',
-  offline: 'advice.stale',
-  error: 'advice.stale_error',
-} as const
+import { focusScreenTitle } from '@/transitions'
 
 /**
  * «Что брать» (MOL-32) — the screen the whole product exists for. The other three fill its
@@ -218,15 +231,15 @@ export default defineComponent({
     CaptureButton,
     AdviceNeverRow,
     AdviceSearch,
+    AdviceSkeleton,
     AdviceTakeCard,
     AppButton,
     AppReveal,
     AppScreen,
-    IconCloud,
-    IconSync,
     ManualEntryButton,
-    ScreenSkeleton,
     ScreenState,
+    SkeletonPart,
+    StatusStrip,
     VerdictEditSheet,
   },
   setup() {
@@ -241,6 +254,98 @@ export default defineComponent({
     /** A sheet of «Записать покупки» is up. */
     const entering = ref(false)
     const { country } = useReceiptCapture()
+    /** The focus is in the field or its «Очистить». */
+    const fieldFocused = ref(false)
+    /**
+     * The field is over a list and in the cold offline; over a failure or a newcomer only while
+     * something is typed in it or the focus is in it (owner's В-3 «а», В-4 «а»): erased to nothing
+     * to type another word, it stays under the thumb with the keyboard, and goes once the person
+     * left it — the focus is then where they put it.
+     */
+    const fieldShown = computed(
+      () =>
+        advice.phase.value === 'ready' ||
+        advice.phase.value === 'offline' ||
+        ((searching.value || fieldFocused.value) &&
+          (advice.phase.value === 'error' || advice.phase.value === 'empty')),
+    )
+    // The one way left for a field to go with the focus in it — a city moved in another tab, the
+    // skeleton in its place: the focus is given to the heading, never left on <body>. Only a focus
+    // that was in the field (review № 8, adversarial Б1): on a phone nobody touched, <body> is where
+    // it always is, and taking it to the heading pulled a screen reader to the top for nothing.
+    watch(fieldShown, async (shown) => {
+      if (shown) return
+      const held = document.activeElement?.closest('.search-field') != null
+      await nextTick()
+      if (held && document.activeElement === document.body) focusScreenTitle()
+    })
+    const day = (when: Date) => purchaseDay(when, locale.value)
+    const time = (when: Date) => timeOfDay(when, locale.value)
+    const cityGenitive = (city: string) =>
+      i18n.te(`advice.cities_genitive.${city}`) ? t(`advice.cities_genitive.${city}`) : city
+
+    /**
+     * An answer on its way for longer than a moment: only then does the strip say so — a quick one
+     * replaces what is shown in silence (MOL-201, В-1 «а»). Timed by what is waited for, not by
+     * whether anything is: a refresh already late and then a city moved are two requests, and one
+     * flag for both put «город сменился» up at once for one asked a moment ago (adversarial А2).
+     */
+    const late = ref(false)
+    let lateTimer: ReturnType<typeof setTimeout> | undefined
+    watch(
+      () => {
+        if (advice.stale.value === 'loading') {
+          return `list ${String(advice.fetchedAt.value?.getTime())}`
+        }
+        const city = advice.cityReloading.value
+        return city === null ? '' : `city ${city}`
+      },
+      (waiting) => {
+        clearTimeout(lateTimer)
+        late.value = false
+        if (waiting) {
+          lateTimer = setTimeout(() => {
+            late.value = true
+          }, STRIP_LATE_MS)
+        }
+      },
+      { immediate: true },
+    )
+    onUnmounted(() => {
+      clearTimeout(lateTimer)
+    })
+
+    /**
+     * What the strip says, by what became of the request behind the list on the screen. The rows
+     * come from the phone, and the strip says how old they are — while the request is late as well,
+     * not only once it has failed (А4); an empty list from memory is dated too (С-4). Not while
+     * something is typed: the list is out of sight, and the search dates what it searched itself.
+     */
+    const strip = computed<{ kind: StripKind; text: string } | null>(() => {
+      const at = advice.fetchedAt.value
+      const stale = advice.stale.value
+      if (stale && at && !searching.value) {
+        const when = { day: day(at), time: time(at) }
+        // Only the server breaking leaves nothing that would fire again by itself: the one with «Повторить».
+        if (stale === 'error') return { kind: 'unanswered', text: t('advice.stale_error', when) }
+        if (stale === 'offline') {
+          const other = advice.otherCity.value
+          const text = other
+            ? t('advice.stale_other_city', {
+                ...when,
+                oldCity: cityGenitive(other.oldCity),
+                city: cityGenitive(other.city),
+              })
+            : t('advice.stale', when)
+          return { kind: 'offline', text }
+        }
+        return late.value ? { kind: 'refreshing', text: t('advice.stale_loading', when) } : null
+      }
+      const city = advice.cityReloading.value
+      return city && late.value
+        ? { kind: 'refreshing', text: t('advice.city_reloading', { city: cityGenitive(city) }) }
+        : null
+    })
     /** The row whose verdict is being amended, as the last answer described it. */
     const editing = ref<{
       itemId: string
@@ -287,8 +392,10 @@ export default defineComponent({
 
     return {
       t,
-      STALE,
       query,
+      strip,
+      fieldShown,
+      fieldFocused,
       searching,
       entering,
       country,
@@ -299,12 +406,8 @@ export default defineComponent({
       groups: advice.groups,
       shown: advice.shown,
       total: advice.total,
-      stale: advice.stale,
       fetchedAt: advice.fetchedAt,
-      cityReloading: advice.cityReloading,
-      otherCity: advice.otherCity,
-      cityGenitive: (city: string) =>
-        i18n.te(`advice.cities_genitive.${city}`) ? t(`advice.cities_genitive.${city}`) : city,
+      attempt: advice.attempt,
       editing,
       edit,
       rate,
@@ -316,40 +419,38 @@ export default defineComponent({
         editing.value = null
       },
       retry: () => void advice.retry(),
-      day: (when: Date) => purchaseDay(when, locale.value),
-      time: (when: Date) => timeOfDay(when, locale.value),
     }
   },
 })
 </script>
 
 <style scoped lang="scss">
-.stale {
+.status {
+  margin-bottom: var(--space-6);
+}
+
+/* `.head` of `AdviceSearch`, still: its gap and its margin, which move together (review № 9). */
+.ghost-head {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: var(--space-2);
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-6);
 }
 
-.city-reloading,
-.stale-text {
-  svg {
-    @include icon;
-
-    font-size: var(--icon-sm);
-    vertical-align: middle;
-    margin-right: var(--space-2);
-  }
-
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
+/* An empty line of the subtitle: an atomic inline keeps the line box, and the strut its height. */
+.subtitle-hold {
+  display: inline-block;
+  width: 46%;
+  height: var(--skeleton-sub);
+  vertical-align: middle;
+  visibility: hidden;
 }
 
-.city-reloading {
-  margin-bottom: var(--space-3);
+.subtitle-bar {
+  @include skeleton-bar;
+
+  display: inline-block;
+  visibility: visible;
 }
 
 .tail {
