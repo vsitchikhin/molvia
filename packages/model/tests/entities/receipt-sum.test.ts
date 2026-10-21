@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   lineAddsUp,
   lineProduct,
+  linesTotalOf,
+  receiptPaidOf,
   priceInDoubt,
   readCovered,
   readPartly,
@@ -95,6 +97,44 @@ const receiptA = [
   figures(pcs(1), amd(1_450), amd(1_450)),
   figures(pcs(1), amd(20), amd(20)),
 ]
+
+describe('what the lines come to by the total (MOL-289)', () => {
+  it('is the total less what the card sent to the card', () => {
+    expect(linesTotalOf(amd(19_097.86), amd(191.02))).toEqual(amd(18_906.84))
+  })
+
+  it('is the total where nothing went to the card, or what did is not of its currency', () => {
+    expect(linesTotalOf(amd(1_700), null)).toEqual(amd(1_700))
+    expect(linesTotalOf(amd(1_700), rub(17))).toEqual(amd(1_700))
+    expect(linesTotalOf(null, amd(17))).toBeNull()
+  })
+
+  it('never makes nothing or less of the total: a bonus the size of it is no reading', () => {
+    expect(linesTotalOf(amd(17), amd(17))).toEqual(amd(17))
+    expect(linesTotalOf(amd(17), amd(18))).toEqual(amd(17))
+  })
+
+  it('lets the sums the total confirms stand, and «Прочитали не всё» say nothing of the bonus', () => {
+    const lines = [figures(pcs(1), amd(890), amd(980)), figures(pcs(1), amd(500), amd(495))]
+    const total = linesTotalOf(amd(1_489), amd(14))
+    expect(recordedSums(lines, total, 2)).toEqual([amd(980), amd(495)])
+    const read = lines.map((line) => ({ settled: true, sum: line.sum }))
+    expect([readPartly(read, total), readPartly(read, amd(1_489))]).toEqual([false, true])
+  })
+})
+
+describe('what left the card (MOL-289, В-5 «а»)', () => {
+  it('is the total less the bonus it was partly paid with', () => {
+    expect(receiptPaidOf(amd(19_097.86), amd(191.02))).toEqual(amd(18_906.84))
+    expect(receiptPaidOf(amd(1_700), null)).toEqual(amd(1_700))
+    expect(receiptPaidOf(null, amd(17))).toBeNull()
+  })
+
+  it('is the total where the bonus is the whole of it or more, or of another currency', () => {
+    expect(receiptPaidOf(amd(17), amd(17))).toEqual(amd(17))
+    expect(receiptPaidOf(amd(1_700), rub(17))).toEqual(amd(1_700))
+  })
+})
 
 describe('what a line is recorded at (MOL-124 В-5)', () => {
   it('takes the printed sum when the total confirms it', () => {

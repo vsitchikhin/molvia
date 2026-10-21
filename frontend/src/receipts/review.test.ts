@@ -146,6 +146,60 @@ describe('the balance — the model’s, not a sum of the phone’s', () => {
   })
 })
 
+describe('a line put right by the font’s swaps (MOL-290)', () => {
+  it('says «проверьте» of its figures until the person typed their own', () => {
+    const detail = receiptA()
+    const put = {
+      ...detail,
+      lines: detail.lines.map((l, i) => (i === 0 ? { ...l, repaired: true } : l)),
+    }
+    expect(reviewLines(put, null).map((l) => l.repaired)).toEqual([true, false, false, false])
+    // an item chosen leaves the figures to the reading, and their «проверьте» with them
+    const chosen: ReceiptDraft = {
+      lines: { 0: { item: { id: MILK, name: 'Молоко' }, skip: false } },
+    }
+    expect(reviewLines(put, chosen)[0]?.repaired).toBe(true)
+    const typed: ReceiptDraft = {
+      lines: {
+        0: {
+          item: { id: MILK, name: 'Молоко' },
+          skip: false,
+          figures: { quantity: parseQuantity('1', 'piece'), amount: amd('531') },
+        },
+      },
+    }
+    expect(reviewLines(put, typed)[0]?.repaired).toBe(false)
+  })
+})
+
+describe('a card that sends its discount to the card (MOL-289)', () => {
+  // the lines come to 3 663 with the chocolate's 980, and 36,63 went to the card: «Ընդամենը» 3 699,63
+  const carded = (cashback: string | null): ReceiptDetail => ({
+    ...receiptA('3699.63'),
+    ...(cashback === null ? {} : { cashback: amd(cashback) }),
+  })
+
+  it('sets the lines against the total less what went to the card', () => {
+    const detail = carded('36.63')
+    const lines = reviewLines(detail, null)
+    const balance = reviewBalance(detail, lines, null)
+    expect([balance.lines, balance.difference]).toEqual([amd('3573'), amd('90')])
+  })
+
+  it('turns В-5 by the total less it when the person typed the total', () => {
+    const detail = carded('36.63')
+    const draft: ReceiptDraft = { lines: {}, total: amd('3699.63') }
+    const lines = reviewLines(detail, draft)
+    expect(lines[3]?.amount).toEqual(amd('980'))
+    expect(reviewBalance(detail, lines, draft).difference).toEqual(amd('0'))
+    // a server of before sends none: the lines fall short of the total by what went to the card
+    const before = carded(null)
+    const without = reviewLines(before, draft)
+    expect(without[3]?.amount).toEqual(amd('890'))
+    expect(reviewBalance(before, without, draft).difference).toEqual(amd('126.63'))
+  })
+})
+
 describe('a total the person typed (Р-8, review 4)', () => {
   it('turns В-5 for the lines not edited: the printed sum the total confirms is recorded', () => {
     // The total was not read: the server recorded the chocolate at 1 × 890.

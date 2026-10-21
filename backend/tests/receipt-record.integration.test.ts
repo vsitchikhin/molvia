@@ -669,6 +669,50 @@ describe('«Записать»', () => {
     expect(pending.body).toContain(milk)
   })
 
+  it('records a line the font’s swaps put right as not read: no shelf price for the memory (MOL-290, Р-7)', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const cheese = await insertItem(db)
+    const id = await parsedReceipt(me, LINES.slice(1, 3))
+    await db
+      .update(receiptLines)
+      .set({ repaired: true })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 0)))
+    const line = (position: number, drams: number) => ({
+      position,
+      skip: false,
+      item: { id: cheese },
+      quantity: pieces(1),
+      amount: amount(drams),
+    })
+    const response = await record(me, id, {
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [line(0, 1_450), line(1, 980)],
+    })
+    expect(response.statusCode).toBe(200)
+    const rows = await db
+      .select()
+      .from(receiptLines)
+      .where(eq(receiptLines.receiptId, id))
+      .orderBy(asc(receiptLines.position))
+    expect(rows.map((row) => [row.position, row.repaired, row.asRead])).toEqual([
+      [0, true, false],
+      [1, false, false],
+    ])
+    // the chocolate, 890 × 1 for 980, is not as read either: neither gives the shelf a price
+    const words = await db
+      .select()
+      .from(storeMemory)
+      .where(eq(storeMemory.kind, 'sku'))
+      .orderBy(asc(storeMemory.key))
+    expect(words.map((word) => [word.key, word.priceMinor])).toEqual([
+      ['1110001', null],
+      ['1110002', null],
+    ])
+  })
+
   it('confirms no row of a line whose price the check took off as misread (MOL-255)', async () => {
     const me = await insertActor(db)
     const place = await insertPlace(db)
@@ -845,6 +889,77 @@ describe('«Записать»', () => {
       }),
     )
     expect([overflow.statusCode, codeOf(overflow)]).toEqual([400, ERROR.INVALID_AMOUNT])
+  }, 10_000)
+
+  it('takes what left the card for a card that sends its discount to it, less a bonus spent (MOL-289)', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db)
+    const body = (over: Record<string, unknown> = {}) => ({
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        { position: 0, skip: false, item: { id: milk }, quantity: pieces(2), amount: amount(740) },
+        { position: 1, skip: true },
+      ],
+      ...over,
+    })
+    const moneyOf = async (receipt: string, payload: ReturnType<typeof body>) => {
+      expect((await record(me, receipt, payload)).statusCode).toBe(200)
+      const [trip] = await db.select().from(trips).where(eq(trips.id, payload.tripId))
+      return trip?.receiptMinor
+    }
+    // 2 190 of lines and 21,90 sent to the card: «Ընդամենը» 2 211,90 left the card
+    const carded = { totalMinor: 221_190n, cashbackMinor: 2_190n }
+    const sent = await parsedReceipt(me, LINES.slice(0, 2), { ...carded, receiptNo: '1' })
+    expect(await moneyOf(sent, body())).toBe(221_190n)
+    // 100,00 of it paid with the bonus sent before: that was recorded then, and the card paid the rest
+    const spent = await parsedReceipt(me, LINES.slice(0, 2), {
+      ...carded,
+      redeemedMinor: 10_000n,
+      receiptNo: '2',
+    })
+    expect(await moneyOf(spent, body())).toBe(211_190n)
+    // the total the person typed is the receipt's too: the bonus comes off it as well
+    const typed = await parsedReceipt(me, LINES.slice(0, 2), {
+      ...carded,
+      redeemedMinor: 10_000n,
+      receiptNo: '3',
+    })
+    expect(await moneyOf(typed, body({ total: amount(2_211.9) }))).toBe(211_190n)
+    // no total vouched for: the lines and what went to the card (review round 1, А3)
+    const unvouched = await parsedReceipt(me, LINES.slice(0, 2), {
+      totalMinor: null,
+      cashbackMinor: 2_190n,
+      receiptNo: '4',
+    })
+    expect(await moneyOf(unvouched, body())).toBe(221_190n)
+    // and less the bonus the card was paid with, where the printed total less it was the payment (review round 6, Г5)
+    const unvouchedBonus = await parsedReceipt(me, LINES.slice(0, 2), {
+      totalMinor: null,
+      cashbackMinor: 2_190n,
+      redeemedMinor: 10_000n,
+      receiptNo: '8',
+    })
+    expect(await moneyOf(unvouchedBonus, body())).toBe(211_190n)
+    // a total vouched for below the lines — a till that takes the discount off on the spot — is the lines alone,
+    // as before: never the lines and the cashback, two discounts over what left the card (review round 2, Б4)
+    const below = await parsedReceipt(me, LINES.slice(0, 2), {
+      totalMinor: 217_000n,
+      cashbackMinor: 2_190n,
+      receiptNo: '5',
+    })
+    expect(await moneyOf(below, body())).toBe(219_000n)
+    // an earlier build is shown the lines' total, 2 190,00, and sends it back with «Итог» saved as it was: the
+    // printed total, what left the card, and no total put right (review round 2, №5)
+    const echoed = await parsedReceipt(me, LINES.slice(0, 2), { ...carded, receiptNo: '6' })
+    expect(await moneyOf(echoed, body({ total: amount(2_190) }))).toBe(221_190n)
+    const days = await db.select().from(receiptDays)
+    expect(days.reduce((all, day) => all + day.totalsCorrected, 0)).toBe(0)
+    // any other figure it sends is the person's word, taken as it is
+    const typedOver = await parsedReceipt(me, LINES.slice(0, 2), { ...carded, receiptNo: '7' })
+    expect(await moneyOf(typedOver, body({ total: amount(2_200) }))).toBe(220_000n)
   }, 10_000)
 
   // review 1, В1, В2: the receipt row holds the trip's date on the accounts, «из чека» and the guard

@@ -6,6 +6,11 @@
         <span>{{ t('receipt.review.lines') }}</span>
         <span class="figure">{{ linesText ?? '—' }}</span>
       </div>
+      <!-- A card that sends its discount to the card (MOL-289): the lines make the total less it. -->
+      <div v-if="cashbackText" class="line">
+        <span>{{ t('receipt.review.cashback') }}</span>
+        <span class="figure">{{ cashbackText }}</span>
+      </div>
       <hr class="rule" />
     </template>
     <!-- The total is a button (Р-8): OCR misses it on half the receipts, and the trip's money is the
@@ -16,6 +21,11 @@
       <span v-if="totalText" class="amount">{{ totalText }}</span>
       <IconChevronRight class="chevron" aria-hidden="true" />
     </button>
+    <!-- The card's bonus spent on it (MOL-289): the trip is what left the card, the total less it. -->
+    <div v-if="redeemedText" class="line">
+      <span>{{ t('receipt.review.redeemed') }}</span>
+      <span class="figure">{{ redeemedText }}</span>
+    </div>
     <p v-if="approx" class="approx">{{ approx }}</p>
     <p v-if="difference" class="difference">
       <IconAlert class="difference-icon" aria-hidden="true" />
@@ -30,7 +40,7 @@ import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconChevronRight from '~icons/mdi/chevron-right'
-import { convertMoney, formatEstimate, formatMoney } from '@molvia/model'
+import { convertMoney, formatEstimate, formatMoney, receiptPaidOf } from '@molvia/model'
 import type { ExchangeRate, Money, ReceiptBalance } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import { calendarDay } from '@/days'
@@ -47,6 +57,9 @@ export default defineComponent({
   props: {
     balance: { type: Object as PropType<ReceiptBalance>, required: true },
     total: { type: Object as PropType<Money | null>, default: null },
+    /** What a card sent to the card, and the bonus spent on the receipt (MOL-289). */
+    cashback: { type: Object as PropType<Money | null>, default: null },
+    redeemed: { type: Object as PropType<Money | null>, default: null },
     rate: { type: Object as PropType<ExchangeRate | null>, default: null },
     /** The day the rate is of: the receipt's. */
     day: { type: String, required: true },
@@ -60,11 +73,13 @@ export default defineComponent({
     const { t, locale } = useI18n()
     const money = (value: Money | null) => (value ? formatMoney(value, locale.value) : null)
     const approx = computed(() => {
-      const { total, rate } = props
-      if (!total || !rate) return null
+      // what left the card, the bonus spent on it aside (MOL-289)
+      const paid = receiptPaidOf(props.total, props.redeemed)
+      const { rate } = props
+      if (!paid || !rate) return null
       try {
         return t('receipt.review.approx', {
-          amount: formatEstimate(convertMoney(total, rate), locale.value),
+          amount: formatEstimate(convertMoney(paid, rate), locale.value),
           day: calendarDay(props.day, locale.value, { day: 'numeric', month: 'short' }),
         })
       } catch {
@@ -90,6 +105,8 @@ export default defineComponent({
       t,
       linesText: computed(() => money(props.balance.lines)),
       totalText: computed(() => money(props.total)),
+      cashbackText: computed(() => (props.noItems ? null : money(props.cashback))),
+      redeemedText: computed(() => money(props.redeemed)),
       approx,
       difference,
     }

@@ -45,6 +45,7 @@ function chocolate(): ReviewLine {
     name: 'Шоколад',
     isNew: false,
     check: true,
+    repaired: false,
     mismatch: true,
     quantity: line.quantity,
     amount: amd('980'),

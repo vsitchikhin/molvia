@@ -8,6 +8,7 @@ import {
   AGGREGATE_MIN_CONTRIBUTIONS,
   barcodeTwins,
   hasSharedAccess,
+  linesTotalOf,
   placeNameIdentity,
   priceInDoubt,
   receiptDigits,
@@ -242,13 +243,26 @@ export async function receiptOfOwner(
   readTotal = false,
   /** The phone knows the detail's `readPartly` (`RECEIPT_READ_PARTLY_HEADER`, MOL-255). */
   readPartly = false,
+  /** The phone knows the detail's `cashback` and `redeemed` (`RECEIPT_CASHBACK_HEADER`, MOL-289). */
+  cashback = false,
+  /** The phone knows a line's `repaired` (`RECEIPT_REPAIRED_HEADER`, MOL-290). */
+  repaired = false,
 ): Promise<ReceiptDetail> {
   const found = await repositories.receipts.one(actor.id, id)
   if (found === null) throw new DomainError(ERROR.NOT_FOUND)
   if (shown) await handedOver(repositories.receipts, actor.id, [found])
   const [receipt] = await withPlaces(repositories.receipts, actor, [found])
   if (receipt === undefined) throw new DomainError(ERROR.NOT_FOUND)
-  const { lines, currency } = found
+  const { currency } = found
+  // an earlier build cannot say «проверьте»: a line put right goes to it empty, as the check left it before
+  // (review round 1, А4; MOL-255, owner's В-1 «а» of MOL-290 — the mark is what lets it be shown)
+  const lines = repaired
+    ? found.lines
+    : found.lines.map((line) =>
+        line.repaired === true
+          ? { ...line, quantity: null, price: null, sum: null, discount: null, settled: false }
+          : line,
+      )
   const tin = receipt.header?.tin ?? null
 
   const { memory, itemIds, names, barcodes, amounts } = await shownLines(
@@ -256,7 +270,8 @@ export async function receiptOfOwner(
     actor.id,
     tin,
     lines,
-    receipt.total,
+    // the lines make the total less what a card sent to the card (MOL-289)
+    linesTotalOf(receipt.total, found.cashback),
     currency,
   )
 
@@ -296,7 +311,11 @@ export async function receiptOfOwner(
   }
 
   return {
-    receipt,
+    // an earlier build sets the lines against `total`, knowing no cashback: it is told what the lines come to,
+    // or it says «Разница» of every line read right (review round 1, А4); the trip's money is the server's
+    receipt: cashback
+      ? receipt
+      : { ...receipt, total: linesTotalOf(receipt.total, found.cashback) },
     lines: lines.map((line, i) => {
       const remembered = memory[i] ?? null
       const itemId = itemIds[i] ?? null
@@ -311,6 +330,7 @@ export async function receiptOfOwner(
         sum: line.sum,
         discount: line.discount,
         settled: line.settled,
+        ...(repaired && line.repaired === true ? { repaired: true } : {}),
         itemId: known === null ? null : itemId,
         itemName: known,
         match:
@@ -331,6 +351,7 @@ export async function receiptOfOwner(
     duplicateOf: twin,
     ...(readTotal ? { readTotal: found.readTotal } : {}),
     ...(readPartly ? { readPartly: found.readPartly } : {}),
+    ...(cashback ? { cashback: found.cashback, redeemed: found.redeemed } : {}),
   }
 }
 

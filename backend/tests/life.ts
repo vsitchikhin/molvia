@@ -168,6 +168,9 @@ export async function aLife(
       printedTime: '15:03',
       receiptNo: '21410811',
       totalMinor: 74_000n,
+      // the card's 1 % sent to the card, a bonus spent on it (MOL-289)
+      cashbackMinor: 740n,
+      redeemedMinor: 1_000n,
       balanced: true,
       recordedAt: at,
       tripId,
