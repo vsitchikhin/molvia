@@ -1136,3 +1136,116 @@ describe('MoneyBudgetView: review of MOL-192, round 1', () => {
     })
   })
 })
+
+describe('MoneyBudgetView: review of MOL-192, round 3', () => {
+  // Adversarial Б3: the large title scrolls away with the page, and the focus given to it there is none.
+  it('the title out of sight is brought into view before it takes the focus', async () => {
+    const scrolled: Element[] = []
+    vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(function (this: Element) {
+      scrolled.push(this)
+    })
+    vi.spyOn(document, 'elementFromPoint').mockReturnValue(null)
+    moneyBudget.mockResolvedValue(
+      budget({
+        categories: budget().categories.filter((one) => one.id !== PETS),
+      }),
+    )
+    const view = await render()
+    await view.findAll('li .list-row')[3]?.trigger('click')
+    await flushPromises()
+    type('input[inputmode=decimal]', '20000')
+    const [, , rent] = budget().rows
+    if (!rent) throw new Error('no row')
+    setBudgetPlan.mockResolvedValue(
+      budget({
+        rows: [...budget().rows, { ...rent, categoryId: TRANSPORT }],
+        unplanned: [],
+        categories: budget()
+          .categories.filter((one) => one.id !== PETS)
+          .map((one) => (one.id === TRANSPORT ? { ...one, archived: true } : one)),
+      }),
+    )
+    await pressUntil(en.budget.sheet.save, () => {
+      expect(setBudgetPlan).toHaveBeenCalled()
+    })
+    await vi.waitFor(() => {
+      expect(document.activeElement?.tagName).toBe('H1')
+    })
+    expect(scrolled.map((one) => one.tagName)).toEqual(['H1'])
+  })
+
+  // Adversarial В1: one sheet serves every row; a write sent from it, swept away, may land while it is
+  // open again for another row.
+  it('a write landing while the sheet is open for another row leaves that sheet alone', async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    await view.findAll('li .list-row')[1]?.trigger('click')
+    await flushPromises()
+    type('input[inputmode=numeric]', '6')
+    let answer: (value: MoneyBudgetView) => void = () => undefined
+    setBudgetPlan.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+    await pressUntil(en.budget.sheet.save, () => {
+      expect(setBudgetPlan).toHaveBeenCalledTimes(1)
+    })
+    router.back()
+    await vi.waitFor(() => {
+      expect(document.querySelector('dialog[open]')).toBeNull()
+    })
+    await view.findAll('li .list-row')[2]?.trigger('click')
+    await vi.waitFor(() => {
+      expect(document.querySelector('dialog[open]')).not.toBeNull()
+    })
+    type('input[inputmode=decimal]', '70000')
+    const sheet = () => document.querySelector('dialog[open]')
+    // The sheet of the next row is its own: nothing of it is at work.
+    expect(sheet()?.textContent).not.toContain(en.budget.sheet.saving)
+
+    answer(budget())
+    // Must not fire: given time to close it, the answer of «Cafe» leaves the sheet of «Rent» open.
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    await flushPromises()
+    expect(sheet()).not.toBeNull()
+    expect(sheet()?.querySelector<HTMLInputElement>('input[inputmode=decimal]')?.value).toBe(
+      '70000',
+    )
+    await pressUntil(en.budget.sheet.save, () => {
+      expect(setBudgetPlan).toHaveBeenCalledTimes(2)
+    })
+    expect(setBudgetPlan.mock.calls[1]?.[0]).toMatchObject({ categoryId: RENT })
+  })
+
+  it('a write failing while the sheet is open for another row says nothing in that sheet', async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    await view.findAll('li .list-row')[1]?.trigger('click')
+    await flushPromises()
+    type('input[inputmode=numeric]', '6')
+    let refuse: (error: Error) => void = () => undefined
+    setBudgetPlan.mockReturnValueOnce(
+      new Promise((_, reject) => {
+        refuse = reject
+      }),
+    )
+    await pressUntil(en.budget.sheet.save, () => {
+      expect(setBudgetPlan).toHaveBeenCalledTimes(1)
+    })
+    router.back()
+    await vi.waitFor(() => {
+      expect(document.querySelector('dialog[open]')).toBeNull()
+    })
+    await view.findAll('li .list-row')[2]?.trigger('click')
+    await vi.waitFor(() => {
+      expect(document.querySelector('dialog[open]')).not.toBeNull()
+    })
+    refuse(new Error('down'))
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')?.textContent).not.toContain(
+      en.budget.sheet.failed,
+    )
+  })
+})

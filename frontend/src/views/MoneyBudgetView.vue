@@ -466,7 +466,8 @@ export default defineComponent({
      * moves its row out (adversarial А2, self-review 1). Then the focus goes to the row of that category
      * wherever it stands now — a button only: a category removed meanwhile on another device is a row
      * that takes no focus (adversarial Б2) — else to the strip, else to the screen's title; never left
-     * on the page's body, where a screen reader starts from the top.
+     * on the page's body, where a screen reader starts from the top. Whatever takes it is brought into
+     * view first when it is out of sight (Б1, Б3).
      */
     async function done(outcome: BudgetOutcome): Promise<void> {
       announce?.(
@@ -492,10 +493,11 @@ export default defineComponent({
       if (!target) return
       // A row elsewhere on the page is brought into view, as «Траты» bring a refusal (MOL-159): the
       // focus of a keyboard out of the window is no focus. Only when it is not in sight — under the
-      // header, the strip or past an edge — so a row in view does not move.
-      if (target === row && !inSight(row)) {
+      // header, the strip or past an edge — so a row in view does not move. The title too: the large
+      // one scrolls away with the page (adversarial Б3). The strip is pinned and always in sight.
+      if (target !== strip && !inSight(target)) {
         const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        row.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' })
+        target.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' })
       }
       target.focus({ preventScroll: true })
     }

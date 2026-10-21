@@ -867,8 +867,13 @@ task did not: five plans of six there are a percent of the month's income — «
   row of «Без плана» moves into the plans, a plan removed moves its row out — the focus goes to that
   category's row wherever it stands, a button only — a category removed meanwhile on another device
   is a row that takes none (Б2) — else to the strip, else to the screen's title, never to the page's
-  body; **a row out of sight is brought into view first** (Б1), as «Траты» bring a refusal, and one
-  in sight does not move. **A row is `ListRow`** with the category's circle, as on «Категории» and
+  body; **whatever takes it, out of sight, is brought into view first** (Б1, Б3) — the row, as «Траты»
+  bring a refusal, and the large title, which scrolls away with the page — and one in sight does not
+  move. **A write belongs to the opening of the sheet it was sent from** (adversarial В1): one sheet
+  serves every row, and a write from a sheet swept away may land while it is open again for another
+  row — that sheet is not closed by it, not «at work» for it and shows no refusal of it; its outcome is
+  said as for a closed sheet. The price, named: a refusal of a write whose sheet was swept away is said
+  nowhere, as before. **A row is `ListRow`** with the category's circle, as on «Категории» and
   «Траты»; the
   chevron on every live row — each opens the sheet of its plan — and **«осталось» in the title's line,
   never the tail** (`name-beside-figure`): a tail of its own width made every bar another length, and

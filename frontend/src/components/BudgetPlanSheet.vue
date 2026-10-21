@@ -180,11 +180,18 @@ export default defineComponent({
     const removing = ref(false)
     const valueField = ref<ComponentPublicInstance | null>(null)
     let outcome: BudgetOutcome | null = null
+    // Which opening of the sheet this is. One sheet serves every row, and a write sent from a sheet
+    // swept away may be answered while it is open again for another (adversarial В1 of MOL-192): the
+    // write belongs to the opening it was sent from, never to the one on screen when it lands.
+    let opening = 0
 
     watch(
       () => props.open,
       (open) => {
         if (!open) return
+        opening++
+        sending.value = false
+        removing.value = false
         const plan = props.plan
         kind.value = props.subject.kind === 'savings' || plan?.kind === 'share' ? 'share' : 'amount'
         // A sum kept from another currency of spending — a move — is never put in the field as if it
@@ -270,8 +277,8 @@ export default defineComponent({
       }
     }
 
-    function finished(done: BudgetOutcome): void {
-      if (!props.open) {
+    function finished(done: BudgetOutcome, from: number): void {
+      if (!props.open || from !== opening) {
         emit('done', done)
         return
       }
@@ -292,22 +299,29 @@ export default defineComponent({
         failed.value = t('spending.sheet.bad_category')
         return
       }
+      const from = opening
       sending.value = true
       removing.value = plan === null
       try {
         await props.save({ categoryId: id, from: props.month, plan })
-        finished({
-          kind: plan ? 'saved' : 'removed',
-          name: id === null ? t('budget.savings.title') : props.nameOf(id),
-          categoryId: id,
-        })
+        finished(
+          {
+            kind: plan ? 'saved' : 'removed',
+            name: id === null ? t('budget.savings.title') : props.nameOf(id),
+            categoryId: id,
+          },
+          from,
+        )
       } catch (caught) {
+        if (from !== opening) return
         const code = caught instanceof ApiError ? caught.code : null
         failed.value =
           code === ERROR.NOT_FOUND ? t('budget.sheet.category_gone') : t('budget.sheet.failed')
       } finally {
-        sending.value = false
-        removing.value = false
+        if (from === opening) {
+          sending.value = false
+          removing.value = false
+        }
       }
     }
 
