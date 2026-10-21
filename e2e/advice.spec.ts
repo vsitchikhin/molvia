@@ -436,6 +436,12 @@ for (const failing of [true, false]) {
     while ((await field.inputValue()) !== '') await page.keyboard.press('Backspace')
     await expect(field).toBeFocused()
 
+    // A touch on the pill beside the input — its magnifier — is a touch on the field: it stays,
+    // focused (adversarial Г1: the focus went to <body>, and the field with it).
+    await page.locator('.search-field .well > .glyph').tap()
+    await page.waitForTimeout(300)
+    await expect(field).toBeFocused()
+
     if (failing) {
       const retry = page.locator('.state').getByRole('button', { name: 'Try again' })
       await expect(retry).toBeVisible()

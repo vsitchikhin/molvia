@@ -320,8 +320,10 @@ describe('AdviceView', () => {
       await flushPromises()
       expect(view.find('input[type="search"]').exists()).toBe(true)
 
+      // Still there until the task after the release, where its click is dispatched — `flushPromises`
+      // waits a task itself, so the render is awaited without one.
       document.body.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
-      await flushPromises()
+      await nextTick()
       expect(view.find('input[type="search"]').exists()).toBe(true)
       await new Promise((resolve) => setTimeout(resolve))
       await flushPromises()
