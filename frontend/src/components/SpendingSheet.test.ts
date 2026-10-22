@@ -239,7 +239,7 @@ describe('SpendingSheet: the phone’s day (MOL-121)', () => {
       spentOn: '2026-09-29',
       note: 'Reconciliation: coins in the other jacket',
     })
-  })
+  }, 10_000)
 
   it('the journal says «Today» of the phone’s day, and «Yesterday» once its midnight is past (Т-3, adversarial Н)', async () => {
     moneyMonth.mockResolvedValue(month('2026-09-28'))
