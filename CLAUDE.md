@@ -664,9 +664,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The shop's memory votes in a line's digits, weaker than the total** (MOL-291): asked at reading by the tax number
   and the articles, the person's own price, else from three with no access (В-1 «в»); it vouches for the price alone,
   one the reader may have confused — a line as printed it confirms, one that does not hold it puts right under
-  «проверьте» with **the sum as read** (Tesseract's other figures as printed, to the hundredth), one as printed 5↔6 off
-  the person's own price it empties (В-2 «б»); a sum changed and a doubt are the total's to take, a total missed refutes
-  it, and the total's repair goes first; put right and recorded as shown, the price stays in the word (В-3 «а»).
+  «проверьте» with **the sum as read** — never where another digit misread explains it (Tesseract's other figures as
+  printed, to the hundredth) — one as printed 5↔6 off the person's own price it empties (В-2 «б»); the total settles
+  it: it vouches for a doubt, takes a sum changed only where the paper as read does not meet it too, refutes, and goes
+  first, the memory choosing no reading of its; put right and recorded as shown, the price stays in the word (В-3 «а»).
 - **A place keeps no tax number**: the place of a seller is where its receipts were recorded, read as
   the memory is; a recorded receipt is not removed while its trip is there — its row dates the trip.
 - **On the phone (MOL-127) a receipt is the country's version, never a flag** (Р-1); its photo is
