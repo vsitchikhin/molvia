@@ -278,6 +278,12 @@ the worker within milliseconds, so it never showed here.
   `digest`, which here is Node's and runs on the thread pool, even for 4 KB — comes back after happy-dom is
   taken down and the window gone: a timer it sets then is Node's own, uncounted, and fires into a worker
   with no `window`, and a `stepBack` it calls fails at once, with no timer at all. No environment can stop a
-  continuation; none of the PWA's code does this today — `crypto.subtle` is not used, IndexedDB happy-dom has
-  not got, and `requestAnimationFrame` is happy-dom's own and never comes after its abort. A test that does
-  will fail as CI did, and its fix is in the test: wait for the work before the file ends.
+  continuation. **The PWA's own client is such a step** (round 3, Р3-А1): happy-dom ends the task of a `fetch`
+  once the headers came, and the reading of the body — `response.json()` in `transport.ts` — is a task whose
+  abort only marks it, neither waited for nor rejected; the rest of the body comes over Node's socket after
+  the window, and the page's answer to it runs there. **No test of the PWA talks to a server today**: 57 files
+  mock `@/api`, `api.test.ts` mocks the client, and no test file but the environment's own starts a server.
+  Not the rest either: `crypto.subtle` is not used, IndexedDB happy-dom has not got, and
+  `requestAnimationFrame` is happy-dom's own and comes before its abort ends. **A test that lets the page's
+  work outlive the file** — a real request whose answer is on its way, a step of Node — will fail as CI did,
+  and its fix is in the test: wait for the work before the file ends.
