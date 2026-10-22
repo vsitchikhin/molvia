@@ -29,7 +29,8 @@
               :aria-label="
                 t('spending.new_category.colour_label', { n: n + 1, total: colours.length })
               "
-              @change="colour = n"
+              @change="choose(n)"
+              @click="choose(n)"
             />
             <span class="swatch" :style="{ background: `var(--cat-own-${n})` }" aria-hidden="true"
               ><IconCheck v-if="n === colour" class="tick"
@@ -127,6 +128,8 @@ export default defineComponent({
     const name = ref('')
     const icon = ref<SpendingIcon>(DEFAULT_SPENDING_ICON)
     const colour = ref(0)
+    /** Whether the person touched the colour — a colour pressed is theirs, the next only a guess. */
+    const colourChosen = ref(false)
     const problem = ref<string | null>(null)
     const field = ref<ComponentPublicInstance | null>(null)
 
@@ -138,6 +141,7 @@ export default defineComponent({
         name.value = own?.name ?? ''
         icon.value = own?.icon ?? DEFAULT_SPENDING_ICON
         colour.value = own?.colour ?? nextCategoryColour(props.categories)
+        colourChosen.value = false
         problem.value = null
         // A new one is a name to type; one's own opened to amend may be only a new icon, and the
         // keyboard would cover the choice.
@@ -191,16 +195,23 @@ export default defineComponent({
         return
       }
       const id = newId()
-      // The tag and the palette's next go unnamed, as an earlier build sends them: such a body reads in
-      // an image rolled back past MOL-285, and the server's next is the rule (adversarial А3).
+      // The tag and a colour nobody touched go unnamed, as an earlier build sends them: such a body reads
+      // in an image rolled back past MOL-285, and the server's next is the rule (adversarial А3). A colour
+      // pressed goes named even when it is the phone's next: the server's may differ, and the person
+      // chose this one (review №6, adversarial Б1).
       queue.addCategory({
         id,
         name: body.name,
         ...(body.icon === DEFAULT_SPENDING_ICON ? {} : { icon: body.icon }),
-        ...(body.colour === nextCategoryColour(props.categories) ? {} : { colour: body.colour }),
+        ...(colourChosen.value ? { colour: body.colour } : {}),
       })
       emit('created', id)
       close()
+    }
+
+    function choose(n: number): void {
+      colour.value = n
+      colourChosen.value = true
     }
 
     function remove(): void {
@@ -236,6 +247,7 @@ export default defineComponent({
       iconOf: (key: SpendingIcon) => OWN_ICONS[key],
       iconLabel,
       submit,
+      choose,
       remove,
     }
   },

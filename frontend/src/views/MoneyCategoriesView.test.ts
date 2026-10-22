@@ -509,6 +509,53 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
     expect(write?.kind === 'category-add' && Object.keys(write.body).sort()).toEqual(['id', 'name'])
   })
 
+  it('a colour pressed goes in the body even when it is the phone’s next — the server’s may differ (№6, Б1)', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    online(false)
+    await addButton(view)?.trigger('click')
+    await risen()
+    // The next is the second colour, already marked; pressed anyway, it is the person's.
+    await choose('Colour 2 of 8')
+    await addThroughSheetName('Gifts')
+    expect(useSpendingQueueStore().pending).toMatchObject([
+      { kind: 'category-add', body: { name: 'Gifts', colour: 1 } },
+    ])
+  })
+
+  it('a colour pressed away and back is the person’s too (Б1)', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    online(false)
+    await addButton(view)?.trigger('click')
+    await risen()
+    await choose('Colour 6 of 8')
+    await choose('Colour 2 of 8')
+    await addThroughSheetName('Gifts')
+    expect(useSpendingQueueStore().pending).toMatchObject([
+      { kind: 'category-add', body: { colour: 1 } },
+    ])
+  })
+
+  // Review №7: the screen hands its list's moment to `categoriesWith`.
+  it('an amendment that landed gives way to the list read after it — another phone’s name shows', async () => {
+    const mine = own(OWN, 'Armenian lessons')
+    spendingCategories.mockResolvedValueOnce({ categories: [mine] })
+    spendingCategories.mockResolvedValue({ categories: [{ ...mine, name: 'Armenian at school' }] })
+    amendSpendingCategory.mockResolvedValue({ categories: [] })
+    const view = await render()
+    await view.findAll('button.list-row').at(0)?.trigger('click')
+    await risen()
+    await typeName('Armenian with a tutor')
+    sheetButton(en.spending.new_category.edit_save).click()
+    await flushPromises()
+    await flushPromises()
+    expect(amendSpendingCategory).toHaveBeenCalledOnce()
+    expect(spendingCategories).toHaveBeenCalledTimes(2)
+    expect(view.text()).toContain('Armenian at school')
+    expect(view.text()).not.toContain('Armenian with a tutor')
+  })
+
   it('a name kept as it was is not checked again: one named as a preset of another language takes an icon (А2)', async () => {
     // «Rent» made on a Russian screen, where the preset is «Аренда жилья»; this screen is English.
     spendingCategories.mockResolvedValue({ categories: [own(OWN, 'Rent')] })

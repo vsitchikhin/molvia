@@ -722,6 +722,17 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     })
   }
 
+  /** Whether a write of another category stands in the queue after the one at `at`. */
+  function othersBehind(at: number, id: string): boolean {
+    return (
+      at !== -1 &&
+      kept.slice(at + 1).some((item) => {
+        const other = categoryOf(item.write)
+        return other !== null && other !== id
+      })
+    )
+  }
+
   /**
    * A category of one's own renamed, redrawn or recoloured (MOL-285): folded into its «Добавить» or
    * its amendment still waiting — the whole of it either way — else sent after them. **Never folded
@@ -737,11 +748,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
           ((item.write.kind === 'category-add' && item.write.body.id === id) ||
             (item.write.kind === 'category-amend' && item.write.id === id)),
       )
-      const behind = kept.slice(found + 1).some((item) => {
-        const other = categoryOf(item.write)
-        return other !== null && other !== id
-      })
-      const at = behind ? -1 : found
+      const at = othersBehind(found, id) ? -1 : found
       const write: SpendingWrite =
         kept[at]?.write.kind === 'category-add'
           ? { kind: 'category-add', body: { id, ...body } }
@@ -753,14 +760,20 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     })
   }
 
-  /** «Убрать» or «Вернуть» a category: the opposite still waiting cancels out. */
+  /**
+   * «Убрать» or «Вернуть» a category: the opposite still waiting cancels out — **unless a write of
+   * another category stands behind it** (adversarial Б2): «Убрать» of «Такси» may be what freed the name
+   * a rename of «Метро» took after it, and taken out from under the rename, the rename was refused
+   * instead of the «Вернуть» that came last. Then both go, in the order they were made.
+   */
   function archiveCategory(id: string, archived: boolean): void {
     const kind = archived ? 'category-archive' : 'category-restore'
     const opposite = archived ? 'category-restore' : 'category-archive'
     change(() => {
-      const at = kept.findIndex(
+      const found = kept.findIndex(
         (item) => waiting(item) && item.write.kind === opposite && item.write.id === id,
       )
+      const at = othersBehind(found, id) ? -1 : found
       kept =
         at === -1
           ? [...kept, { key: newKey(), write: { kind, id } }]

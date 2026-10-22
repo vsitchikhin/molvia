@@ -791,6 +791,20 @@ describe('spending queue', () => {
       ])
     })
 
+    it('Б2: «Вернуть» does not take out the «Убрать» a rename of another stands on — the last is what is refused', async () => {
+      const queue = fresh('idle')
+      queue.archiveCategory(TAXI, true)
+      queue.amendCategory(METRO, { name: 'Такси', icon: 'tag', colour: 1 })
+      queue.archiveCategory(TAXI, false)
+      useActorStore().state = 'ready'
+      await queue.flush()
+      expect(calls).toEqual([
+        `category-archive ${TAXI}`,
+        `category-amend ${METRO} Такси tag 1`,
+        `category-restore ${TAXI}`,
+      ])
+    })
+
     it('still folds past a spending, and past a write of the same category', () => {
       const queue = fresh('idle')
       queue.addCategory({ id: TAXI, name: 'Такси' })
