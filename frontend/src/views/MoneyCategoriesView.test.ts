@@ -396,7 +396,7 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
     await addButton(view)?.trigger('click')
     await risen()
     // One of one's own already, so the next is the second colour.
-    expect(checked()).toEqual([en.spending.icon.tag, 'Colour 2 of 8'])
+    expect(checked()).toEqual(['Colour 2 of 8', en.spending.icon.tag])
     expect(document.querySelectorAll('dialog[open] input[name]').length).toBeGreaterThan(40)
 
     await choose(en.spending.icon.gift)
@@ -430,7 +430,7 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
     expect(
       document.querySelector<HTMLInputElement>('dialog[open] input:not([type="radio"])')?.value,
     ).toBe('Armenian lessons')
-    expect(checked()).toEqual([en.spending.icon.study, 'Colour 3 of 8'])
+    expect(checked()).toEqual(['Colour 3 of 8', en.spending.icon.study])
 
     await choose(en.spending.icon.languages)
     sheetButton(en.spending.new_category.edit_save).click()

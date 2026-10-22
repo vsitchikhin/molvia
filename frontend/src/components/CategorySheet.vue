@@ -17,26 +17,6 @@
       />
 
       <fieldset class="choice">
-        <legend class="legend">{{ t('spending.new_category.icon') }}</legend>
-        <div class="options">
-          <label v-for="key in icons" :key="key" class="option" :class="{ on: key === icon }">
-            <input
-              class="radio"
-              type="radio"
-              :name="iconGroup"
-              :value="key"
-              :checked="key === icon"
-              :aria-label="iconLabel(key)"
-              @change="icon = key"
-            />
-            <span class="circle" :style="circleStyle" aria-hidden="true"
-              ><component :is="iconOf(key)" class="glyph"
-            /></span>
-          </label>
-        </div>
-      </fieldset>
-
-      <fieldset class="choice">
         <legend class="legend">{{ t('spending.new_category.colour') }}</legend>
         <div class="options">
           <label v-for="n in colours" :key="n" class="option" :class="{ on: n === colour }">
@@ -53,6 +33,25 @@
             />
             <span class="swatch" :style="{ background: `var(--cat-own-${n})` }" aria-hidden="true"
               ><IconCheck v-if="n === colour" class="tick"
+            /></span>
+          </label>
+        </div>
+      </fieldset>
+      <fieldset class="choice">
+        <legend class="legend">{{ t('spending.new_category.icon') }}</legend>
+        <div class="options">
+          <label v-for="key in icons" :key="key" class="option" :class="{ on: key === icon }">
+            <input
+              class="radio"
+              type="radio"
+              :name="iconGroup"
+              :value="key"
+              :checked="key === icon"
+              :aria-label="iconLabel(key)"
+              @change="icon = key"
+            />
+            <span class="circle" :style="circleStyle" aria-hidden="true"
+              ><component :is="iconOf(key)" class="glyph"
             /></span>
           </label>
         </div>
@@ -97,7 +96,8 @@ const PRESET_KEYS: readonly string[] = SPENDING_PRESETS
 
 /**
  * «Новая категория» (MOL-82, В-1) and the sheet of one's own (MOL-285, В-1 «а»): a name, an icon of
- * the set and a colour of the palette — through the queue, so a category named at the till with no
+ * the set and a colour of the palette — the colour first, since thirty-seven icons go on below the
+ * fold and the colour is what tells one's own apart on the ring — through the queue, so a category named at the till with no
  * signal is there for the spending at once (В-4). A new one starts on the tag and the palette's next,
  * so at the shelf it is still a name and «Добавить» (Р-4). Opened on one's own, the same sheet amends
  * it whole, and «Убрать категорию» stands under «Сохранить» — quiet, since it erases nothing (В-2 «а»).
@@ -269,6 +269,7 @@ export default defineComponent({
   place-items: center;
   width: var(--touch-target);
   height: var(--touch-target);
+  border-radius: var(--radius-pill);
   cursor: pointer;
 
   &:has(.radio:focus-visible) {
