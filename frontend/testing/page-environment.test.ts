@@ -1,6 +1,6 @@
 import { createServer } from 'node:net'
-import type { AddressInfo } from 'node:net'
-import { describe, expect, it, vi } from 'vitest'
+import type { AddressInfo, Socket } from 'node:net'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import page, { pageTimers } from './page-environment'
 
 /** A window of its own: the timers of the process, under the window's names, and what reached them. */
@@ -109,8 +109,19 @@ describe('the page environment (MOL-286)', () => {
     // aborts no request still on its way, and its teardown then waits for it for ever.
     let arrived = (): void => undefined
     const reached = new Promise<void>((resolve) => (arrived = resolve))
-    const server = createServer(() => {
+    const sockets: Socket[] = []
+    const server = createServer((socket) => {
+      sockets.push(socket)
       arrived()
+    })
+    // Closed however the test ends: a connection left open would hold the close, and the worker, after a red.
+    onTestFinished(async () => {
+      for (const socket of sockets) socket.destroy()
+      await new Promise<void>((resolve) =>
+        server.close(() => {
+          resolve()
+        }),
+      )
     })
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     const { port } = server.address() as AddressInfo
@@ -123,7 +134,7 @@ describe('the page environment (MOL-286)', () => {
       clearInterval,
       console: { ...console, error: said },
     }
-    const window = await page.setup(global, {})
+    const environment = await page.setup(global, {})
     const ran = vi.fn()
     const asked = (global as unknown as { fetch: typeof fetch }).fetch(
       `http://127.0.0.1:${String(port)}/`,
@@ -133,10 +144,9 @@ describe('the page environment (MOL-286)', () => {
     })
 
     await reached
-    await window.teardown(global)
+    await environment.teardown(global)
     await failed
     await wait(20)
-    server.close()
     expect(said).toHaveBeenCalledWith(expect.objectContaining({ name: 'AbortError' }))
     expect(ran).not.toHaveBeenCalled()
     expect(global.setTimeout).toBe(setTimeout)
