@@ -16,6 +16,7 @@ import type {
   VerdictCard,
 } from '@molvia/model'
 import en from '@/i18n/en.json'
+import { forgetPageWrites } from '@/composables/useAdvice'
 import { createAppI18n } from '@/i18n'
 import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import IconMagnify from '~icons/mdi/magnify'
@@ -44,6 +45,12 @@ vi.mock('@/api', () => ({
 }))
 
 const ME = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
+
+// A verdict written from the sheet is kept by the page as well as the shelf (MOL-202): a fresh page
+// for every test, as a reload makes one.
+beforeEach(() => {
+  forgetPageWrites()
+})
 
 function place(name: string, scaledMinor: bigint): AdvicePlace {
   return {
@@ -1349,6 +1356,9 @@ describe('AdviceView: the sheet after a save (MOL-202, А1)', () => {
   let clock = 0
 
   beforeEach(() => {
+    // Shelves a test blocked are given back before they are cleared.
+    vi.restoreAllMocks()
+    forgetPageWrites()
     localStorage.clear()
     sessionStorage.clear()
     advice.mockReset()
@@ -1535,6 +1545,7 @@ describe('AdviceView: the sheet after a save (MOL-202, А1)', () => {
   })
 
   it('В1: a reload over the memory from before the save, the server failing — still the 5', async () => {
+    forgetPageWrites()
     // What the page before left on the shelf: the list as it was, and the write it made after it.
     localStorage.setItem(
       `molvia.advice.${ME}`,
@@ -1571,6 +1582,7 @@ describe('AdviceView: the sheet after a save (MOL-202, А1)', () => {
   })
 
   it('В1: a write of the page before is let go by any answer of this one, whatever its number', async () => {
+    forgetPageWrites()
     localStorage.setItem(
       `molvia.advice-written.${ME}`,
       JSON.stringify({
@@ -1583,6 +1595,79 @@ describe('AdviceView: the sheet after a save (MOL-202, А1)', () => {
     expect(localStorage.getItem(`molvia.advice-written.${ME}`)).toBeNull()
     const sheet = await open(view)
     expect(sheet.get('.current').text()).toBe('Your rating: 3')
+  })
+
+  it('№5: an answer landing in the screen left lets nothing go — the new one still opens on the 5', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const first = await render()
+    // The list asked again after the save is slow: it lands only once the person is back.
+    let land: (value: AdviceResponse) => void = () => undefined
+    await saveFive(first.view, () =>
+      advice.mockReturnValueOnce(new Promise((resolve) => (land = resolve))),
+    )
+    first.view.unmount()
+    mounted.splice(mounted.indexOf(first.view), 1)
+
+    advice.mockRejectedValue(broke())
+    const { view } = await render()
+    land(shared([row(5, '3.7')]))
+    await flushPromises()
+
+    await onFiveAndOneSent(view)
+  })
+
+  it('Г2: a shelf full for the second write keeps the page`s word, and loses its own past', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+
+    // `localStorage` is full now: it refuses the key and still answers with what it held.
+    const real = window.localStorage
+    const full: Storage = {
+      getItem: (key) => real.getItem(key),
+      removeItem: (key) => {
+        real.removeItem(key)
+      },
+      setItem: (key, value) => {
+        if (key.startsWith('molvia.advice-written'))
+          throw new DOMException('full', 'QuotaExceededError')
+        real.setItem(key, value)
+      },
+      clear: () => {
+        real.clear()
+      },
+      key: (n) => real.key(n),
+      get length() {
+        return real.length
+      },
+    }
+    vi.spyOn(window, 'localStorage', 'get').mockReturnValue(full)
+    const sheet = await open(view)
+    amendVerdict.mockResolvedValueOnce(card(3))
+    await key(sheet, 3).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+    ;(view.vm as unknown as { putAway(): void }).putAway()
+    await flushPromises()
+
+    const again = await open(view)
+    expect(again.get('.current').text()).toBe('Your rating: 3')
+    // The next page reads the 3 from the shelf that took it, never the 5 the full one held.
+    expect(real.getItem(`molvia.advice-written.${ME}`)).toBeNull()
+    expect(sessionStorage.getItem(`molvia.advice-written.${ME}`)).toContain('"score":3')
+  })
+
+  it('Г1: a shelf blocked outright — the page keeps the write, still the 5', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    const blocked = () => {
+      throw new DOMException('blocked', 'SecurityError')
+    }
+    vi.spyOn(window, 'localStorage', 'get').mockImplementation(blocked)
+    vi.spyOn(window, 'sessionStorage', 'get').mockImplementation(blocked)
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+
+    await onFiveAndOneSent(view)
   })
 
   it('a row found by the search, dimmed while it is asked again — the same', async () => {

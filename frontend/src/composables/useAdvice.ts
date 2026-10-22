@@ -1,4 +1,4 @@
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { z } from 'zod'
 import type { ComputedRef } from 'vue'
 import { adviceResponseSchema, geographyKey, verdictFields } from '@molvia/model'
@@ -8,7 +8,7 @@ import type { CheapRow, NeverRow, TakeRow } from '@/components/adviceRow'
 import type { SavedVerdict } from '@/components/rating'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
-import { forget, read, write } from '@/stores/storage'
+import { forget, read, write, writeEverywhere } from '@/stores/storage'
 import { forgetOwnPrices } from '@/stores/ownPrices'
 import { reportFailure } from '@/failures'
 import { newId } from '@/ids'
@@ -163,7 +163,21 @@ const writtenSchema = z.record(
 )
 type Written = z.output<typeof writtenSchema>
 
+/**
+ * The writes as this page last set them, by owner — read before the shelf (MOL-202, adversarial Г1,
+ * Г2). A shelf blocked outright keeps nothing, and one that refused a write for its quota still
+ * answers with what it held; the page knows what it wrote either way. The shelf is for the next page.
+ */
+const pageWritten = new Map<string, Written>()
+
+/** A fresh page, as a reload makes one: for the tests, which share one module between them. */
+export function forgetPageWrites(): void {
+  pageWritten.clear()
+}
+
 function readWritten(owner: string): Written {
+  const kept = pageWritten.get(owner)
+  if (kept) return kept
   try {
     const parsed = writtenSchema.safeParse(JSON.parse(read(`${WRITTEN}.${owner}`) ?? '{}'))
     return parsed.success ? parsed.data : {}
@@ -173,8 +187,10 @@ function readWritten(owner: string): Written {
 }
 
 function writeWritten(owner: string, entries: Written): void {
+  pageWritten.set(owner, entries)
+  // Every shelf or none: a shelf that refuses loses its past rather than answer the next page with it.
   if (Object.keys(entries).length === 0) forget(`${WRITTEN}.${owner}`)
-  else write(`${WRITTEN}.${owner}`, JSON.stringify(entries))
+  else writeEverywhere(`${WRITTEN}.${owner}`, JSON.stringify(entries))
 }
 
 /**
@@ -347,6 +363,13 @@ export function useAdvice(): Advice {
     },
   )
   onMounted(() => void load())
+  // A screen gone takes no answer (MOL-202, review №5): landing in it, an answer asked before a step
+  // away and back wrote the memory and let a write go while the new screen still showed the rows
+  // from before it. The new screen asks for itself.
+  onUnmounted(() => {
+    latest = ++requests
+    running = null
+  })
   useReconnect(() => void load())
 
   return {
