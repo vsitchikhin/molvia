@@ -513,6 +513,14 @@ export function moneyOfHundredths(hundredths: number | null, currency: Currency)
   return { minor, currency }
 }
 
+/** An amount as a till's hundredths, by its currency's exponent: what the parse counts in (MOL-291). */
+export function hundredthsOfMoney(money: Money): number {
+  const exponent = MINOR_EXPONENT[money.currency]
+  return exponent >= 2
+    ? Number(money.minor / 10n ** BigInt(exponent - 2))
+    : Number(money.minor) * 10 ** (2 - exponent)
+}
+
 function quantityOf(line: ReceiptTextLine): Quantity | null {
   const milli = line.quantityMilli
   if (milli === null || !Number.isSafeInteger(milli) || milli <= 0) return null

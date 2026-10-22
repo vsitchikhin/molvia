@@ -47,14 +47,28 @@ const sameQuantity = (a: StoredReceiptLine['quantity'], b: StoredReceiptLine['qu
  * (MOL-255): its row would teach the reader that misreading, so it is not read as printed.
  */
 function asRead(stored: StoredReceiptLine, line: RecordedLine): boolean {
+  // put right by the font's swaps, it was not read so: no shelf price for the memory (MOL-290, Р-7)
+  return asShown(stored, line) && stored.repaired !== true
+}
+
+/** A line recorded as the review showed it: it added up, and neither its quantity nor its sum was changed. */
+function asShown(stored: StoredReceiptLine, line: RecordedLine): boolean {
   return (
     stored.settled &&
-    // put right by the font's swaps, it was not read so: no shelf price for the memory (MOL-290, Р-7)
-    stored.repaired !== true &&
     stored.price !== null &&
     sameQuantity(line.quantity, stored.quantity) &&
     sameMoney(line.amount, stored.sum)
   )
+}
+
+/**
+ * Whether the person's word keeps the line's shelf price: a line recorded as read — or one the shop's memory put
+ * right and the person recorded as shown (MOL-291, owner's В-3 «а»): its price is the remembered one, and a word
+ * with none would leave the memory silent on every other receipt. Its cut-out rows are not confirmed, all the same:
+ * they hold the misread.
+ */
+function keepsPrice(stored: StoredReceiptLine, line: RecordedLine): boolean {
+  return asRead(stored, line) || (stored.remembered && asShown(stored, line))
 }
 
 /**
@@ -329,6 +343,7 @@ export async function recordReceipt(
     const written: { position: number; expenseId: string }[] = []
     const words: MemoryWord[] = []
     const confirmed: number[] = []
+    const priced: number[] = []
     const asked = new Set(body.barcodes ?? [])
     const itemOf = (line: RecordedLine) =>
       'id' in line.item ? line.item.id : newItems.get(nameIdentity(line.item.name))
@@ -358,10 +373,11 @@ export async function recordReceipt(
         ...(line.amount === null ? {} : { amount: line.amount }),
       })
       written.push({ position: line.position, expenseId: expense.id })
-      const read = asRead(stored, line)
-      if (read) confirmed.push(line.position)
+      if (asRead(stored, line)) confirmed.push(line.position)
+      const kept = keepsPrice(stored, line)
+      if (kept) priced.push(line.position)
       for (const word of storeMemoryWords(stored)) {
-        words.push({ ...word, itemId, price: read ? stored.price : null })
+        words.push({ ...word, itemId, price: kept ? stored.price : null })
       }
     }
     // in the order of the codes: each code's lock is held to the end of the record (adversarial А1)
@@ -381,6 +397,7 @@ export async function recordReceipt(
       tripId: trip.id,
       expenses: written,
       confirmed,
+      priced,
       edits: editsOf(body, held.lines, shown, held.total),
       // a receipt from the tax office in a table of its own, its lines being no reading (MOL-234)
       source: held.source,
