@@ -30,7 +30,7 @@ export const REMEMBERED_PRICE_SWAPS = 2
 export const REMEMBERED_COMBINATIONS_MAX = 10_000
 export const REMEMBERED_RECEIPT_COMBINATIONS_MAX = 50_000
 
-/** Past this many steps the paper's own readings are taken to meet the total, and the memory's are not (В2). */
+/** Past this many sums the paper's own readings are taken to meet the total, and the memory's are not (В2, Г1). */
 export const REMEMBERED_WAYS_MAX = 10_000
 
 /** The work of the vote in this process — read by tests alone: a ceiling is held by the work it saves. */
@@ -146,44 +146,48 @@ const oneOf = (found: LineFigures[] | null): LineFigures | null =>
   found?.length === 1 ? (found[0] ?? null) : null
 
 /**
- * The sums a line may come to by the reader's own swaps at any price but the remembered one — what it may be without the
- * memory (review 3, №8, №9; adversarial В1). `null` past a ceiling: nobody knows, and the memory says nothing.
+ * The sums a line may come to by the reader's own swaps — every figure by them, the price at any but `at`, the
+ * remembered one — what it may be without the memory (review 3, №8, №9; adversarial В1). Tesseract's every figure goes
+ * by the card's swaps here, never as printed (review 4, №11): the memory takes nothing of it but the price, and asking
+ * whether anything else explains the line, wider is the safe side — «650 / 550» read by it is one number read two ways
+ * as by the model. `null` past a ceiling: nobody knows, and the memory says nothing.
  */
 function withoutMemory(
   swaps: RememberedSwaps,
   read: LineFigures,
-  at: number,
+  at: number | null,
   rate: number | null,
   budget: { left: number },
 ): Set<number> | null {
   const sums = new Set<number>()
   if (read.priceHundredths === null) return sums
+  const own = { ...swaps, others: swaps.price }
   for (const price of variantsOf(
     swaps.price,
     read.priceHundredths,
     REMEMBERED_PRICE_SWAPS,
   ).keys()) {
     if (price === at || price <= 0) continue
-    const found = readingsAt(swaps, read, price, rate, budget, true)
+    const found = readingsAt(own, read, price, rate, budget, true)
     if (found === null) return null
     for (const one of found) if (one.sumHundredths !== null) sums.add(one.sumHundredths)
   }
   return sums
 }
 
-/** Whether one sum of each set, with `fixed`, makes `owed` — a walk of at most `REMEMBERED_WAYS_MAX` steps. */
-function meets(sets: readonly ReadonlySet<number>[], fixed: number, owed: number): boolean {
-  let steps = 0
-  const walk = (k: number, sum: number): boolean => {
-    steps += 1
-    // past the ceiling nobody knows: as good as met, and the memory's readings are not taken
-    if (steps > REMEMBERED_WAYS_MAX) return true
-    const at = sets[k]
-    if (at === undefined) return sum === owed
-    for (const one of at) if (walk(k + 1, sum + one)) return true
-    return false
+/**
+ * Whether one sum of each set makes `owed`: the sums reachable line by line, at most `REMEMBERED_WAYS_MAX` of them —
+ * past it nobody knows, as good as met, and the memory's readings are not taken.
+ */
+function meets(sets: readonly ReadonlySet<number>[], owed: number): boolean {
+  let reach = new Set([0])
+  for (const set of sets) {
+    const next = new Set<number>()
+    for (const sum of reach) for (const one of set) next.add(sum + one)
+    if (next.size > REMEMBERED_WAYS_MAX) return true
+    reach = next
   }
-  return walk(0, fixed)
+  return reach.has(owed)
 }
 
 /** A line as the memory reads it: its figures, holding, and never as printed. */
@@ -280,17 +284,24 @@ export function rememberedLines(
       const figures = pending.get(i)
       return figures === undefined || figures === null ? line : withFigures(line, figures)
     })
-    // the paper's own readings meet the total too — a doubted line as printed or by the swaps: one as good (Б3, В2)
-    const kept = out.filter((_, i) => !pending.has(i))
-    const sets = [...paper.values()]
+    // the paper's own readings meet the total too — every line by the reader's swaps, a doubted one or one the memory
+    // would put right at any price but the memory's: one as good (Б3, В2; adversarial Г1 of review 4 — a bun copied
+    // «160 / 160» for 150 beside a doubted butter met the total with the butter's old price)
+    const sets = out.map((line, i): Set<number> | null => {
+      const without = paper.get(i)
+      if (without !== undefined) return without
+      const read = line.read
+      const own = line.settled && line.sumHundredths !== null ? [line.sumHundredths] : []
+      if (read === undefined) return new Set(own)
+      const found = withoutMemory(swaps, read, null, rate, budget)
+      return found === null ? null : new Set([...own, ...found])
+    })
     const paperMeets =
-      whole(kept) &&
-      (sets.some((set) => set === null) ||
-        meets(
-          sets.filter((set): set is Set<number> => set !== null),
-          sumOf(kept),
-          owed,
-        ))
+      sets.some((set) => set === null) ||
+      meets(
+        sets.filter((set): set is Set<number> => set !== null),
+        owed,
+      )
     if (
       !paperMeets &&
       [...pending.values()].every((figures) => figures !== null) &&

@@ -306,6 +306,15 @@ describe('the shop’s memory as a voice in a model’s digits (MOL-291)', () =>
     expect(shown.lines.map((l) => l.sumHundredths)).toEqual([null, null])
   })
 
+  it('takes no doubted line’s old price where another line’s swaps meet the total with the paper (adversarial Г1)', () => {
+    // A 1 × 560 as printed, remembered 550 (a doubt); a bun of no article 1 × 150 copied «160 / 160»; the total 710
+    const a = line('1110004', { unit_price: '560', sum: '560' })
+    const bun = line(null, { unit_price: '160', sum: '160' })
+    const { shown } = read([a, bun], { '1110004': 55_000 }, owed('710'))
+    expect(shown.balanced).toBe(false)
+    expect(shown.lines.map((l) => l.sumHundredths)).toEqual([null, null])
+  })
+
   it('lets the total put right what it would with no memory: a price gone up 555 → 565 is no reading to drop (№6)', () => {
     // printed 0,456 kg × 565 − 2,58 = 255,06, the discount copied «2.68»; the milk copied 650 for 550
     const cheese = line('2000002', {
@@ -367,10 +376,40 @@ describe('the shop’s memory on Tesseract’s reading (MOL-291)', () => {
   const swaps = ARMENIAN_RECEIPTS
 
   it('puts a price right by the card’s swaps, every other figure as printed', () => {
-    const text = rememberedReading(reading([ocrLine({})]), prices({ '1122223': 5_000 }), swaps)
+    // three at «650» for 550, the sum 1 650 as printed: nothing but the memory's price explains it
+    const three = ocrLine({
+      quantityMilli: 3_000,
+      read: {
+        quantityMilli: 3_000,
+        priceHundredths: 65_000,
+        discountHundredths: 0,
+        sumHundredths: 165_000,
+      },
+    })
+    const text = rememberedReading(reading([three]), prices({ '1122223': 55_000 }), swaps)
     const shown = verifiedReading(text)
-    expect(figuresOf(shown.lines[0])).toEqual([1_000, 5_000, 0, 5_000])
+    expect(figuresOf(shown.lines[0])).toEqual([3_000, 55_000, 0, 165_000])
     expect(shown.lines[0]).toMatchObject({ repaired: true, remembered: 'repaired' })
+  })
+
+  it('puts no number read two ways right, by any swap of the card — «650 / 550», «1 100 / 1 400» (review 4, №11)', () => {
+    for (const [price, sum] of [
+      [65_000, 55_000],
+      [110_000, 140_000],
+    ] as const) {
+      const twice = ocrLine({
+        read: {
+          quantityMilli: 1_000,
+          priceHundredths: price,
+          discountHundredths: 0,
+          sumHundredths: sum,
+        },
+      })
+      for (const memory of [prices({ '1122223': sum }), theirs({ '1122223': sum })]) {
+        const text = rememberedReading(reading([twice]), memory, swaps)
+        expect(text.lines[0]?.remembered).toBeUndefined()
+      }
+    }
   })
 
   it('bends no other figure: the sum read «51» stays as the parse left it', () => {
@@ -469,22 +508,22 @@ describe('the shop’s memory on Tesseract’s reading (MOL-291)', () => {
         },
         ...over,
       })
-    // A 2 × 560 as printed (remembered 550); B 1 × 550 with its price read «650»; C 1 × 290; the total 1 960 meets them
+    // A 2 × 560 as printed (remembered 550); B 3 × 550 with its price read «650»; C 1 × 290; the total 3 060 meets them
     const a = at('1110007', 2_000, 56_000)
-    const b = at('1110009', 1_000, 55_000, {
+    const b = at('1110009', 3_000, 55_000, {
       asPrinted: false,
       read: {
-        quantityMilli: 1_000,
+        quantityMilli: 3_000,
         priceHundredths: 65_000,
         discountHundredths: 0,
-        sumHundredths: 55_000,
+        sumHundredths: 165_000,
       },
     })
     const c = at('1110010', 1_000, 29_000)
     const memory = prices({ '1110007': 55_000, '1110009': 55_000 })
-    const shown = verifiedReading(rememberedReading(reading([a, b, c], 196_000), memory, swaps))
+    const shown = verifiedReading(rememberedReading(reading([a, b, c], 306_000), memory, swaps))
     expect(shown.balanced).toBe(true)
-    expect(shown.lines.map((l) => l.sumHundredths)).toEqual([112_000, 55_000, 29_000])
+    expect(shown.lines.map((l) => l.sumHundredths)).toEqual([112_000, 165_000, 29_000])
   })
 
   it('refutes a line it put right by the total the reading read, in one place too (adversarial А1)', () => {
