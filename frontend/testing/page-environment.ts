@@ -10,10 +10,11 @@ type Start = (handler: TimerHandler, delay?: number, ...args: unknown[]) => unkn
 type Stop = (timer?: unknown) => void
 
 /**
- * Keeps the timers set through `target` until `close()`, which clears every one still pending and
- * gives `target` its own functions back. A timer that ran once, or was cleared, is let go of then.
+ * Keeps the timers set through `target`: `clear()` clears every one still pending, `close()` does too
+ * and gives `target` its own functions back. A timer that ran once, or was cleared, is let go of then —
+ * until Node's `refresh()` sets it going again under the same handle.
  */
-export function pageTimers(target: Timers): { close: () => void } {
+export function pageTimers(target: Timers): { clear: () => void; close: () => void } {
   const given: Timers = {
     setTimeout: target.setTimeout,
     setInterval: target.setInterval,
@@ -25,6 +26,17 @@ export function pageTimers(target: Timers): { close: () => void } {
   const stop = given.clearTimeout as Stop
   const stopRepeat = given.clearInterval as Stop
   const pending = new Set<unknown>()
+  const keep = (timer: unknown): void => {
+    pending.add(timer)
+    if (typeof timer !== 'object' || timer === null) return
+    const node = timer as { refresh?: () => unknown }
+    const refresh = node.refresh?.bind(timer)
+    if (refresh)
+      node.refresh = () => {
+        pending.add(timer)
+        return refresh()
+      }
+  }
 
   const setTimeout: Start = (handler, delay, ...args) => {
     if (typeof handler !== 'function') return start(handler, delay, ...args)
@@ -37,12 +49,12 @@ export function pageTimers(target: Timers): { close: () => void } {
       delay,
       ...args,
     )
-    pending.add(timer)
+    keep(timer)
     return timer
   }
   const setInterval: Start = (handler, delay, ...args) => {
     const timer = repeat(handler, delay, ...args)
-    pending.add(timer)
+    keep(timer)
     return timer
   }
   // Either clears either kind, in a browser and in Node alike.
@@ -56,10 +68,14 @@ export function pageTimers(target: Timers): { close: () => void } {
   }
   Object.assign(target, { setTimeout, setInterval, clearTimeout, clearInterval })
 
+  const clear = (): void => {
+    for (const timer of pending) stop(timer)
+    pending.clear()
+  }
   return {
+    clear,
     close() {
-      for (const timer of pending) stop(timer)
-      pending.clear()
+      clear()
       Object.assign(target, given)
     },
   }
@@ -78,11 +94,15 @@ export default {
   viteEnvironment: 'client',
   async setup(global, options) {
     const page = await happyDom.setup(global, options)
-    const timers = pageTimers(globalThis)
+    const timers = pageTimers(global as typeof globalThis)
     return {
+      // Cleared before happy-dom is taken down and again after it, its functions kept between: taking it
+      // down aborts what is in the air — a request, a load — and runs the page's handlers of the failure,
+      // and a timer one of them sets is the page's too (adversarial А1).
       async teardown(taken) {
-        timers.close()
+        timers.clear()
         await page.teardown(taken)
+        timers.close()
       },
     }
   },
