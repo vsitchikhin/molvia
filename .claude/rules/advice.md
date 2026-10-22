@@ -396,10 +396,19 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   in the air lands with the old figures and lets nothing go; any request of a later page is after it.
   **The page keeps its own copy and reads it first** (adversarial Г1, Г2): a shelf blocked outright keeps
   nothing, and one full for its quota still answers with what it held — so the shelf is written on
-  every one or none (`writeEverywhere`), and is for the next page. **A screen gone takes no answer**
-  (review №5): one landing in it after a step away and back wrote the memory and let the write go while
-  the new screen still showed the rows from before it. Not a second verdict on the phone: the server's
-  own answer, read only as the sheet's starting point. **The prices, named:** each page keeps its own
+  every one or none (`writeEverywhere`), and is for the next page; **a write no shelf of the next page
+  will have takes the list remembered before it along** (adversarial Д2) — `localStorage` full and
+  `sessionStorage` gone with the app, the list would open the next launch on the score from before
+  it. **A screen gone lets no write go** (review №5): its answer landing after a step away and back let
+  one go while the new screen still showed the rows from before it — **but still takes the answer into
+  the phone's memory, the newest of the page only** (adversarial Д3): dropped, the list offline was the
+  one before; written as it landed, an answer asked before the step could land after the next screen's
+  own and put the memory back. **The sheet hands the write over by a prop, `onSaved`** (adversarial
+  Д1), as `BottomSheet` hands `onClosed`: swept away while the write was on its way, it emitted into
+  nothing — the write landed, and the screen neither kept it nor asked again. Not a second verdict on
+  the phone: the server's own answer, read only as the sheet's starting point. **The prices, named:** a
+  list forgotten for a write the shelves would not keep is no list offline until the next answer; a
+  write that fails after its sheet was swept away is said nowhere; each page keeps its own
   copy, so two tabs of one person are not kept in step — a write in one is seen in the other only
   until that other writes or is answered itself; and when the door closes without «Выйти» — a
   session that lapsed, or «Выйти» settled from a tab where somebody else has signed in since — the
