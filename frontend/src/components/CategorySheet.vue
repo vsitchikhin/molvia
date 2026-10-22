@@ -190,7 +190,7 @@ export default defineComponent({
       const body = { name: checked.data, icon: icon.value, colour: colour.value }
       if (own) {
         const same = own.name === body.name && own.icon === body.icon && own.colour === body.colour
-        if (!same) queue.amendCategory(own.id, body)
+        if (!same) queue.amendCategory(own.id, body, kept)
         close()
         return
       }

@@ -664,7 +664,7 @@ describe('spending queue', () => {
     it('a category not yet sent takes the amendment into its «Добавить» — one POST, as amended', async () => {
       const queue = fresh('idle')
       queue.addCategory({ id: TAXI, name: 'Такси' })
-      queue.amendCategory(TAXI, { name: 'Такси и метро', icon: 'taxi', colour: 4 })
+      queue.amendCategory(TAXI, { name: 'Такси и метро', icon: 'taxi', colour: 4 }, false)
       expect(queue.pending).toEqual([
         {
           kind: 'category-add',
@@ -678,14 +678,14 @@ describe('spending queue', () => {
 
     it('two amendments waiting are one PATCH, the last; one on the way is never folded into', async () => {
       const queue = fresh('idle')
-      queue.amendCategory(TAXI, { name: 'Такси', icon: 'car', colour: 1 })
-      queue.amendCategory(TAXI, { name: 'Такси', icon: 'taxi', colour: 2 })
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'car', colour: 1 }, false)
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'taxi', colour: 2 }, false)
       useActorStore().state = 'ready'
       let land: (value: unknown) => void = () => undefined
       amendSpendingCategory.mockImplementationOnce(() => new Promise((resolve) => (land = resolve)))
       const sending = queue.flush()
       await settled()
-      queue.amendCategory(TAXI, { name: 'Такси', icon: 'transport', colour: 3 })
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'transport', colour: 3 }, false)
       land(undefined)
       await sending
       await queue.flush()
@@ -697,7 +697,7 @@ describe('spending queue', () => {
 
     it('keeps an amendment made with no signal on the device and sends it later', async () => {
       const first = fresh('idle')
-      first.amendCategory(TAXI, { name: 'Такси', icon: 'taxi', colour: 5 })
+      first.amendCategory(TAXI, { name: 'Такси', icon: 'taxi', colour: 5 }, false)
       const queue = fresh('ready')
       expect(queue.pending).toEqual([
         { kind: 'category-amend', id: TAXI, body: { name: 'Такси', icon: 'taxi', colour: 5 } },
@@ -711,7 +711,7 @@ describe('spending queue', () => {
         new ApiError(ERROR.SPENDING_CATEGORY_TAKEN, 'name'),
       )
       const queue = fresh()
-      queue.amendCategory(TAXI, { name: 'Кафе', icon: 'cafe', colour: 1 })
+      queue.amendCategory(TAXI, { name: 'Кафе', icon: 'cafe', colour: 1 }, false)
       await settled()
       expect(queue.rejected).toMatchObject([
         { write: { kind: 'category-amend' }, code: ERROR.SPENDING_CATEGORY_TAKEN },
@@ -723,9 +723,9 @@ describe('spending queue', () => {
     // the old name and icon for a round trip.
     it('an amendment that landed stays over the list, the last of the category only', async () => {
       const queue = fresh()
-      queue.amendCategory(TAXI, { name: 'Такси', icon: 'car', colour: 1 })
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'car', colour: 1 }, false)
       await settled()
-      queue.amendCategory(TAXI, { name: 'Машина', icon: 'car', colour: 6 })
+      queue.amendCategory(TAXI, { name: 'Машина', icon: 'car', colour: 6 }, false)
       await settled()
       expect(queue.pending).toEqual([])
       expect(queue.arrived).toHaveLength(1)
@@ -752,7 +752,7 @@ describe('spending queue', () => {
       queue.addCategory({ id: METRO, name: 'Метро' })
       queue.record({ id: BARBER, ...fields('300', 'Метро', METRO) })
       queue.archiveCategory(TAXI, true)
-      queue.amendCategory(METRO, { name: 'Такси', icon: 'tag', colour: 1 })
+      queue.amendCategory(METRO, { name: 'Такси', icon: 'tag', colour: 1 }, false)
       useActorStore().state = 'ready'
       await queue.flush()
       expect(calls).toEqual([
@@ -765,9 +765,9 @@ describe('spending queue', () => {
 
     it('А1б: a rename into a name another frees later in the queue is not folded in front of it', async () => {
       const queue = fresh('idle')
-      queue.amendCategory(TAXI, { name: 'Такси', icon: 'taxi', colour: 0 })
-      queue.amendCategory(METRO, { name: 'Метро и автобус', icon: 'tag', colour: 1 })
-      queue.amendCategory(TAXI, { name: 'Метро', icon: 'taxi', colour: 0 })
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'taxi', colour: 0 }, false)
+      queue.amendCategory(METRO, { name: 'Метро и автобус', icon: 'tag', colour: 1 }, false)
+      queue.amendCategory(TAXI, { name: 'Метро', icon: 'taxi', colour: 0 }, false)
       useActorStore().state = 'ready'
       await queue.flush()
       expect(calls).toEqual([
@@ -779,9 +779,9 @@ describe('spending queue', () => {
 
     it('А1в: nor in front of «Убрать» of the other', async () => {
       const queue = fresh('idle')
-      queue.amendCategory(TAXI, { name: 'Такси', icon: 'taxi', colour: 0 })
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'taxi', colour: 0 }, false)
       queue.archiveCategory(METRO, true)
-      queue.amendCategory(TAXI, { name: 'Метро', icon: 'taxi', colour: 0 })
+      queue.amendCategory(TAXI, { name: 'Метро', icon: 'taxi', colour: 0 }, false)
       useActorStore().state = 'ready'
       await queue.flush()
       expect(calls).toEqual([
@@ -794,7 +794,7 @@ describe('spending queue', () => {
     it('Б2: «Вернуть» does not take out the «Убрать» a rename of another stands on — the last is what is refused', async () => {
       const queue = fresh('idle')
       queue.archiveCategory(TAXI, true)
-      queue.amendCategory(METRO, { name: 'Такси', icon: 'tag', colour: 1 })
+      queue.amendCategory(METRO, { name: 'Такси', icon: 'tag', colour: 1 }, false)
       queue.archiveCategory(TAXI, false)
       useActorStore().state = 'ready'
       await queue.flush()
@@ -805,12 +805,81 @@ describe('spending queue', () => {
       ])
     })
 
+    // Adversarial Б3: a new icon or colour of another stands on no name.
+    const GIFTS = 'ffffffff-0000-4000-8000-000000000004'
+
+    it('Б3а: a rename folds into its «Добавить» past a new icon of another — the state replaced never goes', async () => {
+      const queue = fresh('idle')
+      queue.addCategory({ id: METRO, name: 'Метро' })
+      queue.record({ id: BARBER, ...fields('300', 'Метро', METRO) })
+      queue.amendCategory(GIFTS, { name: 'Подарки', icon: 'gift', colour: 2 }, true)
+      queue.amendCategory(METRO, { name: 'Метро и такси', icon: 'tag', colour: 1 }, false)
+      useActorStore().state = 'ready'
+      await queue.flush()
+      expect(calls).toEqual([
+        `category-add ${METRO}`,
+        `record ${BARBER}`,
+        `category-amend ${GIFTS} Подарки gift 2`,
+      ])
+      expect(addSpendingCategory).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Метро и такси' }),
+      )
+    })
+
+    it('Б3б: a rename folds into the rename it replaces past a new icon of another', () => {
+      const queue = fresh('idle')
+      queue.amendCategory(TAXI, { name: 'Метро', icon: 'taxi', colour: 0 }, false)
+      queue.amendCategory(GIFTS, { name: 'Подарки', icon: 'gift', colour: 2 }, true)
+      queue.amendCategory(TAXI, { name: 'Такси и метро', icon: 'taxi', colour: 0 }, false)
+      expect(queue.pending).toEqual([
+        {
+          kind: 'category-amend',
+          id: TAXI,
+          body: { name: 'Такси и метро', icon: 'taxi', colour: 0 },
+        },
+        {
+          kind: 'category-amend',
+          id: GIFTS,
+          body: { name: 'Подарки', icon: 'gift', colour: 2 },
+          keepsName: true,
+        },
+      ])
+    })
+
+    it('a new icon folded into a rename is a rename; the word «keeps its name» outlives a reload', () => {
+      const first = fresh('idle')
+      first.amendCategory(GIFTS, { name: 'Подарки', icon: 'gift', colour: 2 }, true)
+      first.amendCategory(TAXI, { name: 'Метро', icon: 'taxi', colour: 0 }, false)
+      first.amendCategory(TAXI, { name: 'Метро', icon: 'car', colour: 0 }, true)
+      const queue = fresh('idle')
+      expect(queue.pending).toEqual([
+        {
+          kind: 'category-amend',
+          id: GIFTS,
+          body: { name: 'Подарки', icon: 'gift', colour: 2 },
+          keepsName: true,
+        },
+        { kind: 'category-amend', id: TAXI, body: { name: 'Метро', icon: 'car', colour: 0 } },
+      ])
+    })
+
+    it('«Вернуть» cancels its «Убрать» past a new icon of another, and «Убрать» its «Вернуть» past anything', () => {
+      const queue = fresh('idle')
+      queue.archiveCategory(TAXI, true)
+      queue.amendCategory(GIFTS, { name: 'Подарки', icon: 'gift', colour: 2 }, true)
+      queue.archiveCategory(TAXI, false)
+      queue.archiveCategory(METRO, false)
+      queue.addCategory({ id: BEAUTY, name: 'Метро' })
+      queue.archiveCategory(METRO, true)
+      expect(queue.pending.map((write) => write.kind)).toEqual(['category-amend', 'category-add'])
+    })
+
     it('still folds past a spending, and past a write of the same category', () => {
       const queue = fresh('idle')
       queue.addCategory({ id: TAXI, name: 'Такси' })
       queue.record({ id: BARBER, ...fields('1500', 'Вокзал', TAXI) })
       queue.archiveCategory(TAXI, true)
-      queue.amendCategory(TAXI, { name: 'Такси и метро', icon: 'taxi', colour: 2 })
+      queue.amendCategory(TAXI, { name: 'Такси и метро', icon: 'taxi', colour: 2 }, false)
       expect(queue.pending.map((write) => write.kind)).toEqual([
         'category-add',
         'record',
@@ -822,7 +891,7 @@ describe('spending queue', () => {
     // Review №2: an amendment that landed is over a list asked before its answer only.
     it('an amendment that landed is not laid over a list asked for after it — another phone’s later change shows', async () => {
       const queue = fresh()
-      queue.amendCategory(TAXI, { name: 'Машина', icon: 'car', colour: 6 })
+      queue.amendCategory(TAXI, { name: 'Машина', icon: 'car', colour: 6 }, false)
       await settled()
       const [landed] = queue.arrived
       const at = landed && 'landedAt' in landed ? landed.landedAt : Number.NaN

@@ -441,6 +441,7 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
         kind: 'category-amend',
         id: OWN,
         body: { name: 'Armenian lessons', icon: 'languages', colour: 2 },
+        keepsName: true,
       },
     ])
     const row = view.findAllComponents(ListRow).find((one) => one.text().includes('Armenian'))
@@ -582,6 +583,45 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
       'dialog',
       null,
     ])
+  })
+
+  // Adversarial Б3: a new icon of another stands on no name, so a rename still folds past it.
+  it('Б3а: «Metro» made offline, a ride in it, a new icon for «Gifts», «Metro» renamed — one «Добавить» under the last name', async () => {
+    const gifts = own('ffffffff-0000-4000-8000-000000000022', 'Gifts')
+    spendingCategories.mockResolvedValue({ categories: [...LIST, gifts] })
+    const view = await render()
+    online(false)
+    await addButton(view)?.trigger('click')
+    await risen()
+    await addThroughSheetName('Metro')
+    const queue = useSpendingQueueStore()
+    const metro = queue.pending[0]?.kind === 'category-add' ? queue.pending[0].body.id : ''
+    queue.record({
+      id: 'eeeeeeee-0000-4000-8000-000000000001',
+      spentOn: '2026-09-20',
+      amount: { minor: 30000n, currency: 'AMD' },
+      categoryId: metro,
+    })
+    await flushPromises()
+    const row = (name: string) =>
+      view.findAll('button.list-row').find((one) => one.text().includes(name))
+    await row('Gifts')?.trigger('click')
+    await risen()
+    await choose(en.spending.icon.car)
+    sheetButton(en.spending.new_category.edit_save).click()
+    await flushPromises()
+    await row('Metro')?.trigger('click')
+    await risen()
+    await typeName('Metro and taxi')
+    sheetButton(en.spending.new_category.edit_save).click()
+    await flushPromises()
+    expect(queue.pending.map((write) => write.kind)).toEqual([
+      'category-add',
+      'record',
+      'category-amend',
+    ])
+    expect(queue.pending[0]).toMatchObject({ body: { id: metro, name: 'Metro and taxi' } })
+    expect(queue.pending[2]).toMatchObject({ id: gifts.id, keepsName: true })
   })
 
   it('must not fire: a new one has no «Take out»', async () => {
