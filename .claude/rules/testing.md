@@ -265,7 +265,7 @@ the worker within milliseconds, so it never showed here.
   (`.scratch/tasks/selftests/MOL-286*`), not committed.
 - **The price, named:** the environment rests on `builtinEnvironments` of `vitest/runtime` — a vitest that
   renames it fails every file of the PWA at once, loudly. **And vitest tells a DOM by the name in the
-  config** (adversarial А4): where it reads the name, not the environment, it takes this one for the server
+  config** (adversarial А4, accepted by the owner 22.10.2026): where it reads the name, not the environment, it takes this one for the server
   — the files no test imported are transformed for the coverage report by Vite's `ssr`, not `client`, so
   `npm run test:coverage` counts other totals for them (AppButton.vue 17 lines, 12 under happy-dom), and a
   static collection of tests (`astCollectTests`) transforms the same way. The PWA has no coverage threshold and
