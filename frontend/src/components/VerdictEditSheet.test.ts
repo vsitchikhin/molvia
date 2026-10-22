@@ -25,9 +25,9 @@ vi.mock('@/api', () => ({
 
 const ITEM = 'cccccccc-0000-4000-8000-000000000001'
 
-function card(): VerdictCard {
+function card(over: Partial<VerdictCard> = {}): VerdictCard {
   const at = new Date()
-  return { itemId: ITEM, score: 4, review: null, ratedAt: at, updatedAt: at }
+  return { itemId: ITEM, score: 4, review: null, ratedAt: at, updatedAt: at, ...over }
 }
 
 function online(value: boolean): void {
@@ -96,7 +96,7 @@ function button(view: VueWrapper, text: string) {
 
 describe('VerdictEditSheet', () => {
   it('offers one`s own score pre-chosen, and sends only what was changed', async () => {
-    amendVerdict.mockResolvedValue(card())
+    amendVerdict.mockResolvedValue(card({ review: 'Пахнет крахмалом' }))
     const { view } = await render({ ownScore: 1, ownReview: 'Пахнет крахмалом' })
 
     expect(key(view, 1).attributes('aria-pressed')).toBe('true')
@@ -105,8 +105,11 @@ describe('VerdictEditSheet', () => {
 
     await key(view, 4).trigger('click')
     await button(view, 'Save the rating').trigger('click')
+    await flushPromises()
 
     expect(amendVerdict).toHaveBeenCalledWith(ITEM, { score: 4 })
+    // The server's answer to the write goes up, review and all: the screen opens on it next (А1).
+    expect(view.emitted('saved')).toEqual([[{ score: 4, review: 'Пахнет крахмалом' }]])
   })
 
   // MOL-225, adversarial Р1-А2: the two buttons share one write. The pressed one says its work in
@@ -195,13 +198,16 @@ describe('VerdictEditSheet', () => {
   })
 
   it('an emptied review is erased rather than left as it was', async () => {
-    amendVerdict.mockResolvedValue(card())
+    amendVerdict.mockResolvedValue(card({ score: 3 }))
     const { view } = await render({ ownScore: 3, ownReview: 'Пахнет крахмалом' })
 
     await view.get('textarea').setValue('')
     await button(view, 'Save the rating').trigger('click')
+    await flushPromises()
 
     expect(amendVerdict).toHaveBeenCalledWith(ITEM, { review: null })
+    // The score sent nowhere is the answer's, not the patch's.
+    expect(view.emitted('saved')).toEqual([[{ score: 3, review: null }]])
   })
 
   it('withdraws without asking, and says what withdrawing does', async () => {
@@ -212,7 +218,7 @@ describe('VerdictEditSheet', () => {
     await button(view, 'Withdraw the rating').trigger('click')
 
     expect(withdrawVerdict).toHaveBeenCalledWith(ITEM)
-    expect(view.emitted('saved')).toHaveLength(1)
+    expect(view.emitted('saved')).toEqual([[null]])
   })
 
   it('a score taken back is not a change: an empty patch is a refusal nobody can act on', async () => {
@@ -251,7 +257,7 @@ describe('VerdictEditSheet', () => {
   })
 
   it('А2: a row nobody of one`s own stands behind is rated, not amended', async () => {
-    rateItem.mockResolvedValue({ verdict: card(), created: true })
+    rateItem.mockResolvedValue({ verdict: card({ score: 5 }), created: true })
     const { view } = await render({ mine: false, shared: true })
 
     // Nothing to amend and nothing to withdraw: the sheet says so and offers neither.
@@ -272,7 +278,7 @@ describe('VerdictEditSheet', () => {
 
     expect(rateItem).toHaveBeenCalledWith(ITEM, { score: 5 })
     expect(amendVerdict).not.toHaveBeenCalled()
-    expect(view.emitted('saved')).toHaveLength(1)
+    expect(view.emitted('saved')).toEqual([[{ score: 5, review: null }]])
   })
 
   it('МР-3: withdrawing says what it does, and that differs in the shared mode', async () => {

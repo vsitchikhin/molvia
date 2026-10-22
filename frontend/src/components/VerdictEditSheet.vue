@@ -89,6 +89,9 @@ import { currentIdentity } from '@/stores/identity'
 import { forgetOwnPrices } from '@/stores/ownPrices'
 import { reportFailure } from '@/failures'
 
+/** The two fields of the server's answer the screen opens the sheet on next — and nothing else. */
+const savedOf = ({ score, review }: SavedVerdict): SavedVerdict => ({ score, review })
+
 /** The review's own bound (`newVerdictSchema`), kept by the field so it cannot be passed. */
 const REVIEW_MAX = 500
 
@@ -249,7 +252,7 @@ export default defineComponent({
               score: chosen,
               ...(review.value ? { review: review.value } : {}),
             })
-            .then(({ verdict }) => verdict),
+            .then(({ verdict }) => savedOf(verdict)),
         )
         return
       }
@@ -263,7 +266,7 @@ export default defineComponent({
       // button knew: a space typed into an empty review made it live, and then went — the
       // patch left as `{}` and came back refused, with «Попробуйте ещё раз» over it (А7).
       if (Object.keys(patch).length === 0) return
-      void send(() => api.amendVerdict(props.itemId, patch))
+      void send(() => api.amendVerdict(props.itemId, patch).then(savedOf))
     }
 
     function withdraw(): void {

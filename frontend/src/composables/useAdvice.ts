@@ -1,9 +1,10 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import type { ComputedRef } from 'vue'
 import { adviceResponseSchema, geographyKey } from '@molvia/model'
-import type { AdviceResponse, AdviceRow, AdviceScope } from '@molvia/model'
+import type { AdviceFound, AdviceResponse, AdviceRow, AdviceScope } from '@molvia/model'
 import { api } from '@/api'
 import type { CheapRow, NeverRow, TakeRow } from '@/components/adviceRow'
+import type { SavedVerdict } from '@/components/rating'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
 import { read, write } from '@/stores/storage'
@@ -45,12 +46,12 @@ export interface Advice {
   /** The answer on screen, remembered or fresh: the search reads it with no connection (MOL-128). */
   readonly answer: ComputedRef<AdviceResponse | null>
   /**
-   * The number of the request whose answer is on the screen, 0 for the phone's memory; compared with
-   * `requested()` taken at a moment, it says whether the rows were asked for after it (MOL-202, А1).
+   * A verdict written from this screen: the server's answer to the write, `null` once withdrawn, and
+   * what was on the screen then — before the list is asked for again (MOL-202, А1).
    */
-  readonly answeredBy: ComputedRef<number>
-  /** The number of the last request asked so far. */
-  requested(): number
+  wrote(itemId: string, verdict: SavedVerdict | null, shown: readonly object[]): void
+  /** What a write here made of the verdict behind a row, while the row is older than the write. */
+  writtenOver(shown: AdviceRow | AdviceFound): { readonly verdict: SavedVerdict | null } | null
   retry(): Promise<void>
 }
 
@@ -122,6 +123,42 @@ function forgetOwnNever(owner: string, fresh: AdviceResponse): void {
 }
 
 /**
+ * The requests of the list, numbered across every screen of the page, so an answer of one screen and
+ * a write of another can be told apart in time (MOL-202, adversarial Б1).
+ */
+let requests = 0
+
+/** Which request the answer in the phone's memory came from, by owner — in this page's life. */
+const rememberedBy = new Map<string, number>()
+
+/**
+ * The verdicts written from «Что брать», by owner and item (MOL-202, А1, Б1): the server's answer to
+ * the write, the last request asked before it (`after`) and what was on the screen then (`before`).
+ *
+ * The rows stay as the answer before a save had them until the next one comes — failed, on its way,
+ * or another screen's: a step to «Покупки» and back mounts a new one over the memory written before
+ * the save. A sheet opened on one said «Ваша оценка: 1» over the 5 just saved, and refused the 1 as
+ * «Ничего не изменилось». So a row older than the write opens the sheet on what was written: one on
+ * the screen at that moment, or the list's from a request asked before it — a refresh already in the
+ * air lands after the save with the old figures, written to the memory as well. A newer row is the
+ * server's word again. In the page, not on the shelf: a reload asks afresh and remembers nothing of it.
+ */
+const written = new Map<
+  string,
+  {
+    readonly verdict: SavedVerdict | null
+    readonly after: number
+    readonly before: WeakSet<object>
+  }
+>()
+
+/** A fresh page, as a reload makes one: for the tests, which share one module between them. */
+export function forgetWrittenVerdicts(): void {
+  written.clear()
+  rememberedBy.clear()
+}
+
+/**
  * «Что брать» as this phone sees it (MOL-32): the server's answer, and the last one it gave.
  *
  * The memory is not about speed. Offline the screen has to name the age of what it shows —
@@ -161,11 +198,12 @@ export function useAdvice(): Advice {
     // Decided after the failure, never before the request (MOL-19, A1).
     failure.value = null
     confirmed.value = false
-    answeredBy.value = 0
+    answeredBy.value = id ? (rememberedBy.get(id) ?? 0) : 0
   }
 
   function remember(): void {
     if (!owner.value || !remembered.value) return
+    rememberedBy.set(owner.value, answeredBy.value)
     const { answer, fetchedAt } = remembered.value
     write(
       `${KEY}.${owner.value}`,
@@ -203,7 +241,8 @@ export function useAdvice(): Advice {
   let asks = 0
 
   async function ask(id: string): Promise<void> {
-    const mine = ++latest
+    const mine = ++requests
+    latest = mine
     const where = location.value
     try {
       const fresh = await api.advice()
@@ -236,7 +275,7 @@ export function useAdvice(): Advice {
       failures.value += 1
       if (!navigator.onLine && !remembered.value) {
         remembered.value = recall(`${KEY}.${id}`)
-        answeredBy.value = 0
+        answeredBy.value = rememberedBy.get(id) ?? 0
       }
     }
   }
@@ -277,7 +316,7 @@ export function useAdvice(): Advice {
   watch(
     () => [actor.id, location.value],
     () => {
-      latest += 1
+      latest = ++requests
       running = null
       adopt(actor.id)
       void load()
@@ -314,8 +353,20 @@ export function useAdvice(): Advice {
     fetchedAt: computed(() => remembered.value?.fetchedAt ?? null),
     attempt: computed(() => failures.value),
     answer: computed(() => remembered.value?.answer ?? null),
-    answeredBy: computed(() => answeredBy.value),
-    requested: () => latest,
+    wrote(itemId, verdict, shown) {
+      if (!owner.value) return
+      written.set(`${owner.value} ${itemId}`, {
+        verdict,
+        after: requests,
+        before: new WeakSet(shown),
+      })
+    },
+    writtenOver(shown) {
+      const entry = owner.value ? written.get(`${owner.value} ${shown.itemId}`) : undefined
+      if (!entry) return null
+      const fromList = rows.value.some((row) => row === shown)
+      return entry.before.has(shown) || (fromList && answeredBy.value <= entry.after) ? entry : null
+    },
     retry: load,
   }
 }

@@ -20,6 +20,7 @@ import { createAppI18n } from '@/i18n'
 import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import IconMagnify from '~icons/mdi/magnify'
 import { routes } from '@/router'
+import { forgetWrittenVerdicts } from '@/composables/useAdvice'
 import { useActorStore } from '@/stores/actor'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
 import AdviceView from '@/views/AdviceView.vue'
@@ -44,6 +45,12 @@ vi.mock('@/api', () => ({
 }))
 
 const ME = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
+
+// A verdict written from the screen is kept by the page, across screens (MOL-202, Б1): a fresh page
+// for every test, as a reload makes one.
+beforeEach(() => {
+  forgetWrittenVerdicts()
+})
 
 function place(name: string, scaledMinor: bigint): AdvicePlace {
   return {
@@ -1480,6 +1487,58 @@ describe('AdviceView: the sheet after a save (MOL-202, А1)', () => {
     await flushPromises()
     expect(rateItem).toHaveBeenCalledWith(ITEM, { score: 2 })
     expect(amendVerdict).not.toHaveBeenCalled()
+  })
+
+  it('Б1: a step away and back while the list asked again failed — still the 5', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const first = await render()
+    await saveFive(first.view, () => advice.mockRejectedValue(broke()))
+    first.view.unmount()
+    mounted.splice(mounted.indexOf(first.view), 1)
+
+    // A new screen over the memory written before the save, the server still failing.
+    const { view } = await render()
+    expect(view.findAllComponents({ name: 'AdviceNeverRow' })).toHaveLength(1)
+    await onFiveAndOneSent(view)
+  })
+
+  it('Б1: a step away and back while the list asked again is on its way — the same', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const first = await render()
+    await saveFive(first.view, () => advice.mockReturnValue(new Promise(() => undefined)))
+    first.view.unmount()
+    mounted.splice(mounted.indexOf(first.view), 1)
+
+    const { view } = await render()
+    await onFiveAndOneSent(view)
+  })
+
+  it('Б1 control: back on a screen whose own answer came — the sheet is the server`s again', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const first = await render()
+    await saveFive(first.view, () => advice.mockRejectedValue(broke()))
+    first.view.unmount()
+    mounted.splice(mounted.indexOf(first.view), 1)
+
+    // Asked after the write, and saying 3 — set from elsewhere meanwhile: the answer wins.
+    advice.mockResolvedValue(shared([row(3, '2.7')]))
+    const { view } = await render()
+    const sheet = await open(view)
+    expect(sheet.get('.current').text()).toBe('Your rating: 3')
+  })
+
+  it('Б1 control: the memory written after the write is the server`s word, failing or not', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const first = await render()
+    // Asked after the save and answered 3 — set elsewhere meanwhile; the phone keeps that answer.
+    await saveFive(first.view, () => advice.mockResolvedValue(shared([row(3, '2.7')])))
+    first.view.unmount()
+    mounted.splice(mounted.indexOf(first.view), 1)
+
+    advice.mockRejectedValue(broke())
+    const { view } = await render()
+    const sheet = await open(view)
+    expect(sheet.get('.current').text()).toBe('Your rating: 3')
   })
 
   it('a row found by the search, dimmed while it is asked again — the same', async () => {

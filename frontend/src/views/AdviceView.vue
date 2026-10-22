@@ -359,37 +359,14 @@ export default defineComponent({
     /** The search under the field: the rows it shows when a verdict is saved (MOL-202, А1). */
     const searchBox = ref<{ found: readonly AdviceFound[] } | null>(null)
 
-    /**
-     * What a save here wrote, by item: the server's answer to the write, and the rows on the screen
-     * at that moment (MOL-202, А1). The rows stay as they were until they are asked for again — and
-     * if that fails, or the sheet is opened while it is on its way, a sheet opened on one of them
-     * said «Ваша оценка: 1» over the 5 just saved, and refused the 1 as «Ничего не изменилось». So
-     * a row older than the save opens the sheet on what the save wrote; a newer one is the server's
-     * word again. Older is a row that was on the screen then, or one of the list's from a request
-     * asked before it (`after`): a refresh already in the air lands after the save with the old
-     * figures. The search drops an answer to a request older than its last, and asks again on a save.
-     */
-    const written = new Map<
-      string,
-      { verdict: SavedVerdict | null; after: number; before: WeakSet<object> }
-    >()
-
-    function shownNow(): WeakSet<object> {
+    /** What a write from the sheet is checked against: the rows on the screen at that moment. */
+    function shownNow(): object[] {
       const found = searchBox.value?.found ?? []
-      return new WeakSet<object>([
+      return [
         ...(advice.answer.value?.rows ?? []),
         ...found,
         ...found.flatMap((item) => (item.advice ? [item.advice] : [])),
-      ])
-    }
-
-    function savedOver(shown: AdviceRow | AdviceFound) {
-      const entry = written.get(shown.itemId)
-      if (!entry) return null
-      const fromList = advice.answer.value?.rows.some((row) => row === shown) ?? false
-      return entry.before.has(shown) || (fromList && advice.answeredBy.value <= entry.after)
-        ? entry
-        : null
+      ]
     }
 
     /**
@@ -399,7 +376,7 @@ export default defineComponent({
      */
     function edit(row: AdviceRow, answered?: AdviceScope): void {
       const scope = answered ?? advice.scope.value ?? 'own'
-      const saved = savedOver(row)
+      const saved = advice.writtenOver(row)
       editing.value = {
         itemId: row.itemId,
         name: row.name,
@@ -418,7 +395,7 @@ export default defineComponent({
      * Without a place, as a verdict from «Оценки» is (MOL-27).
      */
     function rate(item: AdviceFound, answered: AdviceScope): void {
-      const verdict = savedOver(item)?.verdict ?? null
+      const verdict = advice.writtenOver(item)?.verdict ?? null
       editing.value = {
         itemId: item.itemId,
         name: item.name,
@@ -452,14 +429,8 @@ export default defineComponent({
       edit,
       rate,
       saved: (verdict: SavedVerdict | null) => {
-        if (editing.value) {
-          // Taken before the list is asked again: an answer numbered above it was asked after this.
-          written.set(editing.value.itemId, {
-            verdict,
-            after: advice.requested(),
-            before: shownNow(),
-          })
-        }
+        // Before the list is asked again: an answer to that request is newer than the write.
+        if (editing.value) advice.wrote(editing.value.itemId, verdict, shownNow())
         void advice.retry()
         refreshes.value += 1
       },
