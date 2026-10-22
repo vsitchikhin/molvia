@@ -231,9 +231,9 @@ CI red with all 10 138 tests green and the deploy held (run 39489913605, 20.10.2
 the worker within milliseconds, so it never showed here.
 
 - **The environment, not the product** (owner's В-1 «а», Р-1): `stepBack` is right where it runs, and a
-  guard for «no window» in it would be code no browser ever executes. The environment closes the class —
-  the queues' doubling retry (`doublingRetry`, a store's timer that reaches the network) is one of it that
-  had not failed yet.
+  guard for «no window» in it would be code no browser ever executes. The environment clears every timer
+  the page sets while its window stands — the queues' doubling retry (`doublingRetry`, a store's timer that
+  reaches the network) among them, which had not failed yet — but not the page's code itself (below).
 - **`setTimeout`, `setInterval` and their `clear*` are wrapped as the window comes up** (`pageTimers`). One
   that ran once, or was cleared, is let go of — until Node's `refresh()` sets it going again under the same
   handle, which puts it back (adversarial А2: no page calls it, a browser's timer has none, and let go of it
@@ -273,3 +273,11 @@ the worker within milliseconds, so it never showed here.
 - **Not this:** a step left in flight between two tests of one file (Р-2). A memory history sends no
   `popstate`, so a step lands only by its guard, a second later; the files that step twice dispatch
   `popstate` themselves (`putBothAway` in `ExchangeView.test.ts`).
+- **The bound of the approach, named** (adversarial round 2, Р2-А1, Р2-А1б): what the environment reaches
+  is timers, not the page's code. A handler that awaits a step finished by a task of Node — Web Crypto's
+  `digest`, which here is Node's and runs on the thread pool, even for 4 KB — comes back after happy-dom is
+  taken down and the window gone: a timer it sets then is Node's own, uncounted, and fires into a worker
+  with no `window`, and a `stepBack` it calls fails at once, with no timer at all. No environment can stop a
+  continuation; none of the PWA's code does this today — `crypto.subtle` is not used, IndexedDB happy-dom has
+  not got, and `requestAnimationFrame` is happy-dom's own and never comes after its abort. A test that does
+  will fail as CI did, and its fix is in the test: wait for the work before the file ends.
