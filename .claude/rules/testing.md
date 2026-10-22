@@ -279,10 +279,15 @@ the worker within milliseconds, so it never showed here.
   taken down and the window gone: a timer it sets then is Node's own, uncounted, and fires into a worker
   with no `window`, and a `stepBack` it calls fails at once, with no timer at all. No environment can stop a
   continuation. **The PWA's own client is such a step** (round 3, Р3-А1): happy-dom ends the task of a `fetch`
-  once the headers came, and the reading of the body — `response.json()` in `transport.ts` — is a task whose
+  once the headers came, and the reading of the body — `response.json()` in `packages/client/src/transport.ts` — is a task whose
   abort only marks it, neither waited for nor rejected; the rest of the body comes over Node's socket after
-  the window, and the page's answer to it runs there. **No test of the PWA talks to a server today**: 57 files
-  mock `@/api`, `api.test.ts` mocks the client, and no test file but the environment's own starts a server.
+  the window, and the page's answer to it runs there. **No test of the PWA reaches the network today**, by a
+  watch of the page's `fetch` (round 4, Р4-А1): 62 files mock `@/api`, and four of them keep the real `api`
+  beside one function replaced — `main`, `main-below-floor` and `ScreenState` never call it, and
+  `main-first-route` asked `me()` of the page's own address, `localhost:3000`, still in the air at the end of
+  the file (refused on CI, aborted by the teardown here) until it answered `me()` offline too; `api.test.ts`
+  mocks the client, and no test file but the environment's own starts a server. A partial mock of `@/api`
+  leaves the rest of it real.
   Not the rest either: `crypto.subtle` is not used, IndexedDB happy-dom has not got, and
   `requestAnimationFrame` is happy-dom's own and comes before its abort ends. **A test that lets the page's
   work outlive the file** — a real request whose answer is on its way, a step of Node — will fail as CI did,
