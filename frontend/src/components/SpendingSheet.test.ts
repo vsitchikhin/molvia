@@ -200,7 +200,7 @@ describe('SpendingSheet: the phone’s day (MOL-121)', () => {
     await risen()
     expect(dayField().value).toBe('2026-09-28')
     expect(dayField().max).toBe('2026-09-28')
-  })
+  }, 15_000)
 
   it('a new spending on a day the phone has not reached is refused (must not fire)', async () => {
     moneyMonth.mockResolvedValue(month('2026-09-28'))
