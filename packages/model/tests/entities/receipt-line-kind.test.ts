@@ -316,6 +316,8 @@ describe('an item standing on a line (MOL-293, В-1 «а», В-2 «а»)', () =>
     expect(fits('Կաթ UHT 3.2%', 'Молоко 3,2%', true)).toBe(true)
     expect(fits('Մարտկոց AA', 'Батарейки', true)).toBe(true)
     expect(fits('Կաթ BIO 3.2%', 'Молоко 3,2%', true)).toBe(true)
+    // «ICE», «ZERO» change the thing: a cold tea is no tea (review 7)
+    expect(fits('Թեյ ICE', 'Чай', true)).toBe(false)
     // a brand of the same form is a thing (review 5, №2)
     expect(fits('Շոկոլադ MARS', 'Шоколад', true)).toBe(false)
   })

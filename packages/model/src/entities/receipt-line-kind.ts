@@ -482,14 +482,13 @@ const QUALITY_ENDINGS = ['ый', 'ий', 'ой', 'ая', 'яя']
 
 /**
  * Latin a till prints for a standard or a size, never a thing (adversarial Г2): a list, since a brand has the same
- * form — «MARS», «LAYS» are things (review 5, №2).
+ * form — «MARS», «LAYS» are things (review 5, №2). «ICE», «ZERO» are not in it: they change the thing, a cold tea, a
+ * beer with no alcohol (review 7).
  */
 const STANDARDS = new Set([
   'BIO',
   'ECO',
-  'ICE',
   'MIX',
-  'ZERO',
   'PET',
   'MINI',
   'MAX',
