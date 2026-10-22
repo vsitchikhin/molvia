@@ -86,7 +86,7 @@ import BottomSheet from '@/components/BottomSheet.vue'
 import RatingScale from '@/components/RatingScale.vue'
 import type { SavedVerdict, Score } from '@/components/rating'
 import { currentIdentity } from '@/stores/identity'
-import { outcomeOf, trackWrite, writeInFlight } from '@/stores/verdictWrites'
+import { landedHalf, outcomeOf, trackWrite, writeInFlight } from '@/stores/verdictWrites'
 import type { WriteOutcome } from '@/stores/verdictWrites'
 import { forgetOwnPrices } from '@/stores/ownPrices'
 import { reportFailure } from '@/failures'
@@ -360,8 +360,9 @@ export default defineComponent({
         const put = savedOf(verdict)
         if (!touched || put.review === wanted) return put
         // Half of it landed: the screen keeps it and the sheet stands on it, so a review refused after
-        // it is said as such and sent again alone (Л1).
+        // it is said as such and sent again alone (Л1) — by a sheet that waits for it too (№7).
         settle({ kind: 'written', verdict: put })
+        landedHalf(writing, put)
         props.onSaved?.(props.itemId, put)
         return savedOf(await api.amendVerdict(props.itemId, { review: wanted }))
       })

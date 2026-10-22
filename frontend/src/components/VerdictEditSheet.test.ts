@@ -557,6 +557,29 @@ describe('VerdictEditSheet', () => {
       expect(amendVerdict).toHaveBeenLastCalledWith(ITEM, { review: null })
     })
 
+    it('№7: a sheet waiting for the two of them stands on the score that landed, the review refused', async () => {
+      let land: (put: { verdict: VerdictCard; created: boolean }) => void = () => undefined
+      rateItem.mockReturnValueOnce(new Promise((resolve) => (land = resolve)))
+      let refuse: (error: Error) => void = () => undefined
+      amendVerdict.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+      const first = await render({ ownReview: 'Пахнет крахмалом', unsure: true })
+      await first.view.get('textarea').setValue('')
+      await key(first.view, 5).trigger('click')
+      await button(first.view, 'Save the rating').trigger('click')
+      first.view.unmount()
+
+      // Opened again on the row the server answered before: its 1.
+      const { view } = await render({ ownScore: 1, ownReview: 'Пахнет крахмалом' })
+      land({ verdict: card({ score: 5, review: 'Пахнет крахмалом' }), created: false })
+      await flushPromises()
+      refuse(new ApiError(ERROR.INTERNAL, 'HTTP 500', true, undefined, { fromApi: true }))
+      await flushPromises()
+
+      expect(view.get('.current').text()).toBe('Your rating: 5')
+      expect(key(view, 5).attributes('aria-pressed')).toBe('true')
+      expect(button(view, 'Nothing has changed').attributes('aria-disabled')).toBe('true')
+    })
+
     it('И2: the review alone, touched — it goes by itself, no score asked for', async () => {
       amendVerdict.mockResolvedValueOnce(card({ score: 4, review: null }))
       const { view } = await render({ ownReview: 'Пахнет крахмалом', unsure: true })

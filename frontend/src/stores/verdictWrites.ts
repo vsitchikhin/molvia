@@ -24,6 +24,11 @@ interface InFlight {
   readonly outcome: Promise<WriteOutcome>
   /** «Снять оценку» rather than a score: the sheet that waits says the work by its own word (Ж2). */
   readonly withdrawal: boolean
+  /**
+   * The half of a write in two that landed — the score by `PUT`, the review still on its way: a review
+   * refused after it leaves the score written, for the sheet that waits too (review №7).
+   */
+  landed?: SavedVerdict
 }
 
 /**
@@ -43,12 +48,28 @@ export function trackWrite(
   write: Promise<SavedVerdict | null>,
   withdrawal: boolean,
 ): void {
-  const outcome = write.then((verdict): WriteOutcome => ({ kind: 'written', verdict }), outcomeOf)
-  const entry = { outcome, withdrawal }
+  const entry: InFlight = {
+    outcome: write.then(
+      (verdict): WriteOutcome => ({ kind: 'written', verdict }),
+      (error: unknown): WriteOutcome => {
+        const outcome = outcomeOf(error)
+        return outcome.kind === 'refused' && entry.landed
+          ? { kind: 'written', verdict: entry.landed }
+          : outcome
+      },
+    ),
+    withdrawal,
+  }
   writes.set(key, entry)
-  void outcome.then(() => {
+  void entry.outcome.then(() => {
     if (writes.get(key) === entry) writes.delete(key)
   })
+}
+
+/** The first half of the item's write in two landed (review №7). */
+export function landedHalf(key: string, verdict: SavedVerdict): void {
+  const entry = writes.get(key)
+  if (entry) entry.landed = verdict
 }
 
 /** A fresh page, as a reload makes one: for the tests, which share one module between them. */
