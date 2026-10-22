@@ -232,11 +232,11 @@ export default defineComponent({
     const scoreChanged = computed(() => score.value !== null && score.value !== own.value.score)
     const reviewChanged = computed(() => review.value !== (own.value.review ?? ''))
     /** Without a verdict of one's own there is nothing to amend: a score is the whole entry. */
-    const ready = computed(() =>
-      own.value.mine && own.value.known
-        ? scoreChanged.value || reviewChanged.value
-        : score.value !== null,
-    )
+    const ready = computed(() => {
+      if (own.value.mine && own.value.known) return scoreChanged.value || reviewChanged.value
+      // A verdict whose last write got no answer: a score, or the review alone once touched (И2).
+      return score.value !== null || (own.value.mine && reviewChanged.value)
+    })
     const keepsScore = computed(
       () => own.value.mine && own.value.score !== null && score.value === null,
     )
@@ -310,9 +310,12 @@ export default defineComponent({
         return
       }
       const chosen = score.value
-      if (!own.value.mine || !own.value.known) {
-        // A first verdict is not an amendment: `PATCH` has nothing to change and answers 404. Nor is
-        // one whose last write got no answer: it may have been withdrawn, and `PUT` is right either way.
+      if (!own.value.known) {
+        unsure(chosen)
+        return
+      }
+      if (!own.value.mine) {
+        // A first verdict is not an amendment: `PATCH` has nothing to change and answers 404.
         if (chosen === null) return
         void send(() =>
           api
@@ -335,6 +338,28 @@ export default defineComponent({
       // patch left as `{}` and came back refused, with «Попробуйте ещё раз» over it (А7).
       if (Object.keys(patch).length === 0) return
       void send(() => api.amendVerdict(props.itemId, patch).then(savedOf))
+    }
+
+    /**
+     * A verdict whose last write got no answer (З2, И1–И3): it may have been withdrawn, so a score goes
+     * by `PUT`, right either way — without the review, which the field shows as the row had it before
+     * that write, and `PUT` keeps the server's own. A review the person touched goes after it by
+     * `PATCH`, the one way to erase it, and only where the answer of `PUT` holds another; touched
+     * alone, it goes alone.
+     */
+    function unsure(chosen: Score | null): void {
+      const wanted = review.value || null
+      const touched = reviewChanged.value
+      if (chosen === null) {
+        if (touched)
+          void send(() => api.amendVerdict(props.itemId, { review: wanted }).then(savedOf))
+        return
+      }
+      void send(async () => {
+        const { verdict } = await api.rateItem(props.itemId, { score: chosen })
+        if (!touched || verdict.review === wanted) return savedOf(verdict)
+        return savedOf(await api.amendVerdict(props.itemId, { review: wanted }))
+      })
     }
 
     function withdraw(): void {

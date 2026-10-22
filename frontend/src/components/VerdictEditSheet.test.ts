@@ -65,6 +65,8 @@ interface Options {
   /** Whether there is a verdict of this person's behind the row (`AdviceRow.isMine`). */
   readonly mine?: boolean
   readonly shared?: boolean
+  /** A write of the item got no answer: no verdict is known as the person's (З1–З4). */
+  readonly unsure?: boolean
 }
 
 async function render(options: Options = {}) {
@@ -79,6 +81,7 @@ async function render(options: Options = {}) {
       shared: options.shared ?? false,
       ownScore: options.ownScore ?? null,
       ownReview: options.ownReview ?? null,
+      unsure: options.unsure ?? false,
       onSaved,
     },
     attachTo: document.body,
@@ -493,5 +496,46 @@ describe('VerdictEditSheet', () => {
 
     expect(onSaved.mock.calls).toEqual([[ITEM, undefined]])
     expect(view.find('.current').exists()).toBe(false)
+  })
+
+  describe('И: the review of a verdict whose last write got no answer', () => {
+    it('И1: erased with a new score — `PUT` the score, then `PATCH` the review away', async () => {
+      rateItem.mockResolvedValueOnce({
+        verdict: card({ score: 4, review: 'Пахнет крахмалом' }),
+        created: false,
+      })
+      amendVerdict.mockResolvedValueOnce(card({ score: 4, review: null }))
+      const { view } = await render({ ownReview: 'Пахнет крахмалом', unsure: true })
+      await view.get('textarea').setValue('')
+      await key(view, 4).trigger('click')
+      await button(view, 'Save the rating').trigger('click')
+      await flushPromises()
+
+      expect(rateItem).toHaveBeenCalledWith(ITEM, { score: 4 })
+      expect(amendVerdict).toHaveBeenCalledWith(ITEM, { review: null })
+      expect(onSaved.mock.calls).toEqual([[ITEM, { score: 4, review: null }]])
+    })
+
+    it('И3: untouched, the review the row had is not sent — the server keeps its own', async () => {
+      rateItem.mockResolvedValueOnce({ verdict: card({ score: 4, review: null }), created: false })
+      const { view } = await render({ ownReview: 'Пахнет крахмалом', unsure: true })
+      await key(view, 4).trigger('click')
+      await button(view, 'Save the rating').trigger('click')
+      await flushPromises()
+
+      expect(rateItem).toHaveBeenCalledWith(ITEM, { score: 4 })
+      expect(amendVerdict).not.toHaveBeenCalled()
+    })
+
+    it('И2: the review alone, touched — it goes by itself, no score asked for', async () => {
+      amendVerdict.mockResolvedValueOnce(card({ score: 4, review: null }))
+      const { view } = await render({ ownReview: 'Пахнет крахмалом', unsure: true })
+      await view.get('textarea').setValue('')
+      await button(view, 'Save the rating').trigger('click')
+      await flushPromises()
+
+      expect(amendVerdict).toHaveBeenCalledWith(ITEM, { review: null })
+      expect(rateItem).not.toHaveBeenCalled()
+    })
   })
 })
