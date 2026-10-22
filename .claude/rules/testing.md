@@ -218,3 +218,35 @@ of the measure and with every test merged. So CI checks every run instead (owner
   parse of receipts (MOL-265), `normalisations` in `support/text.ts`: «found once», «refused before the
   normalisation». Twice the work, or a hundred times a third of a millisecond, is under any bound a clock
   keeps on CI. A count is no rule of the domain and no state anyone reads but a test.
+
+## A page's timers go with its window (MOL-286)
+
+**The PWA's tests run in `frontend/testing/page-environment.ts`, happy-dom whose timers are cleared as its
+window is taken down.** vitest makes `window` the global object itself and leaves Node's own `setTimeout`
+in it — the key is Node's already, so happy-dom's is not put over it — and at the end of a file it deletes
+`window` and leaves the timers to the process. In a browser a timer never outlives its tab. Here a step
+back's guard (`stepBack`, a second, `navigation.ts`) set by a sheet closed in a file's last second fired
+after the file was taken down, into a worker a busy runner had not stopped yet: `window is not defined`,
+CI red with all 10 138 tests green and the deploy held (run 39489913605, 20.10.2026). A free machine stops
+the worker within milliseconds, so it never showed here.
+
+- **The environment, not the product** (owner's В-1 «а», Р-1): `stepBack` is right where it runs, and a
+  guard for «no window» in it would be code no browser ever executes. The environment closes the class —
+  the queues' doubling retry (`doublingRetry`, a store's timer that reaches the network) is one of it that
+  had not failed yet.
+- **`setTimeout`, `setInterval` and their `clear*` are wrapped as the window comes up** (`pageTimers`): the
+  timers still pending at the teardown are cleared and Node's functions given back, before happy-dom is
+  taken down. One that ran once, or was cleared, is let go of. `vi.useFakeTimers()` installs over the
+  wrappers and gives them back; its timers are not the page's.
+- **Held by the bookkeeping's own test** (В-2 «а»): a timeout and an interval pending at the close never
+  run, only what is pending is cleared, the functions come back — six mutants of it red. The race itself
+  needs a worker that outlives the teardown, which no ordinary run makes: an environment kept alive 1.2 s
+  past it reproduced the error of CI over happy-dom and nothing over this one — run by hand, in
+  `.scratch/tasks/selftests/MOL-286.md`, not committed.
+- **The price, named:** that the config names this environment is held by nothing that turns red —
+  `'happy-dom'` put back would pass every test, and the flake would come back as rare as before. And the
+  environment rests on `builtinEnvironments` of `vitest/runtime`: a vitest that renames it fails every
+  file of the PWA at once, loudly.
+- **Not this:** a step left in flight between two tests of one file (Р-2). A memory history sends no
+  `popstate`, so a step lands only by its guard, a second later; the files that step twice dispatch
+  `popstate` themselves (`putBothAway` in `ExchangeView.test.ts`).
