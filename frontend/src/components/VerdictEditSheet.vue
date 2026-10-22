@@ -84,9 +84,10 @@ import AppField from '@/components/AppField.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import RatingScale from '@/components/RatingScale.vue'
-import { trackWrite, writeInFlight } from '@/components/rating'
 import type { SavedVerdict, Score } from '@/components/rating'
 import { currentIdentity } from '@/stores/identity'
+import { outcomeOf, trackWrite, writeInFlight } from '@/stores/verdictWrites'
+import type { WriteOutcome } from '@/stores/verdictWrites'
 import { forgetOwnPrices } from '@/stores/ownPrices'
 import { reportFailure } from '@/failures'
 
@@ -157,10 +158,13 @@ export default defineComponent({
      * the screen opens the sheet on it until its rows are asked for again (MOL-202, А1). A handler held
      * as a prop, not an event, as `BottomSheet`'s `onClosed`: the sheet may be swept away while the
      * write is on its way, and Vue drops what an unmounted component emits — the write landed, and the
-     * screen neither kept it nor asked again (adversarial Д1).
+     * screen neither kept it nor asked again (adversarial Д1). `undefined` is a write that got no
+     * answer: it may have landed, so the screen asks again and keeps nothing (Ж1).
      */
     onSaved: {
-      type: Function as PropType<(itemId: string, verdict: SavedVerdict | null) => void>,
+      type: Function as PropType<
+        (itemId: string, verdict: SavedVerdict | null | undefined) => void
+      >,
       default: undefined,
     },
   },
@@ -170,32 +174,47 @@ export default defineComponent({
 
     /**
      * The verdict the sheet amends: the row's — or, while a write of this item is still on its way,
-     * nobody knows which until it lands: then what it wrote, or the row's if it was refused (Е1). A
-     * choice made meanwhile is the person's and is kept.
+     * nobody knows which until it ends (Е1): then what it wrote, the row's if it was refused, and none
+     * known if no answer came (Ж1). A choice made meanwhile is the person's and is kept.
      */
-    const own = ref({ mine: props.mine, score: props.ownScore, review: props.ownReview })
+    const own = ref<{ mine: boolean; score: Score | null; review: string | null }>({
+      mine: props.mine,
+      score: props.ownScore,
+      review: props.ownReview,
+    })
     const writing = `${currentIdentity() ?? ''} ${props.itemId}`
     const earlier = writeInFlight(writing)
     const waiting = ref(earlier !== undefined)
     const score = ref<Score | null>(waiting.value ? null : props.ownScore)
     const review = ref(props.ownReview ?? '')
     const sending = ref(waiting.value)
-    void earlier?.then((verdict) => {
+    // Which of the two is at work: «Снять оценку» and «Сохранить» share `sending` (adversarial Р1-А2)
+    // — and the write this sheet waits for says its own word too (Ж2).
+    const withdrawing = ref(waiting.value && earlier?.withdrawal === true)
+    void earlier?.outcome.then((outcome) => {
       sending.value = false
+      withdrawing.value = false
       waiting.value = false
       const untouched = score.value === null && review.value === (props.ownReview ?? '')
-      if (verdict !== undefined)
+      settle(outcome)
+      if (!untouched) return
+      score.value = own.value.score
+      review.value = own.value.review ?? ''
+    })
+
+    /** What the sheet stands on after a write ended — its own or the one it waited for. */
+    function settle(outcome: WriteOutcome): void {
+      if (outcome.kind === 'written') {
+        const verdict = outcome.verdict
         own.value = {
           mine: verdict !== null,
           score: verdict?.score ?? null,
           review: verdict?.review ?? null,
         }
-      if (!untouched) return
-      score.value = own.value.score
-      review.value = own.value.review ?? ''
-    })
-    // Which of the two is at work: «Снять оценку» and «Сохранить» share `sending` (adversarial Р1-А2).
-    const withdrawing = ref(false)
+      }
+      // It may have landed: no score is known as the person's, so whatever is chosen is sent.
+      else if (outcome.kind === 'unknown') own.value = { ...own.value, score: null }
+    }
     const failure = ref<WireCode | 'offline' | 'failed' | null>(null)
     const unsupported = ref(false)
 
@@ -249,12 +268,16 @@ export default defineComponent({
       forgetOwnPrices(currentIdentity(), [props.itemId])
       try {
         const write = run()
-        trackWrite(writing, write)
+        trackWrite(writing, write, taking)
         const verdict = await write
         props.onSaved?.(props.itemId, verdict)
         open.value = false
       } catch (error) {
         reportFailure(error, 'screen')
+        const outcome = outcomeOf(error)
+        settle(outcome)
+        // No answer: the write may have landed, and the list is asked again — never kept as written.
+        if (outcome.kind === 'unknown') props.onSaved?.(props.itemId, undefined)
         const code = error instanceof ApiError ? error.code : null
         // Decided after the failure: a connection that went while the answer was on its way is
         // not the server breaking. A code the domain has words for keeps its own.

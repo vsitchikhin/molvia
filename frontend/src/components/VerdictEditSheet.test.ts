@@ -7,7 +7,7 @@ import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE } from '@molvia/model'
 import type { Rating, VerdictAmendment, VerdictCard } from '@molvia/model'
 import VerdictEditSheet from '@/components/VerdictEditSheet.vue'
-import { forgetWritesInFlight } from '@/components/rating'
+import { forgetWritesInFlight } from '@/stores/verdictWrites'
 import type { SavedVerdict, Score } from '@/components/rating'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
@@ -37,7 +37,7 @@ function online(value: boolean): void {
 
 let clock = 0
 /** What the sheet hands the screen on a write: a prop, called even once the sheet is gone (Д1). */
-const onSaved = vi.fn<(itemId: string, verdict: SavedVerdict | null) => void>()
+const onSaved = vi.fn<(itemId: string, verdict: SavedVerdict | null | undefined) => void>()
 
 beforeEach(() => {
   localStorage.clear()
@@ -338,7 +338,8 @@ describe('VerdictEditSheet', () => {
     await view.vm.$nextTick()
 
     expect(view.text()).toContain('Could not save it')
-    expect(onSaved).not.toHaveBeenCalled()
+    // A bare 502 is no word of the API's: the write may have landed, so the list is asked again (Ж1).
+    expect(onSaved.mock.calls).toEqual([[ITEM, undefined]])
 
     online(false)
     await button(view, 'Save the rating').trigger('click')
@@ -403,14 +404,58 @@ describe('VerdictEditSheet', () => {
       expect(button(view, 'Save the rating').attributes('aria-disabled')).toBeUndefined()
     })
 
-    it('a write refused leaves the sheet on the row`s own score', async () => {
+    it('a write refused in the API`s own words leaves the sheet on the row`s own score', async () => {
       const land = await sweptMidWrite()
       const { view } = await render({ ownScore: 1 })
 
-      land(new ApiError(ERROR.INTERNAL, 'HTTP 502'))
+      land(new ApiError(ERROR.NOT_FOUND, undefined, true, undefined, { fromApi: true }))
       await flushPromises()
       expect(view.get('.current').text()).toBe('Your rating: 1')
       expect(button(view, 'Nothing has changed').attributes('aria-busy')).toBeUndefined()
+    })
+
+    it('Ж1: a write that got no answer may have landed — no score is the person`s, and the 1 goes', async () => {
+      const land = await sweptMidWrite()
+      const { view } = await render({ ownScore: 1 })
+
+      // Cut off by the client's timeout: the server may hold the 5.
+      land(new ApiError(ERROR.INTERNAL, 'aborted', false))
+      await flushPromises()
+      expect(view.find('.current').exists()).toBe(false)
+      expect(view.findAll('button[aria-pressed="true"]')).toHaveLength(0)
+
+      amendVerdict.mockResolvedValueOnce(card({ score: 1 }))
+      await key(view, 1).trigger('click')
+      await button(view, 'Save the rating').trigger('click')
+      await flushPromises()
+      expect(amendVerdict).toHaveBeenLastCalledWith(ITEM, { score: 1 })
+    })
+
+    it('Ж1: the same in the sheet that sent it — the 1 goes, and the list is asked again', async () => {
+      amendVerdict.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'aborted', false))
+      const { view } = await render({ ownScore: 1 })
+      await key(view, 5).trigger('click')
+      await button(view, 'Save the rating').trigger('click')
+      await flushPromises()
+      expect(onSaved.mock.calls).toEqual([[ITEM, undefined]])
+
+      amendVerdict.mockResolvedValueOnce(card({ score: 1 }))
+      await key(view, 1).trigger('click')
+      await button(view, 'Save the rating').trigger('click')
+      await flushPromises()
+      expect(amendVerdict).toHaveBeenLastCalledWith(ITEM, { score: 1 })
+    })
+
+    it('Ж2: a withdrawal on its way is said by its own word', async () => {
+      withdrawVerdict.mockReturnValueOnce(new Promise(() => undefined))
+      const first = await render({ ownScore: 1 })
+      await button(first.view, 'Withdraw the rating').trigger('click')
+      first.view.unmount()
+
+      const { view } = await render({ ownScore: 1 })
+      const withdraw = view.findAll('button').find((b) => b.text() === 'Withdrawing the rating…')
+      expect(withdraw?.attributes('aria-busy')).toBe('true')
+      expect(view.findAll('button').map((b) => b.text())).not.toContain('Sending the rating…')
     })
   })
 })

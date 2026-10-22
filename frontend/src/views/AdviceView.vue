@@ -428,10 +428,11 @@ export default defineComponent({
       editing,
       edit,
       rate,
-      saved: (itemId: string, verdict: SavedVerdict | null) => {
+      saved: (itemId: string, verdict: SavedVerdict | null | undefined) => {
         // Before the list is asked again: an answer to that request is newer than the write. By the
         // item the sheet names: swept away while the write was on its way, it is no longer `editing`.
-        advice.wrote(itemId, verdict, shownNow())
+        // A write with no answer is kept as nothing — it may or may not have landed (Ж1).
+        if (verdict !== undefined) advice.wrote(itemId, verdict, shownNow())
         void advice.retry()
         refreshes.value += 1
       },

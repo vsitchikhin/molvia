@@ -17,7 +17,7 @@ import type {
 } from '@molvia/model'
 import en from '@/i18n/en.json'
 import { forgetPageWrites } from '@/composables/useAdvice'
-import { forgetWritesInFlight } from '@/components/rating'
+import { forgetWritesInFlight } from '@/stores/verdictWrites'
 import { createAppI18n } from '@/i18n'
 import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import IconMagnify from '~icons/mdi/magnify'
@@ -1810,6 +1810,55 @@ describe('AdviceView: the sheet after a save (MOL-202, А1)', () => {
 
     expect(localStorage.getItem(`molvia.advice-written.${ME}`)).toContain('"score":5')
     expect(localStorage.getItem(`molvia.advice.${ME}`)).not.toBeNull()
+  })
+
+  it('Ж3: a full shelf writes over the key it holds — the list stays, the next launch has the write', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+
+    // Full now: a new key is refused, a key it holds is written over in the same room.
+    const real = window.localStorage
+    const full: Storage = {
+      getItem: (key) => real.getItem(key),
+      removeItem: (key) => {
+        real.removeItem(key)
+      },
+      setItem: (key, value) => {
+        if (real.getItem(key) === null) throw new DOMException('full', 'QuotaExceededError')
+        real.setItem(key, value)
+      },
+      clear: () => {
+        real.clear()
+      },
+      key: (n) => real.key(n),
+      get length() {
+        return real.length
+      },
+    }
+    vi.spyOn(window, 'localStorage', 'get').mockReturnValue(full)
+    const sheet = await open(view)
+    amendVerdict.mockResolvedValueOnce(card(3))
+    await key(sheet, 3).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+
+    expect(real.getItem(`molvia.advice-written.${ME}`)).toContain('"score":3')
+    expect(real.getItem(`molvia.advice.${ME}`)).not.toBeNull()
+  })
+
+  it('Ж1: a write with no answer is kept as nothing, and the list is asked again', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    const sheet = await open(view)
+    amendVerdict.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'aborted', false))
+    advice.mockRejectedValue(broke())
+    await key(sheet, 5).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+
+    expect(advice).toHaveBeenCalledTimes(2)
+    expect(localStorage.getItem(`molvia.advice-written.${ME}`)).toBeNull()
   })
 
   it('a row found by the search, dimmed while it is asked again — the same', async () => {

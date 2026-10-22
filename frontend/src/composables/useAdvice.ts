@@ -8,7 +8,7 @@ import type { CheapRow, NeverRow, TakeRow } from '@/components/adviceRow'
 import type { SavedVerdict } from '@/components/rating'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
-import { forget, read, sharedHolds, write, writeEverywhere } from '@/stores/storage'
+import { forget, read, sharedKeeps, write, writeEverywhere } from '@/stores/storage'
 import { forgetOwnPrices } from '@/stores/ownPrices'
 import { reportFailure } from '@/failures'
 import { newId } from '@/ids'
@@ -202,8 +202,7 @@ function writeWritten(owner: string, entries: Written): void {
     // offline is the truth, the score from before the write is not (adversarial Д2). A refusal of
     // `sessionStorage` alone takes nothing (Е3). Nor may an answer asked before the write bring the
     // list back (Е2): the memory takes none of the requests asked so far.
-    const held = sharedHolds((key, value) => key === `${WRITTEN}.${owner}` && value === kept)
-    if (held !== true) {
+    if (sharedKeeps(`${WRITTEN}.${owner}`, kept) !== true) {
       forget(`${KEY}.${owner}`)
       rememberedUpTo.set(owner, requests)
     }

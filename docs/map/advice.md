@@ -77,7 +77,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 - `frontend/src/components/VerdictEditSheet.vue` — Sheet from «Что брать»: rate an item, change one's rating or «Снять оценку», talking to the API directly.
 - `frontend/src/components/adviceRow.ts` — Helpers of «Что брать» rows: the three row types, how places read, unit price and rating text.
 - `frontend/src/components/placeLabel.ts` — «Ереван Сити в Гюмри»: a place with its city in the prepositional case, bracketed where the dictionary has none (MOL-120); whether a city is printed is the domain's `cityWhereNameRepeats`. `countryLabel`: a country of the settings by its name, any other by its code (MOL-109).
-- `frontend/src/components/rating.ts` — The `Score` type and the list of scale keys shared by the card of «Оценки» and the edit sheet.
+- `frontend/src/components/rating.ts` — The `Score` type, the list of scale keys shared by the card of «Оценки» and the edit sheet, and the `SavedVerdict` the sheet hands the screen (MOL-202).
 
 ## frontend · composables
 
@@ -89,6 +89,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 ## frontend · stores
 
 - `frontend/src/stores/ownPrices.ts` — Store: the last answer of «Тут дешевле» per item and city, up to `OWN_PRICES_REMEMBERED`, per identity, read only with no signal and let go of an item rated on this phone (MOL-92, В-5).
+- `frontend/src/stores/verdictWrites.ts` — Store: the verdict sheet's writes still on their way, one of an item at a time, and how a write ended — written, refused, or no answer (MOL-202).
 - `frontend/src/stores/verdictDrafts.ts` — Store: verdicts saved on the phone and not yet confirmed, a map by item, sent at start, online and on return.
 
 ## e2e
