@@ -7,6 +7,7 @@ import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type {
   SpendingCategoriesResponse,
+  SpendingCategoryAmend,
   SpendingCategoryBody,
   SpendingCategoryView,
 } from '@molvia/model'
@@ -21,12 +22,16 @@ import MoneyCategoriesView from './MoneyCategoriesView.vue'
 const spendingCategories = vi.fn<() => Promise<SpendingCategoriesResponse>>()
 const addSpendingCategory =
   vi.fn<(body: SpendingCategoryBody) => Promise<SpendingCategoriesResponse>>()
+const amendSpendingCategory =
+  vi.fn<(id: string, body: SpendingCategoryAmend) => Promise<SpendingCategoriesResponse>>()
 const archiveSpendingCategory = vi.fn<(id: string) => Promise<SpendingCategoriesResponse>>()
 const restoreSpendingCategory = vi.fn<(id: string) => Promise<SpendingCategoriesResponse>>()
 vi.mock('@/api', () => ({
   api: {
     spendingCategories: () => spendingCategories(),
     addSpendingCategory: (body: SpendingCategoryBody) => addSpendingCategory(body),
+    amendSpendingCategory: (id: string, body: SpendingCategoryAmend) =>
+      amendSpendingCategory(id, body),
     archiveSpendingCategory: (id: string) => archiveSpendingCategory(id),
     restoreSpendingCategory: (id: string) => restoreSpendingCategory(id),
   },
@@ -130,6 +135,7 @@ beforeEach(() => {
   for (const mock of [
     spendingCategories,
     addSpendingCategory,
+    amendSpendingCategory,
     archiveSpendingCategory,
     restoreSpendingCategory,
   ]) {
@@ -226,7 +232,8 @@ describe('MoneyCategoriesView: «Убрать» is quiet (MOL-191, Ф-34)', () =
     const remove = view
       .findAll('button')
       .filter((button) => button.text() === en.spending.categories.remove)
-    expect(remove).toHaveLength(3)
+    // The presets' only: one's own is taken out from its sheet (MOL-285).
+    expect(remove).toHaveLength(2)
     for (const button of remove) {
       expect(button.classes()).toContain('ghost')
       expect(button.classes()).not.toContain('danger-ghost')
@@ -239,28 +246,45 @@ describe('MoneyCategoriesView: «Убрать» is quiet (MOL-191, Ф-34)', () =
 })
 
 describe('MoneyCategoriesView: a row is the kit’s ListRow (MOL-191, MOL-175)', () => {
-  it('every category of both groups is a row with its circle, «Remove» or «Bring back» its tail', async () => {
+  it('a preset and a removed one are rows with «Remove» or «Bring back» in the tail; one’s own opens', async () => {
     spendingCategories.mockResolvedValue({ categories: LIST })
     const view = await render()
     const rows = view.findAllComponents(ListRow)
     expect(rows).toHaveLength(4)
     for (const row of rows) {
-      expect(row.element.tagName).toBe('DIV')
       expect(row.find('.circle').exists()).toBe(true)
       expect(row.classes()).toContain('wrap')
-      expect(row.find('.tail button').exists()).toBe(true)
     }
-    expect(rows[0]?.find('.circle').attributes('style')).toContain('var(--cat-groceries)')
-    expect(rows[2]?.find('.circle').attributes('style')).toContain('var(--cat-own-0)')
+    const [groceries, cafe, mine, health] = rows
+    for (const row of [groceries, cafe, health]) {
+      expect(row?.element.tagName).toBe('DIV')
+      expect(row?.find('.tail button').exists()).toBe(true)
+      expect(row?.find('.chevron').exists()).toBe(false)
+    }
+    expect(mine?.element.tagName).toBe('BUTTON')
+    expect(mine?.find('.chevron').exists()).toBe(true)
+    expect(mine?.find('.tail').exists()).toBe(false)
+    expect(groceries?.find('.circle').attributes('style')).toContain('var(--cat-groceries)')
+    expect(mine?.find('.circle').attributes('style')).toContain('var(--cat-own-0)')
   })
 
-  it('«own» stands under one’s own category only, never under a preset', async () => {
+  it('three groups: the presets, one’s own, the removed — each only when it has a row (MOL-285)', async () => {
     spendingCategories.mockResolvedValue({ categories: LIST })
     const view = await render()
-    const metas = view
-      .findAllComponents(ListRow)
-      .map((row) => (row.find('.meta').exists() ? row.find('.meta').text() : ''))
-    expect(metas).toEqual(['', '', en.spending.categories.own, ''])
+    expect(view.findAll('.section-caption').map((caption) => caption.text())).toEqual([
+      en.spending.categories.presets,
+      en.spending.categories.own_group,
+      en.spending.categories.archived,
+    ])
+    const groups = view.findAll('.group')
+    expect(groups[1]?.text()).toContain('Armenian lessons')
+    expect(groups[0]?.text()).not.toContain('Armenian lessons')
+
+    spendingCategories.mockResolvedValue({ categories: [preset(GROCERIES, 'groceries')] })
+    const presetsOnly = await render()
+    expect(presetsOnly.findAll('.section-caption').map((caption) => caption.text())).toEqual([
+      en.spending.categories.presets,
+    ])
   })
 
   it('«Sending…» is a tag on the category that waits, and on no other row', async () => {
@@ -345,3 +369,156 @@ describe('MoneyCategoriesView: the skeleton is the answer’s shape (MOL-191, Ф
     expect(view.find('.skeleton-lines').exists()).toBe(false)
   })
 })
+
+describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)', () => {
+  /** The radio of the sheet named so — an icon by its name, a colour by «Colour n of 8». */
+  function radio(label: string): HTMLInputElement {
+    const found = document.querySelector<HTMLInputElement>(
+      `dialog[open] input[type="radio"][aria-label="${label}"]`,
+    )
+    if (!found) throw new Error(`no radio «${label}»`)
+    return found
+  }
+  const checked = () =>
+    [...document.querySelectorAll<HTMLInputElement>('dialog[open] input[type="radio"]')]
+      .filter((input) => input.checked)
+      .map((input) => input.getAttribute('aria-label'))
+
+  async function choose(label: string): Promise<void> {
+    radio(label).click()
+    await flushPromises()
+  }
+
+  it('a new one starts on the tag and the palette’s next; chosen, it is made with them', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    online(false)
+    await addButton(view)?.trigger('click')
+    await risen()
+    // One of one's own already, so the next is the second colour.
+    expect(checked()).toEqual([en.spending.icon.tag, 'Colour 2 of 8'])
+    expect(document.querySelectorAll('dialog[open] input[name]').length).toBeGreaterThan(40)
+
+    await choose(en.spending.icon.gift)
+    await choose('Colour 6 of 8')
+    await addThroughSheetName('Gifts')
+    expect(useSpendingQueueStore().pending).toMatchObject([
+      { kind: 'category-add', body: { name: 'Gifts', icon: 'gift', colour: 5 } },
+    ])
+    const row = view.findAllComponents(ListRow).find((one) => one.text().includes('Gifts'))
+    expect(row?.find('.circle').attributes('style')).toContain('var(--cat-own-5)')
+  })
+
+  it('a preset’s icon is in the choice, under the preset’s name (В-3 «б»)', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    await addButton(view)?.trigger('click')
+    await risen()
+    expect(radio(en.spending.category.cafe).value).toBe('cafe')
+  })
+
+  it('one’s own opens its sheet as it is; saved, the amendment goes through the queue', async () => {
+    const mine = { ...own(OWN, 'Armenian lessons'), icon: 'study' as const, colour: 2 }
+    spendingCategories.mockResolvedValue({ categories: [preset(GROCERIES, 'groceries'), mine] })
+    const view = await render()
+    online(false)
+    await view.findAll('button.list-row').at(0)?.trigger('click')
+    await risen()
+    expect(document.querySelector('dialog[open]')?.textContent).toContain(
+      en.spending.new_category.edit_title,
+    )
+    expect(
+      document.querySelector<HTMLInputElement>('dialog[open] input:not([type="radio"])')?.value,
+    ).toBe('Armenian lessons')
+    expect(checked()).toEqual([en.spending.icon.study, 'Colour 3 of 8'])
+
+    await choose(en.spending.icon.languages)
+    sheetButton(en.spending.new_category.edit_save).click()
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(useSpendingQueueStore().pending).toEqual([
+      {
+        kind: 'category-amend',
+        id: OWN,
+        body: { name: 'Armenian lessons', icon: 'languages', colour: 2 },
+      },
+    ])
+    const row = view.findAllComponents(ListRow).find((one) => one.text().includes('Armenian'))
+    expect(row?.text()).toContain(en.spending.pending)
+  })
+
+  it('must not fire: saved as it was, nothing is written', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    await view.findAll('button.list-row').at(0)?.trigger('click')
+    await risen()
+    sheetButton(en.spending.new_category.edit_save).click()
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(useSpendingQueueStore().pending).toEqual([])
+    expect(amendSpendingCategory).not.toHaveBeenCalled()
+  })
+
+  it('renamed to another of one’s own or to a preset, it is refused in the sheet; its own name is not', async () => {
+    const second = own('ffffffff-0000-4000-8000-000000000021', 'Taxi')
+    spendingCategories.mockResolvedValue({ categories: [...LIST, second] })
+    const view = await render()
+    online(false)
+    await view.findAll('button.list-row').at(0)?.trigger('click')
+    await risen()
+    for (const taken of [' taxi ', en.spending.category.cafe]) {
+      await typeName(taken)
+      sheetButton(en.spending.new_category.edit_save).click()
+      await flushPromises()
+      expect(document.querySelector('dialog[open]')?.textContent).toContain(
+        en.spending.new_category.bad_taken,
+      )
+    }
+    await typeName('ARMENIAN LESSONS')
+    sheetButton(en.spending.new_category.edit_save).click()
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(useSpendingQueueStore().pending).toMatchObject([
+      { kind: 'category-amend', body: { name: 'ARMENIAN LESSONS' } },
+    ])
+  })
+
+  it('«Take out the category» is quiet, in the sheet, and puts it among the removed', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    online(false)
+    await view.findAll('button.list-row').at(0)?.trigger('click')
+    await risen()
+    const remove = sheetButton(en.spending.new_category.remove)
+    expect(remove.classList).toContain('ghost')
+    remove.click()
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(useSpendingQueueStore().pending).toEqual([{ kind: 'category-archive', id: OWN }])
+    expect(view.findAll('.group').at(-1)?.text()).toContain('Armenian lessons')
+  })
+
+  it('must not fire: a new one has no «Take out»', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    await addButton(view)?.trigger('click')
+    await risen()
+    expect(() => sheetButton(en.spending.new_category.remove)).toThrow()
+  })
+})
+
+/** Types into the open sheet's name. */
+async function typeName(name: string): Promise<void> {
+  const input = document.querySelector<HTMLInputElement>('dialog[open] input:not([type="radio"])')
+  if (!input) throw new Error('no field')
+  input.value = name
+  input.dispatchEvent(new Event('input'))
+  await flushPromises()
+}
+
+/** A name into the sheet already open, then «Добавить». */
+async function addThroughSheetName(name: string): Promise<void> {
+  await typeName(name)
+  sheetButton(en.spending.new_category.save).click()
+  await flushPromises()
+}

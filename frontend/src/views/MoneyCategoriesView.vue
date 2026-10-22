@@ -43,22 +43,18 @@
         </AppReveal>
 
         <div class="lists">
-          <section class="group">
-            <SectionCaption>{{ t('spending.categories.live') }}</SectionCaption>
+          <section v-if="presets.length > 0" class="group">
+            <SectionCaption>{{ t('spending.categories.presets') }}</SectionCaption>
             <AppCard as="ul" list>
               <AppReveal group>
-                <li v-for="category in live" :key="category.id">
+                <li v-for="category in presets" :key="category.id">
                   <ListRow
                     as="div"
                     :icon="iconOf(category)"
                     :tint="colourOf(category)"
                     :title="nameOf(category)"
-                    :meta="category.preset ? '' : t('spending.categories.own')"
                     wrap
                   >
-                    <template v-if="waiting(category.id)" #below>
-                      <AppTag tone="warn" :icon="IconUpload">{{ t('spending.pending') }}</AppTag>
-                    </template>
                     <template #tail>
                       <AppButton
                         variant="ghost"
@@ -69,6 +65,30 @@
                       >
                         {{ t('spending.categories.remove') }}
                       </AppButton>
+                    </template>
+                  </ListRow>
+                </li>
+              </AppReveal>
+            </AppCard>
+          </section>
+
+          <!-- One's own opens its sheet — a name, an icon, a colour, and «Убрать» there (MOL-285, В-2
+               «а»): a row that opens has the chevron and no button, and one card never mixes the two. -->
+          <section v-if="own.length > 0" class="group">
+            <SectionCaption>{{ t('spending.categories.own_group') }}</SectionCaption>
+            <AppCard as="ul" list>
+              <AppReveal group>
+                <li v-for="category in own" :key="category.id">
+                  <ListRow
+                    :icon="iconOf(category)"
+                    :tint="colourOf(category)"
+                    :title="nameOf(category)"
+                    wrap
+                    next
+                    @click="edit(category)"
+                  >
+                    <template v-if="waiting(category.id)" #below>
+                      <AppTag tone="warn" :icon="IconUpload">{{ t('spending.pending') }}</AppTag>
                     </template>
                   </ListRow>
                 </li>
@@ -116,13 +136,13 @@
          with nothing ever shown (7h), which took the strip from under an open sheet and its focus with it
          (А3). An error takes the strip for «Повторить» by itself. -->
     <template v-if="phase === 'ready'" #docked>
-      <AppButton size="large" block @click="newOpen = true">
+      <AppButton size="large" block @click="edit(null)">
         <template #icon><IconPlus /></template>
         {{ t('spending.categories.add') }}
       </AppButton>
     </template>
 
-    <NewCategorySheet v-model:open="newOpen" :categories="all" />
+    <CategorySheet v-model:open="sheetOpen" :categories="all" :category="editing" />
   </AppScreen>
 </template>
 
@@ -138,8 +158,8 @@ import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import AppTag from '@/components/AppTag.vue'
+import CategorySheet from '@/components/CategorySheet.vue'
 import ListRow from '@/components/ListRow.vue'
-import NewCategorySheet from '@/components/NewCategorySheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { categoriesWith, categoryColour, categoryIcon } from '@/components/spending'
@@ -153,7 +173,9 @@ import { reportFailure } from '@/failures'
 /**
  * «Деньги → Категории» (MOL-82, В-1): the person's own list. «Убрать» takes a category out of the
  * choice and erases nothing — the spendings in it keep it, past months keep their sums (MOL-73,
- * В-3) — so it asks nothing, is no red word (Ф-34), and «Вернуть» stands right under it. Every change goes through the
+ * В-3) — so it asks nothing, is no red word (Ф-34), and «Вернуть» stands right under it. One's own
+ * stand apart and open their sheet, where the name, the icon and the colour are amended and «Убрать»
+ * is (MOL-285, В-2 «а»). Every change goes through the
  * queue (В-4); the list is the server's with what waits laid over it.
  */
 export default defineComponent({
@@ -164,9 +186,9 @@ export default defineComponent({
     AppReveal,
     AppScreen,
     AppTag,
+    CategorySheet,
     IconPlus,
     ListRow,
-    NewCategorySheet,
     ScreenSkeleton,
     ScreenState,
     SectionCaption,
@@ -179,7 +201,9 @@ export default defineComponent({
 
     const server = ref<SpendingCategoryView[] | null>(null)
     const failure = ref<'error' | 'offline' | null>(null)
-    const newOpen = ref(false)
+    const sheetOpen = ref(false)
+    /** One's own the sheet amends; none while it makes a new one. */
+    const editing = ref<SpendingCategoryView | null>(null)
     let latest = 0
 
     async function load(): Promise<void> {
@@ -215,13 +239,26 @@ export default defineComponent({
     const all = computed(() =>
       categoriesWith(server.value ?? [], [...queue.arrived, ...queue.pending]),
     )
-    const live = computed(() => all.value.filter((category) => !category.archived))
+    const presets = computed(() =>
+      all.value.filter((category) => !category.archived && category.preset !== null),
+    )
+    const own = computed(() =>
+      all.value.filter((category) => !category.archived && category.preset === null),
+    )
     const archived = computed(() => all.value.filter((category) => category.archived))
 
     const nameOf = (category: SpendingCategoryView) =>
       category.preset ? t(`spending.category.${category.preset}`) : (category.name ?? '')
     const waiting = (id: string) =>
-      queue.pending.some((write) => write.kind === 'category-add' && write.body.id === id)
+      queue.pending.some(
+        (write) =>
+          (write.kind === 'category-add' && write.body.id === id) ||
+          (write.kind === 'category-amend' && write.id === id),
+      )
+    function edit(category: SpendingCategoryView | null): void {
+      editing.value = category
+      sheetOpen.value = true
+    }
     const refusals = computed(() =>
       queue.rejected.filter((item) => item.write.kind.startsWith('category-')),
     )
@@ -233,9 +270,12 @@ export default defineComponent({
       queue,
       phase,
       all,
-      live,
+      presets,
+      own,
       archived,
-      newOpen,
+      sheetOpen,
+      editing,
+      edit,
       nameOf,
       waiting,
       refusals,
