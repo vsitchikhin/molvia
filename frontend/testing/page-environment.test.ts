@@ -114,7 +114,15 @@ describe('the page environment (MOL-286)', () => {
     })
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     const { port } = server.address() as AddressInfo
-    const global = { setTimeout, setInterval, clearTimeout, clearInterval, console }
+    // The window's own console: happy-dom says the abort there, and it is how the test knows the abort came.
+    const said = vi.fn()
+    const global = {
+      setTimeout,
+      setInterval,
+      clearTimeout,
+      clearInterval,
+      console: { ...console, error: said },
+    }
     const window = await page.setup(global, {})
     const ran = vi.fn()
     const asked = (global as unknown as { fetch: typeof fetch }).fetch(
@@ -129,6 +137,7 @@ describe('the page environment (MOL-286)', () => {
     await failed
     await wait(20)
     server.close()
+    expect(said).toHaveBeenCalledWith(expect.objectContaining({ name: 'AbortError' }))
     expect(ran).not.toHaveBeenCalled()
     expect(global.setTimeout).toBe(setTimeout)
   })
