@@ -345,7 +345,10 @@ export default defineComponent({
       })
     })
     const remembered = computed(() =>
-      figures.rememberedPrice && priceInDoubt(props.country, figures.price, figures.rememberedPrice)
+      figures.rememberedPrice &&
+      // a line with no price was emptied by the check: the memory is the hint to type it by (MOL-291)
+      (figures.price === null ||
+        priceInDoubt(props.country, figures.price, figures.rememberedPrice))
         ? t('receipt.line.remembered', {
             price: formatMoney(figures.rememberedPrice, locale.value),
           })

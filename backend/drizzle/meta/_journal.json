@@ -495,8 +495,15 @@
     {
       "idx": 70,
       "version": "7",
-      "when": 1792666753207,
-      "tag": "0070_spending_category_icon",
+      "when": 1792667356252,
+      "tag": "0070_receipt_line_remembered",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1792680632713,
+      "tag": "0071_spending_category_icon",
       "breakpoints": true
     }
   ]

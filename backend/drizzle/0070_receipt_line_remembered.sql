@@ -1,0 +1,1 @@
+ALTER TABLE "receipt_lines" ADD COLUMN "remembered" boolean DEFAULT false NOT NULL;

@@ -1,5 +1,5 @@
 {
-  "id": "f1fcc826-eaee-44b1-8bb7-f81d2636d413",
+  "id": "940e30db-c828-4f02-80b6-6144282d688a",
   "prevId": "86349902-f6aa-416c-b067-75deabe11c7c",
   "version": "7",
   "dialect": "postgresql",
@@ -4843,6 +4843,13 @@
           "notNull": true,
           "default": false
         },
+        "remembered": {
+          "name": "remembered",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "spelled": {
           "name": "spelled",
           "type": "boolean",
@@ -5833,12 +5840,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "icon": {
-          "name": "icon",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "archived_at": {
           "name": "archived_at",
           "type": "timestamp with time zone",
@@ -5905,14 +5906,6 @@
         "spending_categories_preset_known": {
           "name": "spending_categories_preset_known",
           "value": "\"spending_categories\".\"preset\" is null or \"spending_categories\".\"preset\" in ('groceries', 'cafe', 'rent', 'home', 'beauty', 'transport', 'telecom', 'health', 'clothes', 'pets', 'leisure', 'documents', 'other')"
-        },
-        "spending_categories_icon_own": {
-          "name": "spending_categories_icon_own",
-          "value": "\"spending_categories\".\"preset\" is null or \"spending_categories\".\"icon\" is null"
-        },
-        "spending_categories_icon_known": {
-          "name": "spending_categories_icon_known",
-          "value": "\"spending_categories\".\"icon\" is null or \"spending_categories\".\"icon\" in ('tag', 'gift', 'sport', 'study', 'kids', 'taxi', 'car', 'fuel', 'travel', 'coffee', 'bar', 'games', 'books', 'music', 'phone', 'tech', 'repair', 'flowers', 'charity', 'subscriptions', 'bank', 'languages', 'dentist', 'utilities', 'groceries', 'cafe', 'rent', 'home', 'beauty', 'transport', 'telecom', 'health', 'clothes', 'pets', 'leisure', 'documents', 'other')"
         },
         "spending_categories_colour_in_palette": {
           "name": "spending_categories_colour_in_palette",

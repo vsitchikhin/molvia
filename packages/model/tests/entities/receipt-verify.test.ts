@@ -298,3 +298,35 @@ describe('the receipt as a whole', () => {
     expect(verifiedReading(reading([], 0)).balanced).toBe(false)
   })
 })
+
+describe('what the shop’s memory said of a line (MOL-291)', () => {
+  const twice = {
+    quantityMilli: 1_000,
+    priceHundredths: 5_000,
+    sumHundredths: 5_000,
+    discountHundredths: 0,
+  }
+
+  it('keeps one number printed twice the memory confirms, on a receipt not proven whole', () => {
+    expect(figures(one(twice))).toEqual(BLANK)
+    expect(figures(one({ ...twice, remembered: 'confirmed' }))).toEqual([
+      1_000,
+      5_000,
+      5_000,
+      0,
+      true,
+    ])
+  })
+
+  it('keeps a line the memory put right on its own word, and one the total did only on a proven receipt', () => {
+    const put = { ...twice, asPrinted: false, repaired: true }
+    expect(figures(one(put))).toEqual(BLANK)
+    expect(figures(one({ ...put, remembered: 'repaired' }))).toEqual([1_000, 5_000, 5_000, 0, true])
+    expect(figures(one(put, 5_000))).toEqual([1_000, 5_000, 5_000, 0, true])
+  })
+
+  it('empties a line the memory doubts, even on a receipt proven whole', () => {
+    const got = verifiedReading(reading([line({ remembered: 'doubted' })], 74_000))
+    expect([figures(got.lines[0]!), got.balanced]).toEqual([BLANK, false])
+  })
+})

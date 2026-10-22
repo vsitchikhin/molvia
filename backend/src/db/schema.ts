@@ -2938,13 +2938,17 @@ export const receiptLines = pgTable(
     // purchase removed takes its line (MOL-240); a line not recorded goes at «Записать».
     expenseId: uuid('expense_id').references(() => expenses.id, { onDelete: 'cascade' }),
     // «Записать» recorded the line as read — it added up, its quantity and sum unchanged (В-4): its price
-    // is the shelf's, what the person's word in the shops' memory carries (MOL-240, round 4, Р4-1). Judged
+    // is the shelf's, what the person's word in the shops' memory carries (MOL-240, round 4, Р4-1) — or one
+    // the shop's memory put right, recorded as shown: the remembered price kept (MOL-291, В-3 «а»). Judged
     // once, at the record: a sum put right later is what was paid, never the shelf. `null` — no record of
     // this build judged it: read and not recorded, or recorded by an image rolled back (round 6, Р6-1).
     asRead: boolean('as_read'),
     // Put right by the digits the till's font confuses, on a model's reading the lines then proved whole
     // (MOL-290): shown with «проверьте», never as read — so never a shelf price for the shops' memory.
     repaired: boolean('repaired').notNull().default(false),
+    // Put right by the shop's memory (MOL-291): the remembered shelf price, one confused digit off the one read,
+    // the line then holding. Recorded as shown, it keeps that price in the person's word (owner's В-3 «а»).
+    remembered: boolean('remembered').notNull().default(false),
     // A new item's proposed name, `translation`, spells a word the dictionary has not in Russian letters
     // (MOL-293, В-4): the review offers it with one press to take it away.
     spelled: boolean('spelled').notNull().default(false),

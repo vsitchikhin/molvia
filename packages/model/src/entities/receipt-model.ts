@@ -4,6 +4,8 @@
 // of the summary with its word (MOL-268, «Дальше»); which amount is the total is decided here, by the
 // country's card, never by the model.
 
+import { cardRate, rememberedLines } from '#model/entities/receipt-remembered'
+import type { RememberedPrices } from '#model/entities/receipt-remembered'
 import { DEPARTMENT, TOLERANCE_HUNDREDTHS } from '#model/entities/receipt-text'
 import type { PhotoReading } from '#model/entities/receipt-card'
 import type { ReceiptText, ReceiptTextLine, TextRow } from '#model/entities/receipt-text'
@@ -209,6 +211,7 @@ function lineOf(line: ModelReceipt['lines'][number]): ReceiptTextLine {
     discountHundredths,
     settled,
     asPrinted: settled,
+    read: { quantityMilli, priceHundredths, discountHundredths, sumHundredths },
     // no boxes: a model's lines are not cut out for the reader's training (MOL-272, Р-4)
     rows: [],
   }
@@ -389,24 +392,6 @@ function readingsOf(
   }
   walk(value, 0, 0)
   return out.filter((one) => one.value !== null)
-}
-
-/**
- * The card's rate the lines as copied share: the discount over the shelf price, to a tenth of a per cent,
- * most of them at it — «Ереван Сити»'s 1 %, 0,5 %. None where no line prints a discount.
- */
-function cardRate(lines: readonly ReceiptTextLine[]): number | null {
-  const counts = new Map<number, number>()
-  for (const line of lines) {
-    const { quantityMilli: qty, priceHundredths: price, discountHundredths: discount } = line
-    if (!line.settled || qty === null || price === null || discount === null || discount <= 0)
-      continue
-    const shelf = Math.round((qty * price) / 1_000)
-    if (shelf <= 0) continue
-    const rate = Math.round((discount * 1_000) / shelf) / 1_000
-    counts.set(rate, (counts.get(rate) ?? 0) + 1)
-  }
-  return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
 }
 
 /** A line's figures as one reading takes them. */
@@ -632,14 +617,33 @@ function repaired(
  * and a section «Բաժին» is printed or a total vouched for; no line and neither is a reading of nothing.
  * Then `verifiedReading(text, { byModel: true })`, as for Tesseract's reading.
  */
-export function receiptTextOfModel(reading: PhotoReading, written: ModelReceipt): ReceiptText {
+export function receiptTextOfModel(
+  reading: PhotoReading,
+  written: ModelReceipt,
+  prices: RememberedPrices = new Map(),
+): ReceiptText {
   const { answer } = canonicalAnswer(reading, written)
   const discounted = answer.lines.some((line) => figureOf(line.discount, 2) !== null)
   const copied = answer.lines.map(lineOf)
   const { total, read, met, owed, cashback, redeemed } = totalOf(reading, answer, copied)
-  // a total two places vouch for that the lines as copied do not meet: put right by the font's swaps, or not
-  const fixed = owed === null || met ? null : repaired(reading, answer, copied, owed)
-  const lines = fixed ?? copied
+  // a total two places vouch for that the lines do not meet: put right by the font's swaps, or not. The total first,
+  // and on its own (MOL-291): a line it vouches for as copied is no doubt of the memory's, nor are the lines it put
+  // right (adversarial А3, review №1); and the memory chooses none of a line's readings — between 0,6 × 550 and
+  // 0,5 × 660 its old price is the one a changed shelf price makes wrong (review 2, №6, Б1)
+  const byTotal = owed === null || met ? null : repaired(reading, answer, copied, owed)
+  // else the shop's memory, a line at a time, and the total again over what it decided
+  const swaps = { price: reading.modelSwaps, others: reading.modelSwaps, doubt: reading.modelSwaps }
+  const less = (amount: number | null): number | null =>
+    amount === null ? null : amount - (cashback ?? 0)
+  const voiced =
+    met || byTotal !== null
+      ? copied
+      : rememberedLines(copied, prices, swaps, { owed, read: less(read) })
+  // the total again only where the memory decided a line: the same lines would be the same walk, twice its work
+  const moved = voiced.some((line, i) => line !== copied[i])
+  const fixed =
+    byTotal ?? (owed === null || met || !moved ? null : repaired(reading, answer, voiced, owed))
+  const lines = fixed ?? voiced
   // a receipt with no line is a sum to record where it prints a section or two places vouch for its
   // total (MOL-227) — the model names a sole trader's «Բաժին 1» as a total no more often than not; with
   // neither it is a reading of nothing, «переснимите» as Tesseract's (`needsReshoot`)
@@ -661,7 +665,13 @@ export function receiptTextOfModel(reading: PhotoReading, written: ModelReceipt)
     receiptNo: number,
     totalHundredths: total,
     readTotalHundredths: read,
-    balanced: met || fixed !== null,
+    balanced:
+      met ||
+      fixed !== null ||
+      (owed !== null &&
+        lines.length > 0 &&
+        lines.every((line) => line.settled) &&
+        lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0) === owed),
     cashbackHundredths: cashback,
     redeemedHundredths: redeemed,
     lines,
