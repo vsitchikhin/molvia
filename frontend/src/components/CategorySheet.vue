@@ -18,7 +18,7 @@
 
       <fieldset class="choice">
         <legend class="legend">{{ t('spending.new_category.colour') }}</legend>
-        <div class="options">
+        <div class="options colours">
           <label v-for="n in colours" :key="n" class="option" :class="{ on: n === colour }">
             <input
               class="radio"
@@ -175,12 +175,15 @@ export default defineComponent({
         problem.value = t('spending.sheet.bad_text')
         return
       }
-      if (taken(checked.data)) {
+      const own = props.category
+      // A name kept as it was is the server's already: a preset's name in the language of this screen
+      // is no reason to refuse a new icon to one made on a screen in another (adversarial А2).
+      const kept = own?.name != null && nameIdentity(own.name) === nameIdentity(checked.data)
+      if (!kept && taken(checked.data)) {
         problem.value = t('spending.new_category.bad_taken')
         return
       }
       const body = { name: checked.data, icon: icon.value, colour: colour.value }
-      const own = props.category
       if (own) {
         const same = own.name === body.name && own.icon === body.icon && own.colour === body.colour
         if (!same) queue.amendCategory(own.id, body)
@@ -188,7 +191,14 @@ export default defineComponent({
         return
       }
       const id = newId()
-      queue.addCategory({ id, ...body })
+      // The tag and the palette's next go unnamed, as an earlier build sends them: such a body reads in
+      // an image rolled back past MOL-285, and the server's next is the rule (adversarial А3).
+      queue.addCategory({
+        id,
+        name: body.name,
+        ...(body.icon === DEFAULT_SPENDING_ICON ? {} : { icon: body.icon }),
+        ...(body.colour === nextCategoryColour(props.categories) ? {} : { colour: body.colour }),
+      })
       emit('created', id)
       close()
     }
@@ -255,12 +265,20 @@ export default defineComponent({
   font-weight: var(--weight-medium);
 }
 
-/* Six to a row at 320, each the thumb's 44 — the row spaced out to the sheet's edges. */
+/* Each the thumb's 44, the row spaced out to the form's edges — five icons to a row at 320, six at
+   390 (the sheet's 16 and the form's own, as the spending's sheet). Rows 8 apart, so the focus
+   standing off the ring of one does not touch the next. */
 .options {
   display: grid;
   grid-template-columns: repeat(auto-fill, var(--touch-target));
   justify-content: space-between;
-  gap: var(--space-1);
+  gap: var(--space-2) var(--space-1);
+}
+
+/* The eight colours four and four on every phone: by the width they broke five and three at 320,
+   six and two at 390, seven and one at 430 (review №1). */
+.colours {
+  grid-template-columns: repeat(4, var(--touch-target));
 }
 
 .option {
@@ -272,8 +290,11 @@ export default defineComponent({
   border-radius: var(--radius-pill);
   cursor: pointer;
 
+  /* Off the ring with the sheet's ground between them: the focus of a radio group stands on the one
+     chosen, and on the ring's own place it was the ring a little thicker (review №4, WCAG 2.4.7) —
+     the chips' way, the ring inside and the focus outside. */
   &:has(.radio:focus-visible) {
-    @include focus-ring;
+    @include focus-ring(4px);
   }
 }
 

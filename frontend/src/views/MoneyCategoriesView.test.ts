@@ -498,6 +498,45 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
     expect(view.findAll('.group').at(-1)?.text()).toContain('Armenian lessons')
   })
 
+  it('a new one left on the tag and the next colour is sent as an earlier build sends it (А3)', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    online(false)
+    await addButton(view)?.trigger('click')
+    await risen()
+    await addThroughSheetName('Gifts')
+    const [write] = useSpendingQueueStore().pending
+    expect(write?.kind === 'category-add' && Object.keys(write.body).sort()).toEqual(['id', 'name'])
+  })
+
+  it('a name kept as it was is not checked again: one named as a preset of another language takes an icon (А2)', async () => {
+    // «Rent» made on a Russian screen, where the preset is «Аренда жилья»; this screen is English.
+    spendingCategories.mockResolvedValue({ categories: [own(OWN, 'Rent')] })
+    const view = await render()
+    online(false)
+    await view.findAll('button.list-row').at(0)?.trigger('click')
+    await risen()
+    await choose(en.spending.icon.car)
+    sheetButton(en.spending.new_category.edit_save).click()
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(useSpendingQueueStore().pending).toMatchObject([
+      { kind: 'category-amend', body: { name: 'Rent', icon: 'car' } },
+    ])
+  })
+
+  it('one’s own row says it opens a sheet; a preset’s does not (review №3)', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST })
+    const view = await render()
+    const rows = view.findAllComponents(ListRow)
+    expect(rows.map((row) => row.attributes('aria-haspopup') ?? null)).toEqual([
+      null,
+      null,
+      'dialog',
+      null,
+    ])
+  })
+
   it('must not fire: a new one has no «Take out»', async () => {
     spendingCategories.mockResolvedValue({ categories: LIST })
     const view = await render()

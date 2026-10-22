@@ -61,7 +61,12 @@ import type {
   SpendingPreset,
   SpendingView,
 } from '@molvia/model'
-import type { RejectedSpendingWrite, SpendingUndo, SpendingWrite } from '@/stores/spendingQueue'
+import type {
+  ArrivedCategoryWrite,
+  RejectedSpendingWrite,
+  SpendingUndo,
+  SpendingWrite,
+} from '@/stores/spendingQueue'
 import { spendingOf } from '@/stores/spendingQueue'
 import type { SpendingPrefill } from '@/stores/spendingHandoff'
 
@@ -182,7 +187,9 @@ export function categoryColour(category: SpendingCategoryView): string {
  */
 export function categoriesWith(
   server: readonly SpendingCategoryView[],
-  pending: readonly SpendingWrite[],
+  pending: readonly (SpendingWrite | ArrivedCategoryWrite)[],
+  /** When the server's list was asked for: an amendment that landed before it is in it already. */
+  askedAt: Date | null = null,
 ): SpendingCategoryView[] {
   const list = [...server]
   for (const write of pending) {
@@ -197,7 +204,8 @@ export function categoriesWith(
         archived: false,
       })
     }
-    if (write.kind === 'category-amend') {
+    const heard = 'landedAt' in write && askedAt !== null && askedAt.getTime() >= write.landedAt
+    if (write.kind === 'category-amend' && !heard) {
       const at = list.findIndex((one) => one.id === write.id)
       const found = list[at]
       if (found?.preset === null) list[at] = { ...found, ...write.body }

@@ -743,6 +743,83 @@ describe('spending queue', () => {
       }
       expect(categoriesWith([preset], [write])).toEqual([preset])
     })
+
+    // Adversarial А1: a name is free only after the write that frees it.
+    const METRO = 'ffffffff-0000-4000-8000-000000000003'
+
+    it('А1а: a category made at the till, renamed after «Убрать» of another, goes after it', async () => {
+      const queue = fresh('idle')
+      queue.addCategory({ id: METRO, name: 'Метро' })
+      queue.record({ id: BARBER, ...fields('300', 'Метро', METRO) })
+      queue.archiveCategory(TAXI, true)
+      queue.amendCategory(METRO, { name: 'Такси', icon: 'tag', colour: 1 })
+      useActorStore().state = 'ready'
+      await queue.flush()
+      expect(calls).toEqual([
+        `category-add ${METRO}`,
+        `record ${BARBER}`,
+        `category-archive ${TAXI}`,
+        `category-amend ${METRO} Такси tag 1`,
+      ])
+    })
+
+    it('А1б: a rename into a name another frees later in the queue is not folded in front of it', async () => {
+      const queue = fresh('idle')
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'taxi', colour: 0 })
+      queue.amendCategory(METRO, { name: 'Метро и автобус', icon: 'tag', colour: 1 })
+      queue.amendCategory(TAXI, { name: 'Метро', icon: 'taxi', colour: 0 })
+      useActorStore().state = 'ready'
+      await queue.flush()
+      expect(calls).toEqual([
+        `category-amend ${TAXI} Такси taxi 0`,
+        `category-amend ${METRO} Метро и автобус tag 1`,
+        `category-amend ${TAXI} Метро taxi 0`,
+      ])
+    })
+
+    it('А1в: nor in front of «Убрать» of the other', async () => {
+      const queue = fresh('idle')
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'taxi', colour: 0 })
+      queue.archiveCategory(METRO, true)
+      queue.amendCategory(TAXI, { name: 'Метро', icon: 'taxi', colour: 0 })
+      useActorStore().state = 'ready'
+      await queue.flush()
+      expect(calls).toEqual([
+        `category-amend ${TAXI} Такси taxi 0`,
+        `category-archive ${METRO}`,
+        `category-amend ${TAXI} Метро taxi 0`,
+      ])
+    })
+
+    it('still folds past a spending, and past a write of the same category', () => {
+      const queue = fresh('idle')
+      queue.addCategory({ id: TAXI, name: 'Такси' })
+      queue.record({ id: BARBER, ...fields('1500', 'Вокзал', TAXI) })
+      queue.archiveCategory(TAXI, true)
+      queue.amendCategory(TAXI, { name: 'Такси и метро', icon: 'taxi', colour: 2 })
+      expect(queue.pending.map((write) => write.kind)).toEqual([
+        'category-add',
+        'record',
+        'category-archive',
+      ])
+      expect(queue.pending[0]).toMatchObject({ body: { name: 'Такси и метро', icon: 'taxi' } })
+    })
+
+    // Review №2: an amendment that landed is over a list asked before its answer only.
+    it('an amendment that landed is not laid over a list asked for after it — another phone’s later change shows', async () => {
+      const queue = fresh()
+      queue.amendCategory(TAXI, { name: 'Машина', icon: 'car', colour: 6 })
+      await settled()
+      const [landed] = queue.arrived
+      const at = landed && 'landedAt' in landed ? landed.landedAt : Number.NaN
+      const later = own({ name: 'Каршеринг', icon: 'car', colour: 6 })
+      expect(categoriesWith([later], queue.arrived, new Date(at + 1))).toEqual([later])
+      expect(categoriesWith([later], queue.arrived, new Date(at))).toEqual([later])
+      // Asked before the answer, or not known when: the amendment stands over it.
+      const before = categoriesWith([own()], queue.arrived, new Date(at - 1))
+      expect(before).toEqual([own({ name: 'Машина', icon: 'car', colour: 6 })])
+      expect(categoriesWith([own()], queue.arrived, null)).toEqual(before)
+    })
   })
 
   it('drops a broken entry alone and keeps the ones around it', () => {

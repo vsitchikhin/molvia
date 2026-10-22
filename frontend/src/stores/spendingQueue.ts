@@ -61,6 +61,29 @@ export type SpendingWrite =
   | { readonly kind: 'category-archive'; readonly id: string }
   | { readonly kind: 'category-restore'; readonly id: string }
 
+/**
+ * A category write that has landed, kept over the lists until they are read again (`arrived`). An
+ * amendment carries the moment its answer came: a list asked for after it holds it already, and over
+ * that list it would only hide a later change from another phone (review №2).
+ */
+export type ArrivedCategoryWrite =
+  | Extract<SpendingWrite, { kind: 'category-add' }>
+  | (Extract<SpendingWrite, { kind: 'category-amend' }> & { readonly landedAt: number })
+
+/** Which category a write is about, or null for a spending's. */
+export function categoryOf(write: SpendingWrite): string | null {
+  switch (write.kind) {
+    case 'category-add':
+      return write.body.id
+    case 'category-amend':
+    case 'category-archive':
+    case 'category-restore':
+      return write.id
+    default:
+      return null
+  }
+}
+
 export interface RejectedSpendingWrite {
   readonly key: string
   readonly write: SpendingWrite
@@ -278,10 +301,10 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
    * and the list that names it is read again only after: in between it stood on no chip, and
    * «Сохранить трату» said «Выберите категорию» over the one just made and chosen. The lists take
    * these until the server's names them (`categoriesWith` skips one it holds). An amendment
-   * (MOL-285) is kept the same way, the last of each category's — in between, the row went back to
-   * the old name and icon for a round trip.
+   * (MOL-285) is kept the same way, the last of each category's, over a list asked for before its
+   * answer only — in between, the row went back to the old name and icon for a round trip.
    */
-  const arrived = ref<Extract<SpendingWrite, { kind: 'category-add' | 'category-amend' }>[]>([])
+  const arrived = ref<ArrivedCategoryWrite[]>([])
   /**
    * The spending just removed, offered back for the ten seconds of its strip on «Траты» and
    * «Деньги» alike, as a trip's is (MOL-76): held by the screen, «Вернуть» went with «Траты» on
@@ -517,7 +540,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
       if (!refusal && write.kind === 'category-amend')
         arrived.value = [
           ...arrived.value.filter((one) => one.kind !== 'category-amend' || one.id !== write.id),
-          write,
+          { ...write, landedAt: Date.now() },
         ]
       if (!refusal && (write.kind === 'remove' || write.kind === 'restore'))
         gone.value = landedAgain(`${GONE_KEY}.${owner}`, write.id, write.kind === 'remove')
@@ -701,16 +724,24 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
 
   /**
    * A category of one's own renamed, redrawn or recoloured (MOL-285): folded into its «Добавить» or
-   * its amendment still waiting — the whole of it either way — else sent after them.
+   * its amendment still waiting — the whole of it either way — else sent after them. **Never folded
+   * past a write of another category** (adversarial А1): a name is free only after the write that
+   * frees it — «Убрать» or a rename of the other — and folded in front of it, the rename was a 409,
+   * and a category made at the till went with the spending in it.
    */
   function amendCategory(id: string, body: SpendingCategoryAmend): void {
     change(() => {
-      const at = kept.findIndex(
+      const found = kept.findIndex(
         (item) =>
           waiting(item) &&
           ((item.write.kind === 'category-add' && item.write.body.id === id) ||
             (item.write.kind === 'category-amend' && item.write.id === id)),
       )
+      const behind = kept.slice(found + 1).some((item) => {
+        const other = categoryOf(item.write)
+        return other !== null && other !== id
+      })
+      const at = behind ? -1 : found
       const write: SpendingWrite =
         kept[at]?.write.kind === 'category-add'
           ? { kind: 'category-add', body: { id, ...body } }

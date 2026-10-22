@@ -1,7 +1,7 @@
 <template>
   <AppScreen :title="t('spending.categories.title')">
     <div class="content">
-      <!-- The answer's shape (Ф-13, 7f): the caption of «В выборе» and six rows of a circle, a name and
+      <!-- The answer's shape (Ф-13, 7f): the caption of «Готовые» and six rows of a circle, a name and
            the button — a `ListRow` in a plain `li`, so its tail stays beside the words at any width. -->
       <ScreenSkeleton v-if="phase === 'loading'">
         <SkeletonPart kind="caption" :width="22" />
@@ -85,6 +85,7 @@
                     :title="nameOf(category)"
                     wrap
                     next
+                    aria-haspopup="dialog"
                     @click="edit(category)"
                   >
                     <template v-if="waiting(category.id)" #below>
@@ -200,6 +201,8 @@ export default defineComponent({
     const queue = useSpendingQueueStore()
 
     const server = ref<SpendingCategoryView[] | null>(null)
+    /** When the list shown was asked for: an amendment that landed before it is in it. */
+    const askedAt = ref<Date | null>(null)
     const failure = ref<'error' | 'offline' | null>(null)
     const sheetOpen = ref(false)
     /** One's own the sheet amends; none while it makes a new one. */
@@ -209,10 +212,12 @@ export default defineComponent({
     async function load(): Promise<void> {
       if (!actor.id) return
       const mine = ++latest
+      const asked = new Date()
       try {
         const answer = await api.spendingCategories()
         if (mine !== latest) return
         server.value = answer.categories
+        askedAt.value = asked
         failure.value = null
       } catch (error) {
         reportFailure(error, 'screen')
@@ -237,7 +242,7 @@ export default defineComponent({
       return failure.value ?? 'loading'
     })
     const all = computed(() =>
-      categoriesWith(server.value ?? [], [...queue.arrived, ...queue.pending]),
+      categoriesWith(server.value ?? [], [...queue.arrived, ...queue.pending], askedAt.value),
     )
     const presets = computed(() =>
       all.value.filter((category) => !category.archived && category.preset !== null),
