@@ -1260,7 +1260,8 @@ what the memory said, line by line — confirmed, put right, doubted (`remembere
 fields 652 → 697 and 686 → 740, made up 2 and 1 as on master; am-44 and Tesseract as they were (105 / 0). **The price,
 named**: a memory poisoned — every price moved by one 5↔6, a price changed by just that digit — loses some 60 right
 fields a run to the doubt and makes up 8–10, every one the bag the model itself copied «60 / 60» for 50 into the very old
-price: a reading that meets the memory is what «confirmed» is, and nothing tells it from the truth. **And by what is
+price: a reading that meets the memory is what «confirmed» is, and nothing tells it from the truth. Taken by the owner
+(review 1, №3 «а»): not confirming one number printed twice closed it and left +6 / +9 of the +45 / +54. **And by what is
 shown**: «1 × p = p» stands only where the memory's price is p — the lower median of three strangers' where the person
 has none, a figure their own paper prints. **Ceilings**: `REMEMBERED_COMBINATIONS_MAX` 10 000 readings a line — past it
 that line alone says nothing, the receipt's budget untouched (adversarial А5) — and `REMEMBERED_RECEIPT_COMBINATIONS_MAX`
