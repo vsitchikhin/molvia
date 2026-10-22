@@ -415,9 +415,12 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   next launch still having the write, takes nothing (Е3), nor a full shelf that wrote the key over in
   its own room (`sharedKeeps`, no probe with a new key, Ж3). **A write that got no answer is no
   refusal** (`stores/verdictWrites`, Ж1): cut off by the client's timeout, the connection lost, a
-  portal's page — it may have landed. The sheet then knows no score as the person's, so whatever is
-  chosen is sent, and the list is asked again (`onSaved` with `undefined`) without the write kept as
-  written; a refusal is the API's own word (`answered`, `fromApi`), after which the row is right. A
+  portal's page, a `2xx` this build cannot read — it may have landed. The sheet then knows no score as
+  the person's, nor whether the verdict was withdrawn, so a score chosen goes by `PUT`, right either
+  way; the list is asked again (`onSaved` with `undefined`), and the screen keeps the write as
+  `unknown` in place of any it kept before (З1, З4) — a sheet opened on that row later knows no score
+  of the person's either, until an answer asked after it. A refusal is the API's own word
+  (`answered`, `fromApi`, not `offContract`), after which the row is right. A
   sheet waiting for a withdrawal says «Снимаем оценку…», not «Сохраняем…» (Ж2). Not a second verdict on
   the phone: the server's own answer, read only as the sheet's starting point. **The prices, named:** a
   list forgotten for a write the shelves would not keep is no list offline until the next answer; a
