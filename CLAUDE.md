@@ -226,7 +226,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   unit» of most purchases first, the other pairs' places after it, never compared (MOL-166); order
   by rating down, then name.
 - **The limit never cuts one's own rows or the warnings** (Р-23, Р-25:
-  `ADVICE_WARNINGS_RESERVED`); the server names no superlative; every row carries `isMine`.
+  `ADVICE_WARNINGS_RESERVED`); the server names no superlative; every row carries `isMine` and the
+  person's own score, `ownScore`, in both modes — `null` on anyone else's (MOL-202).
 - **A withdrawn verdict is still a row** (MOL-27): the gate counts every row, and so does the
   reminder, which skips a purchase made before the withdrawal (MOL-101) — so the row outlives
   «Учитывать меня в статистике» off (MOL-97, В1); **every other reader filters

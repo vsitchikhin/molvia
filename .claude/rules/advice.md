@@ -363,6 +363,20 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   exactly as it is on one's own verdict without one. The flag was already in the statement, for
   the warnings reserve; handing it out is what lets the screen offer «Оценить» where there is
   nothing to amend, instead of a `PATCH` that answers 404 under the word «повторите».
+- **Every row carries the person's own score, in both modes** (`ownScore`, MOL-202, С-2): an integer
+  where `isMine`, `null` otherwise — on a row entirely other people's, and on one's own verdict
+  withdrawn. In the shared mode `rating` is an average, and the verdict sheet could not say what the
+  person had given: nothing could be pre-chosen — an average chosen would be saved as their opinion —
+  so they amended a score they could not see (Ф-25). The sheet says «Ваша оценка: N» over the scale
+  and opens on it. It is theirs, free, as the review is (Р-19); a neighbour on the same row reads
+  their own, and an aggregate gives nothing away it did not. **One column of one statement**:
+  `own_score` of `adviceRowsFor`, the one `is_mine` was already read from, so the list and the search
+  cannot part and the two fields cannot disagree. `nullable().default(null)`: an answer the phone
+  remembered before the field reads, with no score chosen in the sheet until the next answer. **The
+  prices, named:** an installed build older than the field refuses the new answer — strict, as every
+  answer is read — and shows «Что брать» as an error, with «Обновить» first (MOL-132), until it takes
+  the version; and a rollback past it forgets the list the phone remembered, as MOL-120's did.
+  «Тут дешевле» has its own answer and does not carry it.
 
 ## The search on «Что брать» (MOL-128)
 
@@ -416,7 +430,8 @@ the first stood over the field).
   its place. Far ones past the limit stay out: they are the catalogue's guesses.
 - **A row found carries the scope of the search's answer**, and the verdict sheet opened from it
   reads that one, not the list's (adversarial Е): access may open or run out between the two, and
-  an average of three was offered pre-chosen as one's own score.
+  an average of three was offered pre-chosen as one's own score. Since MOL-202 the score is the
+  row's own `ownScore`, and the scope decides only what withdrawing says.
 - **After a save the search is asked again quietly** — the answer stays, dimmed — and the field
   that comes back over a list asked again searches what it holds (adversarial Г, Д).
 - **It writes nothing** (В-2): no `advice_viewed` — the one writer stays `GET /advice`, which the
