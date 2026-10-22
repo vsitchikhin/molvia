@@ -131,6 +131,21 @@ describe('ReceiptLineSheet (MOL-127)', () => {
     expect(text).toContain('— это 890,00 ֏')
   })
 
+  it('names the remembered price on a line the check emptied, and only one confused digit off a price read (MOL-291)', async () => {
+    const base = chocolate()
+    const empty: ReviewLine = {
+      ...base,
+      mismatch: false,
+      line: { ...base.line, price: null, sum: null, settled: false, rememberedPrice: amd('50') },
+    }
+    await render(empty)
+    expect(sheet()?.textContent).toContain('В прошлый раз здесь было')
+    while (mounted.length) mounted.pop()?.unmount()
+    // a price read far off the remembered one changed on the shelf: nothing is said
+    await render({ ...base, line: { ...base.line, rememberedPrice: amd('2000') } })
+    expect(sheet()?.textContent).not.toContain('В прошлый раз здесь было')
+  })
+
   it('«Сохранить» with nothing changed writes no draft: «≠» and «проверьте» stay (review 16)', async () => {
     const { saved } = await render()
     await flushPromises()

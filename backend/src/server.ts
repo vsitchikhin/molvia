@@ -186,6 +186,7 @@ import { createActorRepository } from '@/db/actors-repository'
 import { createExchangeRepository } from '@/db/exchanges-repository'
 import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
+import { createStoreMemoryRepository } from '@/db/store-memory-repository'
 import { createOpenFoodFactsRepository } from '@/db/open-food-facts-repository'
 import { createItemEmbeddingRepository } from '@/db/item-embeddings-repository'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
@@ -781,6 +782,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                 inputTokens: event.tokens?.input,
                 outputTokens: event.tokens?.output,
                 unparsed: event.unparsed,
+                rememberedConfirmed: event.remembered.confirmed,
+                rememberedRepaired: event.remembered.repaired,
+                rememberedDoubted: event.remembered.doubted,
               },
               'receipt read',
             )
@@ -820,6 +824,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
               receipts,
               reader,
               report,
+              storeMemory: createStoreMemoryRepository(db),
               model:
                 model === null
                   ? null

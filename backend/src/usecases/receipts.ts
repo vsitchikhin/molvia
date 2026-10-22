@@ -349,9 +349,12 @@ export async function receiptOfOwner(
         // a proposal only while the line is still a new item: the memory may have named it since
         ...(spelled && line.spelled && known === null ? { spelled: true } : {}),
         amount: amounts[i] ?? null,
-        rememberedPrice: priceInDoubt(receipt.country, line.price, rememberedOf(remembered))
-          ? rememberedOf(remembered)
-          : null,
+        // one confused digit off the price read (В-1); or the line has none — the check emptied it, the memory
+        // doubting it among others (MOL-291, owner's В-2 «б»): a hint to type by, never a figure of the line
+        rememberedPrice:
+          line.price === null || priceInDoubt(receipt.country, line.price, rememberedOf(remembered))
+            ? rememberedOf(remembered)
+            : null,
         ...(code === null ? {} : { code }),
       }
     }),

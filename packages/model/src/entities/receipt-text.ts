@@ -15,6 +15,14 @@
 import { PARSED_FRACTION_DIGITS } from '#model/entities/receipt-card'
 import type { PhotoReading } from '#model/entities/receipt-card'
 
+/** A line's four figures: thousandths of its unit, hundredths of money. */
+export interface LineFigures {
+  readonly quantityMilli: number | null
+  readonly priceHundredths: number | null
+  readonly discountHundredths: number | null
+  readonly sumHundredths: number | null
+}
+
 /** One row of a reading: its text and where it stands on the photo of its part. */
 export interface TextRow {
   readonly text: string
@@ -56,6 +64,16 @@ export interface ReceiptTextLine {
    * total two places vouch for. Shown with «проверьте», never as printed.
    */
   readonly repaired?: boolean
+  /**
+   * The line's figures as the reader gave them, before any swap and with nothing worked out (MOL-291): what
+   * the shop's memory sets its shelf price against. None on a line no article keys — a table's, a journal's.
+   */
+  readonly read?: LineFigures
+  /**
+   * What the shop's memory said of the line (MOL-291): its price `confirmed` a line as printed, `repaired`
+   * one that did not hold, or `doubted` one as printed one confused digit off it — emptied by the check.
+   */
+  readonly remembered?: 'confirmed' | 'repaired' | 'doubted'
   /**
    * The rows the line may be cut out from for the reader's training (MOL-169): its figures, and its
    * name only when the item's number was read on it. A name row is the first row above the figures,
@@ -998,6 +1016,17 @@ function cardReceipt(rows: readonly TextRow[], lx: Lexicon): Laid {
         discountHundredths: finite(pick?.disc ?? hundredthsOf(f.discS)),
         settled,
         asPrinted: settled && pick.swaps === 0 && pick.counted !== true,
+        // a row of two bare figures prints no price apart: which is which is the parse's choice
+        ...(f.priceS === null
+          ? {}
+          : {
+              read: {
+                quantityMilli: finite(milliOf(f.qtyS)),
+                priceHundredths: finite(hundredthsOf(f.priceS)),
+                discountHundredths: finite(hundredthsOf(f.discS)),
+                sumHundredths: finite(hundredthsOf(f.paidS)),
+              },
+            }),
         rows: f.rows,
       }
     })
@@ -1593,6 +1622,12 @@ function classReceipt(rows: readonly TextRow[], lx: Lexicon): Laid {
         discountHundredths: 0,
         settled,
         asPrinted: settled && pick.swaps === 0 && pick.counted !== true,
+        read: {
+          quantityMilli: f.qtyS === null ? null : finite(milliOf(f.qtyS)),
+          priceHundredths: f.priceS === null ? null : finite(hundredthsOf(f.priceS)),
+          discountHundredths: null,
+          sumHundredths: finite(hundredthsOf(sumAsRead)),
+        },
         rows: [rows[first + item.at]].filter((row): row is TextRow => row !== undefined),
       }
     })

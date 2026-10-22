@@ -38,6 +38,8 @@ function provenWhole(text: ReceiptText): boolean {
   const total = text.totalHundredths - (text.cashbackHundredths ?? 0)
   let sum = 0
   for (const line of text.lines) {
+    // a line the memory doubts is no line proven (MOL-291)
+    if (line.remembered === 'doubted') return false
     if (!(line.asPrinted || line.repaired === true) || line.sumHundredths === null) return false
     sum += line.sumHundredths
   }
@@ -52,8 +54,12 @@ function verifiedLine(
 ): ReceiptTextLine {
   const { quantityMilli: qty, priceHundredths: price, sumHundredths: sum } = line
   const discount = line.discountHundredths ?? 0
-  // a line put right by the font's swaps stands only on the receipt it proved whole (MOL-290)
-  const read = line.asPrinted || (line.repaired === true && proven)
+  // a line put right by the font's swaps stands only on the receipt it proved whole (MOL-290); one the shop's
+  // memory put right, on its own word; one it doubts, never (MOL-291, owner's В-2 «б»)
+  if (line.remembered === 'doubted') return blank(line)
+  const byMemory = line.remembered === 'repaired' || line.remembered === 'confirmed'
+  const read =
+    line.asPrinted || (line.repaired === true && (proven || line.remembered === 'repaired'))
   if (!read || qty === null || qty <= 0 || sum === null || sum < 0) return blank(line)
   // a gift — its whole price the discount — is nothing paid only where that holds to the hundredth
   // (review round 2, А7 «а»): «0 0» or a stray «0,00» holds any arithmetic
@@ -72,7 +78,8 @@ function verifiedLine(
   const apart = byModel ? rounding : 0
   const oneAlike =
     qty === 1_000 && discount === 0 && price !== null && Math.abs(price - sum) <= apart
-  if (oneAlike && !proven) return blank(line)
+  // the memory's price is the second source of one number printed twice (MOL-291)
+  if (oneAlike && !proven && !byMemory) return blank(line)
   const holds =
     price !== null && Math.abs(Math.round((qty * price) / 1_000) - (sum + discount)) <= rounding
   return holds ? line : { ...line, priceHundredths: null, discountHundredths: null }
@@ -81,7 +88,7 @@ function verifiedLine(
 function blank(line: ReceiptTextLine): ReceiptTextLine {
   return {
     ...line,
-    // emptied, a line put right is no longer one
+    // emptied, a line put right is no longer one — by the total or by the memory (MOL-291)
     ...(line.repaired === true ? { repaired: false } : {}),
     quantityMilli: null,
     priceHundredths: null,
