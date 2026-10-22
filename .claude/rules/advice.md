@@ -371,12 +371,27 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   and opens on it. It is theirs, free, as the review is (Р-19); a neighbour on the same row reads
   their own, and an aggregate gives nothing away it did not. **One column of one statement**:
   `own_score` of `adviceRowsFor`, the one `is_mine` was already read from, so the list and the search
-  cannot part and the two fields cannot disagree. `nullable().default(null)`: an answer the phone
-  remembered before the field reads, with no score chosen in the sheet until the next answer. **The
+  cannot part, and the schema refuses a score on a row that is not one's own. `nullable().default(null)`:
+  an answer the phone remembered before the field reads, and the sheet opened on it chooses nothing and
+  says «Выберите оценку», never «Ничего не изменилось» over an empty scale (adversarial А2). **The
   prices, named:** an installed build older than the field refuses the new answer — strict, as every
   answer is read — and shows «Что брать» as an error, with «Обновить» first (MOL-132), until it takes
-  the version; and a rollback past it forgets the list the phone remembered, as MOL-120's did.
-  «Тут дешевле» has its own answer and does not carry it.
+  the version; a rollback past it forgets the list the phone remembered, as MOL-120's did; and that
+  memory, read by the new build in the own mode, opens the sheet with nothing chosen where the build
+  before chose the row's whole figure — until the first answer with a signal, offline, where the sheet
+  saves nothing anyway. «Тут дешевле» has its own answer and does not carry it.
+- **After a save the sheet opens on what was written, until the rows are asked for again** (MOL-202,
+  adversarial А1). The rows stay as the answer before the save had them until the next one comes —
+  failed, or still on its way — and a sheet opened on one said «Ваша оценка: 1» over the 5 just
+  saved, and refused the 1 as «Ничего не изменилось». So the screen keeps the server's answer to the
+  write by item (`saved` carries it; a withdrawal is `null` and opens «Оценить»), and a row older than
+  the save opens the sheet on it: a row on the screen at that moment, or one of the list's from a
+  request asked before it (`answeredBy` against `requested()` of `useAdvice`) — a refresh already in
+  the air lands after the save with the old figures. A newer row is the server's word again. The
+  search drops the answer of any request older than its last and asks again on a save. Not a second
+  verdict on the phone: the server's own answer, read only as the sheet's starting point. **Inherited,
+  not closed:** the rows themselves, and the strip — none after a failed refresh following a save, as
+  before.
 
 ## The search on «Что брать» (MOL-128)
 
