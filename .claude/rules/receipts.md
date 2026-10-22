@@ -1221,9 +1221,11 @@ repeats over twelve days). `rememberedLines`, three ways:
   parse had bent another figure (am-39's discount, am-41's count); **to the hundredth, the discount exactly the card's
   rate** — within the till's three luma Tesseract's «60 / 0,26 / 49,76» for 50 / 0,25 / 49,75 held at the remembered 50
   (am-39). `repaired` and «проверьте» as MOL-290's, and `receipt_lines.remembered`; shown on the memory's own word.
-  **Not where another digit misread explains the line as well** — its price as read, the sum as read, another figure
-  by the swaps (review 2, Б1): «0.6 / 660 / 3,3 / 326,7» is 0,6 kg × 550 with the price misread or 0,5 kg × 660 with
-  the weight misread and the cheese gone up to 660, and the memory's 550 is the old price that makes it wrong.
+  **Not where the reader's own swaps explain the line at any other price** — every figure by them, the sum too
+  (`withoutMemory`; review 2, Б1; review 3, №8, №9, В1): «0.6 / 660 / 3,3 / 326,7» is 0,6 kg × 550 with the price
+  misread or 0,5 kg × 660 with the weight misread and the cheese gone up to 660; «0.65 / 660 / 364» is 0,65 × 560 by one
+  swap of the price, never 0,56 × 650 by the memory's; «1 / 650 / 550» is one number copied two ways, 650 or 550. The
+  memory's old price is the one a changed shelf price makes wrong, so it chooses none of them — the total may.
   **The sum is what was paid, the total's** (adversarial А1 of review 1): a butter gone up to 650, copied «660 / 650»,
   read 1 × 550 = 550 at a remembered 550 under a total of 650 two places print — the memory overrode the total. **A price
   read as remembered whose other figures do not hold is not the memory's either** — the total's (MOL-290): with the
@@ -1239,8 +1241,9 @@ repeats over twelve days). `rememberedLines`, three ways:
 **The total settles it, whatever the memory said.** Lines that meet the total two places vouch for, a doubted one as
 printed among them, vouch for it: no doubt — on Tesseract's reading as on the model's (review 2, Б2). The readings that
 need the total — every doubted line's, every sum changed — are taken together or not at all: only where every line
-then meets it, **and the lines' sums as read do not meet it too** — two prices changed the opposite ways by one swap
-each read as each other's against the same total (Б3). **A total refutes what the memory said**: where every line has
+then meets it, **and the paper's own readings do not meet it too** — a doubted line as printed or by the reader's swaps,
+at any price but the memory's (`meets`, a walk of `REMEMBERED_WAYS_MAX` steps, past which nothing is taken): two prices
+changed the opposite ways by one swap each read as each other's against the same total (Б3, В2). **A total refutes what the memory said**: where every line has
 its figures and they miss the total — vouched, or read in one place, which vouches for nothing but refutes — the lines
 it put right go back as read, and **a line it confirmed loses its word where its own 5↔6 alone closes the gap** — the
 one line the total points at (review 2, №7: the bag «60 / 60» confirmed at a remembered 60 under a total 10 short).
@@ -1268,7 +1271,8 @@ what the memory said, line by line — confirmed, put right, doubted (`remembere
 `rememberedDoubted`, review №5) — never a price: the doubts are the price named, lines a changed shelf price emptied.
 
 **On the bench** (`.scratch/tasks/research/MOL-291.md`, the memory of every other paper of the seller): the model's right
-fields 652 → 697 and 686 → 740, made up 2 and 1 as on master; am-44 and Tesseract as they were (105 / 0). **The price,
+fields 652 → 691 and 686 → 734, made up 2 and 1 as on master (697 and 740 before review 3: the lines one number copied
+two ways made, the bag «60 / 50» for 50 among them, are the total's now); am-44 and Tesseract as they were (105 / 0). **The price,
 named**: a memory poisoned — every price moved by one 5↔6, a price changed by just that digit — loses some 60 right
 fields a run to the doubt and makes up 8–10 (10 and 9 since the total points at the line, №7), every one the bag the model itself copied «60 / 60» for 50 into the very old
 price: a reading that meets the memory is what «confirmed» is, and only a total that points at that line tells it from
