@@ -249,7 +249,8 @@
      least 3:1 on --surface, for an icon and a bar; none is used for text. The thirteen presets are
      keyed as the model keys them; one's own categories take the palette by turn (`colour` 0–7).
      Any two can meet in one ring, so any two stand 0.07 apart, and a category keeps its hue in
-     both schemes (MOL-218, `tokens.test.ts`). */
+     both schemes (MOL-218, `tokens.test.ts`); its icon holds 3:1 on its own circle of
+     `--cat-tint-share` (MOL-285). */
   --cat-groceries: #2e7d73;
   --cat-cafe: #8e4f93;
   --cat-rent: #524569;
@@ -257,19 +258,19 @@
   --cat-beauty: #c4587f;
   --cat-transport: #474b9b;
   --cat-telecom: #00566d;
-  --cat-health: #64978f;
+  --cat-health: #5a8e83;
   --cat-clothes: #a466b2;
-  --cat-pets: #1b99d1;
-  --cat-leisure: #667c8e;
-  --cat-documents: #a783af;
+  --cat-pets: #068bd2;
+  --cat-leisure: #6b788b;
+  --cat-documents: #997a9a;
   --cat-other: #8e8171;
-  --cat-own-0: #018ea2;
+  --cat-own-0: #008aa4;
   --cat-own-1: #675886;
   --cat-own-2: #5d6dc1;
-  --cat-own-3: #867ed1;
+  --cat-own-3: #8876d6;
   --cat-own-4: #1e3d6b;
   --cat-own-5: #532268;
-  --cat-own-6: #069875;
+  --cat-own-6: #00966b;
   --cat-own-7: #034445;
 
   /* How much of the category's colour the circle under its icon carries. */
