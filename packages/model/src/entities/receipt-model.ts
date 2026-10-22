@@ -430,7 +430,6 @@ function choicesOf(
   rate: number | null,
   budget: { left: number },
   broken: boolean,
-  remembered: number | undefined,
 ): LineReading[] | null {
   // a discount of 0 is no card's and needs no rate (review round 2, №6), as in `cardRate`
   const discount = figureOf(line.discount, 2)
@@ -473,10 +472,7 @@ function choicesOf(
       }
     }
   }
-  const untied = [...found.values()].filter((one) => !one.tied)
-  // the shop's memory chooses among the readings by their price (MOL-291): the total then confirms the receipt whole
-  const priced = untied.filter((one) => one.reading.price === remembered)
-  const kept = priced.length > 0 ? priced : untied
+  const kept = [...found.values()].filter((one) => !one.tied)
   const fewest = Math.min(...kept.map((one) => one.swaps))
   const cheapest = kept.filter((one) => one.swaps === fewest).map((one) => one.reading)
   const near = (one: LineReading, to: LineReading): boolean =>
@@ -530,10 +526,7 @@ function repaired(
   answer: ModelReceipt,
   lines: readonly ReceiptTextLine[],
   owed: number,
-  prices: RememberedPrices,
 ): ReceiptTextLine[] | null {
-  const priceOf = (line: ReceiptTextLine): number | undefined =>
-    line.sku === null ? undefined : prices.get(line.sku)?.hundredths
   if (lines.length === 0 || lines.every((line) => line.settled)) return null
   const rate = cardRate(lines)
   const budget = { left: REPAIR_RECEIPT_COMBINATIONS_MAX }
@@ -549,7 +542,7 @@ function repaired(
       options.push(null)
       if (copied === undefined || line.sumHundredths === null) continue
       if (!swappable(reading.modelSwaps, copied)) continue
-      const other = choicesOf(reading.modelSwaps, copied, rate, budget, false, priceOf(line))
+      const other = choicesOf(reading.modelSwaps, copied, rate, budget, false)
       if (other === null) return null
       const offs = new Set(other.map((one) => one.sum - own).filter((off) => off !== 0))
       if (offs.size === 0) continue
@@ -560,9 +553,7 @@ function repaired(
       continue
     }
     const found =
-      copied === undefined
-        ? null
-        : choicesOf(reading.modelSwaps, copied, rate, budget, true, priceOf(line))
+      copied === undefined ? null : choicesOf(reading.modelSwaps, copied, rate, budget, true)
     if (found === null || found.length === 0) return null
     options.push(found)
   }
@@ -635,10 +626,11 @@ export function receiptTextOfModel(
   const discounted = answer.lines.some((line) => figureOf(line.discount, 2) !== null)
   const copied = answer.lines.map(lineOf)
   const { total, read, met, owed, cashback, redeemed } = totalOf(reading, answer, copied)
-  // a total two places vouch for that the lines do not meet: put right by the font's swaps, or not — the shop's
-  // memory choosing among a line's readings (MOL-291). The total first: a line it vouches for as copied is no
-  // doubt of the memory's, nor are the lines it put right (adversarial А3, review №1)
-  const byTotal = owed === null || met ? null : repaired(reading, answer, copied, owed, prices)
+  // a total two places vouch for that the lines do not meet: put right by the font's swaps, or not. The total first,
+  // and on its own (MOL-291): a line it vouches for as copied is no doubt of the memory's, nor are the lines it put
+  // right (adversarial А3, review №1); and the memory chooses none of a line's readings — between 0,6 × 550 and
+  // 0,5 × 660 its old price is the one a changed shelf price makes wrong (review 2, №6, Б1)
+  const byTotal = owed === null || met ? null : repaired(reading, answer, copied, owed)
   // else the shop's memory, a line at a time, and the total again over what it decided
   const swaps = { price: reading.modelSwaps, others: reading.modelSwaps, doubt: reading.modelSwaps }
   const less = (amount: number | null): number | null =>
@@ -650,8 +642,7 @@ export function receiptTextOfModel(
   // the total again only where the memory decided a line: the same lines would be the same walk, twice its work
   const moved = voiced.some((line, i) => line !== copied[i])
   const fixed =
-    byTotal ??
-    (owed === null || met || !moved ? null : repaired(reading, answer, voiced, owed, prices))
+    byTotal ?? (owed === null || met || !moved ? null : repaired(reading, answer, voiced, owed))
   const lines = fixed ?? voiced
   // a receipt with no line is a sum to record where it prints a section or two places vouch for its
   // total (MOL-227) — the model names a sole trader's «Բաժին 1» as a total no more often than not; with

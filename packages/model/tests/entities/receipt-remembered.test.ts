@@ -188,6 +188,32 @@ describe('the shop’s memory as a voice in a model’s digits (MOL-291)', () =>
     ).toEqual(BLANK)
   })
 
+  it('confirms no number printed twice a total two places print refutes (review 2, №7)', () => {
+    // the bag 50 on paper, copied «60 / 60», the memory still 60: the total 340 misses the lines by 10
+    const loaves = line('1106618', { quantity: '2', unit_price: '145', sum: '290' })
+    const bag = line('1122223', { unit_price: '60', sum: '60' })
+    const { text, shown } = read([loaves, bag], { '1122223': 6_000 }, owed('340'))
+    expect(text.lines[1]?.remembered).toBeUndefined()
+    expect(figuresOf(shown.lines[1])).toEqual(BLANK)
+    // with no total to refute it, it stands
+    expect(figuresOf(read([loaves, bag], { '1122223': 6_000 }).shown.lines[1])).toEqual([
+      1_000,
+      6_000,
+      null,
+      6_000,
+    ])
+  })
+
+  it('takes no memory’s readings the paper as read meets the total with too (review 2, Б3)', () => {
+    // A 1 × 650 = 650 copied «660 / 650», remembered 550; B 1 × 550 = 550 as printed, remembered 650; the total 1 200
+    // meets the memory's A 550 + B 650 and the paper's A 650 + B 550 alike
+    const a = line('1110004', { unit_price: '660', sum: '650' })
+    const b = line('1110008', { unit_price: '550', sum: '550' })
+    const { shown } = read([a, b], { '1110004': 55_000, '1110008': 65_000 }, owed('1200'))
+    expect(shown.lines.map((l) => l.sumHundredths)).toEqual([null, null])
+    expect(shown.balanced).toBe(false)
+  })
+
   it('says nothing of a price further off: the shelf price changed (caramel 2 030 for 1 830)', () => {
     const caramel = line('066134', {
       quantity: '0.164',
@@ -224,8 +250,9 @@ describe('the shop’s memory as a voice in a model’s digits (MOL-291)', () =>
     expect(read([bread, two], { '1106618': 29_000 }).text.lines[1]?.remembered).toBeUndefined()
   })
 
-  it('chooses among a line’s readings the total confirms, by its price (MOL-290’s doubt)', () => {
-    // printed 0,6 kg × 550 − 3,3 = 326,7, copied 660: 0,5 × 660 is the same sum at the same 1 %
+  it('chooses none of a line’s readings: the price or the weight misread is no memory’s to tell (review 2, №6, Б1)', () => {
+    // «0.6 / 660 / 3,3 / 326,7» is 0,6 kg × 550 with the price misread — or 0,5 kg × 660 with the weight misread, the
+    // cheese gone up to 660. The same sum, the same 1 %: MOL-290's doubt, and the memory's 550 does not settle it
     const cheese = line('2000001', {
       quantity: '0.6',
       unit: 'kg',
@@ -233,10 +260,29 @@ describe('the shop’s memory as a voice in a model’s digits (MOL-291)', () =>
       discount: '3.3',
       sum: '326.7',
     })
-    expect(read([bread, cheese], {}, owed('613.80')).shown.lines[1]?.quantityMilli).toBeNull()
-    const { shown } = read([bread, cheese], { '2000001': 55_000 }, owed('613.80'))
-    expect(figuresOf(shown.lines[1])).toEqual([600, 55_000, 330, 32_670])
+    for (const totals of [owed('613.80'), []]) {
+      const { text, shown } = read([bread, cheese], { '2000001': 55_000 }, totals)
+      expect(text.lines[1]?.remembered).toBeUndefined()
+      expect(figuresOf(shown.lines[1])).toEqual(BLANK)
+    }
+  })
+
+  it('lets the total put right what it would with no memory: a price gone up 555 → 565 is no reading to drop (№6)', () => {
+    // printed 0,456 kg × 565 − 2,58 = 255,06, the discount copied «2.68»; the milk copied 650 for 550
+    const cheese = line('2000002', {
+      quantity: '0.456',
+      unit: 'kg',
+      unit_price: '565',
+      discount: '2.68',
+      sum: '255.06',
+    })
+    const milk = line('1000003', { unit_price: '650', discount: '5.5', sum: '544.5' })
+    const total = owed('1086.66')
+    const plain = read([bread, cheese, milk], {}, total).shown
+    expect(plain.balanced).toBe(true)
+    const { shown } = read([bread, cheese, milk], { '2000002': 55_500 }, total)
     expect(shown.balanced).toBe(true)
+    expect(shown.lines.map((l) => l.sumHundredths)).toEqual(plain.lines.map((l) => l.sumHundredths))
   })
 
   it('reads nothing without an article, and no memory at all as before', () => {
@@ -368,6 +414,40 @@ describe('the shop’s memory on Tesseract’s reading (MOL-291)', () => {
     expect(doubted.lines[0]?.remembered).toBe('doubted')
   })
 
+  it('lets the total vouch for a line it doubts, as printed, on Tesseract’s reading too (review 2, Б2)', () => {
+    const at = (sku: string, qty: number, price: number, over: Partial<ReceiptTextLine> = {}) =>
+      ocrLine({
+        sku,
+        asPrinted: true,
+        quantityMilli: qty,
+        priceHundredths: price,
+        sumHundredths: (qty * price) / 1_000,
+        read: {
+          quantityMilli: qty,
+          priceHundredths: price,
+          discountHundredths: 0,
+          sumHundredths: (qty * price) / 1_000,
+        },
+        ...over,
+      })
+    // A 2 × 560 as printed (remembered 550); B 1 × 550 with its price read «650»; C 1 × 290; the total 1 960 meets them
+    const a = at('1110007', 2_000, 56_000)
+    const b = at('1110009', 1_000, 55_000, {
+      asPrinted: false,
+      read: {
+        quantityMilli: 1_000,
+        priceHundredths: 65_000,
+        discountHundredths: 0,
+        sumHundredths: 55_000,
+      },
+    })
+    const c = at('1110010', 1_000, 29_000)
+    const memory = prices({ '1110007': 55_000, '1110009': 55_000 })
+    const shown = verifiedReading(rememberedReading(reading([a, b, c], 196_000), memory, swaps))
+    expect(shown.balanced).toBe(true)
+    expect(shown.lines.map((l) => l.sumHundredths)).toEqual([112_000, 55_000, 29_000])
+  })
+
   it('refutes a line it put right by the total the reading read, in one place too (adversarial А1)', () => {
     // the price read 650, the sum misread «550»; remembered 550: a total of 650 read says otherwise
     const misread = ocrLine({
@@ -407,8 +487,8 @@ describe('the shop’s memory on Tesseract’s reading (MOL-291)', () => {
     const memory = prices({ '1122223': 5_000, '1122224': 5_000 })
     let before = rememberedTries.count
     const once = rememberedLines([dear], memory, both, none)
-    // tried with its sum as read alone, 137 quantities: never with every sum
-    expect([once[0]?.remembered, rememberedTries.count - before]).toEqual([undefined, 137])
+    // tried with its sum as read alone, 137 quantities at the price as read and 137 at the remembered: never every sum
+    expect([once[0]?.remembered, rememberedTries.count - before]).toEqual([undefined, 274])
     // the bag «60 / 50» after it is put right still (adversarial А5)
     const bag = ocrLine({})
     expect(rememberedLines([dear, bag], memory, both, none).map((l) => l.remembered)).toEqual([
