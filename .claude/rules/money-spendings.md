@@ -427,23 +427,36 @@ nothing up.
   written by an image rolled back past it, reads so (`toCategory`); a preset never has one (its
   check). **A new one starts on the tag and the palette's next**, so at the shelf it is still a name
   and «Добавить» (Р-4), and a body without them — queued by an earlier build — means the same; a repeat
-  holds what the body names. **The sheet puts the colour over the icons**: thirty-seven go below the
-  fold at 320, and the colour is what tells one's own apart on the ring.
+  holds what the body names. **Left so, the sheet sends them unnamed** (adversarial А3): such a body
+  reads in an image rolled back past MOL-285, and the server's next is the rule. **The price, named:**
+  rolled back, a phone of this build keeps in its queue what the earlier build cannot read — a body
+  with an icon or a colour chosen, an amendment — and drops it as a broken entry; the API before it
+  refuses such a body with 400. The database is safe either way. **The sheet puts the colour over the
+  icons**: thirty-seven go below the fold, five to a row at 320; the colours are four and four on
+  every phone (review №1). **A chosen icon or colour is a ring of the accent off its circle, and the
+  focus stands off the ring** with the sheet's ground between them, as on the chips (review №4).
 - **One's own is amended whole, through the queue** (owner's В-1 «а»): `PATCH
 /spending-categories/:id` takes `{name, icon, colour}`, so sent again it is the same state and needs
   no revision — two phones amending one category, the later wins (Р-6). A preset, someone else's and
   no id are one 404; a live name of one's own is `SPENDING_CATEGORY_TAKEN`, checked under the owner's
   lock as «Добавить» checks it; a removed one may be amended and stays removed. On the phone it is
   `category-amend`, folded whole into its «Добавить» or its amendment still waiting (never into one on
-  the way), and **kept in `arrived` once landed, the last of each category's**: the list is read again
-  only after the answer, and in between the row went back to the old name and icon. **The price,
-  named:** for the life of the window that amendment is laid over the server's list, so another
-  phone's later amendment of the same category shows here only after a reload. «Сохранить» with
-  nothing changed writes nothing.
+  the way) — **and never past a write of another category** (adversarial А1): a name is free only after
+  the write that frees it, «Убрать» or a rename of the other; folded in front of it, «Метро» renamed
+  «Такси» after «Убрать» of «Такси» went out first and was a 409, and the spending made in it at the till
+  went with it. **Kept in `arrived` once landed, the last of each category's, with the moment its answer
+  came** (`landedAt`): the list is read again only after the answer, and in between the row went back
+  to the old name and icon; **a list asked for after that moment holds it** (`categoriesWith`'s
+  `askedAt`, review №2), so it is laid only over one asked before — over it, another phone's later
+  change was hidden until a reload. A list recalled from a month kept says no moment, and takes it.
+  «Сохранить» with nothing changed writes nothing; **a name kept as it was is not checked again**
+  (adversarial А2): the server has it, and a preset's name in the language of this screen refused a
+  new icon to one made on a screen in another.
 - **«Категории» stands in three groups** (owner's В-2 «а» of MOL-285): «Готовые» with a quiet
   «Убрать» in the tail, «Свои» — rows that open their sheet, with the chevron and no button, since a
   card never mixes the two (MOL-175, В-14) — and «Убранные» with «Вернуть»; each only when it has a
-  row. **One's own is taken out from its sheet**, «Убрать категорию» quiet under «Сохранить», as a
+  row; one's own row says it opens a sheet (`aria-haspopup="dialog"`, as `NavRow` without `to`).
+  **One's own is taken out from its sheet**, «Убрать категорию» quiet under «Сохранить», as a
   spending is removed from its sheet (MOL-189). The label «своя» went: the group says it.
 - **A category's icon holds 3:1 on its own circle** (MOL-285, owner's В-4 «б»; `tokens.test.ts`):
   the circle is `color-mix(in oklch, colour --cat-tint-share, --surface)`, mixed in the test as a
