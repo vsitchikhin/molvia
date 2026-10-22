@@ -428,7 +428,10 @@ nothing up.
   check). **A new one starts on the tag and the palette's next**, so at the shelf it is still a name
   and «Добавить» (Р-4), and a body without them — queued by an earlier build — means the same; a repeat
   holds what the body names. **Left so, the sheet sends them unnamed** (adversarial А3): such a body
-  reads in an image rolled back past MOL-285, and the server's next is the rule. **The price, named:**
+  reads in an image rolled back past MOL-285, and the server's next is the rule. **A colour pressed is
+  named** (review №6, adversarial Б1), a press on the one already marked included: the phone's next is
+  counted on the list it read, the server's on its rows, and with a category the phone did not see
+  between them the colour the person pressed came back another. **The price, named:**
   rolled back, a phone of this build keeps in its queue what the earlier build cannot read — a body
   with an icon or a colour chosen, an amendment — and drops it as a broken entry; the API before it
   refuses such a body with 400. The database is safe either way. **The sheet puts the colour over the
@@ -444,7 +447,10 @@ nothing up.
   the way) — **and never past a write of another category** (adversarial А1): a name is free only after
   the write that frees it, «Убрать» or a rename of the other; folded in front of it, «Метро» renamed
   «Такси» after «Убрать» of «Такси» went out first and was a 409, and the spending made in it at the till
-  went with it. **Kept in `arrived` once landed, the last of each category's, with the moment its answer
+  went with it. **«Вернуть» and «Убрать» still waiting cancel out by the same rule** (adversarial Б2):
+  never when a write of another category stands behind the one taken out — «Убрать» of «Такси» freed the
+  name a rename of «Метро» took after it, and taken out, the rename was refused instead of the «Вернуть»
+  that came last; now both go in their order and the last is what the server refuses. **Kept in `arrived` once landed, the last of each category's, with the moment its answer
   came** (`landedAt`): the list is read again only after the answer, and in between the row went back
   to the old name and icon; **a list asked for after that moment holds it** (`categoriesWith`'s
   `askedAt`, review №2), so it is laid only over one asked before — over it, another phone's later
