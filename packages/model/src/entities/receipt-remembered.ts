@@ -30,6 +30,9 @@ export const REMEMBERED_PRICE_SWAPS = 2
 export const REMEMBERED_COMBINATIONS_MAX = 10_000
 export const REMEMBERED_RECEIPT_COMBINATIONS_MAX = 50_000
 
+/** Past this many steps the paper's own readings are taken to meet the total, and the memory's are not (В2). */
+export const REMEMBERED_WAYS_MAX = 10_000
+
 /** The work of the vote in this process — read by tests alone: a ceiling is held by the work it saves. */
 export const rememberedTries = { count: 0 }
 
@@ -142,6 +145,47 @@ function readingsAt(
 const oneOf = (found: LineFigures[] | null): LineFigures | null =>
   found?.length === 1 ? (found[0] ?? null) : null
 
+/**
+ * The sums a line may come to by the reader's own swaps at any price but the remembered one — what it may be without the
+ * memory (review 3, №8, №9; adversarial В1). `null` past a ceiling: nobody knows, and the memory says nothing.
+ */
+function withoutMemory(
+  swaps: RememberedSwaps,
+  read: LineFigures,
+  at: number,
+  rate: number | null,
+  budget: { left: number },
+): Set<number> | null {
+  const sums = new Set<number>()
+  if (read.priceHundredths === null) return sums
+  for (const price of variantsOf(
+    swaps.price,
+    read.priceHundredths,
+    REMEMBERED_PRICE_SWAPS,
+  ).keys()) {
+    if (price === at || price <= 0) continue
+    const found = readingsAt(swaps, read, price, rate, budget, true)
+    if (found === null) return null
+    for (const one of found) if (one.sumHundredths !== null) sums.add(one.sumHundredths)
+  }
+  return sums
+}
+
+/** Whether one sum of each set, with `fixed`, makes `owed` — a walk of at most `REMEMBERED_WAYS_MAX` steps. */
+function meets(sets: readonly ReadonlySet<number>[], fixed: number, owed: number): boolean {
+  let steps = 0
+  const walk = (k: number, sum: number): boolean => {
+    steps += 1
+    // past the ceiling nobody knows: as good as met, and the memory's readings are not taken
+    if (steps > REMEMBERED_WAYS_MAX) return true
+    const at = sets[k]
+    if (at === undefined) return sum === owed
+    for (const one of at) if (walk(k + 1, sum + one)) return true
+    return false
+  }
+  return walk(0, fixed)
+}
+
 /** A line as the memory reads it: its figures, holding, and never as printed. */
 const withFigures = (line: ReceiptTextLine, figures: LineFigures): ReceiptTextLine => ({
   ...line,
@@ -190,8 +234,10 @@ export function rememberedLines(
   if (prices.size === 0) return [...lines]
   const rate = cardRate(lines)
   const budget = { left: REMEMBERED_RECEIPT_COMBINATIONS_MAX }
-  // the readings only the total may take: a doubted line's, and one that changes what was paid
+  // the readings only the total may take: a doubted line's, and one that changes what was paid; and the sums each
+  // such line may come to without the memory — the paper's own readings, which the total must not meet as well
   const pending = new Map<number, LineFigures | null>()
+  const paper = new Map<number, Set<number> | null>()
   const out = lines.map((line, i): ReceiptTextLine => {
     const remembered = line.sku === null ? undefined : prices.get(line.sku)
     const read = line.read
@@ -203,18 +249,21 @@ export function rememberedLines(
       if (price === at) return { ...line, remembered: 'confirmed' }
       if (!remembered.own || !nearPrice(swaps.doubt, price, at)) return line
       pending.set(i, oneOf(readingsAt(swaps, read, at, rate, budget, true)))
+      paper.set(i, withoutMemory(swaps, read, at, rate, budget))
       return { ...line, remembered: 'doubted' }
     }
     // the memory's word is the price: a line whose price reads as remembered and whose other figures do not hold
     // is the arithmetic's to put right, by the total (MOL-290) — with no total, a sum bent within the till's
     // rounding passed (am-39's 49,76 for 49,75), and a price misread into a changed one was «confirmed» by it
     if (price === at || !nearPrice(swaps.price, price, at)) return line
-    // another figure misread explains it at the price as read: the memory cannot choose (Б1)
-    const own = readingsAt(swaps, read, price, rate, budget, false)
-    if (own === null || own.length > 0) return line
+    // the reader's own swaps explain it at another price — the weight or the sum misread, the price misread into
+    // another one, one number copied two ways: the memory cannot choose among them (Б1, review 3, №8, №9, В1)
+    const others = withoutMemory(swaps, read, at, rate, budget)
+    if (others === null || others.size > 0) return line
     const kept = oneOf(readingsAt(swaps, read, at, rate, budget, false))
     if (kept !== null) return withFigures(line, kept)
     pending.set(i, oneOf(readingsAt(swaps, read, at, rate, budget, true)))
+    paper.set(i, others)
     return line
   })
   const sumOf = (all: readonly ReceiptTextLine[]): number =>
@@ -231,13 +280,17 @@ export function rememberedLines(
       const figures = pending.get(i)
       return figures === undefined || figures === null ? line : withFigures(line, figures)
     })
-    // the lines' sums as read meet the total too: the paper as read is a reading as good (Б3)
-    const asRead = out.map((line, i) =>
-      pending.has(i) ? (line.read?.sumHundredths ?? null) : line.sumHundredths,
-    )
-    const sums = asRead.filter((sum): sum is number => sum !== null)
+    // the paper's own readings meet the total too — a doubted line as printed or by the swaps: one as good (Б3, В2)
+    const kept = out.filter((_, i) => !pending.has(i))
+    const sets = [...paper.values()]
     const paperMeets =
-      sums.length === asRead.length && sums.reduce((all, sum) => all + sum, 0) === owed
+      whole(kept) &&
+      (sets.some((set) => set === null) ||
+        meets(
+          sets.filter((set): set is Set<number> => set !== null),
+          sumOf(kept),
+          owed,
+        ))
     if (
       !paperMeets &&
       [...pending.values()].every((figures) => figures !== null) &&
