@@ -90,7 +90,7 @@ const ratedFields = {
  * type checker holds the product's core rule, the way `ScreenState` holds «offline is never
  * red». A row that grew a price fails to parse instead of reaching a screen.
  */
-export const adviceRowSchema = z.discriminatedUnion('level', [
+const adviceRowShapes = z.discriminatedUnion('level', [
   z.strictObject({
     ...ratedFields,
     level: z.literal('take'),
@@ -120,6 +120,15 @@ export const adviceRowSchema = z.discriminatedUnion('level', [
   }),
   z.strictObject({ ...ratedFields, level: z.literal('never') }),
 ])
+/**
+ * One's own score on a row that says it is not one's own is the server's mistake, and the score is
+ * the one thing a stranger's row must never carry (MOL-202). The other way is no mistake: an answer
+ * remembered before `ownScore` is `isMine` with `null`.
+ */
+export const adviceRowSchema = adviceRowShapes.refine(
+  (row) => row.ownScore === null || row.isMine,
+  { error: ISSUE.RESPONSE_INVALID },
+)
 export type AdviceRow = z.output<typeof adviceRowSchema>
 
 /**

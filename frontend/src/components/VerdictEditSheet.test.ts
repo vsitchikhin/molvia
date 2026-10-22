@@ -166,9 +166,13 @@ describe('VerdictEditSheet', () => {
     expect(stranger.view.find('.current').exists()).toBe(false)
     stranger.view.unmount()
 
-    // An answer remembered before the server sent the score: nothing chosen, nothing said.
+    // An answer remembered before the server sent the score: nothing chosen, nothing said — and the
+    // button asks for a score rather than saying nothing changed over an empty scale (А2).
     const remembered = await render({ ownScore: null })
     expect(remembered.view.find('.current').exists()).toBe(false)
+    expect(button(remembered.view, 'Pick a rating').attributes('aria-disabled')).toBe('true')
+    await key(remembered.view, 3).trigger('click')
+    expect(button(remembered.view, 'Save the rating').attributes('aria-disabled')).toBeUndefined()
   })
 
   it('«Nothing has changed» is not now in the focus, and a tap on it sends nothing (Ф-6)', async () => {

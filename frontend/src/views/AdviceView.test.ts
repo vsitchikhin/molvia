@@ -11,6 +11,9 @@ import type {
   AdviceRow,
   AdviceSearchResponse,
   PendingVerdicts,
+  Rating,
+  VerdictAmendment,
+  VerdictCard,
 } from '@molvia/model'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
@@ -24,12 +27,19 @@ import AdviceView from '@/views/AdviceView.vue'
 const advice = vi.fn<() => Promise<AdviceResponse>>()
 const adviceSearch = vi.fn<(query: string) => Promise<AdviceSearchResponse>>()
 const pendingVerdicts = vi.fn<() => Promise<PendingVerdicts>>()
+const amendVerdict = vi.fn<(itemId: string, patch: VerdictAmendment) => Promise<VerdictCard>>()
+const withdrawVerdict = vi.fn<(itemId: string) => Promise<void>>()
+const rateItem =
+  vi.fn<(itemId: string, rating: Rating) => Promise<{ verdict: VerdictCard; created: boolean }>>()
 vi.mock('@/api', () => ({
   api: {
     receipts: () => Promise.resolve({ receipts: [] }),
     advice: () => advice(),
     adviceSearch: (query: string) => adviceSearch(query),
     pendingVerdicts: () => pendingVerdicts(),
+    amendVerdict: (itemId: string, patch: VerdictAmendment) => amendVerdict(itemId, patch),
+    withdrawVerdict: (itemId: string) => withdrawVerdict(itemId),
+    rateItem: (itemId: string, rating: Rating) => rateItem(itemId, rating),
   },
 }))
 
@@ -725,7 +735,7 @@ describe('AdviceView', () => {
     // A saved verdict moves the row to another group, or out of the list: the screen asks the
     // server again rather than moving it itself.
     advice.mockResolvedValue(answer([milk]))
-    sheet.vm.$emit('saved')
+    sheet.vm.$emit('saved', { score: 5, review: mine.review })
     await flushPromises()
 
     expect(advice).toHaveBeenCalledTimes(2)
@@ -920,7 +930,7 @@ describe('AdviceView', () => {
 
       // A save asks again for the list and for what is found.
       advice.mockResolvedValue(answer([milk]))
-      sheet.vm.$emit('saved')
+      sheet.vm.$emit('saved', { score: 4, review: null })
       await vi.waitFor(() => {
         expect(adviceSearch).toHaveBeenCalledTimes(2)
       })
@@ -1116,7 +1126,7 @@ describe('AdviceView after the review', () => {
     await view.get('.tap').trigger('click')
     await flushPromises()
     adviceSearch.mockReturnValue(new Promise(() => undefined))
-    view.findComponent({ name: 'VerdictEditSheet' }).vm.$emit('saved')
+    view.findComponent({ name: 'VerdictEditSheet' }).vm.$emit('saved', { score: 5, review: null })
     await flushPromises()
 
     expect(view.find('.skeleton').exists()).toBe(false)
@@ -1314,5 +1324,183 @@ describe('AdviceView after the review', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+// MOL-202, adversarial А1: after a save the rows stay as they were until they are asked for again,
+// and a sheet opened on one of them said «Your rating: 1» over the 5 just saved — and refused the 1
+// as «Nothing has changed». The real sheet here, its keys and its button pressed.
+describe('AdviceView: the sheet after a save (MOL-202, А1)', () => {
+  const ITEM = sausage.itemId
+  /** «Не брать нигде» in the shared mode: 2.3 is three people's, the person's own is `own`. */
+  const row = (own: number, rating = '2.3'): AdviceRow => ({
+    ...sausage,
+    rating,
+    ratingsCount: 3,
+    ownScore: own,
+    review: null,
+  })
+  const shared = (rows: AdviceRow[]) =>
+    answer(rows, { geography: { country: 'AM', city: 'Гюмри' }, scope: 'shared' })
+  const card = (score: number): VerdictCard => {
+    const at = new Date()
+    return { itemId: ITEM, score, review: null, ratedAt: at, updatedAt: at }
+  }
+  let clock = 0
+
+  beforeEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+    advice.mockReset()
+    adviceSearch.mockReset()
+    amendVerdict.mockReset()
+    withdrawVerdict.mockReset()
+    rateItem.mockReset()
+    pendingVerdicts.mockReset()
+    pendingVerdicts.mockResolvedValue({ items: [], total: 0 })
+    vi.restoreAllMocks()
+    online(true)
+    clock = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => clock)
+  })
+
+  afterEach(() => {
+    for (const view of mounted.splice(0)) view.unmount()
+    document.body.innerHTML = ''
+  })
+
+  /** A tap on the row, past the sheet's rise: until then it takes no tap. */
+  async function open(view: VueWrapper): Promise<VueWrapper> {
+    await view.findComponent({ name: 'AdviceNeverRow' }).trigger('click')
+    await flushPromises()
+    clock += 1000
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    return view.findComponent({ name: 'VerdictEditSheet' })
+  }
+
+  const key = (sheet: VueWrapper, score: number) =>
+    sheet.get(`button[aria-label="Rating ${String(score)} out of 5"]`)
+
+  /** The sheet's main action, whatever its words. */
+  const main = (sheet: VueWrapper) => sheet.get('button.large')
+
+  /** Own 1 → 5, saved; what the list is asked for after the save is `next`. */
+  async function saveFive(view: VueWrapper, next: () => void): Promise<void> {
+    const sheet = await open(view)
+    amendVerdict.mockResolvedValueOnce(card(5))
+    next()
+    await key(sheet, 5).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+    ;(view.vm as unknown as { putAway(): void }).putAway()
+    await flushPromises()
+  }
+
+  /** The sheet opened again stands on the 5, and the 1 put back over it is sent. */
+  async function onFiveAndOneSent(view: VueWrapper): Promise<void> {
+    const sheet = await open(view)
+    expect(sheet.get('.current').text()).toBe('Your rating: 5')
+    expect(key(sheet, 5).attributes('aria-pressed')).toBe('true')
+    await key(sheet, 1).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+    expect(amendVerdict).toHaveBeenLastCalledWith(ITEM, { score: 1 })
+  }
+
+  it('control: the list asked again came — the sheet opens on its row', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    await saveFive(view, () => advice.mockResolvedValue(shared([row(5, '3.7')])))
+
+    await onFiveAndOneSent(view)
+  })
+
+  it('the list asked again failed — the sheet opens on what was saved, and the 1 goes', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+
+    // The row still reads the answer before the save: the sheet does not.
+    expect(advice).toHaveBeenCalledTimes(2)
+    await onFiveAndOneSent(view)
+  })
+
+  it('the list asked again is on its way — the same', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    await saveFive(view, () => advice.mockReturnValue(new Promise(() => undefined)))
+
+    await onFiveAndOneSent(view)
+  })
+
+  it('in the own mode too, where the row itself still says 1', async () => {
+    advice.mockResolvedValue(answer([{ ...row(1, '1.0'), ratingsCount: 1 }]))
+    const { view } = await render()
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+
+    await onFiveAndOneSent(view)
+  })
+
+  it('a refresh asked before the save lands after it with the old figures — still the 5', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    // The connection back asks again; its answer is held until after the save.
+    let land: (value: AdviceResponse) => void = () => undefined
+    advice.mockReturnValueOnce(new Promise((resolve) => (land = resolve)))
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+
+    await saveFive(view, () => advice.mockReturnValue(new Promise(() => undefined)))
+    land(shared([row(1)]))
+    await flushPromises()
+
+    await onFiveAndOneSent(view)
+  })
+
+  it('a withdrawal: the row opened again offers «Rate it», not an amendment that answers 404', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    let sheet = await open(view)
+    withdrawVerdict.mockResolvedValueOnce()
+    advice.mockRejectedValue(broke())
+    await sheet
+      .findAll('button')
+      .find((b) => b.text() === 'Withdraw the rating')
+      ?.trigger('click')
+    await flushPromises()
+    ;(view.vm as unknown as { putAway(): void }).putAway()
+    await flushPromises()
+
+    sheet = await open(view)
+    expect(sheet.text()).toContain(en.advice.edit.meta_new)
+    expect(sheet.find('.current').exists()).toBe(false)
+    rateItem.mockResolvedValueOnce({ verdict: card(2), created: false })
+    await key(sheet, 2).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+    expect(rateItem).toHaveBeenCalledWith(ITEM, { score: 2 })
+    expect(amendVerdict).not.toHaveBeenCalled()
+  })
+
+  it('a row found by the search, dimmed while it is asked again — the same', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    adviceSearch.mockResolvedValue({
+      geography: { country: 'AM', city: 'Гюмри' },
+      scope: 'shared',
+      near: true,
+      items: [{ itemId: ITEM, name: sausage.name, advice: row(1) }],
+    })
+    const { view } = await render()
+    await view.get('input[type="search"]').setValue('колб')
+    await vi.waitFor(() => {
+      expect(adviceSearch).toHaveBeenCalled()
+    })
+    await flushPromises()
+
+    adviceSearch.mockReturnValue(new Promise(() => undefined))
+    await saveFive(view, () => advice.mockReturnValue(new Promise(() => undefined)))
+    expect(view.find('.found.stale').exists()).toBe(true)
+
+    await onFiveAndOneSent(view)
   })
 })

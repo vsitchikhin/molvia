@@ -84,7 +84,7 @@ import AppField from '@/components/AppField.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import RatingScale from '@/components/RatingScale.vue'
-import type { Score } from '@/components/rating'
+import type { SavedVerdict, Score } from '@/components/rating'
 import { currentIdentity } from '@/stores/identity'
 import { forgetOwnPrices } from '@/stores/ownPrices'
 import { reportFailure } from '@/failures'
@@ -150,7 +150,11 @@ export default defineComponent({
     onClosed: { type: Function as PropType<() => void>, default: undefined },
   },
   emits: {
-    saved: () => true,
+    /**
+     * What the server answered the write with — the verdict as it now stands, `null` once withdrawn.
+     * The screen opens the sheet on it until its rows are asked for again (MOL-202, А1).
+     */
+    saved: (verdict: SavedVerdict | null) => verdict === null || typeof verdict.score === 'number',
   },
   setup(props, { emit }) {
     const { t } = useI18n()
@@ -173,10 +177,16 @@ export default defineComponent({
       props.mine ? scoreChanged.value || reviewChanged.value : score.value !== null,
     )
     const keepsScore = computed(() => props.mine && props.ownScore !== null && score.value === null)
-    // The button's own word says why it is not now: one's own verdict untouched, or none chosen.
+    // The button's own word says why it is not now: one's own score untouched, or none chosen —
+    // and a scale with nothing on it is the second, whether or not there is a verdict behind it: a
+    // list the phone kept from before `ownScore` knows it is one's own but not what (А2).
     const saveWord = computed(() => {
-      if (props.mine) return t(ready.value ? 'verdict.save' : 'advice.edit.nothing_changed')
-      return t(ready.value ? 'advice.edit.save_new' : 'verdict.save_disabled')
+      if (ready.value) return t(props.mine ? 'verdict.save' : 'advice.edit.save_new')
+      return t(
+        props.mine && props.ownScore !== null
+          ? 'advice.edit.nothing_changed'
+          : 'verdict.save_disabled',
+      )
     })
 
     // Cleared as soon as anything is touched, and synchronously, so a refusal set inside
@@ -198,15 +208,14 @@ export default defineComponent({
       return t(SPOKEN[code] ?? 'advice.edit.failed')
     })
 
-    async function send(run: () => Promise<unknown>, taking = false): Promise<void> {
+    async function send(run: () => Promise<SavedVerdict | null>, taking = false): Promise<void> {
       sending.value = true
       withdrawing.value = taking
       failure.value = null
       // «Тут дешевле» remembered before this verdict no longer says what the item is (MOL-92).
       forgetOwnPrices(currentIdentity(), [props.itemId])
       try {
-        await run()
-        emit('saved')
+        emit('saved', await run())
         open.value = false
       } catch (error) {
         reportFailure(error, 'screen')
@@ -235,10 +244,12 @@ export default defineComponent({
         // A first verdict is not an amendment: `PATCH` has nothing to change and answers 404.
         if (chosen === null) return
         void send(() =>
-          api.rateItem(props.itemId, {
-            score: chosen,
-            ...(review.value ? { review: review.value } : {}),
-          }),
+          api
+            .rateItem(props.itemId, {
+              score: chosen,
+              ...(review.value ? { review: review.value } : {}),
+            })
+            .then(({ verdict }) => verdict),
         )
         return
       }
@@ -257,7 +268,7 @@ export default defineComponent({
 
     function withdraw(): void {
       if (sending.value || !props.mine) return
-      void send(() => api.withdrawVerdict(props.itemId), true)
+      void send(() => api.withdrawVerdict(props.itemId).then(() => null), true)
     }
 
     return {

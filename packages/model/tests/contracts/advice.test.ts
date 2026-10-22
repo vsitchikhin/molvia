@@ -97,6 +97,8 @@ describe('adviceRowSchema', () => {
     // The shared mode: «4.3» is three people's, the 5 is the asker's own.
     expect(adviceRowSchema.parse(take)).toMatchObject({ rating: '4.3', ownScore: 5 })
     expect(adviceRowSchema.parse({ ...never, isMine: false, ownScore: null }).ownScore).toBeNull()
+    // A score on a row that says it is someone else's is the server's mistake, not a thing to show.
+    expect(adviceRowSchema.safeParse({ ...never, isMine: false }).success).toBe(false)
     for (const wrong of [0, 6, 4.5, '4']) {
       expect(adviceRowSchema.safeParse({ ...never, ownScore: wrong }).success).toBe(false)
     }

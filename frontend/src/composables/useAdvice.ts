@@ -44,6 +44,13 @@ export interface Advice {
   readonly attempt: ComputedRef<number>
   /** The answer on screen, remembered or fresh: the search reads it with no connection (MOL-128). */
   readonly answer: ComputedRef<AdviceResponse | null>
+  /**
+   * The number of the request whose answer is on the screen, 0 for the phone's memory; compared with
+   * `requested()` taken at a moment, it says whether the rows were asked for after it (MOL-202, А1).
+   */
+  readonly answeredBy: ComputedRef<number>
+  /** The number of the last request asked so far. */
+  requested(): number
   retry(): Promise<void>
 }
 
@@ -136,6 +143,8 @@ export function useAdvice(): Advice {
   const failures = ref(0)
   /** Whether what is shown came from an answer of this session, rather than from the phone. */
   const confirmed = ref(false)
+  /** Which request the answer shown came from; 0 while it is the phone's memory. */
+  const answeredBy = ref(0)
 
   const cityChanged = ref(false)
   const location = computed(() => (actor.settings ? geographyKey(actor.settings) : null))
@@ -152,6 +161,7 @@ export function useAdvice(): Advice {
     // Decided after the failure, never before the request (MOL-19, A1).
     failure.value = null
     confirmed.value = false
+    answeredBy.value = 0
   }
 
   function remember(): void {
@@ -211,6 +221,7 @@ export function useAdvice(): Advice {
         if (location.value !== where) return
       }
       remembered.value = { answer: fresh, fetchedAt: new Date() }
+      answeredBy.value = mine
       failure.value = null
       confirmed.value = true
       remember()
@@ -223,7 +234,10 @@ export function useAdvice(): Advice {
       // and it is not the server's fault and never red.
       failure.value = navigator.onLine ? 'error' : 'offline'
       failures.value += 1
-      if (!navigator.onLine && !remembered.value) remembered.value = recall(`${KEY}.${id}`)
+      if (!navigator.onLine && !remembered.value) {
+        remembered.value = recall(`${KEY}.${id}`)
+        answeredBy.value = 0
+      }
     }
   }
 
@@ -300,6 +314,8 @@ export function useAdvice(): Advice {
     fetchedAt: computed(() => remembered.value?.fetchedAt ?? null),
     attempt: computed(() => failures.value),
     answer: computed(() => remembered.value?.answer ?? null),
+    answeredBy: computed(() => answeredBy.value),
+    requested: () => latest,
     retry: load,
   }
 }
