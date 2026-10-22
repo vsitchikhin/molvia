@@ -405,10 +405,18 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   one before; written as it landed, an answer asked before the step could land after the next screen's
   own and put the memory back. **The sheet hands the write over by a prop, `onSaved`** (adversarial
   Д1), as `BottomSheet` hands `onClosed`: swept away while the write was on its way, it emitted into
-  nothing — the write landed, and the screen neither kept it nor asked again. Not a second verdict on
+  nothing — the write landed, and the screen neither kept it nor asked again. **One write of an item at
+  a time** (adversarial Е1): a sheet opened again while its item's write is on its way says
+  «Сохраняем…», names and chooses no score of one's own — nobody knows which until it lands — and then
+  stands on what it wrote, or on the row's if it was refused; a choice made meanwhile stays. Opened on
+  the row, it said «Ваша оценка: 1» while the 5 was on its way and refused the 1 back. **The list
+  forgotten for a write stays forgotten** (Е2): an answer asked before the write may not write it back;
+  and only a write the shared shelf does not hold forgets it — a refusal of `sessionStorage` alone, the
+  next launch still having the write, takes nothing (Е3). Not a second verdict on
   the phone: the server's own answer, read only as the sheet's starting point. **The prices, named:** a
   list forgotten for a write the shelves would not keep is no list offline until the next answer; a
-  write that fails after its sheet was swept away is said nowhere; each page keeps its own
+  write that fails after its sheet was swept away is said nowhere; a sheet opened while its item's write
+  is on its way waits for it, the client's timeout at most; each page keeps its own
   copy, so two tabs of one person are not kept in step — a write in one is seen in the other only
   until that other writes or is answered itself; and when the door closes without «Выйти» — a
   session that lapsed, or «Выйти» settled from a tab where somebody else has signed in since — the
