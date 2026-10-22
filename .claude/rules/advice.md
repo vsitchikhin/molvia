@@ -419,7 +419,9 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   the person's, nor whether the verdict was withdrawn, so a score chosen goes by `PUT`, right either
   way — without the review, which the field shows as the row had it before that write and `PUT`
   keeps the server's own; a review the person touched follows by `PATCH`, the one way to erase it,
-  where the answer holds another, and touched alone it goes alone (И1–И3); the list is asked again (`onSaved` with `undefined`), and the screen keeps the write as
+  where the answer holds another, and touched alone it goes alone (И1–И3) — the score that landed is
+  kept by the screen and stood on by the sheet before the review goes, so a review refused after it is
+  retried alone (Л1); the list is asked again (`onSaved` with `undefined`), and the screen keeps the write as
   `unknown` in place of any it kept before (З1, З4) — a sheet opened on that row later knows no score
   of the person's either, until an answer asked after it. A refusal is the API's own word
   (`answered`, `fromApi`, not `offContract`), after which the row is right. A
