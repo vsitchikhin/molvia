@@ -394,11 +394,18 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   out in the very millisecond the write is kept, so the requests of the list are numbered across the
   screens of a page and a write keeps its page and the last number asked before it — a refresh already
   in the air lands with the old figures and lets nothing go; any request of a later page is after it.
-  Not a second verdict on the phone: the server's own answer, read only as the sheet's starting point.
-  **The price, named:** two tabs of one person share the shelf, and an answer in one lets the write go
-  in the other, whose rows may still be older — the sheet there is as before the task until its own
-  answer. **Inherited, not closed:** the rows themselves, and the strip — none after a failed refresh
-  following a save, as before.
+  **The page keeps its own copy and reads it first** (adversarial Г1, Г2): a shelf blocked outright keeps
+  nothing, and one full for its quota still answers with what it held — so the shelf is written on
+  every one or none (`writeEverywhere`), and is for the next page. **A screen gone takes no answer**
+  (review №5): one landing in it after a step away and back wrote the memory and let the write go while
+  the new screen still showed the rows from before it. Not a second verdict on the phone: the server's
+  own answer, read only as the sheet's starting point. **The prices, named:** each page keeps its own
+  copy, so two tabs of one person are not kept in step — a write in one is seen in the other only
+  until that other writes or is answered itself; and when the door closes without «Выйти» — a
+  session that lapsed, or «Выйти» settled from a tab where somebody else has signed in since — the
+  copy stays in the page until the next load, under the person's id, read by nobody else; «Выйти»
+  itself loads the page anew. **Inherited, not closed:** the rows themselves, and the strip — none
+  after a failed refresh following a save, as before.
 
 ## The search on «Что брать» (MOL-128)
 
