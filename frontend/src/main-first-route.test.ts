@@ -18,15 +18,15 @@ vi.mock('@/navigation', async (original) => ({
 // The app itself is not what is tested: an empty root, so mounting it renders nothing.
 vi.mock('@/App.vue', () => ({ default: { render: () => null } }))
 
-// No connection: the report waits in the buffer, and nothing leaves the test.
+// No connection: the report waits in the buffer, and nothing leaves the test — the identity asked at the
+// start neither (MOL-286, adversarial Р4-А1): the real `me()` went to the page's own address and was
+// still in the air when the file ended.
 vi.mock('@/api', async (original) => {
   const real = await original<typeof Api>()
+  const offline = () => Promise.reject(new ApiError(ERROR.INTERNAL, 'offline', false))
   return {
     ...real,
-    api: {
-      ...real.api,
-      reportClientErrors: () => Promise.reject(new ApiError(ERROR.INTERNAL, 'offline', false)),
-    },
+    api: { ...real.api, me: offline, reportClientErrors: offline },
   }
 })
 

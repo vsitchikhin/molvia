@@ -32,8 +32,9 @@ under `packages/model/tests/`, is covered by the source's entry.
 
 - `frontend/eslint.config.js` — PWA lint config: Vue and TypeScript type-aware, SFC block order, no bare strings in templates, the import boundaries.
 - `frontend/package.json` — PWA package: Vue, Pinia, vue-router, vue-i18n, Reka UI, Vite with the PWA and icons plugins; dev, build, lint and style lint.
-- `frontend/tsconfig.json` — PWA TypeScript config: DOM, Vite, PWA and icon types, `@/` to `src`, `.vue` files and the Stylelint plugin's test included.
-- `frontend/vitest.config.ts` — PWA component Vitest project: Vue and icons plugins, happy-dom, the time zone pinned to UTC; also runs the Stylelint plugin's test.
+- `frontend/tsconfig.json` — PWA TypeScript config: DOM, Vite, PWA and icon types, `@/` to `src`, `.vue` files, the Stylelint plugin's test and `testing/` included.
+- `frontend/testing/page-environment.ts` — The PWA tests' Vitest environment: happy-dom whose timers are cleared as its window is taken down, so none fires into a worker with no `window` (MOL-286).
+- `frontend/vitest.config.ts` — PWA component Vitest project: Vue and icons plugins, the page environment over happy-dom, the time zone pinned to UTC; also runs the Stylelint plugin's and the environment's tests.
 
 ## bot
 

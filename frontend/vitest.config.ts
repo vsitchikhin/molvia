@@ -10,8 +10,10 @@ export default defineConfig({
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   test: {
     name: 'frontend',
-    include: ['src/**/*.test.ts', 'stylelint/**/*.test.ts'],
-    environment: 'happy-dom',
+    include: ['src/**/*.test.ts', 'stylelint/**/*.test.ts', 'testing/**/*.test.ts'],
+    // happy-dom whose timers are cleared as its window goes (MOL-286): Node's own, which vitest leaves
+    // in place, outlived the file and fired into a worker with no `window`.
+    environment: './testing/page-environment.ts',
     // The zone CI runs in, on every machine (MOL-82, review Т-1): a day of Yerevan printed in the
     // phone's zone came out right at UTC+4 and a day early in UTC, so the bug was green locally and
     // red only in CI. UTC is west of Yerevan, where such a slip shows.
