@@ -383,15 +383,21 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
 - **After a save the sheet opens on what was written, until the rows are asked for again** (MOL-202,
   adversarial А1). The rows stay as the answer before the save had them until the next one comes —
   failed, or still on its way — and a sheet opened on one said «Ваша оценка: 1» over the 5 just
-  saved, and refused the 1 as «Ничего не изменилось». So the screen keeps the server's answer to the
-  write by item (`saved` carries it; a withdrawal is `null` and opens «Оценить»), and a row older than
-  the save opens the sheet on it: a row on the screen at that moment, or one of the list's from a
-  request asked before it (`answeredBy` against `requested()` of `useAdvice`) — a refresh already in
-  the air lands after the save with the old figures. A newer row is the server's word again. The
-  search drops the answer of any request older than its last and asks again on a save. Not a second
-  verdict on the phone: the server's own answer, read only as the sheet's starting point. **Inherited,
-  not closed:** the rows themselves, and the strip — none after a failed refresh following a save, as
-  before.
+  saved, and refused the 1 as «Ничего не изменилось». So the server's answer to the write is kept by
+  owner and item (`saved` carries it — its score and review, nothing else; a withdrawal is `null` and
+  opens «Оценить»), and a row older than the write opens the sheet on it: a row on the screen at that
+  moment, or one of the list's from a request asked before it — a refresh already in the air lands
+  after the save with the old figures. A newer row is the server's word again. **Kept by the page, not
+  the screen** (`useAdvice`, adversarial Б1): a step to «Покупки» and back mounts a new screen over the
+  memory written before the save, so the requests are numbered across the page's screens and the
+  memory knows which request it came from (`rememberedBy`); a reload asks afresh and keeps none of it.
+  The search drops the answer of any request older than its last and asks again on a save. Not a
+  second verdict on the phone: the server's own answer, read only as the sheet's starting point.
+  **The prices, named:** the page keeps what a person wrote — their score and review — after «Выйти»
+  until the next load, under their id, read by nobody else; and a verdict changed on another device
+  while this page holds an older write here is shown as written here until the list is read again.
+  **Inherited, not closed:** the rows themselves, and the strip — none after a failed refresh
+  following a save, as before.
 
 ## The search on «Что брать» (MOL-128)
 
