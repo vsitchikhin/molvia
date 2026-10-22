@@ -408,14 +408,52 @@ nothing up.
   through to the server's refusal (adversarial А1), and offline with no list (7h) the strip went from
   under the open sheet with its focus (А3) — the handoff's 7f, a strip under the skeleton, is the
   price. **A row is the kit's `ListRow`** (owner's В-1 «а» of MOL-191): the category's icon in a
-  circle of its colour, as on «Траты» — every one's own under the tag (`categoryIcon`), told apart by
-  colour alone; choosing either is MOL-285. **A category that landed stays on the chips until the
+  circle of its colour, as on «Траты». **A category that landed stays on the chips until the
   server's list names it** (`arrived`, found by e2e in MOL-123): it leaves the queue on its answer and
   the list is read again only after, and in between «Сохранить трату» said «Выберите категорию» over
   the one just made and chosen. A name equal to a preset in the language of the
   screen, or to a live one of one's own, is refused there. The colours are tokens — thirteen
   presets and a palette of eight for one's own, none red, olive, ochre or terracotta, each at
-  least 3:1 on `--surface`.
+  least 3:1 on `--surface` **and its icon 3:1 on its own circle** (MOL-285, below).
+- **One's own has an icon and a colour of its choosing** (MOL-285; the owner asked, MOL-82 had said
+  «выбирать не просим»). **The icon is a key of the domain's closed set** (`SPENDING_ICONS`), never an
+  MDI name: the tag, twenty-three of daily life and the presets' own thirteen (owner's В-3 «б») — «Кафе
+  на работе» may take the fork and knife, its colour its own. The drawing is the phone's (`OWN_ICONS`),
+  so an icon is redrawn with no migration; **a key added is a migration**, since the database checks
+  the set (`spending_categories_icon_known`), as it checks the presets. **The colour is one of the
+  eight `--cat-own-*`, never a preset's** (Р-2): MOL-218 holds one's own apart from the presets on the
+  ring, and a preset's colour would merge with it there; two of one's own may share one, as the ninth
+  always did. **An empty `icon` is the tag** (Р-5): no row was rewritten — one's own made before, or
+  written by an image rolled back past it, reads so (`toCategory`); a preset never has one (its
+  check). **A new one starts on the tag and the palette's next**, so at the shelf it is still a name
+  and «Добавить» (Р-4), and a body without them — queued by an earlier build — means the same; a repeat
+  holds what the body names. **The sheet puts the colour over the icons**: thirty-seven go below the
+  fold at 320, and the colour is what tells one's own apart on the ring.
+- **One's own is amended whole, through the queue** (owner's В-1 «а»): `PATCH
+/spending-categories/:id` takes `{name, icon, colour}`, so sent again it is the same state and needs
+  no revision — two phones amending one category, the later wins (Р-6). A preset, someone else's and
+  no id are one 404; a live name of one's own is `SPENDING_CATEGORY_TAKEN`, checked under the owner's
+  lock as «Добавить» checks it; a removed one may be amended and stays removed. On the phone it is
+  `category-amend`, folded whole into its «Добавить» or its amendment still waiting (never into one on
+  the way), and **kept in `arrived` once landed, the last of each category's**: the list is read again
+  only after the answer, and in between the row went back to the old name and icon. **The price,
+  named:** for the life of the window that amendment is laid over the server's list, so another
+  phone's later amendment of the same category shows here only after a reload. «Сохранить» with
+  nothing changed writes nothing.
+- **«Категории» stands in three groups** (owner's В-2 «а» of MOL-285): «Готовые» with a quiet
+  «Убрать» in the tail, «Свои» — rows that open their sheet, with the chevron and no button, since a
+  card never mixes the two (MOL-175, В-14) — and «Убранные» with «Вернуть»; each only when it has a
+  row. **One's own is taken out from its sheet**, «Убрать категорию» quiet under «Сохранить», as a
+  spending is removed from its sheet (MOL-189). The label «своя» went: the group says it.
+- **A category's icon holds 3:1 on its own circle** (MOL-285, owner's В-4 «б»; `tokens.test.ts`):
+  the circle is `color-mix(in oklch, colour --cat-tint-share, --surface)`, mixed in the test as a
+  browser mixes it. Until then only «3:1 on `--surface`» was held, and on their circles the light
+  «Животные», «Документы», «Здоровье» and one's own 3 and 6 stood at 2.67–2.97 since MOL-176. A lower
+  share does not save it (8 % still leaves «Животные» 2.86), and the five darkened alone broke
+  MOL-218's 0.07 («Животные» to one's own 0, 0.056); so seven light values moved — the five and two
+  neighbours, «Развлечения» and one's own 0 — by 0.010–0.043 in OKLab, to 3.04 at least on the circle, every
+  rule of MOL-218 held (`.scratch/tasks/status/MOL-285/opt285.mjs`, `check285.mjs`). The dark scheme
+  held already and did not move.
 - **«Куда ушли» is a ring** (MOL-156, owner's decision В-2, handoff MOL-157 01): the month's
   `slices` — `donutSlices` over `byCategory` on the server, six categories and the rest one
   «Остальные» (seven are all seven), each with its level in thousandths of the ring, shared out by
