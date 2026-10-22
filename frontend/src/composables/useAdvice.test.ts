@@ -37,6 +37,7 @@ function row(n: number, level: AdviceRow['level'], rating = '4.5'): AdviceRow {
     ratingsCount: 1,
     review: null,
     isMine: true,
+    ownScore: 4,
   }
   if (level === 'never') return { ...rated, level }
   if (level === 'take') return { ...rated, level, places: [place('SAS', 570_000_000n)] }
@@ -401,6 +402,8 @@ describe('useAdvice', () => {
     const held = await mounted()
     expect(held.phase.value).toBe('ready')
     expect(names(held.groups.value.never)).toEqual(['Колбаса «Молочная»'])
+    // Remembered before its own score was on the wire: read, with none (MOL-202).
+    expect(held.answer.value?.rows[0]?.ownScore).toBeNull()
   })
 
   it('А4: a list from the phone says its age while the answer is still on its way', async () => {

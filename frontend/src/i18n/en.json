@@ -403,6 +403,7 @@
     "edit": {
       "meta": "Only your own rating changes",
       "meta_new": "You have not rated this yet",
+      "current": "Your rating: {n}",
       "save_new": "Rate it",
       "keeps_score": "The rating stays as it was. To take it back, withdraw it",
       "withdraw": "Withdraw the rating",

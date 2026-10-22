@@ -26,6 +26,7 @@ function row(places: AdvicePlace[], review: string | null = null): TakeRow {
   return {
     level: 'take',
     isMine: true,
+    ownScore: 5,
     itemId: 'cccccccc-0000-4000-8000-000000000001',
     name: 'Говядина, вырезка',
     rating: '4.8',

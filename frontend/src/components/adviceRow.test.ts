@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AdvicePlace } from '@molvia/model'
-import { ownScore, placesView, whereKey } from '@/components/adviceRow'
+import { placesView, whereKey } from '@/components/adviceRow'
 
 function place(name: string, amount: bigint): AdvicePlace {
   return {
@@ -72,22 +72,5 @@ describe('placesView', () => {
     expect(placesView([market, pack])).toMatchObject({ rest: [pack], cheapest: false })
     expect(whereKey(placesView([market, sas, pack]))).toBe('advice.bought_at')
     expect(whereKey(placesView([market, sas]))).toBe('advice.cheapest_at')
-  })
-})
-
-describe('ownScore', () => {
-  it('in the own mode the figure on the row is this person`s score', () => {
-    expect(ownScore('4.0', 'own')).toBe(4)
-    expect(ownScore('1.0', 'own')).toBe(1)
-  })
-
-  it('in the shared mode nothing is offered: an average is nobody`s opinion', () => {
-    // Pre-chosen, a save would write four other people's average down as this person's score.
-    expect(ownScore('4.0', 'shared')).toBeNull()
-    expect(ownScore('4.3', 'shared')).toBeNull()
-  })
-
-  it('a fraction means the row is not one person`s, whatever the mode says', () => {
-    expect(ownScore('4.3', 'own')).toBeNull()
   })
 })

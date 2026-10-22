@@ -52,6 +52,7 @@
            Above the strip of the list's age, as the handoff draws it (review Р-16). -->
       <AdviceSearch
         v-if="fieldShown"
+        ref="searchBox"
         v-model="query"
         :remembered="remembered"
         :fetched-at="fetchedAt"
@@ -169,8 +170,9 @@
       :shared="editing.shared"
       :own-score="editing.score"
       :own-review="editing.review"
+      :unsure="editing.unsure"
       :on-closed="putAway"
-      @saved="saved"
+      :on-saved="saved"
     />
   </AppScreen>
 </template>
@@ -197,8 +199,7 @@ import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import type { StripKind } from '@/components/StatusStrip.vue'
 import VerdictEditSheet from '@/components/VerdictEditSheet.vue'
-import { ownScore } from '@/components/adviceRow'
-import type { Score } from '@/components/rating'
+import type { SavedVerdict, Score } from '@/components/rating'
 import { useAdvice } from '@/composables/useAdvice'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { purchaseDay, timeOfDay } from '@/days'
@@ -354,24 +355,44 @@ export default defineComponent({
       shared: boolean
       score: Score | null
       review: string | null
+      /** A write of the item got no answer: which verdict is the person's, nobody knows (З1–З4). */
+      unsure: boolean
     } | null>(null)
+
+    /** The search under the field: the rows it shows when a verdict is saved (MOL-202, А1). */
+    const searchBox = ref<{ found: readonly AdviceFound[] } | null>(null)
+
+    /** What a write from the sheet is checked against: the rows on the screen at that moment. */
+    function shownNow(): object[] {
+      const found = searchBox.value?.found ?? []
+      return [
+        ...(advice.answer.value?.rows ?? []),
+        ...found,
+        ...found.flatMap((item) => (item.advice ? [item.advice] : [])),
+      ]
+    }
 
     /**
      * A row found by the search carries the scope of the search's answer, which may not be the
-     * list's — access opened or ran out between the two (review Р-13, adversarial Е): read by the
-     * list's, an average of three was offered pre-chosen as one's own score.
+     * list's — access opened or ran out between the two (review Р-13, adversarial Е). The score is
+     * the row's own since MOL-202; the scope still decides what withdrawing says.
      */
     function edit(row: AdviceRow, answered?: AdviceScope): void {
       const scope = answered ?? advice.scope.value ?? 'own'
+      const written = advice.writtenOver(row)?.verdict
+      const unsure = written === 'unknown'
+      const saved = written === undefined || unsure ? undefined : { verdict: written }
       editing.value = {
         itemId: row.itemId,
         name: row.name,
         // Whether there is a verdict of this person's to amend at all (А2). In the shared mode
         // a row may be entirely other people's, and nothing else in it says so.
-        mine: row.isMine,
+        mine: saved ? saved.verdict !== null : row.isMine,
         shared: scope === 'shared',
-        score: ownScore(row.rating, scope),
-        review: row.review,
+        // The server's word, never read off `rating`: in the shared mode that is an average.
+        score: unsure ? null : saved ? (saved.verdict?.score ?? null) : row.ownScore,
+        review: saved ? (saved.verdict?.review ?? null) : row.review,
+        unsure,
       }
     }
 
@@ -380,18 +401,22 @@ export default defineComponent({
      * Without a place, as a verdict from «Оценки» is (MOL-27).
      */
     function rate(item: AdviceFound, answered: AdviceScope): void {
+      const written = advice.writtenOver(item)?.verdict ?? null
+      const verdict = written === 'unknown' ? null : written
       editing.value = {
         itemId: item.itemId,
         name: item.name,
-        mine: false,
+        mine: verdict !== null,
         shared: answered === 'shared',
-        score: null,
-        review: null,
+        score: verdict?.score ?? null,
+        review: verdict?.review ?? null,
+        unsure: written === 'unknown',
       }
     }
 
     return {
       t,
+      searchBox,
       query,
       strip,
       fieldShown,
@@ -411,7 +436,12 @@ export default defineComponent({
       editing,
       edit,
       rate,
-      saved: () => {
+      saved: (itemId: string, verdict: SavedVerdict | null | undefined) => {
+        // Before the list is asked again: an answer to that request is newer than the write. By the
+        // item the sheet names: swept away while the write was on its way, it is no longer `editing`.
+        // A write with no answer is kept as such — it may or may not have landed, and the verdict kept
+        // before it is no longer the person's either (З1, З4).
+        advice.wrote(itemId, verdict === undefined ? 'unknown' : verdict, shownNow())
         void advice.retry()
         refreshes.value += 1
       },

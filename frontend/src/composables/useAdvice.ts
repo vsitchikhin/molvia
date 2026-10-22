@@ -1,14 +1,17 @@
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { z } from 'zod'
 import type { ComputedRef } from 'vue'
-import { adviceResponseSchema, geographyKey } from '@molvia/model'
-import type { AdviceResponse, AdviceRow, AdviceScope } from '@molvia/model'
+import { adviceResponseSchema, geographyKey, verdictFields } from '@molvia/model'
+import type { AdviceFound, AdviceResponse, AdviceRow, AdviceScope } from '@molvia/model'
 import { api } from '@/api'
 import type { CheapRow, NeverRow, TakeRow } from '@/components/adviceRow'
+import type { WrittenVerdict } from '@/components/rating'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
-import { read, write } from '@/stores/storage'
+import { forget, read, sharedKeeps, write, writeEverywhere } from '@/stores/storage'
 import { forgetOwnPrices } from '@/stores/ownPrices'
 import { reportFailure } from '@/failures'
+import { newId } from '@/ids'
 
 /** `idle` — no identity, so there is nobody to advise. */
 export type AdvicePhase = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'offline'
@@ -44,6 +47,13 @@ export interface Advice {
   readonly attempt: ComputedRef<number>
   /** The answer on screen, remembered or fresh: the search reads it with no connection (MOL-128). */
   readonly answer: ComputedRef<AdviceResponse | null>
+  /**
+   * A verdict written from the sheet: the server's answer to the write, `null` once withdrawn, and
+   * what was on the screen then — before the list is asked for again (MOL-202, А1).
+   */
+  wrote(itemId: string, verdict: WrittenVerdict, shown: readonly object[]): void
+  /** What a write here made of the verdict behind a row, while the row is older than the write. */
+  writtenOver(shown: AdviceRow | AdviceFound): { readonly verdict: WrittenVerdict } | null
   retry(): Promise<void>
 }
 
@@ -113,6 +123,100 @@ function forgetOwnNever(owner: string, fresh: AdviceResponse): void {
     })
     .catch(() => undefined)
 }
+
+/**
+ * The verdicts written from «Что брать» that no answer of the list has caught up with yet, by item:
+ * the server's answer to the write and when it was made (MOL-202, adversarial А1, Б1, В1).
+ *
+ * The rows stay as the answer before a save had them until an answer asked after it comes — and it
+ * may fail, be on its way, or never come to this page: a step to «Покупки» and back mounts a new
+ * screen, and a reload — iOS putting the app away, «Обновить» — a new page, both over the memory
+ * written before the save. A sheet opened on such a row said «Ваша оценка: 1» over the 5 just saved,
+ * and refused the 1 as «Ничего не изменилось». So the write is kept on the shelf beside that memory,
+ * `molvia.advice-written.<owner>` — swept with the owner's other drawers by «Выйти» and erasure — and
+ * let go once an answer asked after it is taken. While it is there, every row of the list is older
+ * than it — a refresh already in the air when it was made lands with the old figures and lets nothing
+ * go — and opens the sheet on what was written. A newer row is the server's word again.
+ *
+ * «After» is told without a clock: the request that answers a save goes out in the very millisecond
+ * the write is kept. The requests of the list are numbered across the screens of a page, and a write
+ * keeps the page and the last number asked before it; a request of another page — after a reload —
+ * is after it by its nature.
+ */
+const WRITTEN = 'molvia.advice-written'
+
+/** This page among the ones the phone has loaded: a reload is another. */
+const PAGE = newId()
+
+/** The requests of the list, numbered across the screens of this page. */
+let requests = 0
+
+/** The newest answer the phone's memory holds, by owner: one landing later and older goes unwritten. */
+const rememberedUpTo = new Map<string, number>()
+
+const writtenSchema = z.record(
+  z.string(),
+  z.object({
+    verdict: z.union([
+      z.object({ score: verdictFields.shape.score, review: verdictFields.shape.review }),
+      z.null(),
+      z.literal('unknown'),
+    ]),
+    page: z.string(),
+    after: z.number(),
+  }),
+)
+type Written = z.output<typeof writtenSchema>
+
+/**
+ * The writes as this page last set them, by owner — read before the shelf (MOL-202, adversarial Г1,
+ * Г2). A shelf blocked outright keeps nothing, and one that refused a write for its quota still
+ * answers with what it held; the page knows what it wrote either way. The shelf is for the next page.
+ */
+const pageWritten = new Map<string, Written>()
+
+/** A fresh page, as a reload makes one: for the tests, which share one module between them. */
+export function forgetPageWrites(): void {
+  pageWritten.clear()
+  rememberedUpTo.clear()
+}
+
+function readWritten(owner: string): Written {
+  const kept = pageWritten.get(owner)
+  if (kept) return kept
+  try {
+    const parsed = writtenSchema.safeParse(JSON.parse(read(`${WRITTEN}.${owner}`) ?? '{}'))
+    return parsed.success ? parsed.data : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeWritten(owner: string, entries: Written): void {
+  pageWritten.set(owner, entries)
+  // Every shelf or none: a shelf that refuses loses its past rather than answer the next page with it.
+  if (Object.keys(entries).length === 0) forget(`${WRITTEN}.${owner}`)
+  else {
+    const kept = JSON.stringify(entries)
+    writeEverywhere(`${WRITTEN}.${owner}`, kept)
+    // Not on the shared shelf — the one the next launch has; `sessionStorage` goes with the app — the
+    // write cannot stand over the list remembered before it there, so the list goes too: no list
+    // offline is the truth, the score from before the write is not (adversarial Д2). A refusal of
+    // `sessionStorage` alone takes nothing (Е3). Nor may an answer asked before the write bring the
+    // list back (Е2): the memory takes none of the requests asked so far.
+    if (sharedKeeps(`${WRITTEN}.${owner}`, kept) !== true) {
+      forget(`${KEY}.${owner}`)
+      rememberedUpTo.set(owner, requests)
+    }
+  }
+}
+
+/**
+ * The rows found by the search when a verdict was written, by owner and item. Not on the shelf: the
+ * search is asked again on a save, and drops the answer of any request older than its last, so only
+ * the rows it showed then, dimmed until the next answer, are older than the write.
+ */
+const foundAtWrite = new Map<string, WeakSet<object>>()
 
 /**
  * «Что брать» as this phone sees it (MOL-32): the server's answer, and the last one it gave.
@@ -188,12 +292,15 @@ export function useAdvice(): Advice {
    * than dropped, and every answer carries the number of the request that asked for it.
    */
   let running: object | null = null
+  /** Whether the screen is still here: one gone may take an answer, never let a write go. */
+  let alive = true
   let latest = 0
   /** How many times a fresh list has been asked for; the loop below serves the last ask. */
   let asks = 0
 
   async function ask(id: string): Promise<void> {
-    const mine = ++latest
+    const mine = ++requests
+    latest = mine
     const where = location.value
     try {
       const fresh = await api.advice()
@@ -213,7 +320,19 @@ export function useAdvice(): Advice {
       remembered.value = { answer: fresh, fetchedAt: new Date() }
       failure.value = null
       confirmed.value = true
-      remember()
+      // A screen gone still takes its answer into the phone's memory (adversarial Д3) — the newest
+      // of the page only: one asked before a step away and back may land after the next screen's.
+      if (mine > (rememberedUpTo.get(id) ?? 0)) {
+        rememberedUpTo.set(id, mine)
+        remember()
+      }
+      // Asked after a write, the answer has it: the write is let go (MOL-202, В1) — by a screen
+      // still here only: the one that is may still show the rows from before it (review №5).
+      if (alive) {
+        const entries = Object.entries(readWritten(id))
+        const waiting = entries.filter(([, entry]) => entry.page === PAGE && entry.after >= mine)
+        if (waiting.length < entries.length) writeWritten(id, Object.fromEntries(waiting))
+      }
       forgetOwnNever(id, fresh)
     } catch (error) {
       reportFailure(error, 'screen')
@@ -223,7 +342,9 @@ export function useAdvice(): Advice {
       // and it is not the server's fault and never red.
       failure.value = navigator.onLine ? 'error' : 'offline'
       failures.value += 1
-      if (!navigator.onLine && !remembered.value) remembered.value = recall(`${KEY}.${id}`)
+      if (!navigator.onLine && !remembered.value) {
+        remembered.value = recall(`${KEY}.${id}`)
+      }
     }
   }
 
@@ -263,13 +384,20 @@ export function useAdvice(): Advice {
   watch(
     () => [actor.id, location.value],
     () => {
-      latest += 1
+      latest = ++requests
       running = null
       adopt(actor.id)
       void load()
     },
   )
   onMounted(() => void load())
+  // A screen gone asks nothing more of its own accord, and lets no write go (MOL-202, review №5) — a
+  // write it hands over still asks the list again, and the answer goes to the memory; its answer landing
+  // after a step away and back let one go while the new screen still showed the rows from before it.
+  onUnmounted(() => {
+    alive = false
+    running = null
+  })
   useReconnect(() => void load())
 
   return {
@@ -300,6 +428,19 @@ export function useAdvice(): Advice {
     fetchedAt: computed(() => remembered.value?.fetchedAt ?? null),
     attempt: computed(() => failures.value),
     answer: computed(() => remembered.value?.answer ?? null),
+    wrote(itemId, verdict, shown) {
+      const id = owner.value
+      if (!id) return
+      writeWritten(id, { ...readWritten(id), [itemId]: { verdict, page: PAGE, after: requests } })
+      foundAtWrite.set(`${id} ${itemId}`, new WeakSet(shown))
+    },
+    writtenOver(shown) {
+      const id = owner.value
+      const entry = id ? readWritten(id)[shown.itemId] : undefined
+      if (!id || !entry) return null
+      const fromList = rows.value.some((row) => row === shown)
+      return fromList || foundAtWrite.get(`${id} ${shown.itemId}`)?.has(shown) ? entry : null
+    },
     retry: load,
   }
 }

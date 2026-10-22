@@ -363,6 +363,80 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   exactly as it is on one's own verdict without one. The flag was already in the statement, for
   the warnings reserve; handing it out is what lets the screen offer «Оценить» where there is
   nothing to amend, instead of a `PATCH` that answers 404 under the word «повторите».
+- **Every row carries the person's own score, in both modes** (`ownScore`, MOL-202, С-2): an integer
+  where `isMine`, `null` otherwise — on a row entirely other people's, and on one's own verdict
+  withdrawn. In the shared mode `rating` is an average, and the verdict sheet could not say what the
+  person had given: nothing could be pre-chosen — an average chosen would be saved as their opinion —
+  so they amended a score they could not see (Ф-25). The sheet says «Ваша оценка: N» over the scale
+  and opens on it. It is theirs, free, as the review is (Р-19); a neighbour on the same row reads
+  their own, and an aggregate gives nothing away it did not. **One column of one statement**:
+  `own_score` of `adviceRowsFor`, the one `is_mine` was already read from, so the list and the search
+  cannot part, and the schema refuses a score on a row that is not one's own. `nullable().default(null)`:
+  an answer the phone remembered before the field reads, and the sheet opened on it chooses nothing and
+  says «Выберите оценку», never «Ничего не изменилось» over an empty scale (adversarial А2). **The
+  prices, named:** an installed build older than the field refuses the new answer — strict, as every
+  answer is read — and shows «Что брать» as an error, with «Обновить» first (MOL-132), until it takes
+  the version; a rollback past it forgets the list the phone remembered, as MOL-120's did; and that
+  memory, read by the new build in the own mode, opens the sheet with nothing chosen where the build
+  before chose the row's whole figure — until the first answer with a signal, offline, where the sheet
+  saves nothing anyway. «Тут дешевле» has its own answer and does not carry it.
+- **After a save the sheet opens on what was written, until an answer asked after it comes** (MOL-202,
+  adversarial А1, Б1, В1). The rows stay as the answer before the save had them until then — and that
+  answer may fail, be on its way, or never reach this page: a step to «Покупки» and back mounts a new
+  screen, a reload (iOS putting the app away, «Обновить») a new page, both over the memory written
+  before the save. A sheet opened on such a row said «Ваша оценка: 1» over the 5 just saved, and
+  refused the 1 as «Ничего не изменилось». So the server's answer to the write — its score and review
+  (`saved`), `null` once withdrawn, which opens «Оценить» — **is kept on the shelf beside that memory**,
+  `molvia.advice-written.<owner>`, swept by «Выйти» and erasure with the owner's other drawers, and let
+  go once an answer asked after it is taken. While it is there every row of the list is older than it
+  and opens the sheet on it; so does a row the search showed at the moment of the write, dimmed until
+  the search answers again. **«After» is told without a clock**: the request that answers a save goes
+  out in the very millisecond the write is kept, so the requests of the list are numbered across the
+  screens of a page and a write keeps its page and the last number asked before it — a refresh already
+  in the air lands with the old figures and lets nothing go; any request of a later page is after it.
+  **The page keeps its own copy and reads it first** (adversarial Г1, Г2): a shelf blocked outright keeps
+  nothing, and one full for its quota still answers with what it held — so the shelf is written on
+  every one or none (`writeEverywhere`), and is for the next page; **a write no shelf of the next page
+  will have takes the list remembered before it along** (adversarial Д2) — `localStorage` full and
+  `sessionStorage` gone with the app, the list would open the next launch on the score from before
+  it. **A screen gone lets no write go** (review №5): its answer landing after a step away and back let
+  one go while the new screen still showed the rows from before it — **but still takes the answer into
+  the phone's memory, the newest of the page only** (adversarial Д3): dropped, the list offline was the
+  one before; written as it landed, an answer asked before the step could land after the next screen's
+  own and put the memory back. **The sheet hands the write over by a prop, `onSaved`** (adversarial
+  Д1), as `BottomSheet` hands `onClosed`: swept away while the write was on its way, it emitted into
+  nothing — the write landed, and the screen neither kept it nor asked again. **One write of an item at
+  a time** (adversarial Е1): a sheet opened again while its item's write is on its way says
+  «Сохраняем…», names and chooses no score of one's own — nobody knows which until it lands — and then
+  stands on what it wrote, or on the row's if it was refused; a choice made meanwhile stays. Opened on
+  the row, it said «Ваша оценка: 1» while the 5 was on its way and refused the 1 back. **The list
+  forgotten for a write stays forgotten** (Е2): an answer asked before the write may not write it back;
+  and only a write the shared shelf does not hold forgets it — a refusal of `sessionStorage` alone, the
+  next launch still having the write, takes nothing (Е3), nor a full shelf that wrote the key over in
+  its own room (`sharedKeeps`, no probe with a new key, Ж3). **A write that got no answer is no
+  refusal** (`stores/verdictWrites`, Ж1): cut off by the client's timeout, the connection lost, a
+  portal's page, a `2xx` this build cannot read — it may have landed. The sheet then knows no score as
+  the person's, nor whether the verdict was withdrawn, so a score chosen goes by `PUT`, right either
+  way — without the review, which the field shows as the row had it before that write and `PUT`
+  keeps the server's own; a review the person touched follows by `PATCH`, the one way to erase it,
+  where the answer holds another, and touched alone it goes alone (И1–И3) — the score that landed is
+  kept by the screen and stood on by the sheet before the review goes, so a review refused after it is
+  retried alone (Л1) — and a sheet that waited for the two stands on that score too (review №7);
+  the list is asked again (`onSaved` with `undefined`), and the screen keeps the write as
+  `unknown` in place of any it kept before (З1, З4) — a sheet opened on that row later knows no score
+  of the person's either, until an answer asked after it. A refusal is the API's own word
+  (`answered`, `fromApi`, not `offContract`), after which the row is right. A
+  sheet waiting for a withdrawal says «Снимаем оценку…», not «Сохраняем…» (Ж2). Not a second verdict on
+  the phone: the server's own answer, read only as the sheet's starting point. **The prices, named:** a
+  list forgotten for a write the shelves would not keep is no list offline until the next answer; a
+  write that fails after its sheet was swept away is said nowhere; a sheet opened while its item's write
+  is on its way waits for it, the client's timeout at most; each page keeps its own
+  copy, so two tabs of one person are not kept in step — a write in one is seen in the other only
+  until that other writes or is answered itself; and when the door closes without «Выйти» — a
+  session that lapsed, or «Выйти» settled from a tab where somebody else has signed in since — the
+  copy stays in the page until the next load, under the person's id, read by nobody else; «Выйти»
+  itself loads the page anew. **Inherited, not closed:** the rows themselves, and the strip — none
+  after a failed refresh following a save, as before.
 
 ## The search on «Что брать» (MOL-128)
 
@@ -416,7 +490,8 @@ the first stood over the field).
   its place. Far ones past the limit stay out: they are the catalogue's guesses.
 - **A row found carries the scope of the search's answer**, and the verdict sheet opened from it
   reads that one, not the list's (adversarial Е): access may open or run out between the two, and
-  an average of three was offered pre-chosen as one's own score.
+  an average of three was offered pre-chosen as one's own score. Since MOL-202 the score is the
+  row's own `ownScore`, and the scope decides only what withdrawing says.
 - **After a save the search is asked again quietly** — the answer stays, dimmed — and the field
   that comes back over a list asked again searches what it holds (adversarial Г, Д).
 - **It writes nothing** (В-2): no `advice_viewed` — the one writer stays `GET /advice`, which the

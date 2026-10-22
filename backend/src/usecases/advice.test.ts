@@ -40,7 +40,16 @@ function actor(sharedUntil: Date | null = null): Actor {
 }
 
 function rated(patch: Partial<AdviceVerdictRow> & { sum: number }): AdviceVerdictRow {
-  return { itemId: BEEF, name: 'Говядина, вырезка', count: 1, review: null, isMine: true, ...patch }
+  const isMine = patch.isMine ?? true
+  return {
+    itemId: BEEF,
+    name: 'Говядина, вырезка',
+    count: 1,
+    review: null,
+    isMine,
+    ownScore: isMine && patch.count === undefined ? patch.sum : null,
+    ...patch,
+  }
 }
 
 /** A place alone in its pair unless the pair's weight is named. */
@@ -170,6 +179,7 @@ describe('три группы', () => {
       ratingsCount: 1,
       review: 'Пахнет крахмалом',
       isMine: true,
+      ownScore: 1,
     })
   })
 
@@ -188,6 +198,24 @@ describe('три группы', () => {
     )
 
     expect(answer.rows.map((row) => row.isMine)).toEqual([true, false])
+  })
+
+  it('отдаёт свою оценку рядом со средней, а у чужой строки — null (MOL-202)', async () => {
+    // В общем режиме «4,3» — средняя троих, а шторке нужна своя: иначе правка вслепую (С-2).
+    const rows = [
+      rated({ sum: 13, count: 3, itemId: BEEF, ownScore: 5 }),
+      rated({ sum: 12, count: 3, itemId: CHEESE, name: 'Сыр «Чанах»', isMine: false }),
+    ]
+
+    const answer = await advice(
+      deps({ actor: actor(new Date(Date.now() + 86_400_000)), rows }),
+      ACTOR,
+    )
+
+    expect(answer.rows.map(({ rating, ownScore }) => [rating, ownScore])).toEqual([
+      ['4.3', 5],
+      ['4.0', null],
+    ])
   })
 })
 

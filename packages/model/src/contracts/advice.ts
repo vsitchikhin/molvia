@@ -69,6 +69,16 @@ const ratedFields = {
    * every save came back 404 with «try again» — a refusal a repeat cannot fix.
    */
   isMine: z.boolean(),
+  /**
+   * This person's own score behind the row, in both modes, and `null` without one (MOL-202, С-2).
+   *
+   * In the shared mode `rating` is an average, and the verdict sheet could not say what the person
+   * had given — amending a score unseen. Their own score is theirs to see, free, as their review is
+   * (Р-19), and tells a stranger nothing: it is never sent on a row that is not theirs, and with
+   * `isMine` it is one column of one statement. `null` also from an answer the phone remembered
+   * before the field existed, as `itemCount` (MOL-128).
+   */
+  ownScore: verdictFields.shape.score.nullable().default(null),
 }
 
 /**
@@ -80,7 +90,7 @@ const ratedFields = {
  * type checker holds the product's core rule, the way `ScreenState` holds «offline is never
  * red». A row that grew a price fails to parse instead of reaching a screen.
  */
-export const adviceRowSchema = z.discriminatedUnion('level', [
+const adviceRowShapes = z.discriminatedUnion('level', [
   z.strictObject({
     ...ratedFields,
     level: z.literal('take'),
@@ -110,6 +120,15 @@ export const adviceRowSchema = z.discriminatedUnion('level', [
   }),
   z.strictObject({ ...ratedFields, level: z.literal('never') }),
 ])
+/**
+ * One's own score on a row that says it is not one's own is the server's mistake, and the score is
+ * the one thing a stranger's row must never carry (MOL-202). The other way is no mistake: an answer
+ * remembered before `ownScore` is `isMine` with `null`.
+ */
+export const adviceRowSchema = adviceRowShapes.refine(
+  (row) => row.ownScore === null || row.isMine,
+  { error: ISSUE.RESPONSE_INVALID },
+)
 export type AdviceRow = z.output<typeof adviceRowSchema>
 
 /**

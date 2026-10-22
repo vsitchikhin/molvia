@@ -97,7 +97,7 @@ export default defineComponent({
   justify-content: space-between;
   margin-top: var(--space-2);
   color: var(--text-muted);
-  font-size: var(--text-caption);
+  font-size: var(--text-footnote);
 }
 
 @media (prefers-reduced-motion: reduce) {

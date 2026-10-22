@@ -20,6 +20,7 @@ const row = (itemId: string, name: string): AdviceRow => ({
   ratingsCount: 1,
   review: null,
   isMine: true,
+  ownScore: 1,
 })
 
 const lori = row('cccccccc-0000-4000-8000-000000000001', 'Сыр Лори')
