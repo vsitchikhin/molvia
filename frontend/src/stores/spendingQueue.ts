@@ -772,7 +772,8 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
           (item.write.kind === 'category-add' && item.write.body.id === id) ||
           (item.write.kind === 'category-amend' && item.write.id === id),
       )
-      const found = last !== -1 && waiting(kept[last]) ? last : -1
+      const lastItem = kept[last]
+      const found = lastItem && waiting(lastItem) ? last : -1
       const at = standsBehind(found, id, 'freed') ? -1 : found
       const earlier = kept[at]?.write
       // Folded into an amendment, the name stays only if neither of the two moved it.
