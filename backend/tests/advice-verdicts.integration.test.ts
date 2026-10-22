@@ -84,6 +84,7 @@ describe('свои данные', () => {
         count: 1,
         review: 'Лучшее мясо в городе',
         isMine: true,
+        ownScore: 5,
       },
     ])
   })
@@ -139,7 +140,7 @@ describe('общие данные', () => {
     await rate(me, itemId, 5)
     await rate(await insertActor(db), itemId, 4)
 
-    expect(await rowsFor(me, 'shared')).toMatchObject([{ itemId, sum: 5, count: 1 }])
+    expect(await rowsFor(me, 'shared')).toMatchObject([{ itemId, sum: 5, count: 1, ownScore: 5 }])
   })
 
   it('не приводят чужую позицию, пока вкладчиков меньше трёх', async () => {
@@ -204,9 +205,9 @@ describe('общие данные', () => {
 
     const rows = await rowsFor(me, 'shared')
 
-    expect(rows.map((row) => [row.itemId, row.isMine])).toEqual([
-      [mine, true],
-      [theirs, false],
+    expect(rows.map((row) => [row.itemId, row.isMine, row.ownScore])).toEqual([
+      [mine, true, 5],
+      [theirs, false, null],
     ])
     expect(rows.every((row) => row.review === null)).toBe(true)
   })
@@ -218,6 +219,37 @@ describe('общие данные', () => {
 
     expect((await rowsFor(me, 'own'))[0]?.isMine).toBe(true)
   })
+
+  it('отдают мою оценку рядом со средней, а соседу — его, не мою (MOL-202)', async () => {
+    const me = await insertActor(db)
+    const neighbour = await insertActor(db)
+    const itemId = await insertItem(db)
+    await rate(me, itemId, 5)
+    await rate(neighbour, itemId, 4)
+    await rate(await insertActor(db), itemId, 4)
+
+    // «4,3» — троих, а шторке нужна своя: иначе правка вслепую (С-2).
+    expect(await rowsFor(me, 'shared')).toMatchObject([{ sum: 13, count: 3, ownScore: 5 }])
+    expect(await rowsFor(neighbour, 'shared')).toMatchObject([{ sum: 13, count: 3, ownScore: 4 }])
+  })
+
+  it('снятая своя — не своя оценка, а оценённая заново — снова своя (MOL-202)', async () => {
+    const me = await insertActor(db)
+    const itemId = await insertItem(db)
+    await rate(me, itemId, 5)
+    for (let n = 0; n < 3; n += 1) await rate(await insertActor(db), itemId, 2)
+    await withdraw(me, itemId)
+
+    expect(await rowsFor(me, 'shared')).toMatchObject([{ isMine: false, ownScore: null }])
+
+    // Оценить заново — та же строка обратно (MOL-27), с новой цифрой.
+    await db
+      .update(verdictsTable)
+      .set({ deletedAt: null, score: 3 })
+      .where(and(eq(verdictsTable.actorId, me), eq(verdictsTable.itemId, itemId)))
+
+    expect(await rowsFor(me, 'shared')).toMatchObject([{ isMine: true, ownScore: 3, count: 4 }])
+  }, 10_000)
 })
 
 describe('порядок и предел', () => {

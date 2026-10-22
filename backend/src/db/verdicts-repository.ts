@@ -178,6 +178,12 @@ export interface AdviceVerdictRow {
    * withdraw what was never given.
    */
   readonly isMine: boolean
+  /**
+   * This person's own score, in either mode, or `null` without a verdict of their own (MOL-202).
+   * The sheet shows it as «Ваша оценка» and chooses it beforehand: in the shared mode `sum` and
+   * `count` are everyone's, and the average is not this person's opinion.
+   */
+  readonly ownScore: number | null
 }
 
 /**
@@ -448,6 +454,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         count: string
         review: string | null
         isMine: boolean
+        ownScore: number | null
         total: string
       }>(sql`
         with rated as (
@@ -474,6 +481,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
             case when r.contributors >= ${minContributions} then r.contributors else 1 end
               as contributors,
             r.own_review,
+            r.own_score,
             r.own_score is not null as is_mine
           from rated r
           -- Not aliased: the column references above are written by drizzle and carry the
@@ -501,7 +509,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
             ) as warning_rank
           from scored
         )
-        select "itemId", name, sum, count, review, "isMine", total
+        select "itemId", name, sum, count, review, "isMine", "ownScore", total
         from (
           select
             item_id as "itemId",
@@ -512,6 +520,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
             -- Already computed above for the warnings reserve; handed out since MOL-32 so the
             -- screen knows whose verdict it is looking at.
             is_mine as "isMine",
+            own_score as "ownScore",
             total::text as total,
             -- ::numeric rather than a float: the order of a product decision must not depend
             -- on how two doubles compare.
@@ -562,6 +571,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
           count: Number(row.count),
           review: row.review,
           isMine: row.isMine,
+          ownScore: row.ownScore,
         })),
         total: Number(rows[0]?.total ?? 0),
       }

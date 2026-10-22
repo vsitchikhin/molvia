@@ -29,6 +29,7 @@ const take = {
   ratingsCount: 3,
   review: null,
   isMine: true,
+  ownScore: 5,
   places: [market],
 }
 
@@ -40,6 +41,7 @@ const never = {
   ratingsCount: 1,
   review: 'Пахнет крахмалом, а не мясом',
   isMine: true,
+  ownScore: 2,
 }
 
 describe('adviceRowSchema', () => {
@@ -86,9 +88,25 @@ describe('adviceRowSchema', () => {
   it('says whose verdict stands behind it — nothing else in the row does', () => {
     // In the shared mode a row may be entirely other people's, and a review is empty there
     // exactly as it is on one's own verdict without one (MOL-32, А2).
-    expect(adviceRowSchema.parse({ ...never, isMine: false }).isMine).toBe(false)
+    expect(adviceRowSchema.parse({ ...never, isMine: false, ownScore: null }).isMine).toBe(false)
     // Not optional: «whose is it» is a thing the server says, not one it omits.
     expect(adviceRowSchema.safeParse({ ...never, isMine: undefined }).success).toBe(false)
+  })
+
+  it("carries one's own score beside an average, and none on a row that is not one's own (MOL-202)", () => {
+    // The shared mode: «4.3» is three people's, the 5 is the asker's own.
+    expect(adviceRowSchema.parse(take)).toMatchObject({ rating: '4.3', ownScore: 5 })
+    expect(adviceRowSchema.parse({ ...never, isMine: false, ownScore: null }).ownScore).toBeNull()
+    for (const wrong of [0, 6, 4.5, '4']) {
+      expect(adviceRowSchema.safeParse({ ...never, ownScore: wrong }).success).toBe(false)
+    }
+  })
+
+  it('reads a row remembered before its own score was on the wire, as without one (MOL-202)', () => {
+    const remembered: Record<string, unknown> = { ...never }
+    delete remembered.ownScore
+
+    expect(adviceRowSchema.parse(remembered)).toMatchObject({ isMine: true, ownScore: null })
   })
 
   it('refuses a level nobody decided on', () => {

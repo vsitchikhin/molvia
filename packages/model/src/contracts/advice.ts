@@ -69,6 +69,16 @@ const ratedFields = {
    * every save came back 404 with «try again» — a refusal a repeat cannot fix.
    */
   isMine: z.boolean(),
+  /**
+   * This person's own score behind the row, in both modes, and `null` without one (MOL-202, С-2).
+   *
+   * In the shared mode `rating` is an average, and the verdict sheet could not say what the person
+   * had given — amending a score unseen. Their own score is theirs to see, free, as their review is
+   * (Р-19), and tells a stranger nothing: it is never sent on a row that is not theirs, and with
+   * `isMine` it is one column of one statement. `null` also from an answer the phone remembered
+   * before the field existed, as `itemCount` (MOL-128).
+   */
+  ownScore: verdictFields.shape.score.nullable().default(null),
 }
 
 /**
