@@ -6,9 +6,16 @@ import {
   isWireCode,
   spendingAmendBodySchema,
   spendingBodySchema,
+  spendingCategoryAmendSchema,
   spendingCategoryBodySchema,
 } from '@molvia/model'
-import type { SpendingAmendBody, SpendingBody, SpendingCategoryBody, WireCode } from '@molvia/model'
+import type {
+  SpendingAmendBody,
+  SpendingBody,
+  SpendingCategoryAmend,
+  SpendingCategoryBody,
+  WireCode,
+} from '@molvia/model'
 import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
@@ -50,6 +57,7 @@ export type SpendingWrite =
   | { readonly kind: 'remove'; readonly id: string }
   | { readonly kind: 'restore'; readonly id: string }
   | { readonly kind: 'category-add'; readonly body: SpendingCategoryBody }
+  | { readonly kind: 'category-amend'; readonly id: string; readonly body: SpendingCategoryAmend }
   | { readonly kind: 'category-archive'; readonly id: string }
   | { readonly kind: 'category-restore'; readonly id: string }
 
@@ -114,6 +122,12 @@ function encode(write: SpendingWrite): Loose {
       }
     case 'category-add':
       return { kind: write.kind, body: spendingCategoryBodySchema.encode(write.body) }
+    case 'category-amend':
+      return {
+        kind: write.kind,
+        id: write.id,
+        body: spendingCategoryAmendSchema.encode(write.body),
+      }
     default:
       return { ...write }
   }
@@ -132,6 +146,10 @@ function decode(raw: unknown): SpendingWrite | null {
     return body.success ? { kind, body: body.data } : null
   }
   if (typeof id !== 'string' || !isIdentifier(id)) return null
+  if (kind === 'category-amend') {
+    const body = spendingCategoryAmendSchema.safeParse(raw.body)
+    return body.success ? { kind, id, body: body.data } : null
+  }
   if (kind === 'amend') {
     const body = spendingAmendBodySchema.safeParse(raw.body)
     if (!body.success) return null
@@ -259,9 +277,11 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
    * The categories this window wrote that have landed. A category leaves the queue on its answer,
    * and the list that names it is read again only after: in between it stood on no chip, and
    * «Сохранить трату» said «Выберите категорию» over the one just made and chosen. The lists take
-   * these until the server's names them (`categoriesWith` skips one it holds).
+   * these until the server's names them (`categoriesWith` skips one it holds). An amendment
+   * (MOL-285) is kept the same way, the last of each category's — in between, the row went back to
+   * the old name and icon for a round trip.
    */
-  const arrived = ref<Extract<SpendingWrite, { kind: 'category-add' }>[]>([])
+  const arrived = ref<Extract<SpendingWrite, { kind: 'category-add' | 'category-amend' }>[]>([])
   /**
    * The spending just removed, offered back for the ten seconds of its strip on «Траты» and
    * «Деньги» alike, as a trip's is (MOL-76): held by the screen, «Вернуть» went with «Траты» on
@@ -412,6 +432,9 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
       case 'category-add':
         await api.addSpendingCategory(write.body)
         return
+      case 'category-amend':
+        await api.amendSpendingCategory(write.id, write.body)
+        return
       case 'category-archive':
         await api.archiveSpendingCategory(write.id)
         return
@@ -491,6 +514,11 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
         ]
       }
       if (!refusal && write.kind === 'category-add') arrived.value = [...arrived.value, write]
+      if (!refusal && write.kind === 'category-amend')
+        arrived.value = [
+          ...arrived.value.filter((one) => one.kind !== 'category-amend' || one.id !== write.id),
+          write,
+        ]
       if (!refusal && (write.kind === 'remove' || write.kind === 'restore'))
         gone.value = landedAgain(`${GONE_KEY}.${owner}`, write.id, write.kind === 'remove')
       persist(owner)
@@ -671,6 +699,29 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     })
   }
 
+  /**
+   * A category of one's own renamed, redrawn or recoloured (MOL-285): folded into its «Добавить» or
+   * its amendment still waiting — the whole of it either way — else sent after them.
+   */
+  function amendCategory(id: string, body: SpendingCategoryAmend): void {
+    change(() => {
+      const at = kept.findIndex(
+        (item) =>
+          waiting(item) &&
+          ((item.write.kind === 'category-add' && item.write.body.id === id) ||
+            (item.write.kind === 'category-amend' && item.write.id === id)),
+      )
+      const write: SpendingWrite =
+        kept[at]?.write.kind === 'category-add'
+          ? { kind: 'category-add', body: { id, ...body } }
+          : { kind: 'category-amend', id, body }
+      kept =
+        at === -1
+          ? [...kept, { key: newKey(), write }]
+          : kept.map((item, index) => (index === at ? { key: newKey(), write } : item))
+    })
+  }
+
   /** «Убрать» or «Вернуть» a category: the opposite still waiting cancels out. */
   function archiveCategory(id: string, archived: boolean): void {
     const kind = archived ? 'category-archive' : 'category-restore'
@@ -707,6 +758,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     remove,
     restore,
     addCategory,
+    amendCategory,
     archiveCategory,
     dismiss,
   }

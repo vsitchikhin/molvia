@@ -79,6 +79,7 @@ import {
   spendingAmendBodySchema,
   spendingBodySchema,
   spendingCategoriesResponseCodec,
+  spendingCategoryAmendSchema,
   spendingCategoryBodySchema,
   spendingViewCodec,
   expensePatchSchema,
@@ -161,6 +162,7 @@ import type {
   SpendingAmendBody,
   SpendingBody,
   SpendingCategoriesResponse,
+  SpendingCategoryAmend,
   SpendingCategoryBody,
   SpendingView,
   ExpensePatch,
@@ -528,6 +530,14 @@ export interface MolviaClient {
   addSpendingCategory(
     body: SpendingCategoryBody,
   ): Promise<{ categories: SpendingCategoriesResponse; created: boolean }>
+  /**
+   * One's own renamed, redrawn or recoloured (MOL-285), whole: `error.spending_category_taken` for a
+   * live name, `ERROR.NOT_FOUND` for a preset or a category that is not the owner's.
+   */
+  amendSpendingCategory(
+    id: string,
+    body: SpendingCategoryAmend,
+  ): Promise<SpendingCategoriesResponse>
   /** «Убрать из выбора»: nothing is erased, the spendings in it keep it. */
   archiveSpendingCategory(id: string): Promise<SpendingCategoriesResponse>
   /** «Вернуть» a category to the chips. */
@@ -1112,6 +1122,12 @@ export function createClient(options: ClientOptions): MolviaClient {
       )
       return { categories: data, created: status === 201 }
     },
+
+    amendSpendingCategory: async (id, body) =>
+      request(`/spending-categories/${segment(id)}`, spendingCategoriesResponseCodec, {
+        method: 'PATCH',
+        body: encode(spendingCategoryAmendSchema, body),
+      }),
 
     archiveSpendingCategory: async (id) =>
       request(`/spending-categories/${segment(id)}`, spendingCategoriesResponseCodec, {

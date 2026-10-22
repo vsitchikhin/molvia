@@ -39,6 +39,7 @@ const category = (id: string, preset: string) => ({
   preset: preset as 'groceries',
   name: null,
   colour: null,
+  icon: null,
   archived: false,
 })
 

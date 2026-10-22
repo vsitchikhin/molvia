@@ -75,6 +75,7 @@ import {
   receiptStatusSchema,
   storeMemoryKindSchema,
   SPENDING_CATEGORY_COLOURS,
+  spendingIconSchema,
   spendingPresetSchema,
 } from '@molvia/model'
 import type {
@@ -108,6 +109,7 @@ import type {
   ReceiptStatus,
   ReceiptCity,
   StoreMemoryKind,
+  SpendingIcon,
   SpendingPreset,
 } from '@molvia/model'
 
@@ -1689,6 +1691,9 @@ export const spendingCategories = pgTable(
     preset: text('preset').$type<SpendingPreset>(),
     name: text('name'),
     colour: smallint('colour'),
+    // A key of the set (MOL-285); empty on one's own made before it, or by an image rolled back to
+    // before it, and read as the tag — so no row is rewritten and none goes unreadable.
+    icon: text('icon').$type<SpendingIcon>(),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -1709,6 +1714,11 @@ export const spendingCategories = pgTable(
     check(
       'spending_categories_preset_known',
       sql`${table.preset} is null or ${oneOf(table.preset, spendingPresetSchema.options)}`,
+    ),
+    check('spending_categories_icon_own', sql`${table.preset} is null or ${table.icon} is null`),
+    check(
+      'spending_categories_icon_known',
+      sql`${table.icon} is null or ${oneOf(table.icon, spendingIconSchema.options)}`,
     ),
     check(
       'spending_categories_colour_in_palette',

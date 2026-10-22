@@ -90,7 +90,9 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     previousToDay: null,
     byCategory: [{ categoryId: BEAUTY, amount: amd('5000') }],
     slices: [{ categoryId: BEAUTY, amount: amd('5000'), count: 1, level: 1000 }],
-    categories: [{ id: BEAUTY, preset: 'beauty', name: null, colour: null, archived: false }],
+    categories: [
+      { id: BEAUTY, preset: 'beauty', name: null, colour: null, icon: null, archived: false },
+    ],
     days: [
       {
         day: '2026-09-26',

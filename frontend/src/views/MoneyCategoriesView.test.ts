@@ -43,6 +43,7 @@ const preset = (id: string, key: string, archived = false): SpendingCategoryView
   preset: key as 'groceries',
   name: null,
   colour: null,
+  icon: null,
   archived,
 })
 const own = (id: string, name: string, archived = false): SpendingCategoryView => ({
@@ -50,6 +51,7 @@ const own = (id: string, name: string, archived = false): SpendingCategoryView =
   preset: null,
   name,
   colour: 0,
+  icon: 'tag',
   archived,
 })
 

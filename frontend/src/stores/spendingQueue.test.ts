@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE, parseMoney } from '@molvia/model'
-import type { SpendingAmendBody, SpendingBody, SpendingCategoryBody } from '@molvia/model'
+import type {
+  SpendingAmendBody,
+  SpendingBody,
+  SpendingCategoryAmend,
+  SpendingCategoryBody,
+  SpendingCategoryView,
+} from '@molvia/model'
 import { categoriesWith } from '@/components/spending'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
@@ -13,6 +19,7 @@ const amendSpending = vi.fn<(id: string, body: SpendingAmendBody) => Promise<unk
 const removeSpending = vi.fn<(id: string) => Promise<void>>()
 const restoreSpending = vi.fn<(id: string) => Promise<unknown>>()
 const addSpendingCategory = vi.fn<(body: SpendingCategoryBody) => Promise<unknown>>()
+const amendSpendingCategory = vi.fn<(id: string, body: SpendingCategoryAmend) => Promise<unknown>>()
 const archiveSpendingCategory = vi.fn<(id: string) => Promise<unknown>>()
 const restoreSpendingCategory = vi.fn<(id: string) => Promise<unknown>>()
 const spending = vi.fn<(id: string) => Promise<{ revision: number }>>()
@@ -30,6 +37,10 @@ vi.mock('@/api', () => ({
     addSpendingCategory: (body: SpendingCategoryBody) => (
       calls.push(`category-add ${body.id}`),
       addSpendingCategory(body)
+    ),
+    amendSpendingCategory: (id: string, body: SpendingCategoryAmend) => (
+      calls.push(`category-amend ${id} ${body.name} ${body.icon} ${String(body.colour)}`),
+      amendSpendingCategory(id, body)
     ),
     archiveSpendingCategory: (id: string) => (
       calls.push(`category-archive ${id}`),
@@ -74,6 +85,7 @@ describe('spending queue', () => {
       removeSpending,
       restoreSpending,
       addSpendingCategory,
+      amendSpendingCategory,
       archiveSpendingCategory,
       restoreSpendingCategory,
     ])
@@ -638,6 +650,101 @@ describe('spending queue', () => {
     })
   })
 
+  describe("one's own category amended (MOL-285)", () => {
+    const own = (fields: Partial<SpendingCategoryView> = {}): SpendingCategoryView => ({
+      id: TAXI,
+      preset: null,
+      name: 'Такси',
+      colour: 0,
+      icon: 'tag',
+      archived: false,
+      ...fields,
+    })
+
+    it('a category not yet sent takes the amendment into its «Добавить» — one POST, as amended', async () => {
+      const queue = fresh('idle')
+      queue.addCategory({ id: TAXI, name: 'Такси' })
+      queue.amendCategory(TAXI, { name: 'Такси и метро', icon: 'taxi', colour: 4 })
+      expect(queue.pending).toEqual([
+        {
+          kind: 'category-add',
+          body: { id: TAXI, name: 'Такси и метро', icon: 'taxi', colour: 4 },
+        },
+      ])
+      useActorStore().state = 'ready'
+      await queue.flush()
+      expect(calls).toEqual([`category-add ${TAXI}`])
+    })
+
+    it('two amendments waiting are one PATCH, the last; one on the way is never folded into', async () => {
+      const queue = fresh('idle')
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'car', colour: 1 })
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'taxi', colour: 2 })
+      useActorStore().state = 'ready'
+      let land: (value: unknown) => void = () => undefined
+      amendSpendingCategory.mockImplementationOnce(() => new Promise((resolve) => (land = resolve)))
+      const sending = queue.flush()
+      await settled()
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'transport', colour: 3 })
+      land(undefined)
+      await sending
+      await queue.flush()
+      expect(calls).toEqual([
+        `category-amend ${TAXI} Такси taxi 2`,
+        `category-amend ${TAXI} Такси transport 3`,
+      ])
+    })
+
+    it('keeps an amendment made with no signal on the device and sends it later', async () => {
+      const first = fresh('idle')
+      first.amendCategory(TAXI, { name: 'Такси', icon: 'taxi', colour: 5 })
+      const queue = fresh('ready')
+      expect(queue.pending).toEqual([
+        { kind: 'category-amend', id: TAXI, body: { name: 'Такси', icon: 'taxi', colour: 5 } },
+      ])
+      await queue.flush()
+      expect(calls).toEqual([`category-amend ${TAXI} Такси taxi 5`])
+    })
+
+    it('a name taken is a refusal, and nothing of it stays over the list', async () => {
+      amendSpendingCategory.mockRejectedValueOnce(
+        new ApiError(ERROR.SPENDING_CATEGORY_TAKEN, 'name'),
+      )
+      const queue = fresh()
+      queue.amendCategory(TAXI, { name: 'Кафе', icon: 'cafe', colour: 1 })
+      await settled()
+      expect(queue.rejected).toMatchObject([
+        { write: { kind: 'category-amend' }, code: ERROR.SPENDING_CATEGORY_TAKEN },
+      ])
+      expect(categoriesWith([own()], [...queue.arrived, ...queue.pending])).toEqual([own()])
+    })
+
+    // Out of the queue on its answer, the list read again only after: the row must not go back to
+    // the old name and icon for a round trip.
+    it('an amendment that landed stays over the list, the last of the category only', async () => {
+      const queue = fresh()
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'car', colour: 1 })
+      await settled()
+      queue.amendCategory(TAXI, { name: 'Машина', icon: 'car', colour: 6 })
+      await settled()
+      expect(queue.pending).toEqual([])
+      expect(queue.arrived).toHaveLength(1)
+      expect(categoriesWith([own()], [...queue.arrived, ...queue.pending])).toEqual([
+        own({ name: 'Машина', icon: 'car', colour: 6 }),
+      ])
+    })
+
+    it('must not fire: an amendment never draws over a preset', () => {
+      const preset = own({ preset: 'cafe', name: null, colour: null, icon: null })
+      const write = {
+        kind: 'category-amend' as const,
+        id: TAXI,
+        body: { name: 'Кафе', icon: 'cafe' as const, colour: 1 },
+      }
+      expect(categoriesWith([preset], [write])).toEqual([preset])
+    })
+  })
+
   it('drops a broken entry alone and keeps the ones around it', () => {
     localStorage.setItem(
       `molvia.spending-queue.${ME}`,
@@ -646,9 +753,30 @@ describe('spending queue', () => {
         { key: 'b', write: { kind: 'record', body: { id: RENT } } },
         { key: 'c', write: { kind: 'restore', id: 'not-an-id' } },
         { key: 'd', write: { kind: 'category-archive', id: BEAUTY } },
+        { key: 'e', write: { kind: 'category-amend', id: TAXI, body: { name: 'Такси' } } },
+        {
+          key: 'f',
+          write: {
+            kind: 'category-amend',
+            id: TAXI,
+            body: { name: 'Такси', icon: 'taxi', colour: 9 },
+          },
+        },
+        {
+          key: 'g',
+          write: {
+            kind: 'category-amend',
+            id: TAXI,
+            body: { name: 'Такси', icon: 'taxi', colour: 2 },
+          },
+        },
       ]),
     )
     const queue = fresh('idle')
-    expect(queue.pending.map((write) => write.kind)).toEqual(['remove', 'category-archive'])
+    expect(queue.pending.map((write) => write.kind)).toEqual([
+      'remove',
+      'category-archive',
+      'category-amend',
+    ])
   })
 })

@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { parseMoney } from '@molvia/model'
 import type { MoneyMonthView, SpendingCategoryView } from '@molvia/model'
 import {
+  OWN_ICONS,
   asTyped,
   categoriesWith,
+  categoryIcon,
   dayTotalText,
   journalOf,
   journalRowProps,
@@ -35,6 +37,7 @@ const beauty: SpendingCategoryView = {
   preset: 'beauty',
   name: null,
   colour: null,
+  icon: null,
   archived: false,
 }
 
@@ -269,7 +272,24 @@ describe('the categories as the phone knows them', () => {
       [BEAUTY, true],
       [TAXI, false],
     ])
-    expect(list[1]).toMatchObject({ preset: null, name: 'Такси', colour: 0 })
+    expect(list[1]).toMatchObject({ preset: null, name: 'Такси', colour: 0, icon: 'tag' })
+  })
+
+  it('a category made with an icon and a colour chosen keeps them while it waits (MOL-285)', () => {
+    const list = categoriesWith(
+      [beauty],
+      [{ kind: 'category-add', body: { id: TAXI, name: 'Такси', icon: 'taxi', colour: 6 } }],
+    )
+    expect(list[1]).toMatchObject({ name: 'Такси', icon: 'taxi', colour: 6 })
+  })
+
+  it("draws one's own by its icon, one kept from before it by the tag, a preset by its key", () => {
+    const own = { id: TAXI, preset: null, name: 'Такси', colour: 0, archived: false }
+    expect(categoryIcon({ ...own, icon: 'taxi' })).toBe(OWN_ICONS.taxi)
+    expect(categoryIcon({ ...own, icon: 'cafe' })).toBe(OWN_ICONS.cafe)
+    expect(categoryIcon({ ...own, icon: null })).toBe(OWN_ICONS.tag)
+    expect(categoryIcon(beauty)).toBe(OWN_ICONS.beauty)
+    expect(new Set(Object.values(OWN_ICONS)).size).toBe(Object.keys(OWN_ICONS).length)
   })
 })
 
@@ -399,6 +419,7 @@ describe('a line of the journal as its row says it', () => {
     preset: 'groceries',
     name: null,
     colour: null,
+    icon: null,
     archived: false,
   }
 

@@ -5,8 +5,9 @@ import { exchangeDaySchema } from '#model/entities/exchange'
 import { spendingTextSchema } from '#model/entities/spending'
 import { ISSUE } from '#model/support/errors'
 import {
-  SPENDING_CATEGORY_COLOURS,
+  spendingCategoryColourSchema,
   spendingCategoryNameSchema,
+  spendingIconSchema,
   spendingPresetSchema,
 } from '#model/entities/spending-category'
 import type { SpendingCategory } from '#model/entities/spending-category'
@@ -85,27 +86,43 @@ export const spendingViewCodec = z.strictObject({
 })
 export type SpendingView = z.output<typeof spendingViewCodec>
 
-/** «Добавить категорию»: one's own, named by the device, as everything written offline is. */
+/**
+ * «Добавить категорию»: one's own, named by the device, as everything written offline is. The icon
+ * and the colour are chosen (MOL-285); a body queued by an earlier build has neither, and takes the
+ * tag and the palette's next.
+ */
 export const spendingCategoryBodySchema = z.strictObject({
   id: deviceIdSchema,
   name: spendingCategoryNameSchema,
+  icon: spendingIconSchema.optional(),
+  colour: spendingCategoryColourSchema.optional(),
 })
 export type SpendingCategoryBody = z.infer<typeof spendingCategoryBodySchema>
 
 /**
+ * A category of one's own amended (MOL-285, В-1 «а»): its name, icon and colour, whole — sent again,
+ * it is the same state, so a repeat from the queue needs no revision.
+ */
+export const spendingCategoryAmendSchema = z.strictObject({
+  name: spendingCategoryNameSchema,
+  icon: spendingIconSchema,
+  colour: spendingCategoryColourSchema,
+})
+export type SpendingCategoryAmend = z.infer<typeof spendingCategoryAmendSchema>
+
+/**
  * A category as the screen names it: a preset by its key — the screen says it in its language —
- * one's own by its name and a colour of the palette. `archived` is «taken out of the choice»: still
- * the category of the spendings in it, still in their months, offered back in the list.
+ * one's own by its name, a colour of the palette and an icon of the set. `archived` is «taken out of
+ * the choice»: still the category of the spendings in it, still in their months, offered back in the
+ * list.
  */
 export const spendingCategoryViewCodec = z.strictObject({
   id: z.uuid(),
   preset: spendingPresetSchema.nullable(),
   name: z.string().nullable(),
-  colour: z
-    .int()
-    .min(0)
-    .max(SPENDING_CATEGORY_COLOURS - 1)
-    .nullable(),
+  colour: spendingCategoryColourSchema.nullable(),
+  // A default, so an answer the phone kept from before MOL-285 still reads: one's own is the tag.
+  icon: spendingIconSchema.nullable().default(null),
   archived: z.boolean(),
 })
 export type SpendingCategoryView = z.output<typeof spendingCategoryViewCodec>
@@ -116,6 +133,7 @@ export function spendingCategoryViewOf(category: SpendingCategory): SpendingCate
     preset: category.preset,
     name: category.name,
     colour: category.colour,
+    icon: category.icon,
     archived: category.archivedAt !== null,
   }
 }

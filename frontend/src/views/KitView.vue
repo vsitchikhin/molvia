@@ -671,6 +671,7 @@ export default defineComponent({
         preset,
         name: null,
         colour: null,
+        icon: null,
         archived: false,
       }),
     )
@@ -714,6 +715,7 @@ export default defineComponent({
         preset: 'groceries',
         name: null,
         colour: null,
+        icon: null,
         archived: false,
       },
       {
@@ -721,6 +723,7 @@ export default defineComponent({
         preset: 'cafe',
         name: null,
         colour: null,
+        icon: null,
         archived: false,
       },
     ]

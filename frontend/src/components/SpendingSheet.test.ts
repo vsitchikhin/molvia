@@ -70,7 +70,9 @@ function month(spentOn: string): MoneyMonthView {
     previousToDay: null,
     byCategory: [{ categoryId: OTHER, amount: amd('1000') }],
     slices: [{ categoryId: OTHER, amount: amd('1000'), count: 1, level: 1000 }],
-    categories: [{ id: OTHER, preset: 'other', name: null, colour: null, archived: false }],
+    categories: [
+      { id: OTHER, preset: 'other', name: null, colour: null, icon: null, archived: false },
+    ],
     days: [
       {
         day: spentOn,
@@ -258,7 +260,7 @@ describe('SpendingSheet: a record with no purchases handed over (MOL-78, В-1)',
       ...base,
       categories: [
         ...base.categories,
-        { id: GROCERIES, preset: 'groceries', name: null, colour: null, archived },
+        { id: GROCERIES, preset: 'groceries', name: null, colour: null, icon: null, archived },
       ],
     }
   }

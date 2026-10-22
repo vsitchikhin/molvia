@@ -128,6 +128,7 @@ import { createTransferRepository } from '@/db/transfers-repository'
 import {
   addSpendingCategory,
   amendSpending,
+  amendSpendingCategory,
   archiveSpendingCategory,
   recordSpending,
   removeSpending,
@@ -1158,6 +1159,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         restore: (actor, id) => restoreSpending(tripData, actor, id),
         categories: (actor) => spendingCategoriesOf(tripData, actor),
         addCategory: (actor, body) => addSpendingCategory(tripData, actor, body),
+        amendCategory: (actor, id, body) => amendSpendingCategory(tripData, actor, id, body),
         archiveCategory: (actor, id, archived) =>
           archiveSpendingCategory(tripData, actor, id, archived),
         month: (actor, month, cursor) => moneyMonthOf(tripData, actor, month, cursor),

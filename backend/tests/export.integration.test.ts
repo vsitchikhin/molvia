@@ -330,7 +330,7 @@ async function aFullLife(actorId: string, telegramUserId: number) {
   await db.insert(incomeRevisions).values({ incomeId, revision: 1, ...income })
   const own = randomUUID()
   await db.insert(spendingCategories).values([
-    { id: own, actorId, name: 'Такси', colour: 3, archivedAt: at(16) },
+    { id: own, actorId, name: 'Такси', colour: 3, icon: 'taxi', archivedAt: at(16) },
     { id: randomUUID(), actorId, preset: 'groceries' },
   ])
   await db.insert(spendings).values({
