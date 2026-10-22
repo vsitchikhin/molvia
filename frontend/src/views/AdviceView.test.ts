@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
-import { ERROR } from '@molvia/model'
+import { ERROR, adviceResponseSchema } from '@molvia/model'
 import type {
   AdvicePlace,
   AdviceResponse,
@@ -20,7 +20,6 @@ import { createAppI18n } from '@/i18n'
 import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import IconMagnify from '~icons/mdi/magnify'
 import { routes } from '@/router'
-import { forgetWrittenVerdicts } from '@/composables/useAdvice'
 import { useActorStore } from '@/stores/actor'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
 import AdviceView from '@/views/AdviceView.vue'
@@ -45,12 +44,6 @@ vi.mock('@/api', () => ({
 }))
 
 const ME = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
-
-// A verdict written from the screen is kept by the page, across screens (MOL-202, Б1): a fresh page
-// for every test, as a reload makes one.
-beforeEach(() => {
-  forgetWrittenVerdicts()
-})
 
 function place(name: string, scaledMinor: bigint): AdvicePlace {
   return {
@@ -1537,6 +1530,57 @@ describe('AdviceView: the sheet after a save (MOL-202, А1)', () => {
 
     advice.mockRejectedValue(broke())
     const { view } = await render()
+    const sheet = await open(view)
+    expect(sheet.get('.current').text()).toBe('Your rating: 3')
+  })
+
+  it('В1: a reload over the memory from before the save, the server failing — still the 5', async () => {
+    // What the page before left on the shelf: the list as it was, and the write it made after it.
+    localStorage.setItem(
+      `molvia.advice.${ME}`,
+      JSON.stringify({
+        answer: adviceResponseSchema.encode(shared([row(1)])),
+        fetchedAt: new Date(),
+      }),
+    )
+    localStorage.setItem(
+      `molvia.advice-written.${ME}`,
+      JSON.stringify({
+        [ITEM]: { verdict: { score: 5, review: null }, page: 'the page before', after: 7 },
+      }),
+    )
+    advice.mockRejectedValue(broke())
+    const { view } = await render()
+
+    await onFiveAndOneSent(view)
+  })
+
+  it('В1: the write is on the shelf beside the memory, and an answer asked after it lets it go', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+    expect(JSON.parse(localStorage.getItem(`molvia.advice-written.${ME}`) ?? '{}')).toMatchObject({
+      [ITEM]: { verdict: { score: 5, review: null } },
+    })
+
+    advice.mockResolvedValue(shared([row(5, '3.7')]))
+    await view.vm.$nextTick()
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(localStorage.getItem(`molvia.advice-written.${ME}`)).toBeNull()
+  })
+
+  it('В1: a write of the page before is let go by any answer of this one, whatever its number', async () => {
+    localStorage.setItem(
+      `molvia.advice-written.${ME}`,
+      JSON.stringify({
+        [ITEM]: { verdict: { score: 5, review: null }, page: 'the page before', after: 1e9 },
+      }),
+    )
+    advice.mockResolvedValue(shared([row(3, '2.7')]))
+    const { view } = await render()
+
+    expect(localStorage.getItem(`molvia.advice-written.${ME}`)).toBeNull()
     const sheet = await open(view)
     expect(sheet.get('.current').text()).toBe('Your rating: 3')
   })
