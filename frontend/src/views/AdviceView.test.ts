@@ -47,6 +47,7 @@ function place(name: string, scaledMinor: bigint): AdvicePlace {
 const milk: AdviceRow = {
   level: 'take',
   isMine: true,
+  ownScore: 5,
   itemId: 'cccccccc-0000-4000-8000-000000000001',
   name: 'Молоко «Ашхар»',
   rating: '4.6',
@@ -58,6 +59,7 @@ const milk: AdviceRow = {
 const cheese: AdviceRow = {
   level: 'if_cheap',
   isMine: true,
+  ownScore: 3,
   itemId: 'cccccccc-0000-4000-8000-000000000002',
   name: 'Сыр «Чанах»',
   rating: '2.8',
@@ -70,6 +72,7 @@ const cheese: AdviceRow = {
 const sausage: AdviceRow = {
   level: 'never',
   isMine: true,
+  ownScore: 1,
   itemId: 'cccccccc-0000-4000-8000-000000000003',
   name: 'Колбаса «Молочная»',
   rating: '1.4',
@@ -714,7 +717,7 @@ describe('AdviceView', () => {
     const sheet = view.findComponent({ name: 'VerdictEditSheet' })
     expect(sheet.exists()).toBe(true)
     expect(sheet.props('itemId')).toBe(mine.itemId)
-    // Own mode: the figure on the row is this person's, so the scale opens on it.
+    // The scale opens on the person's own score, as the row carries it.
     expect(sheet.props('ownScore')).toBe(1)
     expect(sheet.props('ownReview')).toBe(mine.review)
     expect(sheet.props('mine')).toBe(true)
@@ -729,24 +732,10 @@ describe('AdviceView', () => {
     expect(view.findAllComponents({ name: 'AdviceNeverRow' })).toHaveLength(0)
   })
 
-  it('in the shared mode the sheet is opened with no score chosen', async () => {
-    // The same row that opens pre-chosen in the own mode: here the figure is an average.
+  it('in the shared mode the sheet opens on one`s own score, never the average (MOL-202)', async () => {
+    // «2,3 из 5» is three people's; the person gave 1, and the sheet says so (С-2, Ф-25).
     advice.mockResolvedValue(
-      answer([mine], { geography: { country: 'AM', city: 'Гюмри' }, scope: 'shared' }),
-    )
-    const { view } = await render()
-
-    await view.findComponent({ name: 'AdviceNeverRow' }).trigger('click')
-    await flushPromises()
-
-    const sheet = view.findComponent({ name: 'VerdictEditSheet' })
-    expect(sheet.props('ownScore')).toBeNull()
-    expect(sheet.props('shared')).toBe(true)
-  })
-
-  it('А2: a stranger`s row opens the sheet as «rate it», not as «amend»', async () => {
-    advice.mockResolvedValue(
-      answer([{ ...mine, isMine: false }], {
+      answer([{ ...sausage, rating: '2.3', ratingsCount: 3, ownScore: 1 }], {
         geography: { country: 'AM', city: 'Гюмри' },
         scope: 'shared',
       }),
@@ -756,7 +745,26 @@ describe('AdviceView', () => {
     await view.findComponent({ name: 'AdviceNeverRow' }).trigger('click')
     await flushPromises()
 
-    expect(view.findComponent({ name: 'VerdictEditSheet' }).props('mine')).toBe(false)
+    const sheet = view.findComponent({ name: 'VerdictEditSheet' })
+    expect(sheet.props('ownScore')).toBe(1)
+    expect(sheet.props('shared')).toBe(true)
+  })
+
+  it('А2: a stranger`s row opens the sheet as «rate it», not as «amend»', async () => {
+    advice.mockResolvedValue(
+      answer([{ ...mine, isMine: false, ownScore: null }], {
+        geography: { country: 'AM', city: 'Гюмри' },
+        scope: 'shared',
+      }),
+    )
+    const { view } = await render()
+
+    await view.findComponent({ name: 'AdviceNeverRow' }).trigger('click')
+    await flushPromises()
+
+    const sheet = view.findComponent({ name: 'VerdictEditSheet' })
+    expect(sheet.props('mine')).toBe(false)
+    expect(sheet.props('ownScore')).toBeNull()
   })
 
   it('А4: the age of a remembered list is on the screen once the answer is late', async () => {
@@ -1004,6 +1012,7 @@ describe('AdviceView after the review', () => {
   const lori: AdviceRow = {
     level: 'take',
     isMine: true,
+    ownScore: 5,
     itemId: 'cccccccc-0000-4000-8000-000000000012',
     name: 'Сыр «Лори»',
     rating: '5.0',
@@ -1155,8 +1164,8 @@ describe('AdviceView after the review', () => {
     await flushPromises()
     const sheet = view.findComponent({ name: 'VerdictEditSheet' })
 
-    // An average of three is nobody's own score: nothing is chosen for the person.
-    expect(sheet.props('ownScore')).toBeNull()
+    // «4,0» of three is not the person's 5: the sheet takes the score the row carries (MOL-202).
+    expect(sheet.props('ownScore')).toBe(5)
     expect(sheet.props('shared')).toBe(true)
   })
 

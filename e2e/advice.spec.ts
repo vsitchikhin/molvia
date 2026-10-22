@@ -639,11 +639,33 @@ test('a mis-tapped verdict is amended where it is met, and withdrawn from there 
   // The sheet takes no tap until it has come up: the second tap of a double tap must not
   // press anything inside it (MOL-18).
   await openSheet(page)
+  const sheet = page.locator('dialog[open]')
+
+  // The score as it stands, said and chosen (MOL-202, Ф-25).
+  await expect(sheet.getByText('Your rating: 1')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Rating 1 out of 5' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  // Not now, with its words and in full colour — the kit's look in a real engine, no opacity (Ф-6).
+  const unchanged = sheet.getByRole('button', { name: 'Nothing has changed' })
+  await expect(unchanged).toHaveAttribute('aria-disabled', 'true')
+  await expect(unchanged).toHaveCSS('opacity', '1')
+  const amended: string[] = []
+  page.on('request', (request) => {
+    if (request.method() === 'PATCH') amended.push(request.url())
+  })
+  // Forced past Playwright's own check, which takes `aria-disabled` for disabled: a tap lands.
+  await unchanged.click({ force: true })
+  await expect(sheet).toBeVisible()
+
   await page.getByRole('button', { name: 'Rating 5 out of 5' }).click()
   await page.getByRole('button', { name: 'Save the rating' }).click()
 
   await expect(page.locator('section.take').getByText(name)).toBeVisible()
   await expect(page.locator('section.never')).toHaveCount(0)
+  // One amendment, the save's: the tap on «Nothing has changed» sent none.
+  expect(amended).toHaveLength(1)
 
   // Withdrawn, it leaves the screen altogether — and the purchase goes back to «Ratings».
   await page.locator('section.take').getByRole('button').first().click()

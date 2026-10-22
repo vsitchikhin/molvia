@@ -3,6 +3,20 @@
     <template #title>{{ name }}</template>
     <template #meta>{{ mine ? t('advice.edit.meta') : t('advice.edit.meta_new') }}</template>
 
+    <!-- The score as it stands, kept while another digit is chosen: the point a change is made
+         from, in both modes — the row's figure may be everyone's average (Ф-25, MOL-202). The
+         messages are the app's one global scope; unnamed, intlify warned at every opening. -->
+    <I18nT
+      v-if="mine && ownScore !== null"
+      keypath="advice.edit.current"
+      scope="global"
+      tag="p"
+      class="current"
+    >
+      <template #n>
+        <b>{{ ownScore }}</b>
+      </template>
+    </I18nT>
     <RatingScale v-model="score" />
     <!-- The scale has one undo — a second tap on the chosen digit — and clearing it is not a
          change the server can be asked for: a verdict without a score does not exist. Said
@@ -26,16 +40,17 @@
       <!-- There before its words, with only the text changing: a live region born together with
            what it says is often not read at all (MOL-19). -->
       <p class="line" :class="{ failed: Boolean(failure) }" role="status">{{ status }}</p>
+      <!-- Not now in the focus, saying why (Ф-6): `disabled` left the focus order and a screen
+           reader passed it by, with nothing to say what was missing. -->
       <AppButton
         size="large"
         block
         :busy="sending && !withdrawing"
         :busy-label="t('verdict.sending')"
-        :inactive="withdrawing"
-        :disabled="!ready && !sending"
+        :inactive="withdrawing || !ready"
         @click="save"
       >
-        {{ mine ? t('verdict.save') : t('advice.edit.save_new') }}
+        {{ saveWord }}
       </AppButton>
       <template v-if="mine">
         <AppButton
@@ -59,7 +74,7 @@
 <script lang="ts">
 import { computed, defineComponent, ref, watch } from 'vue'
 import type { PropType } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { Translation, useI18n } from 'vue-i18n'
 import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE, ratingSchema, tidyText } from '@molvia/model'
 import type { VerdictAmendment, WireCode } from '@molvia/model'
@@ -104,9 +119,10 @@ const SPOKEN: Partial<Record<WireCode, string>> = {
  * row is rated with `PUT` and offers no «Снять оценку»; before, every save on one came back
  * 404 under the words «Попробуйте ещё раз», which a repeat could not fix (А2).
  *
- * **The score is offered pre-chosen only when the figure on the row is the person's own.** In
- * the shared mode the row carries an average of several people, and pre-choosing it would let
- * a save quietly write everyone else's average down as this person's opinion.
+ * **The score offered pre-chosen is the person's own, as the server sends it** (`ownScore`,
+ * MOL-202), in both modes, and «Ваша оценка: N» says it over the scale. In the shared mode the
+ * row's figure is an average of several people: pre-chosen, a save would write it down as this
+ * person's opinion, and with nothing chosen they amended a score they could not see (Ф-25).
  *
  * **Withdrawing asks for no confirmation, and says instead what it does.** Rating again brings
  * the same row back with its original `rated_at` (MOL-27), so nothing here is irreversible —
@@ -118,7 +134,7 @@ const SPOKEN: Partial<Record<WireCode, string>> = {
  */
 export default defineComponent({
   name: 'VerdictEditSheet',
-  components: { AppButton, AppField, AppReveal, BottomSheet, RatingScale },
+  components: { AppButton, AppField, AppReveal, BottomSheet, I18nT: Translation, RatingScale },
   props: {
     itemId: { type: String, required: true },
     name: { type: String, required: true },
@@ -126,7 +142,7 @@ export default defineComponent({
     mine: { type: Boolean, required: true },
     /** Whether the row's figures are everyone's: it changes what withdrawing does. */
     shared: { type: Boolean, default: false },
-    /** The person's own score, when the row carries it; null in the shared mode. */
+    /** The person's own score (`AdviceRow.ownScore`), in either mode; null without a verdict. */
     ownScore: { type: Number as PropType<Score | null>, default: null },
     /** The review is always the asker's own, whatever the mode (MOL-31, Р-19). */
     ownReview: { type: String as PropType<string | null>, default: null },
@@ -157,6 +173,11 @@ export default defineComponent({
       props.mine ? scoreChanged.value || reviewChanged.value : score.value !== null,
     )
     const keepsScore = computed(() => props.mine && props.ownScore !== null && score.value === null)
+    // The button's own word says why it is not now: one's own verdict untouched, or none chosen.
+    const saveWord = computed(() => {
+      if (props.mine) return t(ready.value ? 'verdict.save' : 'advice.edit.nothing_changed')
+      return t(ready.value ? 'advice.edit.save_new' : 'verdict.save_disabled')
+    })
 
     // Cleared as soon as anything is touched, and synchronously, so a refusal set inside
     // `save` is not wiped by the same edit that caused it (МР-6, as `VerdictCard` does).
@@ -251,6 +272,7 @@ export default defineComponent({
       unsupported,
       ready,
       keepsScore,
+      saveWord,
       status,
       save,
       withdraw,
@@ -260,6 +282,17 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.current {
+  margin: 0 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-callout);
+
+  b {
+    color: var(--text);
+    font-weight: var(--weight-medium);
+  }
+}
+
 .review {
   margin-top: var(--space-6);
 }
@@ -279,7 +312,7 @@ export default defineComponent({
 .hint {
   margin: var(--space-2) 0 0;
   color: var(--text-muted);
-  font-size: var(--text-caption);
+  font-size: var(--text-footnote);
   text-align: center;
 }
 </style>

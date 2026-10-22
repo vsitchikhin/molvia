@@ -197,7 +197,6 @@ import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import type { StripKind } from '@/components/StatusStrip.vue'
 import VerdictEditSheet from '@/components/VerdictEditSheet.vue'
-import { ownScore } from '@/components/adviceRow'
 import type { Score } from '@/components/rating'
 import { useAdvice } from '@/composables/useAdvice'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
@@ -358,8 +357,8 @@ export default defineComponent({
 
     /**
      * A row found by the search carries the scope of the search's answer, which may not be the
-     * list's — access opened or ran out between the two (review Р-13, adversarial Е): read by the
-     * list's, an average of three was offered pre-chosen as one's own score.
+     * list's — access opened or ran out between the two (review Р-13, adversarial Е). The score is
+     * the row's own since MOL-202; the scope still decides what withdrawing says.
      */
     function edit(row: AdviceRow, answered?: AdviceScope): void {
       const scope = answered ?? advice.scope.value ?? 'own'
@@ -370,7 +369,8 @@ export default defineComponent({
         // a row may be entirely other people's, and nothing else in it says so.
         mine: row.isMine,
         shared: scope === 'shared',
-        score: ownScore(row.rating, scope),
+        // The server's word, never read off `rating`: in the shared mode that is an average.
+        score: row.ownScore,
         review: row.review,
       }
     }

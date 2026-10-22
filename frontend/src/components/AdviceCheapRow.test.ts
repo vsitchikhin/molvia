@@ -27,6 +27,7 @@ function row(places: AdvicePlace[], threshold: UnitPrice | null): CheapRow {
   return {
     level: 'if_cheap',
     isMine: true,
+    ownScore: 3,
     itemId: 'cccccccc-0000-4000-8000-000000000002',
     name: 'Сыр «Чанах»',
     rating: '2.8',

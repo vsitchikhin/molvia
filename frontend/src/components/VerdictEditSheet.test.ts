@@ -101,7 +101,7 @@ describe('VerdictEditSheet', () => {
 
     expect(key(view, 1).attributes('aria-pressed')).toBe('true')
     // Nothing touched yet: there is nothing to save, and an empty patch the server refuses.
-    expect(button(view, 'Save the rating').attributes('disabled')).toBeDefined()
+    expect(button(view, 'Nothing has changed').attributes('aria-disabled')).toBe('true')
 
     await key(view, 4).trigger('click')
     await button(view, 'Save the rating').trigger('click')
@@ -148,15 +148,46 @@ describe('VerdictEditSheet', () => {
     expect(amendVerdict).not.toHaveBeenCalled()
   })
 
-  it('in the shared mode nothing is pre-chosen: the average is not this person`s opinion', async () => {
-    amendVerdict.mockResolvedValue(card())
-    const { view } = await render({ ownScore: null, ownReview: 'Мой отзыв' })
+  it('says the score as it stands over the scale, in the shared mode too (MOL-202, Ф-25)', async () => {
+    const { view } = await render({ ownScore: 4, ownReview: 'Мой отзыв', shared: true })
 
-    for (const score of [1, 2, 3, 4, 5]) {
-      expect(key(view, score).attributes('aria-pressed')).toBe('false')
-    }
+    expect(view.get('.current').text()).toBe('Your rating: 4')
+    expect(key(view, 4).attributes('aria-pressed')).toBe('true')
     // The review is always one's own, whatever the mode — so it is there to be amended.
     expect(view.get('textarea').element.value).toBe('Мой отзыв')
+
+    // Another digit chosen, the line still says what is saved: the point a change is made from.
+    await key(view, 2).trigger('click')
+    expect(view.get('.current').text()).toBe('Your rating: 4')
+  })
+
+  it('says no score of one`s own where there is none to say', async () => {
+    const stranger = await render({ mine: false, shared: true })
+    expect(stranger.view.find('.current').exists()).toBe(false)
+    stranger.view.unmount()
+
+    // An answer remembered before the server sent the score: nothing chosen, nothing said.
+    const remembered = await render({ ownScore: null })
+    expect(remembered.view.find('.current').exists()).toBe(false)
+  })
+
+  it('«Nothing has changed» is not now in the focus, and a tap on it sends nothing (Ф-6)', async () => {
+    const { view } = await render({ ownScore: 3 })
+    const save = button(view, 'Nothing has changed')
+
+    // `aria-disabled`, not `disabled`: it stays in the focus order and is read with its words.
+    expect(save.attributes('disabled')).toBeUndefined()
+    expect(save.attributes('aria-disabled')).toBe('true')
+    ;(save.element as HTMLButtonElement).focus()
+    expect(document.activeElement).toBe(save.element)
+
+    await save.trigger('click')
+    await flushPromises()
+    expect(amendVerdict).not.toHaveBeenCalled()
+
+    // A review touched is a change: the same button, live and with its own word.
+    await view.get('textarea').setValue('Пахнет крахмалом')
+    expect(button(view, 'Save the rating').attributes('aria-disabled')).toBeUndefined()
   })
 
   it('an emptied review is erased rather than left as it was', async () => {
@@ -187,7 +218,7 @@ describe('VerdictEditSheet', () => {
     await key(view, 4).trigger('click')
 
     expect(key(view, 4).attributes('aria-pressed')).toBe('false')
-    expect(button(view, 'Save the rating').attributes('disabled')).toBeDefined()
+    expect(button(view, 'Nothing has changed').attributes('aria-disabled')).toBe('true')
   })
 
   it('А7: a space typed into an empty review is no change, and nothing is sent', async () => {
@@ -196,7 +227,7 @@ describe('VerdictEditSheet', () => {
     const { view } = await render({ ownScore: 3, ownReview: null })
 
     await view.get('textarea').setValue(' ')
-    expect(button(view, 'Save the rating').attributes('disabled')).toBeUndefined()
+    expect(button(view, 'Save the rating').attributes('aria-disabled')).toBeUndefined()
 
     await button(view, 'Save the rating').trigger('click')
     await flushPromises()
@@ -222,8 +253,14 @@ describe('VerdictEditSheet', () => {
     // Nothing to amend and nothing to withdraw: the sheet says so and offers neither.
     expect(view.text()).toContain('You have not rated this yet')
     expect(view.findAll('button').map((b) => b.text())).not.toContain('Withdraw the rating')
-    // A first verdict needs a score: a review alone is not a verdict.
-    expect(button(view, 'Rate it').attributes('disabled')).toBeDefined()
+    // A first verdict needs a score: a review alone is not a verdict — and the button says so.
+    const pick = button(view, 'Pick a rating')
+    expect(pick.attributes('aria-disabled')).toBe('true')
+    await view.get('textarea').setValue('Пахнет крахмалом')
+    await pick.trigger('click')
+    expect(rateItem).not.toHaveBeenCalled()
+    expect(button(view, 'Pick a rating').attributes('aria-disabled')).toBe('true')
+    await view.get('textarea').setValue('')
 
     await key(view, 5).trigger('click')
     await button(view, 'Rate it').trigger('click')
