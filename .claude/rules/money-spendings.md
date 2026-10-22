@@ -444,13 +444,20 @@ nothing up.
   no id are one 404; a live name of one's own is `SPENDING_CATEGORY_TAKEN`, checked under the owner's
   lock as «Добавить» checks it; a removed one may be amended and stays removed. On the phone it is
   `category-amend`, folded whole into its «Добавить» or its amendment still waiting (never into one on
-  the way) — **and never past a write of another category** (adversarial А1): a name is free only after
-  the write that frees it, «Убрать» or a rename of the other; folded in front of it, «Метро» renamed
-  «Такси» after «Убрать» of «Такси» went out first and was a 409, and the spending made in it at the till
-  went with it. **«Вернуть» and «Убрать» still waiting cancel out by the same rule** (adversarial Б2):
-  never when a write of another category stands behind the one taken out — «Убрать» of «Такси» freed the
-  name a rename of «Метро» took after it, and taken out, the rename was refused instead of the «Вернуть»
-  that came last; now both go in their order and the last is what the server refuses. **Kept in `arrived` once landed, the last of each category's, with the moment its answer
+  the way) — **and never past a write of another category that frees a name** (adversarial А1): a name
+  is free only after the write that frees it, «Убрать» or a rename of the other; folded in front of it,
+  «Метро» renamed «Такси» after «Убрать» of «Такси» went out first and was a 409, and the spending made in
+  it at the till went with it. **«Вернуть» and «Убрать» still waiting cancel out by the same rule**
+  (adversarial Б2): a «Убрать» is not taken out from under a write of another category that takes a name
+  — a new one, a rename, «Вернуть» — or the rename was refused instead of the «Вернуть» that came last;
+  a «Вернуть» taken back frees nothing and always cancels. **A new icon or colour of another stands on no
+  name** (`keepsName`, adversarial Б3): past it the queue folds and cancels, or the state the person had
+  already replaced went to the server, and a name made on another phone refused it — «Метро» made at the
+  till, a ride in it, a new icon for «Подарки», «Метро» renamed: the category, the ride and the rename all
+  refused. Only the sheet knows the name before, so `amendCategory` takes its word, required; an
+  amendment queued without it may rename and stands on everything — the safe side. **The price, named:**
+  a rename of another between them still holds the fold, so a state replaced past it goes as it was.
+  **Kept in `arrived` once landed, the last of each category's, with the moment its answer
   came** (`landedAt`): the list is read again only after the answer, and in between the row went back
   to the old name and icon; **a list asked for after that moment holds it** (`categoriesWith`'s
   `askedAt`, review №2), so it is laid only over one asked before — over it, another phone's later
