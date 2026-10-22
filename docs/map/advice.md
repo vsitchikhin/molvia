@@ -81,7 +81,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 
 ## frontend · composables
 
-- `frontend/src/composables/useAdvice.ts` — Composable: the «Что брать» answer split into groups, remembered on the phone, with stale and city-change states.
+- `frontend/src/composables/useAdvice.ts` — Composable: the «Что брать» answer split into groups, remembered on the phone, with stale and city-change states; a verdict written from the sheet, kept until an answer asked after it.
 - `frontend/src/composables/useCheaperHint.ts` — Composable: «Тут дешевле» on the sheet of a purchase (MOL-92) — the server asked once as the sheet opens and waited for, the answer remembered for no signal only, `cheaperHint` of the domain on every keystroke; never a loading or an error.
 - `frontend/src/composables/useAdviceSearch.ts` — Composable: the search on «Что брать» as it is typed — the server's answer, the rhythm of the catalogue search, the remembered list searched offline.
 - `frontend/src/composables/useVerdictQueue.ts` — Composable: the queue of «Оценки» as the phone sees it — server order, saved drafts hidden, refusals first, «Не сейчас».

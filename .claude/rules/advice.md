@@ -380,23 +380,24 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   memory, read by the new build in the own mode, opens the sheet with nothing chosen where the build
   before chose the row's whole figure — until the first answer with a signal, offline, where the sheet
   saves nothing anyway. «Тут дешевле» has its own answer and does not carry it.
-- **After a save the sheet opens on what was written, until the rows are asked for again** (MOL-202,
-  adversarial А1). The rows stay as the answer before the save had them until the next one comes —
-  failed, or still on its way — and a sheet opened on one said «Ваша оценка: 1» over the 5 just
-  saved, and refused the 1 as «Ничего не изменилось». So the server's answer to the write is kept by
-  owner and item (`saved` carries it — its score and review, nothing else; a withdrawal is `null` and
-  opens «Оценить»), and a row older than the write opens the sheet on it: a row on the screen at that
-  moment, or one of the list's from a request asked before it — a refresh already in the air lands
-  after the save with the old figures. A newer row is the server's word again. **Kept by the page, not
-  the screen** (`useAdvice`, adversarial Б1): a step to «Покупки» and back mounts a new screen over the
-  memory written before the save, so the requests are numbered across the page's screens and the
-  memory knows which request it came from (`rememberedBy`); a reload asks afresh and keeps none of it.
-  The search drops the answer of any request older than its last and asks again on a save. Not a
-  second verdict on the phone: the server's own answer, read only as the sheet's starting point.
-  **The prices, named:** the page keeps what a person wrote — their score and review — after «Выйти»
-  until the next load, under their id, read by nobody else; and a verdict changed on another device
-  while this page holds an older write here is shown as written here until the list is read again.
-  **Inherited, not closed:** the rows themselves, and the strip — none after a failed refresh
+- **After a save the sheet opens on what was written, until an answer asked after it comes** (MOL-202,
+  adversarial А1, Б1, В1). The rows stay as the answer before the save had them until then — and that
+  answer may fail, be on its way, or never reach this page: a step to «Покупки» and back mounts a new
+  screen, a reload (iOS putting the app away, «Обновить») a new page, both over the memory written
+  before the save. A sheet opened on such a row said «Ваша оценка: 1» over the 5 just saved, and
+  refused the 1 as «Ничего не изменилось». So the server's answer to the write — its score and review
+  (`saved`), `null` once withdrawn, which opens «Оценить» — **is kept on the shelf beside that memory**,
+  `molvia.advice-written.<owner>`, swept by «Выйти» and erasure with the owner's other drawers, and let
+  go once an answer asked after it is taken. While it is there every row of the list is older than it
+  and opens the sheet on it; so does a row the search showed at the moment of the write, dimmed until
+  the search answers again. **«After» is told without a clock**: the request that answers a save goes
+  out in the very millisecond the write is kept, so the requests of the list are numbered across the
+  screens of a page and a write keeps its page and the last number asked before it — a refresh already
+  in the air lands with the old figures and lets nothing go; any request of a later page is after it.
+  Not a second verdict on the phone: the server's own answer, read only as the sheet's starting point.
+  **The price, named:** two tabs of one person share the shelf, and an answer in one lets the write go
+  in the other, whose rows may still be older — the sheet there is as before the task until its own
+  answer. **Inherited, not closed:** the rows themselves, and the strip — none after a failed refresh
   following a save, as before.
 
 ## The search on «Что брать» (MOL-128)
