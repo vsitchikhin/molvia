@@ -154,6 +154,8 @@ export type ReadOutcome =
        */
       readonly codes?: readonly (string | null)[]
       readonly specification?: 'ok' | 'failed' | 'skipped'
+      /** Whether the shop's memory put each line right (MOL-291), in the lines' order. */
+      readonly remembered?: readonly boolean[]
     }
   | {
       readonly kind: 'failed'
@@ -172,6 +174,8 @@ export interface StoredReceiptLine extends ReceiptLine {
   readonly translation: string | null
   /** `translation` spells a word in letters (MOL-293, В-4). */
   readonly spelled: boolean
+  /** Put right by the shop's memory (MOL-291): `repaired` too. */
+  readonly remembered: boolean
   /** The package's code the tax office's specification gave the line (MOL-234). */
   readonly gtin: string | null
 }
@@ -262,6 +266,11 @@ export interface RecordedReceipt {
   readonly expenses: readonly { readonly position: number; readonly expenseId: string }[]
   /** Lines recorded as read: their cut-out rows are confirmed, every other one goes (В-4). */
   readonly confirmed: readonly number[]
+  /**
+   * Lines whose shelf price the person's word keeps (`as_read`): those recorded as read, and those the shop's
+   * memory put right recorded as shown (MOL-291, В-3 «а»).
+   */
+  readonly priced: readonly number[]
   /**
    * What the person put right before recording, counted in `receipt_days` — or, of a receipt from the
    * tax office, in `tax_receipt_days` (MOL-234).
@@ -554,6 +563,7 @@ function toLine(row: typeof receiptLines.$inferSelect, currency: Currency): Stor
     match: row.match,
     translation: row.translation,
     spelled: row.spelled,
+    remembered: row.remembered,
     gtin: row.gtin,
     printed: row.printed,
     hs: row.hs,
@@ -924,7 +934,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         .update(receiptLines)
         .set({
           asRead: sql`${receiptLines.position} in (${sql.join(
-            [-1, ...recorded.confirmed].map((position) => sql`${position}`),
+            [-1, ...recorded.priced].map((position) => sql`${position}`),
             sql`, `,
           )})`,
         })
@@ -1315,6 +1325,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
               discountMinor: line.discount?.minor ?? null,
               settled: line.settled,
               repaired: line.repaired === true,
+              remembered: outcome.remembered?.[position] === true,
               itemId: outcome.bindings[position]?.itemId ?? null,
               match: outcome.bindings[position]?.match ?? null,
               translation: outcome.bindings[position]?.translation ?? null,

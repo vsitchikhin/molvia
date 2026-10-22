@@ -1,7 +1,9 @@
 import {
   RECEIPT_MODEL_INPUT_MAX,
   RECEIPT_PAGE_MODES,
+  AGGREGATE_MIN_CONTRIBUTIONS,
   bestReading,
+  hundredthsOfMoney,
   linesTotalOf,
   mergeParts,
   modelHeadRows,
@@ -12,6 +14,7 @@ import {
   receiptCityOf,
   receiptDateOf,
   receiptTextOfModel,
+  rememberedReading,
   unparsedFigures,
   receiptTimeOf,
   receiptLineOf,
@@ -20,9 +23,18 @@ import {
   verifiedReading,
   worstCallMicroUsd,
 } from '@molvia/model'
-import type { Currency, PhotoReading, ReceiptLine, ReceiptText, TextRow } from '@molvia/model'
+import type {
+  Currency,
+  PhotoReading,
+  ReceiptLine,
+  ReceiptText,
+  RememberedPrices,
+  TextRow,
+} from '@molvia/model'
 import { z } from 'zod'
 import type { ModelSpendRepository } from '@/db/model-spend-repository'
+import { memoryKey } from '@/db/store-memory-repository'
+import type { StoreMemoryRepository } from '@/db/store-memory-repository'
 import type {
   ClaimedReceipt,
   LineBinding,
@@ -80,6 +92,8 @@ export interface ReadReceiptsDeps {
   readonly report: (event: ReadReport) => void
   /** The model, where its key is set (MOL-272); without it Tesseract reads every receipt. */
   readonly model?: ReceiptModelDeps | null
+  /** The shops' memory, whose shelf prices vote in a line's digits (MOL-291); without it none do. */
+  readonly storeMemory?: Pick<StoreMemoryRepository, 'recall'> | null
   readonly now?: () => Date
 }
 
@@ -101,6 +115,8 @@ export type ReadReport =
       readonly tokens: ModelPaid['tokens'] | null
       /** How many of the model's figures no rule read (MOL-294): a count, never the figures (Т-8). */
       readonly unparsed: number | null
+      /** Lines the shop's memory put right (MOL-291): a count, never a price. */
+      readonly remembered: number
     }
   | { readonly kind: 'reader_unavailable'; readonly reason: string }
   /**
@@ -239,7 +255,10 @@ async function readByModel(
     return null
   }
   const { currency } = receiptCard(claimed.country)
-  const text = receiptTextOfModel(photoReading, reading.answer)
+  const first = receiptTextOfModel(photoReading, reading.answer)
+  // the tax number and the articles are the reading's: the memory is asked once they are known (MOL-291)
+  const prices = await rememberedPrices(deps, claimed, first, currency)
+  const text = prices.size === 0 ? first : receiptTextOfModel(photoReading, reading.answer, prices)
   const unparsed = unparsedFigures(photoReading, reading.answer)
   const shown = verifiedReading(text, { byModel: true })
   const head = headOf(shown, currency, [modelHeadRows(reading.answer)])
@@ -291,7 +310,10 @@ async function readByOcr(
     }
     readings.push(mergeParts(photoReading, parts))
   }
-  const text = bestReading(photoReading, readings)
+  const chosen = bestReading(photoReading, readings)
+  // the shop's memory, after the parse chose its reading: the price by the card's swaps (MOL-291)
+  const prices = await rememberedPrices(deps, claimed, chosen, currency)
+  const text = rememberedReading(chosen, prices, photoReading.swaps)
   // a figure goes to the review as read only where it is verified, the rest is left empty (MOL-255)
   const shown = verifiedReading(text)
   const head = headOf(shown, currency, readings)
@@ -374,7 +396,45 @@ async function parsed(
       ),
     bindings,
     images,
+    remembered: shown.lines.map((line) => line.repaired === true && line.remembered === 'repaired'),
   }
+}
+
+/**
+ * The shelf prices the shop's memory holds for a reading's articles (MOL-291), in the till's hundredths: the
+ * person's own word's, else the lower median of three prices or more — other people's with no access (owner's
+ * В-1 «в»): the vote shows nothing but a figure printed on the person's own paper. None without the seller's tax
+ * number; none where the memory cannot be read — a reading is never lost to it, and the owner hears of it.
+ */
+async function rememberedPrices(
+  { storeMemory, report }: ReadReceiptsDeps,
+  claimed: ClaimedReceipt,
+  text: ReceiptText,
+  currency: Currency,
+): Promise<RememberedPrices> {
+  const skus = [...new Set(text.lines.flatMap((line) => (line.sku ? [line.sku] : [])))]
+  if (!storeMemory || text.tin === null || skus.length === 0) return new Map()
+  let recalled
+  try {
+    recalled = await storeMemory.recall(
+      claimed.actorId,
+      text.tin,
+      skus.map((key) => ({ kind: 'sku' as const, key })),
+      currency,
+    )
+  } catch (error) {
+    report({ kind: 'error', error })
+    return new Map()
+  }
+  const prices = new Map<string, number>()
+  for (const sku of skus) {
+    const word = recalled.get(memoryKey({ kind: 'sku', key: sku }))
+    if (word === undefined) continue
+    const price =
+      word.ownPrice ?? (word.priced >= AGGREGATE_MIN_CONTRIBUTIONS ? word.sharedPrice : null)
+    if (price !== null) prices.set(sku, hundredthsOfMoney(price))
+  }
+  return prices
 }
 
 /** The item lines, row by row — never the head with the customer's name, never the total. */
@@ -478,6 +538,7 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
       costMicroUsd: paid?.costMicroUsd ?? null,
       tokens: paid?.tokens ?? null,
       unparsed,
+      remembered: outcome.kind === 'parsed' ? (outcome.remembered ?? []).filter(Boolean).length : 0,
     })
   }
 }

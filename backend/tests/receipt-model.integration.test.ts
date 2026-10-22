@@ -8,6 +8,7 @@ import type { FastifyInstance } from 'fastify'
 import { createItemRepository } from '@/db/items-repository'
 import { createModelSpendRepository } from '@/db/model-spend-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
+import { createStoreMemoryRepository } from '@/db/store-memory-repository'
 import {
   actors,
   modelReceiptDays,
@@ -16,6 +17,7 @@ import {
   receiptLineImages,
   receiptLines,
   receipts,
+  storeMemory as storeMemoryTable,
 } from '@/db/schema'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
 import { ModelRejected, ModelUnavailable, receiptModel } from '@/receipts/model-reader'
@@ -26,13 +28,14 @@ import { RECEIPT_MODEL_WAIT_MS, readQueuedReceipts } from '@/usecases/read-recei
 import type { ReadReport } from '@/usecases/read-receipts'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertPlace, insertTrip, signIn } from './fixtures'
+import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
 // Which reader reads a receipt (MOL-272): the model for whoever it is granted to and accepted edition 3,
 // under the month's cap, Tesseract otherwise and whenever the model is not the one to (В-1 «а»).
 
 const { db, close } = connectDrizzle()
 const repository = createReceiptRepository(db)
+const memory = createStoreMemoryRepository(db)
 const spend = createModelSpendRepository(db, true)
 const CAP = 200_000_000
 let app: FastifyInstance
@@ -211,6 +214,7 @@ async function readAll(
         lines,
       ),
     model: model === null ? null : { reader: model, spend, capMicroUsd: cap },
+    storeMemory: memory,
     ...(now === undefined ? {} : { now }),
   })
   return reports
@@ -607,6 +611,141 @@ describe('what the model read', () => {
   }, 30_000)
 })
 
+describe('the shop’s memory in the digits (MOL-291)', () => {
+  const TIN = '01234567'
+  const BUTTER = '1110004'
+  // printed 1 × 550 − 5,5 = 544,5, copied 650 / 5,6 / 644,6; the total in one place only, so the font's swaps by the
+  // total (MOL-290) put nothing right — the memory alone
+  const butter = {
+    printed: 'Կարագ «Օրինակ»',
+    code: '0405',
+    article: BUTTER,
+    quantity: '1',
+    unit: 'pcs' as const,
+    unit_price: '650',
+    discount: '5.6',
+    sum: '644.6',
+  }
+  const answer = (over: Partial<ModelReceipt> = {}): ModelReceipt => ({
+    ...ANSWER,
+    lines: [...ANSWER.lines, butter],
+    totals: [{ label: 'Ընդամենը', amount: '1571.60' }],
+    ...over,
+  })
+  const model = (copied = answer()) =>
+    fakeModel(() =>
+      Promise.resolve({ kind: 'read', answer: copied, costMicroUsd: 1_000, tokens: TOKENS }),
+    )
+  const say = async (actorId: string, itemId: string, drams = 550) =>
+    memory.remember(actorId, TIN, [
+      { kind: 'sku', key: BUTTER, itemId, price: { minor: BigInt(drams * 100), currency: 'AMD' } },
+    ])
+  const butterOf = async (id: string) =>
+    (
+      await db
+        .select()
+        .from(receiptLines)
+        .where(sql`${receiptLines.receiptId} = ${id} and ${receiptLines.position} = 2`)
+    )[0]
+
+  it('puts a line right by the person’s own shelf price, and leaves it empty with none', async () => {
+    const item = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    const me = await person(LATER)
+    await say(me.id, item)
+    const mine = await queued(me)
+    const someone = await person(LATER)
+    const theirs = await queued(someone)
+    const reports = await readAll(benchReader(), model())
+    expect(await butterOf(mine)).toMatchObject({
+      priceMinor: 55_000n,
+      discountMinor: 550n,
+      sumMinor: 54_450n,
+      repaired: true,
+      remembered: true,
+    })
+    // the reading of a person the memory has no word of, and only one stranger's: as before
+    expect(await butterOf(theirs)).toMatchObject({ sumMinor: null, remembered: false })
+    expect(reports.flatMap((r) => (r.kind === 'read' ? [r.remembered] : []))).toEqual([1, 0])
+  }, 30_000)
+
+  it('takes other people’s price from three of them, with no access (owner’s В-1 «в»)', async () => {
+    const item = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    await say(await insertActor(db), item)
+    await say(await insertActor(db), item)
+    const me = await person(LATER)
+    const two = await queued(me)
+    await readAll(benchReader(), model())
+    expect((await butterOf(two))?.remembered).toBe(false)
+    await say(await insertActor(db), item)
+    const three = await queued(me)
+    await readAll(benchReader(), model())
+    expect(await butterOf(three)).toMatchObject({ priceMinor: 55_000n, remembered: true })
+  }, 30_000)
+
+  it('asks nothing without the seller’s tax number', async () => {
+    const item = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    const me = await person(LATER)
+    await say(me.id, item)
+    const id = await queued(me)
+    await readAll(benchReader(), model(answer({ id_rows: ['ԿՀ: 000123'] })))
+    expect((await butterOf(id))?.remembered).toBe(false)
+  }, 30_000)
+
+  it('keeps the remembered price in the person’s word once recorded as shown (owner’s В-3 «а»)', async () => {
+    const butterItem = await insertItem(db, {
+      name: 'Масло сливочное',
+      searchKey: 'maslo slivochnoe',
+    })
+    const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+    const bread = await insertItem(db, { name: 'Хлеб', searchKey: 'hleb' })
+    const me = await person(LATER)
+    await say(me.id, butterItem)
+    const id = await queued(me)
+    await readAll(benchReader(), model())
+    const place = await insertPlace(db)
+    const recorded = await app.inject({
+      method: 'POST',
+      url: `/receipts/${id}/record`,
+      headers: { cookie: me.cookie, 'x-molvia-today': '2026-10-22' },
+      payload: {
+        tripId: randomUUID(),
+        place: { id: place },
+        purchasedOn: '2026-10-08',
+        lines: [
+          {
+            position: 0,
+            skip: false,
+            item: { id: milk },
+            quantity: { value: '2', unit: 'piece' },
+            amount: { amount: '740', currency: 'AMD' },
+          },
+          {
+            position: 1,
+            skip: false,
+            item: { id: bread },
+            quantity: { value: '1', unit: 'piece' },
+            amount: { amount: '287.1', currency: 'AMD' },
+          },
+          {
+            position: 2,
+            skip: false,
+            item: { id: butterItem },
+            quantity: { value: '1', unit: 'piece' },
+            amount: { amount: '544.5', currency: 'AMD' },
+          },
+        ],
+      },
+    })
+    expect(recorded.statusCode).toBe(200)
+    expect((await butterOf(id))?.asRead).toBe(true)
+    const words = await db
+      .select()
+      .from(storeMemoryTable)
+      .where(sql`${storeMemoryTable.actorId} = ${me.id} and ${storeMemoryTable.key} = ${BUTTER}`)
+    expect(words.map((word) => word.priceMinor)).toEqual([55_000n])
+  }, 30_000)
+})
+
 describe('the key against a second record (Т-11, adversarial А5, А6, review №10)', () => {
   const as = (id_rows: string[], over: Partial<ModelReceipt> = {}) =>
     fakeModel(() =>
@@ -628,6 +767,7 @@ describe('the key against a second record (Т-11, adversarial А5, А6, review �
       tripId,
       expenses: [],
       confirmed: [],
+      priced: [],
       edits: { lines: 1, edited: 0, skipped: 0, item: 0, figures: 0, totalCorrected: false },
       source: 'photo',
       codesWritten: 0,
@@ -714,6 +854,7 @@ describe('the measure of 0.2r by its reader (MOL-272, В-6 «а»)', () => {
       tripId,
       expenses: [],
       confirmed: [],
+      priced: [],
       edits: { lines: 2, edited: 1, skipped: 0, item: 1, figures: 0, totalCorrected: false },
       source: 'photo',
       codesWritten: 0,
