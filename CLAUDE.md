@@ -661,6 +661,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   another person's shelf price only with access and from three prices, their lower median. **A person's word
   is what their last line still there says** (MOL-240): settled on every path that deletes a purchase,
   under the person's lock, and whole once the API listens — never on its way there.
+- **The shop's memory votes in a line's digits, weaker than the total** (MOL-291): asked at reading by the tax number
+  and the articles, the person's own price, else from three with no access (В-1 «в»); it vouches for the price alone,
+  one the reader may have confused — a line as printed it confirms, one that does not hold it puts right under
+  «проверьте» (Tesseract's other figures as printed, to the hundredth), one as printed a digit off it empties (В-2 «б»)
+  unless the total takes its reading; put right and recorded as shown, the price stays in the word (В-3 «а»).
 - **A place keeps no tax number**: the place of a seller is where its receipts were recorded, read as
   the memory is; a recorded receipt is not removed while its trip is there — its row dates the trip.
 - **On the phone (MOL-127) a receipt is the country's version, never a flag** (Р-1); its photo is
