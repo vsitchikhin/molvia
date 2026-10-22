@@ -24,10 +24,28 @@ const NODES = [
   node('Корм для собак', ['շան կեր'], ['2309']),
   node('Наполнитель для лотка', ['լցանյութ'], ['3824']),
 ]
-const WORDS = { կաթ: 'молоко', կատու: 'кошка', կատվի: 'кошка', ավազ: 'песок' }
+const WORDS = {
+  կաթ: 'молоко',
+  կատու: 'кошка',
+  կատվի: 'кошка',
+  ավազ: 'песок',
+  շոկոլադ: 'шоколад',
+  թխվածքաբլիթ: 'печенье',
+  սոսինձ: 'клей',
+  յոգուրտ: 'йогурт',
+  ելակ: 'клубника',
+  ելակի: 'клубника',
+  դառը: 'горький',
+}
 const matcher = createLineMatcher(NODES, WORDS)
 
 describe('the words of a line', () => {
+  it('glosses «և» spelt any way the dictionary keys it, «եւ» of old too (review 6, Е3)', () => {
+    const old = createLineMatcher([], { սերկեւիլ: 'айва', սերկևիլի: 'айва', մուրաբա: 'варенье' })
+    expect(old.gloss('Մուրաբա սերկեւիլի')).toBe('варенье айва')
+    expect(old.gloss('Սերկեւիլ')).toBe('айва')
+  })
+
   it('keeps Armenian words of two letters or more, lower case, «և» spelt out', () => {
     expect(receiptWords('0401/1163909 Կաթ «Իգիթ» 3.2% 1լ')).toEqual(['կաթ', 'իգիթ', '1լ'])
     expect(receiptWords('ԵՐԵՎԱՆ և')).toEqual(['երեվան', 'եվ'])
@@ -37,21 +55,18 @@ describe('the words of a line', () => {
 
 describe('a line to an item by its names (MOL-126)', () => {
   it('finds the item and picks the variety by the fat printed', () => {
-    expect(matcher.match('Կաթ «Իգիթ» 3.2% 1լ', '0401')).toEqual({
-      itemId: 'Молоко 3,2%',
-      far: false,
-    })
-    expect(matcher.match('Կաթ «Իգիթ» 1լ', '0401')).toEqual({ itemId: 'Молоко', far: false })
+    expect(matcher.match('Կաթ 3.2% 1լ', '0401')).toEqual({ itemId: 'Молоко 3,2%', far: false })
+    expect(matcher.match('Կաթ 1լ', '0401')).toEqual({ itemId: 'Молоко', far: false })
   })
 
-  it('takes a word one edit off, and a word the till cut', () => {
-    expect(matcher.match('Շոկալադ «Գրանդ»', null)?.itemId).toBe('Шоколад')
-    expect(matcher.match('Թխվածքաբլ. կարագով', null)?.itemId).toBe('Печенье')
+  it('takes a name’s word one edit off, the line’s kind being the dictionary’s', () => {
+    expect(matcher.match('Շոկոլադ դառը', null)?.itemId).toBe('Шоколад')
+    expect(matcher.match('Թխվածքաբլիթ կարագով', null)?.itemId).toBe('Печенье')
   })
 
   it('rules out by the heading what the line cannot be, a swapped digit of it allowed', () => {
-    // milk is no glue: what is left is the heading's one item, far
-    expect(matcher.match('Կաթ', '3506')).toEqual({ itemId: 'Клей', far: true })
+    // milk is no glue, and the heading's one item is no milk either (MOL-293)
+    expect(matcher.match('Կաթ', '3506')).toBeNull()
     expect(matcher.match('Կաթ', '9999')).toBeNull()
     expect(matcher.match('Թխվածքաբլիթ', '1906')?.itemId).toBe('Печенье')
   })
@@ -60,19 +75,62 @@ describe('a line to an item by its names (MOL-126)', () => {
     expect(matcher.match('կովի միս', null)).toBeNull()
   })
 
-  it('falls back to the heading: one item left, or the one sharing a stem with the gloss — far', () => {
-    expect(matcher.match('ՏՈՖՈՒ ՀՈՂ', '3824')).toEqual({
-      itemId: 'Наполнитель для лотка',
-      far: true,
-    })
-    expect(matcher.match('ՎԻՆՆԻ կատու', '2309')).toEqual({ itemId: 'Корм для кошек', far: true })
-    expect(matcher.match('ՎԻՆՆԻ', '2309')).toBeNull()
+  it('falls back to the heading only for an item the line names whole and by its kind — far', () => {
+    const heading = createLineMatcher(
+      [node('Песок кошка', [], ['2508']), node('Песок', [], ['2508'])],
+      WORDS,
+    )
+    expect(heading.match('Ավազ կատու', '2508')).toEqual({ itemId: 'Песок кошка', far: true })
+    // the heading alone names nothing the line does not print (MOL-293): a cat's food, a litter
+    expect(matcher.match('ՏՈՖՈՒ ՀՈՂ', '3824')).toBeNull()
+    expect(matcher.match('ՎԻՆՆԻ կատու', '2309')).toBeNull()
     // a swapped digit rules out, never chooses: 3824 read as 8824 chooses nothing
-    expect(matcher.match('ՏՈՖՈՒ ՀՈՂ', '8824')).toBeNull()
+    expect(heading.match('Ավազ կատու', '2509')).toBeNull()
   })
 
   it('finds nothing in a line with no Armenian word and no heading', () => {
     expect(matcher.match('Coca-Cola 1.5L', null)).toBeNull()
+  })
+})
+
+describe('an item only by the line’s kind and brand (MOL-293, В-1 «а»)', () => {
+  const branded = createLineMatcher(
+    [...NODES, node('Клубника', ['ելակ'], ['0810']), node('Йогурт', ['յոգուրտ'], ['0403'])],
+    WORDS,
+  )
+
+  it('never finds an item by a word of a flavour: a strawberry yoghurt is no strawberry', () => {
+    expect(branded.match('Յոգուրտ ելակի 2% 130գր', null)).toEqual({ itemId: 'Йогурт', far: false })
+    // with no yoghurt in the catalogue there is nothing, never the fruit
+    const noYoghurt = createLineMatcher([node('Клубника', ['ելակ'], ['0810'])], WORDS)
+    expect(noYoghurt.match('Յոգուրտ ելակի 2% 130գր', null)).toBeNull()
+    // a milk of a flavour is a milk: the item names nothing the line has not
+    expect(branded.match('Կաթ ելակով', null)?.itemId).toBe('Молоко')
+  })
+
+  it('takes for two things side by side only a name that says both (adversarial Б1)', () => {
+    // a yoghurt of strawberries, or strawberries: the till does not say which comes first
+    expect(branded.match('Ելակ յոգուրտ', null)).toBeNull()
+    expect(branded.match('Յոգուրտ ելակ', null)).toBeNull()
+    const both = createLineMatcher(
+      [...NODES, node('Йогурт клубничный', ['յոգուրտ ելակ'], [])],
+      WORDS,
+    )
+    expect(both.match('Ելակ յոգուրտ', null)?.itemId).toBe('Йогурт клубничный')
+  })
+
+  it('gives a line printing a brand no item without that brand', () => {
+    expect(branded.match('Յոգուրտ «Երեմյան Փրոդաքթս» ելակ 2%', null)).toBeNull()
+    expect(matcher.match('Կաթ «Իգիթ» 3.2% 1լ', '0401')).toBeNull()
+  })
+
+  it('finds no item whose name the line’s kind is not in, however its words are', () => {
+    expect(branded.match('Շոկոլադ', '1806')?.itemId).toBe('Шоколад')
+    // a kind the dictionary has not may be a letter lost, and its seed's name says it then: «Շոկլադ» is
+    // chocolate; a letter misread is another word, «Շոկալադ» nothing (adversarial Б4)
+    expect(branded.match('Շոկլադ', null)?.itemId).toBe('Шоколад')
+    expect(branded.match('Շոկալադ', null)).toBeNull()
+    expect(branded.match('Շոկ', null)).toBeNull()
   })
 })
 

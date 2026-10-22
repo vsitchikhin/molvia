@@ -9,6 +9,7 @@ import {
   modelHeadRows,
   modelReceiptSchema,
   receiptTextOfModel,
+  unparsedFigures,
 } from '#model/entities/receipt-model'
 import { verifiedReading } from '#model/entities/receipt-verify'
 import type { ModelReceipt } from '#model/entities/receipt-model'
@@ -59,7 +60,7 @@ describe('a model’s answer as the parse’s reading (MOL-272)', () => {
   })
 
   it('takes no figure that is not a number of its kind', () => {
-    const odd = ['5 403,12', '5403,12', '-5', '1.234', 'abc', '', ' ']
+    const odd = ['-5', '1.234', '1,234.56', '0,5,0', '12 34', '5 4031', 'abc', '', ' ']
     for (const sum of odd) expect(figures(answer({ lines: [line({ sum })] }))[0]?.[2]).toBeNull()
     expect(figures(answer({ lines: [line({ quantity: '0.4525' })] }))[0]?.[0]).toBeNull()
     expect(figures(answer({ lines: [line({ quantity: '0.452' })] }))[0]?.[0]).toBe(452)
@@ -155,9 +156,23 @@ describe('a model’s answer as the parse’s reading (MOL-272)', () => {
       '01282006',
       '99784818',
     ])
-    // two fiscal numbers — a prepayment slip, two receipts on a photo — or two tax numbers: none is the key
-    expect(key('ՀՎՀՀ:01234567', 'Ֆիսկալ համար 27410811', 'Ֆիսկալ համար 27410812')).toEqual([
+    // two fiscal numbers — a prepayment slip over «Ереван Сити»'s receipt — are the pair, in whichever order the
+    // model copied them (MOL-293, В-3 «а»); three are none, and two tax numbers no tax number
+    expect(key('ՀՎՀՀ:01234567', 'Ֆիսկալ համար 58899619', 'Ֆիսկալ համար 34408642')).toEqual([
       '01234567',
+      '34408642+58899619',
+    ])
+    expect(key('Ֆիսկալ համար 34408642', 'ԿՀ: 70548', 'Ֆիսկալ համար 58899619')).toEqual([
+      null,
+      '34408642+58899619',
+    ])
+    expect(key('Ֆիսկալ համար 27410811', 'Ֆիսկալ համար 27410812', 'Ֆիսկալ համար 27410813')).toEqual([
+      null,
+      null,
+    ])
+    // either of the pair printed under another label too is a constant of the till: no key (А6, round 4)
+    expect(key('ԳՀ:55512345', 'Ֆիսկալ համար 55512345', 'Ֆիսկալ համար 27410812')).toEqual([
+      null,
       null,
     ])
     expect(key('ՀՎՀՀ:01234567', 'ՀՎՀՀ:01234568', 'Ֆիսկալ համար 27410811')).toEqual([
@@ -174,6 +189,83 @@ describe('a model’s answer as the parse’s reading (MOL-272)', () => {
   it('names the city where the head’s address does', () => {
     expect(receiptCityOf(modelHeadRows(answer()))).toBe('Гюмри')
     expect(modelHeadRows(answer({ shop: null, address: ' ' }))).toEqual([])
+  })
+})
+
+describe('a figure in any spelling the model writes it (MOL-294)', () => {
+  const sumOf = (sum: string) => figures(answer({ lines: [line({ sum })] }))[0]?.[2]
+
+  it('reads thousands grouped by a space, a no-break one and a narrow one', () => {
+    for (const sum of ['1 234.56', '1\u00a0234.56', '1\u202f234.56'])
+      expect(sumOf(sum)).toBe(123_456)
+    expect(sumOf('5 403,12')).toBe(540_312)
+    expect(sumOf('1 000 000')).toBe(100_000_000)
+  })
+
+  it('reads a comma for the point where it is the only one and no point stands', () => {
+    expect(sumOf('5403,12')).toBe(540_312)
+    expect(sumOf('0,5')).toBe(50)
+    const [weighed] = figures(answer({ lines: [line({ quantity: '0,452', unit: 'kg' })] }))
+    expect(weighed?.[0]).toBe(452)
+  })
+
+  it('reads a minus before a line’s discount as its size, and before nothing else', () => {
+    for (const discount of ['-0.50', '−0.50', '- 0,50']) {
+      expect(figures(answer({ lines: [line({ discount })] }))[0]?.[3]).toBe(50)
+    }
+    expect(sumOf('-740')).toBeNull()
+    const [negative] = figures(answer({ lines: [line({ quantity: '-2', unit_price: '-370' })] }))
+    expect([negative?.[0], negative?.[1]]).toEqual([null, null])
+  })
+
+  it('reads a summary’s discount with its minus, never a total: a negative total is a refund', () => {
+    const lines = [line(), line({ quantity: '1', unit_price: '960', sum: '960' })]
+    const refund = read(answer({ lines, totals: [{ label: 'Ընդամենը', amount: '-1700.00' }] }))
+    expect([refund.totalHundredths, refund.readTotalHundredths]).toEqual([null, null])
+    const grouped = read(answer({ lines, totals: [{ label: 'Ընդամենը', amount: '1 700,00' }] }))
+    expect([grouped.totalHundredths, grouped.balanced]).toEqual([170_000, true])
+  })
+
+  it('reads a receipt whose every discount carries a minus as the one without it', () => {
+    // «Ереван Сити»'s card: 1 % off each line, 17,00 sent to the card (MOL-289)
+    const carded = [
+      line({ quantity: '2', unit_price: '370', discount: '7.4', sum: '732.6' }),
+      line({ quantity: '1', unit_price: '960', discount: '9.6', sum: '950.4' }),
+    ]
+    const totals = [
+      { label: 'Ընդամենը', amount: '1683.02' },
+      { label: '/ԱԱՀ-ով հարկվող/ =', amount: '1683.00' },
+      { label: 'Ընդամենը:', amount: '1700.00' },
+      { label: 'Վճարված է PosTerminal:', amount: '1700.00' },
+      { label: 'Զեղչ գործարքից:', amount: '17.00' },
+    ]
+    const signed = carded.map((one) => ({ ...one, discount: `-${one.discount ?? ''}` }))
+    const minusTotals = totals.map((one) =>
+      one.label.startsWith('Զեղչ') ? { ...one, amount: '-17.00' } : one,
+    )
+    const plain = verifiedReading(read(answer({ lines: carded, totals })))
+    const minus = verifiedReading(read(answer({ lines: signed, totals: minusTotals })))
+    expect(minus).toEqual(plain)
+    // every line kept as read: the trace of 36f99484 was every one emptied, the total still shown
+    expect(minus.lines.every((one) => one.asPrinted && one.sumHundredths !== null)).toBe(true)
+    expect([minus.layout, minus.totalHundredths, minus.cashbackHundredths]).toEqual([
+      'card',
+      170_000,
+      1_700,
+    ])
+  })
+
+  it('counts the figures no rule reads, and never an empty one', () => {
+    const read0 = answer({ lines: [line(), line({ discount: '-1.5', sum: '1 480,00' })] })
+    expect(unparsedFigures(ARMENIAN_RECEIPTS, read0)).toBe(0)
+    const odd = answer({
+      lines: [line({ sum: '740,0,0', quantity: '-2', discount: null })],
+      totals: [{ label: 'Ընդամենը', amount: '7 40' }],
+    })
+    expect(unparsedFigures(ARMENIAN_RECEIPTS, odd)).toBe(3)
+    expect(
+      unparsedFigures(ARMENIAN_RECEIPTS, answer({ lines: [line({ quantity: '0.4525' })] })),
+    ).toBe(1)
   })
 })
 

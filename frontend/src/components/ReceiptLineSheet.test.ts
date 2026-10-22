@@ -56,6 +56,21 @@ function chocolate(): ReviewLine {
   }
 }
 
+/** A new item whose proposed name spells «Медиум» in letters (MOL-293, В-4). */
+function spelt(spelled = true): ReviewLine {
+  const base = chocolate()
+  const name = 'Кофе «Латино» Медиум'
+  const line: ReceiptReviewLine = {
+    ...base.line,
+    printed: 'Սուրճ «Լատինո» Մեդիում',
+    itemId: null,
+    itemName: null,
+    translation: name,
+    ...(spelled ? { spelled: true } : {}),
+  }
+  return { ...base, line, itemId: null, name, isNew: true }
+}
+
 /** The sheet takes no tap while it rises: the clock is moved past it once it is open. */
 let clock = 0
 const mounted: VueWrapper[] = []
@@ -164,6 +179,58 @@ describe('ReceiptLineSheet (MOL-127)', () => {
     press(ru.receipt.line.save)
     await flushPromises()
     expect(saved[0]?.figures).toEqual({ quantity: parseQuantity('1', 'piece'), amount: amd('975') })
+  })
+
+  it('takes a name spelt in letters away by one press, the line left as printed (MOL-293, В-4)', async () => {
+    const { saved } = await render(spelt())
+    expect(sheet()?.textContent).toContain(ru.receipt.line.spelled_note)
+    press(ru.receipt.line.unspell)
+    await flushPromises()
+    expect(saved).toHaveLength(1)
+    expect(saved[0]).toMatchObject({
+      item: { name: 'Սուրճ «Լատինո» Մեդիում' },
+      skip: false,
+      confirmed: true,
+    })
+  })
+
+  it('offers no such press over a name of the person’s own, nor over the printed one put back (review №3)', async () => {
+    await render({ ...spelt(), name: 'Кофе в зёрнах', edited: true })
+    expect(sheet()?.textContent).not.toContain(ru.receipt.line.unspell)
+    while (mounted.length) mounted.pop()?.unmount()
+    document.body.innerHTML = ''
+    await render({ ...spelt(), name: 'Սուրճ «Լատինո» Մեդիում', edited: true })
+    expect(sheet()?.textContent).not.toContain(ru.receipt.line.unspell)
+  })
+
+  it('settles «проверьте» of a new item by a name typed over the proposal (MOL-293)', async () => {
+    const { saved } = await render({
+      ...spelt(),
+      check: true,
+      line: { ...spelt().line, match: 'weak' },
+    })
+    const field = sheet()?.querySelector<HTMLInputElement>('input:not([data-field])')
+    if (!field) throw new Error('нет поля имени')
+    field.value = 'Кофе в зёрнах'
+    field.dispatchEvent(new Event('input'))
+    await flushPromises()
+    press(ru.receipt.line.save)
+    await flushPromises()
+    expect(saved[0]).toMatchObject({ item: { name: 'Кофе в зёрнах' }, confirmed: true })
+  })
+
+  it('offers no such press for a name of the dictionary’s words, nor one the person typed over', async () => {
+    await render(spelt(false))
+    expect(sheet()?.textContent).not.toContain(ru.receipt.line.unspell)
+    while (mounted.length) mounted.pop()?.unmount()
+    document.body.innerHTML = ''
+    await render(spelt())
+    const field = sheet()?.querySelector<HTMLInputElement>('input:not([data-field])')
+    if (!field) throw new Error('нет поля имени')
+    field.value = 'Кофе «Латино» в зёрнах'
+    field.dispatchEvent(new Event('input'))
+    await flushPromises()
+    expect(sheet()?.textContent).not.toContain(ru.receipt.line.unspell)
   })
 
   it('«Вернуть в запись» brings a line left out back at once (review 17)', async () => {

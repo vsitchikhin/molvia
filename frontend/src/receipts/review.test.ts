@@ -261,6 +261,30 @@ describe('«проверьте» on a line edited (review 16)', () => {
   })
 })
 
+describe('a new item named by the binding, «проверьте» (MOL-293, В-1 «а», adversarial А6)', () => {
+  const proposed = (): ReceiptDetail => {
+    const detail = receiptA()
+    const [first, second, cheese, fourth] = detail.lines
+    if (!first || !second || !cheese || !fourth) throw new Error('four lines')
+    return { ...detail, lines: [first, second, { ...cheese, match: 'weak' }, fourth] }
+  }
+
+  it('says «проверьте» of a new item the binding marked so, and never of a plain new one', () => {
+    expect(reviewLines(proposed(), null)[2]).toMatchObject({ isNew: true, check: true })
+    expect(reviewLines(receiptA(), null)[2]).toMatchObject({ isNew: true, check: false })
+  })
+
+  it('lets it go once the person answered: a name of their own, or the proposal confirmed', () => {
+    const named = (item: { name: string }, confirmed: boolean): ReceiptDraft => ({
+      lines: { 2: { item, skip: false, ...(confirmed ? { confirmed: true as const } : {}) } },
+    })
+    expect(reviewLines(proposed(), named({ name: 'Сыр лори' }, true))[2]?.check).toBe(false)
+    expect(reviewLines(proposed(), named({ name: 'Сыр Лори копчёный' }, true))[2]?.check).toBe(
+      false,
+    )
+  })
+})
+
 describe('what «Записать» sends', () => {
   it('every line once, a new item by its name, the place the server found, the printed day', () => {
     const detail = receiptA()

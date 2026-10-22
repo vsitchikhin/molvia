@@ -416,6 +416,8 @@ describe('the queue', () => {
       { itemId: milk, hs: '0401' },
       { itemId: plain, hs: '0401' },
     ])
+    // the line prints its brand, «Կաթ «Իգիթ» 3.2%»: only an item of that brand stands on it (MOL-293)
+    const igit = await insertItem(db, { name: 'Молоко «Игит» 3,2%', searchKey: 'moloko igit 3,2%' })
     const id = await queued(me)
     await readAll(benchReader())
 
@@ -424,8 +426,12 @@ describe('the queue', () => {
       .from(receiptLines)
       .where(eq(receiptLines.receiptId, id))
       .orderBy(receiptLines.position)
-    expect(lines[2]).toMatchObject({ itemId: milk, match: 'search', translation: 'молоко' })
-    expect(lines.filter((line) => line.match === 'new').length).toBeGreaterThan(0)
+    expect(lines[2]).toMatchObject({ itemId: igit, translation: 'молоко' })
+    expect(lines.some((line) => line.itemId === milk || line.itemId === plain)).toBe(false)
+    // nothing found is a new item named in full, «проверьте»
+    expect(
+      lines.some((line) => line.itemId === null && line.match === 'weak' && line.translation),
+    ).toBe(true)
     expect(lines.every((line) => line.match !== null)).toBe(true)
   }, 15_000)
 
@@ -592,7 +598,7 @@ describe('the queue', () => {
     const emptied = await askedAll(me, twice)
     expect(emptied.lines.map((line) => line.sum)).toEqual([null, null])
     expect(emptied.readPartly).toBe(true)
-  })
+  }, 15_000)
 
   it('shows the total the payment prints too, the lines short of it (MOL-244)', async () => {
     const me = await owner()

@@ -124,6 +124,12 @@ export const receiptReviewLineCodec = z.strictObject({
   itemName: z.string().nullable(),
   match: receiptMatchSchema,
   translation: z.string().nullable(),
+  /**
+   * The new item's name in `translation` spells a word the dictionary has not in Russian letters (MOL-293,
+   * В-4): offered, and taken away by one press. Sent only when it is, and only to a phone that asked by
+   * `RECEIPT_SPELLED_HEADER` — an installed app of an earlier build reads a line strictly.
+   */
+  spelled: z.boolean().optional(),
   amount: moneyCodec.nullable(),
   rememberedPrice: moneyCodec.nullable(),
   /**
@@ -344,3 +350,6 @@ export const RECEIPT_REPAIRED_HEADER = 'X-Molvia-Receipt-Repaired'
 
 /** A phone that knows the detail's `cashback` and `redeemed` says so by this header (MOL-289). */
 export const RECEIPT_CASHBACK_HEADER = 'X-Molvia-Receipt-Cashback'
+
+/** A phone that knows a line's `spelled` says so by this header (MOL-293), as `RECEIPT_CODES_HEADER`. */
+export const RECEIPT_SPELLED_HEADER = 'X-Molvia-Receipt-Spelled'

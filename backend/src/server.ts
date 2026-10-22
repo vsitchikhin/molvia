@@ -780,6 +780,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                 costMicroUsd: event.costMicroUsd,
                 inputTokens: event.tokens?.input,
                 outputTokens: event.tokens?.output,
+                unparsed: event.unparsed,
               },
               'receipt read',
             )
@@ -831,7 +832,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                     },
               bind: (claimed, lines) =>
                 bindReceiptLines(
-                  { items: createItemRepository(db), embedder },
+                  {
+                    items: createItemRepository(db),
+                    embedder,
+                    // the lines are bound by the gloss alone: the seed's names are missing (MOL-293)
+                    namesMissing: (error) => {
+                      failures.report(error, job('receipt-binding'), 'catalogue has no till names')
+                    },
+                  },
                   claimed.actorId,
                   claimed.country,
                   claimed.language,
@@ -1124,7 +1132,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           return receipt
         },
         list: (actor, shown) => receiptsOf(tripData, actor, shown),
-        one: (actor, id, shown, codes, readTotal, readPartly, cashback, repaired) =>
+        one: (actor, id, shown, codes, readTotal, readPartly, cashback, repaired, spelled) =>
           receiptOfOwner(
             tripData,
             actor,
@@ -1135,6 +1143,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
             readPartly,
             cashback,
             repaired,
+            spelled,
           ),
         remove: (actorId, id) => removeReceipt(receipts, actorId, id),
         restore: (actorId, id) => restoreReceipt(receipts, actorId, id),

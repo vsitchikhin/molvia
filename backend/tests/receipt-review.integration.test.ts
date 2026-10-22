@@ -4,12 +4,20 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   RECEIPT_CASHBACK_HEADER,
   RECEIPT_REPAIRED_HEADER,
+  RECEIPT_SPELLED_HEADER,
   receiptDetailCodec,
   receiptsResponseCodec,
   storeMemoryWords,
 } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
-import { actors, officialRates, receiptLines, receipts, trips as tripsTable } from '@/db/schema'
+import {
+  actors,
+  items,
+  officialRates,
+  receiptLines,
+  receipts,
+  trips as tripsTable,
+} from '@/db/schema'
 import { createStoreMemoryRepository, memoryKey } from '@/db/store-memory-repository'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
@@ -301,6 +309,61 @@ describe('the review of a receipt', () => {
     expect(asked.lines.map((line) => [line.repaired, line.sum])).toEqual([
       [undefined, amd(531)],
       [true, amd(1_032)],
+    ])
+  })
+
+  it('sends a new item the binding marked «проверьте» as such, and a line whose item is gone as new (MOL-293, А6)', async () => {
+    const me = await insertActor(db)
+    const gone = await insertItem(db, { name: 'Сметана', searchKey: 'smetana' })
+    const id = await parsedReceipt(me, [
+      { printed: 'Յոգուրտ «Երեմյան Փրոդաքթս» ելակ', price: 300, sum: 300, match: 'weak' },
+      { printed: 'Թթվասեր 20%', price: 500, sum: 500, itemId: gone, match: 'search' },
+      { printed: 'ՔՍՅԶՔ', price: 100, sum: 100, match: 'new' },
+    ])
+    await db.delete(items).where(eq(items.id, gone))
+    const detail = await review(me, id)
+    expect(detail.lines.map((line) => [line.itemId, line.match])).toEqual([
+      [null, 'weak'],
+      [null, 'new'],
+      [null, 'new'],
+    ])
+  })
+
+  it('tells a new name spelt in letters only to a phone that asks, and only while it is new (MOL-293)', async () => {
+    const me = await insertActor(db)
+    const coffee = await insertItem(db, { name: 'Кофе «Латино»', searchKey: 'kofe latino' })
+    const id = await parsedReceipt(me, [
+      { printed: 'Սուրճ «Լատինո» Մեդիում', sku: '1170001', price: 900, sum: 900, match: 'weak' },
+      { printed: 'Սուրճ «Լատինո» Ռոբուստա', sku: '1170002', price: 950, sum: 950, match: 'weak' },
+    ])
+    await db
+      .update(receiptLines)
+      .set({ translation: 'Кофе «Латино» Медиум', spelled: true })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 0)))
+    await db
+      .update(receiptLines)
+      .set({ translation: 'Кофе «Латино» Робуста', spelled: true })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 1)))
+    // the shop's memory has named the second since: its name is no proposal any more
+    await memory.remember(me, TIN, [
+      { kind: 'sku', key: '1170002', itemId: coffee, price: amd(950) },
+    ])
+    // an earlier build reads a line strictly: it is told nothing
+    const earlier = await review(me, id)
+    expect(earlier.lines.map((line) => line.spelled)).toEqual([undefined, undefined])
+    const response = await app.inject({
+      method: 'GET',
+      url: `/receipts/${id}`,
+      headers: {
+        cookie: await signIn(db, me),
+        'x-molvia-today': '2026-10-03',
+        [RECEIPT_SPELLED_HEADER]: '1',
+      },
+    })
+    const asked = receiptDetailCodec.parse(response.json())
+    expect(asked.lines.map((line) => [line.itemId, line.translation, line.spelled])).toEqual([
+      [null, 'Кофе «Латино» Медиум', true],
+      [coffee, 'Кофе «Латино» Робуста', undefined],
     ])
   })
 

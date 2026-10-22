@@ -12,6 +12,7 @@ import {
   receiptCityOf,
   receiptDateOf,
   receiptTextOfModel,
+  unparsedFigures,
   receiptTimeOf,
   receiptLineOf,
   receiptLineCodec,
@@ -98,6 +99,8 @@ export type ReadReport =
       readonly reader: 'model' | 'ocr'
       readonly costMicroUsd: number | null
       readonly tokens: ModelPaid['tokens'] | null
+      /** How many of the model's figures no rule read (MOL-294): a count, never the figures (Т-8). */
+      readonly unparsed: number | null
     }
   | { readonly kind: 'reader_unavailable'; readonly reason: string }
   /**
@@ -154,7 +157,7 @@ function headOf(
 async function readOne(
   deps: ReadReceiptsDeps,
   claimed: ClaimedReceipt,
-): Promise<{ outcome: ReadOutcome; paid: ModelPaid | null } | 'wait'> {
+): Promise<{ outcome: ReadOutcome; paid: ModelPaid | null; unparsed: number | null } | 'wait'> {
   const { photo: photoReading } = receiptCard(claimed.country)
   if (claimed.parts.length === 0 || photoReading === null) {
     // restored from a nightly copy, which holds no photos (В-2); a country read by its link has no
@@ -165,13 +168,13 @@ async function readOne(
       readerVersion: null,
       head: null,
     }
-    return { outcome, paid: null }
+    return { outcome, paid: null, unparsed: null }
   }
   if (claimed.byModel && deps.model) {
     const byModel = await readByModel(deps, deps.model, claimed, photoReading)
     if (byModel !== null) return byModel
   }
-  return { outcome: await readByOcr(deps, claimed, photoReading), paid: null }
+  return { outcome: await readByOcr(deps, claimed, photoReading), paid: null, unparsed: null }
 }
 
 /**
@@ -187,7 +190,7 @@ async function readByModel(
   { reader: model, spend, capMicroUsd }: ReceiptModelDeps,
   claimed: ClaimedReceipt,
   photoReading: PhotoReading,
-): Promise<{ outcome: ReadOutcome; paid: ModelPaid } | 'wait' | null> {
+): Promise<{ outcome: ReadOutcome; paid: ModelPaid; unparsed: number } | 'wait' | null> {
   const { report } = deps
   const now = deps.now ?? (() => new Date())
   const parts = claimed.parts.map((part) => part.photo)
@@ -237,6 +240,7 @@ async function readByModel(
   }
   const { currency } = receiptCard(claimed.country)
   const text = receiptTextOfModel(photoReading, reading.answer)
+  const unparsed = unparsedFigures(photoReading, reading.answer)
   const shown = verifiedReading(text, { byModel: true })
   const head = headOf(shown, currency, [modelHeadRows(reading.answer)])
   if (needsReshoot(text)) {
@@ -246,7 +250,7 @@ async function readByModel(
       readerVersion: model.version,
       head,
     }
-    return { outcome, paid }
+    return { outcome, paid, unparsed }
   }
   // no boxes: a model's lines are cut out for no training (Р-4)
   const outcome = await parsed(deps, claimed, {
@@ -256,7 +260,7 @@ async function readByModel(
     version: model.version,
     images: [],
   })
-  return { outcome, paid }
+  return { outcome, paid, unparsed }
 }
 
 /**
@@ -425,6 +429,7 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
     const started = performance.now()
     let outcome: ReadOutcome
     let paid: ModelPaid | null = null
+    let unparsed: number | null = null
     try {
       const done = await readOne(deps, claimed)
       if (done === 'wait') {
@@ -435,6 +440,7 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
       }
       outcome = done.outcome
       paid = done.paid
+      unparsed = done.unparsed
     } catch (error) {
       if (error instanceof ReaderUnavailable) {
         await deps.receipts.release(claimed.id)
@@ -471,6 +477,7 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
       reader: paid === null ? 'ocr' : 'model',
       costMicroUsd: paid?.costMicroUsd ?? null,
       tokens: paid?.tokens ?? null,
+      unparsed,
     })
   }
 }

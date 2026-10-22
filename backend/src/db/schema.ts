@@ -2935,6 +2935,9 @@ export const receiptLines = pgTable(
     // Put right by the digits the till's font confuses, on a model's reading the lines then proved whole
     // (MOL-290): shown with «проверьте», never as read — so never a shelf price for the shops' memory.
     repaired: boolean('repaired').notNull().default(false),
+    // A new item's proposed name, `translation`, spells a word the dictionary has not in Russian letters
+    // (MOL-293, В-4): the review offers it with one press to take it away.
+    spelled: boolean('spelled').notNull().default(false),
   },
   (table) => [
     primaryKey({ columns: [table.receiptId, table.position] }),

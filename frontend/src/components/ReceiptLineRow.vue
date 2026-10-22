@@ -11,7 +11,8 @@
       <!-- The line as the till printed it, in the system's face and the receipt's language: one
            line, its height fixed, so an Armenian or Georgian word does not move the row. -->
       <span class="printed" :lang="lang">{{ line.line.printed }}</span>
-      <span v-if="line.check && line.line.translation" class="figures">{{
+      <!-- a new item's name is the proposal itself: «в чеке — …» would only repeat it (MOL-293) -->
+      <span v-if="line.check && !line.isNew && line.line.translation" class="figures">{{
         t('receipt.review.check_note', { text: line.line.translation })
       }}</span>
       <span v-if="figures" class="figures">

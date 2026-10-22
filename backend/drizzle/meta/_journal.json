@@ -484,6 +484,13 @@
       "when": 1792576257615,
       "tag": "0068_receipt_cashback_repaired",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1792606765608,
+      "tag": "0069_receipt_line_spelled",
+      "breakpoints": true
     }
   ]
 }

@@ -387,6 +387,8 @@ export const EXPORT_COLUMNS: Readonly<
       receipt_id: 'the receipt it is nested in',
       as_read:
         'judged at «Записать» from the line’s figures and its purchase, both exported; the shelf price it lets the shops’ memory keep is exported with the word (MOL-240)',
+      spelled:
+        'how the proposed name was made, a hint of the review: the name itself is exported as `translation` (MOL-293)',
     },
   },
   // Taken by erasure with their receipt; never in the file — bytes of a picture, kept days (В-3).

@@ -3,6 +3,7 @@ import { itemSchema } from '@molvia/model'
 import type { CatalogueNode, Item, ReceiptLine } from '@molvia/model'
 import type { ItemRepository, SearchAnswer } from '@/db/items-repository'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
+import type { CatalogueNamesMissing } from './bind-receipt-lines'
 import { bindReceiptLines } from './bind-receipt-lines'
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
@@ -50,17 +51,50 @@ function fakeItems(answer: SearchAnswer = { items: [], near: false, nearIds: [] 
 }
 
 describe('binding the lines of a parsed receipt (MOL-126)', () => {
-  it('finds the item by its Armenian name, and a heading alone is far', async () => {
+  it('finds the item by its Armenian name, and never by a heading alone (MOL-293)', async () => {
     const { items, search } = fakeItems()
     const bound = await bindReceiptLines({ items, embedder: NO_EMBEDDER }, ACTOR, 'AM', 'ru', [
-      line('Կաթ «Իգիթ» 1լ', '0401'),
+      line('Կաթ 1լ', '0401'),
       line('ԴԱՐԱՆ ԿԼԵՅ', '3506'),
     ])
     expect(bound).toEqual([
       { itemId: MILK, match: 'search', translation: 'молоко' },
-      { itemId: GLUE, match: 'weak', translation: null },
+      // glue's heading names no word of the line: a new item, spelt as printed and «проверьте»
+      { itemId: null, match: 'weak', translation: 'Даран клей', spelled: true },
     ])
     expect(search).not.toHaveBeenCalled()
+  })
+
+  it('takes no item without the brand the line prints, nor one naming a flavour it has not (MOL-293)', async () => {
+    const STRAWBERRY = '00000000-0000-4000-8000-000000000004'
+    const { items, search } = fakeItems({
+      items: [item(STRAWBERRY, 'Клубника'), item(MILK, 'Йогурт «Еремян Продактс» персик 2%')],
+      near: true,
+      nearIds: [STRAWBERRY, MILK],
+    })
+    const [yoghurt] = await bindReceiptLines({ items, embedder: NO_EMBEDDER }, ACTOR, 'AM', 'ru', [
+      line('Յոգուրտ «Երեմյան Փրոդաքթս» ելակ 2% 130գր', '0403'),
+    ])
+    expect(yoghurt).toEqual({
+      itemId: null,
+      match: 'weak',
+      translation: 'Йогурт «Еремян Продактс» клубника 2% 130 г',
+      spelled: false,
+    })
+    expect(search).toHaveBeenCalledOnce()
+  })
+
+  it('takes the first of the search’s items the line lets stand, past those it does not', async () => {
+    const STRAWBERRY = '00000000-0000-4000-8000-000000000004'
+    const { items } = fakeItems({
+      items: [item(STRAWBERRY, 'Клубника'), item(MILK, 'Йогурт')],
+      near: true,
+      nearIds: [MILK],
+    })
+    const [yoghurt] = await bindReceiptLines({ items, embedder: NO_EMBEDDER }, ACTOR, 'AM', 'ru', [
+      line('Յոգուրտ ելակով 2%'),
+    ])
+    expect(yoghurt).toMatchObject({ itemId: MILK, match: 'search' })
   })
 
   it('asks the search by the gloss when the names find nothing: near is found, far is «проверьте»', async () => {
@@ -77,7 +111,7 @@ describe('binding the lines of a parsed receipt (MOL-126)', () => {
       [line('ԹԹՎԱՍԵՐ 20%')],
     )
     expect(found).toEqual({ itemId: SOUR_CREAM, match: 'search', translation: 'сметана' })
-    expect(near.search).toHaveBeenCalledWith('сметана', 5, ACTOR, null)
+    expect(near.search).toHaveBeenCalledWith('сметана', 10, ACTOR, null)
 
     const far = fakeItems({ items: [item(SOUR_CREAM, 'Сметана')], near: false, nearIds: [] })
     const [weak] = await bindReceiptLines(
@@ -145,15 +179,18 @@ describe('binding the lines of a parsed receipt (MOL-126)', () => {
     ])
   })
 
-  it('leaves a line new when nothing is found, named by its gloss', async () => {
+  it('makes a line nothing is found for a new item named in full, «проверьте» (MOL-293, В-1 «а»)', async () => {
     const { items } = fakeItems()
     const bound = await bindReceiptLines({ items, embedder: NO_EMBEDDER }, ACTOR, 'AM', 'ru', [
       line('ԹԹՎԱՍԵՐ 20%'),
       line('ՔՍՅԶՔ 77'),
+      line('77 15'),
     ])
     expect(bound).toEqual([
-      { itemId: null, match: 'new', translation: 'сметана' },
-      { itemId: null, match: 'new', translation: null },
+      { itemId: null, match: 'weak', translation: 'Сметана 20%', spelled: false },
+      // a word the dictionary has not is spelt in letters, and offered as such (В-4)
+      { itemId: null, match: 'weak', translation: 'Ксйзк', spelled: true },
+      { itemId: null, match: 'weak', translation: null, spelled: false },
     ])
   })
 
@@ -171,7 +208,62 @@ describe('binding the lines of a parsed receipt (MOL-126)', () => {
       { itemId: MILK, match: 'search', translation: null },
       { itemId: SOUR_CREAM, match: 'search', translation: null },
     ])
-    expect(search).toHaveBeenCalledWith('сметана', 5, ACTOR, null)
+    expect(search).toHaveBeenCalledWith('сметана', 10, ACTOR, null)
+  })
+
+  it('names no new item in Russian on a receipt read out in English', async () => {
+    const { items } = fakeItems()
+    const [line0] = await bindReceiptLines({ items, embedder: NO_EMBEDDER }, ACTOR, 'AM', 'en', [
+      line('ԹԹՎԱՍԵՐ 20%'),
+    ])
+    expect(line0).toEqual({ itemId: null, match: 'weak', translation: null, spelled: false })
+  })
+})
+
+describe('a catalogue with no names of the tills (MOL-293)', () => {
+  it('tells it once a receipt and binds by the gloss all the same', async () => {
+    const heard: CatalogueNamesMissing[] = []
+    const search = vi.fn<ItemRepository['search']>(() =>
+      Promise.resolve({ items: [item(MILK, 'Молоко')], near: true, nearIds: [MILK] }),
+    )
+    const bound = await bindReceiptLines(
+      {
+        items: { nodes: () => Promise.resolve([]), search, byBarcode: NONE },
+        embedder: NO_EMBEDDER,
+        namesMissing: (error) => heard.push(error),
+      },
+      ACTOR,
+      'AM',
+      'ru',
+      [line('Կաթ 1լ'), line('Կաթ 1լ')],
+    )
+    expect(heard.map((error) => error.name)).toEqual(['CatalogueNamesMissing'])
+    expect(bound.map((one) => one.itemId)).toEqual([MILK, MILK])
+  })
+
+  it('must not tell it with the names there, nor for a country that has none (Serbia)', async () => {
+    const heard: unknown[] = []
+    const namesMissing = (error: unknown) => heard.push(error)
+    await bindReceiptLines(
+      { items: fakeItems().items, embedder: NO_EMBEDDER, namesMissing },
+      ACTOR,
+      'AM',
+      'ru',
+      [line('Կաթ 1լ')],
+    )
+    const serbian = {
+      nodes: () => Promise.resolve([]),
+      search: fakeItems().search,
+      byBarcode: NONE,
+    }
+    await bindReceiptLines(
+      { items: serbian, embedder: NO_EMBEDDER, namesMissing },
+      ACTOR,
+      'RS',
+      'ru',
+      [line('BANANA KG')],
+    )
+    expect(heard).toEqual([])
   })
 })
 
