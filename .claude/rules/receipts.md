@@ -1226,6 +1226,12 @@ repeats over twelve days). `rememberedLines`, three ways:
   misread or 0,5 kg × 660 with the weight misread and the cheese gone up to 660; «0.65 / 660 / 364» is 0,65 × 560 by one
   swap of the price, never 0,56 × 650 by the memory's; «1 / 650 / 550» is one number copied two ways, 650 or 550. The
   memory's old price is the one a changed shelf price makes wrong, so it chooses none of them — the total may.
+  **Tesseract's every figure goes by the card's swaps in that question** (review 4, №11), though the memory takes none
+  of them but the price: «650 / 550» read by it is one number read two ways, «1 100 / 1 400» too. **The price, named**:
+  a line of one piece with no discount whose price and sum are one swap apart — «60 / 50», «650 / 550» — is never the
+  memory's to put right, for either reader; it is the total's (MOL-290), and where the total cannot choose its sum
+  either, the line is empty — and a doubt beside it stands, since not every line has its figures (review 4, the model's
+  control of Б2: a 2 × 560 as printed master showed goes empty).
   **The sum is what was paid, the total's** (adversarial А1 of review 1): a butter gone up to 650, copied «660 / 650»,
   read 1 × 550 = 550 at a remembered 550 under a total of 650 two places print — the memory overrode the total. **A price
   read as remembered whose other figures do not hold is not the memory's either** — the total's (MOL-290): with the
@@ -1241,9 +1247,11 @@ repeats over twelve days). `rememberedLines`, three ways:
 **The total settles it, whatever the memory said.** Lines that meet the total two places vouch for, a doubted one as
 printed among them, vouch for it: no doubt — on Tesseract's reading as on the model's (review 2, Б2). The readings that
 need the total — every doubted line's, every sum changed — are taken together or not at all: only where every line
-then meets it, **and the paper's own readings do not meet it too** — a doubted line as printed or by the reader's swaps,
-at any price but the memory's (`meets`, a walk of `REMEMBERED_WAYS_MAX` steps, past which nothing is taken): two prices
-changed the opposite ways by one swap each read as each other's against the same total (Б3, В2). **A total refutes what the memory said**: where every line has
+then meets it, **and the paper's own readings do not meet it too** — every line by the reader's swaps, a doubted one or
+one the memory would put right at any price but the memory's (`meets`, the sums reachable line by line, at most
+`REMEMBERED_WAYS_MAX` of them, past which nothing is taken): two prices changed the opposite ways by one swap each read
+as each other's against the same total (Б3, В2), or a doubted butter's old price meeting it beside a bun copied
+«160 / 160» for 150 (adversarial Г1 of review 4). **A total refutes what the memory said**: where every line has
 its figures and they miss the total — vouched, or read in one place, which vouches for nothing but refutes — the lines
 it put right go back as read, and **a line it confirmed loses its word where its own 5↔6 alone closes the gap** — the
 one line the total points at (review 2, №7: the bag «60 / 60» confirmed at a remembered 60 under a total 10 short).
