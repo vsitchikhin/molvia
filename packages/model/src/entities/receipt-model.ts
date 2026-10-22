@@ -4,6 +4,8 @@
 // of the summary with its word (MOL-268, «Дальше»); which amount is the total is decided here, by the
 // country's card, never by the model.
 
+import { cardRate, rememberedLines } from '#model/entities/receipt-remembered'
+import type { RememberedPrices } from '#model/entities/receipt-remembered'
 import { DEPARTMENT, TOLERANCE_HUNDREDTHS } from '#model/entities/receipt-text'
 import type { PhotoReading } from '#model/entities/receipt-card'
 import type { ReceiptText, ReceiptTextLine, TextRow } from '#model/entities/receipt-text'
@@ -209,6 +211,7 @@ function lineOf(line: ModelReceipt['lines'][number]): ReceiptTextLine {
     discountHundredths,
     settled,
     asPrinted: settled,
+    read: { quantityMilli, priceHundredths, discountHundredths, sumHundredths },
     // no boxes: a model's lines are not cut out for the reader's training (MOL-272, Р-4)
     rows: [],
   }
@@ -391,24 +394,6 @@ function readingsOf(
   return out.filter((one) => one.value !== null)
 }
 
-/**
- * The card's rate the lines as copied share: the discount over the shelf price, to a tenth of a per cent,
- * most of them at it — «Ереван Сити»'s 1 %, 0,5 %. None where no line prints a discount.
- */
-function cardRate(lines: readonly ReceiptTextLine[]): number | null {
-  const counts = new Map<number, number>()
-  for (const line of lines) {
-    const { quantityMilli: qty, priceHundredths: price, discountHundredths: discount } = line
-    if (!line.settled || qty === null || price === null || discount === null || discount <= 0)
-      continue
-    const shelf = Math.round((qty * price) / 1_000)
-    if (shelf <= 0) continue
-    const rate = Math.round((discount * 1_000) / shelf) / 1_000
-    counts.set(rate, (counts.get(rate) ?? 0) + 1)
-  }
-  return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
-}
-
 /** A line's figures as one reading takes them. */
 interface LineReading {
   readonly qty: number
@@ -445,6 +430,7 @@ function choicesOf(
   rate: number | null,
   budget: { left: number },
   broken: boolean,
+  remembered: number | undefined,
 ): LineReading[] | null {
   // a discount of 0 is no card's and needs no rate (review round 2, №6), as in `cardRate`
   const discount = figureOf(line.discount, 2)
@@ -487,7 +473,10 @@ function choicesOf(
       }
     }
   }
-  const kept = [...found.values()].filter((one) => !one.tied)
+  const untied = [...found.values()].filter((one) => !one.tied)
+  // the shop's memory chooses among the readings by their price (MOL-291): the total then confirms the receipt whole
+  const priced = untied.filter((one) => one.reading.price === remembered)
+  const kept = priced.length > 0 ? priced : untied
   const fewest = Math.min(...kept.map((one) => one.swaps))
   const cheapest = kept.filter((one) => one.swaps === fewest).map((one) => one.reading)
   const near = (one: LineReading, to: LineReading): boolean =>
@@ -541,7 +530,10 @@ function repaired(
   answer: ModelReceipt,
   lines: readonly ReceiptTextLine[],
   owed: number,
+  prices: RememberedPrices,
 ): ReceiptTextLine[] | null {
+  const priceOf = (line: ReceiptTextLine): number | undefined =>
+    line.sku === null ? undefined : prices.get(line.sku)
   if (lines.length === 0 || lines.every((line) => line.settled)) return null
   const rate = cardRate(lines)
   const budget = { left: REPAIR_RECEIPT_COMBINATIONS_MAX }
@@ -557,7 +549,7 @@ function repaired(
       options.push(null)
       if (copied === undefined || line.sumHundredths === null) continue
       if (!swappable(reading.modelSwaps, copied)) continue
-      const other = choicesOf(reading.modelSwaps, copied, rate, budget, false)
+      const other = choicesOf(reading.modelSwaps, copied, rate, budget, false, priceOf(line))
       if (other === null) return null
       const offs = new Set(other.map((one) => one.sum - own).filter((off) => off !== 0))
       if (offs.size === 0) continue
@@ -568,7 +560,9 @@ function repaired(
       continue
     }
     const found =
-      copied === undefined ? null : choicesOf(reading.modelSwaps, copied, rate, budget, true)
+      copied === undefined
+        ? null
+        : choicesOf(reading.modelSwaps, copied, rate, budget, true, priceOf(line))
     if (found === null || found.length === 0) return null
     options.push(found)
   }
@@ -632,14 +626,27 @@ function repaired(
  * and a section «Բաժին» is printed or a total vouched for; no line and neither is a reading of nothing.
  * Then `verifiedReading(text, { byModel: true })`, as for Tesseract's reading.
  */
-export function receiptTextOfModel(reading: PhotoReading, written: ModelReceipt): ReceiptText {
+export function receiptTextOfModel(
+  reading: PhotoReading,
+  written: ModelReceipt,
+  prices: RememberedPrices = new Map(),
+): ReceiptText {
   const { answer } = canonicalAnswer(reading, written)
   const discounted = answer.lines.some((line) => figureOf(line.discount, 2) !== null)
   const copied = answer.lines.map(lineOf)
   const { total, read, met, owed, cashback, redeemed } = totalOf(reading, answer, copied)
-  // a total two places vouch for that the lines as copied do not meet: put right by the font's swaps, or not
-  const fixed = owed === null || met ? null : repaired(reading, answer, copied, owed)
-  const lines = fixed ?? copied
+  // the shop's memory, a line at a time, where the lines as copied do not meet the total (MOL-291)
+  const voiced = met
+    ? copied
+    : rememberedLines(
+        copied,
+        prices,
+        { price: reading.modelSwaps, others: reading.modelSwaps },
+        owed,
+      )
+  // a total two places vouch for that the lines do not meet: put right by the font's swaps, or not
+  const fixed = owed === null || met ? null : repaired(reading, answer, voiced, owed, prices)
+  const lines = fixed ?? voiced
   // a receipt with no line is a sum to record where it prints a section or two places vouch for its
   // total (MOL-227) — the model names a sole trader's «Բաժին 1» as a total no more often than not; with
   // neither it is a reading of nothing, «переснимите» as Tesseract's (`needsReshoot`)
@@ -661,7 +668,13 @@ export function receiptTextOfModel(reading: PhotoReading, written: ModelReceipt)
     receiptNo: number,
     totalHundredths: total,
     readTotalHundredths: read,
-    balanced: met || fixed !== null,
+    balanced:
+      met ||
+      fixed !== null ||
+      (owed !== null &&
+        lines.length > 0 &&
+        lines.every((line) => line.settled) &&
+        lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0) === owed),
     cashbackHundredths: cashback,
     redeemedHundredths: redeemed,
     lines,
