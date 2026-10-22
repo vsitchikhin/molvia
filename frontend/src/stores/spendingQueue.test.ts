@@ -874,6 +874,52 @@ describe('spending queue', () => {
       expect(queue.pending.map((write) => write.kind)).toEqual(['category-amend', 'category-add'])
     })
 
+    // Adversarial Б4: two amendments of one category may stand side by side once what held them
+    // apart is cancelled; the next folds into the last, never the first.
+    const separated = () => {
+      const queue = fresh('idle')
+      queue.amendCategory(TAXI, { name: 'Такси 2', icon: 'taxi', colour: 0 }, false)
+      queue.archiveCategory(METRO, true)
+      queue.amendCategory(TAXI, { name: 'Такси 2', icon: 'car', colour: 0 }, true)
+      queue.archiveCategory(METRO, false)
+      return queue
+    }
+
+    it('Б4а: a rename after «Вернуть» took its «Убрать» back folds into the last amendment — the last word holds', async () => {
+      const queue = separated()
+      queue.amendCategory(TAXI, { name: 'Такси 3', icon: 'car', colour: 0 }, false)
+      useActorStore().state = 'ready'
+      await queue.flush()
+      expect(calls).toEqual([
+        `category-amend ${TAXI} Такси 2 taxi 0`,
+        `category-amend ${TAXI} Такси 3 car 0`,
+      ])
+    })
+
+    it('Б4б: a new colour there too — the server ends on it', async () => {
+      const queue = separated()
+      queue.amendCategory(TAXI, { name: 'Такси 2', icon: 'car', colour: 5 }, true)
+      useActorStore().state = 'ready'
+      await queue.flush()
+      expect(calls.at(-1)).toBe(`category-amend ${TAXI} Такси 2 car 5`)
+    })
+
+    it('must not fire: the last amendment on its way is folded into by nothing', async () => {
+      const queue = fresh()
+      let land: (value: unknown) => void = () => undefined
+      amendSpendingCategory.mockImplementationOnce(() => new Promise((resolve) => (land = resolve)))
+      queue.amendCategory(TAXI, { name: 'Такси 2', icon: 'taxi', colour: 0 }, false)
+      await settled()
+      queue.amendCategory(TAXI, { name: 'Такси 3', icon: 'taxi', colour: 0 }, false)
+      land(undefined)
+      await settled()
+      await queue.flush()
+      expect(calls).toEqual([
+        `category-amend ${TAXI} Такси 2 taxi 0`,
+        `category-amend ${TAXI} Такси 3 taxi 0`,
+      ])
+    })
+
     it('still folds past a spending, and past a write of the same category', () => {
       const queue = fresh('idle')
       queue.addCategory({ id: TAXI, name: 'Такси' })

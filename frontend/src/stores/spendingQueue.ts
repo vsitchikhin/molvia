@@ -763,12 +763,16 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
    */
   function amendCategory(id: string, body: SpendingCategoryAmend, keepsName: boolean): void {
     change(() => {
-      const found = kept.findIndex(
+      // Into the last of its «Добавить» and amendments, never an earlier one (adversarial Б4): two may
+      // stand apart — a write between them held the fold — and folded into the first, the second went
+      // after it with the state from before and took the last word back. The last one on its way is
+      // folded into by nothing.
+      const last = kept.findLastIndex(
         (item) =>
-          waiting(item) &&
-          ((item.write.kind === 'category-add' && item.write.body.id === id) ||
-            (item.write.kind === 'category-amend' && item.write.id === id)),
+          (item.write.kind === 'category-add' && item.write.body.id === id) ||
+          (item.write.kind === 'category-amend' && item.write.id === id),
       )
+      const found = last !== -1 && waiting(kept[last]) ? last : -1
       const at = standsBehind(found, id, 'freed') ? -1 : found
       const earlier = kept[at]?.write
       // Folded into an amendment, the name stays only if neither of the two moved it.
@@ -797,9 +801,14 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     const kind = archived ? 'category-archive' : 'category-restore'
     const opposite = archived ? 'category-restore' : 'category-archive'
     change(() => {
-      const found = kept.findIndex(
-        (item) => waiting(item) && item.write.kind === opposite && item.write.id === id,
+      // The last «Убрать» or «Вернуть» of it, as the fold takes the last amendment (Б4).
+      const last = kept.findLastIndex(
+        (item) =>
+          (item.write.kind === 'category-archive' || item.write.kind === 'category-restore') &&
+          item.write.id === id,
       )
+      const lastWrite = kept[last]
+      const found = lastWrite && waiting(lastWrite) && lastWrite.write.kind === opposite ? last : -1
       const at = opposite === 'category-archive' && standsBehind(found, id, 'taken') ? -1 : found
       kept =
         at === -1
