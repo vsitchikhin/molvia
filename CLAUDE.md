@@ -1042,7 +1042,8 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
   `.claude/rules/testing.md`.
 - **The PWA's tests run in `frontend/testing/page-environment.ts`** (MOL-286): happy-dom whose timers are
   cleared as its window is taken down — vitest leaves Node's own, which outlived the file and fired into a
-  worker with no `window`. Why and its price — `.claude/rules/testing.md`.
+  worker with no `window`; a test file names no environment but `node`. Why and its price —
+  `.claude/rules/testing.md`.
 - **Maximize corner cases.** Mandatory checklist:
   - NULL / legacy — the field is empty but the entity still falls under the rule
   - alternative write path — the same outcome reached by a different route

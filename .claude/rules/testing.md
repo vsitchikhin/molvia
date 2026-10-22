@@ -234,19 +234,42 @@ the worker within milliseconds, so it never showed here.
   guard for «no window» in it would be code no browser ever executes. The environment closes the class —
   the queues' doubling retry (`doublingRetry`, a store's timer that reaches the network) is one of it that
   had not failed yet.
-- **`setTimeout`, `setInterval` and their `clear*` are wrapped as the window comes up** (`pageTimers`): the
-  timers still pending at the teardown are cleared and Node's functions given back, before happy-dom is
-  taken down. One that ran once, or was cleared, is let go of. `vi.useFakeTimers()` installs over the
-  wrappers and gives them back; its timers are not the page's.
-- **Held by the bookkeeping's own test** (В-2 «а»): a timeout and an interval pending at the close never
-  run, only what is pending is cleared, the functions come back — six mutants of it red. The race itself
-  needs a worker that outlives the teardown, which no ordinary run makes: an environment kept alive 1.2 s
-  past it reproduced the error of CI over happy-dom and nothing over this one — run by hand, in
-  `.scratch/tasks/selftests/MOL-286.md`, not committed.
-- **The price, named:** that the config names this environment is held by nothing that turns red —
-  `'happy-dom'` put back would pass every test, and the flake would come back as rare as before. And the
-  environment rests on `builtinEnvironments` of `vitest/runtime`: a vitest that renames it fails every
-  file of the PWA at once, loudly.
+- **`setTimeout`, `setInterval` and their `clear*` are wrapped as the window comes up** (`pageTimers`). One
+  that ran once, or was cleared, is let go of — until Node's `refresh()` sets it going again under the same
+  handle, which puts it back (adversarial А2: no page calls it, a browser's timer has none, and let go of it
+  ran past the close). `vi.useFakeTimers()` installs over the wrappers and gives them back; its timers are
+  not the page's.
+- **Cleared before happy-dom is taken down, and again after it, the wrappers kept between** (adversarial
+  А1). Taking happy-dom down aborts what is in the air — a request, a load, a navigation — and runs the
+  page's handlers of the failure while the window is still there: a step back answering a failed request
+  set its guard then, and cleared only before, it fired past the window exactly as on CI. Only after the
+  second clearing are Node's functions given back. **A request still on its way is not aborted by
+  happy-dom at all**: its teardown waits for it, so the environment's own test waits for the request to
+  reach the server first.
+- **The runner's timers go through it too** (review №2): vitest takes its own «safe» timers after the
+  environment is up, so a test's deadline, `vi.waitFor` and `expect.poll` are wrapped like the page's. None
+  is pending at the teardown — each ends with its test; a runner that one day keeps one past the file has
+  it cleared there.
+- **Held by tests, each with its mutant red** (В-2 «а»): the bookkeeping — a timeout and an interval pending
+  at the close never run, only what is pending is cleared, a timer set between the two clearings is cleared,
+  `refresh()` is kept, the functions come back; the teardown — the environment set up over a global object
+  of its own, a request aborted as it is taken down, its handler's timer never runs. **That the PWA runs in
+  it**: vitest names the environment in the state of `expect`, and `'happy-dom'` back in the config, or
+  `--environment` on the command line, turns `expect.getState().environment` red (review №1). **That no file
+  names its own past it**: `// @vitest-environment happy-dom` in a file gives it the built-in window and
+  Node's timers back, and a directive can carry only a name — vitest reads the first
+  `@vitest-environment` or `@jest-environment` by `[\w-]+`, so this environment's path never fits — so every
+  test file of the module is read by the same pattern, and only `node` passes (adversarial А3). The race
+  itself needs a worker that outlives the teardown, which no ordinary run makes: an environment kept alive
+  1.2 s past it reproduced the error of CI over happy-dom and nothing over this one — run by hand
+  (`.scratch/tasks/selftests/MOL-286*`), not committed.
+- **The price, named:** the environment rests on `builtinEnvironments` of `vitest/runtime` — a vitest that
+  renames it fails every file of the PWA at once, loudly. **And vitest tells a DOM by the name in the
+  config** (adversarial А4): where it reads the name, not the environment, it takes this one for the server
+  — the files no test imported are transformed for the coverage report by Vite's `ssr`, not `client`, so
+  `npm run test:coverage` counts other totals for them (AppButton.vue 17 lines, 12 under happy-dom), and a
+  static collection of tests (`astCollectTests`) transforms the same way. The PWA has no coverage threshold and
+  CI does not count coverage; a test run is untouched — it goes by the environment's `viteEnvironment`.
 - **Not this:** a step left in flight between two tests of one file (Р-2). A memory history sends no
   `popstate`, so a step lands only by its guard, a second later; the files that step twice dispatch
   `popstate` themselves (`putBothAway` in `ExchangeView.test.ts`).
