@@ -7,7 +7,7 @@ import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE } from '@molvia/model'
 import type { Rating, VerdictAmendment, VerdictCard } from '@molvia/model'
 import VerdictEditSheet from '@/components/VerdictEditSheet.vue'
-import type { Score } from '@/components/rating'
+import type { SavedVerdict, Score } from '@/components/rating'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 
@@ -35,6 +35,8 @@ function online(value: boolean): void {
 }
 
 let clock = 0
+/** What the sheet hands the screen on a write: a prop, called even once the sheet is gone (Д1). */
+const onSaved = vi.fn<(itemId: string, verdict: SavedVerdict | null) => void>()
 
 beforeEach(() => {
   localStorage.clear()
@@ -43,6 +45,7 @@ beforeEach(() => {
   amendVerdict.mockReset()
   withdrawVerdict.mockReset()
   rateItem.mockReset()
+  onSaved.mockReset()
   vi.restoreAllMocks()
   online(true)
   clock = 0
@@ -74,6 +77,7 @@ async function render(options: Options = {}) {
       shared: options.shared ?? false,
       ownScore: options.ownScore ?? null,
       ownReview: options.ownReview ?? null,
+      onSaved,
     },
     attachTo: document.body,
     global: { plugins: [router, createPinia(), createAppI18n('en')] },
@@ -109,7 +113,7 @@ describe('VerdictEditSheet', () => {
 
     expect(amendVerdict).toHaveBeenCalledWith(ITEM, { score: 4 })
     // The server's answer to the write goes up, review and all: the screen opens on it next (А1).
-    expect(view.emitted('saved')).toEqual([[{ score: 4, review: 'Пахнет крахмалом' }]])
+    expect(onSaved.mock.calls).toEqual([[ITEM, { score: 4, review: 'Пахнет крахмалом' }]])
   })
 
   // MOL-225, adversarial Р1-А2: the two buttons share one write. The pressed one says its work in
@@ -207,7 +211,7 @@ describe('VerdictEditSheet', () => {
 
     expect(amendVerdict).toHaveBeenCalledWith(ITEM, { review: null })
     // The score sent nowhere is the answer's, not the patch's.
-    expect(view.emitted('saved')).toEqual([[{ score: 3, review: null }]])
+    expect(onSaved.mock.calls).toEqual([[ITEM, { score: 3, review: null }]])
   })
 
   it('withdraws without asking, and says what withdrawing does', async () => {
@@ -218,7 +222,7 @@ describe('VerdictEditSheet', () => {
     await button(view, 'Withdraw the rating').trigger('click')
 
     expect(withdrawVerdict).toHaveBeenCalledWith(ITEM)
-    expect(view.emitted('saved')).toEqual([[null]])
+    expect(onSaved.mock.calls).toEqual([[ITEM, null]])
   })
 
   it('a score taken back is not a change: an empty patch is a refusal nobody can act on', async () => {
@@ -278,7 +282,7 @@ describe('VerdictEditSheet', () => {
 
     expect(rateItem).toHaveBeenCalledWith(ITEM, { score: 5 })
     expect(amendVerdict).not.toHaveBeenCalled()
-    expect(view.emitted('saved')).toEqual([[{ score: 5, review: null }]])
+    expect(onSaved.mock.calls).toEqual([[ITEM, { score: 5, review: null }]])
   })
 
   it('МР-3: withdrawing says what it does, and that differs in the shared mode', async () => {
@@ -332,7 +336,7 @@ describe('VerdictEditSheet', () => {
     await view.vm.$nextTick()
 
     expect(view.text()).toContain('Could not save it')
-    expect(view.emitted('saved')).toBeUndefined()
+    expect(onSaved).not.toHaveBeenCalled()
 
     online(false)
     await button(view, 'Save the rating').trigger('click')

@@ -149,17 +149,21 @@ export default defineComponent({
     ownScore: { type: Number as PropType<Score | null>, default: null },
     /** The review is always the asker's own, whatever the mode (MOL-31, Р-19). */
     ownReview: { type: String as PropType<string | null>, default: null },
-    /** The screen puts the sheet away from here, and asks the server again on `saved`. */
+    /** The screen puts the sheet away from here, and asks the server again on `onSaved`. */
     onClosed: { type: Function as PropType<() => void>, default: undefined },
-  },
-  emits: {
     /**
-     * What the server answered the write with — the verdict as it now stands, `null` once withdrawn.
-     * The screen opens the sheet on it until its rows are asked for again (MOL-202, А1).
+     * What the server answered the write with — the verdict as it now stands, `null` once withdrawn;
+     * the screen opens the sheet on it until its rows are asked for again (MOL-202, А1). A handler held
+     * as a prop, not an event, as `BottomSheet`'s `onClosed`: the sheet may be swept away while the
+     * write is on its way, and Vue drops what an unmounted component emits — the write landed, and the
+     * screen neither kept it nor asked again (adversarial Д1).
      */
-    saved: (verdict: SavedVerdict | null) => verdict === null || typeof verdict.score === 'number',
+    onSaved: {
+      type: Function as PropType<(itemId: string, verdict: SavedVerdict | null) => void>,
+      default: undefined,
+    },
   },
-  setup(props, { emit }) {
+  setup(props) {
     const { t } = useI18n()
     const open = ref(true)
 
@@ -218,7 +222,8 @@ export default defineComponent({
       // «Тут дешевле» remembered before this verdict no longer says what the item is (MOL-92).
       forgetOwnPrices(currentIdentity(), [props.itemId])
       try {
-        emit('saved', await run())
+        const verdict = await run()
+        props.onSaved?.(props.itemId, verdict)
         open.value = false
       } catch (error) {
         reportFailure(error, 'screen')

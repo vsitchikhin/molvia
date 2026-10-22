@@ -151,6 +151,9 @@ const PAGE = newId()
 /** The requests of the list, numbered across the screens of this page. */
 let requests = 0
 
+/** The newest answer the phone's memory holds, by owner: one landing later and older goes unwritten. */
+const rememberedUpTo = new Map<string, number>()
+
 const writtenSchema = z.record(
   z.string(),
   z.object({
@@ -173,6 +176,7 @@ const pageWritten = new Map<string, Written>()
 /** A fresh page, as a reload makes one: for the tests, which share one module between them. */
 export function forgetPageWrites(): void {
   pageWritten.clear()
+  rememberedUpTo.clear()
 }
 
 function readWritten(owner: string): Written {
@@ -190,7 +194,11 @@ function writeWritten(owner: string, entries: Written): void {
   pageWritten.set(owner, entries)
   // Every shelf or none: a shelf that refuses loses its past rather than answer the next page with it.
   if (Object.keys(entries).length === 0) forget(`${WRITTEN}.${owner}`)
-  else writeEverywhere(`${WRITTEN}.${owner}`, JSON.stringify(entries))
+  // Kept on no shelf the next page will have — `localStorage` full, `sessionStorage` gone with the
+  // app — the write cannot stand over the list remembered before it there, so the list goes too:
+  // no list offline is the truth, the score from before the write is not (adversarial Д2).
+  else if (!writeEverywhere(`${WRITTEN}.${owner}`, JSON.stringify(entries)))
+    forget(`${KEY}.${owner}`)
 }
 
 /**
@@ -274,6 +282,8 @@ export function useAdvice(): Advice {
    * than dropped, and every answer carries the number of the request that asked for it.
    */
   let running: object | null = null
+  /** Whether the screen is still here: one gone may take an answer, never let a write go. */
+  let alive = true
   let latest = 0
   /** How many times a fresh list has been asked for; the loop below serves the last ask. */
   let asks = 0
@@ -300,11 +310,19 @@ export function useAdvice(): Advice {
       remembered.value = { answer: fresh, fetchedAt: new Date() }
       failure.value = null
       confirmed.value = true
-      remember()
-      // Asked after a write, the answer has it: the write is let go (MOL-202, В1).
-      const entries = Object.entries(readWritten(id))
-      const waiting = entries.filter(([, entry]) => entry.page === PAGE && entry.after >= mine)
-      if (waiting.length < entries.length) writeWritten(id, Object.fromEntries(waiting))
+      // A screen gone still takes its answer into the phone's memory (adversarial Д3) — the newest
+      // of the page only: one asked before a step away and back may land after the next screen's.
+      if (mine > (rememberedUpTo.get(id) ?? 0)) {
+        rememberedUpTo.set(id, mine)
+        remember()
+      }
+      // Asked after a write, the answer has it: the write is let go (MOL-202, В1) — by a screen
+      // still here only: the one that is may still show the rows from before it (review №5).
+      if (alive) {
+        const entries = Object.entries(readWritten(id))
+        const waiting = entries.filter(([, entry]) => entry.page === PAGE && entry.after >= mine)
+        if (waiting.length < entries.length) writeWritten(id, Object.fromEntries(waiting))
+      }
       forgetOwnNever(id, fresh)
     } catch (error) {
       reportFailure(error, 'screen')
@@ -363,11 +381,10 @@ export function useAdvice(): Advice {
     },
   )
   onMounted(() => void load())
-  // A screen gone takes no answer (MOL-202, review №5): landing in it, an answer asked before a step
-  // away and back wrote the memory and let a write go while the new screen still showed the rows
-  // from before it. The new screen asks for itself.
+  // A screen gone asks nothing more, and lets no write go (MOL-202, review №5): its answer landing
+  // after a step away and back let one go while the new screen still showed the rows from before it.
   onUnmounted(() => {
-    latest = ++requests
+    alive = false
     running = null
   })
   useReconnect(() => void load())

@@ -118,6 +118,14 @@ const broke = () => new ApiError(ERROR.INTERNAL, 'HTTP 502')
 
 const mounted: VueWrapper[] = []
 
+/** The handler a sheet hands its write to — a prop, as the screen passes it (MOL-202, Д1). */
+const written = (sheet: VueWrapper) =>
+  (
+    sheet.vm.$props as {
+      onSaved: (itemId: string, verdict: { score: number; review: string | null } | null) => void
+    }
+  ).onSaved
+
 /** The strips of the connection on the screen, by kind and words: one a screen (MOL-181). */
 function strips(view: VueWrapper): { kind: string; text: string }[] {
   return view.findAllComponents(StatusStrip).map((strip) => ({
@@ -742,7 +750,7 @@ describe('AdviceView', () => {
     // A saved verdict moves the row to another group, or out of the list: the screen asks the
     // server again rather than moving it itself.
     advice.mockResolvedValue(answer([milk]))
-    sheet.vm.$emit('saved', { score: 5, review: mine.review })
+    written(sheet)(mine.itemId, { score: 5, review: mine.review })
     await flushPromises()
 
     expect(advice).toHaveBeenCalledTimes(2)
@@ -937,7 +945,7 @@ describe('AdviceView', () => {
 
       // A save asks again for the list and for what is found.
       advice.mockResolvedValue(answer([milk]))
-      sheet.vm.$emit('saved', { score: 4, review: null })
+      written(sheet)(plait.itemId, { score: 4, review: null })
       await vi.waitFor(() => {
         expect(adviceSearch).toHaveBeenCalledTimes(2)
       })
@@ -1133,7 +1141,8 @@ describe('AdviceView after the review', () => {
     await view.get('.tap').trigger('click')
     await flushPromises()
     adviceSearch.mockReturnValue(new Promise(() => undefined))
-    view.findComponent({ name: 'VerdictEditSheet' }).vm.$emit('saved', { score: 5, review: null })
+    const sheet = view.findComponent({ name: 'VerdictEditSheet' })
+    written(sheet)(sheet.props('itemId') as string, { score: 5, review: null })
     await flushPromises()
 
     expect(view.find('.skeleton').exists()).toBe(false)
@@ -1668,6 +1677,86 @@ describe('AdviceView: the sheet after a save (MOL-202, А1)', () => {
     await saveFive(view, () => advice.mockRejectedValue(broke()))
 
     await onFiveAndOneSent(view)
+  })
+
+  it('Д1: the sheet swept away while the write is on its way — the write is kept and the list asked', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    const sheet = await open(view)
+    let answer: (card: VerdictCard) => void = () => undefined
+    amendVerdict.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    await key(sheet, 5).trigger('click')
+    await main(sheet).trigger('click')
+    // Swept away mid-write: the screen puts it away, as `onClosed` does.
+    ;(view.vm as unknown as { putAway(): void }).putAway()
+    await flushPromises()
+    expect(view.findComponent({ name: 'VerdictEditSheet' }).exists()).toBe(false)
+
+    advice.mockRejectedValue(broke())
+    answer(card(5))
+    await flushPromises()
+
+    expect(advice).toHaveBeenCalledTimes(2)
+    await onFiveAndOneSent(view)
+  })
+
+  it('Д2: a write no shelf of the next page will have takes the list remembered before it along', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    const real = window.localStorage
+    const full: Storage = {
+      getItem: (key) => real.getItem(key),
+      removeItem: (key) => {
+        real.removeItem(key)
+      },
+      setItem: (key, value) => {
+        if (key.startsWith('molvia.advice-written'))
+          throw new DOMException('full', 'QuotaExceededError')
+        real.setItem(key, value)
+      },
+      clear: () => {
+        real.clear()
+      },
+      key: (n) => real.key(n),
+      get length() {
+        return real.length
+      },
+    }
+    vi.spyOn(window, 'localStorage', 'get').mockReturnValue(full)
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+    // This page still knows it.
+    await onFiveAndOneSent(view)
+
+    // The next launch: no `sessionStorage`, no page copy — and no list from before the write either.
+    expect(real.getItem(`molvia.advice.${ME}`)).toBeNull()
+    vi.restoreAllMocks()
+    sessionStorage.clear()
+    forgetPageWrites()
+    const next = await render()
+    expect(next.view.findAllComponents({ name: 'AdviceNeverRow' })).toHaveLength(0)
+  })
+
+  it('Д3: a screen gone still takes its answer into the memory — but never an older one over a newer', async () => {
+    let first: (value: AdviceResponse) => void = () => undefined
+    advice.mockReturnValueOnce(new Promise((resolve) => (first = resolve)))
+    const gone = await render()
+    gone.view.unmount()
+    mounted.splice(mounted.indexOf(gone.view), 1)
+    first(shared([row(4, '3.0')]))
+    await flushPromises()
+    expect(localStorage.getItem(`molvia.advice.${ME}`)).toContain('"ownScore":4')
+
+    // Asked before the step away and back, landing after the next screen's own: not written.
+    let late: (value: AdviceResponse) => void = () => undefined
+    advice.mockReturnValueOnce(new Promise((resolve) => (late = resolve)))
+    const old = await render()
+    old.view.unmount()
+    mounted.splice(mounted.indexOf(old.view), 1)
+    advice.mockResolvedValue(shared([row(3, '2.7')]))
+    await render()
+    late(shared([row(1)]))
+    await flushPromises()
+    expect(localStorage.getItem(`molvia.advice.${ME}`)).toContain('"ownScore":3')
   })
 
   it('a row found by the search, dimmed while it is asked again — the same', async () => {

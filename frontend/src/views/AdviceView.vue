@@ -171,7 +171,7 @@
       :own-score="editing.score"
       :own-review="editing.review"
       :on-closed="putAway"
-      @saved="saved"
+      :on-saved="saved"
     />
   </AppScreen>
 </template>
@@ -428,9 +428,10 @@ export default defineComponent({
       editing,
       edit,
       rate,
-      saved: (verdict: SavedVerdict | null) => {
-        // Before the list is asked again: an answer to that request is newer than the write.
-        if (editing.value) advice.wrote(editing.value.itemId, verdict, shownNow())
+      saved: (itemId: string, verdict: SavedVerdict | null) => {
+        // Before the list is asked again: an answer to that request is newer than the write. By the
+        // item the sheet names: swept away while the write was on its way, it is no longer `editing`.
+        advice.wrote(itemId, verdict, shownNow())
         void advice.retry()
         refreshes.value += 1
       },
