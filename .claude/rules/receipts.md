@@ -1216,27 +1216,34 @@ repeats over twelve days). `rememberedLines`, three ways:
 - **Confirmed**: a line as printed whose price is the remembered one. A line of one piece whose price is its sum is one
   number printed twice, emptied on its own by MOL-255; the memory is its second source, and `verifiedReading` keeps it.
 - **Repaired**: a line that does not hold, whose price the swaps make the remembered one — read otherwise — and whose
-  other figures then hold it one way: by the swaps for the model (two a figure, as MOL-290), **as printed for
-  Tesseract** — two lines whose price the memory confirmed were wrong on the bench where the parse had bent another
-  figure (am-39's discount, am-41's count); **to the hundredth, the discount exactly the card's rate** — within the
-  till's three luma Tesseract's «60 / 0,26 / 49,76» for 50 / 0,25 / 49,75 held at the remembered 50 (am-39), and the model
-  loses nothing by it. **A price read as remembered whose other figures do not hold is not the memory's** — the total's
-  (MOL-290): the memory has no word on a sum, and with the poisoned memory below it «confirmed» a «60 / 50» into «60 /
-  60». `repaired` and «проверьте» as MOL-290's, and `receipt_lines.remembered`; shown on the memory's own word, with no
-  receipt proven whole.
-- **Doubted** (owner's В-2 «б»): a line as printed one confused digit off the memory — misread alike in its price and sum
-  (am-34's 540 / 5,4 / 534,6 for 640) or the price went up by just that digit; the text cannot tell them, and a wrong
-  figure is worse than none — emptied, never proving the receipt whole; the review hints the remembered price. **Unless
-  the total two places vouch for is met by the lines only with the memory's reading of every doubted line**: then that
-  reading is taken, repaired.
+  quantity and discount then hold it **with the sum as read**, one way: by the swaps for the model (two a figure, as
+  MOL-290), **as printed for Tesseract** — two lines whose price the memory confirmed were wrong on the bench where the
+  parse had bent another figure (am-39's discount, am-41's count); **to the hundredth, the discount exactly the card's
+  rate** — within the till's three luma Tesseract's «60 / 0,26 / 49,76» for 50 / 0,25 / 49,75 held at the remembered 50
+  (am-39). `repaired` and «проверьте» as MOL-290's, and `receipt_lines.remembered`; shown on the memory's own word.
+  **The sum is what was paid, the total's** (adversarial А1 of review 1): a butter gone up to 650, copied «660 / 650»,
+  read 1 × 550 = 550 at a remembered 550 under a total of 650 two places print — the memory overrode the total. **A price
+  read as remembered whose other figures do not hold is not the memory's either** — the total's (MOL-290): with the
+  poisoned memory below it «confirmed» a «60 / 50» into «60 / 60».
+- **Doubted** (owner's В-2 «б»): a line as printed one **5↔6** off **the person's own** price — misread alike in its
+  price and sum (am-34's 540 / 5,4 / 534,6 for 640) or the price went up by just that digit; the text cannot tell them,
+  and a wrong figure is worse than none — emptied, never proving the receipt whole; the review hints the remembered
+  price. **5↔6 for either reader** (adversarial А4, review №2): the owner was asked of the font's pair, and Tesseract's
+  others are as many ordinary changes of a price — 990 → 999, 1 100 → 1 400, 330 → 380. **The person's own alone**
+  (review №4): the hint shows other people's price only with access, and a newcomer's line would go empty with nothing
+  to type it by.
 
-**Weaker than the total**: a receipt whose lines meet the total as read is not touched. **The model's order**: the memory
-a line at a time, then MOL-290's repair by the total over what is left — a line the memory decided is one read whole
-there — **and among a line's readings the total confirms, the memory's price chooses** (MOL-290's 0,6 × 550 beside 0,5 ×
-660, one sum: a doubt there, a choice with the memory). Tesseract's after `bestReading` chose (`rememberedReading`): its
-choice is not touched, and every line keeps its figures as printed for it (`read`, the card's and the class code's rows;
-a plain row of two bare figures prints no price apart and has none). The prompt is v5: the model never sees the memory
-(MOL-268, MOL-290 В-4, MOL-293).
+**The total takes the readings that need it — every doubted line's, every sum changed — or none**: only where the
+total two places vouch for is then met by every line. **And a total refutes the lines the memory put right**: where every
+line has its figures and they miss the total — vouched, or read in one place, which vouches for nothing but refutes —
+they go back as read. **The total first** (adversarial А3, review №1): for the model MOL-290's repair by the total runs
+on the lines as copied, the memory's price choosing among a line's readings (0,6 × 550 beside 0,5 × 660, one sum: a
+doubt there, a choice with the memory); where it proves the receipt whole, the memory says nothing more — a line the
+total vouches for as copied is no doubt, and doubted, it had emptied every line MOL-290 put right. Else the memory, a line
+at a time, and MOL-290 again over what it decided. A receipt whose lines meet the total as read is not touched.
+Tesseract's after `bestReading` chose (`rememberedReading`): its choice is not touched, and every line keeps its figures
+as printed for it (`read`, the card's and the class code's rows; a plain row of two bare figures prints no price apart
+and has none). The prompt is v5: the model never sees the memory (MOL-268, MOL-290 В-4, MOL-293).
 
 **What the memory keeps after it** (owner's В-3 «а»): a line it put right, recorded as shown, keeps the remembered price
 in the person's word (`as_read`, `keepsPrice` in `record-receipt.ts`) — with none the word would lose the price, and the
@@ -1245,16 +1252,19 @@ memory would speak on every other receipt; its cut-out rows are not confirmed, a
 
 **The review**: a line with no price — the check emptied it, a doubt among them — shows the remembered price as the hint
 «В прошлый раз здесь было …» (`rememberedPrice`, the hint's own rule of access); the mark of a line put right says
-«Цифры поправили — сверьте с бумагой», since it may be the memory's and not the total's. The log of a reading counts the
-lines it put right (`remembered`), never a price.
+«Цифры поправили — сверьте с бумагой», since it may be the memory's and not the total's. The log of a reading counts
+what the memory said, line by line — confirmed, put right, doubted (`rememberedConfirmed`, `rememberedRepaired`,
+`rememberedDoubted`, review №5) — never a price: the doubts are the price named, lines a changed shelf price emptied.
 
 **On the bench** (`.scratch/tasks/research/MOL-291.md`, the memory of every other paper of the seller): the model's right
-fields 652 → 709 and 686 → 749, made up 2 and 1 as on master; am-44 and Tesseract as they were (105 / 0). **The price,
-named**: a memory poisoned — every price moved by one 5↔6, a price changed by just that digit — loses some 74 right
+fields 652 → 697 and 686 → 740, made up 2 and 1 as on master; am-44 and Tesseract as they were (105 / 0). **The price,
+named**: a memory poisoned — every price moved by one 5↔6, a price changed by just that digit — loses some 60 right
 fields a run to the doubt and makes up 8–10, every one the bag the model itself copied «60 / 60» for 50 into the very old
-price: a reading that meets the memory is what «confirmed» is, and nothing tells it from the truth. **Ceilings**:
-`REMEMBERED_COMBINATIONS_MAX` 10 000 readings a line, `REMEMBERED_RECEIPT_COMBINATIONS_MAX` 50 000 a receipt; a line of the
-bench tries some dozens.
+price: a reading that meets the memory is what «confirmed» is, and nothing tells it from the truth. **And by what is
+shown**: «1 × p = p» stands only where the memory's price is p — the lower median of three strangers' where the person
+has none, a figure their own paper prints. **Ceilings**: `REMEMBERED_COMBINATIONS_MAX` 10 000 readings a line — past it
+that line alone says nothing, the receipt's budget untouched (adversarial А5) — and `REMEMBERED_RECEIPT_COMBINATIONS_MAX`
+50 000 a receipt; a line of the bench tries some dozens.
 
 ## A Serbian receipt by its link (MOL-232)
 
