@@ -28,6 +28,7 @@ import type {
   PhotoReading,
   ReceiptLine,
   ReceiptText,
+  RememberedPrice,
   RememberedPrices,
   TextRow,
 } from '@molvia/model'
@@ -97,6 +98,15 @@ export interface ReadReceiptsDeps {
   readonly now?: () => Date
 }
 
+/** How many lines the shop's memory confirmed, put right and doubted on a reading (MOL-291). */
+export interface RememberedVoice {
+  readonly confirmed: number
+  readonly repaired: number
+  readonly doubted: number
+}
+
+const SILENT: RememberedVoice = { confirmed: 0, repaired: 0, doubted: 0 }
+
 export type ReadReport =
   | {
       readonly kind: 'read'
@@ -115,8 +125,11 @@ export type ReadReport =
       readonly tokens: ModelPaid['tokens'] | null
       /** How many of the model's figures no rule read (MOL-294): a count, never the figures (Т-8). */
       readonly unparsed: number | null
-      /** Lines the shop's memory put right (MOL-291): a count, never a price. */
-      readonly remembered: number
+      /**
+       * What the shop's memory said of the lines (MOL-291, review №5): confirmed, put right, doubted — counts, never a
+       * price. The doubts are the price named: lines a changed shelf price emptied.
+       */
+      readonly remembered: RememberedVoice
     }
   | { readonly kind: 'reader_unavailable'; readonly reason: string }
   /**
@@ -313,7 +326,7 @@ async function readByOcr(
   const chosen = bestReading(photoReading, readings)
   // the shop's memory, after the parse chose its reading: the price by the card's swaps (MOL-291)
   const prices = await rememberedPrices(deps, claimed, chosen, currency)
-  const text = rememberedReading(chosen, prices, photoReading.swaps)
+  const text = rememberedReading(chosen, prices, photoReading)
   // a figure goes to the review as read only where it is verified, the rest is left empty (MOL-255)
   const shown = verifiedReading(text)
   const head = headOf(shown, currency, readings)
@@ -397,6 +410,13 @@ async function parsed(
     bindings,
     images,
     remembered: shown.lines.map((line) => line.repaired === true && line.remembered === 'repaired'),
+    voice: {
+      confirmed: text.lines.filter((line) => line.remembered === 'confirmed').length,
+      repaired: shown.lines.filter(
+        (line) => line.repaired === true && line.remembered === 'repaired',
+      ).length,
+      doubted: text.lines.filter((line) => line.remembered === 'doubted').length,
+    },
   }
 }
 
@@ -426,13 +446,15 @@ async function rememberedPrices(
     report({ kind: 'error', error })
     return new Map()
   }
-  const prices = new Map<string, number>()
+  const prices = new Map<string, RememberedPrice>()
   for (const sku of skus) {
     const word = recalled.get(memoryKey({ kind: 'sku', key: sku }))
     if (word === undefined) continue
-    const price =
-      word.ownPrice ?? (word.priced >= AGGREGATE_MIN_CONTRIBUTIONS ? word.sharedPrice : null)
-    if (price !== null) prices.set(sku, hundredthsOfMoney(price))
+    if (word.ownPrice !== null) {
+      prices.set(sku, { hundredths: hundredthsOfMoney(word.ownPrice), own: true })
+    } else if (word.priced >= AGGREGATE_MIN_CONTRIBUTIONS && word.sharedPrice !== null) {
+      prices.set(sku, { hundredths: hundredthsOfMoney(word.sharedPrice), own: false })
+    }
   }
   return prices
 }
@@ -538,7 +560,7 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
       costMicroUsd: paid?.costMicroUsd ?? null,
       tokens: paid?.tokens ?? null,
       unparsed,
-      remembered: outcome.kind === 'parsed' ? (outcome.remembered ?? []).filter(Boolean).length : 0,
+      remembered: outcome.kind === 'parsed' ? (outcome.voice ?? SILENT) : SILENT,
     })
   }
 }

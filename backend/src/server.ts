@@ -782,7 +782,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                 inputTokens: event.tokens?.input,
                 outputTokens: event.tokens?.output,
                 unparsed: event.unparsed,
-                remembered: event.remembered,
+                rememberedConfirmed: event.remembered.confirmed,
+                rememberedRepaired: event.remembered.repaired,
+                rememberedDoubted: event.remembered.doubted,
               },
               'receipt read',
             )

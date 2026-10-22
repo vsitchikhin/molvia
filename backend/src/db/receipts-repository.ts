@@ -156,6 +156,12 @@ export type ReadOutcome =
       readonly specification?: 'ok' | 'failed' | 'skipped'
       /** Whether the shop's memory put each line right (MOL-291), in the lines' order. */
       readonly remembered?: readonly boolean[]
+      /** What the shop's memory said of the lines, for the log (MOL-291): counted, never stored. */
+      readonly voice?: {
+        readonly confirmed: number
+        readonly repaired: number
+        readonly doubted: number
+      }
     }
   | {
       readonly kind: 'failed'

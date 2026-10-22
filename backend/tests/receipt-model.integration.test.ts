@@ -614,7 +614,7 @@ describe('what the model read', () => {
 describe('the shop’s memory in the digits (MOL-291)', () => {
   const TIN = '01234567'
   const BUTTER = '1110004'
-  // printed 1 × 550 − 5,5 = 544,5, copied 650 / 5,6 / 644,6; the total in one place only, so the font's swaps by the
+  // printed 1 × 550 − 5,5 = 544,5, copied 650 / 5,6 / 544,5; the total in one place only, so the font's swaps by the
   // total (MOL-290) put nothing right — the memory alone
   const butter = {
     printed: 'Կարագ «Օրինակ»',
@@ -624,7 +624,7 @@ describe('the shop’s memory in the digits (MOL-291)', () => {
     unit: 'pcs' as const,
     unit_price: '650',
     discount: '5.6',
-    sum: '644.6',
+    sum: '544.5',
   }
   const answer = (over: Partial<ModelReceipt> = {}): ModelReceipt => ({
     ...ANSWER,
@@ -665,7 +665,10 @@ describe('the shop’s memory in the digits (MOL-291)', () => {
     })
     // the reading of a person the memory has no word of, and only one stranger's: as before
     expect(await butterOf(theirs)).toMatchObject({ sumMinor: null, remembered: false })
-    expect(reports.flatMap((r) => (r.kind === 'read' ? [r.remembered] : []))).toEqual([1, 0])
+    expect(reports.flatMap((r) => (r.kind === 'read' ? [r.remembered] : []))).toEqual([
+      { confirmed: 0, repaired: 1, doubted: 0 },
+      { confirmed: 0, repaired: 0, doubted: 0 },
+    ])
   }, 30_000)
 
   it('takes other people’s price from three of them, with no access (owner’s В-1 «в»)', async () => {
@@ -689,6 +692,71 @@ describe('the shop’s memory in the digits (MOL-291)', () => {
     const id = await queued(me)
     await readAll(benchReader(), model(answer({ id_rows: ['ԿՀ: 000123'] })))
     expect((await butterOf(id))?.remembered).toBe(false)
+  }, 30_000)
+
+  it('puts nothing right against a total two places print — the butter gone up to 650 (adversarial А1)', async () => {
+    const item = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    const me = await person(LATER)
+    await say(me.id, item)
+    const id = await queued(me)
+    // printed 1 × 650 = 650, the price copied «660»; remembered 550; the total 650 in two places
+    const gone = { ...butter, unit_price: '660', discount: null, sum: '650' }
+    await readAll(
+      benchReader(),
+      model(
+        answer({
+          lines: [gone],
+          totals: [
+            { label: 'Ընդամենը', amount: '650' },
+            { label: 'Վճարված է Առձեռն', amount: '650' },
+          ],
+        }),
+      ),
+    )
+    expect(
+      await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id)),
+    ).toMatchObject([{ priceMinor: null, sumMinor: null, repaired: false, remembered: false }])
+  }, 30_000)
+
+  it('shows no price of other people’s that the line’s own sum does not hold, and doubts nothing by it (А2, review №4)', async () => {
+    const item = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    const cheese = await insertItem(db, { name: 'Сыр', searchKey: 'syr' })
+    for (let i = 0; i < 3; i += 1) {
+      const stranger = await insertActor(db)
+      await say(stranger, item)
+      await memory.remember(stranger, TIN, [
+        { kind: 'sku', key: '1110005', itemId: cheese, price: { minor: 55_000n, currency: 'AMD' } },
+      ])
+    }
+    const me = await person(LATER)
+    const id = await queued(me)
+    // the butter 1 × 650 = 650 copied «660 / 650»; the cheese 2 × 560 = 1 120 as printed; the bread copied wrong
+    const lines = [
+      { ...butter, unit_price: '660', discount: null, sum: '650' },
+      {
+        ...butter,
+        article: '1110005',
+        discount: null,
+        quantity: '2',
+        unit_price: '560',
+        sum: '1120',
+      },
+      { ...ANSWER.lines[0]!, sum: '760' },
+    ]
+    await readAll(
+      benchReader(),
+      model(answer({ lines, totals: [{ label: 'Ընդամենը', amount: '2510' }] })),
+    )
+    const stored = await db
+      .select()
+      .from(receiptLines)
+      .where(eq(receiptLines.receiptId, id))
+      .orderBy(receiptLines.position)
+    expect(stored.map((line) => [line.priceMinor, line.sumMinor, line.remembered])).toEqual([
+      [null, null, false],
+      [56_000n, 112_000n, false],
+      [null, null, false],
+    ])
   }, 30_000)
 
   it('keeps the remembered price in the person’s word once recorded as shown (owner’s В-3 «а»)', async () => {

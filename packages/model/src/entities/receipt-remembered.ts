@@ -1,10 +1,23 @@
+import type { PhotoReading } from '#model/entities/receipt-card'
 import type { LineFigures, ReceiptText, ReceiptTextLine } from '#model/entities/receipt-text'
 
 /**
- * The shelf price the shop's memory holds for each article of the receipt's seller (MOL-291), in hundredths of
- * the receipt's currency: the person's own, else the lower median of three prices or more (owner's В-1 «в»).
+ * The shelf price the shop's memory holds for an article of the receipt's seller (MOL-291), in hundredths of the
+ * receipt's currency: the person's own (`own`), else the lower median of three prices or more (owner's В-1 «в»).
  */
-export type RememberedPrices = ReadonlyMap<string, number>
+export interface RememberedPrice {
+  readonly hundredths: number
+  readonly own: boolean
+}
+
+/** The shop's memory for a receipt, by article. */
+export type RememberedPrices = ReadonlyMap<string, RememberedPrice>
+
+/** The totals a reading has, less what went to the card: two places vouching for it, and read in one place. */
+export interface RememberedTotals {
+  readonly owed: number | null
+  readonly read: number | null
+}
 
 /** The most swaps in the price the memory is set against: «550» read «660» is two (as MOL-290's В-2). */
 export const REMEMBERED_PRICE_SWAPS = 2
@@ -25,6 +38,11 @@ export interface RememberedSwaps {
   readonly price: Readonly<Record<string, string>>
   /** Tesseract's other figures stand as printed (`{}`): two lines it bent besides the price were wrong. */
   readonly others: Readonly<Record<string, string>>
+  /**
+   * The pair a doubt is of, for either reader: the font's 5↔6, as the owner was asked (В-2 «б»). Tesseract's other
+   * pairs are as many ordinary changes of a price — 990 → 999, 1 100 → 1 400 (adversarial А4, review №2).
+   */
+  readonly doubt: Readonly<Record<string, string>>
 }
 
 /**
@@ -67,15 +85,20 @@ function variantsOf(
 }
 
 /** Whether the price read is the remembered one or within the swaps of it. */
-const nearPrice = (swaps: RememberedSwaps, read: number, remembered: number): boolean =>
-  variantsOf(swaps.price, read, REMEMBERED_PRICE_SWAPS).has(remembered)
+const nearPrice = (
+  swaps: Readonly<Record<string, string>>,
+  read: number,
+  remembered: number,
+): boolean => variantsOf(swaps, read, REMEMBERED_PRICE_SWAPS).has(remembered)
 
 /**
  * The one reading of a line at the remembered price: its quantity, discount and sum as read or by the swaps of
  * `others` (two a figure, as MOL-290), holding the line's arithmetic **to the hundredth**, the discount exactly the
  * card's rate of the shelf price. Not to the till's three luma, as a line's own reading is: Tesseract read
  * «60 / 0,26 / 49,76» for 50 / 0,25 / 49,75 — every 5 a 6 — and at the remembered 50 its sum held within them
- * (am-39); on the model's bench the exact rule loses nothing. `null` — none, two, or past the ceiling.
+ * (am-39); on the model's bench the exact rule loses nothing. **The sum as read** unless `paid` — what was paid is
+ * the total's to vouch for, never the memory's (adversarial А1). `null` — none, two, or past a ceiling: past the
+ * line's the memory says nothing of that line alone, the receipt's budget untouched (А5).
  */
 function readingAt(
   swaps: RememberedSwaps,
@@ -83,6 +106,7 @@ function readingAt(
   price: number,
   rate: number | null,
   budget: { left: number },
+  paid: boolean,
 ): LineFigures | null {
   const { quantityMilli: qty, discountHundredths: discount, sumHundredths: sum } = read
   if (qty === null || qty <= 0 || sum === null) return null
@@ -90,12 +114,9 @@ function readingAt(
   if (discount !== null && discount > 0 && rate === null) return null
   const qtys = variantsOf(swaps.others, qty, 2)
   const discounts = discount === null ? new Map([[0, 0]]) : variantsOf(swaps.others, discount, 2)
-  const sums = variantsOf(swaps.others, sum, 2)
+  const sums = paid ? variantsOf(swaps.others, sum, 2) : new Map([[sum, 0]])
   const combinations = qtys.size * sums.size
-  if (combinations > REMEMBERED_COMBINATIONS_MAX || combinations > budget.left) {
-    budget.left = 0
-    return null
-  }
+  if (combinations > REMEMBERED_COMBINATIONS_MAX || combinations > budget.left) return null
   budget.left -= combinations
   rememberedTries.count += combinations
   const found: LineFigures[] = []
@@ -134,72 +155,95 @@ const withFigures = (line: ReceiptTextLine, figures: LineFigures): ReceiptTextLi
  *
  * - **Confirmed**: a line as printed whose price is the remembered one — a line of one piece whose price is its
  *   sum is one number printed twice, emptied on its own by MOL-255; the memory is its second source.
- * - **Repaired**: a line that does not hold as read, whose price the swaps make the remembered one — read otherwise, and whose
- *   other figures then hold it one way — as read, or by `others` — the discount at the card's rate. «60 60» read
- *   for «50 50», «650 / 5,6 / 644,6» for 550 / 5,5 / 544,5. Shown with «проверьте».
- * - **Doubted** (owner's В-2 «б»): a line that holds as printed one confused digit off the memory — misread alike
- *   in its price and sum (am-34's 540 / 5,4 / 534,6 for 640), or the price went up by just that digit. The text
- *   cannot tell them, and a wrong figure is worse than none: emptied by the check. Unless `owed` — the total two
- *   places vouch for, less what went to the card — is met by the lines only with the memory's reading of it:
- *   then that reading is taken, repaired.
+ * - **Repaired**: a line that does not hold as read, whose price the swaps make the remembered one — read otherwise
+ *   — and whose quantity and discount then hold it with **the sum as read**, one way — as read, or by `others` — the
+ *   discount at the card's rate. «60 50» read for «50 50», «650 / 5,6 / 544,5» for 550 / 5,5 / 544,5. Shown with
+ *   «проверьте». A reading that changes the sum is what was paid, the total's: taken only as below. «660 / 650» for
+ *   a butter gone up to 650, against a remembered 550, read 1 × 550 = 550 under a total of 650 (adversarial А1).
+ * - **Doubted** (owner's В-2 «б»): a line that holds as printed one 5↔6 off **the person's own** price — misread
+ *   alike in its price and sum (am-34's 540 / 5,4 / 534,6 for 640), or the price went up by just that digit. The text
+ *   cannot tell them, and a wrong figure is worse than none: emptied by the check, the remembered price the hint. Never
+ *   by other people's price: the hint shows it only with access, and a newcomer's line would go empty with nothing to
+ *   type it by (review №4).
+ *
+ * **The total takes the memory's readings that need it — every doubted line, every sum changed — or none of them**:
+ * only where `owed`, the total two places vouch for, is then met by every line. **And a total refutes the lines the
+ * memory put right**: where every line has its figures and they miss the total — vouched, or read in one place — the
+ * lines go back as read (adversarial А1: the memory is weaker than the total).
  */
 export function rememberedLines(
   lines: readonly ReceiptTextLine[],
   prices: RememberedPrices,
   swaps: RememberedSwaps,
-  owed: number | null,
+  totals: RememberedTotals,
 ): ReceiptTextLine[] {
   if (prices.size === 0) return [...lines]
   const rate = cardRate(lines)
   const budget = { left: REMEMBERED_RECEIPT_COMBINATIONS_MAX }
-  const doubts = new Map<number, LineFigures | null>()
+  // the readings only the total may take: a doubted line's, and one that changes what was paid
+  const pending = new Map<number, LineFigures | null>()
   const out = lines.map((line, i): ReceiptTextLine => {
     const remembered = line.sku === null ? undefined : prices.get(line.sku)
     const read = line.read
     if (remembered === undefined || read?.priceHundredths === undefined) return line
     if (read.priceHundredths === null) return line
     const price = read.priceHundredths
+    const at = remembered.hundredths
     if (line.asPrinted) {
-      if (price === remembered) return { ...line, remembered: 'confirmed' }
-      if (!nearPrice(swaps, price, remembered)) return line
-      doubts.set(i, readingAt(swaps, read, remembered, rate, budget))
+      if (price === at) return { ...line, remembered: 'confirmed' }
+      if (!remembered.own || !nearPrice(swaps.doubt, price, at)) return line
+      pending.set(i, readingAt(swaps, read, at, rate, budget, true))
       return { ...line, remembered: 'doubted' }
     }
     // the memory's word is the price: a line whose price reads as remembered and whose other figures do not hold
     // is the arithmetic's to put right, by the total (MOL-290) — with no total, a sum bent within the till's
     // rounding passed (am-39's 49,76 for 49,75), and a price misread into a changed one was «confirmed» by it
-    if (price === remembered || !nearPrice(swaps, price, remembered)) return line
-    const figures = readingAt(swaps, read, remembered, rate, budget)
-    return figures === null ? line : withFigures(line, figures)
+    if (price === at || !nearPrice(swaps.price, price, at)) return line
+    const kept = readingAt(swaps, read, at, rate, budget, false)
+    if (kept !== null) return withFigures(line, kept)
+    pending.set(i, readingAt(swaps, read, at, rate, budget, true))
+    return line
   })
-  if (doubts.size === 0 || owed === null) return out
-  // the total vouches for the memory's reading of every doubted line, or for none of them
-  const taken = out.map((line, i) => {
-    const figures = doubts.get(i)
-    return figures === undefined || figures === null ? line : withFigures(line, figures)
-  })
-  const whole =
-    [...doubts.values()].every((figures) => figures !== null) &&
-    taken.every((line) => line.settled && line.sumHundredths !== null) &&
-    taken.reduce((all, line) => all + (line.sumHundredths ?? 0), 0) === owed
-  return whole ? taken : out
+  const sumOf = (all: readonly ReceiptTextLine[]): number =>
+    all.reduce((sum, line) => sum + (line.sumHundredths ?? 0), 0)
+  const whole = (all: readonly ReceiptTextLine[]): boolean =>
+    all.every((line) => line.settled && line.sumHundredths !== null)
+  if (pending.size > 0 && totals.owed !== null) {
+    const taken = out.map((line, i) => {
+      const figures = pending.get(i)
+      return figures === undefined || figures === null ? line : withFigures(line, figures)
+    })
+    if (
+      [...pending.values()].every((figures) => figures !== null) &&
+      whole(taken) &&
+      sumOf(taken) === totals.owed
+    ) {
+      return taken
+    }
+  }
+  const judge = totals.owed ?? totals.read
+  if (judge === null || !whole(out) || sumOf(out) === judge) return out
+  return out.map((line, i) => (line.remembered === 'repaired' ? (lines[i] ?? line) : line))
 }
 
 /**
  * Tesseract's reading with the shop's memory's word on it (MOL-291): after the parse chose its reading, a line at
- * a time, by the figures as printed — the price by the card's swaps, every other figure as printed. A receipt
- * proven whole as read is not touched: the memory is weaker than the total.
+ * a time, by the figures as printed — the price by the card's swaps, every other figure as printed, a doubt by the
+ * font's 5↔6. A receipt proven whole as read is not touched: the memory is weaker than the total.
  */
 export function rememberedReading(
   text: ReceiptText,
   prices: RememberedPrices,
-  swaps: Readonly<Record<string, string>>,
+  reading: Pick<PhotoReading, 'swaps' | 'modelSwaps'>,
 ): ReceiptText {
   if (prices.size === 0 || text.lines.length === 0) return text
-  const owed =
-    text.totalHundredths === null ? null : text.totalHundredths - (text.cashbackHundredths ?? 0)
+  const less = (total: number | null): number | null =>
+    total === null ? null : total - (text.cashbackHundredths ?? 0)
+  const owed = less(text.totalHundredths)
   const asRead = text.lines.every((line) => line.asPrinted && line.sumHundredths !== null)
   const sum = text.lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0)
   if (asRead && owed !== null && sum === owed) return text
-  return { ...text, lines: rememberedLines(text.lines, prices, { price: swaps, others: {} }, owed) }
+  const swaps = { price: reading.swaps, others: {}, doubt: reading.modelSwaps }
+  const totals = { owed, read: less(text.readTotalHundredths) }
+  return { ...text, lines: rememberedLines(text.lines, prices, swaps, totals) }
 }
