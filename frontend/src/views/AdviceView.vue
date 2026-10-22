@@ -170,6 +170,7 @@
       :shared="editing.shared"
       :own-score="editing.score"
       :own-review="editing.review"
+      :unsure="editing.unsure"
       :on-closed="putAway"
       :on-saved="saved"
     />
@@ -354,6 +355,8 @@ export default defineComponent({
       shared: boolean
       score: Score | null
       review: string | null
+      /** A write of the item got no answer: which verdict is the person's, nobody knows (З1–З4). */
+      unsure: boolean
     } | null>(null)
 
     /** The search under the field: the rows it shows when a verdict is saved (MOL-202, А1). */
@@ -376,7 +379,9 @@ export default defineComponent({
      */
     function edit(row: AdviceRow, answered?: AdviceScope): void {
       const scope = answered ?? advice.scope.value ?? 'own'
-      const saved = advice.writtenOver(row)
+      const written = advice.writtenOver(row)?.verdict
+      const unsure = written === 'unknown'
+      const saved = written === undefined || unsure ? undefined : { verdict: written }
       editing.value = {
         itemId: row.itemId,
         name: row.name,
@@ -385,8 +390,9 @@ export default defineComponent({
         mine: saved ? saved.verdict !== null : row.isMine,
         shared: scope === 'shared',
         // The server's word, never read off `rating`: in the shared mode that is an average.
-        score: saved ? (saved.verdict?.score ?? null) : row.ownScore,
+        score: unsure ? null : saved ? (saved.verdict?.score ?? null) : row.ownScore,
         review: saved ? (saved.verdict?.review ?? null) : row.review,
+        unsure,
       }
     }
 
@@ -395,7 +401,8 @@ export default defineComponent({
      * Without a place, as a verdict from «Оценки» is (MOL-27).
      */
     function rate(item: AdviceFound, answered: AdviceScope): void {
-      const verdict = advice.writtenOver(item)?.verdict ?? null
+      const written = advice.writtenOver(item)?.verdict ?? null
+      const verdict = written === 'unknown' ? null : written
       editing.value = {
         itemId: item.itemId,
         name: item.name,
@@ -403,6 +410,7 @@ export default defineComponent({
         shared: answered === 'shared',
         score: verdict?.score ?? null,
         review: verdict?.review ?? null,
+        unsure: written === 'unknown',
       }
     }
 
@@ -431,8 +439,9 @@ export default defineComponent({
       saved: (itemId: string, verdict: SavedVerdict | null | undefined) => {
         // Before the list is asked again: an answer to that request is newer than the write. By the
         // item the sheet names: swept away while the write was on its way, it is no longer `editing`.
-        // A write with no answer is kept as nothing — it may or may not have landed (Ж1).
-        if (verdict !== undefined) advice.wrote(itemId, verdict, shownNow())
+        // A write with no answer is kept as such — it may or may not have landed, and the verdict kept
+        // before it is no longer the person's either (З1, З4).
+        advice.wrote(itemId, verdict === undefined ? 'unknown' : verdict, shownNow())
         void advice.retry()
         refreshes.value += 1
       },

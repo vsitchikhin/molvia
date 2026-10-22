@@ -297,7 +297,9 @@ describe('VerdictEditSheet', () => {
   })
 
   it('МР-4: a refusal the domain has words for gets them, instead of «try again»', async () => {
-    amendVerdict.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, 'HTTP 404'))
+    // The API's own words — a refusal, not a write that got no answer (Ж1).
+    const word = { fromApi: true }
+    amendVerdict.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, 'HTTP 404', true, undefined, word))
     const { view } = await render({ ownScore: 1 })
 
     await key(view, 5).trigger('click')
@@ -307,7 +309,9 @@ describe('VerdictEditSheet', () => {
     expect(view.text()).toContain('You have no rating here')
     expect(view.text()).not.toContain('Try again')
 
-    amendVerdict.mockRejectedValue(new ApiError(ISSUE.PATCH_EMPTY, 'HTTP 400'))
+    amendVerdict.mockRejectedValue(
+      new ApiError(ISSUE.PATCH_EMPTY, 'HTTP 400', true, undefined, word),
+    )
     await key(view, 4).trigger('click')
     await button(view, 'Save the rating').trigger('click')
     await flushPromises()
@@ -424,11 +428,12 @@ describe('VerdictEditSheet', () => {
       expect(view.find('.current').exists()).toBe(false)
       expect(view.findAll('button[aria-pressed="true"]')).toHaveLength(0)
 
-      amendVerdict.mockResolvedValueOnce(card({ score: 1 }))
+      // Withdrawn or not, nobody knows: `PUT`, right for either (З2).
+      rateItem.mockResolvedValueOnce({ verdict: card({ score: 1 }), created: false })
       await key(view, 1).trigger('click')
       await button(view, 'Save the rating').trigger('click')
       await flushPromises()
-      expect(amendVerdict).toHaveBeenLastCalledWith(ITEM, { score: 1 })
+      expect(rateItem).toHaveBeenLastCalledWith(ITEM, { score: 1 })
     })
 
     it('Ж1: the same in the sheet that sent it — the 1 goes, and the list is asked again', async () => {
@@ -439,11 +444,12 @@ describe('VerdictEditSheet', () => {
       await flushPromises()
       expect(onSaved.mock.calls).toEqual([[ITEM, undefined]])
 
-      amendVerdict.mockResolvedValueOnce(card({ score: 1 }))
+      // Withdrawn or not, nobody knows: `PUT`, right for either (З2).
+      rateItem.mockResolvedValueOnce({ verdict: card({ score: 1 }), created: false })
       await key(view, 1).trigger('click')
       await button(view, 'Save the rating').trigger('click')
       await flushPromises()
-      expect(amendVerdict).toHaveBeenLastCalledWith(ITEM, { score: 1 })
+      expect(rateItem).toHaveBeenLastCalledWith(ITEM, { score: 1 })
     })
 
     it('Ж2: a withdrawal on its way is said by its own word', async () => {
@@ -457,5 +463,35 @@ describe('VerdictEditSheet', () => {
       expect(withdraw?.attributes('aria-busy')).toBe('true')
       expect(view.findAll('button').map((b) => b.text())).not.toContain('Sending the rating…')
     })
+  })
+
+  it('З2: a withdrawal with no answer — the next score goes by `PUT`, right whether it landed or not', async () => {
+    withdrawVerdict.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'aborted', false))
+    const { view } = await render({ ownScore: 1 })
+    await button(view, 'Withdraw the rating').trigger('click')
+    await flushPromises()
+
+    rateItem.mockResolvedValueOnce({ verdict: card({ score: 4 }), created: true })
+    await key(view, 4).trigger('click')
+    await button(view, 'Save the rating').trigger('click')
+    await flushPromises()
+    expect(rateItem).toHaveBeenCalledWith(ITEM, { score: 4 })
+    expect(amendVerdict).not.toHaveBeenCalled()
+  })
+
+  it('З3: a 2xx this build cannot read is no refusal — the list is asked again', async () => {
+    amendVerdict.mockRejectedValueOnce(
+      new ApiError(ISSUE.RESPONSE_INVALID, '/verdicts', true, 200, {
+        fromApi: true,
+        offContract: true,
+      }),
+    )
+    const { view } = await render({ ownScore: 1 })
+    await key(view, 5).trigger('click')
+    await button(view, 'Save the rating').trigger('click')
+    await flushPromises()
+
+    expect(onSaved.mock.calls).toEqual([[ITEM, undefined]])
+    expect(view.find('.current').exists()).toBe(false)
   })
 })

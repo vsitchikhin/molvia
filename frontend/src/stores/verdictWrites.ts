@@ -13,7 +13,9 @@ export type WriteOutcome =
   | { readonly kind: 'unknown' }
 
 export function outcomeOf(error: unknown): WriteOutcome {
-  return error instanceof ApiError && error.answered && error.fromApi
+  // The API's `2xx` the contract could not read is no refusal either: written, in words this build
+  // cannot read (adversarial З3).
+  return error instanceof ApiError && error.answered && error.fromApi && !error.offContract
     ? { kind: 'refused' }
     : { kind: 'unknown' }
 }

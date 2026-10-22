@@ -5,7 +5,7 @@ import { adviceResponseSchema, geographyKey, verdictFields } from '@molvia/model
 import type { AdviceFound, AdviceResponse, AdviceRow, AdviceScope } from '@molvia/model'
 import { api } from '@/api'
 import type { CheapRow, NeverRow, TakeRow } from '@/components/adviceRow'
-import type { SavedVerdict } from '@/components/rating'
+import type { WrittenVerdict } from '@/components/rating'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
 import { forget, read, sharedKeeps, write, writeEverywhere } from '@/stores/storage'
@@ -51,9 +51,9 @@ export interface Advice {
    * A verdict written from the sheet: the server's answer to the write, `null` once withdrawn, and
    * what was on the screen then — before the list is asked for again (MOL-202, А1).
    */
-  wrote(itemId: string, verdict: SavedVerdict | null, shown: readonly object[]): void
+  wrote(itemId: string, verdict: WrittenVerdict, shown: readonly object[]): void
   /** What a write here made of the verdict behind a row, while the row is older than the write. */
-  writtenOver(shown: AdviceRow | AdviceFound): { readonly verdict: SavedVerdict | null } | null
+  writtenOver(shown: AdviceRow | AdviceFound): { readonly verdict: WrittenVerdict } | null
   retry(): Promise<void>
 }
 
@@ -157,9 +157,11 @@ const rememberedUpTo = new Map<string, number>()
 const writtenSchema = z.record(
   z.string(),
   z.object({
-    verdict: z
-      .object({ score: verdictFields.shape.score, review: verdictFields.shape.review })
-      .nullable(),
+    verdict: z.union([
+      z.object({ score: verdictFields.shape.score, review: verdictFields.shape.review }),
+      z.null(),
+      z.literal('unknown'),
+    ]),
     page: z.string(),
     after: z.number(),
   }),

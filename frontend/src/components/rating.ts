@@ -10,6 +10,12 @@ export type Score = Rating['score']
 export type SavedVerdict = Pick<VerdictCard, 'score' | 'review'>
 
 /**
+ * What the screen keeps of a write until the rows are asked for again: the server's answer, `null`
+ * once withdrawn — or `unknown`, a write that got no answer and may have landed (MOL-202, Ж1, З1–З4).
+ */
+export type WrittenVerdict = SavedVerdict | null | 'unknown'
+
+/**
  * The keys of the scale, in the order they are drawn. In a module of its own because two
  * components need them — the card of «Оценки» and the scale it hands the sheet of «Что брать»
  * — and an SFC exports a component, not a list.

@@ -151,6 +151,12 @@ export default defineComponent({
     ownScore: { type: Number as PropType<Score | null>, default: null },
     /** The review is always the asker's own, whatever the mode (MOL-31, Р-19). */
     ownReview: { type: String as PropType<string | null>, default: null },
+    /**
+     * A write of this item got no answer and may have landed (MOL-202, З1–З4): no score is known as
+     * the person's, nor whether the verdict was withdrawn — so a score chosen goes by `PUT`, right
+     * for a verdict live and withdrawn alike.
+     */
+    unsure: { type: Boolean, default: false },
     /** The screen puts the sheet away from here, and asks the server again on `onSaved`. */
     onClosed: { type: Function as PropType<() => void>, default: undefined },
     /**
@@ -177,15 +183,16 @@ export default defineComponent({
      * nobody knows which until it ends (Е1): then what it wrote, the row's if it was refused, and none
      * known if no answer came (Ж1). A choice made meanwhile is the person's and is kept.
      */
-    const own = ref<{ mine: boolean; score: Score | null; review: string | null }>({
+    const own = ref<{ mine: boolean; known: boolean; score: Score | null; review: string | null }>({
       mine: props.mine,
-      score: props.ownScore,
+      known: !props.unsure,
+      score: props.unsure ? null : props.ownScore,
       review: props.ownReview,
     })
     const writing = `${currentIdentity() ?? ''} ${props.itemId}`
     const earlier = writeInFlight(writing)
     const waiting = ref(earlier !== undefined)
-    const score = ref<Score | null>(waiting.value ? null : props.ownScore)
+    const score = ref<Score | null>(waiting.value ? null : own.value.score)
     const review = ref(props.ownReview ?? '')
     const sending = ref(waiting.value)
     // Which of the two is at work: «Снять оценку» and «Сохранить» share `sending` (adversarial Р1-А2)
@@ -208,12 +215,14 @@ export default defineComponent({
         const verdict = outcome.verdict
         own.value = {
           mine: verdict !== null,
+          known: true,
           score: verdict?.score ?? null,
           review: verdict?.review ?? null,
         }
       }
-      // It may have landed: no score is known as the person's, so whatever is chosen is sent.
-      else if (outcome.kind === 'unknown') own.value = { ...own.value, score: null }
+      // It may have landed: no score is known as the person's, nor whether it was withdrawn — so
+      // whatever is chosen is sent, by `PUT` (З2).
+      else if (outcome.kind === 'unknown') own.value = { ...own.value, known: false, score: null }
     }
     const failure = ref<WireCode | 'offline' | 'failed' | null>(null)
     const unsupported = ref(false)
@@ -224,7 +233,9 @@ export default defineComponent({
     const reviewChanged = computed(() => review.value !== (own.value.review ?? ''))
     /** Without a verdict of one's own there is nothing to amend: a score is the whole entry. */
     const ready = computed(() =>
-      own.value.mine ? scoreChanged.value || reviewChanged.value : score.value !== null,
+      own.value.mine && own.value.known
+        ? scoreChanged.value || reviewChanged.value
+        : score.value !== null,
     )
     const keepsScore = computed(
       () => own.value.mine && own.value.score !== null && score.value === null,
@@ -299,8 +310,9 @@ export default defineComponent({
         return
       }
       const chosen = score.value
-      if (!own.value.mine) {
-        // A first verdict is not an amendment: `PATCH` has nothing to change and answers 404.
+      if (!own.value.mine || !own.value.known) {
+        // A first verdict is not an amendment: `PATCH` has nothing to change and answers 404. Nor is
+        // one whose last write got no answer: it may have been withdrawn, and `PUT` is right either way.
         if (chosen === null) return
         void send(() =>
           api

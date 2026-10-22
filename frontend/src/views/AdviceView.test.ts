@@ -1847,7 +1847,7 @@ describe('AdviceView: the sheet after a save (MOL-202, А1)', () => {
     expect(real.getItem(`molvia.advice.${ME}`)).not.toBeNull()
   })
 
-  it('Ж1: a write with no answer is kept as nothing, and the list is asked again', async () => {
+  it('Ж1: a write with no answer is kept as unknown, and the list is asked again', async () => {
     advice.mockResolvedValue(shared([row(1)]))
     const { view } = await render()
     const sheet = await open(view)
@@ -1858,7 +1858,52 @@ describe('AdviceView: the sheet after a save (MOL-202, А1)', () => {
     await flushPromises()
 
     expect(advice).toHaveBeenCalledTimes(2)
-    expect(localStorage.getItem(`molvia.advice-written.${ME}`)).toBeNull()
+    expect(localStorage.getItem(`molvia.advice-written.${ME}`)).toContain('"verdict":"unknown"')
+  })
+
+  /** The sheet open on the row says no score of the person's and sends the one chosen by `PUT`. */
+  async function unsureAndPut(view: VueWrapper, chosen: number): Promise<void> {
+    const sheet = await open(view)
+    expect(sheet.find('.current').exists()).toBe(false)
+    expect(sheet.findAll('button[aria-pressed="true"]')).toHaveLength(0)
+    rateItem.mockResolvedValueOnce({ verdict: card(chosen), created: false })
+    await key(sheet, chosen).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+    expect(rateItem).toHaveBeenLastCalledWith(ITEM, { score: chosen })
+  }
+
+  const cutOff = () => new ApiError(ERROR.INTERNAL, 'aborted', false)
+
+  it('З4: a write with no answer, the sheet closed and opened again — still no score of one`s own', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    const sheet = await open(view)
+    amendVerdict.mockRejectedValueOnce(cutOff())
+    advice.mockRejectedValue(broke())
+    await key(sheet, 5).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+    ;(view.vm as unknown as { putAway(): void }).putAway()
+    await flushPromises()
+
+    await unsureAndPut(view, 1)
+  })
+
+  it('З1: a write with no answer after one that landed — the earlier is no longer the person`s', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+    const sheet = await open(view)
+    amendVerdict.mockRejectedValueOnce(cutOff())
+    await key(sheet, 3).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+    ;(view.vm as unknown as { putAway(): void }).putAway()
+    await flushPromises()
+
+    // The server may hold the 3: the 5 goes back by `PUT`, never refused as «nothing changed».
+    await unsureAndPut(view, 5)
   })
 
   it('a row found by the search, dimmed while it is asked again — the same', async () => {
