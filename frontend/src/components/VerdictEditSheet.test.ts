@@ -7,6 +7,7 @@ import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE } from '@molvia/model'
 import type { Rating, VerdictAmendment, VerdictCard } from '@molvia/model'
 import VerdictEditSheet from '@/components/VerdictEditSheet.vue'
+import { forgetWritesInFlight } from '@/components/rating'
 import type { SavedVerdict, Score } from '@/components/rating'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
@@ -46,6 +47,7 @@ beforeEach(() => {
   withdrawVerdict.mockReset()
   rateItem.mockReset()
   onSaved.mockReset()
+  forgetWritesInFlight()
   vi.restoreAllMocks()
   online(true)
   clock = 0
@@ -343,5 +345,72 @@ describe('VerdictEditSheet', () => {
     await view.vm.$nextTick()
 
     expect(view.text()).toContain('A rating can be changed once you are online')
+  })
+
+  describe('Е1: swept away mid-write and opened again', () => {
+    async function sweptMidWrite(): Promise<(verdict: VerdictCard | Error) => void> {
+      let settle: (verdict: VerdictCard | Error) => void = () => undefined
+      amendVerdict.mockReturnValueOnce(
+        new Promise((resolve, reject) => {
+          settle = (verdict) => {
+            if (verdict instanceof Error) reject(verdict)
+            else resolve(verdict)
+          }
+        }),
+      )
+      const first = await render({ ownScore: 1 })
+      await key(first.view, 5).trigger('click')
+      await button(first.view, 'Save the rating').trigger('click')
+      first.view.unmount()
+      return settle
+    }
+
+    it('waits for the write on its way, then stands on what it wrote — and the 1 goes after it', async () => {
+      const land = await sweptMidWrite()
+      const { view } = await render({ ownScore: 1 })
+      const save = view.get('button.large')
+      expect(save.text()).toBe('Sending the rating…')
+      expect(save.attributes('aria-busy')).toBe('true')
+      // Which score is the person's is not known until it lands: none said, none chosen.
+      expect(view.find('.current').exists()).toBe(false)
+      expect(view.findAll('button[aria-pressed="true"]')).toHaveLength(0)
+
+      land(card({ score: 5 }))
+      await flushPromises()
+      expect(view.get('.current').text()).toBe('Your rating: 5')
+      expect(key(view, 5).attributes('aria-pressed')).toBe('true')
+
+      amendVerdict.mockResolvedValueOnce(card({ score: 1 }))
+      await key(view, 1).trigger('click')
+      await button(view, 'Save the rating').trigger('click')
+      await flushPromises()
+      // One write of the item at a time, in the order they were made.
+      expect(amendVerdict.mock.calls.map(([, patch]) => patch)).toEqual([
+        { score: 5 },
+        { score: 1 },
+      ])
+    })
+
+    it('a choice made while it waits is the person`s, and stays', async () => {
+      const land = await sweptMidWrite()
+      const { view } = await render({ ownScore: 1 })
+      await key(view, 3).trigger('click')
+
+      land(card({ score: 5 }))
+      await flushPromises()
+      expect(view.get('.current').text()).toBe('Your rating: 5')
+      expect(key(view, 3).attributes('aria-pressed')).toBe('true')
+      expect(button(view, 'Save the rating').attributes('aria-disabled')).toBeUndefined()
+    })
+
+    it('a write refused leaves the sheet on the row`s own score', async () => {
+      const land = await sweptMidWrite()
+      const { view } = await render({ ownScore: 1 })
+
+      land(new ApiError(ERROR.INTERNAL, 'HTTP 502'))
+      await flushPromises()
+      expect(view.get('.current').text()).toBe('Your rating: 1')
+      expect(button(view, 'Nothing has changed').attributes('aria-busy')).toBeUndefined()
+    })
   })
 })

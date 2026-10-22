@@ -8,7 +8,7 @@ import type { CheapRow, NeverRow, TakeRow } from '@/components/adviceRow'
 import type { SavedVerdict } from '@/components/rating'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
-import { forget, read, write, writeEverywhere } from '@/stores/storage'
+import { forget, read, sharedHolds, write, writeEverywhere } from '@/stores/storage'
 import { forgetOwnPrices } from '@/stores/ownPrices'
 import { reportFailure } from '@/failures'
 import { newId } from '@/ids'
@@ -194,11 +194,20 @@ function writeWritten(owner: string, entries: Written): void {
   pageWritten.set(owner, entries)
   // Every shelf or none: a shelf that refuses loses its past rather than answer the next page with it.
   if (Object.keys(entries).length === 0) forget(`${WRITTEN}.${owner}`)
-  // Kept on no shelf the next page will have — `localStorage` full, `sessionStorage` gone with the
-  // app — the write cannot stand over the list remembered before it there, so the list goes too:
-  // no list offline is the truth, the score from before the write is not (adversarial Д2).
-  else if (!writeEverywhere(`${WRITTEN}.${owner}`, JSON.stringify(entries)))
-    forget(`${KEY}.${owner}`)
+  else {
+    const kept = JSON.stringify(entries)
+    writeEverywhere(`${WRITTEN}.${owner}`, kept)
+    // Not on the shared shelf — the one the next launch has; `sessionStorage` goes with the app — the
+    // write cannot stand over the list remembered before it there, so the list goes too: no list
+    // offline is the truth, the score from before the write is not (adversarial Д2). A refusal of
+    // `sessionStorage` alone takes nothing (Е3). Nor may an answer asked before the write bring the
+    // list back (Е2): the memory takes none of the requests asked so far.
+    const held = sharedHolds((key, value) => key === `${WRITTEN}.${owner}` && value === kept)
+    if (held !== true) {
+      forget(`${KEY}.${owner}`)
+      rememberedUpTo.set(owner, requests)
+    }
+  }
 }
 
 /**
@@ -381,7 +390,8 @@ export function useAdvice(): Advice {
     },
   )
   onMounted(() => void load())
-  // A screen gone asks nothing more, and lets no write go (MOL-202, review №5): its answer landing
+  // A screen gone asks nothing more of its own accord, and lets no write go (MOL-202, review №5) — a
+  // write it hands over still asks the list again, and the answer goes to the memory; its answer landing
   // after a step away and back let one go while the new screen still showed the rows from before it.
   onUnmounted(() => {
     alive = false

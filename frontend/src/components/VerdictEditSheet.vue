@@ -1,20 +1,20 @@
 <template>
   <BottomSheet v-model:open="open" :on-closed="onClosed">
     <template #title>{{ name }}</template>
-    <template #meta>{{ mine ? t('advice.edit.meta') : t('advice.edit.meta_new') }}</template>
+    <template #meta>{{ own.mine ? t('advice.edit.meta') : t('advice.edit.meta_new') }}</template>
 
     <!-- The score as it stands, kept while another digit is chosen: the point a change is made
          from, in both modes — the row's figure may be everyone's average (Ф-25, MOL-202). The
          messages are the app's one global scope; unnamed, intlify warned at every opening. -->
     <I18nT
-      v-if="mine && ownScore !== null"
+      v-if="own.mine && own.score !== null && !waiting"
       keypath="advice.edit.current"
       scope="global"
       tag="p"
       class="current"
     >
       <template #n>
-        <b>{{ ownScore }}</b>
+        <b>{{ own.score }}</b>
       </template>
     </I18nT>
     <RatingScale v-model="score" />
@@ -52,7 +52,7 @@
       >
         {{ saveWord }}
       </AppButton>
-      <template v-if="mine">
+      <template v-if="own.mine">
         <AppButton
           variant="danger-ghost"
           block
@@ -84,6 +84,7 @@ import AppField from '@/components/AppField.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import RatingScale from '@/components/RatingScale.vue'
+import { trackWrite, writeInFlight } from '@/components/rating'
 import type { SavedVerdict, Score } from '@/components/rating'
 import { currentIdentity } from '@/stores/identity'
 import { forgetOwnPrices } from '@/stores/ownPrices'
@@ -167,9 +168,32 @@ export default defineComponent({
     const { t } = useI18n()
     const open = ref(true)
 
-    const score = ref<Score | null>(props.ownScore)
+    /**
+     * The verdict the sheet amends: the row's — or, while a write of this item is still on its way,
+     * nobody knows which until it lands: then what it wrote, or the row's if it was refused (Е1). A
+     * choice made meanwhile is the person's and is kept.
+     */
+    const own = ref({ mine: props.mine, score: props.ownScore, review: props.ownReview })
+    const writing = `${currentIdentity() ?? ''} ${props.itemId}`
+    const earlier = writeInFlight(writing)
+    const waiting = ref(earlier !== undefined)
+    const score = ref<Score | null>(waiting.value ? null : props.ownScore)
     const review = ref(props.ownReview ?? '')
-    const sending = ref(false)
+    const sending = ref(waiting.value)
+    void earlier?.then((verdict) => {
+      sending.value = false
+      waiting.value = false
+      const untouched = score.value === null && review.value === (props.ownReview ?? '')
+      if (verdict !== undefined)
+        own.value = {
+          mine: verdict !== null,
+          score: verdict?.score ?? null,
+          review: verdict?.review ?? null,
+        }
+      if (!untouched) return
+      score.value = own.value.score
+      review.value = own.value.review ?? ''
+    })
     // Which of the two is at work: «Снять оценку» and «Сохранить» share `sending` (adversarial Р1-А2).
     const withdrawing = ref(false)
     const failure = ref<WireCode | 'offline' | 'failed' | null>(null)
@@ -177,20 +201,22 @@ export default defineComponent({
 
     // A score taken back is not a change the server can be asked for: a verdict without a
     // score does not exist, and the only way to have none is to withdraw it.
-    const scoreChanged = computed(() => score.value !== null && score.value !== props.ownScore)
-    const reviewChanged = computed(() => review.value !== (props.ownReview ?? ''))
+    const scoreChanged = computed(() => score.value !== null && score.value !== own.value.score)
+    const reviewChanged = computed(() => review.value !== (own.value.review ?? ''))
     /** Without a verdict of one's own there is nothing to amend: a score is the whole entry. */
     const ready = computed(() =>
-      props.mine ? scoreChanged.value || reviewChanged.value : score.value !== null,
+      own.value.mine ? scoreChanged.value || reviewChanged.value : score.value !== null,
     )
-    const keepsScore = computed(() => props.mine && props.ownScore !== null && score.value === null)
+    const keepsScore = computed(
+      () => own.value.mine && own.value.score !== null && score.value === null,
+    )
     // The button's own word says why it is not now: one's own score untouched, or none chosen —
     // and a scale with nothing on it is the second, whether or not there is a verdict behind it: a
     // list the phone kept from before `ownScore` knows it is one's own but not what (А2).
     const saveWord = computed(() => {
-      if (ready.value) return t(props.mine ? 'verdict.save' : 'advice.edit.save_new')
+      if (ready.value) return t(own.value.mine ? 'verdict.save' : 'advice.edit.save_new')
       return t(
-        props.mine && props.ownScore !== null
+        own.value.mine && own.value.score !== null
           ? 'advice.edit.nothing_changed'
           : 'verdict.save_disabled',
       )
@@ -222,7 +248,9 @@ export default defineComponent({
       // «Тут дешевле» remembered before this verdict no longer says what the item is (MOL-92).
       forgetOwnPrices(currentIdentity(), [props.itemId])
       try {
-        const verdict = await run()
+        const write = run()
+        trackWrite(writing, write)
+        const verdict = await write
         props.onSaved?.(props.itemId, verdict)
         open.value = false
       } catch (error) {
@@ -248,7 +276,7 @@ export default defineComponent({
         return
       }
       const chosen = score.value
-      if (!props.mine) {
+      if (!own.value.mine) {
         // A first verdict is not an amendment: `PATCH` has nothing to change and answers 404.
         if (chosen === null) return
         void send(() =>
@@ -275,7 +303,7 @@ export default defineComponent({
     }
 
     function withdraw(): void {
-      if (sending.value || !props.mine) return
+      if (sending.value || !own.value.mine) return
       void send(() => api.withdrawVerdict(props.itemId).then(() => null), true)
     }
 
@@ -285,6 +313,8 @@ export default defineComponent({
       open,
       score,
       review,
+      own,
+      waiting,
       sending,
       withdrawing,
       failure,

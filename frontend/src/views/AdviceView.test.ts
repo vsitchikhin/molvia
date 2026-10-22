@@ -17,6 +17,7 @@ import type {
 } from '@molvia/model'
 import en from '@/i18n/en.json'
 import { forgetPageWrites } from '@/composables/useAdvice'
+import { forgetWritesInFlight } from '@/components/rating'
 import { createAppI18n } from '@/i18n'
 import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import IconMagnify from '~icons/mdi/magnify'
@@ -50,6 +51,7 @@ const ME = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 // for every test, as a reload makes one.
 beforeEach(() => {
   forgetPageWrites()
+  forgetWritesInFlight()
 })
 
 function place(name: string, scaledMinor: bigint): AdvicePlace {
@@ -1757,6 +1759,57 @@ describe('AdviceView: the sheet after a save (MOL-202, А1)', () => {
     late(shared([row(1)]))
     await flushPromises()
     expect(localStorage.getItem(`molvia.advice.${ME}`)).toContain('"ownScore":3')
+  })
+
+  /** A shelf refusing the key of the writes and still answering with what it held — a quota. */
+  function refusing(shelf: Storage): Storage {
+    return {
+      getItem: (key) => shelf.getItem(key),
+      removeItem: (key) => {
+        shelf.removeItem(key)
+      },
+      setItem: (key, value) => {
+        if (key.startsWith('molvia.advice-written'))
+          throw new DOMException('full', 'QuotaExceededError')
+        shelf.setItem(key, value)
+      },
+      clear: () => {
+        shelf.clear()
+      },
+      key: (n) => shelf.key(n),
+      get length() {
+        return shelf.length
+      },
+    }
+  }
+
+  it('Е2: a list forgotten for a write is not brought back by an answer asked before it', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    // The connection back asks again; its answer is held until after the save.
+    let land: (value: AdviceResponse) => void = () => undefined
+    advice.mockReturnValueOnce(new Promise((resolve) => (land = resolve)))
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+
+    const real = window.localStorage
+    vi.spyOn(window, 'localStorage', 'get').mockReturnValue(refusing(real))
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+    expect(real.getItem(`molvia.advice.${ME}`)).toBeNull()
+
+    land(shared([row(1)]))
+    await flushPromises()
+    expect(real.getItem(`molvia.advice.${ME}`)).toBeNull()
+  })
+
+  it('Е3: a refusal of `sessionStorage` alone keeps the list: the next launch has the write', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    vi.spyOn(window, 'sessionStorage', 'get').mockReturnValue(refusing(window.sessionStorage))
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+
+    expect(localStorage.getItem(`molvia.advice-written.${ME}`)).toContain('"score":5')
+    expect(localStorage.getItem(`molvia.advice.${ME}`)).not.toBeNull()
   })
 
   it('a row found by the search, dimmed while it is asked again — the same', async () => {
