@@ -436,8 +436,8 @@ the kind's choice counts no unit, «Ազնվամորու Մուրաբա կգ» i
   letters («Смузи»), and «-ի», «-ու» are a case only of a word the dictionary has, since a loan ends so; a name only
   where an Armenian capital says so on a line of small letters, «Բանան Սաբրոսթար», a sort; a standard or a size in
   Latin is no thing, «Կաթ UHT 3.2%», «Մարտկոց AA», «Լամպ LED» (Г2) — by a list, since a brand has the same form:
-  «Շոկոլադ MARS» is a thing (review 5, №2), and a standard the list has not, too (BIO, ICE and their like are in it,
-  Е2). «և» spelt as of old, «եւ» («Երեւան»), is «և» for the dictionary, the gloss, the seed's names and the letters of
+  «Շոկոլադ MARS» is a thing (review 5, №2), and a standard the list has not, too (BIO, MIX and their like are in it,
+  Е2); «ICE», «ZERO» change the thing — a cold tea, a beer with no alcohol — and are none (review 7). «և» spelt as of old, «եւ» («Երեւան»), is «և» for the dictionary, the gloss, the seed's names and the letters of
   a name (Д1, Е3). Of 527 lines «flavour kind»
   made of the seed's words, the first round bound 459 to the fruit, sure; now none.
 - **Any other item stands where `lineFitter` lets it** — a heading's far match, each of the search's first ten:
