@@ -69,7 +69,9 @@ function page(days: [string, ReturnType<typeof entry>[]][], cursor: JournalKey |
     previousToDay: null,
     byCategory: [],
     slices: [],
-    categories: [{ id: BEAUTY, preset: 'beauty', name: null, colour: null, archived: false }],
+    categories: [
+      { id: BEAUTY, preset: 'beauty', name: null, colour: null, icon: null, archived: false },
+    ],
     days: days.map(([day, entries]) => ({
       day,
       total: amd('1000'),
@@ -475,7 +477,14 @@ describe('useMoneyMonth', () => {
       vi.setSystemTime(new Date('2026-09-27T08:02:00Z'))
       const categories = [
         ...page([], null).categories,
-        { id: TAXI, preset: 'transport' as const, name: null, colour: null, archived: false },
+        {
+          id: TAXI,
+          preset: 'transport' as const,
+          name: null,
+          colour: null,
+          icon: null,
+          archived: false,
+        },
       ]
       moneyMonth.mockResolvedValueOnce({ ...page([], null), categories })
       host(pinia)

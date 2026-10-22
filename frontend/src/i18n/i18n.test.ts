@@ -152,9 +152,13 @@ describe('словарь: повторяющиеся тексты', () => {
         'item.save_edit',
         'receipt.line.save',
         'settings.save',
+        'spending.new_category.edit_save',
         'transfer.save',
         'trip.receipt.sheet.save',
       ],
+      // Поле категории в шторке траты и заголовок шторки своей категории (MOL-285) — одно слово о
+      // разном: поле выбирает, шторка правит.
+      Категория: ['spending.new_category.edit_title', 'spending.sheet.category'],
       // Цена Р-2: одно состояние, написанное для трёх экранов, и у просмотра чека своё (MOL-127).
       'Сервер не ответил': [
         'advice.error.title',
@@ -385,9 +389,11 @@ describe('словарь: повторяющиеся тексты', () => {
         'item.save_edit',
         'receipt.line.save',
         'settings.save',
+        'spending.new_category.edit_save',
         'transfer.save',
         'trip.receipt.sheet.save',
       ],
+      Category: ['spending.new_category.edit_title', 'spending.sheet.category'],
       'No connection': [
         'bot.offline.title',
         'consent.lost.title',

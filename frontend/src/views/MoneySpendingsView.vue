@@ -224,7 +224,7 @@
       @saved="saved"
       @removed="spendingRemoved"
     />
-    <NewCategorySheet
+    <CategorySheet
       v-model:open="newCategoryOpen"
       over
       :categories="categories"
@@ -252,8 +252,8 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
+import CategorySheet from '@/components/CategorySheet.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
-import NewCategorySheet from '@/components/NewCategorySheet.vue'
 import OperationRow from '@/components/OperationRow.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
@@ -283,9 +283,9 @@ export default defineComponent({
     AppCard,
     AppReveal,
     AppScreen,
+    CategorySheet,
     IconPlus,
     MonthSwitcher,
-    NewCategorySheet,
     OperationRow,
     ScreenSkeleton,
     ScreenState,

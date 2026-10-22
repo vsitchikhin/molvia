@@ -6,9 +6,16 @@ import {
   isWireCode,
   spendingAmendBodySchema,
   spendingBodySchema,
+  spendingCategoryAmendSchema,
   spendingCategoryBodySchema,
 } from '@molvia/model'
-import type { SpendingAmendBody, SpendingBody, SpendingCategoryBody, WireCode } from '@molvia/model'
+import type {
+  SpendingAmendBody,
+  SpendingBody,
+  SpendingCategoryAmend,
+  SpendingCategoryBody,
+  WireCode,
+} from '@molvia/model'
 import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
@@ -50,8 +57,41 @@ export type SpendingWrite =
   | { readonly kind: 'remove'; readonly id: string }
   | { readonly kind: 'restore'; readonly id: string }
   | { readonly kind: 'category-add'; readonly body: SpendingCategoryBody }
+  | {
+      readonly kind: 'category-amend'
+      readonly id: string
+      readonly body: SpendingCategoryAmend
+      /**
+       * The name stays as it was — a new icon or colour only (adversarial Б3): such an amendment frees
+       * no name and takes none, so nothing else in the queue stands on it. Left out, it may rename.
+       */
+      readonly keepsName?: true
+    }
   | { readonly kind: 'category-archive'; readonly id: string }
   | { readonly kind: 'category-restore'; readonly id: string }
+
+/**
+ * A category write that has landed, kept over the lists until they are read again (`arrived`). An
+ * amendment carries the moment its answer came: a list asked for after it holds it already, and over
+ * that list it would only hide a later change from another phone (review №2).
+ */
+export type ArrivedCategoryWrite =
+  | Extract<SpendingWrite, { kind: 'category-add' }>
+  | (Extract<SpendingWrite, { kind: 'category-amend' }> & { readonly landedAt: number })
+
+/** Which category a write is about, or null for a spending's. */
+export function categoryOf(write: SpendingWrite): string | null {
+  switch (write.kind) {
+    case 'category-add':
+      return write.body.id
+    case 'category-amend':
+    case 'category-archive':
+    case 'category-restore':
+      return write.id
+    default:
+      return null
+  }
+}
 
 export interface RejectedSpendingWrite {
   readonly key: string
@@ -114,6 +154,13 @@ function encode(write: SpendingWrite): Loose {
       }
     case 'category-add':
       return { kind: write.kind, body: spendingCategoryBodySchema.encode(write.body) }
+    case 'category-amend':
+      return {
+        kind: write.kind,
+        id: write.id,
+        body: spendingCategoryAmendSchema.encode(write.body),
+        ...(write.keepsName ? { keepsName: true } : {}),
+      }
     default:
       return { ...write }
   }
@@ -132,6 +179,13 @@ function decode(raw: unknown): SpendingWrite | null {
     return body.success ? { kind, body: body.data } : null
   }
   if (typeof id !== 'string' || !isIdentifier(id)) return null
+  if (kind === 'category-amend') {
+    const body = spendingCategoryAmendSchema.safeParse(raw.body)
+    if (!body.success) return null
+    return raw.keepsName === true
+      ? { kind, id, body: body.data, keepsName: true }
+      : { kind, id, body: body.data }
+  }
   if (kind === 'amend') {
     const body = spendingAmendBodySchema.safeParse(raw.body)
     if (!body.success) return null
@@ -259,9 +313,11 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
    * The categories this window wrote that have landed. A category leaves the queue on its answer,
    * and the list that names it is read again only after: in between it stood on no chip, and
    * «Сохранить трату» said «Выберите категорию» over the one just made and chosen. The lists take
-   * these until the server's names them (`categoriesWith` skips one it holds).
+   * these until the server's names them (`categoriesWith` skips one it holds). An amendment
+   * (MOL-285) is kept the same way, the last of each category's, over a list asked for before its
+   * answer only — in between, the row went back to the old name and icon for a round trip.
    */
-  const arrived = ref<Extract<SpendingWrite, { kind: 'category-add' }>[]>([])
+  const arrived = ref<ArrivedCategoryWrite[]>([])
   /**
    * The spending just removed, offered back for the ten seconds of its strip on «Траты» and
    * «Деньги» alike, as a trip's is (MOL-76): held by the screen, «Вернуть» went with «Траты» on
@@ -412,6 +468,9 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
       case 'category-add':
         await api.addSpendingCategory(write.body)
         return
+      case 'category-amend':
+        await api.amendSpendingCategory(write.id, write.body)
+        return
       case 'category-archive':
         await api.archiveSpendingCategory(write.id)
         return
@@ -491,6 +550,11 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
         ]
       }
       if (!refusal && write.kind === 'category-add') arrived.value = [...arrived.value, write]
+      if (!refusal && write.kind === 'category-amend')
+        arrived.value = [
+          ...arrived.value.filter((one) => one.kind !== 'category-amend' || one.id !== write.id),
+          { ...write, landedAt: Date.now() },
+        ]
       if (!refusal && (write.kind === 'remove' || write.kind === 'restore'))
         gone.value = landedAgain(`${GONE_KEY}.${owner}`, write.id, write.kind === 'remove')
       persist(owner)
@@ -671,14 +735,82 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     })
   }
 
-  /** «Убрать» or «Вернуть» a category: the opposite still waiting cancels out. */
+  /**
+   * Whether a write of another category after the one at `at` stands on what that one does to a name
+   * (adversarial А1, Б2, Б3): one that frees a name — «Убрать», a rename — or one that takes it — a new
+   * one, a rename, «Вернуть». A new icon or colour of another (`keepsName`) and a spending stand on
+   * nothing: past them the queue still folds and cancels, or the state the person already replaced
+   * went to the server and was refused by a name made on another phone.
+   */
+  function standsBehind(at: number, id: string, on: 'freed' | 'taken'): boolean {
+    if (at === -1) return false
+    return kept.slice(at + 1).some(({ write }) => {
+      const other = categoryOf(write)
+      if (other === null || other === id) return false
+      if (write.kind === 'category-amend') return write.keepsName !== true
+      return on === 'freed' ? write.kind === 'category-archive' : write.kind !== 'category-archive'
+    })
+  }
+
+  /**
+   * A category of one's own renamed, redrawn or recoloured (MOL-285): folded into its «Добавить» or
+   * its amendment still waiting — the whole of it either way — else sent after them. **Never folded
+   * past a write of another category that frees a name** (adversarial А1): a name is free only after
+   * the write that frees it — «Убрать» or a rename of the other — and folded in front of it, the
+   * rename was a 409, and a category made at the till went with the spending in it. `keepsName` is
+   * the sheet's word that the name stays as it was — required: only the sheet knows the name before,
+   * and an amendment said to rename stands on everything, which is the safe side.
+   */
+  function amendCategory(id: string, body: SpendingCategoryAmend, keepsName: boolean): void {
+    change(() => {
+      // Into the last of its «Добавить» and amendments, never an earlier one (adversarial Б4): two may
+      // stand apart — a write between them held the fold — and folded into the first, the second went
+      // after it with the state from before and took the last word back. The last one on its way is
+      // folded into by nothing.
+      const last = kept.findLastIndex(
+        (item) =>
+          (item.write.kind === 'category-add' && item.write.body.id === id) ||
+          (item.write.kind === 'category-amend' && item.write.id === id),
+      )
+      const lastItem = kept[last]
+      const found = lastItem && waiting(lastItem) ? last : -1
+      const at = standsBehind(found, id, 'freed') ? -1 : found
+      const earlier = kept[at]?.write
+      // Folded into an amendment, the name stays only if neither of the two moved it.
+      const keeps = keepsName && (earlier?.kind !== 'category-amend' || earlier.keepsName === true)
+      const write: SpendingWrite =
+        earlier?.kind === 'category-add'
+          ? { kind: 'category-add', body: { id, ...body } }
+          : keeps
+            ? { kind: 'category-amend', id, body, keepsName: true }
+            : { kind: 'category-amend', id, body }
+      kept =
+        at === -1
+          ? [...kept, { key: newKey(), write }]
+          : kept.map((item, index) => (index === at ? { key: newKey(), write } : item))
+    })
+  }
+
+  /**
+   * «Убрать» or «Вернуть» a category: the opposite still waiting cancels out — **unless a write of
+   * another category behind a «Убрать» takes a name** (adversarial Б2): «Убрать» of «Такси» may be what
+   * freed the name a rename of «Метро» took after it, and taken out from under the rename, the rename
+   * was refused instead of the «Вернуть» that came last. Then both go, in the order they were made. A
+   * «Вернуть» taken back frees nothing anybody could stand on: it always cancels.
+   */
   function archiveCategory(id: string, archived: boolean): void {
     const kind = archived ? 'category-archive' : 'category-restore'
     const opposite = archived ? 'category-restore' : 'category-archive'
     change(() => {
-      const at = kept.findIndex(
-        (item) => waiting(item) && item.write.kind === opposite && item.write.id === id,
+      // The last «Убрать» or «Вернуть» of it, as the fold takes the last amendment (Б4).
+      const last = kept.findLastIndex(
+        (item) =>
+          (item.write.kind === 'category-archive' || item.write.kind === 'category-restore') &&
+          item.write.id === id,
       )
+      const lastWrite = kept[last]
+      const found = lastWrite && waiting(lastWrite) && lastWrite.write.kind === opposite ? last : -1
+      const at = opposite === 'category-archive' && standsBehind(found, id, 'taken') ? -1 : found
       kept =
         at === -1
           ? [...kept, { key: newKey(), write: { kind, id } }]
@@ -707,6 +839,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     remove,
     restore,
     addCategory,
+    amendCategory,
     archiveCategory,
     dismiss,
   }

@@ -13,6 +13,7 @@ import {
   spendingAmendBodySchema,
   spendingBodySchema,
   spendingCategoriesResponseCodec,
+  spendingCategoryAmendSchema,
   spendingCategoryBodySchema,
   spendingViewCodec,
   yearSchema,
@@ -28,6 +29,7 @@ import type {
   SpendingAmendBody,
   SpendingBody,
   SpendingCategoriesResponse,
+  SpendingCategoryAmend,
   SpendingCategoryBody,
   SpendingView,
 } from '@molvia/model'
@@ -47,6 +49,11 @@ export interface SpendingsApi {
     actor: Asking,
     body: SpendingCategoryBody,
   ): Promise<{ list: SpendingCategoriesResponse; created: boolean }>
+  amendCategory(
+    actor: Asking,
+    id: string,
+    body: SpendingCategoryAmend,
+  ): Promise<SpendingCategoriesResponse>
   archiveCategory(actor: Asking, id: string, archived: boolean): Promise<SpendingCategoriesResponse>
   month(actor: Asking, month: string, cursor?: JournalKey): Promise<MoneyMonthView>
   chartMonth(actor: Asking, month: string): Promise<MoneyChartMonthView>
@@ -130,6 +137,20 @@ export function spendingRoutes(app: FastifyInstance, api: SpendingsApi): void {
       z.encode(spendingCategoriesResponseCodec, list),
     )
   })
+
+  /** One's own renamed, redrawn or recoloured (MOL-285): the whole of it, so a repeat is the same. */
+  app.patch<{ Params: { categoryId: string } }>(
+    '/spending-categories/:categoryId',
+    async (request, reply) => {
+      const body = parseBody(spendingCategoryAmendSchema, request.body)
+      return privately(reply).send(
+        z.encode(
+          spendingCategoriesResponseCodec,
+          await api.amendCategory(ownerOf(request), request.params.categoryId, body),
+        ),
+      )
+    },
+  )
 
   /** «Убрать из выбора»: nothing is erased — the category leaves the chips only (В-3). */
   app.delete<{ Params: { categoryId: string } }>(

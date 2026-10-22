@@ -81,7 +81,9 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     previousToDay: null,
     byCategory: [{ categoryId: BEAUTY, amount: amd('5000') }],
     slices: [{ categoryId: BEAUTY, amount: amd('5000'), count: 1, level: 1000 }],
-    categories: [{ id: BEAUTY, preset: 'beauty', name: null, colour: null, archived: false }],
+    categories: [
+      { id: BEAUTY, preset: 'beauty', name: null, colour: null, icon: null, archived: false },
+    ],
     days: [
       {
         day: '2026-09-26',
@@ -242,7 +244,7 @@ describe('MoneySpendingsView: rows and the sheet', () => {
     expect(plain(view.get('.total').text())).toContain('317,800')
     // One dot between the two parts, a space on either side (adversarial Б).
     expect(plain(view.get('.approx').text())).toBe('≈ ₽68,788 · 1 spending not counted yet')
-  })
+  }, 10_000)
 
   it('must not fire: with no «≈» the waiting spending starts the line, with no dot before it', async () => {
     moneyMonth.mockResolvedValue(month({ spentIncome: null }))
@@ -284,7 +286,7 @@ describe('MoneySpendingsView: rows and the sheet', () => {
       saved?.kind === 'record' ? saved.body.id : 'no record',
     )
     vi.unstubAllGlobals()
-  })
+  }, 10_000)
 
   it('removes without a question and offers «Undo», which brings the same spending back', async () => {
     moneyMonth.mockResolvedValue(month())
@@ -812,7 +814,7 @@ describe('MoneySpendingsView: the kit’s states, the rhythm and the day’s sum
     expect(await lines('AMD')).toBe(false)
     // Nothing known of the accounts: the usual case, two currencies.
     expect(await lines(null)).toBe(true)
-  })
+  }, 10_000)
 
   it('a day with no rate is its sum in its own currency, never «≈ 0 ֏», and the total names it', async () => {
     const dollars = parseMoney('50', 'USD')

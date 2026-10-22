@@ -140,7 +140,7 @@ function journal(account: MoneyAccountView, rows: AccountOperationView[]): Accou
 }
 
 const categories: SpendingCategoryView[] = [
-  { id: OTHER, preset: 'other', name: null, colour: null, archived: false },
+  { id: OTHER, preset: 'other', name: null, colour: null, icon: null, archived: false },
 ]
 
 let clock = 0

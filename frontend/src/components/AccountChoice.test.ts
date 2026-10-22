@@ -84,7 +84,7 @@ function withAccounts(accounts: MoneyAccountView[]): Pinia {
 }
 
 const categories: SpendingCategoryView[] = [
-  { id: CAFE, preset: 'cafe', name: null, colour: null, archived: false },
+  { id: CAFE, preset: 'cafe', name: null, colour: null, icon: null, archived: false },
 ]
 
 let clock = 0

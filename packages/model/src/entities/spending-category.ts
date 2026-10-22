@@ -39,6 +39,50 @@ export const spendingCategoryNameSchema = visibleLine(SPENDING_CATEGORY_NAME_MAX
 export const SPENDING_CATEGORY_COLOURS = 8
 
 /**
+ * The icons a person's own category may take (MOL-285): the tag every one of them had before, the
+ * owner's twenty-three of daily life, and the presets' own (В-3 «б»), so «Кафе на работе» can have
+ * the fork and knife in a colour of its own. A key rather than an icon's name, as a preset is: the
+ * set is the domain's, the drawing the phone's. A key added is a migration — the database checks it.
+ */
+export const SPENDING_ICONS = [
+  'tag',
+  'gift',
+  'sport',
+  'study',
+  'kids',
+  'taxi',
+  'car',
+  'fuel',
+  'travel',
+  'coffee',
+  'bar',
+  'games',
+  'books',
+  'music',
+  'phone',
+  'tech',
+  'repair',
+  'flowers',
+  'charity',
+  'subscriptions',
+  'bank',
+  'languages',
+  'dentist',
+  'utilities',
+  ...SPENDING_PRESETS,
+] as const
+export const spendingIconSchema = z.enum(SPENDING_ICONS)
+export type SpendingIcon = z.infer<typeof spendingIconSchema>
+
+/** What one's own category was drawn with before it could choose, and what a new one starts with. */
+export const DEFAULT_SPENDING_ICON: SpendingIcon = 'tag'
+
+export const spendingCategoryColourSchema = z
+  .int()
+  .min(0)
+  .max(SPENDING_CATEGORY_COLOURS - 1)
+
+/**
  * One of a person's spending categories (MOL-73, В-3): a preset they were given, or one they made.
  * Every account has its own list, so «у кого-то категорий больше или меньше или они вообще другие».
  *
@@ -52,20 +96,17 @@ export const spendingCategorySchema = z
     actorId: z.uuid(),
     preset: spendingPresetSchema.nullable(),
     name: spendingCategoryNameSchema.nullable(),
-    colour: z
-      .int()
-      .min(0)
-      .max(SPENDING_CATEGORY_COLOURS - 1)
-      .nullable(),
+    colour: spendingCategoryColourSchema.nullable(),
+    icon: spendingIconSchema.nullable(),
     archivedAt: z.date().nullable(),
     createdAt: z.date(),
   })
-  // A preset is said by its key and coloured by it; one's own has a name and a colour of the
-  // palette. Never both, never neither.
+  // A preset is said, coloured and drawn by its key; one's own has a name, a colour of the palette
+  // and an icon of the set. Never both, never neither.
   .refine((category) =>
     category.preset === null
-      ? category.name !== null && category.colour !== null
-      : category.name === null && category.colour === null,
+      ? category.name !== null && category.colour !== null && category.icon !== null
+      : category.name === null && category.colour === null && category.icon === null,
   )
 export type SpendingCategory = z.infer<typeof spendingCategorySchema>
 

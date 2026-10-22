@@ -8,6 +8,11 @@ import {
   monthSchema,
 } from '#model/contracts/money'
 import type { MoneyMonthView } from '#model/contracts/money'
+import {
+  spendingCategoryAmendSchema,
+  spendingCategoryBodySchema,
+  spendingCategoryViewCodec,
+} from '#model/contracts/spending'
 import { moneyMonth } from '#model/entities/money-month'
 import type { Spending } from '#model/entities/spending'
 import { SPENDING_PRESETS } from '#model/entities/spending-category'
@@ -21,6 +26,7 @@ const categories: SpendingCategory[] = SPENDING_PRESETS.map((preset, index) => (
   preset,
   name: null,
   colour: null,
+  icon: null,
   archivedAt: index === 0 ? new Date('2026-09-10T00:00:00Z') : null,
   createdAt: new Date('2026-09-01T00:00:00Z'),
 }))
@@ -214,5 +220,42 @@ describe('a month on the wire', () => {
     const older: Record<string, unknown> = { ...z.encode(moneyMonthCodec, view) }
     delete older.budget
     expect(moneyMonthCodec.parse(older).budget).toBeNull()
+  })
+})
+
+describe("one's own category's icon and colour on the wire (MOL-285)", () => {
+  const ID = '11111111-1111-4111-8111-111111111111'
+
+  it('takes a body queued by an earlier build, with neither', () => {
+    expect(spendingCategoryBodySchema.parse({ id: ID, name: 'Такси' })).toEqual({
+      id: ID,
+      name: 'Такси',
+    })
+  })
+
+  it('takes an icon of the set and a colour of the palette, and nothing else', () => {
+    const body = { id: ID, name: 'Такси', icon: 'taxi', colour: 7 }
+    expect(spendingCategoryBodySchema.parse(body)).toEqual(body)
+    expect(spendingCategoryBodySchema.safeParse({ ...body, icon: 'rocket' }).success).toBe(false)
+    expect(spendingCategoryBodySchema.safeParse({ ...body, colour: 8 }).success).toBe(false)
+    expect(spendingCategoryBodySchema.safeParse({ ...body, colour: -1 }).success).toBe(false)
+  })
+
+  it('amends the whole of it: name, icon and colour, each required', () => {
+    const amend = { name: 'Подарки', icon: 'cafe', colour: 0 }
+    expect(spendingCategoryAmendSchema.parse(amend)).toEqual(amend)
+    const { name, icon, colour } = amend
+    for (const partial of [
+      { icon, colour },
+      { name, colour },
+      { name, icon },
+    ])
+      expect(spendingCategoryAmendSchema.safeParse(partial).success).toBe(false)
+    expect(spendingCategoryAmendSchema.safeParse({ ...amend, preset: 'cafe' }).success).toBe(false)
+  })
+
+  it('reads a category the phone kept from before it as the tag', () => {
+    const kept = { id: ID, preset: null, name: 'Такси', colour: 0, archived: false }
+    expect(spendingCategoryViewCodec.parse(kept).icon).toBeNull()
   })
 })

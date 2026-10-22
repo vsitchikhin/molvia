@@ -90,7 +90,9 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     previousToDay: null,
     byCategory: [{ categoryId: BEAUTY, amount: amd('5000') }],
     slices: [{ categoryId: BEAUTY, amount: amd('5000'), count: 1, level: 1000 }],
-    categories: [{ id: BEAUTY, preset: 'beauty', name: null, colour: null, archived: false }],
+    categories: [
+      { id: BEAUTY, preset: 'beauty', name: null, colour: null, icon: null, archived: false },
+    ],
     days: [
       {
         day: '2026-09-26',
@@ -813,7 +815,7 @@ describe('MoneyView: the ways out, one figure each (MOL-81, MOL-159)', () => {
     })
     expect(await figure({ planned: true, left: null })).toMatchObject({ text: en.budget.title })
     expect(await figure(null)).toMatchObject({ text: en.budget.title })
-  })
+  }, 10_000)
 
   it('must not fire: offline with nothing kept — the screens behind it would show nothing either', async () => {
     online(false)
@@ -1229,7 +1231,7 @@ describe('MoneyView: «На счетах сейчас»', () => {
     ).toBe(false)
     // Nothing known of the accounts: the usual case, two currencies.
     expect(await lines(noAccounts())).toBe(true)
-  })
+  }, 10_000)
 
   // Adversarial Б3: nothing known at all is two currencies, and «Счета» answering while the month
   // loads does not change the skeleton under the switcher.

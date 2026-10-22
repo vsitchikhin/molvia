@@ -588,7 +588,8 @@ test('a category of one’s own is made from the sheet, and a preset’s name is
   await page.getByRole('link', { name: /^Категории/ }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Категории')
   await expect(page.getByText('Такси')).toBeVisible()
-  await page.getByRole('button', { name: 'Убрать категорию «Такси»' }).click()
+  // One's own is taken out from its sheet (MOL-285, В-2 «а»).
+  await removeOwn(page, 'Такси')
   await expect(page.getByRole('heading', { name: 'Убранные' })).toBeVisible()
   await page.getByRole('button', { name: 'Вернуть категорию «Такси»' }).click()
   await expect(page.getByRole('heading', { name: 'Убранные' })).toBeHidden()
@@ -612,15 +613,76 @@ test('a category is made from the strip of «Категории», removed quiet
   await expect(sheet).toBeHidden()
   await expect(add).toBeFocused()
 
-  const live = page.locator('section', { has: page.getByRole('heading', { name: 'В выборе' }) })
+  const live = page.locator('section', { has: page.getByRole('heading', { name: 'Свои' }) })
   await expect(live.getByText('Подарки')).toBeVisible()
   await expect(live.getByText('Отправляем…')).toBeHidden()
-  await page.getByRole('button', { name: 'Убрать категорию «Подарки»' }).click()
+  await removeOwn(page, 'Подарки')
   const archived = page.locator('section', { has: page.getByRole('heading', { name: 'Убранные' }) })
   await expect(archived.getByText('Подарки')).toBeVisible()
   await page.getByRole('button', { name: 'Вернуть категорию «Подарки»' }).click()
   await expect(page.getByRole('heading', { name: 'Убранные' })).toBeHidden()
   await expect(live.getByText('Подарки')).toBeVisible()
+})
+
+/** One's own opened from «Категории» and taken out from its sheet (MOL-285). */
+async function removeOwn(page: Page, name: string): Promise<void> {
+  await page.getByRole('button', { name, exact: true }).click()
+  const sheet = page.locator('dialog[open]')
+  await expect(sheet).toContainText('Категория')
+  await page.waitForTimeout(400)
+  await sheet.getByRole('button', { name: 'Убрать категорию' }).click()
+  await expect(sheet).toBeHidden()
+}
+
+// The icon and the colour go to the server and back, and «Траты» draw the category by them (MOL-285).
+test('one’s own takes the icon and the colour chosen, and its sheet amends them', async ({
+  page,
+}) => {
+  await openMoney(page)
+  await page.getByRole('link', { name: /^Категории/ }).click()
+  await page.locator('.dock').getByRole('button', { name: 'Добавить категорию' }).click()
+  const sheet = page.locator('dialog[open]')
+  await expect(sheet).toContainText('Новая категория')
+  await page.waitForTimeout(400)
+  // A new one starts on the tag and the first colour of the palette.
+  await expect(sheet.getByRole('radio', { name: 'Бирка' })).toBeChecked()
+  await expect(sheet.getByRole('radio', { name: 'Цвет 1 из 8' })).toBeChecked()
+  await sheet.getByLabel('Название').fill('Подарки')
+  await sheet.getByRole('radio', { name: 'Подарок' }).check()
+  await sheet.getByRole('radio', { name: 'Цвет 6 из 8' }).check()
+  await sheet.getByRole('button', { name: 'Добавить' }).click()
+  await expect(sheet).toBeHidden()
+
+  const own = page.locator('section', { has: page.getByRole('heading', { name: 'Свои' }) })
+  const row = own.getByRole('button', { name: 'Подарки', exact: true })
+  await expect(row.locator('.circle')).toHaveAttribute('style', /--cat-own-5/)
+  await expect(own.getByText('Отправляем…')).toBeHidden()
+
+  // Read again from the server, the sheet opens on what it holds.
+  await page.reload()
+  await row.click()
+  await expect(sheet).toContainText('Категория')
+  await page.waitForTimeout(400)
+  await expect(sheet.getByLabel('Название')).toHaveValue('Подарки')
+  await expect(sheet.getByRole('radio', { name: 'Подарок' })).toBeChecked()
+  await expect(sheet.getByRole('radio', { name: 'Цвет 6 из 8' })).toBeChecked()
+  await sheet.getByLabel('Название').fill('Подарки и цветы')
+  await sheet.getByRole('radio', { name: 'Цветы' }).check()
+  await sheet.getByRole('button', { name: 'Сохранить' }).click()
+  await expect(sheet).toBeHidden()
+  const amended = own.getByRole('button', { name: 'Подарки и цветы', exact: true })
+  await expect(amended).toBeVisible()
+  await expect(own.getByText('Отправляем…')).toBeHidden()
+  const drawn = await amended.locator('.circle svg').innerHTML()
+
+  // A spending in it is drawn by the same icon and colour on «Траты».
+  await page.goBack()
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  await writeSpending(page, '3000', 'Подарки и цветы', 'Букет')
+  await openSpendings(page)
+  const spent = page.locator('.list-row', { hasText: 'Букет' })
+  await expect(spent.locator('.circle')).toHaveAttribute('style', /--cat-own-5/)
+  expect(await spent.locator('.circle svg').innerHTML()).toBe(drawn)
 })
 
 // The skeleton is the answer's shape (Ф-13, MOL-178): its rows as tall as the rows that come, a button of

@@ -426,7 +426,7 @@ export const EXPORT_COLUMNS: Readonly<
     },
   },
   spending_categories: {
-    exported: ['id', 'preset', 'name', 'colour', 'archived_at', 'created_at'],
+    exported: ['id', 'preset', 'name', 'colour', 'icon', 'archived_at', 'created_at'],
     omitted: { actor_id: OWNER },
   },
   money_month_rates: {
@@ -1169,6 +1169,7 @@ export function createExportRepository(db: Db): ExportRepository {
               preset: row.preset,
               name: row.name,
               colour: row.colour,
+              icon: row.icon,
               archivedAt: row.archivedAt,
               createdAt: row.createdAt,
             })),

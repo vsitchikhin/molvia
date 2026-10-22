@@ -32,6 +32,11 @@ export interface MoneyMonth {
   /** The owner's categories: this month's answer's, or those of the newest month kept. */
   readonly knownCategories: ComputedRef<MoneyMonthView['categories']>
   /**
+   * When the month that names them was asked for — never its fetch: an amendment of a category that
+   * landed before is in it (MOL-285). None for the categories recalled from another month kept.
+   */
+  readonly categoriesAskedAt: ComputedRef<Date | null>
+  /**
    * «Мой курс на сегодня» — the running month's rate, from its answer kept on the phone when another
    * month is on screen (review С-5): a spending is written today whatever month is looked at.
    */
@@ -331,6 +336,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
     attempt: computed(() => failed.value),
     askedAt: computed(() => shown.value?.askedAt ?? shown.value?.fetchedAt ?? null),
     knownCategories: computed(() => shown.value?.answer.categories ?? kept.value),
+    categoriesAskedAt: computed(() => shown.value?.askedAt ?? null),
     todayRate: computed(() =>
       shown.value?.answer.rateKind === 'live' ? shown.value.answer.rate : keptRate.value,
     ),

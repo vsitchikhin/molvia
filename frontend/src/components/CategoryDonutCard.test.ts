@@ -38,11 +38,11 @@ function month(value: string, slices = SEPTEMBER): MoneyMonthView {
     spent: amd('274523'),
     slices,
     categories: [
-      { id: TELECOM, preset: 'telecom', name: null, colour: null, archived: false },
-      { id: GROCERIES, preset: 'groceries', name: null, colour: null, archived: false },
-      { id: OTHER, preset: 'other', name: null, colour: null, archived: false },
-      { id: HOME, preset: 'home', name: null, colour: null, archived: false },
-      { id: OWN, preset: null, name: 'Такси', colour: 3, archived: false },
+      { id: TELECOM, preset: 'telecom', name: null, colour: null, icon: null, archived: false },
+      { id: GROCERIES, preset: 'groceries', name: null, colour: null, icon: null, archived: false },
+      { id: OTHER, preset: 'other', name: null, colour: null, icon: null, archived: false },
+      { id: HOME, preset: 'home', name: null, colour: null, icon: null, archived: false },
+      { id: OWN, preset: null, name: 'Такси', colour: 3, icon: 'tag', archived: false },
     ],
   } as MoneyMonthView
 }

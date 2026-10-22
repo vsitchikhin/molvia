@@ -26,13 +26,18 @@ export function useOwnCategories(): OwnCategories {
   const actor = useActorStore()
   const queue = useSpendingQueueStore()
   const server = ref<SpendingCategoryView[]>(actor.id ? recallCategories(actor.id) : [])
+  // When the list was asked for; none for one recalled from a month kept on the phone.
+  const askedAt = ref<Date | null>(null)
 
   async function load(): Promise<void> {
     const owner = actor.id
     if (!owner) return
+    const asked = new Date()
     try {
       const { categories } = await api.spendingCategories()
-      if (actor.id === owner) server.value = categories
+      if (actor.id !== owner) return
+      server.value = categories
+      askedAt.value = asked
     } catch {
       // Whatever the phone remembers stands; a name unknown reads «Прочее».
     }
@@ -42,12 +47,13 @@ export function useOwnCategories(): OwnCategories {
     () => actor.id,
     (id) => {
       server.value = id ? recallCategories(id) : []
+      askedAt.value = null
       void load()
     },
   )
 
   const categories = computed(() =>
-    categoriesWith(server.value, [...queue.arrived, ...queue.pending]),
+    categoriesWith(server.value, [...queue.arrived, ...queue.pending], askedAt.value),
   )
   function nameOf(category: SpendingCategoryView): string {
     return category.preset ? t(`spending.category.${category.preset}`) : (category.name ?? '')

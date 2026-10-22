@@ -47,8 +47,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // receipt's `readPartly`, whether its lines as read fell short, before the check emptied any (MOL-255).
 // 20: the account's `receiptsModelUntil`, until when a model reads the person's receipts (MOL-272). 21:
 // a receipt's `cashback` and `redeemed`, what a card sent to the card and the bonus it was paid with
-// (MOL-289), and a line's `repaired`, put right by the digits the till's font confuses (MOL-290).
-export const EXPORT_VERSION = 21
+// (MOL-289), and a line's `repaired`, put right by the digits the till's font confuses (MOL-290). 22: a
+// category's `icon`, chosen for one's own (MOL-285).
+export const EXPORT_VERSION = 22
 
 const day = z.iso.date()
 
@@ -385,6 +386,7 @@ const spendingCategorySchema = z.strictObject({
   preset: spendingPresetSchema.nullable(),
   name: z.string().nullable(),
   colour: z.int().nullable(),
+  icon: z.string().nullable(),
   archivedAt: isoDate.nullable(),
   createdAt: isoDate,
 })
