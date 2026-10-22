@@ -831,6 +831,7 @@ export default defineComponent({
               preset: 'other',
               name: null,
               colour: null,
+              icon: null,
               archived: false,
             },
           ),

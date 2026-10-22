@@ -23,7 +23,7 @@ import type {
 } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createRateRepository } from '@/db/rates-repository'
-import { actors, expenses, moneyMonthRates, spendings } from '@/db/schema'
+import { actors, expenses, moneyMonthRates, spendingCategories, spendings } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import {
@@ -81,7 +81,7 @@ async function owner(): Promise<Owner> {
 
 async function call(
   me: Owner,
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   url: string,
   body?: unknown,
 ) {
@@ -179,6 +179,140 @@ describe('категории трат (MOL-73, В-3)', () => {
     expect((await categories(me)).categories.find((c) => c.id === cafe)).toMatchObject({
       archived: false,
     })
+  })
+})
+
+describe('своя категория: иконка и цвет (MOL-285)', () => {
+  async function add(me: Owner, body: Record<string, unknown>) {
+    return call(me, 'POST', '/spending-categories', { id: randomUUID(), ...body })
+  }
+  async function own(me: Owner, id: string) {
+    return (await categories(me)).categories.find((category) => category.id === id)
+  }
+
+  it('без иконки и цвета — бирка и следующий цвет; с ними — выбранные', async () => {
+    const me = await owner()
+    const plain = randomUUID()
+    expect((await add(me, { id: plain, name: 'Такси' })).statusCode).toBe(201)
+    expect(await own(me, plain)).toMatchObject({ icon: 'tag', colour: 0 })
+
+    const chosen = randomUUID()
+    const answer = await add(me, { id: chosen, name: 'Кафе на работе', icon: 'cafe', colour: 5 })
+    expect(answer.statusCode).toBe(201)
+    expect(spendingCategoriesResponseCodec.parse(answer.json()).categories.at(-1)).toMatchObject({
+      id: chosen,
+      icon: 'cafe',
+      colour: 5,
+    })
+    // The palette's next is still counted by how many there are, whatever was chosen before.
+    const third = randomUUID()
+    await add(me, { id: third, name: 'Подарки' })
+    expect(await own(me, third)).toMatchObject({ icon: 'tag', colour: 2 })
+    // A preset is drawn by its key: no icon of its own on the wire.
+    expect((await categories(me)).categories[0]).toMatchObject({ preset: 'groceries', icon: null })
+  })
+
+  it('повтор — те же имя, иконка и цвет; другое под тем же id — 409; тело старой сборки — повтор', async () => {
+    const me = await owner()
+    const id = randomUUID()
+    const body = { id, name: 'Такси', icon: 'taxi', colour: 3 }
+    expect((await add(me, body)).statusCode).toBe(201)
+    expect((await add(me, body)).statusCode).toBe(200)
+    expect((await add(me, { id, name: 'Такси' })).statusCode).toBe(200)
+    expect((await add(me, { ...body, icon: 'car' })).statusCode).toBe(409)
+    expect((await add(me, { ...body, colour: 4 })).statusCode).toBe(409)
+    expect(await own(me, id)).toMatchObject({ icon: 'taxi', colour: 3 })
+  })
+
+  it('иконка не из набора, цвет вне палитры — 400', async () => {
+    const me = await owner()
+    expect((await add(me, { name: 'Ракета', icon: 'rocket' })).statusCode).toBe(400)
+    expect((await add(me, { name: 'Ракета', colour: 8 })).statusCode).toBe(400)
+  })
+
+  it('своя без иконки — от старого образа или до MOL-285 — читается биркой', async () => {
+    const me = await owner()
+    await categories(me)
+    const id = randomUUID()
+    await db.insert(spendingCategories).values({ id, actorId: me.id, name: 'Такси', colour: 1 })
+    expect(await own(me, id)).toMatchObject({ name: 'Такси', icon: 'tag', colour: 1 })
+  })
+
+  it('база не держит иконку у готовой и ключ не из набора', async () => {
+    const me = await owner()
+    const cafe = await presetId(me, 'cafe')
+    await expect(
+      db.update(spendingCategories).set({ icon: 'cafe' }).where(eq(spendingCategories.id, cafe)),
+    ).rejects.toThrow()
+    const id = randomUUID()
+    await expect(
+      db.execute(
+        sql`insert into spending_categories (id, actor_id, name, colour, icon)
+            values (${id}, ${me.id}, 'Ракета', 0, 'rocket')`,
+      ),
+    ).rejects.toThrow()
+  })
+
+  it('правка своей: имя, иконка, цвет; повтор — то же; готовая, чужая и не id — 404', async () => {
+    const me = await owner()
+    const stranger = await owner()
+    const id = randomUUID()
+    await add(me, { id, name: 'Такси' })
+    const amend = { name: 'Такси и каршеринг', icon: 'car', colour: 6 }
+
+    const first = await call(me, 'PATCH', `/spending-categories/${id}`, amend)
+    expect(first.statusCode).toBe(200)
+    expect(first.headers['cache-control']).toBe('no-store')
+    expect(spendingCategoriesResponseCodec.parse(first.json()).categories.at(-1)).toMatchObject({
+      id,
+      ...amend,
+    })
+    expect((await call(me, 'PATCH', `/spending-categories/${id}`, amend)).statusCode).toBe(200)
+    expect(
+      (await call(me, 'PATCH', `/spending-categories/${id.toUpperCase()}`, amend)).statusCode,
+    ).toBe(200)
+
+    const cafe = await presetId(me, 'cafe')
+    expect((await call(me, 'PATCH', `/spending-categories/${cafe}`, amend)).statusCode).toBe(404)
+    expect((await call(stranger, 'PATCH', `/spending-categories/${id}`, amend)).statusCode).toBe(
+      404,
+    )
+    expect((await call(me, 'PATCH', '/spending-categories/nope', amend)).statusCode).toBe(404)
+    expect(await own(me, id)).toMatchObject(amend)
+    expect(
+      (await call(me, 'PATCH', `/spending-categories/${id}`, { ...amend, icon: 'rocket' }))
+        .statusCode,
+    ).toBe(400)
+    expect(
+      (await call(me, 'PATCH', `/spending-categories/${id}`, { name: 'Такси' })).statusCode,
+    ).toBe(400)
+  })
+
+  it('правка: имя другой живой своей — 409; своё же имя и имя убранной — можно; убранную править можно', async () => {
+    const me = await owner()
+    const taxi = randomUUID()
+    const gifts = randomUUID()
+    const old = randomUUID()
+    await add(me, { id: taxi, name: 'Такси' })
+    await add(me, { id: gifts, name: 'Подарки' })
+    await add(me, { id: old, name: 'Курсы' })
+    await call(me, 'DELETE', `/spending-categories/${old}`)
+
+    const taken = await call(me, 'PATCH', `/spending-categories/${gifts}`, {
+      name: ' такси ',
+      icon: 'gift',
+      colour: 1,
+    })
+    expect(taken.statusCode).toBe(409)
+    expect(taken.json()).toMatchObject({ code: ERROR.SPENDING_CATEGORY_TAKEN })
+    const same = { name: 'ПОДАРКИ', icon: 'gift', colour: 1 }
+    expect((await call(me, 'PATCH', `/spending-categories/${gifts}`, same)).statusCode).toBe(200)
+    const freed = { name: 'Курсы', icon: 'study', colour: 2 }
+    expect((await call(me, 'PATCH', `/spending-categories/${taxi}`, freed)).statusCode).toBe(200)
+    // A removed one is still the category of its spendings, and stays removed when amended.
+    const archived = { name: 'Курсы языка', icon: 'languages', colour: 4 }
+    expect((await call(me, 'PATCH', `/spending-categories/${old}`, archived)).statusCode).toBe(200)
+    expect(await own(me, old)).toMatchObject({ ...archived, archived: true })
   })
 })
 

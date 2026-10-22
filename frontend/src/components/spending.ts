@@ -15,7 +15,31 @@ import IconTag from '~icons/mdi/tag-outline'
 import IconWifi from '~icons/mdi/wifi'
 import IconCafe from '~icons/mdi/silverware-fork-knife'
 import IconCart from '~icons/mdi/cart-outline'
+import IconBank from '~icons/mdi/bank-outline'
+import IconBar from '~icons/mdi/glass-cocktail'
+import IconBooks from '~icons/mdi/book-open-variant'
+import IconCar from '~icons/mdi/car-outline'
+import IconCharity from '~icons/mdi/hand-heart-outline'
+import IconCoffee from '~icons/mdi/coffee-outline'
+import IconDentist from '~icons/mdi/tooth-outline'
+import IconFlowers from '~icons/mdi/flower-outline'
+import IconFuel from '~icons/mdi/gas-station-outline'
+import IconGames from '~icons/mdi/gamepad-variant-outline'
+import IconGift from '~icons/mdi/gift-outline'
+import IconKids from '~icons/mdi/baby-carriage'
+import IconLanguages from '~icons/mdi/translate'
+import IconMusic from '~icons/mdi/music-note'
+import IconPhone from '~icons/mdi/cellphone'
+import IconRepair from '~icons/mdi/hammer-wrench'
+import IconSport from '~icons/mdi/dumbbell'
+import IconStudy from '~icons/mdi/school-outline'
+import IconSubscriptions from '~icons/mdi/autorenew'
+import IconTaxi from '~icons/mdi/taxi'
+import IconTech from '~icons/mdi/laptop'
+import IconTravel from '~icons/mdi/airplane'
+import IconUtilities from '~icons/mdi/lightning-bolt-outline'
 import {
+  DEFAULT_SPENDING_ICON,
   MINOR_EXPONENT,
   RATE_SCALE,
   currencySign,
@@ -33,10 +57,16 @@ import type {
   Money,
   MoneyMonthView,
   SpendingCategoryView,
+  SpendingIcon,
   SpendingPreset,
   SpendingView,
 } from '@molvia/model'
-import type { RejectedSpendingWrite, SpendingUndo, SpendingWrite } from '@/stores/spendingQueue'
+import type {
+  ArrivedCategoryWrite,
+  RejectedSpendingWrite,
+  SpendingUndo,
+  SpendingWrite,
+} from '@/stores/spendingQueue'
 import { spendingOf } from '@/stores/spendingQueue'
 import type { SpendingPrefill } from '@/stores/spendingHandoff'
 
@@ -47,7 +77,7 @@ import type { SpendingPrefill } from '@/stores/spendingHandoff'
  * frontend»; requirements, Р-3).
  */
 
-/** The icon of a preset, by its key (handoff 06); one's own categories take the tag. */
+/** The icon of a preset, by its key (handoff 06). */
 const PRESET_ICONS: Record<SpendingPreset, Component> = {
   groceries: markRaw(IconFood),
   cafe: markRaw(IconCafe),
@@ -64,8 +94,43 @@ const PRESET_ICONS: Record<SpendingPreset, Component> = {
   other: markRaw(IconOther),
 }
 
+/**
+ * What one's own category may be drawn with (MOL-285): the tag, the owner's twenty-three and the
+ * presets' own, by the domain's key — the drawing is the phone's, so an icon may be redrawn here
+ * without a migration.
+ */
+export const OWN_ICONS: Record<SpendingIcon, Component> = {
+  tag: markRaw(IconTag),
+  gift: markRaw(IconGift),
+  sport: markRaw(IconSport),
+  study: markRaw(IconStudy),
+  kids: markRaw(IconKids),
+  taxi: markRaw(IconTaxi),
+  car: markRaw(IconCar),
+  fuel: markRaw(IconFuel),
+  travel: markRaw(IconTravel),
+  coffee: markRaw(IconCoffee),
+  bar: markRaw(IconBar),
+  games: markRaw(IconGames),
+  books: markRaw(IconBooks),
+  music: markRaw(IconMusic),
+  phone: markRaw(IconPhone),
+  tech: markRaw(IconTech),
+  repair: markRaw(IconRepair),
+  flowers: markRaw(IconFlowers),
+  charity: markRaw(IconCharity),
+  subscriptions: markRaw(IconSubscriptions),
+  bank: markRaw(IconBank),
+  languages: markRaw(IconLanguages),
+  dentist: markRaw(IconDentist),
+  utilities: markRaw(IconUtilities),
+  ...PRESET_ICONS,
+}
+
+/** A preset by its key; one's own by the icon it chose — an answer kept from before that, the tag. */
 export function categoryIcon(category: SpendingCategoryView): Component {
-  return category.preset ? PRESET_ICONS[category.preset] : markRaw(IconTag)
+  if (category.preset) return PRESET_ICONS[category.preset]
+  return OWN_ICONS[category.icon ?? DEFAULT_SPENDING_ICON]
 }
 
 /**
@@ -117,12 +182,14 @@ export function categoryColour(category: SpendingCategoryView): string {
 
 /**
  * The person's categories as the phone knows them now: the server's list, then what waits in the
- * queue — a category made with no signal, and a removal or a return not yet sent (В-4). One's own
- * made on the phone stands after the others, as the server will put it.
+ * queue — a category made with no signal, an amendment (MOL-285), and a removal or a return not yet
+ * sent (В-4). One's own made on the phone stands after the others, as the server will put it.
  */
 export function categoriesWith(
   server: readonly SpendingCategoryView[],
-  pending: readonly SpendingWrite[],
+  pending: readonly (SpendingWrite | ArrivedCategoryWrite)[],
+  /** When the server's list was asked for: an amendment that landed before it is in it already. */
+  askedAt: Date | null = null,
 ): SpendingCategoryView[] {
   const list = [...server]
   for (const write of pending) {
@@ -132,9 +199,16 @@ export function categoriesWith(
         id: write.body.id,
         preset: null,
         name: write.body.name,
-        colour: nextCategoryColour(list),
+        colour: write.body.colour ?? nextCategoryColour(list),
+        icon: write.body.icon ?? DEFAULT_SPENDING_ICON,
         archived: false,
       })
+    }
+    const heard = 'landedAt' in write && askedAt !== null && askedAt.getTime() >= write.landedAt
+    if (write.kind === 'category-amend' && !heard) {
+      const at = list.findIndex((one) => one.id === write.id)
+      const found = list[at]
+      if (found?.preset === null) list[at] = { ...found, ...write.body }
     }
     if (write.kind === 'category-archive' || write.kind === 'category-restore') {
       const archived = write.kind === 'category-archive'

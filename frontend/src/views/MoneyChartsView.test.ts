@@ -138,13 +138,27 @@ function yearCharts(patch: Partial<MoneyChartYearView> = {}): MoneyChartYearView
     firstMonth: '2026-08',
     categories: [
       {
-        category: { id: GROCERIES, preset: 'groceries', name: null, colour: null, archived: false },
+        category: {
+          id: GROCERIES,
+          preset: 'groceries',
+          name: null,
+          colour: null,
+          icon: null,
+          archived: false,
+        },
         average: amd('17988'),
         averageLevel: 300,
         points: CALENDAR.map((month) => point(month, '60318', 1000)),
       },
       {
-        category: { id: CAFE, preset: 'cafe', name: null, colour: null, archived: false },
+        category: {
+          id: CAFE,
+          preset: 'cafe',
+          name: null,
+          colour: null,
+          icon: null,
+          archived: false,
+        },
         average: null,
         averageLevel: null,
         points: CALENDAR.map((month) => point(month, '20390', 1000)),
@@ -921,7 +935,14 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
         categories: [
           ...yearCharts().categories,
           {
-            category: { id: OTHER, preset: 'other', name: null, colour: null, archived: false },
+            category: {
+              id: OTHER,
+              preset: 'other',
+              name: null,
+              colour: null,
+              icon: null,
+              archived: false,
+            },
             average: null,
             averageLevel: null,
             points: CALENDAR.map((month) => ({ month, amount: amd('0'), change: null, level: 0 })),
@@ -1128,6 +1149,7 @@ function monthCharts(patch: Partial<MoneyChartMonthView> = {}): MoneyChartMonthV
       preset,
       name: null,
       colour: null,
+      icon: null,
       archived: false,
     })) as MoneyChartMonthView['categories'],
     ...patch,

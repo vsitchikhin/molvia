@@ -30,8 +30,8 @@ function donut(modelValue: string | null = null, patch: Partial<MoneyChartMonthV
     deviations: [],
     pace: { days: [], usual: null },
     categories: [
-      { id: A, preset: 'rent', name: null, colour: null, archived: false },
-      { id: B, preset: null, name: 'Такси', colour: 2, archived: false },
+      { id: A, preset: 'rent', name: null, colour: null, icon: null, archived: false },
+      { id: B, preset: null, name: 'Такси', colour: 2, icon: 'tag', archived: false },
     ],
     ...patch,
   }

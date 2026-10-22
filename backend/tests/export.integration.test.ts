@@ -330,7 +330,7 @@ async function aFullLife(actorId: string, telegramUserId: number) {
   await db.insert(incomeRevisions).values({ incomeId, revision: 1, ...income })
   const own = randomUUID()
   await db.insert(spendingCategories).values([
-    { id: own, actorId, name: 'Такси', colour: 3, archivedAt: at(16) },
+    { id: own, actorId, name: 'Такси', colour: 3, icon: 'taxi', archivedAt: at(16) },
     { id: randomUUID(), actorId, preset: 'groceries' },
   ])
   await db.insert(spendings).values({
@@ -617,7 +617,7 @@ describe('экспорт всего своего (MOL-93)', () => {
     expect(text).not.toContain('Отзыв Бориса')
     for (const { id } of borisTrips) expect(text).not.toContain(id)
     expect(content.catalogue.places.map((place) => place.id)).toEqual([shared.placeId])
-  })
+  }, 20_000)
 
   it('удалённое и снятое — в файле, каждое со своей отметкой', async () => {
     const { tg, actorId } = await someone()

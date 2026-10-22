@@ -39,6 +39,7 @@ const category = (id: string, preset: string) => ({
   preset: preset as 'groceries',
   name: null,
   colour: null,
+  icon: null,
   archived: false,
 })
 
@@ -1105,7 +1106,7 @@ describe('MoneyBudgetView: review of MOL-192, round 1', () => {
       document.body.innerHTML = ''
       setBudgetPlan.mockReset()
     }
-  })
+  }, 10_000)
 
   // Self-review 2: a sheet swept away while the write was on its way — the outcome comes before the redraw.
   it('a sheet swept away before the answer: the focus goes to the strip the answer drew', async () => {

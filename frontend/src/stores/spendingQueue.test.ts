@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE, parseMoney } from '@molvia/model'
-import type { SpendingAmendBody, SpendingBody, SpendingCategoryBody } from '@molvia/model'
+import type {
+  SpendingAmendBody,
+  SpendingBody,
+  SpendingCategoryAmend,
+  SpendingCategoryBody,
+  SpendingCategoryView,
+} from '@molvia/model'
 import { categoriesWith } from '@/components/spending'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
@@ -13,6 +19,7 @@ const amendSpending = vi.fn<(id: string, body: SpendingAmendBody) => Promise<unk
 const removeSpending = vi.fn<(id: string) => Promise<void>>()
 const restoreSpending = vi.fn<(id: string) => Promise<unknown>>()
 const addSpendingCategory = vi.fn<(body: SpendingCategoryBody) => Promise<unknown>>()
+const amendSpendingCategory = vi.fn<(id: string, body: SpendingCategoryAmend) => Promise<unknown>>()
 const archiveSpendingCategory = vi.fn<(id: string) => Promise<unknown>>()
 const restoreSpendingCategory = vi.fn<(id: string) => Promise<unknown>>()
 const spending = vi.fn<(id: string) => Promise<{ revision: number }>>()
@@ -30,6 +37,10 @@ vi.mock('@/api', () => ({
     addSpendingCategory: (body: SpendingCategoryBody) => (
       calls.push(`category-add ${body.id}`),
       addSpendingCategory(body)
+    ),
+    amendSpendingCategory: (id: string, body: SpendingCategoryAmend) => (
+      calls.push(`category-amend ${id} ${body.name} ${body.icon} ${String(body.colour)}`),
+      amendSpendingCategory(id, body)
     ),
     archiveSpendingCategory: (id: string) => (
       calls.push(`category-archive ${id}`),
@@ -74,6 +85,7 @@ describe('spending queue', () => {
       removeSpending,
       restoreSpending,
       addSpendingCategory,
+      amendSpendingCategory,
       archiveSpendingCategory,
       restoreSpendingCategory,
     ])
@@ -638,6 +650,307 @@ describe('spending queue', () => {
     })
   })
 
+  describe("one's own category amended (MOL-285)", () => {
+    const own = (fields: Partial<SpendingCategoryView> = {}): SpendingCategoryView => ({
+      id: TAXI,
+      preset: null,
+      name: 'Такси',
+      colour: 0,
+      icon: 'tag',
+      archived: false,
+      ...fields,
+    })
+
+    it('a category not yet sent takes the amendment into its «Добавить» — one POST, as amended', async () => {
+      const queue = fresh('idle')
+      queue.addCategory({ id: TAXI, name: 'Такси' })
+      queue.amendCategory(TAXI, { name: 'Такси и метро', icon: 'taxi', colour: 4 }, false)
+      expect(queue.pending).toEqual([
+        {
+          kind: 'category-add',
+          body: { id: TAXI, name: 'Такси и метро', icon: 'taxi', colour: 4 },
+        },
+      ])
+      useActorStore().state = 'ready'
+      await queue.flush()
+      expect(calls).toEqual([`category-add ${TAXI}`])
+    })
+
+    it('two amendments waiting are one PATCH, the last; one on the way is never folded into', async () => {
+      const queue = fresh('idle')
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'car', colour: 1 }, false)
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'taxi', colour: 2 }, false)
+      useActorStore().state = 'ready'
+      let land: (value: unknown) => void = () => undefined
+      amendSpendingCategory.mockImplementationOnce(() => new Promise((resolve) => (land = resolve)))
+      const sending = queue.flush()
+      await settled()
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'transport', colour: 3 }, false)
+      land(undefined)
+      await sending
+      await queue.flush()
+      expect(calls).toEqual([
+        `category-amend ${TAXI} Такси taxi 2`,
+        `category-amend ${TAXI} Такси transport 3`,
+      ])
+    })
+
+    it('keeps an amendment made with no signal on the device and sends it later', async () => {
+      const first = fresh('idle')
+      first.amendCategory(TAXI, { name: 'Такси', icon: 'taxi', colour: 5 }, false)
+      const queue = fresh('ready')
+      expect(queue.pending).toEqual([
+        { kind: 'category-amend', id: TAXI, body: { name: 'Такси', icon: 'taxi', colour: 5 } },
+      ])
+      await queue.flush()
+      expect(calls).toEqual([`category-amend ${TAXI} Такси taxi 5`])
+    })
+
+    it('a name taken is a refusal, and nothing of it stays over the list', async () => {
+      amendSpendingCategory.mockRejectedValueOnce(
+        new ApiError(ERROR.SPENDING_CATEGORY_TAKEN, 'name'),
+      )
+      const queue = fresh()
+      queue.amendCategory(TAXI, { name: 'Кафе', icon: 'cafe', colour: 1 }, false)
+      await settled()
+      expect(queue.rejected).toMatchObject([
+        { write: { kind: 'category-amend' }, code: ERROR.SPENDING_CATEGORY_TAKEN },
+      ])
+      expect(categoriesWith([own()], [...queue.arrived, ...queue.pending])).toEqual([own()])
+    })
+
+    // Out of the queue on its answer, the list read again only after: the row must not go back to
+    // the old name and icon for a round trip.
+    it('an amendment that landed stays over the list, the last of the category only', async () => {
+      const queue = fresh()
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'car', colour: 1 }, false)
+      await settled()
+      queue.amendCategory(TAXI, { name: 'Машина', icon: 'car', colour: 6 }, false)
+      await settled()
+      expect(queue.pending).toEqual([])
+      expect(queue.arrived).toHaveLength(1)
+      expect(categoriesWith([own()], [...queue.arrived, ...queue.pending])).toEqual([
+        own({ name: 'Машина', icon: 'car', colour: 6 }),
+      ])
+    })
+
+    it('must not fire: an amendment never draws over a preset', () => {
+      const preset = own({ preset: 'cafe', name: null, colour: null, icon: null })
+      const write = {
+        kind: 'category-amend' as const,
+        id: TAXI,
+        body: { name: 'Кафе', icon: 'cafe' as const, colour: 1 },
+      }
+      expect(categoriesWith([preset], [write])).toEqual([preset])
+    })
+
+    // Adversarial А1: a name is free only after the write that frees it.
+    const METRO = 'ffffffff-0000-4000-8000-000000000003'
+
+    it('А1а: a category made at the till, renamed after «Убрать» of another, goes after it', async () => {
+      const queue = fresh('idle')
+      queue.addCategory({ id: METRO, name: 'Метро' })
+      queue.record({ id: BARBER, ...fields('300', 'Метро', METRO) })
+      queue.archiveCategory(TAXI, true)
+      queue.amendCategory(METRO, { name: 'Такси', icon: 'tag', colour: 1 }, false)
+      useActorStore().state = 'ready'
+      await queue.flush()
+      expect(calls).toEqual([
+        `category-add ${METRO}`,
+        `record ${BARBER}`,
+        `category-archive ${TAXI}`,
+        `category-amend ${METRO} Такси tag 1`,
+      ])
+    })
+
+    it('А1б: a rename into a name another frees later in the queue is not folded in front of it', async () => {
+      const queue = fresh('idle')
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'taxi', colour: 0 }, false)
+      queue.amendCategory(METRO, { name: 'Метро и автобус', icon: 'tag', colour: 1 }, false)
+      queue.amendCategory(TAXI, { name: 'Метро', icon: 'taxi', colour: 0 }, false)
+      useActorStore().state = 'ready'
+      await queue.flush()
+      expect(calls).toEqual([
+        `category-amend ${TAXI} Такси taxi 0`,
+        `category-amend ${METRO} Метро и автобус tag 1`,
+        `category-amend ${TAXI} Метро taxi 0`,
+      ])
+    })
+
+    it('А1в: nor in front of «Убрать» of the other', async () => {
+      const queue = fresh('idle')
+      queue.amendCategory(TAXI, { name: 'Такси', icon: 'taxi', colour: 0 }, false)
+      queue.archiveCategory(METRO, true)
+      queue.amendCategory(TAXI, { name: 'Метро', icon: 'taxi', colour: 0 }, false)
+      useActorStore().state = 'ready'
+      await queue.flush()
+      expect(calls).toEqual([
+        `category-amend ${TAXI} Такси taxi 0`,
+        `category-archive ${METRO}`,
+        `category-amend ${TAXI} Метро taxi 0`,
+      ])
+    })
+
+    it('Б2: «Вернуть» does not take out the «Убрать» a rename of another stands on — the last is what is refused', async () => {
+      const queue = fresh('idle')
+      queue.archiveCategory(TAXI, true)
+      queue.amendCategory(METRO, { name: 'Такси', icon: 'tag', colour: 1 }, false)
+      queue.archiveCategory(TAXI, false)
+      useActorStore().state = 'ready'
+      await queue.flush()
+      expect(calls).toEqual([
+        `category-archive ${TAXI}`,
+        `category-amend ${METRO} Такси tag 1`,
+        `category-restore ${TAXI}`,
+      ])
+    })
+
+    // Adversarial Б3: a new icon or colour of another stands on no name.
+    const GIFTS = 'ffffffff-0000-4000-8000-000000000004'
+
+    it('Б3а: a rename folds into its «Добавить» past a new icon of another — the state replaced never goes', async () => {
+      const queue = fresh('idle')
+      queue.addCategory({ id: METRO, name: 'Метро' })
+      queue.record({ id: BARBER, ...fields('300', 'Метро', METRO) })
+      queue.amendCategory(GIFTS, { name: 'Подарки', icon: 'gift', colour: 2 }, true)
+      queue.amendCategory(METRO, { name: 'Метро и такси', icon: 'tag', colour: 1 }, false)
+      useActorStore().state = 'ready'
+      await queue.flush()
+      expect(calls).toEqual([
+        `category-add ${METRO}`,
+        `record ${BARBER}`,
+        `category-amend ${GIFTS} Подарки gift 2`,
+      ])
+      expect(addSpendingCategory).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Метро и такси' }),
+      )
+    })
+
+    it('Б3б: a rename folds into the rename it replaces past a new icon of another', () => {
+      const queue = fresh('idle')
+      queue.amendCategory(TAXI, { name: 'Метро', icon: 'taxi', colour: 0 }, false)
+      queue.amendCategory(GIFTS, { name: 'Подарки', icon: 'gift', colour: 2 }, true)
+      queue.amendCategory(TAXI, { name: 'Такси и метро', icon: 'taxi', colour: 0 }, false)
+      expect(queue.pending).toEqual([
+        {
+          kind: 'category-amend',
+          id: TAXI,
+          body: { name: 'Такси и метро', icon: 'taxi', colour: 0 },
+        },
+        {
+          kind: 'category-amend',
+          id: GIFTS,
+          body: { name: 'Подарки', icon: 'gift', colour: 2 },
+          keepsName: true,
+        },
+      ])
+    })
+
+    it('a new icon folded into a rename is a rename; the word «keeps its name» outlives a reload', () => {
+      const first = fresh('idle')
+      first.amendCategory(GIFTS, { name: 'Подарки', icon: 'gift', colour: 2 }, true)
+      first.amendCategory(TAXI, { name: 'Метро', icon: 'taxi', colour: 0 }, false)
+      first.amendCategory(TAXI, { name: 'Метро', icon: 'car', colour: 0 }, true)
+      const queue = fresh('idle')
+      expect(queue.pending).toEqual([
+        {
+          kind: 'category-amend',
+          id: GIFTS,
+          body: { name: 'Подарки', icon: 'gift', colour: 2 },
+          keepsName: true,
+        },
+        { kind: 'category-amend', id: TAXI, body: { name: 'Метро', icon: 'car', colour: 0 } },
+      ])
+    })
+
+    it('«Вернуть» cancels its «Убрать» past a new icon of another, and «Убрать» its «Вернуть» past anything', () => {
+      const queue = fresh('idle')
+      queue.archiveCategory(TAXI, true)
+      queue.amendCategory(GIFTS, { name: 'Подарки', icon: 'gift', colour: 2 }, true)
+      queue.archiveCategory(TAXI, false)
+      queue.archiveCategory(METRO, false)
+      queue.addCategory({ id: BEAUTY, name: 'Метро' })
+      queue.archiveCategory(METRO, true)
+      expect(queue.pending.map((write) => write.kind)).toEqual(['category-amend', 'category-add'])
+    })
+
+    // Adversarial Б4: two amendments of one category may stand side by side once what held them
+    // apart is cancelled; the next folds into the last, never the first.
+    const separated = () => {
+      const queue = fresh('idle')
+      queue.amendCategory(TAXI, { name: 'Такси 2', icon: 'taxi', colour: 0 }, false)
+      queue.archiveCategory(METRO, true)
+      queue.amendCategory(TAXI, { name: 'Такси 2', icon: 'car', colour: 0 }, true)
+      queue.archiveCategory(METRO, false)
+      return queue
+    }
+
+    it('Б4а: a rename after «Вернуть» took its «Убрать» back folds into the last amendment — the last word holds', async () => {
+      const queue = separated()
+      queue.amendCategory(TAXI, { name: 'Такси 3', icon: 'car', colour: 0 }, false)
+      useActorStore().state = 'ready'
+      await queue.flush()
+      expect(calls).toEqual([
+        `category-amend ${TAXI} Такси 2 taxi 0`,
+        `category-amend ${TAXI} Такси 3 car 0`,
+      ])
+    })
+
+    it('Б4б: a new colour there too — the server ends on it', async () => {
+      const queue = separated()
+      queue.amendCategory(TAXI, { name: 'Такси 2', icon: 'car', colour: 5 }, true)
+      useActorStore().state = 'ready'
+      await queue.flush()
+      expect(calls.at(-1)).toBe(`category-amend ${TAXI} Такси 2 car 5`)
+    })
+
+    it('must not fire: the last amendment on its way is folded into by nothing', async () => {
+      const queue = fresh()
+      let land: (value: unknown) => void = () => undefined
+      amendSpendingCategory.mockImplementationOnce(() => new Promise((resolve) => (land = resolve)))
+      queue.amendCategory(TAXI, { name: 'Такси 2', icon: 'taxi', colour: 0 }, false)
+      await settled()
+      queue.amendCategory(TAXI, { name: 'Такси 3', icon: 'taxi', colour: 0 }, false)
+      land(undefined)
+      await settled()
+      await queue.flush()
+      expect(calls).toEqual([
+        `category-amend ${TAXI} Такси 2 taxi 0`,
+        `category-amend ${TAXI} Такси 3 taxi 0`,
+      ])
+    })
+
+    it('still folds past a spending, and past a write of the same category', () => {
+      const queue = fresh('idle')
+      queue.addCategory({ id: TAXI, name: 'Такси' })
+      queue.record({ id: BARBER, ...fields('1500', 'Вокзал', TAXI) })
+      queue.archiveCategory(TAXI, true)
+      queue.amendCategory(TAXI, { name: 'Такси и метро', icon: 'taxi', colour: 2 }, false)
+      expect(queue.pending.map((write) => write.kind)).toEqual([
+        'category-add',
+        'record',
+        'category-archive',
+      ])
+      expect(queue.pending[0]).toMatchObject({ body: { name: 'Такси и метро', icon: 'taxi' } })
+    })
+
+    // Review №2: an amendment that landed is over a list asked before its answer only.
+    it('an amendment that landed is not laid over a list asked for after it — another phone’s later change shows', async () => {
+      const queue = fresh()
+      queue.amendCategory(TAXI, { name: 'Машина', icon: 'car', colour: 6 }, false)
+      await settled()
+      const [landed] = queue.arrived
+      const at = landed && 'landedAt' in landed ? landed.landedAt : Number.NaN
+      const later = own({ name: 'Каршеринг', icon: 'car', colour: 6 })
+      expect(categoriesWith([later], queue.arrived, new Date(at + 1))).toEqual([later])
+      expect(categoriesWith([later], queue.arrived, new Date(at))).toEqual([later])
+      // Asked before the answer, or not known when: the amendment stands over it.
+      const before = categoriesWith([own()], queue.arrived, new Date(at - 1))
+      expect(before).toEqual([own({ name: 'Машина', icon: 'car', colour: 6 })])
+      expect(categoriesWith([own()], queue.arrived, null)).toEqual(before)
+    })
+  })
+
   it('drops a broken entry alone and keeps the ones around it', () => {
     localStorage.setItem(
       `molvia.spending-queue.${ME}`,
@@ -646,9 +959,30 @@ describe('spending queue', () => {
         { key: 'b', write: { kind: 'record', body: { id: RENT } } },
         { key: 'c', write: { kind: 'restore', id: 'not-an-id' } },
         { key: 'd', write: { kind: 'category-archive', id: BEAUTY } },
+        { key: 'e', write: { kind: 'category-amend', id: TAXI, body: { name: 'Такси' } } },
+        {
+          key: 'f',
+          write: {
+            kind: 'category-amend',
+            id: TAXI,
+            body: { name: 'Такси', icon: 'taxi', colour: 9 },
+          },
+        },
+        {
+          key: 'g',
+          write: {
+            kind: 'category-amend',
+            id: TAXI,
+            body: { name: 'Такси', icon: 'taxi', colour: 2 },
+          },
+        },
       ]),
     )
     const queue = fresh('idle')
-    expect(queue.pending.map((write) => write.kind)).toEqual(['remove', 'category-archive'])
+    expect(queue.pending.map((write) => write.kind)).toEqual([
+      'remove',
+      'category-archive',
+      'category-amend',
+    ])
   })
 })

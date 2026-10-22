@@ -261,7 +261,15 @@ const file: ExportFile = {
     },
   ],
   spendingCategories: [
-    { id: id(14), preset: null, name: 'Такси', colour: 0, archivedAt: null, createdAt: at },
+    {
+      id: id(14),
+      preset: null,
+      name: 'Такси',
+      colour: 0,
+      icon: 'tag',
+      archivedAt: null,
+      createdAt: at,
+    },
   ],
   monthRates: [{ month: '2026-08', rate: { ...rate, source: 'personal' } }],
   budgetPlans: [
@@ -393,7 +401,7 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(21)
+    expect(wire.version).toBe(22)
     expect(wire.account.consentedAt).toBe('2026-09-20T10:00:00.000Z')
     expect(wire.account.analyticsOnAt).toBe('2026-09-20T10:00:00.000Z')
     expect(wire.receipts[0]?.lines[0]?.quantity).toEqual({ value: '2.000', unit: 'piece' })

@@ -1701,15 +1701,17 @@ describe('«Деньги» (MOL-82)', () => {
       expect(await codeOf(client.removeSpending(SPENDING))).toBe(ISSUE.RESPONSE_INVALID)
   })
 
-  it('lists, adds, removes and brings back a category', async () => {
+  it('lists, adds, amends, removes and brings back a category', async () => {
     const { client, calls } = clientReplying(200, categoriesWire)
     expect((await client.spendingCategories()).categories[0]?.preset).toBe('beauty')
     expect((await client.addSpendingCategory({ id: CATEGORY, name: 'Такси' })).created).toBe(false)
+    await client.amendSpendingCategory(CATEGORY, { name: 'Такси', icon: 'taxi', colour: 2 })
     await client.archiveSpendingCategory(CATEGORY)
     await client.restoreSpendingCategory(CATEGORY)
     expect(calls.map(({ method, url }) => `${method} ${new URL(url).pathname}`)).toEqual([
       'GET /spending-categories',
       'POST /spending-categories',
+      `PATCH /spending-categories/${CATEGORY}`,
       `DELETE /spending-categories/${CATEGORY}`,
       `POST /spending-categories/${CATEGORY}/restore`,
     ])

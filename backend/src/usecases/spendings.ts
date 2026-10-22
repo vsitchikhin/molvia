@@ -13,6 +13,7 @@ import type {
   SpendingAmendBody,
   SpendingBody,
   SpendingCategoriesResponse,
+  SpendingCategoryAmend,
   SpendingCategoryBody,
   SpendingView,
 } from '@molvia/model'
@@ -194,6 +195,22 @@ export async function addSpendingCategory(
 ): Promise<{ list: SpendingCategoriesResponse; created: boolean }> {
   const { created } = await repositories.spendingCategories.add(owner.id, body)
   return { list: await spendingCategoriesOf(repositories, owner), created }
+}
+
+/**
+ * A category of one's own renamed, redrawn or recoloured (MOL-285): the list whole; 404 for one that
+ * is not the owner's own — a preset is said by its key and has nothing to amend.
+ */
+export async function amendSpendingCategory(
+  repositories: Pick<Repositories, 'spendingCategories'>,
+  owner: Pick<Owner, 'id'>,
+  id: string,
+  body: SpendingCategoryAmend,
+): Promise<SpendingCategoriesResponse> {
+  if (!(await repositories.spendingCategories.amend(owner.id, id, body))) {
+    throw new DomainError(ERROR.NOT_FOUND)
+  }
+  return spendingCategoriesOf(repositories, owner)
 }
 
 /** «Убрать из выбора» / «Вернуть»: the list whole; 404 for a category that is not the owner's. */
