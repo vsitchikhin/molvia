@@ -513,7 +513,11 @@ describe('VerdictEditSheet', () => {
 
       expect(rateItem).toHaveBeenCalledWith(ITEM, { score: 4 })
       expect(amendVerdict).toHaveBeenCalledWith(ITEM, { review: null })
-      expect(onSaved.mock.calls).toEqual([[ITEM, { score: 4, review: null }]])
+      // The score as it landed, then the whole as it stands.
+      expect(onSaved.mock.calls).toEqual([
+        [ITEM, { score: 4, review: 'Пахнет крахмалом' }],
+        [ITEM, { score: 4, review: null }],
+      ])
     })
 
     it('И3: untouched, the review the row had is not sent — the server keeps its own', async () => {
@@ -525,6 +529,32 @@ describe('VerdictEditSheet', () => {
 
       expect(rateItem).toHaveBeenCalledWith(ITEM, { score: 4 })
       expect(amendVerdict).not.toHaveBeenCalled()
+    })
+
+    it('Л1: the score landed, the review refused — the score is kept, the review alone sent again', async () => {
+      rateItem.mockResolvedValueOnce({
+        verdict: card({ score: 4, review: 'Пахнет крахмалом' }),
+        created: false,
+      })
+      amendVerdict.mockRejectedValueOnce(
+        new ApiError(ERROR.INTERNAL, 'HTTP 500', true, undefined, { fromApi: true }),
+      )
+      const { view } = await render({ ownReview: 'Пахнет крахмалом', unsure: true })
+      await view.get('textarea').setValue('')
+      await key(view, 4).trigger('click')
+      await button(view, 'Save the rating').trigger('click')
+      await flushPromises()
+
+      // The screen has the 4, and the sheet stands on it.
+      expect(onSaved.mock.calls).toEqual([[ITEM, { score: 4, review: 'Пахнет крахмалом' }]])
+      expect(view.text()).toContain('Could not save it')
+      expect(view.get('.current').text()).toBe('Your rating: 4')
+
+      amendVerdict.mockResolvedValueOnce(card({ score: 4, review: null }))
+      await button(view, 'Save the rating').trigger('click')
+      await flushPromises()
+      expect(rateItem).toHaveBeenCalledTimes(1)
+      expect(amendVerdict).toHaveBeenLastCalledWith(ITEM, { review: null })
     })
 
     it('И2: the review alone, touched — it goes by itself, no score asked for', async () => {

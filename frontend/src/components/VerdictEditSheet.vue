@@ -357,7 +357,12 @@ export default defineComponent({
       }
       void send(async () => {
         const { verdict } = await api.rateItem(props.itemId, { score: chosen })
-        if (!touched || verdict.review === wanted) return savedOf(verdict)
+        const put = savedOf(verdict)
+        if (!touched || put.review === wanted) return put
+        // Half of it landed: the screen keeps it and the sheet stands on it, so a review refused after
+        // it is said as such and sent again alone (Л1).
+        settle({ kind: 'written', verdict: put })
+        props.onSaved?.(props.itemId, put)
         return savedOf(await api.amendVerdict(props.itemId, { review: wanted }))
       })
     }
