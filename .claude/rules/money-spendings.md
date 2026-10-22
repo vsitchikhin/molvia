@@ -443,8 +443,10 @@ nothing up.
   no revision — two phones amending one category, the later wins (Р-6). A preset, someone else's and
   no id are one 404; a live name of one's own is `SPENDING_CATEGORY_TAKEN`, checked under the owner's
   lock as «Добавить» checks it; a removed one may be amended and stays removed. On the phone it is
-  `category-amend`, folded whole into its «Добавить» or its amendment still waiting (never into one on
-  the way) — **and never past a write of another category that frees a name** (adversarial А1): a name
+  `category-amend`, folded whole into **the last** of its «Добавить» and amendments while it still waits
+  (never into one on the way, and never an earlier one: two may stand apart, the write between them
+  cancelled later, and folded into the first, the second went after it and took the last word back —
+  adversarial Б4; «Убрать» and «Вернуть» cancel the last of theirs the same way) — **and never past a write of another category that frees a name** (adversarial А1): a name
   is free only after the write that frees it, «Убрать» or a rename of the other; folded in front of it,
   «Метро» renamed «Такси» after «Убрать» of «Такси» went out first and was a 409, and the spending made in
   it at the till went with it. **«Вернуть» and «Убрать» still waiting cancel out by the same rule**
