@@ -647,6 +647,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   28 days after recording, of a line recorded as read only** (В-3, В-4); **photos never enter the
   nightly copy** (В-2), never the log. **A recorded receipt goes with its trip, a line with its
   purchase, a line not recorded at «Записать»** (MOL-240): by the keys, never a timer.
+- **A line's purchase is the till's pieces times the package its name prints** (MOL-264): `receiptPack` — the till's
+  figures, arithmetic, total and memory stay in its pieces; a package not read for sure is none (a 6 off a photo, an
+  Armenian unit not glued, a thickness, two sizes); a pack of pieces wins over litres; sent by `RECEIPT_PACK_HEADER`,
+  and at «Записать» neither form shown is an edit.
 - **A line finds its item: the shop's memory by article, by the line, the country's names with the
   heading, the search by the gloss, else new** (MOL-126); names and search once in the queue, the memory
   on every reading. The matcher is MOL-114's `dict-match.mjs`, held to the bench.

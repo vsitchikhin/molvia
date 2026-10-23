@@ -1430,6 +1430,74 @@ codes only. The review says «Строки — из налоговой Серб�
 shot (a refund) is no miss, a worker that failed is one. Optional on the wire (Р-3): a body a phone of an
 earlier build left in its queue has neither, and a door refused is never sent again.
 
+## The package a line's name prints (MOL-264)
+
+**A till sells a packed thing in pieces and prints its size in the name** — «Կոկա Կոլա» 1.5լ, «Աշտարակ» ափսեով 950գր, a
+Serbian journal's «0.5L AQUA VIVA VODA FL» — and a price is compared only by the kilogram, the litre or the piece:
+«1 шт за 702,90» compared with nothing, and «Тут дешевле» said nothing or a lie (owner, 09.10.2026). **The purchase is the
+till's pieces times the package** (`receiptPack`, `packedQuantity`, `linePack` in `receipt-pack.ts`): two bottles of
+«1լ» milk are 2 l, «10հտ» eggs are ten pieces, a pizza base «250±10գր» twice is 500 g.
+
+**The till's own figures stay as printed** (Р-2): its count, its shelf price, the line's arithmetic, «≠», the total and
+the shop's memory by article all speak in its pieces, as MOL-255, MOL-290 and MOL-291 built them. The package is a layer
+over them, worked out of `printed` by a pure function on the server's review and at «Записать» — never stored (Р-1), so
+a receipt read before the rollout and not yet recorded gets it too.
+
+- **Sizes**: a figure and `կգ`, `գր`, `գ`, `լ`, `մլ` — or `кг`, `гр`, `г`, `л`, `мл`, `kg`, `g`, `gr`, `l`, `ml` — the unit
+  ending its word; a tolerance is no part of it («470գր±3%»); «N×» before or «*N» after multiplies («6х200մլ» 1,2 l,
+  «15գ*8» 120 g). A fat, microns, milligrams, volts, metres, years («5տ») are never a package; a figure with no unit — a
+  size the till cut, «… 85» — is none.
+- **A pack of pieces wins over what one holds** (Р-3, owner's В-1 «а» — every kind of goods, not food alone): «Աղբի
+  պարկեր 35լ 30հտ» is thirty bags, never 35 l. Two at least: «1 հտ» is the till's own count as often as a pack. A Serbian
+  pack is «107KOM» glued or «10/1»; a «KOM» apart is the journal's unit of sale.
+- **A thickness printed says the thing is packaging** (Р-11): «… 60միկրոն», «KESA VJZ 7KG 51 MIKRON» — its kilograms
+  are what it carries. None.
+- **Two sizes that disagree are none** (Р-4); a pack of pieces with two counts too.
+- **A line the till weighed or poured keeps its quantity**, and a line the check emptied gets no package (Р-8): a package
+  of nobody knows how many is a guess.
+
+**Wrong is worse than unread, so a size not read for sure is none** (MOL-255). Measured on the bench
+(`.scratch/tasks/status/MOL-264/`, packages from the truth's `meaning`, written by hand, × the till's count):
+
+|                         | truth's text | Haiku v5, three runs       | Tesseract | Serbia (78 lines) |
+| ----------------------- | ------------ | -------------------------- | --------- | ----------------- |
+| master: right / made up | 2 / 0        | 2, 2, 0 / 0                | 1 / 0     | —                 |
+| the grammar alone       | 253 / 0      | 117, 124, 22 / 13, 12, 0   | 9 / 4     | —                 |
+| **as shipped**          | **236 / 0**  | **105, 112, 20 / 0, 1, 0** | **8 / 1** | **21 / 1**        |
+
+- **A 6 in a size read off a photo is a doubt** (Р-12): «Ереван Сити»'s font prints a 5 with a flat top and both readers
+  copy it as a 6 (MOL-290) — «0.46լ» for 0,45 l, «46գր», «1.6լ», «260±10գր» were every one of the model's made up. Doubting
+  the 6 costs 17 sizes of the truth's 230 that really hold one (165 g chips, 360 g condensed milk, 1.6 l); doubting the 5
+  as well cost 78 for one made up less. Serbia's text is the tax office's, never read off a photo: no doubt.
+- **An Armenian unit is glued to its figure** — 232 sizes of 232 on the bench — so «505 գր» is the model's copy of the
+  glue's «505 6գր» with its 6 lost: none. A Latin or Cyrillic unit may stand apart («MLEKO 1 L KOM»).
+- **No package weighs over 50 kg or holds over 25 l**: «330լ» is a can with its point lost. A cooler's 19 l, a bag of cat
+  food's 20 kg are packages.
+- **The prices, named:** the model's «9գր» on an ice cream whose size the till cut is made up — a unit the model wrote
+  that the paper never printed; Tesseract's «88գր» for 85 (one in nine of its packages); a Serbian baby bottle's «260ml»
+  is what it holds, as the bags' litres (Р-3) — a container whose capacity is printed with no count beside it. Half a
+  gram is no quantity («18.5G» of coffee): the kilogram is kept in grams.
+
+**On the wire to a phone that asks** (`pack`, `RECEIPT_PACK_HEADER`, as `spelled`): an installed app of an earlier build
+reads a line strictly. **The review shows the purchase** — the line's quantity is the pieces times the package, the
+sheet opens at «1,5 л» with «За единицу» and «Тут дешевле» by the litre — and **the row keeps the till's figures where
+they stood, the package after them, «2 шт × 370,00 ֏ · 2 л»** (owner's В-2 «а»): the person checks the paper by the
+till's figures. «кол-во × цена» of the sheet is a weighed line's alone: a bottle's shelf price times its litres is no
+figure of the line.
+
+**At «Записать» the quantity shown is no edit, in either form** (Р-9, Р-10): the pieces times the package, or the till's
+pieces a phone of an earlier build sends, knowing no package — so the 0.2 measure counts neither, the line is as read and
+the shop's memory keeps its shelf price. **The price, named:** a person who sets such a line back to pieces on purpose is
+told from an earlier build by nothing, and is not counted as having put it right. **A new item takes one package as its
+usual quantity** (`typical_qty`, MOL-261): the next purchase typed by hand is offered «1,5 л», the milk «1 л» for the two
+bottles bought — only where the package is of the unit recorded. Its name keeps the size, as MOL-293 named it (В-1 «б»).
+
+**What was recorded before is put right once, by hand** (owner's В-3 «а»): `make repack` (`dist/repack-receipts.js` in
+production), a dry run unless `YES=1` — the same transaction, rolled back, as the seed's — printing every purchase «было →
+станет». It moves a purchase only while its quantity is still the till's pieces as read, and an item only where that very
+record made it, by that person — an item's `created_at` and its receipt's `recorded_at` are one transaction's `now()` —
+still in pieces with no usual quantity. A second run finds nothing.
+
 ## The reader holds nothing
 
 **The reader is a container with no database, no disk but `/tmp`, no port outside the compose network
