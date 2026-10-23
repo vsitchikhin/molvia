@@ -435,9 +435,9 @@ test.describe('«Тут дешевле»', () => {
       expect(hint(page)).toContainText('Зовуни', { timeout: 5000 }),
     )
 
-    expect(motion.moved).toBeGreaterThan(20)
-    expect(motion.moving).toBeGreaterThan(3)
-    expect(motion.largest).toBeLessThan(motion.moved / 2)
+    expect.soft(motion.moved).toBeGreaterThan(20)
+    expect.soft(motion.moving).toBeGreaterThan(3)
+    expect.soft(motion.largest).toBeLessThan(motion.moved / 2)
   })
 
   test('says something else over frames too: one line to two (adversarial Е′)', async ({
@@ -456,8 +456,8 @@ test.describe('«Тут дешевле»', () => {
       await still(page)
     })
 
-    expect(motion.moved).toBeGreaterThan(10)
-    expect(motion.moving).toBeGreaterThan(3)
-    expect(motion.largest).toBeLessThan(motion.moved / 2)
+    expect.soft(motion.moved).toBeGreaterThan(10)
+    expect.soft(motion.moving).toBeGreaterThan(3)
+    expect.soft(motion.largest).toBeLessThan(motion.moved / 2)
   })
 })
