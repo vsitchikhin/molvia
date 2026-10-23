@@ -71,22 +71,24 @@ const TIMES_SIGN = String.raw`(?:(?<!\p{L})[xх×]\s*|\d\s*\p{L}*[xх×]\s*|\p{L
  */
 // what a number glued to it says is no count: plies «3շ», «3D», years «5տ», three in one «3-ը 1-ում», «3в1», «2in1»
 /**
- * A volt or an ampere in a capital glued to its figure, «220В E27», «9В Крона», «10А» (С1): a measure whatever follows —
- * case is what tells it from the word «в», «6в упаковке», and a word in small letters or in capitals after it, «6В УПАК»,
- * keeps it a word; read like a size, its figure is no count.
+ * A Russian volt or ampere glued to its figure, «220В E27», «9В Крона», «9в 2шт», «10а» (С1, У2): a measure unless a word
+ * in small letters or in capitals follows — «6в упаковке», «6В УПАК» keep it a word; read like a size, its figure is no
+ * count. **The price, named:** «Пиво 6в 0.5л» reads volts.
  */
-const CAPITAL_MEASURE = /(?<![\d.,])\d+(?:[.,]\d+)?[ВА](?![a-z]|\s*(?:[а-яё]|[А-ЯЁ]{2}))/gu
+const CAPITAL_MEASURE = /(?<![\d.,])\d+(?:[.,]\d+)?[ВАва](?![a-z]|\s*(?:[а-яё]|[А-ЯЁ]{2}))/gu
 // a figure with a unit of measure after it is a measure, never a count: «500мг», «220V», «70x110мм» (П2); never a unit
 // that is also a word — «6 в упаковке», «6 ед.»: «м» only glued; a Russian volt is `CAPITAL_MEASURE`'s
 const MEASURE = String.raw`(?:\s*(?:мкг|мг|mcg|mg|մգ|мм|mm|մմ|см|cm|սմ|V|W|Вт|kW|кВт|mAh|мАч|Ah|Ач|ккал|kcal|кДж|kJ|Hz|Гц|ГБ|GB|МБ|MB|МЕ|IU|Վտ|Վ|Ա|mA|мА|вольт\p{L}*|ватт\p{L}*|ампер\p{L}*|volts?|watts?|amps?|ամպեր)|м|m|A)(?!\p{L})`
 const NOT_A_COUNT = String.raw`(?:(?:շ|Դ|D|տ|[-–](?:ը|ում))(?!\p{L})|(?:в|in)1(?!\d)|${MEASURE})`
 /**
  * Where a count may start: not inside a number, «0.5», «3,2», nor after «№», «#»; and not after a lone letter — a
- * class or a model, a Latin one or the eggs' «С», «C1», «N4», «E27», «С0», a sign of times apart excepted, «x6». After a word, glued or past its point,
- * a figure is a count, «уп12», «PAK6», «уп.12», «бл.4» (Т1): nothing tells it from a model's «LR6», and a pack of
- * several read as one is worse than none (MOL-255). **The price, named:** «AA LR6 4шт», «LR03» keep none.
+ * class or a model, a Latin one, «C1», «N4», «E27», or the eggs' class «С2», «Ս2», a sign of times apart excepted,
+ * «x6». After a word — glued, past its point or its comma — a figure is a count, «уп12», «PAK6», «уп.12», «бл,4» (Т1,
+ * У1): nothing tells it from a model's number glued to its word, and a pack of several read as one is worse than none
+ * (MOL-255). **The price, named, as a class:** a model's number glued to its word — «Mach3 4шт», «Nan2 400г», «GU10
+ * 2шт», «AA LR6 4шт» — keeps none.
  */
-const COUNT_START = String.raw`(?<![\d,#№])(?<!\d\.)(?<!(?<![\p{L}\d])(?![xX])[A-Za-zСс])`
+const COUNT_START = String.raw`(?<![\d#№])(?<!\d[.,])(?<!(?<![\p{L}\d])(?![xX])[A-Za-z])(?<!(?<![\p{L}\d])[СсՍս](?=2(?!\d)))`
 const OTHER_NUMBER = new RegExp(
   String.raw`${COUNT_START}(?<!\d\s*[-–/xх×*+]\s*)(?:[2-9]|[1-9]\d|100)(?!\d|[.,]\d|\s*[%°]|\s*[-–/xх×*]\s*\d|${NOT_A_COUNT})`,
   'giu',

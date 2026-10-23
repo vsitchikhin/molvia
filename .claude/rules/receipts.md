@@ -1466,16 +1466,17 @@ a receipt read before the rollout and not yet recorded gets it too.
   «дюжина», «мультипак», «двойная», «сдвоенная», «трио», «дуо», «спарка», «double», «duplo», «զույգ»), a bundle «N+M»,
   «N x M» or «N/M» beside a weight or a volume and no count of pieces of two or more — the till's «1шт» is none (Р3) — «0.5л 1х12», «2x6 0.5լ», «0.5л 1/12» (`PAIR`,
   rounds 13–14, Н1, П3) — and a count past a hundred with a word after it, «200 пакетиков 2г» (`LARGE_COUNT`, №18),
-  keeps no package. What is not a count: a figure after a lone Latin letter or the eggs'
-  «С», a model's or a class's, «C1», «N4», «E27», «С0», and after «№» — but «x6» is a sign, and a figure after a word,
-  glued or past its point, is a count, «уп12», «PAK6», «уп.12», «бл.4» (Т1; **the price, named:** «AA LR6 4шт», «LR03»
-  keep none, «0.5л №12» is read as a label); plies, «3D», years and three in one glued after
+  keeps no package. What is not a count: a figure after a lone Latin letter, a model's or a
+  class's, «C1», «N4», «E27», the eggs' class «С2», «Ս2», and after «№» — but «x6» is a sign, and a figure after a word,
+  glued or past its point or its comma, is a count, «уп12», «PAK6», «уп.12», «бл,4» (Т1, У1; **the price, named, as a
+  class:** a model's number glued to its word — «Mach3 4шт», «Nan2 400г», «GU10 2шт», «AA LR6 4шт» — keeps none, №21;
+  «0.5л №12» is read as a label); plies, «3D», years and three in one glued after
   it, «3շ», «5տ», «3-ը 1-ում», «3в1», «2in1» (`NOT_A_COUNT`, the bench's own); a fraction, a percent or degrees, a range and
   a width by a length beside a count of pieces, «3.2%», «40°» (Н3), «9-14կգ», «100шт 24х37», «35л 50х70 30шт» (П1, №19); a
   figure with a unit of measure, «500мг», «220V», «220В», «10Վտ», «10А», «9 Вольт», «60 Ватт», «70мм», «5м» glued
   (`MEASURE`, П2, Р1, С1, С2) — never a unit that is also a word, «6 в упаковке», «6 ед.»: «м» and «В» only glued; a
-  capital «В» or «А» glued — never a small one — is a measure unless a word in small letters or in capitals follows, «220В E27», «9В Крона» —
-  «6В УПАК» stays a count (`CAPITAL_MEASURE`); **the price, named:** «Пиво 6В 0.5л» reads volts; a line's number before its name, «17.»; a code past a hundred standing
+  Russian «В» or «А» glued, in either case, is a measure unless a word in small letters or in capitals follows (У2), «220В E27», «9В Крона» —
+  «6В УПАК» stays a count (`CAPITAL_MEASURE`); **the price, named:** «Пиво 6В 0.5л», «6в 0.5л» read volts; a line's number before its name, «17.»; a code past a hundred standing
   alone, «9639», «250h 193», a vintage «2019». **The price, named, as one class:** a name's own number — «Балтика 7», «7 злаков», «Pampers 4
   Maxi 52шт», «3 в 1» apart, «12 лет в коробке», «Три медведя», «AFTER EIGHT», a model's letter copied as a figure,
   «2ոկոլապ», «Neva 12h 32» — keeps none: on the bench 231 of 233 read right (two lines of the brand «3 կոռոչկի»), 95
