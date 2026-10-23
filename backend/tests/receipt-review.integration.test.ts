@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   RECEIPT_CASHBACK_HEADER,
+  RECEIPT_PACK_HEADER,
   RECEIPT_REPAIRED_HEADER,
   RECEIPT_SPELLED_HEADER,
   receiptDetailCodec,
@@ -366,6 +367,50 @@ describe('the review of a receipt', () => {
       [coffee, 'Кофе «Латино» Робуста', undefined],
     ])
   })
+
+  it('tells a line’s package only to a phone that asks, of a line the till sold in pieces (MOL-264)', async () => {
+    const me = await insertActor(db)
+    const id = await parsedReceipt(me, [
+      { printed: 'Գազավորված ըմպելիք «Կոկա Կոլա» 1.5լ', sku: '1170010', price: 700, sum: 700 },
+      { printed: 'Կաթ «Իգիթ» 3.2% 1լ', sku: '1170011', qty: 2, price: 370, sum: 740 },
+      { printed: 'Հավկիթ «Ոսկեհավ» #0-1 10հտ', sku: '1170012', price: 850, sum: 850 },
+      { printed: 'Սերուցք «Իգիթ» 10%', sku: '1170013', price: 600, sum: 600 },
+      { printed: 'Ազնվամորու Մուրաբա 1կգ', sku: '1170014', price: 2_000, sum: 868 },
+      { printed: 'Պանիր «Լոռի» 500գր', sku: '1170015', price: 900, sum: 900 },
+    ])
+    // the jam the till weighed — 0,434 kg — and the cheese the check emptied keep no package
+    await db
+      .update(receiptLines)
+      .set({ qtyMilli: 434n, qtyUnit: 'kg' })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 4)))
+    await db
+      .update(receiptLines)
+      .set({ qtyMilli: null, qtyUnit: null, priceMinor: null, sumMinor: null, settled: false })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 5)))
+    // an earlier build reads a line strictly: it is told nothing, and its figures are the till's
+    const earlier = await review(me, id)
+    expect(earlier.lines.map((line) => line.pack)).toEqual(Array(6).fill(undefined))
+    const response = await app.inject({
+      method: 'GET',
+      url: `/receipts/${id}`,
+      headers: {
+        cookie: await signIn(db, me),
+        'x-molvia-today': '2026-10-03',
+        [RECEIPT_PACK_HEADER]: '1',
+      },
+    })
+    const asked = receiptDetailCodec.parse(response.json())
+    expect(asked.lines.map((line) => line.pack)).toEqual([
+      { milli: 1_500n, unit: 'l' },
+      { milli: 1_000n, unit: 'l' },
+      { milli: 10_000n, unit: 'piece' },
+      undefined,
+      undefined,
+      undefined,
+    ])
+    // the till's own figures stay as printed
+    expect(asked.lines[1]?.quantity).toEqual({ milli: 2_000n, unit: 'piece' })
+  }, 10_000)
 
   it('doubts a price one confused digit off the memory’s, and only then names it (В-1)', async () => {
     const me = await insertActor(db)

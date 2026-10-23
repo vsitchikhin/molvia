@@ -17,6 +17,12 @@
       }}</span>
       <span v-if="figures" class="figures">
         {{ figures }}
+        <!-- what the till's pieces make by the package the name prints: what is recorded (MOL-264, В-2 «а») -->
+        <I18nT v-if="packed" keypath="receipt.review.packed" scope="global" tag="span">
+          <template #pack>
+            <b class="packed">{{ packed }}</b>
+          </template>
+        </I18nT>
         <span v-if="line.mismatch && printed" class="mismatch">{{
           t('receipt.review.mismatch', { printed })
         }}</span>
@@ -39,9 +45,10 @@
 <script lang="ts">
 import { computed, defineComponent } from 'vue'
 import type { PropType } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { Translation, useI18n } from 'vue-i18n'
 import IconChevronRight from '~icons/mdi/chevron-right'
 import { formatMoney, formatQuantity } from '@molvia/model'
+import type { Quantity } from '@molvia/model'
 import type { ReviewLine } from '@/receipts/review'
 
 /**
@@ -53,7 +60,7 @@ import type { ReviewLine } from '@/receipts/review'
  */
 export default defineComponent({
   name: 'ReceiptLineRow',
-  components: { IconChevronRight },
+  components: { I18nT: Translation, IconChevronRight },
   props: {
     line: { type: Object as PropType<ReviewLine>, required: true },
     /** The language the receipt is printed in, for the system's face to pick its glyphs. */
@@ -62,11 +69,14 @@ export default defineComponent({
   emits: { open: () => true },
   setup(props) {
     const { t, locale } = useI18n()
+    const quantityText = (quantity: Quantity) =>
+      `${formatQuantity(quantity, locale.value)} ${t(`item.unit_${quantity.unit}`)}`
     const figures = computed(() => {
-      const { quantity } = props.line
+      // the till's own count beside its price, as printed; the purchase the package makes is said after it
+      const quantity = props.line.ownFigures ? props.line.quantity : props.line.line.quantity
       const price = props.line.ownFigures ? null : props.line.line.price
       if (!quantity) return null
-      const qty = `${formatQuantity(quantity, locale.value)} ${t(`item.unit_${quantity.unit}`)}`
+      const qty = quantityText(quantity)
       if (!price) return qty
       const discount = props.line.line.discount
       // A discount of nothing is printed by the till as «0,00»: no «− 0» after the price.
@@ -78,6 +88,11 @@ export default defineComponent({
           })
         : t('receipt.review.qty_price', { qty, price: formatMoney(price, locale.value) })
     })
+    const packed = computed(() =>
+      !props.line.ownFigures && props.line.line.pack && props.line.quantity
+        ? quantityText(props.line.quantity)
+        : null,
+    )
     const printed = computed(() =>
       props.line.line.sum ? formatMoney(props.line.line.sum, locale.value) : null,
     )
@@ -101,13 +116,20 @@ export default defineComponent({
       [
         t('receipt.review.line_aria', {
           name: props.line.name,
-          qty: figures.value ?? (unread.value ? t('receipt.review.unread') : ''),
+          qty:
+            figures.value === null
+              ? unread.value
+                ? t('receipt.review.unread')
+                : ''
+              : packed.value === null
+                ? figures.value
+                : t('receipt.review.packed_spoken', { figures: figures.value, pack: packed.value }),
           sum: sum.value ?? '',
         }),
         ...tags.value.map((tag) => tag.text),
       ].join(', '),
     )
-    return { t, figures, printed, sum, unread, tags, spoken }
+    return { t, figures, packed, printed, sum, unread, tags, spoken }
   },
 })
 </script>
@@ -162,6 +184,11 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-footnote);
   font-variant-numeric: tabular-nums;
+}
+
+.packed {
+  color: var(--text);
+  font-weight: var(--weight-medium);
 }
 
 .mismatch {

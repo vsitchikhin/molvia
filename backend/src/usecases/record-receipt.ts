@@ -5,8 +5,10 @@ import {
   addMoney,
   geographyAllowed,
   latestDay,
+  linePack,
   linesTotalOf,
   nameIdentity,
+  packedQuantity,
   receiptDigits,
   receiptMomentOf,
   receiptPaidOf,
@@ -18,6 +20,7 @@ import {
 import type {
   Actor,
   Money,
+  ReceiptCountry,
   ReceiptRecordBody,
   ReceiptRecorded,
   ReceiptSettled,
@@ -41,22 +44,33 @@ const sameQuantity = (a: StoredReceiptLine['quantity'], b: StoredReceiptLine['qu
   a === null || b === null ? a === b : a.milli === b.milli && a.unit === b.unit
 
 /**
+ * The quantity the review showed a line at: the purchase its package makes (MOL-264) — or the till's pieces, which a
+ * phone of an earlier build shows, knowing no package (Р-10). Neither is an edit.
+ */
+function shownQuantity(stored: StoredReceiptLine, line: RecordedLine, country: ReceiptCountry) {
+  return (
+    sameQuantity(line.quantity, stored.quantity) ||
+    sameQuantity(line.quantity, packedQuantity(stored.quantity, linePack(stored, country)))
+  )
+}
+
+/**
  * A line recorded as it was read (В-4): it added up, and the person changed neither its quantity nor
  * what was paid. Its cut-out rows keep the text read as their confirmed text; its shelf price is what
  * the memory keeps. A line that added up has no price only where the check took it off as misread
  * (MOL-255): its row would teach the reader that misreading, so it is not read as printed.
  */
-function asRead(stored: StoredReceiptLine, line: RecordedLine): boolean {
+function asRead(stored: StoredReceiptLine, line: RecordedLine, country: ReceiptCountry): boolean {
   // put right by the font's swaps, it was not read so: no shelf price for the memory (MOL-290, Р-7)
-  return asShown(stored, line) && stored.repaired !== true
+  return asShown(stored, line, country) && stored.repaired !== true
 }
 
 /** A line recorded as the review showed it: it added up, and neither its quantity nor its sum was changed. */
-function asShown(stored: StoredReceiptLine, line: RecordedLine): boolean {
+function asShown(stored: StoredReceiptLine, line: RecordedLine, country: ReceiptCountry): boolean {
   return (
     stored.settled &&
     stored.price !== null &&
-    sameQuantity(line.quantity, stored.quantity) &&
+    shownQuantity(stored, line, country) &&
     sameMoney(line.amount, stored.sum)
   )
 }
@@ -67,8 +81,12 @@ function asShown(stored: StoredReceiptLine, line: RecordedLine): boolean {
  * with none would leave the memory silent on every other receipt. Its cut-out rows are not confirmed, all the same:
  * they hold the misread.
  */
-function keepsPrice(stored: StoredReceiptLine, line: RecordedLine): boolean {
-  return asRead(stored, line) || (stored.remembered && asShown(stored, line))
+function keepsPrice(
+  stored: StoredReceiptLine,
+  line: RecordedLine,
+  country: ReceiptCountry,
+): boolean {
+  return asRead(stored, line, country) || (stored.remembered && asShown(stored, line, country))
 }
 
 /**
@@ -86,6 +104,7 @@ function editsOf(
   stored: readonly StoredReceiptLine[],
   shown: ShownLines,
   total: Money | null,
+  country: ReceiptCountry,
 ): ReceiptEdits {
   const recorded = new Set(
     body.lines
@@ -108,7 +127,7 @@ function editsOf(
       const was = shown.itemIds[line.position] ?? null
       if ('id' in line.item ? line.item.id !== was : was !== null) item.add(line.position)
       if (
-        !sameQuantity(line.quantity, read.quantity) ||
+        !shownQuantity(read, line, country) ||
         !sameMoney(line.amount, shown.amounts[line.position] ?? null)
       ) {
         figures.add(line.position)
@@ -331,8 +350,19 @@ export async function recordReceipt(
       return keyA < keyB ? -1 : keyA > keyB ? 1 : a < b ? -1 : a > b ? 1 : 0
     })
     for (const [identity, { name, line }] of toCreate) {
+      // what one package holds is what the next purchase typed by hand is offered (MOL-264): «1,5 л», never the
+      // two bottles of this one; a quantity the person put in another unit says nothing of it
+      const stored = held.lines[line.position]
+      const pack = stored === undefined ? null : linePack(stored, held.country)
+      const unit = line.quantity?.unit ?? 'piece'
       const proposal = await items.createUnlessNamed(
-        { kind: 'product', name, barcodes: [], defaultUnit: line.quantity?.unit ?? 'piece' },
+        {
+          kind: 'product',
+          name,
+          barcodes: [],
+          defaultUnit: unit,
+          ...(pack !== null && pack.unit === unit ? { typicalQuantity: pack } : {}),
+        },
         actor.id,
       )
       // the item is made with no codes, so none of them can be another item's
@@ -373,8 +403,8 @@ export async function recordReceipt(
         ...(line.amount === null ? {} : { amount: line.amount }),
       })
       written.push({ position: line.position, expenseId: expense.id })
-      if (asRead(stored, line)) confirmed.push(line.position)
-      const kept = keepsPrice(stored, line)
+      if (asRead(stored, line, held.country)) confirmed.push(line.position)
+      const kept = keepsPrice(stored, line, held.country)
       if (kept) priced.push(line.position)
       for (const word of storeMemoryWords(stored)) {
         words.push({ ...word, itemId, price: kept ? stored.price : null })
@@ -398,7 +428,7 @@ export async function recordReceipt(
       expenses: written,
       confirmed,
       priced,
-      edits: editsOf(body, held.lines, shown, held.total),
+      edits: editsOf(body, held.lines, shown, held.total, held.country),
       // a receipt from the tax office in a table of its own, its lines being no reading (MOL-234)
       source: held.source,
       codesWritten: codes.filter((one) => one.outcome === 'written').length,

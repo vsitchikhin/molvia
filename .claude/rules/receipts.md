@@ -1430,6 +1430,139 @@ codes only. The review says «Строки — из налоговой Серб�
 shot (a refund) is no miss, a worker that failed is one. Optional on the wire (Р-3): a body a phone of an
 earlier build left in its queue has neither, and a door refused is never sent again.
 
+## The package a line's name prints (MOL-264)
+
+**A till sells a packed thing in pieces and prints its size in the name** — «Կոկա Կոլա» 1.5լ, «Աշտարակ» ափսեով 950գր, a
+Serbian journal's «0.5L AQUA VIVA VODA FL» — and a price is compared only by the kilogram, the litre or the piece:
+«1 шт за 702,90» compared with nothing, and «Тут дешевле» said nothing or a lie (owner, 09.10.2026). **The purchase is the
+till's pieces times the package** (`receiptPack`, `packedQuantity`, `linePack` in `receipt-pack.ts`): two bottles of
+«1լ» milk are 2 l, «10հտ» eggs are ten pieces, a pizza base «250±10գր» twice is 500 g.
+
+**The till's own figures stay as printed** (Р-2): its count, its shelf price, the line's arithmetic, «≠», the total and
+the shop's memory by article all speak in its pieces, as MOL-255, MOL-290 and MOL-291 built them. The package is a layer
+over them, worked out of `printed` by a pure function on the server's review and at «Записать» — never stored (Р-1), so
+a receipt read before the rollout and not yet recorded gets it too.
+
+- **Sizes**: a figure and `կգ`, `գր`, `գ`, `լ`, `մլ` — or `кг`, `гр`, `г`, `л`, `мл`, `kg`, `g`, `gr`, `l`, `ml` — the unit
+  ending its word; a tolerance is no part of it («470գր±3%»); «N×» before or «×N», «*N» after multiplies («6х200մլ» 1,2 l,
+  «15գ*8» 120 g). **A pack of pieces is read by what follows its «× N»** (reviews 2–5, В1, Г2, Д1, Д2, Е1, Е2, №10): a
+  unit of a size, glued or apart, is what each piece weighs and the count stands alone («25հտ x 2գ», «32шт х 30 г»);
+  anything else — nothing, a word, a hyphen of any kind, a bracket, a quote, a comma — may be packs or plies, nothing tells
+  which: none — a Serbian count's «X N» as well, «100KOM X 2», «10/1 X 2» (review 6, Ж2), and a sign of times with a
+  figure anywhere after the count, «10шт. х 3», «4հ «Զևա» x 2», «10հտ (C1) x 3» (review 7, З2) — but a sign with a number
+  standing alone before it is the thing's width and length, «100шт 24х37см», «30հտ 50x60», and the count stands (review 8,
+  И1, №13); a figure glued to a letter is a word, «10հտ C1 x 3», «4шт LR6 x 2» — packs, none (review 9, Й3). Four rounds of review found a new spelling of «packs or plies» each time while the default was to multiply;
+  none by default ends it. **The prices, named:** «4հ x 2», eight rolls, and two-ply napkins «100հ x 2 շերտ» keep no
+  package. A star before a size is no count: «Արարատ 3* 0.5լ» is a cognac's stars
+  (review №1). A fat, microns, milligrams, volts, metres, years («5տ», a vintage «2019г» — a whole number from 1900 to
+  2099 before the Russian «г», in either case; an Armenian or a Latin gram is a package, «2000գ» of cat food — review 2, В4) are never a
+  package; a figure with no unit — a size the till cut, «… 85» — is none.
+- **The size or the pack is read only where it is the name's one number** (review 12, over reviews 8–11). A count of
+  several beside the size makes the size one of them — «4 банки 0.5л», «6 в упаковке», «из 6ти банок», «6pk», «x6»,
+  «0.5լ/6», «1+1», «пара банок», «six-pack», «тридцать банок» — and the ways a count is spelt have no end: rounds 8–12
+  listed containers, words between, prepositions and number words, and each round found a new spelling, half the time
+  one the last fix had opened. So any other whole number from 2 to 100 standing on its own (`OTHER_NUMBER`), a number
+  spelt in a word (`COUNT_WORD`: Russian in any case to forty, English with «-pack», Armenian, Serbian, «пара»,
+  «дюжина», «мультипак», «двойная», «сдвоенная», «трио», «дуо», «спарка», «double», «duplo», «զույգ»), a bundle «N+M»,
+  «N x M» or «N/M» beside a weight or a volume and no count of pieces of two or more — the till's «1шт» is none (Р3) — «0.5л 1х12», «2x6 0.5լ», «0.5л 1/12» (`PAIR`,
+  rounds 13–14, Н1, П3) — and a count past a hundred with a word after it, «200 пакетиков 2г» (`LARGE_COUNT`, №18),
+  keeps no package. What is not a count: a figure after a lone Latin letter, a model's or a
+  class's, «C1», «N4», «E27», the eggs' class «С2», «С3», «Ս2», and after «№» — but «x6» is a sign, and a figure after a word,
+  glued or past its point or its comma, is a count, «уп12», «PAK6», «уп.12», «бл,4» (Т1, У1; **the price, named, as a
+  class:** a model's number glued to its word — «Mach3 4шт», «Nan2 400г», «GU10 2шт», «AA LR6 4шт» — keeps none, №21;
+  «0.5л №12» is read as a label); plies, «3D», years and three in one glued after
+  it, «3շ», «5տ», «3-ը 1-ում», «3в1», «2in1» (`NOT_A_COUNT`, the bench's own); a fraction, a percent or degrees, a range and
+  a width by a length beside a count of pieces, «3.2%», «40°» (Н3), «9-14կգ», «100шт 24х37», «35л 50х70 30шт» (П1, №19); a
+  figure with a unit of measure, «500мг», «220V», «220В», «10Վտ», «10А», «9 Вольт», «60 Ватт», «70мм», «5м» glued
+  (`MEASURE`, П2, Р1, С1, С2) — never a unit that is also a word, «6 в упаковке», «6 ед.»: «м» and «В» only glued; a
+  Russian «В» or «А» glued, in either case, is a measure unless a word in small letters or in capitals follows (У2), «220В E27», «9В Крона» —
+  «6В УПАК» stays a count (`CAPITAL_MEASURE`); **the price, named:** «Пиво 6В 0.5л», «6в 0.5л» read volts; a line's number before its name, «17.»; a code past a hundred standing
+  alone, «9639», «250h 193», a vintage «2019». **The price, named, as one class:** a name's own number — «Балтика 7», «7 злаков», «Pampers 4
+  Maxi 52шт», «3 в 1» apart, «12 лет в коробке», «Три медведя», «AFTER EIGHT», a model's letter copied as a figure,
+  «2ոկոլապ», «Neva 12h 32» — keeps none: on the bench 231 of 233 read right (two lines of the brand «3 կոռոչկի»), 95
+  and 99 of 102 and 107 by the model (its copies of «3շ» as «32», «Շ» as «2»), 20 of 21 in Serbia; nothing made up
+  more, and one less in Serbia — «260ml … SCY903/01» (round 14). **What stays:** a pack of several that prints no count — «Пиво упаковка 0.5л», «набор» — is read as one; a
+  count spelt in a word past the list is read as none of it — the one class no rule of the text closes, since a pack
+  of several named only in words prints nothing a figure could say; the list holds the words met and the ones review
+  named; a count glued after a word, «PAK6», is the word's. A word of a count is read outside what was read, so the pack's own «3զույգ» stays a pack (Р2). A word of a pair
+  or a double in a name is a count too, «Milka Double», «Triple Sec» — the
+  same class as the name's own number.
+- **What stands before a size may say it is none of its own** (review №2, adversarial А3, А4): a range, «9-14կգ» — a
+  nappy for a child of that weight; a fraction, «1/2կգ», «1/2L» — its denominator; a sign of times whose count is a word,
+  «25пак*2г», «25 փաթեթ x 2գր» — one sachet of a box, 25 times the price a kilogram. The line keeps no package. A sign of
+  times, in either case, is one standing apart, «25 KES X 2G»; one glued to the figure after any letter, «пакх2г», «4
+  банкиx0.5л», «2 коробкиx10шт» (reviews 2–6, В2, Д3, Ж1, №12); or one ending a word that follows a figure, glued or apart,
+  «25ПАКХ 2Г», «25 пакетикиx 2г» (Г1, Г3, З1). A count's word and a name's read alike there — «25 пакетикиx 2г» and «Ariel
+  3в1 Max 25шт» are a figure, a word ending in «x», a figure — and a package made up is worse than one unread. With no
+  figure before it, «x» is the word's own: «Elixir mix 0.33l», «Durex 3հտ», «пальчиковых 4шт» (Г5). **The prices,
+  named:** «Ariel 3в1 Max 25шт», «2in1 Max 400мл», «в 2 вкусах 200г» (review 7 over Е3, №11) and «Pepsi Max1.5լ», glued,
+  keep none — «Elixir mix 0.33l» is a drink,
+  «Durex 3հտ» three, «пальчиковых 4шт» four (Г5). A count of pieces with a sign of times before it, «2x10հտ», is a count of packs unread: none (review 2,
+  №7). **The price, named:** «1/1L» is none too.
+- **A pack of pieces wins over what one holds** (Р-3, owner's В-1 «а» — every kind of goods, not food alone): «Աղբի
+  պարկեր 35լ 30հտ» is thirty bags, never 35 l. Two at least: «1 հտ» is the till's own count as often as a pack. A Serbian
+  pack is «107KOM» glued or «10/1»; a «KOM» apart is the journal's unit of sale.
+- **A thickness printed says the thing is packaging** (Р-11): «… 60միկրոն», «KESA VJZ 7KG 51 MIKRON» — its kilograms
+  are what it carries. None.
+- **Two sizes that disagree are none** (Р-4); a pack of pieces with two counts too.
+- **A Latin «h», in either case, beside a size is no pack** (adversarial А1, review №3; «48H» — review 2, №6, В3): it is the model's copy of «հ» — «Անձեռոցիկ 75h»,
+  «Տոպրակ աղբի 20լ 30h» — and a label's hours too, «Rexona 48h 150մլ», 48 pieces of a deodorant. Nothing tells which,
+  so beside a size the line keeps no package — the garbage bags of the model's copy are pieces again, never their 20 l.
+  Dropped altogether, the bench lost 8 and 14 packages and made the bags' litres up. **The price, named:** hours with no
+  size beside them, «Nivea Men 48h», are a pack of 48.
+- **A line the till weighed or poured keeps its quantity**, and a line the check emptied gets no package (Р-8): a package
+  of nobody knows how many is a guess.
+
+**Wrong is worse than unread, so a size not read for sure is none** (MOL-255). Measured on the bench
+(`.scratch/tasks/status/MOL-264/`, packages from the truth's `meaning`, written by hand, × the till's count):
+
+|                         | truth's text | Haiku v5, three runs       | Tesseract | Serbia (78 lines) |
+| ----------------------- | ------------ | -------------------------- | --------- | ----------------- |
+| master: right / made up | 2 / 0        | 2, 2, 0 / 0                | 1 / 0     | —                 |
+| the grammar alone       | 253 / 0      | 117, 124, 22 / 13, 12, 0   | 9 / 4     | —                 |
+| the PR before review 1  | 236 / 0      | 105, 112, 20 / 0, 1, 0     | 8 / 1     | 21 / 1            |
+| **as shipped**          | **233 / 0**  | **102, 107, 20 / 0, 1, 0** | **8 / 1** | **21 / 1**        |
+
+- **A 6 read off a photo is a doubt, in a size and in a count of pieces** (Р-12; adversarial А2, review №4): «Ереван
+  Сити»'s font prints a 5 with a flat top and both readers copy it as a 6 (MOL-290) — «0.46լ» for 0,45 l, «46գր», «1.6լ»,
+  «260±10գր» were every one of the model's made up, and 15 eggs copied «16հտ» are as made up. Doubting the 6 costs 17 sizes
+  of the truth's 230 that really hold one (165 g chips, 360 g condensed milk, 1.6 l); doubting the 5 as well cost 78 for
+  one made up less. A count in doubt takes the size beside it along: the cups' 330 ml is what one holds. Serbia's text is
+  the tax office's, never read off a photo: no doubt.
+- **A unit read off a photo is glued to its figure** — 232 sizes of 232 on the bench — so «505 գր» is the model's copy of
+  the glue's «505 6գր» with its 6 lost, «Maxi 4 L» a nappy's size, «2019 г» a vintage: none. On a Serbian journal a Latin
+  unit may stand apart («MLEKO 1 L KOM»).
+- **No package weighs over 50 kg or holds over 25 l**: «330լ» is a can with its point lost. A cooler's 19 l, a bag of cat
+  food's 20 kg are packages.
+- **The prices, named:** the model's «9գր» on an ice cream whose size the till cut is made up — a unit the model wrote
+  that the paper never printed; Tesseract's «88գր» for 85 (one in nine of its packages); a Serbian baby bottle's «260ml»
+  is what it holds, as the bags' litres (Р-3) — a container whose capacity is printed with no count beside it. Half a
+  gram is no quantity («18.5G» of coffee): the kilogram is kept in grams.
+
+**On the wire to a phone that asks** (`pack`, `RECEIPT_PACK_HEADER`, as `spelled`): an installed app of an earlier build
+reads a line strictly. **The review shows the purchase** — the line's quantity is the pieces times the package, the
+sheet opens at «1,5 л» with «За единицу» and «Тут дешевле» by the litre — and **the row keeps the till's figures where
+they stood, the package after them, «2 шт × 370,00 ֏ · 2 л»** (owner's В-2 «а»): the person checks the paper by the
+till's figures. «кол-во × цена» of the sheet is a weighed line's alone: a bottle's shelf price times its litres is no
+figure of the line.
+
+**At «Записать» the quantity shown is no edit, in either form** (Р-9, Р-10): the pieces times the package, or the till's
+pieces a phone of an earlier build sends, knowing no package — so the 0.2 measure counts neither, the line is as read and
+the shop's memory keeps its shelf price. **A line set back to the till's pieces on purpose** (adversarial Б) is put right
+by the phone's word — `edited`, the measure of 0.2 counts it — and as read for the memory all the same: the till's figures
+are what it read, a piece's shelf price true in either form. **The prices, named:** an earlier build, sending no
+`edited`, is told from it by nothing; and `make repack`, below, moves such a line into its package — so it is run once,
+right after the rollout, before a receipt is recorded on the new build. A draft of an earlier build whose sum alone was
+put right carries the till's pieces, and recorded after that run it stays in pieces (review №5). **A new item takes one package as its
+usual quantity** (`typical_qty`, MOL-261): the next purchase typed by hand is offered «1,5 л», the milk «1 л» for the two
+bottles bought — only where the package is of the unit recorded. Its name keeps the size, as MOL-293 named it (В-1 «б»).
+
+**What was recorded before is put right once, by hand** (owner's В-3 «а»): `make repack` (`dist/repack-receipts.js` in
+production), a dry run unless `YES=1` — the same transaction, rolled back, as the seed's — printing every purchase «было →
+станет». It moves a purchase only while its quantity is still the till's pieces as read, and an item only where that very
+record made it, by that person — an item's `created_at` and its receipt's `recorded_at` are one transaction's `now()` —
+still in pieces with no usual quantity. A second run finds nothing.
+
 ## The reader holds nothing
 
 **The reader is a container with no database, no disk but `/tmp`, no port outside the compose network

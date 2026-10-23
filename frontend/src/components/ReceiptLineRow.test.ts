@@ -64,3 +64,37 @@ describe('ReceiptLineRow (MOL-293)', () => {
     expect(render(found).text()).toContain('в чеке — «Йогурт «Еремян Продактс» клубника 2% 130 г»')
   })
 })
+
+describe('ReceiptLineRow — a line’s package (MOL-264, В-2 «а»)', () => {
+  const packed = (over: Partial<ReviewLine> = {}) => {
+    const plain = row({}, 'search')
+    return row(
+      {
+        line: {
+          ...plain.line,
+          quantity: parseQuantity('2', 'piece'),
+          pack: parseQuantity('130', 'g'),
+        },
+        quantity: parseQuantity('260', 'g'),
+        ...over,
+      },
+      'search',
+    )
+  }
+
+  it('keeps the till’s count beside its price, and says the purchase after it', () => {
+    const wrapper = render(packed())
+    expect(wrapper.find('.figures').text().replace(/\s+/gu, ' ')).toBe('2 шт × 300,00 ֏ · 0,26 кг')
+    expect(wrapper.find('.packed').text()).toBe('0,26 кг')
+    expect(wrapper.attributes('aria-label')?.replace(/\s+/gu, ' ')).toContain(
+      '2 шт × 300,00 ֏, запишем 0,26 кг',
+    )
+  })
+
+  it('says no package of a line with none, nor once the person typed their own figures', () => {
+    expect(render(row({}, 'search')).find('.packed').exists()).toBe(false)
+    const own = render(packed({ ownFigures: true, quantity: parseQuantity('0.5', 'kg') }))
+    expect(own.find('.packed').exists()).toBe(false)
+    expect(own.find('.figures').text()).toBe('0,5 кг')
+  })
+})

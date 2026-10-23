@@ -9,6 +9,7 @@
     "migrate": "tsx src/db/migrate-cli.ts",
     "forget": "tsx src/forget-cli.ts",
     "seed": "tsx src/seed-catalogue-cli.ts",
+    "repack": "tsx src/repack-receipts-cli.ts",
     "gates": "tsx src/gates-cli.ts",
     "failures": "tsx src/failures-cli.ts",
     "merge": "tsx src/merge-cli.ts",

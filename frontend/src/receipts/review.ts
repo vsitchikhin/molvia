@@ -1,5 +1,6 @@
 import {
   linesTotalOf,
+  packedQuantity,
   receiptBalance,
   receiptCard,
   receiptDigits,
@@ -39,6 +40,10 @@ export interface ReviewLine {
   readonly repaired: boolean
   /** The printed sum differs from quantity × price — highlighted, never refused (Р-3 of MOL-113). */
   readonly mismatch: boolean
+  /**
+   * What the line is recorded at: the till's pieces times the package its name prints (MOL-264) — the till's own
+   * count and price stay on `line` — or the person's figure once edited.
+   */
   readonly quantity: Quantity | null
   /** What the line will be recorded at (В-5 on the server; the person's figure once edited). */
   readonly amount: Money | null
@@ -91,6 +96,9 @@ function amountsOf(detail: ReceiptDetail, draft: ReceiptDraft | null) {
   return recordedSums(figures, linesTotalOf(total, detail.cashback ?? null), digits)
 }
 
+/** The quantity the review shows a line at before any edit: the purchase its package makes (MOL-264). */
+const shownQuantity = (line: ReceiptReviewLine) => packedQuantity(line.quantity, line.pack ?? null)
+
 export function reviewLines(
   detail: ReceiptDetail,
   draft: ReceiptDraft | null,
@@ -117,7 +125,7 @@ export function reviewLines(
         // Figures typed are what was paid, and «≠» of the reading no longer describes the line; an
         // item chosen alone leaves the figures, and the sum, to the reading (review 28).
         mismatch: figures ? false : !line.settled && line.sum !== null,
-        quantity: figures ? figures.quantity : line.quantity,
+        quantity: figures ? figures.quantity : shownQuantity(line),
         amount: figures ? figures.amount : amount,
         skip: edit.skip,
         edited: true,
@@ -133,7 +141,7 @@ export function reviewLines(
           // (adversarial Б3)
           figures:
             figures !== undefined &&
-            (!sameQuantity(figures.quantity, line.quantity) ||
+            (!sameQuantity(figures.quantity, shownQuantity(line)) ||
               !sameMoney(figures.amount, line.amount)),
         },
       }
@@ -148,7 +156,7 @@ export function reviewLines(
       check: line.match === 'weak',
       repaired: line.repaired === true,
       mismatch: !line.settled && line.sum !== null,
-      quantity: line.quantity,
+      quantity: shownQuantity(line),
       amount,
       skip: false,
       edited: false,
