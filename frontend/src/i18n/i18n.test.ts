@@ -253,10 +253,10 @@ describe('словарь: повторяющиеся тексты', () => {
       'НБ Грузии': ['exchange.card_source_nbg', 'trip.rate.source_nbg'],
       'НБ Сербии': ['exchange.card_source_nbs', 'trip.rate.source_nbs'],
       'open.er-api.com': ['exchange.card_source_erapi', 'trip.rate.source_erapi'],
-      // Счета (MOL-123): экран и пункт страницы приватности о том же; плавающая «Счёт», заголовок
-      // её шторки в правке и строка выбора счёта в шторках операций.
+      // Счета (MOL-123): экран и пункт страницы приватности о том же; заголовок шторки счёта в правке
+      // и строка выбора счёта в шторках операций.
       Счета: ['accounts.title', 'privacy.stored.accounts.term'],
-      Счёт: ['accounts.picker.row_spending', 'accounts.screen.add', 'accounts.sheet.title_edit'],
+      Счёт: ['accounts.picker.row_spending', 'accounts.sheet.title_edit'],
       // Период графика курса (MOL-168): подпись сегмента и та же фраза в «Курс рубля за …»; у
       // месяца они расходятся регистром. Сам переключатель говорит словами «Графиков».
       '6 месяцев': ['exchange.rate_chart.period_in.6', 'exchange.rate_chart.period_option.6'],
@@ -296,13 +296,17 @@ describe('словарь: повторяющиеся тексты', () => {
         'transfer.wait_online_save',
       ],
       // Правка обмена и дохода без связи (MOL-189, Ф-6): те же слова неактивной кнопки, что у
-      // перевода и счёта, и одно «Вернём» у обеих полос «Вернуть».
+      // перевода и счёта, и одно «Вернём» у полос «Вернуть» — и у «Вернуть» «Счетов» (MOL-193).
       'Удалим, когда будет связь': [
         'exchange.sheet.remove_offline',
         'income.sheet.remove_offline',
         'transfer.remove_wait',
       ],
-      'Вернём, когда будет связь': ['exchange.restore_offline', 'income.restore_offline'],
+      'Вернём, когда будет связь': [
+        'accounts.screen.restore_wait',
+        'exchange.restore_offline',
+        'income.restore_offline',
+      ],
       // Кнопка в подвале правки и подтверждение над ней — одни слова (81 v2, кадр 3e): человек
       // видит, что подтверждает то, что нажал.
       'Удалить доход': ['income.remove_sheet.confirm', 'income.sheet.remove'],
@@ -413,7 +417,11 @@ describe('словарь: повторяющиеся тексты', () => {
         'trip.error.title',
       ],
       // MOL-189, as in Russian.
-      'Will bring back once online': ['exchange.restore_offline', 'income.restore_offline'],
+      'Will bring back once online': [
+        'accounts.screen.restore_wait',
+        'exchange.restore_offline',
+        'income.restore_offline',
+      ],
       'Will save once online': [
         'accounts.sheet.wait_online',
         'exchange.sheet.save_offline',
@@ -463,7 +471,6 @@ describe('словарь: повторяющиеся тексты', () => {
       // The settings group of one's Molvia account and a money account are one English word.
       Account: [
         'accounts.picker.row_spending',
-        'accounts.screen.add',
         'accounts.sheet.title_edit',
         'settings.group_account',
       ],
