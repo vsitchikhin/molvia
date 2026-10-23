@@ -58,16 +58,26 @@ const SIZE = new RegExp(
  */
 const TIMES_SIGN = String.raw`(?:(?<!\p{L})[xх×]\s*|\d\s*\p{L}*[xх×]\s*|\p{L}[xх×])`
 /**
- * A count of packs spelt in a container's word — «4 банки 0.5л», «3 уп. по 10шт», «25пак 2г», «Ջուր 4 շիշ, 1.5լ», «4
- * жестяные пивные банки 0.5л», «из 4-х банок», «6-pack», «четыре банки» — anywhere in the name (reviews 8–10, И2, Й2, К2,
- * К3, №15): packs unread, the line keeps no package. Only a container's word says so (Й1, №14): «7 злаков», «5 աստղ», «3
- * слоя», «4 Maxi», «3 в 1», «3 Корочки» are words of the name (К1), and so is one container, «1 бут.». **The prices,
- * named:** «Чай 25 пакетиков 50г», a container the list lacks with no «по» before the size, «Pampers 4 Giant Pack 76шт».
+ * A count of packs spelt in a container's word — «4 банки 0.5л», «3 уп. по 10шт», «2 кор. 200г», «25пак 2г», «Ջուր 4 շիշ,
+ * 1.5լ», «4 жестяные пивные банки 0.5л», «из 4-х банок», «из шести банок», «6-pack», «six-pack», «четыре банки» — anywhere
+ * in the name (reviews 8–11, И2, Й2, К2, К3, Л2, №15, №16): packs unread, the line keeps no package. Only a container's
+ * word says so (Й1, №14): «7 злаков», «5 աստղ», «3 слоя», «4 Maxi», «3 в 1», «3 Корочки» are words of the name (К1), and
+ * so are one container, «1 бут.», and the one a thing comes in, «12 лет в коробке» (Л1). **The prices, named:** «Чай 25
+ * пакетиков 50г», a container the list lacks with no «по» before the size, «Pampers 4 Giant Pack 76шт», «Балтика 7 бут.».
  */
-const COUNT = String.raw`(?:[2-9]|[1-9]\d+)(?:[-–‑]\p{L}{0,3})?|(?:два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|двенадцать|երկու|երեք|չորս|հինգ|վեց|ութ|տասը|dva|dve|tri|četiri|cetiri|šest|sest|osam|deset)(?=\s)`
-const CONTAINER = String.raw`бан(?!ан)|бут|уп|пач|короб|пак|ящ|стакан|лот(?:о?к)|жест|флакон|տուփ|շիշ|շշ|փաթ|տոպր|բանկա|արկղ|բաժակ|թիթեղ|limen|flaš|flas|boc|kut|kes|pak|pack|čaš|cas|tegl`
+const COUNT = [
+  String.raw`(?:[2-9]|[1-9]\d+)(?:[-–‑]\p{L}{0,3})?`,
+  String.raw`(?:дв(?:а|е|ух)|тр(?:и|[её]х)|четыр(?:е|[её]х)|пят[ьи]|шест[ьи]|сем[ьи]|восемь|восьми|девят[ьи]|десят[ьи]|двенадцат[ьи]|(?:пол)?дюжин\p{L}*)(?=[\s\-–‑])`,
+  String.raw`(?:two|three|four|six|eight|ten|twelve)(?=[\s\-–‑])`,
+  String.raw`(?:երկու|երեք|չորս|հինգ|վեց|ութ|տասը?)(?:ական)?(?=\s)`,
+  String.raw`(?:dva|dve|tri|četiri|cetiri|šest|sest|osam|deset)(?=[\s\-–‑])`,
+].join('|')
+// a word cut short is a container too, «2 кор. 200г», «3 лот. 10шт», never a word it only begins (№16)
+const CONTAINER = String.raw`бан(?!ан)|бут|уп|пач|короб|кор(?!\p{L})|пак|ящ|стак(?:ан|(?!\p{L}))|лот(?:о?к|(?!\p{L}))|жест|флакон|տուփ|շիշ|շշ|փաթ|տոպր|բանկա|արկղ|բաժ(?:ակ|(?!\p{L}))|թիթեղ|limen|flaš|flas|boc|kut|kes|pak|pack|čaš|cas|tegl`
+// «в коробке», «u kutiji», «in a box» — the one a thing comes in, never a count of them (Л1)
+const IN = String.raw`(?<!(?<!\p{L})(?:в|во|u|in)\s+)`
 const PACKED_IN = new RegExp(
-  String.raw`(?<![\p{L}\d.,])(?:${COUNT})(?:(?:\s+\p{L}+){0,2}\s+|\s*[-–‑]?\s*)(?:${CONTAINER})`,
+  String.raw`(?<![\p{L}\d.,])(?:${COUNT})(?:(?:\s+\p{L}+){0,2}\s+|\s*[-–‑]?\s*)${IN}(?:${CONTAINER})`,
   'iu',
 )
 // «по 125г», «PO 0,5L» — what each of several holds: the count before it unread (К2)

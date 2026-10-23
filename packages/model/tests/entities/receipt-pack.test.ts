@@ -374,8 +374,17 @@ describe('receiptPack — an Armenian till', () => {
     ['Пиво Heineken 6-pack 0.33л', 'AM'],
     ['PIVO 6-PAK 0.5L (Ђ)', 'RS'],
     ['Йогурт 4 чашки по 125г', 'AM'],
+    ['Конфеты 2 кор. 200г', 'AM'],
+    ['Яйцо 3 лот. 10шт', 'AM'],
+    ['Йогурт 4 стак. 125г', 'AM'],
+    ['Մածուն 4 բաժ. 125գ', 'AM'],
+    ['Пиво «Жигули» упаковка из шести банок 0.5л', 'AM'],
+    ['Вино «Арени» набор из двух бутылок 0.75л', 'AM'],
+    ['Пиво «Жигули» полдюжины банок 0.5л', 'AM'],
+    ['Пиво «Heineken» six-pack 0.33л', 'AM'],
+    ['Ջուր «Բջնի» վեցական շիշ 0.5լ', 'AM'],
   ] as const)(
-    'reads none of a count of containers anywhere: %s (reviews 8–10, И2, Й2, К2, К3, №15)',
+    'reads none of a count of containers anywhere: %s (reviews 8–11, И2, Й2, К2, К3, Л2, №15, №16)',
     (printed, country) => {
       expect(receiptPack(printed, country)).toBeNull()
     },
@@ -394,8 +403,11 @@ describe('receiptPack — an Armenian till', () => {
     ['Смузи 2 банана 0.5л', 'AM', l(500)],
     ['VODA PET BOCA 1.5L (Ђ)', 'RS', l(1500)],
     ['Сыр по-русски 300г', 'AM', kg(300)],
+    ['Виски «Johnnie Walker» 12 лет в коробке 0.7л', 'AM', l(700)],
+    ['Конфеты «Ассорти» 12 видов в коробке 200г', 'AM', kg(200)],
+    ['VINO 12 GODINA U KUTIJI 0,75L (Ђ)', 'RS', l(750)],
   ] as const)(
-    'reads a number of the name and a word that is no container as the name’s: %s (review 9, Й1, №14; review 10, К1)',
+    'reads a number of the name and a word that is no container as the name’s: %s (review 9, Й1, №14; review 10, К1; review 11, Л1)',
     (printed, country, pack) => {
       expect(receiptPack(printed, country)).toEqual(pack)
     },

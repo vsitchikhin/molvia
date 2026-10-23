@@ -1457,19 +1457,23 @@ a receipt read before the rollout and not yet recorded gets it too.
   (review №1). A fat, microns, milligrams, volts, metres, years («5տ», a vintage «2019г» — a whole number from 1900 to
   2099 before the Russian «г», in either case; an Armenian or a Latin gram is a package, «2000գ» of cat food — review 2, В4) are never a
   package; a figure with no unit — a size the till cut, «… 85» — is none.
-- **A count of containers anywhere in the name is packs unread** (reviews 8–10, И2, Й2, К2, К3, №15): «4 банки 0.5л»,
-  «3 уп. по 10шт», «4банки 0.5л», «4 жестяные пивные банки 0.5л», «упаковка из 4-х банок», «6-pack 0.33л», «четыре банки
-  0.5л», «4 банки «Жигули» 0.5л», «25пак 2г», «Ջուր 4 շիշ, 1.5լ», «PIVO 4 LIMENKE 0,5L» — a number of two or more, in
-  figures or in letters, up to two words or a hyphen, then a container's word (`PACKED_IN`: банка, бутылка, упаковка,
-  пачка, коробка, пакет, ящик, стакан, лоток, жестянка, флакон, տուփ, շիշ, շշիկ, փաթեթ, տոպրակ, բանկա, արկղ, բաժակ,
-  թիթեղ, limenka, flaša, boca, kutija, kesa, pak, pack, čaša, tegla): none. **«по» before a size or a count says what
-  each of several holds** (К2): «4 стаканчика по 125г», «2 лотка по 10шт», «SOK 4 KOM PO 0,2L» — none, whatever the
-  container is called. Any other word is the name's (review 9, Й1, №14; К1): «Балтика 7 Экспортное», «5 աստղ», «10 лет»,
-  «3 слоя», «Pampers 4 Maxi», «7 злаков», «3 в 1», «3 Корочки», «2 банана» keep their size or count; so does one
-  container, «1 бут.». The first try, any number and a word or two, took all of these for counts — the bench has none of
-  them, so it measured nothing. **The prices, named:** a word that starts like a container, «Чай 25 пакетиков 50г»,
-  «Ձու 10 հատ տուփ», «Pampers 4 Giant Pack 76шт», keeps none; a container the list lacks, with no «по», is read as one
-  of the pack — the list is the measure, and a new container on a receipt is a line in it.
+- **A count of containers anywhere in the name is packs unread** (reviews 8–11, И2, Й2, К2, К3, Л2, №15, №16): «4 банки
+  0.5л», «3 уп. по 10шт», «2 кор. 200г», «4банки 0.5л», «4 жестяные пивные банки 0.5л», «упаковка из 4-х банок», «из
+  шести банок», «полдюжины банок», «6-pack 0.33л», «six-pack», «четыре банки 0.5л», «4 банки «Жигули» 0.5л», «25пак 2г»,
+  «Ջուր 4 շիշ, 1.5լ», «վեցական շիշ», «PIVO 4 LIMENKE 0,5L» — a number of two or more, in figures or in letters (Russian
+  in any case, English, Armenian, Serbian), up to two words or a hyphen, then a container's word or its cut, «кор.»,
+  «лот.», «стак.», «բաժ.» (`PACKED_IN`: банка, бутылка, упаковка, пачка, коробка, пакет, ящик, стакан, лоток, жестянка,
+  флакон, տուփ, շիշ, շշիկ, փաթեթ, տոպրակ, բանկա, արկղ, բաժակ, թիթեղ, limenka, flaša, boca, kutija, kesa, pak, pack, čaša,
+  tegla): none. **«по» before a size or a count says what each of several holds** (К2): «4 стаканчика по 125г», «2 лотка
+  по 10шт», «SOK 4 KOM PO 0,2L» — none, whatever the container is called. Any other word is the name's (review 9, Й1,
+  №14; К1): «Балтика 7 Экспортное», «5 աստղ», «10 лет», «3 слоя», «Pampers 4 Maxi», «7 злаков», «3 в 1», «3 Корочки», «2
+  банана» keep their size or count; so do one container, «1 бут.», and the one a thing comes in, after «в», «u», «in» —
+  «12 лет в коробке 0.7л», «U KUTIJI» (Л1). The first try, any number and a word or two, took all of these for counts —
+  the bench has none of them, so it measured nothing. **The prices, named:** a word that starts like a container, «Чай
+  25 пакетиков 50г», «Ձու 10 հատ տուփ», «Pampers 4 Giant Pack 76шт», and a name's number beside its one container with
+  nothing between, «Балтика 7 бут. 0.47л», «Арарат 5 звезд бут.», «5 աստղ շիշ» — the same words as «4 бут. 0.5л» — keep
+  none; a container the list lacks, with no «по», is read as one of the pack — the list is the measure, and a new
+  container on a receipt is a line in it.
 - **What stands before a size may say it is none of its own** (review №2, adversarial А3, А4): a range, «9-14կգ» — a
   nappy for a child of that weight; a fraction, «1/2կգ», «1/2L» — its denominator; a sign of times whose count is a word,
   «25пак*2г», «25 փաթեթ x 2գր» — one sachet of a box, 25 times the price a kilogram. The line keeps no package. A sign of
