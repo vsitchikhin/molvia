@@ -130,6 +130,12 @@ export const receiptReviewLineCodec = z.strictObject({
    * `RECEIPT_SPELLED_HEADER` — an installed app of an earlier build reads a line strictly.
    */
   spelled: z.boolean().optional(),
+  /**
+   * What one piece of the till holds by the line's name (MOL-264): the purchase is the till's pieces times it,
+   * the till's own figures stay as printed. Sent only when there is one, and only to a phone that asked by
+   * `RECEIPT_PACK_HEADER` — an installed app of an earlier build reads a line strictly.
+   */
+  pack: quantityCodec.optional(),
   amount: moneyCodec.nullable(),
   rememberedPrice: moneyCodec.nullable(),
   /**
@@ -353,3 +359,6 @@ export const RECEIPT_CASHBACK_HEADER = 'X-Molvia-Receipt-Cashback'
 
 /** A phone that knows a line's `spelled` says so by this header (MOL-293), as `RECEIPT_CODES_HEADER`. */
 export const RECEIPT_SPELLED_HEADER = 'X-Molvia-Receipt-Spelled'
+
+/** A phone that knows a line's `pack` says so by this header (MOL-264), as `RECEIPT_CODES_HEADER`. */
+export const RECEIPT_PACK_HEADER = 'X-Molvia-Receipt-Pack'

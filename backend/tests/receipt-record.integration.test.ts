@@ -31,6 +31,7 @@ import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtur
 // The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 857 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
 // than any yet seen.
+// The 3 of MOL-264 took 1.2–1.5 s on a Mac under the lock: twenty times, as the reporter advises, is 30 s.
 
 /**
  * «Записать» (MOL-126): a parsed receipt written in one go as a finished trip on its own day, its
@@ -711,6 +712,132 @@ describe('«Записать»', () => {
       ['1110001', null],
       ['1110002', null],
     ])
+  })
+
+  describe('a line’s package from its name (MOL-264)', () => {
+    const PACKED: Line[] = [
+      { printed: 'Գազավորված ըմպելիք «Կոկա Կոլա» 1.5լ', sku: '1170010', price: 700, sum: 700 },
+      { printed: 'Կաթ «Իգիթ» 3.2% 1լ', sku: '1170011', qty: 2, price: 370, sum: 740 },
+      { printed: 'Հավկիթ «Ոսկեհավ» #0-1 10հտ', sku: '1170012', price: 850, sum: 850 },
+      { printed: 'Սերուցք «Իգիթ» 10%', sku: '1170013', price: 600, sum: 600 },
+    ]
+    const NAMES = ['Coca-Cola', 'Молоко «Игит» 3,2%', 'Яйца «Воскеат»', 'Сливки «Игит» 10%']
+    const line = (position: number, quantity: Record<string, string>, drams: number) => ({
+      position,
+      skip: false,
+      item: { name: NAMES[position] },
+      quantity,
+      amount: amount(drams),
+    })
+    const shown = [
+      line(0, { value: '1.5', unit: 'l' }, 700),
+      line(1, { value: '2', unit: 'l' }, 740),
+      line(2, pieces(10), 850),
+      line(3, pieces(1), 600),
+    ]
+
+    async function recorded(me: string, lines: readonly Record<string, unknown>[]) {
+      const place = await insertPlace(db)
+      const id = await parsedReceipt(me, PACKED)
+      const response = await record(me, id, {
+        tripId: randomUUID(),
+        place: { id: place },
+        purchasedOn: '2026-09-26',
+        lines,
+      })
+      expect(response.statusCode).toBe(200)
+      const bought = await db
+        .select({ name: items.name, milli: expenses.qtyMilli, unit: expenses.qtyUnit })
+        .from(expenses)
+        .innerJoin(items, eq(items.id, expenses.itemId))
+        .orderBy(asc(items.name))
+      const made = await db
+        .select({
+          name: items.name,
+          unit: items.defaultUnit,
+          typical: items.typicalQtyMilli,
+          typicalUnit: items.typicalQtyUnit,
+        })
+        .from(items)
+        .orderBy(asc(items.name))
+      const read = await db
+        .select({ position: receiptLines.position, asRead: receiptLines.asRead })
+        .from(receiptLines)
+        .where(eq(receiptLines.receiptId, id))
+        .orderBy(asc(receiptLines.position))
+      const words = await db
+        .select({ key: storeMemory.key, price: storeMemory.priceMinor })
+        .from(storeMemory)
+        .where(eq(storeMemory.kind, 'sku'))
+        .orderBy(asc(storeMemory.key))
+      const [days] = await db.select().from(receiptDays)
+      return { bought, made, read, words, days }
+    }
+
+    it('records the purchase as the review showed it — the pieces times the package — and as read', async () => {
+      const me = await insertActor(db)
+      const { bought, made, read, words, days } = await recorded(me, shown)
+      expect(bought).toEqual([
+        { name: 'Coca-Cola', milli: 1_500n, unit: 'l' },
+        { name: 'Молоко «Игит» 3,2%', milli: 2_000n, unit: 'l' },
+        { name: 'Сливки «Игит» 10%', milli: 1_000n, unit: 'piece' },
+        { name: 'Яйца «Воскеат»', milli: 10_000n, unit: 'piece' },
+      ])
+      // a new item is offered one package the next time — the milk one litre, not the two bought
+      expect(made).toEqual([
+        { name: 'Coca-Cola', unit: 'l', typical: 1_500n, typicalUnit: 'l' },
+        { name: 'Молоко «Игит» 3,2%', unit: 'l', typical: 1_000n, typicalUnit: 'l' },
+        { name: 'Сливки «Игит» 10%', unit: 'piece', typical: null, typicalUnit: null },
+        { name: 'Яйца «Воскеат»', unit: 'piece', typical: 10_000n, typicalUnit: 'piece' },
+      ])
+      // the till's figures are what the memory keeps: the shelf price of a piece, the line as read
+      expect(read.map((row) => row.asRead)).toEqual([true, true, true, true])
+      expect(words.map((word) => [word.key, word.price])).toEqual([
+        ['1170010', 70_000n],
+        ['1170011', 37_000n],
+        ['1170012', 85_000n],
+        ['1170013', 60_000n],
+      ])
+      // and the measure of 0.2 counts no line put right (a phone sending no `edited`: the server judges)
+      expect(days).toMatchObject({ lines: 4, linesEdited: 0, linesFigures: 0 })
+    }, 30_000)
+
+    it('records an earlier build’s pieces as it sends them, no edit either (Р-10)', async () => {
+      const me = await insertActor(db)
+      const { bought, made, read, days } = await recorded(me, [
+        line(0, pieces(1), 700),
+        line(1, pieces(2), 740),
+        line(2, pieces(1), 850),
+        line(3, pieces(1), 600),
+      ])
+      expect(bought.map((row) => [row.milli, row.unit])).toEqual([
+        [1_000n, 'piece'],
+        [2_000n, 'piece'],
+        [1_000n, 'piece'],
+        [1_000n, 'piece'],
+      ])
+      // a package of another unit than what was recorded says nothing of the item
+      expect(made.map((row) => [row.unit, row.typical])).toEqual([
+        ['piece', null],
+        ['piece', null],
+        ['piece', null],
+        ['piece', 10_000n],
+      ])
+      expect(read.map((row) => row.asRead)).toEqual([true, true, true, true])
+      expect(days).toMatchObject({ lines: 4, linesEdited: 0, linesFigures: 0 })
+    }, 30_000)
+
+    it('counts another quantity as figures put right, never as read', async () => {
+      const me = await insertActor(db)
+      const { bought, read, words, days } = await recorded(me, [
+        line(0, { value: '1', unit: 'l' }, 700),
+        ...shown.slice(1),
+      ])
+      expect(bought[0]).toEqual({ name: 'Coca-Cola', milli: 1_000n, unit: 'l' })
+      expect(read.map((row) => row.asRead)).toEqual([false, true, true, true])
+      expect(words[0]).toEqual({ key: '1170010', price: null })
+      expect(days).toMatchObject({ lines: 4, linesEdited: 1, linesFigures: 1 })
+    }, 30_000)
   })
 
   it('confirms no row of a line whose price the check took off as misread (MOL-255)', async () => {

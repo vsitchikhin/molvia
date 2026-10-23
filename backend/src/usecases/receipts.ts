@@ -8,6 +8,7 @@ import {
   AGGREGATE_MIN_CONTRIBUTIONS,
   barcodeTwins,
   hasSharedAccess,
+  linePack,
   linesTotalOf,
   placeNameIdentity,
   priceInDoubt,
@@ -249,6 +250,8 @@ export async function receiptOfOwner(
   repaired = false,
   /** The phone knows a line's `spelled` (`RECEIPT_SPELLED_HEADER`, MOL-293). */
   spelled = false,
+  /** The phone knows a line's `pack` (`RECEIPT_PACK_HEADER`, MOL-264). */
+  pack = false,
 ): Promise<ReceiptDetail> {
   const found = await repositories.receipts.one(actor.id, id)
   if (found === null) throw new DomainError(ERROR.NOT_FOUND)
@@ -323,6 +326,7 @@ export async function receiptOfOwner(
       const itemId = itemIds[i] ?? null
       const known = itemId === null ? null : (names.get(itemId) ?? null)
       const code = asked[i] ?? null
+      const packed = pack ? linePack(line, receipt.country) : null
       return {
         printed: line.printed,
         hs: line.hs,
@@ -348,6 +352,7 @@ export async function receiptOfOwner(
         translation: line.translation,
         // a proposal only while the line is still a new item: the memory may have named it since
         ...(spelled && line.spelled && known === null ? { spelled: true } : {}),
+        ...(packed === null ? {} : { pack: packed }),
         amount: amounts[i] ?? null,
         // one confused digit off the price read (В-1); or the line has none — the check emptied it, the memory
         // doubting it among others (MOL-291, owner's В-2 «б»): a hint to type by, never a figure of the line

@@ -102,6 +102,17 @@ export function receiptPack(printed: string, country: ReceiptCountry): Quantity 
 }
 
 /**
+ * The package of a line the till sold in pieces — the one a purchase is made of; none for a line weighed, poured, or
+ * with no count read (MOL-255: the check emptied it, and a package of nobody knows how many is a guess).
+ */
+export function linePack(
+  line: { readonly printed: string; readonly quantity: Quantity | null },
+  country: ReceiptCountry,
+): Quantity | null {
+  return line.quantity?.unit === 'piece' ? receiptPack(line.printed, country) : null
+}
+
+/**
  * What a line is recorded at: the till's count of pieces times the package one holds; a line the till weighed, a
  * line with no package and a line with no count stay as they are.
  */
