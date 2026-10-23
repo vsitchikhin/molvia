@@ -367,7 +367,7 @@ test.describe('«Тут дешевле»', () => {
    * by time like a rise held by it — two frames, the way spread over the hold — and only their count
    * tells them apart; with one frame dropped right on it, a jump is at the threshold of half the way,
    * and the stamps decide which side (adversarial Б1). Its price: a runner busy over ~110 ms of the
-   * 220 ms rise fails it.
+   * 220 ms rise fails it — over ~80 ms beyond the 60 of `busy`, in the test of the dropped frame.
    */
   async function priceFieldMoves(page: Page, act: () => Promise<void>, busy = 0) {
     await page.evaluate((busy) => {
@@ -455,8 +455,9 @@ test.describe('«Тут дешевле»', () => {
     expect(motion.widest).toBeGreaterThan(motion.moved / 2)
     expect(motion.largest).toBeLessThan(motion.moved / 2)
     // Not a jump either: one with a frame dropped right on it is half the way over two frames' time,
-    // and the frames' stamps, a tenth of a millisecond coarse, put it a hair under (adversarial Б1).
-    expect(motion.moving).toBeGreaterThan(1)
+    // and the frames' stamps, a tenth of a millisecond coarse, put it a hair under (adversarial Б1);
+    // with a pixel drawn before it, the hold takes the rest — two steps (В1). The rise held is 7–8.
+    expect(motion.moving).toBeGreaterThan(3)
   })
 
   test('says something else over frames too: one line to two (adversarial Е′)', async ({
