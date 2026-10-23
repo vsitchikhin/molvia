@@ -636,6 +636,17 @@ describe('AdviceView', () => {
       ).toBe(false)
     })
 
+    it('the cycle is the kit`s rows: two lead on with a chevron, the last has none (MOL-203)', async () => {
+      advice.mockResolvedValue(answer([]))
+      const { view } = await render()
+      const rows = view.get('ol').findAllComponents({ name: 'ListRow' })
+
+      expect(rows.map((row) => row.element.tagName)).toEqual(['BUTTON', 'BUTTON', 'DIV'])
+      expect(rows.map((row) => row.find('.chevron').exists())).toEqual([true, true, false])
+      // A step is an explanation: its title wraps rather than ending in «…» on a narrow phone.
+      expect(rows.every((row) => row.classes('wrap'))).toBe(true)
+    })
+
     it('purchases waiting for a verdict: «Now rate them», and the card leads to «Оценки»', async () => {
       advice.mockResolvedValue(answer([]))
       pendingVerdicts.mockResolvedValue({
@@ -653,7 +664,12 @@ describe('AdviceView', () => {
 
       expect(view.text()).toContain(en.advice.home.pending.title)
       expect(view.text()).not.toContain(en.advice.home.new_capture.title)
-      await view.get('.pending .purchase-row').trigger('click')
+      // The kit's row: the star is a status in the muted ink, the chevron says it opens (Ф-4).
+      const row = view.get('.pending .list-row')
+      expect(row.find('.chevron').exists()).toBe(true)
+      expect(row.find('.accent').exists()).toBe(false)
+      expect(row.text()).toContain('Рынок')
+      await row.trigger('click')
       await flushPromises()
       expect(router.currentRoute.value.name).toBe('verdicts')
     })

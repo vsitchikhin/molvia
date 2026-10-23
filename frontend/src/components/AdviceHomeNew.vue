@@ -21,15 +21,17 @@
       </AppCard>
     </AppReveal>
 
-    <!-- (в): purchases recorded and none rated — the one thing left to do, and where. -->
+    <!-- (в): purchases recorded and none rated — the one thing left to do, and where. The star is a
+         status, not a button (Ф-4): the chevron says the row opens. -->
     <AppReveal>
       <AppCard v-if="pending > 0" class="pending" list>
-        <PurchaseRow
+        <ListRow
           :icon="IconStar"
-          accent
           :title="t('verdict.pending_count', { n: pending }, pending)"
-          :meta="pendingFrom"
-          @open="goTab('verdicts')"
+          :meta="pendingFrom ?? ''"
+          wrap
+          next
+          @click="goTab('verdicts')"
         />
       </AppCard>
     </AppReveal>
@@ -39,43 +41,45 @@
          to another tab are buttons; the last is this screen, and nothing to tap. -->
     <AppCard as="ol" list>
       <li>
-        <button class="line link" type="button" @click="goTab('purchases')">
-          <IconCart class="icon" aria-hidden="true" />
-          <span class="text">
-            <span class="title">{{
-              t(
-                country
-                  ? 'advice.home.step_purchases_capture_title'
-                  : 'advice.home.step_purchases_title',
-              )
-            }}</span>
-            <span class="sub">{{
-              t(
-                country
-                  ? 'advice.home.step_purchases_capture_body'
-                  : 'advice.home.step_purchases_body',
-              )
-            }}</span>
-          </span>
-          <IconChevronRight class="chevron" aria-hidden="true" />
-        </button>
+        <ListRow
+          :icon="IconCart"
+          :title="
+            t(
+              country
+                ? 'advice.home.step_purchases_capture_title'
+                : 'advice.home.step_purchases_title',
+            )
+          "
+          :meta="
+            t(
+              country
+                ? 'advice.home.step_purchases_capture_body'
+                : 'advice.home.step_purchases_body',
+            )
+          "
+          wrap
+          next
+          @click="goTab('purchases')"
+        />
       </li>
       <li>
-        <button class="line link" type="button" @click="goTab('verdicts')">
-          <IconStar class="icon" aria-hidden="true" />
-          <span class="text">
-            <span class="title">{{ t('advice.home.step_verdicts_title') }}</span>
-            <span class="sub">{{ t('advice.home.step_verdicts_body') }}</span>
-          </span>
-          <IconChevronRight class="chevron" aria-hidden="true" />
-        </button>
+        <ListRow
+          :icon="IconStar"
+          :title="t('advice.home.step_verdicts_title')"
+          :meta="t('advice.home.step_verdicts_body')"
+          wrap
+          next
+          @click="goTab('verdicts')"
+        />
       </li>
-      <li class="line">
-        <IconLightbulb class="icon" aria-hidden="true" />
-        <span class="text">
-          <span class="title">{{ t('advice.home.step_advice_title') }}</span>
-          <span class="sub">{{ t('advice.home.step_advice_body') }}</span>
-        </span>
+      <li>
+        <ListRow
+          as="div"
+          :icon="IconLightbulb"
+          :title="t('advice.home.step_advice_title')"
+          :meta="t('advice.home.step_advice_body')"
+          wrap
+        />
       </li>
     </AppCard>
 
@@ -94,13 +98,13 @@
 import { computed, defineComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconCart from '~icons/mdi/cart-outline'
-import IconChevronRight from '~icons/mdi/chevron-right'
 import IconLightbulb from '~icons/mdi/lightbulb-on-outline'
 import IconStar from '~icons/mdi/star-outline'
 import IconSync from '~icons/mdi/sync'
 import IconCloudUpload from '~icons/mdi/cloud-upload-outline'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
+import ListRow from '@/components/ListRow.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
 import PurchaseRow from '@/components/PurchaseRow.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
@@ -121,6 +125,9 @@ import { useNavigation } from '@/navigation'
  * stands in the strip, «Записать вручную» is a row under the cycle. Without (Д-3): (а) «Запишите
  * первые покупки» or (в), and «Записать покупки» in the strip.
  *
+ * Every row is the kit's `ListRow` (MOL-203, Ф-12), its title wrapping: a step cut to «…» explains
+ * nothing. Its icon is muted — a status, never the accent of a button (Ф-4).
+ *
  * Only the person's own data: other people's figures are behind access (MOL-31).
  */
 export default defineComponent({
@@ -128,10 +135,7 @@ export default defineComponent({
   components: {
     AppCard,
     AppReveal,
-    IconCart,
-    IconChevronRight,
-    IconLightbulb,
-    IconStar,
+    ListRow,
     ManualEntryButton,
     PurchaseRow,
     ScreenSkeleton,
@@ -176,6 +180,8 @@ export default defineComponent({
     }))
     return {
       t,
+      IconCart,
+      IconLightbulb,
       IconStar,
       IconSync,
       IconCloudUpload,
@@ -225,76 +231,11 @@ export default defineComponent({
 }
 
 .pending {
-  margin-top: var(--space-4);
+  margin-top: var(--space-6);
 }
 
 .caption {
   margin-top: var(--space-6);
-}
-
-.line {
-  display: flex;
-  gap: var(--space-3);
-  align-items: center;
-  width: 100%;
-  min-height: calc(var(--touch-target-lg) + var(--space-3));
-  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
-  color: var(--text);
-  background: var(--surface);
-  text-align: left;
-  font: inherit;
-}
-
-/* At no weight, so the rule between rows stays `AppCard list`'s. */
-:where(.line) {
-  border: 0;
-}
-
-.link {
-  cursor: pointer;
-
-  &:hover {
-    background: var(--surface-2);
-  }
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-}
-
-.icon {
-  @include icon;
-
-  font-size: var(--icon-md);
-  color: var(--text-muted);
-}
-
-.text {
-  flex: 1;
-  min-width: 0;
-}
-
-.title,
-.sub {
-  display: block;
-  overflow-wrap: anywhere;
-}
-
-.title {
-  font-size: var(--text-headline);
-  font-weight: var(--weight-medium);
-}
-
-.sub {
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
-.chevron {
-  @include icon;
-
-  font-size: var(--icon);
-  color: var(--text-muted);
 }
 
 .by-hand {
@@ -309,7 +250,7 @@ export default defineComponent({
 }
 
 .trust {
-  margin: var(--space-4) var(--space-1) 0;
+  margin: var(--space-6) var(--space-1) 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
 }
