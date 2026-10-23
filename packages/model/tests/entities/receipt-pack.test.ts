@@ -161,6 +161,43 @@ describe('receiptPack — an Armenian till', () => {
     expect(receiptPack('Դեզոդորանտ «Nivea» Men 48h', 'AM')).toEqual(pieces(48))
   })
 
+  it('reads a Latin «H» as an «h»: hours in capitals beside a size are no pack (review 2, №6, В3)', () => {
+    expect(receiptPack('Դեզոդորանտ «Rexona» Men Invisible 48H 150մլ', 'AM')).toBeNull()
+    expect(receiptPack('Տոպրակ աղբի 20լ 30H', 'AM')).toBeNull()
+    expect(receiptPack('Թուղթ զուգարանի Neva 12H 32', 'AM')).toEqual(pieces(12))
+  })
+
+  it('reads none of a count of pieces with a sign of times before it (review 2, №7)', () => {
+    expect(receiptPack('Ձու 2x10հտ', 'AM')).toBeNull()
+    expect(receiptPack('Անձեռոցիկ 3 x 100հ', 'AM')).toBeNull()
+    expect(receiptPack('Ձու 10հտ x 2', 'AM')).toEqual(pieces(20))
+    // a range before a count is no sign of times: the model's «1.5/4hտ» of a battery is four
+    expect(receiptPack('Մարտոց «Էվրոլի» Սուլեր ԱՄ 1.5/4hտ', 'AM')).toEqual(pieces(4))
+  })
+
+  it.each([
+    ['Թեյ 25հտ x 2գ', 25],
+    ['Կոնֆետ 20հտ x 15գ', 20],
+    ['Сет Ронин 32шт x 30г', 32],
+    ['Անձեռոցիկ 100հ x 2շերտ', 100],
+  ])('multiplies a count only by a bare number after it: %s (review 2, В1)', (printed, count) => {
+    expect(receiptPack(printed, 'AM')).toEqual(pieces(count))
+  })
+
+  it.each([['Чай 25пакх2г'], ['Թեյ 25փթx2գ'], ['Թեյ 25փաթեթx2գր']])(
+    'reads none where a sign of times glued to a word and the figure cuts the count: %s (review 2, В2)',
+    (printed) => {
+      expect(receiptPack(printed, 'AM')).toBeNull()
+    },
+  )
+
+  it('reads a year only before the Russian «г»: an Armenian or a Latin gram is a package (review 2, В4)', () => {
+    expect(receiptPack('Կեր կատվի «Whiskas» 2000գ', 'AM')).toEqual(kg(2000))
+    expect(receiptPack('Լվացքի փոշի «Ariel» 1950գ', 'AM')).toEqual(kg(1950))
+    expect(receiptPack('Կերակրի աղ 2000գր', 'AM')).toEqual(kg(2000))
+    expect(receiptPack('Գինի «Արենի» 2019г', 'AM')).toBeNull()
+  })
+
   it('reads none of a thousandth of a gram', () => {
     expect(receiptPack('Դեղ 0.5գր', 'AM')).toBeNull()
   })

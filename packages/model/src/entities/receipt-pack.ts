@@ -46,18 +46,25 @@ const SIZE = new RegExp(
  * What before a figure says it is no package of its own: a range, «9-14կգ» — a nappy for a child of that weight; a
  * fraction, «1/2կգ» — its denominator is no size; a multiplier whose count is a word, «25пак*2г», «25 փաթեթ x 2գր» —
  * one sachet of a box (review №2, adversarial А3, А4). The line keeps no package: half of it read is a guess. A sign of
- * times stands apart, never as the last letter of a word, «Elixir mix 0.33l»; a star after a figure and a space is a
- * cognac's stars, «3* 0.5լ», and glued to both, «25*2գ», a count's sign.
+ * times stands apart, never as the last letter of a word, «Elixir mix 0.33l» — or glued to a word and the figure both,
+ * «25пакх2г», «25փթx2գ» (review 2, В2); a star after a figure and a space is a cognac's stars, «3* 0.5լ», and glued to
+ * both, «25*2գ», a count's sign.
  */
-const CUT_BEFORE = /(?:\d\s*[-–/]\s*|(?<!\p{L})[xх×]\s*|(?<!\d)\*\s*|\d\*)$/u
-// a vintage, never a package: a whole number of grams from 1900 to 2099 (adversarial А5)
+const CUT_BEFORE = /(?:\d\s*[-–/]\s*|(?<!\p{L})[xх×]\s*|\p{L}[xх×]|(?<!\d)\*\s*|\d\*)$/u
+// a count of pieces with a sign of times before it is a count of packs unread, «2x10հտ» (review 2, №7)
+const TIMES_END = /(?:[xх×]|\*)\s*$/u
+/**
+ * A vintage, never a package: a whole number from 1900 to 2099 before the Russian «г» of a year (adversarial А5) — never
+ * an Armenian or a Latin gram, «2000գ» of cat food (review 2, В4).
+ */
 const YEAR = /^(?:19|20)\d\d$/u
 /**
  * A pack of pieces, «10հտ», «5հատ», «12հ», «1զույգ», «32шт»; the model copies «հ» as a Latin «h» («75h», «4hտ», MOL-264
- * bench) and «հատ» as «հաբ». Two pieces at least: «1 հատ» is the till's own count as often as a pack.
+ * bench) and «հատ» as «հաբ». Two pieces at least: «1 հատ» is the till's own count as often as a pack. «× N» after it
+ * multiplies only a bare number: «25հտ x 2գ» is 25 sachets of 2 g, «100հ x 2շերտ» two-ply (review 2, В1).
  */
 const ARMENIAN_PIECES =
-  /(?<![\d.,])(\d+)\s*(հատ|հտ|հաբ|հ|hտ|h|զույգ|шт)(?![ա-ֆԱ-Ֆа-яёА-ЯЁA-Za-z])(?:\s*[xх×*]\s*(\d+)(?![\d.,]))?/giu
+  /(?<![\d.,])(\d+)\s*(հատ|հտ|հաբ|հ|hտ|h|զույգ|шт)(?![ա-ֆԱ-Ֆа-яёА-ЯЁA-Za-z])(?:\s*[xх×*]\s*(\d+)(?![\d.,\p{L}]))?/giu
 /**
  * A Latin «h» is the model's copy of «հ» — and a label's hours too, «Rexona 48h 150մլ» (adversarial А1, review №3):
  * beside a size it is no pack of pieces, and nothing tells which, so the line keeps no package. Alone it is the pack the
@@ -85,8 +92,7 @@ function sizeOf(match: RegExpExecArray, printed: string, photo: boolean): Quanti
   if (gap !== '' && (photo || /[ա-ֆ]/u.test(unit ?? ''))) return null
   if (photo && `${before ?? ''}${figure ?? ''}${after ?? ''}`.includes(DOUBTED)) return null
   if (CUT_BEFORE.test(printed.slice(0, match.index))) return null
-  if (before === undefined && YEAR.test(figure ?? '') && /^(?:գր|գ|гр|г|gr|g)$/iu.test(unit ?? ''))
-    return null
+  if (before === undefined && YEAR.test(figure ?? '') && unit === 'г') return null
   const [base, factor] = SIZE_UNITS[(unit ?? '').toLowerCase()] ?? []
   const scaled = scaledFromDecimal(figure ?? '', 3)
   if (base === undefined || factor === undefined || scaled === null) return null
@@ -120,11 +126,15 @@ export function receiptPack(printed: string, country: ReceiptCountry): Quantity 
       count: BigInt(match[1] ?? 0) * BigInt(match[3] ?? 1),
       // the count of a pack is the font's 6 as a size is (adversarial А2, review №4)
       doubted: photo && `${match[1] ?? ''}${match[3] ?? ''}`.includes(DOUBTED),
-      latin: (match[2] ?? '').startsWith(LATIN_PIECES),
+      // in either case: «REXONA 48H 150ML» (review 2, №6, В3)
+      latin: (match[2] ?? '').toLowerCase().startsWith(LATIN_PIECES),
+      cut: TIMES_END.test(printed.slice(0, match.index)),
     }))
     .filter((pack) => pack.count >= 2n && pack.count * 1000n <= INT8_MAX)
   if (packs.length > 0) {
-    if (packs.some((pack) => pack.doubted || (pack.latin && found.length > 0))) return null
+    if (packs.some((pack) => pack.doubted || pack.cut || (pack.latin && found.length > 0))) {
+      return null
+    }
     return one(packs.map((pack): Quantity => ({ milli: pack.count * 1000n, unit: 'piece' })))
   }
   const sizes = found.map((match) => sizeOf(match, printed, photo))

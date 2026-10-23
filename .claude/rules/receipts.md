@@ -1445,20 +1445,24 @@ a receipt read before the rollout and not yet recorded gets it too.
 
 - **Sizes**: a figure and `կգ`, `գր`, `գ`, `լ`, `մլ` — or `кг`, `гр`, `г`, `л`, `мл`, `kg`, `g`, `gr`, `l`, `ml` — the unit
   ending its word; a tolerance is no part of it («470գր±3%»); «N×» before or «×N», «*N» after multiplies («6х200մլ» 1,2 l,
-  «15գ*8» 120 g) — a pack of pieces too («4հ x 2», eight rolls). A star before a size is no count: «Արարատ 3* 0.5լ» is a
-  cognac's stars (review №1). A fat, microns, milligrams, volts, metres, years («5տ», a vintage «2019г» — a whole number
-  of grams from 1900 to 2099) are never a package; a figure with no unit — a size the till cut, «… 85» — is none.
+  «15գ*8» 120 g) — a pack of pieces too, by a bare number only («4հ x 2», eight rolls; «25հտ x 2գ» is 25 sachets of 2 g,
+  «100հ x 2շերտ» two-ply — review 2, В1). A star before a size is no count: «Արարատ 3* 0.5լ» is a cognac's stars
+  (review №1). A fat, microns, milligrams, volts, metres, years («5տ», a vintage «2019г» — a whole number from 1900 to
+  2099 before the Russian «г»; an Armenian or a Latin gram is a package, «2000գ» of cat food — review 2, В4) are never a
+  package; a figure with no unit — a size the till cut, «… 85» — is none.
 - **What stands before a size may say it is none of its own** (review №2, adversarial А3, А4): a range, «9-14կգ» — a
   nappy for a child of that weight; a fraction, «1/2կգ», «1/2L» — its denominator; a sign of times whose count is a word,
   «25пак*2г», «25 փաթեթ x 2գր» — one sachet of a box, 25 times the price a kilogram. The line keeps no package. A sign of
-  times is one only standing apart — «Elixir mix 0.33l» is a drink. **The price, named:** «1/1L» is none too.
+  times is one standing apart — «Elixir mix 0.33l» is a drink — or glued to a word and the figure both, «25пакх2г»
+  (review 2, В2). A count of pieces with a sign of times before it, «2x10հտ», is a count of packs unread: none (review 2,
+  №7). **The price, named:** «1/1L» is none too.
 - **A pack of pieces wins over what one holds** (Р-3, owner's В-1 «а» — every kind of goods, not food alone): «Աղբի
   պարկեր 35լ 30հտ» is thirty bags, never 35 l. Two at least: «1 հտ» is the till's own count as often as a pack. A Serbian
   pack is «107KOM» glued or «10/1»; a «KOM» apart is the journal's unit of sale.
 - **A thickness printed says the thing is packaging** (Р-11): «… 60միկրոն», «KESA VJZ 7KG 51 MIKRON» — its kilograms
   are what it carries. None.
 - **Two sizes that disagree are none** (Р-4); a pack of pieces with two counts too.
-- **A Latin «h» beside a size is no pack** (adversarial А1, review №3): it is the model's copy of «հ» — «Անձեռոցիկ 75h»,
+- **A Latin «h», in either case, beside a size is no pack** (adversarial А1, review №3; «48H» — review 2, №6, В3): it is the model's copy of «հ» — «Անձեռոցիկ 75h»,
   «Տոպրակ աղբի 20լ 30h» — and a label's hours too, «Rexona 48h 150մլ», 48 pieces of a deodorant. Nothing tells which,
   so beside a size the line keeps no package — the garbage bags of the model's copy are pieces again, never their 20 l.
   Dropped altogether, the bench lost 8 and 14 packages and made the bags' litres up. **The price, named:** hours with no
