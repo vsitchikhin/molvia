@@ -9,14 +9,18 @@
     </div>
     <ScreenSkeleton v-else-if="asking" :groups="[70]" />
 
-    <!-- (б): the first receipt is being read (MOL-127) — its row, which leads to «Покупки». -->
+    <!-- (б): the first receipt is being read (MOL-127) — its row, which leads to «Покупки», and
+         breathes as it does there (2c). -->
     <AppReveal>
       <AppCard v-if="variant === 'parsing' && reading" class="pending" list>
-        <PurchaseRow
+        <ListRow
+          :class="{ breathing }"
           :icon="underWay?.state === 'parsing' ? IconSync : IconCloudUpload"
           :title="t('purchases.group_working')"
-          :meta="underWayMeta"
-          @open="goTab('purchases')"
+          :meta="underWayMeta ?? ''"
+          wrap
+          next
+          @click="goTab('purchases')"
         />
       </AppCard>
     </AppReveal>
@@ -105,7 +109,6 @@ import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import ListRow from '@/components/ListRow.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
-import PurchaseRow from '@/components/PurchaseRow.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import { usePendingFrom } from '@/composables/usePendingFrom'
@@ -136,7 +139,6 @@ export default defineComponent({
     AppReveal,
     ListRow,
     ManualEntryButton,
-    PurchaseRow,
     ScreenSkeleton,
     SectionCaption,
   },
@@ -158,6 +160,8 @@ export default defineComponent({
         : (receipts.rows.value.find((row) => UNDER_WAY.includes(row.state)) ?? null),
     )
     const reading = computed(() => underWay.value !== null)
+    // As on «Покупки»: with no connection nothing is being read, and nothing breathes.
+    const breathing = computed(() => underWay.value?.state === 'parsing' && receipts.online.value)
     const underWayMeta = computed(() => {
       const row = underWay.value
       if (!row) return null
@@ -189,6 +193,7 @@ export default defineComponent({
       pending,
       country,
       reading,
+      breathing,
       INTRO,
       variant: computed<'pending' | 'parsing' | 'new' | 'unknown'>(() => {
         if (pending.value > 0) return 'pending'
@@ -235,6 +240,10 @@ export default defineComponent({
 
 .caption {
   margin-top: var(--space-6);
+}
+
+.breathing :deep(.icon) {
+  @include work-breath;
 }
 
 .by-hand {

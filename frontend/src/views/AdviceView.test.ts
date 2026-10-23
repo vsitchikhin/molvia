@@ -12,6 +12,7 @@ import type {
   AdviceSearchResponse,
   PendingVerdicts,
   Rating,
+  ReceiptsResponse,
   VerdictAmendment,
   VerdictCard,
 } from '@molvia/model'
@@ -33,9 +34,11 @@ const amendVerdict = vi.fn<(itemId: string, patch: VerdictAmendment) => Promise<
 const withdrawVerdict = vi.fn<(itemId: string) => Promise<void>>()
 const rateItem =
   vi.fn<(itemId: string, rating: Rating) => Promise<{ verdict: VerdictCard; created: boolean }>>()
+/** What the server holds of the person's receipts; none unless a test says so. */
+let held: ReceiptsResponse['receipts'] = []
 vi.mock('@/api', () => ({
   api: {
-    receipts: () => Promise.resolve({ receipts: [] }),
+    receipts: () => Promise.resolve({ receipts: held }),
     advice: () => advice(),
     adviceSearch: (query: string) => adviceSearch(query),
     pendingVerdicts: () => pendingVerdicts(),
@@ -516,6 +519,7 @@ describe('AdviceView', () => {
     adviceSearch.mockReset()
     pendingVerdicts.mockReset()
     pendingVerdicts.mockResolvedValue({ items: [], total: 0 })
+    held = []
     vi.restoreAllMocks()
     online(true)
   })
@@ -666,10 +670,47 @@ describe('AdviceView', () => {
       expect(view.text()).not.toContain(en.advice.home.manual_body)
     })
 
+    it('the first receipt being read is a row of the kit that breathes and leads to «Покупки» (2c)', async () => {
+      held = [
+        {
+          id: 'cccccccc-0000-4000-8000-000000000003',
+          status: 'reading',
+          failure: null,
+          parts: 1,
+          received: 1,
+          capturedAt: new Date(),
+          country: 'AM',
+          language: 'en',
+          header: null,
+          total: null,
+          balanced: false,
+          lineCount: 0,
+          unsettled: 0,
+          place: null,
+          tripId: null,
+        },
+      ]
+      advice.mockResolvedValue(answer([]))
+      const { view, router } = await render()
+      const row = view.get('.pending .list-row')
+
+      expect(view.text()).toContain(en.advice.home.parsing.title)
+      expect(row.text()).toContain(en.purchases.group_working)
+      expect(row.find('.chevron').exists()).toBe(true)
+      // Being read, as on «Покупки»: no percent, no timer — the icon breathes.
+      expect(row.classes()).toContain('breathing')
+
+      await row.trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.name).toBe('purchases')
+    })
+
     it('the cycle is the kit`s rows: two lead on with a chevron, the last has none (MOL-203)', async () => {
       advice.mockResolvedValue(answer([]))
       const { view } = await render()
-      const rows = view.get('ol').findAllComponents({ name: 'ListRow' })
+      const rows = view
+        .findAllComponents({ name: 'ListRow' })
+        .filter((row) => row.element.closest('ol') !== null)
 
       expect(rows.map((row) => row.element.tagName)).toEqual(['BUTTON', 'BUTTON', 'DIV'])
       expect(rows.map((row) => row.find('.chevron').exists())).toEqual([true, true, false])

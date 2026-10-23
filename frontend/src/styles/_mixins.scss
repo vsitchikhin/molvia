@@ -59,6 +59,18 @@ $row-narrow: 22rem;
   }
 }
 
+/// The icon of a work under way «breathes» (handoff 03, 2c): a receipt being read, with no percent and no
+/// timer — work that takes a while. Down to 0.35 and back (`@keyframes work-breath`, main.scss), on the
+/// compositor; still under «reduce motion». One look for the row of «Покупки» and of the newcomer's «Что
+/// брать» (MOL-203), which draw the same receipt.
+@mixin work-breath {
+  animation: work-breath 1.6s ease-in-out infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 /// The target device is a phone; anything wider is the exception, so it is opt-in.
 @mixin wider-than-phone {
   @media (width >= 40rem) {
