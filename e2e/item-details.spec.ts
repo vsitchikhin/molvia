@@ -345,37 +345,34 @@ test.describe('«Тут дешевле»', () => {
     await expect(line).toContainText('rated 5.0')
   })
 
-  /**
-   * How long the page is held busy on the way up: two frames dropped, so the steep part of the rise
-   * falls into one step whatever frame it began in — one dropped did so only when it fell between the
-   * two steepest, 16 + 16 px of 60 (MOL-292).
-   */
-  const RUNNER_LOAD_MS = 60
-
   /** One frame of a 60 Hz screen: the time a step is measured over, whatever the runner drew. */
   const FRAME_MS = 1000 / 60
 
   /**
    * The top of the price field, frame by frame, while `act` runs and for a moment after: how far it
-   * went in all, in how many frames, and the largest step — the way gone in one frame's time.
+   * went in all, in how many frames, the widest step between two drawn frames, and the largest step —
+   * the way gone in one frame's time.
    *
    * A step is measured over its frame's time, never between two drawn frames (MOL-292): a frame the
    * runner dropped puts two frames' way into one step — 16 + 16 px of the 60 failed CI as 32 at a
    * threshold of 30 — and so is shared over the two frames' time it took. A jump goes its way in one
-   * frame and stays a jump. Once the field has first moved, the page is held busy for a few frames,
-   * as a loaded runner holds it: every run goes through the dropped frame. Held after the first move,
-   * so a jump has already been seen whole.
+   * frame and stays a jump.
+   *
+   * `busy` holds the page that long once the field has first moved, as a loaded runner holds it. Only
+   * the test of the dropped frame asks for it: held there, the steepest of the rise is drawn in one step
+   * and measured only as an average, which a rise of 100 ms passes — the checks of the motion itself
+   * take it as the runner gives it (adversarial А1).
    *
    * `moving` still counts frames, the one check that does: a jump held by the runner right then looks
    * by time like a rise held by it — two frames, the way spread over the hold — and only their count
-   * tells them apart. Its price: a runner that drew under four frames of the 220 ms rise fails it.
+   * tells them apart. Its price: a runner busy over ~110 ms of the 220 ms rise fails it.
    */
-  async function priceFieldMoves(page: Page, act: () => Promise<void>) {
+  async function priceFieldMoves(page: Page, act: () => Promise<void>, busy = 0) {
     await page.evaluate((busy) => {
       const w = window as unknown as { __frames: { time: number; top: number }[]; __stop: boolean }
       w.__frames = []
       w.__stop = false
-      let held = false
+      let held = busy === 0
       // `time` is the frame's own: the moment the page's animations are drawn at.
       const step = (time: number) => {
         const field = document.querySelector('dialog[open] [data-field="amount"]')
@@ -393,7 +390,7 @@ test.describe('«Тут дешевле»', () => {
         if (!w.__stop) requestAnimationFrame(step)
       }
       requestAnimationFrame(step)
-    }, RUNNER_LOAD_MS)
+    }, busy)
     await act()
     await page.waitForTimeout(600)
     const frames = await page.evaluate(() => {
@@ -409,6 +406,7 @@ test.describe('«Тут дешевле»', () => {
     return {
       moved: Math.abs((frames.at(-1)?.top ?? 0) - (frames[0]?.top ?? 0)),
       moving: steps.filter((step) => step.way > 0.5).length,
+      widest: Math.max(0, ...steps.map((step) => step.way)),
       largest: Math.max(0, ...steps.map((step) => step.perFrame)),
     }
   }
@@ -437,6 +435,31 @@ test.describe('«Тут дешевле»', () => {
 
     expect(motion.moved).toBeGreaterThan(20)
     expect(motion.moving).toBeGreaterThan(3)
+    expect(motion.largest).toBeLessThan(motion.moved / 2)
+  })
+
+  test('a frame the runner drops on the way up is the way up, not a jump (MOL-292)', async ({
+    page,
+  }) => {
+    const { word } = await boughtAtZovuni(page)
+    await page.route('**/api/advice/prices**', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      await route.continue()
+    })
+    await pick({ page, word })
+    await still(page)
+    await expect(hint(page)).toHaveCount(0)
+
+    // Two frames' time and more: in CI the steep part of the rise came drawn as one step, 50 of 60 px.
+    const motion = await priceFieldMoves(
+      page,
+      () => expect(hint(page)).toContainText('Зовуни', { timeout: 5000 }),
+      60,
+    )
+
+    expect(motion.moved).toBeGreaterThan(20)
+    // Dropped indeed: drawn, more than half the way went between two frames — the flake's own shape.
+    expect(motion.widest).toBeGreaterThan(motion.moved / 2)
     expect(motion.largest).toBeLessThan(motion.moved / 2)
   })
 
