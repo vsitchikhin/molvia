@@ -84,8 +84,9 @@ const SELECTED = new Set([
  *              explains nothing — the newcomer's steps on a phone of 320 (MOL-203). A list of rows
  *              keeps its two, so a long place does not grow the row without end;
  *   next     — the chevron (the owner's В-14 «а»): the row opens something to go on with — a screen, a
- *              sheet with fields. A row that acts at once or asks to confirm has none, and one card
- *              never mixes the two (DESIGN.md; held by review, the card is the screen's);
+ *              sheet with fields, or a fork on the way to them (MOL-203). A row that acts at once or asks
+ *              to confirm has none, and one card never mixes the two (DESIGN.md; held by review, the card
+ *              is the screen's);
  *   danger   — the title and the icon in `bad-ink`: the row destroys;
  *   inactive — not now (Ф-6, MOL-174): focusable, `aria-disabled`, a press reaching nobody, the link
  *              followed nowhere — a link loses its `href` too, or a middle click or a long press would

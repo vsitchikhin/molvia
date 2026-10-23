@@ -1,7 +1,8 @@
 <template>
   <!-- On the newcomer's «Что брать» with receipts it is a row of its own under the cycle (2a): the
        card is drawn here, around the row alone — around this component it would draw the kit's
-       hairline over the sheets below as well. -->
+       hairline over the sheets below as well. The chevron is В-14's either way: «Где вы?», or with a
+       record open the fork whose both ways go on to fields (MOL-203, adversarial А2). -->
   <AppCard v-if="row" list>
     <ListRow
       :icon="IconPencil"
