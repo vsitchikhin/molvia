@@ -32,6 +32,7 @@ import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtur
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
 // than any yet seen.
 // The 3 of MOL-264 took 1.2–1.5 s on a Mac under the lock: twenty times, as the reporter advises, is 30 s.
+// Three more went past ten times their worst on CI in MOL-264's run (1 112, 534 and 702 ms): the advice's 25 s, 15 s.
 
 /**
  * «Записать» (MOL-126): a parsed receipt written in one go as a finished trip on its own day, its
@@ -556,7 +557,7 @@ describe('«Записать»', () => {
           await Promise.all([pool.end(), holder.end(), watcher.end()])
         }
       },
-      10_000,
+      25_000,
     )
   })
 
@@ -619,7 +620,7 @@ describe('«Записать»', () => {
     expect(response.statusCode).toBe(200)
     const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
     expect(trip?.receiptMinor).toBe(215_000n)
-  })
+  }, 15_000)
 
   it('records a gift at 0 as a purchase of the trip, and as no price of its place (MOL-274, А8)', async () => {
     const me = await insertActor(db)
@@ -712,7 +713,7 @@ describe('«Записать»', () => {
       ['1110001', null],
       ['1110002', null],
     ])
-  })
+  }, 15_000)
 
   describe('a line’s package from its name (MOL-264)', () => {
     const PACKED: Line[] = [
