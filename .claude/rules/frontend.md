@@ -740,8 +740,15 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the two currencies** — a new pair, a closed month with none frozen — has no «≈» (`spentApprox`)
   while the bars, which cannot know it before the answer, drew one: the page shrinks by that line
   under the switcher, as for the empty month above (adversarial А4 of MOL-184). The total of 77 v2 2a (`TripTotal`) is no card until
-  MOL-206 makes it one, and the sums of «Счета», an account and «Обмен» still stand at the
-  body's leading, some 8 px taller than the part — their tasks set the part against their answer.
+  MOL-206 makes it one, and the sums of an account and «Обмен» still stand at the body's
+  leading, some 8 px taller than the part — their tasks set the part against their answer. **«Счета» stand
+  at the part's leading** (MOL-193): the figure and the line under it as «Деньги», so the tiles start within
+  4 px of where the plate stood; two lines each in two currencies, the card comes 30 px taller than the part at
+  390 and 117 at 320, where the tiles stand one under the other — growth below nothing that chooses. **And
+  shorter where the answer has one currency after all** (self-review Р2-1): the part takes «≈» from the
+  settings' two currencies, while the answer drops the line, and the tiles' second lines, wherever either
+  currency left an account out (`money-accounts.md`) — the page shrinks by them as it comes, with nothing
+  above the card to choose.
   **«Бюджет» takes the part with «≈» and its plate** (MOL-192): its three figures a line each stand
   some 40 px taller than the plate of 44, and the page grows by that as the answer comes, below the
   switcher; a person of one currency has no «≈», which takes some 20 px of it back. **The price, named

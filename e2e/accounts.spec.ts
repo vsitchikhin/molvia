@@ -174,6 +174,8 @@ test('счёт без операций удаляется с «Вернуть»,
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Счета')
   // The strip itself, not the live region that says the same words (MOL-64).
   await expect(page.locator('.undo-strip .text')).toHaveText('Удалено: Лишний')
+  // «Вернуть» over the strip, which stays under it (Ф-29, MOL-193).
+  await expect(page.locator('.dock').getByRole('button', { name: 'Добавить счёт' })).toBeVisible()
   await page.waitForTimeout(1000)
   await page.getByRole('button', { name: 'Вернуть' }).click()
   await expect(page.getByRole('link', { name: /Лишний/ })).toBeVisible()
@@ -207,8 +209,7 @@ test('перевод между своими счетами: два остатк
   await page.getByRole('button', { name: 'Добавить счёт' }).click()
   await addAccount(page, 'Карта ֏', '10000')
   await expect(page.getByRole('button', { name: /Перевод между счетами/ })).toHaveCount(0)
-  // With an account there, «Добавить счёт» floats as «Счёт».
-  await page.getByRole('button', { name: 'Счёт', exact: true }).click()
+  await page.getByRole('button', { name: 'Добавить счёт' }).click()
   await addAccount(page, 'Копилка ֏', '0')
 
   await page.getByRole('button', { name: /Перевод между счетами/ }).click()
@@ -264,9 +265,12 @@ test('без связи счета не красные, а шторка счёт
   await expect(page.getByRole('link', { name: /Наличные ֏/ })).toBeVisible()
 
   await context.setOffline(true)
-  await expect(page.getByText(/Нет связи\. Остатки на/)).toBeVisible()
+  // The strip itself, not the live region that says the same words (MOL-64).
+  await expect(
+    page.locator('.strip.offline').filter({ hasText: /Без связи · остатки на/ }),
+  ).toBeVisible()
   await expect(page.getByRole('alert')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Счёт', exact: true }).click()
+  await page.getByRole('button', { name: 'Добавить счёт' }).click()
   const sheet = topSheet(page)
   await expect(sheet).toContainText('Счета меняются только со связью')
   await expect(sheet.getByRole('button', { name: /Сохраним, когда будет связь/ })).toBeDisabled()
@@ -321,6 +325,11 @@ test.describe('320 px, English', () => {
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Accounts')
     await expect(page.getByRole('link', { name: /Card in roubles/ })).toBeVisible()
     expect(await noSideScroll()).toBe(true)
+    // The total in two currencies, the tiles too (MOL-193, В-1 «б»): no figure cut on a phone of 320.
+    const cut = await page
+      .locator('.total :is(.figure, .figure-second, .tile-figure, .tile-second)')
+      .evaluateAll((nodes) => nodes.filter((node) => node.scrollWidth > node.clientWidth).length)
+    expect(cut).toBe(0)
 
     await page.getByRole('link', { name: /Card in roubles/ }).click()
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Card in roubles')
