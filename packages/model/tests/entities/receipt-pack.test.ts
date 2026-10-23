@@ -414,6 +414,9 @@ describe('receiptPack — an Armenian till', () => {
     ['Вода «Бжни» 0.5л 1х12 1шт', 'AM'],
     ['Ջուր «Բջնի» 2x6 0.5լ 1 հատ', 'AM'],
     ['VODA ROSA 0,5L 1X12 1KOM (Ђ)', 'RS'],
+    ['ПИВО 6 В УПАКОВКЕ 0.5Л', 'AM'],
+    ['ПИВО 6В УПАК 0.5Л', 'AM'],
+    ['Пиво 6в упаковке 0.5л', 'AM'],
   ] as const)(
     'reads none where another count stands beside the size, in figures or in a word: %s (reviews 8–12)',
     (printed, country) => {
@@ -478,6 +481,12 @@ describe('receiptPack — an Armenian till', () => {
     ['Մարտկոց «Էներջի» 9Վ 2հտ', 'AM', pieces(2)],
     ['Գուլպա «Ֆալկե» 3զույգ', 'AM', pieces(3)],
     ['Ձեռնոց աշխատանքային 2 զույգ', 'AM', pieces(2)],
+    ['Лампа светодиодная 220В E27 3шт', 'AM', pieces(3)],
+    ['Батарейки 9В Крона 2шт', 'AM', pieces(2)],
+    ['Предохранитель 10А 5шт', 'AM', pieces(5)],
+    ['Ապահովիչ 10Ա 5հտ', 'AM', pieces(5)],
+    ['Батарейки 9 Вольт 2шт', 'AM', pieces(2)],
+    ['Лампа накаливания 60 Ватт 2шт', 'AM', pieces(2)],
     ['Սուրճ լուծ. «Մակ Կոֆե» 3/1-ում 18գր', 'AM', kg(18)],
   ] as const)(
     'reads the size where no other count stands — a 1, a fraction, a percent, a range, a width, a model’s or a line’s number, a code (review 12): %s',

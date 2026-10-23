@@ -1470,8 +1470,10 @@ a receipt read before the rollout and not yet recorded gets it too.
   model's or a class's, «C1», «LR6», «N4», «№4» (but «x6» is a sign); plies, «3D», years and three in one glued after
   it, «3շ», «5տ», «3-ը 1-ում», «3в1», «2in1» (`NOT_A_COUNT`, the bench's own); a fraction, a percent or degrees, a range and
   a width by a length beside a count of pieces, «3.2%», «40°» (Н3), «9-14կգ», «100шт 24х37», «35л 50х70 30шт» (П1, №19); a
-  figure with a unit of measure, «500мг», «220V», «220В», «10Վտ», «70мм», «5м» glued (`MEASURE`, П2, Р1) — never a unit
-  that is also a word, «6 в упаковке», «6 ед.»: «м» and «В» only glued, «В» with no word after it; a line's number before its name, «17.»; a code past a hundred standing
+  figure with a unit of measure, «500мг», «220V», «220В», «10Վտ», «10А», «9 Вольт», «60 Ватт», «70мм», «5м» glued
+  (`MEASURE`, П2, Р1, С1, С2) — never a unit that is also a word, «6 в упаковке», «6 ед.»: «м» and «В» only glued; a
+  capital «В» or «А» glued is a measure unless a word in small letters or in capitals follows, «220В E27», «9В Крона» —
+  «6В УПАК» stays a count (`CAPITAL_MEASURE`); **the price, named:** «Пиво 6В 0.5л» reads volts; a line's number before its name, «17.»; a code past a hundred standing
   alone, «9639», «250h 193», a vintage «2019». **The price, named, as one class:** a name's own number — «Балтика 7», «7 злаков», «Pampers 4
   Maxi 52шт», «3 в 1» apart, «12 лет в коробке», «Три медведя», «AFTER EIGHT», a model's letter copied as a figure,
   «2ոկոլապ», «Neva 12h 32» — keeps none: on the bench 231 of 233 read right (two lines of the brand «3 կոռոչկի»), 95

@@ -70,9 +70,15 @@ const TIMES_SIGN = String.raw`(?:(?<!\p{L})[xх×]\s*|\d\s*\p{L}*[xх×]\s*|\p{L
  * «Пиво упаковка 0.5л», is read as one.
  */
 // what a number glued to it says is no count: plies «3շ», «3D», years «5տ», three in one «3-ը 1-ում», «3в1», «2in1»
+/**
+ * A volt or an ampere in a capital glued to its figure, «220В E27», «9В Крона», «10А» (С1): a measure whatever follows —
+ * case is what tells it from the word «в», «6в упаковке», and a word in small letters or in capitals after it, «6В УПАК»,
+ * keeps it a word; read like a size, its figure is no count.
+ */
+const CAPITAL_MEASURE = /(?<![\d.,])\d+(?:[.,]\d+)?[ВА](?![a-z]|\s*(?:[а-яё]|[А-ЯЁ]{2}))/gu
 // a figure with a unit of measure after it is a measure, never a count: «500мг», «220V», «70x110мм» (П2); never a unit
 // that is also a word — «6 в упаковке», «6 ед.»: «м» and a Russian «В» only glued, the volt with no word after it, «9В 2шт»
-const MEASURE = String.raw`(?:\s*(?:мкг|мг|mcg|mg|մգ|мм|mm|մմ|см|cm|սմ|V|W|Вт|kW|кВт|mAh|мАч|Ah|Ач|ккал|kcal|кДж|kJ|Hz|Гц|ГБ|GB|МБ|MB|МЕ|IU|Վտ|Վ)|м|m|В(?!\s*\p{L}))(?!\p{L})`
+const MEASURE = String.raw`(?:\s*(?:мкг|мг|mcg|mg|մգ|мм|mm|մմ|см|cm|սմ|V|W|Вт|kW|кВт|mAh|мАч|Ah|Ач|ккал|kcal|кДж|kJ|Hz|Гц|ГБ|GB|МБ|MB|МЕ|IU|Վտ|Վ|Ա|mA|мА|вольт\p{L}*|ватт\p{L}*|ампер\p{L}*|volts?|watts?|amps?|ամպեր)|м|m|A|[ВА](?!\s*\p{L}))(?!\p{L})`
 const NOT_A_COUNT = String.raw`(?:(?:շ|Դ|D|տ|[-–](?:ը|ում))(?!\p{L})|(?:в|in)1(?!\d)|${MEASURE})`
 const OTHER_NUMBER = new RegExp(
   String.raw`(?<![\d.,#№])(?<!(?![xх×])\p{L})(?<!\p{L}[xх×])(?<!\d\s*[-–/xх×*+]\s*)(?:[2-9]|[1-9]\d|100)(?!\d|[.,]\d|\s*[%°]|\s*[-–/xх×*]\s*\d|${NOT_A_COUNT})`,
@@ -192,7 +198,7 @@ function countBeside(
   counts: readonly RegExpExecArray[],
 ): boolean {
   const start = LINE_NUMBER.exec(printed)?.[0].length ?? 0
-  const read = [...sizes, ...counts]
+  const read = [...sizes, ...counts, ...printed.matchAll(CAPITAL_MEASURE)]
   const inside = (at: number) =>
     read.some((match) => at >= match.index && at < match.index + match[0].length)
   const outside = (pattern: RegExp) =>
