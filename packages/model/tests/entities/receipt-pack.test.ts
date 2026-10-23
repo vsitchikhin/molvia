@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { packedQuantity, receiptPack } from '#model/entities/receipt-pack'
+import { linePack, packedQuantity, receiptPack } from '#model/entities/receipt-pack'
 import type { Quantity } from '#model/values/units'
 
 const kg = (grams: number): Quantity => ({ milli: BigInt(grams), unit: 'kg' })
@@ -150,6 +150,20 @@ describe('receiptPack — a Serbian journal', () => {
 
   it('reads an Armenian word as nothing of Serbia, and «հտ» as no Serbian pack', () => {
     expect(receiptPack('Հավկիթ 10հտ', 'RS')).toBeNull()
+  })
+})
+
+describe('linePack', () => {
+  const printed = 'Կաթ «Իգիթ» 3.2% 1լ'
+
+  it('is the package of a line the till sold in pieces', () => {
+    expect(linePack({ printed, quantity: pieces(2) }, 'AM')).toEqual(l(1000))
+  })
+
+  it('is none of a line weighed, poured or emptied by the check', () => {
+    expect(linePack({ printed, quantity: kg(434) }, 'AM')).toBeNull()
+    expect(linePack({ printed, quantity: l(1000) }, 'RS')).toBeNull()
+    expect(linePack({ printed, quantity: null }, 'AM')).toBeNull()
   })
 })
 
