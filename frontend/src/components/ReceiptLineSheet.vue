@@ -338,7 +338,11 @@ export default defineComponent({
     )
     const weightHint = computed(() => {
       const many = parsedQuantity.value
-      if (!many || many.unit === 'piece' || !figures.price) return null
+      // the shelf price of a line the till sold in pieces is a piece's: its litres by a package are no factor of it
+      // (MOL-264)
+      if (!many || many.unit === 'piece' || !figures.price || figures.quantity?.unit === 'piece') {
+        return null
+      }
       return t('receipt.line.weight_hint', {
         qty: `${formatQuantity(many, locale.value)} ${t(`item.unit_${many.unit}`)}`,
         price: formatMoney(figures.price, locale.value),

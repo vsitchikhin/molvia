@@ -183,6 +183,35 @@ describe('ReceiptLineSheet (MOL-127)', () => {
     expect(saved[0]?.figures).toBeUndefined()
   })
 
+  it('opens a line with a package at the purchase it makes, its price by the litre (MOL-264)', async () => {
+    const base = chocolate()
+    const line: ReceiptReviewLine = {
+      ...base.line,
+      printed: 'Գազավորված ըմպելիք «Կոկա Կոլա» 1.5լ',
+      price: amd('700'),
+      sum: amd('700'),
+      settled: true,
+      pack: parseQuantity('1.5', 'l'),
+    }
+    const cola = {
+      ...base,
+      line,
+      mismatch: false,
+      quantity: parseQuantity('1.5', 'l'),
+      amount: amd('700'),
+    }
+    const { saved } = await render(cola)
+    expect(sheet()?.querySelector<HTMLInputElement>('[data-field="quantity"]')?.value).toBe('1,5')
+    const text = (sheet()?.textContent ?? '').replace(/\s/gu, ' ')
+    expect(text).toContain('/л')
+    // the shelf price is a bottle's: 1,5 л × 700 is no figure of the line
+    expect(text).not.toContain('за единицу посчитаем сами')
+    // as shown, the litres are no figures of the person's
+    press(ru.receipt.line.save)
+    await flushPromises()
+    expect(saved.every((draft) => draft.figures === undefined)).toBe(true)
+  })
+
   it('a sum typed is the person’s figure', async () => {
     const { saved } = await render()
     await flushPromises()

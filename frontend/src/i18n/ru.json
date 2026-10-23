@@ -2276,6 +2276,8 @@
       "qty_price": "{qty} × {price}",
       "unread": "Цифры не прочитали — посмотрите в чеке",
       "qty_price_discount": "{qty} × {price} − {discount}",
+      "packed": "· {pack}",
+      "packed_spoken": "{figures}, запишем {pack}",
       "mismatch": "≠ {printed}",
       "lines": "Строки",
       "total": "Итог чека",

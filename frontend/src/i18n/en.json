@@ -2276,6 +2276,8 @@
       "qty_price": "{qty} × {price}",
       "unread": "The figures weren’t read — see the receipt",
       "qty_price_discount": "{qty} × {price} − {discount}",
+      "packed": "· {pack}",
+      "packed_spoken": "{figures}, recorded as {pack}",
       "mismatch": "≠ {printed}",
       "lines": "Lines",
       "total": "Receipt total",

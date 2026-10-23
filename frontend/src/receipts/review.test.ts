@@ -285,6 +285,58 @@ describe('a new item named by the binding, «проверьте» (MOL-293, В-1
   })
 })
 
+describe('a line’s package (MOL-264)', () => {
+  const COLA = 'eeeeeeee-0000-4000-8000-000000000001'
+  function packed(): ReceiptDetail {
+    const detail = receiptA()
+    return {
+      ...detail,
+      lines: [
+        line('ԿԱԹ «ԻԳԻԹ» 3.2% 1լ', '2', 'piece', '370', '740', {
+          pack: parseQuantity('1', 'l'),
+        }),
+        ...detail.lines.slice(1),
+      ],
+    }
+  }
+
+  it('shows the purchase the package makes, the till’s figures kept on the line', () => {
+    const [milk] = reviewLines(packed(), null)
+    expect(milk?.quantity).toEqual(parseQuantity('2', 'l'))
+    expect(milk?.line.quantity).toEqual(parseQuantity('2', 'piece'))
+    expect(milk?.changed).toEqual({ item: false, figures: false })
+  })
+
+  it('sends it at «Записать», and an item chosen alone leaves it so', () => {
+    const detail = packed()
+    const draft: ReceiptDraft = {
+      lines: { 0: { item: { id: COLA, name: 'Молоко' }, skip: false } },
+    }
+    const lines = reviewLines(detail, draft)
+    expect(lines[0]?.quantity).toEqual(parseQuantity('2', 'l'))
+    expect(recordBody(detail, draft, lines, TRIP, '2026-09-27')?.lines[0]).toMatchObject({
+      quantity: parseQuantity('2', 'l'),
+    })
+  })
+
+  it('counts figures put right against the litres shown, never against the till’s pieces', () => {
+    const detail = packed()
+    const kept = (value: string, unit: 'piece' | 'l') =>
+      reviewLines(detail, {
+        lines: {
+          0: {
+            item: { id: MILK, name: 'Молоко' },
+            skip: false,
+            figures: { quantity: parseQuantity(value, unit), amount: amd('740') },
+          },
+        },
+      })[0]?.changed.figures
+    expect(kept('2', 'l')).toBe(false)
+    expect(kept('2', 'piece')).toBe(true)
+    expect(kept('1', 'l')).toBe(true)
+  })
+})
+
 describe('what «Записать» sends', () => {
   it('every line once, a new item by its name, the place the server found, the printed day', () => {
     const detail = receiptA()
