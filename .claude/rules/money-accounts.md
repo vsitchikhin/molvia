@@ -136,9 +136,11 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
 - **«Счета» show the total in both currencies of the settings** (MOL-193, owner's В-19 «в», В-1 «б»): the income
   one large — the figure «На счетах сейчас» shows, so one money is one number on both screens — the spending one
   under it, and the tiles «Можно тратить» / «Сбережения» in both. One currency, or a page kept from before
-  `incomeTotals`, is one figure. «N не посчитаны» is said by the large figure's totals. **The price, named:** an
-  account that one currency converts and the other does not would be named under one of them only — the rates of
-  both come by one chain, and it has not been met.
+  `incomeTotals`, is one figure. **So is a page where either currency left an account out** (self-review Р1-1 of
+  MOL-193): with no rate between the two, each currency's own accounts stand in its own figure alone, and the line
+  under the large one spoke of another set of accounts — «≈ 5 921 ₽» the roubles, «≈ 190 132 ֏» the drams — even
+  at one count apiece; the phone cannot tell which accounts a count is of. «N не посчитаны» is said by the large
+  figure's totals. The price, named: while one account has no rate, the person sees their money in one currency.
 - **The month of «Деньги» reads the same balances for its «Остаток»** (MOL-134): `balancesOn` — the
   live accounts started by a day, their operations up to it — through `accountsCounted`, the one
   loading of accounts, operations and rates both screens share. A removed account is in neither.

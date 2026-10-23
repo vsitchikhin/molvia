@@ -10,8 +10,10 @@
         kind="offline"
         :text="t('accounts.screen.offline', { time: when(overview.countedAt) })"
       />
+      <!-- By the last read, not by whether this session had an answer before it: the page shown is
+           older than the read that failed, as «Деньги» say of the same money (MOL-183, Б1). -->
       <StatusStrip
-        v-else-if="phase === 'ready' && stale === 'error' && overview"
+        v-else-if="phase === 'ready' && failed === 'error' && overview"
         kind="unanswered"
         :text="t('accounts.screen.unanswered', { time: when(overview.countedAt) })"
         :attempt="store.failures"
@@ -83,8 +85,16 @@
               </div>
               <div class="tile">
                 <span class="tile-label">{{ t('accounts.savings') }}</span>
-                <span class="tile-figure">≈ {{ estimate(main.savings) }}</span>
-                <span v-if="second" class="tile-second">≈ {{ estimate(second.savings) }}</span>
+                <span class="tile-figure" :class="{ negative: main.savings.minor < 0n }">
+                  ≈ {{ estimate(main.savings) }}
+                </span>
+                <span
+                  v-if="second"
+                  class="tile-second"
+                  :class="{ negative: second.savings.minor < 0n }"
+                >
+                  ≈ {{ estimate(second.savings) }}
+                </span>
               </div>
             </div>
             <p v-if="rateLine" class="footnote">{{ rateLine }}</p>
@@ -169,7 +179,9 @@
               <ul class="removed-list">
                 <AppReveal group>
                   <!-- Two targets (handoff 01 п. 6): the account's screen, and «Вернуть». Without a
-                       connection «Вернуть» is not now, and says why on itself (Ф-6, С-10). -->
+                       connection «Вернуть» is not now, and says why on itself (Ф-6, С-10); nor while
+                       another «Вернуть» of the screen is in the air — each answers with the page whole,
+                       and the later to land would take the other back (MOL-189). -->
                   <li v-for="account in removedAccounts" :key="account.id" class="removed-row">
                     <ListRow
                       as="router-link"
@@ -182,7 +194,9 @@
                     <AppButton
                       variant="tinted"
                       class="removed-restore"
-                      :inactive="!online && restoring !== account.id"
+                      :inactive="
+                        (!online || undoing || restoring !== null) && restoring !== account.id
+                      "
                       :busy="restoring === account.id"
                       :busy-label="t('accounts.screen.restoring')"
                       @click="bringBack(account)"
@@ -212,6 +226,7 @@
         :action="t('accounts.screen.restore')"
         :busy="undoing"
         :busy-label="t('accounts.screen.restoring')"
+        :inactive="restoring !== null"
         :waiting="!online && !undoing"
         :waiting-action="t('accounts.screen.restore_wait')"
         @restore="undoRemoval"
@@ -283,7 +298,7 @@ import {
   shortDay,
   signedAmount,
 } from '@/components/accounts'
-import { bankWords, rateWords } from '@/components/spending'
+import { bankWords, rateWords, unbroken } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useOnline } from '@/composables/useOnline'
 import { useReconnect } from '@/composables/useReconnect'
@@ -374,6 +389,9 @@ export default defineComponent({
     /**
      * The large figures in the income currency and the line under them in the spending one (В-19 «в»,
      * В-1 «б»). One currency, or a page kept on the phone from before `incomeTotals` — one figure.
+     * **And one where either left an account out** (self-review Р1-1): with no rate between the two,
+     * each currency's own accounts are in its own figure alone, so the two lines spoke of two sets of
+     * accounts — even at one count apiece; the note under the figure says what it misses.
      */
     const main = computed(() => {
       const page = overview.value
@@ -383,7 +401,8 @@ export default defineComponent({
     })
     const second = computed(() => {
       const page = overview.value
-      return page && main.value !== page.totals ? page.totals : null
+      if (!page || !main.value || main.value === page.totals) return null
+      return main.value.uncounted === 0 && page.totals.uncounted === 0 ? page.totals : null
     })
     /**
      * The skeleton's «≈» line by the person's two currencies, as the settings name them; with none
@@ -396,12 +415,15 @@ export default defineComponent({
 
     function liveLine(account: MoneyAccountView): string {
       const { currency, lastCheckedOn, startOn } = account
-      return lastCheckedOn
-        ? t('accounts.screen.row_checked', {
-            currency,
-            date: shortDay(lastCheckedOn, locale.value),
-          })
-        : t('accounts.screen.row_started', { currency, date: shortDay(startOn, locale.value) })
+      // «старт 20 окт.» whole: beside the balance at 320 the date broke between its day and month.
+      return unbroken(
+        lastCheckedOn
+          ? t('accounts.screen.row_checked', {
+              currency,
+              date: shortDay(lastCheckedOn, locale.value),
+            })
+          : t('accounts.screen.row_started', { currency, date: shortDay(startOn, locale.value) }),
+      )
     }
     const when = (at: Date) => countedWhen(at, locale.value)
 
@@ -435,15 +457,17 @@ export default defineComponent({
 
     const showRemoved = ref(false)
     function removedLine(account: MoneyAccountView): string {
-      return t('accounts.screen.archived_row', {
-        currency: account.currency,
-        amount: signedAmount(account.balance, locale.value),
-        date: account.archivedAt
-          ? new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'short' }).format(
-              account.archivedAt,
-            )
-          : shortDay(account.startOn, locale.value),
-      })
+      return unbroken(
+        t('accounts.screen.archived_row', {
+          currency: account.currency,
+          amount: signedAmount(account.balance, locale.value),
+          date: account.archivedAt
+            ? new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'short' }).format(
+                account.archivedAt,
+              )
+            : shortDay(account.startOn, locale.value),
+        }),
+      )
     }
 
     const restoring = ref<string | null>(null)
@@ -517,7 +541,7 @@ export default defineComponent({
       store,
       online,
       phase,
-      stale: computed(() => store.stale),
+      failed: computed(() => store.failed),
       overview,
       live,
       removedAccounts,
@@ -568,13 +592,16 @@ export default defineComponent({
   margin: 0;
   font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
+  line-height: var(--leading-tight);
 }
 
+/* «≈» of «Деньги» (`MoneyMonthCard`); both at the leading the skeleton's figure stands at (MOL-178). */
 .figure-second {
   margin: 0;
-  color: var(--text-muted);
   font-size: var(--text-headline);
+  font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
+  line-height: var(--leading-tight);
 }
 
 .negative {
@@ -612,16 +639,16 @@ export default defineComponent({
 
 .tile-figure {
   font-size: var(--text-headline);
-  white-space: nowrap;
   font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .tile-second {
   color: var(--text-muted);
   font-size: var(--text-footnote);
-  white-space: nowrap;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .footnote {
@@ -737,7 +764,10 @@ export default defineComponent({
 }
 
 /* The link and «Вернуть» side by side where both fit whole, else the button under the name, at the
-   right: it keeps the width of «Возвращаем…» too (MOL-225), and shrunk beside it the name was cut. */
+   right: it keeps the width of «Возвращаем…» too (MOL-225), and shrunk beside it the name was cut. On a
+   line of its own it shrinks to the row, from where the name begins, and wraps its words: «Вернём, когда
+   будет связь» at 320 stood past the row's padding, 2 px from the card's edge, which cuts (adversarial
+   А4). */
 .removed-row {
   display: flex;
   flex-wrap: wrap;
@@ -760,7 +790,8 @@ export default defineComponent({
 }
 
 .removed-restore {
-  flex: none;
+  flex: 0 1 auto;
+  max-width: calc(100% - var(--space-4));
   margin-block: var(--space-2);
   margin-inline-start: auto;
 }

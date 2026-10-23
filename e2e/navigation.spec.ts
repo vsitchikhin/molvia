@@ -461,8 +461,7 @@ test.describe('safe areas', () => {
   })
 
   // On a nested screen whose strip stays under it — «Счета» since MOL-193 (Ф-29) — «Вернуть» stands 8
-  // over the strip, and the strip over the home indicator. The screen with no strip it was until then
-  // is the account's (С-9, MOL-194).
+  // over the strip, and the strip's action 12 over the home indicator (К-9).
   test.describe('in Russian', () => {
     test.use({ locale: 'ru-RU' })
 
@@ -497,18 +496,77 @@ test.describe('safe areas', () => {
       await expect(strip).toBeVisible()
       await strip.locator('.text').hover()
       await page.waitForFunction(() => !document.documentElement.hasAttribute('data-nav'))
-      const [box, dock] = await Promise.all([
+      const add = page.locator('.dock').getByRole('button', { name: 'Добавить счёт' })
+      await expect(add).toBeVisible()
+      const [box, dock, button] = await Promise.all([
         strip.boundingBox(),
         page.locator('.dock').boundingBox(),
+        add.boundingBox(),
       ])
-      await expect(
-        page.locator('.dock').getByRole('button', { name: 'Добавить счёт' }),
-      ).toBeVisible()
       expect(Math.round((dock?.y ?? 0) - ((box?.y ?? 0) + (box?.height ?? 0)))).toBe(8)
+      // The button, not the strip: the strip holds the inset in its padding and ends at the bottom
+      // whatever it does (self-review Р1-4).
       const height = await page.evaluate(() => window.innerHeight)
-      expect(Math.round(height - ((dock?.y ?? 0) + (dock?.height ?? 0)))).toBeLessThanOrEqual(
-        portrait.bottom,
+      expect(Math.round(height - ((button?.y ?? 0) + (button?.height ?? 0)))).toBe(
+        portrait.bottom + 12,
       )
+    })
+
+    // With no strip — an account's screen, `#undo` and no `#docked` (С-9) — «Вернуть» stands 8 over
+    // the home indicator (adversarial А5: «Счета» held this until they got their strip).
+    test('«Вернуть» on a nested screen with no strip stands 8 over the indicator', async ({
+      page,
+    }) => {
+      await insets(page, portrait)
+      await open(page, '/money/accounts')
+      const headers = await asBrowser(page)
+      const yesterday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(
+        new Date(Date.now() - 24 * 60 * 60 * 1000),
+      )
+      const account = randomUUID()
+      const made = await page.request.post('/api/money/accounts', {
+        headers,
+        data: {
+          id: account,
+          name: 'Карта',
+          currency: 'AMD',
+          savings: false,
+          start: { amount: '100000', currency: 'AMD' },
+          startOn: yesterday,
+        },
+      })
+      expect(made.status(), await made.text()).toBe(201)
+      const { categories } = (await (
+        await page.request.get('/api/spending-categories', { headers })
+      ).json()) as { categories: { id: string }[] }
+      const spent = await page.request.post('/api/spendings', {
+        headers,
+        data: {
+          id: randomUUID(),
+          spentOn: yesterday,
+          amount: { amount: '5000', currency: 'AMD' },
+          categoryId: categories[0]?.id,
+          note: 'Лишняя',
+          accountId: account,
+        },
+      })
+      expect(spent.status(), await spent.text()).toBe(201)
+      await open(page, `/money/accounts/${account}`)
+      await page.getByRole('button', { name: /^Открыть операцию: Лишняя/ }).click()
+      await page.waitForTimeout(400)
+      await page
+        .locator('dialog[open]')
+        .last()
+        .getByRole('button', { name: 'Удалить трату' })
+        .click()
+      const strip = page.locator('.undo-strip')
+      await expect(strip).toBeVisible()
+      await expect(page.locator('.dock')).toHaveCount(0)
+      await strip.locator('.text').hover()
+      await page.waitForFunction(() => !document.documentElement.hasAttribute('data-nav'))
+      const box = await strip.boundingBox()
+      const height = await page.evaluate(() => window.innerHeight)
+      expect(Math.round(height - ((box?.y ?? 0) + (box?.height ?? 0)))).toBe(portrait.bottom + 8)
     })
   })
 

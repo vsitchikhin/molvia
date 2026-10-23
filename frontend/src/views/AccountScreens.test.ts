@@ -72,6 +72,7 @@ vi.mock('@/api', () => ({
 const OWNER = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const CASH = '5c1f8b2d-3e4a-4b6c-8d7e-9f0a1b2c3d4e'
 const OTHER = 'ffffffff-0000-4000-8000-00000000000d'
+const THIRD = 'ffffffff-0000-4000-8000-00000000000e'
 const TAXI = 'eeeeeeee-0000-4000-8000-000000000001'
 
 function amd(text: string) {
@@ -639,6 +640,42 @@ describe('«Счета» on the kit (MOL-193)', () => {
     expect(tile?.get('.tile-figure').classes()).toContain('negative')
     expect(tile?.get('.tile-second').classes()).toContain('negative')
     expect(view.get('.figure').classes()).not.toContain('negative')
+    expect(view.findAll('.tile')[1]?.find('.negative').exists()).toBe(false)
+
+    // The savings too — a card in debt among them, a start below zero (adversarial А1).
+    const savings = session()
+    moneyAccounts.mockResolvedValue({
+      ...two,
+      totals: { ...two.totals, savings: amd('-5000') },
+      incomeTotals: two.incomeTotals && {
+        ...two.incomeTotals,
+        savings: { ...rub('1082'), minor: -108225n },
+      },
+    })
+    const saved = (await open(AccountsView, '/money/accounts', savings)).findAll('.tile')[1]
+    expect(saved?.get('.tile-figure').classes()).toContain('negative')
+    expect(saved?.get('.tile-second').classes()).toContain('negative')
+  })
+
+  it('must not fire: either currency left an account out — one figure, and the note says what it misses (Р1-1)', async () => {
+    const two = twoCurrencies()
+    // No rate between the two: the drams are in the drams' figure alone, the roubles in theirs.
+    for (const [income, spend] of [
+      [1, 1],
+      [0, 1],
+      [1, 0],
+    ] as const) {
+      moneyAccounts.mockResolvedValue({
+        ...two,
+        totals: { ...two.totals, uncounted: spend },
+        incomeTotals: two.incomeTotals && { ...two.incomeTotals, uncounted: income },
+      })
+      const view = await open(AccountsView, '/money/accounts', session())
+      expect(view.get('.figure').text()).toContain('₽')
+      expect(view.find('.figure-second').exists()).toBe(false)
+      expect(view.find('.tile-second').exists()).toBe(false)
+      expect(view.text().includes('not counted')).toBe(income > 0)
+    }
   })
 
   it('an account is a row of the kit to its screen, «≈» only beside a foreign balance', async () => {
@@ -698,5 +735,63 @@ describe('«Счета» on the kit (MOL-193)', () => {
       .findAllComponents(StatusStrip)
       .filter((one) => !one.element.closest('dialog'))
     expect(onScreen.map((one) => one.props('kind'))).toEqual(['offline'])
+  })
+
+  it('answered in this session, then a read that failed: the same strip, as «Деньги» date the same money (adversarial А2)', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([cash()], new Date('2026-10-23T09:05:00Z')))
+    const first = await open(AccountsView, '/money/accounts', pinia)
+    views.splice(views.indexOf(first), 1)
+    first.unmount()
+
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const again = await open(AccountsView, '/money/accounts', pinia)
+    expect(again.getComponent(StatusStrip).props('kind')).toBe('unanswered')
+    expect(button(again, en.state.retry)).toBeDefined()
+
+    // An answer takes it away.
+    moneyAccounts.mockResolvedValue(page([cash()]))
+    await button(again, en.state.retry)?.trigger('click')
+    await settle()
+    expect(again.findComponent(StatusStrip).exists()).toBe(false)
+  })
+
+  it('one «Вернуть» of the screen in the air at a time: each answers with the page whole (adversarial А3)', async () => {
+    const pinia = session()
+    const store = useAccountsStore(pinia)
+    const away = new Date('2026-10-20T10:00:00Z')
+    const third = cash({ id: THIRD, name: 'Third', archivedAt: away })
+    moneyAccounts.mockResolvedValue(page([cash(), cash({ id: OTHER, archivedAt: away }), third]))
+    const view = await open(AccountsView, '/money/accounts', pinia)
+    store.removed = { id: 'eeeeeeee-0000-4000-8000-000000000001', name: 'Spare', stamp: Date.now() }
+    await view.get('.removed-head').trigger('click')
+    await settle()
+
+    let land: (answer: MoneyAccountsResponse) => void = () => undefined
+    restoreMoneyAccount.mockImplementation(() => new Promise((resolve) => (land = resolve)))
+    await view.get('.removed-restore').trigger('click')
+    expect(restoreMoneyAccount).toHaveBeenCalledWith(OTHER)
+    expect(view.getComponent(UndoStrip).props('inactive')).toBe(true)
+    await view.getComponent(UndoStrip).get('button').trigger('click')
+    expect(restoreMoneyAccount).toHaveBeenCalledTimes(1)
+    land(page([cash(), cash({ id: OTHER }), third]))
+    await settle()
+    expect(view.getComponent(UndoStrip).props('inactive')).toBe(false)
+
+    // And the other way: the strip's at work holds the row's.
+    await view.getComponent(UndoStrip).get('button').trigger('click')
+    await settle()
+    expect(view.getComponent(UndoStrip).props('busy')).toBe(true)
+    expect(view.get('.removed-restore').attributes('aria-disabled')).toBe('true')
+    land(page([cash(), cash({ id: OTHER }), third]))
+    await settle()
+  })
+
+  it('a date in a row stays whole: «started Sep 16», never broken between its day and month (Р1-5)', async () => {
+    moneyAccounts.mockResolvedValue(page([cash()]))
+    const view = await open(AccountsView, '/money/accounts', session())
+    const meta = view.get('a.list-row .meta').text()
+    expect(meta).toContain('started Sep 16')
+    expect(meta).toMatch(/^AMD · /)
   })
 })
