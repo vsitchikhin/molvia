@@ -94,6 +94,8 @@ export const useAccountsStore = defineStore('accounts', () => {
     readonly stamp: number
   } | null>(null)
   const failure = ref<'offline' | 'error' | null>(null)
+  /** Every read that failed, counted: the strip of «Счета» says a retry that failed the same way again (C1). */
+  const failures = ref(0)
   /**
    * Screens showing accounts that are up now. A queue's answer reads the page again only for them:
    * read for every purchase at the shelf, the dearest answer of the server went out beside the queue
@@ -132,6 +134,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (actor.id !== owner || mine !== latest) return
       // Decided after the failure, never before the request (MOL-19, A1).
       failure.value = navigator.onLine ? 'error' : 'offline'
+      failures.value += 1
     }
   }
 
@@ -225,6 +228,7 @@ export const useAccountsStore = defineStore('accounts', () => {
      * session does not hide it: the page on screen is older than the read that failed (MOL-183, Б1).
      */
     failed: computed(() => failure.value),
+    failures: computed(() => failures.value),
     /** Why the page on screen is not an answer of this session, or null when it is. */
     stale: computed<'loading' | 'offline' | 'error' | null>(() => {
       if (!shown.value || confirmed.value) return null
