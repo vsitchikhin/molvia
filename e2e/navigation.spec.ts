@@ -460,13 +460,13 @@ test.describe('safe areas', () => {
     expect(await opened.evaluate((node) => getComputedStyle(node).animationName)).not.toBe('appear')
   })
 
-  // On a nested screen with no strip — «Счета» — «Вернуть» stands 8 over the home indicator.
+  // On a nested screen whose strip stays under it — «Счета» since MOL-193 (Ф-29) — «Вернуть» stands 8
+  // over the strip, and the strip over the home indicator. The screen with no strip it was until then
+  // is the account's (С-9, MOL-194).
   test.describe('in Russian', () => {
     test.use({ locale: 'ru-RU' })
 
-    test('«Вернуть» on a nested screen with no strip stands 8 over the indicator', async ({
-      page,
-    }) => {
+    test('«Вернуть» on a nested screen stands 8 over its strip, which stays', async ({ page }) => {
       await insets(page, portrait)
       await open(page, '/money/accounts')
       await expect(page.getByRole('heading', { level: 1 })).toHaveText('Счета')
@@ -497,9 +497,18 @@ test.describe('safe areas', () => {
       await expect(strip).toBeVisible()
       await strip.locator('.text').hover()
       await page.waitForFunction(() => !document.documentElement.hasAttribute('data-nav'))
-      const box = await strip.boundingBox()
+      const [box, dock] = await Promise.all([
+        strip.boundingBox(),
+        page.locator('.dock').boundingBox(),
+      ])
+      await expect(
+        page.locator('.dock').getByRole('button', { name: 'Добавить счёт' }),
+      ).toBeVisible()
+      expect(Math.round((dock?.y ?? 0) - ((box?.y ?? 0) + (box?.height ?? 0)))).toBe(8)
       const height = await page.evaluate(() => window.innerHeight)
-      expect(Math.round(height - ((box?.y ?? 0) + (box?.height ?? 0)))).toBe(portrait.bottom + 8)
+      expect(Math.round(height - ((dock?.y ?? 0) + (dock?.height ?? 0)))).toBeLessThanOrEqual(
+        portrait.bottom,
+      )
     })
   })
 
