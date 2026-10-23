@@ -367,7 +367,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   MOL-203, adversarial А1): square, the card's radius cut its ring at the corners — «Записать вручную», the
   one row of its card, lost all four, where the ghost button before it kept a whole one. Only the corners at
   the card's edge, only in focus, so the hairline between rows stays straight; a row in an `li` of its own is
-  reached through it. `kit-rows` holds a first, a middle and a last row, `advice.spec` the newcomer's row.
+  reached through it. **Rows of the kit only, by their class** (`.list-row`, `.nav-row`): by depth alone it
+  took a pill «Завершить» in the last row of «Устройства» into a dome and rounded the line «не знаем,
+  сохранилось ли» on top in the middle of «Ваши данные» (round 2, Б1, Б2). `kit-rows` holds a first, a middle
+  and a last row, `advice.spec` the newcomer's row, `devices.spec` and `settings.spec` the two that are not
+  rows.
   **Active** is the row the keyboard stands on in a list a field owns (К-4): the fill without the
   ring, since the focus is in the field; on a chosen row the fill is the layer's alone — the row's own
   square fill stood out past the round ring at every corner (adversarial В1). Only a `div` row takes a button into its tail — a button
@@ -742,13 +746,15 @@ The detail behind the frontend lines of `CLAUDE.md`.
   groups 24, so the card of rows comes 16 px lower; and a row with a line under its bar — a share of
   «Пришло», as five plans of the owner's six are — is some 20 px taller than its bars. All of it growth
   below the switcher, which MOL-138's hold allows. **The newcomer's headline is its own shape** (MOL-203,
-  adversarial А3): a line of the title and four of the phrase on the ground, in place of `groups`, whose card
-  left the cycle 70 px higher than the answer — «Сфотографируйте первый чек» on a phone of 390–412.
-  `advice.spec` holds that the cycle moves by exactly the answer's lines beyond those, never by more: the wrap
-  is the engine's, and CI's Chromium on Linux breaks the English phrase a line otherwise than a Mac's. **The price, named:** the headline is not known before the queue
-  answers, and where it wraps otherwise the cycle moves by its lines — a title of two lines in Russian at 390,
-  28 px down; up to 52 at 320; «Осталось оценить», a line shorter, 25 up, while its card comes in over it
-  anyway. **The price:** a card adds its padding and
+  adversarial А3): in place of `groups`, whose card left the cycle 70 px higher than the answer, the words of
+  the commonest answer — the queue empty — set unseen give the skeleton its height, and the bars stand over
+  the first lines. In an attribute (`content: attr()`), so no reader, no search of the page and no test of
+  the text finds «первые покупки» over a queue not known (adversarial В of MOL-128). A shape of fixed lines
+  was tried first and stood still on one phone and one language only — a line of the title and four of the
+  phrase, «Сфотографируйте первый чек» at 412; Russian at 390 moved the cycle 28 px, 320 up to 52, «Запишите
+  первые покупки» 25 up (self-review 4, adversarial round 2). `advice.spec` holds the cycle still at 412 and 320. **The price, named:** the queue answering «Осталось оценить» or «Первый чек разбираем» moves the cycle
+  by the difference of its words, while its card comes in over it anyway; and a phrase longer than the bars
+  has its last lines empty under them. **The price:** a card adds its padding and
   edge, so a skeleton of `groups` is some 34 px taller than before — taller, not shorter, which the hold
   of MOL-138 needs.
 - **An installed app takes a new version only when nobody can lose anything to it: hidden, and
