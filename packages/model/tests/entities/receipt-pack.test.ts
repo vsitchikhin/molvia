@@ -393,6 +393,15 @@ describe('receiptPack — an Armenian till', () => {
     ['Пиво 1+1 0.5л', 'AM'],
     ['Ջուր 0.5լ/6', 'AM'],
     ['Виски «Johnnie Walker» 12 лет с коробкой 0.7л', 'AM'],
+    ['Вода «Бжни» 0.5л 1х12', 'AM'],
+    ['Ջուր «Բջնի» 2x6 0.5լ', 'AM'],
+    ['VODA ROSA 0,5L 1X12 (Ђ)', 'RS'],
+    ['Пиво «Жигули» двойная упаковка 0.5л', 'AM'],
+    ['Сок «Добрый» трио 0.2л', 'AM'],
+    ['Пиво спарка 0.5л', 'AM'],
+    ['Beer «Heineken» double pack 0.33l', 'AM'],
+    ['MLEKO DUPLO PAKOVANJE 1L (Ђ)', 'RS'],
+    ['Чай Lipton 200 пакетиков 2г', 'AM'],
   ] as const)(
     'reads none where another count stands beside the size, in figures or in a word: %s (reviews 8–12)',
     (printed, country) => {
@@ -441,6 +450,10 @@ describe('receiptPack — an Armenian till', () => {
     ['Шампунь Head & Shoulders 2in1 400мл', 'AM', l(400)],
     ['Вино «Арени» 2019 0.75л', 'AM', l(750)],
     ['Йогурт 125г №4', 'AM', kg(125)],
+    ['Водка «Арарат» 40° 0.5л', 'AM', l(500)],
+    ['Коньяк «Ной» 40 ° 0.5л', 'AM', l(500)],
+    ['Вода «Бжни» 0.5л x12', 'AM', l(6000)],
+    ['Փայտիկ ականջի 250h 193', 'AM', pieces(250)],
   ] as const)(
     'reads the size where no other count stands — a 1, a fraction, a percent, a range, a width, a model’s or a line’s number, a code (review 12): %s',
     (printed, country, pack) => {
