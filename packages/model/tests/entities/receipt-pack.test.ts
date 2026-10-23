@@ -402,6 +402,15 @@ describe('receiptPack — an Armenian till', () => {
     ['Beer «Heineken» double pack 0.33l', 'AM'],
     ['MLEKO DUPLO PAKOVANJE 1L (Ђ)', 'RS'],
     ['Чай Lipton 200 пакетиков 2г', 'AM'],
+    ['Вода «Бжни» 0.5л 1/12', 'AM'],
+    ['Ջուր «Բջնի» 0.5լ 12/1', 'AM'],
+    ['VODA ROSA 0,5L 1/12 (Ђ)', 'RS'],
+    ['Йогурт «Чудо» дуо 125г', 'AM'],
+    ['Йогурт «Danone» trio 125г', 'AM'],
+    ['Пиво «Жигули» сдвоенная упаковка 0.5л', 'AM'],
+    ['Գարեջուր «Կիլիկիա» զույգ 0.5լ', 'AM'],
+    ['Вода 6 ед. 0.5л', 'AM'],
+    ['Вода 6 м 0.5л', 'AM'],
   ] as const)(
     'reads none where another count stands beside the size, in figures or in a word: %s (reviews 8–12)',
     (printed, country) => {
@@ -454,6 +463,13 @@ describe('receiptPack — an Armenian till', () => {
     ['Коньяк «Ной» 40 ° 0.5л', 'AM', l(500)],
     ['Вода «Бжни» 0.5л x12', 'AM', l(6000)],
     ['Փայտիկ ականջի 250h 193', 'AM', pieces(250)],
+    ['Мешки для мусора 35л 50х70 30шт', 'AM', pieces(30)],
+    ['Աղբի պարկեր 35լ 50x70 30հտ', 'AM', pieces(30)],
+    ['KESE ZA SMECE 60L 60X80 20KOM (Ђ)', 'RS', pieces(20)],
+    ['Парацетамол 500мг 10шт', 'AM', pieces(10)],
+    ['Պարացետամոլ 500մգ 10հաբ', 'AM', pieces(10)],
+    ['Лампа светодиодная E27 220V 3шт', 'AM', pieces(3)],
+    ['Սուրճ լուծ. «Մակ Կոֆե» 3/1-ում 18գր', 'AM', kg(18)],
   ] as const)(
     'reads the size where no other count stands — a 1, a fraction, a percent, a range, a width, a model’s or a line’s number, a code (review 12): %s',
     (printed, country, pack) => {

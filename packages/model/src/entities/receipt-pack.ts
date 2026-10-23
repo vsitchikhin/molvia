@@ -70,7 +70,10 @@ const TIMES_SIGN = String.raw`(?:(?<!\p{L})[xх×]\s*|\d\s*\p{L}*[xх×]\s*|\p{L
  * «Пиво упаковка 0.5л», is read as one.
  */
 // what a number glued to it says is no count: plies «3շ», «3D», years «5տ», three in one «3-ը 1-ում», «3в1», «2in1»
-const NOT_A_COUNT = String.raw`(?:(?:շ|Դ|D|տ|[-–](?:ը|ում))(?!\p{L})|(?:в|in)1(?!\d))`
+// a figure with a unit of measure after it is a measure, never a count: «500мг», «220V», «70x110мм» (П2); never a unit
+// that is also a word — «6 в упаковке», «6 ед.»
+const MEASURE = String.raw`(?:\s*(?:мкг|мг|mcg|mg|մգ|мм|mm|մմ|см|cm|սմ|V|W|Вт|kW|кВт|mAh|мАч|Ah|Ач|ккал|kcal|кДж|kJ|Hz|Гц|ГБ|GB|МБ|MB|МЕ|IU)|м|m)(?!\p{L})`
+const NOT_A_COUNT = String.raw`(?:(?:շ|Դ|D|տ|[-–](?:ը|ում))(?!\p{L})|(?:в|in)1(?!\d)|${MEASURE})`
 const OTHER_NUMBER = new RegExp(
   String.raw`(?<![\d.,#№])(?<!(?![xх×])\p{L})(?<!\p{L}[xх×])(?<!\d\s*[-–/xх×*+]\s*)(?:[2-9]|[1-9]\d|100)(?!\d|[.,]\d|\s*[%°]|\s*[-–/xх×*]\s*\d|${NOT_A_COUNT})`,
   'giu',
@@ -80,7 +83,7 @@ const COUNT_WORD = new RegExp(
     String.raw`дв(?:а|е|ое|ух)|тр(?:и|ое|[её]х)|четыр\p{L}*|четвер\p{L}*|пят(?:ь|и|ер\p{L}*|надцат\p{L}*|ьдесят\p{L}*)`,
     String.raw`шест(?:ь|и|ер\p{L}*|надцат\p{L}*|ьдесят\p{L}*)|сем(?:ь|и|ер\p{L}*)|восем\p{L}*|восьм\p{L}*|девят\p{L}*|десят\p{L}*`,
     String.raw`одиннадцат\p{L}*|двенадцат\p{L}*|двадцат\p{L}*|тридцат\p{L}*|сорок\p{L}*|пар[аыу]|(?:пол)?дюжин\p{L}*|мульти-?пак\p{L}*`,
-    String.raw`двойн\p{L}*|тройн\p{L}*|трио|спарк\p{L}*|double|triple|duplo|dupl\p{L}*|trostruk\p{L}*|կրկնակի`,
+    String.raw`двойн\p{L}*|тройн\p{L}*|сдвоен\p{L}*|строен\p{L}*|трио|дуо|спарк\p{L}*|double|triple|trio|duplo|dupl\p{L}*|trostruk\p{L}*|կրկնակի|զույգ`,
     String.raw`(?:two|three|four|five|six|eight|ten|twelve|twenty|twin|duo|pair|dozen|multi)(?:-?pack|pk)?`,
     String.raw`(?:երկու|երեք|չորս|հինգ|վեց|յոթ|ութ|ինը|տասը)(?:ական)?`,
     String.raw`dva|dve|tri|četiri|cetiri|šest|sest|sedam|osam|devet|deset|dvanaest|dvadeset|par`,
@@ -90,12 +93,16 @@ const COUNT_WORD = new RegExp(
 // «1+1», «2+1» — a bundle, several taped into one
 const BUNDLE = /\d\s*\+\s*\d/u
 /**
- * Beside a weight or a volume, «N x M» is a pack of several, «0.5л 1х12», «2x6 0.5լ» (Н1): a width by a length, «24х37»,
- * stands only beside a count of pieces, «100шт 24х37».
+ * Beside a weight or a volume and no count of pieces, «N x M» and «N/M» are a pack of several, «0.5л 1х12», «2x6 0.5լ»,
+ * «0.5л 1/12» (Н1, П3): beside a count of pieces they are a width by a length, «35л 50х70 30шт» (П1, №19).
  */
-const PAIR = /(?<![\d.,])\d+\s*[xх×*]\s*\d+(?![.,]?\d)/giu
+// «3/1-ում» is three in one
+const PAIR = /(?<![\d.,])\d+\s*[xх×*/]\s*\d+(?![.,]?\d|[-–]?(?:ում|ը)(?!\p{L}))/giu
 // a count past a hundred with a word after it, «200 пакетиков 2г» (№18) — a code stands alone, «250h 193», «(4818)»
-const LARGE_COUNT = /(?<![\p{L}\d.,#№])[1-9]\d{2}(?![.,]?\d)(?=\s*\p{L})/gu
+const LARGE_COUNT = new RegExp(
+  String.raw`(?<![\p{L}\d.,#№])[1-9]\d{2}(?![.,]?\d)(?!${MEASURE})(?=\s*\p{L})`,
+  'gu',
+)
 const LINE_NUMBER = /^\s*\d+[.)]/u
 const CUT_BEFORE = new RegExp(String.raw`(?:\d\s*[-–/]\s*|${TIMES_SIGN}|(?<!\d)\*\s*|\d\*)$`, 'iu')
 // a count of pieces with a sign of times before it is a count of packs unread, «2x10հտ», «2X10հտ» (review 2, №7; Г1)
@@ -192,7 +199,7 @@ function countBeside(
     BUNDLE.test(printed) ||
     outside(OTHER_NUMBER) ||
     outside(LARGE_COUNT) ||
-    (sizes.length > 0 && outside(PAIR))
+    (sizes.length > 0 && counts.length === 0 && outside(PAIR))
   )
 }
 
