@@ -17,7 +17,7 @@ NEED_SCAFFOLD = @test -f package.json || { echo "no scaffold yet (package.json i
 # The heavy checks of every copy on this machine take turns, the push's among them (MOL-139).
 ONE_AT_A_TIME = ./bin/one-at-a-time.sh "make $@"
 
-.PHONY: help setup hooks up down reup ps logs psql migrate forget notify seed gates failures merge unmerge apart merge-night merge-candidates db-reset dev format lint typecheck test e2e check prod-build watcher certs icons ports
+.PHONY: help setup hooks up down reup ps logs psql migrate forget notify seed repack gates failures merge unmerge apart merge-night merge-candidates db-reset dev format lint typecheck test e2e check prod-build watcher certs icons ports
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -99,6 +99,12 @@ notify: ## Write to people about a leak: make notify FILE=<text> [COUNTRY=AM,GE]
 seed: ## Put the common names into the catalogue: make seed [YES=1] (dry run without YES=1)
 	$(NEED_SCAFFOLD)
 	npm run --silent seed -w @molvia/backend -- $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
+
+# The purchases recorded from receipts before MOL-264 put into the package their line prints — once, after the
+# rollout. Writes only for YES=1 typed on this command line, as `seed` does.
+repack: ## Purchases from receipts into their packages: make repack [YES=1] (dry run without YES=1)
+	$(NEED_SCAFFOLD)
+	npm run --silent repack -w @molvia/backend -- $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
 
 # FROM and TO reach the script through the environment, never pasted into the recipe, for the
 # reason `forget` gives (MOL-58, П-3). It only reads. Only a value typed on this command line
