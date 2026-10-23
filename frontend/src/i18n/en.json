@@ -1896,8 +1896,7 @@
     "error_body": "The server didn't answer. Nothing you saved is lost — try again",
     "offer": {
       "title": "Where is your money?",
-      "body": "Add cash and cards — balances will keep themselves up to date",
-      "action": "Add account"
+      "body": "Add cash and cards — balances will keep themselves up to date"
     },
     "unassigned_sheet": {
       "title": "Not in any balance",
@@ -1910,17 +1909,19 @@
       "row_checked": "{currency} · checked {date}",
       "row_started": "{currency} · started {date}",
       "row_open": "Open account:",
-      "add": "Account",
+      "add": "Add account",
       "archived": "Put away ({n})",
       "archived_row": "{currency} · {amount} · put away {date}",
       "archived_note": "A put-away account isn’t offered for new spending, income or exchanges. Its history and balance are kept",
       "restore": "Restore",
       "restoring": "Restoring…",
+      "restore_wait": "Will bring back once online",
       "restored": "“{name}” is back in the list",
       "removed": "Deleted: {name}",
       "removed_announced": "Deleted: {name}. Undo within 10 seconds",
       "archived_done": "“{name}” put away — find it under “Put away”",
-      "offline": "Offline. Balances as of {time} — they'll update when you're back online. Accounts and checks wait for a connection",
+      "offline": "Offline · balances as of {time}. Accounts and checks wait for a connection",
+      "unanswered": "The server did not answer · balances as of {time}",
       "empty": {
         "body": "Add cash and cards — balances will follow your spending, income, exchanges and purchases"
       },
