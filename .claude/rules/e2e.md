@@ -204,6 +204,37 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   `evaluate`, that window included. **The prices, named:** a shift that changes no DOM is not in it —
   it keeps no screenshots; and the artifact lives seven days (`retention-days` of `ci.yml`), so the
   failure is read the week it comes.
+- **A motion measured frame by frame is measured by the frame's time, never between two drawn frames**
+  (MOL-292): a step is the way gone, brought to one frame of 60 Hz by the frame's own time — the moment
+  `requestAnimationFrame` hands its callback, which the page's animations are drawn at. A loaded runner
+  drops frames, and the next one drawn holds the way of all of them: «Тут дешевле» rises 60 px over
+  220 ms, at most 16.2 px a frame (the CI trace: 1.0 · 10.6 · 16.2 · 16.2 · 7.0 …), and with one frame
+  dropped between the two steepest it failed CI as 32.3 at a threshold of half the way (run
+  39613154163). Shared over its time, a dropped frame's way is no more than a frame's; a jump goes its
+  way in one frame and stays a jump. With one frame dropped right on it, a jump is half the way over two
+  frames' time — at the threshold, and the frames' stamps, a tenth of a millisecond coarse, decide the
+  side (60 over 33.4 ms is 29.94, adversarial Б1): `moving` at 1 is what fails it, so every test of a
+  motion keeps a count of the frames it moved in. **Every run goes through a dropped frame, in a test of
+  its own** («a frame the runner drops on the way up…»): `priceFieldMoves` holds the page busy 60 ms
+  once the field has first moved, and the test says both halves — drawn, more than half the way went
+  between two frames (CI: 50.0 of 60 in every attempt, run 39922499322), measured, under half (12.5) —
+  and in more than three steps, as Е and Е′ (`moving > 3`; the rise held is 7–8). Not more than one: a
+  jump with a pixel drawn before it is two steps, the hold arming on the pixel and taking the rest — a
+  block in 20–90 ms is 2–3, 1 where it is the first move (adversarial В1). **Never in the tests of the
+  motion itself** (adversarial А1): held after the first move, the hold covers the steepest of the
+  rise, which then counts only as its average — a rise of 100 ms, 33 px a frame on screen, passed as
+  smooth, and a runner's own 70 ms after the hold left `moving` at 3 (А2). Е and Е′ take the frames as
+  the runner gives them. **The test of the dropped frame keeps А1, named** (adversarial Г1): its «not a
+  jump» holds to ~90 ms, Е to ~110 — a block of 100–110 ms (120 in a late phase), 55 of 60 px drawn in
+  one step, is 4 steps and passes it while Е fails it. One of two prices, chosen (Д1): `moving > 4`
+  closes the gap — the rise held is 7–8 — at ~20 ms of the runner's margin, the test failing from
+  60–80 ms beyond the hold rather than 80–90, two frames over the rise's 7 in CI; Е guards the product,
+  so the gap is taken and the margin kept. **The price, named:** the count of frames the field moved in
+  (`moving > 3`) stays a count — the one check that tells a jump the runner held right then from a rise
+  it held, which look alike by time — so a runner busy over ~110 ms of the 220 ms rise still fails it,
+  and over ~80 ms beyond the hold of 60 in the test of the dropped frame; it never has. Slowing the
+  page's clock by CDP (`Animation.setPlaybackRate`) was not taken: four times slower, an animation of
+  30 ms passes as a smooth one, and the check stopped telling it from a jump.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**
   (MOL-64). The app has one polite region, in `App.vue` above the router, and **eight things write
   to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the

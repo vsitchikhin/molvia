@@ -706,6 +706,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   MOL-174, MOL-175, MOL-180); a test it cannot run says why.
 - **Words said out loud are taken by a locator outside the live region**, never muted with
   `.first()`.
+- **A motion measured frame by frame is measured by the frame's time, never between two drawn frames**
+  (MOL-292): a runner drops frames, and the next one drawn holds their way.
 
 ### Deployment — `.claude/rules/deploy.md`
 
