@@ -281,7 +281,25 @@ test('the newcomer`s headline comes in where its skeleton stood: the cycle under
   release()
   await expect(page.getByRole('heading', { name: 'Photograph your first receipt' })).toBeVisible()
   await expect(page.locator('.home .skeleton')).toHaveCount(0)
-  expect(Math.abs((await topOf(page, '.home ol')) - before)).toBeLessThanOrEqual(2)
+  // The skeleton is a line of the title and four of the phrase at the answer's own heights. How many
+  // lines the answer takes is the engine's wrap — four on a Mac, a line otherwise on CI's Linux — so the
+  // cycle moves by exactly the lines it took beyond those, never by a card of paragraphs (+70).
+  const beyond = await page.evaluate(() => {
+    const lines = (selector: string) => {
+      const element = document.querySelector(selector)
+      if (!element) throw new Error(`no ${selector}`)
+      const style = getComputedStyle(element)
+      // A unitless leading is read back in pixels or as itself, by the engine.
+      const line = style.lineHeight.endsWith('px')
+        ? parseFloat(style.lineHeight)
+        : parseFloat(style.lineHeight) * parseFloat(style.fontSize)
+      return { line, count: Math.round(element.getBoundingClientRect().height / line) }
+    }
+    const title = lines('.intro-title')
+    const body = lines('.intro-body')
+    return (title.count - 1) * title.line + (body.count - 4) * body.line
+  })
+  expect(Math.abs((await topOf(page, '.home ol')) - before - beyond)).toBeLessThanOrEqual(2)
 })
 
 // «Add by hand» is the one row of its card, which clips it to its radius: its square ring of the
