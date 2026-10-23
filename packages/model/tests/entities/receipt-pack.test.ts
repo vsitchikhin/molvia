@@ -198,6 +198,44 @@ describe('receiptPack — an Armenian till', () => {
     expect(receiptPack('Գինի «Արենի» 2019г', 'AM')).toBeNull()
   })
 
+  it.each([
+    ['ЧАЙ ГРИНФИЛД 25ПАК Х 2Г', 'AM'],
+    ['ЧАЙ ГРИНФИЛД 25ПАКХ2Г', 'AM'],
+    ['Чай 25пакх 2г', 'AM'],
+    ['Ձու 2X10հտ', 'AM'],
+    ['Ձու 2 X 10հտ', 'AM'],
+    ['CAJ NEVEN 25 KES X 2G', 'RS'],
+    ['MIX 2X10KOM', 'RS'],
+  ] as const)(
+    'reads a sign of times in either case, apart or ending the count’s word: %s (review 3, Г1, Г3)',
+    (printed, country) => {
+      expect(receiptPack(printed, country)).toBeNull()
+    },
+  )
+
+  it.each([
+    ['Պահպանակ Durex 3հտ', 'AM', pieces(3)],
+    ['Անձեռոցիկ Kleenex 100հ', 'AM', pieces(100)],
+    ['Батарейки пальчиковых 4шт', 'AM', pieces(4)],
+    ['Tide max 20KOM', 'RS', pieces(20)],
+    ['Pepsi MAX 1.5լ', 'AM', l(1500)],
+  ] as const)(
+    'reads the last letter of a word as the word’s own, never a sign of times: %s (review 3, №8, Г5)',
+    (printed, country, pack) => {
+      expect(receiptPack(printed, country)).toEqual(pack)
+    },
+  )
+
+  it('multiplies a count by no figure whose unit or word stands apart after it (review 3, Г2)', () => {
+    expect(receiptPack('Անձեռոցիկ 100հ x 2 շերտ', 'AM')).toEqual(pieces(100))
+    expect(receiptPack('Сет Ронин 32шт х 30 г', 'AM')).toEqual(pieces(32))
+  })
+
+  it('reads a vintage before a capital «Г» too (review 3, №9, Г4)', () => {
+    expect(receiptPack('ВИНО АРЕНИ КРАСНОЕ 2019Г', 'RS')).toBeNull()
+    expect(receiptPack('Գինի «Արենի» 2019Г', 'AM')).toBeNull()
+  })
+
   it('reads none of a thousandth of a gram', () => {
     expect(receiptPack('Դեղ 0.5գր', 'AM')).toBeNull()
   })
