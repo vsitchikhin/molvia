@@ -289,6 +289,57 @@ for (const width of [412, 320]) {
   })
 }
 
+// With no answer from the queue there is no headline to draw (adversarial В of MOL-128), and its place,
+// as tall as the headline, went in one frame: the cycle and «Add by hand» rose 134 px from under a thumb
+// (adversarial В1 of MOL-203). The place shrinks away over frames now (MOL-151, owner's choice) — the
+// cycle still rises, by sliding.
+test('the queue failing, the newcomer`s headline place shrinks away rather than vanishing', async ({
+  page,
+}) => {
+  await person(page)
+  let release: () => void = () => undefined
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('**/api/verdicts/pending*', async (route) => {
+    await held
+    await route.fulfill({ status: 502, contentType: 'text/html', body: '<html>Bad gateway</html>' })
+  })
+  await page.goto('/')
+  await expect(page.locator('.home .skeleton')).toBeVisible()
+  await page.evaluate(() => document.fonts.ready)
+  const before = await page.locator('.home ol').evaluate((list) => list.getBoundingClientRect().top)
+  // Every frame from the release on: whether the place is shrinking by its height.
+  await page.evaluate(() => {
+    const seen: boolean[] = []
+    Object.assign(window, { shrinkSeen: seen })
+    const look = () => {
+      const place = document.querySelector('.home .intro-place')
+      const shrinking = place
+        ?.getAnimations()
+        .some((animation) =>
+          ((animation.effect as KeyframeEffect | null)?.getKeyframes() ?? []).some(
+            (frame) => frame.height === '0px',
+          ),
+        )
+      seen.push(shrinking === true)
+      if (seen.length < 600) requestAnimationFrame(look)
+    }
+    requestAnimationFrame(look)
+  })
+
+  release()
+  await expect(page.locator('.home .intro-place')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Photograph your first receipt' })).toHaveCount(0)
+  expect(
+    await page.evaluate(() =>
+      (window as unknown as { shrinkSeen: boolean[] }).shrinkSeen.some(Boolean),
+    ),
+  ).toBe(true)
+  const after = await page.locator('.home ol').evaluate((list) => list.getBoundingClientRect().top)
+  expect(after).toBeLessThan(before - 100)
+})
+
 // «Add by hand» is the one row of its card, which clips it to its radius: its square ring of the
 // keyboard's focus lost all four corners, where the ghost button before it kept a whole one (MOL-203,
 // adversarial А1). In focus it is rounded as the card, and the ring follows.

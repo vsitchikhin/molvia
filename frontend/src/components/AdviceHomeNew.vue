@@ -2,29 +2,36 @@
   <div class="home">
     <!-- The headline speaks of the queue of verdicts, and only of one known: «первые покупки»
          over a queue not yet answered told a person with twelve purchases they had none
-         (adversarial В) — so until it answers, the skeleton; with no answer to be had, nothing. -->
-    <div v-if="variant !== 'unknown'" class="intro">
-      <h2 class="intro-title">{{ t(INTRO[variant].title) }}</h2>
-      <p class="intro-body">{{ t(INTRO[variant].body, { app: t('app.name') }) }}</p>
-    </div>
-    <!-- The headline's own shape while the queue is on its way, on the ground as the answer stands: a
-         card of paragraphs left the cycle 70 px higher than the answer put it (MOL-178, adversarial А3
-         of MOL-203). Its height is the words of the commonest answer, the queue empty, set unseen —
-         a shape of fixed lines fitted one phone and one language and moved the cycle on the others
-         (self-review 4); the bars stand over them. -->
-    <ScreenSkeleton v-else-if="asking">
-      <span class="intro ghost-intro">
-        <span class="ghost-title" :data-words="t(INTRO.new.title)"
-          ><span class="ghost-lines"
-            ><span class="ghost-line"><span class="ghost-bar"></span></span></span
-        ></span>
-        <span class="ghost-body" :data-words="t(INTRO.new.body, { app: t('app.name') })"
-          ><span class="ghost-lines"
-            ><span v-for="width in [100, 94, 58]" :key="width" class="ghost-line"
-              ><span class="ghost-bar" :style="{ width: `${width}%` }"></span></span></span
-        ></span>
-      </span>
-    </ScreenSkeleton>
+         (adversarial В) — so until it answers, the skeleton; with no answer to be had, nothing.
+         Its place is one block: the answer comes into it where the skeleton stood, and with none
+         the place shrinks away over frames — gone in one, it took the cycle 134 px up from under a
+         thumb (adversarial В1 of MOL-203, owner's choice). -->
+    <AppReveal>
+      <div v-if="variant !== 'unknown' || asking" class="intro-place">
+        <div v-if="variant !== 'unknown'" class="intro">
+          <h2 class="intro-title">{{ t(INTRO[variant].title) }}</h2>
+          <p class="intro-body">{{ t(INTRO[variant].body, { app: t('app.name') }) }}</p>
+        </div>
+        <!-- The headline's own shape while the queue is on its way, on the ground as the answer
+             stands: a card of paragraphs left the cycle 70 px higher than the answer put it (MOL-178,
+             adversarial А3 of MOL-203). Its height is the words of the commonest answer, the queue
+             empty, set unseen — a shape of fixed lines fitted one phone and one language and moved the
+             cycle on the others (self-review 4); the bars stand over them. -->
+        <ScreenSkeleton v-else>
+          <span class="intro ghost-intro">
+            <span class="ghost-title" :data-words="t(INTRO.new.title)"
+              ><span class="ghost-lines"
+                ><span class="ghost-line"><span class="ghost-bar"></span></span></span
+            ></span>
+            <span class="ghost-body" :data-words="t(INTRO.new.body, { app: t('app.name') })"
+              ><span class="ghost-lines"
+                ><span v-for="width in [100, 94, 58]" :key="width" class="ghost-line"
+                  ><span class="ghost-bar" :style="{ width: `${width}%` }"></span></span></span
+            ></span>
+          </span>
+        </ScreenSkeleton>
+      </div>
+    </AppReveal>
 
     <!-- (б): the first receipt is being read (MOL-127) — its row, which leads to «Покупки», and
          breathes as it does there (2c). -->
