@@ -333,7 +333,12 @@ The detail behind the frontend lines of `CLAUDE.md`.
   **The chevron means «opens something to go on with»** (owner's В-14 «а»): a screen or a sheet with
   fields. A row that acts at once («Скачать мои данные») or asks to confirm («Удалить», «Выйти») has
   none, and one card never mixes the two — then «Политика» moves out of «Ваши данные», and «Написать
-  разработчику», a sheet with fields, gets one though 147 drew it without. `ListRow` takes it as an
+  разработчику», a sheet with fields, gets one though 147 drew it without. **A fork on the way to fields
+  keeps it** (owner's decision on adversarial А2 of MOL-203): «Записать вручную» with a record open asks
+  «Уже записываете «Рынок»» — no field there, but «Продолжить» goes to the record and «Закончить и начать
+  новую» to «Где вы?», both on to fields; asking to confirm is a question whose «yes» is the act itself.
+  The chevron is the row's, not of one outcome, and a row that changed its look by a state the screen does
+  not show would say nothing. `ListRow` takes it as an
   explicit `next`, never guessed from the tag, since the card decides and not the tag; `NavRow`, an
   entry, always has it. That a card does not mix is held by review and DESIGN.md: only the whole
   screen shows it, as only the place shows an icon's role (MOL-173). **The meta keeps two lines, unless it
@@ -358,7 +363,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   ring itself — 2 px of the same colour on the same place — and the keyboard lost the row it stood on,
   where a radio group puts the focus first (adversarial А1, WCAG 2.4.7); chips draw it the other way,
   the ring inside and the focus outside, which a list card clips. `e2e/kit-rows` holds both in both
-  engines.
+  engines. **The plain focus of a row at the card's edge is rounded there while it stands** (`AppCard`,
+  MOL-203, adversarial А1): square, the card's radius cut its ring at the corners — «Записать вручную», the
+  one row of its card, lost all four, where the ghost button before it kept a whole one. Only the corners at
+  the card's edge, only in focus, so the hairline between rows stays straight; a row in an `li` of its own is
+  reached through it. `kit-rows` holds a first, a middle and a last row, `advice.spec` the newcomer's row.
   **Active** is the row the keyboard stands on in a list a field owns (К-4): the fill without the
   ring, since the focus is in the field; on a chosen row the fill is the layer's alone — the row's own
   square fill stood out past the round ring at every corner (adversarial В1). Only a `div` row takes a button into its tail — a button
@@ -732,7 +741,13 @@ The detail behind the frontend lines of `CLAUDE.md`.
   besides** (self-review 1 of MOL-192): the frame stands its parts 8 apart where the answer stands its
   groups 24, so the card of rows comes 16 px lower; and a row with a line under its bar — a share of
   «Пришло», as five plans of the owner's six are — is some 20 px taller than its bars. All of it growth
-  below the switcher, which MOL-138's hold allows. **The price:** a card adds its padding and
+  below the switcher, which MOL-138's hold allows. **The newcomer's headline is its own shape** (MOL-203,
+  adversarial А3): a line of the title and four of the phrase on the ground, in place of `groups`, whose card
+  left the cycle 70 px higher than the answer — «Сфотографируйте первый чек» on a phone of 390–412, where
+  `advice.spec` holds the cycle still. **The price, named:** the headline is not known before the queue
+  answers, and where it wraps otherwise the cycle moves by its lines — a title of two lines in Russian at 390,
+  28 px down; up to 52 at 320; «Осталось оценить», a line shorter, 25 up, while its card comes in over it
+  anyway. **The price:** a card adds its padding and
   edge, so a skeleton of `groups` is some 34 px taller than before — taller, not shorter, which the hold
   of MOL-138 needs.
 - **An installed app takes a new version only when nobody can lose anything to it: hidden, and
