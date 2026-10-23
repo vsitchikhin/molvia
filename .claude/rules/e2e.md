@@ -214,19 +214,22 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   way in one frame and stays a jump. With one frame dropped right on it, a jump is half the way over two
   frames' time — at the threshold, and the frames' stamps, a tenth of a millisecond coarse, decide the
   side (60 over 33.4 ms is 29.94, adversarial Б1): `moving` at 1 is what fails it, so every test of a
-  motion keeps a count of the frames it moved in. **Every run goes through a dropped
-  frame, in a test of its own** («a frame the runner drops on the way up…»): `priceFieldMoves` holds the
-  page busy 60 ms once the field has first moved, and the test says both halves — drawn, more than half
-  the way went between two frames (CI: 50.0 of 60 in every attempt, run 39922499322), measured, under
-  half (12.5) — and in more than one step (`moving > 1`, a jump's is 1). **Never in the tests of the motion itself** (adversarial А1): held after the first move,
-  the hold covers the steepest of the rise, which then counts only as its average — a rise of 100 ms,
-  33 px a frame on screen, passed as smooth, and a runner's own 70 ms after the hold left `moving` at 3
-  (А2). Е and Е′ take the frames as the runner gives them. **The price, named:** the count of frames the
-  field moved in (`moving > 3`) stays a count — the one check that tells a jump the runner held right
-  then from a rise it held, which look alike by time — so a runner busy over ~110 ms of the 220 ms rise
-  still fails it; it never has. Slowing the page's clock by CDP (`Animation.setPlaybackRate`) was not
-  taken: four times slower, an animation of 30 ms passes as a smooth one, and the check stopped telling
-  it from a jump.
+  motion keeps a count of the frames it moved in. **Every run goes through a dropped frame, in a test of
+  its own** («a frame the runner drops on the way up…»): `priceFieldMoves` holds the page busy 60 ms
+  once the field has first moved, and the test says both halves — drawn, more than half the way went
+  between two frames (CI: 50.0 of 60 in every attempt, run 39922499322), measured, under half (12.5) —
+  and in more than three steps, as Е and Е′ (`moving > 3`; the rise held is 7–8). Not more than one: a
+  jump with a pixel drawn before it is two steps, the hold arming on the pixel and taking the rest — a
+  block in 20–70 ms is 2–3 (adversarial В1). **Never in the tests of the motion itself** (adversarial
+  А1): held after the first move, the hold covers the steepest of the rise, which then counts only as
+  its average — a rise of 100 ms, 33 px a frame on screen, passed as smooth, and a runner's own 70 ms
+  after the hold left `moving` at 3 (А2). Е and Е′ take the frames as the runner gives them. **The
+  price, named:** the count of frames the field moved in (`moving > 3`) stays a count — the one check
+  that tells a jump the runner held right then from a rise it held, which look alike by time — so a
+  runner busy over ~110 ms of the 220 ms rise still fails it, and over ~80 ms beyond the hold of 60 in
+  the test of the dropped frame; it never has. Slowing the page's clock by CDP
+  (`Animation.setPlaybackRate`) was not taken: four times slower, an animation of 30 ms passes as a
+  smooth one, and the check stopped telling it from a jump.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**
   (MOL-64). The app has one polite region, in `App.vue` above the router, and **eight things write
   to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the
