@@ -72,5 +72,21 @@ export default defineComponent({
   :deep(:focus-visible) {
     outline-offset: -2px;
   }
+
+  /* Inside, a square ring was cut at the card's corners: «Записать вручную», the one row of its card,
+     lost all four (MOL-203, adversarial А1). A row at the card's edge is rounded there while in focus, and
+     the ring follows; at its own edges only, so the hairline between rows, a row's `border-top`, stays
+     straight. A row may stand in an `li` of its own. */
+  > :deep(:first-child:focus-visible),
+  > :deep(:first-child > :focus-visible) {
+    border-start-start-radius: var(--radius-lg);
+    border-start-end-radius: var(--radius-lg);
+  }
+
+  > :deep(:last-child:focus-visible),
+  > :deep(:last-child > :focus-visible) {
+    border-end-start-radius: var(--radius-lg);
+    border-end-end-radius: var(--radius-lg);
+  }
 }
 </style>

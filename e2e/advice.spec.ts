@@ -256,6 +256,39 @@ test('nothing rated yet: the newcomer is offered to act, and the cycle leads to 
   await expect(page).toHaveURL(/\/verdicts$/)
 })
 
+// «Add by hand» is the one row of its card, which clips it to its radius: its square ring of the
+// keyboard's focus lost all four corners, where the ghost button before it kept a whole one (MOL-203,
+// adversarial А1). In focus it is rounded as the card, and the ring follows.
+test('the newcomer`s «Add by hand» in focus is rounded as its card at every corner', async ({
+  page,
+}) => {
+  await person(page)
+  await page.goto('/')
+  const row = page.getByRole('button', { name: /^Add by hand/ })
+  await expect(row).toBeVisible()
+
+  await page.keyboard.press('Tab')
+  await row.focus()
+  const look = await row.evaluate((element) => {
+    const style = getComputedStyle(element)
+    return {
+      visible: element.matches(':focus-visible'),
+      outline: style.outlineStyle,
+      corners: [
+        style.borderTopLeftRadius,
+        style.borderTopRightRadius,
+        style.borderBottomRightRadius,
+        style.borderBottomLeftRadius,
+      ],
+    }
+  })
+  expect(look).toEqual({
+    visible: true,
+    outline: 'solid',
+    corners: ['20px', '20px', '20px', '20px'],
+  })
+})
+
 // The commonest break at a shelf: the connection goes while the answer is on its way. It is
 // offline, yellow and polite — not the red error the first cut of MOL-19 drew (A1).
 test('a connection lost mid-request is offline, not an error', async ({ page, context }) => {
