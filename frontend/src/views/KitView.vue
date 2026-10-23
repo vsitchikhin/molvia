@@ -232,6 +232,16 @@
           </li>
           <li>
             <ListRow
+              :icon="IconCart"
+              :title="t('dev.kit.row_whole')"
+              :meta="t('dev.kit.row_whole_meta')"
+              wrap
+              whole
+              next
+            />
+          </li>
+          <li>
+            <ListRow
               as="router-link"
               :to="{ query: { followed: 'live' } }"
               :icon="IconDevices"
