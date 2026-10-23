@@ -58,19 +58,26 @@ const SIZE = new RegExp(
  */
 const TIMES_SIGN = String.raw`(?:(?<!\p{L})[xх×]\s*|\d\s*\p{L}*[xх×]\s*|\p{L}[xх×])`
 /**
- * A count of packs spelt in a container's word — «4 банки 0.5л», «3 уп. по 10шт», «25пак 2г»,
- * «Ջուր 4 շիշ, 1.5լ», «4 жестяные банки по 0.5л» — anywhere in the name (review 8, И2; review 9, Й2): packs unread, the
- * line keeps no package. Only a container's word says so (Й1, №14): «7 злаков», «5 աստղ», «3 слоя», «4 Maxi», «3 в 1»
- * are words of the name, and so is one container, «1 бут.». **The price, named:** «Чай 25 пакетиков 50г», «Смузи 2
- * банана 0.5л» keep none.
+ * A count of packs spelt in a container's word — «4 банки 0.5л», «3 уп. по 10шт», «25пак 2г», «Ջուր 4 շիշ, 1.5լ», «4
+ * жестяные пивные банки 0.5л», «из 4-х банок», «6-pack», «четыре банки» — anywhere in the name (reviews 8–10, И2, Й2, К2,
+ * К3, №15): packs unread, the line keeps no package. Only a container's word says so (Й1, №14): «7 злаков», «5 աստղ», «3
+ * слоя», «4 Maxi», «3 в 1», «3 Корочки» are words of the name (К1), and so is one container, «1 бут.». **The prices,
+ * named:** «Чай 25 пакетиков 50г», a container the list lacks with no «по» before the size, «Pampers 4 Giant Pack 76шт».
  */
+const COUNT = String.raw`(?:[2-9]|[1-9]\d+)(?:[-–‑]\p{L}{0,3})?|(?:два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|двенадцать|երկու|երեք|չորս|հինգ|վեց|ութ|տասը|dva|dve|tri|četiri|cetiri|šest|sest|osam|deset)(?=\s)`
+const CONTAINER = String.raw`бан(?!ан)|бут|уп|пач|короб|пак|ящ|стакан|лот(?:о?к)|жест|флакон|տուփ|շիշ|շշ|փաթ|տոպր|բանկա|արկղ|բաժակ|թիթեղ|limen|flaš|flas|boc|kut|kes|pak|pack|čaš|cas|tegl`
 const PACKED_IN = new RegExp(
-  String.raw`(?<![\p{L}\d.,])(?:[2-9]|[1-9]\d+)(?:\s+\p{L}+\s+|\s*)(?:бан|бут|уп|пач|кор|пак|ящ|տուփ|շիշ|փաթ|տոպր|բանկա|արկղ|limen|flaš|flas|boc|kut|kes|pak|pack)`,
+  String.raw`(?<![\p{L}\d.,])(?:${COUNT})(?:(?:\s+\p{L}+){0,2}\s+|\s*[-–‑]?\s*)(?:${CONTAINER})`,
   'iu',
 )
-const CUT_BEFORE = new RegExp(String.raw`(?:\d\s*[-–/]\s*|${TIMES_SIGN}|(?<!\d)\*\s*|\d\*)$`, 'iu')
+// «по 125г», «PO 0,5L» — what each of several holds: the count before it unread (К2)
+const EACH = String.raw`(?<!\p{L})(?:по|po)\s+`
+const CUT_BEFORE = new RegExp(
+  String.raw`(?:\d\s*[-–/]\s*|${TIMES_SIGN}|(?<!\d)\*\s*|\d\*|${EACH})$`,
+  'iu',
+)
 // a count of pieces with a sign of times before it is a count of packs unread, «2x10հտ», «2X10հտ» (review 2, №7; Г1)
-const TIMES_END = new RegExp(String.raw`(?:${TIMES_SIGN}|\*\s*)$`, 'iu')
+const TIMES_END = new RegExp(String.raw`(?:${TIMES_SIGN}|\*\s*|${EACH})$`, 'iu')
 /**
  * A vintage, never a package: a whole number from 1900 to 2099 before the Russian «г» of a year (adversarial А5) — never
  * an Armenian or a Latin gram, «2000գ» of cat food (review 2, В4).
