@@ -48,11 +48,12 @@ const SIZE = new RegExp(
  * one sachet of a box (review №2, adversarial А3, А4). The line keeps no package: half of it read is a guess. A star
  * after a figure and a space is a cognac's stars, «3* 0.5լ», and glued to both, «25*2գ», a count's sign.
  *
- * A sign of times, in either case, is one only standing apart — «25 KES X 2G» — or ending a word that begins with the
- * count, «25пакх2г», «25ПАКХ 2Г», «2X10հտ» (reviews 2 and 3, В2, Г1, Г3); the last letter of a word is a word's own,
- * «Elixir mix 0.33l», «Pepsi MAX 1.5լ», «Durex 3հտ», «пальчиковых 4шт» (Г5).
+ * A sign of times, in either case, is one standing apart — «25 KES X 2G» — ending the word of a count, glued or apart,
+ * «25пакх2г», «25ПАКХ 2Г», «25 пакх2г», «2 տուփx10հտ», or glued to the figure after a letter, «пакх2г» (reviews 2–4, В2,
+ * Г1, Г3, Д3). The last letter of a word with no count before it is the word's own, «Elixir mix 0.33l», «Pepsi MAX
+ * 1.5լ», «Durex 3հտ», «пальчиковых 4шт» (Г5).
  */
-const TIMES_SIGN = String.raw`(?:(?<!\p{L})[xх×]|\d\p{L}*[xх×])\s*`
+const TIMES_SIGN = String.raw`(?:(?<!\p{L})[xх×]\s*|\d\s*\p{L}*[xх×]\s*|\p{L}[xх×])`
 const CUT_BEFORE = new RegExp(String.raw`(?:\d\s*[-–/]\s*|${TIMES_SIGN}|(?<!\d)\*\s*|\d\*)$`, 'iu')
 // a count of pieces with a sign of times before it is a count of packs unread, «2x10հտ», «2X10հտ» (review 2, №7; Г1)
 const TIMES_END = new RegExp(String.raw`(?:${TIMES_SIGN}|\*\s*)$`, 'iu')
@@ -63,12 +64,15 @@ const TIMES_END = new RegExp(String.raw`(?:${TIMES_SIGN}|\*\s*)$`, 'iu')
 const YEAR = /^(?:19|20)\d\d$/u
 /**
  * A pack of pieces, «10հտ», «5հատ», «12հ», «1զույգ», «32шт»; the model copies «հ» as a Latin «h» («75h», «4hտ», MOL-264
- * bench) and «հատ» as «հաբ». Two pieces at least: «1 հատ» is the till's own count as often as a pack. «× N» after it
- * multiplies only a bare number, a unit or a word after it glued or apart: «25հտ x 2գ» is 25 sachets of 2 g, «100հ x
- * 2 շերտ» two-ply (review 2 and 3, В1, Г2).
+ * bench) and «հատ» as «հաբ». Two pieces at least: «1 հատ» is the till's own count as often as a pack.
+ *
+ * «× N» after it is read by what follows N (reviews 2–4, В1, Г2, Д1, Д2, №10): nothing, or no letter — «4հ x 2», «4հ x 2
+ * «Զևա»» — multiplies; a unit of a size, glued or apart — «25հտ x 2գ», «32шт х 30 г» — is what each piece weighs, and
+ * the count stands alone; any other word or a hyphen — «x 2 տուփ», «x 2 Zewa», «x 2 շերտ», «x 2-х слойная» — may be
+ * packs or plies, nothing tells which, and the line keeps no package.
  */
 const ARMENIAN_PIECES =
-  /(?<![\d.,])(\d+)\s*(հատ|հտ|հաբ|հ|hտ|h|զույգ|шт)(?![ա-ֆԱ-Ֆа-яёА-ЯЁA-Za-z])(?:\s*[xх×*]\s*(\d+)(?![\d.,])(?!\s*\p{L}))?/giu
+  /(?<![\d.,])(\d+)\s*(հատ|հտ|հաբ|հ|hտ|h|զույգ|шт)(?![ա-ֆԱ-Ֆа-яёА-ЯЁA-Za-z])(?:\s*[xх×*]\s*(\d+)(?![\d.,])(\s*-?\s*\p{L}+)?)?/giu
 /**
  * A Latin «h» is the model's copy of «հ» — and a label's hours too, «Rexona 48h 150մլ» (adversarial А1, review №3):
  * beside a size it is no pack of pieces, and nothing tells which, so the line keeps no package. Alone it is the pack the
@@ -127,17 +131,24 @@ export function receiptPack(printed: string, country: ReceiptCountry): Quantity 
   const photo = country !== 'RS'
   const found = [...printed.matchAll(SIZE)]
   const packs = [...printed.matchAll(photo ? ARMENIAN_PIECES : SERBIAN_PIECES)]
-    .map((match) => ({
-      count: BigInt(match[1] ?? 0) * BigInt(match[3] ?? 1),
-      // the count of a pack is the font's 6 as a size is (adversarial А2, review №4)
-      doubted: photo && `${match[1] ?? ''}${match[3] ?? ''}`.includes(DOUBTED),
-      // in either case: «REXONA 48H 150ML» (review 2, №6, В3)
-      latin: (match[2] ?? '').toLowerCase().startsWith(LATIN_PIECES),
-      cut: TIMES_END.test(printed.slice(0, match.index)),
-    }))
+    .map((match) => {
+      const tail = match[4]?.trim().toLowerCase()
+      const each = tail !== undefined && SIZE_UNITS[tail] !== undefined
+      const times = tail === undefined ? (match[3] ?? '') : ''
+      return {
+        count: BigInt(match[1] ?? 0) * BigInt(times === '' ? 1 : times),
+        // a multiplier with a word after it is packs or plies: unread (Д1, Д2)
+        unread: tail !== undefined && !each,
+        // the count of a pack is the font's 6 as a size is (adversarial А2, review №4)
+        doubted: photo && `${match[1] ?? ''}${times}`.includes(DOUBTED),
+        // in either case: «REXONA 48H 150ML» (review 2, №6, В3)
+        latin: (match[2] ?? '').toLowerCase().startsWith(LATIN_PIECES),
+        cut: TIMES_END.test(printed.slice(0, match.index)),
+      }
+    })
     .filter((pack) => pack.count >= 2n && pack.count * 1000n <= INT8_MAX)
   if (packs.length > 0) {
-    if (packs.some((pack) => pack.doubted || pack.cut || (pack.latin && found.length > 0))) {
+    if (packs.some((p) => p.unread || p.doubted || p.cut || (p.latin && found.length > 0))) {
       return null
     }
     return one(packs.map((pack): Quantity => ({ milli: pack.count * 1000n, unit: 'piece' })))

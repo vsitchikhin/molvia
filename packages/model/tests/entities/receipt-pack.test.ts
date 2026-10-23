@@ -179,7 +179,6 @@ describe('receiptPack — an Armenian till', () => {
     ['Թեյ 25հտ x 2գ', 25],
     ['Կոնֆետ 20հտ x 15գ', 20],
     ['Сет Ронин 32шт x 30г', 32],
-    ['Անձեռոցիկ 100հ x 2շերտ', 100],
   ])('multiplies a count only by a bare number after it: %s (review 2, В1)', (printed, count) => {
     expect(receiptPack(printed, 'AM')).toEqual(pieces(count))
   })
@@ -226,10 +225,42 @@ describe('receiptPack — an Armenian till', () => {
     },
   )
 
-  it('multiplies a count by no figure whose unit or word stands apart after it (review 3, Г2)', () => {
-    expect(receiptPack('Անձեռոցիկ 100հ x 2 շերտ', 'AM')).toEqual(pieces(100))
+  it('takes a unit after the multiplier, glued or apart, as what each piece weighs (review 3, Г2)', () => {
     expect(receiptPack('Сет Ронин 32шт х 30 г', 'AM')).toEqual(pieces(32))
+    expect(receiptPack('Կոնֆետ 20հտ x 15 գ', 'AM')).toEqual(pieces(20))
   })
+
+  it.each([
+    ['Ձու «Ոսկեհավ» 10հտ x 2 տուփ'],
+    ['Яйцо С1 10шт х 3 уп'],
+    ['Թուղթ զուգարանի 4հ x 2 Zewa'],
+    ['Անձեռոցիկ 100հ x 2 շերտ'],
+    ['Անձեռոցիկ 100հ x 2շերտ'],
+    ['Бумага туалетная 4шт х 2-х слойная'],
+    ['Салфетки «Зева» 100шт х 3-слойные'],
+  ])(
+    'reads none where a word or a hyphen after the multiplier may be packs or plies: %s (review 4, Д1, Д2, №10)',
+    (printed) => {
+      expect(receiptPack(printed, 'AM')).toBeNull()
+    },
+  )
+
+  it('multiplies where nothing but no letter follows: «4հ x 2 «Զևա»» is eight', () => {
+    expect(receiptPack('Թուղթ զուգարանի 4հ x 2 «Զևա»', 'AM')).toEqual(pieces(8))
+  })
+
+  it.each([
+    ['Чай «Greenfield» 25 пакх2г'],
+    ['ЧАЙ ГРИНФИЛД 25 ПАКХ2Г'],
+    ['Թեյ «Ահմադ» 25 փթx2գ'],
+    ['Ձու 2 տուփx10հտ'],
+    ['Яйцо 2 упх10шт'],
+  ])(
+    'reads a sign of times ending the word of a count set apart from it: %s (review 4, Д3)',
+    (printed) => {
+      expect(receiptPack(printed, 'AM')).toBeNull()
+    },
+  )
 
   it('reads a vintage before a capital «Г» too (review 3, №9, Г4)', () => {
     expect(receiptPack('ВИНО АРЕНИ КРАСНОЕ 2019Г', 'RS')).toBeNull()
