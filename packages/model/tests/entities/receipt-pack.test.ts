@@ -50,7 +50,7 @@ describe('receiptPack — an Armenian till', () => {
 
   it.each([
     ['Աղբի պարկեր «Ֆրեկեն Բոկ» 35լ 30հտ', pieces(30)],
-    ['Բաժակ թղթե «Էկո Փեյփր» 330մլ, 6հտ', pieces(6)],
+    ['Բաժակ թղթե «Էկո Փեյփր» 330մլ, 5հտ', pieces(5)],
   ])('takes the pieces over what one holds (Р-3): %s', (printed, pack) => {
     expect(receiptPack(printed, 'AM')).toEqual(pack)
   })
@@ -109,6 +109,58 @@ describe('receiptPack — an Armenian till', () => {
     expect(receiptPack('Կեր կատվի 51կգ', 'AM')).toBeNull()
   })
 
+  it('takes a star before a size as no count: «3*» is a cognac’s stars (review №1)', () => {
+    expect(receiptPack('Կոնյակ «Արարատ» 3* 0.5լ', 'AM')).toEqual(l(500))
+    expect(receiptPack('Կոնյակ «Արարատ» 5* 0.7լ', 'AM')).toEqual(l(700))
+    expect(receiptPack('Կոճակ զուգարանի 15գ*8', 'AM')).toEqual(kg(120))
+    // glued to both figures it is a count's sign with its count unread: none
+    expect(receiptPack('Թեյ 25*2գր', 'AM')).toBeNull()
+  })
+
+  it.each([
+    // a range: a nappy for a child of 9 to 14 kg (review №2)
+    ['Տակդիր «Pampers» N4 9-14կգ'],
+    ['Տակդիր «Pampers» N4 9–14կգ'],
+    // a fraction: its denominator is no size (adversarial А3)
+    ['Խմոր շերտավոր «Արտֆուդ» 1/2կգ'],
+    // a multiplier whose count is a word: one sachet of a box (adversarial А4)
+    ['Чай «Greenfield» Golden Ceylon 25пак*2г'],
+    ['Թեյ «Գրինֆիլդ» 25 փաթեթ x 2գր'],
+    ['Թեյ «Ահմադ» 25փթ*2գ'],
+    // a vintage, a nappy's size, a unit apart from its figure on a photo (adversarial А5)
+    ['Գինի «Արենի» 2019г'],
+    ['Вино «Арени» красное сухое 2019 г'],
+    ['Տակդիր «Pampers» Active Baby Maxi 4 L'],
+  ])('reads none where what stands before a size says it is not one: %s', (printed) => {
+    expect(receiptPack(printed, 'AM')).toBeNull()
+  })
+
+  it('takes a pack of pieces past a range, and a times sign that ends no word', () => {
+    expect(receiptPack('Տակդիր «Pampers» N4 9-14կգ 52հտ', 'AM')).toEqual(pieces(52))
+    expect(receiptPack('Elixir mix 0.33l', 'AM')).toEqual(l(330))
+  })
+
+  it('multiplies a pack of pieces as it does a size: «4հ x 2» is eight rolls (adversarial А5)', () => {
+    expect(receiptPack('Թուղթ զուգարանի «Զևա» 4հ x 2', 'AM')).toEqual(pieces(8))
+  })
+
+  it('doubts a count with a 6 read off a photo, as a size (adversarial А2, review №4)', () => {
+    expect(receiptPack('Հավկիթ «Ոսկեհավ» 16հտ', 'AM')).toBeNull()
+    // the cups' 330 ml is what one holds: with the count in doubt, the line keeps no package
+    expect(receiptPack('Բաժակ թղթե «Էկո Փեյփր» 330մլ, 6հտ', 'AM')).toBeNull()
+    expect(receiptPack('Հավկիթ «Ոսկեհավ» 15հտ', 'AM')).toEqual(pieces(15))
+  })
+
+  it('reads a Latin «h» beside a size as no pack: a label’s hours (adversarial А1, review №3)', () => {
+    expect(receiptPack('Դեզոդորանտ «Rexona» Men Invisible 48h 150մլ', 'AM')).toBeNull()
+    expect(receiptPack('Կրեմ դեմքի «Nivea» 24h 50մլ', 'AM')).toBeNull()
+    expect(receiptPack('Տոպրակ աղբի 20լ 30h(Հատ)', 'AM')).toBeNull()
+    // the Armenian «հտ» beside a size is the pack, as ever (Р-3)
+    expect(receiptPack('Աղբի պարկեր «Ֆրեկեն Բոկ» 35լ 30հտ', 'AM')).toEqual(pieces(30))
+    // the price, named: alone, hours are a pack — nothing tells them from the model's napkins
+    expect(receiptPack('Դեզոդորանտ «Nivea» Men 48h', 'AM')).toEqual(pieces(48))
+  })
+
   it('reads none of a thousandth of a gram', () => {
     expect(receiptPack('Դեղ 0.5գր', 'AM')).toBeNull()
   })
@@ -139,6 +191,9 @@ describe('receiptPack — a Serbian journal', () => {
 
   it.each([
     ['KNJAZ MILOS 0.25(KOM) (Ђ)'],
+    // a fraction, «1/1» as «1/2»: the denominator is no size (adversarial А3)
+    ['MLEKO 2,8% 1/2L (Ђ)'],
+    ['MLEKO 2,8% 1/1L (Ђ)'],
     ['CEDJENA NARANDZA 0.2/kom (Ђ)'],
     ['KESA VJZ 7KG 51 MIKRON           KOM (Ђ)'],
     // «KOM» apart is the journal's unit of sale, never a pack

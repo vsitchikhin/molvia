@@ -274,8 +274,10 @@ In a working copy the same thing is `make notify FILE=notice.txt [COUNTRY=AM,GE]
 
 ## Purchases from receipts into their packages (MOL-264)
 
-Once, after the rollout of MOL-264: the purchases recorded from receipts before it are in the till's pieces — «1 шт» of
-cola — where the line's name prints its package. A dry run first, then `--yes` once the owner read the list:
+Once, right after the rollout of MOL-264 and before a receipt is recorded on it: the purchases recorded from receipts
+before it are in the till's pieces — «1 шт» of cola — where the line's name prints its package; a line someone sets back
+to pieces on the new build looks the same, and would be moved too. A dry run first, then `--yes` once the owner read the
+list:
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.prod \

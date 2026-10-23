@@ -29,23 +29,41 @@ const SIZE_UNITS: Readonly<Record<string, readonly [BaseUnit, bigint]>> = {
 const NUMBER = String.raw`\d+(?:[.,]\d+)?`
 // a tolerance is no part of the size: «250±10գր», «470գր±3%»
 const PLUS_MINUS = String.raw`(?:\s*±\s*${NUMBER}\s*%?)?`
-const TIMES = String.raw`\s*[xх×*]\s*`
+// a count of N before the size is «N×», never «N*»: «Արարատ 3* 0.5լ» is a cognac of three stars (review №1)
+const TIMES_BEFORE = String.raw`\s*[xх×]\s*`
+const TIMES_AFTER = String.raw`\s*[xх×*]\s*`
 /**
  * «1.5լ», «6х200մլ», «15գ*8», «0.33l»: a figure and a unit of weight or volume, the unit ending its word in its
  * script — «1 լոլիկ» is a tomato. Longer units first, so «մլ» is never «լ».
- * An Armenian till glues its unit to the figure (232 sizes of 232 on the bench): «505 գր» is the model's copy of
- * «505 6գր», the glue's article and its 6 g with the 6 lost.
+ * A till read off a photo glues its unit to the figure (232 sizes of 232 on the bench): «505 գր» is the model's copy of
+ * «505 6գր», the glue's article and its 6 g with the 6 lost; «2019 г» a vintage, «Maxi 4 L» a nappy's size.
  */
 const SIZE = new RegExp(
-  String.raw`(?<![\d.,])(?:(\d+)${TIMES})?(${NUMBER})${PLUS_MINUS}(\s*)(կգ|գր|գ|մլ|լ|кг|гр|г|мл|л|kg|gr|g|ml|l)(?![ա-ֆԱ-Ֆа-яёА-ЯЁA-Za-z])${PLUS_MINUS}(?:${TIMES}(\d+)(?![\d.,]))?`,
+  String.raw`(?<![\d.,])(?:(\d+)${TIMES_BEFORE})?(${NUMBER})${PLUS_MINUS}(\s*)(կգ|գր|գ|մլ|լ|кг|гр|г|мл|л|kg|gr|g|ml|l)(?![ա-ֆԱ-Ֆа-яёА-ЯЁA-Za-z])${PLUS_MINUS}(?:${TIMES_AFTER}(\d+)(?![\d.,]))?`,
   'giu',
 )
+/**
+ * What before a figure says it is no package of its own: a range, «9-14կգ» — a nappy for a child of that weight; a
+ * fraction, «1/2կգ» — its denominator is no size; a multiplier whose count is a word, «25пак*2г», «25 փաթեթ x 2գր» —
+ * one sachet of a box (review №2, adversarial А3, А4). The line keeps no package: half of it read is a guess. A sign of
+ * times stands apart, never as the last letter of a word, «Elixir mix 0.33l»; a star after a figure and a space is a
+ * cognac's stars, «3* 0.5լ», and glued to both, «25*2գ», a count's sign.
+ */
+const CUT_BEFORE = /(?:\d\s*[-–/]\s*|(?<!\p{L})[xх×]\s*|(?<!\d)\*\s*|\d\*)$/u
+// a vintage, never a package: a whole number of grams from 1900 to 2099 (adversarial А5)
+const YEAR = /^(?:19|20)\d\d$/u
 /**
  * A pack of pieces, «10հտ», «5հատ», «12հ», «1զույգ», «32шт»; the model copies «հ» as a Latin «h» («75h», «4hտ», MOL-264
  * bench) and «հատ» as «հաբ». Two pieces at least: «1 հատ» is the till's own count as often as a pack.
  */
 const ARMENIAN_PIECES =
-  /(?<![\d.,])(\d+)\s*(?:հատ|հտ|հաբ|հ|hտ|h|զույգ|шт)(?![ա-ֆԱ-Ֆа-яёА-ЯЁA-Za-z])/giu
+  /(?<![\d.,])(\d+)\s*(հատ|հտ|հաբ|հ|hտ|h|զույգ|шт)(?![ա-ֆԱ-Ֆа-яёА-ЯЁA-Za-z])(?:\s*[xх×*]\s*(\d+)(?![\d.,]))?/giu
+/**
+ * A Latin «h» is the model's copy of «հ» — and a label's hours too, «Rexona 48h 150մլ» (adversarial А1, review №3):
+ * beside a size it is no pack of pieces, and nothing tells which, so the line keeps no package. Alone it is the pack the
+ * model copied, «Անձեռոցիկ 75h»: dropped, the bench lost 8 and 14 packages and made up the bags' litres.
+ */
+const LATIN_PIECES = 'h'
 // a Serbian pack, «107KOM», «5KOM», «10/1», «20/ 1»: a «KOM» apart is the journal's unit of sale, «MLEKO 1 L KOM»
 const SERBIAN_PIECES = /(?<![\d.,])(\d+)(?:(?:KOM|КОМ)(?![A-Za-zА-Яа-я])|\s*\/\s*1(?![\d.,]))/giu
 // a thickness printed says the thing is packaging: its kilograms and litres are what it holds, never what it is
@@ -62,10 +80,13 @@ const LARGEST: Readonly<Record<BaseUnit, bigint>> = { kg: 50_000n, l: 25_000n, p
  */
 const DOUBTED = '6'
 
-function sizeOf(match: RegExpExecArray, photo: boolean): Quantity | null {
+function sizeOf(match: RegExpExecArray, printed: string, photo: boolean): Quantity | null {
   const [, before, figure, gap, unit, after] = match
-  if (gap !== '' && /[ա-ֆ]/u.test(unit ?? '')) return null
+  if (gap !== '' && (photo || /[ա-ֆ]/u.test(unit ?? ''))) return null
   if (photo && `${before ?? ''}${figure ?? ''}${after ?? ''}`.includes(DOUBTED)) return null
+  if (CUT_BEFORE.test(printed.slice(0, match.index))) return null
+  if (before === undefined && YEAR.test(figure ?? '') && /^(?:գր|գ|гр|г|gr|g)$/iu.test(unit ?? ''))
+    return null
   const [base, factor] = SIZE_UNITS[(unit ?? '').toLowerCase()] ?? []
   const scaled = scaledFromDecimal(figure ?? '', 3)
   if (base === undefined || factor === undefined || scaled === null) return null
@@ -85,19 +106,28 @@ function one(found: readonly Quantity[]): Quantity | null {
 
 /**
  * The package one piece of the line holds, by its name: a weight, a volume or a pack of pieces — none where the name
- * prints none, two that disagree, a thickness, or a size in doubt. A pack of pieces is what one is where the name prints both: a
+ * prints none, two that disagree, a thickness, or a size or a count in doubt. A pack of pieces is what one is where the name prints both: a
  * garbage bag's «35լ» is what it holds, its «30հտ» what it is (Р-3). A figure with no unit — a size the till cut,
  * «… 85» — is none.
  */
 export function receiptPack(printed: string, country: ReceiptCountry): Quantity | null {
   if (THICKNESS.test(printed)) return null
-  const counts = [...printed.matchAll(country === 'RS' ? SERBIAN_PIECES : ARMENIAN_PIECES)]
-    .map((match) => BigInt(match[1] ?? 0))
-    .filter((count) => count >= 2n && count * 1000n <= INT8_MAX)
-    .map((count): Quantity => ({ milli: count * 1000n, unit: 'piece' }))
-  if (counts.length > 0) return one(counts)
   // a Serbian line is the tax office's text, never read off a photo
-  const sizes = [...printed.matchAll(SIZE)].map((match) => sizeOf(match, country !== 'RS'))
+  const photo = country !== 'RS'
+  const found = [...printed.matchAll(SIZE)]
+  const packs = [...printed.matchAll(photo ? ARMENIAN_PIECES : SERBIAN_PIECES)]
+    .map((match) => ({
+      count: BigInt(match[1] ?? 0) * BigInt(match[3] ?? 1),
+      // the count of a pack is the font's 6 as a size is (adversarial А2, review №4)
+      doubted: photo && `${match[1] ?? ''}${match[3] ?? ''}`.includes(DOUBTED),
+      latin: (match[2] ?? '').startsWith(LATIN_PIECES),
+    }))
+    .filter((pack) => pack.count >= 2n && pack.count * 1000n <= INT8_MAX)
+  if (packs.length > 0) {
+    if (packs.some((pack) => pack.doubted || (pack.latin && found.length > 0))) return null
+    return one(packs.map((pack): Quantity => ({ milli: pack.count * 1000n, unit: 'piece' })))
+  }
+  const sizes = found.map((match) => sizeOf(match, printed, photo))
   return sizes.includes(null) ? null : one(sizes as Quantity[])
 }
 
