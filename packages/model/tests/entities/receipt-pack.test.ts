@@ -351,13 +351,46 @@ describe('receiptPack — an Armenian till', () => {
   )
 
   it.each([
-    ['Пиво «Жигули» 4 банки 0.5л'],
-    ['Ջուր «Բջնի» 4 շիշ 1.5լ'],
-    ['Яйцо С1 3 уп по 10шт'],
-    ['Կաթ «Մարիաննա» 2 տուփ 1լ'],
-  ])('reads none after a count spelt in a word with no sign: %s (review 8, И2)', (printed) => {
-    expect(receiptPack(printed, 'AM')).toBeNull()
-  })
+    ['Пиво «Жигули» 4 банки 0.5л', 'AM'],
+    ['Ջուր «Բջնի» 4 շիշ 1.5լ', 'AM'],
+    ['Яйцо С1 3 уп по 10шт', 'AM'],
+    ['Կաթ «Մարիաննա» 2 տուփ 1լ', 'AM'],
+    ['Яйцо С1 3 уп. по 10шт', 'AM'],
+    ['Пиво «Жигули» 4банки 0.5л', 'AM'],
+    ['Пиво «Жигули» 4 жестяные банки по 0.5л', 'AM'],
+    ['Пиво 4 банки «Жигули» 0.5л', 'AM'],
+    ['Чай «Greenfield» 25пак 2г', 'AM'],
+    ['Ջուր «Բջնի» 4 շիշ, 1.5լ', 'AM'],
+    ['PIVO 4 LIMENKE 0,5L (Ђ)', 'RS'],
+  ] as const)(
+    'reads none of a count of containers anywhere: %s (review 8, И2; review 9, Й2)',
+    (printed, country) => {
+      expect(receiptPack(printed, country)).toBeNull()
+    },
+  )
+
+  it.each([
+    ['Пиво «Балтика» 7 Экспортное 0.5л', 'AM', l(500)],
+    ['Կոնյակ «Արարատ» 5 աստղ 0.5լ', 'AM', l(500)],
+    ['Туалетная бумага Zewa 3 слоя 8шт', 'AM', pieces(8)],
+    ['Подгузники Pampers Active Baby 4 Maxi 52шт', 'AM', pieces(52)],
+    ['Хлеб «Бородинский» 7 злаков 400г', 'AM', kg(400)],
+    ['Кофе 3 в 1 MacCoffee 18г', 'AM', kg(18)],
+    ['RAKIJA 5 GODINA 0.7L (Ђ)', 'RS', l(700)],
+    ['Вода 1 бут. 1.5л', 'AM', l(1500)],
+  ] as const)(
+    'reads a number of the name and a word that is no container as the name’s: %s (review 9, Й1, №14)',
+    (printed, country, pack) => {
+      expect(receiptPack(printed, country)).toEqual(pack)
+    },
+  )
+
+  it.each([['Ձու «Ոսկեհավ» 10հտ C1 x 3'], ['Яйцо 10шт С0 х 2'], ['Батарейки 4шт AA LR6 x 2']])(
+    'reads a sign after a figure glued to a letter as packs unread: %s (review 9, Й3)',
+    (printed) => {
+      expect(receiptPack(printed, 'AM')).toBeNull()
+    },
+  )
 
   it('keeps a size after a unit glued to its number or a hyphen: words of the name', () => {
     expect(receiptPack('Սուրճ լուծվող «Մակ Կոֆե» թունդ 3-ը 1-ում 18գր', 'AM')).toEqual(kg(18))

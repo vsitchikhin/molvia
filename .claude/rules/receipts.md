@@ -1450,15 +1450,22 @@ a receipt read before the rollout and not yet recorded gets it too.
   anything else — nothing, a word, a hyphen of any kind, a bracket, a quote, a comma — may be packs or plies, nothing tells
   which: none — a Serbian count's «X N» as well, «100KOM X 2», «10/1 X 2» (review 6, Ж2), and a sign of times with a
   figure anywhere after the count, «10шт. х 3», «4հ «Զևա» x 2», «10հտ (C1) x 3» (review 7, З2) — but a sign with a number
-  before it is the thing's width and length, «100шт 24х37см», «30հտ 50x60», and the count stands (review 8, И1, №13). Four rounds of review found a new spelling of «packs or plies» each time while the default was to multiply;
+  standing alone before it is the thing's width and length, «100шт 24х37см», «30հտ 50x60», and the count stands (review 8,
+  И1, №13); a figure glued to a letter is a word, «10հտ C1 x 3», «4шт LR6 x 2» — packs, none (review 9, Й3). Four rounds of review found a new spelling of «packs or plies» each time while the default was to multiply;
   none by default ends it. **The prices, named:** «4հ x 2», eight rolls, and two-ply napkins «100հ x 2 շերտ» keep no
   package. A star before a size is no count: «Արարատ 3* 0.5լ» is a cognac's stars
   (review №1). A fat, microns, milligrams, volts, metres, years («5տ», a vintage «2019г» — a whole number from 1900 to
   2099 before the Russian «г», in either case; an Armenian or a Latin gram is a package, «2000գ» of cat food — review 2, В4) are never a
   package; a figure with no unit — a size the till cut, «… 85» — is none.
-- **A count spelt in a word with no sign of times is packs unread** (review 8, И2): «4 банки 0.5л», «3 уп по 10шт», «2
-  տուփ 1լ» — a whole number, a word or two, then the size: none. A unit glued to the number, «1.5Վ 4հտ», or a hyphen, «3-ը
-  1-ում 18գր», is a word of the name. On the bench it cost nothing.
+- **A count of containers anywhere in the name is packs unread** (review 8, И2; review 9, Й2): «4 банки 0.5л», «3 уп. по
+  10шт», «4банки 0.5л», «4 жестяные банки по 0.5л», «4 банки «Жигули» 0.5л», «25пак 2г», «Ջուր 4 շիշ, 1.5լ», «PIVO 4
+  LIMENKE 0,5L» — a number of two or more, a word at most, then a container's word (`PACKED_IN`: банка, бутылка,
+  упаковка, пачка, коробка, пакет, ящик, տուփ, շիշ, փաթեթ, տոպրակ, բանկա, արկղ, limenka, flaša, boca, kutija, kesa,
+  pak, pack): none. Any other word is the name's (review 9, Й1, №14): «Балтика 7 Экспортное», «5 աստղ», «10 лет», «3
+  слоя», «Pampers 4 Maxi», «7 злаков», «3 в 1» keep their size or count; so does one container, «1 бут.». The first try,
+  any number and a word or two, took all of these for counts — the bench has none of them, so it measured nothing.
+  **The price, named:** a word that starts like a container, «Чай 25 пакетиков 50г», «Смузи 2 банана 0.5л», and «Ձու 10
+  հատ տուփ» keep none.
 - **What stands before a size may say it is none of its own** (review №2, adversarial А3, А4): a range, «9-14կգ» — a
   nappy for a child of that weight; a fraction, «1/2կգ», «1/2L» — its denominator; a sign of times whose count is a word,
   «25пак*2г», «25 փաթեթ x 2գր» — one sachet of a box, 25 times the price a kilogram. The line keeps no package. A sign of

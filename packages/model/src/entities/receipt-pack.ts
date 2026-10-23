@@ -58,17 +58,19 @@ const SIZE = new RegExp(
  */
 const TIMES_SIGN = String.raw`(?:(?<!\p{L})[xх×]\s*|\d\s*\p{L}*[xх×]\s*|\p{L}[xх×])`
 /**
- * A count spelt in a word with no sign of times, «4 банки 0.5л», «3 уп по 10шт», «2 տուփ 1լ» (review 8, И2): a whole
- * number, a space, a word or two, a space — packs unread. A unit glued to the number, «1.5Վ 4հտ», or a hyphen, «1-ում
- * 18գր», is a word of the name.
+ * A count of packs spelt in a container's word — «4 банки 0.5л», «3 уп. по 10шт», «25пак 2г»,
+ * «Ջուր 4 շիշ, 1.5լ», «4 жестяные банки по 0.5л» — anywhere in the name (review 8, И2; review 9, Й2): packs unread, the
+ * line keeps no package. Only a container's word says so (Й1, №14): «7 злаков», «5 աստղ», «3 слоя», «4 Maxi», «3 в 1»
+ * are words of the name, and so is one container, «1 бут.». **The price, named:** «Чай 25 пакетиков 50г», «Смузи 2
+ * банана 0.5л» keep none.
  */
-const COUNT_WORDS = String.raw`(?<![\d.,])\d+\s+\p{L}+(?:\s+\p{L}+)?\s+`
-const CUT_BEFORE = new RegExp(
-  String.raw`(?:\d\s*[-–/]\s*|${TIMES_SIGN}|(?<!\d)\*\s*|\d\*|${COUNT_WORDS})$`,
+const PACKED_IN = new RegExp(
+  String.raw`(?<![\p{L}\d.,])(?:[2-9]|[1-9]\d+)(?:\s+\p{L}+\s+|\s*)(?:бан|бут|уп|пач|кор|пак|ящ|տուփ|շիշ|փաթ|տոպր|բանկա|արկղ|limen|flaš|flas|boc|kut|kes|pak|pack)`,
   'iu',
 )
+const CUT_BEFORE = new RegExp(String.raw`(?:\d\s*[-–/]\s*|${TIMES_SIGN}|(?<!\d)\*\s*|\d\*)$`, 'iu')
 // a count of pieces with a sign of times before it is a count of packs unread, «2x10հտ», «2X10հտ» (review 2, №7; Г1)
-const TIMES_END = new RegExp(String.raw`(?:${TIMES_SIGN}|\*\s*|${COUNT_WORDS})$`, 'iu')
+const TIMES_END = new RegExp(String.raw`(?:${TIMES_SIGN}|\*\s*)$`, 'iu')
 /**
  * A vintage, never a package: a whole number from 1900 to 2099 before the Russian «г» of a year (adversarial А5) — never
  * an Armenian or a Latin gram, «2000գ» of cat food (review 2, В4).
@@ -86,11 +88,12 @@ const YEAR = /^(?:19|20)\d\d$/u
 // «× N» after a count, and the unit of a size after N if one stands there — groups 3 and 4 of either country's pack
 /**
  * A sign of times with a figure anywhere after a count, «10шт. х 3», «4հ «Զևա» x 2», «10հտ (C1) x 3» — packs the count's
- * own «× N» did not reach: unread, unless a unit of a size follows the figure (review 7, З2). A sign with a number before
- * it is the thing's width and length, «100шт 24х37см», «30հտ 50x60» (review 8, И1, №13).
+ * own «× N» did not reach: unread, unless a unit of a size follows the figure (review 7, З2). A sign with a number standing
+ * alone before it is the thing's width and length, «100шт 24х37см», «30հտ 50x60» (review 8, И1, №13); a number glued to a
+ * letter is a word, «C1 x 3», «LR6 x 2» — packs (review 9, Й3).
  */
 const LATER_TIMES = new RegExp(
-  String.raw`(?<!\d\s*)(?:(?<!\p{L})[xх×]|\p{L}[xх×]|\*)\s*\d+(?:[.,]\d+)?(?!\s*(?:կգ|գր|գ|մլ|լ|кг|гр|г|мл|л|kg|gr|g|ml|l)(?!\p{L}))(?![\d.,])`,
+  String.raw`(?<!(?<![\p{L}\d.,])\d+(?:[.,]\d+)?\s*)(?:(?<!\p{L})[xх×]|\p{L}[xх×]|\*)\s*\d+(?:[.,]\d+)?(?!\s*(?:կգ|գր|գ|մլ|լ|кг|гр|г|мл|л|kg|gr|g|ml|l)(?!\p{L}))(?![\d.,])`,
   'iu',
 )
 const PIECES_TIMES = String.raw`(?:\s*[xх×*]\s*(\d+(?:[.,]\d+)?)(\s*(?:կգ|գր|գ|մլ|լ|кг|гр|г|мл|л|kg|gr|g|ml|l)(?!\p{L}))?)?`
@@ -157,7 +160,7 @@ function one(found: readonly Quantity[]): Quantity | null {
  * «… 85» — is none.
  */
 export function receiptPack(printed: string, country: ReceiptCountry): Quantity | null {
-  if (THICKNESS.test(printed)) return null
+  if (THICKNESS.test(printed) || PACKED_IN.test(printed)) return null
   // a Serbian line is the tax office's text, never read off a photo
   const photo = country !== 'RS'
   const found = [...printed.matchAll(SIZE)]

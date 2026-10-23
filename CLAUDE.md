@@ -649,7 +649,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
   purchase, a line not recorded at «Записать»** (MOL-240): by the keys, never a timer.
 - **A line's purchase is the till's pieces times the package its name prints** (MOL-264): `receiptPack` — the till's
   figures, arithmetic, total and memory stay in its pieces; a package not read for sure is none (a 6 off a photo, a unit
-  not glued on a photo, a range, a fraction, a count spelt in a word, a Latin «h» beside a size, a thickness, two sizes); a
+  not glued on a photo, a range, a fraction, a count of containers, a Latin «h» beside a size, a thickness, two sizes); a
   pack of pieces wins over litres; sent by `RECEIPT_PACK_HEADER`; `make repack` once, right after the rollout.
 - **A line finds its item: the shop's memory by article, by the line, the country's names with the
   heading, the search by the gloss, else new** (MOL-126); names and search once in the queue, the memory
