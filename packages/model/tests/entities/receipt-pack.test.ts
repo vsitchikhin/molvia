@@ -417,6 +417,14 @@ describe('receiptPack — an Armenian till', () => {
     ['ПИВО 6 В УПАКОВКЕ 0.5Л', 'AM'],
     ['ПИВО 6В УПАК 0.5Л', 'AM'],
     ['Пиво 6в упаковке 0.5л', 'AM'],
+    ['Вода «Бжни» 0.5л уп12', 'AM'],
+    ['Пиво «Жигули» 0.5л упак4', 'AM'],
+    ['PIVO JELEN 0,5L PAK6 (Ђ)', 'RS'],
+    ['Ջուր «Բջնի» 0.5լ տուփ12', 'AM'],
+    ['Вода 0.5л уп.12', 'AM'],
+    ['Пиво 0.5л бл.4', 'AM'],
+    ['PIVO 0,5L PAK.6 (Ђ)', 'RS'],
+    ['Пиво 0.5л П12', 'AM'],
   ] as const)(
     'reads none where another count stands beside the size, in figures or in a word: %s (reviews 8–12)',
     (printed, country) => {
@@ -485,6 +493,8 @@ describe('receiptPack — an Armenian till', () => {
     ['Батарейки 9В Крона 2шт', 'AM', pieces(2)],
     ['Предохранитель 10А 5шт', 'AM', pieces(5)],
     ['Ապահովիչ 10Ա 5հտ', 'AM', pieces(5)],
+    ['Лампа галогенная GU5.3 12В 2шт', 'AM', pieces(2)],
+    ['Яйцо С1 10шт', 'AM', pieces(10)],
     ['Батарейки 9 Вольт 2шт', 'AM', pieces(2)],
     ['Лампа накаливания 60 Ватт 2шт', 'AM', pieces(2)],
     ['Սուրճ լուծ. «Մակ Կոֆե» 3/1-ում 18գր', 'AM', kg(18)],

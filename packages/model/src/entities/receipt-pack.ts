@@ -62,7 +62,7 @@ const TIMES_SIGN = String.raw`(?:(?<!\p{L})[xх×]\s*|\d\s*\p{L}*[xх×]\s*|\p{L
  * «six-pack» — makes the size one of them, and the ways a count is spelt have no end: each of reviews 8–12 found new ones
  * while the rule listed the containers. So the size or the pack is read only where it is the name's one number: any
  * other whole number from 2 to 100 standing on its own, a number spelt in a word or a bundle keeps no package. Glued after
- * a letter it is a model's or a class's, «C1», «LR6», «N4» — a sign of times apart is no letter, «x6»; plies, «3D», years
+ * a lone Latin letter it is a model's or a class's, «C1», «N4» — a sign of times apart is no letter, «x6»; plies, «3D», years
  * and three in one glued after it are the name's, «3շ», «5տ», «3в1»; a fraction, a percent or degrees, a range and a
  * width by a length beside a count of pieces, «3.2%», «40°», «9-14կգ», «100шт 24х37», are no count; nor is a line's number before its name, «17.», nor a code past a
  * hundred, «9639». **The price, named, as one class:** a name's own number — «Балтика 7», «7 злаков», «Pampers 4 Maxi»,
@@ -77,11 +77,18 @@ const TIMES_SIGN = String.raw`(?:(?<!\p{L})[xх×]\s*|\d\s*\p{L}*[xх×]\s*|\p{L
  */
 const CAPITAL_MEASURE = /(?<![\d.,])\d+(?:[.,]\d+)?[ВА](?![a-z]|\s*(?:[а-яё]|[А-ЯЁ]{2}))/gu
 // a figure with a unit of measure after it is a measure, never a count: «500мг», «220V», «70x110мм» (П2); never a unit
-// that is also a word — «6 в упаковке», «6 ед.»: «м» and a Russian «В» only glued, the volt with no word after it, «9В 2шт»
-const MEASURE = String.raw`(?:\s*(?:мкг|мг|mcg|mg|մգ|мм|mm|մմ|см|cm|սմ|V|W|Вт|kW|кВт|mAh|мАч|Ah|Ач|ккал|kcal|кДж|kJ|Hz|Гц|ГБ|GB|МБ|MB|МЕ|IU|Վտ|Վ|Ա|mA|мА|вольт\p{L}*|ватт\p{L}*|ампер\p{L}*|volts?|watts?|amps?|ամպեր)|м|m|A|[ВА](?!\s*\p{L}))(?!\p{L})`
+// that is also a word — «6 в упаковке», «6 ед.»: «м» only glued; a Russian volt is `CAPITAL_MEASURE`'s
+const MEASURE = String.raw`(?:\s*(?:мкг|мг|mcg|mg|մգ|мм|mm|մմ|см|cm|սմ|V|W|Вт|kW|кВт|mAh|мАч|Ah|Ач|ккал|kcal|кДж|kJ|Hz|Гц|ГБ|GB|МБ|MB|МЕ|IU|Վտ|Վ|Ա|mA|мА|вольт\p{L}*|ватт\p{L}*|ампер\p{L}*|volts?|watts?|amps?|ամպեր)|м|m|A)(?!\p{L})`
 const NOT_A_COUNT = String.raw`(?:(?:շ|Դ|D|տ|[-–](?:ը|ում))(?!\p{L})|(?:в|in)1(?!\d)|${MEASURE})`
+/**
+ * Where a count may start: not inside a number, «0.5», «3,2», nor after «№», «#»; and not after a lone letter — a
+ * class or a model, a Latin one or the eggs' «С», «C1», «N4», «E27», «С0», a sign of times apart excepted, «x6». After a word, glued or past its point,
+ * a figure is a count, «уп12», «PAK6», «уп.12», «бл.4» (Т1): nothing tells it from a model's «LR6», and a pack of
+ * several read as one is worse than none (MOL-255). **The price, named:** «AA LR6 4шт», «LR03» keep none.
+ */
+const COUNT_START = String.raw`(?<![\d,#№])(?<!\d\.)(?<!(?<![\p{L}\d])(?![xX])[A-Za-zСс])`
 const OTHER_NUMBER = new RegExp(
-  String.raw`(?<![\d.,#№])(?<!(?![xх×])\p{L})(?<!\p{L}[xх×])(?<!\d\s*[-–/xх×*+]\s*)(?:[2-9]|[1-9]\d|100)(?!\d|[.,]\d|\s*[%°]|\s*[-–/xх×*]\s*\d|${NOT_A_COUNT})`,
+  String.raw`${COUNT_START}(?<!\d\s*[-–/xх×*+]\s*)(?:[2-9]|[1-9]\d|100)(?!\d|[.,]\d|\s*[%°]|\s*[-–/xх×*]\s*\d|${NOT_A_COUNT})`,
   'giu',
 )
 const COUNT_WORD = new RegExp(
@@ -106,7 +113,7 @@ const BUNDLE = /\d\s*\+\s*\d/u
 const PAIR = /(?<![\d.,])\d+\s*[xх×*/]\s*\d+(?![.,]?\d|[-–]?(?:ում|ը)(?!\p{L}))/giu
 // a count past a hundred with a word after it, «200 пакетиков 2г» (№18) — a code stands alone, «250h 193», «(4818)»
 const LARGE_COUNT = new RegExp(
-  String.raw`(?<![\p{L}\d.,#№])[1-9]\d{2}(?![.,]?\d)(?!${MEASURE})(?=\s*\p{L})`,
+  String.raw`${COUNT_START}[1-9]\d{2}(?![.,]?\d)(?!${MEASURE})(?=\s*\p{L})`,
   'gu',
 )
 const LINE_NUMBER = /^\s*\d+[.)]/u
