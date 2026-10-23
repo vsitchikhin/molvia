@@ -524,20 +524,8 @@ export default defineComponent({
 }
 
 // A receipt being read «breathes» (handoff 03): no percent, no timer — work that takes a while.
-// Still under «reduce motion» and with no connection, when nothing is being read anyway.
+// Still with no connection, when nothing is being read anyway.
 .breathing :deep(.icon) {
-  animation: breathe 1.6s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .breathing :deep(.icon) {
-    animation: none;
-  }
-}
-
-@keyframes breathe {
-  50% {
-    opacity: 0.35;
-  }
+  @include work-breath;
 }
 </style>

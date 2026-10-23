@@ -6,6 +6,7 @@
       live: tag === 'button' || tag === 'a',
       option: tag === 'li',
       wrap,
+      whole,
       danger,
       inactive,
       selected,
@@ -79,9 +80,13 @@ const SELECTED = new Set([
  *   tint     — the icon stands in a circle of 40 (MOL-176): a colour — a category's, on its
  *              `cat-tint-share` — or `muted`, `surface-2` under `text-muted`, for what has no colour;
  *   wrap     — the title breaks onto lines instead of ending in «…»;
+ *   whole    — the meta stands whole, in as many lines as it takes: an explanation cut at two lines
+ *              explains nothing — the newcomer's steps on a phone of 320 (MOL-203). A list of rows
+ *              keeps its two, so a long place does not grow the row without end;
  *   next     — the chevron (the owner's В-14 «а»): the row opens something to go on with — a screen, a
- *              sheet with fields. A row that acts at once or asks to confirm has none, and one card
- *              never mixes the two (DESIGN.md; held by review, the card is the screen's);
+ *              sheet with fields, or a fork on the way to them (MOL-203). A row that acts at once or asks
+ *              to confirm has none, and one card never mixes the two (DESIGN.md; held by review, the card
+ *              is the screen's);
  *   danger   — the title and the icon in `bad-ink`: the row destroys;
  *   inactive — not now (Ф-6, MOL-174): focusable, `aria-disabled`, a press reaching nobody, the link
  *              followed nowhere — a link loses its `href` too, or a middle click or a long press would
@@ -112,6 +117,7 @@ export default defineComponent({
     icon: { type: [Object, Function] as PropType<Component>, default: undefined },
     tint: { type: String, default: '' },
     wrap: { type: Boolean, default: false },
+    whole: { type: Boolean, default: false },
     next: { type: Boolean, default: false },
     danger: { type: Boolean, default: false },
     inactive: { type: Boolean, default: false },
@@ -269,6 +275,13 @@ export default defineComponent({
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
+}
+
+.whole .meta {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: none;
+  line-clamp: none;
 }
 
 .below {

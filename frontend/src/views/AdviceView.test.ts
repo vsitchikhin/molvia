@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
-import { ERROR, adviceResponseSchema } from '@molvia/model'
+import { ERROR, adviceResponseSchema, tripViewCodec } from '@molvia/model'
 import type {
   AdvicePlace,
   AdviceResponse,
@@ -12,6 +12,7 @@ import type {
   AdviceSearchResponse,
   PendingVerdicts,
   Rating,
+  ReceiptsResponse,
   VerdictAmendment,
   VerdictCard,
 } from '@molvia/model'
@@ -24,6 +25,7 @@ import IconMagnify from '~icons/mdi/magnify'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
+import { useTripStore } from '@/stores/trip'
 import AdviceView from '@/views/AdviceView.vue'
 
 const advice = vi.fn<() => Promise<AdviceResponse>>()
@@ -33,9 +35,11 @@ const amendVerdict = vi.fn<(itemId: string, patch: VerdictAmendment) => Promise<
 const withdrawVerdict = vi.fn<(itemId: string) => Promise<void>>()
 const rateItem =
   vi.fn<(itemId: string, rating: Rating) => Promise<{ verdict: VerdictCard; created: boolean }>>()
+/** What the server holds of the person's receipts; none unless a test says so. */
+let held: ReceiptsResponse['receipts'] = []
 vi.mock('@/api', () => ({
   api: {
-    receipts: () => Promise.resolve({ receipts: [] }),
+    receipts: () => Promise.resolve({ receipts: held }),
     advice: () => advice(),
     adviceSearch: (query: string) => adviceSearch(query),
     pendingVerdicts: () => pendingVerdicts(),
@@ -143,7 +147,25 @@ function retries(): Element[] {
   )
 }
 
-async function render({ identity = true, country = 'AM' } = {}) {
+/** A record typed by hand, open at «Рынок». */
+function openTrip() {
+  return tripViewCodec.parse({
+    id: 'bbbbbbbb-0000-4000-8000-0000000000aa',
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    currency: 'AMD',
+    rate: null,
+    rateProvider: null,
+    rateJump: null,
+    rateStale: false,
+    place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Рынок' },
+    expenses: [],
+    total: [],
+    converted: null,
+  })
+}
+
+async function render({ identity = true, country = 'AM', trip = false } = {}) {
   localStorage.setItem('molvia.actor', ME)
   localStorage.setItem(
     `molvia.settings.${ME}`,
@@ -152,6 +174,7 @@ async function render({ identity = true, country = 'AM' } = {}) {
   const pinia = createPinia()
   setActivePinia(pinia)
   useActorStore().id = identity ? ME : null
+  if (trip) useTripStore().current = openTrip()
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/')
   const view = mount(AdviceView, {
@@ -516,6 +539,7 @@ describe('AdviceView', () => {
     adviceSearch.mockReset()
     pendingVerdicts.mockReset()
     pendingVerdicts.mockResolvedValue({ items: [], total: 0 })
+    held = []
     vi.restoreAllMocks()
     online(true)
   })
@@ -636,6 +660,124 @@ describe('AdviceView', () => {
       ).toBe(false)
     })
 
+    it('with receipts «Записать вручную» is a row of its own under the cycle, and asks «Где вы?» (2a)', async () => {
+      advice.mockResolvedValue(answer([]))
+      const { view } = await render()
+      const row = view
+        .findAllComponents({ name: 'ListRow' })
+        .find((found) => found.text().includes(en.purchases.manual_by_hand))
+
+      expect(row?.element.tagName).toBe('BUTTON')
+      expect(row?.text()).toContain(en.advice.home.manual_body)
+      // It opens a sheet with fields — the chevron of В-14 — and stands in a card of its own, the
+      // only row there: the cycle is not mixed with it.
+      expect(row?.find('.chevron').exists()).toBe(true)
+      expect(row?.element.closest('ol')).toBeNull()
+      expect(row?.element.parentElement?.classList.contains('list')).toBe(true)
+      expect(row?.element.parentElement?.children).toHaveLength(1)
+
+      await row?.trigger('click')
+      await flushPromises()
+      expect(document.body.querySelector('dialog[open]')?.textContent).toContain(
+        en.trip.start.title,
+      )
+    })
+
+    // With a record open the row asks whether to go on with it or start anew — no field in that sheet,
+    // but both ways go on to fields: the record, or «Где вы?». A fork on the way, not a confirmation, so
+    // the chevron of В-14 stays (owner's decision on adversarial А2 of MOL-203).
+    it('with a record open the same row, its chevron kept, asks to go on with it or start anew', async () => {
+      advice.mockResolvedValue(answer([]))
+      const { view } = await render({ trip: true })
+      const row = view
+        .findAllComponents({ name: 'ListRow' })
+        .find((found) => found.text().includes(en.purchases.manual_by_hand))
+      expect(row?.find('.chevron').exists()).toBe(true)
+
+      await row?.trigger('click')
+      await flushPromises()
+      const sheet = document.body.querySelector('dialog[open]')
+      expect(sheet?.textContent).toContain(
+        en.purchases.manual_ask.title.replace('{place}', 'Рынок'),
+      )
+      expect(sheet?.textContent).toContain(
+        en.purchases.manual_ask.continue.replace('{place}', 'Рынок'),
+      )
+      expect(sheet?.textContent).toContain(en.purchases.manual_ask.finish)
+    })
+
+    it('without receipts no row of «Записать вручную»: the strip records (Д-3)', async () => {
+      advice.mockResolvedValue(answer([], { geography: { country: 'GE', city: 'Гюмри' } }))
+      const { view } = await render({ country: 'GE' })
+      expect(view.text()).not.toContain(en.purchases.manual_by_hand)
+      expect(view.text()).not.toContain(en.advice.home.manual_body)
+    })
+
+    const reading: ReceiptsResponse['receipts'][number] = {
+      id: 'cccccccc-0000-4000-8000-000000000003',
+      status: 'reading',
+      failure: null,
+      parts: 1,
+      received: 1,
+      capturedAt: new Date(),
+      country: 'AM',
+      language: 'en',
+      header: null,
+      total: null,
+      balanced: false,
+      lineCount: 0,
+      unsettled: 0,
+      place: null,
+      tripId: null,
+    }
+
+    it('the first receipt being read is a row of the kit that breathes and leads to «Покупки» (2c)', async () => {
+      held = [reading]
+      advice.mockResolvedValue(answer([]))
+      const { view, router } = await render()
+      const row = view.get('.pending .list-row')
+
+      expect(view.text()).toContain(en.advice.home.parsing.title)
+      expect(row.text()).toContain(en.purchases.group_working)
+      expect(row.find('.chevron').exists()).toBe(true)
+      // Being read, as on «Покупки»: no percent, no timer — the icon breathes.
+      expect(row.classes()).toContain('breathing')
+
+      await row.trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.name).toBe('purchases')
+    })
+
+    // As on «Покупки»: with no connection nothing is being read, so nothing breathes — the row stays.
+    it('the receipt being read stops breathing once the connection goes, and keeps its row', async () => {
+      held = [reading]
+      advice.mockResolvedValue(answer([]))
+      const { view } = await render()
+      expect(view.get('.pending .list-row').classes()).toContain('breathing')
+
+      online(false)
+      window.dispatchEvent(new Event('offline'))
+      await flushPromises()
+
+      const row = view.get('.pending .list-row')
+      expect(row.text()).toContain(en.purchases.group_working)
+      expect(row.classes()).not.toContain('breathing')
+    })
+
+    it('the cycle is the kit`s rows: two lead on with a chevron, the last has none (MOL-203)', async () => {
+      advice.mockResolvedValue(answer([]))
+      const { view } = await render()
+      const rows = view
+        .findAllComponents({ name: 'ListRow' })
+        .filter((row) => row.element.closest('ol') !== null)
+
+      expect(rows.map((row) => row.element.tagName)).toEqual(['BUTTON', 'BUTTON', 'DIV'])
+      expect(rows.map((row) => row.find('.chevron').exists())).toEqual([true, true, false])
+      // A step is an explanation: its title and its meta wrap whole rather than end in «…» on a
+      // narrow phone.
+      expect(rows.every((row) => row.classes('wrap') && row.classes('whole'))).toBe(true)
+    })
+
     it('purchases waiting for a verdict: «Now rate them», and the card leads to «Оценки»', async () => {
       advice.mockResolvedValue(answer([]))
       pendingVerdicts.mockResolvedValue({
@@ -653,7 +795,13 @@ describe('AdviceView', () => {
 
       expect(view.text()).toContain(en.advice.home.pending.title)
       expect(view.text()).not.toContain(en.advice.home.new_capture.title)
-      await view.get('.pending .purchase-row').trigger('click')
+      // The kit's row: the star is a status in the muted ink, the chevron says it opens (Ф-4).
+      const row = view.get('.pending .list-row')
+      expect(row.find('.chevron').exists()).toBe(true)
+      expect(row.find('.icon').exists()).toBe(true)
+      expect(row.find('.circle').exists()).toBe(false)
+      expect(row.text()).toContain('Рынок')
+      await row.trigger('click')
       await flushPromises()
       expect(router.currentRoute.value.name).toBe('verdicts')
     })

@@ -92,6 +92,45 @@ test('one device ends another: the other meets the login screen, this one stays'
   }
 })
 
+// The list card rounds a row at its edge while in focus (MOL-203, adversarial А1); by depth alone it took
+// «End», a pill in the last row, and in focus its bottom corners went to the card's 20 — the radii scaled
+// down together, the pill a dome (round 2, Б1). A button keeps its variant's form in every state.
+test('«End» in the last row keeps its pill in the keyboard’s focus', async ({
+  page,
+  browser,
+}, testInfo) => {
+  await signedIn(page)
+  const other = await secondDevice(browser, page, testInfo)
+  try {
+    await openDevices(page)
+    const end = page.getByRole('button', { name: /^End the session on / })
+    await expect(end).toBeVisible()
+    const radii = () =>
+      end.evaluate((element) => {
+        const style = getComputedStyle(element)
+        return [
+          style.borderTopLeftRadius,
+          style.borderTopRightRadius,
+          style.borderBottomRightRadius,
+          style.borderBottomLeftRadius,
+        ]
+      })
+    const rest = await radii()
+    expect(new Set(rest).size).toBe(1)
+
+    // From the keyboard: the screen was reached by taps, and a focus from a script after a tap is no
+    // `:focus-visible`.
+    await end.focus()
+    await page.keyboard.press('Shift+Tab')
+    await page.keyboard.press('Tab')
+    await expect(end).toBeFocused()
+    expect(await end.evaluate((element) => element.matches(':focus-visible'))).toBe(true)
+    expect(await radii()).toEqual(rest)
+  } finally {
+    await other.context.close()
+  }
+})
+
 test('signing out here erases this device and leaves the other one signed in', async ({
   page,
   browser,

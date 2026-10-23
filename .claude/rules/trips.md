@@ -291,7 +291,11 @@ answer. A retry of the history ends with the screen that asked (И1).
 
 **The newcomer's home is «Что брать»** (`AdviceHomeNew`, handoff `02`): «Запишите первые
 покупки», or «Осталось оценить» once purchases wait for a verdict, the cycle of three steps whose
-first two change tab, the line about money and trust, and «Записать покупки» below. **Only for a
+first two change tab, the line about money and trust, and «Записать покупки» below. **Every row is the kit's
+`ListRow`** (MOL-203, Ф-12): the steps' titles and meta whole, never «…» — an explanation cut at 320 explains
+nothing (`whole`); the star of «ждут оценки» muted, a status and not a button (Ф-4); with receipts «Записать
+вручную» a row of its own card under the cycle (`ManualEntryButton row`, 2a), and the first receipt being read
+breathes as on «Покупки» (`work-breath`, 2c). **Only for a
 list known to be empty** — the answer of `GET /advice` now or remembered, with no rows; no answer and
 no memory is offline or a failure, never a newcomer — MOL-56's «no answer is not the answer „no“».
 The memory of `useAdvice` is that knowledge, so no flag of its own is kept; `answeredEmpty` stays

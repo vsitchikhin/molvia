@@ -214,6 +214,13 @@ describe('ListRow', () => {
     expect(mount(ListRow, { props: { wrap: true } }).classes()).toContain('wrap')
   })
 
+  it('keeps the meta to two lines unless it is asked to stand whole (MOL-203)', () => {
+    expect(mount(ListRow, { props: { meta: 'Строки чека' } }).classes()).not.toContain('whole')
+    expect(mount(ListRow, { props: { meta: 'Строки чека', whole: true } }).classes()).toContain(
+      'whole',
+    )
+  })
+
   describe('a circle under the icon (MOL-176)', () => {
     it('stands only with a tint, the icon inside it', () => {
       const plain = mount(ListRow, { props: { title: 'Наличные', icon: IconWallet } })

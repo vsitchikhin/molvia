@@ -1353,6 +1353,8 @@
       "row_card": "Ardshin card",
       "row_long": "Lori cheese, brined, from Shirak, by weight at the market counter",
       "row_long_meta": "The title wraps, and the meta keeps to two lines at most: anything longer ends in an ellipsis, so the row never grows without end",
+      "row_whole": "An explanation — the meta whole",
+      "row_whole_meta": "A step explains, and one cut by an ellipsis explains nothing: with whole the meta stands whole, in as many lines as it takes — as the newcomer’s steps on «What to buy» on a phone 320 wide",
       "row_download_meta": "Acts at once — no chevron",
       "row_erase_meta": "Asks to confirm — no chevron",
       "row_link": "A link that goes on",
