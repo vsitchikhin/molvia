@@ -220,10 +220,13 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   between two frames (CI: 50.0 of 60 in every attempt, run 39922499322), measured, under half (12.5) —
   and in more than three steps, as Е and Е′ (`moving > 3`; the rise held is 7–8). Not more than one: a
   jump with a pixel drawn before it is two steps, the hold arming on the pixel and taking the rest — a
-  block in 20–70 ms is 2–3 (adversarial В1). **Never in the tests of the motion itself** (adversarial
-  А1): held after the first move, the hold covers the steepest of the rise, which then counts only as
-  its average — a rise of 100 ms, 33 px a frame on screen, passed as smooth, and a runner's own 70 ms
-  after the hold left `moving` at 3 (А2). Е and Е′ take the frames as the runner gives them. **The
+  block in 20–90 ms is 2–3 in every phase (adversarial В1). **Never in the tests of the motion itself**
+  (adversarial А1): held after the first move, the hold covers the steepest of the rise, which then
+  counts only as its average — a rise of 100 ms, 33 px a frame on screen, passed as smooth, and a
+  runner's own 70 ms after the hold left `moving` at 3 (А2). Е and Е′ take the frames as the runner
+  gives them. **The test of the dropped frame keeps А1, named** (adversarial Г1): its «not a jump»
+  holds to ~90 ms, Е to ~110 — a block of 100–120 ms, 55 of 60 px drawn in one step, passes it while
+  Е fails it; Е guards the product, and the hold cannot be kept without the gap. **The
   price, named:** the count of frames the field moved in (`moving > 3`) stays a count — the one check
   that tells a jump the runner held right then from a rise it held, which look alike by time — so a
   runner busy over ~110 ms of the 220 ms rise still fails it, and over ~80 ms beyond the hold of 60 in

@@ -457,6 +457,7 @@ test.describe('«Тут дешевле»', () => {
     // Not a jump either: one with a frame dropped right on it is half the way over two frames' time,
     // and the frames' stamps, a tenth of a millisecond coarse, put it a hair under (adversarial Б1);
     // with a pixel drawn before it, the hold takes the rest — two steps (В1). The rise held is 7–8.
+    // A block of 20–90 ms is 2–3; one of 100–120 ms, a jump to Е, passes here as А1 passed it (Г1).
     expect(motion.moving).toBeGreaterThan(3)
   })
 
