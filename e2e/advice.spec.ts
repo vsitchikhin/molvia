@@ -256,6 +256,34 @@ test('nothing rated yet: the newcomer is offered to act, and the cycle leads to 
   await expect(page).toHaveURL(/\/verdicts$/)
 })
 
+// The headline waits for the queue of verdicts — it speaks of it — and its skeleton was a card of
+// paragraphs: the cycle under it, drawn at once, jumped 70 px down as the queue answered, under a thumb
+// aimed at a step (MOL-178: a screen trades `groups` for its answer's shape; adversarial А3 of MOL-203).
+test('the newcomer`s headline comes in where its skeleton stood: the cycle under it stays', async ({
+  page,
+}) => {
+  // Still, so every animation that ends has ended when a top is read — the skeleton breathes forever.
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await person(page)
+  let release: () => void = () => undefined
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('**/api/verdicts/pending*', async (route) => {
+    await held
+    await route.continue()
+  })
+  await page.goto('/')
+  await expect(page.locator('.home .skeleton')).toBeVisible()
+  await page.evaluate(() => document.fonts.ready)
+  const before = await topOf(page, '.home ol')
+
+  release()
+  await expect(page.getByRole('heading', { name: 'Photograph your first receipt' })).toBeVisible()
+  await expect(page.locator('.home .skeleton')).toHaveCount(0)
+  expect(Math.abs((await topOf(page, '.home ol')) - before)).toBeLessThanOrEqual(2)
+})
+
 // «Add by hand» is the one row of its card, which clips it to its radius: its square ring of the
 // keyboard's focus lost all four corners, where the ghost button before it kept a whole one (MOL-203,
 // adversarial А1). In focus it is rounded as the card, and the ring follows.

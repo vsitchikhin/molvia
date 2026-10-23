@@ -7,7 +7,19 @@
       <h2 class="intro-title">{{ t(INTRO[variant].title) }}</h2>
       <p class="intro-body">{{ t(INTRO[variant].body, { app: t('app.name') }) }}</p>
     </div>
-    <ScreenSkeleton v-else-if="asking" :groups="[70]" />
+    <!-- The headline's own shape while the queue is on its way, on the ground as the answer stands: a
+         card of paragraphs left the cycle 70 px higher than the answer put it (MOL-178, adversarial А3
+         of MOL-203). A line of the title and four of the phrase — «Сфотографируйте первый чек» on a
+         phone of 390–412, the newcomer with receipts; where the answer wraps otherwise the cycle moves
+         by its lines. -->
+    <ScreenSkeleton v-else-if="asking">
+      <span class="intro ghost-intro">
+        <span class="ghost-title"><span class="ghost-bar"></span></span>
+        <span v-for="width in [100, 94, 97, 56]" :key="width" class="ghost-line"
+          ><span class="ghost-bar" :style="{ width: `${width}%` }"></span
+        ></span>
+      </span>
+    </ScreenSkeleton>
 
     <!-- (б): the first receipt is being read (MOL-127) — its row, which leads to «Покупки», and
          breathes as it does there (2c). -->
@@ -235,6 +247,36 @@ export default defineComponent({
   color: var(--text);
   font-size: var(--text-body);
   line-height: var(--leading-body);
+}
+
+/* The lines of the headline at their own heights, a bar in the middle of each. */
+.ghost-intro {
+  display: block;
+}
+
+.ghost-title,
+.ghost-line {
+  display: flex;
+  align-items: center;
+}
+
+.ghost-title {
+  height: calc(var(--text-title) * var(--leading-tight));
+  margin-bottom: var(--space-2);
+
+  .ghost-bar {
+    width: 64%;
+  }
+}
+
+.ghost-line {
+  height: calc(var(--text-body) * var(--leading-body));
+}
+
+.ghost-bar {
+  @include skeleton-bar;
+
+  height: var(--skeleton-line);
 }
 
 .pending {
