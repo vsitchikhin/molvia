@@ -535,9 +535,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   never not now** (MOL-225): `busy` with its `busy-label` («Удаляем…») in the action's look,
   `disabled` or not, as wide as the wider word; no spinner, and the linter refuses `busy` without it.
 - **A row is `ListRow` or `NavRow`, a caps caption `SectionCaption` — caps nowhere else, the linter
-  holds it** (MOL-175): the chevron is «opens something to go on with» — a screen or a sheet with
-  fields (В-14) — never on a row that acts or asks to confirm, never mixed in one card; a caption's
-  place is in `:where()`, the screen's class sets the space above it. **An operation is
+  holds it** (MOL-175): the chevron is «opens something to go on with» — a screen, a sheet with
+  fields or a fork on the way to them (В-14, MOL-203) — never on a row that acts or asks to confirm,
+  never mixed in one card; a caption's place is in `:where()`, the screen's class sets the space above
+  it. **An operation is
   `OperationRow`** (MOL-176): its words come from `journalRowProps` and `operationRowProps`, never
   from the row; the chevron on every one, the amounts in one column, never coloured, never cut — a row
   narrower than 22rem stands its amount under the words. **A search is `SearchField`** (MOL-177): a

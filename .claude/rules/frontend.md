@@ -333,10 +333,17 @@ The detail behind the frontend lines of `CLAUDE.md`.
   **The chevron means «opens something to go on with»** (owner's В-14 «а»): a screen or a sheet with
   fields. A row that acts at once («Скачать мои данные») or asks to confirm («Удалить», «Выйти») has
   none, and one card never mixes the two — then «Политика» moves out of «Ваши данные», and «Написать
-  разработчику», a sheet with fields, gets one though 147 drew it without. `ListRow` takes it as an
+  разработчику», a sheet with fields, gets one though 147 drew it without. **A fork on the way to fields
+  keeps it** (owner's decision on adversarial А2 of MOL-203): «Записать вручную» with a record open asks
+  «Уже записываете «Рынок»» — no field there, but «Продолжить» goes to the record and «Закончить и начать
+  новую» to «Где вы?», both on to fields; asking to confirm is a question whose «yes» is the act itself.
+  The chevron is the row's, not of one outcome, and a row that changed its look by a state the screen does
+  not show would say nothing. `ListRow` takes it as an
   explicit `next`, never guessed from the tag, since the card decides and not the tag; `NavRow`, an
   entry, always has it. That a card does not mix is held by review and DESIGN.md: only the whole
-  screen shows it, as only the place shows an icon's role (MOL-173). **The row's icon is a prop,
+  screen shows it, as only the place shows an icon's role (MOL-173). **The meta keeps two lines, unless it
+  explains** (`whole`, MOL-203): the newcomer's steps on a phone of 320 lost «одной кнопкой» and «дешевле» to the
+  «…» — a list of places or operations keeps its two, so a row does not grow without end. **The row's icon is a prop,
   drawn in the row** at `--icon-md`, so `molvia/icon-size` sees it in one file and no screen draws a
   22 beside a 24. **A row's button look is taken off in `:where()`**: the hairline `AppCard list`
   draws between rows is a `border-top`, and an equal selector reset it by load order (`AdviceHomeNew`
@@ -356,7 +363,18 @@ The detail behind the frontend lines of `CLAUDE.md`.
   ring itself — 2 px of the same colour on the same place — and the keyboard lost the row it stood on,
   where a radio group puts the focus first (adversarial А1, WCAG 2.4.7); chips draw it the other way,
   the ring inside and the focus outside, which a list card clips. `e2e/kit-rows` holds both in both
-  engines.
+  engines. **The plain focus of a row at the card's edge is rounded there while it stands** (`AppCard`,
+  MOL-203, adversarial А1): square, the card's radius cut its ring at the corners — «Записать вручную», the
+  one row of its card, lost all four, where the ghost button before it kept a whole one. Only the corners at
+  the card's edge, only in focus, so the hairline between rows stays straight; a row in an `li` of its own is
+  reached through it. **Rows of the kit only, by their class** (`.list-row`, `.nav-row`): by depth alone it
+  took a pill «Завершить» in the last row of «Устройства» into a dome and rounded the line «не знаем,
+  сохранилось ли» on top in the middle of «Ваши данные» (round 2, Б1, Б2). `kit-rows` holds a first, a middle
+  and a last row, `advice.spec` the newcomer's row, `devices.spec` and `settings.spec` the two that are not
+  rows. **The price, named** (self-review 7): a row built in place, not of the kit — «Написать разработчику»,
+  «Бот», «Устройства» and «Выйти» of «Настройки», «Сканировать штрихкод» of a record, `PurchaseRow`, `TripRow` —
+  keeps its ring cut at the card's edge, as on master, until its screen comes to the kit; the
+  selector is not widened for them.
   **Active** is the row the keyboard stands on in a list a field owns (К-4): the fill without the
   ring, since the focus is in the field; on a chosen row the fill is the layer's alone — the row's own
   square fill stood out past the round ring at every corner (adversarial В1). Only a `div` row takes a button into its tail — a button
@@ -737,7 +755,20 @@ The detail behind the frontend lines of `CLAUDE.md`.
   besides** (self-review 1 of MOL-192): the frame stands its parts 8 apart where the answer stands its
   groups 24, so the card of rows comes 16 px lower; and a row with a line under its bar — a share of
   «Пришло», as five plans of the owner's six are — is some 20 px taller than its bars. All of it growth
-  below the switcher, which MOL-138's hold allows. **The price:** a card adds its padding and
+  below the switcher, which MOL-138's hold allows. **The newcomer's headline is its own shape** (MOL-203,
+  adversarial А3): in place of `groups`, whose card left the cycle 70 px higher than the answer, the words of
+  the commonest answer — the queue empty — set unseen give the skeleton its height, and the bars stand over
+  the first lines. In an attribute (`content: attr()`), so no reader, no search of the page and no test of
+  the text finds «первые покупки» over a queue not known (adversarial В of MOL-128). A shape of fixed lines
+  was tried first and stood still on one phone and one language only — a line of the title and four of the
+  phrase, «Photograph your first receipt» at 412; Russian at 390 moved the cycle 28 px, 320 up to 52, «Запишите
+  первые покупки» 25 up (self-review 4, adversarial round 2). `advice.spec` holds the cycle still at 412 and 320. **The price, named:** the queue answering «Осталось оценить» or «Первый чек разбираем» moves the cycle
+  by the difference of its words, while its card comes in over it anyway; and a phrase longer than the bars
+  has its last lines empty under them. **With no answer the place shrinks away** (adversarial В1, owner's
+  choice): the queue failing leaves no headline to draw, and the skeleton as tall as one went in a frame,
+  the cycle 134 px up from under a thumb; the place is one block in `AppReveal`, the answer coming into it
+  without a move, and with none it shrinks over frames (MOL-151) — still under «reduce motion», as every
+  `AppReveal`. `advice.spec` holds the shrinking. **The price:** a card adds its padding and
   edge, so a skeleton of `groups` is some 34 px taller than before — taller, not shorter, which the hold
   of MOL-138 needs.
 - **An installed app takes a new version only when nobody can lose anything to it: hidden, and

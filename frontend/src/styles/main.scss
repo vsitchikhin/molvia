@@ -175,3 +175,10 @@ html[data-nav] {
     opacity: 1;
   }
 }
+
+// The icon of a work under way breathes (`work-breath`, MOL-203). Global for the same reason.
+@keyframes work-breath {
+  50% {
+    opacity: 0.35;
+  }
+}

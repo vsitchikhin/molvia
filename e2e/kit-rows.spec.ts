@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 // DOM for the code inside page.evaluate, which runs in the browser.
 import { expect, test } from '@playwright/test'
+import type { Locator } from '@playwright/test'
 import { open } from './session'
 
 /**
@@ -37,6 +38,49 @@ test('a chosen row shows the keyboard’s focus inside its ring, with the fill b
   expect(look.ring).toBe(2)
   // The outline's outer edge lies `-offset` inside the layer; the ring takes the first 2 px of it.
   expect(-look.offset - look.ring).toBeGreaterThanOrEqual(2)
+})
+
+// The list card clips its rows to its radius, and the square ring of a row at its edge was cut at the
+// card's corners — «Add by hand», the one row of its card, lost all four (MOL-203, adversarial А1). A row
+// in focus is rounded at the card's own edges and the ring follows; between rows it stays square, so the
+// hairline above a row stays straight.
+test('a row in focus at the card’s edge is rounded as the card there, and square between rows', async ({
+  page,
+}) => {
+  await open(page, '/_kit')
+  const card = page
+    .getByRole('heading', { name: 'Goes on' })
+    .locator('xpath=following-sibling::ul[1]')
+  const corners = async (row: Locator) => {
+    // A key first, so the engine takes the focus that follows for the keyboard's.
+    await page.keyboard.press('Tab')
+    await row.focus()
+    return row.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        visible: element.matches(':focus-visible'),
+        top: [style.borderTopLeftRadius, style.borderTopRightRadius],
+        bottom: [style.borderBottomLeftRadius, style.borderBottomRightRadius],
+      }
+    })
+  }
+  const round = ['20px', '20px']
+  const square = ['0px', '0px']
+  expect(await corners(card.getByRole('button', { name: /^Cash, drams/ }))).toEqual({
+    visible: true,
+    top: round,
+    bottom: square,
+  })
+  expect(await corners(card.getByRole('button', { name: /^An explanation/ }))).toEqual({
+    visible: true,
+    top: square,
+    bottom: square,
+  })
+  expect(await corners(card.getByRole('link', { name: /^A link while offline/ }))).toEqual({
+    visible: true,
+    top: square,
+    bottom: round,
+  })
 })
 
 // Rounded itself, a chosen row bent the hairline the list card draws as its `border-top` (round 3,

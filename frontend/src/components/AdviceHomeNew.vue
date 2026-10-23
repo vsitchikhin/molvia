@@ -2,34 +2,64 @@
   <div class="home">
     <!-- The headline speaks of the queue of verdicts, and only of one known: «первые покупки»
          over a queue not yet answered told a person with twelve purchases they had none
-         (adversarial В) — so until it answers, the skeleton; with no answer to be had, nothing. -->
-    <div v-if="variant !== 'unknown'" class="intro">
-      <h2 class="intro-title">{{ t(INTRO[variant].title) }}</h2>
-      <p class="intro-body">{{ t(INTRO[variant].body, { app: t('app.name') }) }}</p>
-    </div>
-    <ScreenSkeleton v-else-if="asking" :groups="[70]" />
+         (adversarial В) — so until it answers, the skeleton; with no answer to be had, nothing.
+         Its place is one block: the answer comes into it where the skeleton stood, and with none
+         the place shrinks away over frames — gone in one, it took the cycle 134 px up from under a
+         thumb (adversarial В1 of MOL-203, owner's choice). -->
+    <AppReveal>
+      <div v-if="variant !== 'unknown' || asking" class="intro-place">
+        <div v-if="variant !== 'unknown'" class="intro">
+          <h2 class="intro-title">{{ t(INTRO[variant].title) }}</h2>
+          <p class="intro-body">{{ t(INTRO[variant].body, { app: t('app.name') }) }}</p>
+        </div>
+        <!-- The headline's own shape while the queue is on its way, on the ground as the answer
+             stands: a card of paragraphs left the cycle 70 px higher than the answer put it (MOL-178,
+             adversarial А3 of MOL-203). Its height is the words of the commonest answer, the queue
+             empty, set unseen — a shape of fixed lines fitted one phone and one language and moved the
+             cycle on the others (self-review 4); the bars stand over them. -->
+        <ScreenSkeleton v-else>
+          <span class="intro ghost-intro">
+            <span class="ghost-title" :data-words="t(INTRO.new.title)"
+              ><span class="ghost-lines"
+                ><span class="ghost-line"><span class="ghost-bar"></span></span></span
+            ></span>
+            <span class="ghost-body" :data-words="t(INTRO.new.body, { app: t('app.name') })"
+              ><span class="ghost-lines"
+                ><span v-for="width in [100, 94, 58]" :key="width" class="ghost-line"
+                  ><span class="ghost-bar" :style="{ width: `${width}%` }"></span></span></span
+            ></span>
+          </span>
+        </ScreenSkeleton>
+      </div>
+    </AppReveal>
 
-    <!-- (б): the first receipt is being read (MOL-127) — its row, which leads to «Покупки». -->
+    <!-- (б): the first receipt is being read (MOL-127) — its row, which leads to «Покупки», and
+         breathes as it does there (2c). -->
     <AppReveal>
       <AppCard v-if="variant === 'parsing' && reading" class="pending" list>
-        <PurchaseRow
+        <ListRow
+          :class="{ breathing }"
           :icon="underWay?.state === 'parsing' ? IconSync : IconCloudUpload"
           :title="t('purchases.group_working')"
-          :meta="underWayMeta"
-          @open="goTab('purchases')"
+          :meta="underWayMeta ?? ''"
+          wrap
+          next
+          @click="goTab('purchases')"
         />
       </AppCard>
     </AppReveal>
 
-    <!-- (в): purchases recorded and none rated — the one thing left to do, and where. -->
+    <!-- (в): purchases recorded and none rated — the one thing left to do, and where. The star is a
+         status, not a button (Ф-4): the chevron says the row opens. -->
     <AppReveal>
       <AppCard v-if="pending > 0" class="pending" list>
-        <PurchaseRow
+        <ListRow
           :icon="IconStar"
-          accent
           :title="t('verdict.pending_count', { n: pending }, pending)"
-          :meta="pendingFrom"
-          @open="goTab('verdicts')"
+          :meta="pendingFrom ?? ''"
+          wrap
+          next
+          @click="goTab('verdicts')"
         />
       </AppCard>
     </AppReveal>
@@ -39,51 +69,55 @@
          to another tab are buttons; the last is this screen, and nothing to tap. -->
     <AppCard as="ol" list>
       <li>
-        <button class="line link" type="button" @click="goTab('purchases')">
-          <IconCart class="icon" aria-hidden="true" />
-          <span class="text">
-            <span class="title">{{
-              t(
-                country
-                  ? 'advice.home.step_purchases_capture_title'
-                  : 'advice.home.step_purchases_title',
-              )
-            }}</span>
-            <span class="sub">{{
-              t(
-                country
-                  ? 'advice.home.step_purchases_capture_body'
-                  : 'advice.home.step_purchases_body',
-              )
-            }}</span>
-          </span>
-          <IconChevronRight class="chevron" aria-hidden="true" />
-        </button>
+        <ListRow
+          :icon="IconCart"
+          :title="
+            t(
+              country
+                ? 'advice.home.step_purchases_capture_title'
+                : 'advice.home.step_purchases_title',
+            )
+          "
+          :meta="
+            t(
+              country
+                ? 'advice.home.step_purchases_capture_body'
+                : 'advice.home.step_purchases_body',
+            )
+          "
+          wrap
+          whole
+          next
+          @click="goTab('purchases')"
+        />
       </li>
       <li>
-        <button class="line link" type="button" @click="goTab('verdicts')">
-          <IconStar class="icon" aria-hidden="true" />
-          <span class="text">
-            <span class="title">{{ t('advice.home.step_verdicts_title') }}</span>
-            <span class="sub">{{ t('advice.home.step_verdicts_body') }}</span>
-          </span>
-          <IconChevronRight class="chevron" aria-hidden="true" />
-        </button>
+        <ListRow
+          :icon="IconStar"
+          :title="t('advice.home.step_verdicts_title')"
+          :meta="t('advice.home.step_verdicts_body')"
+          wrap
+          whole
+          next
+          @click="goTab('verdicts')"
+        />
       </li>
-      <li class="line">
-        <IconLightbulb class="icon" aria-hidden="true" />
-        <span class="text">
-          <span class="title">{{ t('advice.home.step_advice_title') }}</span>
-          <span class="sub">{{ t('advice.home.step_advice_body') }}</span>
-        </span>
+      <li>
+        <ListRow
+          as="div"
+          :icon="IconLightbulb"
+          :title="t('advice.home.step_advice_title')"
+          :meta="t('advice.home.step_advice_body')"
+          wrap
+          whole
+        />
       </li>
     </AppCard>
 
     <!-- With receipts the strip holds the camera, and the record typed by hand is a row of its own
          under the cycle (2a): at the market, or with the receipt lost. -->
     <div v-if="country" class="by-hand">
-      <ManualEntryButton by-hand @busy="$emit('busy', $event)" />
-      <p class="by-hand-note">{{ t('advice.home.manual_body') }}</p>
+      <ManualEntryButton row @busy="$emit('busy', $event)" />
     </div>
 
     <p class="trust">{{ t('advice.home.trust') }}</p>
@@ -94,15 +128,14 @@
 import { computed, defineComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconCart from '~icons/mdi/cart-outline'
-import IconChevronRight from '~icons/mdi/chevron-right'
 import IconLightbulb from '~icons/mdi/lightbulb-on-outline'
 import IconStar from '~icons/mdi/star-outline'
 import IconSync from '~icons/mdi/sync'
 import IconCloudUpload from '~icons/mdi/cloud-upload-outline'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
+import ListRow from '@/components/ListRow.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
-import PurchaseRow from '@/components/PurchaseRow.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import { usePendingFrom } from '@/composables/usePendingFrom'
@@ -121,6 +154,9 @@ import { useNavigation } from '@/navigation'
  * stands in the strip, «Записать вручную» is a row under the cycle. Without (Д-3): (а) «Запишите
  * первые покупки» or (в), and «Записать покупки» in the strip.
  *
+ * Every row is the kit's `ListRow` (MOL-203, Ф-12), its title wrapping, and a step's meta whole: a step
+ * cut to «…» explains nothing. Its icon is muted — a status, never the accent of a button (Ф-4).
+ *
  * Only the person's own data: other people's figures are behind access (MOL-31).
  */
 export default defineComponent({
@@ -128,12 +164,8 @@ export default defineComponent({
   components: {
     AppCard,
     AppReveal,
-    IconCart,
-    IconChevronRight,
-    IconLightbulb,
-    IconStar,
+    ListRow,
     ManualEntryButton,
-    PurchaseRow,
     ScreenSkeleton,
     SectionCaption,
   },
@@ -155,6 +187,8 @@ export default defineComponent({
         : (receipts.rows.value.find((row) => UNDER_WAY.includes(row.state)) ?? null),
     )
     const reading = computed(() => underWay.value !== null)
+    // As on «Покупки»: with no connection nothing is being read, and nothing breathes.
+    const breathing = computed(() => underWay.value?.state === 'parsing' && receipts.online.value)
     const underWayMeta = computed(() => {
       const row = underWay.value
       if (!row) return null
@@ -176,6 +210,8 @@ export default defineComponent({
     }))
     return {
       t,
+      IconCart,
+      IconLightbulb,
       IconStar,
       IconSync,
       IconCloudUpload,
@@ -184,6 +220,7 @@ export default defineComponent({
       pending,
       country,
       reading,
+      breathing,
       INTRO,
       variant: computed<'pending' | 'parsing' | 'new' | 'unknown'>(() => {
         if (pending.value > 0) return 'pending'
@@ -208,7 +245,8 @@ export default defineComponent({
   padding: 0 var(--space-1);
 }
 
-.intro-title {
+.intro-title,
+.ghost-title {
   @include display-type;
 
   margin: 0 0 var(--space-2);
@@ -217,99 +255,84 @@ export default defineComponent({
   text-wrap: balance;
 }
 
-.intro-body {
+.intro-body,
+.ghost-body {
   margin: 0;
-  color: var(--text);
   font-size: var(--text-body);
   line-height: var(--leading-body);
 }
 
+.intro-body {
+  color: var(--text);
+}
+
+/* The words of the answer, unseen, give the skeleton its height: in an attribute, so no reader, no
+   search of the page and no test of the text finds «первые покупки» over a queue not known (В). */
+.ghost-intro,
+.ghost-title,
+.ghost-body {
+  display: block;
+}
+
+.ghost-title,
+.ghost-body {
+  position: relative;
+
+  &::before {
+    visibility: hidden;
+    content: attr(data-words);
+  }
+}
+
+/* The bars over the first lines, each in the middle of its line; a phrase that takes more lines has
+   them empty under the bars. */
+.ghost-lines {
+  position: absolute;
+  inset: 0 0 auto;
+  display: grid;
+}
+
+.ghost-line {
+  display: flex;
+  align-items: center;
+}
+
+.ghost-title .ghost-line {
+  height: calc(var(--text-title) * var(--leading-tight));
+
+  .ghost-bar {
+    width: 64%;
+  }
+}
+
+.ghost-body .ghost-line {
+  height: calc(var(--text-body) * var(--leading-body));
+}
+
+.ghost-bar {
+  @include skeleton-bar;
+
+  height: var(--skeleton-line);
+}
+
 .pending {
-  margin-top: var(--space-4);
+  margin-top: var(--space-6);
 }
 
 .caption {
   margin-top: var(--space-6);
 }
 
-.line {
-  display: flex;
-  gap: var(--space-3);
-  align-items: center;
-  width: 100%;
-  min-height: calc(var(--touch-target-lg) + var(--space-3));
-  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
-  color: var(--text);
-  background: var(--surface);
-  text-align: left;
-  font: inherit;
-}
-
-/* At no weight, so the rule between rows stays `AppCard list`'s. */
-:where(.line) {
-  border: 0;
-}
-
-.link {
-  cursor: pointer;
-
-  &:hover {
-    background: var(--surface-2);
-  }
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-}
-
-.icon {
-  @include icon;
-
-  font-size: var(--icon-md);
-  color: var(--text-muted);
-}
-
-.text {
-  flex: 1;
-  min-width: 0;
-}
-
-.title,
-.sub {
-  display: block;
-  overflow-wrap: anywhere;
-}
-
-.title {
-  font-size: var(--text-headline);
-  font-weight: var(--weight-medium);
-}
-
-.sub {
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
-.chevron {
-  @include icon;
-
-  font-size: var(--icon);
-  color: var(--text-muted);
+.breathing :deep(.icon) {
+  @include work-breath;
 }
 
 .by-hand {
   margin-top: var(--space-2);
 }
 
-.by-hand-note {
-  margin: 0 var(--space-1);
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-  text-align: center;
-}
-
 .trust {
-  margin: var(--space-4) var(--space-1) 0;
+  margin: var(--space-6) var(--space-1) 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
 }
