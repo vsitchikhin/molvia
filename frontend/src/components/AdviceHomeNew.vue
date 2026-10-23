@@ -86,8 +86,7 @@
     <!-- With receipts the strip holds the camera, and the record typed by hand is a row of its own
          under the cycle (2a): at the market, or with the receipt lost. -->
     <div v-if="country" class="by-hand">
-      <ManualEntryButton by-hand @busy="$emit('busy', $event)" />
-      <p class="by-hand-note">{{ t('advice.home.manual_body') }}</p>
+      <ManualEntryButton row @busy="$emit('busy', $event)" />
     </div>
 
     <p class="trust">{{ t('advice.home.trust') }}</p>
@@ -240,13 +239,6 @@ export default defineComponent({
 
 .by-hand {
   margin-top: var(--space-2);
-}
-
-.by-hand-note {
-  margin: 0 var(--space-1);
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-  text-align: center;
 }
 
 .trust {

@@ -120,7 +120,7 @@ test('an offline trip keeps the context captured before another device changed s
   await page.context().setOffline(true)
   // The newcomer's «Что брать» holds «Записать вручную» under the cycle; the strip is the camera's
   // (MOL-127).
-  await page.getByRole('button', { name: 'Записать вручную', exact: true }).click()
+  await page.getByRole('button', { name: 'Записать вручную' }).click()
   const sheet = page.locator('dialog[open]')
   await expect(sheet).toBeVisible()
   await page.waitForTimeout(400)

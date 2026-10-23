@@ -636,6 +636,36 @@ describe('AdviceView', () => {
       ).toBe(false)
     })
 
+    it('with receipts «Записать вручную» is a row of its own under the cycle, and asks «Где вы?» (2a)', async () => {
+      advice.mockResolvedValue(answer([]))
+      const { view } = await render()
+      const row = view
+        .findAllComponents({ name: 'ListRow' })
+        .find((found) => found.text().includes(en.purchases.manual_by_hand))
+
+      expect(row?.element.tagName).toBe('BUTTON')
+      expect(row?.text()).toContain(en.advice.home.manual_body)
+      // It opens a sheet with fields — the chevron of В-14 — and stands in a card of its own, the
+      // only row there: the cycle is not mixed with it.
+      expect(row?.find('.chevron').exists()).toBe(true)
+      expect(row?.element.closest('ol')).toBeNull()
+      expect(row?.element.parentElement?.classList.contains('list')).toBe(true)
+      expect(row?.element.parentElement?.children).toHaveLength(1)
+
+      await row?.trigger('click')
+      await flushPromises()
+      expect(document.body.querySelector('dialog[open]')?.textContent).toContain(
+        en.trip.start.title,
+      )
+    })
+
+    it('without receipts no row of «Записать вручную»: the strip records (Д-3)', async () => {
+      advice.mockResolvedValue(answer([], { geography: { country: 'GE', city: 'Гюмри' } }))
+      const { view } = await render({ country: 'GE' })
+      expect(view.text()).not.toContain(en.purchases.manual_by_hand)
+      expect(view.text()).not.toContain(en.advice.home.manual_body)
+    })
+
     it('the cycle is the kit`s rows: two lead on with a chevron, the last has none (MOL-203)', async () => {
       advice.mockResolvedValue(answer([]))
       const { view } = await render()
