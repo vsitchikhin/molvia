@@ -9,14 +9,19 @@
     </div>
     <!-- The headline's own shape while the queue is on its way, on the ground as the answer stands: a
          card of paragraphs left the cycle 70 px higher than the answer put it (MOL-178, adversarial А3
-         of MOL-203). A line of the title and four of the phrase — «Сфотографируйте первый чек» on a
-         phone of 390–412, the newcomer with receipts; where the answer wraps otherwise the cycle moves
-         by its lines. -->
+         of MOL-203). Its height is the words of the commonest answer, the queue empty, set unseen —
+         a shape of fixed lines fitted one phone and one language and moved the cycle on the others
+         (self-review 4); the bars stand over them. -->
     <ScreenSkeleton v-else-if="asking">
       <span class="intro ghost-intro">
-        <span class="ghost-title"><span class="ghost-bar"></span></span>
-        <span v-for="width in [100, 94, 97, 56]" :key="width" class="ghost-line"
-          ><span class="ghost-bar" :style="{ width: `${width}%` }"></span
+        <span class="ghost-title" :data-words="t(INTRO.new.title)"
+          ><span class="ghost-lines"
+            ><span class="ghost-line"><span class="ghost-bar"></span></span></span
+        ></span>
+        <span class="ghost-body" :data-words="t(INTRO.new.body, { app: t('app.name') })"
+          ><span class="ghost-lines"
+            ><span v-for="width in [100, 94, 58]" :key="width" class="ghost-line"
+              ><span class="ghost-bar" :style="{ width: `${width}%` }"></span></span></span
         ></span>
       </span>
     </ScreenSkeleton>
@@ -233,7 +238,8 @@ export default defineComponent({
   padding: 0 var(--space-1);
 }
 
-.intro-title {
+.intro-title,
+.ghost-title {
   @include display-type;
 
   margin: 0 0 var(--space-2);
@@ -242,34 +248,57 @@ export default defineComponent({
   text-wrap: balance;
 }
 
-.intro-body {
+.intro-body,
+.ghost-body {
   margin: 0;
-  color: var(--text);
   font-size: var(--text-body);
   line-height: var(--leading-body);
 }
 
-/* The lines of the headline at their own heights, a bar in the middle of each. */
-.ghost-intro {
+.intro-body {
+  color: var(--text);
+}
+
+/* The words of the answer, unseen, give the skeleton its height: in an attribute, so no reader, no
+   search of the page and no test of the text finds «первые покупки» over a queue not known (В). */
+.ghost-intro,
+.ghost-title,
+.ghost-body {
   display: block;
 }
 
 .ghost-title,
+.ghost-body {
+  position: relative;
+
+  &::before {
+    visibility: hidden;
+    content: attr(data-words);
+  }
+}
+
+/* The bars over the first lines, each in the middle of its line; a phrase that takes more lines has
+   them empty under the bars. */
+.ghost-lines {
+  position: absolute;
+  inset: 0 0 auto;
+  display: grid;
+}
+
 .ghost-line {
   display: flex;
   align-items: center;
 }
 
-.ghost-title {
+.ghost-title .ghost-line {
   height: calc(var(--text-title) * var(--leading-tight));
-  margin-bottom: var(--space-2);
 
   .ghost-bar {
     width: 64%;
   }
 }
 
-.ghost-line {
+.ghost-body .ghost-line {
   height: calc(var(--text-body) * var(--leading-body));
 }
 
