@@ -298,7 +298,7 @@ import {
   shortDay,
   signedAmount,
 } from '@/components/accounts'
-import { bankWords, rateWords, unbroken } from '@/components/spending'
+import { bankWords, rateWords } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useOnline } from '@/composables/useOnline'
 import { useReconnect } from '@/composables/useReconnect'
@@ -413,17 +413,19 @@ export default defineComponent({
       return settings ? settings.incomeCurrency !== settings.spendCurrency : true
     })
 
+    /**
+     * A date of a row is one word, «20 окт.» (self-review Р1-5): beside the balance at 320 it broke
+     * between its day and month. Only the date — the whole «старт 20 окт.» held as one, a narrow column
+     * broke it inside a word, «окт» over «.» (adversarial Б1).
+     */
+    const whole = (text: string) => text.replaceAll(' ', '\u00a0')
+    const day = (date: string) => whole(shortDay(date, locale.value))
+
     function liveLine(account: MoneyAccountView): string {
       const { currency, lastCheckedOn, startOn } = account
-      // «старт 20 окт.» whole: beside the balance at 320 the date broke between its day and month.
-      return unbroken(
-        lastCheckedOn
-          ? t('accounts.screen.row_checked', {
-              currency,
-              date: shortDay(lastCheckedOn, locale.value),
-            })
-          : t('accounts.screen.row_started', { currency, date: shortDay(startOn, locale.value) }),
-      )
+      return lastCheckedOn
+        ? t('accounts.screen.row_checked', { currency, date: day(lastCheckedOn) })
+        : t('accounts.screen.row_started', { currency, date: day(startOn) })
     }
     const when = (at: Date) => countedWhen(at, locale.value)
 
@@ -457,17 +459,17 @@ export default defineComponent({
 
     const showRemoved = ref(false)
     function removedLine(account: MoneyAccountView): string {
-      return unbroken(
-        t('accounts.screen.archived_row', {
-          currency: account.currency,
-          amount: signedAmount(account.balance, locale.value),
-          date: account.archivedAt
-            ? new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'short' }).format(
+      return t('accounts.screen.archived_row', {
+        currency: account.currency,
+        amount: signedAmount(account.balance, locale.value),
+        date: account.archivedAt
+          ? whole(
+              new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'short' }).format(
                 account.archivedAt,
-              )
-            : shortDay(account.startOn, locale.value),
-        }),
-      )
+              ),
+            )
+          : day(account.startOn),
+      })
     }
 
     const restoring = ref<string | null>(null)

@@ -561,7 +561,8 @@ test.describe('safe areas', () => {
         .click()
       const strip = page.locator('.undo-strip')
       await expect(strip).toBeVisible()
-      await expect(page.locator('.dock')).toHaveCount(0)
+      // The frame's strip, not `FloatingDock`, which wears `dock` too and only hides under «Вернуть».
+      await expect(page.locator('.screen > .dock')).toHaveCount(0)
       await strip.locator('.text').hover()
       await page.waitForFunction(() => !document.documentElement.hasAttribute('data-nav'))
       const box = await strip.boundingBox()

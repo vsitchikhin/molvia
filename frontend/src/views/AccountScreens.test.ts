@@ -787,11 +787,14 @@ describe('«Счета» on the kit (MOL-193)', () => {
     await settle()
   })
 
-  it('a date in a row stays whole: «started Sep 16», never broken between its day and month (Р1-5)', async () => {
-    moneyAccounts.mockResolvedValue(page([cash()]))
+  it('a date in a row stays whole, and only the date: «started» may still go to the next line (Р1-5, Б1)', async () => {
+    moneyAccounts.mockResolvedValue(
+      page([cash(), cash({ id: OTHER, archivedAt: new Date('2026-10-21T10:00:00Z') })]),
+    )
     const view = await open(AccountsView, '/money/accounts', session())
-    const meta = view.get('a.list-row .meta').text()
-    expect(meta).toContain('started Sep 16')
-    expect(meta).toMatch(/^AMD · /)
+    expect(view.get('a.list-row .meta').text()).toBe('AMD · started Sep\u00a016')
+    await view.get('.removed-head').trigger('click')
+    await settle()
+    expect(view.get('.removed-open .meta').text()).toMatch(/· put away Oct\u00a021$/)
   })
 })
