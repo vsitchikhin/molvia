@@ -1449,12 +1449,16 @@ a receipt read before the rollout and not yet recorded gets it too.
   unit of a size, glued or apart, is what each piece weighs and the count stands alone («25հտ x 2գ», «32шт х 30 г»);
   anything else — nothing, a word, a hyphen of any kind, a bracket, a quote, a comma — may be packs or plies, nothing tells
   which: none — a Serbian count's «X N» as well, «100KOM X 2», «10/1 X 2» (review 6, Ж2), and a sign of times with a
-  figure anywhere after the count, «10шт. х 3», «4հ «Զևա» x 2», «10հտ (C1) x 3» (review 7, З2). Four rounds of review found a new spelling of «packs or plies» each time while the default was to multiply;
+  figure anywhere after the count, «10шт. х 3», «4հ «Զևա» x 2», «10հտ (C1) x 3» (review 7, З2) — but a sign with a number
+  before it is the thing's width and length, «100шт 24х37см», «30հտ 50x60», and the count stands (review 8, И1, №13). Four rounds of review found a new spelling of «packs or plies» each time while the default was to multiply;
   none by default ends it. **The prices, named:** «4հ x 2», eight rolls, and two-ply napkins «100հ x 2 շերտ» keep no
   package. A star before a size is no count: «Արարատ 3* 0.5լ» is a cognac's stars
   (review №1). A fat, microns, milligrams, volts, metres, years («5տ», a vintage «2019г» — a whole number from 1900 to
   2099 before the Russian «г», in either case; an Armenian or a Latin gram is a package, «2000գ» of cat food — review 2, В4) are never a
   package; a figure with no unit — a size the till cut, «… 85» — is none.
+- **A count spelt in a word with no sign of times is packs unread** (review 8, И2): «4 банки 0.5л», «3 уп по 10шт», «2
+  տուփ 1լ» — a whole number, a word or two, then the size: none. A unit glued to the number, «1.5Վ 4հտ», or a hyphen, «3-ը
+  1-ում 18գր», is a word of the name. On the bench it cost nothing.
 - **What stands before a size may say it is none of its own** (review №2, adversarial А3, А4): a range, «9-14կգ» — a
   nappy for a child of that weight; a fraction, «1/2կգ», «1/2L» — its denominator; a sign of times whose count is a word,
   «25пак*2г», «25 փաթեթ x 2գր» — one sachet of a box, 25 times the price a kilogram. The line keeps no package. A sign of

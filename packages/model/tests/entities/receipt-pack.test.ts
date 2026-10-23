@@ -338,6 +338,32 @@ describe('receiptPack — an Armenian till', () => {
     expect(receiptPack(printed, 'RS')).toBeNull()
   })
 
+  it.each([
+    ['Салфетки бумажные 100шт 24х24см', 'AM', pieces(100)],
+    ['Губки для посуды 5шт 9x6.5см', 'AM', pieces(5)],
+    ['Անձեռոցիկ «Զևա» 100հ 33x33սմ', 'AM', pieces(100)],
+    ['SALVETE 100KOM 33X33CM (Ђ)', 'RS', pieces(100)],
+  ] as const)(
+    'reads a sign with a number before it after a count as the thing’s size: %s (review 8, И1, №13)',
+    (printed, country, pack) => {
+      expect(receiptPack(printed, country)).toEqual(pack)
+    },
+  )
+
+  it.each([
+    ['Пиво «Жигули» 4 банки 0.5л'],
+    ['Ջուր «Բջնի» 4 շիշ 1.5լ'],
+    ['Яйцо С1 3 уп по 10шт'],
+    ['Կաթ «Մարիաննա» 2 տուփ 1լ'],
+  ])('reads none after a count spelt in a word with no sign: %s (review 8, И2)', (printed) => {
+    expect(receiptPack(printed, 'AM')).toBeNull()
+  })
+
+  it('keeps a size after a unit glued to its number or a hyphen: words of the name', () => {
+    expect(receiptPack('Սուրճ լուծվող «Մակ Կոֆե» թունդ 3-ը 1-ում 18գր', 'AM')).toEqual(kg(18))
+    expect(receiptPack('Մարտկոց «Էներջի» Սուպեր ԱԱ 1.5Վ 4հտ', 'AM')).toEqual(pieces(4))
+  })
+
   it('reads none of a thousandth of a gram', () => {
     expect(receiptPack('Դեղ 0.5գր', 'AM')).toBeNull()
   })
