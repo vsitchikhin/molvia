@@ -365,7 +365,9 @@ test.describe('«Тут дешевле»', () => {
    *
    * `moving` still counts frames, the one check that does: a jump held by the runner right then looks
    * by time like a rise held by it — two frames, the way spread over the hold — and only their count
-   * tells them apart. Its price: a runner busy over ~110 ms of the 220 ms rise fails it.
+   * tells them apart; with one frame dropped right on it, a jump is at the threshold of half the way,
+   * and the stamps decide which side (adversarial Б1). Its price: a runner busy over ~110 ms of the
+   * 220 ms rise fails it.
    */
   async function priceFieldMoves(page: Page, act: () => Promise<void>, busy = 0) {
     await page.evaluate((busy) => {
@@ -416,11 +418,12 @@ test.describe('«Тут дешевле»', () => {
       .poll(() => page.evaluate(() => document.getAnimations().length), { timeout: 10_000 })
       .toBe(0)
 
-  test('comes in over frames: the fields rise with it, never in one jump (adversarial Е)', async ({
-    page,
-  }) => {
+  /**
+   * The hint coming in late, as on a shelf's connection: the sheet is up and still before the answer
+   * comes. Answers the act that waits for it — one rise for both tests that measure it.
+   */
+  async function lateHint(page: Page): Promise<() => Promise<void>> {
     const { word } = await boughtAtZovuni(page)
-    // A shelf's connection: the answer comes after the sheet is up and still.
     await page.route('**/api/advice/prices**', async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 1500))
       await route.continue()
@@ -428,10 +431,13 @@ test.describe('«Тут дешевле»', () => {
     await pick({ page, word })
     await still(page)
     await expect(hint(page)).toHaveCount(0)
+    return () => expect(hint(page)).toContainText('Зовуни', { timeout: 5000 })
+  }
 
-    const motion = await priceFieldMoves(page, () =>
-      expect(hint(page)).toContainText('Зовуни', { timeout: 5000 }),
-    )
+  test('comes in over frames: the fields rise with it, never in one jump (adversarial Е)', async ({
+    page,
+  }) => {
+    const motion = await priceFieldMoves(page, await lateHint(page))
 
     expect(motion.moved).toBeGreaterThan(20)
     expect(motion.moving).toBeGreaterThan(3)
@@ -441,26 +447,16 @@ test.describe('«Тут дешевле»', () => {
   test('a frame the runner drops on the way up is the way up, not a jump (MOL-292)', async ({
     page,
   }) => {
-    const { word } = await boughtAtZovuni(page)
-    await page.route('**/api/advice/prices**', async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      await route.continue()
-    })
-    await pick({ page, word })
-    await still(page)
-    await expect(hint(page)).toHaveCount(0)
-
     // Two frames' time and more: in CI the steep part of the rise came drawn as one step, 50 of 60 px.
-    const motion = await priceFieldMoves(
-      page,
-      () => expect(hint(page)).toContainText('Зовуни', { timeout: 5000 }),
-      60,
-    )
+    const motion = await priceFieldMoves(page, await lateHint(page), 60)
 
     expect(motion.moved).toBeGreaterThan(20)
     // Dropped indeed: drawn, more than half the way went between two frames — the flake's own shape.
     expect(motion.widest).toBeGreaterThan(motion.moved / 2)
     expect(motion.largest).toBeLessThan(motion.moved / 2)
+    // Not a jump either: one with a frame dropped right on it is half the way over two frames' time,
+    // and the frames' stamps, a tenth of a millisecond coarse, put it a hair under (adversarial Б1).
+    expect(motion.moving).toBeGreaterThan(1)
   })
 
   test('says something else over frames too: one line to two (adversarial Е′)', async ({
