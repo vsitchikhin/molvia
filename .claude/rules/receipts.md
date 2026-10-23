@@ -1464,22 +1464,23 @@ a receipt read before the rollout and not yet recorded gets it too.
   one the last fix had opened. So any other whole number from 2 to 100 standing on its own (`OTHER_NUMBER`), a number
   spelt in a word (`COUNT_WORD`: Russian in any case to forty, English with «-pack», Armenian, Serbian, «пара»,
   «дюжина», «мультипак», «двойная», «сдвоенная», «трио», «дуо», «спарка», «double», «duplo», «զույգ»), a bundle «N+M»,
-  «N x M» or «N/M» beside a weight or a volume and no count of pieces — «0.5л 1х12», «2x6 0.5լ», «0.5л 1/12» (`PAIR`,
+  «N x M» or «N/M» beside a weight or a volume and no count of pieces of two or more — the till's «1шт» is none (Р3) — «0.5л 1х12», «2x6 0.5լ», «0.5л 1/12» (`PAIR`,
   rounds 13–14, Н1, П3) — and a count past a hundred with a word after it, «200 пакетиков 2г» (`LARGE_COUNT`, №18),
   keeps no package. What is not a count: a figure glued after a letter, a
   model's or a class's, «C1», «LR6», «N4», «№4» (but «x6» is a sign); plies, «3D», years and three in one glued after
   it, «3շ», «5տ», «3-ը 1-ում», «3в1», «2in1» (`NOT_A_COUNT`, the bench's own); a fraction, a percent or degrees, a range and
   a width by a length beside a count of pieces, «3.2%», «40°» (Н3), «9-14կգ», «100шт 24х37», «35л 50х70 30шт» (П1, №19); a
-  figure with a unit of measure, «500мг», «220V», «70мм», «5м» glued (`MEASURE`, П2) — never a unit that is also a word,
-  «6 в упаковке», «6 ед.»; a line's number before its name, «17.»; a code past a hundred standing
+  figure with a unit of measure, «500мг», «220V», «220В», «10Վտ», «70мм», «5м» glued (`MEASURE`, П2, Р1) — never a unit
+  that is also a word, «6 в упаковке», «6 ед.»: «м» and «В» only glued, «В» with no word after it; a line's number before its name, «17.»; a code past a hundred standing
   alone, «9639», «250h 193», a vintage «2019». **The price, named, as one class:** a name's own number — «Балтика 7», «7 злаков», «Pampers 4
   Maxi 52шт», «3 в 1» apart, «12 лет в коробке», «Три медведя», «AFTER EIGHT», a model's letter copied as a figure,
   «2ոկոլապ», «Neva 12h 32» — keeps none: on the bench 231 of 233 read right (two lines of the brand «3 կոռոչկի»), 95
   and 99 of 102 and 107 by the model (its copies of «3շ» as «32», «Շ» as «2»), 20 of 21 in Serbia; nothing made up
-  more. **What stays:** a pack of several that prints no count — «Пиво упаковка 0.5л», «набор» — is read as one; a
+  more, and one less in Serbia — «260ml … SCY903/01» (round 14). **What stays:** a pack of several that prints no count — «Пиво упаковка 0.5л», «набор» — is read as one; a
   count spelt in a word past the list is read as none of it — the one class no rule of the text closes, since a pack
   of several named only in words prints nothing a figure could say; the list holds the words met and the ones review
-  named; a count glued after a word, «PAK6», is the word's. A word of a pair or a double in a name is a count too, «Milka Double», «Triple Sec» — the
+  named; a count glued after a word, «PAK6», is the word's. A word of a count is read outside what was read, so the pack's own «3զույգ» stays a pack (Р2). A word of a pair
+  or a double in a name is a count too, «Milka Double», «Triple Sec» — the
   same class as the name's own number.
 - **What stands before a size may say it is none of its own** (review №2, adversarial А3, А4): a range, «9-14կգ» — a
   nappy for a child of that weight; a fraction, «1/2կգ», «1/2L» — its denominator; a sign of times whose count is a word,

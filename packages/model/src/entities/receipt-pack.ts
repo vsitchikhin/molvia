@@ -71,8 +71,8 @@ const TIMES_SIGN = String.raw`(?:(?<!\p{L})[xх×]\s*|\d\s*\p{L}*[xх×]\s*|\p{L
  */
 // what a number glued to it says is no count: plies «3շ», «3D», years «5տ», three in one «3-ը 1-ում», «3в1», «2in1»
 // a figure with a unit of measure after it is a measure, never a count: «500мг», «220V», «70x110мм» (П2); never a unit
-// that is also a word — «6 в упаковке», «6 ед.»
-const MEASURE = String.raw`(?:\s*(?:мкг|мг|mcg|mg|մգ|мм|mm|մմ|см|cm|սմ|V|W|Вт|kW|кВт|mAh|мАч|Ah|Ач|ккал|kcal|кДж|kJ|Hz|Гц|ГБ|GB|МБ|MB|МЕ|IU)|м|m)(?!\p{L})`
+// that is also a word — «6 в упаковке», «6 ед.»: «м» and a Russian «В» only glued, the volt with no word after it, «9В 2шт»
+const MEASURE = String.raw`(?:\s*(?:мкг|мг|mcg|mg|մգ|мм|mm|մմ|см|cm|սմ|V|W|Вт|kW|кВт|mAh|мАч|Ah|Ач|ккал|kcal|кДж|kJ|Hz|Гц|ГБ|GB|МБ|MB|МЕ|IU|Վտ|Վ)|м|m|В(?!\s*\p{L}))(?!\p{L})`
 const NOT_A_COUNT = String.raw`(?:(?:շ|Դ|D|տ|[-–](?:ը|ում))(?!\p{L})|(?:в|in)1(?!\d)|${MEASURE})`
 const OTHER_NUMBER = new RegExp(
   String.raw`(?<![\d.,#№])(?<!(?![xх×])\p{L})(?<!\p{L}[xх×])(?<!\d\s*[-–/xх×*+]\s*)(?:[2-9]|[1-9]\d|100)(?!\d|[.,]\d|\s*[%°]|\s*[-–/xх×*]\s*\d|${NOT_A_COUNT})`,
@@ -88,7 +88,7 @@ const COUNT_WORD = new RegExp(
     String.raw`(?:երկու|երեք|չորս|հինգ|վեց|յոթ|ութ|ինը|տասը)(?:ական)?`,
     String.raw`dva|dve|tri|četiri|cetiri|šest|sest|sedam|osam|devet|deset|dvanaest|dvadeset|par`,
   ].join('|')})(?!\p{L})`,
-  'iu',
+  'giu',
 )
 // «1+1», «2+1» — a bundle, several taped into one
 const BUNDLE = /\d\s*\+\s*\d/u
@@ -183,6 +183,9 @@ function sizeOf(match: RegExpExecArray, printed: string, photo: boolean): Quanti
 }
 
 // another number, or one in a word, beside what was read — the size and the pack read count for nothing
+// the till's own «1 հատ», «1шт» is no count of pieces the name prints (Р3)
+const isCount = (match: RegExpExecArray) => BigInt(match[1] ?? 0) >= 2n
+
 function countBeside(
   printed: string,
   sizes: readonly RegExpExecArray[],
@@ -195,11 +198,11 @@ function countBeside(
   const outside = (pattern: RegExp) =>
     [...printed.matchAll(pattern)].some((match) => match.index >= start && !inside(match.index))
   return (
-    COUNT_WORD.test(printed) ||
+    outside(COUNT_WORD) ||
     BUNDLE.test(printed) ||
     outside(OTHER_NUMBER) ||
     outside(LARGE_COUNT) ||
-    (sizes.length > 0 && counts.length === 0 && outside(PAIR))
+    (sizes.length > 0 && !counts.some(isCount) && outside(PAIR))
   )
 }
 
