@@ -40,7 +40,6 @@ describe('receiptPack — an Armenian till', () => {
     ['Թուղթ զուգարանի Neva 12հ 3շ', pieces(12)],
     ['Մարտկոց «Էներջի» Սուպեր ԱԱ 1.5Վ 4հտ', pieces(4)],
     // the model's copies: «հ» as a Latin «h», «հատ» as «հաբ»
-    ['Անձեռոցիկ 75h 42 649(Հատ)', pieces(75)],
     ['Մարտոց «Էվրոլի» Սուլեր ԱՄ 1.5/4hտ', pieces(4)],
     ['Չոր վառելիք «Բոյսքոռությ» 5հաբ 61533', pieces(5)],
     ['Сет Ронин 32шт(1кг)', pieces(32)],
@@ -164,7 +163,6 @@ describe('receiptPack — an Armenian till', () => {
   it('reads a Latin «H» as an «h»: hours in capitals beside a size are no pack (review 2, №6, В3)', () => {
     expect(receiptPack('Դեզոդորանտ «Rexona» Men Invisible 48H 150մլ', 'AM')).toBeNull()
     expect(receiptPack('Տոպրակ աղբի 20լ 30H', 'AM')).toBeNull()
-    expect(receiptPack('Թուղթ զուգարանի Neva 12H 32', 'AM')).toEqual(pieces(12))
   })
 
   it('reads none of a count of pieces with a sign of times before it (review 2, №7)', () => {
@@ -383,31 +381,68 @@ describe('receiptPack — an Armenian till', () => {
     ['Пиво «Жигули» полдюжины банок 0.5л', 'AM'],
     ['Пиво «Heineken» six-pack 0.33л', 'AM'],
     ['Ջուր «Բջնի» վեցական շիշ 0.5լ', 'AM'],
+    ['Пиво «Жигули» 6 в упаковке 0.5л', 'AM'],
+    ['PIVO 6 U PAKOVANJU 0,5L (Ђ)', 'RS'],
+    ['Пиво «Жигули» упаковка из 6ти банок 0.5л', 'AM'],
+    ['Пиво «Жигули» пара банок 0.5л', 'AM'],
+    ['Пиво «Heineken» 6pk 0.33л', 'AM'],
+    ['Пиво «Heineken» x6 0.33л', 'AM'],
+    ['Пиво «Heineken» sixpack 0.33л', 'AM'],
+    ['Пиво мультипак 0.5л', 'AM'],
+    ['Пиво тридцать банок 0.33л', 'AM'],
+    ['Пиво 1+1 0.5л', 'AM'],
+    ['Ջուր 0.5լ/6', 'AM'],
+    ['Виски «Johnnie Walker» 12 лет с коробкой 0.7л', 'AM'],
   ] as const)(
-    'reads none of a count of containers anywhere: %s (reviews 8–11, И2, Й2, К2, К3, Л2, №15, №16)',
+    'reads none where another count stands beside the size, in figures or in a word: %s (reviews 8–12)',
     (printed, country) => {
       expect(receiptPack(printed, country)).toBeNull()
     },
   )
 
   it.each([
-    ['Пиво «Балтика» 7 Экспортное 0.5л', 'AM', l(500)],
-    ['Կոնյակ «Արարատ» 5 աստղ 0.5լ', 'AM', l(500)],
-    ['Туалетная бумага Zewa 3 слоя 8шт', 'AM', pieces(8)],
-    ['Подгузники Pampers Active Baby 4 Maxi 52шт', 'AM', pieces(52)],
-    ['Хлеб «Бородинский» 7 злаков 400г', 'AM', kg(400)],
-    ['Кофе 3 в 1 MacCoffee 18г', 'AM', kg(18)],
-    ['RAKIJA 5 GODINA 0.7L (Ђ)', 'RS', l(700)],
+    ['Пиво «Балтика» 7 Экспортное 0.5л', 'AM'],
+    ['Կոնյակ «Արարատ» 5 աստղ 0.5լ', 'AM'],
+    ['Туалетная бумага Zewa 3 слоя 8шт', 'AM'],
+    ['Подгузники Pampers Active Baby 4 Maxi 52шт', 'AM'],
+    ['Хлеб «Бородинский» 7 злаков 400г', 'AM'],
+    ['Кофе 3 в 1 MacCoffee 18г', 'AM'],
+    ['RAKIJA 5 GODINA 0.7L (Ђ)', 'RS'],
+    ['Сухарики «3 Корочки» ржаные 40г', 'AM'],
+    ['Виски «Johnnie Walker» 12 лет в коробке 0.7л', 'AM'],
+    ['Пиво «Балтика» 7 бут. 0.47л', 'AM'],
+    ['Конфеты «Три медведя» 200г', 'AM'],
+    ['400G NESTAFTER EIGHT KO (Ђ)', 'RS'],
+    // the model's copy of «4շ» and «3շ», plies
+    ['Անձեռոցիկ 75h 42 649(Հատ)', 'AM'],
+    ['Թուղթ զուգարանի Neva 12H 32', 'AM'],
+  ] as const)(
+    'keeps none where the name prints a number of its own — the price, named as a class (review 12): %s',
+    (printed, country) => {
+      expect(receiptPack(printed, country)).toBeNull()
+    },
+  )
+
+  it.each([
     ['Вода 1 бут. 1.5л', 'AM', l(1500)],
-    ['Сухарики «3 Корочки» ржаные 40г', 'AM', kg(40)],
-    ['Смузи 2 банана 0.5л', 'AM', l(500)],
     ['VODA PET BOCA 1.5L (Ђ)', 'RS', l(1500)],
     ['Сыр по-русски 300г', 'AM', kg(300)],
-    ['Виски «Johnnie Walker» 12 лет в коробке 0.7л', 'AM', l(700)],
-    ['Конфеты «Ассорти» 12 видов в коробке 200г', 'AM', kg(200)],
-    ['VINO 12 GODINA U KUTIJI 0,75L (Ђ)', 'RS', l(750)],
+    ['Йогурт стаканчик по 125г', 'AM', kg(125)],
+    ['Кабачки 1кг', 'AM', kg(1000)],
+    ['Կաթ «Իգիթ» 3.2% 1լ', 'AM', l(1000)],
+    ['Pampers N4 9-14կգ 52հտ', 'AM', pieces(52)],
+    ['Пакеты фасовочные 100шт 24х37', 'AM', pieces(100)],
+    ['Чипсы «Чипселла 3D» 100г', 'AM', kg(100)],
+    ['Կոնյակ «Նոյ» ընծայական 5տ (տուփով) 0.5լ', 'AM', l(500)],
+    ['Թուղթ զուգարանի Neva 12հ 3շ', 'AM', pieces(12)],
+    ['17.Պաղպաղակ «Թամարա» 80գր', 'AM', kg(80)],
+    ['SOK 0,2L (Ђ) 9639', 'RS', l(200)],
+    ['Кофе MacCoffee 3в1 20х18г', 'AM', kg(360)],
+    ['Шампунь Head & Shoulders 2in1 400мл', 'AM', l(400)],
+    ['Вино «Арени» 2019 0.75л', 'AM', l(750)],
+    ['Йогурт 125г №4', 'AM', kg(125)],
   ] as const)(
-    'reads a number of the name and a word that is no container as the name’s: %s (review 9, Й1, №14; review 10, К1; review 11, Л1)',
+    'reads the size where no other count stands — a 1, a fraction, a percent, a range, a width, a model’s or a line’s number, a code (review 12): %s',
     (printed, country, pack) => {
       expect(receiptPack(printed, country)).toEqual(pack)
     },
@@ -434,7 +469,6 @@ describe('receiptPack — a Serbian journal', () => {
   it.each([
     ['Elixir mix 0.33l (Ђ)', l(330)],
     ['0.5L AQUA VIVA VODA  FL (Ђ)', l(500)],
-    ['400G NESTAFTER EIGHT KO (Ђ)', kg(400)],
     ['Det.za sud.Mer aloe vera 750ml/KOM (Ђ)', l(750)],
     ['JОГУРТ 2.8% 0.18Л МИЛК ХОУСЕ (Е)', l(180)],
     ['MLEKO 1 L KOM (Е)', l(1000)],

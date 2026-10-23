@@ -58,36 +58,40 @@ const SIZE = new RegExp(
  */
 const TIMES_SIGN = String.raw`(?:(?<!\p{L})[xх×]\s*|\d\s*\p{L}*[xх×]\s*|\p{L}[xх×])`
 /**
- * A count of packs spelt in a container's word — «4 банки 0.5л», «3 уп. по 10шт», «2 кор. 200г», «25пак 2г», «Ջուր 4 շիշ,
- * 1.5լ», «4 жестяные пивные банки 0.5л», «из 4-х банок», «из шести банок», «6-pack», «six-pack», «четыре банки» — anywhere
- * in the name (reviews 8–11, И2, Й2, К2, К3, Л2, №15, №16): packs unread, the line keeps no package. Only a container's
- * word says so (Й1, №14): «7 злаков», «5 աստղ», «3 слоя», «4 Maxi», «3 в 1», «3 Корочки» are words of the name (К1), and
- * so are one container, «1 бут.», and the one a thing comes in, «12 лет в коробке» (Л1). **The prices, named:** «Чай 25
- * пакетиков 50г», a container the list lacks with no «по» before the size, «Pampers 4 Giant Pack 76шт», «Балтика 7 бут.».
+ * A count of several beside the size — «4 банки 0.5л», «6 в упаковке», «из 6ти банок», «6pk», «x6», «1+1», «пара банок»,
+ * «six-pack» — makes the size one of them, and the ways a count is spelt have no end: each of reviews 8–12 found new ones
+ * while the rule listed the containers. So the size or the pack is read only where it is the name's one number: any
+ * other whole number from 2 to 100 standing on its own, a number spelt in a word or a bundle keeps no package. Glued after
+ * a letter it is a model's or a class's, «C1», «LR6», «N4» — a sign of times apart is no letter, «x6»; plies, «3D», years
+ * and three in one glued after it are the name's, «3շ», «5տ», «3в1»; a fraction, a percent, a range and a width by a
+ * length, «3.2%», «9-14կգ», «24х37», are no count; nor is a line's number before its name, «17.», nor a code past a
+ * hundred, «9639». **The price, named, as one class:** a name's own number — «Балтика 7», «7 злаков», «Pampers 4 Maxi»,
+ * «3 в 1», «12 лет», «Три медведя» — keeps none (MOL-255). **What stays:** a pack of several that prints no count,
+ * «Пиво упаковка 0.5л», is read as one.
  */
-const COUNT = [
-  String.raw`(?:[2-9]|[1-9]\d+)(?:[-–‑]\p{L}{0,3})?`,
-  String.raw`(?:дв(?:а|е|ух)|тр(?:и|[её]х)|четыр(?:е|[её]х)|пят[ьи]|шест[ьи]|сем[ьи]|восемь|восьми|девят[ьи]|десят[ьи]|двенадцат[ьи]|(?:пол)?дюжин\p{L}*)(?=[\s\-–‑])`,
-  String.raw`(?:two|three|four|six|eight|ten|twelve)(?=[\s\-–‑])`,
-  String.raw`(?:երկու|երեք|չորս|հինգ|վեց|ութ|տասը?)(?:ական)?(?=\s)`,
-  String.raw`(?:dva|dve|tri|četiri|cetiri|šest|sest|osam|deset)(?=[\s\-–‑])`,
-].join('|')
-// a word cut short is a container too, «2 кор. 200г», «3 лот. 10шт», never a word it only begins (№16)
-const CONTAINER = String.raw`бан(?!ан)|бут|уп|пач|короб|кор(?!\p{L})|пак|ящ|стак(?:ан|(?!\p{L}))|лот(?:о?к|(?!\p{L}))|жест|флакон|տուփ|շիշ|շշ|փաթ|տոպր|բանկա|արկղ|բաժ(?:ակ|(?!\p{L}))|թիթեղ|limen|flaš|flas|boc|kut|kes|pak|pack|čaš|cas|tegl`
-// «в коробке», «u kutiji», «in a box» — the one a thing comes in, never a count of them (Л1)
-const IN = String.raw`(?<!(?<!\p{L})(?:в|во|u|in)\s+)`
-const PACKED_IN = new RegExp(
-  String.raw`(?<![\p{L}\d.,])(?:${COUNT})(?:(?:\s+\p{L}+){0,2}\s+|\s*[-–‑]?\s*)${IN}(?:${CONTAINER})`,
+// what a number glued to it says is no count: plies «3շ», «3D», years «5տ», three in one «3-ը 1-ում», «3в1», «2in1»
+const NOT_A_COUNT = String.raw`(?:(?:շ|Դ|D|տ|[-–](?:ը|ում))(?!\p{L})|(?:в|in)1(?!\d))`
+const OTHER_NUMBER = new RegExp(
+  String.raw`(?<![\d.,#№])(?<!(?![xх×])\p{L})(?<!\p{L}[xх×])(?<!\d\s*[-–/xх×*+]\s*)(?:[2-9]|[1-9]\d|100)(?!\d|[.,]\d|\s*%|\s*[-–/xх×*]\s*\d|${NOT_A_COUNT})`,
+  'giu',
+)
+const COUNT_WORD = new RegExp(
+  String.raw`(?<!\p{L})(?:${[
+    String.raw`дв(?:а|е|ое|ух)|тр(?:и|ое|[её]х)|четыр\p{L}*|четвер\p{L}*|пят(?:ь|и|ер\p{L}*|надцат\p{L}*|ьдесят\p{L}*)`,
+    String.raw`шест(?:ь|и|ер\p{L}*|надцат\p{L}*|ьдесят\p{L}*)|сем(?:ь|и|ер\p{L}*)|восем\p{L}*|восьм\p{L}*|девят\p{L}*|десят\p{L}*`,
+    String.raw`одиннадцат\p{L}*|двенадцат\p{L}*|двадцат\p{L}*|тридцат\p{L}*|сорок\p{L}*|пар[аыу]|(?:пол)?дюжин\p{L}*|мульти-?пак\p{L}*`,
+    String.raw`(?:two|three|four|five|six|eight|ten|twelve|twenty|twin|duo|pair|dozen|multi)(?:-?pack|pk)?`,
+    String.raw`(?:երկու|երեք|չորս|հինգ|վեց|յոթ|ութ|ինը|տասը)(?:ական)?`,
+    String.raw`dva|dve|tri|četiri|cetiri|šest|sest|sedam|osam|devet|deset|dvanaest|dvadeset|par`,
+  ].join('|')})(?!\p{L})`,
   'iu',
 )
-// «по 125г», «PO 0,5L» — what each of several holds: the count before it unread (К2)
-const EACH = String.raw`(?<!\p{L})(?:по|po)\s+`
-const CUT_BEFORE = new RegExp(
-  String.raw`(?:\d\s*[-–/]\s*|${TIMES_SIGN}|(?<!\d)\*\s*|\d\*|${EACH})$`,
-  'iu',
-)
+// «1+1», «2+1» — a bundle, several taped into one
+const BUNDLE = /\d\s*\+\s*\d/u
+const LINE_NUMBER = /^\s*\d+[.)]/u
+const CUT_BEFORE = new RegExp(String.raw`(?:\d\s*[-–/]\s*|${TIMES_SIGN}|(?<!\d)\*\s*|\d\*)$`, 'iu')
 // a count of pieces with a sign of times before it is a count of packs unread, «2x10հտ», «2X10հտ» (review 2, №7; Г1)
-const TIMES_END = new RegExp(String.raw`(?:${TIMES_SIGN}|\*\s*|${EACH})$`, 'iu')
+const TIMES_END = new RegExp(String.raw`(?:${TIMES_SIGN}|\*\s*)$`, 'iu')
 /**
  * A vintage, never a package: a whole number from 1900 to 2099 before the Russian «г» of a year (adversarial А5) — never
  * an Armenian or a Latin gram, «2000գ» of cat food (review 2, В4).
@@ -163,6 +167,20 @@ function sizeOf(match: RegExpExecArray, printed: string, photo: boolean): Quanti
   return milli > 0n && milli <= LARGEST[base] ? { milli, unit: base } : null
 }
 
+// another number, or one in a word, beside what was read — the size and the pack read count for nothing
+function countBeside(printed: string, read: readonly RegExpExecArray[]): boolean {
+  const start = LINE_NUMBER.exec(printed)?.[0].length ?? 0
+  const inside = (at: number) =>
+    read.some((match) => at >= match.index && at < match.index + match[0].length)
+  return (
+    COUNT_WORD.test(printed) ||
+    BUNDLE.test(printed) ||
+    [...printed.matchAll(OTHER_NUMBER)].some(
+      (match) => match.index >= start && !inside(match.index),
+    )
+  )
+}
+
 function one(found: readonly Quantity[]): Quantity | null {
   const [first] = found
   return first !== undefined && found.every((q) => q.milli === first.milli && q.unit === first.unit)
@@ -177,11 +195,13 @@ function one(found: readonly Quantity[]): Quantity | null {
  * «… 85» — is none.
  */
 export function receiptPack(printed: string, country: ReceiptCountry): Quantity | null {
-  if (THICKNESS.test(printed) || PACKED_IN.test(printed)) return null
+  if (THICKNESS.test(printed)) return null
   // a Serbian line is the tax office's text, never read off a photo
   const photo = country !== 'RS'
   const found = [...printed.matchAll(SIZE)]
-  const packs = [...printed.matchAll(photo ? ARMENIAN_PIECES : SERBIAN_PIECES)]
+  const counted = [...printed.matchAll(photo ? ARMENIAN_PIECES : SERBIAN_PIECES)]
+  if (countBeside(printed, [...found, ...counted])) return null
+  const packs = counted
     .map((match) => {
       return {
         count: BigInt(match[1] ?? 0),
