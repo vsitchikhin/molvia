@@ -372,8 +372,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   сохранилось ли» on top in the middle of «Ваши данные» (round 2, Б1, Б2). `kit-rows` holds a first, a middle
   and a last row, `advice.spec` the newcomer's row, `devices.spec` and `settings.spec` the two that are not
   rows. **The price, named** (self-review 7): a row built in place, not of the kit — «Написать разработчику»,
-  «Бот», «Устройства» and «Выйти» of «Настройки», «Сканировать штрихкод» of a record, `PurchaseRow`, `TripRow`,
-  `AccountLine` — keeps its ring cut at the card's edge, as on master, until its screen comes to the kit; the
+  «Бот», «Устройства» and «Выйти» of «Настройки», «Сканировать штрихкод» of a record, `PurchaseRow`, `TripRow` —
+  keeps its ring cut at the card's edge, as on master, until its screen comes to the kit; the
   selector is not widened for them.
   **Active** is the row the keyboard stands on in a list a field owns (К-4): the fill without the
   ring, since the focus is in the field; on a chosen row the fill is the layer's alone — the row's own
