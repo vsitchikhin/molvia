@@ -293,6 +293,29 @@ describe('receiptPack — an Armenian till', () => {
     expect(receiptPack('Գինի «Արենի» 2019Г', 'AM')).toBeNull()
   })
 
+  it.each([
+    ['Чай «Greenfield» 25 пакетикиx2г', 'AM'],
+    ['ЧАЙ ГРИНФИЛД 25 ПАКЕТИКИХ2Г', 'AM'],
+    ['Пиво 4 банкиx0.5л', 'AM'],
+    ['Яйцо С1 2 коробкиx10шт', 'AM'],
+    ['Ձու «Ոսկեհավ» 2 տուփիx10հտ', 'AM'],
+    ['CAJ NEVEN 20 KESICAX2G (Ђ)', 'RS'],
+    ['PIVO 4 LIMENKEX0.5L (Ђ)', 'RS'],
+  ] as const)(
+    'reads a sign glued to the figure after any letter as a sign: %s (review 6, Ж1, №12)',
+    (printed, country) => {
+      expect(receiptPack(printed, country)).toBeNull()
+    },
+  )
+
+  it.each([
+    ['MARAMICE ZEWA 100KOM X 2 (Ђ)'],
+    ['JAJA L 10KOM X 3 (Ђ)'],
+    ['TOALET PAPIR 10/1 X 2 (Ђ)'],
+  ])('reads a Serbian count’s «X N» as packs or plies unread: %s (review 6, Ж2)', (printed) => {
+    expect(receiptPack(printed, 'RS')).toBeNull()
+  })
+
   it('reads none of a thousandth of a gram', () => {
     expect(receiptPack('Դեղ 0.5գր', 'AM')).toBeNull()
   })

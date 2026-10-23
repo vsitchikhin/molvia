@@ -48,14 +48,14 @@ const SIZE = new RegExp(
  * one sachet of a box (review №2, adversarial А3, А4). The line keeps no package: half of it read is a guess. A star
  * after a figure and a space is a cognac's stars, «3* 0.5լ», and glued to both, «25*2գ», a count's sign.
  *
- * A sign of times, in either case, is one standing apart — «25 KES X 2G» — or ending, after a consonant, the word of a
- * count, glued or apart, «25пакх2г», «25ПАКХ 2Г», «25 пакх2г», «2 տուփx10հտ», or a word glued to the figure, «пакх2г»
- * (reviews 2–5, В2, Г1, Г3, Д3). A count's word is cut short, «пак», «уп», «փթ»; after a vowel «x» is a word's own —
- * «Elixir mix 0.33l», «Pepsi MAX 1.5լ», «Durex 3հտ», «пальчиковых 4шт», «Ariel 3в1 Max 25шт», «2in1 Max 400мл», «в 2
- * вкусах 200г» (Г5, Е3, №11).
+ * A sign of times, in either case, is one standing apart — «25 KES X 2G»; one glued to the figure after any letter,
+ * «пакх2г», «25 пакетикиx2г», «4 банкиx0.5л», «2 коробкиx10шт» (reviews 2–6, В2, Д3, Ж1, №12); or one ending, after a
+ * consonant and apart from the figure, the word of a count, «25ПАКХ 2Г», «25 пакх 2г» (Г1, Г3). Apart from the figure
+ * after a vowel, «x» is a word's own — «Elixir mix 0.33l», «Pepsi MAX 1.5լ», «Durex 3հտ», «пальчиковых 4шт», «Ariel 3в1
+ * Max 25шт», «2in1 Max 400мл», «в 2 вкусах 200г» (Г5, Е3, №11). **The price, named:** «Pepsi Max1.5լ», glued, keeps none.
  */
 const CONSONANT = String.raw`(?![aeiouyаеёиоуыэюяաեէըիոօ])\p{L}`
-const TIMES_SIGN = String.raw`(?:(?<!\p{L})[xх×]\s*|\d\s*\p{L}*${CONSONANT}[xх×]\s*|${CONSONANT}[xх×])`
+const TIMES_SIGN = String.raw`(?:(?<!\p{L})[xх×]\s*|\d\s*\p{L}*${CONSONANT}[xх×]\s*|\p{L}[xх×])`
 const CUT_BEFORE = new RegExp(String.raw`(?:\d\s*[-–/]\s*|${TIMES_SIGN}|(?<!\d)\*\s*|\d\*)$`, 'iu')
 // a count of pieces with a sign of times before it is a count of packs unread, «2x10հտ», «2X10հտ» (review 2, №7; Г1)
 const TIMES_END = new RegExp(String.raw`(?:${TIMES_SIGN}|\*\s*)$`, 'iu')
@@ -73,16 +73,26 @@ const YEAR = /^(?:19|20)\d\d$/u
  * «4հ x 2», «x 2 տուփ», «x 2 (շերտ)», «x 2, Զևա», «x 2-х слойная»; nothing tells which, and the line keeps no package
  * (reviews 2–5, В1, Г2, Д1, Д2, Е1, Е2, №10). **The price, named:** «4հ x 2», eight rolls, keeps none.
  */
-const ARMENIAN_PIECES =
-  /(?<![\d.,])(\d+)\s*(հատ|հտ|հաբ|հ|hտ|h|զույգ|шт)(?![ա-ֆԱ-Ֆа-яёА-ЯЁA-Za-z])(?:\s*[xх×*]\s*(\d+(?:[.,]\d+)?)(\s*(?:կգ|գր|գ|մլ|լ|кг|гр|г|мл|л|kg|gr|g|ml|l)(?!\p{L}))?)?/giu
+// «× N» after a count, and the unit of a size after N if one stands there — groups 3 and 4 of either country's pack
+const PIECES_TIMES = String.raw`(?:\s*[xх×*]\s*(\d+(?:[.,]\d+)?)(\s*(?:կգ|գր|գ|մլ|լ|кг|гр|г|мл|л|kg|gr|g|ml|l)(?!\p{L}))?)?`
+const ARMENIAN_PIECES = new RegExp(
+  String.raw`(?<![\d.,])(\d+)\s*(հատ|հտ|հաբ|հ|hտ|h|զույգ|шт)(?![ա-ֆԱ-Ֆа-яёА-ЯЁA-Za-z])${PIECES_TIMES}`,
+  'giu',
+)
 /**
  * A Latin «h» is the model's copy of «հ» — and a label's hours too, «Rexona 48h 150մլ» (adversarial А1, review №3):
  * beside a size it is no pack of pieces, and nothing tells which, so the line keeps no package. Alone it is the pack the
  * model copied, «Անձեռոցիկ 75h»: dropped, the bench lost 8 and 14 packages and made up the bags' litres.
  */
 const LATIN_PIECES = 'h'
-// a Serbian pack, «107KOM», «5KOM», «10/1», «20/ 1»: a «KOM» apart is the journal's unit of sale, «MLEKO 1 L KOM»
-const SERBIAN_PIECES = /(?<![\d.,])(\d+)(?:(?:KOM|КОМ)(?![A-Za-zА-Яа-я])|\s*\/\s*1(?![\d.,]))/giu
+/**
+ * A Serbian pack, «107KOM», «5KOM», «10/1», «20/ 1»: a «KOM» apart is the journal's unit of sale, «MLEKO 1 L KOM». Its
+ * «× N» is read as an Armenian count's is: «100KOM X 2», «10/1 X 2» may be packs or plies, none (review 6, Ж2).
+ */
+const SERBIAN_PIECES = new RegExp(
+  String.raw`(?<![\d.,])(\d+)((?:KOM|КОМ)(?![A-Za-zА-Яа-я])|\s*\/\s*1(?![\d.,]))${PIECES_TIMES}`,
+  'giu',
+)
 // a thickness printed says the thing is packaging: its kilograms and litres are what it holds, never what it is
 const THICKNESS = /միկր|mikron|микрон|мкм/iu
 /**

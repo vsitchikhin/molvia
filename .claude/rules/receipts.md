@@ -1448,7 +1448,7 @@ a receipt read before the rollout and not yet recorded gets it too.
   «15գ*8» 120 g). **A pack of pieces is read by what follows its «× N»** (reviews 2–5, В1, Г2, Д1, Д2, Е1, Е2, №10): a
   unit of a size, glued or apart, is what each piece weighs and the count stands alone («25հտ x 2գ», «32шт х 30 г»);
   anything else — nothing, a word, a hyphen of any kind, a bracket, a quote, a comma — may be packs or plies, nothing tells
-  which: none. Four rounds of review found a new spelling of «packs or plies» each time while the default was to multiply;
+  which: none — a Serbian count's «X N» as well, «100KOM X 2», «10/1 X 2» (review 6, Ж2). Four rounds of review found a new spelling of «packs or plies» each time while the default was to multiply;
   none by default ends it. **The prices, named:** «4հ x 2», eight rolls, and two-ply napkins «100հ x 2 շերտ» keep no
   package. A star before a size is no count: «Արարատ 3* 0.5լ» is a cognac's stars
   (review №1). A fat, microns, milligrams, volts, metres, years («5տ», a vintage «2019г» — a whole number from 1900 to
@@ -1457,10 +1457,11 @@ a receipt read before the rollout and not yet recorded gets it too.
 - **What stands before a size may say it is none of its own** (review №2, adversarial А3, А4): a range, «9-14կգ» — a
   nappy for a child of that weight; a fraction, «1/2կգ», «1/2L» — its denominator; a sign of times whose count is a word,
   «25пак*2г», «25 փաթեթ x 2գր» — one sachet of a box, 25 times the price a kilogram. The line keeps no package. A sign of
-  times, in either case, is one standing apart, «25 KES X 2G», or after a consonant ending the word of a count glued or
-  apart, «25пакх2г», «25ПАКХ 2Г», «25 пакх2г», «2 տուփx10հտ», or a word glued to the figure, «пакх2г» (reviews 2–5, В2,
-  Г1, Г3, Д3): a count's word is cut short, «пак», «уп», «փթ». After a vowel «x» is the word's own, a count before it or
-  not — «Ariel 3в1 Max 25шт», «2in1 Max 400мл», «в 2 вкусах 200г» (Е3, №11) — «Elixir mix 0.33l» is a drink,
+  times, in either case, is one standing apart, «25 KES X 2G»; one glued to the figure after any letter, «пакх2г», «25
+  пакетикиx2г», «4 банкиx0.5л», «2 коробкиx10шт» (reviews 2–6, В2, Д3, Ж1, №12); or, apart from the figure, one ending the
+  word of a count after a consonant, «25ПАКХ 2Г», «25 пакх 2г» (Г1, Г3) — a count's word cut short, «пак», «уп», «փթ».
+  Apart from the figure after a vowel, «x» is the word's own — «Ariel 3в1 Max 25шт», «2in1 Max 400мл», «в 2 вкусах 200г»
+  (Е3, №11). **The price, named:** «Pepsi Max1.5լ», glued, keeps none — «Elixir mix 0.33l» is a drink,
   «Durex 3հտ» three, «пальчиковых 4шт» four (Г5). A count of pieces with a sign of times before it, «2x10հտ», is a count of packs unread: none (review 2,
   №7). **The price, named:** «1/1L» is none too.
 - **A pack of pieces wins over what one holds** (Р-3, owner's В-1 «а» — every kind of goods, not food alone): «Աղբի
