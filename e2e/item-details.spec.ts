@@ -346,21 +346,43 @@ test.describe('«Тут дешевле»', () => {
   })
 
   /**
+   * How long the page is held busy on the way up: two frames dropped, so the steep part of the rise
+   * falls into one step whatever frame it began in — one dropped did so only when it fell between the
+   * two steepest, 16 + 16 px of 60 (MOL-292).
+   */
+  const RUNNER_LOAD_MS = 60
+
+  /**
    * The top of the price field, frame by frame, while `act` runs and for a moment after: how far it
    * went in all, and the largest step between two frames.
+   *
+   * Once the field has first moved, the page is held busy for a few frames, as a loaded runner holds
+   * it (MOL-292): the rise goes on while no frame is drawn, and a frame dropped on its way up is still
+   * the way up, not a jump. Held after the first move, so a jump has already been seen whole.
    */
   async function priceFieldMoves(page: Page, act: () => Promise<void>) {
-    await page.evaluate(() => {
+    await page.evaluate((busy) => {
       const w = window as unknown as { __tops: number[]; __stop: boolean }
       w.__tops = []
       w.__stop = false
+      let held = false
       const step = () => {
         const field = document.querySelector('dialog[open] [data-field="amount"]')
-        if (field) w.__tops.push(field.getBoundingClientRect().top)
+        if (field) {
+          const top = field.getBoundingClientRect().top
+          if (!held && w.__tops.length > 0 && top !== w.__tops.at(-1)) {
+            held = true
+            const until = performance.now() + busy
+            while (performance.now() < until) {
+              // a runner's load: the frames due meanwhile are not drawn
+            }
+          }
+          w.__tops.push(top)
+        }
         if (!w.__stop) requestAnimationFrame(step)
       }
       requestAnimationFrame(step)
-    })
+    }, RUNNER_LOAD_MS)
     await act()
     await page.waitForTimeout(600)
     const tops = await page.evaluate(() => {
