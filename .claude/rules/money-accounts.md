@@ -132,7 +132,13 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   first opening of «Деньги» on a phone, with nothing kept, moves the switcher down once by its height
   as the answer comes, and in the same frame the row «Счета» goes from the ways out — the page grows by
   the card and shortens by 52 at its foot, a growth all told (self-review Р2-4); a placeholder would
-  stand for a newcomer with no account and go again. The two currencies on «Счета» are MOL-193's.
+  stand for a newcomer with no account and go again.
+- **«Счета» show the total in both currencies of the settings** (MOL-193, owner's В-19 «в», В-1 «б»): the income
+  one large — the figure «На счетах сейчас» shows, so one money is one number on both screens — the spending one
+  under it, and the tiles «Можно тратить» / «Сбережения» in both. One currency, or a page kept from before
+  `incomeTotals`, is one figure. «N не посчитаны» is said by the large figure's totals. **The price, named:** an
+  account that one currency converts and the other does not would be named under one of them only — the rates of
+  both come by one chain, and it has not been met.
 - **The month of «Деньги» reads the same balances for its «Остаток»** (MOL-134): `balancesOn` — the
   live accounts started by a day, their operations up to it — through `accountsCounted`, the one
   loading of accounts, operations and rates both screens share. A removed account is in neither.
