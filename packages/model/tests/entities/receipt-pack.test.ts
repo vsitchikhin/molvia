@@ -262,18 +262,40 @@ describe('receiptPack — an Armenian till', () => {
   )
 
   it.each([
-    ['Капсулы для стирки Ariel 3в1 Max 25шт', pieces(25)],
-    ['Батарейки Duracell LR6 Max 4шт', pieces(4)],
-    ['Карандаши 12 цветных 2шт', pieces(2)],
-    ['Шампунь Head & Shoulders 2in1 Max 400мл', l(400)],
-    ['Конфеты в 2 вкусах 200г', kg(200)],
-    ['Кофе MacCoffee 3в1 Max 20х18г', kg(360)],
+    ['Капсулы для стирки Ariel 3в1 Max 25шт'],
+    ['Батарейки Duracell LR6 Max 4шт'],
+    ['Карандаши 12 цветных 2шт'],
+    ['Шампунь Head & Shoulders 2in1 Max 400мл'],
+    ['Конфеты в 2 вкусах 200г'],
+    // a word ending in «x» after a figure reads as a count's word: these are the price of З1 (review 7)
+    ['Чай «Greenfield» 25 пакетикиx 2г'],
+    ['ЧАЙ ГРИНФИЛД 25 ПАКЕТИКИХ 2Г'],
+    ['Яйцо С1 2 коробкиx 10шт'],
   ])(
-    'reads «x» after a vowel as a word’s own, a count before it or not: %s (review 5, Е3, №11)',
-    (printed, pack) => {
-      expect(receiptPack(printed, 'AM')).toEqual(pack)
+    'reads a word ending in «x» after a figure as a sign of times: %s (review 7, З1)',
+    (printed) => {
+      expect(receiptPack(printed, 'AM')).toBeNull()
     },
   )
+
+  it.each([
+    ['Яйцо С1 10шт. х 3', 'AM'],
+    ['Թուղթ զուգարանի 4հ. x 2', 'AM'],
+    ['Թուղթ զուգարանի 4հ «Զևա» x 2', 'AM'],
+    ['Салфетки 100шт белые х 2', 'AM'],
+    ['Ձու 10հտ (C1) x 3', 'AM'],
+    ['JAJA L 10KOM. X 3 (Ђ)', 'RS'],
+  ] as const)(
+    'reads none where a sign of times with a figure stands anywhere after a count: %s (review 7, З2)',
+    (printed, country) => {
+      expect(receiptPack(printed, country)).toBeNull()
+    },
+  )
+
+  it('keeps a count whose later figure is a size, and one with no sign after it', () => {
+    expect(receiptPack('Чай 25шт (Greenfield) x 2г', 'AM')).toEqual(pieces(25))
+    expect(receiptPack('Անձեռոցիկ «Զևա» 100հ, սպիտակ', 'AM')).toEqual(pieces(100))
+  })
 
   it.each([
     ['Чай «Greenfield» 25 пакх2г'],

@@ -49,13 +49,14 @@ const SIZE = new RegExp(
  * after a figure and a space is a cognac's stars, «3* 0.5լ», and glued to both, «25*2գ», a count's sign.
  *
  * A sign of times, in either case, is one standing apart — «25 KES X 2G»; one glued to the figure after any letter,
- * «пакх2г», «25 пакетикиx2г», «4 банкиx0.5л», «2 коробкиx10шт» (reviews 2–6, В2, Д3, Ж1, №12); or one ending, after a
- * consonant and apart from the figure, the word of a count, «25ПАКХ 2Г», «25 пакх 2г» (Г1, Г3). Apart from the figure
- * after a vowel, «x» is a word's own — «Elixir mix 0.33l», «Pepsi MAX 1.5լ», «Durex 3հտ», «пальчиковых 4шт», «Ariel 3в1
- * Max 25шт», «2in1 Max 400мл», «в 2 вкусах 200г» (Г5, Е3, №11). **The price, named:** «Pepsi Max1.5լ», glued, keeps none.
+ * «пакх2г», «4 банкиx0.5л», «2 коробкиx10шт» (reviews 2–6, В2, Д3, Ж1, №12); or one ending a word that follows a figure,
+ * glued or apart, «25ПАКХ 2Г», «25 пакетикиx 2г», «2 коробкиx 10шт» (Г1, Г3, З1). A word of a count and a word of a
+ * name read alike there — «25 пакетикиx 2г» and «Ariel 3в1 Max 25шт» are a figure, a word ending in «x», a figure — and a
+ * package made up is worse than one unread (MOL-255). With no figure before the word, «x» is its own: «Elixir mix
+ * 0.33l», «Pepsi MAX 1.5լ», «Durex 3հտ», «пальчиковых 4шт» (Г5). **The prices, named:** «Ariel 3в1 Max 25шт», «2in1 Max
+ * 400мл», «в 2 вкусах 200г» and «Pepsi Max1.5լ», glued, keep none (review 7, З1 over Е3 and №11).
  */
-const CONSONANT = String.raw`(?![aeiouyаеёиоуыэюяաեէըիոօ])\p{L}`
-const TIMES_SIGN = String.raw`(?:(?<!\p{L})[xх×]\s*|\d\s*\p{L}*${CONSONANT}[xх×]\s*|\p{L}[xх×])`
+const TIMES_SIGN = String.raw`(?:(?<!\p{L})[xх×]\s*|\d\s*\p{L}*[xх×]\s*|\p{L}[xх×])`
 const CUT_BEFORE = new RegExp(String.raw`(?:\d\s*[-–/]\s*|${TIMES_SIGN}|(?<!\d)\*\s*|\d\*)$`, 'iu')
 // a count of pieces with a sign of times before it is a count of packs unread, «2x10հտ», «2X10հտ» (review 2, №7; Г1)
 const TIMES_END = new RegExp(String.raw`(?:${TIMES_SIGN}|\*\s*)$`, 'iu')
@@ -74,6 +75,14 @@ const YEAR = /^(?:19|20)\d\d$/u
  * (reviews 2–5, В1, Г2, Д1, Д2, Е1, Е2, №10). **The price, named:** «4հ x 2», eight rolls, keeps none.
  */
 // «× N» after a count, and the unit of a size after N if one stands there — groups 3 and 4 of either country's pack
+/**
+ * A sign of times with a figure anywhere after a count, «10шт. х 3», «4հ «Զևա» x 2», «10հտ (C1) x 3» — packs the count's
+ * own «× N» did not reach: unread, unless a unit of a size follows the figure (review 7, З2).
+ */
+const LATER_TIMES = new RegExp(
+  String.raw`(?:(?<!\p{L})[xх×]|\p{L}[xх×]|\*)\s*\d+(?:[.,]\d+)?(?!\s*(?:կգ|գր|գ|մլ|լ|кг|гр|г|мл|л|kg|gr|g|ml|l)(?!\p{L}))(?![\d.,])`,
+  'iu',
+)
 const PIECES_TIMES = String.raw`(?:\s*[xх×*]\s*(\d+(?:[.,]\d+)?)(\s*(?:կգ|գր|գ|մլ|լ|кг|гр|г|мл|л|kg|gr|g|ml|l)(?!\p{L}))?)?`
 const ARMENIAN_PIECES = new RegExp(
   String.raw`(?<![\d.,])(\d+)\s*(հատ|հտ|հաբ|հ|hտ|h|զույգ|шт)(?![ա-ֆԱ-Ֆа-яёА-ЯЁA-Za-z])${PIECES_TIMES}`,
@@ -147,7 +156,9 @@ export function receiptPack(printed: string, country: ReceiptCountry): Quantity 
       return {
         count: BigInt(match[1] ?? 0),
         // «× N» with no unit after it is packs or plies: unread (Д1, Д2, Е1, Е2)
-        unread: match[3] !== undefined && match[4] === undefined,
+        unread:
+          (match[3] !== undefined && match[4] === undefined) ||
+          LATER_TIMES.test(printed.slice(match.index + match[0].length)),
         // the count of a pack is the font's 6 as a size is (adversarial А2, review №4)
         doubted: photo && (match[1] ?? '').includes(DOUBTED),
         // in either case: «REXONA 48H 150ML» (review 2, №6, В3)
