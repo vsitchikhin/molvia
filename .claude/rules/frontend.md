@@ -371,7 +371,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   took a pill «Завершить» in the last row of «Устройства» into a dome and rounded the line «не знаем,
   сохранилось ли» on top in the middle of «Ваши данные» (round 2, Б1, Б2). `kit-rows` holds a first, a middle
   and a last row, `advice.spec` the newcomer's row, `devices.spec` and `settings.spec` the two that are not
-  rows.
+  rows. **The price, named** (self-review 7): a row built in place, not of the kit — «Написать разработчику»,
+  «Бот», «Устройства» and «Выйти» of «Настройки», «Сканировать штрихкод» of a record, `PurchaseRow`, `TripRow`,
+  `AccountLine` — keeps its ring cut at the card's edge, as on master, until its screen comes to the kit; the
+  selector is not widened for them.
   **Active** is the row the keyboard stands on in a list a field owns (К-4): the fill without the
   ring, since the focus is in the field; on a chosen row the fill is the layer's alone — the row's own
   square fill stood out past the round ring at every corner (adversarial В1). Only a `div` row takes a button into its tail — a button
@@ -751,10 +754,14 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the first lines. In an attribute (`content: attr()`), so no reader, no search of the page and no test of
   the text finds «первые покупки» over a queue not known (adversarial В of MOL-128). A shape of fixed lines
   was tried first and stood still on one phone and one language only — a line of the title and four of the
-  phrase, «Сфотографируйте первый чек» at 412; Russian at 390 moved the cycle 28 px, 320 up to 52, «Запишите
+  phrase, «Photograph your first receipt» at 412; Russian at 390 moved the cycle 28 px, 320 up to 52, «Запишите
   первые покупки» 25 up (self-review 4, adversarial round 2). `advice.spec` holds the cycle still at 412 and 320. **The price, named:** the queue answering «Осталось оценить» or «Первый чек разбираем» moves the cycle
   by the difference of its words, while its card comes in over it anyway; and a phrase longer than the bars
-  has its last lines empty under them. **The price:** a card adds its padding and
+  has its last lines empty under them. **With no answer the place shrinks away** (adversarial В1, owner's
+  choice): the queue failing leaves no headline to draw, and the skeleton as tall as one went in a frame,
+  the cycle 134 px up from under a thumb; the place is one block in `AppReveal`, the answer coming into it
+  without a move, and with none it shrinks over frames (MOL-151) — still under «reduce motion», as every
+  `AppReveal`. `advice.spec` holds the shrinking. **The price:** a card adds its padding and
   edge, so a skeleton of `groups` is some 34 px taller than before — taller, not shorter, which the hold
   of MOL-138 needs.
 - **An installed app takes a new version only when nobody can lose anything to it: hidden, and
