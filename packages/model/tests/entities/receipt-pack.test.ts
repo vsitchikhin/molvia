@@ -140,8 +140,8 @@ describe('receiptPack — an Armenian till', () => {
     expect(receiptPack('Elixir mix 0.33l', 'AM')).toEqual(l(330))
   })
 
-  it('multiplies a pack of pieces as it does a size: «4հ x 2» is eight rolls (adversarial А5)', () => {
-    expect(receiptPack('Թուղթ զուգարանի «Զևա» 4հ x 2', 'AM')).toEqual(pieces(8))
+  it('reads «× N» after a pack of pieces as packs or plies unread: none, never four (adversarial А5, review 5)', () => {
+    expect(receiptPack('Թուղթ զուգարանի «Զևա» 4հ x 2', 'AM')).toBeNull()
   })
 
   it('doubts a count with a 6 read off a photo, as a size (adversarial А2, review №4)', () => {
@@ -170,7 +170,7 @@ describe('receiptPack — an Armenian till', () => {
   it('reads none of a count of pieces with a sign of times before it (review 2, №7)', () => {
     expect(receiptPack('Ձու 2x10հտ', 'AM')).toBeNull()
     expect(receiptPack('Անձեռոցիկ 3 x 100հ', 'AM')).toBeNull()
-    expect(receiptPack('Ձու 10հտ x 2', 'AM')).toEqual(pieces(20))
+    expect(receiptPack('Ձու 10հտ x 2', 'AM')).toBeNull()
     // a range before a count is no sign of times: the model's «1.5/4hտ» of a battery is four
     expect(receiptPack('Մարտոց «Էվրոլի» Սուլեր ԱՄ 1.5/4hտ', 'AM')).toEqual(pieces(4))
   })
@@ -245,9 +245,35 @@ describe('receiptPack — an Armenian till', () => {
     },
   )
 
-  it('multiplies where nothing but no letter follows: «4հ x 2 «Զևա»» is eight', () => {
-    expect(receiptPack('Թուղթ զուգարանի 4հ x 2 «Զևա»', 'AM')).toEqual(pieces(8))
-  })
+  it.each([
+    ['Թուղթ զուգարանի 4հ x 2 «Զևա»'],
+    ['Անձեռոցիկ «Զևա» 100հ x 2 (շերտ)'],
+    ['Салфетки 100шт х 2 «слоя»'],
+    ['Անձեռոցիկ «Զևա» 100հ x 2֊շերտ'],
+    ['Салфетки «Зева» 100шт х 3–слойные'],
+    ['Бумага туалетная 4шт х 2‑х слойная'],
+    ['Թուղթ զուգարանի 4հ x 2, Զևա'],
+    ['Яйцо С1 10шт х 3.'],
+  ])(
+    'reads none of a count whose «× N» no unit of a size follows: %s (review 5, Е1, Е2)',
+    (printed) => {
+      expect(receiptPack(printed, 'AM')).toBeNull()
+    },
+  )
+
+  it.each([
+    ['Капсулы для стирки Ariel 3в1 Max 25шт', pieces(25)],
+    ['Батарейки Duracell LR6 Max 4шт', pieces(4)],
+    ['Карандаши 12 цветных 2шт', pieces(2)],
+    ['Шампунь Head & Shoulders 2in1 Max 400мл', l(400)],
+    ['Конфеты в 2 вкусах 200г', kg(200)],
+    ['Кофе MacCoffee 3в1 Max 20х18г', kg(360)],
+  ])(
+    'reads «x» after a vowel as a word’s own, a count before it or not: %s (review 5, Е3, №11)',
+    (printed, pack) => {
+      expect(receiptPack(printed, 'AM')).toEqual(pack)
+    },
+  )
 
   it.each([
     ['Чай «Greenfield» 25 пакх2г'],
