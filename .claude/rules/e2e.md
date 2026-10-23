@@ -211,12 +211,14 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   220 ms, at most 16.2 px a frame (the CI trace: 1.0 · 10.6 · 16.2 · 16.2 · 7.0 …), and with one frame
   dropped between the two steepest it failed CI as 32.3 at a threshold of half the way (run
   39613154163). Shared over its time, a dropped frame's way is no more than a frame's; a jump goes its
-  way in one frame and stays a jump — or, should the runner drop a frame right at it, exactly half the
-  way, which fails `<` too, with no margin, and `moving` at 1 besides. **Every run goes through a dropped
+  way in one frame and stays a jump. With one frame dropped right on it, a jump is half the way over two
+  frames' time — at the threshold, and the frames' stamps, a tenth of a millisecond coarse, decide the
+  side (60 over 33.4 ms is 29.94, adversarial Б1): `moving` at 1 is what fails it, so every test of a
+  motion keeps a count of the frames it moved in. **Every run goes through a dropped
   frame, in a test of its own** («a frame the runner drops on the way up…»): `priceFieldMoves` holds the
   page busy 60 ms once the field has first moved, and the test says both halves — drawn, more than half
   the way went between two frames (CI: 50.0 of 60 in every attempt, run 39922499322), measured, under
-  half (12.5). **Never in the tests of the motion itself** (adversarial А1): held after the first move,
+  half (12.5) — and in more than one step (`moving > 1`, a jump's is 1). **Never in the tests of the motion itself** (adversarial А1): held after the first move,
   the hold covers the steepest of the rise, which then counts only as its average — a rise of 100 ms,
   33 px a frame on screen, passed as smooth, and a runner's own 70 ms after the hold left `moving` at 3
   (А2). Е and Е′ take the frames as the runner gives them. **The price, named:** the count of frames the
