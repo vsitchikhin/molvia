@@ -8,6 +8,7 @@
       :title="t('purchases.manual_by_hand')"
       :meta="t('advice.home.manual_body')"
       wrap
+      whole
       next
       @click="begin"
     />

@@ -62,6 +62,7 @@
             )
           "
           wrap
+          whole
           next
           @click="goTab('purchases')"
         />
@@ -72,6 +73,7 @@
           :title="t('advice.home.step_verdicts_title')"
           :meta="t('advice.home.step_verdicts_body')"
           wrap
+          whole
           next
           @click="goTab('verdicts')"
         />
@@ -83,6 +85,7 @@
           :title="t('advice.home.step_advice_title')"
           :meta="t('advice.home.step_advice_body')"
           wrap
+          whole
         />
       </li>
     </AppCard>
@@ -127,8 +130,8 @@ import { useNavigation } from '@/navigation'
  * stands in the strip, «Записать вручную» is a row under the cycle. Without (Д-3): (а) «Запишите
  * первые покупки» or (в), and «Записать покупки» in the strip.
  *
- * Every row is the kit's `ListRow` (MOL-203, Ф-12), its title wrapping: a step cut to «…» explains
- * nothing. Its icon is muted — a status, never the accent of a button (Ф-4).
+ * Every row is the kit's `ListRow` (MOL-203, Ф-12), its title wrapping, and a step's meta whole: a step
+ * cut to «…» explains nothing. Its icon is muted — a status, never the accent of a button (Ф-4).
  *
  * Only the person's own data: other people's figures are behind access (MOL-31).
  */

@@ -714,8 +714,9 @@ describe('AdviceView', () => {
 
       expect(rows.map((row) => row.element.tagName)).toEqual(['BUTTON', 'BUTTON', 'DIV'])
       expect(rows.map((row) => row.find('.chevron').exists())).toEqual([true, true, false])
-      // A step is an explanation: its title wraps rather than ending in «…» on a narrow phone.
-      expect(rows.every((row) => row.classes('wrap'))).toBe(true)
+      // A step is an explanation: its title and its meta wrap whole rather than end in «…» on a
+      // narrow phone.
+      expect(rows.every((row) => row.classes('wrap') && row.classes('whole'))).toBe(true)
     })
 
     it('purchases waiting for a verdict: «Now rate them», and the card leads to «Оценки»', async () => {
