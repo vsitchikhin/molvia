@@ -435,6 +435,7 @@ test.describe('«Тут дешевле»', () => {
       expect(hint(page)).toContainText('Зовуни', { timeout: 5000 }),
     )
 
+    expect.soft(motion, 'замер').toBeNull()
     expect.soft(motion.moved).toBeGreaterThan(20)
     expect.soft(motion.moving).toBeGreaterThan(3)
     expect.soft(motion.largest).toBeLessThan(motion.moved / 2)
@@ -456,6 +457,7 @@ test.describe('«Тут дешевле»', () => {
       await still(page)
     })
 
+    expect.soft(motion, 'замер').toBeNull()
     expect.soft(motion.moved).toBeGreaterThan(10)
     expect.soft(motion.moving).toBeGreaterThan(3)
     expect.soft(motion.largest).toBeLessThan(motion.moved / 2)

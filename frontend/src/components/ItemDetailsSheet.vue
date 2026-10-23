@@ -45,18 +45,14 @@
           <span class="per-unit-label">{{ t('item.unit_price_label') }}</span>
           <span class="per-unit-value">{{ perUnit ?? '—' }}</span>
         </div>
-        <!-- Keyed by its words: a line that says something else goes and comes rather than changing
+        <AppReveal>
+          <!-- Keyed by its words: a line that says something else goes and comes rather than changing
                height in one frame — a second line of it lifted the price by 17 px (adversarial Е′). -->
-        <p
-          v-if="itemHint"
-          :key="itemHint.text"
-          class="hint"
-          :class="`hint-${itemHint.kind}`"
-          data-hint="item"
-        >
-          <component :is="itemHint.icon" class="hint-icon" aria-hidden="true" />
-          <span>{{ itemHint.text }}</span>
-        </p>
+          <p v-if="itemHint" class="hint" :class="`hint-${itemHint.kind}`" data-hint="item">
+            <component :is="itemHint.icon" class="hint-icon" aria-hidden="true" />
+            <span>{{ itemHint.text }}</span>
+          </p>
+        </AppReveal>
         <AppReveal>
           <p
             v-if="alternativeHint"
