@@ -336,7 +336,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   разработчику», a sheet with fields, gets one though 147 drew it without. `ListRow` takes it as an
   explicit `next`, never guessed from the tag, since the card decides and not the tag; `NavRow`, an
   entry, always has it. That a card does not mix is held by review and DESIGN.md: only the whole
-  screen shows it, as only the place shows an icon's role (MOL-173). **The row's icon is a prop,
+  screen shows it, as only the place shows an icon's role (MOL-173). **The meta keeps two lines, unless it
+  explains** (`whole`, MOL-203): the newcomer's steps on a phone of 320 lost «одной кнопкой» and «дешевле» to the
+  «…» — a list of places or operations keeps its two, so a row does not grow without end. **The row's icon is a prop,
   drawn in the row** at `--icon-md`, so `molvia/icon-size` sees it in one file and no screen draws a
   22 beside a 24. **A row's button look is taken off in `:where()`**: the hairline `AppCard list`
   draws between rows is a `border-top`, and an equal selector reset it by load order (`AdviceHomeNew`
