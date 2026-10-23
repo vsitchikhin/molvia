@@ -64,7 +64,7 @@ $row-narrow: 22rem;
 /// compositor; still under «reduce motion». One look for the row of «Покупки» and of the newcomer's «Что
 /// брать» (MOL-203), which draw the same receipt.
 @mixin work-breath {
-  animation: work-breath 1.6s ease-in-out infinite;
+  animation: work-breath var(--dur-work-breath) ease-in-out infinite;
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;
