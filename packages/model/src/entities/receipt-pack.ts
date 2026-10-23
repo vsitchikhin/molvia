@@ -82,13 +82,13 @@ const MEASURE = String.raw`(?:\s*(?:мкг|мг|mcg|mg|մգ|мм|mm|մմ|см|cm
 const NOT_A_COUNT = String.raw`(?:(?:շ|Դ|D|տ|[-–](?:ը|ում))(?!\p{L})|(?:в|in)1(?!\d)|${MEASURE})`
 /**
  * Where a count may start: not inside a number, «0.5», «3,2», nor after «№», «#»; and not after a lone letter — a
- * class or a model, a Latin one, «C1», «N4», «E27», or the eggs' class «С2», «Ս2», a sign of times apart excepted,
+ * class or a model, a Latin one, «C1», «N4», «E27», or the eggs' class «С2», «С3», «Ս2», a sign of times apart excepted,
  * «x6». After a word — glued, past its point or its comma — a figure is a count, «уп12», «PAK6», «уп.12», «бл,4» (Т1,
  * У1): nothing tells it from a model's number glued to its word, and a pack of several read as one is worse than none
  * (MOL-255). **The price, named, as a class:** a model's number glued to its word — «Mach3 4шт», «Nan2 400г», «GU10
  * 2шт», «AA LR6 4шт» — keeps none.
  */
-const COUNT_START = String.raw`(?<![\d#№])(?<!\d[.,])(?<!(?<![\p{L}\d])(?![xX])[A-Za-z])(?<!(?<![\p{L}\d])[СсՍս](?=2(?!\d)))`
+const COUNT_START = String.raw`(?<![\d#№])(?<!\d[.,])(?<!(?<![\p{L}\d])(?![xX])[A-Za-z])(?<!(?<![\p{L}\d])[СсՍս](?=[23](?!\d)))`
 const OTHER_NUMBER = new RegExp(
   String.raw`${COUNT_START}(?<!\d\s*[-–/xх×*+]\s*)(?:[2-9]|[1-9]\d|100)(?!\d|[.,]\d|\s*[%°]|\s*[-–/xх×*]\s*\d|${NOT_A_COUNT})`,
   'giu',

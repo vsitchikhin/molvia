@@ -1467,7 +1467,7 @@ a receipt read before the rollout and not yet recorded gets it too.
   «N x M» or «N/M» beside a weight or a volume and no count of pieces of two or more — the till's «1шт» is none (Р3) — «0.5л 1х12», «2x6 0.5լ», «0.5л 1/12» (`PAIR`,
   rounds 13–14, Н1, П3) — and a count past a hundred with a word after it, «200 пакетиков 2г» (`LARGE_COUNT`, №18),
   keeps no package. What is not a count: a figure after a lone Latin letter, a model's or a
-  class's, «C1», «N4», «E27», the eggs' class «С2», «Ս2», and after «№» — but «x6» is a sign, and a figure after a word,
+  class's, «C1», «N4», «E27», the eggs' class «С2», «С3», «Ս2», and after «№» — but «x6» is a sign, and a figure after a word,
   glued or past its point or its comma, is a count, «уп12», «PAK6», «уп.12», «бл,4» (Т1, У1; **the price, named, as a
   class:** a model's number glued to its word — «Mach3 4шт», «Nan2 400г», «GU10 2шт», «AA LR6 4шт» — keeps none, №21;
   «0.5л №12» is read as a label); plies, «3D», years and three in one glued after
