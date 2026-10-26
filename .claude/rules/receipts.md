@@ -543,8 +543,12 @@ Armenian, this the name). Word by word the dictionary gave «Напиток га
   (adversarial Б4). **It names nothing the line does not
   say** (adversarial А2): its whole name only where every word of it is the line's — by a form of a gloss, or of the
   adjective of a word's genitive («լոլիկ», «томатный» of «լոլիկի»); the seed lumps, «Соус острый» knows «սոուս չիլի», and a
-  sweet chili stays «Соус «Чим Чим» сладкий чили». Then it stands for every word it covers where it has as many words;
-  with fewer the rest are said («Кофе» for «սուրճ աղացած» leaves «молотый»). Else the gloss gets **the seed's number of
+  sweet chili stays «Соус «Чим Чим» сладкий чили». **And it stands for no word it does not say** (adversarial В1): a word
+  its till name covered goes only where its Russian name says it — «Желудки куриные» says «հավի» by its genitive's
+  adjective — and the rest stay, since the seed lumps the other way too: «ծամոն անշաքար» is its «Жевательная резинка»,
+  and the line keeps «без сахара»; «Кофе» for «սուրճ աղացած» leaves «молотый». A kind the dictionary has not takes the
+  seed's head only where its till name covered the kind alone: «Այս» of «այս թի» is no «Чай» (adversarial В3), and the
+  line is spelt as before. Else the gloss gets **the seed's number of
   the same noun** — «Яйца», «Шампиньоны» — **so `kindKey` of the new item is the seed's** and «Тут дешевле» reads them as
   one kind: the «связь вида» of the task, with no column. **The same noun, never an adjective of it nor a noun for an
   adjective** (adversarial А1): `formsOf` holds «сахар» and «Сахарная», «макаронные» and «Макароны», and the kind became
