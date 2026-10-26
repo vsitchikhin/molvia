@@ -17,8 +17,8 @@ export interface RenameReport {
   readonly taken: readonly RenamedItem[]
 }
 
-/** The name a line would propose today, or none. */
-export type LineNamer = (printed: string, country: ReceiptCountry) => string | null
+/** The name a line would propose today for an item named `current`, or none. */
+export type LineNamer = (printed: string, country: ReceiptCountry, current: string) => string | null
 
 export interface RenameRepository {
   /**
@@ -82,7 +82,7 @@ export function createRenameRepository(db: Conn): RenameRepository {
             if (!made || row.proposed === null) continue
             if (nameIdentity(row.name) !== nameIdentity(row.proposed)) continue
             seen.add(row.itemId)
-            const to = nameOf(row.printed, row.country)
+            const to = nameOf(row.printed, row.country, row.name)
             if (to === null || nameIdentity(to) === nameIdentity(row.name)) continue
 
             const key = toSearchKey(to)

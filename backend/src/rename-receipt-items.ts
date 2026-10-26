@@ -1,4 +1,10 @@
-import { describeFailure, newLineName, receiptCard, receiptLineParts } from '@molvia/model'
+import {
+  describeFailure,
+  keepsEveryWord,
+  newLineName,
+  receiptCard,
+  receiptLineParts,
+} from '@molvia/model'
 import type { CatalogueNode, ItemNameLanguage, NameLexicon } from '@molvia/model'
 import type { RenameReport, RenameRepository } from '@/db/rename-repository'
 import { TILL_WORDS_RU } from '@/receipts/till-words-ru'
@@ -28,6 +34,8 @@ export async function renameReceiptItems(
   }
 
   const dryRun = !argv.includes('--yes')
+  // a name that would lose a word of the one the person took is not given (adversarial А6): listed, for the owner
+  const lost: { readonly from: string; readonly to: string }[] = []
   let report: RenameReport
   try {
     const lexicons = new Map<ItemNameLanguage, NameLexicon>()
@@ -36,11 +44,14 @@ export async function renameReceiptItems(
     }
     report = await deps.renamer.rename({
       dryRun,
-      nameOf: (printed, country) => {
+      nameOf: (printed, country, current) => {
         const language = receiptCard(country).nameLanguage
         const lexicon = language === null ? undefined : lexicons.get(language)
         if (lexicon === undefined) return null
-        return newLineName(receiptLineParts(printed), TILL_WORDS_RU, lexicon)?.name ?? null
+        const to = newLineName(receiptLineParts(printed), TILL_WORDS_RU, lexicon)?.name ?? null
+        if (to === null || keepsEveryWord(current, to)) return to
+        lost.push({ from: current, to })
+        return null
       },
     })
   } catch (error) {
@@ -55,6 +66,8 @@ export async function renameReceiptItems(
   write(`  ${'taken'.padEnd(12)}${String(report.taken.length)}`)
   for (const item of report.taken)
     write(`    ${item.from} → ${item.to}: another item holds the name`)
+  write(`  ${'kept'.padEnd(12)}${String(lost.length)}`)
+  for (const item of lost) write(`    ${item.from} → ${item.to}: the new name loses a word`)
   write(dryRun ? 'dry run: nothing changed. Run again with --yes to write.' : 'written.')
   return 0
 }
