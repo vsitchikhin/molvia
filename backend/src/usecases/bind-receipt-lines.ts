@@ -21,7 +21,7 @@ import type { LineBinding } from '@/db/receipts-repository'
 import type { Embedder } from '@/embeddings/embedder'
 import { CATALOGUE_SEED } from '@/catalogue-seed'
 import { TILL_BRANDS } from '@/receipts/till-brands'
-import { TILL_GENITIVES_RU, TILL_WORDS_RU } from '@/receipts/till-words-ru'
+import { TILL_GENITIVES_RU, TILL_PHRASES_RU, TILL_WORDS_RU } from '@/receipts/till-words-ru'
 import { findByBarcode } from '@/usecases/find-by-barcode'
 import { queryMeaning } from '@/usecases/query-meaning'
 
@@ -55,11 +55,16 @@ const SEED_NAMES = new Set(CATALOGUE_SEED.map(([name]) => name))
 
 /**
  * What a new item's name is written with beyond the till's words (MOL-261): the brands as their packages spell
- * them, the seed's items in the till's language — the country's nodes — for the kind it is of, and the genitives
- * as adjectives.
+ * them, the seed's items in the till's language — the country's nodes — for the kind it is of, the genitives
+ * as adjectives and the till's phrases.
  */
 export function namingLexicon(nodes: readonly CatalogueNode[]): NameLexicon {
-  return { brands: TILL_BRANDS, seed: nodes, genitives: TILL_GENITIVES_RU }
+  return {
+    brands: TILL_BRANDS,
+    seed: nodes,
+    genitives: TILL_GENITIVES_RU,
+    phrases: TILL_PHRASES_RU,
+  }
 }
 
 /** A name shorter than this is no item to search by: «Ko», a unit's cut that stood alone. */

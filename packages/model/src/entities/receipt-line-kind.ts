@@ -291,6 +291,11 @@ export interface NameLexicon {
    * «-ի» ends a nominative as often.
    */
   readonly genitives?: Readonly<Record<string, string>>
+  /**
+   * A phrase of the till, two or three words as printed, lower case, to the name a shelf gives the thing (Т-5):
+   * «ֆրանսիական հրուշակեղեն» «пирожное французское», «շոկոլադե սալիկ» «шоколад». It names the kind it holds.
+   */
+  readonly phrases?: Readonly<Record<string, string>>
 }
 
 /** An item of the seed: its name and its names in the till's language. */
@@ -358,7 +363,36 @@ export function newLineName(
   lexicon: NameLexicon = {},
 ): LineName | null {
   let spelled = false
-  const kindOf = seedKindOf(parts, dictionary, lexicon.seed ?? [])
+
+  // a token of the line, or a phrase of the lexicon's, with where it stood and whether it holds the kind
+  interface Unit {
+    readonly text: string
+    readonly at: number
+    readonly kind: boolean
+    readonly phrase: string | null
+  }
+  // a product line of two words, a phrase of the till of two or three, are the lexicon's before their words —
+  // «Արտ Բեյքրի» Art Bakery, «Ֆրանսիական հրուշակեղեն» пирожное французское — read in the line's own order
+  const known = (text: string): boolean =>
+    lexicon.phrases?.[lexiconKey(text)] !== undefined || shelfOf(text, lexicon) !== null
+  const unitsOf = (tokens: readonly string[]): Unit[] => {
+    const out: Unit[] = []
+    for (let at = 0; at < tokens.length;) {
+      const group = [3, 2]
+        .map((size) => tokens.slice(at, at + size))
+        .find((one) => one.length > 1 && known(one.join(' '))) ?? [tokens[at] ?? '']
+      const text = group.join(' ')
+      const kind = parts.kind !== null && group.includes(parts.kind)
+      out.push({ text, at, kind, phrase: lexicon.phrases?.[lexiconKey(text)] ?? null })
+      at += group.length
+    }
+    return out
+  }
+  const beforeUnits = unitsOf(parts.before)
+  const afterUnits = unitsOf(parts.after)
+  // a phrase that holds the kind names it; else the seed's item may (Т-2)
+  const phrased = [...beforeUnits, ...afterUnits].some((unit) => unit.kind && unit.phrase !== null)
+  const kindOf = phrased ? null : seedKindOf(parts, dictionary, lexicon.seed ?? [])
   // the seed's words the name begins with stand for what they covered: «Желудки куриные» for «հավի … քարաճիկ»
   const said: string[] = kindOf === null ? [] : wordsOf(kindOf.name)
   const covered = kindOf?.covered ?? new Set<string>()
@@ -368,29 +402,21 @@ export function newLineName(
     readonly word: string
     readonly at: number
     readonly kind: boolean
+    /** Spelt in letters: a thing nobody knows, a brand printed bare — no noun an adjective agrees with. */
+    readonly letters?: boolean
   }
 
-  // a product line of two words is the lexicon's before either of them: «Արտ Բեյքրի» Art Bakery
-  const lines = (tokens: readonly (readonly [string, number])[]): (readonly [string, number])[] =>
-    tokens.flatMap(([token, at], i) => {
-      const pair = `${tokens[i - 1]?.[0] ?? ''} ${token}`
-      if (i > 0 && shelfOf(pair, lexicon) !== null) return []
-      const next = `${token} ${tokens[i + 1]?.[0] ?? ''}`
-      if (i + 1 < tokens.length && shelfOf(next, lexicon) !== null) return [[next, at] as const]
-      return [[token, at] as const]
-    })
-
-  const words = (tokens: readonly (readonly [string, number])[]): Said[] =>
-    lines(tokens).flatMap(([token, at]): Said[] => {
-      const kind = token === parts.kind
+  const words = (units: readonly Unit[]): Said[] =>
+    units.flatMap(({ text: token, at, kind, phrase }): Said[] => {
       // what the seed's name stands for
       if (covered.has(token)) return []
-      const shelf = shelfOf(token, lexicon)
+      const shelf = phrase === null ? shelfOf(token, lexicon) : null
       if (shelf !== null) return [{ word: shelf, at, kind }]
-      if (!isNameWord(token) || UNIT_WORDS.has(keyed(token))) return []
+      if (phrase === null && (!isNameWord(token) || UNIT_WORDS.has(keyed(token)))) return []
       if (LATIN.test(token)) return [{ word: token, at, kind }]
       const genitive = kind ? undefined : lexicon.genitives?.[lexiconKey(token)]
-      const gloss = genitive ?? asSeedSays(glossOf(token, dictionary), kind, lexicon.seed ?? [])
+      const gloss =
+        phrase ?? genitive ?? asSeedSays(glossOf(token, dictionary), kind, lexicon.seed ?? [])
       // an abbreviation the dictionary has not, «անտ.», is no word to spell
       if (gloss === null && token.endsWith('.')) return []
       if (gloss === null) spelled = true
@@ -399,39 +425,43 @@ export function newLineName(
       const own = wordsOf(word)
       if (own.length > 0 && own.every((one) => said.some((was) => sameRussian(one, was)))) return []
       said.push(...own)
-      return [{ word, at, kind }]
+      return [{ word, at, kind, letters: gloss === null }]
     })
-  const indexed = (tokens: readonly string[]): (readonly [string, number])[] =>
-    tokens.map((token, at) => [token, at] as const)
-  // the kind first, as a shelf names it: «Капуста квашеная», «Напиток газированный» — the seed's name in its
-  // place where it stands for the kind; read first, so that what it says is not said again
-  const kindAt = parts.kind === null ? -1 : parts.before.indexOf(parts.kind)
-  const before = indexed(parts.before)
+  // the kind first, as a shelf names it: «Капуста квашеная», «Напиток газированный»; read first, so that what it
+  // says is not said again
+  const kindUnit = beforeUnits.findIndex((unit) => unit.kind)
   const kindFirst =
-    kindAt < 0 ? before : [before[kindAt] ?? ['', 0], ...before.filter((_, at) => at !== kindAt)]
+    kindUnit < 0
+      ? beforeUnits
+      : [beforeUnits[kindUnit], ...beforeUnits.filter((_, at) => at !== kindUnit)].filter(
+          (unit): unit is Unit => unit !== undefined,
+        )
   const beforeSaid = words(kindFirst)
-  const afterSaid = words(indexed(parts.after))
+  const afterSaid = words(afterUnits)
   const head =
     kindOf?.name ??
     [...beforeSaid, ...afterSaid].find((one) => one.kind)?.word ??
     beforeSaid[0]?.word ??
     ''
-  // an Armenian adjective stands before its noun: it agrees with the next noun the line printed, else the head;
-  // past the kind a till lists what qualifies the kind, «Երշիկ հում-ապխտած չորիզո» is a sausage, raw-smoked
-  const agreed = (segment: readonly Said[], kindAt: number): string[] => {
+  // an Armenian adjective stands before its noun: it agrees with the next noun of the dictionary the line printed
+  // — «ягодный крем», «тёмная вишня» — else the head: a word spelt in letters is a brand or a thing nobody knows,
+  // «Салфетки … антибактериальные Смайл». The price, named: a noun in apposition takes it, «сырокопчёное чоризо»
+  const agreed = (segment: readonly Said[]): string[] => {
     const inOrder = [...segment].sort((a, b) => a.at - b.at)
     return segment.map((one) => {
       if (!isAdjective(one.word)) return one.word
-      if (kindAt >= 0 && one.at > kindAt) return agreeing(one.word, head)
-      const noun = inOrder.find((other) => other.at > one.at && (other.kind || isNoun(other.word)))
+      const noun = inOrder.find(
+        (other) =>
+          other.at > one.at && other.letters !== true && (other.kind || isNoun(other.word)),
+      )
       return agreeing(one.word, noun?.word ?? head)
     })
   }
   const name = [
     ...(kindOf === null ? [] : [kindOf.name]),
-    ...agreed(beforeSaid, kindAt),
+    ...agreed(beforeSaid),
     ...(parts.brand === null ? [] : [brandInName(parts.brand, lexicon)]),
-    ...agreed(afterSaid, -1),
+    ...agreed(afterSaid),
     ...(parts.percent === null ? [] : [parts.percent]),
     ...(parts.size === null ? [] : [parts.size]),
   ].join(' ')
@@ -487,6 +517,8 @@ const INDECLINABLE: Readonly<Record<string, Agreement>> = {
 }
 // plurals in «-а», «-я», never a feminine: «Яйца куриные», «Семена тыквенные»
 const PLURAL_A = new Set(['яйца', 'семена', 'бедра', 'крылья', 'окорока', 'перья'])
+// words of a noun's ending that say how much, never what: «пористый, экстра чёрный»
+const NOT_NOUNS = new Set(['экстра', 'супер', 'ультра', 'мини', 'макси', 'премиум', 'люкс'])
 // nouns of an adjective's ending, never agreed: «Пакет … алюминий» is no adjective
 const NOT_ADJECTIVES = new Set(['алюминий', 'магний', 'кальций', 'натрий', 'калий', 'гербарий'])
 // the possessive adjectives, «говяжья», «рыбье»: their ending keeps a soft sign
@@ -514,6 +546,7 @@ const isNoun = (word: string): boolean => {
   const first = lowerRussian(word.split(' ')[0] ?? '')
   return (
     /^[а-я-]+$/u.test(first) &&
+    !NOT_NOUNS.has(first) &&
     !/(?:ый|ий|ой|ая|яя|ое|ее|ые|ие)$/u.test(first) &&
     !['с', 'со', 'для', 'на', 'в', 'во', 'из', 'без', 'по'].includes(first)
   )
