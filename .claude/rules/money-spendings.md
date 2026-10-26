@@ -206,9 +206,14 @@ nothing up.
   the answer, which puts the month in place of the error card — the rows stood the whole retry and the
   tap on «Обмен денег» was lost as in CI. Unseen with their place kept (`visibility`), faded out and back
   over frames by `--appear-duration` — gone in one frame and back in one on a refusal, no answer read,
-  broke MOL-151 (adversarial В1) — and no tap from the press on: **what holds is the tap, not the
-  sight** (adversarial Г1) — an answer faster than the fade, as a server back up gives, moves them
-  faded only part-way (0.71 at the palest in CI), not unseen, and nothing aimed at them lands there; never
+  broke MOL-151 (adversarial В1) — and no tap from the press on, so a row fading is never pressed.
+  **The price, named** (adversarial Г1, Д1): an answer faster than the fade, as a server back up gives,
+  moves them faded only part-way (0.71, 0.93 in CI), not unseen, and what the answer puts in their old
+  place is pressed instead — a month with a spending stands its card and «Куда ушли» over them, and a tap
+  at «Обмен денег» there opened «Графики». The window is the answer's own time, tens of milliseconds:
+  less than a press on «Повторить» and a second on a row take, while an answer slower than the fade
+  finds the rows gone. Hidden at once on the press it would close, at the cost of a going in one frame
+  (В1), and held unseen for a set time, at the cost of a timer for a sight; neither is taken. Never
   taken out:
   taken out, the page under a small phone scrolled down shortened, the browser brought the scroll up,
   and the card of «Повторить» itself dropped under the finger (adversarial Б2); they are back with the
