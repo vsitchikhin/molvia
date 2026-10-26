@@ -824,10 +824,13 @@ describe('AppScreen with an error of the whole screen', () => {
   // A version waiting: the error offers its own «Обновить» first (MOL-132, В-2), and a focus brought
   // there let the next Enter, meant for the screen's action, reload the app — «Повторить» takes it
   // (MOL-194, adversarial Е).
+  // A focus that stood on «Обновить» of the version's row goes to the error's «Обновить» in its
+  // place: the next Enter was meant for the reload (adversarial Ж).
   it.each([
-    ['the action swapped for the error', false],
-    ['the strip gone as the error came', true],
-  ])('hands a focus to «Try again», past the error’s «Update»: %s', async (_, together) => {
+    ['the action swapped for the error', false, '.own', en.state.retry],
+    ['the strip gone as the error came', true, '.own', en.state.retry],
+    ['the focus on the version’s «Update»', false, '.update button', en.update.apply],
+  ])('hands a focus past the error’s «Update» but from one: %s', async (_, together, from, to) => {
     const failed = ref(false)
     const update = waiting('ready')
     const view = mount(
@@ -852,12 +855,12 @@ describe('AppScreen with an error of the whole screen', () => {
         },
       },
     )
-    ;(view.get('.own').element as HTMLElement).focus()
+    ;(view.get(from).element as HTMLElement).focus()
     failed.value = true
     await nextTick()
     await nextTick()
     expect(buttons(view.get('.dock'))).toEqual([en.update.apply, en.state.retry])
-    expect(document.activeElement?.textContent).toContain(en.state.retry)
+    expect(document.activeElement?.textContent).toContain(to)
     view.unmount()
   })
 
