@@ -558,7 +558,10 @@ Armenian, this the name). Word by word the dictionary gave «Напиток га
 - **Russian grammar** (Т-3, `agreeing`): an adjective of the dictionary, given in the masculine, takes the gender or number of
   the next noun of the dictionary the line printed after it — «тёмная вишня», «ягодный крем» — else of the head:
   «Соль мелкая», «Желудки … свежие», «Сливки … ультрапастеризованные». The gender is the ending's, a soft sign's and an
-  indeclinable's by a list, «яйца», «семена» plural; **a plural only by an ending no singular has** (adversarial А3) —
+  indeclinable's by a list, «яйца», «семена» plural; **a noun of the seed by the seed's own adjective** (adversarial Г1):
+  the seed gives a kind its number, «Окорочка», «Рёбра», «Полотенца», and its «куриные», «бумажные» say it, where the
+  ending «-а» reads a feminine — an adjective next to the head and of it alone, last after it or first before it, never
+  «высший» of «Мука высший сорт»; **a plural only by an ending no singular has** (adversarial А3) —
   «-ы», «-ья», «-и» after «к», «г», «х» or a hushing letter, «Хлопья шоколадные», «Сливки»; any other «-и» is a loan as
   often, «сулугуни», «салями», and one no ending tells leaves the word as the dictionary has it — «Сулугуни … копчёный».
   **A possessive keeps its soft sign** (self-review Р1-1): «говяжья», «коровье», «телячьи» — a list, since «телячий» ends
