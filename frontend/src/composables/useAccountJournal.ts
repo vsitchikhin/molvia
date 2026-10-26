@@ -19,6 +19,11 @@ export interface AccountJournal {
   readonly journal: ComputedRef<AccountJournalResponse | null>
   /** The journal on screen is the phone's memory: offline, or the server not answered yet. */
   readonly stale: ComputedRef<'loading' | 'offline' | 'error' | null>
+  /**
+   * Why the last read failed, until an answer comes — unlike `stale`, an answer earlier in this
+   * session does not hide it: the journal on screen is older than the read that failed (MOL-194, А1).
+   */
+  readonly failed: ComputedRef<'offline' | 'error' | null>
   readonly more: ComputedRef<'idle' | 'loading' | 'failed'>
   /** Reads that failed with the journal shown, so a retry that failed the same way is said again. */
   readonly failures: ComputedRef<number>
@@ -145,6 +150,7 @@ export function useAccountJournal(accountId: Ref<string>): AccountJournal {
       if (!shown.value || confirmed.value) return null
       return failure.value === 'missing' ? null : (failure.value ?? 'loading')
     }),
+    failed: computed(() => (failure.value === 'missing' ? null : failure.value)),
     more: computed(() => more.value),
     failures: computed(() => failures.value),
     loadMore,

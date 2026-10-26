@@ -102,6 +102,7 @@ import { useCollapsed, useHeight } from '@/composables/useCollapsed'
 import { provideStateStrip } from '@/composables/useStateStrip'
 import { backTarget, useNavigation } from '@/navigation'
 import { usePwaUpdate } from '@/pwaUpdate'
+import { focusScreenTitle } from '@/transitions'
 
 /**
  * The frame every screen of 0.1 sits in: a pinned row, the large title, the room under the tab
@@ -171,7 +172,16 @@ export default defineComponent({
       docked.value = hasRow()
       focusInDock = dock.value?.contains(document.activeElement) ?? false
     })
+    // A render that swapped the strip's actions under the focus — an account put away or deleted on
+    // another phone, «Вернуть» answered — left it on the body: it goes to the strip's first button,
+    // where the one it stood on was, or to the title where the strip went whole (MOL-194, Б2, Б3).
     onUpdated(() => {
+      const focused = document.activeElement
+      if (focusInDock && (focused === null || focused === document.body)) {
+        const first = dock.value?.querySelector('button')
+        if (first) first.focus()
+        else focusScreenTitle()
+      }
       focusInDock = false
     })
     const tabbed = computed(() => Boolean(route.meta.tab))

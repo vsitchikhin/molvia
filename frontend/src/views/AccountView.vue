@@ -9,20 +9,18 @@
 
     <div class="content">
       <!-- The connection in one line, the screen's words with the hour of the answer shown (MOL-181,
-           Ф-14). The strip holds «Сверить с фактом», so «Повторить» is here (К-5). -->
+           Ф-14). The strip holds «Сверить с фактом», so «Повторить» is here (К-5). By the last read,
+           as on «Счета», not by whether this session had an answer before it: a transfer re-reads
+           the journal, and a read that failed left it without the transfer the balance has (А1). -->
       <StatusStrip
-        v-if="phase === 'ready' && stale === 'offline'"
+        v-if="phase === 'ready' && (!online || failed === 'offline')"
         kind="offline"
         :text="countedAt ? t('accounts.stale', { time: countedAt }) : t('spending.offline.title')"
       />
       <StatusStrip
-        v-else-if="phase === 'ready' && stale === 'error'"
+        v-else-if="phase === 'ready' && failed === 'error'"
         kind="unanswered"
-        :text="
-          countedAt
-            ? t('accounts.screen.unanswered', { time: countedAt })
-            : t('accounts.account.unanswered')
-        "
+        :text="unansweredLine"
         :attempt="failures"
       >
         <template #action>
@@ -307,7 +305,8 @@ export default defineComponent({
     const { categories, nameOf } = useOwnCategories()
 
     const accountId = computed(() => String(route.params.accountId ?? ''))
-    const { phase, journal, stale, more, failures, loadMore, retry } = useAccountJournal(accountId)
+    const { phase, journal, stale, failed, more, failures, loadMore, retry } =
+      useAccountJournal(accountId)
 
     const online = ref(navigator.onLine)
     const onLine = () => (online.value = true)
@@ -361,6 +360,13 @@ export default defineComponent({
     const estimate = (value: Money) => signedAmount(value, locale.value, { estimate: true })
     const countedAt = computed(() =>
       store.overview ? countedWhen(store.overview.countedAt, locale.value) : null,
+    )
+    // The hour only where the balance is the phone's too: over a page this session read, it named the
+    // minute of an answer the journal under it never had (review №1).
+    const unansweredLine = computed(() =>
+      countedAt.value && store.stale !== null
+        ? t('accounts.screen.unanswered', { time: countedAt.value })
+        : t('accounts.account.unanswered'),
     )
 
     const subtitle = computed(() => {
@@ -466,10 +472,13 @@ export default defineComponent({
         store.accept(await api.restoreMoneyAccount(value.id))
         announce?.(t('accounts.screen.restored', { name: value.name }))
         // The button pressed is gone with the mark: the focus goes to the action in its place, not to
-        // the page (Р-5).
+        // the page (Р-5) — the frame brings a focus that stood on it, this a tap Safari never focused
+        // (MOL-80); a focus the person took elsewhere meanwhile stays there (adversarial В).
         await nextTick()
+        const focused = document.activeElement
         const next = reconcileButton.value?.$el as unknown
-        if (next instanceof HTMLElement) next.focus()
+        if ((focused === null || focused === document.body) && next instanceof HTMLElement)
+          next.focus()
       } catch {
         announce?.(t('accounts.sheet.failed'))
       } finally {
@@ -524,7 +533,8 @@ export default defineComponent({
       t,
       phase,
       journal,
-      stale,
+      failed,
+      unansweredLine,
       more,
       loadMore,
       retry,
