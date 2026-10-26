@@ -77,6 +77,7 @@ import { useI18n } from 'vue-i18n'
 import {
   MONTH_STARTED_DAYS,
   formatEstimate,
+  formatMoney,
   lastDayOf,
   percentChange,
   previousMonth,
@@ -86,7 +87,7 @@ import AppCard from '@/components/AppCard.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import { signedAmount } from '@/components/accounts'
 import { signedPercent } from '@/components/charts'
-import { asTyped, bankWords, rateWords, spentApprox } from '@/components/spending'
+import { bankWords, rateWords, spentApprox } from '@/components/spending'
 import { calendarDay } from '@/days'
 
 /**
@@ -121,7 +122,7 @@ export default defineComponent({
     const signed = (value: Money) => signedAmount(value, locale.value, { estimate: true })
     // What no rate counted is money as written, with no «≈» before it: never rounded (MOL-184, А2).
     const list = (values: readonly Money[]) =>
-      values.map((value) => asTyped(value, locale.value)).join(', ')
+      values.map((value) => formatMoney(value, locale.value)).join(', ')
     const shortDay = (day: string) =>
       calendarDay(day, locale.value, { day: 'numeric', month: 'short' })
     const days = (values: readonly string[]) => values.map(shortDay).join(', ')
@@ -186,7 +187,8 @@ export default defineComponent({
     const foreign = computed(() =>
       props.month.foreign.map(({ amount, counted }) =>
         t('spending.foreign_part', {
-          amount: formatEstimate(amount, locale.value),
+          // The money as spent, as its row in «Траты» says it; only what it came to is «≈» (MOL-205, В-1 «в»).
+          amount: formatMoney(amount, locale.value),
           counted: whole(counted),
         }),
       ),

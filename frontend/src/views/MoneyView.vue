@@ -135,9 +135,11 @@
              that will not load must not close the way to the income that broke it (MOL-81; review
              Т-1, as MOL-66 argued) — but not offline with nothing kept, where the screens behind
              them would show nothing either. Never under the skeleton (MOL-269): the answer moved
-             them from under the finger, and «Счета» answering moves them too. -->
+             them from under the finger, and «Счета» answering moves them too. Unseen, their place
+             kept, while «Повторить» reads a failed month again (`ways-held`). -->
         <MoneyEntries
           v-if="entriesShown"
+          :class="{ 'ways-held': entriesHeld }"
           :month="selected === currentMonth ? null : selected"
           :values="entries"
           :spendings="!newcomer"
@@ -198,7 +200,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, watch } from 'vue'
+import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconPlus from '~icons/mdi/plus'
@@ -295,20 +297,34 @@ export default defineComponent({
      * The ways out once nothing that answers above them can move them (MOL-269): the month answered,
      * failed or kept, and «Счета» too — their card over the switcher comes with their answer. Under
      * the skeleton they jumped 291 px up for a newcomer and 99 down with a spending, and the tap aimed
-     * at one landed on another, or on nothing. Nor under a failed month read again — «Повторить», the
-     * connection back — which stays `error` until its answer puts the month in place of the card
-     * (adversarial А1).
+     * at one landed on another, or on nothing.
      */
     const entriesShown = computed(() => {
       const phase = screen.phase.value
-      if (phase === 'error' && screen.reading.value) return false
       return phase !== 'loading' && phase !== 'offline' && accounts.phase !== 'loading'
     })
 
+    /**
+     * «Повторить» pressed under a failed month (adversarial А1): the phase stays `error` until the
+     * answer puts the month in place of the card, and the rows went from under the finger already low
+     * on the screen — the tap of CI, one press later. Unseen with their place kept, never taken out:
+     * taken out, the page shortened and the card of «Повторить» itself dropped under the finger on a
+     * small phone scrolled down (adversarial Б2). Only the person's own «Повторить» — a read nobody
+     * asked for, the connection or the app back, a spending landed, is refused as a rule under a
+     * month that fails, and took the rows away for nothing (review Р4-1, adversarial Б1).
+     */
+    const retrying = ref(false)
+    const entriesHeld = computed(() => retrying.value && screen.phase.value === 'error')
+
     /** «Повторить» asks «Счета» again too: the server that broke the month broke them as well (А2). */
-    function retryAll(): Promise<void> {
+    async function retryAll(): Promise<void> {
       void accounts.refresh()
-      return screen.retry()
+      retrying.value = true
+      try {
+        await screen.retry()
+      } finally {
+        retrying.value = false
+      }
     }
 
     /**
@@ -409,6 +425,7 @@ export default defineComponent({
       refusedHere,
       entries,
       entriesShown,
+      entriesHeld,
       saved,
       openSpendings,
     }
@@ -484,6 +501,12 @@ export default defineComponent({
 
 .ghost-line:nth-child(3) {
   width: 54%;
+}
+
+/* The ways out while «Повторить» reads a failed month again: their place kept (MOL-269, Б2). Not
+   `held`: that is `AppScreen`'s own class on its root, which carries this screen's scope too. */
+.ways-held {
+  visibility: hidden;
 }
 
 /* The answer comes in where the skeleton stood, faded only: the screen keeps it in one block of its

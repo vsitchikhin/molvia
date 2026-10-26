@@ -349,9 +349,9 @@ describe('TripView', () => {
 
     const rows = view.findAll('.row')
     expect(rows).toHaveLength(2)
-    expect(plain(rows[0]?.text())).toContain('570,00 ֏ за л')
+    expect(plain(rows[0]?.text())).toContain('570 ֏ за л')
     // Дешевле на ценнике и дороже за литр — ради этой строки экран и существует.
-    expect(plain(rows[1]?.text())).toContain('520,00 ֏')
+    expect(plain(rows[1]?.text())).toContain('520 ֏')
     expect(plain(rows[1]?.text())).toContain('577,78 ֏ за л')
   })
 
@@ -469,7 +469,7 @@ describe('TripView', () => {
       expect(rows).toHaveLength(3)
       const last = rows[2]
       expect(last?.text()).toContain(ru.trip.queued.waiting)
-      expect(plain(last?.text())).toContain('300,00 ֏ за л')
+      expect(plain(last?.text())).toContain('300 ֏ за л')
     })
 
     it('правка и удаление помечают серверную строку, а не заводят новую', async () => {

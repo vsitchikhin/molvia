@@ -93,10 +93,13 @@ describe('formatUnitPrice', () => {
   const digits = (text: string): string => text.replace(/[\s\u00a0\u202f]/g, '')
 
   it.each([
-    ['570', '1', 'l', '570,00֏'],
+    ['570', '1', 'l', '570֏'],
     ['520', '0.9', 'l', '577,78֏'],
-    ['5403.12', '1.128', 'kg', '4790,00֏'],
-    ['250', '1', 'piece', '250,00֏'],
+    ['5403.12', '1.128', 'kg', '4790֏'],
+    ['250', '1', 'piece', '250֏'],
+    ['1290.50', '1', 'kg', '1290,50֏'],
+    // 569,995 per piece prints whole, so it prints bare (MOL-205): «570», never «570,00».
+    ['1139.99', '2', 'piece', '570֏'],
   ] as const)('prints %s ֏ for %s %s as %s, as the sheet shows it', (amount, qty, unit, shown) => {
     expect(
       digits(formatUnitPrice(unitPrice(parseMoney(amount, 'AMD'), parseQuantity(qty, unit)))),

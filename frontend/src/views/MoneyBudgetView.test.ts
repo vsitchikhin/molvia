@@ -625,7 +625,7 @@ describe('MoneyBudgetView: what the review found (MOL-117)', () => {
     await flushPromises()
     const sheet = document.querySelector('dialog[open]')
     expect(sheet?.querySelector<HTMLInputElement>('input[inputmode=decimal]')?.value).toBe('')
-    expect(sheet?.textContent).toContain('The plan was ֏250,000.00')
+    expect(sheet?.textContent).toContain('The plan was ֏250,000')
     await pressUntil(en.budget.sheet.save, () => {
       expect(sheet?.textContent).toContain('Enter a sum')
     })
