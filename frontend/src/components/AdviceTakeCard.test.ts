@@ -51,8 +51,8 @@ describe('AdviceTakeCard', () => {
     const view = render([market, sas, carrefour])
 
     expect(plain(view.get('.where').text())).toBe('Дешевле всего: Рынок в Гюмри')
-    expect(plain(view.get('.price').text())).toBe('4 790,00 ֏/кг')
-    expect(plain(view.get('.more').text())).toBe('Ещё: SAS 5 100,00 ֏/кг · Carrefour 5 240,00 ֏/кг')
+    expect(plain(view.get('.price').text())).toBe('4 790 ֏/кг')
+    expect(plain(view.get('.more').text())).toBe('Ещё: SAS 5 100 ֏/кг · Carrefour 5 240 ֏/кг')
   })
 
   it('MOL-120: one name in two cities — each named with its city, the rest of the row without', () => {
@@ -62,7 +62,7 @@ describe('AdviceTakeCard', () => {
 
     expect(plain(view.get('.where').text())).toBe('Дешевле всего: Ереван Сити в Гюмри')
     expect(plain(view.get('.more').text())).toBe(
-      'Ещё: Ереван Сити в Ереване 4 800,00 ֏/кг · SAS 5 100,00 ֏/кг',
+      'Ещё: Ереван Сити в Ереване 4 800 ֏/кг · SAS 5 100 ֏/кг',
     )
   })
 
@@ -70,7 +70,7 @@ describe('AdviceTakeCard', () => {
     const view = render([place('Ереван Сити', 540_000_000_000n), { ...sas, name: 'Ереван Сити' }])
 
     expect(plain(view.get('.where').text())).toBe('Брали здесь: Ереван Сити')
-    expect(plain(view.get('.more').text())).toBe('Ещё: Ереван Сити 5 100,00 ֏/кг')
+    expect(plain(view.get('.more').text())).toBe('Ещё: Ереван Сити 5 100 ֏/кг')
   })
 
   it('one place is «Брали здесь»: a superlative out of one observation is a conclusion from nothing', () => {
@@ -86,7 +86,7 @@ describe('AdviceTakeCard', () => {
     const view = render([sas, market])
 
     expect(plain(view.get('.where').text())).toBe('Брали здесь: SAS')
-    expect(plain(view.get('.more').text())).toBe('Ещё: Рынок в Гюмри 4 790,00 ֏/кг')
+    expect(plain(view.get('.more').text())).toBe('Ещё: Рынок в Гюмри 4 790 ֏/кг')
   })
 
   it('rated but never bought: no price block at all, rather than an empty one', () => {
