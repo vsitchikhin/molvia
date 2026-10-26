@@ -62,8 +62,8 @@
     </template>
     <!-- Saved on the tap, beside the form and never under its «Сохранить»: the form's four fields
          are also a trip's context (MOL-134, Н-1, В-5). The groups are mounted under the skeleton, so
-         their reads go at once, and shown once the form has answered, failed or stands offline
-         (MOL-269): the form coming in place of the skeleton moved them from under the finger. -->
+         their reads go at once, and hidden while the form's skeleton stands (MOL-269): the form coming
+         in its place moved them from under the finger. -->
     <SalaryShiftGroup v-show="groupsShown" class="group" />
     <!-- The bot's messages, a switch each, on a page of their own (MOL-129, В-2). -->
     <section v-show="groupsShown" class="group">
@@ -84,7 +84,7 @@
     <!-- This device's own, not the account's: nothing goes to the server (MOL-111). -->
     <SchemeGroup v-show="groupsShown" class="group" />
     <!-- Outside the form's states: the way into the account does not depend on whether its
-         settings loaded (MOL-57). -->
+         settings loaded (MOL-57) — only on the skeleton having gone, answer or failure (MOL-269). -->
     <section v-show="groupsShown" class="group">
       <SectionCaption>{{ t('settings.group_account') }}</SectionCaption>
       <AppCard as="ul" list>
@@ -284,13 +284,12 @@ export default defineComponent({
       if (!open) signOut.stay()
     })
 
-    // The form answered, failed or stands offline (MOL-269). Not the salary's day: nothing of it is
+    // Never under the form's skeleton (MOL-269), on the first read or one after a failure — «Повторить»,
+    // the connection back, the app back in view all read with the failure still standing, and the
+    // skeleton is the one condition both share (review Р3-1). Not the salary's day: nothing of it is
     // kept on the phone, so waiting for it hid the groups at every opening, and a step back the browser
     // showed whole came in again under its picture.
-    const groupsShown = computed(() => {
-      const form = settings.form
-      return !!form.draft || form.failure || !settings.online.value
-    })
+    const groupsShown = computed(() => !(settings.form.loading && !settings.form.draft))
 
     return {
       t,

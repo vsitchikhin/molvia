@@ -119,6 +119,32 @@ describe('the groups under the form come with its answer (MOL-269)', () => {
     expect(shown(view)).toEqual([true, true, true, true])
   })
 
+  // Review Р3-1: a read after a failure — «Повторить», the app back in view — stands the skeleton
+  // again with the failure still there; the groups went under it.
+  it('must not fire: none under the skeleton of a read after a failure, by a tap or by itself', async () => {
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render(false)
+    expect(view.text()).toContain(en.settings.load_error.title)
+    expect(shown(view)).toEqual([true, true, true, true])
+
+    me.mockReturnValue(new Promise(() => undefined))
+    await view
+      .findAll('button')
+      .find((button) => button.text() === en.state.retry)
+      ?.trigger('click')
+    await flushPromises()
+    expect(view.find('.skeleton').exists()).toBe(true)
+    expect(shown(view)).toEqual([false, false, false, false])
+
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const back = await render(false)
+    me.mockReturnValue(new Promise(() => undefined))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(back.find('.skeleton').exists()).toBe(true)
+    expect(shown(back)).toEqual([false, false, false, false])
+  })
+
   it('come when the form failed, or offline with nothing kept', async () => {
     salaryShift.mockRejectedValue(new ApiError(ERROR.INTERNAL))
     me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
