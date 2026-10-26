@@ -6,6 +6,7 @@
 #   bin/init-env.sh          # индекс из имени каталога: molvia → 0, molvia2 → 2
 #   bin/init-env.sh 7        # индекс явно
 #   bin/init-env.sh 7 --force  # перезаписать существующий .env
+#   PG_HOST=postgres PG_HOST_PORT=5432 bin/init-env.sh 0   # база не на петле (контейнер CI, MOL-295)
 #
 # Порты разводятся смещением индекс*10, база и compose-проект — суффиксом.
 # Полоса портов у молвии своя (3300 / 5300 / 5500), а не дефолтная: на машине
@@ -65,6 +66,12 @@ e2e_pwa_port=$(( pwa_port + 1 ))
 # The receipt reader of `make reader` (MOL-125): the API's band, after the fake of Open Food Facts.
 reader_port=$(( api_port + 3 ))
 
+# Where the applications reach the database. The end-to-end job of CI runs in a container (MOL-295),
+# where the loopback is the container's own and the Postgres service is its name on its own port.
+# POSTGRES_PORT stays the band's: it is what compose publishes, not what a URL names.
+pg_host="${PG_HOST:-127.0.0.1}"
+pg_url_port="${PG_HOST_PORT:-$pg_port}"
+
 # Все шесть портов, которые займёт копия, вместе с читателем чеков: против чужого процесса на
 # соседнем порту полоса не помогает, а предупреждение здесь — да.
 busy=""
@@ -87,17 +94,17 @@ APP_BASE_URL=http://127.0.0.1:${pwa_port}
 POSTGRES_DB=molvia_${index}
 POSTGRES_USER=molvia
 POSTGRES_PASSWORD=molvia
-DATABASE_URL=postgres://molvia:molvia@127.0.0.1:${pg_port}/molvia_${index}
+DATABASE_URL=postgres://molvia:molvia@${pg_host}:${pg_url_port}/molvia_${index}
 # Integration tests get their own database on the same server, so a test run can
 # never truncate the data you have been entering by hand.
-TEST_DATABASE_URL=postgres://molvia:molvia@127.0.0.1:${pg_port}/molvia_${index}_test
+TEST_DATABASE_URL=postgres://molvia:molvia@${pg_host}:${pg_url_port}/molvia_${index}_test
 
 # End-to-end gets the same protection, and its own ports with it (MOL-60): the run
 # is dropped and recreated before every pass, and it cannot reach the dev stack even
 # when \`make dev\` is up, because that one listens elsewhere.
 E2E_API_PORT=${e2e_api_port}
 E2E_PWA_PORT=${e2e_pwa_port}
-E2E_DATABASE_URL=postgres://molvia:molvia@127.0.0.1:${pg_port}/molvia_${index}_e2e
+E2E_DATABASE_URL=postgres://molvia:molvia@${pg_host}:${pg_url_port}/molvia_${index}_e2e
 
 # У КАЖДОЙ КОПИИ СВОЙ БОТ. Два процесса на одном токене воруют друг у друга
 # апдейты через long polling — молча и невоспроизводимо. Завести отдельного

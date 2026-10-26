@@ -80,6 +80,17 @@ jobs:
   e2e:
     name: end-to-end
     runs-on: ubuntu-latest
+    # A run is 13–18 minutes. A step that hangs is otherwise held for six hours (MOL-295, В-2).
+    timeout-minutes: 40
+
+    # The browsers and every system package they need come in the image (MOL-295): `playwright install
+    # --with-deps` put 181 packages through apt on every run, and on a slow mirror that took 17 to 60
+    # minutes. The tag is the version of @playwright/test in package-lock.json, which
+    # bin/check-playwright-image.mjs holds in `npm run lint`. The runner's own uid, as Playwright's
+    # documentation has it, so the workspace stays the runner's.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --user 1001
 
     # The API migrates at boot and refuses to start without a database, which is correct:
     # it cannot serve without one. So the end-to-end job needs a real database too — and
@@ -91,8 +102,7 @@ jobs:
           POSTGRES_DB: molvia_0
           POSTGRES_USER: molvia
           POSTGRES_PASSWORD: molvia
-        ports:
-          - 5500:5432
+        # No port published: in the container's network the service is `postgres:5432`.
         options: >-
           --health-cmd pg_isready
           --health-interval 5s
@@ -101,6 +111,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+      # The image's Node is 24; ours is .nvmrc's.
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -110,16 +121,10 @@ jobs:
         env:
           ONNXRUNTIME_NODE_INSTALL: skip
       - run: ./bin/init-env.sh 0
+        env:
+          PG_HOST: postgres
+          PG_HOST_PORT: 5432
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          # The browsers are in the key: saved only on a miss, a cache from before WebKit (MOL-80)
-          # would have had it downloaded again on every run.
-          key: playwright-chromium-webkit-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
 
       # The traces CI records — a retry's, and the first attempt's where a spec asks for it (MOL-217):
