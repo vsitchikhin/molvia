@@ -122,6 +122,14 @@ The detail behind the frontend lines of `CLAUDE.md`.
   Of the 321 Google fonts covering Cyrillic, four also cover Armenian and none is usable
   here. Without this the glyph falls back to a system font and shifts the baseline in the
   one place it must not: the prices.
+- **Money is printed by one rule, in the domain** (MOL-205, DESIGN.md «whole amounts print without
+  ",00"»): `formatMoney` for an amount, `formatUnitPrice` for a price per unit, `formatEstimate` for
+  «≈». Whole is bare — «9 870 ֏», «570 ֏/л»; a fraction keeps every digit of its currency, never
+  rounded or trimmed — «2 495,69 ₽», «40,50 ₽»; whole is what is printed, so 569,995 ֏/л is «570 ֏/л»
+  (`exactFigures`, by `trailingZeroDisplay`, which the floor of the browsers has). Until then «Деньги»
+  printed by `asTyped` of their own and «Покупки», the receipt and «Что брать» by `formatMoney`, which
+  kept the «,00» — one app, two rules. No screen formats money with an `Intl.NumberFormat` of its own;
+  a rate, a percent and a quantity are not money and keep theirs.
 - **Native HTML first, then Reka UI, never a styled kit.** On a phone `<select>`,
   `<input type="date">` and `<input inputmode="decimal">` open the system pickers, which
   beat anything a library renders; `<dialog>` already brings a focus trap and a backdrop.

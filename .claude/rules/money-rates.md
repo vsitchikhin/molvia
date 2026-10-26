@@ -687,7 +687,7 @@ rate exactly as before.
   received — never of `measured`, the same money in the spending currency rounded to its cent:
   spent in dollars, −1,00 ֏ is 0,00 $, and the point said nothing where the card said «хуже»
   (adversarial А1). **The price, named:** «Обмены против рынка» sums the money in the spending
-  currency, so its place may read «0,00 $» with no tone beside a mark of `--bad`; the chart is the
+  currency, so its place may read «0 $» with no tone beside a mark of `--bad`; the chart is the
   exchange's, not the place's. No comparison and nothing at all are `--graphic`. An answer of a server
   before it has no `sign` (`default(null)`) and the phone takes the percent's; a page before it reads
   `sign` by the strict codec of its time and refuses the answer of «Обмен денег» whole, as one before
