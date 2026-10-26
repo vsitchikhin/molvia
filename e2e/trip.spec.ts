@@ -572,20 +572,20 @@ test.describe('the receipt total (MOL-78)', () => {
 
     await recorded(page, 'Ереван Сити').click()
     await expect(page.locator('.caption')).toHaveText('Total by receipt')
-    await expect(page.locator('.sum')).toContainText('1,400.00')
+    await expect(page.locator('.sum')).toContainText('֏1,400')
     await expect(page.locator('.split')).toContainText('With a price — 1 of 2')
-    await expect(page.locator('.split')).toContainText('570.00')
+    await expect(page.locator('.split')).toContainText('֏570')
     await expect(page.locator('.split')).toContainText('Without a price — 1')
-    await expect(page.locator('.split')).toContainText('830.00')
+    await expect(page.locator('.split')).toContainText('֏830')
     // The price of the milk stayed what it was: nothing is worked out of the sum.
-    await expect(row(page).first()).toContainText('570.00')
+    await expect(row(page).first()).toContainText('֏570')
 
     await page.getByRole('button', { name: 'Change the receipt total' }).click()
     await page.waitForTimeout(400)
     await expect(sheet(page).getByLabel('Amount')).toHaveValue('1400')
     await sheet(page).getByRole('button', { name: 'Remove the total' }).click()
     await expect(page.locator('.caption')).toHaveText('Total')
-    await expect(page.locator('.sum')).toContainText('570.00')
+    await expect(page.locator('.sum')).toContainText('֏570')
   })
 
   test('typed with no connection goes when it comes back, and the total says it is on its way', async ({
@@ -608,7 +608,7 @@ test.describe('the receipt total (MOL-78)', () => {
     await context.setOffline(false)
     await page.evaluate(() => window.dispatchEvent(new Event('online')))
     await expect(page.locator('.caption')).toHaveText('Total by receipt', { timeout: 15_000 })
-    await expect(page.locator('.sum')).toContainText('2,500.00')
+    await expect(page.locator('.sum')).toContainText('֏2,500')
     await expect(page.locator('.waiting')).toHaveCount(0)
   })
 
