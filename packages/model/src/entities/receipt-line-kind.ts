@@ -392,7 +392,9 @@ export function newLineName(
   const afterUnits = unitsOf(parts.after)
   // a phrase that holds the kind names it; else the seed's item may (Т-2)
   const phrased = [...beforeUnits, ...afterUnits].some((unit) => unit.kind && unit.phrase !== null)
-  const kindOf = phrased ? null : seedKindOf(parts, dictionary, lexicon.seed ?? [])
+  const kindOf = phrased
+    ? null
+    : seedKindOf(parts, dictionary, lexicon.seed ?? [], lexicon.genitives ?? {})
   // the seed's words the name begins with stand for what they covered: «Желудки куриные» for «հավի … քարաճիկ»
   const said: string[] = kindOf === null ? [] : wordsOf(kindOf.name)
   const covered = kindOf?.covered ?? new Set<string>()
@@ -411,7 +413,8 @@ export function newLineName(
       // what the seed's name stands for
       if (covered.has(token)) return []
       const shelf = phrase === null ? shelfOf(token, lexicon) : null
-      if (shelf !== null) return [{ word: shelf, at, kind }]
+      // a brand the till printed bare is written as its package is all the same: «Шоколад «Алёнка»» (adversarial А5)
+      if (shelf !== null) return [{ word: LATIN_NAME.test(shelf) ? shelf : `«${shelf}»`, at, kind }]
       if (phrase === null && (!isNameWord(token) || UNIT_WORDS.has(keyed(token)))) return []
       if (LATIN.test(token)) return [{ word: token, at, kind }]
       const genitive = kind ? undefined : lexicon.genitives?.[lexiconKey(token)]
@@ -515,15 +518,30 @@ const INDECLINABLE: Readonly<Record<string, Agreement>> = {
   чили: 'masculine',
   мини: 'masculine',
 }
-// plurals in «-а», «-я», never a feminine: «Яйца куриные», «Семена тыквенные»
-const PLURAL_A = new Set(['яйца', 'семена', 'бедра', 'крылья', 'окорока', 'перья'])
+// plurals in «-а», never a feminine: «Яйца куриные», «Семена тыквенные»; «-ья» is a plural's own, «Хлопья»
+const PLURAL_A = new Set(['яйца', 'семена', 'бедра', 'окорока'])
 // words of a noun's ending that say how much, never what: «пористый, экстра чёрный»
 const NOT_NOUNS = new Set(['экстра', 'супер', 'ультра', 'мини', 'макси', 'премиум', 'люкс'])
-// nouns of an adjective's ending, never agreed: «Пакет … алюминий» is no adjective
-const NOT_ADJECTIVES = new Set(['алюминий', 'магний', 'кальций', 'натрий', 'калий', 'гербарий'])
-// the possessive adjectives, «говяжья», «рыбье»: their ending keeps a soft sign
-const POSSESSIVE = new Set([
+/**
+ * Nouns of an adjective's ending, never agreed: «Пакет … алюминий», «Напиток цикорий» is no adjective. With
+ * `POSSESSIVE_ADJECTIVES` a word of the dictionaries in «-ий» no ending tells is held to one of them or to the
+ * ordinary by the backend's test (MOL-261, self-review Р1-1): «телячий» and «горячий» end alike.
+ */
+export const NOUNS_OF_ADJECTIVE_ENDING: ReadonlySet<string> = new Set([
+  'алюминий',
+  'магний',
+  'кальций',
+  'натрий',
+  'калий',
+  'гербарий',
+  'цикорий',
+])
+/** The possessive adjectives, «говяжья», «коровье», «телячьи»: their ending keeps a soft sign. */
+export const POSSESSIVE_ADJECTIVES: ReadonlySet<string> = new Set([
   'говяжий',
+  'коровий',
+  'телячий',
+  'ягнячий',
   'рыбий',
   'козий',
   'овечий',
@@ -539,7 +557,7 @@ const lowerRussian = (word: string): string => word.toLowerCase().replace(/ё/gu
 const isAdjective = (word: string): boolean =>
   /^[а-яё-]{5,}$/iu.test(word) &&
   /(?:ый|ий|ой)$/u.test(word) &&
-  !NOT_ADJECTIVES.has(lowerRussian(word))
+  !NOUNS_OF_ADJECTIVE_ENDING.has(lowerRussian(word))
 
 /** A word that may be the noun an adjective agrees with: Russian letters, no adjective's ending, no preposition. */
 const isNoun = (word: string): boolean => {
@@ -554,7 +572,10 @@ const isNoun = (word: string): boolean => {
 
 /**
  * The gender or number of a Russian noun by its ending (MOL-261, Т-3), the first word of a gloss that is not
- * an adjective's — «целлофановый пакет» is a «пакет»; none where the ending does not say.
+ * an adjective's — «целлофановый пакет» is a «пакет»; none where the ending does not say. A plural only by an
+ * ending no singular has (adversarial А3): «-ы», «-ья», «-и» after «к», «г», «х» or a hushing letter, which
+ * spelling gives a plural there — «сливки», «желудки». Any other «-и» is a loan as often, «сулугуни», «салями»,
+ * and says nothing; the price, named: «пельмени», «вафли» keep the dictionary's adjective, as before.
  */
 function agreementOf(noun: string): Agreement | null {
   const words = noun.split(' ').map(lowerRussian)
@@ -573,7 +594,8 @@ function agreementOf(noun: string): Agreement | null {
   if (/(?:ая|яя)$/u.test(word)) return 'feminine'
   if (/(?:ые|ие)$/u.test(word)) return 'plural'
   if (/(?:ий|й)$/u.test(word)) return 'masculine'
-  if (/[ыи]$/u.test(word)) return 'plural'
+  if (/(?:ы|ья|[кгхжшчщ]и)$/u.test(word)) return 'plural'
+  if (word.endsWith('и')) return null
   if (/[ая]$/u.test(word)) return 'feminine'
   if (/[оеё]$/u.test(word)) return 'neuter'
   if (word.endsWith('ь')) {
@@ -593,7 +615,7 @@ function agreeing(adjective: string, noun: string): string {
   const found = /^(.*?)(ый|ий|ой)$/u.exec(adjective)
   if (to === null || to === 'masculine' || found === null) return adjective
   const [, stem = '', ending = ''] = found
-  if (POSSESSIVE.has(lowerRussian(adjective))) {
+  if (POSSESSIVE_ADJECTIVES.has(lowerRussian(adjective))) {
     return stem + { feminine: 'ья', neuter: 'ье', plural: 'ьи' }[to]
   }
   const last = lowerRussian(stem.slice(-1))
@@ -615,18 +637,20 @@ interface SeedKind {
  * The seed's item whose name in the till's language says the line's kind (MOL-261, Т-2) — by `seedNameFits`'s
  * rule but on a branded line too, since a name may begin with a kind the line's brand is of — and has every word
  * of it in the line: the one that covers most of the line, else the shorter name. Its head word must be the
- * kind's gloss in some form — else the seed reads the line its own way, «Лимонад» for «газированный напиток»,
- * «Пломбир» for an ice cream — or the dictionary have none. A name that covers more than the kind stands for the
- * kind, its figures apart, and for every word it covered where it has as many words — «Желудки куриные» for
- * «հավի … քարաճիկ», «Рис круглозёрный» for «բրինձ կլոր». With fewer the seed lumps, and the other words are
- * said: «Кофе» for «սուրճ աղացած» leaves «молотый». One that covers the kind alone says only the word of the
- * kind, and only where the dictionary has none: else the gloss is the line's own word, in the seed's number
- * (`asSeedSays`).
+ * kind's gloss or the same noun in another number — else the seed reads the line its own way, «Лимонад» for
+ * «газированный напиток», «Пломбир» for an ice cream — or the dictionary have none. **It names nothing the line
+ * does not say** (adversarial А2): the seed lumps — «Соус острый» knows «սոուս չիլի», a sweet chili is no hot sauce —
+ * so its whole name stands for the kind, its figures apart, only where every word of it is the line's, by a form of
+ * a gloss or of a genitive's adjective: «Желудки куриные» for «հավի … քարաճիկ»; then for every word it covered
+ * where it has as many words, else the other words are said. One that covers the kind alone, or names more, says
+ * only the word of the kind, and only where the dictionary has none: else the gloss is the line's own word, in the
+ * seed's number (`asSeedSays`).
  */
 function seedKindOf(
   parts: ReceiptLineParts,
   dictionary: Readonly<Record<string, string>>,
   seed: readonly SeedName[],
+  genitives: Readonly<Record<string, string>>,
 ): SeedKind | null {
   if (parts.kind === null || seed.length === 0) return null
   const tokens = [...parts.before, ...parts.after].filter(
@@ -658,16 +682,27 @@ function seedKindOf(
   const head = best.name.split(' ')[0] ?? best.name
   const gloss = glossOf(parts.kind, dictionary)
   if (gloss === null) return { name: head, covered: new Set([parts.kind]) }
-  const glossHead = (gloss.split(' ')[0] ?? '').toLowerCase().replace(/ё/gu, 'е')
-  if (!sameRussian(glossHead, head.toLowerCase().replace(/ё/gu, 'е'))) return null
+  const glossHead = lowerRussian(gloss.split(' ')[0] ?? '')
+  const seedHead = lowerRussian(head)
+  if (glossHead !== seedHead && !sameNoun(glossHead, seedHead)) return null
   if (best.covered.size === 1) return null
+  const said = tokens.flatMap((token) => [
+    ...sensesOf(token, dictionary).flatMap(wordsOf),
+    // a noun's adjective is its genitive's, the regular «-ի» — «լոլիկ», «томатный» of «լոլիկի» — as the seed says it
+    ...sensesOf(`${token}ի`, dictionary).flatMap(wordsOf),
+    ...wordsOf(genitives[lexiconKey(token)] ?? genitives[`${lexiconKey(token)}ի`] ?? ''),
+  ])
+  const own = wordsOf(best.name).every((word) => said.some((one) => sameRussian(word, one)))
+  if (!own) return null
   const all = wordsOf(best.name).length >= best.covered.size
   return { name: best.name, covered: all ? best.covered : new Set([parts.kind]) }
 }
 
 /**
  * The kind's gloss in the form the seed names that kind by, its number: «яйцо» is the seed's «Яйца», «шампиньон»
- * its «Шампиньоны» (MOL-261, Т-2). Only the head word, only for the line's kind, only a form of the same word.
+ * its «Шампиньоны» (MOL-261, Т-2). Only the head word, only for the line's kind, only the same noun in another
+ * number — never an adjective of it nor a noun for an adjective, «Сахарная» for «сахар», «Макароны» for
+ * «макаронные изделия» (adversarial А1) — and never where the seed has the very form.
  */
 function asSeedSays(
   gloss: string | null,
@@ -677,10 +712,11 @@ function asSeedSays(
   if (gloss === null || !isKind) return gloss
   const [head, ...rest] = gloss.split(' ')
   if (head === undefined) return gloss
-  const key = head.toLowerCase().replace(/ё/gu, 'е')
-  const form = seed
-    .map((item) => (item.name.split(' ')[0] ?? '').toLowerCase())
-    .find((first) => first !== key && sameRussian(key, first.replace(/ё/gu, 'е')))
+  const key = lowerRussian(head)
+  const heads = seed.map((item) => lowerRussian(item.name.split(' ')[0] ?? ''))
+  // the seed's own form of it is the form: «Сахар» beside «Сахарная пудра» (adversarial А1)
+  if (heads.includes(key)) return gloss
+  const form = heads.find((first) => sameNoun(key, first))
   return form === undefined ? gloss : [form, ...rest].join(' ')
 }
 
@@ -736,6 +772,36 @@ const NOUN_ENDINGS = [
   'я',
 ]
 
+// an adjective's ending, in any gender and number: such a word is no noun to take a number of
+const ADJECTIVE_SHAPED = /^.{3,}(?:ый|ий|ой|ая|яя|ое|ее|ые|ие)$/u
+
+/** A noun's forms alone, its number and case — «яйцо», «яйца»; «желудок», «желудки» — and no adjective of it. */
+function nounForms(word: string): Set<string> {
+  const out = new Set([word])
+  // the stem: less its last vowel or soft sign, «ец» and «ок» losing their vowel — «огурц», «сырк»
+  const stems = /[аяоеиыйь]$/u.test(word)
+    ? [word.slice(0, -1)]
+    : word.endsWith('ец') || word.endsWith('ок')
+      ? [word, `${word.slice(0, -2)}${word.slice(-1)}`]
+      : [word]
+  // «-ой» is a feminine's case alone: «рыбой», never «сыр» — «сырой» is raw
+  const endings = /[ая]$/u.test(word) ? NOUN_ENDINGS : NOUN_ENDINGS.filter((one) => one !== 'ой')
+  for (const stem of stems) {
+    if (stem.length < 3) continue
+    for (const one of endings) out.add(stem + one)
+  }
+  return out
+}
+
+/**
+ * Two nouns one word in another number or case (MOL-261, adversarial А1): «яйцо» and «Яйца», never «сахар» and
+ * «Сахарная», nor «макаронные» and «Макароны» — an adjective of a noun is another word to a name.
+ */
+const sameNoun = (a: string, b: string): boolean =>
+  !ADJECTIVE_SHAPED.test(a) &&
+  !ADJECTIVE_SHAPED.test(b) &&
+  (nounForms(a).has(b) || nounForms(b).has(a))
+
 /**
  * A Russian word's forms an item may name it by: an adjective in any gender, number and case — «сливочное»,
  * «сливочный»; a noun in any number and case — «огурец», «огурцы»; «яйцо», «яйца»; «шиповник», «шиповника»;
@@ -753,20 +819,9 @@ function formsOf(word: string): Set<string> {
     for (const one of ADJECTIVE_ENDINGS) out.add(word.slice(0, -adjective.length) + one)
     return out
   }
-  // the stem: less its last vowel or soft sign, «ец» and «ок» losing their vowel — «огурц», «сырк»
-  const stems = /[аяоеиыйь]$/u.test(word)
-    ? [word.slice(0, -1)]
-    : word.endsWith('ец') || word.endsWith('ок')
-      ? [word, `${word.slice(0, -2)}${word.slice(-1)}`]
-      : [word]
-  // «-ой» is a feminine's case alone: «рыбой», never «сыр» — «сырой» is raw
-  const endings = /[ая]$/u.test(word) ? NOUN_ENDINGS : NOUN_ENDINGS.filter((one) => one !== 'ой')
-  for (const stem of stems) {
-    if (stem.length < 3) continue
-    for (const one of endings) out.add(stem + one)
-  }
+  for (const one of nounForms(word)) out.add(one)
   // the adjective of a noun: «оливк» — «оливков», «шоколад» — «шоколадн», «молок» — «молочн»
-  const root = stems[0] ?? word
+  const root = /[аяоеиыйь]$/u.test(word) ? word.slice(0, -1) : word
   const roots = [root, ...(root.endsWith('к') ? [`${root.slice(0, -1)}ч`] : [])]
   for (const one of roots) {
     if (one.length < 3) continue
@@ -779,6 +834,18 @@ function formsOf(word: string): Set<string> {
 
 /** Two Russian words one word by its forms, either way. */
 const sameRussian = (a: string, b: string): boolean => formsOf(a).has(b) || formsOf(b).has(a)
+
+/**
+ * Whether a new name says every word an old one did, in any form or script (MOL-261, adversarial А6): «Соль
+ * мелкий» — «Соль мелкая», «Кока Кола» — «Coca-Cola». A rename that loses one — «чили» of a sweet chili sauce — is
+ * a name worse than the one the person took, and is not made.
+ */
+export function keepsEveryWord(from: string, to: string): boolean {
+  const now = wordsOf(to)
+  return wordsOf(from).every((word) =>
+    now.some((one) => sameRussian(word, one) || sameLetters(word, one)),
+  )
+}
 
 /**
  * Two names one by their letters — a brand, a word of no dictionary spelt across scripts: the same by the

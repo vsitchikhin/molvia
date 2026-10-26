@@ -2073,7 +2073,7 @@ export const TILL_GENITIVES_RU: Readonly<Record<string, string>> = {
  * receipts; a phrase is added here, never in code.
  */
 export const TILL_PHRASES_RU: Readonly<Record<string, string>> = {
-  'ֆրանսիական հրուշակեղեն': 'пирожное французское',
+  'ֆրանսիական հրուշակեղեն': 'пирожные французские',
   'շոկոլադե սալիկ': 'шоколад',
   'շոկ. սալիկ': 'шоколад',
   'էներգետիկ ըմպելիք': 'энергетик',

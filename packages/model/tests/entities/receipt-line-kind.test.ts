@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   armenianInRussian,
+  keepsEveryWord,
   lineFitter,
   newLineName,
   receiptLineParts,
@@ -356,7 +357,37 @@ describe('a new item of the seed’s kind (MOL-261, Т-2)', () => {
     newLineName(receiptLineParts(printed), dictionary, { seed })?.name
 
   it('names the line by the seed’s item that says its kind, for every word it covers', () => {
-    expect(kinded('Բրինձ կլոր «Միստրալ» 900գր')).toBe('Рис круглозёрный «Мистрал» 900 г')
+    const chicken = newLineName(receiptLineParts('Հավի թարմ քարաճիկ «Աշտարակ» 950գր'), words, {
+      seed: [{ name: 'Желудки куриные', names: ['հավի քարաճիկ'] }],
+      genitives: { հավի: 'куриный' },
+    })
+    expect(chicken?.name).toBe('Желудки куриные свежие «Аштарак» 950 г')
+  })
+
+  it('never names what the line does not say: the seed lumps (adversarial А2)', () => {
+    expect(kinded('Բրինձ կլոր «Միստրալ» 900գր')).toBe('Рис круглый «Мистрал» 900 г')
+    const sauce = newLineName(
+      receiptLineParts('Սոուս «Չիմ Չիմ» քաղցր չիլի ա/տ 220գր'),
+      { ...words, սոուս: 'соус', քաղցր: 'сладкий', չիլի: 'чили' },
+      { seed: [{ name: 'Соус острый', names: ['սոուս չիլի'] }] },
+    )
+    expect(sauce?.name).toBe('Соус «Чим Чим» сладкий чили 220 г')
+  })
+
+  it('takes the seed’s number of the same noun only, never an adjective of it (adversarial А1)', () => {
+    const sugar = { ...words, շաքար: 'сахар', մակարոնեղեն: 'макаронные изделия' }
+    const seed = [
+      { name: 'Сахарная пудра', names: ['շաքարափոշի'] },
+      { name: 'Сахар', names: ['շաքարավազ'] },
+      { name: 'Макароны', names: ['մակարոն'] },
+    ]
+    const name = (printed: string) => newLineName(receiptLineParts(printed), sugar, { seed })?.name
+    expect(name('Շաքար «Գյումրի» 1կգ')).toBe('Сахар «Гюмри» 1 кг')
+    expect(name('Մակարոնեղեն «Մաքֆա» 450գր')).toBe('Макаронные изделия «Макфа» 450 г')
+    // without the seed's own form, its adjective is still no form of the noun
+    expect(
+      newLineName(receiptLineParts('Շաքար «Գյումրի» 1կգ'), sugar, { seed: seed.slice(0, 1) })?.name,
+    ).toBe('Сахар «Гюмри» 1 кг')
   })
 
   it('says the other words where the seed lumps them: «Кофе» for «սուրճ աղացած»', () => {
@@ -443,6 +474,34 @@ describe('a new item’s name in Russian grammar (MOL-261, Т-3, Т-4)', () => {
   it('leaves an adjective as the dictionary has it where no ending tells the gender', () => {
     expect(grammar('Կահույք մանր')).toBe('Мебель мелкий')
   })
+
+  it('reads a plural only by an ending no singular has, never a loan’s «-и» (adversarial А3)', () => {
+    const more = {
+      ...words,
+      սուլուգունի: 'сулугуни',
+      ապխտած: 'копчёный',
+      փաթիլներ: 'хлопья',
+      շոկոլադե: 'шоколадный',
+    }
+    const of = (printed: string) => newLineName(receiptLineParts(printed), more)?.name
+    expect(of('Սուլուգունի «Մարիաննա» ապխտած կգ')).toBe('Сулугуни «Марианна» копчёный')
+    expect(of('Փաթիլներ շոկոլադե «Նեստլե» 250գր')).toBe('Хлопья шоколадные «Нестле» 250 г')
+    expect(of('Սերուցք «Մարիաննա» ապխտած')).toBe('Сливки «Марианна» копчёные')
+  })
+
+  it('keeps the soft sign of a possessive: «коровье», «телячьи» (self-review Р1-1)', () => {
+    const milk = {
+      ...words,
+      կովի: 'коровий',
+      հորթի: 'телячий',
+      նրբերշիկ: 'сосиски',
+      ցիկորի: 'цикорий',
+    }
+    const of = (printed: string) => newLineName(receiptLineParts(printed), milk)?.name
+    expect(of('Կաթ կովի 3.2%')).toBe('Молоко коровье 3,2%')
+    expect(of('Նրբերշիկ հորթի')).toBe('Сосиски телячьи')
+    expect(of('Կաթ ցիկորի')).toBe('Молоко цикорий')
+  })
 })
 
 describe('a phrase of the till (MOL-261, Т-5)', () => {
@@ -474,8 +533,24 @@ describe('a phrase of the till (MOL-261, Т-5)', () => {
     expect(phrased('Շոկոլադե սալիկ «Ռոշեն» 85գր', seed)).toBe('Шоколад Roshen 85 г')
   })
 
+  it('writes a Cyrillic brand the till printed bare in «…», as its package (adversarial А5)', () => {
+    expect(phrased('Շոկոլադ Ալյոնկա 90գր')).toBe(phrased('Շոկոլադ «Ալյոնկա» 90գր'))
+  })
+
   it('reads its words one by one where they do not stand together', () => {
     expect(phrased('Սալիկ շոկոլադե')).toBe('Плитка шоколадная')
+  })
+})
+
+describe('a rename that keeps every word (MOL-261, adversarial А6)', () => {
+  it('takes a new form, script or order of a word, and refuses a word lost', () => {
+    expect(keepsEveryWord('Соль мелкий «Фаворит» 1 кг', 'Соль мелкая «Фаворит» 1 кг')).toBe(true)
+    expect(
+      keepsEveryWord('Напиток газированный «Кока Кола»', 'Напиток газированный Coca-Cola'),
+    ).toBe(true)
+    expect(keepsEveryWord('Соус «Чим Чим» сладкий чили', 'Соус острый «Чим Чим» сладкий')).toBe(
+      false,
+    )
   })
 })
 
