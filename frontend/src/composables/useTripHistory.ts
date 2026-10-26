@@ -21,6 +21,8 @@ export interface HistoryRow {
   total: readonly Money[] | null
   /** Recorded from a receipt (MOL-126): «· из чека» beside the count (MOL-127, С-5 of MOL-128). */
   fromReceipt: boolean
+  /** Finished on this phone and in no answer yet: no read drew it, failed or not (adversarial Б3). */
+  onPhone: boolean
 }
 interface TripHistoryScreen {
   t: ReturnType<typeof useI18n>['t']
@@ -30,6 +32,14 @@ interface TripHistoryScreen {
   /** The load «Показать ещё» asked for — the one that button says it is at work on (MOL-225). */
   loadingMore: Ref<boolean>
   trouble: Ref<'error' | 'offline' | null>
+  /** How many loads failed: the strip says the same words again for each (MOL-181, C1). */
+  failures: Ref<number>
+  /**
+   * The last load's «did not load» came of a list that kept moving, not of the server: every ask was
+   * answered, under a cache another window was writing, and the page shown is the server's answer
+   * (MOL-204, adversarial А4, В1). A page put back that is not the answer is memory (Б4).
+   */
+  moved: Ref<boolean>
   load(): void
   more(): void
   open(tripId: string): void
@@ -55,6 +65,8 @@ export function useTripHistory(): TripHistoryScreen {
   const loading = computed(() => busy.value || !actor.id)
   const loadingMore = ref(false)
   const trouble = ref<'error' | 'offline' | null>(null)
+  const failures = ref(0)
+  const moved = ref(false)
   let run = 0
   const rows = computed(() => {
     const rows = new Map(
@@ -68,6 +80,7 @@ export function useTripHistory(): TripHistoryScreen {
           itemCount: row.itemCount,
           total: row.total,
           fromReceipt: row.fromReceipt,
+          onPhone: false,
         },
       ]),
     )
@@ -82,6 +95,7 @@ export function useTripHistory(): TripHistoryScreen {
         itemCount: saved.expenses.length,
         total: saved.total,
         fromReceipt: saved.receiptId !== null,
+        onPhone: false,
       })
     }
     for (const row of history.local) {
@@ -98,6 +112,7 @@ export function useTripHistory(): TripHistoryScreen {
           itemCount: null,
           total: null,
           fromReceipt: false,
+          onPhone: true,
         })
     }
     // A removal still waiting takes the row off every list at once (MOL-76).
@@ -122,10 +137,18 @@ export function useTripHistory(): TripHistoryScreen {
         await new Promise((resolve) => setTimeout(resolve, RETRY_PAUSE_MS * 2 ** (again - 1)))
         if (token === run) taken = await history.load(more)
       }
-      if (token === run) trouble.value = taken ? null : 'error'
+      if (token === run) {
+        trouble.value = taken ? null : 'error'
+        moved.value = !taken && history.showsAnswer()
+      }
+      if (token === run && !taken) failures.value += 1
     } catch (error) {
       reportFailure(error, 'screen')
-      if (token === run) trouble.value = navigator.onLine ? 'error' : 'offline'
+      if (token === run) {
+        trouble.value = navigator.onLine ? 'error' : 'offline'
+        moved.value = false
+        failures.value += 1
+      }
     } finally {
       if (token === run) {
         busy.value = false
@@ -171,6 +194,8 @@ export function useTripHistory(): TripHistoryScreen {
     loading,
     loadingMore,
     trouble,
+    failures,
+    moved,
     load: () => void load(),
     more: () => void load(true),
     open: (tripId: string) => void router.push({ name: 'purchase', params: { tripId } }),

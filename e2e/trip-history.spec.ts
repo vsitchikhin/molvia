@@ -13,7 +13,7 @@ interface WireTrip {
 }
 const sheet = (page: Page) => page.locator('dialog[open]')
 /** A row of «Записаны» on «Покупки» (MOL-128). */
-const recorded = (page: Page) => page.locator('.recorded .purchase-row')
+const recorded = (page: Page) => page.locator('.recorded .list-row')
 async function createTrip(page: Page, name: string): Promise<WireTrip> {
   const headers = await asBrowser(page)
   // A trip names the settings it was started with since MOL-65; the server takes its city and

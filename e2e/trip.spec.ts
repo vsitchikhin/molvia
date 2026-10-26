@@ -66,7 +66,7 @@ const row = (page: Page) => page.locator('.row')
 const heading = (page: Page) => page.getByRole('heading', { level: 1 })
 /** A row of «Записаны» on «Покупки». */
 const recorded = (page: Page, place: string) =>
-  page.locator('.recorded .purchase-row').filter({ hasText: place })
+  page.locator('.recorded .list-row').filter({ hasText: place })
 
 /**
  * «Записать вручную» stands in the strip of «Покупки» and under the cycle of the newcomer's «Что
@@ -226,7 +226,7 @@ test.describe('the trip', () => {
 
     // Back as the record going on: first on «Покупки», and whole inside.
     await page.getByRole('button', { name: 'Undo' }).click()
-    await page.locator('.open .purchase-row').click()
+    await page.locator('.open button').click()
     await expect(row(page)).toHaveCount(1)
     await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
   })
@@ -251,7 +251,7 @@ test.describe('the trip', () => {
     await page.waitForTimeout(400)
     await sheet(page).getByRole('button', { name: 'Delete the entry' }).click()
     await expect(page).toHaveURL(/\/purchases$/)
-    await page.locator('.open .purchase-row').click()
+    await page.locator('.open button').click()
     await expect(heading(page)).toHaveText('Ереван Сити')
 
     await context.setOffline(false)
@@ -290,7 +290,7 @@ test.describe('the trip', () => {
     await sheet(page).getByRole('button', { name: 'Delete the entry' }).click()
     await expect(page).toHaveURL(/\/purchases$/)
     await page.getByRole('button', { name: 'Undo' }).click()
-    await page.locator('.open .purchase-row').click()
+    await page.locator('.open button').click()
     await expect(heading(page)).toHaveText('Ереван Сити')
 
     await context.setOffline(false)
@@ -336,7 +336,7 @@ test.describe('the trip', () => {
       .poll(async () => (await setting.current())?.place.name, { timeout: 15_000 })
       .toBe('Ереван Сити')
     await expect(page.getByRole('button', { name: 'Undo' })).toHaveCount(0)
-    await page.locator('.open .purchase-row').click()
+    await page.locator('.open button').click()
     await expect(heading(page)).toHaveText('Ереван Сити')
     await expect(page.getByRole('heading', { name: /is already open/ })).toHaveCount(0)
   })

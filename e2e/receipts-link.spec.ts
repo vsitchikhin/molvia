@@ -50,7 +50,7 @@ test('a receipt by its link: pasted, asked of the tax office, reviewed and recor
   await sheet(page).getByRole('button', { name: 'Send receipt' }).click()
   await expect(sheet(page)).toHaveCount(0)
 
-  const ready = page.locator('.purchase-row').filter({ hasText: '2 items' })
+  const ready = page.locator('.list-row').filter({ hasText: '2 items' })
   await expect(ready).toBeVisible(READ)
   await ready.click()
   await expect(page).toHaveURL(/\/purchases\/receipts\/[0-9a-f-]+$/)
@@ -96,9 +96,9 @@ test('a double tap on «Send receipt» sends one receipt and stays in «Purchase
   await page.touchscreen.tap(x, y)
   await expect(sheet(page)).toHaveCount(0)
   await expect(page).toHaveURL(/\/purchases$/)
-  await expect(page.locator('.purchase-row').filter({ hasText: '2 items' })).toHaveCount(1, READ)
+  await expect(page.locator('.list-row').filter({ hasText: '2 items' })).toHaveCount(1, READ)
   await page.waitForTimeout(3_000)
-  await expect(page.locator('.purchase-row').filter({ hasText: '2 items' })).toHaveCount(1)
+  await expect(page.locator('.list-row').filter({ hasText: '2 items' })).toHaveCount(1)
 })
 
 test('a pasted text that is no receipt to record is refused under the field, and nothing is queued', async ({
@@ -125,11 +125,11 @@ test('a link pasted with no connection waits on the phone and is read once it is
   await paste(page, link())
   await sheet(page).getByRole('button', { name: 'Send receipt' }).click()
   await expect(sheet(page)).toHaveCount(0)
-  await expect(page.locator('.purchase-row').filter({ hasText: 'by link' })).toBeVisible()
+  await expect(page.locator('.list-row').filter({ hasText: 'by link' })).toBeVisible()
 
   await context.setOffline(false)
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
-  await expect(page.locator('.purchase-row').filter({ hasText: '2 items' })).toBeVisible(READ)
+  await expect(page.locator('.list-row').filter({ hasText: '2 items' })).toBeVisible(READ)
 })
 
 test('a receipt the tax office does not show yet stays «asking the tax office», with no failure', async ({
@@ -141,9 +141,9 @@ test('a receipt the tax office does not show yet stays «asking the tax office»
   // is the integration test's
   await paste(page, link('FRESHAAA'))
   await sheet(page).getByRole('button', { name: 'Send receipt' }).click()
-  await expect(
-    page.locator('.purchase-row').filter({ hasText: 'asking the tax office' }),
-  ).toBeVisible(READ)
+  await expect(page.locator('.list-row').filter({ hasText: 'asking the tax office' })).toBeVisible(
+    READ,
+  )
 })
 
 /** The code `bin/fake-purs.mjs` gives the sugar of a CODEDAAA receipt: 860, the counter, the check. */
@@ -169,7 +169,7 @@ test('a code from the tax office is asked about at «Save», and bound finds its
   )
   await sheet(page).getByRole('button', { name: 'Send receipt' }).click()
   await expect(sheet(page)).toHaveCount(0)
-  const ready = page.locator('.purchase-row').filter({ hasText: '2 items' })
+  const ready = page.locator('.list-row').filter({ hasText: '2 items' })
   await expect(ready).toBeVisible(READ)
   await ready.click()
   await expect(page.locator('.receipt-line')).toHaveCount(2)
