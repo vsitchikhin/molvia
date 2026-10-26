@@ -1,6 +1,6 @@
 import { RECEIPT_SIDE_MIN } from '@molvia/model'
 import { RECEIPT_PHOTO_SIDE } from '@/receipts/photo'
-import { EDGES_LONG_SIDE, proposedCorners } from '@/receipts/edges'
+import { halvingSteps, proposedCorners } from '@/receipts/edges'
 import { boundsOf, orderCorners, rectOf, shifted, snapped, warp, within } from '@/receipts/warp'
 import type { Quad, Size } from '@/receipts/warp'
 import type { WarpReply, WarpRequest } from '@/receipts/warpWorker'
@@ -65,28 +65,39 @@ function canvasOf(size: Size): HTMLCanvasElement {
   return canvas
 }
 
+/** A copy's memory let go at once, not when the collector gets to it; the photo itself is kept. */
+function letGo(copy: HTMLCanvasElement, photo: HTMLCanvasElement): void {
+  if (copy === photo) return
+  copy.width = 0
+  copy.height = 0
+}
+
 /**
- * Where the phone proposes the corners (Т-2): looked for on a copy at most `EDGES_LONG_SIDE` long —
- * a few hundred thousand pixels read, never the photo's millions — and carried back to the photo.
+ * Where the phone proposes the corners (Т-2): looked for on a copy halved down to at most
+ * `EDGES_HALVED_SIDE` — each step a mean of four pixels, as the bench's `halvedCopy`, never one
+ * `drawImage` straight to the size, which samples (MOL-259) — read whole by `grayOf` to
+ * `EDGES_LONG_SIDE`, and carried back to the photo.
  */
 export function proposeCorners(photo: HTMLCanvasElement): { quad: Quad; found: boolean } {
-  const scale = Math.min(1, EDGES_LONG_SIDE / Math.max(photo.width, photo.height))
-  const small = canvasOf({
-    width: Math.max(1, Math.round(photo.width * scale)),
-    height: Math.max(1, Math.round(photo.height * scale)),
-  })
-  const context = small.getContext('2d', { willReadFrequently: true })
   const whole: Quad = [
     { x: 0, y: 0 },
     { x: photo.width, y: 0 },
     { x: photo.width, y: photo.height },
     { x: 0, y: photo.height },
   ]
+  let copy = photo
+  for (const step of halvingSteps(photo)) {
+    const next = canvasOf(step)
+    const drawn = next.getContext('2d')
+    if (!drawn) return { quad: whole, found: false }
+    drawn.drawImage(copy, 0, 0, step.width, step.height)
+    letGo(copy, photo)
+    copy = next
+  }
+  const context = copy.getContext('2d', { willReadFrequently: true })
   if (!context) return { quad: whole, found: false }
-  context.drawImage(photo, 0, 0, small.width, small.height)
-  const pixels = context.getImageData(0, 0, small.width, small.height)
-  small.width = 0
-  small.height = 0
+  const pixels = context.getImageData(0, 0, copy.width, copy.height)
+  letGo(copy, photo)
   const { quad, found } = proposedCorners(pixels)
   if (!found) return { quad: whole, found: false }
   const sx = photo.width / pixels.width

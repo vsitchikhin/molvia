@@ -1,5 +1,6 @@
 // MOL-222 — where the receipt is on the photo: four corners the phone proposes and the person moves.
-// No DOM, so the bench of MOL-114 measures the very code the phone runs (Т-2, Р-2).
+// No DOM, so the bench of MOL-114 measures the very code the phone runs (Т-2, Р-2) — from the copy the
+// phone's canvas halves the photo to, which the bench makes by `halvedCopy` (MOL-259).
 
 import { orderCorners } from '@/receipts/warp'
 import type { Pixels, Point, Quad, Size } from '@/receipts/warp'
@@ -15,6 +16,54 @@ export interface Gray extends Size {
 
 /** The long side corners are looked for at: the paper's edge is a few pixels wide even here. */
 export const EDGES_LONG_SIDE = 640
+
+/**
+ * The long side the phone halves a photo down to before `grayOf` takes it the rest of the way (MOL-259):
+ * one `drawImage` from 4 000 px straight to 640 samples four pixels of forty, and the noise and print it
+ * keeps tore a long receipt's paper in two — am-05c lost its top half in Chromium. Each half is a mean.
+ */
+export const EDGES_HALVED_SIDE = 2 * EDGES_LONG_SIDE
+
+/** The sizes a photo goes through, each half the one before, until its long side is within `longSide`. */
+export function halvingSteps(size: Size, longSide = EDGES_HALVED_SIDE): Size[] {
+  const steps: Size[] = []
+  let { width, height } = size
+  while (Math.max(width, height) > longSide) {
+    width = Math.max(1, Math.round(width / 2))
+    height = Math.max(1, Math.round(height / 2))
+    steps.push({ width, height })
+  }
+  return steps
+}
+
+/** The photo brought to `size`, each pixel the mean of the ones it covers: a step of `halvingSteps`. */
+export function halved(photo: Pixels, size: Size): Pixels {
+  const { width, height } = size
+  const sum = new Float64Array(width * height * 4)
+  const count = new Uint32Array(width * height)
+  for (let y = 0; y < photo.height; y++) {
+    const ty = Math.min(height - 1, Math.floor((y * height) / photo.height))
+    for (let x = 0; x < photo.width; x++) {
+      const tx = Math.min(width - 1, Math.floor((x * width) / photo.width))
+      const to = ty * width + tx
+      const at = (y * photo.width + x) * 4
+      for (let c = 0; c < 4; c++)
+        sum[to * 4 + c] = (sum[to * 4 + c] ?? 0) + (photo.data[at + c] ?? 0)
+      count[to] = (count[to] ?? 0) + 1
+    }
+  }
+  const data = new Uint8ClampedArray(width * height * 4)
+  for (let i = 0; i < data.length; i++)
+    data[i] = Math.round((sum[i] ?? 0) / Math.max(1, count[i >> 2] ?? 0))
+  return { data, width, height }
+}
+
+/** The copy the phone's canvas halves a photo to (`proposeCorners`), made without one: what the bench reads. */
+export function halvedCopy(photo: Pixels): Pixels {
+  let copy = photo
+  for (const step of halvingSteps(photo)) copy = halved(copy, step)
+  return copy
+}
 
 /** Below this share of the photo it is no receipt but a label, above it no edge was found. */
 const AREA_MIN = 0.03
