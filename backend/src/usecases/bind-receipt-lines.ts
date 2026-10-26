@@ -9,12 +9,19 @@ import {
   receiptLineParts,
   serbianServiceLine,
 } from '@molvia/model'
-import type { AppLocale, ReceiptCountry, ReceiptLine } from '@molvia/model'
+import type {
+  AppLocale,
+  CatalogueNode,
+  NameLexicon,
+  ReceiptCountry,
+  ReceiptLine,
+} from '@molvia/model'
 import type { ItemRepository } from '@/db/items-repository'
 import type { LineBinding } from '@/db/receipts-repository'
 import type { Embedder } from '@/embeddings/embedder'
 import { CATALOGUE_SEED } from '@/catalogue-seed'
-import { TILL_WORDS_RU } from '@/receipts/till-words-ru'
+import { TILL_BRANDS } from '@/receipts/till-brands'
+import { TILL_GENITIVES_RU, TILL_PHRASES_RU, TILL_WORDS_RU } from '@/receipts/till-words-ru'
 import { findByBarcode } from '@/usecases/find-by-barcode'
 import { queryMeaning } from '@/usecases/query-meaning'
 
@@ -45,6 +52,20 @@ const SEARCH_ROWS = 10
 
 /** The seed's names: kinds, never brands — no branded line stands on one (MOL-293, «Бекон» for a sausage of «Բեկոն»). */
 const SEED_NAMES = new Set(CATALOGUE_SEED.map(([name]) => name))
+
+/**
+ * What a new item's name is written with beyond the till's words (MOL-261): the brands as their packages spell
+ * them, the seed's items in the till's language — the country's nodes — for the kind it is of, the genitives
+ * as adjectives and the till's phrases.
+ */
+export function namingLexicon(nodes: readonly CatalogueNode[]): NameLexicon {
+  return {
+    brands: TILL_BRANDS,
+    seed: nodes,
+    genitives: TILL_GENITIVES_RU,
+    phrases: TILL_PHRASES_RU,
+  }
+}
 
 /** A name shorter than this is no item to search by: «Ko», a unit's cut that stood alone. */
 const SHORTEST_NAME = 3
@@ -77,6 +98,7 @@ export async function bindReceiptLines(
   const nodes = names === null ? [] : await items.nodes(names)
   if (names !== null && nodes.length === 0) namesMissing?.(new CatalogueNamesMissing(names))
   const matcher = createLineMatcher(nodes, TILL_WORDS_RU)
+  const lexicon = namingLexicon(nodes)
   // the headings the seed gave the catalogue's nodes; an item the search finds outside them has none known
   const headings = new Map(nodes.map((node) => [node.itemId, node.headings]))
   const bound: LineBinding[] = []
@@ -117,7 +139,7 @@ export async function bindReceiptLines(
       // «Клубника» first, and an item that names a flavour, a brand or a size the line has not is another;
       // nor one the printed heading rules out — a brush is no tomato however the gloss read (MOL-255) —
       // which was «проверьте» and is now a new item, as the rest
-      const fits = lineFitter(parts, TILL_WORDS_RU)
+      const fits = lineFitter(parts, TILL_WORDS_RU, lexicon)
       const first = answer.items.find(
         (item) =>
           fits(item.name, { generic: SEED_NAMES.has(item.name) }) &&
@@ -131,7 +153,7 @@ export async function bindReceiptLines(
       }
     }
     // a new item, named in full from the line and offered under «проверьте»: a guess (MOL-293, В-1 «а»)
-    const named = language === 'ru' ? newLineName(parts, TILL_WORDS_RU) : null
+    const named = language === 'ru' ? newLineName(parts, TILL_WORDS_RU, lexicon) : null
     bound.push({
       itemId: null,
       match: 'weak',
