@@ -218,3 +218,77 @@ of the measure and with every test merged. So CI checks every run instead (owner
   parse of receipts (MOL-265), `normalisations` in `support/text.ts`: «found once», «refused before the
   normalisation». Twice the work, or a hundred times a third of a millisecond, is under any bound a clock
   keeps on CI. A count is no rule of the domain and no state anyone reads but a test.
+
+## A page's timers go with its window (MOL-286)
+
+**The PWA's tests run in `frontend/testing/page-environment.ts`, happy-dom whose timers are cleared as its
+window is taken down.** vitest makes `window` the global object itself and leaves Node's own `setTimeout`
+in it — the key is Node's already, so happy-dom's is not put over it — and at the end of a file it deletes
+`window` and leaves the timers to the process. In a browser a timer never outlives its tab. Here a step
+back's guard (`stepBack`, a second, `navigation.ts`) set by a sheet closed in a file's last second fired
+after the file was taken down, into a worker a busy runner had not stopped yet: `window is not defined`,
+CI red with all 10 138 tests green and the deploy held (run 39489913605, 20.10.2026). A free machine stops
+the worker within milliseconds, so it never showed here.
+
+- **The environment, not the product** (owner's В-1 «а», Р-1): `stepBack` is right where it runs, and a
+  guard for «no window» in it would be code no browser ever executes. The environment clears every timer
+  the page sets while its window stands — the queues' doubling retry (`doublingRetry`, a store's timer that
+  reaches the network) among them, which had not failed yet — but not the page's code itself (below).
+- **`setTimeout`, `setInterval` and their `clear*` are wrapped as the window comes up** (`pageTimers`). One
+  that ran once, or was cleared, is let go of — until Node's `refresh()` sets it going again under the same
+  handle, which puts it back (adversarial А2: no page calls it, a browser's timer has none, and let go of it
+  ran past the close). `vi.useFakeTimers()` installs over the wrappers and gives them back; its timers are
+  not the page's.
+- **Cleared before happy-dom is taken down, and again after it, the wrappers kept between** (adversarial
+  А1). Taking happy-dom down aborts what is in the air — a request, a load, a navigation — and runs the
+  page's handlers of the failure while the window is still there: a step back answering a failed request
+  set its guard then, and cleared only before, it fired past the window exactly as on CI. Only after the
+  second clearing are Node's functions given back. **A request still on its way is not aborted by
+  happy-dom at all**: its teardown waits for it, so the environment's own test waits for the request to
+  reach the server first.
+- **The runner's timers go through it too** (review №2): vitest takes its own «safe» timers after the
+  environment is up, so a test's deadline, `vi.waitFor` and `expect.poll` are wrapped like the page's. None
+  is pending at the teardown — each ends with its test; a runner that one day keeps one past the file has
+  it cleared there.
+- **Held by tests, each with its mutant red** (В-2 «а»): the bookkeeping — a timeout and an interval pending
+  at the close never run, only what is pending is cleared, a timer set between the two clearings is cleared,
+  `refresh()` is kept, the functions come back; the teardown — the environment set up over a global object
+  of its own, a request aborted as it is taken down, its handler's timer never runs. **That the PWA runs in
+  it**: vitest names the environment in the state of `expect`, and `'happy-dom'` back in the config, or
+  `--environment` on the command line, turns `expect.getState().environment` red (review №1). **That no file
+  names its own past it**: `// @vitest-environment happy-dom` in a file gives it the built-in window and
+  Node's timers back, and a directive can carry only a name — vitest reads the first
+  `@vitest-environment` or `@jest-environment` by `[\w-]+`, so this environment's path never fits — so every
+  test file of the module is read by the same pattern, and only `node` passes (adversarial А3). The race
+  itself needs a worker that outlives the teardown, which no ordinary run makes: an environment kept alive
+  1.2 s past it reproduced the error of CI over happy-dom and nothing over this one — run by hand
+  (`.scratch/tasks/selftests/MOL-286*`), not committed.
+- **The price, named:** the environment rests on `builtinEnvironments` of `vitest/runtime` — a vitest that
+  renames it fails every file of the PWA at once, loudly. **And vitest tells a DOM by the name in the
+  config** (adversarial А4, accepted by the owner 22.10.2026): where it reads the name, not the environment, it takes this one for the server
+  — the files no test imported are transformed for the coverage report by Vite's `ssr`, not `client`, so
+  `npm run test:coverage` counts other totals for them (AppButton.vue 17 lines, 12 under happy-dom), and a
+  static collection of tests (`astCollectTests`) transforms the same way. The PWA has no coverage threshold and
+  CI does not count coverage; a test run is untouched — it goes by the environment's `viteEnvironment`.
+- **Not this:** a step left in flight between two tests of one file (Р-2). A memory history sends no
+  `popstate`, so a step lands only by its guard, a second later; the files that step twice dispatch
+  `popstate` themselves (`putBothAway` in `ExchangeView.test.ts`).
+- **The bound of the approach, named** (adversarial round 2, Р2-А1, Р2-А1б): what the environment reaches
+  is timers, not the page's code. A handler that awaits a step finished by a task of Node — Web Crypto's
+  `digest`, which here is Node's and runs on the thread pool, even for 4 KB — comes back after happy-dom is
+  taken down and the window gone: a timer it sets then is Node's own, uncounted, and fires into a worker
+  with no `window`, and a `stepBack` it calls fails at once, with no timer at all. No environment can stop a
+  continuation. **The PWA's own client is such a step** (round 3, Р3-А1): happy-dom ends the task of a `fetch`
+  once the headers came, and the reading of the body — `response.json()` in `packages/client/src/transport.ts` — is a task whose
+  abort only marks it, neither waited for nor rejected; the rest of the body comes over Node's socket after
+  the window, and the page's answer to it runs there. **No test of the PWA reaches the network today**, by a
+  watch of the page's `fetch` (round 4, Р4-А1): 62 files mock `@/api`, and four of them keep the real `api`
+  beside one function replaced — `main`, `main-below-floor` and `ScreenState` never call it, and
+  `main-first-route` asked `me()` of the page's own address, `localhost:3000`, still in the air at the end of
+  the file (refused on CI, aborted by the teardown here) until it answered `me()` offline too; `api.test.ts`
+  mocks the client, and no test file but the environment's own starts a server. A partial mock of `@/api`
+  leaves the rest of it real.
+  Not the rest either: `crypto.subtle` is not used, IndexedDB happy-dom has not got, and
+  `requestAnimationFrame` is happy-dom's own and comes before its abort ends. **A test that lets the page's
+  work outlive the file** — a real request whose answer is on its way, a step of Node — will fail as CI did,
+  and its fix is in the test: wait for the work before the file ends.

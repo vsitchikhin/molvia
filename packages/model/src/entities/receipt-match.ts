@@ -5,6 +5,7 @@
 // for line (`.scratch/tasks/status/MOL-126/parity.mjs`), so the measured figure — 54 of 70 lines of
 // receipts its rules never saw — still holds.
 
+import { lineFitter, receiptLineParts, seedNameFits } from '#model/entities/receipt-line-kind'
 import { levenshtein } from '#model/support/edits'
 
 /** An item as a receipt reaches it: its own name, its names in the till's language, its headings. */
@@ -50,7 +51,7 @@ const MATCH_SCORE = 0.7
 export function receiptWords(text: string): string[] {
   return text
     .toLowerCase()
-    .replace(/և/gu, 'եվ')
+    .replace(/և|եւ/gu, 'եվ')
     .split(/[^ա-ևԱ-Ֆa-zа-яё0-9%]+/u)
     .filter((word) => word.length >= 2 && /[ա-և]/u.test(word))
 }
@@ -127,12 +128,19 @@ export function createLineMatcher(
       .map(
         (token) =>
           words.get(token) ??
+          // the dictionary keys «և» as one letter, and as of old «եւ»: «սերկեւիլ», «սերկևիլի» (review 6, Е3)
+          words.get(token.replace(/եվ/gu, 'և')) ??
+          words.get(token.replace(/եվ/gu, 'եւ')) ??
           fuzzyWords.find(([word]) => levenshtein(word, token) <= 1)?.[1] ??
           null,
       )
       .filter((word): word is string => word !== null && word !== '')
       .join(' ')
   }
+
+  // An item names the line's kind and nothing the line does not print (MOL-293, В-1 «а»): a word of a
+  // flavour found «Клубника» for a strawberry yoghurt. An item of the seed is a kind, never a brand.
+  type Fits = (name: string) => boolean
 
   // A fat or a strength printed on the line picks the variety: «Կաթ 3.2%» is «Молоко 3,2%».
   function refine(found: CatalogueNode, printed: string): CatalogueNode {
@@ -146,10 +154,10 @@ export function createLineMatcher(
 
   // No name matched: the heading alone, when it leaves one item, or the item whose own name shares a
   // stem with the line's gloss («кошка» → «Корм для кошек»). Bound far — «проверьте».
-  function byHeading(printed: string, hs: string | null): LineMatch | null {
+  function byHeading(printed: string, hs: string | null, fits: Fits): LineMatch | null {
     if (!isHeading(hs)) return null
     // the exact heading only: a swapped digit is fine for ruling out, not for choosing (3506 → 8506)
-    const candidates = nodes.filter((node) => node.headings.includes(hs))
+    const candidates = nodes.filter((node) => node.headings.includes(hs) && fits(node.name))
     if (candidates.length === 0) return null
     const stems = gloss(printed)
       .toLowerCase()
@@ -175,6 +183,9 @@ export function createLineMatcher(
 
   function match(printed: string, hs: string | null): LineMatch | null {
     const tokens = receiptWords(printed)
+    const parts = receiptLineParts(printed)
+    const fitter = lineFitter(parts, dictionary)
+    const fits: Fits = (name) => fitter(name, { generic: true })
     let best: { node: CatalogueNode; score: number } | null = null
     for (const entry of index) {
       const { headings } = entry.node
@@ -184,12 +195,15 @@ export function createLineMatcher(
       // more words — more specific
       const score =
         scores.reduce((sum, x) => sum + x, 0) / entry.words.length + 0.05 * (entry.words.length - 1)
-      if (best === null || score > best.score) best = { node: entry.node, score }
+      // asked last, and only of a name that would win: the seed's own name in the till's language says the
+      // line's kind — its Russian one the dictionary need not know, «Ատամի պաստա» is «Паста зубная»
+      if ((best === null || score > best.score) && seedNameFits(parts, entry.words, dictionary))
+        best = { node: entry.node, score }
     }
     if (best !== null && best.score >= MATCH_SCORE) {
       return { itemId: refine(best.node, printed).itemId, far: isServiceClass(hs) }
     }
-    return byHeading(printed, hs)
+    return byHeading(printed, hs, fits)
   }
 
   return { match, gloss }

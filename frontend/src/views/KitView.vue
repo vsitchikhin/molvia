@@ -232,6 +232,16 @@
           </li>
           <li>
             <ListRow
+              :icon="IconCart"
+              :title="t('dev.kit.row_whole')"
+              :meta="t('dev.kit.row_whole_meta')"
+              wrap
+              whole
+              next
+            />
+          </li>
+          <li>
+            <ListRow
               as="router-link"
               :to="{ query: { followed: 'live' } }"
               :icon="IconDevices"
@@ -369,7 +379,7 @@
     </section>
 
     <!-- The connection in one line (MOL-181, Ф-14): one strip a screen, in the screen's words;
-         «Повторить» only where the server did not answer. -->
+         «Повторить» only where the server did not answer; a late answer is the third kind (MOL-201). -->
     <section class="group">
       <SectionCaption class="caption">{{ t('dev.kit.strip') }}</SectionCaption>
       <StatusStrip kind="offline" :text="t('dev.kit.strip_offline')" />
@@ -379,6 +389,7 @@
           <AppButton variant="ghost">{{ t('state.retry') }}</AppButton>
         </template>
       </StatusStrip>
+      <StatusStrip kind="refreshing" :text="t('dev.kit.strip_refreshing')" />
     </section>
 
     <!-- The four kinds of a state (MOL-180): told apart by form — the quiet circle of an empty one,
@@ -670,6 +681,7 @@ export default defineComponent({
         preset,
         name: null,
         colour: null,
+        icon: null,
         archived: false,
       }),
     )
@@ -713,6 +725,7 @@ export default defineComponent({
         preset: 'groceries',
         name: null,
         colour: null,
+        icon: null,
         archived: false,
       },
       {
@@ -720,6 +733,7 @@ export default defineComponent({
         preset: 'cafe',
         name: null,
         colour: null,
+        icon: null,
         archived: false,
       },
     ]

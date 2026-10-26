@@ -59,6 +59,18 @@ $row-narrow: 22rem;
   }
 }
 
+/// The icon of a work under way «breathes» (handoff 03, 2c): a receipt being read, with no percent and no
+/// timer — work that takes a while. Down to 0.35 and back (`@keyframes work-breath`, main.scss), on the
+/// compositor; still under «reduce motion». One look for the row of «Покупки» and of the newcomer's «Что
+/// брать» (MOL-203), which draw the same receipt.
+@mixin work-breath {
+  animation: work-breath var(--dur-work-breath) ease-in-out infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 /// The target device is a phone; anything wider is the exception, so it is opt-in.
 @mixin wider-than-phone {
   @media (width >= 40rem) {
@@ -71,6 +83,39 @@ $row-narrow: 22rem;
 /// blur that was to keep them apart was a second picture to read past. Its hairline is the user's.
 @mixin pinned-bar {
   background: var(--surface);
+}
+
+/// A name and its figure on one row of «Что брать» (MOL-200) — an item and its rating, a place and its
+/// price; on the row, the name its first child and the figure its last. Squeezed beside the figure, the
+/// name broke mid-word on a phone of 320 — «4,8 из 5 · 12 оценок» left «армянский» room for «армянс», a
+/// price left «Продовольственный» room for «Продовольствен» — so the figure goes under the name, at the
+/// right, once the name gives way: `name` — while the whole name fits beside it (an item: a name of a
+/// word a line beside its rating read as a list), `word` — while each word of it does (a place: wrapped
+/// by words beside its price, as the handoff draws «Дешевле всего: Ереван Сити»). A word wider than the
+/// whole row breaks rather than leaves it: under `word` the automatic minimum of the name is its longest
+/// word, and `max-width` caps it at the row — without the cap a glued receipt head of 33 capitals stood
+/// past the card in Chromium and WebKit alike, and the page scrolled sideways.
+@mixin name-beside-figure($until: name) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  align-items: baseline;
+
+  > :first-child {
+    @if $until == word {
+      flex: 1 1 0;
+      max-width: 100%;
+    } @else {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    overflow-wrap: break-word;
+  }
+
+  > :last-child {
+    margin-left: auto;
+  }
 }
 
 /// Read by a screen reader, never drawn. For words the screen already says with a picture —

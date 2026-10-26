@@ -155,7 +155,11 @@ export function useMoneyScreen(): MoneyScreen {
   // a spending can be written before this month's answer, or offline on the first of the month
   // (review Т-5).
   const categories = computed(() =>
-    categoriesWith(money.knownCategories.value, [...queue.arrived, ...queue.pending]),
+    categoriesWith(
+      money.knownCategories.value,
+      [...queue.arrived, ...queue.pending],
+      money.categoriesAskedAt.value,
+    ),
   )
   /** Whether a spending can be written here at all: a category is required, and known. */
   const canWrite = computed(() => categories.value.some((category) => !category.archived))

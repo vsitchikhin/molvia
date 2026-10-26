@@ -104,6 +104,12 @@ export interface ReceiptHead {
    * alone. A receipt by its link has none — its total is the tax office's.
    */
   readonly readTotalMinor: bigint | null
+  /**
+   * What a card sent to the card instead of taking it off, and the bonus the receipt is partly paid with
+   * (MOL-289): only a model's reading names them; none — nothing read, or a head of before.
+   */
+  readonly cashbackMinor?: bigint | null
+  readonly redeemedMinor?: bigint | null
   readonly balanced: boolean
   /** How a photo's lines were laid out; a receipt by its link has none. */
   readonly layout: ReceiptLayout | null
@@ -119,6 +125,8 @@ export interface LineBinding {
   readonly itemId: string | null
   readonly match: ReceiptParsedMatch
   readonly translation: string | null
+  /** The new item's name spells a word in letters the dictionary has not (MOL-293, В-4): a proposal. */
+  readonly spelled?: boolean
 }
 
 export interface LineImage {
@@ -146,6 +154,14 @@ export type ReadOutcome =
        */
       readonly codes?: readonly (string | null)[]
       readonly specification?: 'ok' | 'failed' | 'skipped'
+      /** Whether the shop's memory put each line right (MOL-291), in the lines' order. */
+      readonly remembered?: readonly boolean[]
+      /** What the shop's memory said of the lines, for the log (MOL-291): counted, never stored. */
+      readonly voice?: {
+        readonly confirmed: number
+        readonly repaired: number
+        readonly doubted: number
+      }
     }
   | {
       readonly kind: 'failed'
@@ -162,6 +178,10 @@ export interface StoredReceiptLine extends ReceiptLine {
   /** `null` for a line read before MOL-126: nothing was looked for. */
   readonly match: ReceiptParsedMatch | null
   readonly translation: string | null
+  /** `translation` spells a word in letters (MOL-293, В-4). */
+  readonly spelled: boolean
+  /** Put right by the shop's memory (MOL-291): `repaired` too. */
+  readonly remembered: boolean
   /** The package's code the tax office's specification gave the line (MOL-234). */
   readonly gtin: string | null
 }
@@ -179,6 +199,10 @@ export interface StoredReceipt {
   readonly heard: ReceiptHeard | null
   /** The total as the reading found it in one place (MOL-244): «Прочитали не всё» alone. */
   readonly readTotal: Money | null
+  /** What a card sent to the card: the lines make the total less it (MOL-289). */
+  readonly cashback: Money | null
+  /** The bonus the receipt is partly paid with: the trip's money is the total less it (MOL-289). */
+  readonly redeemed: Money | null
   /** Read in part, of the lines as read before the check (MOL-255, А6 «а»); `null` — read before it. */
   readonly readPartly: boolean | null
 }
@@ -230,6 +254,9 @@ export interface ReceiptToRecord {
   readonly printedOn: string | null
   readonly printedTime: string | null
   readonly total: Money | null
+  /** What a card sent to the card, and the bonus the receipt is partly paid with (MOL-289). */
+  readonly cashback: Money | null
+  readonly redeemed: Money | null
   readonly city: ReceiptCity | null
   /** The trip it was recorded as; `null` — not recorded: a trip removed for good takes it (MOL-240). */
   readonly tripId: string | null
@@ -245,6 +272,11 @@ export interface RecordedReceipt {
   readonly expenses: readonly { readonly position: number; readonly expenseId: string }[]
   /** Lines recorded as read: their cut-out rows are confirmed, every other one goes (В-4). */
   readonly confirmed: readonly number[]
+  /**
+   * Lines whose shelf price the person's word keeps (`as_read`): those recorded as read, and those the shop's
+   * memory put right recorded as shown (MOL-291, В-3 «а»).
+   */
+  readonly priced: readonly number[]
   /**
    * What the person put right before recording, counted in `receipt_days` — or, of a receipt from the
    * tax office, in `tax_receipt_days` (MOL-234).
@@ -452,7 +484,8 @@ const undoFrom = () => sql`clock_timestamp() - make_interval(mins => ${RECEIPT_U
 // The parts held and the lines read, beside the row: what «Покупки» shows of a receipt.
 const received = sql<number>`(select count(*)::int from ${receiptParts} where ${receiptParts.receiptId} = ${receipts.id})`
 const lineCount = sql<number>`(select count(*)::int from ${receiptLines} where ${receiptLines.receiptId} = ${receipts.id})`
-const unsettled = sql<number>`(select count(*)::int from ${receiptLines} where ${receiptLines.receiptId} = ${receipts.id} and not ${receiptLines.settled})`
+// «проверьте N строк»: a line that does not add up, and one the font's swaps put right (MOL-290, review round 1, №2)
+const unsettled = sql<number>`(select count(*)::int from ${receiptLines} where ${receiptLines.receiptId} = ${receipts.id} and (not ${receiptLines.settled} or ${receiptLines.repaired}))`
 
 // The purchases it was recorded as and their place, while they are there (MOL-126): a trip removed,
 // even within its «Вернуть», is no record of the receipt.
@@ -511,6 +544,9 @@ function toSummary({
   }
 }
 
+const cashOf = (minor: bigint | null, currency: Currency): Money | null =>
+  minor === null ? null : { minor, currency }
+
 function toStored(found: SummaryRow): StoredReceipt {
   return {
     receipt: toSummary(found),
@@ -519,10 +555,9 @@ function toStored(found: SummaryRow): StoredReceipt {
     shopUnit: found.row.shopUnit,
     source: found.row.source,
     heard: found.row.heard,
-    readTotal:
-      found.row.readTotalMinor === null
-        ? null
-        : { minor: found.row.readTotalMinor, currency: found.row.currency },
+    readTotal: cashOf(found.row.readTotalMinor, found.row.currency),
+    cashback: cashOf(found.row.cashbackMinor, found.row.currency),
+    redeemed: cashOf(found.row.redeemedMinor, found.row.currency),
     readPartly: found.row.readPartly,
   }
 }
@@ -533,6 +568,8 @@ function toLine(row: typeof receiptLines.$inferSelect, currency: Currency): Stor
     itemId: row.itemId,
     match: row.match,
     translation: row.translation,
+    spelled: row.spelled,
+    remembered: row.remembered,
     gtin: row.gtin,
     printed: row.printed,
     hs: row.hs,
@@ -545,6 +582,7 @@ function toLine(row: typeof receiptLines.$inferSelect, currency: Currency): Stor
     sum: cash(row.sumMinor),
     discount: cash(row.discountMinor),
     settled: row.settled,
+    repaired: row.repaired,
   }
 }
 
@@ -875,6 +913,8 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         printedOn: row.printedOn,
         printedTime: row.printedTime,
         total: row.totalMinor === null ? null : { minor: row.totalMinor, currency: row.currency },
+        cashback: cashOf(row.cashbackMinor, row.currency),
+        redeemed: cashOf(row.redeemedMinor, row.currency),
         city: row.city,
         tripId: row.tripId,
         tripAlive,
@@ -900,7 +940,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         .update(receiptLines)
         .set({
           asRead: sql`${receiptLines.position} in (${sql.join(
-            [-1, ...recorded.confirmed].map((position) => sql`${position}`),
+            [-1, ...recorded.priced].map((position) => sql`${position}`),
             sql`, `,
           )})`,
         })
@@ -1241,6 +1281,8 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
                   receiptNo: head.receiptNo,
                   totalMinor: head.totalMinor,
                   readTotalMinor: head.readTotalMinor,
+                  cashbackMinor: head.cashbackMinor ?? null,
+                  redeemedMinor: head.redeemedMinor ?? null,
                   balanced: head.balanced,
                   city: head.city,
                   shopUnit: head.shopUnit ?? null,
@@ -1288,9 +1330,12 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
               sumMinor: line.sum?.minor ?? null,
               discountMinor: line.discount?.minor ?? null,
               settled: line.settled,
+              repaired: line.repaired === true,
+              remembered: outcome.remembered?.[position] === true,
               itemId: outcome.bindings[position]?.itemId ?? null,
               match: outcome.bindings[position]?.match ?? null,
               translation: outcome.bindings[position]?.translation ?? null,
+              spelled: outcome.bindings[position]?.spelled === true,
               gtin: outcome.codes?.[position] ?? null,
             })),
           )

@@ -70,7 +70,9 @@ function month(spentOn: string): MoneyMonthView {
     previousToDay: null,
     byCategory: [{ categoryId: OTHER, amount: amd('1000') }],
     slices: [{ categoryId: OTHER, amount: amd('1000'), count: 1, level: 1000 }],
-    categories: [{ id: OTHER, preset: 'other', name: null, colour: null, archived: false }],
+    categories: [
+      { id: OTHER, preset: 'other', name: null, colour: null, icon: null, archived: false },
+    ],
     days: [
       {
         day: spentOn,
@@ -198,7 +200,7 @@ describe('SpendingSheet: the phone’s day (MOL-121)', () => {
     await risen()
     expect(dayField().value).toBe('2026-09-28')
     expect(dayField().max).toBe('2026-09-28')
-  })
+  }, 15_000)
 
   it('a new spending on a day the phone has not reached is refused (must not fire)', async () => {
     moneyMonth.mockResolvedValue(month('2026-09-28'))
@@ -237,7 +239,7 @@ describe('SpendingSheet: the phone’s day (MOL-121)', () => {
       spentOn: '2026-09-29',
       note: 'Reconciliation: coins in the other jacket',
     })
-  })
+  }, 10_000)
 
   it('the journal says «Today» of the phone’s day, and «Yesterday» once its midnight is past (Т-3, adversarial Н)', async () => {
     moneyMonth.mockResolvedValue(month('2026-09-28'))
@@ -258,7 +260,7 @@ describe('SpendingSheet: a record with no purchases handed over (MOL-78, В-1)',
       ...base,
       categories: [
         ...base.categories,
-        { id: GROCERIES, preset: 'groceries', name: null, colour: null, archived },
+        { id: GROCERIES, preset: 'groceries', name: null, colour: null, icon: null, archived },
       ],
     }
   }

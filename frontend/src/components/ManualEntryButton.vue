@@ -1,6 +1,21 @@
 <template>
+  <!-- On the newcomer's «Что брать» with receipts it is a row of its own under the cycle (2a): the
+       card is drawn here, around the row alone — around this component it would draw the kit's
+       hairline over the sheets below as well. The chevron is В-14's either way: «Где вы?», or with a
+       record open the fork whose both ways go on to fields (MOL-203, adversarial А2). -->
+  <AppCard v-if="row" list>
+    <ListRow
+      :icon="IconPencil"
+      :title="t('purchases.manual_by_hand')"
+      :meta="t('advice.home.manual_body')"
+      wrap
+      whole
+      next
+      @click="begin"
+    />
+  </AppCard>
   <!-- With receipts it is the quieter second way, «Записать вручную» under the camera (handoff 03). -->
-  <AppButton v-if="byHand" variant="ghost" block @click="begin">
+  <AppButton v-else-if="byHand" variant="ghost" block @click="begin">
     {{ t('purchases.manual_by_hand') }}
   </AppButton>
   <AppButton v-else size="large" block @click="begin">
@@ -40,7 +55,9 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconPencil from '~icons/mdi/pencil-outline'
 import AppButton from '@/components/AppButton.vue'
+import AppCard from '@/components/AppCard.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import ListRow from '@/components/ListRow.vue'
 import StartTripSheet from '@/components/StartTripSheet.vue'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useTripRows } from '@/composables/useTripRows'
@@ -60,10 +77,12 @@ import { useTripQueueStore } from '@/stores/tripQueue'
  */
 export default defineComponent({
   name: 'ManualEntryButton',
-  components: { AppButton, BottomSheet, IconPencil, StartTripSheet },
+  components: { AppButton, AppCard, BottomSheet, IconPencil, ListRow, StartTripSheet },
   props: {
     /** The version «с чеком» (Д-3): the second button of the strip, «Записать вручную». */
     byHand: { type: Boolean, default: false },
+    /** The same as a row of the kit in a card of its own, with what it is for (MOL-203, 2a). */
+    row: { type: Boolean, default: false },
   },
   emits: {
     /** Whether a sheet of its own is up: the screen keeps the button mounted meanwhile (Р-15). */
@@ -182,6 +201,7 @@ export default defineComponent({
 
     return {
       t,
+      IconPencil,
       starting,
       started,
       asking,

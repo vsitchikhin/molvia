@@ -104,9 +104,9 @@ describe('an operation as its row says it', () => {
   const CARD = 'cccccccc-0000-4000-8000-000000000001'
   const CASH = 'cccccccc-0000-4000-8000-000000000002'
   const categories: SpendingCategoryView[] = [
-    { id: OTHER, preset: 'other', name: null, colour: null, archived: false },
-    { id: CAFE, preset: 'cafe', name: null, colour: null, archived: false },
-    { id: GROCERIES, preset: 'groceries', name: null, colour: null, archived: false },
+    { id: OTHER, preset: 'other', name: null, colour: null, icon: null, archived: false },
+    { id: CAFE, preset: 'cafe', name: null, colour: null, icon: null, archived: false },
+    { id: GROCERIES, preset: 'groceries', name: null, colour: null, icon: null, archived: false },
   ]
   const NAMES: Record<string, string> = { cafe: 'Кафе', groceries: 'Продукты', other: 'Прочее' }
   const { t } = createAppI18n('ru').global

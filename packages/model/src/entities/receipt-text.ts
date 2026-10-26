@@ -15,6 +15,14 @@
 import { PARSED_FRACTION_DIGITS } from '#model/entities/receipt-card'
 import type { PhotoReading } from '#model/entities/receipt-card'
 
+/** A line's four figures: thousandths of its unit, hundredths of money. */
+export interface LineFigures {
+  readonly quantityMilli: number | null
+  readonly priceHundredths: number | null
+  readonly discountHundredths: number | null
+  readonly sumHundredths: number | null
+}
+
 /** One row of a reading: its text and where it stands on the photo of its part. */
 export interface TextRow {
   readonly text: string
@@ -50,6 +58,22 @@ export interface ReceiptTextLine {
    * is decided from this.
    */
   readonly asPrinted: boolean
+  /**
+   * Put right by the digits the till's font confuses, on a model's reading proven whole by it (MOL-290):
+   * the one reading of the line that holds its arithmetic and the card's rate, every line then meeting a
+   * total two places vouch for. Shown with «проверьте», never as printed.
+   */
+  readonly repaired?: boolean
+  /**
+   * The line's figures as the reader gave them, before any swap and with nothing worked out (MOL-291): what
+   * the shop's memory sets its shelf price against. None on a line no article keys — a table's, a journal's.
+   */
+  readonly read?: LineFigures
+  /**
+   * What the shop's memory said of the line (MOL-291): its price `confirmed` a line as printed, `repaired`
+   * one that did not hold, or `doubted` one as printed one confused digit off it — emptied by the check.
+   */
+  readonly remembered?: 'confirmed' | 'repaired' | 'doubted'
   /**
    * The rows the line may be cut out from for the reader's training (MOL-169): its figures, and its
    * name only when the item's number was read on it. A name row is the first row above the figures,
@@ -87,6 +111,17 @@ export interface ReceiptText {
   readonly readTotalHundredths: number | null
   /** The lines add up to the printed total. */
   readonly balanced: boolean
+  /**
+   * The card's discount of the transaction, sent to the card as a bonus rather than taken off at the till
+   * («Զեղչ գործարքից», «Ереван Сити», MOL-289): the lines make the total less it, and the total is what
+   * left the card. Only a model's reading names it.
+   */
+  readonly cashbackHundredths?: number | null
+  /**
+   * The bonus this receipt is partly paid with («Կանխավճարի մարում», MOL-289): the trip's money is the
+   * total less it — what the card's bonus covered was recorded when it was sent to the card.
+   */
+  readonly redeemedHundredths?: number | null
   readonly lines: readonly ReceiptTextLine[]
 }
 
@@ -138,6 +173,7 @@ interface Lexicon {
   readonly sectionTax: RegExp
   readonly totalKept: RegExp
   readonly discountKept: RegExp
+  readonly sinceStart: RegExp
   readonly paid: RegExp
 }
 
@@ -160,8 +196,10 @@ function lexiconOf(reading: PhotoReading): Lexicon {
   // a word that captures moves the figures the parse reads after it by their groups: the total read as the
   // word, NaN (adversarial А1) — refused, as a format it cannot read is
   const fragments = [
-    ...[w.total, w.totalKept, w.discountKept, w.control, w.fiscalSign, w.tin, w.fiscal],
-    ...[w.fiscalNumber, w.receiptNumber, w.sumSign, ...w.paid, ...w.sectionTax, ...w.tinMisread],
+    ...[w.total, w.totalKept, w.discountKept, w.sinceStart, w.cashback, w.taxed, w.redeemed],
+    ...[w.control, w.fiscalSign, w.tin],
+    ...[w.fiscal, w.fiscalNumber, w.receiptNumber, w.sumSign, ...w.paid, ...w.sectionTax],
+    ...w.tinMisread,
     ...[...w.head, ...w.currency, ...Object.values(u)],
   ]
   const captures = fragments.find(
@@ -261,6 +299,7 @@ function lexiconOf(reading: PhotoReading): Lexicon {
     sectionTax: new RegExp(any(w.sectionTax), 'u'),
     totalKept: new RegExp(word(w.totalKept), 'u'),
     discountKept: new RegExp(word(w.discountKept), 'u'),
+    sinceStart: new RegExp(word(w.sinceStart), 'u'),
     paid: new RegExp(any(w.paid), 'u'),
   }
   lexicons.set(reading, lexicon)
@@ -977,6 +1016,17 @@ function cardReceipt(rows: readonly TextRow[], lx: Lexicon): Laid {
         discountHundredths: finite(pick?.disc ?? hundredthsOf(f.discS)),
         settled,
         asPrinted: settled && pick.swaps === 0 && pick.counted !== true,
+        // a row of two bare figures prints no price apart: which is which is the parse's choice
+        ...(f.priceS === null
+          ? {}
+          : {
+              read: {
+                quantityMilli: finite(milliOf(f.qtyS)),
+                priceHundredths: finite(hundredthsOf(f.priceS)),
+                discountHundredths: finite(hundredthsOf(f.discS)),
+                sumHundredths: finite(hundredthsOf(f.paidS)),
+              },
+            }),
         rows: f.rows,
       }
     })
@@ -1572,6 +1622,12 @@ function classReceipt(rows: readonly TextRow[], lx: Lexicon): Laid {
         discountHundredths: 0,
         settled,
         asPrinted: settled && pick.swaps === 0 && pick.counted !== true,
+        read: {
+          quantityMilli: f.qtyS === null ? null : finite(milliOf(f.qtyS)),
+          priceHundredths: f.priceS === null ? null : finite(hundredthsOf(f.priceS)),
+          discountHundredths: null,
+          sumHundredths: finite(hundredthsOf(sumAsRead)),
+        },
         rows: [rows[first + item.at]].filter((row): row is TextRow => row !== undefined),
       }
     })
@@ -1614,8 +1670,9 @@ const DEPARTMENT_DATE = /(?<!\d)(\d{2})[-.]\s?(\d{2})[-.]\s?(\d{2})\s+(\d{2}):(\
 const DEPARTMENT_MOMENT = new RegExp(DEPARTMENT_DATE.source)
 // The total's row as OCR reads its word, «Ընդամենը», «/չդամենը», «Կղդամեկը» — and not its discount,
 // «Ընդամենը զեղչ», however OCR spells the discount's first letter.
+// a sum since the start of the year is what a card bought this year, never the receipt's (MOL-288)
 const totalRow = (text: string, lx: Lexicon): boolean =>
-  lx.totalKept.test(text) && !lx.discountKept.test(text)
+  lx.totalKept.test(text) && !lx.discountKept.test(text) && !lx.sinceStart.test(text)
 // An amount with its hundredths: «1700.00», «1800 00», and with its thousands apart before a point,
 // «2 050,01» — the card's payment, which read digit by digit was 50,01 in two places at once (MOL-244). A
 // figure that lost its point is no vote.

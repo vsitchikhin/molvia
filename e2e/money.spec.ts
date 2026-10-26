@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import { fakeKeyboard } from './keyboard'
-import { standAt, topOf } from './scroll'
+import { facesIn, standAt, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -439,6 +439,8 @@ test('offline, a month not read keeps the switcher where it was, at the top of t
   // (adversarial round 2, Г).
   const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
   expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  // No scene to set, so the faces are waited for here, as `standAt` waits for them (MOL-267).
+  await facesIn(page)
   const before = await topOf(previous)
   await previous.click()
   await expect(page).toHaveURL(/month=/)
@@ -586,11 +588,194 @@ test('a category of one’s own is made from the sheet, and a preset’s name is
   await page.getByRole('link', { name: /^Категории/ }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Категории')
   await expect(page.getByText('Такси')).toBeVisible()
-  await page.getByRole('button', { name: 'Убрать категорию «Такси»' }).click()
+  // One's own is taken out from its sheet (MOL-285, В-2 «а»).
+  await removeOwn(page, 'Такси')
   await expect(page.getByRole('heading', { name: 'Убранные' })).toBeVisible()
   await page.getByRole('button', { name: 'Вернуть категорию «Такси»' }).click()
   await expect(page.getByRole('heading', { name: 'Убранные' })).toBeHidden()
 })
+
+test('a category is made from the strip of «Категории», removed quietly and brought back', async ({
+  page,
+}) => {
+  await openMoney(page)
+  await page.getByRole('link', { name: /^Категории/ }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Категории')
+
+  // The main action stands in the strip over the tab bar, not over the list (MOL-191, Ф-28).
+  const add = page.locator('.dock').getByRole('button', { name: 'Добавить категорию' })
+  await add.click()
+  const sheet = page.locator('dialog[open]')
+  await expect(sheet).toContainText('Новая категория')
+  await page.waitForTimeout(400)
+  await sheet.getByLabel('Название').fill('Подарки')
+  await sheet.getByRole('button', { name: 'Добавить' }).click()
+  await expect(sheet).toBeHidden()
+  await expect(add).toBeFocused()
+
+  const live = page.locator('section', { has: page.getByRole('heading', { name: 'Свои' }) })
+  await expect(live.getByText('Подарки')).toBeVisible()
+  await expect(live.getByText('Отправляем…')).toBeHidden()
+  await removeOwn(page, 'Подарки')
+  const archived = page.locator('section', { has: page.getByRole('heading', { name: 'Убранные' }) })
+  await expect(archived.getByText('Подарки')).toBeVisible()
+  await page.getByRole('button', { name: 'Вернуть категорию «Подарки»' }).click()
+  await expect(page.getByRole('heading', { name: 'Убранные' })).toBeHidden()
+  await expect(live.getByText('Подарки')).toBeVisible()
+})
+
+/** One's own opened from «Категории» and taken out from its sheet (MOL-285). */
+async function removeOwn(page: Page, name: string): Promise<void> {
+  await page.getByRole('button', { name, exact: true }).click()
+  const sheet = page.locator('dialog[open]')
+  await expect(sheet).toContainText('Категория')
+  await page.waitForTimeout(400)
+  await sheet.getByRole('button', { name: 'Убрать категорию' }).click()
+  await expect(sheet).toBeHidden()
+}
+
+// The icon and the colour go to the server and back, and «Траты» draw the category by them (MOL-285).
+test('one’s own takes the icon and the colour chosen, and its sheet amends them', async ({
+  page,
+}) => {
+  await openMoney(page)
+  await page.getByRole('link', { name: /^Категории/ }).click()
+  await page.locator('.dock').getByRole('button', { name: 'Добавить категорию' }).click()
+  const sheet = page.locator('dialog[open]')
+  await expect(sheet).toContainText('Новая категория')
+  await page.waitForTimeout(400)
+  // A new one starts on the tag and the first colour of the palette.
+  await expect(sheet.getByRole('radio', { name: 'Бирка' })).toBeChecked()
+  await expect(sheet.getByRole('radio', { name: 'Цвет 1 из 8' })).toBeChecked()
+  await sheet.getByLabel('Название').fill('Подарки')
+  await sheet.getByRole('radio', { name: 'Подарок' }).check()
+  await sheet.getByRole('radio', { name: 'Цвет 6 из 8' }).check()
+  await sheet.getByRole('button', { name: 'Добавить' }).click()
+  await expect(sheet).toBeHidden()
+
+  const own = page.locator('section', { has: page.getByRole('heading', { name: 'Свои' }) })
+  const row = own.getByRole('button', { name: 'Подарки', exact: true })
+  await expect(row.locator('.circle')).toHaveAttribute('style', /--cat-own-5/)
+  await expect(own.getByText('Отправляем…')).toBeHidden()
+
+  // Read again from the server, the sheet opens on what it holds.
+  await page.reload()
+  await row.click()
+  await expect(sheet).toContainText('Категория')
+  await page.waitForTimeout(400)
+  await expect(sheet.getByLabel('Название')).toHaveValue('Подарки')
+  await expect(sheet.getByRole('radio', { name: 'Подарок' })).toBeChecked()
+  await expect(sheet.getByRole('radio', { name: 'Цвет 6 из 8' })).toBeChecked()
+  await sheet.getByLabel('Название').fill('Подарки и цветы')
+  await sheet.getByRole('radio', { name: 'Цветы' }).check()
+  await sheet.getByRole('button', { name: 'Сохранить' }).click()
+  await expect(sheet).toBeHidden()
+  const amended = own.getByRole('button', { name: 'Подарки и цветы', exact: true })
+  await expect(amended).toBeVisible()
+  await expect(own.getByText('Отправляем…')).toBeHidden()
+  const drawn = await amended.locator('.circle svg').innerHTML()
+
+  // A spending in it is drawn by the same icon and colour on «Траты».
+  await page.goBack()
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  await writeSpending(page, '3000', 'Подарки и цветы', 'Букет')
+  await openSpendings(page)
+  const spent = page.locator('.list-row', { hasText: 'Букет' })
+  await expect(spent.locator('.circle')).toHaveAttribute('style', /--cat-own-5/)
+  expect(await spent.locator('.circle svg').innerHTML()).toBe(drawn)
+})
+
+// The skeleton is the answer's shape (Ф-13, MOL-178): its rows as tall as the rows that come, a button of
+// 44 in their tail — and no strip under it: the sheet knows one's own names from the list alone (В-2 «а»).
+test('the skeleton of «Категории» is as tall, row by row, as the list that comes', async ({
+  page,
+}) => {
+  let release: () => void = () => undefined
+  let hold = false
+  await page.route('**/api/spending-categories', async (route) => {
+    if (hold) await new Promise<void>((resolve) => (release = resolve))
+    await route.continue()
+  })
+  await openMoney(page)
+  hold = true
+  await page.getByRole('link', { name: /^Категории/ }).click()
+  const skeleton = page.locator('.skeleton-rows .item')
+  await expect(skeleton).toHaveCount(6)
+  const add = page.locator('.dock').getByRole('button', { name: 'Добавить категорию' })
+  await expect(add).toBeHidden()
+  const bars = await skeleton.evaluateAll((rows) =>
+    rows.map((row) => row.getBoundingClientRect().height),
+  )
+  hold = false
+  release()
+  const rows = page.locator('.list-row')
+  await expect(rows.first()).toBeVisible()
+  await expect(add).toBeVisible()
+  const answer = await rows.evaluateAll((all) =>
+    all.slice(0, 6).map((row) => row.parentElement?.getBoundingClientRect().height ?? 0),
+  )
+  expect(answer).toHaveLength(6)
+  for (const [index, height] of bars.entries()) expect(height).toBeCloseTo(answer[index] ?? 0, 0)
+  // The row keeps 64 by its button standing over its padding, and the button keeps its 44.
+  const target = await page
+    .getByRole('button', { name: /^Убрать категорию/ })
+    .first()
+    .boundingBox()
+  expect(target?.height).toBeCloseTo(44, 0)
+})
+
+/** The words of the names of «Категории» that stand on two lines: broken in their middle. */
+async function brokenWords(page: Page): Promise<string[]> {
+  await expect(page.locator('.lists .title').first()).toBeVisible()
+  await page.evaluate(() => document.fonts.ready)
+  return page.evaluate(() =>
+    [...document.querySelectorAll('.lists .title')].flatMap((title) => {
+      const text = [...title.childNodes].find(
+        (node): node is Text => node instanceof Text && node.data.trim() !== '',
+      )
+      if (!text) return []
+      return [...text.data.matchAll(/\S+/g)].flatMap((match) => {
+        const range = document.createRange()
+        range.setStart(text, match.index)
+        range.setEnd(text, match.index + match[0].length)
+        const lines = new Set(
+          [...range.getClientRects()]
+            .filter((rect) => rect.width > 0)
+            .map((rect) => Math.round(rect.top)),
+        )
+        return lines.size > 1 ? [match[0]] : []
+      })
+    }),
+  )
+}
+
+// At 320 the words of a row had some 100 px beside a circle of 40 and a button of 90, and «Развлечения»
+// broke in its middle (adversarial А2 of MOL-191) — and under «Вернуть», wider than «Убрать», with the
+// button's sides of 8 alone still (Б1). So the longest word is taken out first: both tails are measured.
+for (const locale of ['ru-RU', 'en-US'])
+  test.describe(`at 320 in ${locale}`, () => {
+    test.use({ locale, viewport: { width: 320, height: 844 } })
+
+    test('no name of a category breaks in the middle of a word, in either group', async ({
+      page,
+    }) => {
+      await signedIn(page)
+      const headers = await asBrowser(page)
+      const { categories } = (await (
+        await page.request.get('/api/spending-categories', { headers })
+      ).json()) as { categories: { id: string; preset: string | null }[] }
+      const leisure = categories.find((category) => category.preset === 'leisure')
+      expect(leisure).toBeDefined()
+      const removed = await page.request.delete(`/api/spending-categories/${leisure?.id ?? ''}`, {
+        headers,
+      })
+      expect(removed.ok()).toBe(true)
+
+      await page.goto('/money/categories')
+      await expect(page.locator('.lists .group')).toHaveCount(2)
+      expect(await brokenWords(page)).toEqual([])
+    })
+  })
 
 async function fitsNarrowPhone(page: Page, money: string): Promise<void> {
   await page.setViewportSize({ width: 320, height: 640 })

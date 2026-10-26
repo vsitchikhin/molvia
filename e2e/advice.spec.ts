@@ -1,7 +1,7 @@
 import { actorCodec, settingsOf } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { BrowserContext, Page } from '@playwright/test'
 import { liveRegion, recordLiveRegion } from './live-region'
 import { asBrowser, signedIn } from './session'
 
@@ -42,25 +42,36 @@ async function person(page: Page): Promise<Person> {
 const tag = randomUUID().slice(0, 8)
 
 /** Bought once in «SAS», at 520 ֏ for 0,9 l, and rated — which is the whole path to this screen. */
-async function ratedPurchase(who: Person, name: string, score: number): Promise<void> {
-  const tripId = randomUUID()
-  await who.call('POST', '/trips', {
-    context: settingsOf(actorCodec.parse(await who.call('GET', '/actors/me'))),
-    id: tripId,
-    place: { kind: 'store', name: 'SAS' },
-  })
+async function ratedPurchase(
+  who: Person,
+  name: string,
+  score: number,
+  place = 'SAS',
+): Promise<string> {
   const entry = (await who.call('POST', '/catalogue/items', {
     kind: 'product',
     name,
     defaultUnit: 'l',
   })) as { id: string }
+  await purchase(who, entry.id, place, '520')
+  await who.call('PUT', `/verdicts/${entry.id}`, { score })
+  return entry.id
+}
+
+/** One more purchase of the item, 0,9 l for the amount given, in a trip of its own. */
+async function purchase(who: Person, itemId: string, place: string, amount: string): Promise<void> {
+  const tripId = randomUUID()
+  await who.call('POST', '/trips', {
+    context: settingsOf(actorCodec.parse(await who.call('GET', '/actors/me'))),
+    id: tripId,
+    place: { kind: 'store', name: place },
+  })
   await who.call('POST', `/trips/${tripId}/expenses`, {
     id: randomUUID(),
-    itemId: entry.id,
+    itemId,
     quantity: { value: '0.9', unit: 'l' },
-    amount: { amount: '520', currency: 'AMD' },
+    amount: { amount, currency: 'AMD' },
   })
-  await who.call('PUT', `/verdicts/${entry.id}`, { score })
   // Finished, so a second purchase can open a trip of its own: one open at a time.
   await who.call('POST', `/trips/${tripId}/finish`, {
     finishedOnDeviceAt: new Date().toISOString(),
@@ -94,6 +105,121 @@ test('a rated purchase becomes a recommendation with the place and the price per
   // The own mode leaves the count out: it is always one, and the subtitle says so (МР-12).
   await expect(take.getByText('5.0 out of 5', { exact: true })).toBeVisible()
   await expect(take.getByText('1 rating')).toHaveCount(0)
+  // A sentence is never smaller than 13 (Ф-8), and the card does not repeat the verdict: the pill's
+  // word was «BUY», the group's caption says «Buy it» (Ф-26).
+  await expect(take.getByText('5.0 out of 5', { exact: true })).toHaveCSS('font-size', '13px')
+  await expect(take.getByRole('button').getByText('BUY', { exact: true })).toHaveCount(0)
+})
+
+test('«only if cheap» says where it was bought, the price beside the place (MOL-200)', async ({
+  page,
+}) => {
+  const who = await person(page)
+  const name = `Сметана «Ташир» ${tag}`
+  await ratedPurchase(who, name, 3)
+
+  await page.goto('/')
+
+  const cheap = page.locator('section.if-cheap')
+  await expect(cheap.getByText(name)).toBeVisible()
+  // One purchase: no threshold yet (MOL-33), and the place stands with its price, with no word
+  // before it — one place is named, and nothing is claimed of the others (Ф-21).
+  await expect(cheap.getByText('֏577.78/l · SAS', { exact: true })).toBeVisible()
+  await expect(cheap.getByText('Bought here')).toHaveCount(0)
+  await expect(cheap.getByText('Worth buying below')).toHaveCount(0)
+})
+
+test('on a phone of 320 a long name stays in its row in all three forms, shared mode too (MOL-200)', async ({
+  page,
+}) => {
+  const who = await person(page)
+  // One word wider than what is left beside the rating: «1.0 out of 5 · 12 ratings» of the shared
+  // mode is the widest figure there is, so it is asked for by rewriting the answer — a grant of
+  // access is no business of this spec.
+  const names = {
+    take: `Молоко ультрапастеризованное ${tag}`,
+    'if-cheap': `Сливки гомогенизированные ${tag}`,
+    never: `Кефир ультрапастеризованный ${tag}`,
+  }
+  // A receipt's head in capitals: one word narrower than the plate, wider than what the price leaves.
+  const word = 'ՍՈՒՊԵՐՄԱՐԿԵՏՆԵՐԻ'
+  // The same head read with its spaces lost: one word wider than any row of the card.
+  const glued = 'ՍՈՒՊԵՐՄԱՐԿԵՏՆԵՐԻՑԱՆՑԳՅՈՒՄՐԻՈՒՄՆԵՐ'
+  // A place of short words, as the handoff draws it: the price stays beside it.
+  const short = `Лаваш ${tag}`
+  await ratedPurchase(who, names.take, 5, `${word} ՑԱՆՑ`)
+  await ratedPurchase(who, names['if-cheap'], 3, glued)
+  await ratedPurchase(who, names.never, 1)
+  // Dearer in the glued place, so it stands under «Ещё».
+  await purchase(who, await ratedPurchase(who, short, 5, 'Ереван Сити'), glued, '560')
+  await page.route(/\/api\/advice$/, async (route) => {
+    const response = await route.fetch()
+    const json = (await response.json()) as { scope: string; rows: { ratingsCount: number }[] }
+    json.scope = 'shared'
+    for (const row of json.rows) row.ratingsCount = 12
+    await route.fulfill({ response, json })
+  })
+
+  await page.setViewportSize({ width: 320, height: 800 })
+  await page.goto('/')
+  await expect(page.getByText('Reviews and prices are yours alone')).toBeVisible()
+
+  for (const [group, name] of Object.entries(names)) {
+    const row = page.locator(`section.${group}`).locator('article, .row').filter({ hasText: name })
+    await expect(row.getByText(name), group).toBeVisible()
+    const fits = await row.evaluate((element) => {
+      const name = element.querySelector('.name')!
+      const rating = element.querySelector('.rating')!.getBoundingClientRect()
+      return {
+        // The text, not its box: a box squeezed by `min-width: 0` stays inside while a word that
+        // does not break runs out of it.
+        name: name.scrollWidth <= name.clientWidth,
+        rating: rating.right <= element.getBoundingClientRect().right,
+      }
+    })
+    expect(fits, group).toEqual({ name: true, rating: true })
+  }
+  // The place stays whole and the price inside the card: the price goes under the place instead.
+  const take = page.locator('section.take article')
+  const plate = await take.filter({ hasText: names.take }).evaluate((card, whole) => {
+    const where = card.querySelector('.where')!
+    const text = where.firstChild!
+    const range = document.createRange()
+    const at = text.textContent!.indexOf(whole)
+    range.setStart(text, at)
+    range.setEnd(text, at + whole.length)
+    return {
+      wordLines: range.getClientRects().length,
+      price:
+        card.querySelector('.price')!.getBoundingClientRect().right <=
+        card.getBoundingClientRect().right,
+    }
+  }, word)
+  expect(plate).toEqual({ wordLines: 1, price: true })
+  // Each word of «Cheapest at Ереван Сити» fits beside the price, so the price stays on the place's
+  // first line — not under the place because the whole of it does not fit there (MOL-200, №6).
+  const beside = await take.filter({ hasText: short }).evaluate((card) => {
+    const where = card.querySelector('.where')!.getBoundingClientRect()
+    const price = card.querySelector('.price')!.getBoundingClientRect()
+    return price.top < where.top + where.height / 2
+  })
+  expect(beside).toBe(true)
+  // A word wider than its row breaks inside it — in «Ещё: …» and in «price · place» of «only if
+  // cheap» as in the plate.
+  for (const [where, text] of [
+    [take.filter({ hasText: short }), '.more'],
+    [page.locator('section.if-cheap .row'), '.at'],
+  ] as const) {
+    const fits = await where.evaluate((element, selector) => {
+      const line = element.querySelector(selector)!
+      return line.scrollWidth <= line.clientWidth
+    }, text)
+    expect(fits, text).toBe(true)
+  }
+  // Nothing pushes the page sideways: only the page scrolls, and only up and down.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(
+    0,
+  )
 })
 
 test('a bad verdict carries no price and no place: there is nothing to be cheap with', async ({
@@ -108,6 +234,7 @@ test('a bad verdict carries no price and no place: there is nothing to be cheap 
   const never = page.locator('section.never')
   await expect(never.getByText(name)).toBeVisible()
   await expect(never.getByText('The price is left out on purpose')).toBeVisible()
+  await expect(never.getByText('The price is left out on purpose')).toHaveCSS('font-size', '13px')
   // The row was bought for 520 ֏ at 577,78 ֏/l in SAS, and none of it is anywhere on the screen.
   await expect(page.getByText('577.78')).toHaveCount(0)
   await expect(page.getByText('SAS')).toHaveCount(0)
@@ -127,6 +254,123 @@ test('nothing rated yet: the newcomer is offered to act, and the cycle leads to 
   await page.getByRole('button', { name: /At home — «Ratings»/ }).click()
 
   await expect(page).toHaveURL(/\/verdicts$/)
+})
+
+// The headline waits for the queue of verdicts — it speaks of it — and its skeleton was a card of
+// paragraphs: the cycle under it, drawn at once, jumped 70 px down as the queue answered, under a thumb
+// aimed at a step (MOL-178: a screen trades `groups` for its answer's shape; adversarial А3 of MOL-203).
+// The skeleton takes its height from the newcomer's words, unseen, so the wrap of a phone and a language
+// is the answer's own: a shape of fixed lines stood still on one and moved on another (self-review 4).
+for (const width of [412, 320]) {
+  test(`at ${String(width)} the newcomer's headline comes in where its skeleton stood: the cycle stays`, async ({
+    page,
+  }) => {
+    // Still, so every animation that ends has ended when a top is read — the skeleton breathes forever.
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.setViewportSize({ width, height: 900 })
+    await person(page)
+    let release: () => void = () => undefined
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    await page.route('**/api/verdicts/pending*', async (route) => {
+      await held
+      await route.continue()
+    })
+    await page.goto('/')
+    await expect(page.locator('.home .skeleton')).toBeVisible()
+    await page.evaluate(() => document.fonts.ready)
+    const before = await topOf(page, '.home ol')
+
+    release()
+    await expect(page.getByRole('heading', { name: 'Photograph your first receipt' })).toBeVisible()
+    await expect(page.locator('.home .skeleton')).toHaveCount(0)
+    expect(Math.abs((await topOf(page, '.home ol')) - before)).toBeLessThanOrEqual(1)
+  })
+}
+
+// With no answer from the queue there is no headline to draw (adversarial В of MOL-128), and its place,
+// as tall as the headline, went in one frame: the cycle and «Add by hand» rose 134 px from under a thumb
+// (adversarial В1 of MOL-203). The place shrinks away over frames now (MOL-151, owner's choice) — the
+// cycle still rises, by sliding.
+test('the queue failing, the newcomer`s headline place shrinks away rather than vanishing', async ({
+  page,
+}) => {
+  await person(page)
+  let release: () => void = () => undefined
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('**/api/verdicts/pending*', async (route) => {
+    await held
+    await route.fulfill({ status: 502, contentType: 'text/html', body: '<html>Bad gateway</html>' })
+  })
+  await page.goto('/')
+  await expect(page.locator('.home .skeleton')).toBeVisible()
+  await page.evaluate(() => document.fonts.ready)
+  const before = await page.locator('.home ol').evaluate((list) => list.getBoundingClientRect().top)
+  // Every frame from the release on: whether the place is shrinking by its height.
+  await page.evaluate(() => {
+    const seen: boolean[] = []
+    Object.assign(window, { shrinkSeen: seen })
+    const look = () => {
+      const place = document.querySelector('.home .intro-place')
+      const shrinking = place
+        ?.getAnimations()
+        .some((animation) =>
+          ((animation.effect as KeyframeEffect | null)?.getKeyframes() ?? []).some(
+            (frame) => frame.height === '0px',
+          ),
+        )
+      seen.push(shrinking === true)
+      if (seen.length < 600) requestAnimationFrame(look)
+    }
+    requestAnimationFrame(look)
+  })
+
+  release()
+  await expect(page.locator('.home .intro-place')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Photograph your first receipt' })).toHaveCount(0)
+  expect(
+    await page.evaluate(() =>
+      (window as unknown as { shrinkSeen: boolean[] }).shrinkSeen.some(Boolean),
+    ),
+  ).toBe(true)
+  const after = await page.locator('.home ol').evaluate((list) => list.getBoundingClientRect().top)
+  expect(after).toBeLessThan(before - 100)
+})
+
+// «Add by hand» is the one row of its card, which clips it to its radius: its square ring of the
+// keyboard's focus lost all four corners, where the ghost button before it kept a whole one (MOL-203,
+// adversarial А1). In focus it is rounded as the card, and the ring follows.
+test('the newcomer`s «Add by hand» in focus is rounded as its card at every corner', async ({
+  page,
+}) => {
+  await person(page)
+  await page.goto('/')
+  const row = page.getByRole('button', { name: /^Add by hand/ })
+  await expect(row).toBeVisible()
+
+  await page.keyboard.press('Tab')
+  await row.focus()
+  const look = await row.evaluate((element) => {
+    const style = getComputedStyle(element)
+    return {
+      visible: element.matches(':focus-visible'),
+      outline: style.outlineStyle,
+      corners: [
+        style.borderTopLeftRadius,
+        style.borderTopRightRadius,
+        style.borderBottomRightRadius,
+        style.borderBottomLeftRadius,
+      ],
+    }
+  })
+  expect(look).toEqual({
+    visible: true,
+    outline: 'solid',
+    corners: ['20px', '20px', '20px', '20px'],
+  })
 })
 
 // The commonest break at a shelf: the connection goes while the answer is on its way. It is
@@ -150,10 +394,251 @@ test('a connection lost mid-request is offline, not an error', async ({ page, co
   await expect(
     page.getByRole('heading', { name: 'The list will show up once you are online' }),
   ).toBeVisible()
-  await expect(
-    page.getByText('Verdicts are worked out on the server, there is no local copy'),
-  ).toHaveCount(0)
   await expect(page.locator('[role="alert"]')).toHaveCount(0)
+
+  // The cold offline is not empty (Ф-14, MOL-201): the field is there, and with nothing on the phone
+  // its answer says why — in place of the cloud, never red, the server not asked.
+  const searches: string[] = []
+  page.on('request', (request) => {
+    if (request.url().includes('/api/advice/search')) searches.push(request.url())
+  })
+  await page.getByRole('searchbox', { name: 'Search the catalogue' }).fill('молоко')
+  // Taken from the block, not the live region, which says the same words (e2e rule).
+  const found = page.locator('.state')
+  await expect(found.getByText('No «молоко» found')).toBeVisible()
+  await expect(
+    found.getByText('Without a connection we search only what was rated. The whole catalogue'),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'The list will show up once you are online' }),
+  ).toHaveCount(0)
+  await expect(page.locator('.state.bad')).toHaveCount(0)
+  await expect(
+    page.locator('.dock').getByRole('button', { name: 'Photograph a receipt' }),
+  ).toBeVisible()
+  expect(searches).toEqual([])
+})
+
+// The field stands in one place whatever came (owner's В-2 «а» on review № 1 of MOL-201): the line
+// under the title is held while the answer is on its way and when there is none, so the well, the
+// field in the cold offline and the field over the list stand at one height.
+async function topOf(page: Page, selector: string): Promise<number> {
+  const box = page.locator(selector)
+  await expect(box).toBeVisible()
+  await page.evaluate(() =>
+    Promise.allSettled(document.getAnimations().map((animation) => animation.finished)),
+  )
+  return box.evaluate((element) => element.getBoundingClientRect().top)
+}
+
+test('the field over the list stands where its well stood', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const who = await person(page)
+  await ratedPurchase(who, `Тан ${tag}`, 5)
+  await page.route('**/api/advice', () => new Promise(() => undefined))
+  await page.goto('/')
+  const well = await topOf(page, '.skeleton-field')
+
+  await page.unroute('**/api/advice')
+  await page.goto('/')
+  await expect(page.locator('section.take')).toBeVisible()
+  expect(await topOf(page, '.search-field .well')).toBe(well)
+})
+
+test('the field of the cold offline stands where its well stood', async ({ page, context }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await person(page)
+  // The first answer held and then lost with the connection: nothing is ever kept.
+  let release: () => void = () => undefined
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('**/api/advice', async (route) => {
+    await held
+    await route.abort('internetdisconnected')
+  })
+  await page.goto('/')
+  const well = await topOf(page, '.skeleton-field')
+
+  await context.setOffline(true)
+  release()
+  await expect(
+    page.getByRole('heading', { name: 'The list will show up once you are online' }),
+  ).toBeVisible()
+  expect(await topOf(page, '.search-field .well')).toBe(well)
+})
+
+/** Cold offline: the first answer lost with the connection, the cloud on the screen. */
+async function coldOffline(page: Page, context: BrowserContext): Promise<void> {
+  let release: () => void = () => undefined
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('**/api/advice', async (route) => {
+    await held
+    await route.abort('internetdisconnected')
+  })
+  await page.goto('/')
+  await expect(page.locator('.skeleton')).toBeVisible()
+  await context.setOffline(true)
+  release()
+  await expect(
+    page.getByRole('heading', { name: 'The list will show up once you are online' }),
+  ).toBeVisible()
+  await page.unroute('**/api/advice')
+}
+
+// The connection back without a list: the field being typed in stays under the thumb with what it
+// holds — erased to nothing too, while the focus is in it — and goes once the person left it
+// (owner's В-3 «а» on adversarial А1, В-4 «а» on Б2).
+test('the connection back without a list keeps the field typed in; left empty, it goes', async ({
+  page,
+  context,
+}) => {
+  await person(page)
+  await coldOffline(page, context)
+  const field = page.getByRole('searchbox', { name: 'Search the catalogue' })
+  await field.click()
+  await field.pressSequentially('молоко')
+  await expect(page.locator('.state').getByText('No «молоко» found')).toBeVisible()
+
+  await page.route('**/api/advice', (route) => route.fulfill({ status: 500, body: '{}' }))
+  const searched = page.waitForResponse((response) => response.url().includes('/api/advice/search'))
+  await context.setOffline(false)
+  // The search is asked of the server now, and its answer — whatever the shared catalogue holds —
+  // stands where the phone's «offline» did.
+  await searched
+  await expect(page.getByText('Without a connection we search only what was rated')).toHaveCount(0)
+  await expect(field).toHaveValue('молоко')
+  await expect(field).toBeFocused()
+  await expect(page.getByRole('heading', { name: 'The server did not answer' })).toHaveCount(0)
+
+  // Erased to type another word: the field and the keyboard stay, and «сыр» goes in.
+  // A letter at a time, as on a phone: each step a query of its own, the last one empty.
+  while ((await field.inputValue()) !== '') await page.keyboard.press('Backspace')
+  await expect(field).toHaveValue('')
+  await expect(field).toBeFocused()
+  await page.keyboard.type('сыр')
+  await expect(field).toHaveValue('сыр')
+
+  // «Clear» gives the focus back to the field, which stays; left, the empty field goes.
+  await page.getByRole('button', { name: 'Clear' }).click()
+  await expect(field).toBeFocused()
+  await page.getByRole('heading', { level: 1 }).click()
+  await expect(page.getByRole('heading', { name: 'The server did not answer' })).toBeVisible()
+  await expect(field).toHaveCount(0)
+})
+
+// The empty field held by its focus goes once the tap that took the focus is over: gone on the
+// press, everything under it rose by its height and the release landed elsewhere — the first tap on
+// «Try again» or a step of the cycle did nothing (owner's В-5 «а» on adversarial В1).
+for (const failing of [true, false]) {
+  test(`the field emptied over ${failing ? 'a failure' : 'the newcomer'}: the first tap under it counts`, async ({
+    page,
+    context,
+  }) => {
+    await person(page)
+    await coldOffline(page, context)
+    const field = page.getByRole('searchbox', { name: 'Search the catalogue' })
+    await field.click()
+    await field.pressSequentially('мол')
+    if (failing) {
+      await page.route('**/api/advice', (route) => route.fulfill({ status: 500, body: '{}' }))
+    }
+    const searched = page.waitForResponse((response) =>
+      response.url().includes('/api/advice/search'),
+    )
+    await context.setOffline(false)
+    await searched
+    while ((await field.inputValue()) !== '') await page.keyboard.press('Backspace')
+    await expect(field).toBeFocused()
+
+    // A touch on the pill beside the input — its magnifier — is a touch on the field: it stays,
+    // focused (adversarial Г1: the focus went to <body>, and the field with it).
+    await page.locator('.search-field .well > .glyph').tap()
+    await page.waitForTimeout(300)
+    await expect(field).toBeFocused()
+
+    if (failing) {
+      const retry = page.locator('.state').getByRole('button', { name: 'Try again' })
+      await expect(retry).toBeVisible()
+      const asked = page.waitForRequest(
+        (request) => new URL(request.url()).pathname === '/api/advice',
+      )
+      await retry.tap()
+      await asked
+    } else {
+      const step = page.locator('.home').getByRole('button').first()
+      await expect(step).toBeVisible()
+      await step.tap()
+      await expect.poll(() => new URL(page.url()).pathname).not.toBe('/')
+    }
+    await expect(field).toHaveCount(0)
+  })
+}
+
+// 1l-0: where no receipt is read, the cold offline records purchases from the strip (Ф-14).
+test('the cold offline without receipts offers «Record purchases» below, never red', async ({
+  page,
+  context,
+}) => {
+  const who = await person(page)
+  const previous = settingsOf(actorCodec.parse(await who.call('GET', '/actors/me')))
+  await who.call('PUT', '/actors/me/settings', {
+    previous,
+    settings: { ...previous, country: 'GE', city: 'Тбилиси' },
+  })
+  await coldOffline(page, context)
+
+  await expect(page.getByRole('searchbox', { name: 'Search the catalogue' })).toBeVisible()
+  const dock = page.locator('.dock')
+  await expect(dock.getByRole('button', { name: 'Record purchases' })).toBeVisible()
+  await expect(dock.getByRole('button', { name: 'Photograph a receipt' })).toHaveCount(0)
+  await expect(page.locator('.state.bad')).toHaveCount(0)
+  await expect(page.locator('[role="alert"]')).toHaveCount(0)
+})
+
+// A list remembered is dated by one strip under the field (MOL-201, Ф-14): offline the cloud and
+// nothing to press, the server silent its circle and the one «Try again» of the screen; never red.
+test('a list remembered: one strip under the field, offline and with the server silent', async ({
+  page,
+  context,
+}) => {
+  const who = await person(page)
+  const name = `Мацун ${tag}`
+  await ratedPurchase(who, name, 5)
+  await page.goto('/')
+  const row = page.locator('section.take').getByText(name)
+  await expect(row).toBeVisible()
+  const tabs = page.locator('.tabbar')
+  const field = page.getByRole('searchbox', { name: 'Search the catalogue' })
+  const strip = page.locator('.strip')
+
+  // Back on the screen with no connection: the list the phone kept, and its age.
+  await context.setOffline(true)
+  await tabs.getByRole('link', { name: 'Purchases' }).click()
+  await tabs.getByRole('link', { name: 'What to buy' }).click()
+  await expect(row).toBeVisible()
+  await expect(strip).toHaveCount(1)
+  await expect(strip).toHaveText(/^Offline · the list as of today, /)
+  await expect(strip.getByRole('button')).toHaveCount(0)
+  await expect(page.locator('[role="alert"]')).toHaveCount(0)
+  const fieldBox = await field.boundingBox()
+  const stripBox = await strip.boundingBox()
+  expect(stripBox?.y ?? 0).toBeGreaterThan((fieldBox?.y ?? 0) + (fieldBox?.height ?? 0))
+
+  // Back online, and the server does not answer: the same place, its own words and «Try again».
+  await page.route('**/api/advice', (route) => route.fulfill({ status: 500, body: '{}' }))
+  await context.setOffline(false)
+  await expect(strip).toHaveText(/^The server did not answer — the list as of today, /)
+  await expect(strip).toHaveCount(1)
+  await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(1)
+  await expect(row).toBeVisible()
+
+  await page.unroute('**/api/advice')
+  await strip.getByRole('button', { name: 'Try again' }).click()
+  await expect(strip).toHaveCount(0)
+  await expect(row).toBeVisible()
 })
 
 // Loading is drawn as the content that is coming, and says so to a screen reader. The answer
@@ -271,11 +756,33 @@ test('a mis-tapped verdict is amended where it is met, and withdrawn from there 
   // The sheet takes no tap until it has come up: the second tap of a double tap must not
   // press anything inside it (MOL-18).
   await openSheet(page)
+  const sheet = page.locator('dialog[open]')
+
+  // The score as it stands, said and chosen (MOL-202, Ф-25).
+  await expect(sheet.getByText('Your rating: 1')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Rating 1 out of 5' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  // Not now, with its words and in full colour — the kit's look in a real engine, no opacity (Ф-6).
+  const unchanged = sheet.getByRole('button', { name: 'Nothing has changed' })
+  await expect(unchanged).toHaveAttribute('aria-disabled', 'true')
+  await expect(unchanged).toHaveCSS('opacity', '1')
+  const amended: string[] = []
+  page.on('request', (request) => {
+    if (request.method() === 'PATCH') amended.push(request.url())
+  })
+  // Forced past Playwright's own check, which takes `aria-disabled` for disabled: a tap lands.
+  await unchanged.click({ force: true })
+  await expect(sheet).toBeVisible()
+
   await page.getByRole('button', { name: 'Rating 5 out of 5' }).click()
   await page.getByRole('button', { name: 'Save the rating' }).click()
 
   await expect(page.locator('section.take').getByText(name)).toBeVisible()
   await expect(page.locator('section.never')).toHaveCount(0)
+  // One amendment, the save's: the tap on «Nothing has changed» sent none.
+  expect(amended).toHaveLength(1)
 
   // Withdrawn, it leaves the screen altogether — and the purchase goes back to «Ratings».
   await page.locator('section.take').getByRole('button').first().click()

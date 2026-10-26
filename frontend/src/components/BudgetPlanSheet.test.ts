@@ -94,3 +94,32 @@ describe('BudgetPlanSheet at work (MOL-225)', () => {
     expect(remove.getAttribute('aria-disabled')).toBe('true')
   })
 })
+
+describe('BudgetPlanSheet without a connection (MOL-192)', () => {
+  // A plan is written with a connection only (Р-8 of MOL-117): the sheet says so in the kit's line,
+  // and its buttons are not now — in the focus order, saying why (Ф-6) — never a native `disabled`.
+  it('says it in one line, and both buttons are not now in their own words', async () => {
+    const save = vi.fn<() => Promise<MoneyBudgetView>>()
+    const view = await render(save, false)
+    const strips = document.querySelectorAll('dialog[open] .strip')
+    expect(strips).toHaveLength(1)
+    expect(strips[0]?.classList.contains('offline')).toBe(true)
+    expect(strips[0]?.textContent).toContain(en.budget.sheet.offline)
+
+    for (const word of [en.budget.sheet.save_offline, en.budget.sheet.remove_offline]) {
+      const one = button(word)
+      expect(one.disabled).toBe(false)
+      expect(one.getAttribute('aria-disabled')).toBe('true')
+      one.focus()
+      expect(document.activeElement).toBe(one)
+      one.click()
+    }
+    await flushPromises()
+    expect(save).not.toHaveBeenCalled()
+
+    await view.setProps({ online: true })
+    expect(document.querySelector('dialog[open] .strip')).toBeNull()
+    expect(button(en.budget.sheet.save).getAttribute('aria-disabled')).toBeNull()
+    expect(button(en.budget.sheet.remove).getAttribute('aria-disabled')).toBeNull()
+  })
+})

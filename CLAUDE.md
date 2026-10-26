@@ -226,7 +226,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   unit» of most purchases first, the other pairs' places after it, never compared (MOL-166); order
   by rating down, then name.
 - **The limit never cuts one's own rows or the warnings** (Р-23, Р-25:
-  `ADVICE_WARNINGS_RESERVED`); the server names no superlative; every row carries `isMine`.
+  `ADVICE_WARNINGS_RESERVED`); the server names no superlative; every row carries `isMine` and the
+  person's own score, `ownScore`, in both modes — `null` on anyone else's (MOL-202).
 - **A withdrawn verdict is still a row** (MOL-27): the gate counts every row, and so does the
   reminder, which skips a purchase made before the withdrawal (MOL-101) — so the row outlives
   «Учитывать меня в статистике» off (MOL-97, В1); **every other reader filters
@@ -237,7 +238,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   before.
 - **The search on «Что брать» is answered by the server** (`GET /advice/search`, MOL-128): the
   list's own statement and rules for what is found, never glued on the phone; it writes no visit and
-  no pick; offline — the remembered list by the start of words.
+  no pick; offline — the remembered list by the start of words, and with none remembered the field
+  stays and says so (MOL-201).
 - **«Тут дешевле» is one's own history only** (`GET /advice/prices`, MOL-92): a place's last price,
   the record's city, «не брать нигде» with no price; another item of the kind (`kindKey`) when
   cheaper and rated no worse; it writes nothing; offline — the answer remembered, let go by a verdict.
@@ -533,9 +535,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   never not now** (MOL-225): `busy` with its `busy-label` («Удаляем…») in the action's look,
   `disabled` or not, as wide as the wider word; no spinner, and the linter refuses `busy` without it.
 - **A row is `ListRow` or `NavRow`, a caps caption `SectionCaption` — caps nowhere else, the linter
-  holds it** (MOL-175): the chevron is «opens something to go on with» — a screen or a sheet with
-  fields (В-14) — never on a row that acts or asks to confirm, never mixed in one card; a caption's
-  place is in `:where()`, the screen's class sets the space above it. **An operation is
+  holds it** (MOL-175): the chevron is «opens something to go on with» — a screen, a sheet with
+  fields or a fork on the way to them (В-14, MOL-203) — never on a row that acts or asks to confirm,
+  never mixed in one card; a caption's place is in `:where()`, the screen's class sets the space above
+  it. **An operation is
   `OperationRow`** (MOL-176): its words come from `journalRowProps` and `operationRowProps`, never
   from the row; the chevron on every one, the amounts in one column, never coloured, never cut — a row
   narrower than 22rem stands its amount under the words. **A search is `SearchField`** (MOL-177): a
@@ -547,8 +550,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   circle with its icon, attention a triangle; a full error's buttons stand in the strip, a
   section's error is the quiet card** (MOL-180): a screen whose strip works with the server down
   draws its error `inline`. **The connection is one `StatusStrip` a screen, in its words** (MOL-181):
-  offline or «сервер не ответил», «Повторить» only in the latter, a failed retry said again
-  (`attempt`); it speaks through the live region — while a sheet is up, its own, and what a block in
+  offline, «сервер не ответил» or «обновляем» once an answer is late (MOL-201), «Повторить» only in
+  the second, a failed retry said again (`attempt`); it speaks through the live region — while a sheet is up, its own, and what a block in
   a closed sheet holds is said at the opening. **The skeleton is the
   answer's shape** (MOL-178): the kit's `SkeletonPart`s in its slot, roots named `skeleton-*` and never a
   class of a screen (a test holds it), bars only `skeleton-bar` — breathing by their own opacity from
@@ -597,7 +600,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   and no disk. The API holds the queue, the photos and the parse, one receipt at a time.
 - **A model's answer goes through the parse's own gate** (MOL-272): `receiptTextOfModel` into
   `ReceiptText`, then `verifiedReading(text, { byModel: true })` — every number as printed, the layout and
-  the total our code's by the card's words, never the model's.
+  the total our code's by the card's words, never the model's; a figure in any spelling it writes it, a
+  discount's minus its size, and the log counts what was not read (`unparsed`, MOL-294).
 - **The parse is MOL-114's prototype, measured on the bench** (`receipt-text.ts`, `score.mjs`): a rule
   changed is run on the bench's truth before and after; amounts in hundredths, never floats.
 - **A country's words are its card's, never a literal of the parse** (MOL-247, `receipt-card.ts`): currency,
@@ -626,6 +630,13 @@ that are easiest to break; the file holds every rule of the area and the reason 
   again as printed, a table too — two places shown included (В-2 «а»). Read in one place it is
   `read_total_minor`, what «Прочитали не всё» measures by alone, sent only to a phone that asks
   (`RECEIPT_READ_TOTAL_HEADER`).
+- **A card that sends its discount to the card** (MOL-289): the lines meet «Ընդամենը» less «Զեղչ գործարքից»
+  (`linesTotalOf`), its second place «ԱԱՀ-ով հարկվող»; the total shown is what left the card, and the trip's money that
+  less a bonus spent (`receiptPaidOf`); a model's reading only. «Ընդամենը ամվա սկզբից» is never a total (MOL-288).
+- **A model's line is put right by the font's 5↔6 only with the whole receipt** (MOL-290): two swaps a figure, the
+  card's rate, a line's fewest swaps giving one sum the total confirms, never chooses — but a luma of the sum (А1, Б2,
+  Г1 «а»), every line read whole as copied, a cashback vouched for (Б1 «а»); shown «проверьте», never as read
+  (`repaired`), empty to an earlier build, no shelf price for the memory; the model is never asked to do the sum.
 - **The reader away leaves a receipt queued; a photo it drops goes to the end with its attempt
   counted; a photo it cannot read fails** — never lost, never read forever; people read in turn.
 - **The class code is a boundary, not a layout** (MOL-226): «Դաս. 56.10» opens an item on any fiscal till,
@@ -637,14 +648,32 @@ that are easiest to break; the file holds every rule of the area and the reason 
   28 days after recording, of a line recorded as read only** (В-3, В-4); **photos never enter the
   nightly copy** (В-2), never the log. **A recorded receipt goes with its trip, a line with its
   purchase, a line not recorded at «Записать»** (MOL-240): by the keys, never a timer.
+- **A line's purchase is the till's pieces times the package its name prints** (MOL-264): `receiptPack` — the till's
+  figures, arithmetic, total and memory stay in its pieces; a package not read for sure is none (a 6 off a photo, a unit
+  not glued on a photo, a range, a fraction, another count beside it, a Latin «h» beside a size, a thickness, two sizes); a
+  pack of pieces wins over litres; sent by `RECEIPT_PACK_HEADER`; `make repack` once, right after the rollout.
 - **A line finds its item: the shop's memory by article, by the line, the country's names with the
   heading, the search by the gloss, else new** (MOL-126); names and search once in the queue, the memory
   on every reading. The matcher is MOL-114's `dict-match.mjs`, held to the bench.
+- **An item stands on a line only by its kind and its brand** (MOL-293): a seed's till name only where it says
+  the line's kind (`seedNameFits`) — inflected, or a letter lost of a word no dictionary has, never a common start;
+  any other item by `lineFitter` — every word of its name the line's by a Russian form or by its letters, never a
+  common start, every figure with its unit, the line's brand in it (the seed's items are kinds), its name the line's
+  kind — or all of it that brand; two things side by side, both; a heading's item it rules out is none. Else a new
+  item named in full, «проверьте» on the wire too — a word spelt in letters taken away by one press (`spelled`). A
+  dictionary's word is read exactly, never one edit off.
 - **The shops' memory is shared** (owner, 30.09.2026): the person's own word first, else the item most
   people said, the later on a tie; the erased still count; nobody's word is shown as someone's, and
   another person's shelf price only with access and from three prices, their lower median. **A person's word
   is what their last line still there says** (MOL-240): settled on every path that deletes a purchase,
   under the person's lock, and whole once the API listens — never on its way there.
+- **The shop's memory votes in a line's digits, weaker than the total** (MOL-291): asked at reading by the tax number
+  and the articles, the person's own price, else from three with no access (В-1 «в»); it vouches for the price alone,
+  one the reader may have confused — a line as printed it confirms, one that does not hold it puts right under
+  «проверьте» with **the sum as read** — never where the reader's swaps explain it at another price (Tesseract's other figures as
+  printed, to the hundredth) — one as printed 5↔6 off the person's own price it empties (В-2 «б»); the total settles
+  it: it vouches for a doubt, takes a sum changed only where the paper as read does not meet it too, refutes, and goes
+  first, the memory choosing no reading of its; put right and recorded as shown, the price stays in the word (В-3 «а»).
 - **A place keeps no tax number**: the place of a seller is where its receipts were recorded, read as
   the memory is; a recorded receipt is not removed while its trip is there — its row dates the trip.
 - **On the phone (MOL-127) a receipt is the country's version, never a flag** (Р-1); its photo is
@@ -681,6 +710,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   MOL-174, MOL-175, MOL-180); a test it cannot run says why.
 - **Words said out loud are taken by a locator outside the live region**, never muted with
   `.first()`.
+- **A motion measured frame by frame is measured by the frame's time, never between two drawn frames**
+  (MOL-292): a runner drops frames, and the next one drawn holds their way.
 
 ### Deployment — `.claude/rules/deploy.md`
 
@@ -1023,6 +1054,10 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
   (`@molvia/model/testing/clock`); `bin/check-clock-bounds.mjs` in `npm run lint` refuses the other
   spellings it knows, found by parsing; under `vi.useFakeTimers()` a bound is held as real too, so a test
   there bounds the time it moves the timers by, never a clock. Why ten, how a bound is judged, how CI holds it and its prices —
+  `.claude/rules/testing.md`.
+- **The PWA's tests run in `frontend/testing/page-environment.ts`** (MOL-286): happy-dom whose timers are
+  cleared as its window is taken down — vitest leaves Node's own, which outlived the file and fired into a
+  worker with no `window`; a test file names no environment but `node`. Why and its price —
   `.claude/rules/testing.md`.
 - **Maximize corner cases.** Mandatory checklist:
   - NULL / legacy — the field is empty but the entity still falls under the rule

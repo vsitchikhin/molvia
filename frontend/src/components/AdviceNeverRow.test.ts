@@ -12,6 +12,7 @@ function row(review: string | null): NeverRow {
   return {
     level: 'never',
     isMine: true,
+    ownScore: 1,
     itemId: 'cccccccc-0000-4000-8000-000000000003',
     name: 'Колбаса «Молочная»',
     rating: '1.4',

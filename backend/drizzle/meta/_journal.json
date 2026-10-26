@@ -477,6 +477,34 @@
       "when": 1792497630013,
       "tag": "0067_model_receipt_days",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1792576257615,
+      "tag": "0068_receipt_cashback_repaired",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1792606765608,
+      "tag": "0069_receipt_line_spelled",
+      "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1792667356252,
+      "tag": "0070_receipt_line_remembered",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1792680632713,
+      "tag": "0071_spending_category_icon",
+      "breakpoints": true
     }
   ]
 }

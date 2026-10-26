@@ -5,9 +5,13 @@ import {
   addMoney,
   geographyAllowed,
   latestDay,
+  linePack,
+  linesTotalOf,
   nameIdentity,
+  packedQuantity,
   receiptDigits,
   receiptMomentOf,
+  receiptPaidOf,
   recordedSums,
   settingsCityOf,
   storeMemoryWords,
@@ -16,6 +20,7 @@ import {
 import type {
   Actor,
   Money,
+  ReceiptCountry,
   ReceiptRecordBody,
   ReceiptRecorded,
   ReceiptSettled,
@@ -39,18 +44,49 @@ const sameQuantity = (a: StoredReceiptLine['quantity'], b: StoredReceiptLine['qu
   a === null || b === null ? a === b : a.milli === b.milli && a.unit === b.unit
 
 /**
+ * The quantity the review showed a line at: the purchase its package makes (MOL-264) — or the till's pieces, which a
+ * phone of an earlier build shows, knowing no package (Р-10). Neither is an edit.
+ */
+function shownQuantity(stored: StoredReceiptLine, line: RecordedLine, country: ReceiptCountry) {
+  return (
+    sameQuantity(line.quantity, stored.quantity) ||
+    sameQuantity(line.quantity, packedQuantity(stored.quantity, linePack(stored, country)))
+  )
+}
+
+/**
  * A line recorded as it was read (В-4): it added up, and the person changed neither its quantity nor
  * what was paid. Its cut-out rows keep the text read as their confirmed text; its shelf price is what
  * the memory keeps. A line that added up has no price only where the check took it off as misread
  * (MOL-255): its row would teach the reader that misreading, so it is not read as printed.
  */
-function asRead(stored: StoredReceiptLine, line: RecordedLine): boolean {
+function asRead(stored: StoredReceiptLine, line: RecordedLine, country: ReceiptCountry): boolean {
+  // put right by the font's swaps, it was not read so: no shelf price for the memory (MOL-290, Р-7)
+  return asShown(stored, line, country) && stored.repaired !== true
+}
+
+/** A line recorded as the review showed it: it added up, and neither its quantity nor its sum was changed. */
+function asShown(stored: StoredReceiptLine, line: RecordedLine, country: ReceiptCountry): boolean {
   return (
     stored.settled &&
     stored.price !== null &&
-    sameQuantity(line.quantity, stored.quantity) &&
+    shownQuantity(stored, line, country) &&
     sameMoney(line.amount, stored.sum)
   )
+}
+
+/**
+ * Whether the person's word keeps the line's shelf price: a line recorded as read — or one the shop's memory put
+ * right and the person recorded as shown (MOL-291, owner's В-3 «а»): its price is the remembered one, and a word
+ * with none would leave the memory silent on every other receipt. Its cut-out rows are not confirmed, all the same:
+ * they hold the misread.
+ */
+function keepsPrice(
+  stored: StoredReceiptLine,
+  line: RecordedLine,
+  country: ReceiptCountry,
+): boolean {
+  return asRead(stored, line, country) || (stored.remembered && asShown(stored, line, country))
 }
 
 /**
@@ -68,6 +104,7 @@ function editsOf(
   stored: readonly StoredReceiptLine[],
   shown: ShownLines,
   total: Money | null,
+  country: ReceiptCountry,
 ): ReceiptEdits {
   const recorded = new Set(
     body.lines
@@ -90,7 +127,7 @@ function editsOf(
       const was = shown.itemIds[line.position] ?? null
       if ('id' in line.item ? line.item.id !== was : was !== null) item.add(line.position)
       if (
-        !sameQuantity(line.quantity, read.quantity) ||
+        !shownQuantity(read, line, country) ||
         !sameMoney(line.amount, shown.amounts[line.position] ?? null)
       ) {
         figures.add(line.position)
@@ -110,19 +147,37 @@ function editsOf(
 }
 
 /**
- * The money of the trip (MOL-126 Т-10, В-3; В-5 of the review): the total the phone sent — the printed
- * one, or the person's correction of what OCR misread; without it the printed total where it is not
- * below the lines — what was paid, the lines left out and those OCR lost included, while a lost line
+ * The body with the total the phone sent read as the paper's (MOL-289, review round 2, №5): a build before it is
+ * shown the lines' total for the receipt's — the total less what went to the card — and sends exactly that back
+ * when «Итог» is opened and saved as it was. That echo is the printed total, neither the trip's money nor a
+ * correction; anything else it sends is the person's own word.
+ */
+function echoed(held: ReceiptToRecord, body: ReceiptRecordBody): ReceiptRecordBody {
+  const { total, cashback } = held
+  if (body.total === undefined || total === null || cashback === null || cashback.minor <= 0n)
+    return body
+  return sameMoney(body.total, linesTotalOf(total, cashback)) ? { ...body, total } : body
+}
+
+/**
+ * The money of the trip: the receipt's total (`receiptTotal`), less the card's bonus it was partly paid
+ * with (MOL-289).
+ */
+function receiptMoney(held: ReceiptToRecord, body: ReceiptRecordBody): Money | null {
+  return receiptPaidOf(receiptTotal(held, body), held.redeemed)
+}
+
+/**
+ * The receipt's total for its trip (MOL-126 Т-10, В-3; В-5 of the review): the total the phone sent — the
+ * printed one, or the person's correction of what OCR misread; without it the printed total where it is
+ * not below the lines — what was paid, the lines left out and those OCR lost included, while a lost line
  * only ever raises a total, so one below the lines was misread — else the sum of every line: a recorded
- * one at what the person settled on, one left out at what it would have been recorded at (В-5). `null`
+ * one at what the person settled on, one left out at what it would have been recorded at (В-5), and what a card
+ * sent to the card (MOL-289). `null`
  * when nothing is known: the trip then counts its prices (MOL-78).
  */
-function receiptMoney(
-  printed: Money | null,
-  stored: readonly StoredReceiptLine[],
-  body: ReceiptRecordBody,
-  currency: Money['currency'],
-): Money | null {
+function receiptTotal(held: ReceiptToRecord, body: ReceiptRecordBody): Money | null {
+  const { total: printed, lines: stored, currency } = held
   if (body.total !== undefined) {
     // the receipt's currency is printed on it: a total in another is the phone's mistake (Р2-В2)
     if (body.total.currency !== currency) throw new DomainError(ERROR.CURRENCY_MISMATCH)
@@ -132,7 +187,8 @@ function receiptMoney(
     printed,
     ...stored.flatMap((line) => [line.price, line.sum, line.discount]),
   ])
-  const left = recordedSums(stored, printed, digits)
+  // the lines make the total less what a card sent to the card (MOL-289)
+  const left = recordedSums(stored, linesTotalOf(printed, held.cashback), digits)
   let sum: Money | null = { minor: 0n, currency }
   for (const line of body.lines) {
     const amount = line.skip ? (left[line.position] ?? null) : line.amount
@@ -144,7 +200,13 @@ function receiptMoney(
   if (printed !== null && printed.minor > 0n && (lines === null || printed.minor >= lines.minor)) {
     return printed
   }
-  return lines
+  // what a card sent to the card left it too: the lines and it, where no total was vouched for (review round 1,
+  // А3; owner's В-5 «а» of MOL-289 — «записывать, сколько списалось»). A total vouched for below the lines — a
+  // till that takes the discount off on the spot among them — is the lines alone, as before (review round 2, Б4)
+  const { cashback } = held
+  return lines === null || printed !== null || cashback?.currency !== lines.currency
+    ? lines
+    : addMoney(lines, cashback)
 }
 
 /**
@@ -161,7 +223,7 @@ export async function recordReceipt(
   transact: Transact,
   actor: Actor & Today,
   id: string,
-  body: ReceiptRecordBody,
+  sent: ReceiptRecordBody,
   now: Date = new Date(),
 ): Promise<ReceiptRecorded> {
   return transact(async (repositories) => {
@@ -171,6 +233,7 @@ export async function recordReceipt(
     await trips.lockOwner(actor.id)
     const held = await receipts.lockForRecord(actor.id, id)
     if (held === null) throw new DomainError(ERROR.NOT_FOUND)
+    const body = echoed(held, sent)
     const answer = async (tripId: string): Promise<ReceiptRecorded> => {
       const found = await receipts.one(actor.id, held.id)
       if (found === null) throw new DomainError(ERROR.NOT_FOUND)
@@ -232,14 +295,14 @@ export async function recordReceipt(
       actor.id,
       held.tin,
       held.lines,
-      body.total ?? held.total,
+      linesTotalOf(body.total ?? held.total, held.cashback),
       held.currency,
     )
 
     const recorded = body.lines
       .filter((line): line is RecordedLine => !line.skip)
       .sort((a, b) => a.position - b.position)
-    const money = receiptMoney(held.total, held.lines, body, held.currency)
+    const money = receiptMoney(held, body)
     // a trip with no money and no purchase is an empty row of «Деньги»: a receipt with no items needs
     // its total, read or typed (MOL-227, Р-4)
     if (money === null && recorded.length === 0) {
@@ -287,8 +350,19 @@ export async function recordReceipt(
       return keyA < keyB ? -1 : keyA > keyB ? 1 : a < b ? -1 : a > b ? 1 : 0
     })
     for (const [identity, { name, line }] of toCreate) {
+      // what one package holds is what the next purchase typed by hand is offered (MOL-264): «1,5 л», never the
+      // two bottles of this one; a quantity the person put in another unit says nothing of it
+      const stored = held.lines[line.position]
+      const pack = stored === undefined ? null : linePack(stored, held.country)
+      const unit = line.quantity?.unit ?? 'piece'
       const proposal = await items.createUnlessNamed(
-        { kind: 'product', name, barcodes: [], defaultUnit: line.quantity?.unit ?? 'piece' },
+        {
+          kind: 'product',
+          name,
+          barcodes: [],
+          defaultUnit: unit,
+          ...(pack !== null && pack.unit === unit ? { typicalQuantity: pack } : {}),
+        },
         actor.id,
       )
       // the item is made with no codes, so none of them can be another item's
@@ -299,6 +373,7 @@ export async function recordReceipt(
     const written: { position: number; expenseId: string }[] = []
     const words: MemoryWord[] = []
     const confirmed: number[] = []
+    const priced: number[] = []
     const asked = new Set(body.barcodes ?? [])
     const itemOf = (line: RecordedLine) =>
       'id' in line.item ? line.item.id : newItems.get(nameIdentity(line.item.name))
@@ -328,10 +403,11 @@ export async function recordReceipt(
         ...(line.amount === null ? {} : { amount: line.amount }),
       })
       written.push({ position: line.position, expenseId: expense.id })
-      const read = asRead(stored, line)
-      if (read) confirmed.push(line.position)
+      if (asRead(stored, line, held.country)) confirmed.push(line.position)
+      const kept = keepsPrice(stored, line, held.country)
+      if (kept) priced.push(line.position)
       for (const word of storeMemoryWords(stored)) {
-        words.push({ ...word, itemId, price: read ? stored.price : null })
+        words.push({ ...word, itemId, price: kept ? stored.price : null })
       }
     }
     // in the order of the codes: each code's lock is held to the end of the record (adversarial А1)
@@ -351,7 +427,8 @@ export async function recordReceipt(
       tripId: trip.id,
       expenses: written,
       confirmed,
-      edits: editsOf(body, held.lines, shown, held.total),
+      priced,
+      edits: editsOf(body, held.lines, shown, held.total, held.country),
       // a receipt from the tax office in a table of its own, its lines being no reading (MOL-234)
       source: held.source,
       codesWritten: codes.filter((one) => one.outcome === 'written').length,

@@ -185,6 +185,17 @@ neither it is «переснимите». Then **the one check, `verifiedReading
 everything after it is Tesseract's path: `readPartly`, the lines' items, the wire. No line is cut out for
 training (Р-4): there are no boxes.
 
+**A figure is read in every spelling the model writes it** (MOL-294): thousands grouped by a space, a no-break or a
+narrow one («1 000,00»), a comma for the point where it is the only one and no point stands («0,50»), and a minus
+before a line's or the summary's discount — its size. A minus before a quantity, a price, a sum or a total is no
+figure: a negative total is a refund, never a purchase. The answer is put in that one form at the door of
+`receiptTextOfModel`, so the repair of the font's swaps and the total read what the lines read. **Why**: production's
+36f99484 came with 39 lines, the total, and not one figure in a line, «Прочитали не всё» silent — exactly what every
+line's discount written «-0.50» gives: no line holds its arithmetic, the check empties all of them, and the sums as read
+still meet the total. The answer is not kept (Т-8), so the spelling is not proven; on the bench no line's figure ever
+came signed. **So the log of a reading counts what was not read** (`unparsed`, a number, never the figures): the next
+such receipt shows in the log, not by a guess.
+
 **`byModel` widens one rule, and only for the model**: a line of one piece with no discount whose price is
 within the card's rounding of its sum is «one number printed twice» — kept only on a receipt proven whole.
 The model names the columns itself, and «389,99 390» holds either way round (lit-9295 of the bench);
@@ -252,8 +263,18 @@ and the next one «recorded before»: copying, it moves a label too, mostly onto
 **never a number the rows print under another label too** (adversarial А6, round 4) — the shop's tax number,
 the till's «ԳՀ» moved under «Ֆիսկալ»: a constant of the till, every receipt after the first «recorded
 before»; no barcode, no «ՖՀ». The tax number keeps no such guard — it is a constant anyway, and the bench's
-one number under two labels was the tax number under «ՀՎՀՀ» and «ՀԴՄ» both, right. Anything else is no key,
-and the receipt is held by its id alone. **The rows have no ceiling**: they give only the key, and a bank slip
+one number under two labels was the tax number under «ՀՎՀՀ» and «ՀԴՄ» both, right. **Two fiscal numbers are the key as a pair** (MOL-293, owner's В-3 «а»): «Ереван Сити» prints a prepayment slip of
+the card's cashback over the receipt, with a fiscal number of its own, so every receipt of the owner's shop with the
+card was keyless and could be recorded twice. The pair, in ascending order («34408642+58899619»), does not care which
+the model copied first; each number is still held to its own label (А6), and three are none. On the bench (v5) two
+readings by the model gave one key on 24 receipts against 21. **The price, named:** a reading that caught one of the
+two is another key than one that caught both (am-13) — as one paper read twice may be two keys anyway. Anything else
+is no key, and the receipt is held by its id alone. **The tax number stays the model's to copy, and v6 was measured
+and not taken** (MOL-293): asked never to leave «ՀՎՀՀ» out and to copy every label letter by letter — the model had
+written «ՀԿՀ:01282006» and «ՀԴՄ:01282006» for it on am-44 — three runs against three of v5 on the same photos gave
+the tax number right 41, 34, 33 of 46 against 29, 30, 33, and the lines' fields 777, 803, 770 right, 3, 7, 1 made up
+against 801, 833, 827 and 0, 4, 1: every run of it below the worst of v5. A line misread is worse than a tax number
+missing, so v5 stays; the shop's memory of a model's receipt with no tax number is the price. **The rows have no ceiling**: they give only the key, and a bank slip
 under the receipt, a row too many, threw the paid reading away (adversarial А7); the output's cap bounds them.
 On the bench (v5, two runs): the tax number 32 right, 3 wrong, 11 none — against 40 wrong of 94 in v4; two
 readings by the model give one key on 21 receipts and two on none (v4: 23 and 11); the model and Tesseract one
@@ -265,7 +286,8 @@ two receipts of that till. Each part is seen apart: it moved the till's number u
 in 6 answers of 108 — «ՀՎՀՀ» five times, «ՖՍ» once — and lost the fiscal number's label in 3; together, never.
 
 **The log carries counts** (Т-8): who read (`reader`), what it cost and the tokens in and out, why the model
-was passed and what an answer not taken cost (review №6) — never its answer, a line or a tax number. **The
+was passed and what an answer not taken cost (review №6), how many of its figures no rule read (`unparsed`,
+MOL-294) — never its answer, a line or a tax number. **The
 measure of 0.2 is the reader's** (В-6 «а»): a receipt the model read counts in `model_receipt_days` — read and
 recorded alike, by its `reader_version` — a table of its own for MOL-234's reason, and `make gates` prints its
 block under Tesseract's, with the same stop. A receipt that failed for its attempts has no reader and counts
@@ -381,6 +403,98 @@ nothing — a new item named by the gloss. The answer's `match` is the handoff's
 person's one action is to check and correct — and `weak` is a search found far (`near = false`, MOL-124
 В-4) or an item chosen by the heading alone.
 
+**An item stands on a line only by the line's kind and brand** (MOL-293, owner's В-1 «а», 21.10.2026). The first
+receipt the model read on production (b8a76f31, «Ереван Сити», 39 lines) bound 7 lines to another thing altogether
+and 4 to another brand or sort — a strawberry yoghurt «Клубника», a pizza base «Пицца», crab chips «Креветки», a
+Fanta «Лимонад» — all of them sure, and «Записать» recorded them: «в 10 раз хуже, чем если бы они не распознались».
+Both the names and the search took an item when **any** word of its name stood in the line, so a word of a flavour
+or a filling found the fruit. The line's **kind** is its head word before the brand, past adjectives, participles and
+the genitive (`receiptLineParts`; «խորոված», a shashlik, is a noun of an adjective's ending; «հող», soil, too short for
+a participle) — the genitive of a noun in «-ի» too, in «-ու» («ազնվամորու մուրաբա» is raspberry jam, never raspberries),
+and the few in «-ան» the dictionary holds («ձկան»), behind any other word, since a nominative ends so too («կատու»,
+«չորաթթու»; review 2, №2). A capital past the first word on a line of small letters is a name — a sort or a brand
+printed bare — and the kind only where nothing else is: «Լեզու տավարի Արցախ» is a tongue (adversarial Г3). A capital
+says so only with small letters after it, on a line the till printed a small first letter in, a unit's included:
+«Բանան Սաբրոսթար կգ» is a sort, while in «Ազնվամորու Մուրաբա», every word a capital, it says nothing (review 5, №1);
+the kind's choice counts no unit, «Ազնվամորու Մուրաբա կգ» is jam (review 6, №1). Then:
+
+- **A name of the seed in the till's language stands only where it says the kind** (`seedNameFits`), the seed's own
+  word against the printed one — «Ատամի պաստա» is «Паста зубная» by the seed's name, which the dictionary's Russian
+  need not cover — and never on a branded line: the seed names no brand. Judged by the Russian name instead, the
+  first round turned 333 of the seed's 2 000 till names away from their own items and 163 onto others' (adversarial
+  А1, А2); now all 2 000 bind as master bound them. The words are the same, one inflected past the other («կոնֆետներ»,
+  «հրուշակեղեն»), or — a printed word the dictionary has not, from four letters — the seed's with **one letter lost**,
+  as Tesseract and the model lose one: «Կոլասա» is «կոլբասա». Exact alone, the first fix of round 1 left 228 of the
+  seed's 1 523 names with a letter dropped on their own items, master 1 296; now 1 386, and not one master put on its
+  own is on another (adversarial Б4). **Never a common start** — «Տուշ», mascara, was «Тушёнка», «Թել», a thread,
+  «Вермишель», «Դեղ», a medicine, «Персики» (Б3) — **nor a letter misread**: «Ռոլիկ», a roller, is no «լոլիկ».
+- **Two things side by side, neither in a case, do not say which is the kind** (adversarial Б1): a till prints the
+  kind first («Պանիր չեդդեր»), Armenian the head last («Ելակ յոգուրտ», a strawberry yoghurt), so an item — and a
+  seed's name — stands only where it says both. A quality the dictionary glosses as one («միջին», средний) is no
+  thing; a gloss with a thing in it is one, «պաստեղ» — «пастила фруктовая» (В2). **A word the dictionary has not is a
+  thing too** — a dessert or a drink of loans, «Ելակ սմուզի», «Խնձոր շտրուդել», «Ելակ Smoothie» (В1) — said by its
+  letters («Смузи»), and «-ի», «-ու» are a case only of a word the dictionary has, since a loan ends so; a name only
+  where an Armenian capital says so on a line of small letters, «Բանան Սաբրոսթար», a sort; a standard or a size in
+  Latin is no thing, «Կաթ UHT 3.2%», «Մարտկոց AA», «Լամպ LED» (Г2) — by a list, since a brand has the same form:
+  «Շոկոլադ MARS» is a thing (review 5, №2), and a standard the list has not, too (BIO, MIX and their like are in it,
+  Е2); «ICE», «ZERO» change the thing — a cold tea, a beer with no alcohol — and are none (review 7). «և» spelt as of old, «եւ» («Երեւան»), is «և» for the dictionary, the gloss, the seed's names and the letters of
+  a name (Д1, Е3). Of 527 lines «flavour kind»
+  made of the seed's words, the first round bound 459 to the fruit, sure; now none.
+- **Any other item stands where `lineFitter` lets it** — a heading's far match, each of the search's first ten:
+  **every word of its name is the line's**, by a **form** of the dictionary's Russian — an adjective in any gender,
+  number and case, a noun in any number and case, the adjective a noun makes («оливки» — «оливковый», «молоко» —
+  «молочный») — or by its **letters** where the line spells it, the search key's one edit from five letters at most
+  («Pringles», «Принглс»); never a common start, which found «Пастила» for a toothpaste, «Печенье» for a liver and
+  «Лимонад» for a lemon (А1, А3, review №2). **Every figure with its unit**: a fat is never a litre (А5). **The line's
+  brand in «…» is in its name**, by the letters across scripts («Կոկա Կոլա» is «Coca-Cola»); an item of the seed is a
+  kind and takes no branded line («Бекон» for a sausage of «Բեկոն»). **Its name says the line's kind**, unless all of
+  it is that brand (В-2 «а»: the owner's «Coca-Cola»). A kind the dictionary has not takes nothing but its brand. **A
+  word of the dictionary is read exactly**, never one edit off: «լոշիկ», a flatbread, was «լոլիկ», a tomato.
+
+**An item the printed heading rules out is no item now**, where MOL-255 made it «проверьте»: the new item beside
+it is «проверьте» too, and a wrong item offered is worse than a name to check (Tesseract's «(3824) ՏՈՖՈՒ ՀՈՂ», a
+cat's litter, found «Тофу»). **The shop's memory is above all of it**: the person's own word, unchanged.
+
+**Anything else is a new item, named in full and «проверьте»** (`match: weak` with no item, В-1 «а», on the wire too —
+the review sends `new` only for a line whose item is gone since, adversarial А6): `newLineName` — the kind first, as a
+shelf names it, the other words before the brand in order, the brand in «…» in Russian letters (`armenianInRussian`),
+the words after it, the fat and the package — «Йогурт «Еремян Продактс» клубника 2% 130 г» (В-1 «б»: the weight is in
+the name, so a package is an item). A word the dictionary has not is spelt in letters, and the line says so
+(`receipt_lines.spelled`, 0069, В-4 «а» with the owner's note): the review offers the name, and «Убрать имя — оставить
+как в чеке» takes it away in one press — while the proposal stands, never over a name of the person's own. A name
+typed over the proposal answers «проверьте». Units, counts, a lone sign («x 24»), packaging marks and an abbreviation
+the dictionary has not are no words of it; a word in capitals of up to four letters on a line of small ones keeps
+them («АА», «ГОСТ»), and a lone Latin letter is a size («M»; review 2, №3); with no word left there is no name at all, never the gloss (А7). On a
+receipt read out in English there is no Russian name, as there is no gloss. «Записать» puts a new name that is an
+item's already on that item (`createUnlessNamed`).
+
+**The bench** (`.scratch/tasks/status/MOL-293/`, `research/MOL-293.md`): MOL-114's 321 lines of 34 receipts, through
+the product's own `bindReceiptLines` on the seed and the owner's items of am-34…43, each pair «line → item» judged.
+Master: 47 right, 203 «general» (the kind with no brand or sort), **42 wrong**, 29 new. Now: **136 right, 0 wrong**,
+4 general, 181 new with meaning (124 / 0 / 4 / 193 by letters alone) — every new one «проверьте». **The dictionary grew
+by the words of these very lines**, so the honest figure is lower: with master's dictionary 93 right, 0 wrong — the
+first receipts of the owner's the bench never saw will tell. **The seed's own 2 000 till names**, as lines: 1 972 to
+their own item, 28 to another — as on master; by the search alone, the names path off, 1 045 own, 88 another (a kind
+for a sort: «Молоко» for «Կաթ 3,2%», «Рыба» for a hake), 867 new. **The prices, named:** a line whose brand nobody
+named is new however near the seed's item stands, so the first receipt of a shop is mostly «проверьте» until the
+person's words fill the shop's memory, which needs the tax number (below); a word the item names that the line does
+not print keeps it away from the search — «Огурцы маринованные» for «Վարունգ ընտիր»; two things side by side lose
+the kind of the order a till prints — «Йогурт» for «Յոգուրտ ելակ», 407 of those 527 lines in the first round, 55 now
+(«Хлеб» for «Հաց Պումպերնիկել» on the bench), a new item instead, and so do a word after the kind the dictionary has
+not — with master's dictionary «Помидоры» for «Լոլիկ ջերմոցի», «Салфетки влажные» for «… անտիբակտերիալ», 96 → 93
+right on the bench — and a Latin brand printed bare after it («Պահպանակ Durex»); a loan kind with a capital on a line of small letters is a sort, so its flavour
+stands — «Ելակ Չիզքեյք կգ» is «Клубника», as on master, as «Բանան Սաբրոսթար կգ» is a banana: the two are one shape,
+and on the bench every capital past the kind is a sort or a brand (12 of 12; adversarial Г1, Е1); a kind cut by the till or the reader
+past one letter finds nothing, and its new name is the cut spelt in letters — «Թխվածքաբլ» is «Тхвацкабл», for one
+press to take away (review 3, №1); a genitive before the kind is asked of no seed's name
+— «Թեյի տոպրակ», a tea bag, is «Пакеты фасовочные», sure (review 2, №4); a diminutive is another word — «16 Թև» is
+no «Крылья куриные» (`թևիկներ`), as «թել» is no «թելիկ»; a brand two letters off is another — the owner's «Бисквит
+Kinder Délice» for «Բիսքվիթ «Կինդեր» դելիս» is a new item beside it; a Russian word of a form these rules do not make
+(«крылья» for «крылышко») is another word; and the new item's name is the dictionary's words as they stand, an
+adjective unagreed («Плёнка пищевой») — under «проверьте», for the person to put right. **And the measure of 0.2
+moves with it** (review №6): a new line the person binds to an item of the catalogue is an item put right, so the
+share of «0.2r» may rise by the caution of this rule, not by the reading.
+
 **The names and the search are found once, in the queue; the memory on every reading** (Р-1). A search
 with its meaning costs tens of milliseconds a line, nothing in the background and a second on every
 opening of a receipt; the memory changes with every receipt recorded, and the second receipt of a shop
@@ -388,7 +502,8 @@ must know what the first taught without anything read again. Hence no `revision`
 record carries the whole receipt as the phone holds it (Р-4), and nothing the server suggested since is
 written in silently.
 
-**The matcher is MOL-114's `dict-match.mjs`, ported without improvements** (Р-7): on the bench's 152
+**The matcher is MOL-114's `dict-match.mjs`, ported without improvements** (Р-7) — until MOL-293 put the kind and
+brand before it: on the bench's 152
 lines it gives the prototype's item and gloss line for line, in the seed's order and by name alike
 (`.scratch/tasks/status/MOL-126/parity.mjs`) — so the figure measured on receipts its rules never saw,
 54 of 70, still holds. The nodes come by name bytewise, so a tie is decided the same on every database.
@@ -421,12 +536,14 @@ threshold would lose the first receipt of every shop.
 teaches nothing. The price kept is the shelf price of a line recorded as read, the memory's argument
 where a figure reads two ways — «60 60» for «50 50» adds up either way — and it is a hint, never a
 correction (В-1): a price one confused digit off the remembered is `rememberedPrice` on the line, «
-проверьте», and the parse's figures stay as read. Putting the price into the parse is a change of the
-parse, measured on the bench, and is not done here. **The price is someone's figure** (review 5, В6; round 2, Р2-В3): the
+проверьте», and the parse's figures stay as read — and, since MOL-291, on a line the check emptied too. **The price
+goes into the digits since MOL-291** (below): as a voice beside the line's arithmetic and the total, measured on the
+bench, by its own rule of whose price — not the hint's. **The price is someone's figure** (review 5, В6; round 2, Р2-В3): the
 person's own always; other people's only as their figures are — with access (`shared_until`) and from
 three prices (`AGGREGATE_MIN_CONTRIBUTIONS`), their lower median, as the prices of places open
 (MOL-166) — in the receipt's currency only: prices of two currencies are never one median (review 15). Three people for an item are not three prices: a word recorded with corrected figures
-carries none.
+carries none. That is the rule of the price **shown**; the digits take other people's from three prices with no access
+(MOL-291, owner's В-1 «в»), since what they show is the person's own paper.
 
 **Nobody's word is shown as someone's**: the answer is an item and, in doubt, a price — never who or
 when. The item itself is shared on one word: «at this seller this article is milk» is the shop's fact
@@ -942,6 +1059,238 @@ rule — the item has headings and none is the line's, OCR's swaps allowed — n
 the gloss too: «Ռոլիկ» (9603, brushes) glossed one letter off «լոլիկ» found tomatoes (0702) near. Only the
 headings the seed gave the catalogue's nodes are known; an item with none is ruled out by nothing.
 
+## A card that sends its discount to the card (MOL-289)
+
+**«Ереван Сити» does not take its card's discount off at the till: it sends it to the card.** The lines are
+what was paid with the discount, «Ընդամենը:» is the sum without it — what left the card — and the discount is
+printed apart as «Զեղչ գործարքից», a prepayment slip of the same sum over the receipt (am-35…39, am-44). Read as
+before, the lines never met the total: no total shown, «Прочитали не всё — не хватает 191,02» on every such
+receipt, and the 0.2 measure counted it read in part.
+
+**The lines meet «Ընդամենը» less «Զեղչ գործարքից»** (`linesTotalOf`), and **its second place is the sum taxed with VAT,
+«ԱԱՀ-ով հարկվող»** (the card's `cashback` and `taxed` words): the lines as read every one meet it, else those two vote;
+else **the total itself where two places print it — the total and a payment equal to it to the luma** — as before the
+cashback (review round 1, А2: «ԱԱՀ-ով հարկվող» misread alike lost a total master showed); **that last one puts no line
+right** (review round 2, owner's Б1 «а»): it vouches for the total and says nothing of the cashback, one figure copied
+with the same 5↔6 — 54,00 for 64,00 made water at 160 the line that met 6 550 less it, «ԱԱՀ-ով հարկվող» saying 6 486. A
+payment rounded to the dram is no place, and nor is «Ընդամենը» under the list, 0,02 off the lines where the till rounds
+a price with its discount (am-39, am-44). **The total shown is what left the card** (owner's В-5 «а»: «с карты
+списывается 19 097 — записывать надо именно эту сумму»), and the discount stands beside it (`receipts.cashback_minor`):
+every comparison of the lines with the total takes it off — the sums В-5 records, the review's difference, «Прочитали не
+всё», «proven whole» — and the trip's money never does. **A bonus a receipt is partly paid with, «Կանխավճարի մարում»**,
+is the trip's money taken off (`receiptPaidOf`, `redeemed_minor`): what the bonus covered was recorded when it was sent
+to the card, «когда покроется, тогда и запишем». It is kept only where the card's payment is the total less it, to the
+dram — the total shown, else one printed: with no total vouched for, the trip of the lines and the cashback is the bonus
+less too (review round 6, Г5). **The price, named:** no receipt with a bonus spent has been seen — the rule is the label
+every receipt prints with a 0, and the vouch by the payment keeps a misread one out; a bonus spent where the payment is
+cash, change printed, is not kept, and the trip counts the total. Two discounts of the transaction printed apart are a
+doubt, and the receipt reads as before. **With no total vouched for, the trip is the lines and the cashback** (review
+round 1, А3) — what left the card, as В-5 «а» asks; a total vouched for below the lines is the lines alone, as before
+(review round 2, Б4). **The price, named** (А2б): a till that takes «Զեղչ գործարքից» off on the spot, lines before it,
+is read as one that sends it to the card — its total is shown by its two places, the review says the lines miss it by
+twice the discount, and the trip is the lines, the discount over what left the card, as on master; none has been seen.
+
+**Only a model's reading names them** (`receiptTextOfModel`): Tesseract reads its total after the word under the list,
+the lines' own sum, and on the bench shows none of these receipts' totals; reading the cashback there is a change of the
+parse, measured on its own. **The price, named:** a receipt Tesseract reads whole records the lines' sum, the bonus
+sent to the card unrecorded. **The phone hears the cashback by `RECEIPT_CASHBACK_HEADER`**: the foot says «Кэшбэк на
+карту» under «Строки» and «Оплачено бонусом карты» under the total, «≈» of what left the card; an installed app of an
+earlier build reads the detail strictly and knows no cashback: it is sent the lines' total as the receipt's, so it
+says no «Разница» of lines read right (review round 1, А4). **That total sent back is the printed one** (review round 2,
+№5): «Итог» opened and saved as it was sends exactly the lines' total, and «Записать» takes it as the total printed —
+what left the card, and no total put right in the 0.2 measure; any other figure sent is the person's word. **The
+price, named** (review round 3, №7): the record carries no build, so a phone of this build that has the lines' total
+typed on purpose is taken the same way — the trip what left the card, as В-5 «а» asks, but the edit uncounted.
+
+**«Ընդամենը ամվա սկզբից» is never a total** (MOL-288, the card's `sinceStart`): what the card bought this year, the
+largest amount the total's word stood by, it was the total read — «Прочитали не всё» short by 120 000 ֏. Neither read
+nor a vote, for either reader.
+
+On the bench (`.scratch/tasks/research/MOL-290.md`): totals shown 27 → 34 and 26 → 33 of 54, none wrong; am-44's.
+
+## A model's line put right by the font's 5↔6 (MOL-290)
+
+**«Ереван Сити»'s «5» has a flat top, and the model copies it as «6»**: the owner's first receipt read by the model on
+production (am-44) found all 39 lines and lost six to it, the check emptying them rightly; a faded receipt (am-34) and
+am-38/39 do the same. **A line whose arithmetic does not hold as the model copied it is tried with the card's
+`modelSwaps`** — only 5↔6, measured; Tesseract's pairs are its own — at most two swaps a figure («550» copied «660»,
+owner's note to В-2) in any of its four figures (am-44's line 27 needed one in each of three). A reading holds the
+line's arithmetic as `lineOf` judges it, and **gives a discount at the card's rate of the shelf price**, the rate the
+lines as copied share, to the till's three luma: «exactly the percentage, rounded up» holds on 233 of the bench's 254
+lines, not all — 395 gives 3,96 — and without the rate three wrong readings passed where one did. **A line that prints
+a discount on a receipt whose lines share no rate is not tried** (review round 1, №3): nothing would hold its discount.
+
+**The total chooses among a line's readings, never the fewest swaps** (review round 1, owner's А1 «а»): every reading of
+the quantity, price and sum stays, and of all the choices across the lines exactly one may meet the total. The fewest
+swaps chose wrong where the model erred twice in one figure — the very case of В-2: 0,6 kg × 550 copied «660» read as
+0,5 × 660, one swap in the quantity, the same sum at the same 1 % — and the total, the sum being one, could not see it;
+the review showed 0,5 kg at 660. On the reviewer's brute force (205 498 copies): wrong quantities and prices 63 → 0,
+lines put right 178 065 → 188 086 — the total now also tells a sum a luma off (am-39's 567,15 and 567,16). **The
+discount of one quantity, price and sum is the one at the fewest swaps; two there are a doubt.** **The price, named**
+(А1 «а»): a discount the till's rounding lets read two ways — 2,55 or 2,56 of 255 — may stand a luma off the paper, on 8
+539 of the brute force's lines (4,1 %), and on 15 461 of 106 161 copies of three swaps a line (14,6 %, review round 6 —
+am-44's line 27 took three); the sum, the quantity and the price are right, the line under «проверьте», and the memory
+takes nothing of it. Holding it too (every reading one way, «б») loses am-44 whole: its line 18 prints 5,56 where 1 % of
+555 is 5,55, and nothing tells them. A line read two ways with one sum — «0,6 × 650» reads as printed and as 0,5 × 660 —
+is not put right: a doubt, not a choice. **The price, named:** a receipt whose card gives two rates (am-34: 1 % on 30
+lines, 0,5 % on two) holds every line to the commoner one, and a broken line at the other is not put right.
+
+**The total chooses only among the fewest swaps' sums** (review round 2, owner's Б2 «а»): the readings of a line it
+chooses among are those whose sum is, to the till's rounding, one its fewest swaps give — the same sum split another way
+(0,6 × 550, 0,5 × 660), a luma off (567,15, 567,16). A reading further off is not the total's to choose: a line the
+model bent to fit, 99,00 short (am-34), made the cottage cheese's 615,78 — three swaps where one reads it as printed —
+the one choice that met the total, and «proven whole» hid the difference that pointed at the butter. **A line read whole
+that the swaps read whole too** (a bun copied 96 / 96 for 95 / 95) is a second way: a choice that meets the total with
+it moved is a doubt, and the one choice must meet it with every such line as copied; past `REPAIR_SHIFTS_MAX` (4 096)
+ways of moving them nothing is put right. **And never between two sums** (review round 3, owner's Г1 «а»): where the
+fewest swaps give sums more than the till's rounding apart — «160» at 150, or «622 / 6.22» at 516,78 read back or with
+its sum swapped — the line is a doubt; the total confirms a line's one sum and chooses only a luma — of the sum alone,
+at the fewest swaps' quantity and price (review round 4, Г3: 0,51 × 665 = 339,15 read as 0,61 × 556 = 339,16 beside a
+line a luma short); the same sum split another way stays, a doubt. The fewest swaps must read one quantity and one price
+besides (review round 5, Г4): 0,61 × 515 = 314,15 with its price copied «616» reads, two swaps either way, as 0,51 × 616
+= 314,16 too — a quantity a luma would have chosen, so a doubt; on a till that prints no discount a luma is therefore
+never chosen, the quantity times the price being the sum to the luma. A line read whole is moved by every sum its fewest
+swaps give, apart or not (№9): Г1 held to it lost «505.56»'s luma, and «205.05 / 205.06» beside it was put right at
+205,05. Two readings equally cheap let the cottage cheese's 615,78 pay for am-34 again, Б2 dodged by one more error of
+the model. **The price, named:** such a line stays empty as before MOL-290, copied right beside it or not — lines put
+right on the brute force 187 801 → 186 157 (−0,9 %), none wrong, the bench as before. The shifts cost lines put right on
+the brute force 188 086 → 187 801 (−0,15 %), none wrong; on the class code's tills each neighbour that reads whole both
+ways costs some 0,5 % more (440 of 84 056 beside 1 × 560); on the card's, two neighbours at 1 % whose sum ends in a 5 or
+6 read a luma off within the till's rounding, and the reviewer's synthetic (review round 3, №8) puts right 112 878 → 101
+421 of 124 932 (−10 %), the discounts a luma off 9 919 → 6 675 among them; the bench as before. **The price, named**
+(review round 4, owner's Г2 «а»): a line the model misread twice where one swap explains it too — 0,6 kg × 1 050 = 630
+copied «0.5 / 1060 / 630», read as 0,5 × 1 060 = 530 — has its one cheap sum wrong, and a neighbour bent by just that
+much the other way, no 5 or 6 to swap (a bun 380 copied 480), meets the total with it: the receipt «proven whole», two
+lines made up, the repaired one under «проверьте». It is the edge the check by the sum has on master — two lines misread
+by +d and −d — met by one more pair; the reviewer's search puts 327 copies of round 1's space a total away from such a
+repair, every one of two errors in its line and wanting a neighbour off by exactly the difference.
+
+**It is taken only with the whole receipt** (owner's В-1 «а»): every line as copied or put right, and their sum
+exactly the total two places vouch for, less what went to the card — a second source a misread line cannot fake. Short
+of it nothing changes: the lines are as copied, and the check empties them as before. **A line put right is never as
+read** (`repaired`, `receipt_lines.repaired`): «проверьте» with «Цифры поправили по итогу чека — сверьте с бумагой»
+until the person types their own; the shops' memory takes no shelf price from it (`as_read` false); the phone hears it
+by `RECEIPT_REPAIRED_HEADER`; **an earlier build, which cannot say it, gets the line empty**, as the check left it
+before (review round 1, А4). «Покупки» count it among the lines to check («проверьте N строк»), and so does the
+review's «проверьте: N» (№2). A line misread alike in its price and sum (am-34: 540 / 5,4 / 534,6 for 640 / 6,4 /
+633,6) holds as copied and is not tried; the total, which it does not meet, keeps every other line of the receipt as it
+was.
+
+**The model is never asked to do the sum** (MOL-268): copying, it bends the digits to fit, and the check has nothing
+left to catch. Asked only to mark the figures where a 5 or a 6 may be the other (prompt v6, owner's В-4 «а»), it marked
+85 % of the lines that have one and copied worse — 769 → 732 right fields; an image of the till's own 5 and 6 before the
+receipt, 745. Both measured and not taken: the prompt is v5.
+
+**Every search has a ceiling** (Р-8): `REPAIR_COMBINATIONS_MAX` 20 000 readings of a line's quantity, price and
+discount, past which the line is not tried and its receipt not put right; `REPAIR_RECEIPT_COMBINATIONS_MAX` 200 000 a
+receipt; `REPAIR_ASSIGNMENTS_MAX` 100 000 steps of the total's choice among the lines' readings — twelve lines read
+four ways each are 16 million ways, given up in ~10 ms. **A figure that is no number is not walked** (review round 1,
+№1): a swap of a digit for a digit keeps its form, and three hundred fives of junk in four fields took 0,4 s past
+every ceiling. The worst shape — 300 lines of 2 233 readings each — stops at the 90th line after some 30 ms; a line of
+the bench tries a few hundred. `repairTries` counts the work for the tests.
+
+On the bench: right fields 646 → 652 and 656 → 686, am-44 99 → 117, made up 2, 1, 0 as before; proven whole 18 → 19
+and 17 → 19, am-44 whole. **The price, named:** a receipt with one line no swap of the pair explains — a 3 for an 8, a
+digit lost — stays as copied, its five other lines too; and am-35/36, whose sum taxed with VAT the model misread with
+the same 5→6, have no second place and are not put right.
+
+## The shop's memory as a voice in the digits (MOL-291)
+
+**Haiku is not retrained; the shop's memory learns instead** (owner, 21.10.2026: «можем ли дообучить модель, чтоб со
+временем лучше распознавала цифры на определённых чеках?»). Every receipt recorded leaves «tax number + article → item
+and shelf price» (MOL-126); that price is now a third voice in a line's digits, beside its arithmetic and the total,
+**and weaker than both: a shelf price changes.** It is asked in the queue, at reading, by the reading's tax number and
+articles (`rememberedPrices` in `read-receipts.ts`), since `receipt_lines` holds only what is shown (MOL-255) — never by
+the line's text, which OCR reads otherwise each time; no tax number, no voice (the model copies it on 32 receipts of 46).
+
+**Whose price** (owner's В-1 «в»): the person's own word's; else the lower median of three prices or more — other
+people's **with no access**: the vote shows nothing but a figure printed on the person's own paper, three keep it an
+aggregate, and with access alone it would be silent for every newcomer of 0.2. The hint on the review keeps its rule —
+with access (MOL-126, round 2).
+
+**It vouches for the price alone, and only one the reader may have confused with it** — within two of the reader's
+swaps (the card's `modelSwaps` for the model, `swaps` for Tesseract): a price further off is one that changed, and it
+says nothing (caramel 2 030 at a remembered 1 830, pepper 1 390 at 1 320 — the two changes the bench holds, in 38
+repeats over twelve days). `rememberedLines`, three ways:
+
+- **Confirmed**: a line as printed whose price is the remembered one. A line of one piece whose price is its sum is one
+  number printed twice, emptied on its own by MOL-255; the memory is its second source, and `verifiedReading` keeps it.
+- **Repaired**: a line that does not hold, whose price the swaps make the remembered one — read otherwise — and whose
+  quantity and discount then hold it **with the sum as read**, one way: by the swaps for the model (two a figure, as
+  MOL-290), **as printed for Tesseract** — two lines whose price the memory confirmed were wrong on the bench where the
+  parse had bent another figure (am-39's discount, am-41's count); **to the hundredth, the discount exactly the card's
+  rate** — within the till's three luma Tesseract's «60 / 0,26 / 49,76» for 50 / 0,25 / 49,75 held at the remembered 50
+  (am-39). `repaired` and «проверьте» as MOL-290's, and `receipt_lines.remembered`; shown on the memory's own word.
+  **Not where the reader's own swaps explain the line at any other price** — every figure by them, the sum too
+  (`withoutMemory`; review 2, Б1; review 3, №8, №9, В1): «0.6 / 660 / 3,3 / 326,7» is 0,6 kg × 550 with the price
+  misread or 0,5 kg × 660 with the weight misread and the cheese gone up to 660; «0.65 / 660 / 364» is 0,65 × 560 by one
+  swap of the price, never 0,56 × 650 by the memory's; «1 / 650 / 550» is one number copied two ways, 650 or 550. The
+  memory's old price is the one a changed shelf price makes wrong, so it chooses none of them — the total may.
+  **Tesseract's every figure goes by the card's swaps in that question** (review 4, №11), though the memory takes none
+  of them but the price: «650 / 550» read by it is one number read two ways, «1 100 / 1 400» too. **The price, named**:
+  a line of one piece with no discount whose price and sum are one swap apart — «60 / 50», «650 / 550» — is never the
+  memory's to put right, for either reader; it is the total's (MOL-290), and where the total cannot choose its sum
+  either, the line is empty — and a doubt beside it stands, since not every line has its figures (review 4, the model's
+  control of Б2: a 2 × 560 as printed master showed goes empty).
+  **The sum is what was paid, the total's** (adversarial А1 of review 1): a butter gone up to 650, copied «660 / 650»,
+  read 1 × 550 = 550 at a remembered 550 under a total of 650 two places print — the memory overrode the total. **A price
+  read as remembered whose other figures do not hold is not the memory's either** — the total's (MOL-290): with the
+  poisoned memory below it «confirmed» a «60 / 50» into «60 / 60».
+- **Doubted** (owner's В-2 «б»): a line as printed one **5↔6** off **the person's own** price — misread alike in its
+  price and sum (am-34's 540 / 5,4 / 534,6 for 640) or the price went up by just that digit; the text cannot tell them,
+  and a wrong figure is worse than none — emptied, never proving the receipt whole; the review hints the remembered
+  price. **5↔6 for either reader** (adversarial А4, review №2): the owner was asked of the font's pair, and Tesseract's
+  others are as many ordinary changes of a price — 990 → 999, 1 100 → 1 400, 330 → 380. **The person's own alone**
+  (review №4): the hint shows other people's price only with access, and a newcomer's line would go empty with nothing
+  to type it by.
+
+**The total settles it, whatever the memory said.** Lines that meet the total two places vouch for, a doubted one as
+printed among them, vouch for it: no doubt — on Tesseract's reading as on the model's (review 2, Б2). The readings that
+need the total — every doubted line's, every sum changed — are taken together or not at all: only where every line
+then meets it, **and the paper's own readings do not meet it too** — every line by the reader's swaps, a doubted one or
+one the memory would put right at any price but the memory's (`meets`, the sums reachable line by line, at most
+`REMEMBERED_WAYS_MAX` of them, past which nothing is taken): two prices changed the opposite ways by one swap each read
+as each other's against the same total (Б3, В2), or a doubted butter's old price meeting it beside a bun copied
+«160 / 160» for 150 (adversarial Г1 of review 4). **A total refutes what the memory said**: where every line has
+its figures and they miss the total — vouched, or read in one place, which vouches for nothing but refutes — the lines
+it put right go back as read, and **a line it confirmed loses its word where its own 5↔6 alone closes the gap** — the
+one line the total points at (review 2, №7: the bag «60 / 60» confirmed at a remembered 60 under a total 10 short).
+Every confirmation dropped instead cost 3 and 12 right fields of the bench for 0 and 2 made up: the gap is most often
+another line's misread, and the total does not say whose. **The total first, and on its own** (adversarial А3, review
+№1, №6): for the model MOL-290's repair by the total runs on the lines as copied; where it proves the receipt whole, the
+memory says nothing more — a line the total vouches for as copied is no doubt, and doubted, it had emptied every line
+MOL-290 put right. **The memory chooses none of a line's readings there**: choosing by its price, it dropped the one
+the total confirms (a cheese gone up 555 → 565, its discount copied «2.68»: the memory's reading four swaps off, and the
+receipt not put right) and chose 0,6 × 550 where the paper printed 0,5 × 660 (Б1). Else the memory, a line at a time,
+and MOL-290 again over what it decided. A receipt whose lines meet the total as read is not touched.
+Tesseract's after `bestReading` chose (`rememberedReading`): its choice is not touched, and every line keeps its figures
+as printed for it (`read`, the card's and the class code's rows; a plain row of two bare figures prints no price apart
+and has none). The prompt is v5: the model never sees the memory (MOL-268, MOL-290 В-4, MOL-293).
+
+**What the memory keeps after it** (owner's В-3 «а»): a line it put right, recorded as shown, keeps the remembered price
+in the person's word (`as_read`, `keepsPrice` in `record-receipt.ts`) — with none the word would lose the price, and the
+memory would speak on every other receipt; its cut-out rows are not confirmed, all the same: they hold the misread
+(`asRead` stays strict for them). A line the total put right (MOL-290) still keeps nothing.
+
+**The review**: a line with no price — the check emptied it, a doubt among them — shows the remembered price as the hint
+«В прошлый раз здесь было …» (`rememberedPrice`, the hint's own rule of access); the mark of a line put right says
+«Цифры поправили — сверьте с бумагой», since it may be the memory's and not the total's. The log of a reading counts
+what the memory said, line by line — confirmed, put right, doubted (`rememberedConfirmed`, `rememberedRepaired`,
+`rememberedDoubted`, review №5) — never a price: the doubts are the price named, lines a changed shelf price emptied.
+
+**On the bench** (`.scratch/tasks/research/MOL-291.md`, the memory of every other paper of the seller): the model's right
+fields 652 → 691 and 686 → 734, made up 2 and 1 as on master (697 and 740 before review 3: the lines one number copied
+two ways made, the bag «60 / 50» for 50 among them, are the total's now); am-44 and Tesseract as they were (105 / 0). **The price,
+named**: a memory poisoned — every price moved by one 5↔6, a price changed by just that digit — loses some 60 right
+fields a run to the doubt and makes up 8–10 (10 and 9 since the total points at the line, №7), every one the bag the model itself copied «60 / 60» for 50 into the very old
+price: a reading that meets the memory is what «confirmed» is, and only a total that points at that line tells it from
+the truth (№7) — on a receipt of one such line, or where the total is not read, nothing does. Taken by the owner
+(review 1, №3 «а»): not confirming one number printed twice closed it and left +6 / +9 of the +45 / +54. **And by what is
+shown**: «1 × p = p» stands only where the memory's price is p — the lower median of three strangers' where the person
+has none, a figure their own paper prints. **Ceilings**: `REMEMBERED_COMBINATIONS_MAX` 10 000 readings a line — past it
+that line alone says nothing, the receipt's budget untouched (adversarial А5) — and `REMEMBERED_RECEIPT_COMBINATIONS_MAX`
+50 000 a receipt; a line of the bench tries some dozens.
+
 ## A Serbian receipt by its link (MOL-232)
 
 **A Serbian receipt is not read off a photo: it is asked of the tax office** (MOL-223, `.scratch/tasks/research/MOL-223.md`).
@@ -1080,6 +1429,139 @@ codes only. The review says «Строки — из налоговой Серб�
 `paste` from the field — and `missed`, whether the camera missed in this sheet before; a refusal read off the
 shot (a refund) is no miss, a worker that failed is one. Optional on the wire (Р-3): a body a phone of an
 earlier build left in its queue has neither, and a door refused is never sent again.
+
+## The package a line's name prints (MOL-264)
+
+**A till sells a packed thing in pieces and prints its size in the name** — «Կոկա Կոլա» 1.5լ, «Աշտարակ» ափսեով 950գր, a
+Serbian journal's «0.5L AQUA VIVA VODA FL» — and a price is compared only by the kilogram, the litre or the piece:
+«1 шт за 702,90» compared with nothing, and «Тут дешевле» said nothing or a lie (owner, 09.10.2026). **The purchase is the
+till's pieces times the package** (`receiptPack`, `packedQuantity`, `linePack` in `receipt-pack.ts`): two bottles of
+«1լ» milk are 2 l, «10հտ» eggs are ten pieces, a pizza base «250±10գր» twice is 500 g.
+
+**The till's own figures stay as printed** (Р-2): its count, its shelf price, the line's arithmetic, «≠», the total and
+the shop's memory by article all speak in its pieces, as MOL-255, MOL-290 and MOL-291 built them. The package is a layer
+over them, worked out of `printed` by a pure function on the server's review and at «Записать» — never stored (Р-1), so
+a receipt read before the rollout and not yet recorded gets it too.
+
+- **Sizes**: a figure and `կգ`, `գր`, `գ`, `լ`, `մլ` — or `кг`, `гр`, `г`, `л`, `мл`, `kg`, `g`, `gr`, `l`, `ml` — the unit
+  ending its word; a tolerance is no part of it («470գր±3%»); «N×» before or «×N», «*N» after multiplies («6х200մլ» 1,2 l,
+  «15գ*8» 120 g). **A pack of pieces is read by what follows its «× N»** (reviews 2–5, В1, Г2, Д1, Д2, Е1, Е2, №10): a
+  unit of a size, glued or apart, is what each piece weighs and the count stands alone («25հտ x 2գ», «32шт х 30 г»);
+  anything else — nothing, a word, a hyphen of any kind, a bracket, a quote, a comma — may be packs or plies, nothing tells
+  which: none — a Serbian count's «X N» as well, «100KOM X 2», «10/1 X 2» (review 6, Ж2), and a sign of times with a
+  figure anywhere after the count, «10шт. х 3», «4հ «Զևա» x 2», «10հտ (C1) x 3» (review 7, З2) — but a sign with a number
+  standing alone before it is the thing's width and length, «100шт 24х37см», «30հտ 50x60», and the count stands (review 8,
+  И1, №13); a figure glued to a letter is a word, «10հտ C1 x 3», «4шт LR6 x 2» — packs, none (review 9, Й3). Four rounds of review found a new spelling of «packs or plies» each time while the default was to multiply;
+  none by default ends it. **The prices, named:** «4հ x 2», eight rolls, and two-ply napkins «100հ x 2 շերտ» keep no
+  package. A star before a size is no count: «Արարատ 3* 0.5լ» is a cognac's stars
+  (review №1). A fat, microns, milligrams, volts, metres, years («5տ», a vintage «2019г» — a whole number from 1900 to
+  2099 before the Russian «г», in either case; an Armenian or a Latin gram is a package, «2000գ» of cat food — review 2, В4) are never a
+  package; a figure with no unit — a size the till cut, «… 85» — is none.
+- **The size or the pack is read only where it is the name's one number** (review 12, over reviews 8–11). A count of
+  several beside the size makes the size one of them — «4 банки 0.5л», «6 в упаковке», «из 6ти банок», «6pk», «x6»,
+  «0.5լ/6», «1+1», «пара банок», «six-pack», «тридцать банок» — and the ways a count is spelt have no end: rounds 8–12
+  listed containers, words between, prepositions and number words, and each round found a new spelling, half the time
+  one the last fix had opened. So any other whole number from 2 to 100 standing on its own (`OTHER_NUMBER`), a number
+  spelt in a word (`COUNT_WORD`: Russian in any case to forty, English with «-pack», Armenian, Serbian, «пара»,
+  «дюжина», «мультипак», «двойная», «сдвоенная», «трио», «дуо», «спарка», «double», «duplo», «զույգ»), a bundle «N+M»,
+  «N x M» or «N/M» beside a weight or a volume and no count of pieces of two or more — the till's «1шт» is none (Р3) — «0.5л 1х12», «2x6 0.5լ», «0.5л 1/12» (`PAIR`,
+  rounds 13–14, Н1, П3) — and a count past a hundred with a word after it, «200 пакетиков 2г» (`LARGE_COUNT`, №18),
+  keeps no package. What is not a count: a figure after a lone Latin letter, a model's or a
+  class's, «C1», «N4», «E27», the eggs' class «С2», «С3», «Ս2», and after «№» — but «x6» is a sign, and a figure after a word,
+  glued or past its point or its comma, is a count, «уп12», «PAK6», «уп.12», «бл,4» (Т1, У1; **the price, named, as a
+  class:** a model's number glued to its word — «Mach3 4шт», «Nan2 400г», «GU10 2шт», «AA LR6 4шт» — keeps none, №21;
+  «0.5л №12» is read as a label); plies, «3D», years and three in one glued after
+  it, «3շ», «5տ», «3-ը 1-ում», «3в1», «2in1» (`NOT_A_COUNT`, the bench's own); a fraction, a percent or degrees, a range and
+  a width by a length beside a count of pieces, «3.2%», «40°» (Н3), «9-14կգ», «100шт 24х37», «35л 50х70 30шт» (П1, №19); a
+  figure with a unit of measure, «500мг», «220V», «220В», «10Վտ», «10А», «9 Вольт», «60 Ватт», «70мм», «5м» glued
+  (`MEASURE`, П2, Р1, С1, С2) — never a unit that is also a word, «6 в упаковке», «6 ед.»: «м» and «В» only glued; a
+  Russian «В» or «А» glued, in either case, is a measure unless a word in small letters or in capitals follows (У2), «220В E27», «9В Крона» —
+  «6В УПАК» stays a count (`CAPITAL_MEASURE`); **the price, named:** «Пиво 6В 0.5л», «6в 0.5л» read volts; a line's number before its name, «17.»; a code past a hundred standing
+  alone, «9639», «250h 193», a vintage «2019». **The price, named, as one class:** a name's own number — «Балтика 7», «7 злаков», «Pampers 4
+  Maxi 52шт», «3 в 1» apart, «12 лет в коробке», «Три медведя», «AFTER EIGHT», a model's letter copied as a figure,
+  «2ոկոլապ», «Neva 12h 32» — keeps none: on the bench 231 of 233 read right (two lines of the brand «3 կոռոչկի»), 95
+  and 99 of 102 and 107 by the model (its copies of «3շ» as «32», «Շ» as «2»), 20 of 21 in Serbia; nothing made up
+  more, and one less in Serbia — «260ml … SCY903/01» (round 14). **What stays:** a pack of several that prints no count — «Пиво упаковка 0.5л», «набор» — is read as one; a
+  count spelt in a word past the list is read as none of it — the one class no rule of the text closes, since a pack
+  of several named only in words prints nothing a figure could say; the list holds the words met and the ones review
+  named; a count glued after a word, «PAK6», is the word's. A word of a count is read outside what was read, so the pack's own «3զույգ» stays a pack (Р2). A word of a pair
+  or a double in a name is a count too, «Milka Double», «Triple Sec» — the
+  same class as the name's own number.
+- **What stands before a size may say it is none of its own** (review №2, adversarial А3, А4): a range, «9-14կգ» — a
+  nappy for a child of that weight; a fraction, «1/2կգ», «1/2L» — its denominator; a sign of times whose count is a word,
+  «25пак*2г», «25 փաթեթ x 2գր» — one sachet of a box, 25 times the price a kilogram. The line keeps no package. A sign of
+  times, in either case, is one standing apart, «25 KES X 2G»; one glued to the figure after any letter, «пакх2г», «4
+  банкиx0.5л», «2 коробкиx10шт» (reviews 2–6, В2, Д3, Ж1, №12); or one ending a word that follows a figure, glued or apart,
+  «25ПАКХ 2Г», «25 пакетикиx 2г» (Г1, Г3, З1). A count's word and a name's read alike there — «25 пакетикиx 2г» and «Ariel
+  3в1 Max 25шт» are a figure, a word ending in «x», a figure — and a package made up is worse than one unread. With no
+  figure before it, «x» is the word's own: «Elixir mix 0.33l», «Durex 3հտ», «пальчиковых 4шт» (Г5). **The prices,
+  named:** «Ariel 3в1 Max 25шт», «2in1 Max 400мл», «в 2 вкусах 200г» (review 7 over Е3, №11) and «Pepsi Max1.5լ», glued,
+  keep none — «Elixir mix 0.33l» is a drink,
+  «Durex 3հտ» three, «пальчиковых 4шт» four (Г5). A count of pieces with a sign of times before it, «2x10հտ», is a count of packs unread: none (review 2,
+  №7). **The price, named:** «1/1L» is none too.
+- **A pack of pieces wins over what one holds** (Р-3, owner's В-1 «а» — every kind of goods, not food alone): «Աղբի
+  պարկեր 35լ 30հտ» is thirty bags, never 35 l. Two at least: «1 հտ» is the till's own count as often as a pack. A Serbian
+  pack is «107KOM» glued or «10/1»; a «KOM» apart is the journal's unit of sale.
+- **A thickness printed says the thing is packaging** (Р-11): «… 60միկրոն», «KESA VJZ 7KG 51 MIKRON» — its kilograms
+  are what it carries. None.
+- **Two sizes that disagree are none** (Р-4); a pack of pieces with two counts too.
+- **A Latin «h», in either case, beside a size is no pack** (adversarial А1, review №3; «48H» — review 2, №6, В3): it is the model's copy of «հ» — «Անձեռոցիկ 75h»,
+  «Տոպրակ աղբի 20լ 30h» — and a label's hours too, «Rexona 48h 150մլ», 48 pieces of a deodorant. Nothing tells which,
+  so beside a size the line keeps no package — the garbage bags of the model's copy are pieces again, never their 20 l.
+  Dropped altogether, the bench lost 8 and 14 packages and made the bags' litres up. **The price, named:** hours with no
+  size beside them, «Nivea Men 48h», are a pack of 48.
+- **A line the till weighed or poured keeps its quantity**, and a line the check emptied gets no package (Р-8): a package
+  of nobody knows how many is a guess.
+
+**Wrong is worse than unread, so a size not read for sure is none** (MOL-255). Measured on the bench
+(`.scratch/tasks/status/MOL-264/`, packages from the truth's `meaning`, written by hand, × the till's count):
+
+|                         | truth's text | Haiku v5, three runs       | Tesseract | Serbia (78 lines) |
+| ----------------------- | ------------ | -------------------------- | --------- | ----------------- |
+| master: right / made up | 2 / 0        | 2, 2, 0 / 0                | 1 / 0     | —                 |
+| the grammar alone       | 253 / 0      | 117, 124, 22 / 13, 12, 0   | 9 / 4     | —                 |
+| the PR before review 1  | 236 / 0      | 105, 112, 20 / 0, 1, 0     | 8 / 1     | 21 / 1            |
+| **as shipped**          | **233 / 0**  | **102, 107, 20 / 0, 1, 0** | **8 / 1** | **21 / 1**        |
+
+- **A 6 read off a photo is a doubt, in a size and in a count of pieces** (Р-12; adversarial А2, review №4): «Ереван
+  Сити»'s font prints a 5 with a flat top and both readers copy it as a 6 (MOL-290) — «0.46լ» for 0,45 l, «46գր», «1.6լ»,
+  «260±10գր» were every one of the model's made up, and 15 eggs copied «16հտ» are as made up. Doubting the 6 costs 17 sizes
+  of the truth's 230 that really hold one (165 g chips, 360 g condensed milk, 1.6 l); doubting the 5 as well cost 78 for
+  one made up less. A count in doubt takes the size beside it along: the cups' 330 ml is what one holds. Serbia's text is
+  the tax office's, never read off a photo: no doubt.
+- **A unit read off a photo is glued to its figure** — 232 sizes of 232 on the bench — so «505 գր» is the model's copy of
+  the glue's «505 6գր» with its 6 lost, «Maxi 4 L» a nappy's size, «2019 г» a vintage: none. On a Serbian journal a Latin
+  unit may stand apart («MLEKO 1 L KOM»).
+- **No package weighs over 50 kg or holds over 25 l**: «330լ» is a can with its point lost. A cooler's 19 l, a bag of cat
+  food's 20 kg are packages.
+- **The prices, named:** the model's «9գր» on an ice cream whose size the till cut is made up — a unit the model wrote
+  that the paper never printed; Tesseract's «88գր» for 85 (one in nine of its packages); a Serbian baby bottle's «260ml»
+  is what it holds, as the bags' litres (Р-3) — a container whose capacity is printed with no count beside it. Half a
+  gram is no quantity («18.5G» of coffee): the kilogram is kept in grams.
+
+**On the wire to a phone that asks** (`pack`, `RECEIPT_PACK_HEADER`, as `spelled`): an installed app of an earlier build
+reads a line strictly. **The review shows the purchase** — the line's quantity is the pieces times the package, the
+sheet opens at «1,5 л» with «За единицу» and «Тут дешевле» by the litre — and **the row keeps the till's figures where
+they stood, the package after them, «2 шт × 370,00 ֏ · 2 л»** (owner's В-2 «а»): the person checks the paper by the
+till's figures. «кол-во × цена» of the sheet is a weighed line's alone: a bottle's shelf price times its litres is no
+figure of the line.
+
+**At «Записать» the quantity shown is no edit, in either form** (Р-9, Р-10): the pieces times the package, or the till's
+pieces a phone of an earlier build sends, knowing no package — so the 0.2 measure counts neither, the line is as read and
+the shop's memory keeps its shelf price. **A line set back to the till's pieces on purpose** (adversarial Б) is put right
+by the phone's word — `edited`, the measure of 0.2 counts it — and as read for the memory all the same: the till's figures
+are what it read, a piece's shelf price true in either form. **The prices, named:** an earlier build, sending no
+`edited`, is told from it by nothing; and `make repack`, below, moves such a line into its package — so it is run once,
+right after the rollout, before a receipt is recorded on the new build. A draft of an earlier build whose sum alone was
+put right carries the till's pieces, and recorded after that run it stays in pieces (review №5). **A new item takes one package as its
+usual quantity** (`typical_qty`, MOL-261): the next purchase typed by hand is offered «1,5 л», the milk «1 л» for the two
+bottles bought — only where the package is of the unit recorded. Its name keeps the size, as MOL-293 named it (В-1 «б»).
+
+**What was recorded before is put right once, by hand** (owner's В-3 «а»): `make repack` (`dist/repack-receipts.js` in
+production), a dry run unless `YES=1` — the same transaction, rolled back, as the seed's — printing every purchase «было →
+станет». It moves a purchase only while its quantity is still the till's pieces as read, and an item only where that very
+record made it, by that person — an item's `created_at` and its receipt's `recorded_at` are one transaction's `now()` —
+still in pieces with no usual quantity. A second run finds nothing.
 
 ## The reader holds nothing
 

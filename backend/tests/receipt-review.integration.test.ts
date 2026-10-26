@@ -1,9 +1,24 @@
 import { randomUUID } from 'node:crypto'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { receiptDetailCodec, receiptsResponseCodec, storeMemoryWords } from '@molvia/model'
+import {
+  RECEIPT_CASHBACK_HEADER,
+  RECEIPT_PACK_HEADER,
+  RECEIPT_REPAIRED_HEADER,
+  RECEIPT_SPELLED_HEADER,
+  receiptDetailCodec,
+  receiptsResponseCodec,
+  storeMemoryWords,
+} from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
-import { actors, officialRates, receiptLines, receipts, trips as tripsTable } from '@/db/schema'
+import {
+  actors,
+  items,
+  officialRates,
+  receiptLines,
+  receipts,
+  trips as tripsTable,
+} from '@/db/schema'
 import { createStoreMemoryRepository, memoryKey } from '@/db/store-memory-repository'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
@@ -218,6 +233,184 @@ describe('the review of a receipt', () => {
     const unread = await review(me, await parsedReceipt(me, lines, { totalMinor: null }))
     expect(unread.lines[4]?.amount).toEqual(amd(890))
   })
+
+  it('confirms the printed sum by the total less what a card sent to the card, and tells the phone that asks (MOL-289)', async () => {
+    const me = await insertActor(db)
+    const lines: Line[] = [
+      { printed: 'A', price: 531, sum: 531 },
+      { printed: 'Шоколад', price: 890, sum: 980 },
+    ]
+    // 1 511 of lines, 15,11 sent to the card: «Ընդամենը» 1 526,11
+    const carded = { totalMinor: 152_611n, cashbackMinor: 1_511n, redeemedMinor: 10_000n }
+    const id = await parsedReceipt(me, lines, carded)
+    const shown = await review(me, id)
+    expect(shown.lines[1]?.amount).toEqual(amd(980))
+    // an earlier build, which knows no cashback, is told what the lines come to (review round 1, А4)
+    expect([shown.receipt.total, shown.cashback, shown.redeemed]).toEqual([
+      { minor: 151_100n, currency: 'AMD' },
+      undefined,
+      undefined,
+    ])
+    // the same total with nothing sent to the card: the lines fall short of it, and the figures stand
+    const plain = await review(me, await parsedReceipt(me, lines, { totalMinor: 152_611n }))
+    expect(plain.lines[1]?.amount).toEqual(amd(890))
+    // an installed app of an earlier build reads the detail strictly: only a phone that asks is told
+    const response = await app.inject({
+      method: 'GET',
+      url: `/receipts/${id}`,
+      headers: {
+        cookie: await signIn(db, me),
+        'x-molvia-today': '2026-10-03',
+        [RECEIPT_CASHBACK_HEADER]: '1',
+      },
+    })
+    const asked = receiptDetailCodec.parse(response.json())
+    expect([asked.cashback, asked.redeemed]).toEqual([amd(15.11), amd(100)])
+    expect(asked.receipt.total).toEqual({ minor: 152_611n, currency: 'AMD' })
+  })
+
+  it('tells a line the font’s swaps put right only to a phone that asks (MOL-290)', async () => {
+    const me = await insertActor(db)
+    const id = await parsedReceipt(me, [
+      { printed: 'A', price: 531, sum: 531 },
+      { printed: 'B', price: 1_032, sum: 1_032 },
+    ])
+    await db
+      .update(receiptLines)
+      .set({ repaired: true })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 1)))
+    // «Покупки» ask to check it, as a line that does not add up (review round 1, №2)
+    const cookie = await signIn(db, me)
+    const listed = receiptsResponseCodec.parse(
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/receipts',
+          headers: { cookie, 'x-molvia-today': '2026-10-03' },
+        })
+      ).json(),
+    )
+    expect(listed.receipts.find((one) => one.id === id)?.unsettled).toBe(1)
+    // an earlier build cannot say «проверьте»: the line goes to it empty (review round 1, А4)
+    const earlier = await review(me, id)
+    expect(earlier.lines.map((line) => [line.repaired, line.sum, line.amount])).toEqual([
+      [undefined, amd(531), amd(531)],
+      [undefined, null, null],
+    ])
+    const response = await app.inject({
+      method: 'GET',
+      url: `/receipts/${id}`,
+      headers: {
+        cookie: await signIn(db, me),
+        'x-molvia-today': '2026-10-03',
+        [RECEIPT_REPAIRED_HEADER]: '1',
+      },
+    })
+    const asked = receiptDetailCodec.parse(response.json())
+    expect(asked.lines.map((line) => [line.repaired, line.sum])).toEqual([
+      [undefined, amd(531)],
+      [true, amd(1_032)],
+    ])
+  })
+
+  it('sends a new item the binding marked «проверьте» as such, and a line whose item is gone as new (MOL-293, А6)', async () => {
+    const me = await insertActor(db)
+    const gone = await insertItem(db, { name: 'Сметана', searchKey: 'smetana' })
+    const id = await parsedReceipt(me, [
+      { printed: 'Յոգուրտ «Երեմյան Փրոդաքթս» ելակ', price: 300, sum: 300, match: 'weak' },
+      { printed: 'Թթվասեր 20%', price: 500, sum: 500, itemId: gone, match: 'search' },
+      { printed: 'ՔՍՅԶՔ', price: 100, sum: 100, match: 'new' },
+    ])
+    await db.delete(items).where(eq(items.id, gone))
+    const detail = await review(me, id)
+    expect(detail.lines.map((line) => [line.itemId, line.match])).toEqual([
+      [null, 'weak'],
+      [null, 'new'],
+      [null, 'new'],
+    ])
+  })
+
+  it('tells a new name spelt in letters only to a phone that asks, and only while it is new (MOL-293)', async () => {
+    const me = await insertActor(db)
+    const coffee = await insertItem(db, { name: 'Кофе «Латино»', searchKey: 'kofe latino' })
+    const id = await parsedReceipt(me, [
+      { printed: 'Սուրճ «Լատինո» Մեդիում', sku: '1170001', price: 900, sum: 900, match: 'weak' },
+      { printed: 'Սուրճ «Լատինո» Ռոբուստա', sku: '1170002', price: 950, sum: 950, match: 'weak' },
+    ])
+    await db
+      .update(receiptLines)
+      .set({ translation: 'Кофе «Латино» Медиум', spelled: true })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 0)))
+    await db
+      .update(receiptLines)
+      .set({ translation: 'Кофе «Латино» Робуста', spelled: true })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 1)))
+    // the shop's memory has named the second since: its name is no proposal any more
+    await memory.remember(me, TIN, [
+      { kind: 'sku', key: '1170002', itemId: coffee, price: amd(950) },
+    ])
+    // an earlier build reads a line strictly: it is told nothing
+    const earlier = await review(me, id)
+    expect(earlier.lines.map((line) => line.spelled)).toEqual([undefined, undefined])
+    const response = await app.inject({
+      method: 'GET',
+      url: `/receipts/${id}`,
+      headers: {
+        cookie: await signIn(db, me),
+        'x-molvia-today': '2026-10-03',
+        [RECEIPT_SPELLED_HEADER]: '1',
+      },
+    })
+    const asked = receiptDetailCodec.parse(response.json())
+    expect(asked.lines.map((line) => [line.itemId, line.translation, line.spelled])).toEqual([
+      [null, 'Кофе «Латино» Медиум', true],
+      [coffee, 'Кофе «Латино» Робуста', undefined],
+    ])
+  })
+
+  it('tells a line’s package only to a phone that asks, of a line the till sold in pieces (MOL-264)', async () => {
+    const me = await insertActor(db)
+    const id = await parsedReceipt(me, [
+      { printed: 'Գազավորված ըմպելիք «Կոկա Կոլա» 1.5լ', sku: '1170010', price: 700, sum: 700 },
+      { printed: 'Կաթ «Իգիթ» 3.2% 1լ', sku: '1170011', qty: 2, price: 370, sum: 740 },
+      { printed: 'Հավկիթ «Ոսկեհավ» #0-1 10հտ', sku: '1170012', price: 850, sum: 850 },
+      { printed: 'Սերուցք «Իգիթ» 10%', sku: '1170013', price: 600, sum: 600 },
+      { printed: 'Ազնվամորու Մուրաբա 1կգ', sku: '1170014', price: 2_000, sum: 868 },
+      { printed: 'Պանիր «Լոռի» 500գր', sku: '1170015', price: 900, sum: 900 },
+    ])
+    // the jam the till weighed — 0,434 kg — and the cheese the check emptied keep no package
+    await db
+      .update(receiptLines)
+      .set({ qtyMilli: 434n, qtyUnit: 'kg' })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 4)))
+    await db
+      .update(receiptLines)
+      .set({ qtyMilli: null, qtyUnit: null, priceMinor: null, sumMinor: null, settled: false })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 5)))
+    // an earlier build reads a line strictly: it is told nothing, and its figures are the till's
+    const earlier = await review(me, id)
+    expect(earlier.lines.map((line) => line.pack)).toEqual(Array(6).fill(undefined))
+    const response = await app.inject({
+      method: 'GET',
+      url: `/receipts/${id}`,
+      headers: {
+        cookie: await signIn(db, me),
+        'x-molvia-today': '2026-10-03',
+        [RECEIPT_PACK_HEADER]: '1',
+      },
+    })
+    const asked = receiptDetailCodec.parse(response.json())
+    expect(asked.lines.map((line) => line.pack)).toEqual([
+      { milli: 1_500n, unit: 'l' },
+      { milli: 1_000n, unit: 'l' },
+      { milli: 10_000n, unit: 'piece' },
+      undefined,
+      undefined,
+      undefined,
+    ])
+    // the till's own figures stay as printed
+    expect(asked.lines[1]?.quantity).toEqual({ milli: 2_000n, unit: 'piece' })
+  }, 10_000)
 
   it('doubts a price one confused digit off the memory’s, and only then names it (В-1)', async () => {
     const me = await insertActor(db)

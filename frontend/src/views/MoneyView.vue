@@ -187,7 +187,7 @@
       @add-category="newCategoryOpen = true"
       @saved="saved"
     />
-    <NewCategorySheet
+    <CategorySheet
       v-model:open="newCategoryOpen"
       over
       :categories="categories"
@@ -209,12 +209,12 @@ import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import CategoryDonutCard from '@/components/CategoryDonutCard.vue'
+import CategorySheet from '@/components/CategorySheet.vue'
 import MoneyAccountsNow from '@/components/MoneyAccountsNow.vue'
 import MoneyEntries from '@/components/MoneyEntries.vue'
 import type { EntryValues } from '@/components/MoneyEntries.vue'
 import MoneyMonthCard from '@/components/MoneyMonthCard.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
-import NewCategorySheet from '@/components/NewCategorySheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SkeletonPart from '@/components/SkeletonPart.vue'
@@ -244,12 +244,12 @@ export default defineComponent({
     AppReveal,
     AppScreen,
     CategoryDonutCard,
+    CategorySheet,
     IconPlus,
     MoneyAccountsNow,
     MoneyEntries,
     MoneyMonthCard,
     MonthSwitcher,
-    NewCategorySheet,
     ScreenSkeleton,
     ScreenState,
     SkeletonPart,

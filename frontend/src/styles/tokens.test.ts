@@ -128,6 +128,39 @@ function oklab(hex: string): [number, number, number] {
   ]
 }
 
+/**
+ * `color-mix(in oklch, colour share, ground)` as a browser draws it: lightness, chroma and hue each
+ * taken the share of the way, the hue the shorter way round, then into sRGB and its eight bits.
+ */
+function mixInOklch(colour: string, ground: string, share: number): string {
+  const lch = (hex: string) => {
+    const [l, a, b] = oklab(hex)
+    return [l, Math.hypot(a, b), Math.atan2(b, a)] as const
+  }
+  const [[l1, c1, h1], [l2, c2, h2]] = [lch(colour), lch(ground)]
+  const turn = h1 - h2 > Math.PI ? -2 * Math.PI : h1 - h2 < -Math.PI ? 2 * Math.PI : 0
+  const [l, c, h] = [l2 + (l1 - l2) * share, c2 + (c1 - c2) * share, h2 + (h1 + turn - h2) * share]
+  const [a, b] = [c * Math.cos(h), c * Math.sin(h)]
+  const lms = [
+    (l + 0.3963377774 * a + 0.2158037573 * b) ** 3,
+    (l - 0.1055613458 * a - 0.0638541728 * b) ** 3,
+    (l - 0.0894841775 * a - 1.291485548 * b) ** 3,
+  ] as const
+  const rgb = [
+    4.0767416621 * lms[0] - 3.3077115913 * lms[1] + 0.2309699292 * lms[2],
+    -1.2684380046 * lms[0] + 2.6097574011 * lms[1] - 0.3413193965 * lms[2],
+    -0.0041960863 * lms[0] - 0.7034186147 * lms[1] + 1.707614701 * lms[2],
+  ]
+  const byte = (linear: number) => {
+    const v = Math.min(1, Math.max(0, linear))
+    const encoded = v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055
+    return Math.round(encoded * 255)
+      .toString(16)
+      .padStart(2, '0')
+  }
+  return `#${rgb.map(byte).join('')}`
+}
+
 function distance(a: string, b: string): number {
   const [x, y] = [oklab(a), oklab(b)]
   return Math.hypot(...x.map((v, i) => v - (y[i] ?? 0)))
@@ -198,6 +231,24 @@ describe.each(['light', 'dark'] as const)('the %s scheme', (scheme) => {
   it(`draws every mark and category at ${String(MARK_CONTRAST)}:1 on --surface`, () => {
     const faint = [...MARKS, ...CATEGORIES]
       .map((name) => [name, contrast(value(name), value('surface'))] as const)
+      .filter(([, ratio]) => ratio < MARK_CONTRAST)
+      .map(([name, ratio]) => `--${name} ${ratio.toFixed(2)}:1`)
+    expect(faint).toEqual([])
+  })
+
+  // The icon of a category stands in a circle of its own colour on `--cat-tint-share` of it (MOL-176,
+  // `ListRow`), and the sheet of one's own draws every icon so (MOL-285): on --surface alone, five
+  // light categories held 3:1 and fell to 2.67…2.97 on their circle, and no test saw it.
+  it(`draws every category's icon at ${String(MARK_CONTRAST)}:1 on its own circle`, () => {
+    const share =
+      Number.parseFloat(
+        declared[scheme].get('cat-tint-share') ?? declared.light.get('cat-tint-share') ?? '',
+      ) / 100
+    expect(share).toBeGreaterThan(0)
+    const faint = CATEGORIES.map(
+      (name) =>
+        [name, contrast(value(name), mixInOklch(value(name), value('surface'), share))] as const,
+    )
       .filter(([, ratio]) => ratio < MARK_CONTRAST)
       .map(([name, ratio]) => `--${name} ${ratio.toFixed(2)}:1`)
     expect(faint).toEqual([])

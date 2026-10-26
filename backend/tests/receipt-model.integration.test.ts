@@ -8,6 +8,7 @@ import type { FastifyInstance } from 'fastify'
 import { createItemRepository } from '@/db/items-repository'
 import { createModelSpendRepository } from '@/db/model-spend-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
+import { createStoreMemoryRepository } from '@/db/store-memory-repository'
 import {
   actors,
   modelReceiptDays,
@@ -16,6 +17,7 @@ import {
   receiptLineImages,
   receiptLines,
   receipts,
+  storeMemory as storeMemoryTable,
 } from '@/db/schema'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
 import { ModelRejected, ModelUnavailable, receiptModel } from '@/receipts/model-reader'
@@ -26,13 +28,14 @@ import { RECEIPT_MODEL_WAIT_MS, readQueuedReceipts } from '@/usecases/read-recei
 import type { ReadReport } from '@/usecases/read-receipts'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertPlace, insertTrip, signIn } from './fixtures'
+import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
 // Which reader reads a receipt (MOL-272): the model for whoever it is granted to and accepted edition 3,
 // under the month's cap, Tesseract otherwise and whenever the model is not the one to (В-1 «а»).
 
 const { db, close } = connectDrizzle()
 const repository = createReceiptRepository(db)
+const memory = createStoreMemoryRepository(db)
 const spend = createModelSpendRepository(db, true)
 const CAP = 200_000_000
 let app: FastifyInstance
@@ -211,6 +214,7 @@ async function readAll(
         lines,
       ),
     model: model === null ? null : { reader: model, spend, capMicroUsd: cap },
+    storeMemory: memory,
     ...(now === undefined ? {} : { now }),
   })
   return reports
@@ -249,7 +253,39 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
       reader: 'model',
       costMicroUsd: 2_180,
       tokens: TOKENS,
+      unparsed: 0,
     })
+  }, 30_000)
+
+  it('reads a discount with its minus and a sum with its comma, and counts what it could not (MOL-294)', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    const [milk, bread] = ANSWER.lines
+    const spelt: ModelReceipt = {
+      ...ANSWER,
+      lines: [
+        { ...milk!, sum: '740,00', article: null },
+        { ...bread!, discount: '-2.90', sum: '287,1' },
+        { ...milk!, printed: 'Թեյ «Օրինակ»', quantity: '1', unit_price: '7,4,0', sum: '740' },
+      ],
+      totals: [
+        { label: 'Ընդամենը', amount: '1 767,10' },
+        { label: 'Վճարված է Առձեռն', amount: '1 767.10' },
+      ],
+    }
+    const model = fakeModel(() =>
+      Promise.resolve({ kind: 'read', answer: spelt, costMicroUsd: 2_180, tokens: TOKENS }),
+    )
+    const reports = await readAll(benchReader(), model)
+    const lines = await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id))
+    expect(lines.map((line) => [line.printed, line.sumMinor, line.discountMinor])).toEqual([
+      ['Կաթ «Օրինակ» 3.2% 1լ', 74_000n, null],
+      ['Հաց «Օրինակ»', 28_710n, 290n],
+      ['Թեյ «Օրինակ»', null, null],
+    ])
+    // the count alone, never the figure (Т-8)
+    expect(reports.find((r) => r.kind === 'read')).toMatchObject({ reader: 'model', unparsed: 1 })
+    expect(JSON.stringify(reports)).not.toContain('7,4,0')
   }, 30_000)
 
   it('leaves to Tesseract whoever has no grant, a grant past or ending now, or no edition 3', async () => {
@@ -263,8 +299,12 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
     for (const one of people) await queued(one)
     const reader = benchReader()
     const model = fakeModel(() => read())
-    await readAll(reader, model)
+    const reports = await readAll(reader, model)
     expect(model.asked).toBe(0)
+    // Tesseract's figures are no model's: no count at all
+    expect(reports.filter((r) => r.kind === 'read').map((r) => r.unparsed)).toEqual(
+      Array(5).fill(null),
+    )
     const rows = await db.select({ version: receipts.readerVersion }).from(receipts)
     expect(rows.map((row) => row.version)).toEqual(Array(5).fill('tesseract 5.5.0 · test'))
     expect(await month()).toBeNull()
@@ -436,6 +476,90 @@ describe('the model away (Р-9)', () => {
 })
 
 describe('what the model read', () => {
+  it('keeps what a card sent to the card, and calls such a receipt read whole (MOL-289)', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    // the lines make 1 027,10; 10,27 went to the card; «Ընդամենը:» 1 037,37 left it, 100,00 of the
+    // bonus spent and the rest paid by card, rounded to the dram
+    const totals = [
+      { label: 'Ընդամենը', amount: '1027.12' },
+      { label: '/ԱԱՀ-ով հարկվող/ =', amount: '1027.10' },
+      { label: 'Ընդամենը:', amount: '1037.37' },
+      { label: 'Վճարված է PosTerminal:', amount: '937.00' },
+      { label: 'Կանխավճարի մարում:', amount: '100.00' },
+      { label: 'Զեղչ գործարքից:', amount: '10.27' },
+      { label: 'Ընդամենը ամվա սկզբից:', amount: '139432.00' },
+    ]
+    const reports = await readAll(
+      benchReader(),
+      fakeModel(() =>
+        Promise.resolve({
+          kind: 'read',
+          answer: { ...ANSWER, totals },
+          costMicroUsd: 1_000,
+          tokens: TOKENS,
+        }),
+      ),
+    )
+    expect(await receiptOf(id)).toMatchObject({
+      status: 'parsed',
+      totalMinor: 103_737n,
+      readTotalMinor: 103_737n,
+      cashbackMinor: 1_027n,
+      redeemedMinor: 10_000n,
+      balanced: true,
+      readPartly: false,
+    })
+    expect(reports.find((r) => r.kind === 'read')).toMatchObject({ partly: false })
+  }, 30_000)
+
+  it('keeps a line the font’s swaps put right, the receipt whole by it, never as read (MOL-290)', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    // printed 1 × 530 − 5,3 = 524,7 and copied with a discount of 6,3; the bread prints the card's 1 %
+    const curd = {
+      printed: 'Կաթնաշոռ «Օրինակ»',
+      code: '0406',
+      article: '1110003',
+      quantity: '1',
+      unit: 'pcs' as const,
+      unit_price: '530',
+      discount: '6.3',
+      sum: '524.7',
+    }
+    const totals = [
+      { label: 'Ընդամենը', amount: '1551.80' },
+      { label: 'Վճարված է Առձեռն', amount: '1551.80' },
+    ]
+    await readAll(
+      benchReader(),
+      fakeModel(() =>
+        Promise.resolve({
+          kind: 'read',
+          answer: { ...ANSWER, lines: [...ANSWER.lines, curd], totals },
+          costMicroUsd: 1_000,
+          tokens: TOKENS,
+        }),
+      ),
+    )
+    expect(await receiptOf(id)).toMatchObject({
+      status: 'parsed',
+      totalMinor: 155_180n,
+      balanced: true,
+      readPartly: false,
+    })
+    const lines = await db
+      .select()
+      .from(receiptLines)
+      .where(eq(receiptLines.receiptId, id))
+      .orderBy(receiptLines.position)
+    expect(lines.map((line) => [line.discountMinor, line.sumMinor, line.repaired])).toEqual([
+      [null, 74_000n, false],
+      [290n, 28_710n, false],
+      [530n, 52_470n, true],
+    ])
+  }, 30_000)
+
   it('is «переснимите» where it read nothing, and a sum to record where it read a section', async () => {
     const me = await person(LATER)
     const nothing = await queued(me)
@@ -487,6 +611,209 @@ describe('what the model read', () => {
   }, 30_000)
 })
 
+describe('the shop’s memory in the digits (MOL-291)', () => {
+  const TIN = '01234567'
+  const BUTTER = '1110004'
+  // printed 1 × 550 − 5,5 = 544,5, copied 650 / 5,6 / 544,5; the total in one place only, so the font's swaps by the
+  // total (MOL-290) put nothing right — the memory alone
+  const butter = {
+    printed: 'Կարագ «Օրինակ»',
+    code: '0405',
+    article: BUTTER,
+    quantity: '1',
+    unit: 'pcs' as const,
+    unit_price: '650',
+    discount: '5.6',
+    sum: '544.5',
+  }
+  const answer = (over: Partial<ModelReceipt> = {}): ModelReceipt => ({
+    ...ANSWER,
+    lines: [...ANSWER.lines, butter],
+    totals: [{ label: 'Ընդամենը', amount: '1571.60' }],
+    ...over,
+  })
+  const model = (copied = answer()) =>
+    fakeModel(() =>
+      Promise.resolve({ kind: 'read', answer: copied, costMicroUsd: 1_000, tokens: TOKENS }),
+    )
+  const say = async (actorId: string, itemId: string, drams = 550) =>
+    memory.remember(actorId, TIN, [
+      { kind: 'sku', key: BUTTER, itemId, price: { minor: BigInt(drams * 100), currency: 'AMD' } },
+    ])
+  const butterOf = async (id: string) =>
+    (
+      await db
+        .select()
+        .from(receiptLines)
+        .where(sql`${receiptLines.receiptId} = ${id} and ${receiptLines.position} = 2`)
+    )[0]
+
+  it('puts a line right by the person’s own shelf price, and leaves it empty with none', async () => {
+    const item = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    const me = await person(LATER)
+    await say(me.id, item)
+    const mine = await queued(me)
+    const someone = await person(LATER)
+    const theirs = await queued(someone)
+    const reports = await readAll(benchReader(), model())
+    expect(await butterOf(mine)).toMatchObject({
+      priceMinor: 55_000n,
+      discountMinor: 550n,
+      sumMinor: 54_450n,
+      repaired: true,
+      remembered: true,
+    })
+    // the reading of a person the memory has no word of, and only one stranger's: as before
+    expect(await butterOf(theirs)).toMatchObject({ sumMinor: null, remembered: false })
+    expect(reports.flatMap((r) => (r.kind === 'read' ? [r.remembered] : []))).toEqual([
+      { confirmed: 0, repaired: 1, doubted: 0 },
+      { confirmed: 0, repaired: 0, doubted: 0 },
+    ])
+  }, 30_000)
+
+  it('takes other people’s price from three of them, with no access (owner’s В-1 «в»)', async () => {
+    const item = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    await say(await insertActor(db), item)
+    await say(await insertActor(db), item)
+    const me = await person(LATER)
+    const two = await queued(me)
+    await readAll(benchReader(), model())
+    expect((await butterOf(two))?.remembered).toBe(false)
+    await say(await insertActor(db), item)
+    const three = await queued(me)
+    await readAll(benchReader(), model())
+    expect(await butterOf(three)).toMatchObject({ priceMinor: 55_000n, remembered: true })
+  }, 30_000)
+
+  it('asks nothing without the seller’s tax number', async () => {
+    const item = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    const me = await person(LATER)
+    await say(me.id, item)
+    const id = await queued(me)
+    await readAll(benchReader(), model(answer({ id_rows: ['ԿՀ: 000123'] })))
+    expect((await butterOf(id))?.remembered).toBe(false)
+  }, 30_000)
+
+  it('puts nothing right against a total two places print — the butter gone up to 650 (adversarial А1)', async () => {
+    const item = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    const me = await person(LATER)
+    await say(me.id, item)
+    const id = await queued(me)
+    // printed 1 × 650 = 650, the price copied «660»; remembered 550; the total 650 in two places
+    const gone = { ...butter, unit_price: '660', discount: null, sum: '650' }
+    await readAll(
+      benchReader(),
+      model(
+        answer({
+          lines: [gone],
+          totals: [
+            { label: 'Ընդամենը', amount: '650' },
+            { label: 'Վճարված է Առձեռն', amount: '650' },
+          ],
+        }),
+      ),
+    )
+    expect(
+      await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id)),
+    ).toMatchObject([{ priceMinor: null, sumMinor: null, repaired: false, remembered: false }])
+  }, 30_000)
+
+  it('shows no price of other people’s that the line’s own sum does not hold, and doubts nothing by it (А2, review №4)', async () => {
+    const item = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    const cheese = await insertItem(db, { name: 'Сыр', searchKey: 'syr' })
+    for (let i = 0; i < 3; i += 1) {
+      const stranger = await insertActor(db)
+      await say(stranger, item)
+      await memory.remember(stranger, TIN, [
+        { kind: 'sku', key: '1110005', itemId: cheese, price: { minor: 55_000n, currency: 'AMD' } },
+      ])
+    }
+    const me = await person(LATER)
+    const id = await queued(me)
+    // the butter 1 × 650 = 650 copied «660 / 650»; the cheese 2 × 560 = 1 120 as printed; the bread copied wrong
+    const lines = [
+      { ...butter, unit_price: '660', discount: null, sum: '650' },
+      {
+        ...butter,
+        article: '1110005',
+        discount: null,
+        quantity: '2',
+        unit_price: '560',
+        sum: '1120',
+      },
+      { ...ANSWER.lines[0]!, sum: '760' },
+    ]
+    await readAll(
+      benchReader(),
+      model(answer({ lines, totals: [{ label: 'Ընդամենը', amount: '2510' }] })),
+    )
+    const stored = await db
+      .select()
+      .from(receiptLines)
+      .where(eq(receiptLines.receiptId, id))
+      .orderBy(receiptLines.position)
+    expect(stored.map((line) => [line.priceMinor, line.sumMinor, line.remembered])).toEqual([
+      [null, null, false],
+      [56_000n, 112_000n, false],
+      [null, null, false],
+    ])
+  }, 30_000)
+
+  it('keeps the remembered price in the person’s word once recorded as shown (owner’s В-3 «а»)', async () => {
+    const butterItem = await insertItem(db, {
+      name: 'Масло сливочное',
+      searchKey: 'maslo slivochnoe',
+    })
+    const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+    const bread = await insertItem(db, { name: 'Хлеб', searchKey: 'hleb' })
+    const me = await person(LATER)
+    await say(me.id, butterItem)
+    const id = await queued(me)
+    await readAll(benchReader(), model())
+    const place = await insertPlace(db)
+    const recorded = await app.inject({
+      method: 'POST',
+      url: `/receipts/${id}/record`,
+      headers: { cookie: me.cookie, 'x-molvia-today': '2026-10-22' },
+      payload: {
+        tripId: randomUUID(),
+        place: { id: place },
+        purchasedOn: '2026-10-08',
+        lines: [
+          {
+            position: 0,
+            skip: false,
+            item: { id: milk },
+            quantity: { value: '2', unit: 'piece' },
+            amount: { amount: '740', currency: 'AMD' },
+          },
+          {
+            position: 1,
+            skip: false,
+            item: { id: bread },
+            quantity: { value: '1', unit: 'piece' },
+            amount: { amount: '287.1', currency: 'AMD' },
+          },
+          {
+            position: 2,
+            skip: false,
+            item: { id: butterItem },
+            quantity: { value: '1', unit: 'piece' },
+            amount: { amount: '544.5', currency: 'AMD' },
+          },
+        ],
+      },
+    })
+    expect(recorded.statusCode).toBe(200)
+    expect((await butterOf(id))?.asRead).toBe(true)
+    const words = await db
+      .select()
+      .from(storeMemoryTable)
+      .where(sql`${storeMemoryTable.actorId} = ${me.id} and ${storeMemoryTable.key} = ${BUTTER}`)
+    expect(words.map((word) => word.priceMinor)).toEqual([55_000n])
+  }, 30_000)
+})
+
 describe('the key against a second record (Т-11, adversarial А5, А6, review №10)', () => {
   const as = (id_rows: string[], over: Partial<ModelReceipt> = {}) =>
     fakeModel(() =>
@@ -508,6 +835,7 @@ describe('the key against a second record (Т-11, adversarial А5, А6, review �
       tripId,
       expenses: [],
       confirmed: [],
+      priced: [],
       edits: { lines: 1, edited: 0, skipped: 0, item: 0, figures: 0, totalCorrected: false },
       source: 'photo',
       codesWritten: 0,
@@ -594,6 +922,7 @@ describe('the measure of 0.2r by its reader (MOL-272, В-6 «а»)', () => {
       tripId,
       expenses: [],
       confirmed: [],
+      priced: [],
       edits: { lines: 2, edited: 1, skipped: 0, item: 1, figures: 0, totalCorrected: false },
       source: 'photo',
       codesWritten: 0,

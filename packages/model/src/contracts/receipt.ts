@@ -103,14 +103,20 @@ export const receiptLineCodec = z.strictObject({
   discount: moneyCodec.nullable(),
   /** The line's own arithmetic holds: quantity × price = paid + discount. */
   settled: z.boolean(),
+  /**
+   * Put right by the digits the till's font confuses, on a model's reading the lines then proved whole
+   * (MOL-290): «проверьте», never as read. Sent only when it is, and only to a phone that asked by
+   * `RECEIPT_REPAIRED_HEADER` — an installed app of an earlier build reads a line strictly.
+   */
+  repaired: z.boolean().optional(),
 })
 export type ReceiptLineView = z.output<typeof receiptLineCodec>
 
 /**
  * A line on the review screen (MOL-126): as read, with the item it found and how — `weak` is
  * «проверьте» — the gloss, and what it will be recorded at (`amount`, MOL-124 В-5). `rememberedPrice`
- * is the shop's memory's shelf price when the one read is a digit OCR confuses off it (В-1): a hint,
- * the figures stay as read.
+ * is the shop's memory's shelf price when the one read is a digit OCR confuses off it (В-1), or when the
+ * line has no price — emptied by the check (MOL-291): a hint, the figures stay as read.
  */
 export const receiptReviewLineCodec = z.strictObject({
   ...receiptLineCodec.shape,
@@ -118,6 +124,18 @@ export const receiptReviewLineCodec = z.strictObject({
   itemName: z.string().nullable(),
   match: receiptMatchSchema,
   translation: z.string().nullable(),
+  /**
+   * The new item's name in `translation` spells a word the dictionary has not in Russian letters (MOL-293,
+   * В-4): offered, and taken away by one press. Sent only when it is, and only to a phone that asked by
+   * `RECEIPT_SPELLED_HEADER` — an installed app of an earlier build reads a line strictly.
+   */
+  spelled: z.boolean().optional(),
+  /**
+   * What one piece of the till holds by the line's name (MOL-264): the purchase is the till's pieces times it,
+   * the till's own figures stay as printed. Sent only when there is one, and only to a phone that asked by
+   * `RECEIPT_PACK_HEADER` — an installed app of an earlier build reads a line strictly.
+   */
+  pack: quantityCodec.optional(),
   amount: moneyCodec.nullable(),
   rememberedPrice: moneyCodec.nullable(),
   /**
@@ -151,7 +169,10 @@ export const receiptSummaryCodec = z.strictObject({
    * recorded goes at «Записать», and one whose purchase was removed with it (MOL-240).
    */
   lineCount: z.int().min(0),
-  /** Lines whose own arithmetic does not hold — highlighted, never refused (Р-3 of MOL-113). */
+  /**
+   * Lines to check: whose own arithmetic does not hold — highlighted, never refused (Р-3 of MOL-113) — and those
+   * the font's swaps put right (MOL-290).
+   */
   unsettled: z.int().min(0),
   place: receiptPlaceCodec.nullable(),
   /**
@@ -201,6 +222,14 @@ export const receiptDetailCodec = z.strictObject({
    * `RECEIPT_READ_PARTLY_HEADER`, as `readTotal`.
    */
   readPartly: z.boolean().nullable().optional(),
+  /**
+   * What a card sent to the card instead of taking it off (MOL-289, «Զեղչ գործարքից»): the lines make the
+   * total less it — `linesTotalOf` — and the total is what left the card. With it the bonus the receipt is
+   * partly paid with, which the trip's money takes off the total. Sent only to a phone that asked by
+   * `RECEIPT_CASHBACK_HEADER`, as `readTotal`.
+   */
+  cashback: moneyCodec.nullable().optional(),
+  redeemed: moneyCodec.nullable().optional(),
 })
 export type ReceiptDetail = z.output<typeof receiptDetailCodec>
 
@@ -321,3 +350,15 @@ export const RECEIPT_READ_TOTAL_HEADER = 'X-Molvia-Receipt-Read-Total'
 
 /** A phone that knows the detail's `readPartly` says so by this header (MOL-255), as `RECEIPT_CODES_HEADER`. */
 export const RECEIPT_READ_PARTLY_HEADER = 'X-Molvia-Receipt-Read-Partly'
+
+/** A phone that knows a line's `repaired` says so by this header (MOL-290), as `RECEIPT_CODES_HEADER`. */
+export const RECEIPT_REPAIRED_HEADER = 'X-Molvia-Receipt-Repaired'
+
+/** A phone that knows the detail's `cashback` and `redeemed` says so by this header (MOL-289). */
+export const RECEIPT_CASHBACK_HEADER = 'X-Molvia-Receipt-Cashback'
+
+/** A phone that knows a line's `spelled` says so by this header (MOL-293), as `RECEIPT_CODES_HEADER`. */
+export const RECEIPT_SPELLED_HEADER = 'X-Molvia-Receipt-Spelled'
+
+/** A phone that knows a line's `pack` says so by this header (MOL-264), as `RECEIPT_CODES_HEADER`. */
+export const RECEIPT_PACK_HEADER = 'X-Molvia-Receipt-Pack'

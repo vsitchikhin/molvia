@@ -45,8 +45,11 @@ export const EXPORT_FORMAT = 'molvia-export'
 // and a spending's `transferId`, the transfer it is the fee of (MOL-253). 18: a receipt's `readTotal`,
 // the total as the reader found it in one place, which no second source vouched for (MOL-244). 19: a
 // receipt's `readPartly`, whether its lines as read fell short, before the check emptied any (MOL-255).
-// 20: the account's `receiptsModelUntil`, until when a model reads the person's receipts (MOL-272).
-export const EXPORT_VERSION = 20
+// 20: the account's `receiptsModelUntil`, until when a model reads the person's receipts (MOL-272). 21:
+// a receipt's `cashback` and `redeemed`, what a card sent to the card and the bonus it was paid with
+// (MOL-289), and a line's `repaired`, put right by the digits the till's font confuses (MOL-290). 22: a
+// category's `icon`, chosen for one's own (MOL-285).
+export const EXPORT_VERSION = 22
 
 const day = z.iso.date()
 
@@ -347,6 +350,8 @@ const receiptSchema = z.strictObject({
   receiptNo: z.string().nullable(),
   total: signedMoneyCodec.nullable(),
   readTotal: signedMoneyCodec.nullable(),
+  cashback: signedMoneyCodec.nullable(),
+  redeemed: signedMoneyCodec.nullable(),
   readPartly: z.boolean().nullable(),
   balanced: z.boolean(),
   city: z.string().nullable(),
@@ -366,6 +371,7 @@ const receiptSchema = z.strictObject({
       sum: signedMoneyCodec.nullable(),
       discount: signedMoneyCodec.nullable(),
       settled: z.boolean(),
+      repaired: z.boolean(),
       itemId: z.uuid().nullable(),
       match: z.string().nullable(),
       translation: z.string().nullable(),
@@ -380,6 +386,7 @@ const spendingCategorySchema = z.strictObject({
   preset: spendingPresetSchema.nullable(),
   name: z.string().nullable(),
   colour: z.int().nullable(),
+  icon: z.string().nullable(),
   archivedAt: isoDate.nullable(),
   createdAt: isoDate,
 })

@@ -116,8 +116,9 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   runs of a runner that wanders, so a cost likely rather than measured; a spec that needs it says
   `test.use({ trace: { mode: 'retain-on-first-failure', screenshots: false } })` under `CI`, as
   `verdicts.spec` does. A describe cannot say it — Playwright refuses `use({ trace })` there, since it
-  would take a worker of its own — so the focus block of `scanner.spec` (MOL-249) starts the context's
-  tracing on the first attempt itself and keeps it only when the attempt failed — and steps aside when
+  would take a worker of its own — so the focus block of `scanner.spec` (MOL-249) and «a line gone under
+  the category of «Год»» (MOL-267) call `firstAttemptTrace` (`e2e/trace.ts`): it starts the context's
+  tracing on the first attempt itself, keeps it only when the attempt failed, and steps aside when
   the run already traces that attempt (`--trace on`, a config's `retain-on-first-failure`), whose
   second start threw in every test of the block (review Р2-А1); for the whole file it would have traced
   the camera's reads as well. Not without the DOM of each step: Playwright records the network only with
@@ -179,6 +180,61 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   the question's or the focus's — the check after them never ran and the failure was the old
   `Received: ''`; a test of the spec holds it, the button pressed as soon as it is drawn. The other routes laid after
   `open()` — some fifty — stay as they are until one of them fails so.
+- **A position is measured once the faces have come** (MOL-63, MOL-267): `standAt` and `toTheEnd` of
+  `e2e/scroll.ts` lay the page out and wait for `document.fonts.ready` (`facesIn`) before they set the
+  scene; `topOf` only measures, so a measure with no scene set waits with `facesIn` itself (`money.spec`,
+  «offline, a month not read…», at the top of the page). Every face is `font-display: swap` with a
+  `unicode-range`, so its file is asked for only when a glyph of its range is first laid out — on «Год»
+  the answer brings Onest 700 and ֏ — and the text stands in the fallback until it comes. On a Mac a
+  late face moved the choice of «Год» half a pixel (456.19 → 456.70), which `topOf`'s rounding shows or
+  hides by chance. **The price, named:** a face first needed after the action — a glyph only the next
+  answer brings — still moves what is measured after it; on «Год» every face is on the page before the
+  choice, the other screens were not checked for it.
+- **«A line gone under the category of «Год»» keeps its first attempt's trace in CI** (MOL-267,
+  `firstAttemptTrace` of `e2e/trace.ts`), since its one failure was never explained (run 37911189456,
+  09.10, `scrollY` 1151 → 1132 with the choice where it was). Late faces were not it: held a second with
+  the scene set without waiting, CI stayed green (run 39575601047), and held in the very window of the
+  failure, in Chromium on Linux with DejaVu as the runner has, they moved no block on the failing head,
+  on master or after this task (adversarial А1). On the failing head a calm page in that browser stands
+  at 1132 (П2): the scene was set on a page 19 px longer than it settles to — something over the choice
+  gave way between `toTheEnd` and the first `topOf`, two `evaluate`s, and Chromium's scroll anchoring
+  kept the view; the choice of a category had no part in it. Which block was never caught — of forty runs
+  at four times slower CPU seven reached the measure, and none failed so; the failure came two days
+  before MOL-186 remade the blocks over the choice, and not in some 176 runs since. The trace has the DOM before and after each
+  `evaluate`, that window included. **The prices, named:** a shift that changes no DOM is not in it —
+  it keeps no screenshots; and the artifact lives seven days (`retention-days` of `ci.yml`), so the
+  failure is read the week it comes.
+- **A motion measured frame by frame is measured by the frame's time, never between two drawn frames**
+  (MOL-292): a step is the way gone, brought to one frame of 60 Hz by the frame's own time — the moment
+  `requestAnimationFrame` hands its callback, which the page's animations are drawn at. A loaded runner
+  drops frames, and the next one drawn holds the way of all of them: «Тут дешевле» rises 60 px over
+  220 ms, at most 16.2 px a frame (the CI trace: 1.0 · 10.6 · 16.2 · 16.2 · 7.0 …), and with one frame
+  dropped between the two steepest it failed CI as 32.3 at a threshold of half the way (run
+  39613154163). Shared over its time, a dropped frame's way is no more than a frame's; a jump goes its
+  way in one frame and stays a jump. With one frame dropped right on it, a jump is half the way over two
+  frames' time — at the threshold, and the frames' stamps, a tenth of a millisecond coarse, decide the
+  side (60 over 33.4 ms is 29.94, adversarial Б1): `moving` at 1 is what fails it, so every test of a
+  motion keeps a count of the frames it moved in. **Every run goes through a dropped frame, in a test of
+  its own** («a frame the runner drops on the way up…»): `priceFieldMoves` holds the page busy 60 ms
+  once the field has first moved, and the test says both halves — drawn, more than half the way went
+  between two frames (CI: 50.0 of 60 in every attempt, run 39922499322), measured, under half (12.5) —
+  and in more than three steps, as Е and Е′ (`moving > 3`; the rise held is 7–8). Not more than one: a
+  jump with a pixel drawn before it is two steps, the hold arming on the pixel and taking the rest — a
+  block in 20–90 ms is 2–3, 1 where it is the first move (adversarial В1). **Never in the tests of the
+  motion itself** (adversarial А1): held after the first move, the hold covers the steepest of the
+  rise, which then counts only as its average — a rise of 100 ms, 33 px a frame on screen, passed as
+  smooth, and a runner's own 70 ms after the hold left `moving` at 3 (А2). Е and Е′ take the frames as
+  the runner gives them. **The test of the dropped frame keeps А1, named** (adversarial Г1): its «not a
+  jump» holds to ~90 ms, Е to ~110 — a block of 100–110 ms (120 in a late phase), 55 of 60 px drawn in
+  one step, is 4 steps and passes it while Е fails it. One of two prices, chosen (Д1): `moving > 4`
+  closes the gap — the rise held is 7–8 — at ~20 ms of the runner's margin, the test failing from
+  60–80 ms beyond the hold rather than 80–90, two frames over the rise's 7 in CI; Е guards the product,
+  so the gap is taken and the margin kept. **The price, named:** the count of frames the field moved in
+  (`moving > 3`) stays a count — the one check that tells a jump the runner held right then from a rise
+  it held, which look alike by time — so a runner busy over ~110 ms of the 220 ms rise still fails it,
+  and over ~80 ms beyond the hold of 60 in the test of the dropped frame; it never has. Slowing the
+  page's clock by CDP (`Animation.setPlaybackRate`) was not taken: four times slower, an animation of
+  30 ms passes as a smooth one, and the check stopped telling it from a jump.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**
   (MOL-64). The app has one polite region, in `App.vue` above the router, and **eight things write
   to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the

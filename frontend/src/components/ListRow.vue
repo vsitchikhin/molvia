@@ -6,6 +6,7 @@
       live: tag === 'button' || tag === 'a',
       option: tag === 'li',
       wrap,
+      whole,
       danger,
       inactive,
       selected,
@@ -79,9 +80,13 @@ const SELECTED = new Set([
  *   tint     — the icon stands in a circle of 40 (MOL-176): a colour — a category's, on its
  *              `cat-tint-share` — or `muted`, `surface-2` under `text-muted`, for what has no colour;
  *   wrap     — the title breaks onto lines instead of ending in «…»;
+ *   whole    — the meta stands whole, in as many lines as it takes: an explanation cut at two lines
+ *              explains nothing — the newcomer's steps on a phone of 320 (MOL-203). A list of rows
+ *              keeps its two, so a long place does not grow the row without end;
  *   next     — the chevron (the owner's В-14 «а»): the row opens something to go on with — a screen, a
- *              sheet with fields. A row that acts at once or asks to confirm has none, and one card
- *              never mixes the two (DESIGN.md; held by review, the card is the screen's);
+ *              sheet with fields, or a fork on the way to them (MOL-203). A row that acts at once or asks
+ *              to confirm has none, and one card never mixes the two (DESIGN.md; held by review, the card
+ *              is the screen's);
  *   danger   — the title and the icon in `bad-ink`: the row destroys;
  *   inactive — not now (Ф-6, MOL-174): focusable, `aria-disabled`, a press reaching nobody, the link
  *              followed nowhere — a link loses its `href` too, or a middle click or a long press would
@@ -93,8 +98,9 @@ const SELECTED = new Set([
  *              the fill without the ring, since the focus is in the field, and read out as selected, as
  *              the ARIA combobox has its active option.
  *
- * The slot `below` stands under the meta, in the column of the words — a tag, «Отправляем…»: in the
- * meta it would be cut with it at two lines.
+ * The slot `below` stands under the meta, in the column of the words and as wide as it — a tag,
+ * «Отправляем…», at its own width, since it is inline; a bar of «Бюджет» across the column (MOL-192):
+ * in the meta either would be cut with it at two lines.
  */
 export default defineComponent({
   name: 'ListRow',
@@ -111,6 +117,7 @@ export default defineComponent({
     icon: { type: [Object, Function] as PropType<Component>, default: undefined },
     tint: { type: String, default: '' },
     wrap: { type: Boolean, default: false },
+    whole: { type: Boolean, default: false },
     next: { type: Boolean, default: false },
     danger: { type: Boolean, default: false },
     inactive: { type: Boolean, default: false },
@@ -270,8 +277,14 @@ export default defineComponent({
   line-clamp: 2;
 }
 
+.whole .meta {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: none;
+  line-clamp: none;
+}
+
 .below {
-  justify-self: start;
   margin-top: var(--space-1);
 }
 
@@ -288,6 +301,18 @@ export default defineComponent({
   max-width: 45%;
   font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
+}
+
+/* A button of 44 in the tail stands over the row's padding of 12 by 4 a side, so a row with a button is
+   64 as every row is (DESIGN.md), its target still 44: grown by it, the rows of «Категории» were 68 and
+   their skeleton 64 (MOL-191). Its sides are 8, not a button's 16, and it stands 8 into the row's padding
+   at the right — its pill 8 from the card's edge, its word 16, the handoff's 8 and 20: beside a circle of
+   40 a phone of 320 left the words 100 px, and «Развлечения» of 107 broke in the middle (adversarial А2),
+   under «Вернуть», wider than «Убрать», with the sides alone still (Б1); now 113. */
+.tail > :slotted(.button) {
+  margin-block: calc(var(--space-1) * -1);
+  margin-inline-end: calc(var(--space-2) * -1);
+  padding-inline: var(--space-2);
 }
 
 /* In a narrow container named `row` the tail goes under the words, on a line of its own at the right —

@@ -26,6 +26,9 @@ import IncomeSheet from '@/components/IncomeSheet.vue'
 import OperationRow from '@/components/OperationRow.vue'
 import OperationSheet from '@/components/OperationSheet.vue'
 import ReconcileSheet from '@/components/ReconcileSheet.vue'
+import ScreenState from '@/components/ScreenState.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
+import UndoStrip from '@/components/UndoStrip.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -69,6 +72,7 @@ vi.mock('@/api', () => ({
 const OWNER = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const CASH = '5c1f8b2d-3e4a-4b6c-8d7e-9f0a1b2c3d4e'
 const OTHER = 'ffffffff-0000-4000-8000-00000000000d'
+const THIRD = 'ffffffff-0000-4000-8000-00000000000e'
 const TAXI = 'eeeeeeee-0000-4000-8000-000000000001'
 
 function amd(text: string) {
@@ -140,7 +144,7 @@ function journal(account: MoneyAccountView, rows: AccountOperationView[]): Accou
 }
 
 const categories: SpendingCategoryView[] = [
-  { id: OTHER, preset: 'other', name: null, colour: null, archived: false },
+  { id: OTHER, preset: 'other', name: null, colour: null, icon: null, archived: false },
 ]
 
 let clock = 0
@@ -516,5 +520,281 @@ describe('the ways into «Перевод» (MOL-253, handoff 01)', () => {
     moneyAccounts.mockResolvedValue(page([cash(), dollars]))
     const alone = await open(AccountView, `/money/accounts/${CASH}`, session())
     expect(button(alone, 'Transfer')).toBeUndefined()
+  })
+})
+
+describe('«Счета» on the kit (MOL-193)', () => {
+  const add = (view: VueWrapper) => button(view, en.accounts.screen.add)
+  const offline = () => vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+  const rub = (text: string) => parseMoney(text, 'RUB')
+
+  function twoCurrencies(): MoneyAccountsResponse {
+    return {
+      ...page([cash()]),
+      totals: {
+        total: amd('3559833'),
+        spendable: amd('217486'),
+        savings: amd('3342347'),
+        uncounted: 0,
+      },
+      incomeTotals: {
+        currency: 'RUB',
+        total: rub('770527'),
+        spendable: rub('47075'),
+        savings: rub('723452'),
+        uncounted: 0,
+      },
+    }
+  }
+
+  it('«Добавить счёт» is the strip over an answer: with accounts, and on the empty screen with no button of its own', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([cash()]))
+    const view = await open(AccountsView, '/money/accounts', pinia)
+    expect(view.get('.dock').text()).toContain(en.accounts.screen.add)
+
+    const empty = session()
+    moneyAccounts.mockResolvedValue(page([]))
+    const bare = await open(AccountsView, '/money/accounts', empty)
+    expect(bare.get('.dock').text()).toContain(en.accounts.screen.add)
+    expect(bare.getComponent(ScreenState).findAll('button')).toHaveLength(0)
+  })
+
+  it('must not fire: no strip on the skeleton, and the error takes it with «Повторить»', async () => {
+    const pinia = session()
+    moneyAccounts.mockImplementation(() => new Promise(() => undefined))
+    const view = await open(AccountsView, '/money/accounts', pinia)
+    expect(view.find('.skeleton-figure').exists()).toBe(true)
+    expect(add(view)).toBeUndefined()
+
+    const broken = session()
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const failed = await open(AccountsView, '/money/accounts', broken)
+    expect(add(failed)).toBeUndefined()
+    expect(failed.get('.dock').text()).toContain(en.state.retry)
+  })
+
+  it('a removal leaves «Добавить счёт» under «Вернуть», which waits for the connection offline', async () => {
+    const pinia = session()
+    const store = useAccountsStore(pinia)
+    moneyAccounts.mockResolvedValue(page([cash()]))
+    const view = await open(AccountsView, '/money/accounts', pinia)
+    store.removed = { id: OTHER, name: 'Card ₽', stamp: Date.now() }
+    await settle()
+    expect(view.findComponent(UndoStrip).exists()).toBe(true)
+    expect(add(view)).toBeDefined()
+    expect(view.getComponent(UndoStrip).props('waiting')).toBe(false)
+
+    offline()
+    window.dispatchEvent(new Event('offline'))
+    await settle()
+    expect(view.getComponent(UndoStrip).props('waiting')).toBe(true)
+    expect(view.getComponent(UndoStrip).props('waitingAction')).toBe(
+      en.accounts.screen.restore_wait,
+    )
+  })
+
+  it('the total in the income currency large and the spending one under it, the tiles too (В-19, В-1 «б»)', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(twoCurrencies())
+    const view = await open(AccountsView, '/money/accounts', pinia)
+    expect(plain(view.get('.figure').text())).toMatch(/770,527/)
+    expect(view.get('.figure').text()).toContain('₽')
+    expect(plain(view.get('.figure-second').text())).toMatch(/3,559,833/)
+    const tiles = view.findAll('.tile')
+    expect(plain(tiles[0]?.get('.tile-figure').text() ?? '')).toMatch(/47,075/)
+    expect(plain(tiles[0]?.get('.tile-second').text() ?? '')).toMatch(/217,486/)
+    expect(plain(tiles[1]?.get('.tile-figure').text() ?? '')).toMatch(/723,452/)
+    expect(plain(tiles[1]?.get('.tile-second').text() ?? '')).toMatch(/3,342,347/)
+  })
+
+  it('one currency, or a page kept from before `incomeTotals` — one figure, no line under it', async () => {
+    const same = session()
+    const one = twoCurrencies()
+    moneyAccounts.mockResolvedValue({ ...one, incomeTotals: { ...one.totals, currency: 'AMD' } })
+    const view = await open(AccountsView, '/money/accounts', same)
+    expect(plain(view.get('.figure').text())).toMatch(/3,559,833/)
+    expect(view.find('.figure-second').exists()).toBe(false)
+    expect(view.find('.tile-second').exists()).toBe(false)
+
+    const old = session()
+    moneyAccounts.mockResolvedValue({ ...one, incomeTotals: null })
+    const kept = await open(AccountsView, '/money/accounts', old)
+    expect(plain(kept.get('.figure').text())).toMatch(/3,559,833/)
+    expect(kept.find('.figure-second').exists()).toBe(false)
+  })
+
+  it('below zero each figure by its own sign', async () => {
+    const pinia = session()
+    const two = twoCurrencies()
+    moneyAccounts.mockResolvedValue({
+      ...two,
+      totals: { ...two.totals, spendable: amd('-5000') },
+      incomeTotals: two.incomeTotals && {
+        ...two.incomeTotals,
+        spendable: { ...rub('1082'), minor: -108225n },
+      },
+    })
+    const view = await open(AccountsView, '/money/accounts', pinia)
+    const tile = view.findAll('.tile')[0]
+    expect(tile?.get('.tile-figure').classes()).toContain('negative')
+    expect(tile?.get('.tile-second').classes()).toContain('negative')
+    expect(view.get('.figure').classes()).not.toContain('negative')
+    expect(view.findAll('.tile')[1]?.find('.negative').exists()).toBe(false)
+
+    // The savings too — a card in debt among them, a start below zero (adversarial А1).
+    const savings = session()
+    moneyAccounts.mockResolvedValue({
+      ...two,
+      totals: { ...two.totals, savings: amd('-5000') },
+      incomeTotals: two.incomeTotals && {
+        ...two.incomeTotals,
+        savings: { ...rub('1082'), minor: -108225n },
+      },
+    })
+    const saved = (await open(AccountsView, '/money/accounts', savings)).findAll('.tile')[1]
+    expect(saved?.get('.tile-figure').classes()).toContain('negative')
+    expect(saved?.get('.tile-second').classes()).toContain('negative')
+  })
+
+  it('must not fire: either currency left an account out — one figure, and the note says what it misses (Р1-1)', async () => {
+    const two = twoCurrencies()
+    // No rate between the two: the drams are in the drams' figure alone, the roubles in theirs.
+    for (const [income, spend] of [
+      [1, 1],
+      [0, 1],
+      [1, 0],
+    ] as const) {
+      moneyAccounts.mockResolvedValue({
+        ...two,
+        totals: { ...two.totals, uncounted: spend },
+        incomeTotals: two.incomeTotals && { ...two.incomeTotals, uncounted: income },
+      })
+      const view = await open(AccountsView, '/money/accounts', session())
+      expect(view.get('.figure').text()).toContain('₽')
+      expect(view.find('.figure-second').exists()).toBe(false)
+      expect(view.find('.tile-second').exists()).toBe(false)
+      expect(view.text().includes('not counted')).toBe(income > 0)
+    }
+  })
+
+  it('an account is a row of the kit to its screen, «≈» only beside a foreign balance', async () => {
+    const pinia = session()
+    const card = cash({
+      id: OTHER,
+      name: 'Card ₽',
+      currency: 'RUB',
+      balance: rub('515.81'),
+      inSpend: amd('2383'),
+    })
+    moneyAccounts.mockResolvedValue(page([cash(), card]))
+    const view = await open(AccountsView, '/money/accounts', pinia)
+    const rows = view.findAll('a.list-row')
+    expect(rows).toHaveLength(2)
+    expect(rows[0]?.attributes('href')).toBe(`/money/accounts/${CASH}`)
+    expect(rows[0]?.find('.approx').exists()).toBe(false)
+    expect(plain(rows[1]?.get('.approx').text() ?? '')).toMatch(/2,383/)
+  })
+
+  it('a removed account offline: «Вернуть» not now and saying why, the way to its screen open', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([cash(), cash({ id: OTHER, archivedAt: new Date() })]))
+    offline()
+    const view = await open(AccountsView, '/money/accounts', pinia)
+    await view.get('.removed-head').trigger('click')
+    await settle()
+    const restore = button(view, en.accounts.screen.restore_wait)
+    expect(restore?.attributes('aria-disabled')).toBe('true')
+    await restore?.trigger('click')
+    expect(restoreMoneyAccount).not.toHaveBeenCalled()
+    expect(view.get('.removed-open').attributes('href')).toBe(`/money/accounts/${OTHER}`)
+  })
+
+  it("the connection in one strip of the screen's words; a failed retry says the same words again", async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([cash()]))
+    const view = await open(AccountsView, '/money/accounts', pinia)
+    expect(view.findComponent(StatusStrip).exists()).toBe(false)
+
+    // Kept from an earlier launch: this one has not had an answer.
+    useAccountsStore(session()).accept(page([cash()], new Date('2026-09-26T10:05:00Z')))
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const stale = await open(AccountsView, '/money/accounts', session())
+    const strip = stale.getComponent(StatusStrip)
+    expect(strip.props('kind')).toBe('unanswered')
+    const before = strip.props('attempt') as number
+    await button(stale, en.state.retry)?.trigger('click')
+    await settle()
+    expect(stale.getComponent(StatusStrip).props('attempt')).toBe(before + 1)
+
+    offline()
+    window.dispatchEvent(new Event('offline'))
+    await settle()
+    // One on the screen: a closed sheet's own strip is the sheet's.
+    const onScreen = stale
+      .findAllComponents(StatusStrip)
+      .filter((one) => !one.element.closest('dialog'))
+    expect(onScreen.map((one) => one.props('kind'))).toEqual(['offline'])
+  })
+
+  it('answered in this session, then a read that failed: the same strip, as «Деньги» date the same money (adversarial А2)', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([cash()], new Date('2026-10-23T09:05:00Z')))
+    const first = await open(AccountsView, '/money/accounts', pinia)
+    views.splice(views.indexOf(first), 1)
+    first.unmount()
+
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const again = await open(AccountsView, '/money/accounts', pinia)
+    expect(again.getComponent(StatusStrip).props('kind')).toBe('unanswered')
+    expect(button(again, en.state.retry)).toBeDefined()
+
+    // An answer takes it away.
+    moneyAccounts.mockResolvedValue(page([cash()]))
+    await button(again, en.state.retry)?.trigger('click')
+    await settle()
+    expect(again.findComponent(StatusStrip).exists()).toBe(false)
+  })
+
+  it('one «Вернуть» of the screen in the air at a time: each answers with the page whole (adversarial А3)', async () => {
+    const pinia = session()
+    const store = useAccountsStore(pinia)
+    const away = new Date('2026-10-20T10:00:00Z')
+    const third = cash({ id: THIRD, name: 'Third', archivedAt: away })
+    moneyAccounts.mockResolvedValue(page([cash(), cash({ id: OTHER, archivedAt: away }), third]))
+    const view = await open(AccountsView, '/money/accounts', pinia)
+    store.removed = { id: 'eeeeeeee-0000-4000-8000-000000000001', name: 'Spare', stamp: Date.now() }
+    await view.get('.removed-head').trigger('click')
+    await settle()
+
+    let land: (answer: MoneyAccountsResponse) => void = () => undefined
+    restoreMoneyAccount.mockImplementation(() => new Promise((resolve) => (land = resolve)))
+    await view.get('.removed-restore').trigger('click')
+    expect(restoreMoneyAccount).toHaveBeenCalledWith(OTHER)
+    expect(view.getComponent(UndoStrip).props('inactive')).toBe(true)
+    await view.getComponent(UndoStrip).get('button').trigger('click')
+    expect(restoreMoneyAccount).toHaveBeenCalledTimes(1)
+    land(page([cash(), cash({ id: OTHER }), third]))
+    await settle()
+    expect(view.getComponent(UndoStrip).props('inactive')).toBe(false)
+
+    // And the other way: the strip's at work holds the row's.
+    await view.getComponent(UndoStrip).get('button').trigger('click')
+    await settle()
+    expect(view.getComponent(UndoStrip).props('busy')).toBe(true)
+    expect(view.get('.removed-restore').attributes('aria-disabled')).toBe('true')
+    land(page([cash(), cash({ id: OTHER }), third]))
+    await settle()
+  })
+
+  it('a date in a row stays whole, and only the date: «started» may still go to the next line (Р1-5, Б1)', async () => {
+    moneyAccounts.mockResolvedValue(
+      page([cash(), cash({ id: OTHER, archivedAt: new Date('2026-10-21T10:00:00Z') })]),
+    )
+    const view = await open(AccountsView, '/money/accounts', session())
+    expect(view.get('a.list-row .meta').text()).toBe('AMD · started Sep\u00a016')
+    await view.get('.removed-head').trigger('click')
+    await settle()
+    expect(view.get('.removed-open .meta').text()).toMatch(/· put away Oct\u00a021$/)
   })
 })

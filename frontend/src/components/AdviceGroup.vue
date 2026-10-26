@@ -67,8 +67,10 @@ export default defineComponent({
   margin-top: var(--space-6);
 }
 
-.never,
-.unrated {
+/* The hairline stands in the middle of the 24 between groups, not after it (MOL-200, В-1). */
+.group + .never,
+.group + .unrated {
+  margin-top: var(--space-3);
   padding-top: var(--space-3);
   border-top: var(--hairline) solid var(--border);
 }

@@ -146,6 +146,60 @@ describe('the balance — the model’s, not a sum of the phone’s', () => {
   })
 })
 
+describe('a line put right by the font’s swaps (MOL-290)', () => {
+  it('says «проверьте» of its figures until the person typed their own', () => {
+    const detail = receiptA()
+    const put = {
+      ...detail,
+      lines: detail.lines.map((l, i) => (i === 0 ? { ...l, repaired: true } : l)),
+    }
+    expect(reviewLines(put, null).map((l) => l.repaired)).toEqual([true, false, false, false])
+    // an item chosen leaves the figures to the reading, and their «проверьте» with them
+    const chosen: ReceiptDraft = {
+      lines: { 0: { item: { id: MILK, name: 'Молоко' }, skip: false } },
+    }
+    expect(reviewLines(put, chosen)[0]?.repaired).toBe(true)
+    const typed: ReceiptDraft = {
+      lines: {
+        0: {
+          item: { id: MILK, name: 'Молоко' },
+          skip: false,
+          figures: { quantity: parseQuantity('1', 'piece'), amount: amd('531') },
+        },
+      },
+    }
+    expect(reviewLines(put, typed)[0]?.repaired).toBe(false)
+  })
+})
+
+describe('a card that sends its discount to the card (MOL-289)', () => {
+  // the lines come to 3 663 with the chocolate's 980, and 36,63 went to the card: «Ընդամենը» 3 699,63
+  const carded = (cashback: string | null): ReceiptDetail => ({
+    ...receiptA('3699.63'),
+    ...(cashback === null ? {} : { cashback: amd(cashback) }),
+  })
+
+  it('sets the lines against the total less what went to the card', () => {
+    const detail = carded('36.63')
+    const lines = reviewLines(detail, null)
+    const balance = reviewBalance(detail, lines, null)
+    expect([balance.lines, balance.difference]).toEqual([amd('3573'), amd('90')])
+  })
+
+  it('turns В-5 by the total less it when the person typed the total', () => {
+    const detail = carded('36.63')
+    const draft: ReceiptDraft = { lines: {}, total: amd('3699.63') }
+    const lines = reviewLines(detail, draft)
+    expect(lines[3]?.amount).toEqual(amd('980'))
+    expect(reviewBalance(detail, lines, draft).difference).toEqual(amd('0'))
+    // a server of before sends none: the lines fall short of the total by what went to the card
+    const before = carded(null)
+    const without = reviewLines(before, draft)
+    expect(without[3]?.amount).toEqual(amd('890'))
+    expect(reviewBalance(before, without, draft).difference).toEqual(amd('126.63'))
+  })
+})
+
 describe('a total the person typed (Р-8, review 4)', () => {
   it('turns В-5 for the lines not edited: the printed sum the total confirms is recorded', () => {
     // The total was not read: the server recorded the chocolate at 1 × 890.
@@ -204,6 +258,82 @@ describe('«проверьте» on a line edited (review 16)', () => {
     })
     expect(reviewLines(detail, edited(false))[3]?.check).toBe(true)
     expect(reviewLines(detail, edited(true))[3]?.check).toBe(false)
+  })
+})
+
+describe('a new item named by the binding, «проверьте» (MOL-293, В-1 «а», adversarial А6)', () => {
+  const proposed = (): ReceiptDetail => {
+    const detail = receiptA()
+    const [first, second, cheese, fourth] = detail.lines
+    if (!first || !second || !cheese || !fourth) throw new Error('four lines')
+    return { ...detail, lines: [first, second, { ...cheese, match: 'weak' }, fourth] }
+  }
+
+  it('says «проверьте» of a new item the binding marked so, and never of a plain new one', () => {
+    expect(reviewLines(proposed(), null)[2]).toMatchObject({ isNew: true, check: true })
+    expect(reviewLines(receiptA(), null)[2]).toMatchObject({ isNew: true, check: false })
+  })
+
+  it('lets it go once the person answered: a name of their own, or the proposal confirmed', () => {
+    const named = (item: { name: string }, confirmed: boolean): ReceiptDraft => ({
+      lines: { 2: { item, skip: false, ...(confirmed ? { confirmed: true as const } : {}) } },
+    })
+    expect(reviewLines(proposed(), named({ name: 'Сыр лори' }, true))[2]?.check).toBe(false)
+    expect(reviewLines(proposed(), named({ name: 'Сыр Лори копчёный' }, true))[2]?.check).toBe(
+      false,
+    )
+  })
+})
+
+describe('a line’s package (MOL-264)', () => {
+  const COLA = 'eeeeeeee-0000-4000-8000-000000000001'
+  function packed(): ReceiptDetail {
+    const detail = receiptA()
+    return {
+      ...detail,
+      lines: [
+        line('ԿԱԹ «ԻԳԻԹ» 3.2% 1լ', '2', 'piece', '370', '740', {
+          pack: parseQuantity('1', 'l'),
+        }),
+        ...detail.lines.slice(1),
+      ],
+    }
+  }
+
+  it('shows the purchase the package makes, the till’s figures kept on the line', () => {
+    const [milk] = reviewLines(packed(), null)
+    expect(milk?.quantity).toEqual(parseQuantity('2', 'l'))
+    expect(milk?.line.quantity).toEqual(parseQuantity('2', 'piece'))
+    expect(milk?.changed).toEqual({ item: false, figures: false })
+  })
+
+  it('sends it at «Записать», and an item chosen alone leaves it so', () => {
+    const detail = packed()
+    const draft: ReceiptDraft = {
+      lines: { 0: { item: { id: COLA, name: 'Молоко' }, skip: false } },
+    }
+    const lines = reviewLines(detail, draft)
+    expect(lines[0]?.quantity).toEqual(parseQuantity('2', 'l'))
+    expect(recordBody(detail, draft, lines, TRIP, '2026-09-27')?.lines[0]).toMatchObject({
+      quantity: parseQuantity('2', 'l'),
+    })
+  })
+
+  it('counts figures put right against the litres shown, never against the till’s pieces', () => {
+    const detail = packed()
+    const kept = (value: string, unit: 'piece' | 'l') =>
+      reviewLines(detail, {
+        lines: {
+          0: {
+            item: { id: MILK, name: 'Молоко' },
+            skip: false,
+            figures: { quantity: parseQuantity(value, unit), amount: amd('740') },
+          },
+        },
+      })[0]?.changed.figures
+    expect(kept('2', 'l')).toBe(false)
+    expect(kept('2', 'piece')).toBe(true)
+    expect(kept('1', 'l')).toBe(true)
   })
 })
 

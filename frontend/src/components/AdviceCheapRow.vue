@@ -4,13 +4,12 @@
     <VerdictBadge level="if_cheap" compact />
 
     <span class="body">
-      <span class="name">{{ row.name }}</span>
-      <span v-if="second" class="second">{{ second }}</span>
-    </span>
-
-    <span class="figures">
-      <span v-if="places.kind !== 'none'" class="price">{{ unitPrice(places.best) }}</span>
-      <AdviceRating :rating="row.rating" :count="row.ratingsCount" :scope="scope" />
+      <span class="title">
+        <span class="name">{{ row.name }}</span>
+        <AdviceRating :rating="row.rating" :count="row.ratingsCount" :scope="scope" />
+      </span>
+      <span v-if="at" class="at">{{ at }}</span>
+      <span v-if="threshold" class="threshold">{{ threshold }}</span>
     </span>
   </button>
 </template>
@@ -23,7 +22,7 @@ import { cityWhereNameRepeats } from '@molvia/model'
 import type { AdvicePlace, AdviceScope } from '@molvia/model'
 import AdviceRating from '@/components/AdviceRating.vue'
 import VerdictBadge from '@/components/VerdictBadge.vue'
-import { placesView, unitPriceText, whereKey } from '@/components/adviceRow'
+import { placesView, unitPriceText } from '@/components/adviceRow'
 import { placeLabel } from '@/components/placeLabel'
 import type { CheapRow } from '@/components/adviceRow'
 
@@ -34,11 +33,14 @@ import type { CheapRow } from '@/components/adviceRow'
  * The dashed edge is the third sign of «conditionally», independent of colour, after the shape
  * of the badge and its icon.
  *
- * **The second line is the threshold, and the place when there is no threshold** (В-2). The
- * lower median needs three purchases before it means anything (MOL-33), and until then the
- * server sends `null` rather than a number with nothing under it. A line that said nothing at
- * all in the meantime would leave the row without an answer to «where did I buy this», which
- * the card above always gives.
+ * **The price and its place first, the threshold under them** (MOL-200, Ф-21): «1 290 ֏/кг ·
+ * Ереван Сити», then «Стоит брать дешевле 1 100 ֏/кг». The place used to stand only where there
+ * was no threshold, so a row that had one never said where it was bought. Either line is left
+ * out when there is nothing to say: the lower median needs three purchases before it means
+ * anything (MOL-33), and a row rated but never bought has no place.
+ *
+ * **No word before the place.** One place is named, and «price · place» says nothing about the
+ * others, so the superlative the card above decides (А1) has nothing to be true or false of here.
  */
 export default defineComponent({
   name: 'AdviceCheapRow',
@@ -60,20 +62,21 @@ export default defineComponent({
     const cityOf = computed(() => cityWhereNameRepeats(props.row.places))
     const named = (place: AdvicePlace): string => placeLabel(place.name, cityOf.value(place), i18n)
 
-    const unitPrice = (place: AdvicePlace): string =>
-      unitPriceText(place.unitPrice, t, locale.value)
-
-    const second = computed(() => {
-      const threshold = props.row.threshold
-      if (threshold) {
-        return t('advice.threshold', { price: unitPriceText(threshold, t, locale.value) })
-      }
+    const at = computed(() => {
       const view = places.value
       if (view.kind === 'none') return ''
-      return t(whereKey(view), { place: named(view.best) })
+      return t('advice.price_at', {
+        price: unitPriceText(view.best.unitPrice, t, locale.value),
+        place: named(view.best),
+      })
     })
 
-    return { t, places, second, unitPrice }
+    const threshold = computed(() => {
+      const price = props.row.threshold
+      return price ? t('advice.threshold', { price: unitPriceText(price, t, locale.value) }) : ''
+    })
+
+    return { t, at, threshold }
   },
 })
 </script>
@@ -82,10 +85,10 @@ export default defineComponent({
 .row {
   display: flex;
   gap: var(--space-3);
-  align-items: center;
+  align-items: flex-start;
   width: 100%;
   min-height: var(--touch-target);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3);
   border: var(--hairline) dashed var(--warn);
   border-radius: var(--radius);
   background: var(--surface);
@@ -113,29 +116,29 @@ export default defineComponent({
   min-width: 0;
 }
 
+.title {
+  @include name-beside-figure;
+}
+
 .name {
-  display: block;
-  font-size: var(--text-callout);
+  font-size: var(--text-body);
   font-weight: var(--weight-medium);
 }
 
-.second {
+.at,
+.threshold {
   display: block;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-}
-
-.figures {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  align-items: flex-end;
-  text-align: right;
-}
-
-.price {
   font-size: var(--text-footnote);
+}
+
+/* A place of one word wider than the row breaks rather than leaves it, as it does in the plate of «Брать». */
+.at {
   font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
+  overflow-wrap: break-word;
+}
+
+.threshold {
+  color: var(--text-muted);
 }
 </style>

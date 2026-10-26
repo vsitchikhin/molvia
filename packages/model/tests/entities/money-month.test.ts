@@ -16,6 +16,8 @@ import type { AccountOperation, MoneyAccount } from '#model/entities/money-accou
 import { spendingIn, spendingSchema } from '#model/entities/spending'
 import type { Spending } from '#model/entities/spending'
 import {
+  DEFAULT_SPENDING_ICON,
+  SPENDING_ICONS,
   SPENDING_PRESETS,
   categoryOrder,
   nextCategoryColour,
@@ -57,6 +59,7 @@ const presets: SpendingCategory[] = SPENDING_PRESETS.map((preset, index) => ({
   preset,
   name: null,
   colour: null,
+  icon: null,
   archivedAt: null,
   createdAt: new Date('2026-09-01T00:00:00Z'),
 }))
@@ -755,6 +758,7 @@ describe('categories', () => {
       preset: null,
       name: 'Такси',
       colour: 0,
+      icon: 'tag',
       archivedAt: null,
       createdAt: new Date('2026-09-02T00:00:00Z'),
     }
@@ -772,6 +776,7 @@ describe('categories', () => {
       preset: null,
       name: `Своя ${String(index)}`,
       colour: index,
+      icon: 'tag',
       archivedAt: null,
       createdAt: new Date(),
     })
@@ -780,25 +785,27 @@ describe('categories', () => {
     expect(nextCategoryColour(Array.from({ length: 8 }, (_, index) => own(index)))).toBe(0)
   })
 
-  it("is a preset by its key or one's own by name and colour — never both, never neither", () => {
+  it("is a preset by its key or one's own by name, colour and icon — never both, never neither", () => {
     const base = { id: nextId(), actorId: OWNER, archivedAt: null, createdAt: new Date() }
-    expect(
-      spendingCategorySchema.safeParse({ ...base, preset: 'cafe', name: null, colour: null })
-        .success,
-    ).toBe(true)
-    expect(
-      spendingCategorySchema.safeParse({ ...base, preset: null, name: 'Такси', colour: 3 }).success,
-    ).toBe(true)
-    expect(
-      spendingCategorySchema.safeParse({ ...base, preset: 'cafe', name: 'Кафе', colour: null })
-        .success,
-    ).toBe(false)
-    expect(
-      spendingCategorySchema.safeParse({ ...base, preset: null, name: null, colour: null }).success,
-    ).toBe(false)
-    expect(
-      spendingCategorySchema.safeParse({ ...base, preset: null, name: '   ', colour: 1 }).success,
-    ).toBe(false)
+    const parses = (fields: object) =>
+      spendingCategorySchema.safeParse({ ...base, ...fields }).success
+    expect(parses({ preset: 'cafe', name: null, colour: null, icon: null })).toBe(true)
+    expect(parses({ preset: null, name: 'Такси', colour: 3, icon: 'taxi' })).toBe(true)
+    expect(parses({ preset: 'cafe', name: 'Кафе', colour: null, icon: null })).toBe(false)
+    expect(parses({ preset: null, name: null, colour: null, icon: null })).toBe(false)
+    expect(parses({ preset: null, name: '   ', colour: 1, icon: 'tag' })).toBe(false)
+    // A preset is drawn by its key, never by an icon of its own (MOL-285).
+    expect(parses({ preset: 'cafe', name: null, colour: null, icon: 'cafe' })).toBe(false)
+    expect(parses({ preset: null, name: 'Такси', colour: 3, icon: null })).toBe(false)
+    expect(parses({ preset: null, name: 'Такси', colour: 3, icon: 'rocket' })).toBe(false)
+    expect(parses({ preset: null, name: 'Такси', colour: 8, icon: 'taxi' })).toBe(false)
+  })
+
+  it("offers one's own the tag first, the presets' icons too, each once (MOL-285, В-3 «б»)", () => {
+    expect(SPENDING_ICONS[0]).toBe(DEFAULT_SPENDING_ICON)
+    expect(new Set(SPENDING_ICONS).size).toBe(SPENDING_ICONS.length)
+    expect(SPENDING_ICONS).toEqual(expect.arrayContaining([...SPENDING_PRESETS]))
+    expect(SPENDING_ICONS).toHaveLength(24 + SPENDING_PRESETS.length)
   })
 })
 

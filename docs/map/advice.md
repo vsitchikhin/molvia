@@ -63,24 +63,25 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 
 ## frontend · components
 
-- `frontend/src/components/AdviceCheapRow.vue` — Row of «Только если дёшево»: the rating, then the price threshold or the place where it was bought.
-- `frontend/src/components/AdviceGroup.vue` — Group heading of «Что брать»: the word and badge of «Брать», «Только если дёшево» or «Не брать нигде»; «Ещё не оценивали» for the search.
-- `frontend/src/components/AdviceHomeNew.vue` — «Что брать» of a newcomer (MOL-128): «Запишите первые покупки» or «Осталось оценить», the cycle of three steps, the line about trust.
+- `frontend/src/components/AdviceCheapRow.vue` — Row of «Только если дёшево»: the name and rating, then «price · place» and the price threshold, each only when there is one.
+- `frontend/src/components/AdviceGroup.vue` — Group of «Что брать»: the caption with the verdict's dot of «Брать», «Только если дёшево» or «Не брать нигде»; «Ещё не оценивали» for the search; a hairline before «Не брать нигде» and «Ещё не оценивали», only under another group.
+- `frontend/src/components/AdviceHomeNew.vue` — «Что брать» of a newcomer (MOL-128): «Запишите первые покупки» or «Осталось оценить», the cycle of three steps, the line about trust; every row the kit's `ListRow` (MOL-203), «Записать вручную» a row of its own with receipts.
 - `frontend/src/components/AdviceNeverRow.vue` — Row of «Не брать нигде»: struck-through name, rating and own review, with no price or place.
-- `frontend/src/components/AdviceSearch.vue` — The search on «Что брать»: the kit's `SearchField` with «Очистить», and what is found laid out by the list's groups and shapes, «Ещё не оценивали» last with «Оценить».
+- `frontend/src/components/AdviceSearch.vue` — The search on «Что брать»: the kit's `SearchField` with «Очистить» and the one strip of the connection under it — the search's offline, else the list's from the screen — and what is found laid out by the list's groups and shapes, «Ещё не оценивали» last as a `ListRow` with «Оценить».
+- `frontend/src/components/AdviceSkeleton.vue` — «Что брать» while its answer is on its way (MOL-201, Ф-13): the captions, a card of «Брать», a row of «если дёшево»; the screen puts the field's well and its strip above it, the search draws it under its own field.
 - `frontend/src/components/AdviceRating.vue` — The «4,3 из 5 · 3 оценки» figure shared by all three row forms; the count is left out in own mode.
-- `frontend/src/components/AdviceTakeCard.vue` — Card of «Брать»: verdict, rating, name, and where it is cheapest at what price per unit.
+- `frontend/src/components/AdviceTakeCard.vue` — Card of «Брать»: name and rating, where it is cheapest at what price per unit; no badge, the group says the verdict.
 - `frontend/src/components/RatingScale.vue` — The 1–5 digit scale used wherever a verdict is given or changed; a second tap takes the choice back.
 - `frontend/src/components/VerdictBadge.vue` — Badge of a verdict level told apart by shape and icon, not only colour.
 - `frontend/src/components/VerdictCard.vue` — One card of «Оценки»: the item, where and when it was bought, the scale and an optional review.
 - `frontend/src/components/VerdictEditSheet.vue` — Sheet from «Что брать»: rate an item, change one's rating or «Снять оценку», talking to the API directly.
-- `frontend/src/components/adviceRow.ts` — Helpers of «Что брать» rows: the three row types, how places read, unit price and rating text, one's own score.
+- `frontend/src/components/adviceRow.ts` — Helpers of «Что брать» rows: the three row types, how places read, unit price and rating text.
 - `frontend/src/components/placeLabel.ts` — «Ереван Сити в Гюмри»: a place with its city in the prepositional case, bracketed where the dictionary has none (MOL-120); whether a city is printed is the domain's `cityWhereNameRepeats`. `countryLabel`: a country of the settings by its name, any other by its code (MOL-109).
-- `frontend/src/components/rating.ts` — The `Score` type and the list of scale keys shared by the card of «Оценки» and the edit sheet.
+- `frontend/src/components/rating.ts` — The `Score` type, the list of scale keys shared by the card of «Оценки» and the edit sheet, and the `SavedVerdict` the sheet hands the screen (MOL-202).
 
 ## frontend · composables
 
-- `frontend/src/composables/useAdvice.ts` — Composable: the «Что брать» answer split into groups, remembered on the phone, with stale and city-change states.
+- `frontend/src/composables/useAdvice.ts` — Composable: the «Что брать» answer split into groups, remembered on the phone, with stale and city-change states; a verdict written from the sheet, kept until an answer asked after it.
 - `frontend/src/composables/useCheaperHint.ts` — Composable: «Тут дешевле» on the sheet of a purchase (MOL-92) — the server asked once as the sheet opens and waited for, the answer remembered for no signal only, `cheaperHint` of the domain on every keystroke; never a loading or an error.
 - `frontend/src/composables/useAdviceSearch.ts` — Composable: the search on «Что брать» as it is typed — the server's answer, the rhythm of the catalogue search, the remembered list searched offline.
 - `frontend/src/composables/useVerdictQueue.ts` — Composable: the queue of «Оценки» as the phone sees it — server order, saved drafts hidden, refusals first, «Не сейчас».
@@ -88,6 +89,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 ## frontend · stores
 
 - `frontend/src/stores/ownPrices.ts` — Store: the last answer of «Тут дешевле» per item and city, up to `OWN_PRICES_REMEMBERED`, per identity, read only with no signal and let go of an item rated on this phone (MOL-92, В-5).
+- `frontend/src/stores/verdictWrites.ts` — Store: the verdict sheet's writes still on their way, one of an item at a time, and how a write ended — written, refused, or no answer (MOL-202).
 - `frontend/src/stores/verdictDrafts.ts` — Store: verdicts saved on the phone and not yet confirmed, a map by item, sent at start, online and on return.
 
 ## e2e

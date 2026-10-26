@@ -1,5 +1,6 @@
 import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm'
 import {
+  DEFAULT_SPENDING_ICON,
   DomainError,
   ERROR,
   SPENDING_PRESETS,
@@ -7,7 +8,7 @@ import {
   nextCategoryColour,
   spendingCategorySchema,
 } from '@molvia/model'
-import type { SpendingCategory, SpendingCategoryBody } from '@molvia/model'
+import type { SpendingCategory, SpendingCategoryAmend, SpendingCategoryBody } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull } from './rows'
@@ -23,14 +24,21 @@ export interface SpendingCategoryRepository {
   list(actorId: string): Promise<readonly SpendingCategory[]>
 
   /**
-   * «Добавить категорию». The same identifier and name again is a repeat (`created: false`); the
-   * same identifier with another name, or someone else's, is `CONFLICT`; a name another live one of
-   * the owner's already has is `SPENDING_CATEGORY_TAKEN`.
+   * «Добавить категорию». The same identifier and name again — and the icon and colour, where the
+   * body names them — is a repeat (`created: false`); the same identifier with anything else, or
+   * someone else's, is `CONFLICT`; a name another live one of the owner's already has is
+   * `SPENDING_CATEGORY_TAKEN`. Without an icon it is the tag, without a colour the palette's next.
    */
   add(
     actorId: string,
     input: SpendingCategoryBody,
   ): Promise<{ category: SpendingCategory; created: boolean }>
+
+  /**
+   * A category of one's own renamed, redrawn or recoloured (MOL-285); false when the owner has no
+   * such category of their own — a preset included. The name is checked as «Добавить» checks it.
+   */
+  amend(actorId: string, id: string, input: SpendingCategoryAmend): Promise<boolean>
 
   /** Takes the owner's category out of the choice; false when there is no such category of theirs. */
   archive(actorId: string, id: string): Promise<boolean>
@@ -47,7 +55,10 @@ function lockOwner(actorId: string) {
 }
 
 function toCategory(row: Row): SpendingCategory {
-  return spendingCategorySchema.parse(row)
+  // One's own made before MOL-285, or by an image rolled back past it, has no icon: it is the tag.
+  return spendingCategorySchema.parse(
+    row.preset === null && row.icon === null ? { ...row, icon: DEFAULT_SPENDING_ICON } : row,
+  )
 }
 
 export function createSpendingCategoryRepository(db: Conn): SpendingCategoryRepository {
@@ -103,7 +114,11 @@ export function createSpendingCategoryRepository(db: Conn): SpendingCategoryRepo
           const owned = await all(actorId, tx)
           const same = owned.find((category) => category.id === input.id)
           if (same) {
-            if (same.name !== input.name) throw new DomainError(ERROR.CONFLICT)
+            const other =
+              same.name !== input.name ||
+              (input.icon !== undefined && same.icon !== input.icon) ||
+              (input.colour !== undefined && same.colour !== input.colour)
+            if (other) throw new DomainError(ERROR.CONFLICT)
             return { category: same, created: false }
           }
           if (nameTaken(owned, input.name)) throw new DomainError(ERROR.SPENDING_CATEGORY_TAKEN)
@@ -114,13 +129,36 @@ export function createSpendingCategoryRepository(db: Conn): SpendingCategoryRepo
               id: input.id,
               actorId,
               name: input.name,
-              colour: nextCategoryColour(owned),
+              colour: input.colour ?? nextCategoryColour(owned),
+              icon: input.icon ?? DEFAULT_SPENDING_ICON,
             })
             .onConflictDoNothing({ target: spendingCategories.id })
             .returning()
           // Taken by an identifier of someone else's: a device does not choose another's name.
           if (!inserted) throw new DomainError(ERROR.CONFLICT)
           return { category: toCategory(inserted), created: true }
+        }),
+      )
+    },
+
+    async amend(actorId, id, input) {
+      const own = idOrNull(id)
+      if (own === null) return false
+      return translateFailures(() =>
+        db.transaction(async (tx) => {
+          await tx.execute(lockOwner(actorId))
+          const owned = await all(actorId, tx)
+          const category = owned.find((candidate) => candidate.id === own)
+          if (category?.preset !== null) return false
+          // A removed one keeps its name to itself: only the live ones are the chips' (as `restore`).
+          if (category.archivedAt === null && nameTaken(owned, input.name, own)) {
+            throw new DomainError(ERROR.SPENDING_CATEGORY_TAKEN)
+          }
+          await tx
+            .update(spendingCategories)
+            .set({ name: input.name, icon: input.icon, colour: input.colour })
+            .where(and(eq(spendingCategories.id, own), eq(spendingCategories.actorId, actorId)))
+          return true
         }),
       )
     },

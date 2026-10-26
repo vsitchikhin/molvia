@@ -1,36 +1,62 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { nextTick } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
-import { ERROR } from '@molvia/model'
+import { ERROR, adviceResponseSchema, tripViewCodec } from '@molvia/model'
 import type {
   AdvicePlace,
   AdviceResponse,
   AdviceRow,
   AdviceSearchResponse,
   PendingVerdicts,
+  Rating,
+  ReceiptsResponse,
+  VerdictAmendment,
+  VerdictCard,
 } from '@molvia/model'
 import en from '@/i18n/en.json'
+import { forgetPageWrites } from '@/composables/useAdvice'
+import { forgetWritesInFlight } from '@/stores/verdictWrites'
 import { createAppI18n } from '@/i18n'
+import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
+import IconMagnify from '~icons/mdi/magnify'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
+import { useTripStore } from '@/stores/trip'
 import AdviceView from '@/views/AdviceView.vue'
 
 const advice = vi.fn<() => Promise<AdviceResponse>>()
 const adviceSearch = vi.fn<(query: string) => Promise<AdviceSearchResponse>>()
 const pendingVerdicts = vi.fn<() => Promise<PendingVerdicts>>()
+const amendVerdict = vi.fn<(itemId: string, patch: VerdictAmendment) => Promise<VerdictCard>>()
+const withdrawVerdict = vi.fn<(itemId: string) => Promise<void>>()
+const rateItem =
+  vi.fn<(itemId: string, rating: Rating) => Promise<{ verdict: VerdictCard; created: boolean }>>()
+/** What the server holds of the person's receipts; none unless a test says so. */
+let held: ReceiptsResponse['receipts'] = []
 vi.mock('@/api', () => ({
   api: {
-    receipts: () => Promise.resolve({ receipts: [] }),
+    receipts: () => Promise.resolve({ receipts: held }),
     advice: () => advice(),
     adviceSearch: (query: string) => adviceSearch(query),
     pendingVerdicts: () => pendingVerdicts(),
+    amendVerdict: (itemId: string, patch: VerdictAmendment) => amendVerdict(itemId, patch),
+    withdrawVerdict: (itemId: string) => withdrawVerdict(itemId),
+    rateItem: (itemId: string, rating: Rating) => rateItem(itemId, rating),
   },
 }))
 
 const ME = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
+
+// A verdict written from the sheet is kept by the page as well as the shelf (MOL-202): a fresh page
+// for every test, as a reload makes one.
+beforeEach(() => {
+  forgetPageWrites()
+  forgetWritesInFlight()
+})
 
 function place(name: string, scaledMinor: bigint): AdvicePlace {
   return {
@@ -44,6 +70,7 @@ function place(name: string, scaledMinor: bigint): AdvicePlace {
 const milk: AdviceRow = {
   level: 'take',
   isMine: true,
+  ownScore: 5,
   itemId: 'cccccccc-0000-4000-8000-000000000001',
   name: 'Молоко «Ашхар»',
   rating: '4.6',
@@ -55,6 +82,7 @@ const milk: AdviceRow = {
 const cheese: AdviceRow = {
   level: 'if_cheap',
   isMine: true,
+  ownScore: 3,
   itemId: 'cccccccc-0000-4000-8000-000000000002',
   name: 'Сыр «Чанах»',
   rating: '2.8',
@@ -67,6 +95,7 @@ const cheese: AdviceRow = {
 const sausage: AdviceRow = {
   level: 'never',
   isMine: true,
+  ownScore: 1,
   itemId: 'cccccccc-0000-4000-8000-000000000003',
   name: 'Колбаса «Молочная»',
   rating: '1.4',
@@ -95,7 +124,48 @@ const broke = () => new ApiError(ERROR.INTERNAL, 'HTTP 502')
 
 const mounted: VueWrapper[] = []
 
-async function render({ identity = true, country = 'AM' } = {}) {
+/** The handler a sheet hands its write to — a prop, as the screen passes it (MOL-202, Д1). */
+const written = (sheet: VueWrapper) =>
+  (
+    sheet.vm.$props as {
+      onSaved: (itemId: string, verdict: { score: number; review: string | null } | null) => void
+    }
+  ).onSaved
+
+/** The strips of the connection on the screen, by kind and words: one a screen (MOL-181). */
+function strips(view: VueWrapper): { kind: string; text: string }[] {
+  return view.findAllComponents(StatusStrip).map((strip) => ({
+    kind: strip.props('kind') as string,
+    text: strip.props('text') as string,
+  }))
+}
+
+/** Every «Try again» on the screen, wherever it stands — the strip of the screen included. */
+function retries(): Element[] {
+  return [...document.body.querySelectorAll('button')].filter(
+    (button) => button.textContent.trim() === en.state.retry,
+  )
+}
+
+/** A record typed by hand, open at «Рынок». */
+function openTrip() {
+  return tripViewCodec.parse({
+    id: 'bbbbbbbb-0000-4000-8000-0000000000aa',
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    currency: 'AMD',
+    rate: null,
+    rateProvider: null,
+    rateJump: null,
+    rateStale: false,
+    place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Рынок' },
+    expenses: [],
+    total: [],
+    converted: null,
+  })
+}
+
+async function render({ identity = true, country = 'AM', trip = false } = {}) {
   localStorage.setItem('molvia.actor', ME)
   localStorage.setItem(
     `molvia.settings.${ME}`,
@@ -104,6 +174,7 @@ async function render({ identity = true, country = 'AM' } = {}) {
   const pinia = createPinia()
   setActivePinia(pinia)
   useActorStore().id = identity ? ME : null
+  if (trip) useTripStore().current = openTrip()
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/')
   const view = mount(AdviceView, {
@@ -130,6 +201,270 @@ describe('AdviceView', () => {
       expect(newcomer.view.text()).toContain(en.advice.home.new.title)
       expect(newcomer.view.get('.dock').text()).toContain(en.purchases.manual)
       expect(newcomer.view.text()).not.toContain(en.purchases.capture)
+    })
+
+    // 1k-0: the strip has nothing to do without a list, so it is the error's — the one «Try again»
+    // of the screen (Ф-15), and the words are a person's, not a developer's (Ф-19).
+    it('no answer and nothing remembered: one «Try again», in the strip', async () => {
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+
+      expect(view.text()).toContain(en.advice.error.body)
+      expect(retries()).toHaveLength(1)
+      expect(view.get('.dock').text()).toContain(en.state.retry)
+      expect(view.find('input[type="search"]').exists()).toBe(false)
+    })
+
+    // 1l-0: the cold offline is not empty (Ф-14) — the field, the cloud, and purchases recorded
+    // from the strip, since a purchase needs no list.
+    it('offline with nothing remembered: the field, the cloud, and «Record purchases» below', async () => {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+
+      expect(view.find('input[type="search"]').exists()).toBe(true)
+      const state = view.getComponent({ name: 'ScreenState' })
+      expect(state.props('kind')).toBe('offline')
+      expect(state.props('tone')).toBe('warn')
+      expect(state.props('body')).toBe(en.advice.offline.body)
+      expect(view.get('.dock').text()).toContain(en.purchases.manual)
+      expect(strips(view)).toEqual([])
+      expect(retries()).toHaveLength(0)
+    })
+
+    // С-1: nothing on the phone to search, and the answer says so and why — in place of the cloud,
+    // as the list gives way to what is found; the server is not asked.
+    it('offline with nothing remembered: a query is answered «offline», and the cloud gives way', async () => {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+
+      await view.get('input[type="search"]').setValue('молоко')
+      await flushPromises()
+
+      expect(adviceSearch).not.toHaveBeenCalled()
+      const states = view.findAllComponents({ name: 'ScreenState' })
+      expect(states).toHaveLength(1)
+      expect(states[0]?.props('kind')).toBe('empty')
+      expect(states[0]?.props('body')).toBe(en.advice.search.empty.body_offline)
+      expect(view.get('.dock').text()).toContain(en.purchases.manual)
+
+      // Cleared, the cloud is back.
+      await view.get('.clear').trigger('click')
+      await flushPromises()
+      expect(view.getComponent({ name: 'ScreenState' }).props('kind')).toBe('offline')
+    })
+
+    // The connection back without a list — the server failed, or nothing is rated yet: the field
+    // being typed in stays under the thumb with what it holds, and answers from the server; cleared,
+    // it goes and the focus is given to the heading (owner's В-3 «а» on adversarial А1).
+    for (const [kind, reply] of [
+      ['fails', () => advice.mockRejectedValue(broke())],
+      [
+        'is empty',
+        () => advice.mockResolvedValue(answer([], { geography: { country: 'GE', city: 'Гюмри' } })),
+      ],
+    ] as const) {
+      it(`В-3: back online, the list ${kind} — the field typed in stays, cleared it goes`, async () => {
+        online(false)
+        advice.mockRejectedValue(broke())
+        const { view } = await render({ country: 'GE' })
+        const field = view.get<HTMLInputElement>('input[type="search"]')
+        field.element.focus()
+        await field.setValue('молоко')
+        await flushPromises()
+
+        online(true)
+        reply()
+        adviceSearch.mockResolvedValue({
+          geography: { country: 'GE', city: 'Гюмри' },
+          scope: 'own',
+          near: true,
+          items: [{ itemId: milk.itemId, name: milk.name, advice: null }],
+        })
+        window.dispatchEvent(new Event('online'))
+        await flushPromises()
+        await vi.waitFor(() => {
+          expect(adviceSearch).toHaveBeenCalledWith('молоко')
+        })
+        await flushPromises()
+
+        expect(view.get('input[type="search"]').element).toBe(field.element)
+        expect(field.element.value).toBe('молоко')
+        expect(document.activeElement).toBe(field.element)
+        expect(view.text()).toContain(milk.name)
+        // What the list's answer put up waits for the field to be cleared.
+        expect(view.text()).not.toContain(en.advice.error.title)
+        expect(view.text()).not.toContain(en.advice.home.new.title)
+
+        // Erased to nothing to type another word: the field stays, with the focus (В-4 «а», Б2).
+        for (const text of ['мо', 'м', '']) await field.setValue(text)
+        await flushPromises()
+        expect(view.get('input[type="search"]').element).toBe(field.element)
+        expect(document.activeElement).toBe(field.element)
+        await field.setValue('сыр')
+        await flushPromises()
+        expect(field.element.value).toBe('сыр')
+
+        // «Очистить» gives the focus back to the field (Р-12), so it stays too.
+        await view.get('.clear').trigger('click')
+        await flushPromises()
+        expect(view.get('input[type="search"]').element).toBe(field.element)
+
+        // Left empty, it goes; the focus is where the person put it, never pulled to the heading.
+        field.element.blur()
+        await flushPromises()
+        expect(view.find('input[type="search"]').exists()).toBe(false)
+        expect(view.text()).toContain(
+          kind === 'fails' ? en.advice.error.title : en.advice.home.new.title,
+        )
+        expect(document.activeElement?.tagName).not.toBe('H1')
+      })
+    }
+
+    // Nobody touched the field: the connection back without a list takes it, and the focus stays
+    // where it was — <body> on a phone nobody touched is no focus to give away (Б1, review № 8).
+    it('must not fire: the field nobody touched goes, the focus is not pulled to the heading', async () => {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+      expect(document.activeElement).toBe(document.body)
+
+      online(true)
+      window.dispatchEvent(new Event('online'))
+      await flushPromises()
+
+      expect(view.find('input[type="search"]').exists()).toBe(false)
+      expect(view.text()).toContain(en.advice.error.title)
+      expect(document.activeElement).toBe(document.body)
+    })
+
+    /** The cold offline, «мол» typed, the connection back with the list failed, the text erased. */
+    async function heldEmpty() {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const rendered = await render({ country: 'GE' })
+      const field = rendered.view.get<HTMLInputElement>('input[type="search"]')
+      field.element.focus()
+      await field.setValue('мол')
+      await flushPromises()
+      online(true)
+      adviceSearch.mockResolvedValue({
+        geography: { country: 'GE', city: 'Гюмри' },
+        scope: 'own',
+        near: true,
+        items: [],
+      })
+      window.dispatchEvent(new Event('online'))
+      await flushPromises()
+      await field.setValue('')
+      await flushPromises()
+      expect(document.activeElement).toBe(field.element)
+      return { ...rendered, field }
+    }
+
+    // A press under the field takes the focus as it lands; the field goes once the press is over,
+    // or what was pressed rose from under the finger before the release (owner's В-5 «а», В1).
+    it('В-5: the focus taken by a press — the empty field goes only after the release', async () => {
+      const { view, field } = await heldEmpty()
+
+      document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+      field.element.blur()
+      await flushPromises()
+      expect(view.find('input[type="search"]').exists()).toBe(true)
+
+      // Still there until the task after the release, where its click is dispatched — `flushPromises`
+      // waits a task itself, so the render is awaited without one.
+      document.body.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+      await nextTick()
+      expect(view.find('input[type="search"]').exists()).toBe(true)
+      await new Promise((resolve) => setTimeout(resolve))
+      await flushPromises()
+      expect(view.find('input[type="search"]').exists()).toBe(false)
+      expect(view.text()).toContain(en.advice.error.title)
+      expect(document.activeElement?.tagName).not.toBe('H1')
+    })
+
+    // «Очистить» pressed takes the focus for a moment and gives it back: the press is no leaving.
+    it('must not fire: a press on «Clear» keeps the empty field', async () => {
+      const { view, field } = await heldEmpty()
+      await field.setValue('сыр')
+      await flushPromises()
+
+      const clear = view.get('.clear')
+      clear.element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+      ;(clear.element as HTMLButtonElement).focus()
+      await clear.trigger('click')
+      clear.element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+      await new Promise((resolve) => setTimeout(resolve))
+      await flushPromises()
+
+      expect(view.get('input[type="search"]').element).toBe(field.element)
+      expect(document.activeElement).toBe(field.element)
+    })
+
+    // Gone to another app to copy a name: the page lost the system's focus, not the person the field.
+    it('must not fire: the page losing the system`s focus keeps the empty field', async () => {
+      const { view, field } = await heldEmpty()
+      const away = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+
+      field.element.blur()
+      await flushPromises()
+      away.mockRestore()
+
+      expect(view.get('input[type="search"]').element).toBe(field.element)
+    })
+
+    // The strip of a list remembered empty — another window kept it — stands under the field the
+    // focus holds over the newcomer, never above it as well (adversarial В2).
+    it('В2: over the newcomer with the field held, one strip, under the field', async () => {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+      const field = view.get<HTMLInputElement>('input[type="search"]')
+      field.element.focus()
+      await flushPromises()
+
+      // Another window kept an empty list meanwhile; this one, back in view, cannot ask.
+      localStorage.setItem(
+        `molvia.advice.${ME}`,
+        JSON.stringify({
+          answer: answer([], { geography: { country: 'GE', city: 'Гюмри' } }),
+          fetchedAt: new Date('2026-10-21T09:00:00Z').toISOString(),
+        }),
+      )
+      document.dispatchEvent(new Event('visibilitychange'))
+      await flushPromises()
+
+      expect(view.text()).toContain(en.advice.home.new.title)
+      expect(view.get('input[type="search"]').element).toBe(field.element)
+      expect(strips(view)).toHaveLength(1)
+      const under = view.get('.strip').element.closest('.head')
+      expect(under?.contains(field.element)).toBe(true)
+    })
+
+    // The connection back: the list comes under the very field being typed in.
+    it('the connection back brings the list under the same field, the text kept', async () => {
+      online(false)
+      advice.mockRejectedValue(broke())
+      const { view } = await render({ country: 'GE' })
+      const field = view.get<HTMLInputElement>('input[type="search"]')
+      await field.setValue('мол')
+      await flushPromises()
+
+      online(true)
+      const georgia = { geography: { country: 'GE', city: 'Гюмри' } }
+      advice.mockResolvedValue(answer([milk], georgia))
+      adviceSearch.mockResolvedValue({ ...georgia, scope: 'own', near: true, items: [] })
+      window.dispatchEvent(new Event('online'))
+      await flushPromises()
+
+      expect(view.get('input[type="search"]').element).toBe(field.element)
+      expect(field.element.value).toBe('мол')
+      await field.setValue('')
+      await flushPromises()
+      expect(view.text()).toContain(milk.name)
+      expect(view.find('.dock').exists()).toBe(false)
     })
 
     // A failure under «Где вы?» opened from the strip: the error is a section's while the sheet is
@@ -204,6 +539,7 @@ describe('AdviceView', () => {
     adviceSearch.mockReset()
     pendingVerdicts.mockReset()
     pendingVerdicts.mockResolvedValue({ items: [], total: 0 })
+    held = []
     vi.restoreAllMocks()
     online(true)
   })
@@ -212,11 +548,38 @@ describe('AdviceView', () => {
     for (const view of mounted.splice(0)) view.unmount()
   })
 
-  it('draws the skeleton while the answer is on its way', async () => {
+  // The answer's shape, with the field's well where the field will stand (Ф-13, 1j).
+  it('draws the skeleton while the answer is on its way, the field`s well first', async () => {
     advice.mockReturnValue(new Promise(() => undefined))
     const { view } = await render()
 
     expect(view.find('.skeleton').exists()).toBe(true)
+    // The well where the field will stand, above the frame (review № 2).
+    const head = view.get('.ghost-head').element
+    expect(head.firstElementChild?.classList).toContain('skeleton-field')
+    expect(head.nextElementSibling?.classList).toContain('skeleton')
+    expect(view.findAll('.skeleton .ghost-take')).toHaveLength(1)
+    expect(view.findAll('.skeleton .skeleton-caption')).toHaveLength(3)
+    // The subtitle's line is held, as a bar (owner's В-2 «а»).
+    expect(view.find('.subtitle .subtitle-bar').exists()).toBe(true)
+  })
+
+  // The line under the title stands in every state, so the field under it never moves (В-2 «а»): a
+  // bar while the answer is on its way, empty with none, the words once they are known.
+  it('В-2: the subtitle`s line stands in every state, words only with the answer', async () => {
+    online(false)
+    advice.mockRejectedValue(broke())
+    const cold = await render({ country: 'GE' })
+    expect(cold.view.find('.subtitle .subtitle-hold').exists()).toBe(true)
+    expect(cold.view.find('.subtitle-bar').exists()).toBe(false)
+
+    online(true)
+    const failed = await render({ country: 'GE' })
+    expect(failed.view.find('.subtitle .subtitle-hold').exists()).toBe(true)
+
+    advice.mockResolvedValue(answer([milk]))
+    const ready = await render()
+    expect(ready.view.get('.subtitle').text()).toBe(en.advice.own_data_only)
   })
 
   it('three groups, each in its own shape, in the order the answer arrived', async () => {
@@ -297,6 +660,124 @@ describe('AdviceView', () => {
       ).toBe(false)
     })
 
+    it('with receipts «Записать вручную» is a row of its own under the cycle, and asks «Где вы?» (2a)', async () => {
+      advice.mockResolvedValue(answer([]))
+      const { view } = await render()
+      const row = view
+        .findAllComponents({ name: 'ListRow' })
+        .find((found) => found.text().includes(en.purchases.manual_by_hand))
+
+      expect(row?.element.tagName).toBe('BUTTON')
+      expect(row?.text()).toContain(en.advice.home.manual_body)
+      // It opens a sheet with fields — the chevron of В-14 — and stands in a card of its own, the
+      // only row there: the cycle is not mixed with it.
+      expect(row?.find('.chevron').exists()).toBe(true)
+      expect(row?.element.closest('ol')).toBeNull()
+      expect(row?.element.parentElement?.classList.contains('list')).toBe(true)
+      expect(row?.element.parentElement?.children).toHaveLength(1)
+
+      await row?.trigger('click')
+      await flushPromises()
+      expect(document.body.querySelector('dialog[open]')?.textContent).toContain(
+        en.trip.start.title,
+      )
+    })
+
+    // With a record open the row asks whether to go on with it or start anew — no field in that sheet,
+    // but both ways go on to fields: the record, or «Где вы?». A fork on the way, not a confirmation, so
+    // the chevron of В-14 stays (owner's decision on adversarial А2 of MOL-203).
+    it('with a record open the same row, its chevron kept, asks to go on with it or start anew', async () => {
+      advice.mockResolvedValue(answer([]))
+      const { view } = await render({ trip: true })
+      const row = view
+        .findAllComponents({ name: 'ListRow' })
+        .find((found) => found.text().includes(en.purchases.manual_by_hand))
+      expect(row?.find('.chevron').exists()).toBe(true)
+
+      await row?.trigger('click')
+      await flushPromises()
+      const sheet = document.body.querySelector('dialog[open]')
+      expect(sheet?.textContent).toContain(
+        en.purchases.manual_ask.title.replace('{place}', 'Рынок'),
+      )
+      expect(sheet?.textContent).toContain(
+        en.purchases.manual_ask.continue.replace('{place}', 'Рынок'),
+      )
+      expect(sheet?.textContent).toContain(en.purchases.manual_ask.finish)
+    })
+
+    it('without receipts no row of «Записать вручную»: the strip records (Д-3)', async () => {
+      advice.mockResolvedValue(answer([], { geography: { country: 'GE', city: 'Гюмри' } }))
+      const { view } = await render({ country: 'GE' })
+      expect(view.text()).not.toContain(en.purchases.manual_by_hand)
+      expect(view.text()).not.toContain(en.advice.home.manual_body)
+    })
+
+    const reading: ReceiptsResponse['receipts'][number] = {
+      id: 'cccccccc-0000-4000-8000-000000000003',
+      status: 'reading',
+      failure: null,
+      parts: 1,
+      received: 1,
+      capturedAt: new Date(),
+      country: 'AM',
+      language: 'en',
+      header: null,
+      total: null,
+      balanced: false,
+      lineCount: 0,
+      unsettled: 0,
+      place: null,
+      tripId: null,
+    }
+
+    it('the first receipt being read is a row of the kit that breathes and leads to «Покупки» (2c)', async () => {
+      held = [reading]
+      advice.mockResolvedValue(answer([]))
+      const { view, router } = await render()
+      const row = view.get('.pending .list-row')
+
+      expect(view.text()).toContain(en.advice.home.parsing.title)
+      expect(row.text()).toContain(en.purchases.group_working)
+      expect(row.find('.chevron').exists()).toBe(true)
+      // Being read, as on «Покупки»: no percent, no timer — the icon breathes.
+      expect(row.classes()).toContain('breathing')
+
+      await row.trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.name).toBe('purchases')
+    })
+
+    // As on «Покупки»: with no connection nothing is being read, so nothing breathes — the row stays.
+    it('the receipt being read stops breathing once the connection goes, and keeps its row', async () => {
+      held = [reading]
+      advice.mockResolvedValue(answer([]))
+      const { view } = await render()
+      expect(view.get('.pending .list-row').classes()).toContain('breathing')
+
+      online(false)
+      window.dispatchEvent(new Event('offline'))
+      await flushPromises()
+
+      const row = view.get('.pending .list-row')
+      expect(row.text()).toContain(en.purchases.group_working)
+      expect(row.classes()).not.toContain('breathing')
+    })
+
+    it('the cycle is the kit`s rows: two lead on with a chevron, the last has none (MOL-203)', async () => {
+      advice.mockResolvedValue(answer([]))
+      const { view } = await render()
+      const rows = view
+        .findAllComponents({ name: 'ListRow' })
+        .filter((row) => row.element.closest('ol') !== null)
+
+      expect(rows.map((row) => row.element.tagName)).toEqual(['BUTTON', 'BUTTON', 'DIV'])
+      expect(rows.map((row) => row.find('.chevron').exists())).toEqual([true, true, false])
+      // A step is an explanation: its title and its meta wrap whole rather than end in «…» on a
+      // narrow phone.
+      expect(rows.every((row) => row.classes('wrap') && row.classes('whole'))).toBe(true)
+    })
+
     it('purchases waiting for a verdict: «Now rate them», and the card leads to «Оценки»', async () => {
       advice.mockResolvedValue(answer([]))
       pendingVerdicts.mockResolvedValue({
@@ -314,7 +795,13 @@ describe('AdviceView', () => {
 
       expect(view.text()).toContain(en.advice.home.pending.title)
       expect(view.text()).not.toContain(en.advice.home.new_capture.title)
-      await view.get('.pending .purchase-row').trigger('click')
+      // The kit's row: the star is a status in the muted ink, the chevron says it opens (Ф-4).
+      const row = view.get('.pending .list-row')
+      expect(row.find('.chevron').exists()).toBe(true)
+      expect(row.find('.icon').exists()).toBe(true)
+      expect(row.find('.circle').exists()).toBe(false)
+      expect(row.text()).toContain('Рынок')
+      await row.trigger('click')
       await flushPromises()
       expect(router.currentRoute.value.name).toBe('verdicts')
     })
@@ -362,9 +849,13 @@ describe('AdviceView', () => {
     const { view } = await render()
 
     expect(view.text()).toContain(milk.name)
-    expect(view.text()).toContain('The list as of today at')
+    // One strip, the cloud, under the field — never red (Ф-14).
+    expect(strips(view)).toEqual([
+      { kind: 'offline', text: expect.stringContaining('Offline · the list as of today,') },
+    ])
+    expect(view.find('.head .strip').exists()).toBe(true)
     // The connection will come back by itself, so the strip offers nothing to press.
-    expect(view.findAll('button').map((button) => button.text())).not.toContain(en.state.retry)
+    expect(retries()).toHaveLength(0)
   })
 
   it('the server broke with a list remembered: the strip offers the retry the screen cannot make', async () => {
@@ -374,9 +865,21 @@ describe('AdviceView', () => {
     advice.mockRejectedValue(broke())
     const { view } = await render()
 
-    expect(view.text()).toContain('the server did not answer')
-    const retry = view.findAll('button').find((button) => button.text() === en.state.retry)
-    expect(retry).toBeDefined()
+    expect(strips(view)).toEqual([
+      {
+        kind: 'unanswered',
+        text: expect.stringContaining('The server did not answer — the list as of today,'),
+      },
+    ])
+    // One «Try again» on the screen, in the strip: the docked strip holds the camera (Ф-15).
+    expect(retries()).toHaveLength(1)
+    expect(view.get('.strip .action').text()).toBe(en.state.retry)
+
+    // A retry that failed the same way is an answer still: the strip says it again (C1).
+    const before = view.findComponent(StatusStrip).props('attempt') as number
+    await view.get('.strip .action button').trigger('click')
+    await flushPromises()
+    expect(view.findComponent(StatusStrip).props('attempt')).toBe(before + 1)
   })
 
   it('a tap on a row opens the sheet on that row, and a save asks the server again', async () => {
@@ -389,7 +892,7 @@ describe('AdviceView', () => {
     const sheet = view.findComponent({ name: 'VerdictEditSheet' })
     expect(sheet.exists()).toBe(true)
     expect(sheet.props('itemId')).toBe(mine.itemId)
-    // Own mode: the figure on the row is this person's, so the scale opens on it.
+    // The scale opens on the person's own score, as the row carries it.
     expect(sheet.props('ownScore')).toBe(1)
     expect(sheet.props('ownReview')).toBe(mine.review)
     expect(sheet.props('mine')).toBe(true)
@@ -397,31 +900,17 @@ describe('AdviceView', () => {
     // A saved verdict moves the row to another group, or out of the list: the screen asks the
     // server again rather than moving it itself.
     advice.mockResolvedValue(answer([milk]))
-    sheet.vm.$emit('saved')
+    written(sheet)(mine.itemId, { score: 5, review: mine.review })
     await flushPromises()
 
     expect(advice).toHaveBeenCalledTimes(2)
     expect(view.findAllComponents({ name: 'AdviceNeverRow' })).toHaveLength(0)
   })
 
-  it('in the shared mode the sheet is opened with no score chosen', async () => {
-    // The same row that opens pre-chosen in the own mode: here the figure is an average.
+  it('in the shared mode the sheet opens on one`s own score, never the average (MOL-202)', async () => {
+    // «2,3 из 5» is three people's; the person gave 1, and the sheet says so (С-2, Ф-25).
     advice.mockResolvedValue(
-      answer([mine], { geography: { country: 'AM', city: 'Гюмри' }, scope: 'shared' }),
-    )
-    const { view } = await render()
-
-    await view.findComponent({ name: 'AdviceNeverRow' }).trigger('click')
-    await flushPromises()
-
-    const sheet = view.findComponent({ name: 'VerdictEditSheet' })
-    expect(sheet.props('ownScore')).toBeNull()
-    expect(sheet.props('shared')).toBe(true)
-  })
-
-  it('А2: a stranger`s row opens the sheet as «rate it», not as «amend»', async () => {
-    advice.mockResolvedValue(
-      answer([{ ...mine, isMine: false }], {
+      answer([{ ...sausage, rating: '2.3', ratingsCount: 3, ownScore: 1 }], {
         geography: { country: 'AM', city: 'Гюмри' },
         scope: 'shared',
       }),
@@ -431,21 +920,76 @@ describe('AdviceView', () => {
     await view.findComponent({ name: 'AdviceNeverRow' }).trigger('click')
     await flushPromises()
 
-    expect(view.findComponent({ name: 'VerdictEditSheet' }).props('mine')).toBe(false)
+    const sheet = view.findComponent({ name: 'VerdictEditSheet' })
+    expect(sheet.props('ownScore')).toBe(1)
+    expect(sheet.props('shared')).toBe(true)
   })
 
-  it('А4: the age of a remembered list is on the screen while the answer is still coming', async () => {
+  it('А2: a stranger`s row opens the sheet as «rate it», not as «amend»', async () => {
+    advice.mockResolvedValue(
+      answer([{ ...mine, isMine: false, ownScore: null }], {
+        geography: { country: 'AM', city: 'Гюмри' },
+        scope: 'shared',
+      }),
+    )
+    const { view } = await render()
+
+    await view.findComponent({ name: 'AdviceNeverRow' }).trigger('click')
+    await flushPromises()
+
+    const sheet = view.findComponent({ name: 'VerdictEditSheet' })
+    expect(sheet.props('mine')).toBe(false)
+    expect(sheet.props('ownScore')).toBeNull()
+  })
+
+  it('А4: the age of a remembered list is on the screen once the answer is late', async () => {
     advice.mockResolvedValue(answer([milk]))
     await render()
 
-    advice.mockReturnValue(new Promise<AdviceResponse>(() => undefined))
-    const { view } = await render()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      advice.mockReturnValue(new Promise<AdviceResponse>(() => undefined))
+      const { view } = await render()
 
-    expect(view.text()).toContain(milk.name)
-    expect(view.find('.stale').exists()).toBe(true)
-    expect(view.text()).toContain('The list as of today at')
-    // Nothing to press: the request it is waiting for is already in the air.
-    expect(view.findAll('button').map((button) => button.text())).not.toContain(en.state.retry)
+      // A quick answer would replace the list in silence: nothing flashes under the field (В-1 «а»).
+      expect(view.text()).toContain(milk.name)
+      expect(strips(view)).toEqual([])
+
+      vi.advanceTimersByTime(STRIP_LATE_MS - 1)
+      await nextTick()
+      expect(strips(view)).toEqual([])
+
+      vi.advanceTimersByTime(1)
+      await nextTick()
+      expect(strips(view)).toEqual([
+        { kind: 'refreshing', text: expect.stringContaining('Refreshing · the list as of today,') },
+      ])
+      // Nothing to press: the request it is waiting for is already in the air.
+      expect(retries()).toHaveLength(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('must not fire: an answer in time puts no strip up at all', async () => {
+    advice.mockResolvedValue(answer([milk]))
+    await render()
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      let answered: (value: AdviceResponse) => void = () => undefined
+      advice.mockReturnValue(new Promise<AdviceResponse>((resolve) => (answered = resolve)))
+      const { view } = await render()
+
+      vi.advanceTimersByTime(STRIP_LATE_MS - 1)
+      answered(answer([milk]))
+      await flushPromises()
+      vi.advanceTimersByTime(STRIP_LATE_MS)
+      await nextTick()
+      expect(strips(view)).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('С-4: an empty list from the phone is dated too', async () => {
@@ -457,7 +1001,10 @@ describe('AdviceView', () => {
     const { view } = await render()
 
     expect(view.text()).toContain(en.advice.home.new_capture.title)
-    expect(view.text()).toContain('The list as of today at')
+    // No field over the newcomer: the strip stands under the header.
+    expect(strips(view)).toEqual([
+      { kind: 'offline', text: expect.stringContaining('Offline · the list as of today,') },
+    ])
   })
 
   it('without an identity the screen asks for nothing and shows no failure of its own', async () => {
@@ -533,7 +1080,13 @@ describe('AdviceView', () => {
         expect(view.text()).toContain(en.advice.search.rate)
       })
 
-      await view.get('.unrated-row').trigger('click')
+      // A row of the kit, its name the title and nothing under it: the caption says «not rated» (С-9).
+      const row = view.getComponent({ name: 'ListRow' })
+      expect(row.props('title')).toBe(plait.name)
+      expect(row.props('meta')).toBe('')
+      expect(row.props('next')).toBe(false)
+      expect(row.text()).not.toContain(en.advice.search.group_unrated)
+      await row.trigger('click')
       await flushPromises()
       const sheet = view.findComponent({ name: 'VerdictEditSheet' })
       expect(sheet.props('itemId')).toBe(plait.itemId)
@@ -542,7 +1095,7 @@ describe('AdviceView', () => {
 
       // A save asks again for the list and for what is found.
       advice.mockResolvedValue(answer([milk]))
-      sheet.vm.$emit('saved')
+      written(sheet)(plait.itemId, { score: 4, review: null })
       await vi.waitFor(() => {
         expect(adviceSearch).toHaveBeenCalledTimes(2)
       })
@@ -559,6 +1112,7 @@ describe('AdviceView', () => {
         expect(view.text()).toContain('No «кускус» found')
       })
       expect(view.get('.state').classes()).toContain('quiet')
+      expect(view.getComponent({ name: 'ScreenState' }).props('icon')).toBe(IconMagnify)
       expect(view.get('.state').find('button').exists()).toBe(false)
     })
 
@@ -587,8 +1141,27 @@ describe('AdviceView', () => {
       expect(adviceSearch).not.toHaveBeenCalled()
       expect(view.findAllComponents({ name: 'AdviceCheapRow' })).toHaveLength(1)
       expect(view.text()).not.toContain(milk.name)
-      expect(view.text()).toContain('Without a connection we search only the list as of')
+      expect(strips(view)).toEqual([
+        {
+          kind: 'offline',
+          text: expect.stringContaining('Offline · searching only the list as of'),
+        },
+      ])
       expect(view.text()).toContain(en.advice.search.offline_more)
+    })
+
+    it('waiting for its first answer: the groups` shape, no second well', async () => {
+      advice.mockResolvedValue(answer([milk]))
+      adviceSearch.mockReturnValue(new Promise(() => undefined))
+      const { view } = await render()
+
+      await view.get('input[type="search"]').setValue('сыр')
+      await vi.waitFor(() => {
+        expect(adviceSearch).toHaveBeenCalled()
+      })
+
+      expect(view.find('.skeleton .ghost-take').exists()).toBe(true)
+      expect(view.find('.skeleton-field').exists()).toBe(false)
     })
 
     it('clearing the field brings the list back and asks nothing', async () => {
@@ -614,6 +1187,7 @@ describe('AdviceView after the review', () => {
   const lori: AdviceRow = {
     level: 'take',
     isMine: true,
+    ownScore: 5,
     itemId: 'cccccccc-0000-4000-8000-000000000012',
     name: 'Сыр «Лори»',
     rating: '5.0',
@@ -717,7 +1291,8 @@ describe('AdviceView after the review', () => {
     await view.get('.tap').trigger('click')
     await flushPromises()
     adviceSearch.mockReturnValue(new Promise(() => undefined))
-    view.findComponent({ name: 'VerdictEditSheet' }).vm.$emit('saved')
+    const sheet = view.findComponent({ name: 'VerdictEditSheet' })
+    written(sheet)(sheet.props('itemId') as string, { score: 5, review: null })
     await flushPromises()
 
     expect(view.find('.skeleton').exists()).toBe(false)
@@ -765,8 +1340,8 @@ describe('AdviceView after the review', () => {
     await flushPromises()
     const sheet = view.findComponent({ name: 'VerdictEditSheet' })
 
-    // An average of three is nobody's own score: nothing is chosen for the person.
-    expect(sheet.props('ownScore')).toBeNull()
+    // «4,0» of three is not the person's 5: the sheet takes the score the row carries (MOL-202).
+    expect(sheet.props('ownScore')).toBe(5)
     expect(sheet.props('shared')).toBe(true)
   })
 
@@ -788,12 +1363,716 @@ describe('AdviceView after the review', () => {
     online(false)
     advice.mockRejectedValue(broke())
     const view = await renderIn('Гюмри')
-    expect(view.find('.stale').exists()).toBe(true)
+    expect(strips(view).map((strip) => strip.text)).toEqual([
+      expect.stringContaining('Offline · the list as of'),
+    ])
 
     await view.get('input[type="search"]').setValue('мол')
     await flushPromises()
 
-    expect(view.find('.stale').exists()).toBe(false)
-    expect(view.text()).toContain('Without a connection we search only the list as of')
+    expect(strips(view)).toEqual([
+      { kind: 'offline', text: expect.stringContaining('Offline · searching only the list as of') },
+    ])
+  })
+
+  it('a list of another city, offline: one strip, the cloud, naming both cities', async () => {
+    advice.mockResolvedValue(answer([milk], { geography: { country: 'AM', city: 'Ереван' } }))
+    await renderIn('Ереван')
+    for (const view of mounted.splice(0)) view.unmount()
+    online(false)
+    advice.mockRejectedValue(broke())
+    const view = await renderIn('Гюмри')
+
+    expect(view.text()).toContain(milk.name)
+    expect(strips(view)).toEqual([
+      {
+        kind: 'offline',
+        text: expect.stringMatching(/^Offline · the list for .+ as of today, .+\. Prices for /u),
+      },
+    ])
+  })
+
+  // The field goes with the focus in it — a city moved in another tab: the focus is given to the
+  // heading, never left on <body> (Б1: only a focus that was in the field).
+  it('the city moved with the focus in the field: the focus goes to the heading', async () => {
+    advice.mockResolvedValue(answer([milk]))
+    const view = await renderIn('Гюмри')
+    view.get<HTMLInputElement>('input[type="search"]').element.focus()
+    await flushPromises()
+
+    advice.mockReturnValue(new Promise<AdviceResponse>(() => undefined))
+    const key = `molvia.settings.${ME}`
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        country: 'AM',
+        city: 'Ереван',
+        spendCurrency: 'AMD',
+        incomeCurrency: 'RUB',
+      }),
+    )
+    window.dispatchEvent(new StorageEvent('storage', { key }))
+    await flushPromises()
+
+    expect(view.find('.skeleton').exists()).toBe(true)
+    expect(view.find('input[type="search"]').exists()).toBe(false)
+    expect(document.activeElement?.tagName).toBe('H1')
+  })
+
+  it('a city changed, its list late: «refreshing» for that city in one strip with the skeleton', async () => {
+    advice.mockResolvedValue(answer([milk], { geography: { country: 'AM', city: 'Ереван' } }))
+    await renderIn('Ереван')
+    for (const view of mounted.splice(0)) view.unmount()
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      advice.mockReturnValue(new Promise<AdviceResponse>(() => undefined))
+      const view = await renderIn('Гюмри')
+      expect(view.find('.skeleton').exists()).toBe(true)
+      expect(strips(view)).toEqual([])
+
+      vi.advanceTimersByTime(STRIP_LATE_MS)
+      await nextTick()
+      expect(strips(view)).toEqual([
+        { kind: 'refreshing', text: 'Refreshing · the list for Gyumri' },
+      ])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // Two waits are two requests: a refresh already late, then a city moved in another tab — the new
+  // city's list was asked a moment ago, and its strip waits its own second (adversarial А2).
+  it('А2: a city moved after a late refresh — its strip waits its own second', async () => {
+    advice.mockResolvedValue(answer([milk]))
+    await renderIn('Гюмри')
+    for (const view of mounted.splice(0)) view.unmount()
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      advice.mockReturnValue(new Promise<AdviceResponse>(() => undefined))
+      const view = await renderIn('Гюмри')
+      vi.advanceTimersByTime(STRIP_LATE_MS)
+      await nextTick()
+      expect(strips(view).map((strip) => strip.kind)).toEqual(['refreshing'])
+
+      let answered: (value: AdviceResponse) => void = () => undefined
+      advice.mockReturnValue(new Promise<AdviceResponse>((resolve) => (answered = resolve)))
+      const key = `molvia.settings.${ME}`
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          country: 'AM',
+          city: 'Ереван',
+          spendCurrency: 'AMD',
+          incomeCurrency: 'RUB',
+        }),
+      )
+      window.dispatchEvent(new StorageEvent('storage', { key }))
+      await nextTick()
+      await nextTick()
+      expect(view.find('.skeleton').exists()).toBe(true)
+      expect(strips(view)).toEqual([])
+
+      vi.advanceTimersByTime(STRIP_LATE_MS - 1)
+      await nextTick()
+      expect(strips(view)).toEqual([])
+      vi.advanceTimersByTime(1)
+      await nextTick()
+      expect(strips(view)).toEqual([
+        { kind: 'refreshing', text: 'Refreshing · the list for Yerevan' },
+      ])
+
+      // A quick answer to a city never shows it: here it answers late, and the strip goes with it.
+      answered(answer([milk], { geography: { country: 'AM', city: 'Ереван' } }))
+      await flushPromises()
+      expect(strips(view)).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+// MOL-202, adversarial А1: after a save the rows stay as they were until they are asked for again,
+// and a sheet opened on one of them said «Your rating: 1» over the 5 just saved — and refused the 1
+// as «Nothing has changed». The real sheet here, its keys and its button pressed.
+describe('AdviceView: the sheet after a save (MOL-202, А1)', () => {
+  const ITEM = sausage.itemId
+  /** «Не брать нигде» in the shared mode: 2.3 is three people's, the person's own is `own`. */
+  const row = (own: number, rating = '2.3'): AdviceRow => ({
+    ...sausage,
+    rating,
+    ratingsCount: 3,
+    ownScore: own,
+    review: null,
+  })
+  const shared = (rows: AdviceRow[]) =>
+    answer(rows, { geography: { country: 'AM', city: 'Гюмри' }, scope: 'shared' })
+  const card = (score: number): VerdictCard => {
+    const at = new Date()
+    return { itemId: ITEM, score, review: null, ratedAt: at, updatedAt: at }
+  }
+  let clock = 0
+
+  beforeEach(() => {
+    // Shelves a test blocked are given back before they are cleared.
+    vi.restoreAllMocks()
+    forgetPageWrites()
+    localStorage.clear()
+    sessionStorage.clear()
+    advice.mockReset()
+    adviceSearch.mockReset()
+    amendVerdict.mockReset()
+    withdrawVerdict.mockReset()
+    rateItem.mockReset()
+    pendingVerdicts.mockReset()
+    pendingVerdicts.mockResolvedValue({ items: [], total: 0 })
+    vi.restoreAllMocks()
+    online(true)
+    clock = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => clock)
+  })
+
+  afterEach(() => {
+    for (const view of mounted.splice(0)) view.unmount()
+    document.body.innerHTML = ''
+  })
+
+  /** A tap on the row, past the sheet's rise: until then it takes no tap. */
+  async function open(view: VueWrapper): Promise<VueWrapper> {
+    await view.findComponent({ name: 'AdviceNeverRow' }).trigger('click')
+    await flushPromises()
+    clock += 1000
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    return view.findComponent({ name: 'VerdictEditSheet' })
+  }
+
+  const key = (sheet: VueWrapper, score: number) =>
+    sheet.get(`button[aria-label="Rating ${String(score)} out of 5"]`)
+
+  /** The sheet's main action, whatever its words. */
+  const main = (sheet: VueWrapper) => sheet.get('button.large')
+
+  /** Own 1 → 5, saved; what the list is asked for after the save is `next`. */
+  async function saveFive(view: VueWrapper, next: () => void): Promise<void> {
+    const sheet = await open(view)
+    amendVerdict.mockResolvedValueOnce(card(5))
+    next()
+    await key(sheet, 5).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+    ;(view.vm as unknown as { putAway(): void }).putAway()
+    await flushPromises()
+  }
+
+  /** The sheet opened again stands on the 5, and the 1 put back over it is sent. */
+  async function onFiveAndOneSent(view: VueWrapper): Promise<void> {
+    const sheet = await open(view)
+    expect(sheet.get('.current').text()).toBe('Your rating: 5')
+    expect(key(sheet, 5).attributes('aria-pressed')).toBe('true')
+    await key(sheet, 1).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+    expect(amendVerdict).toHaveBeenLastCalledWith(ITEM, { score: 1 })
+  }
+
+  it('control: the list asked again came — the sheet opens on its row', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    await saveFive(view, () => advice.mockResolvedValue(shared([row(5, '3.7')])))
+
+    await onFiveAndOneSent(view)
+  })
+
+  it('the list asked again failed — the sheet opens on what was saved, and the 1 goes', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+
+    // The row still reads the answer before the save: the sheet does not.
+    expect(advice).toHaveBeenCalledTimes(2)
+    await onFiveAndOneSent(view)
+  })
+
+  it('the list asked again is on its way — the same', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    await saveFive(view, () => advice.mockReturnValue(new Promise(() => undefined)))
+
+    await onFiveAndOneSent(view)
+  })
+
+  it('in the own mode too, where the row itself still says 1', async () => {
+    advice.mockResolvedValue(answer([{ ...row(1, '1.0'), ratingsCount: 1 }]))
+    const { view } = await render()
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+
+    await onFiveAndOneSent(view)
+  })
+
+  it('a refresh asked before the save lands after it with the old figures — still the 5', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    // The connection back asks again; its answer is held until after the save.
+    let land: (value: AdviceResponse) => void = () => undefined
+    advice.mockReturnValueOnce(new Promise((resolve) => (land = resolve)))
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+
+    await saveFive(view, () => advice.mockReturnValue(new Promise(() => undefined)))
+    land(shared([row(1)]))
+    await flushPromises()
+
+    await onFiveAndOneSent(view)
+  })
+
+  it('a withdrawal: the row opened again offers «Rate it», not an amendment that answers 404', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    let sheet = await open(view)
+    withdrawVerdict.mockResolvedValueOnce()
+    advice.mockRejectedValue(broke())
+    await sheet
+      .findAll('button')
+      .find((b) => b.text() === 'Withdraw the rating')
+      ?.trigger('click')
+    await flushPromises()
+    ;(view.vm as unknown as { putAway(): void }).putAway()
+    await flushPromises()
+
+    sheet = await open(view)
+    expect(sheet.text()).toContain(en.advice.edit.meta_new)
+    expect(sheet.find('.current').exists()).toBe(false)
+    rateItem.mockResolvedValueOnce({ verdict: card(2), created: false })
+    await key(sheet, 2).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+    expect(rateItem).toHaveBeenCalledWith(ITEM, { score: 2 })
+    expect(amendVerdict).not.toHaveBeenCalled()
+  })
+
+  it('Б1: a step away and back while the list asked again failed — still the 5', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const first = await render()
+    await saveFive(first.view, () => advice.mockRejectedValue(broke()))
+    first.view.unmount()
+    mounted.splice(mounted.indexOf(first.view), 1)
+
+    // A new screen over the memory written before the save, the server still failing.
+    const { view } = await render()
+    expect(view.findAllComponents({ name: 'AdviceNeverRow' })).toHaveLength(1)
+    await onFiveAndOneSent(view)
+  })
+
+  it('Б1: a step away and back while the list asked again is on its way — the same', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const first = await render()
+    await saveFive(first.view, () => advice.mockReturnValue(new Promise(() => undefined)))
+    first.view.unmount()
+    mounted.splice(mounted.indexOf(first.view), 1)
+
+    const { view } = await render()
+    await onFiveAndOneSent(view)
+  })
+
+  it('Б1 control: back on a screen whose own answer came — the sheet is the server`s again', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const first = await render()
+    await saveFive(first.view, () => advice.mockRejectedValue(broke()))
+    first.view.unmount()
+    mounted.splice(mounted.indexOf(first.view), 1)
+
+    // Asked after the write, and saying 3 — set from elsewhere meanwhile: the answer wins.
+    advice.mockResolvedValue(shared([row(3, '2.7')]))
+    const { view } = await render()
+    const sheet = await open(view)
+    expect(sheet.get('.current').text()).toBe('Your rating: 3')
+  })
+
+  it('Б1 control: the memory written after the write is the server`s word, failing or not', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const first = await render()
+    // Asked after the save and answered 3 — set elsewhere meanwhile; the phone keeps that answer.
+    await saveFive(first.view, () => advice.mockResolvedValue(shared([row(3, '2.7')])))
+    first.view.unmount()
+    mounted.splice(mounted.indexOf(first.view), 1)
+
+    advice.mockRejectedValue(broke())
+    const { view } = await render()
+    const sheet = await open(view)
+    expect(sheet.get('.current').text()).toBe('Your rating: 3')
+  })
+
+  it('В1: a reload over the memory from before the save, the server failing — still the 5', async () => {
+    forgetPageWrites()
+    // What the page before left on the shelf: the list as it was, and the write it made after it.
+    localStorage.setItem(
+      `molvia.advice.${ME}`,
+      JSON.stringify({
+        answer: adviceResponseSchema.encode(shared([row(1)])),
+        fetchedAt: new Date(),
+      }),
+    )
+    localStorage.setItem(
+      `molvia.advice-written.${ME}`,
+      JSON.stringify({
+        [ITEM]: { verdict: { score: 5, review: null }, page: 'the page before', after: 7 },
+      }),
+    )
+    advice.mockRejectedValue(broke())
+    const { view } = await render()
+
+    await onFiveAndOneSent(view)
+  })
+
+  it('В1: the write is on the shelf beside the memory, and an answer asked after it lets it go', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+    expect(JSON.parse(localStorage.getItem(`molvia.advice-written.${ME}`) ?? '{}')).toMatchObject({
+      [ITEM]: { verdict: { score: 5, review: null } },
+    })
+
+    advice.mockResolvedValue(shared([row(5, '3.7')]))
+    await view.vm.$nextTick()
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(localStorage.getItem(`molvia.advice-written.${ME}`)).toBeNull()
+  })
+
+  it('В1: a write of the page before is let go by any answer of this one, whatever its number', async () => {
+    forgetPageWrites()
+    localStorage.setItem(
+      `molvia.advice-written.${ME}`,
+      JSON.stringify({
+        [ITEM]: { verdict: { score: 5, review: null }, page: 'the page before', after: 1e9 },
+      }),
+    )
+    advice.mockResolvedValue(shared([row(3, '2.7')]))
+    const { view } = await render()
+
+    expect(localStorage.getItem(`molvia.advice-written.${ME}`)).toBeNull()
+    const sheet = await open(view)
+    expect(sheet.get('.current').text()).toBe('Your rating: 3')
+  })
+
+  it('№5: an answer landing in the screen left lets nothing go — the new one still opens on the 5', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const first = await render()
+    // The list asked again after the save is slow: it lands only once the person is back.
+    let land: (value: AdviceResponse) => void = () => undefined
+    await saveFive(first.view, () =>
+      advice.mockReturnValueOnce(new Promise((resolve) => (land = resolve))),
+    )
+    first.view.unmount()
+    mounted.splice(mounted.indexOf(first.view), 1)
+
+    advice.mockRejectedValue(broke())
+    const { view } = await render()
+    land(shared([row(5, '3.7')]))
+    await flushPromises()
+
+    await onFiveAndOneSent(view)
+  })
+
+  it('Г2: a shelf full for the second write keeps the page`s word, and loses its own past', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+
+    // `localStorage` is full now: it refuses the key and still answers with what it held.
+    const real = window.localStorage
+    const full: Storage = {
+      getItem: (key) => real.getItem(key),
+      removeItem: (key) => {
+        real.removeItem(key)
+      },
+      setItem: (key, value) => {
+        if (key.startsWith('molvia.advice-written'))
+          throw new DOMException('full', 'QuotaExceededError')
+        real.setItem(key, value)
+      },
+      clear: () => {
+        real.clear()
+      },
+      key: (n) => real.key(n),
+      get length() {
+        return real.length
+      },
+    }
+    vi.spyOn(window, 'localStorage', 'get').mockReturnValue(full)
+    const sheet = await open(view)
+    amendVerdict.mockResolvedValueOnce(card(3))
+    await key(sheet, 3).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+    ;(view.vm as unknown as { putAway(): void }).putAway()
+    await flushPromises()
+
+    const again = await open(view)
+    expect(again.get('.current').text()).toBe('Your rating: 3')
+    // The next page reads the 3 from the shelf that took it, never the 5 the full one held.
+    expect(real.getItem(`molvia.advice-written.${ME}`)).toBeNull()
+    expect(sessionStorage.getItem(`molvia.advice-written.${ME}`)).toContain('"score":3')
+  })
+
+  it('Г1: a shelf blocked outright — the page keeps the write, still the 5', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    const blocked = () => {
+      throw new DOMException('blocked', 'SecurityError')
+    }
+    vi.spyOn(window, 'localStorage', 'get').mockImplementation(blocked)
+    vi.spyOn(window, 'sessionStorage', 'get').mockImplementation(blocked)
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+
+    await onFiveAndOneSent(view)
+  })
+
+  it('Д1: the sheet swept away while the write is on its way — the write is kept and the list asked', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    const sheet = await open(view)
+    let answer: (card: VerdictCard) => void = () => undefined
+    amendVerdict.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    await key(sheet, 5).trigger('click')
+    await main(sheet).trigger('click')
+    // Swept away mid-write: the screen puts it away, as `onClosed` does.
+    ;(view.vm as unknown as { putAway(): void }).putAway()
+    await flushPromises()
+    expect(view.findComponent({ name: 'VerdictEditSheet' }).exists()).toBe(false)
+
+    advice.mockRejectedValue(broke())
+    answer(card(5))
+    await flushPromises()
+
+    expect(advice).toHaveBeenCalledTimes(2)
+    await onFiveAndOneSent(view)
+  })
+
+  it('Д2: a write no shelf of the next page will have takes the list remembered before it along', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    const real = window.localStorage
+    const full: Storage = {
+      getItem: (key) => real.getItem(key),
+      removeItem: (key) => {
+        real.removeItem(key)
+      },
+      setItem: (key, value) => {
+        if (key.startsWith('molvia.advice-written'))
+          throw new DOMException('full', 'QuotaExceededError')
+        real.setItem(key, value)
+      },
+      clear: () => {
+        real.clear()
+      },
+      key: (n) => real.key(n),
+      get length() {
+        return real.length
+      },
+    }
+    vi.spyOn(window, 'localStorage', 'get').mockReturnValue(full)
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+    // This page still knows it.
+    await onFiveAndOneSent(view)
+
+    // The next launch: no `sessionStorage`, no page copy — and no list from before the write either.
+    expect(real.getItem(`molvia.advice.${ME}`)).toBeNull()
+    vi.restoreAllMocks()
+    sessionStorage.clear()
+    forgetPageWrites()
+    const next = await render()
+    expect(next.view.findAllComponents({ name: 'AdviceNeverRow' })).toHaveLength(0)
+  })
+
+  it('Д3: a screen gone still takes its answer into the memory — but never an older one over a newer', async () => {
+    let first: (value: AdviceResponse) => void = () => undefined
+    advice.mockReturnValueOnce(new Promise((resolve) => (first = resolve)))
+    const gone = await render()
+    gone.view.unmount()
+    mounted.splice(mounted.indexOf(gone.view), 1)
+    first(shared([row(4, '3.0')]))
+    await flushPromises()
+    expect(localStorage.getItem(`molvia.advice.${ME}`)).toContain('"ownScore":4')
+
+    // Asked before the step away and back, landing after the next screen's own: not written.
+    let late: (value: AdviceResponse) => void = () => undefined
+    advice.mockReturnValueOnce(new Promise((resolve) => (late = resolve)))
+    const old = await render()
+    old.view.unmount()
+    mounted.splice(mounted.indexOf(old.view), 1)
+    advice.mockResolvedValue(shared([row(3, '2.7')]))
+    await render()
+    late(shared([row(1)]))
+    await flushPromises()
+    expect(localStorage.getItem(`molvia.advice.${ME}`)).toContain('"ownScore":3')
+  })
+
+  /** A shelf refusing the key of the writes and still answering with what it held — a quota. */
+  function refusing(shelf: Storage): Storage {
+    return {
+      getItem: (key) => shelf.getItem(key),
+      removeItem: (key) => {
+        shelf.removeItem(key)
+      },
+      setItem: (key, value) => {
+        if (key.startsWith('molvia.advice-written'))
+          throw new DOMException('full', 'QuotaExceededError')
+        shelf.setItem(key, value)
+      },
+      clear: () => {
+        shelf.clear()
+      },
+      key: (n) => shelf.key(n),
+      get length() {
+        return shelf.length
+      },
+    }
+  }
+
+  it('Е2: a list forgotten for a write is not brought back by an answer asked before it', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    // The connection back asks again; its answer is held until after the save.
+    let land: (value: AdviceResponse) => void = () => undefined
+    advice.mockReturnValueOnce(new Promise((resolve) => (land = resolve)))
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+
+    const real = window.localStorage
+    vi.spyOn(window, 'localStorage', 'get').mockReturnValue(refusing(real))
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+    expect(real.getItem(`molvia.advice.${ME}`)).toBeNull()
+
+    land(shared([row(1)]))
+    await flushPromises()
+    expect(real.getItem(`molvia.advice.${ME}`)).toBeNull()
+  })
+
+  it('Е3: a refusal of `sessionStorage` alone keeps the list: the next launch has the write', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    vi.spyOn(window, 'sessionStorage', 'get').mockReturnValue(refusing(window.sessionStorage))
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+
+    expect(localStorage.getItem(`molvia.advice-written.${ME}`)).toContain('"score":5')
+    expect(localStorage.getItem(`molvia.advice.${ME}`)).not.toBeNull()
+  })
+
+  it('Ж3: a full shelf writes over the key it holds — the list stays, the next launch has the write', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+
+    // Full now: a new key is refused, a key it holds is written over in the same room.
+    const real = window.localStorage
+    const full: Storage = {
+      getItem: (key) => real.getItem(key),
+      removeItem: (key) => {
+        real.removeItem(key)
+      },
+      setItem: (key, value) => {
+        if (real.getItem(key) === null) throw new DOMException('full', 'QuotaExceededError')
+        real.setItem(key, value)
+      },
+      clear: () => {
+        real.clear()
+      },
+      key: (n) => real.key(n),
+      get length() {
+        return real.length
+      },
+    }
+    vi.spyOn(window, 'localStorage', 'get').mockReturnValue(full)
+    const sheet = await open(view)
+    amendVerdict.mockResolvedValueOnce(card(3))
+    await key(sheet, 3).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+
+    expect(real.getItem(`molvia.advice-written.${ME}`)).toContain('"score":3')
+    expect(real.getItem(`molvia.advice.${ME}`)).not.toBeNull()
+  })
+
+  it('Ж1: a write with no answer is kept as unknown, and the list is asked again', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    const sheet = await open(view)
+    amendVerdict.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'aborted', false))
+    advice.mockRejectedValue(broke())
+    await key(sheet, 5).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+
+    expect(advice).toHaveBeenCalledTimes(2)
+    expect(localStorage.getItem(`molvia.advice-written.${ME}`)).toContain('"verdict":"unknown"')
+  })
+
+  /** The sheet open on the row says no score of the person's and sends the one chosen by `PUT`. */
+  async function unsureAndPut(view: VueWrapper, chosen: number): Promise<void> {
+    const sheet = await open(view)
+    expect(sheet.find('.current').exists()).toBe(false)
+    expect(sheet.findAll('button[aria-pressed="true"]')).toHaveLength(0)
+    rateItem.mockResolvedValueOnce({ verdict: card(chosen), created: false })
+    await key(sheet, chosen).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+    expect(rateItem).toHaveBeenLastCalledWith(ITEM, { score: chosen })
+  }
+
+  const cutOff = () => new ApiError(ERROR.INTERNAL, 'aborted', false)
+
+  it('З4: a write with no answer, the sheet closed and opened again — still no score of one`s own', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    const sheet = await open(view)
+    amendVerdict.mockRejectedValueOnce(cutOff())
+    advice.mockRejectedValue(broke())
+    await key(sheet, 5).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+    ;(view.vm as unknown as { putAway(): void }).putAway()
+    await flushPromises()
+
+    await unsureAndPut(view, 1)
+  })
+
+  it('З1: a write with no answer after one that landed — the earlier is no longer the person`s', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    const { view } = await render()
+    await saveFive(view, () => advice.mockRejectedValue(broke()))
+    const sheet = await open(view)
+    amendVerdict.mockRejectedValueOnce(cutOff())
+    await key(sheet, 3).trigger('click')
+    await main(sheet).trigger('click')
+    await flushPromises()
+    ;(view.vm as unknown as { putAway(): void }).putAway()
+    await flushPromises()
+
+    // The server may hold the 3: the 5 goes back by `PUT`, never refused as «nothing changed».
+    await unsureAndPut(view, 5)
+  })
+
+  it('a row found by the search, dimmed while it is asked again — the same', async () => {
+    advice.mockResolvedValue(shared([row(1)]))
+    adviceSearch.mockResolvedValue({
+      geography: { country: 'AM', city: 'Гюмри' },
+      scope: 'shared',
+      near: true,
+      items: [{ itemId: ITEM, name: sausage.name, advice: row(1) }],
+    })
+    const { view } = await render()
+    await view.get('input[type="search"]').setValue('колб')
+    await vi.waitFor(() => {
+      expect(adviceSearch).toHaveBeenCalled()
+    })
+    await flushPromises()
+
+    adviceSearch.mockReturnValue(new Promise(() => undefined))
+    await saveFive(view, () => advice.mockReturnValue(new Promise(() => undefined)))
+    expect(view.find('.found.stale').exists()).toBe(true)
+
+    await onFiveAndOneSent(view)
   })
 })

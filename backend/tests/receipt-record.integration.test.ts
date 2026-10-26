@@ -31,6 +31,8 @@ import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtur
 // The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 857 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
 // than any yet seen.
+// The 3 of MOL-264 took 1.2–1.5 s on a Mac under the lock: twenty times, as the reporter advises, is 30 s.
+// Three more went past ten times their worst on CI in MOL-264's run (1 112, 534 and 702 ms): the advice's 25 s, 15 s.
 
 /**
  * «Записать» (MOL-126): a parsed receipt written in one go as a finished trip on its own day, its
@@ -555,7 +557,7 @@ describe('«Записать»', () => {
           await Promise.all([pool.end(), holder.end(), watcher.end()])
         }
       },
-      10_000,
+      25_000,
     )
   })
 
@@ -618,7 +620,7 @@ describe('«Записать»', () => {
     expect(response.statusCode).toBe(200)
     const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
     expect(trip?.receiptMinor).toBe(215_000n)
-  })
+  }, 15_000)
 
   it('records a gift at 0 as a purchase of the trip, and as no price of its place (MOL-274, А8)', async () => {
     const me = await insertActor(db)
@@ -667,6 +669,176 @@ describe('«Записать»', () => {
       headers: { cookie: await signIn(db, me) },
     })
     expect(pending.body).toContain(milk)
+  })
+
+  it('records a line the font’s swaps put right as not read: no shelf price for the memory (MOL-290, Р-7)', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const cheese = await insertItem(db)
+    const id = await parsedReceipt(me, LINES.slice(1, 3))
+    await db
+      .update(receiptLines)
+      .set({ repaired: true })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 0)))
+    const line = (position: number, drams: number) => ({
+      position,
+      skip: false,
+      item: { id: cheese },
+      quantity: pieces(1),
+      amount: amount(drams),
+    })
+    const response = await record(me, id, {
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [line(0, 1_450), line(1, 980)],
+    })
+    expect(response.statusCode).toBe(200)
+    const rows = await db
+      .select()
+      .from(receiptLines)
+      .where(eq(receiptLines.receiptId, id))
+      .orderBy(asc(receiptLines.position))
+    expect(rows.map((row) => [row.position, row.repaired, row.asRead])).toEqual([
+      [0, true, false],
+      [1, false, false],
+    ])
+    // the chocolate, 890 × 1 for 980, is not as read either: neither gives the shelf a price
+    const words = await db
+      .select()
+      .from(storeMemory)
+      .where(eq(storeMemory.kind, 'sku'))
+      .orderBy(asc(storeMemory.key))
+    expect(words.map((word) => [word.key, word.priceMinor])).toEqual([
+      ['1110001', null],
+      ['1110002', null],
+    ])
+  }, 15_000)
+
+  describe('a line’s package from its name (MOL-264)', () => {
+    const PACKED: Line[] = [
+      { printed: 'Գազավորված ըմպելիք «Կոկա Կոլա» 1.5լ', sku: '1170010', price: 700, sum: 700 },
+      { printed: 'Կաթ «Իգիթ» 3.2% 1լ', sku: '1170011', qty: 2, price: 370, sum: 740 },
+      { printed: 'Հավկիթ «Ոսկեհավ» #0-1 10հտ', sku: '1170012', price: 850, sum: 850 },
+      { printed: 'Սերուցք «Իգիթ» 10%', sku: '1170013', price: 600, sum: 600 },
+    ]
+    const NAMES = ['Coca-Cola', 'Молоко «Игит» 3,2%', 'Яйца «Воскеат»', 'Сливки «Игит» 10%']
+    const line = (position: number, quantity: Record<string, string>, drams: number) => ({
+      position,
+      skip: false,
+      item: { name: NAMES[position] },
+      quantity,
+      amount: amount(drams),
+    })
+    const shown = [
+      line(0, { value: '1.5', unit: 'l' }, 700),
+      line(1, { value: '2', unit: 'l' }, 740),
+      line(2, pieces(10), 850),
+      line(3, pieces(1), 600),
+    ]
+
+    async function recorded(me: string, lines: readonly Record<string, unknown>[]) {
+      const place = await insertPlace(db)
+      const id = await parsedReceipt(me, PACKED)
+      const response = await record(me, id, {
+        tripId: randomUUID(),
+        place: { id: place },
+        purchasedOn: '2026-09-26',
+        lines,
+      })
+      expect(response.statusCode).toBe(200)
+      const bought = await db
+        .select({ name: items.name, milli: expenses.qtyMilli, unit: expenses.qtyUnit })
+        .from(expenses)
+        .innerJoin(items, eq(items.id, expenses.itemId))
+        .orderBy(asc(items.name))
+      const made = await db
+        .select({
+          name: items.name,
+          unit: items.defaultUnit,
+          typical: items.typicalQtyMilli,
+          typicalUnit: items.typicalQtyUnit,
+        })
+        .from(items)
+        .orderBy(asc(items.name))
+      const read = await db
+        .select({ position: receiptLines.position, asRead: receiptLines.asRead })
+        .from(receiptLines)
+        .where(eq(receiptLines.receiptId, id))
+        .orderBy(asc(receiptLines.position))
+      const words = await db
+        .select({ key: storeMemory.key, price: storeMemory.priceMinor })
+        .from(storeMemory)
+        .where(eq(storeMemory.kind, 'sku'))
+        .orderBy(asc(storeMemory.key))
+      const [days] = await db.select().from(receiptDays)
+      return { bought, made, read, words, days }
+    }
+
+    it('records the purchase as the review showed it — the pieces times the package — and as read', async () => {
+      const me = await insertActor(db)
+      const { bought, made, read, words, days } = await recorded(me, shown)
+      expect(bought).toEqual([
+        { name: 'Coca-Cola', milli: 1_500n, unit: 'l' },
+        { name: 'Молоко «Игит» 3,2%', milli: 2_000n, unit: 'l' },
+        { name: 'Сливки «Игит» 10%', milli: 1_000n, unit: 'piece' },
+        { name: 'Яйца «Воскеат»', milli: 10_000n, unit: 'piece' },
+      ])
+      // a new item is offered one package the next time — the milk one litre, not the two bought
+      expect(made).toEqual([
+        { name: 'Coca-Cola', unit: 'l', typical: 1_500n, typicalUnit: 'l' },
+        { name: 'Молоко «Игит» 3,2%', unit: 'l', typical: 1_000n, typicalUnit: 'l' },
+        { name: 'Сливки «Игит» 10%', unit: 'piece', typical: null, typicalUnit: null },
+        { name: 'Яйца «Воскеат»', unit: 'piece', typical: 10_000n, typicalUnit: 'piece' },
+      ])
+      // the till's figures are what the memory keeps: the shelf price of a piece, the line as read
+      expect(read.map((row) => row.asRead)).toEqual([true, true, true, true])
+      expect(words.map((word) => [word.key, word.price])).toEqual([
+        ['1170010', 70_000n],
+        ['1170011', 37_000n],
+        ['1170012', 85_000n],
+        ['1170013', 60_000n],
+      ])
+      // and the measure of 0.2 counts no line put right (a phone sending no `edited`: the server judges)
+      expect(days).toMatchObject({ lines: 4, linesEdited: 0, linesFigures: 0 })
+    }, 30_000)
+
+    it('records an earlier build’s pieces as it sends them, no edit either (Р-10)', async () => {
+      const me = await insertActor(db)
+      const { bought, made, read, days } = await recorded(me, [
+        line(0, pieces(1), 700),
+        line(1, pieces(2), 740),
+        line(2, pieces(1), 850),
+        line(3, pieces(1), 600),
+      ])
+      expect(bought.map((row) => [row.milli, row.unit])).toEqual([
+        [1_000n, 'piece'],
+        [2_000n, 'piece'],
+        [1_000n, 'piece'],
+        [1_000n, 'piece'],
+      ])
+      // a package of another unit than what was recorded says nothing of the item
+      expect(made.map((row) => [row.unit, row.typical])).toEqual([
+        ['piece', null],
+        ['piece', null],
+        ['piece', null],
+        ['piece', 10_000n],
+      ])
+      expect(read.map((row) => row.asRead)).toEqual([true, true, true, true])
+      expect(days).toMatchObject({ lines: 4, linesEdited: 0, linesFigures: 0 })
+    }, 30_000)
+
+    it('counts another quantity as figures put right, never as read', async () => {
+      const me = await insertActor(db)
+      const { bought, read, words, days } = await recorded(me, [
+        line(0, { value: '1', unit: 'l' }, 700),
+        ...shown.slice(1),
+      ])
+      expect(bought[0]).toEqual({ name: 'Coca-Cola', milli: 1_000n, unit: 'l' })
+      expect(read.map((row) => row.asRead)).toEqual([false, true, true, true])
+      expect(words[0]).toEqual({ key: '1170010', price: null })
+      expect(days).toMatchObject({ lines: 4, linesEdited: 1, linesFigures: 1 })
+    }, 30_000)
   })
 
   it('confirms no row of a line whose price the check took off as misread (MOL-255)', async () => {
@@ -845,6 +1017,77 @@ describe('«Записать»', () => {
       }),
     )
     expect([overflow.statusCode, codeOf(overflow)]).toEqual([400, ERROR.INVALID_AMOUNT])
+  }, 10_000)
+
+  it('takes what left the card for a card that sends its discount to it, less a bonus spent (MOL-289)', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db)
+    const body = (over: Record<string, unknown> = {}) => ({
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        { position: 0, skip: false, item: { id: milk }, quantity: pieces(2), amount: amount(740) },
+        { position: 1, skip: true },
+      ],
+      ...over,
+    })
+    const moneyOf = async (receipt: string, payload: ReturnType<typeof body>) => {
+      expect((await record(me, receipt, payload)).statusCode).toBe(200)
+      const [trip] = await db.select().from(trips).where(eq(trips.id, payload.tripId))
+      return trip?.receiptMinor
+    }
+    // 2 190 of lines and 21,90 sent to the card: «Ընդամենը» 2 211,90 left the card
+    const carded = { totalMinor: 221_190n, cashbackMinor: 2_190n }
+    const sent = await parsedReceipt(me, LINES.slice(0, 2), { ...carded, receiptNo: '1' })
+    expect(await moneyOf(sent, body())).toBe(221_190n)
+    // 100,00 of it paid with the bonus sent before: that was recorded then, and the card paid the rest
+    const spent = await parsedReceipt(me, LINES.slice(0, 2), {
+      ...carded,
+      redeemedMinor: 10_000n,
+      receiptNo: '2',
+    })
+    expect(await moneyOf(spent, body())).toBe(211_190n)
+    // the total the person typed is the receipt's too: the bonus comes off it as well
+    const typed = await parsedReceipt(me, LINES.slice(0, 2), {
+      ...carded,
+      redeemedMinor: 10_000n,
+      receiptNo: '3',
+    })
+    expect(await moneyOf(typed, body({ total: amount(2_211.9) }))).toBe(211_190n)
+    // no total vouched for: the lines and what went to the card (review round 1, А3)
+    const unvouched = await parsedReceipt(me, LINES.slice(0, 2), {
+      totalMinor: null,
+      cashbackMinor: 2_190n,
+      receiptNo: '4',
+    })
+    expect(await moneyOf(unvouched, body())).toBe(221_190n)
+    // and less the bonus the card was paid with, where the printed total less it was the payment (review round 6, Г5)
+    const unvouchedBonus = await parsedReceipt(me, LINES.slice(0, 2), {
+      totalMinor: null,
+      cashbackMinor: 2_190n,
+      redeemedMinor: 10_000n,
+      receiptNo: '8',
+    })
+    expect(await moneyOf(unvouchedBonus, body())).toBe(211_190n)
+    // a total vouched for below the lines — a till that takes the discount off on the spot — is the lines alone,
+    // as before: never the lines and the cashback, two discounts over what left the card (review round 2, Б4)
+    const below = await parsedReceipt(me, LINES.slice(0, 2), {
+      totalMinor: 217_000n,
+      cashbackMinor: 2_190n,
+      receiptNo: '5',
+    })
+    expect(await moneyOf(below, body())).toBe(219_000n)
+    // an earlier build is shown the lines' total, 2 190,00, and sends it back with «Итог» saved as it was: the
+    // printed total, what left the card, and no total put right (review round 2, №5)
+    const echoed = await parsedReceipt(me, LINES.slice(0, 2), { ...carded, receiptNo: '6' })
+    expect(await moneyOf(echoed, body({ total: amount(2_190) }))).toBe(221_190n)
+    const days = await db.select().from(receiptDays)
+    expect(days.reduce((all, day) => all + day.totalsCorrected, 0)).toBe(0)
+    // any other figure it sends is the person's word, taken as it is
+    const typedOver = await parsedReceipt(me, LINES.slice(0, 2), { ...carded, receiptNo: '7' })
+    expect(await moneyOf(typedOver, body({ total: amount(2_200) }))).toBe(220_000n)
   }, 10_000)
 
   // review 1, В1, В2: the receipt row holds the trip's date on the accounts, «из чека» and the guard

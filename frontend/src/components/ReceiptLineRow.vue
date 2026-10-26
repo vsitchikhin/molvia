@@ -11,15 +11,26 @@
       <!-- The line as the till printed it, in the system's face and the receipt's language: one
            line, its height fixed, so an Armenian or Georgian word does not move the row. -->
       <span class="printed" :lang="lang">{{ line.line.printed }}</span>
-      <span v-if="line.check && line.line.translation" class="figures">{{
+      <!-- a new item's name is the proposal itself: «в чеке — …» would only repeat it (MOL-293) -->
+      <span v-if="line.check && !line.isNew && line.line.translation" class="figures">{{
         t('receipt.review.check_note', { text: line.line.translation })
       }}</span>
       <span v-if="figures" class="figures">
         {{ figures }}
+        <!-- what the till's pieces make by the package the name prints: what is recorded (MOL-264, В-2 «а») -->
+        <I18nT v-if="packed" keypath="receipt.review.packed" scope="global" tag="span">
+          <template #pack>
+            <b class="packed">{{ packed }}</b>
+          </template>
+        </I18nT>
         <span v-if="line.mismatch && printed" class="mismatch">{{
           t('receipt.review.mismatch', { printed })
         }}</span>
       </span>
+      <!-- Figures put right by the font's 5↔6, the receipt whole by them: «проверьте» (MOL-290). -->
+      <span v-if="line.repaired && figures" class="figures">{{
+        t('receipt.review.repaired_note')
+      }}</span>
       <!-- Figures that were not verified are left empty, never guessed (MOL-255, В-3 «а»). -->
       <span v-else-if="unread" class="figures">{{ t('receipt.review.unread') }}</span>
       <span v-if="tags.length > 0" class="tags">
@@ -34,20 +45,22 @@
 <script lang="ts">
 import { computed, defineComponent } from 'vue'
 import type { PropType } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { Translation, useI18n } from 'vue-i18n'
 import IconChevronRight from '~icons/mdi/chevron-right'
 import { formatMoney, formatQuantity } from '@molvia/model'
+import type { Quantity } from '@molvia/model'
 import type { ReviewLine } from '@/receipts/review'
 
 /**
  * One line of a receipt on the review (handoff 05): the item in the person's language, the line as
  * printed, «кол-во × цена», the printed sum where it disagrees («≠ 980», a highlight that refuses
- * nothing), the marks «новый товар», «проверьте», «не записываем», and on the right what the line
+ * nothing), the marks «новый товар», «проверьте» — of the item, or of figures the font's swaps put right
+ * (MOL-290) — «не записываем», and on the right what the line
  * will be recorded at. A screen reader hears «товар, кол-во × цена, сумма, метка».
  */
 export default defineComponent({
   name: 'ReceiptLineRow',
-  components: { IconChevronRight },
+  components: { I18nT: Translation, IconChevronRight },
   props: {
     line: { type: Object as PropType<ReviewLine>, required: true },
     /** The language the receipt is printed in, for the system's face to pick its glyphs. */
@@ -56,11 +69,14 @@ export default defineComponent({
   emits: { open: () => true },
   setup(props) {
     const { t, locale } = useI18n()
+    const quantityText = (quantity: Quantity) =>
+      `${formatQuantity(quantity, locale.value)} ${t(`item.unit_${quantity.unit}`)}`
     const figures = computed(() => {
-      const { quantity } = props.line
+      // the till's own count beside its price, as printed; the purchase the package makes is said after it
+      const quantity = props.line.ownFigures ? props.line.quantity : props.line.line.quantity
       const price = props.line.ownFigures ? null : props.line.line.price
       if (!quantity) return null
-      const qty = `${formatQuantity(quantity, locale.value)} ${t(`item.unit_${quantity.unit}`)}`
+      const qty = quantityText(quantity)
       if (!price) return qty
       const discount = props.line.line.discount
       // A discount of nothing is printed by the till as «0,00»: no «− 0» after the price.
@@ -72,6 +88,11 @@ export default defineComponent({
           })
         : t('receipt.review.qty_price', { qty, price: formatMoney(price, locale.value) })
     })
+    const packed = computed(() =>
+      !props.line.ownFigures && props.line.line.pack && props.line.quantity
+        ? quantityText(props.line.quantity)
+        : null,
+    )
     const printed = computed(() =>
       props.line.line.sum ? formatMoney(props.line.line.sum, locale.value) : null,
     )
@@ -86,7 +107,8 @@ export default defineComponent({
       ...(!props.line.skip && props.line.isNew
         ? [{ key: 'new', text: t('receipt.review.tag_new') }]
         : []),
-      ...(!props.line.skip && props.line.check
+      // one «проверьте» for the item and the figures alike: the note under the figures says which
+      ...(!props.line.skip && (props.line.check || props.line.repaired)
         ? [{ key: 'check', text: t('receipt.review.tag_check') }]
         : []),
     ])
@@ -94,13 +116,20 @@ export default defineComponent({
       [
         t('receipt.review.line_aria', {
           name: props.line.name,
-          qty: figures.value ?? (unread.value ? t('receipt.review.unread') : ''),
+          qty:
+            figures.value === null
+              ? unread.value
+                ? t('receipt.review.unread')
+                : ''
+              : packed.value === null
+                ? figures.value
+                : t('receipt.review.packed_spoken', { figures: figures.value, pack: packed.value }),
           sum: sum.value ?? '',
         }),
         ...tags.value.map((tag) => tag.text),
       ].join(', '),
     )
-    return { t, figures, printed, sum, unread, tags, spoken }
+    return { t, figures, packed, printed, sum, unread, tags, spoken }
   },
 })
 </script>
@@ -155,6 +184,11 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-footnote);
   font-variant-numeric: tabular-nums;
+}
+
+.packed {
+  color: var(--text);
+  font-weight: var(--weight-medium);
 }
 
 .mismatch {

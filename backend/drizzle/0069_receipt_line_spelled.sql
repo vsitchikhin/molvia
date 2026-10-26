@@ -1,0 +1,1 @@
+ALTER TABLE "receipt_lines" ADD COLUMN "spelled" boolean DEFAULT false NOT NULL;

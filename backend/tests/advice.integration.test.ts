@@ -186,6 +186,7 @@ describe('три группы', () => {
       'itemId',
       'level',
       'name',
+      'ownScore',
       'rating',
       'ratingsCount',
       'review',

@@ -1,4 +1,6 @@
 import {
+  linesTotalOf,
+  packedQuantity,
   receiptBalance,
   receiptCard,
   receiptDigits,
@@ -31,8 +33,17 @@ export interface ReviewLine {
   readonly isNew: boolean
   /** «проверьте» — found from far (`match: weak`), until the person settled the item. */
   readonly check: boolean
+  /**
+   * «проверьте» of the figures — put right by the digits the till's font confuses (MOL-290) — until the
+   * person typed their own.
+   */
+  readonly repaired: boolean
   /** The printed sum differs from quantity × price — highlighted, never refused (Р-3 of MOL-113). */
   readonly mismatch: boolean
+  /**
+   * What the line is recorded at: the till's pieces times the package its name prints (MOL-264) — the till's own
+   * count and price stay on `line` — or the person's figure once edited.
+   */
   readonly quantity: Quantity | null
   /** What the line will be recorded at (В-5 on the server; the person's figure once edited). */
   readonly amount: Money | null
@@ -81,8 +92,12 @@ function amountsOf(detail: ReceiptDetail, draft: ReceiptDraft | null) {
     total,
     ...detail.lines.flatMap((line) => [line.price, line.sum, line.discount]),
   ])
-  return recordedSums(figures, total, digits)
+  // the lines make the total less what a card sent to the card (MOL-289)
+  return recordedSums(figures, linesTotalOf(total, detail.cashback ?? null), digits)
 }
+
+/** The quantity the review shows a line at before any edit: the purchase its package makes (MOL-264). */
+const shownQuantity = (line: ReceiptReviewLine) => packedQuantity(line.quantity, line.pack ?? null)
 
 export function reviewLines(
   detail: ReceiptDetail,
@@ -106,10 +121,11 @@ export function reviewLines(
         isNew: itemId === null,
         // «проверьте» goes only once the person chose the item, not with any edit (review 16).
         check: line.match === 'weak' && edit.confirmed !== true && itemId === line.itemId,
+        repaired: line.repaired === true && figures === undefined,
         // Figures typed are what was paid, and «≠» of the reading no longer describes the line; an
         // item chosen alone leaves the figures, and the sum, to the reading (review 28).
         mismatch: figures ? false : !line.settled && line.sum !== null,
-        quantity: figures ? figures.quantity : line.quantity,
+        quantity: figures ? figures.quantity : shownQuantity(line),
         amount: figures ? figures.amount : amount,
         skip: edit.skip,
         edited: true,
@@ -125,7 +141,7 @@ export function reviewLines(
           // (adversarial Б3)
           figures:
             figures !== undefined &&
-            (!sameQuantity(figures.quantity, line.quantity) ||
+            (!sameQuantity(figures.quantity, shownQuantity(line)) ||
               !sameMoney(figures.amount, line.amount)),
         },
       }
@@ -138,8 +154,9 @@ export function reviewLines(
       name: isNew ? newName(line, country) : (line.itemName ?? newName(line, country)),
       isNew,
       check: line.match === 'weak',
+      repaired: line.repaired === true,
       mismatch: !line.settled && line.sum !== null,
-      quantity: line.quantity,
+      quantity: shownQuantity(line),
       amount,
       skip: false,
       edited: false,
@@ -157,7 +174,7 @@ export function reviewBalance(
 ): ReceiptBalance {
   return receiptBalance(
     lines.map((one) => ({ printed: one.line.sum, amount: one.amount, skip: one.skip })),
-    draft?.total ?? detail.receipt.total,
+    linesTotalOf(draft?.total ?? detail.receipt.total, detail.cashback ?? null),
     receiptCard(detail.receipt.country).currency,
   )
 }

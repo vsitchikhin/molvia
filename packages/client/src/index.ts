@@ -4,9 +4,13 @@ import {
   ERROR,
   EXPORT_FORMAT,
   LOGIN_HEADER,
+  RECEIPT_CASHBACK_HEADER,
   RECEIPT_CODES_HEADER,
   RECEIPT_READ_PARTLY_HEADER,
   RECEIPT_READ_TOTAL_HEADER,
+  RECEIPT_REPAIRED_HEADER,
+  RECEIPT_SPELLED_HEADER,
+  RECEIPT_PACK_HEADER,
   loginStartedCodec,
   sessionsResponseCodec,
   loginPollCodec,
@@ -76,6 +80,7 @@ import {
   spendingAmendBodySchema,
   spendingBodySchema,
   spendingCategoriesResponseCodec,
+  spendingCategoryAmendSchema,
   spendingCategoryBodySchema,
   spendingViewCodec,
   expensePatchSchema,
@@ -158,6 +163,7 @@ import type {
   SpendingAmendBody,
   SpendingBody,
   SpendingCategoriesResponse,
+  SpendingCategoryAmend,
   SpendingCategoryBody,
   SpendingView,
   ExpensePatch,
@@ -463,7 +469,10 @@ export interface MolviaClient {
    * One receipt with its lines; `error.not_found` for a missing, removed or someone else's one. Every
    * build that reads a line's `code` asks for it (`RECEIPT_CODES_HEADER`, MOL-234, adversarial А3), and
    * the total as read in one place likewise (`RECEIPT_READ_TOTAL_HEADER`, MOL-244), and whether it was
-   * read in part (`RECEIPT_READ_PARTLY_HEADER`, MOL-255).
+   * read in part (`RECEIPT_READ_PARTLY_HEADER`, MOL-255), and what a card sent to the card
+   * (`RECEIPT_CASHBACK_HEADER`, MOL-289), and which lines the font's swaps put right
+   * (`RECEIPT_REPAIRED_HEADER`, MOL-290), and which new names spell a word in letters
+   * (`RECEIPT_SPELLED_HEADER`, MOL-293), and what one piece of a line holds (`RECEIPT_PACK_HEADER`, MOL-264).
    */
   receipt(id: string, options?: { readonly shown?: boolean }): Promise<ReceiptDetail>
   removeReceipt(id: string): Promise<void>
@@ -522,6 +531,14 @@ export interface MolviaClient {
   addSpendingCategory(
     body: SpendingCategoryBody,
   ): Promise<{ categories: SpendingCategoriesResponse; created: boolean }>
+  /**
+   * One's own renamed, redrawn or recoloured (MOL-285), whole: `error.spending_category_taken` for a
+   * live name, `ERROR.NOT_FOUND` for a preset or a category that is not the owner's.
+   */
+  amendSpendingCategory(
+    id: string,
+    body: SpendingCategoryAmend,
+  ): Promise<SpendingCategoriesResponse>
   /** «Убрать из выбора»: nothing is erased, the spendings in it keep it. */
   archiveSpendingCategory(id: string): Promise<SpendingCategoriesResponse>
   /** «Вернуть» a category to the chips. */
@@ -1006,6 +1023,10 @@ export function createClient(options: ClientOptions): MolviaClient {
           [RECEIPT_CODES_HEADER]: '1',
           [RECEIPT_READ_TOTAL_HEADER]: '1',
           [RECEIPT_READ_PARTLY_HEADER]: '1',
+          [RECEIPT_CASHBACK_HEADER]: '1',
+          [RECEIPT_REPAIRED_HEADER]: '1',
+          [RECEIPT_SPELLED_HEADER]: '1',
+          [RECEIPT_PACK_HEADER]: '1',
         }),
       }),
     receiptSettled: (id) => request(`/receipts/${segment(id)}/settled`, receiptSettledCodec),
@@ -1103,6 +1124,12 @@ export function createClient(options: ClientOptions): MolviaClient {
       )
       return { categories: data, created: status === 201 }
     },
+
+    amendSpendingCategory: async (id, body) =>
+      request(`/spending-categories/${segment(id)}`, spendingCategoriesResponseCodec, {
+        method: 'PATCH',
+        body: encode(spendingCategoryAmendSchema, body),
+      }),
 
     archiveSpendingCategory: async (id) =>
       request(`/spending-categories/${segment(id)}`, spendingCategoriesResponseCodec, {

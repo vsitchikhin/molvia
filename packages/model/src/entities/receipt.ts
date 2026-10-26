@@ -494,6 +494,8 @@ export interface ReceiptLine {
   readonly sum: Money | null
   readonly discount: Money | null
   readonly settled: boolean
+  /** Put right by the digits the till's font confuses, the receipt proved whole by it (MOL-290). */
+  readonly repaired?: boolean
 }
 
 /**
@@ -509,6 +511,14 @@ export function moneyOfHundredths(hundredths: number | null, currency: Currency)
       ? BigInt(hundredths) * 10n ** BigInt(exponent - 2)
       : BigInt(Math.round(hundredths / 10 ** (2 - exponent)))
   return { minor, currency }
+}
+
+/** An amount as a till's hundredths, by its currency's exponent: what the parse counts in (MOL-291). */
+export function hundredthsOfMoney(money: Money): number {
+  const exponent = MINOR_EXPONENT[money.currency]
+  return exponent >= 2
+    ? Number(money.minor / 10n ** BigInt(exponent - 2))
+    : Number(money.minor) * 10 ** (2 - exponent)
 }
 
 function quantityOf(line: ReceiptTextLine): Quantity | null {
@@ -529,6 +539,7 @@ export function receiptLineOf(line: ReceiptTextLine, currency: Currency): Receip
     sum: moneyOfHundredths(line.sumHundredths, currency),
     discount: moneyOfHundredths(line.discountHundredths, currency),
     settled: line.settled,
+    ...(line.repaired === true ? { repaired: true } : {}),
   }
 }
 

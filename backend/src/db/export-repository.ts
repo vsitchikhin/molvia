@@ -350,6 +350,8 @@ export const EXPORT_COLUMNS: Readonly<
       'receipt_no',
       'total_minor',
       'read_total_minor',
+      'cashback_minor',
+      'redeemed_minor',
       'read_partly',
       'balanced',
       'city',
@@ -374,6 +376,7 @@ export const EXPORT_COLUMNS: Readonly<
       'sum_minor',
       'discount_minor',
       'settled',
+      'repaired',
       'item_id',
       'match',
       'translation',
@@ -384,6 +387,10 @@ export const EXPORT_COLUMNS: Readonly<
       receipt_id: 'the receipt it is nested in',
       as_read:
         'judged at «Записать» from the line’s figures and its purchase, both exported; the shelf price it lets the shops’ memory keep is exported with the word (MOL-240)',
+      spelled:
+        'how the proposed name was made, a hint of the review: the name itself is exported as `translation` (MOL-293)',
+      remembered:
+        'how the figures were put right — by the shop’s memory: the figures and `repaired` are exported (MOL-291)',
     },
   },
   // Taken by erasure with their receipt; never in the file — bytes of a picture, kept days (В-3).
@@ -419,7 +426,7 @@ export const EXPORT_COLUMNS: Readonly<
     },
   },
   spending_categories: {
-    exported: ['id', 'preset', 'name', 'colour', 'archived_at', 'created_at'],
+    exported: ['id', 'preset', 'name', 'colour', 'icon', 'archived_at', 'created_at'],
     omitted: { actor_id: OWNER },
   },
   money_month_rates: {
@@ -1126,6 +1133,8 @@ export function createExportRepository(db: Db): ExportRepository {
               receiptNo: row.receiptNo,
               total: cash(row.totalMinor, row.currency),
               readTotal: cash(row.readTotalMinor, row.currency),
+              cashback: cash(row.cashbackMinor, row.currency),
+              redeemed: cash(row.redeemedMinor, row.currency),
               readPartly: row.readPartly,
               balanced: row.balanced,
               city: row.city,
@@ -1147,6 +1156,7 @@ export function createExportRepository(db: Db): ExportRepository {
                 sum: cash(line.sumMinor, row.currency),
                 discount: cash(line.discountMinor, row.currency),
                 settled: line.settled,
+                repaired: line.repaired,
                 itemId: line.itemId,
                 match: line.match,
                 translation: line.translation,
@@ -1159,6 +1169,7 @@ export function createExportRepository(db: Db): ExportRepository {
               preset: row.preset,
               name: row.name,
               colour: row.colour,
+              icon: row.icon,
               archivedAt: row.archivedAt,
               createdAt: row.createdAt,
             })),

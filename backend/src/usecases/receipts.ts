@@ -8,6 +8,8 @@ import {
   AGGREGATE_MIN_CONTRIBUTIONS,
   barcodeTwins,
   hasSharedAccess,
+  linePack,
+  linesTotalOf,
   placeNameIdentity,
   priceInDoubt,
   receiptDigits,
@@ -242,13 +244,30 @@ export async function receiptOfOwner(
   readTotal = false,
   /** The phone knows the detail's `readPartly` (`RECEIPT_READ_PARTLY_HEADER`, MOL-255). */
   readPartly = false,
+  /** The phone knows the detail's `cashback` and `redeemed` (`RECEIPT_CASHBACK_HEADER`, MOL-289). */
+  cashback = false,
+  /** The phone knows a line's `repaired` (`RECEIPT_REPAIRED_HEADER`, MOL-290). */
+  repaired = false,
+  /** The phone knows a line's `spelled` (`RECEIPT_SPELLED_HEADER`, MOL-293). */
+  spelled = false,
+  /** The phone knows a line's `pack` (`RECEIPT_PACK_HEADER`, MOL-264). */
+  pack = false,
 ): Promise<ReceiptDetail> {
   const found = await repositories.receipts.one(actor.id, id)
   if (found === null) throw new DomainError(ERROR.NOT_FOUND)
   if (shown) await handedOver(repositories.receipts, actor.id, [found])
   const [receipt] = await withPlaces(repositories.receipts, actor, [found])
   if (receipt === undefined) throw new DomainError(ERROR.NOT_FOUND)
-  const { lines, currency } = found
+  const { currency } = found
+  // an earlier build cannot say «проверьте»: a line put right goes to it empty, as the check left it before
+  // (review round 1, А4; MOL-255, owner's В-1 «а» of MOL-290 — the mark is what lets it be shown)
+  const lines = repaired
+    ? found.lines
+    : found.lines.map((line) =>
+        line.repaired === true
+          ? { ...line, quantity: null, price: null, sum: null, discount: null, settled: false }
+          : line,
+      )
   const tin = receipt.header?.tin ?? null
 
   const { memory, itemIds, names, barcodes, amounts } = await shownLines(
@@ -256,7 +275,8 @@ export async function receiptOfOwner(
     actor.id,
     tin,
     lines,
-    receipt.total,
+    // the lines make the total less what a card sent to the card (MOL-289)
+    linesTotalOf(receipt.total, found.cashback),
     currency,
   )
 
@@ -296,12 +316,17 @@ export async function receiptOfOwner(
   }
 
   return {
-    receipt,
+    // an earlier build sets the lines against `total`, knowing no cashback: it is told what the lines come to,
+    // or it says «Разница» of every line read right (review round 1, А4); the trip's money is the server's
+    receipt: cashback
+      ? receipt
+      : { ...receipt, total: linesTotalOf(receipt.total, found.cashback) },
     lines: lines.map((line, i) => {
       const remembered = memory[i] ?? null
       const itemId = itemIds[i] ?? null
       const known = itemId === null ? null : (names.get(itemId) ?? null)
       const code = asked[i] ?? null
+      const packed = pack ? linePack(line, receipt.country) : null
       return {
         printed: line.printed,
         hs: line.hs,
@@ -311,19 +336,30 @@ export async function receiptOfOwner(
         sum: line.sum,
         discount: line.discount,
         settled: line.settled,
+        ...(repaired && line.repaired === true ? { repaired: true } : {}),
         itemId: known === null ? null : itemId,
         itemName: known,
+        // a new item the binding named and marked «проверьте» stays so (MOL-293, В-1 «а»); a line whose item
+        // is gone since — removed, merged away — is new, with no mark (adversarial А6, review №1)
         match:
           remembered !== null && known !== null
             ? 'memory'
             : known === null
-              ? 'new'
+              ? line.match === 'weak' && line.itemId === null
+                ? 'weak'
+                : 'new'
               : (line.match ?? 'new'),
         translation: line.translation,
+        // a proposal only while the line is still a new item: the memory may have named it since
+        ...(spelled && line.spelled && known === null ? { spelled: true } : {}),
+        ...(packed === null ? {} : { pack: packed }),
         amount: amounts[i] ?? null,
-        rememberedPrice: priceInDoubt(receipt.country, line.price, rememberedOf(remembered))
-          ? rememberedOf(remembered)
-          : null,
+        // one confused digit off the price read (В-1); or the line has none — the check emptied it, the memory
+        // doubting it among others (MOL-291, owner's В-2 «б»): a hint to type by, never a figure of the line
+        rememberedPrice:
+          line.price === null || priceInDoubt(receipt.country, line.price, rememberedOf(remembered))
+            ? rememberedOf(remembered)
+            : null,
         ...(code === null ? {} : { code }),
       }
     }),
@@ -331,6 +367,7 @@ export async function receiptOfOwner(
     duplicateOf: twin,
     ...(readTotal ? { readTotal: found.readTotal } : {}),
     ...(readPartly ? { readPartly: found.readPartly } : {}),
+    ...(cashback ? { cashback: found.cashback, redeemed: found.redeemed } : {}),
   }
 }
 

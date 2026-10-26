@@ -1,19 +1,24 @@
 <template>
-  <SearchField
-    class="field"
-    :model-value="modelValue"
-    :label="t('advice.search.label')"
-    :placeholder="t('advice.search.placeholder')"
-    clearable
-    @update:model-value="$emit('update:modelValue', $event)"
-  />
+  <!-- The field and the one strip of the connection under it, 8 apart (handoff `01`): while something
+       is typed, the search's — what it searched, as of when — otherwise the list's, the screen's own. -->
+  <div class="head" @focusin="entered" @focusout="left">
+    <SearchField
+      :model-value="modelValue"
+      :label="t('advice.search.label')"
+      :placeholder="t('advice.search.placeholder')"
+      clearable
+      @update:model-value="$emit('update:modelValue', $event)"
+    />
+    <StatusStrip
+      v-if="phase === 'memory' && fetchedAt"
+      kind="offline"
+      :text="t('advice.search.offline', { day: day(fetchedAt), time: time(fetchedAt) })"
+    />
+    <slot v-else-if="phase === 'idle'" name="strip" />
+  </div>
 
   <template v-if="phase !== 'idle'">
-    <p v-if="phase === 'memory' && fetchedAt" class="note">
-      {{ t('advice.search.offline', { day: day(fetchedAt), time: time(fetchedAt) }) }}
-    </p>
-
-    <ScreenSkeleton v-if="phase === 'loading'" :groups="[62, 62]" />
+    <AdviceSkeleton v-if="phase === 'loading'" />
 
     <ScreenState
       v-else-if="phase === 'error'"
@@ -76,20 +81,20 @@
       </AdviceGroup>
 
       <AdviceGroup v-if="groups.unrated.length > 0" level="unrated">
+        <!-- No meta: «Ещё не оценивали» is the caption's already (С-9 of MOL-118). No chevron: the
+             word in the tail opens the sheet, as a card of a group does with none. -->
         <AppCard list>
-          <button
+          <ListRow
             v-for="item in groups.unrated"
             :key="item.itemId"
-            class="unrated-row"
-            type="button"
+            :title="item.name"
+            wrap
             @click="$emit('rate', item, scope)"
           >
-            <span class="text">
-              <span class="name">{{ item.name }}</span>
-              <span class="sub">{{ t('advice.search.group_unrated') }}</span>
-            </span>
-            <span class="rate">{{ t('advice.search.rate') }}</span>
-          </button>
+            <template #tail
+              ><span class="rate">{{ t('advice.search.rate') }}</span></template
+            >
+          </ListRow>
         </AppCard>
       </AdviceGroup>
 
@@ -99,19 +104,21 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onUnmounted, toRef, watch } from 'vue'
+import { computed, defineComponent, onMounted, onUnmounted, toRef, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import IconNotFound from '~icons/mdi/magnify-close'
+import IconNotFound from '~icons/mdi/magnify'
 import type { AdviceFound, AdviceResponse, AdviceRow, AdviceScope } from '@molvia/model'
 import AdviceCheapRow from '@/components/AdviceCheapRow.vue'
 import AdviceGroup from '@/components/AdviceGroup.vue'
 import AdviceNeverRow from '@/components/AdviceNeverRow.vue'
+import AdviceSkeleton from '@/components/AdviceSkeleton.vue'
 import AdviceTakeCard from '@/components/AdviceTakeCard.vue'
 import AppCard from '@/components/AppCard.vue'
-import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import ListRow from '@/components/ListRow.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SearchField from '@/components/SearchField.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import type { CheapRow, NeverRow, TakeRow } from '@/components/adviceRow'
 import { useAdviceSearch } from '@/composables/useAdviceSearch'
 import { useAnnouncer } from '@/composables/useAnnouncer'
@@ -153,11 +160,13 @@ export default defineComponent({
     AdviceCheapRow,
     AdviceGroup,
     AdviceNeverRow,
+    AdviceSkeleton,
     AdviceTakeCard,
     AppCard,
-    ScreenSkeleton,
+    ListRow,
     ScreenState,
     SearchField,
+    StatusStrip,
   },
   props: {
     modelValue: { type: String, required: true },
@@ -172,8 +181,13 @@ export default defineComponent({
     /** With the scope of the answer the row came in: the list's may be another (review Р-13, Е). */
     edit: (row: AdviceRow, scope: AdviceScope) => typeof row === 'object' && !!scope,
     rate: (item: AdviceFound, scope: AdviceScope) => typeof item === 'object' && !!scope,
+    /**
+     * The focus came into the field or its «Очистить», or left them: «Что брать» keeps it then. Left
+     * by a press, it is told once the press is over; left for another app, not at all.
+     */
+    focused: (inside: boolean) => typeof inside === 'boolean',
   },
-  setup(props) {
+  setup(props, { emit }) {
     const { t, locale } = useI18n()
     const search = useAdviceSearch(toRef(props, 'modelValue'), () => props.remembered)
     const { phase, found, stale, answered } = search
@@ -205,6 +219,45 @@ export default defineComponent({
       withdraw?.()
     })
 
+    // A press takes the focus out of the field as it lands, and the field over a failure or a
+    // newcomer goes with it (В-4 «а») — told then, it went before the finger lifted, everything
+    // under it rose by its height, and the release landed on something else: the first tap on
+    // «Повторить» or a step of the cycle did nothing (adversarial В1). So the leaving is told a task
+    // after the release, past its click (owner's В-5 «а»); a focus moved by the keys, at once.
+    let pressed = false
+    let leaving = false
+    const press = () => {
+      pressed = true
+    }
+    const lift = () => {
+      setTimeout(() => {
+        pressed = false
+        if (!leaving) return
+        leaving = false
+        emit('focused', false)
+      })
+    }
+    onMounted(() => {
+      document.addEventListener('mousedown', press, true)
+      document.addEventListener('mouseup', lift, true)
+    })
+    onUnmounted(() => {
+      document.removeEventListener('mousedown', press, true)
+      document.removeEventListener('mouseup', lift, true)
+      leaving = false
+    })
+    function entered(): void {
+      leaving = false
+      emit('focused', true)
+    }
+    function left(): void {
+      // The page lost the system's focus — another app, to copy a name — and the field keeps it:
+      // the focus comes back to it with the person.
+      if (!document.hasFocus()) return
+      if (pressed) leaving = true
+      else emit('focused', false)
+    }
+
     return {
       t,
       IconNotFound,
@@ -215,6 +268,8 @@ export default defineComponent({
       scope: search.scope,
       groups: computed(() => laidOut(found.value)),
       retry: search.retry,
+      entered,
+      left,
       day: (when: Date) => purchaseDay(when, locale.value),
       time: (when: Date) => timeOfDay(when, locale.value),
     }
@@ -223,8 +278,12 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.field {
-  margin-bottom: var(--space-4);
+/* `.ghost-head` of «Что брать» draws this still over the skeleton: a change here goes there too. */
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
 }
 
 .note,
@@ -254,52 +313,7 @@ export default defineComponent({
   }
 }
 
-.unrated-row {
-  display: flex;
-  gap: var(--space-3);
-  align-items: center;
-  width: 100%;
-  min-height: calc(var(--touch-target-lg) + var(--space-3));
-  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
-  border: 0;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--surface-2);
-  }
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-}
-
-.text {
-  flex: 1;
-  min-width: 0;
-}
-
-.name,
-.sub {
-  display: block;
-  overflow-wrap: anywhere;
-}
-
-.name {
-  font-size: var(--text-headline);
-  font-weight: var(--weight-medium);
-}
-
-.sub {
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
 .rate {
-  flex: none;
   color: var(--accent-ink);
   font-size: var(--text-callout);
   font-weight: var(--weight-medium);

@@ -128,6 +128,7 @@ import { createTransferRepository } from '@/db/transfers-repository'
 import {
   addSpendingCategory,
   amendSpending,
+  amendSpendingCategory,
   archiveSpendingCategory,
   recordSpending,
   removeSpending,
@@ -186,6 +187,7 @@ import { createActorRepository } from '@/db/actors-repository'
 import { createExchangeRepository } from '@/db/exchanges-repository'
 import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
+import { createStoreMemoryRepository } from '@/db/store-memory-repository'
 import { createOpenFoodFactsRepository } from '@/db/open-food-facts-repository'
 import { createItemEmbeddingRepository } from '@/db/item-embeddings-repository'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
@@ -780,6 +782,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                 costMicroUsd: event.costMicroUsd,
                 inputTokens: event.tokens?.input,
                 outputTokens: event.tokens?.output,
+                unparsed: event.unparsed,
+                rememberedConfirmed: event.remembered.confirmed,
+                rememberedRepaired: event.remembered.repaired,
+                rememberedDoubted: event.remembered.doubted,
               },
               'receipt read',
             )
@@ -819,6 +825,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
               receipts,
               reader,
               report,
+              storeMemory: createStoreMemoryRepository(db),
               model:
                 model === null
                   ? null
@@ -831,7 +838,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                     },
               bind: (claimed, lines) =>
                 bindReceiptLines(
-                  { items: createItemRepository(db), embedder },
+                  {
+                    items: createItemRepository(db),
+                    embedder,
+                    // the lines are bound by the gloss alone: the seed's names are missing (MOL-293)
+                    namesMissing: (error) => {
+                      failures.report(error, job('receipt-binding'), 'catalogue has no till names')
+                    },
+                  },
                   claimed.actorId,
                   claimed.country,
                   claimed.language,
@@ -1124,8 +1138,20 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           return receipt
         },
         list: (actor, shown) => receiptsOf(tripData, actor, shown),
-        one: (actor, id, shown, codes, readTotal, readPartly) =>
-          receiptOfOwner(tripData, actor, id, shown, codes, readTotal, readPartly),
+        one: (actor, id, shown, codes, readTotal, readPartly, cashback, repaired, spelled, pack) =>
+          receiptOfOwner(
+            tripData,
+            actor,
+            id,
+            shown,
+            codes,
+            readTotal,
+            readPartly,
+            cashback,
+            repaired,
+            spelled,
+            pack,
+          ),
         remove: (actorId, id) => removeReceipt(receipts, actorId, id),
         restore: (actorId, id) => restoreReceipt(receipts, actorId, id),
         record: (actor, id, body) => recordReceipt(transact, actor, id, body),
@@ -1139,6 +1165,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         restore: (actor, id) => restoreSpending(tripData, actor, id),
         categories: (actor) => spendingCategoriesOf(tripData, actor),
         addCategory: (actor, body) => addSpendingCategory(tripData, actor, body),
+        amendCategory: (actor, id, body) => amendSpendingCategory(tripData, actor, id, body),
         archiveCategory: (actor, id, archived) =>
           archiveSpendingCategory(tripData, actor, id, archived),
         month: (actor, month, cursor) => moneyMonthOf(tripData, actor, month, cursor),

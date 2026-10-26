@@ -352,7 +352,10 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   decides by comparing the prices, not by counting the places** (MOL-32, А1): the list comes
   own city first and only then by price (Р-26), so the first place is the one to name but not
   always the cheapest — and «Дешевле всего» over 4 790 ֏/кг with «Ещё: 3 000 ֏/кг» under it was
-  a lie the screen printed for a person who shops in two cities. And a review is always the
+  a lie the screen printed for a person who shops in two cities. **«Только если дёшево» says no
+  word at all** (MOL-200, Ф-21): «1 290 ֏/кг · Ереван Сити» over its threshold — one place, its
+  own price, nothing claimed of the others; the place used to stand only where there was no
+  threshold, and a row with one never said where it was bought. And a review is always the
   asker's own: words are not an aggregate, there is nothing in them to average and nothing to
   hide behind.
 - **Every row says whose verdict stands behind it** (`isMine`, MOL-32, А2). Nothing else in it
@@ -360,13 +363,117 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   exactly as it is on one's own verdict without one. The flag was already in the statement, for
   the warnings reserve; handing it out is what lets the screen offer «Оценить» where there is
   nothing to amend, instead of a `PATCH` that answers 404 under the word «повторите».
+- **Every row carries the person's own score, in both modes** (`ownScore`, MOL-202, С-2): an integer
+  where `isMine`, `null` otherwise — on a row entirely other people's, and on one's own verdict
+  withdrawn. In the shared mode `rating` is an average, and the verdict sheet could not say what the
+  person had given: nothing could be pre-chosen — an average chosen would be saved as their opinion —
+  so they amended a score they could not see (Ф-25). The sheet says «Ваша оценка: N» over the scale
+  and opens on it. It is theirs, free, as the review is (Р-19); a neighbour on the same row reads
+  their own, and an aggregate gives nothing away it did not. **One column of one statement**:
+  `own_score` of `adviceRowsFor`, the one `is_mine` was already read from, so the list and the search
+  cannot part, and the schema refuses a score on a row that is not one's own. `nullable().default(null)`:
+  an answer the phone remembered before the field reads, and the sheet opened on it chooses nothing and
+  says «Выберите оценку», never «Ничего не изменилось» over an empty scale (adversarial А2). **The
+  prices, named:** an installed build older than the field refuses the new answer — strict, as every
+  answer is read — and shows «Что брать» as an error, with «Обновить» first (MOL-132), until it takes
+  the version; a rollback past it forgets the list the phone remembered, as MOL-120's did; and that
+  memory, read by the new build in the own mode, opens the sheet with nothing chosen where the build
+  before chose the row's whole figure — until the first answer with a signal, offline, where the sheet
+  saves nothing anyway. «Тут дешевле» has its own answer and does not carry it.
+- **After a save the sheet opens on what was written, until an answer asked after it comes** (MOL-202,
+  adversarial А1, Б1, В1). The rows stay as the answer before the save had them until then — and that
+  answer may fail, be on its way, or never reach this page: a step to «Покупки» and back mounts a new
+  screen, a reload (iOS putting the app away, «Обновить») a new page, both over the memory written
+  before the save. A sheet opened on such a row said «Ваша оценка: 1» over the 5 just saved, and
+  refused the 1 as «Ничего не изменилось». So the server's answer to the write — its score and review
+  (`saved`), `null` once withdrawn, which opens «Оценить» — **is kept on the shelf beside that memory**,
+  `molvia.advice-written.<owner>`, swept by «Выйти» and erasure with the owner's other drawers, and let
+  go once an answer asked after it is taken. While it is there every row of the list is older than it
+  and opens the sheet on it; so does a row the search showed at the moment of the write, dimmed until
+  the search answers again. **«After» is told without a clock**: the request that answers a save goes
+  out in the very millisecond the write is kept, so the requests of the list are numbered across the
+  screens of a page and a write keeps its page and the last number asked before it — a refresh already
+  in the air lands with the old figures and lets nothing go; any request of a later page is after it.
+  **The page keeps its own copy and reads it first** (adversarial Г1, Г2): a shelf blocked outright keeps
+  nothing, and one full for its quota still answers with what it held — so the shelf is written on
+  every one or none (`writeEverywhere`), and is for the next page; **a write no shelf of the next page
+  will have takes the list remembered before it along** (adversarial Д2) — `localStorage` full and
+  `sessionStorage` gone with the app, the list would open the next launch on the score from before
+  it. **A screen gone lets no write go** (review №5): its answer landing after a step away and back let
+  one go while the new screen still showed the rows from before it — **but still takes the answer into
+  the phone's memory, the newest of the page only** (adversarial Д3): dropped, the list offline was the
+  one before; written as it landed, an answer asked before the step could land after the next screen's
+  own and put the memory back. **The sheet hands the write over by a prop, `onSaved`** (adversarial
+  Д1), as `BottomSheet` hands `onClosed`: swept away while the write was on its way, it emitted into
+  nothing — the write landed, and the screen neither kept it nor asked again. **One write of an item at
+  a time** (adversarial Е1): a sheet opened again while its item's write is on its way says
+  «Сохраняем…», names and chooses no score of one's own — nobody knows which until it lands — and then
+  stands on what it wrote, or on the row's if it was refused; a choice made meanwhile stays. Opened on
+  the row, it said «Ваша оценка: 1» while the 5 was on its way and refused the 1 back. **The list
+  forgotten for a write stays forgotten** (Е2): an answer asked before the write may not write it back;
+  and only a write the shared shelf does not hold forgets it — a refusal of `sessionStorage` alone, the
+  next launch still having the write, takes nothing (Е3), nor a full shelf that wrote the key over in
+  its own room (`sharedKeeps`, no probe with a new key, Ж3). **A write that got no answer is no
+  refusal** (`stores/verdictWrites`, Ж1): cut off by the client's timeout, the connection lost, a
+  portal's page, a `2xx` this build cannot read — it may have landed. The sheet then knows no score as
+  the person's, nor whether the verdict was withdrawn, so a score chosen goes by `PUT`, right either
+  way — without the review, which the field shows as the row had it before that write and `PUT`
+  keeps the server's own; a review the person touched follows by `PATCH`, the one way to erase it,
+  where the answer holds another, and touched alone it goes alone (И1–И3) — the score that landed is
+  kept by the screen and stood on by the sheet before the review goes, so a review refused after it is
+  retried alone (Л1) — and a sheet that waited for the two stands on that score too (review №7);
+  the list is asked again (`onSaved` with `undefined`), and the screen keeps the write as
+  `unknown` in place of any it kept before (З1, З4) — a sheet opened on that row later knows no score
+  of the person's either, until an answer asked after it. A refusal is the API's own word
+  (`answered`, `fromApi`, not `offContract`), after which the row is right. A
+  sheet waiting for a withdrawal says «Снимаем оценку…», not «Сохраняем…» (Ж2). Not a second verdict on
+  the phone: the server's own answer, read only as the sheet's starting point. **The prices, named:** a
+  list forgotten for a write the shelves would not keep is no list offline until the next answer; a
+  write that fails after its sheet was swept away is said nowhere; a sheet opened while its item's write
+  is on its way waits for it, the client's timeout at most; each page keeps its own
+  copy, so two tabs of one person are not kept in step — a write in one is seen in the other only
+  until that other writes or is answered itself; and when the door closes without «Выйти» — a
+  session that lapsed, or «Выйти» settled from a tab where somebody else has signed in since — the
+  copy stays in the page until the next load, under the person's id, read by nobody else; «Выйти»
+  itself loads the page anew. **Inherited, not closed:** the rows themselves, and the strip — none
+  after a failed refresh following a save, as before.
 
 ## The search on «Что брать» (MOL-128)
 
 **The home of the app is «Что брать», with a search at its top** — at the shelf a person looks an
 item up rather than scrolls. The field is in the page and scrolls with it, never pinned, and is
-there only over a list: loading, a failure and the newcomer have none (the newcomer's search could
-only ever answer «not rated yet», and would teach that it is useless).
+there over a list **and in the cold offline** — no connection and nothing remembered (MOL-201, Ф-14,
+С-1): the screen is not empty there, the field answers from what the phone has — nothing — and says
+why, «Без связи ищем только среди оценённого», in place of the cloud; it is the same field as over the
+list, so the list the connection brings comes under the one being typed in. A failure and the
+newcomer have none (the newcomer's search could only ever answer «not rated yet», and would teach
+that it is useless) — **unless something is typed in it or the focus is in it** (owner's В-3 «а» on
+adversarial А1, В-4 «а» on Б2): the connection back with a failure or an empty list took the field from
+under the thumb with what it held and left the focus on `<body>`; it stays, answered by the server's
+search, erased to nothing too — the last Backspace took it and the keyboard with it, and the next word
+had nowhere to go — and goes once the person left it, the focus where they put it. **Left by a press,
+it goes once the press is over** (owner's В-5 «а» on adversarial В1): gone as the finger landed, it
+took what was under it up by its height before the release, and the first tap on «Повторить» or a
+step of the newcomer's cycle landed elsewhere; so the leaving is told a task after the release, past
+its click — by the keys, at once — and the page losing the system's focus, another app, is no leaving.
+The price: after that tap what is under the field still rises by its height, the tap already done —
+and a «Повторить» that failed again stands that much higher, so a second tap at the same place lands
+on nothing (adversarial round 4). A touch on the field's own pill keeps it (`SearchField`, Г1). Only a field that
+goes with the focus in it — a city moved in another tab — gives the focus to the heading, and only that
+focus (review № 8, Б1: on a phone nobody touched, `<body>` is no focus to give). The prices, named: a
+newcomer who typed in the cold offline is searched for on this one path; and while the field holds
+words over a failure, the screen does not say the list failed and offers no «Повторить» — cleared and
+left, the failure is back with it. Loading draws the well where the field will stand, and **the line under the title is
+held in every state** (В-2 «а», review № 1): whose figures these are is the answer's to say, so it is
+a bar while the answer is on its way and empty with none — read only once the answer came, it moved
+the field a line down under the thumb. **One strip of the connection stands
+under the field** (`StatusStrip`, MOL-201): the search's while something is typed, else the list's —
+offline, another city's list offline, «Сервер не ответил» with its «Повторить», and «Обновляем» only
+once the answer is late (`STRIP_LATE_MS`, owner's В-1 «а») — timed by what is waited for, so a city
+moved after a refresh already late waits its own second (adversarial А2); under the well of the
+skeleton after a change of city, «Обновляем · список для Гюмри»; with no field — the newcomer from
+memory — under the header, and under the field the focus holds there (adversarial В2: drawn in both,
+the first stood over the field).
 
 - **The answer for what is found is the server's, never glued on the phone** (`GET /advice/search`,
   В-1). The list is cut at `ADVICE_LIMIT`, so an item rated past the cut would read «ещё не
@@ -383,14 +490,15 @@ only ever answer «not rated yet», and would teach that it is useless).
   its place. Far ones past the limit stay out: they are the catalogue's guesses.
 - **A row found carries the scope of the search's answer**, and the verdict sheet opened from it
   reads that one, not the list's (adversarial Е): access may open or run out between the two, and
-  an average of three was offered pre-chosen as one's own score.
+  an average of three was offered pre-chosen as one's own score. Since MOL-202 the score is the
+  row's own `ownScore`, and the scope decides only what withdrawing says.
 - **After a save the search is asked again quietly** — the answer stays, dimmed — and the field
   that comes back over a list asked again searches what it holds (adversarial Г, Д).
 - **It writes nothing** (В-2): no `advice_viewed` — the one writer stays `GET /advice`, which the
   screen asks for whenever it opens and whenever the connection comes back, and the field is not
-  shown without a list; the one visit missed (the list failed, the search then worked) errs towards
-  «stop». And no pick into `search_picks`: a pick teaches the entry of a purchase, and nothing was
-  bought here.
+  shown over a failure; the one visit missed (the list failed, the search then worked) errs towards
+  «stop». In the cold offline it asks nothing at all — the phone answers. And no pick into
+  `search_picks`: a pick teaches the entry of a purchase, and nothing was bought here.
 - **The found are laid out by the list's groups and shapes, «Ещё не оценивали» last**; inside a
   group, in the order of the search. «Не брать нигде» has no price and no place here either, and no
   tail «Цены нет намеренно». No «Предложить товар»: nothing was bought. «Оценить» on an item not

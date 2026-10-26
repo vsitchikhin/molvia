@@ -9,7 +9,7 @@ paths:
   - 'backend/tests/{salary-shift,month-rest,money-chart-month,money-chart-year,money-budget}*.ts'
   - 'backend/drizzle/*{spending,budget}*.sql'
   - 'frontend/src/views/Money*'
-  - 'frontend/src/components/{Budget*,Spending*,spending*,Category*,NewCategorySheet*,MoneyEntries*,MonthSwitcher*,UndoStrip*,FloatingDock*,BarChart*,DonutRing*,DonutChart*,DeviationBars*,PaceLine*,Charts*,ExchangeLosses*,charts*}'
+  - 'frontend/src/components/{Budget*,Spending*,spending*,Category*,MoneyEntries*,MonthSwitcher*,UndoStrip*,FloatingDock*,BarChart*,DonutRing*,DonutChart*,DeviationBars*,PaceLine*,Charts*,ExchangeLosses*,charts*}'
   - 'frontend/src/composables/{useMoneyMonth,useMoneyCharts,useMoneyBudget,useKeptAnswer,useChartPointer}*'
   - 'frontend/src/composables/useSalaryShift*'
   - 'frontend/src/components/SalaryShift*'
@@ -401,13 +401,87 @@ nothing up.
   underneath with its own parents — «Траты» of the running month over «Деньги».
 - **One's own category is made from the chips** («+ Своя», a sheet over the sheet, chosen as soon
   as it exists) **and kept on «Деньги → Категории»** (В-1): «Убрать» asks nothing, since it erases
-  nothing, and «Вернуть» stands right under it. **A category that landed stays on the chips until the
+  nothing — and is a `ghost`, never red (MOL-191, Ф-34: thirteen red words stood in a column) — and
+  «Вернуть» stands right under it. **«Добавить категорию» is the strip** (`#docked`, Ф-28) **over a
+  list shown only** (owner's В-2 «а» of MOL-191), offline over it too, since the queue makes it either
+  way: the sheet knows one's own names from the list alone, so under the skeleton it let a name taken
+  through to the server's refusal (adversarial А1), and offline with no list (7h) the strip went from
+  under the open sheet with its focus (А3) — the handoff's 7f, a strip under the skeleton, is the
+  price. **A row is the kit's `ListRow`** (owner's В-1 «а» of MOL-191): the category's icon in a
+  circle of its colour, as on «Траты». **A category that landed stays on the chips until the
   server's list names it** (`arrived`, found by e2e in MOL-123): it leaves the queue on its answer and
   the list is read again only after, and in between «Сохранить трату» said «Выберите категорию» over
   the one just made and chosen. A name equal to a preset in the language of the
   screen, or to a live one of one's own, is refused there. The colours are tokens — thirteen
   presets and a palette of eight for one's own, none red, olive, ochre or terracotta, each at
-  least 3:1 on `--surface`.
+  least 3:1 on `--surface` **and its icon 3:1 on its own circle** (MOL-285, below).
+- **One's own has an icon and a colour of its choosing** (MOL-285; the owner asked, MOL-82 had said
+  «выбирать не просим»). **The icon is a key of the domain's closed set** (`SPENDING_ICONS`), never an
+  MDI name: the tag, twenty-three of daily life and the presets' own thirteen (owner's В-3 «б») — «Кафе
+  на работе» may take the fork and knife, its colour its own. The drawing is the phone's (`OWN_ICONS`),
+  so an icon is redrawn with no migration; **a key added is a migration**, since the database checks
+  the set (`spending_categories_icon_known`), as it checks the presets. **The colour is one of the
+  eight `--cat-own-*`, never a preset's** (Р-2): MOL-218 holds one's own apart from the presets on the
+  ring, and a preset's colour would merge with it there; two of one's own may share one, as the ninth
+  always did. **An empty `icon` is the tag** (Р-5): no row was rewritten — one's own made before, or
+  written by an image rolled back past it, reads so (`toCategory`); a preset never has one (its
+  check). **A new one starts on the tag and the palette's next**, so at the shelf it is still a name
+  and «Добавить» (Р-4), and a body without them — queued by an earlier build — means the same; a repeat
+  holds what the body names. **Left so, the sheet sends them unnamed** (adversarial А3): such a body
+  reads in an image rolled back past MOL-285, and the server's next is the rule. **A colour pressed is
+  named** (review №6, adversarial Б1), a press on the one already marked included: the phone's next is
+  counted on the list it read, the server's on its rows, and with a category the phone did not see
+  between them the colour the person pressed came back another. **The price, named:**
+  rolled back, a phone of this build keeps in its queue what the earlier build cannot read — a body
+  with an icon or a colour chosen, an amendment — and drops it as a broken entry; the API before it
+  refuses such a body with 400. The database is safe either way. **The sheet puts the colour over the
+  icons**: thirty-seven go below the fold, five to a row at 320; the colours are four and four on
+  every phone (review №1). **A chosen icon or colour is a ring of the accent off its circle, and the
+  focus stands off the ring** with the sheet's ground between them, as on the chips (review №4).
+- **One's own is amended whole, through the queue** (owner's В-1 «а»): `PATCH
+/spending-categories/:id` takes `{name, icon, colour}`, so sent again it is the same state and needs
+  no revision — two phones amending one category, the later wins (Р-6). A preset, someone else's and
+  no id are one 404; a live name of one's own is `SPENDING_CATEGORY_TAKEN`, checked under the owner's
+  lock as «Добавить» checks it; a removed one may be amended and stays removed. On the phone it is
+  `category-amend`, folded whole into **the last** of its «Добавить» and amendments while it still waits
+  (never into one on the way, and never an earlier one: two may stand apart, the write between them
+  cancelled later, and folded into the first, the second went after it and took the last word back —
+  adversarial Б4; «Убрать» and «Вернуть» cancel the last of theirs the same way) — **and never past a write of another category that frees a name** (adversarial А1): a name
+  is free only after the write that frees it, «Убрать» or a rename of the other; folded in front of it,
+  «Метро» renamed «Такси» after «Убрать» of «Такси» went out first and was a 409, and the spending made in
+  it at the till went with it. **«Вернуть» and «Убрать» still waiting cancel out by the same rule**
+  (adversarial Б2): a «Убрать» is not taken out from under a write of another category that takes a name
+  — a new one, a rename, «Вернуть» — or the rename was refused instead of the «Вернуть» that came last;
+  a «Вернуть» taken back frees nothing and always cancels. **A new icon or colour of another stands on no
+  name** (`keepsName`, adversarial Б3): past it the queue folds and cancels, or the state the person had
+  already replaced went to the server, and a name made on another phone refused it — «Метро» made at the
+  till, a ride in it, a new icon for «Подарки», «Метро» renamed: the category, the ride and the rename all
+  refused. Only the sheet knows the name before, so `amendCategory` takes its word, required; an
+  amendment queued without it may rename and stands on everything — the safe side. **The price, named:**
+  a rename of another between them still holds the fold, so a state replaced past it goes as it was.
+  **Kept in `arrived` once landed, the last of each category's, with the moment its answer
+  came** (`landedAt`): the list is read again only after the answer, and in between the row went back
+  to the old name and icon; **a list asked for after that moment holds it** (`categoriesWith`'s
+  `askedAt`, review №2), so it is laid only over one asked before — over it, another phone's later
+  change was hidden until a reload. A list recalled from a month kept says no moment, and takes it.
+  «Сохранить» with nothing changed writes nothing; **a name kept as it was is not checked again**
+  (adversarial А2): the server has it, and a preset's name in the language of this screen refused a
+  new icon to one made on a screen in another.
+- **«Категории» stands in three groups** (owner's В-2 «а» of MOL-285): «Готовые» with a quiet
+  «Убрать» in the tail, «Свои» — rows that open their sheet, with the chevron and no button, since a
+  card never mixes the two (MOL-175, В-14) — and «Убранные» with «Вернуть»; each only when it has a
+  row; one's own row says it opens a sheet (`aria-haspopup="dialog"`, as `NavRow` without `to`).
+  **One's own is taken out from its sheet**, «Убрать категорию» quiet under «Сохранить», as a
+  spending is removed from its sheet (MOL-189). The label «своя» went: the group says it.
+- **A category's icon holds 3:1 on its own circle** (MOL-285, owner's В-4 «б»; `tokens.test.ts`):
+  the circle is `color-mix(in oklch, colour --cat-tint-share, --surface)`, mixed in the test as a
+  browser mixes it. Until then only «3:1 on `--surface`» was held, and on their circles the light
+  «Животные», «Документы», «Здоровье» and one's own 3 and 6 stood at 2.67–2.97 since MOL-176. A lower
+  share does not save it (8 % still leaves «Животные» 2.86), and the five darkened alone broke
+  MOL-218's 0.07 («Животные» to one's own 0, 0.056); so seven light values moved — the five and two
+  neighbours, «Развлечения» and one's own 0 — by 0.010–0.043 in OKLab, to 3.04 at least on the circle, every
+  rule of MOL-218 held (`.scratch/tasks/status/MOL-285/opt285.mjs`, `check285.mjs`). The dark scheme
+  held already and did not move.
 - **«Куда ушли» is a ring** (MOL-156, owner's decision В-2, handoff MOL-157 01): the month's
   `slices` — `donutSlices` over `byCategory` on the server, six categories and the rest one
   «Остальные» (seven are all seven), each with its level in thousandths of the ring, shared out by
@@ -845,5 +919,50 @@ task did not: five plans of six there are a percent of the month's income — «
   have counted before it or after, so then the month is read once more (adversarial Ж of round 2).
   Numbered on arrival, the write's older answer put back a spending landed meanwhile.
   The sheet works no plan out of «Пришло» — what a percent comes to is the server's, on the row.
+- **The screen is the kit's since MOL-192** (Т-Д1-11 of MOL-118; no handoff drew it, owner's В-1 «а»).
+  **«Задать план категории» is the strip** (`#docked`, Ф-28), over an answer only — before one the sheet
+  knows nothing to choose (MOL-191, В-2) — and only while a live category has no row; offline it is not
+  now, «Задать план можно со связью» (Ф-6), and the sheet of a row says the same of «Сохранить» and
+  «Убрать план» under a `StatusStrip` of its own. **The connection is one line under the switcher**:
+  offline over a month kept or over this visit's answer — the strip saying «можно со связью» with
+  nothing above it was the screen's own contradiction (adversarial А3) — «сервер не ответил» with
+  «Повторить» in it, since the strip holds «Задать план» (К-5). **«Offline» is read again when the app
+  comes back into view** (`useOnline`, adversarial А1, А1′): a frozen PWA missed `online` and the strip
+  stood «можно со связью» over the answer the server had just given. **A write that takes away what
+  opened its sheet hands the focus on** (adversarial А2): the last category planned takes the strip, a
+  row of «Без плана» moves into the plans, a plan removed moves its row out — the focus goes to that
+  category's row wherever it stands, a button only — a category removed meanwhile on another device
+  is a row that takes none (Б2) — else to the strip, else to the screen's title, never to the page's
+  body; **whatever takes it, out of sight, is brought into view first** (Б1, Б3) — the row, as «Траты»
+  bring a refusal, and the large title, which scrolls away with the page — and one in sight does not
+  move. **A write belongs to the opening of the sheet it was sent from** (adversarial В1): one sheet
+  serves every row, and a write from a sheet swept away may land while it is open again for another
+  row — that sheet is not closed by it, not «at work» for it and shows no refusal of it; its outcome is
+  said as for a closed sheet. **The writes go in the order of the taps** (Г1): a plan is the last write
+  the server got, with no revision, so a write waits for the one before it, answered or not — the same
+  row opened again and saved while the swept write was on its way left the older sum on the server.
+  **The queue is `useMoneyBudget`'s, not the screen's** (Г2): a step back and in again mounts a new
+  screen while the old one's write is on its way, and kept in the sheet, the new one's went first.
+  **Outliving the screen, it outlives the person: a write goes only while the one who tapped is still
+  the one here and the door is open** (adversarial Д1) — else it is refused unsent: the door shut by a
+  `401` takes the screens away with no reload, and the savings target of one person, waiting behind a
+  hung write, went into the account of the next. **Not «once the server has named them»** (Д2,
+  self-review 7): that is MOL-56's rule for the queues on the device, and a write made by hand in a
+  sheet is not held by it — held, every plan was refused unsent while `me()` went unanswered at the
+  launch, with the server answering everything else. The prices, named: a refusal of a write whose
+  sheet was swept away is said nowhere, as before; a write waits, «Сохраняем…», while the one before it
+  hangs, up to the client's 15 s — whoever made that one. **A row is `ListRow`**
+  with the category's circle, as on «Категории» and «Траты»; the chevron on every live row — each opens
+  the sheet of its plan — and **«осталось» in the title's line, never the tail**
+  (`name-beside-figure`): a tail of its own width made every bar another length, and
+  bars one under another are read against each other. **The bar is the category's colour**, never the
+  accent (Ф-4), over the plan `--warn` to the edge; the target's bar is `--graphic`, its mark `--text`.
+  **What the row says besides is a line under the bar** — the share, «пока ничего не пришло», «не всё
+  посчитано», «категория убрана» — and so is «Разница … из …» of «Отложить»: in the meta, cut at two
+  lines, a phone of 320 lost them. **A removed category's row is a `div` with the chevron's place kept
+  empty**, so its figure and bar stand in the column of the others, and it says why it does not open.
+  **The three figures of the total are a line each on one plate**: three tiles across broke «330 000
+  ֏» in its middle at 320 and a sum of seven digits at 390. «Плана пока нет» does not grow to the
+  free height — «Отложить» stands under it.
 - **Private, and it goes with its owner** (Р-13): erasure takes `budget_plans` before the categories
   they point at, and the copy of one's data has them (`budgetPlans`, version 7).

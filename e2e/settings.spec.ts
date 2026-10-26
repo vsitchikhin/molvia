@@ -120,7 +120,7 @@ test('an offline trip keeps the context captured before another device changed s
   await page.context().setOffline(true)
   // The newcomer's «Что брать» holds «Записать вручную» under the cycle; the strip is the camera's
   // (MOL-127).
-  await page.getByRole('button', { name: 'Записать вручную', exact: true }).click()
+  await page.getByRole('button', { name: 'Записать вручную' }).click()
   const sheet = page.locator('dialog[open]')
   await expect(sheet).toBeVisible()
   await page.waitForTimeout(400)
@@ -359,6 +359,45 @@ test('«Учитывать меня в статистике» turns off on the t
   await expect(counted).not.toBeChecked()
   await counted.check()
   await expect.poll(setting).toEqual({ off: false })
+})
+
+// The list card rounds a row at its edge while in focus (MOL-203, adversarial А1); by depth alone it took
+// the line «не знаем, сохранилось ли» under the switch, in the middle of the card, rounded on top and
+// square below (round 2, Б2). It touches no edge of the card, and stays as it was.
+test('the line «not known whether it saved» takes the focus with its own corners, mid-card', async ({
+  page,
+}) => {
+  await signedIn(page, '/settings')
+  const counted = page.getByRole('switch', { name: 'Учитывать меня в статистике' })
+  await expect(counted).toBeVisible()
+  // From here on the API never answers in its own words: a proxy's page, for the write and the checks.
+  await page.route('**/api/actors/me/analytics', (route) =>
+    route.fulfill({ status: 502, contentType: 'text/html', body: '<html>Bad gateway</html>' }),
+  )
+  await counted.focus()
+  await page.keyboard.press('Space')
+
+  const line = page.locator('.unsure')
+  await expect(line).toBeFocused()
+  const look = await line.evaluate((element) => {
+    const style = getComputedStyle(element)
+    return {
+      visible: element.matches(':focus-visible'),
+      below:
+        element.getBoundingClientRect().top -
+        (element.closest('.card')?.getBoundingClientRect().top ?? 0),
+      radii: [
+        style.borderTopLeftRadius,
+        style.borderTopRightRadius,
+        style.borderBottomRightRadius,
+        style.borderBottomLeftRadius,
+      ],
+    }
+  })
+  expect(look.visible).toBe(true)
+  // Not at the card's edge: the row of the switch stands above it.
+  expect(look.below).toBeGreaterThan(40)
+  expect(look.radii).toEqual(['0px', '0px', '0px', '0px'])
 })
 
 test('the bot’s messages turn off on the tap, each its own, and stay off after a reload (MOL-103, MOL-129)', async ({

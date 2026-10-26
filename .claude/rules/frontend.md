@@ -333,10 +333,17 @@ The detail behind the frontend lines of `CLAUDE.md`.
   **The chevron means «opens something to go on with»** (owner's В-14 «а»): a screen or a sheet with
   fields. A row that acts at once («Скачать мои данные») or asks to confirm («Удалить», «Выйти») has
   none, and one card never mixes the two — then «Политика» moves out of «Ваши данные», and «Написать
-  разработчику», a sheet with fields, gets one though 147 drew it without. `ListRow` takes it as an
+  разработчику», a sheet with fields, gets one though 147 drew it without. **A fork on the way to fields
+  keeps it** (owner's decision on adversarial А2 of MOL-203): «Записать вручную» with a record open asks
+  «Уже записываете «Рынок»» — no field there, but «Продолжить» goes to the record and «Закончить и начать
+  новую» to «Где вы?», both on to fields; asking to confirm is a question whose «yes» is the act itself.
+  The chevron is the row's, not of one outcome, and a row that changed its look by a state the screen does
+  not show would say nothing. `ListRow` takes it as an
   explicit `next`, never guessed from the tag, since the card decides and not the tag; `NavRow`, an
   entry, always has it. That a card does not mix is held by review and DESIGN.md: only the whole
-  screen shows it, as only the place shows an icon's role (MOL-173). **The row's icon is a prop,
+  screen shows it, as only the place shows an icon's role (MOL-173). **The meta keeps two lines, unless it
+  explains** (`whole`, MOL-203): the newcomer's steps on a phone of 320 lost «одной кнопкой» and «дешевле» to the
+  «…» — a list of places or operations keeps its two, so a row does not grow without end. **The row's icon is a prop,
   drawn in the row** at `--icon-md`, so `molvia/icon-size` sees it in one file and no screen draws a
   22 beside a 24. **A row's button look is taken off in `:where()`**: the hairline `AppCard list`
   draws between rows is a `border-top`, and an equal selector reset it by load order (`AdviceHomeNew`
@@ -356,11 +363,26 @@ The detail behind the frontend lines of `CLAUDE.md`.
   ring itself — 2 px of the same colour on the same place — and the keyboard lost the row it stood on,
   where a radio group puts the focus first (adversarial А1, WCAG 2.4.7); chips draw it the other way,
   the ring inside and the focus outside, which a list card clips. `e2e/kit-rows` holds both in both
-  engines.
+  engines. **The plain focus of a row at the card's edge is rounded there while it stands** (`AppCard`,
+  MOL-203, adversarial А1): square, the card's radius cut its ring at the corners — «Записать вручную», the
+  one row of its card, lost all four, where the ghost button before it kept a whole one. Only the corners at
+  the card's edge, only in focus, so the hairline between rows stays straight; a row in an `li` of its own is
+  reached through it. **Rows of the kit only, by their class** (`.list-row`, `.nav-row`): by depth alone it
+  took a pill «Завершить» in the last row of «Устройства» into a dome and rounded the line «не знаем,
+  сохранилось ли» on top in the middle of «Ваши данные» (round 2, Б1, Б2). `kit-rows` holds a first, a middle
+  and a last row, `advice.spec` the newcomer's row, `devices.spec` and `settings.spec` the two that are not
+  rows. **The price, named** (self-review 7): a row built in place, not of the kit — «Написать разработчику»,
+  «Бот», «Устройства» and «Выйти» of «Настройки», «Сканировать штрихкод» of a record, `PurchaseRow`, `TripRow` —
+  keeps its ring cut at the card's edge, as on master, until its screen comes to the kit; the
+  selector is not widened for them.
   **Active** is the row the keyboard stands on in a list a field owns (К-4): the fill without the
   ring, since the focus is in the field; on a chosen row the fill is the layer's alone — the row's own
   square fill stood out past the round ring at every corner (adversarial В1). Only a `div` row takes a button into its tail — a button
-  inside a button is no HTML. `NavRow` without `to` is a button that opens a sheet and says so
+  inside a button is no HTML — **and a button there does not make the row taller**: its 44 stands over
+  the row's padding by 4 a side, so the row is 64 as its skeleton is (MOL-191: «Категории» came 68);
+  its sides are 8 and it stands 8 into the row's padding at the right, so beside a circle of 40 a word of
+  a name fits at 320 under the widest word of the tail (adversarial А2: «Развлечения» broke in its middle
+  at 16; Б1: under «Вернуть» with the sides alone). `NavRow` without `to` is a button that opens a sheet and says so
   (`aria-haspopup="dialog"`). **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
   handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
   its tint, in the strip's shape and never a live region; a tag a pill of 13/600, plain, warn or bad
@@ -372,7 +394,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   review Р1-3: a scanner of 44 in a pill of 44 would lie over the edge), a magnifier of 20, at the right the screen's action —
   the scanner — **or** «Очистить» while there is text and the field is not read-only, never both, the
   focus of a kit field and a hint of 13 (adversarial А2: read-only kept the keys out and let the button
-  empty the field). **In an open dialog the field gives Esc to the dialog**: Chromium takes a search
+  empty the field). **The pill is the field**: a press on its magnifier, its gap or its padding — some
+  64 px beside the input at 390 — keeps the focus and gives it to the input; the input and a button in
+  the well keep their own press (MOL-201, adversarial Г1: the focus went to `<body>`, and «Что брать»'s
+  field held by its focus went with it as it was touched). **In an open dialog the field gives Esc to the dialog**: Chromium takes a search
   field's Esc for itself — it clears the text, and the dialog never hears `cancel` — so «Выбрать товар»
   lost the receipt's words and stayed open (adversarial А3); the field prevents that Esc and makes the
   close request the platform would have: a `cancel` the dialog may prevent — a sheet does, and closes
@@ -564,7 +589,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   commonest break at a shelf, and drawing it red was the first consumer's bug (MOL-19, A1).
   Back online, a screen tries again by itself, as the identity does — through `useReconnect`,
   which also hears the app coming back into view: an iOS PWA frozen in the background misses
-  `online`. Polite states do not carry `role="status"`: they hand their words to the app's one
+  `online`. **`useOnline` reads the browser again at that same return** (MOL-192, adversarial А1):
+  its word «no connection ahead of time» outlived the connection a frozen PWA got back unheard.
+  Polite states do not carry `role="status"`: they hand their words to the app's one
   live region in `App.vue`, above the router, since a region born with its words is often not
   read. Each announcement is a node added a task later, taken back when its block goes and
   gone by itself after seconds — a hidden region is still read in browse mode. Only an error
@@ -602,10 +629,15 @@ The detail behind the frontend lines of `CLAUDE.md`.
   chooses the answer (the month, the search field — never above it, the rule below) or first in a
   sheet; **in the screen's words, whole**, the time inside them — where «на 14:05» stands in the
   sentence is the screen's and the language's, and a prop of time would have the kit glue a sentence
-  of pieces; where a memory keeps no time, the key has none. **Two kinds, and the kit draws the
+  of pieces; where a memory keeps no time, the key has none. **Three kinds, and the kit draws the
   glyph:** `offline`, the cloud; `unanswered` — the server did not answer and the last answer is shown
   — the circle of frame 6h (owner's В-1 «а»): the form says «the server's error», the yellow says
-  «what is shown still holds»; never red. The kind is required — offline or error is the screen's,
+  «what is shown still holds»; never red. **`refreshing`, `sync`** (MOL-201, owner's В-1 «а»): an
+  answer kept on the phone stands while the next is on its way — «Что брать» shows yesterday's list at
+  once and asks — and neither of the two was true of it: the connection is there and the server has
+  not failed. **It is put up only once the answer is late** (`STRIP_LATE_MS`, a second): a quick one
+  replaces what is shown in silence, where a strip at once flashed for a fifth of a second under the
+  field and said «обновляем» into the region at every opening. No button: the request is in the air. The kind is required — offline or error is the screen's,
   decided after the failure. **«Повторить» only in `unanswered`'s `#action`** (К-5), a ghost, and only
   where the screen's strip does not hold one: without a connection there is nothing to try, so an
   offline strip draws no slot whatever it is given; the button takes the strip's padding, and the
@@ -651,7 +683,12 @@ The detail behind the frontend lines of `CLAUDE.md`.
   screen's scope too, and a scoped `.caption` of «Бюджет» set its size on the caption's bar
   (adversarial А3) — a class of a root is never a word a screen uses for its own, and `SkeletonPart.test`
   holds it against the styles of every component (adversarial Б1: «Настройки» drew their fields as
-  `.skeleton-field`, now `ghost-*`). **A root is an element of the part's own, never `AppCard`**: the card
+  `.skeleton-field`, now `ghost-*`). **A screen's head stands over the frame, not in it** (MOL-201,
+  review № 9): the well of a field whose strip of the connection goes under it — «Что брать», «город
+  сменился» while the list is late — is a part put above `ScreenSkeleton`, in the field's own head
+  (gap 8, 24 under it), since inside the frame the strip would be hidden from a screen reader with the
+  bars; the line under the title is held by a bar of `skeleton-bar` in the subtitle. e2e holds the
+  well's top to the field's. **A root is an element of the part's own, never `AppCard`**: the card
   carried `card`, `plain` and `list` on the root too, and a `.card` of «Графики» gave the rows a padding of
   16 and the paragraphs a gap of 4 (adversarial В1); the scope goes down to the root alone, so a card one
   level in is the part's, and the test holds that every class of a root is `skeleton-*`. **A bar is `@include skeleton-bar`** — `border-strong` at
@@ -703,8 +740,35 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the two currencies** — a new pair, a closed month with none frozen — has no «≈» (`spentApprox`)
   while the bars, which cannot know it before the answer, drew one: the page shrinks by that line
   under the switcher, as for the empty month above (adversarial А4 of MOL-184). The total of 77 v2 2a (`TripTotal`) is no card until
-  MOL-206 makes it one, and the sums of «Счета», an account, «Обмен» and «Бюджет» still stand at the
-  body's leading, some 8 px taller than the part — their tasks set the part against their answer. **The price:** a card adds its padding and
+  MOL-206 makes it one, and the sums of an account and «Обмен» still stand at the body's
+  leading, some 8 px taller than the part — their tasks set the part against their answer. **«Счета» stand
+  at the part's leading** (MOL-193): the figure and the line under it as «Деньги», so the tiles start within
+  4 px of where the plate stood; two lines each in two currencies, the card comes 30 px taller than the part at
+  390 and 117 at 320, where the tiles stand one under the other — growth below nothing that chooses. **And
+  shorter where the answer has one currency after all** (self-review Р2-1): the part takes «≈» from the
+  settings' two currencies, while the answer drops the line, and the tiles' second lines, wherever either
+  currency left an account out (`money-accounts.md`) — the page shrinks by them as it comes, with nothing
+  above the card to choose.
+  **«Бюджет» takes the part with «≈» and its plate** (MOL-192): its three figures a line each stand
+  some 40 px taller than the plate of 44, and the page grows by that as the answer comes, below the
+  switcher; a person of one currency has no «≈», which takes some 20 px of it back. **The price, named
+  besides** (self-review 1 of MOL-192): the frame stands its parts 8 apart where the answer stands its
+  groups 24, so the card of rows comes 16 px lower; and a row with a line under its bar — a share of
+  «Пришло», as five plans of the owner's six are — is some 20 px taller than its bars. All of it growth
+  below the switcher, which MOL-138's hold allows. **The newcomer's headline is its own shape** (MOL-203,
+  adversarial А3): in place of `groups`, whose card left the cycle 70 px higher than the answer, the words of
+  the commonest answer — the queue empty — set unseen give the skeleton its height, and the bars stand over
+  the first lines. In an attribute (`content: attr()`), so no reader, no search of the page and no test of
+  the text finds «первые покупки» over a queue not known (adversarial В of MOL-128). A shape of fixed lines
+  was tried first and stood still on one phone and one language only — a line of the title and four of the
+  phrase, «Photograph your first receipt» at 412; Russian at 390 moved the cycle 28 px, 320 up to 52, «Запишите
+  первые покупки» 25 up (self-review 4, adversarial round 2). `advice.spec` holds the cycle still at 412 and 320. **The price, named:** the queue answering «Осталось оценить» or «Первый чек разбираем» moves the cycle
+  by the difference of its words, while its card comes in over it anyway; and a phrase longer than the bars
+  has its last lines empty under them. **With no answer the place shrinks away** (adversarial В1, owner's
+  choice): the queue failing leaves no headline to draw, and the skeleton as tall as one went in a frame,
+  the cycle 134 px up from under a thumb; the place is one block in `AppReveal`, the answer coming into it
+  without a move, and with none it shrinks over frames (MOL-151) — still under «reduce motion», as every
+  `AppReveal`. `advice.spec` holds the shrinking. **The price:** a card adds its padding and
   edge, so a skeleton of `groups` is some 34 px taller than before — taller, not shorter, which the hold
   of MOL-138 needs.
 - **An installed app takes a new version only when nobody can lose anything to it: hidden, and

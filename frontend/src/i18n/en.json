@@ -390,18 +390,20 @@
     "also_at": "Also: {places}",
     "also_place": "{place} {price}",
     "threshold": "Worth buying below {price}",
+    "price_at": "{price} · {place}",
     "no_price_shown": "The price is left out on purpose: there is nothing to compare",
     "rating": "{value} out of 5",
     "ratings_count": "{n} rating | {n} ratings",
     "rating_line": "{rating} · {count}",
     "truncated": "Showing {shown} of {total}",
-    "stale": "The list as of {day} at {time} — we will refresh once you are back online",
-    "stale_error": "The list as of {day} at {time} — the server did not answer",
-    "stale_loading": "The list as of {day} at {time} — refreshing",
+    "stale": "Offline · the list as of {day}, {time}",
+    "stale_error": "The server did not answer — the list as of {day}, {time}",
+    "stale_loading": "Refreshing · the list as of {day}, {time}",
     "edit_action": "Change the rating",
     "edit": {
       "meta": "Only your own rating changes",
       "meta_new": "You have not rated this yet",
+      "current": "Your rating: {n}",
       "save_new": "Rate it",
       "keeps_score": "The rating stays as it was. To take it back, withdraw it",
       "withdraw": "Withdraw the rating",
@@ -415,16 +417,16 @@
     },
     "error": {
       "title": "The server did not answer",
-      "body": "Verdicts are worked out on the server, there is no local copy",
+      "body": "The list didn’t load. Try again",
       "body_capture": "The list didn’t load. You can still photograph a receipt"
     },
     "offline": {
       "title": "The list will show up once you are online",
-      "body": "Verdicts are worked out on the server — we will show the list the moment you are back",
+      "body": "We’ll show the list as soon as you’re back online. You can record purchases now",
       "body_capture": "We’ll show the list as soon as you’re back online. You can photograph a receipt now"
     },
-    "city_reloading": "City changed to {city} — reloading the list",
-    "stale_other_city": "List for {oldCity} from {day} at {time}. Prices for {city} will appear when the connection returns.",
+    "city_reloading": "Refreshing · the list for {city}",
+    "stale_other_city": "Offline · the list for {oldCity} as of {day}, {time}. Prices for {city} will appear once you are back online",
     "cities_genitive": {
       "Гюмри": "Gyumri",
       "Ереван": "Yerevan",
@@ -444,7 +446,7 @@
         "body_offline": "Without a connection we search only what was rated. The whole catalogue — with a connection"
       },
       "error_body": "The search did not go through. Try again — or clear the field: the list is still there",
-      "offline": "Without a connection we search only the list as of {day} at {time}",
+      "offline": "Offline · searching only the list as of {day}, {time}",
       "offline_more": "Unrated items and the whole catalogue — once there is a connection"
     },
     "home": {
@@ -754,6 +756,32 @@
       "documents": "Documents",
       "other": "Other"
     },
+    "icon": {
+      "tag": "Tag",
+      "gift": "Gift",
+      "sport": "Sport",
+      "study": "Study",
+      "kids": "Kids",
+      "taxi": "Taxi",
+      "car": "Car",
+      "fuel": "Fuel",
+      "travel": "Travel",
+      "coffee": "Coffee",
+      "bar": "Bar",
+      "games": "Games",
+      "books": "Books",
+      "music": "Music",
+      "phone": "Phone",
+      "tech": "Tech",
+      "repair": "Repairs",
+      "flowers": "Flowers",
+      "charity": "Charity",
+      "subscriptions": "Subscriptions",
+      "bank": "Bank and taxes",
+      "languages": "Languages",
+      "dentist": "Dentist",
+      "utilities": "Utilities"
+    },
     "currency_name": {
       "AMD": "Drams",
       "RUB": "Roubles",
@@ -805,9 +833,9 @@
     },
     "categories": {
       "title": "Categories",
-      "live": "In the choice",
+      "presets": "Ready-made",
+      "own_group": "Your own",
       "archived": "Taken out",
-      "own": "own",
       "remove": "Take out",
       "remove_label": "Take out the category “{name}”",
       "restore_label": "Bring back the category “{name}”",
@@ -828,7 +856,13 @@
       "placeholder": "Taxi, sport, gifts",
       "save": "Add",
       "bad_empty": "Enter a name",
-      "bad_taken": "This category already exists"
+      "bad_taken": "This category already exists",
+      "edit_title": "Category",
+      "icon": "Icon",
+      "colour": "Colour",
+      "colour_label": "Colour {n} of {total}",
+      "edit_save": "Save",
+      "remove": "Take out the category"
     },
     "entries_label": "Money sections",
     "month_in": {
@@ -1319,6 +1353,8 @@
       "row_card": "Ardshin card",
       "row_long": "Lori cheese, brined, from Shirak, by weight at the market counter",
       "row_long_meta": "The title wraps, and the meta keeps to two lines at most: anything longer ends in an ellipsis, so the row never grows without end",
+      "row_whole": "An explanation — the meta whole",
+      "row_whole_meta": "A step explains, and one cut by an ellipsis explains nothing: with whole the meta stands whole, in as many lines as it takes — as the newcomer’s steps on «What to buy» on a phone 320 wide",
       "row_download_meta": "Acts at once — no chevron",
       "row_erase_meta": "Asks to confirm — no chevron",
       "row_link": "A link that goes on",
@@ -1331,6 +1367,7 @@
       "strip_offline": "Offline · charts as of 14:05",
       "strip_offline_long": "Offline · settings as of 14:05. Changes can be saved once the internet is back",
       "strip_unanswered": "The list as of yesterday 21:40 — the server did not answer",
+      "strip_refreshing": "Refreshing · the list as of yesterday, 21:40",
       "caption_goes_on": "Goes on",
       "caption_acts": "Acts at once or asks",
       "row_link_inactive": "A link while offline",
@@ -1861,8 +1898,7 @@
     "error_body": "The server didn't answer. Nothing you saved is lost — try again",
     "offer": {
       "title": "Where is your money?",
-      "body": "Add cash and cards — balances will keep themselves up to date",
-      "action": "Add account"
+      "body": "Add cash and cards — balances will keep themselves up to date"
     },
     "unassigned_sheet": {
       "title": "Not in any balance",
@@ -1875,17 +1911,19 @@
       "row_checked": "{currency} · checked {date}",
       "row_started": "{currency} · started {date}",
       "row_open": "Open account:",
-      "add": "Account",
+      "add": "Add account",
       "archived": "Put away ({n})",
       "archived_row": "{currency} · {amount} · put away {date}",
       "archived_note": "A put-away account isn’t offered for new spending, income or exchanges. Its history and balance are kept",
       "restore": "Restore",
       "restoring": "Restoring…",
+      "restore_wait": "Will bring back once online",
       "restored": "“{name}” is back in the list",
       "removed": "Deleted: {name}",
       "removed_announced": "Deleted: {name}. Undo within 10 seconds",
       "archived_done": "“{name}” put away — find it under “Put away”",
-      "offline": "Offline. Balances as of {time} — they'll update when you're back online. Accounts and checks wait for a connection",
+      "offline": "Offline · balances as of {time}. Accounts and checks wait for a connection",
+      "unanswered": "The server did not answer · balances as of {time}",
       "empty": {
         "body": "Add cash and cards — balances will follow your spending, income, exchanges and purchases"
       },
@@ -2090,7 +2128,8 @@
   },
   "budget": {
     "title": "Budget",
-    "offline_strip": "No connection. Figures as of {when}",
+    "offline_strip": "Offline · budget as of {when}",
+    "error_strip": "The server did not answer — budget as of {when}",
     "offline_body": "This month's budget has not been loaded on this phone yet. It will appear once the connection is back",
     "load_error": {
       "title": "The budget did not load",
@@ -2113,10 +2152,12 @@
       "of": "{spent} of {planned}",
       "share": "{percent} % of income",
       "over": "over the plan",
-      "awaiting": "nothing came in yet"
+      "awaiting": "nothing came in yet",
+      "archived": "category removed"
     },
     "unplanned": "No plan",
     "add": "Set a category plan",
+    "add_offline": "Setting a plan needs a connection",
     "savings": {
       "title": "Put aside",
       "target": "Target — {percent} % of income",
@@ -2149,12 +2190,13 @@
       "bad_percent": "Enter a whole number from 0 to {max}",
       "category_gone": "This category is gone — refresh the screen",
       "failed": "Not saved. Try again",
-      "offline": "No connection. A plan is saved only online",
+      "offline": "Offline · a plan is saved with a connection",
       "save": "Save",
       "saving": "Saving…",
-      "wait_online": "Waiting for connection",
+      "save_offline": "Saving needs a connection",
       "remove": "Remove the plan",
       "removing": "Removing the plan…",
+      "remove_offline": "Removing needs a connection",
       "other_currency": "The plan was {amount}, before the spending currency changed. Enter a sum in {sign}",
       "too_big": "Too large a sum for a month's plan"
     }
@@ -2237,10 +2279,15 @@
       "qty_price": "{qty} × {price}",
       "unread": "The figures weren’t read — see the receipt",
       "qty_price_discount": "{qty} × {price} − {discount}",
+      "packed": "· {pack}",
+      "packed_spoken": "{figures}, recorded as {pack}",
       "mismatch": "≠ {printed}",
       "lines": "Lines",
       "total": "Receipt total",
       "total_missing": "Total not read · set it",
+      "cashback": "Cashback to the card",
+      "redeemed": "Paid with the card’s bonus",
+      "repaired_note": "Figures put right — check them against the paper",
       "approx": "≈ {amount} at the {day} rate",
       "diff": "{amount} off — probably in the “{line}” line. You can save it anyway",
       "diff_unknown": "{amount} off — we couldn’t find the line. You can save it anyway",
@@ -2284,6 +2331,8 @@
       "check_warn": "Not a sure match: the receipt says “{text}”. Check the item or pick another",
       "name": "Name it",
       "name_note": "The catalogue has no such item — saving adds it",
+      "spelled_note": "Words our dictionary lacks are spelt in the receipt's letters",
+      "unspell": "Drop the name — keep it as printed",
       "find": "Find in the catalogue",
       "price": "Price for all, as on the receipt",
       "weight_hint": "{qty} × {price} — we work out the unit price",

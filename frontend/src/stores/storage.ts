@@ -181,6 +181,20 @@ export function sharedHolds(match: (key: string, value: string | null) => boolea
 }
 
 /**
+ * Whether the shared shelf holds `value` under `key` — or `null` when it cannot be read. No probe
+ * with a new key, as `sharedHolds` makes: a full shelf refuses a new key while a key it already holds
+ * is written over in the same room, and the question here is what the next launch will find
+ * (MOL-202, adversarial Ж3). A shelf that refuses writes and reads empty answers `false`.
+ */
+export function sharedKeeps(key: string, value: string): boolean | null {
+  try {
+    return window.localStorage.getItem(key) === value
+  } catch {
+    return null
+  }
+}
+
+/**
  * Rewrites one key on every shelf that holds it, each from its own value: `change` answers what
  * that shelf should keep, `null` for nothing. Each shelf separately, because two shelves may hold
  * different values under one key — the shared one and this window's own (MOL-57).

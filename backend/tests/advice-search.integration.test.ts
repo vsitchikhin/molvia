@@ -6,7 +6,13 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
-import { ADVICE_LIMIT, adviceSearchResponseSchema, toSearchKey, unitPrice } from '@molvia/model'
+import {
+  ADVICE_LIMIT,
+  adviceResponseSchema,
+  adviceSearchResponseSchema,
+  toSearchKey,
+  unitPrice,
+} from '@molvia/model'
 import type { AdviceSearchResponse, Money, Quantity } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { actors, events, expenses, items, searchPicks, verdicts } from '@/db/schema'
@@ -214,7 +220,31 @@ describe('GET /advice/search', () => {
 
     const [found] = (await search(me, 'сыр')).items
 
-    expect(found?.advice).toMatchObject({ rating: '4.3', ratingsCount: 3, isMine: false })
+    expect(found?.advice).toMatchObject({
+      rating: '4.3',
+      ratingsCount: 3,
+      isMine: false,
+      ownScore: null,
+    })
+  })
+
+  it('в общем режиме своя оценка — рядом со средней, та же, что в списке (MOL-202)', async () => {
+    const me = await insertActor(db)
+    await grantAccess(me)
+    const cheese = await item('Сыр Лори')
+    await rate(me, cheese, 5)
+    for (const score of [4, 4]) await rate(await insertActor(db), cheese, score)
+
+    const [found] = (await search(me, 'сыр')).items
+    const list = await app.inject({
+      method: 'GET',
+      url: '/advice',
+      headers: { cookie: await signIn(db, me) },
+    })
+    const [row] = adviceResponseSchema.parse(JSON.parse(list.body)).rows
+
+    expect(found?.advice).toMatchObject({ rating: '4.3', isMine: true, ownScore: 5 })
+    expect(row).toMatchObject({ itemId: cheese, rating: '4.3', ownScore: 5 })
   })
 
   it('без доступа чужие оценки не видны вовсе', async () => {

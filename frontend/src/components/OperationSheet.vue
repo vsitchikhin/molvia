@@ -16,7 +16,7 @@
         @paid="$emit('saved')"
         @removed="$emit('removed', $event)"
       />
-      <NewCategorySheet
+      <CategorySheet
         v-model:open="newCategoryOpen"
         over
         :categories="categories"
@@ -59,7 +59,7 @@ import { computed, defineComponent, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { AccountOperationView, Currency } from '@molvia/model'
-import NewCategorySheet from '@/components/NewCategorySheet.vue'
+import CategorySheet from '@/components/CategorySheet.vue'
 import OperationExchangeSheet from '@/components/OperationExchangeSheet.vue'
 import OperationIncomeSheet from '@/components/OperationIncomeSheet.vue'
 import SpendingSheet from '@/components/SpendingSheet.vue'
@@ -79,7 +79,7 @@ import { useActorStore } from '@/stores/actor'
 export default defineComponent({
   name: 'OperationSheet',
   components: {
-    NewCategorySheet,
+    CategorySheet,
     OperationExchangeSheet,
     OperationIncomeSheet,
     SpendingSheet,
