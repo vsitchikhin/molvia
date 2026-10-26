@@ -414,7 +414,7 @@ test.describe('safe areas', () => {
     })
     expect(expense.status()).toBe(201)
     await open(page, '/purchases')
-    await page.locator('.recorded .purchase-row').filter({ hasText: 'Removed shop' }).click()
+    await page.locator('.recorded .list-row').filter({ hasText: 'Removed shop' }).click()
     await expect(page).toHaveURL(new RegExp(`/purchases/${removed}$`))
     await page.getByRole('button', { name: 'Delete the entry' }).click()
     await page.waitForTimeout(400)
@@ -431,7 +431,7 @@ test.describe('safe areas', () => {
     const [undo, dock, last] = await Promise.all([
       strip.boundingBox(),
       page.locator('.dock').boundingBox(),
-      page.locator('.recorded .purchase-row').last().boundingBox(),
+      page.locator('.recorded .list-row').last().boundingBox(),
     ])
     expect(Math.round((dock?.y ?? 0) - ((undo?.y ?? 0) + (undo?.height ?? 0)))).toBe(8)
     expect((last?.y ?? 0) + (last?.height ?? 0)).toBeLessThanOrEqual(undo?.y ?? 0)

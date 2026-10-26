@@ -36,7 +36,8 @@
        and the choice between going on and starting anew is asked, never guessed. -->
   <BottomSheet v-model:open="asking" :on-closed="afterAsk">
     <template #title>{{ t('purchases.manual_ask.title', { place: open?.place ?? '' }) }}</template>
-    <p v-if="open?.meta" class="meta">{{ open.meta }}</p>
+    <!-- When it began is the record's, so it stands in the sheet's head, under its name (К-П-17). -->
+    <template v-if="open?.meta" #meta>{{ open.meta }}</template>
     <p class="body">{{ t('purchases.manual_ask.body') }}</p>
     <template #footer>
       <AppButton size="large" block @click="choose('continue')">
@@ -217,12 +218,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.meta {
-  margin: 0 0 var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
 .body {
   margin: 0;
   color: var(--text-muted);
