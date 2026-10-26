@@ -500,6 +500,10 @@ describe('PurchasesView (MOL-128)', () => {
       tripHistory.mockReturnValue(new Promise(() => undefined))
       const { view } = await render()
       expect(view.find('.skeleton').exists()).toBe(true)
+      // The answer's shape (Ф-13): «Записаны» and its rows with a sum, never the paragraphs of `groups`.
+      expect(view.find('.skeleton-caption').exists()).toBe(true)
+      expect(view.find('.skeleton-rows').exists()).toBe(true)
+      expect(view.find('.skeleton-lines').exists()).toBe(false)
       expect(view.text()).not.toContain(ru.purchases.empty.title)
       expect(view.get('.dock').text()).toContain(ru.purchases.capture)
     })
@@ -1130,6 +1134,9 @@ describe('PurchasesView (MOL-128)', () => {
       clock += 1000
       const sheet = openSheet()
       expect(sheet?.textContent).toContain('Уже записываете «Рынок»')
+      // When it began is the sheet's head, under its name — not a paragraph of its body (К-П-17).
+      expect(sheet?.querySelector('.head .meta')?.textContent).toMatch(/, с \d{1,2}:\d{2}$/)
+      expect(sheet?.querySelectorAll('.meta')).toHaveLength(1)
 
       inside(sheet, 'Продолжить «Рынок»').click()
       await vi.waitFor(() => {

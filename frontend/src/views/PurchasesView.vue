@@ -110,7 +110,13 @@
       </AppCard>
     </AppReveal>
 
-    <ScreenSkeleton v-if="shown === 'loading'" :groups="[34, 70, 56, 74, 62]" />
+    <!-- The answer's shape (Ф-13, Р-7): «Записаны» and three rows with a sum and a chevron, no icon —
+         a recorded row has none. The record going on is no part of it: drawn from the phone, it stands
+         over the skeleton already, and a bar in its place would go from under a person with none. -->
+    <ScreenSkeleton v-if="shown === 'loading'">
+      <SkeletonPart kind="caption" :width="22" />
+      <SkeletonPart kind="rows" tail next />
+    </ScreenSkeleton>
 
     <!-- No button: the action is in the strip below. The circle is the quiet one, which does not
          read as a button (Ф-16, MOL-77). Only for a history known to be empty (`answeredEmpty`). -->
@@ -231,6 +237,7 @@ import ReceiptWorkSheet from '@/components/ReceiptWorkSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import type { StripKind } from '@/components/StatusStrip.vue'
 import TripNotices from '@/components/TripNotices.vue'
@@ -277,6 +284,7 @@ export default defineComponent({
     ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    SkeletonPart,
     StatusStrip,
     TripNotices,
     TripUndoStrip,
