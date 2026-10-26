@@ -45,7 +45,10 @@ async function onTable(page: Page, paper = 900): Promise<Buffer> {
   return Buffer.from(encoded, 'base64')
 }
 
-async function shoot(page: Page, paper = 900): Promise<void> {
+async function shoot(
+  page: Page,
+  paper: number | ((page: Page) => Promise<Buffer>) = 900,
+): Promise<void> {
   await signedIn(page, '/purchases')
   await page.getByRole('button', { name: 'Photograph a receipt' }).click()
   await expect(capturing(page)).toContainText('Smooth the receipt out')
@@ -55,7 +58,7 @@ async function shoot(page: Page, paper = 900): Promise<void> {
     .setInputFiles({
       name: 'receipt.jpg',
       mimeType: 'image/jpeg',
-      buffer: await onTable(page, paper),
+      buffer: typeof paper === 'number' ? await onTable(page, paper) : await paper(page),
     })
   await expect(edges(page)).toBeVisible()
   // the sheet takes no tap until it has come up (MOL-69)
@@ -74,6 +77,65 @@ test('the corners found on the paper, «Done» makes the receipt a part', async 
   await expect(edges(page)).toHaveCount(0)
   await expect(capturing(page)).toContainText('Part 1')
   await expect(capturing(page).getByRole('button', { name: 'Send receipt' })).toBeVisible()
+})
+
+/**
+ * A long receipt as a phone shoots it (MOL-259): rows of print, the sensor's noise and a crease across
+ * its middle, on a dark table — 1 512 × 2 016, the paper from 6 % to 94 % of the height. One
+ * `drawImage` straight to 640 tears it at the crease; the canvas halved to 1 008 does not.
+ */
+async function longCreased(page: Page): Promise<Buffer> {
+  const encoded = await page.evaluate(async () => {
+    const [width, height] = [1512, 2016]
+    const [x0, x1, y0, y1] = [575, 975, 125, 1900]
+    let seed = 1
+    const random = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32
+    const ink = new Uint8Array((x1 - x0) * (y1 - y0))
+    for (let y = 20; y < y1 - y0 - 20; y += 23)
+      for (let x = 20; x < x1 - x0 - 20; x += 11)
+        if (random() < 0.75) {
+          for (let d = 0; d < 11; d++) ink[(y + d) * (x1 - x0) + x] = 1
+          for (let d = 0; d < 7; d++) ink[y * (x1 - x0) + x + d] = 1
+        }
+    const image = new ImageData(width, height)
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const onPaper = x >= x0 && x < x1 && y >= y0 && y < y1
+        const crease = 50 * Math.exp(-(((y - (y0 + y1) / 2) / 30) ** 2))
+        const paper = ink[(y - y0) * (x1 - x0) + x - x0] === 1 ? 40 : 235 - crease
+        const noise = 40 * 1.73 * (random() + random() + random() + random() - 2)
+        const [r, g, b] = onPaper ? [paper, paper, paper] : [70, 48, 38]
+        image.data.set([r + noise, g + noise, b + noise, 255], (y * width + x) * 4)
+      }
+    }
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('no canvas')
+    context.putImageData(image, 0, 0)
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', 0.95)
+    })
+    if (!blob) throw new Error('no jpeg')
+    const bytes = new Uint8Array(await blob.arrayBuffer())
+    let binary = ''
+    for (const byte of bytes) binary += String.fromCharCode(byte)
+    return btoa(binary)
+  })
+  return Buffer.from(encoded, 'base64')
+}
+
+test('a long receipt creased across is found whole, its top and its foot', async ({ page }) => {
+  await shoot(page, longCreased)
+  const top = (index: number) =>
+    edges(page)
+      .locator('.handle')
+      .nth(index)
+      .evaluate((node) => parseFloat((node as HTMLElement).style.top))
+  // the paper stands from 6.2 % to 94.2 % of the photo; torn at the crease, the foot stood at 50 %
+  expect(await top(0)).toBeLessThan(8)
+  expect(await top(2)).toBeGreaterThan(92)
 })
 
 test('a corner dragged by the pointer moves, and the sheet stays where it is', async ({ page }) => {
