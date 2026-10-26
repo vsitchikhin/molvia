@@ -1902,7 +1902,7 @@
     "savings_tag": "savings",
     "total": "Total",
     "total_foot": "Spendable {spendable} · savings {savings}",
-    "stale": "Offline — balances as of {time}",
+    "stale": "Offline · balances as of {time}",
     "unassigned": "{n} entry isn't in any balance | {n} entries aren't in any balance",
     "load_failed": "Couldn't load balances",
     "done": "Done",
@@ -1977,6 +1977,8 @@
       "reconcile": "Check against reality",
       "not_found": "No such account",
       "to_list": "To accounts",
+      "title": "Account",
+      "unanswered": "The server did not answer",
       "error": {
         "title": "Couldn't load the account"
       },

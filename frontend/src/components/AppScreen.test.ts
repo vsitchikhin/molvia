@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { enableAutoUnmount, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -89,6 +89,9 @@ afterEach(() => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
+// A test that failed before its own `unmount()` left its heading in the page, and the next one's
+// focus went to it: one breakage read as three.
+enableAutoUnmount(afterEach)
 
 describe('AppScreen', () => {
   it('titles the screen with one heading, focusable for the router to land on', async () => {
@@ -818,6 +821,55 @@ describe('AppScreen with an error of the whole screen', () => {
     view.unmount()
   })
 
+  // A version waiting: the error offers its own «Обновить» first (MOL-132, В-2), and a focus brought
+  // there let the next Enter, meant for the screen's action, reload the app — «Повторить» takes it
+  // (MOL-194, adversarial Е).
+  // A focus that stood on «Обновить» of the version's row goes to the error's «Обновить» in its
+  // place: the next Enter was meant for the reload (adversarial Ж).
+  it.each([
+    ['the action swapped for the error', false, '.own', en.state.retry],
+    ['the strip gone as the error came', true, '.own', en.state.retry],
+    ['the focus on the version’s «Update»', false, '.update button', en.update.apply],
+    [
+      'the focus on the version’s «Update», the strip gone as the error came',
+      true,
+      '.update button',
+      en.update.apply,
+    ],
+  ])('hands a focus past the error’s «Update» but from one: %s', async (_, together, from, to) => {
+    const failed = ref(false)
+    const update = waiting('ready')
+    const view = mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            AppScreen,
+            { title: 'What to buy' },
+            together && failed.value
+              ? { default: () => error() }
+              : {
+                  default: () => (failed.value ? error() : h('p', 'Ready')),
+                  docked: () => h('button', { class: 'own' }, 'Record purchases'),
+                },
+          ),
+      }),
+      {
+        attachTo: document.body,
+        global: {
+          plugins: [await routed('/'), createPinia(), createAppI18n('en')],
+          provide: { [pwaUpdateKey as symbol]: update },
+        },
+      },
+    )
+    ;(view.get(from).element as HTMLElement).focus()
+    failed.value = true
+    await nextTick()
+    await nextTick()
+    expect(buttons(view.get('.dock'))).toEqual([en.update.apply, en.state.retry])
+    expect(document.activeElement?.textContent).toContain(to)
+    view.unmount()
+  })
+
   // A focus the person moved elsewhere meanwhile is theirs, and stays where it is.
   it('must not take a focus that stands outside the strip', async () => {
     const failed = ref(false)
@@ -847,6 +899,115 @@ describe('AppScreen with an error of the whole screen', () => {
     ;(view.get('.elsewhere').element as HTMLElement).focus()
     failed.value = true
     await nextTick()
+    await nextTick()
+    expect(document.activeElement).toBe(view.get('.elsewhere').element)
+    view.unmount()
+  })
+
+  // The strip's actions swapped under the focus — an account put away on another phone — left it on
+  // the body: it goes to the strip's first button, or to the title where the strip went whole
+  // (MOL-194, Б2, Б3) — never to «Обновить» of a version waiting over them, a reload the person did
+  // not ask for (review №3, adversarial Г1, Г2).
+  it.each([
+    ['to the strip’s first button where its actions were swapped', true, 'none'],
+    ['to the screen’s first button, past a version waiting', true, 'ready'],
+    ['to the title where the strip went whole', false, 'none'],
+    ['to the title where only a version waiting is left', false, 'ready'],
+  ] as const)('brings a focus the strip lost %s', async (_, swapped, phase) => {
+    const away = ref(false)
+    const view = mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            AppScreen,
+            { title: 'Cash' },
+            away.value && !swapped
+              ? { default: () => h('p', 'Gone') }
+              : {
+                  default: () => h('button', { class: 'elsewhere' }, 'Taxi'),
+                  docked: () =>
+                    away.value
+                      ? h('button', { key: 'restore', class: 'restore' }, 'Restore')
+                      : h('button', { key: 'own', class: 'own' }, 'Check'),
+                },
+          ),
+      }),
+      {
+        attachTo: document.body,
+        global: {
+          plugins: [await routed('/'), createPinia(), createAppI18n('en')],
+          provide: { [pwaUpdateKey as symbol]: waiting(phase) },
+        },
+      },
+    )
+    expect(view.find('.dock .update').exists()).toBe(phase === 'ready')
+    ;(view.get('.own').element as HTMLElement).focus()
+    away.value = true
+    await nextTick()
+    expect(document.activeElement).toBe(
+      swapped ? view.get('.restore').element : view.get('h1').element,
+    )
+    view.unmount()
+  })
+
+  // The row of the version swaps «Обновить» for its words in a render of its own, which the frame
+  // never saw: a version that did not take left the focus on the body (adversarial Д).
+  it('brings a focus on «Обновить» to the screen’s action when the version did not take', async () => {
+    const update = waiting('ready')
+    const view = mount(
+      defineComponent({
+        setup: () => () =>
+          h(AppScreen, { title: 'Cash' }, { docked: () => h('button', { class: 'own' }, 'Check') }),
+      }),
+      {
+        attachTo: document.body,
+        global: {
+          plugins: [await routed('/'), createPinia(), createAppI18n('en')],
+          provide: { [pwaUpdateKey as symbol]: update },
+        },
+      },
+    )
+    const apply = view.get('.update button').element as HTMLElement
+    apply.focus()
+    update.phase.value = 'applying'
+    await nextTick()
+    await nextTick()
+    expect(document.activeElement).toBe(apply)
+    update.phase.value = 'failed'
+    await nextTick()
+    await nextTick()
+    expect(view.find('.update button').exists()).toBe(false)
+    expect(document.activeElement).toBe(view.get('.own').element)
+    view.unmount()
+  })
+
+  it('must not take a focus from outside the strip when its actions are swapped', async () => {
+    const away = ref(false)
+    const view = mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            AppScreen,
+            { title: 'Cash' },
+            {
+              default: () => h('button', { class: 'elsewhere' }, 'Taxi'),
+              docked: () =>
+                h('button', { key: String(away.value), class: away.value ? 'restore' : 'own' }, [
+                  'Check',
+                ]),
+            },
+          ),
+      }),
+      {
+        attachTo: document.body,
+        global: {
+          plugins: [await routed('/'), createPinia(), createAppI18n('en')],
+          provide: { [pwaUpdateKey as symbol]: waiting('none') },
+        },
+      },
+    )
+    ;(view.get('.elsewhere').element as HTMLElement).focus()
+    away.value = true
     await nextTick()
     expect(document.activeElement).toBe(view.get('.elsewhere').element)
     view.unmount()

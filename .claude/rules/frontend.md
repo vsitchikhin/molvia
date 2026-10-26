@@ -243,10 +243,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   footer read as two buttons of equal weight. The price, accepted (А4): the `surface-2` pill stands
   1.10:1 on a sheet, so in a footer that sends, primary and ghost read as two muted words; an edge
   would make it a secondary, which is `surface` with a `border-strong` edge. **The lift of a floating
-  action is the dock's, not a state's** (reviews 1 and 6): `FloatingDock` gives `--shadow-md` to
-  whatever it holds, live or not, by a weight above any variant's shadow — lifted only when
-  inactive, a dead «Восстановить» floated above the live one; the kit drops an inactive primary's
-  rest shadow by a light `:where`. The hover and the press are written on `:not(:disabled, [aria-disabled])`,
+  action was the dock's, not a state's** (reviews 1 and 6): a dead «Восстановить» floated above the
+  live one; the kit drops an inactive primary's rest shadow by a light `:where`, and since MOL-194 no
+  action floats — every screen of «Деньги» holds its own in the docked strip. The hover and the press are written on `:not(:disabled, [aria-disabled])`,
   since `aria-disabled` is still `:enabled` and an inactive primary lit up under the pointer. A button that is only an icon draws its glyph in `text`, inactive in
   `text-muted` (owner's В-15 «а») — `text-muted` for both made the month's arrow at the edge look
   like the live one. **Chosen is a fill or a form, never a weight**: a segment is filled
@@ -625,7 +624,18 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the strip is up (adversarial А1): taken, the strip took the sheet and what was typed in it. A
   second full error while the first holds the strip is drawn as the quiet card (А4); the same error
   turning a section's where it stands gives its focus back to «Повторить» (А2); and the error says
-  the version out loud in the row's place (`useUpdateAnnouncement`, А3).
+  the version out loud in the row's place (`useUpdateAnnouncement`, А3). **A focus the strip loses is brought
+  back by the frame** (MOL-194, adversarial Б2, Б3): a render that swaps the strip's actions under
+  the focus — an account put away or deleted on another phone — left it on the body; it goes to the
+  screen's first button in the strip, where the one it stood on was, or to the title where the strip
+  went whole. **Never to «Обновить»** — a button marked `reload`: the row of a version waiting over
+  them (review №3, adversarial Г1, Г2) and the full error's own, first in the strip it takes (Е,
+  inherited from MOL-180 review №6: the focus held from the screen's action now goes to «Повторить»):
+  the next Enter, meant for the screen, let a reload in. A focus that stood on a «Обновить» itself goes
+  to the «Обновить» in its place (Ж): that Enter was meant for the reload. The row of the version changes in a render
+  of its own, which the frame does not see, so the frame watches its phase too: «Обновить» swapped
+  for «Не обновилось» gives the focus to the screen's action (Д, inherited from MOL-132). A focus
+  outside the strip stays where the person put it.
 - **The connection is one line, `StatusStrip`** (MOL-181, Ф-14, Н-7). «Без связи», «из памяти» and
   «сервер не ответил» were drawn five ways — a strip copied into seventeen files, a card of
   `ScreenState` over the screen, a note in a sheet — two or three on one screen, and a strip shared
@@ -649,7 +659,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   on coming and on new words, taken back when it goes. Drawn again with the same words it says
   nothing new; **a retry that failed the same way is still an answer** (C1, review С-7, adversarial
   А4): the screen counts its failed answers in `attempt`, and a new one says the same words again —
-  the strip stays through the retry, so nothing else would. «From
+  the strip stays through the retry, so nothing else would. **Gone with the focus on «Повторить», it gives it to the
+  title** (MOL-194, Б1), as a full error does: the retry answered is exactly when it goes. Not in a
+  sheet — the page under it is inert and a sheet's title takes no focus; there it falls as before, a
+  price. «From
   memory» has two forms only: `ScreenState` when there is no answer, the strip when an old one is
   shown. One per screen is held by the screens' tests, not a linter: two strips in a template are
   often `v-if` and `v-else`. `AppNote` stays the note — the «i», 400, no voice. The seventeen copies
@@ -822,7 +835,7 @@ The detail behind the frontend lines of `CLAUDE.md`.
   server, the tests — it is `none`. **The strip is the top row of `AppScreen`'s pinned strip over the
   tab bar** (owner's decision В-1, Р-6): the screen's own main action — «Начать поход», the trip's
   total, «Сохранить» — stays under it, nearer the thumb, the room for the list is the strip's as
-  ever, and what stands over the list — «Вернуть» in `#undo`, `FloatingDock` — rises by
+  ever, and what stands over the list — «Вернуть» in `#undo` — rises by
   `--dock-height`, a token like `--keyboard-inset` that `AppScreen` sets. On the login screen, its own frame, it stands under the
   screen's action. «Обновить» lets the waiting worker in and reloads when it takes over; a version
   another window already let in (`owed`) is a reload alone. **A sheet opened between the tap and
@@ -877,9 +890,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   `#docked` — it pushed «Сфотографировать чек» up on «Покупки» — and never `position: fixed`
   inside `UndoStrip` itself: a parent playing `appear` (`translate`) becomes the containing block
   of a fixed child, and the strip would ride the card for the length of the animation; a sheet's
-  «Вернуть» is in its own footer, which the same component serves unchanged. A screen whose
-  `FloatingDock` still holds its action hides it while «Вернуть» stands (16 over the tab bar under
-  8 would overlap), until its task moves the action into the strip. `UndoStrip` reads «words ·
+  «Вернуть» is in its own footer, which the same component serves unchanged. No action floats any
+  more: the last, the account's screen, went into its strip with MOL-194. `UndoStrip` reads «words ·
   count · Вернуть», the count in a ring of `--graphic`, `aria-hidden` — the announcement says the
   ten seconds once, a live region ticking would talk over a person reaching for the button (81 v2
   asked for a label; declined, MOL-179 Р-5). **A «Вернуть» that waits for the server** — an exchange's,

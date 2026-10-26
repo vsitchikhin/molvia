@@ -102,6 +102,7 @@ import { useCollapsed, useHeight } from '@/composables/useCollapsed'
 import { provideStateStrip } from '@/composables/useStateStrip'
 import { backTarget, useNavigation } from '@/navigation'
 import { usePwaUpdate } from '@/pwaUpdate'
+import { focusScreenTitle } from '@/transitions'
 
 /**
  * The frame every screen of 0.1 sits in: a pinned row, the large title, the room under the tab
@@ -165,14 +166,41 @@ export default defineComponent({
     // render instead: a row filled late is pinned and alive, not drawn inside an invisible one.
     const hasRow = (): boolean => Boolean(parentTitleKey.value ?? slots.meta ?? slots.trailing)
     const docked = ref(hasRow())
-    // Whether the focus stood in the strip as this render began (adversarial Г1, below).
+    const isReload = (element: Element | null) => element?.classList.contains('reload') ?? false
+    /**
+     * Where a focus lost in the strip goes: its first button but a «Обновить» (`.reload`) — a reload
+     * the person did not ask for, the next Enter away (review №3, adversarial Г, Е) — unless the focus
+     * stood on a «Обновить» itself, and then the one in its place (adversarial Ж).
+     */
+    const nextAction = (within: HTMLElement | null, onReload: boolean) => {
+      const all = [...(within?.querySelectorAll('button') ?? [])]
+      return (
+        (onReload ? all.find((one) => isReload(one)) : undefined) ??
+        all.find((one) => !isReload(one))
+      )
+    }
+    // Whether the focus stood in the strip as this render began (adversarial Г1, below), and on what.
     let focusInDock = false
+    let focusOnReload = false
     onBeforeUpdate(() => {
       docked.value = hasRow()
       focusInDock = dock.value?.contains(document.activeElement) ?? false
+      focusOnReload = focusInDock && isReload(document.activeElement)
     })
+    // A render that swapped the strip's actions under the focus — an account put away or deleted on
+    // another phone, «Вернуть» answered — left it on the body: it goes to the strip's first button,
+    // where the one it stood on was, or to the title where the strip went whole (MOL-194, Б2, Б3).
+    function bringFocus(onReload: boolean): void {
+      const focused = document.activeElement
+      if (focused !== null && focused !== document.body) return
+      const next = nextAction(dock.value, onReload)
+      if (next) next.focus()
+      else focusScreenTitle()
+    }
     onUpdated(() => {
+      if (focusInDock) bringFocus(focusOnReload)
       focusInDock = false
+      focusOnReload = false
     })
     const tabbed = computed(() => Boolean(route.meta.tab))
 
@@ -196,17 +224,30 @@ export default defineComponent({
         ? `calc(${String(dockHeight.value)}px${over} + var(--space-4))`
         : undefined
     })
-    // What stands over the list — «Вернуть», `FloatingDock` — rises above the strip by its height.
+    // What stands over the list — «Вернуть» — rises above the strip by its height.
     const dockStyle = computed(() =>
       dockHeight.value > 0 ? { '--dock-height': `${String(dockHeight.value)}px` } : undefined,
     )
     const update = usePwaUpdate()
     const updating = computed(() => update.phase.value !== 'none')
+    // The row of the version swaps its button for words in its own render, which the frame does not
+    // see: a version that did not take left the focus on the body (adversarial Д).
+    watch(
+      () => update.phase.value,
+      () => {
+        const focused = document.activeElement
+        if (dock.value?.contains(focused))
+          void nextTick(() => {
+            bringFocus(isReload(focused))
+          })
+      },
+      { flush: 'pre' },
+    )
     const stateTarget = ref<HTMLElement | null>(null)
     const strip = provideStateStrip(stateTarget)
     // An error taking the strip unmounts the screen's own action, and a focus on it fell to the body
     // («Где вы?» closed over a failed «Что брать» hands it back to «Записать покупки», review №6): it
-    // goes to the error's first button, which stands where that action stood. Where the action went
+    // goes to the error's first button, where that action stood (`nextAction`). Where the action went
     // in the very render the error came in — «Что брать» draws its strip only for a newcomer — the
     // whole strip went before the error held it, and the focus with it (adversarial Г1): so whether
     // it stood in the strip is read before the frame patches, and a focus lost to the body is brought.
@@ -217,7 +258,8 @@ export default defineComponent({
         const focused = document.activeElement
         const lost = focused === null || focused === document.body
         if (!dock.value?.contains(focused) && !(focusInDock && lost)) return
-        void nextTick(() => stateTarget.value?.querySelector('button')?.focus())
+        const onReload = lost ? focusOnReload : isReload(focused)
+        void nextTick(() => nextAction(stateTarget.value, onReload)?.focus())
       },
       { flush: 'pre' },
     )

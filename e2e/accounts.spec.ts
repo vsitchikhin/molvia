@@ -159,6 +159,7 @@ test('разницу, которой нет причины, закрывает �
 
 test('счёт без операций удаляется с «Вернуть», с операциями — убирается в «Убранные»', async ({
   page,
+  context,
 }) => {
   await openMoney(page)
   await openAccounts(page)
@@ -195,7 +196,22 @@ test('счёт без операций удаляется с «Вернуть»,
   const removed = page.getByRole('button', { name: 'Убранные (1)' })
   await removed.click()
   await expect(removed).toHaveAttribute('aria-expanded', 'true')
-  await page.getByRole('button', { name: 'Вернуть' }).click()
+
+  // Its own screen: «Вернуть» in the strip where «Сверить» stood, not now offline and saying why;
+  // brought back, «Сверить с фактом» takes its place and the focus (MOL-194).
+  await page.getByRole('link', { name: /Лишний/ }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Лишний')
+  const dock = page.locator('.dock')
+  await expect(dock.getByRole('button')).toHaveText(['Вернуть'])
+  await context.setOffline(true)
+  const waiting = dock.getByRole('button', { name: 'Вернём, когда будет связь' })
+  await expect(waiting).toHaveAttribute('aria-disabled', 'true')
+  await context.setOffline(false)
+  await dock.getByRole('button', { name: 'Вернуть' }).click()
+  const reconcile = dock.getByRole('button', { name: 'Сверить с фактом' })
+  await expect(reconcile).toBeFocused()
+  await expect(page.getByText(/Убран из выбора/)).toBeHidden()
+  await page.getByRole('button', { name: /Счета/ }).click()
   await expect(removed).toBeHidden()
   await expect(page.getByRole('link', { name: /Лишний/ })).toBeVisible()
 })
@@ -334,6 +350,13 @@ test.describe('320 px, English', () => {
     await page.getByRole('link', { name: /Card in roubles/ }).click()
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Card in roubles')
     expect(await noSideScroll()).toBe(true)
+    // The account's actions are its strip, the header «Edit» alone, «‹ Accounts» whole (MOL-194).
+    await expect(page.locator('.dock').getByRole('button')).toHaveText(['Check against reality'])
+    await expect(page.locator('.bar .back')).toContainText('Accounts')
+    const cutInDock = await page
+      .locator('.dock button')
+      .evaluateAll((nodes) => nodes.filter((node) => node.scrollWidth > node.clientWidth).length)
+    expect(cutInDock).toBe(0)
 
     await page.getByRole('button', { name: 'Check against reality' }).click()
     const check = topSheet(page)

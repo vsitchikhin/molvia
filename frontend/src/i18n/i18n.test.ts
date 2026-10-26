@@ -160,7 +160,9 @@ describe('словарь: повторяющиеся тексты', () => {
       // разном: поле выбирает, шторка правит.
       Категория: ['spending.new_category.edit_title', 'spending.sheet.category'],
       // Цена Р-2: одно состояние, написанное для трёх экранов, и у просмотра чека своё (MOL-127).
+      // И у экрана счёта, чей журнал из памяти, а «Счетов» в памяти нет (MOL-194).
       'Сервер не ответил': [
+        'accounts.account.unanswered',
         'advice.error.title',
         'exchange.sheet.unanswered',
         'income.sheet.unanswered',
@@ -254,9 +256,9 @@ describe('словарь: повторяющиеся тексты', () => {
       'НБ Сербии': ['exchange.card_source_nbs', 'trip.rate.source_nbs'],
       'open.er-api.com': ['exchange.card_source_erapi', 'trip.rate.source_erapi'],
       // Счета (MOL-123): экран и пункт страницы приватности о том же; заголовок шторки счёта в правке
-      // и строка выбора счёта в шторках операций.
+      // и строка выбора счёта в шторках операций, и заголовок экрана счёта, чьё имя неизвестно (MOL-194, Е-6).
       Счета: ['accounts.title', 'privacy.stored.accounts.term'],
-      Счёт: ['accounts.picker.row_spending', 'accounts.sheet.title_edit'],
+      Счёт: ['accounts.account.title', 'accounts.picker.row_spending', 'accounts.sheet.title_edit'],
       // Период графика курса (MOL-168): подпись сегмента и та же фраза в «Курс рубля за …»; у
       // месяца они расходятся регистром. Сам переключатель говорит словами «Графиков».
       '6 месяцев': ['exchange.rate_chart.period_in.6', 'exchange.rate_chart.period_option.6'],
@@ -410,6 +412,7 @@ describe('словарь: повторяющиеся тексты', () => {
         'spending.offline.title',
       ],
       'The server did not answer': [
+        'accounts.account.unanswered',
         'advice.error.title',
         'exchange.sheet.unanswered',
         'income.sheet.unanswered',
@@ -470,6 +473,7 @@ describe('словарь: повторяющиеся тексты', () => {
       Name: ['accounts.sheet.name', 'spending.new_category.name'],
       // The settings group of one's Molvia account and a money account are one English word.
       Account: [
+        'accounts.account.title',
         'accounts.picker.row_spending',
         'accounts.sheet.title_edit',
         'settings.group_account',

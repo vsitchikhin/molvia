@@ -212,7 +212,7 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   taken anew, a corrected note moved a closed month by today's cache (adversarial А1). **A removal and
   «Вернуть» take the owner's lock** an amendment holds: removed between an amendment's read and its
   write, the transfer was marked and its fee written live beside it (А2).
-- **On the phone** (`TransferSheet`, handoff MOL-253): the way in is «Перевести» under «Сверить» on an
+- **On the phone** (`TransferSheet`, handoff MOL-253): the way in is «Перевести», a ghost under «Сверить» in the strip of an
   account's screen and «Перевод между счетами» under the total of «Счета», only while some currency —
   the account's own there — has two live accounts (`canTransfer`). «Куда» offers only the source's
   currency without the source and without «Без счёта», and the one account it can be is put in (Р-6);
@@ -237,8 +237,7 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   Every write answers with «Счета» whole, and `accounts.transfers` tells the journals and the month to
   read again. **The price, named:** one day for both halves — a transfer that arrives the next day is
   written on one; the fee only in the money's currency and only from the source; no list of
-  transfers of their own; and «Перевести» floats as a secondary button under «Сверить» until the
-  screen's actions go into its docked strip (MOL-194).
+  transfers of their own.
 - **The prices, named:** the balance of a view counts live operations while «удалить или убрать» asks
   of every row — a spending in its ten minutes of «Вернуть» makes an account «убран» rather than
   deleted; an operation naming a marked account is in no balance until the timer unlinks it; a check
@@ -334,6 +333,25 @@ balance, total and difference is the server's.
   «Вернуть» of a deleted account goes with the answer, never with the tap; 404 is «too late».
 - **A removed account's screen says so and offers «Вернуть» where «Сверить» stands** (owner's decision
   В-2); its sheet offers no «Убрать». «Все ›» stands while there is any account, a removed one too.
+- **The account's actions are its docked strip** (MOL-194, owner's В-1 «б» of 26.10.2026 over the
+  last line of Ф-28): «Сверить с фактом» the main one, «Перевести» a ghost under it (Р-9 MOL-253) —
+  never in the header, where «Править» alone stands: the header was out of the thumb's reach and, in
+  English at 320, had no room for «Check against reality» beside «Edit». A removed account holds
+  «Вернуть» there — at work «Возвращаем…», offline not now saying «Вернём, когда будет связь» (Ф-6) —
+  and, brought back, gives the focus to «Сверить с фактом», which takes its place — a focus that stood
+  on it or fell to the page (a tap Safari never focused), never one the person took to a row while
+  the answer was on its way (adversarial В). «Вернуть» of a
+  spending removed from the journal stands over the strip, which stays: on a removed account two
+  «Вернуть» at once, each saying what it brings back (С-8). «Нет такого счёта» is attention, not an
+  error — no «Повторить» — and the screen puts «К счетам» in its strip itself, since the kit gives
+  the strip to an error alone. The strip comes over an answer only (Р-1 MOL-193). The title is the
+  name the phone keeps while the journal is on its way, failed or offline, else «Счёт» — and «Счёт»
+  over «нет такого», whatever the phone kept (Е-6, handoff 8h). **The strip of the connection is the last read's**, as on
+  «Счета» (`failed` of the journal, not `stale`; adversarial А1, А2): a transfer re-reads the journal,
+  and a read that failed after an answer of the session left it without the transfer the balance
+  already had, with no strip and no «Повторить». Offline is the cloud whatever was answered. «Сервер
+  не ответил» carries the hour of «Счета» only where the balance is the phone's too — over a page this
+  session read, it named the minute of an answer the journal under it never had (review №1).
 - **«По счетам на …: … · Подставить» under «сколько было до»** (owner's decision В-3): the server's sum
   of the accounts of the currency (Р-20 MOL-115), put in by a tap only; nothing below zero; no
   answer, no line.
