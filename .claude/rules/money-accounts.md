@@ -287,8 +287,22 @@ balance, total and difference is the server's.
   for the default. No account at all — no row. An income and an exchange offer only their own
   currency and never «Списано»; a spending and a trip offer the others with «Списано» under the row.
 - **The check asks the fact first and shows nothing of the count until the server answers** — not in
-  text, not in `aria`; the result is said through the app's live region and takes the focus. The
-  same fact goes again under the same name, also after an answer that never came (Р-19). A reason
+  text, not in `aria`; the result is said through the app's live region and takes the focus. **Nor
+  does the screen behind it** (MOL-195, Ф-33): while the fact is typed the balance of the account's
+  screen is «•••» in `text-muted` — never red, which would tell a balance below zero — its «≈ … по моему
+  курсу» is gone, and a reader hears «Остаток скрыт, пока идёт сверка» from a visually hidden line beside
+  the dots (`aria-label` on a `<p>` is read by nothing); the start and «сверено» stay, they tell nothing
+  of the count. The sheet tells the screen its step (`step`: `fact` / `result`) as it changes — an
+  answer gives the balance back, «Ввести другую сумму» and every opening hide it — in the same render,
+  so no frame shows it. The figure is no live region (С-12): back with the answer, it would be said over
+  the check's result. «≈» goes and comes back through `AppReveal` — it pushes the footnote and the
+  journal in sight over the sheet (MOL-151, adversarial А4). **The price, named:** the balance is on the screen before «Сверить с фактом» is
+  pressed — it is what the screen is for; the dots keep the count out of sight while the fact is typed,
+  not out of memory. **Nor out of arithmetic** (review Р2-2): the start in the footnote and the journal
+  behind the sheet stay in sight — the sheet covers the lower part of the screen, as the handoff draws
+  it — so a balance of the start and a few rows adds up from them, and one with no operations is the
+  start itself («Пока остаток — это старт»). The dots take the figure out of sight; a sheet the
+  height of the screen, the other half of Ф-33, was not chosen. The same fact goes again under the same name, also after an answer that never came (Р-19). A reason
   is put right in its own sheet over the check, and the same check is sent again **once nothing put
   right is still waiting** — no spending, and no write of a trip but its start and finish (its account,
   its removal or «Вернуть», a purchase added, amended or removed) in either queue: «some queue landed»
@@ -310,7 +324,27 @@ balance, total and difference is the server's.
   away in another window — it is asked again at once. A reason removed from its sheet is offered back in the check and in «не
   попали», where the person is. Only the newest answer is taken: a recount landing after «Ввести
   другую сумму» does not take the sheet back. A recount that failed leaves the difference stale with
-  «Повторить»; offline is one yellow line, drawn by the connection and gone with it, never red.
+  «Повторить»; offline is the kit's `StatusStrip`, first in the sheet over either step, drawn by the
+  connection and gone with it, never red (MOL-195) — over an answered count in words of what waits,
+  «Сверка посчитана — разницу можно записать со связью», never «сверить» (review Р2-4), and over
+  «Сходится» or a difference written, with no write to offer, «Сверка посчитана» (Р3-1). **What was
+  typed stays while no answer came** (adversarial А2): the line promises it, and a person closes the
+  sheet to come back with the connection; once an answer was shown — a fact typed after «Ввести другую
+  сумму» too, typed with the count in sight (Б3) — or for another account, it starts afresh, and a
+  reload or a screen left loses it — no draft is kept. **«Записать разницу» is tinted, and not now says
+  why on it** (Ф-6, С-10): `inactive`, in the focus order — «Запишем, когда будет связь» offline, first,
+  since nothing is recounted without it; «Запишем после ответа в «Покупках»» while a trip's write waits
+  for the person there (owner's В-1 «а» of MOL-195, the line above it says the same); «Запишем после
+  пересчёта» while a correction is on its way. «Сверим, когда будет связь» of step one likewise. **Every
+  way in waits as the button does** (adversarial А1): the write itself refuses while any of the three
+  holds, and «Повторить» of «Прочее» not found is not now then — it wrote over a count its neighbour
+  called stale, the correction and «Прочее» the same money twice; not now rather than gone, so a focus
+  on it stays as the connection drops (Б2), and saying why on itself (В1): «Повторим, когда будет
+  связь», «… после ответа в «Покупках»», «… после пересчёта». «Повторить» of a recount that failed is
+  not now offline too, in the first of these words (В2): it asked nothing and said nothing. **The
+  price, named** (review round 6): «Прочее» not found while the write waits leaves two buttons not now
+  with near the same words — «Повторим …» over «Запишем …» — a third of the screen at 320; rare, and
+  each stays where a focus may be.
 - **«Записать разницу»** writes the server's `difference` as «Прочее» with the note «сверка» — read
   back as «Прочее · сверка» in either language. **Below zero**: a spending through its queue, named
   once per answer, and the same check once more after that spending has landed, kept in the store
