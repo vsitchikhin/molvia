@@ -98,19 +98,13 @@ describe('imageProblems', () => {
     ).toHaveLength(3)
   })
 
-  // Adversarial Б1: a digest pins the tag; the tag is still what is checked.
-  it('reads the tag before a digest, and asks for the digest with a tag moved', () => {
+  // Adversarial В1: Docker pulls the digest, not the tag, and the digest's version is not to be read here.
+  it('refuses a digest, with the right tag too', () => {
     const digest = `@sha256:${'a1'.repeat(32)}`
-    expect(imageProblems(workflow(`v1.63.0-noble${digest}`), ALL)).toEqual([])
-    expect(imageProblems(workflow(`v1.62.0-noble${digest}`), ALL)[0]).toBe(
-      told(
-        `v1.62.0-noble${digest}`,
-        '@playwright/test',
-        '1.63.0',
-        'v1.63.0-noble, and its digest with it',
-      ),
-    )
-    expect(imageProblems(`    container:\n      image: ${IMAGE}${digest}\n`, ALL)).toHaveLength(3)
+    const pinned = `the image ${IMAGE}:v1.63.0-noble${digest} is pinned by a digest, which Docker pulls instead of the tag and no check here can read: pin it in .github/workflows/ci.yml by the tag alone`
+    expect(imageProblems(workflow(`v1.63.0-noble${digest}`), ALL)).toEqual([pinned])
+    expect(imageProblems(workflow(`v1.62.0-noble${digest}`), ALL)).toHaveLength(4)
+    expect(imageProblems(`    container:\n      image: ${IMAGE}${digest}\n`, ALL)).toHaveLength(4)
   })
 
   it('refuses a second image that is not the version', () => {

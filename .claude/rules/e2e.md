@@ -39,8 +39,10 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
     after the push in the mutation of #215. `bin/check-playwright-image.mjs` in `npm run lint` says
     it in the checks job too, in one sentence with the tag to set (4:10 there), so the pull request
     reads as a tag to move rather than a broken suite. It reads the value of `image:`, never a
-    comment (А3), a version with a hyphen of its own whole (А2), and the tag before a digest — a tag
-    moved asks for its digest too, which only the registry knows (Б1).
+    comment (А3), a version with a hyphen of its own whole (А2), and refuses a digest: Docker pulls
+    the digest and never reads the tag, and which version a digest is only the registry knows — a tag
+    moved with the old digest left ran the old image with lint green (adversarial В1). **The price,
+    named:** this image is pinned by its tag, never a digest, as the actions are.
   - **Dependabot never moves the tag, so its pull request of Playwright is red until we do — on
     purpose** (owner's В-1 «а»). Playwright is a group of its own in `dependabot.yml`, so the rest of
     the week's packages go green without it. The tag is moved by a commit to Dependabot's branch;

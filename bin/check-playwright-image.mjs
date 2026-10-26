@@ -58,16 +58,23 @@ export function imageProblems(workflow, lockfile) {
   }
   const problems = []
   for (const image of new Set(images)) {
-    // A digest after the tag pins what the tag names (adversarial Б1): the tag is still the version, and
-    // a tag moved needs the digest of the new one, which only the registry knows.
+    // With a digest Docker pulls the digest and never reads the tag, and which version a digest is only
+    // the registry knows: a tag moved with the old digest left passed here and ran the old image
+    // (adversarial В1). So the image is pinned by its tag alone, and a digest is refused by name.
     const [reference, digest] = image.split('@')
+    if (digest) {
+      problems.push(
+        `the image ${image} is pinned by a digest, which Docker pulls instead of the tag and no check here ` +
+          `can read: pin it in ${WORKFLOW} by the tag alone`,
+      )
+    }
     const tag = reference.slice(REPOSITORY.length + 1)
     const suffix = tag.match(SUFFIX)?.[0] ?? ''
     for (const { name, version } of installed) {
       if (tag === `v${version}${suffix}`) continue
       problems.push(
         `the image is ${image}, ${LOCKFILE} has ${name} ${version}: set the tag in ${WORKFLOW} to ` +
-          `v${version}${suffix || '-noble'}${digest ? ', and its digest with it' : ''}`,
+          `v${version}${suffix || '-noble'}`,
       )
     }
   }
