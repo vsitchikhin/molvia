@@ -752,6 +752,8 @@ describe('PurchasesView (MOL-128)', () => {
         local: [],
       })
       tripHistory.mockImplementation(() => {
+        // its answer, with its moment before it, as `persist` writes them
+        localStorage.setItem(`molvia.trip-history-at.${ME}`, new Date().toISOString())
         localStorage.setItem(key, full)
         window.dispatchEvent(new StorageEvent('storage', { key }))
         return Promise.resolve({ trips: [trip(1)], nextCursor: null })
@@ -764,6 +766,29 @@ describe('PurchasesView (MOL-128)', () => {
       expect(rows(view)).toHaveLength(1)
       expect(view.findAll('.strip')).toHaveLength(0)
       expect(view.find('.state').exists()).toBe(false)
+    })
+
+    it('другое окно кладёт назад свою старую страницу — полоса со временем той страницы (адверсариальное Б4)', async () => {
+      const old = new Date(NOW.getTime() - 3 * 86_400_000)
+      // An `apply` of a window sending its queue: the page it read three days ago, with that moment.
+      tripHistory.mockImplementation(() => {
+        localStorage.setItem(`molvia.trip-history-at.${ME}`, old.toISOString())
+        remember([trip(5, 'SAS')])
+        window.dispatchEvent(new StorageEvent('storage', { key }))
+        return Promise.resolve({ trips: [trip(1), trip(5, 'SAS')], nextCursor: null })
+      })
+      const { view } = await render()
+      await pausesPass()
+
+      expect(tripHistory).toHaveBeenCalledTimes(4)
+      expect(rows(view)).toHaveLength(1)
+      const strips = view.findAll('.strip')
+      expect(strips).toHaveLength(1)
+      expect(strips[0]?.text()).toContain(
+        ru.purchases.stale_error
+          .replace('{day}', purchaseDay(old, 'ru'))
+          .replace('{time}', timeOfDay(old, 'ru')),
+      )
     })
 
     it('экран снят во время паузы повтора — больше ничего не спрашивается', async () => {
@@ -1190,6 +1215,99 @@ describe('PurchasesView (MOL-128)', () => {
         expect(view.find('.skeleton').exists()).toBe(true)
         expect(view.text()).toContain(ru.purchases.receipts_error.title)
         expect(view.text()).not.toContain(ru.purchases.error.title)
+      })
+
+      const refusedReceipt = () => {
+        localStorage.setItem(
+          `molvia.receipt-rejected.${ME}`,
+          JSON.stringify([
+            {
+              key: 'k1',
+              code: 'error.receipt_not_photo',
+              at: Date.now(),
+              write: {
+                kind: 'create',
+                body: {
+                  id: 'cccccccc-0000-4000-8000-000000000001',
+                  parts: 1,
+                  country: 'AM',
+                  language: 'ru',
+                  capturedAt: new Date().toISOString(),
+                },
+              },
+            },
+          ]),
+        )
+      }
+
+      it('история ответила, чеки упали, на экране только «Не принят» с телефона — «Чеки не загрузились», полосы нет (адверсариальное Б1)', async () => {
+        tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
+        receipts.mockRejectedValue(new Error('HTTP 500'))
+        const { view } = await render({
+          before: () => {
+            localStorage.setItem(
+              `molvia.receipts.${ME}`,
+              JSON.stringify({
+                all: {
+                  answer: receiptsResponseCodec.encode(
+                    receiptsResponseCodec.parse({ receipts: [] }),
+                  ),
+                  fetchedAt: AT.toISOString(),
+                },
+              }),
+            )
+            refusedReceipt()
+          },
+        })
+        expect(view.text()).toContain('Не принят')
+        expect(strips(view)).toHaveLength(0)
+        expect(view.text()).toContain(ru.purchases.receipts_error.title)
+      })
+
+      it('без связи, «Записаны» из памяти со временем и «Не принят» с телефона — время на полосе остаётся (адверсариальное Б2)', async () => {
+        offline()
+        const { view } = await render({
+          before: () => {
+            remember([trip(1)])
+            localStorage.setItem(`molvia.trip-history-at.${ME}`, AT.toISOString())
+            refusedReceipt()
+          },
+        })
+        expect(view.text()).toContain('Не принят')
+        expect(strips(view)).toHaveLength(1)
+        expect(strips(view)[0]?.text()).toBe(said(ru.purchases.stale))
+      })
+
+      it('без связи, «Записаны» нет, одна запись, законченная на телефоне, — «Без связи» словами экрана, не полоса (адверсариальное Б3)', async () => {
+        offline()
+        const id = 'bbbbbbbb-0000-4000-8000-000000000009'
+        const { view, queue } = await render({
+          before: () => {
+            localStorage.setItem(
+              `molvia.trip-history.${ME}`,
+              JSON.stringify({
+                page: { trips: [], nextCursor: null },
+                selected: null,
+                local: [
+                  {
+                    id,
+                    name: 'SAS',
+                    startedAt: NOW.toISOString(),
+                    completedAt: NOW.toISOString(),
+                    currency: 'AMD',
+                    view: null,
+                  },
+                ],
+              }),
+            )
+          },
+        })
+        queue.enqueue({ kind: 'finish', tripId: id, finishedOnDeviceAt: NOW })
+        await flushPromises()
+        expect(rows(view)).toHaveLength(1)
+        expect(strips(view)).toHaveLength(0)
+        expect(view.get('.state').text()).toContain(ru.purchases.offline.title)
+        expect(view.get('.state').classes()).toContain('inline')
       })
 
       it('«не должно сработать»: история упала с памятью, чеки свежие — полоса со временем истории', async () => {

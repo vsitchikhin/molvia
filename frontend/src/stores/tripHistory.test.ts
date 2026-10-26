@@ -254,6 +254,29 @@ describe('when the server answered the first page (MOL-204)', () => {
     expect(again.answeredAt).toBeNull()
   })
 
+  it('a page put back on the shelf takes back its own moment, not a newer one (adversarial Б4)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-20T10:00:00Z'))
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({ trips: [entry(A)], nextCursor: null })
+    await store.load()
+    vi.useRealTimers()
+    // Another window answered on 27 Sept. and this one did not hear it before its own write.
+    localStorage.setItem(AT, '2026-09-27T14:05:00.000Z')
+    store.apply(view(C, false))
+    expect(localStorage.getItem(AT)).toBe('2026-09-20T10:00:00.000Z')
+    sessionStorage.clear()
+    expect(restart().answeredAt?.toISOString()).toBe('2026-09-20T10:00:00.000Z')
+  })
+
+  it('a page with no moment known puts none on the shelf', () => {
+    localStorage.setItem(AT, '2026-09-27T14:05:00.000Z')
+    const store = useTripHistoryStore()
+    store.answeredAt = null
+    store.apply(view(C))
+    expect(localStorage.getItem(AT)).toBeNull()
+  })
+
   it('another owner’s moment is not this owner’s', () => {
     localStorage.setItem(`molvia.trip-history-at.${A}`, '2026-09-27T10:05:00.000Z')
     expect(restart().answeredAt).toBeNull()

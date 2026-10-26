@@ -21,6 +21,8 @@ export interface HistoryRow {
   total: readonly Money[] | null
   /** Recorded from a receipt (MOL-126): «· из чека» beside the count (MOL-127, С-5 of MOL-128). */
   fromReceipt: boolean
+  /** Finished on this phone and in no answer yet: no read drew it, failed or not (adversarial Б3). */
+  onPhone: boolean
 }
 interface TripHistoryScreen {
   t: ReturnType<typeof useI18n>['t']
@@ -34,7 +36,8 @@ interface TripHistoryScreen {
   failures: Ref<number>
   /**
    * The last load's «did not load» came of a list that kept moving, not of the server: every ask was
-   * answered, under a cache another window was writing (MOL-204, adversarial А4).
+   * answered, under a cache another window was writing with an answer of the same while (MOL-204,
+   * adversarial А4). A page put back from before the load is no such answer (Б4).
    */
   moved: Ref<boolean>
   load(): void
@@ -77,6 +80,7 @@ export function useTripHistory(): TripHistoryScreen {
           itemCount: row.itemCount,
           total: row.total,
           fromReceipt: row.fromReceipt,
+          onPhone: false,
         },
       ]),
     )
@@ -91,6 +95,7 @@ export function useTripHistory(): TripHistoryScreen {
         itemCount: saved.expenses.length,
         total: saved.total,
         fromReceipt: saved.receiptId !== null,
+        onPhone: false,
       })
     }
     for (const row of history.local) {
@@ -107,6 +112,7 @@ export function useTripHistory(): TripHistoryScreen {
           itemCount: null,
           total: null,
           fromReceipt: false,
+          onPhone: true,
         })
     }
     // A removal still waiting takes the row off every list at once (MOL-76).
@@ -118,6 +124,7 @@ export function useTripHistory(): TripHistoryScreen {
   async function load(more = false): Promise<void> {
     if (!actor.id) return
     const token = ++run
+    const askedAt = Date.now()
     busy.value = true
     loadingMore.value = more
     history.stale = true
@@ -133,7 +140,7 @@ export function useTripHistory(): TripHistoryScreen {
       }
       if (token === run) {
         trouble.value = taken ? null : 'error'
-        moved.value = !taken
+        moved.value = !taken && (history.answeredAt?.getTime() ?? -Infinity) >= askedAt
       }
       if (token === run && !taken) failures.value += 1
     } catch (error) {

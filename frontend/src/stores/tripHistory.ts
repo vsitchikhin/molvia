@@ -134,7 +134,7 @@ const empty = (): TripHistory => ({ trips: [], nextCursor: null })
  * 14:05» says. A key of its own for the reason `EMPTY_KEY` is one — a field of the strict cache would be
  * no cache at all to a window on the previous build, which would write its own over a finish made with
  * no signal. Moved with the first page only, by `load()`; «Показать ещё» reads older rows, not a newer
- * list. **The price, named:** a window on the previous build loads the history without moving it, and
+ * list. Written with every page a window puts on the shelf, as old as that page (adversarial Б4). **The price, named:** a window on the previous build loads the history without moving it, and
  * the strip then names a moment older than the list — never a newer one. A cache from before this key
  * has none, and the strip says no time; nor does a page some shelf refused, since that shelf keeps the
  * page before it (adversarial А5).
@@ -273,6 +273,12 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
       // memory, and the start or finish it came with is queued all the same (MOL-121, round 3 С).
       return
     }
+    // The moment goes on the shelf with the page it belongs to, and before it, so a window that hears
+    // the cache's write reads the moment that came with it: a page put back by `apply` or `forgetLocal`
+    // is this window's last answer, as old as this window's moment (adversarial Б4). A shelf that
+    // refused either keeps no moment — none is older than any, a newer one is the lie (А5).
+    const at = `${AT_KEY}.${actor.id}`
+    const timed = answeredAt.value !== null && writeEverywhere(at, answeredAt.value.toISOString())
     ahead = !writeEverywhere(`${KEY}.${actor.id}`, shelf, (past) => {
       try {
         const held = cacheCodec.parse(fromShelf(past))
@@ -282,6 +288,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
         return null
       }
     })
+    if (!timed || ahead) forget(at)
   }
 
   function capture(
@@ -444,15 +451,10 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
       answeredEmpty.value = answer.trips.length === 0
       if (owner && answeredEmpty.value) write(`${EMPTY_KEY}.${owner}`, '1')
       else if (owner) forget(`${EMPTY_KEY}.${owner}`)
-      // Before the cache, so a window that hears the cache's write reads the moment that came with it.
       answeredAt.value = new Date()
-      if (owner) write(`${AT_KEY}.${owner}`, answeredAt.value.toISOString())
     }
     stale.value = false
     persist()
-    // A shelf too full for the page keeps the one before, and would take the moment all the same: no
-    // moment is older than any, a newer one is the lie (adversarial А5). This window keeps its own.
-    if (!more && owner && ahead) forget(`${AT_KEY}.${owner}`)
     return true
   }
 

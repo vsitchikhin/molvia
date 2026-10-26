@@ -170,7 +170,7 @@
       v-else-if="state === 'offline'"
       kind="offline"
       tone="warn"
-      :inline="!!open || pending > 0 || receiptRows.length > 0"
+      :inline="!!open || pending > 0 || receiptRows.length > 0 || rows.length > 0"
       :title="t('purchases.offline.title')"
       :body="t(country ? 'purchases.offline_capture' : 'purchases.offline.body')"
     />
@@ -392,19 +392,26 @@ export default defineComponent({
       return a === 'error' || b === 'error' ? 'error' : null
     }
     /**
+     * What the reads drew, failed or not: a record finished here and a receipt the queue holds or the
+     * server refused are the phone's own word, and stand with an answer as without one (adversarial
+     * Б1–Б3).
+     */
+    const served = computed(() => rows.value.filter((row) => !row.onPhone).length)
+    const receiptsServed = computed(
+      () => receiptRows.value.filter((row) => row.summary !== null).length,
+    )
+    /**
      * The history's read failed — unless every ask was answered under a list another window kept
      * moving: the rows shown are then that window's answer, and «Сервер не ответил» over them would be
      * untrue (adversarial А4). With nothing shown the quiet «did not load» is true either way.
      */
-    const historyTrouble = computed(() =>
-      moved.value && rows.value.length > 0 ? null : trouble.value,
-    )
+    const historyTrouble = computed(() => (moved.value && served.value > 0 ? null : trouble.value))
     /**
      * «Записаны» did not come and nothing of it is shown: the screen's state, for both reads. A strip
      * over a receipt alone would read as every purchase there is (adversarial А3).
      */
     const state = computed(() =>
-      historyTrouble.value !== null && rows.value.length === 0
+      historyTrouble.value !== null && served.value === 0
         ? worse(historyTrouble.value, receipts.trouble.value)
         : null,
     )
@@ -422,14 +429,14 @@ export default defineComponent({
       const failed = [
         ...(historyTrouble.value === null
           ? []
-          : [{ trouble: historyTrouble.value, at: history.answeredAt, drawn: rows.value.length }]),
+          : [{ trouble: historyTrouble.value, at: history.answeredAt, drawn: served.value }]),
         ...(receipts.trouble.value === null
           ? []
           : [
               {
                 trouble: receipts.trouble.value,
                 at: receipts.fetchedAt.value,
-                drawn: receiptRows.value.length,
+                drawn: receiptsServed.value,
               },
             ]),
       ]
@@ -452,7 +459,7 @@ export default defineComponent({
     })
     /** The receipts failed with nothing of them shown, and no strip or state speaks for them. */
     const receiptsState = computed(() =>
-      state.value === null && strip.value === null && receiptRows.value.length === 0
+      state.value === null && strip.value === null && receiptsServed.value === 0
         ? receipts.trouble.value
         : null,
     )
