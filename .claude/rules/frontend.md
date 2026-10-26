@@ -243,10 +243,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   footer read as two buttons of equal weight. The price, accepted (А4): the `surface-2` pill stands
   1.10:1 on a sheet, so in a footer that sends, primary and ghost read as two muted words; an edge
   would make it a secondary, which is `surface` with a `border-strong` edge. **The lift of a floating
-  action is the dock's, not a state's** (reviews 1 and 6): `FloatingDock` gives `--shadow-md` to
-  whatever it holds, live or not, by a weight above any variant's shadow — lifted only when
-  inactive, a dead «Восстановить» floated above the live one; the kit drops an inactive primary's
-  rest shadow by a light `:where`. The hover and the press are written on `:not(:disabled, [aria-disabled])`,
+  action was the dock's, not a state's** (reviews 1 and 6): a dead «Восстановить» floated above the
+  live one; the kit drops an inactive primary's rest shadow by a light `:where`, and since MOL-194 no
+  action floats — every screen of «Деньги» holds its own in the docked strip. The hover and the press are written on `:not(:disabled, [aria-disabled])`,
   since `aria-disabled` is still `:enabled` and an inactive primary lit up under the pointer. A button that is only an icon draws its glyph in `text`, inactive in
   `text-muted` (owner's В-15 «а») — `text-muted` for both made the month's arrow at the edge look
   like the live one. **Chosen is a fill or a form, never a weight**: a segment is filled
@@ -818,7 +817,7 @@ The detail behind the frontend lines of `CLAUDE.md`.
   server, the tests — it is `none`. **The strip is the top row of `AppScreen`'s pinned strip over the
   tab bar** (owner's decision В-1, Р-6): the screen's own main action — «Начать поход», the trip's
   total, «Сохранить» — stays under it, nearer the thumb, the room for the list is the strip's as
-  ever, and what stands over the list — «Вернуть» in `#undo`, `FloatingDock` — rises by
+  ever, and what stands over the list — «Вернуть» in `#undo` — rises by
   `--dock-height`, a token like `--keyboard-inset` that `AppScreen` sets. On the login screen, its own frame, it stands under the
   screen's action. «Обновить» lets the waiting worker in and reloads when it takes over; a version
   another window already let in (`owed`) is a reload alone. **A sheet opened between the tap and
@@ -873,9 +872,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   `#docked` — it pushed «Сфотографировать чек» up on «Покупки» — and never `position: fixed`
   inside `UndoStrip` itself: a parent playing `appear` (`translate`) becomes the containing block
   of a fixed child, and the strip would ride the card for the length of the animation; a sheet's
-  «Вернуть» is in its own footer, which the same component serves unchanged. A screen whose
-  `FloatingDock` still holds its action hides it while «Вернуть» stands (16 over the tab bar under
-  8 would overlap), until its task moves the action into the strip. `UndoStrip` reads «words ·
+  «Вернуть» is in its own footer, which the same component serves unchanged. No action floats any
+  more: the last, the account's screen, went into its strip with MOL-194. `UndoStrip` reads «words ·
   count · Вернуть», the count in a ring of `--graphic`, `aria-hidden` — the announcement says the
   ten seconds once, a live region ticking would talk over a person reaching for the button (81 v2
   asked for a label; declined, MOL-179 Р-5). **A «Вернуть» that waits for the server** — an exchange's,
