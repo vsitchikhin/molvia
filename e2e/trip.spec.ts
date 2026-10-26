@@ -139,9 +139,9 @@ test.describe('the trip', () => {
     await addItem(page, setting.word, '570')
     await expect(row(page)).toHaveCount(1)
     // The price per litre is the server's: the phone divides nothing once the row is written.
-    await expect(row(page).first()).toContainText('570.00')
+    await expect(row(page).first()).toContainText('֏570')
     await expect(row(page).first()).toContainText('per l')
-    await expect(page.locator('.sum')).toContainText('570.00')
+    await expect(page.locator('.sum')).toContainText('֏570')
     await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
 
     await row(page).first().click()
@@ -149,8 +149,8 @@ test.describe('the trip', () => {
     await sheet(page).getByLabel('Price as on the tag').fill('580')
     await sheet(page).getByRole('button', { name: 'Save' }).click()
     await expect(sheet(page)).toBeHidden()
-    await expect(row(page).first()).toContainText('580.00')
-    await expect(page.locator('.sum')).toContainText('580.00')
+    await expect(row(page).first()).toContainText('֏580')
+    await expect(page.locator('.sum')).toContainText('֏580')
 
     await row(page).first().click()
     await page.waitForTimeout(400)
@@ -551,7 +551,7 @@ test.describe('the receipt total (MOL-78)', () => {
     await expect(page).toHaveURL(/\/purchases$/)
 
     // The receipt went before the finish, and «Записаны» shows it as the record's money.
-    await expect(recorded(page, 'Ереван Сити')).toContainText('1,400.00', { timeout: 15_000 })
+    await expect(recorded(page, 'Ереван Сити')).toContainText('֏1,400', { timeout: 15_000 })
     const history = (await (await page.request.get('/api/trips/history', { headers })).json()) as {
       trips: { total: { amount: string }[] | null }[]
     }
