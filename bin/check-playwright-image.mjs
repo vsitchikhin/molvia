@@ -58,13 +58,16 @@ export function imageProblems(workflow, lockfile) {
   }
   const problems = []
   for (const image of new Set(images)) {
-    const tag = image.slice(REPOSITORY.length + 1)
+    // A digest after the tag pins what the tag names (adversarial Б1): the tag is still the version, and
+    // a tag moved needs the digest of the new one, which only the registry knows.
+    const [reference, digest] = image.split('@')
+    const tag = reference.slice(REPOSITORY.length + 1)
     const suffix = tag.match(SUFFIX)?.[0] ?? ''
     for (const { name, version } of installed) {
       if (tag === `v${version}${suffix}`) continue
       problems.push(
         `the image is ${image}, ${LOCKFILE} has ${name} ${version}: set the tag in ${WORKFLOW} to ` +
-          `v${version}${suffix || '-noble'}`,
+          `v${version}${suffix || '-noble'}${digest ? ', and its digest with it' : ''}`,
       )
     }
   }
