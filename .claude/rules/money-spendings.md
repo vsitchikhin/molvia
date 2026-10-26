@@ -210,9 +210,12 @@ nothing up.
   **The price, named** (adversarial Г1, Д1): an answer faster than the fade, as a server back up gives,
   moves them faded only part-way (0.71, 0.93 in CI), not unseen, and what the answer puts in their old
   place is pressed instead — a month with a spending stands its card and «Куда ушли» over them, and a tap
-  at «Обмен денег» there opened «Графики». The window is the answer's own time, tens of milliseconds:
-  less than a press on «Повторить» and a second on a row take, while an answer slower than the fade
-  finds the rows gone. Hidden at once on the press it would close, at the cost of a going in one frame
+  at «Обмен денег» there opened «Графики». The window is any answer faster than the fade — up to 220 ms, the
+  usual time of a phone's network to the server (adversarial Е1), tens of milliseconds only on a
+  runner's loopback — and the tap it takes is a second one made after that answer and before the eye
+  has seen the move, aimed where the row stood: hundreds of milliseconds after «Повторить», as a
+  person's second tap comes (review Р9-1). An answer slower than the fade finds the rows gone, and the
+  tap goes nowhere. Hidden at once on the press it would close, at the cost of a going in one frame
   (В1), and held unseen for a set time, at the cost of a timer for a sight; neither is taken. Never
   taken out:
   taken out, the page under a small phone scrolled down shortened, the browser brought the scroll up,
