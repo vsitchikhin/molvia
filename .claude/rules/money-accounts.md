@@ -285,8 +285,17 @@ balance, total and difference is the server's.
   for the default. No account at all — no row. An income and an exchange offer only their own
   currency and never «Списано»; a spending and a trip offer the others with «Списано» under the row.
 - **The check asks the fact first and shows nothing of the count until the server answers** — not in
-  text, not in `aria`; the result is said through the app's live region and takes the focus. The
-  same fact goes again under the same name, also after an answer that never came (Р-19). A reason
+  text, not in `aria`; the result is said through the app's live region and takes the focus. **Nor
+  does the screen behind it** (MOL-195, Ф-33): while the fact is typed the balance of the account's
+  screen is «•••» in `text-muted` — never red, which would tell a balance below zero — its «≈ … по моему
+  курсу» is gone, and a reader hears «Остаток скрыт, пока идёт сверка» from a visually hidden line beside
+  the dots (`aria-label` on a `<p>` is read by nothing); the start and «сверено» stay, they tell nothing
+  of the count. The sheet tells the screen its step (`step`: `fact` / `result`) as it changes — an
+  answer gives the balance back, «Ввести другую сумму» and every opening hide it — in the same render,
+  so no frame shows it. The figure is no live region (С-12): back with the answer, it would be said over
+  the check's result. **The price, named:** the balance is on the screen before «Сверить с фактом» is
+  pressed — it is what the screen is for; the dots keep the count out of sight while the fact is typed,
+  not out of memory. The same fact goes again under the same name, also after an answer that never came (Р-19). A reason
   is put right in its own sheet over the check, and the same check is sent again **once nothing put
   right is still waiting** — no spending, and no write of a trip but its start and finish (its account,
   its removal or «Вернуть», a purchase added, amended or removed) in either queue: «some queue landed»
@@ -308,7 +317,12 @@ balance, total and difference is the server's.
   away in another window — it is asked again at once. A reason removed from its sheet is offered back in the check and in «не
   попали», where the person is. Only the newest answer is taken: a recount landing after «Ввести
   другую сумму» does not take the sheet back. A recount that failed leaves the difference stale with
-  «Повторить»; offline is one yellow line, drawn by the connection and gone with it, never red.
+  «Повторить»; offline is the kit's `StatusStrip`, first in the sheet over either step, drawn by the
+  connection and gone with it, never red (MOL-195). **«Записать разницу» is tinted, and not now says
+  why on it** (Ф-6, С-10): `inactive`, in the focus order — «Запишем, когда будет связь» offline, first,
+  since nothing is recounted without it; «Запишем после ответа в «Покупках»» while a trip's write waits
+  for the person there (owner's В-1 «а» of MOL-195, the line above it says the same); «Запишем после
+  пересчёта» while a correction is on its way. «Сверим, когда будет связь» of step one likewise.
 - **«Записать разницу»** writes the server's `difference` as «Прочее» with the note «сверка» — read
   back as «Прочее · сверка» in either language. **Below zero**: a spending through its queue, named
   once per answer, and the same check once more after that spending has landed, kept in the store
