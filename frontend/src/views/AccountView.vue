@@ -63,10 +63,17 @@
       <template v-else-if="journal && account">
         <AppCard class="balance">
           <SectionCaption as="p" inset>{{ t('accounts.balance') }}</SectionCaption>
-          <p class="figure" :class="{ negative: account.balance.minor < 0n }" aria-live="polite">
+          <!-- Blind while the fact is typed (Ф-33): no figure, no sign by colour, no «≈» — the start and
+               «сверено» stay, they tell nothing of the count. No live region on the figure: it comes
+               back as the check answers, and the check says its result itself (С-12). -->
+          <p v-if="balanceHidden" class="figure hidden">
+            <span aria-hidden="true">•••</span>
+            <span class="unseen">{{ t('accounts.account.balance_hidden') }}</span>
+          </p>
+          <p v-else class="figure" :class="{ negative: account.balance.minor < 0n }">
             {{ money(account.balance) }}
           </p>
-          <p v-if="account.inSpend" class="approx">
+          <p v-if="account.inSpend && !balanceHidden" class="approx">
             {{ t('accounts.account.approx', { amount: `≈ ${estimate(account.inSpend)}` }) }}
           </p>
           <p class="footnote">{{ startLine }}</p>
@@ -191,6 +198,7 @@
       :categories="categories"
       :name-of="nameOf"
       :account-name="accountName"
+      @step="reconcileStep = $event"
     />
     <OperationSheet
       v-model:open="operationOpen"
@@ -233,6 +241,7 @@ import AppScreen from '@/components/AppScreen.vue'
 import OperationRow from '@/components/OperationRow.vue'
 import OperationSheet from '@/components/OperationSheet.vue'
 import ReconcileSheet from '@/components/ReconcileSheet.vue'
+import type { ReconcileStep } from '@/components/ReconcileSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
@@ -439,6 +448,12 @@ export default defineComponent({
 
     const editOpen = ref(false)
     const reconcileOpen = ref(false)
+    /**
+     * Where the check stands, as its sheet tells: the balance is hidden while the fact is typed. An
+     * opening puts the sheet back on the fact, and it says so before anything is drawn.
+     */
+    const reconcileStep = ref<ReconcileStep>('fact')
+    const balanceHidden = computed(() => reconcileOpen.value && reconcileStep.value !== 'result')
     const operationOpen = ref(false)
     const operation = ref<AccountOperationView | null>(null)
     function openRow(row: AccountOperationView): void {
@@ -554,6 +569,8 @@ export default defineComponent({
       sentinel,
       editOpen,
       reconcileOpen,
+      reconcileStep,
+      balanceHidden,
       operationOpen,
       operation,
       openRow,
@@ -609,6 +626,14 @@ export default defineComponent({
   &.negative {
     color: var(--bad-ink);
   }
+
+  &.hidden {
+    color: var(--text-muted);
+  }
+}
+
+.unseen {
+  @include visually-hidden;
 }
 
 .approx {

@@ -1959,6 +1959,7 @@
     "account": {
       "edit": "Править",
       "approx": "{amount} по моему курсу",
+      "balance_hidden": "Остаток скрыт, пока идёт сверка",
       "started": "старт {amount} на {date}",
       "checked": "сверено {date}",
       "operations": "Операции",

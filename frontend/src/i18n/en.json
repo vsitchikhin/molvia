@@ -1959,6 +1959,7 @@
     "account": {
       "edit": "Edit",
       "approx": "{amount} at my rate",
+      "balance_hidden": "Balance hidden while you reconcile",
       "started": "started at {amount} on {date}",
       "checked": "checked {date}",
       "operations": "Entries",

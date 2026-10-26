@@ -230,6 +230,11 @@ import type { QueuedWrite } from '@/stores/tripQueue'
 import { reportFailure } from '@/failures'
 
 type Reason = AccountCheckResponse['reasons'][number]
+/**
+ * The fact being typed, or the server's answer shown: the screen behind hides its balance while the
+ * fact is typed (Ф-33).
+ */
+export type ReconcileStep = 'fact' | 'result'
 /** A check as this sheet sends it: the day is the request's (MOL-121). */
 interface Check {
   readonly id: string
@@ -279,6 +284,7 @@ export default defineComponent({
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
+    step: (step: ReconcileStep) => typeof step === 'string',
   },
   setup(props, { emit }) {
     const { t, locale } = useI18n()
@@ -338,6 +344,15 @@ export default defineComponent({
     const signed = (value: Money) => signedAmount(value, locale.value, { plus: true })
     const shortDay = (day: string) => dayOf(day, locale.value)
     const matched = computed(() => result.value?.difference.minor === 0n)
+
+    // The screen is told the step as it changes: an answer shows the balance behind, «Ввести другую
+    // сумму» and an opening hide it again (Ф-33).
+    watch(
+      () => result.value === null,
+      (none) => {
+        emit('step', none ? 'fact' : 'result')
+      },
+    )
 
     async function ask(check: Check): Promise<boolean> {
       failure.value = null
