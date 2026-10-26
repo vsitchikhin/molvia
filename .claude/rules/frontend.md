@@ -624,7 +624,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   back by the frame** (MOL-194, adversarial Б2, Б3): a render that swaps the strip's actions under
   the focus — an account put away or deleted on another phone — left it on the body; it goes to the
   screen's first button in the strip, where the one it stood on was, or to the title where the strip
-  went whole. **Never to «Обновить»** of a version waiting over them (review №3, adversarial Г1, Г2):
+  went whole. **Never to «Обновить»** — a button marked `reload`: the row of a version waiting over
+  them (review №3, adversarial Г1, Г2) and the full error's own, first in the strip it takes (Е,
+  inherited from MOL-180 review №6: the focus held from the screen's action now goes to «Повторить»):
   the next Enter, meant for the screen, let a reload in. The row of the version changes in a render
   of its own, which the frame does not see, so the frame watches its phase too: «Обновить» swapped
   for «Не обновилось» gives the focus to the screen's action (Д, inherited from MOL-132). A focus
