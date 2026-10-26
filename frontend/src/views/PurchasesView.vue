@@ -6,26 +6,38 @@
          that is still being done (handoff `03`, Р-4). From the phone as much as from the server —
          a record started with no signal is open all the same. -->
     <AppReveal>
+      <!-- «Продолжить» is the row's one control, a button of the kit in its tail (В-1 «а»): a button in
+           a button is no HTML. Its name carries the place, so a screen reader hears what goes on. -->
       <AppCard v-if="open" class="block open" list>
-        <PurchaseRow
+        <ListRow
+          as="div"
           :icon="IconPencil"
-          accent
           :title="open.place"
           :meta="t('purchases.open_manual_meta', { count: positions(open.count) })"
-          :tag="t('purchases.continue')"
-          @open="goOn"
-        />
+          wrap
+        >
+          <template #tail>
+            <AppButton
+              variant="secondary"
+              :label="t('purchases.manual_ask.continue', { place: open.place })"
+              @click="goOn"
+              >{{ t('purchases.continue') }}</AppButton
+            >
+          </template>
+        </ListRow>
       </AppCard>
     </AppReveal>
 
     <AppReveal>
+      <!-- The star is a status, not a button: muted, the chevron says it opens (Ф-4). -->
       <AppCard v-if="pending > 0 && !country" class="block pending" list>
-        <PurchaseRow
+        <ListRow
           :icon="IconStar"
-          accent
           :title="t('verdict.pending_count', { n: pending }, pending)"
-          :meta="pendingFrom"
-          @open="goTab('verdicts')"
+          :meta="pendingFrom ?? ''"
+          wrap
+          next
+          @click="goTab('verdicts')"
         />
       </AppCard>
     </AppReveal>
@@ -36,15 +48,17 @@
       <SectionCaption as="p" class="caption">{{ t('purchases.group_working') }}</SectionCaption>
       <AppCard class="block" list>
         <AppReveal group>
-          <PurchaseRow
+          <ListRow
             v-for="row in working"
             :key="row.id"
             :icon="iconOf(row)"
             :class="{ breathing: row.state === 'parsing' && receipts.online.value }"
-            :warn="row.state === 'rejected' || row.state === 'stuck'"
+            :tone="row.state === 'rejected' || row.state === 'stuck' ? 'warn' : ''"
             :title="receiptTitle(row)"
             :meta="receiptMeta(row)"
-            @open="openReceipt(row)"
+            wrap
+            next
+            @click="openReceipt(row)"
           />
         </AppReveal>
       </AppCard>
@@ -53,28 +67,36 @@
       <SectionCaption as="p" class="caption">{{ t('purchases.group_review') }}</SectionCaption>
       <AppCard class="block" list>
         <AppReveal group>
-          <PurchaseRow
+          <ListRow
             v-for="row in review"
             :key="row.id"
             :icon="iconOf(row)"
-            :warn="row.state === 'failed'"
+            :tone="row.state === 'failed' ? 'warn' : ''"
             :title="receiptTitle(row)"
             :meta="receiptMeta(row)"
-            :note="receiptNote(row)"
-            :sum="receiptSum(row)"
-            @open="openReceipt(row)"
-          />
+            wrap
+            next
+            @click="openReceipt(row)"
+          >
+            <!-- Under the meta, not in it: cut with it at two lines it would be lost (Р-5). -->
+            <template v-if="receiptNote(row)" #below>
+              <span class="note">{{ receiptNote(row) }}</span>
+            </template>
+            <template v-if="receiptSum(row)" #tail>{{ receiptSum(row) }}</template>
+          </ListRow>
         </AppReveal>
       </AppCard>
     </template>
 
     <AppReveal>
       <AppCard v-if="pending > 0 && country" class="block pending" list>
-        <PurchaseRow
+        <ListRow
           :icon="IconStar"
           :title="t('verdict.pending_count', { n: pending }, pending)"
-          :meta="pendingFrom"
-          @open="goTab('verdicts')"
+          :meta="pendingFrom ?? ''"
+          wrap
+          next
+          @click="goTab('verdicts')"
         />
       </AppCard>
     </AppReveal>
@@ -125,15 +147,20 @@
       <SectionCaption as="p" class="caption">{{ t('purchases.group_recorded') }}</SectionCaption>
       <AppCard class="recorded" list>
         <AppReveal group>
-          <PurchaseRow
+          <ListRow
             v-for="row in rows"
             :key="row.id"
             :title="row.name"
             :meta="recordedMeta(row)"
-            :note="row.pending ? t('trip.history.local_finish') : null"
-            :sum="sum(row)"
-            @open="openRow(row.id)"
-          />
+            wrap
+            next
+            @click="openRow(row.id)"
+          >
+            <template v-if="row.pending" #below>
+              <span class="note">{{ t('trip.history.local_finish') }}</span>
+            </template>
+            <template v-if="sum(row)" #tail>{{ sum(row) }}</template>
+          </ListRow>
         </AppReveal>
       </AppCard>
       <AppButton
@@ -192,8 +219,8 @@ import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import CaptureButton from '@/components/CaptureButton.vue'
+import ListRow from '@/components/ListRow.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
-import PurchaseRow from '@/components/PurchaseRow.vue'
 import ReceiptSentLine from '@/components/ReceiptSentLine.vue'
 import ReceiptUndoStrip from '@/components/ReceiptUndoStrip.vue'
 import ReceiptWorkSheet from '@/components/ReceiptWorkSheet.vue'
@@ -236,8 +263,8 @@ export default defineComponent({
     AppReveal,
     AppScreen,
     CaptureButton,
+    ListRow,
     ManualEntryButton,
-    PurchaseRow,
     ReceiptSentLine,
     ReceiptUndoStrip,
     ReceiptWorkSheet,
@@ -520,7 +547,12 @@ export default defineComponent({
 }
 
 .more {
-  margin-top: var(--space-4);
+  margin-top: var(--space-2);
+}
+
+.note {
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
 }
 
 // A receipt being read «breathes» (handoff 03): no percent, no timer — work that takes a while.

@@ -106,7 +106,7 @@ test('a receipt from the photo to the purchases: read, reviewed, recorded under 
   await capture(page)
 
   // Read by the fake reader: «Check and save», thirteen items dated 1 October.
-  const ready = page.locator('.purchase-row').filter({ hasText: '13 items' })
+  const ready = page.locator('.list-row').filter({ hasText: '13 items' })
   await expect(ready).toBeVisible(READ)
   await ready.click()
   await expect(page).toHaveURL(/\/purchases\/receipts\/[0-9a-f-]+$/)
@@ -122,7 +122,7 @@ test('a receipt from the photo to the purchases: read, reviewed, recorded under 
   await page.goBack()
   await expect(page).toHaveURL(/\/purchases$/)
   await expect(
-    page.locator('.recorded .purchase-row').filter({ hasText: 'from a receipt' }),
+    page.locator('.recorded .list-row').filter({ hasText: 'from a receipt' }),
   ).toBeVisible(READ)
 })
 
@@ -134,7 +134,7 @@ test('a receipt with no items is recorded as its total, its purchases to add in 
   await signedIn(page, '/purchases')
   await capture(page, 1, true)
 
-  const ready = page.locator('.purchase-row').filter({ hasText: 'no items' })
+  const ready = page.locator('.list-row').filter({ hasText: 'no items' })
   await expect(ready).toBeVisible(READ)
   await ready.click()
   await expect(page).toHaveURL(/\/purchases\/receipts\/[0-9a-f-]+$/)
@@ -172,7 +172,7 @@ test('a receipt taken with no connection waits on the phone and goes once it is 
   await context.setOffline(true)
   await capture(page, 2)
 
-  const waiting = page.locator('.purchase-row').filter({ hasText: 'waiting for a connection' })
+  const waiting = page.locator('.list-row').filter({ hasText: 'waiting for a connection' })
   await expect(waiting).toBeVisible()
   // No red anywhere while offline.
   await expect(page.locator('.state.bad')).toHaveCount(0)
@@ -182,13 +182,13 @@ test('a receipt taken with no connection waits on the phone and goes once it is 
   await page.route('**/api/**', (route) => route.abort())
   await context.setOffline(false)
   await page.reload()
-  const held = page.locator('.purchase-row').filter({ hasText: '2 parts' })
+  const held = page.locator('.list-row').filter({ hasText: '2 parts' })
   await expect(held).toBeVisible()
 
   await page.unroute('**/api/**')
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
   await expect(held).toHaveCount(0, READ)
-  await expect(page.locator('.purchase-row').filter({ hasText: '13 items' })).toBeVisible(READ)
+  await expect(page.locator('.list-row').filter({ hasText: '13 items' })).toBeVisible(READ)
 })
 
 test('a file that is not a photo is said in the sheet and never queued', async ({ page }) => {
@@ -230,7 +230,7 @@ test('«Удалить чек» goes with «Вернуть» for ten seconds, an
   test.setTimeout(90_000)
   await signedIn(page, '/purchases')
   await capture(page)
-  const ready = page.locator('.purchase-row').filter({ hasText: '13 items' })
+  const ready = page.locator('.list-row').filter({ hasText: '13 items' })
   await expect(ready).toBeVisible(READ)
   await ready.click()
   await page.getByRole('button', { name: 'Delete receipt' }).click()
@@ -252,7 +252,7 @@ test('a receipt sent from «Что брать» opens «Покупки», where 
   await capture(page)
   await expect(page).toHaveURL(/\/purchases$/)
   await expect(
-    page.locator('.purchase-row').filter({ hasText: /sending|reading|13 items/ }),
+    page.locator('.list-row').filter({ hasText: /sending|reading|13 items/ }),
   ).toBeVisible(READ)
 })
 
@@ -263,7 +263,7 @@ test('a line put right goes with «Записать»; recorded with no connecti
   test.setTimeout(120_000)
   await signedIn(page, '/purchases')
   await capture(page)
-  const ready = page.locator('.purchase-row').filter({ hasText: '13 items' })
+  const ready = page.locator('.list-row').filter({ hasText: '13 items' })
   await expect(ready).toBeVisible(READ)
   await ready.click()
   await expect(page.locator('.receipt-line')).toHaveCount(13)
@@ -282,7 +282,7 @@ test('a line put right goes with «Записать»; recorded with no connecti
   await saveAll(page)
   await expect(page).toHaveURL(/\/purchases$/)
   await expect(
-    page.locator('.purchase-row').filter({ hasText: 'we’ll save it once you are online' }),
+    page.locator('.list-row').filter({ hasText: 'we’ll save it once you are online' }),
   ).toBeVisible()
 
   const sent = page.waitForRequest(
@@ -296,6 +296,6 @@ test('a line put right goes with «Записать»; recorded with no connecti
   }
   expect(body.lines.find((one) => one.position === 0)?.amount?.amount).toBe('777.00')
   await expect(
-    page.locator('.recorded .purchase-row').filter({ hasText: 'from a receipt' }),
+    page.locator('.recorded .list-row').filter({ hasText: 'from a receipt' }),
   ).toBeVisible(READ)
 })

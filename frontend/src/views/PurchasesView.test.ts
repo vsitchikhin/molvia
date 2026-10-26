@@ -175,7 +175,7 @@ function remember(trips: TripHistoryEntry[] = []) {
   if (trips.length === 0) localStorage.setItem(`molvia.trip-history-empty.${ME}`, '1')
 }
 
-const rows = (view: VueWrapper) => view.findAll('.recorded .purchase-row')
+const rows = (view: VueWrapper) => view.findAll('.recorded .list-row')
 /** The headings of the screen's groups: «Разбираем», «Посмотреть и записать». */
 const captions = (view: VueWrapper) => view.findAll('p.caption').map((caption) => caption.text())
 
@@ -467,8 +467,10 @@ describe('PurchasesView (MOL-128)', () => {
           )
         },
       })
-      const row = view.findAll('.purchase-row').find((one) => one.text().includes('Не принят'))
+      const row = view.findAll('.list-row').find((one) => one.text().includes('Не принят'))
       expect(row).toBeDefined()
+      // The one icon of a row in the warning's ink (Ф-4, MOL-204).
+      expect(row?.classes()).toContain('tone-warn')
       await row?.trigger('click')
       await flushPromises()
       expect(openSheet()?.textContent).toContain(ru.purchases.remove)
@@ -571,7 +573,7 @@ describe('PurchasesView (MOL-128)', () => {
       for (const row of rows(view)) {
         expect(row.text()).toContain('сумма по чеку · ')
         expect(row.text()).not.toMatch(/0 позиций|из чека/)
-        expect(row.find('.sum').exists()).toBe(true)
+        expect(row.find('.tail').exists()).toBe(true)
       }
     })
 
@@ -596,9 +598,9 @@ describe('PurchasesView (MOL-128)', () => {
       const [row, other] = rows(view)
       expect(row?.text()).toContain('Ереван Сити')
       expect(row?.text()).toContain('12 позиций · вчера')
-      expect(row?.get('.sum').text().replaceAll('\u00a0', ' ')).toBe('9 870,00 ֏ · 12,00 $')
+      expect(row?.get('.tail').text().replaceAll('\u00a0', ' ')).toBe('9 870,00 ֏ · 12,00 $')
       // A row read back from the phone, or from an older server, says where and when, nothing more.
-      expect(other?.find('.sum').exists()).toBe(false)
+      expect(other?.find('.tail').exists()).toBe(false)
       expect(other?.text()).not.toContain('позиц')
 
       await row?.trigger('click')
@@ -639,7 +641,7 @@ describe('PurchasesView (MOL-128)', () => {
       })
       await flushPromises()
       expect(rows(view)).toHaveLength(1)
-      expect(rows(view)[0]?.text()).toContain(ru.trip.history.local_finish)
+      expect(rows(view)[0]?.get('.below').text()).toBe(ru.trip.history.local_finish)
       expect(view.text()).not.toContain(ru.purchases.empty.title)
     })
   })
@@ -754,8 +756,11 @@ describe('PurchasesView (MOL-128)', () => {
       const { view, router } = await render()
       expect(view.get('.pending').text()).toContain('2 покупки ждут оценки')
       expect(view.get('.pending .meta').text()).toBe('Из «Ереван Сити», последняя — вчера')
+      // A status, not a button: no accent on the star, the chevron says it opens (Ф-4).
+      expect(view.find('.pending .accent').exists()).toBe(false)
+      expect(view.find('.pending .chevron').exists()).toBe(true)
 
-      await view.get('.pending .purchase-row').trigger('click')
+      await view.get('.pending .list-row').trigger('click')
       await flushPromises()
       expect(router.currentRoute.value.name).toBe('verdicts')
     })
@@ -901,7 +906,16 @@ describe('PurchasesView (MOL-128)', () => {
         view.html().indexOf('recorded'),
       )
 
-      await open.get('.purchase-row').trigger('click')
+      // One control in the row, the kit's secondary button (В-1 «а»), named with its place; the row
+      // itself is no button, and the pencil is a status, not the accent (Ф-4).
+      expect(open.get('.list-row').element.tagName).toBe('DIV')
+      expect(open.findAll('button')).toHaveLength(1)
+      expect(open.get('button').classes()).toContain('secondary')
+      expect(open.get('button').attributes('aria-label')).toBe('Продолжить «Рынок»')
+      expect(open.find('.accent').exists()).toBe(false)
+      expect(open.find('.chevron').exists()).toBe(false)
+
+      await open.get('button').trigger('click')
       await flushPromises()
       expect(router.currentRoute.value.name).toBe('purchase-manual')
     })

@@ -1362,7 +1362,7 @@ describe('TripView', () => {
     it('удалён единственный поход истории — главная встречает знакомством, а не скелетом (А5)', async () => {
       tripHistory.mockResolvedValueOnce(single)
       const { view, queue } = await render()
-      expect(view.findAll('.purchase-row')).toHaveLength(1)
+      expect(view.findAll('.recorded .list-row')).toHaveLength(1)
 
       tripHistory.mockResolvedValue({ trips: [], nextCursor: null })
       removeTrip.mockResolvedValue(undefined)
@@ -1427,7 +1427,7 @@ describe('TripView', () => {
     it('отказ «Вернуть» единственного похода истории — главная перечитывает историю (раунд 2, Б2)', async () => {
       tripHistory.mockResolvedValueOnce(single)
       const { view, queue } = await render()
-      expect(view.findAll('.purchase-row')).toHaveLength(1)
+      expect(view.findAll('.recorded .list-row')).toHaveLength(1)
 
       let land: () => void = () => undefined
       removeTrip.mockReturnValueOnce(
