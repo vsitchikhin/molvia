@@ -199,9 +199,11 @@ nothing up.
   CI the tap on «Обмен денег» left «Деньги» unmoved (run 38706549474), and on a phone it opened
   «Бюджет». The rows come with no `appear`: they are an answer read whole (MOL-151). **The price,
   named:** the very first opening, with nothing kept, waits for both answers before it can go to
-  «Обмен денег» — under a second as a rule, as long as the client waits with a server that hangs; and a
-  fresh answer over a month kept still moves them by whatever it changed — the price of showing the
-  memory at once. e2e holds both answers back in turn (`money.spec`). **A refusal stands once, and always somewhere it can be put
+  «Обмен денег» — under a second as a rule, as long as the client waits with a server that hangs; a
+  month turned to that the phone has not read, and «Повторить» after a month that failed, bring the
+  skeleton back and take the ways out with it until the answer — under that skeleton they would have
+  moved all the same; and a fresh answer over a month kept still moves them by whatever it changed —
+  the price of showing the memory at once. e2e holds both answers back in turn (`money.spec`). **A refusal stands once, and always somewhere it can be put
   right** (MOL-159): about a row the journal on screen shows, it marks that row, and any amendment of
   the row takes it away; with no such row, it is a row of «Не приняты» on top of «Траты», in every
   month and whatever its pages (`refusedRows`). «Не приняты» names the marked ones too and leads to the
