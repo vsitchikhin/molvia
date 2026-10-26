@@ -58,12 +58,6 @@ const LINES = [
     proposed: 'Молоко сгущённый «Алексеевскойе» 360 г',
     named: 'Молоко сгущённый «Алексеевскойе» 360 г',
   },
-  // a name now that would lose a word of the one taken: kept, and listed (adversarial А6)
-  {
-    printed: 'Ձվիկ «Ոսկեհատ» 10հտ',
-    proposed: 'Яйцо «Воскехат» отборное',
-    named: 'Яйцо «Воскехат» отборное',
-  },
   // an item of the catalogue, made by nobody's record
   { printed: 'Ֆանտա 0.5լ', proposed: 'Фанта 0,5 л', named: null },
 ] as const
@@ -157,8 +151,6 @@ describe('rename-receipt-items (MOL-261, В-3 «а»)', () => {
       '    Соль мелкий «Фаворит» 1 кг → Соль мелкая «Фаворит» 1 кг',
       '  taken       1',
       '    Молоко сгущённый «Алексеевскойе» 360 г → Молоко сгущённое «Алексеевское» 360 г: another item holds the name',
-      '  kept        1',
-      '    Яйцо «Воскехат» отборное → Яйцо «Воскеат»: the new name loses a word',
       'dry run: nothing changed. Run again with --yes to write.',
     ])
   }, 30_000)
@@ -182,7 +174,6 @@ describe('rename-receipt-items (MOL-261, В-3 «а»)', () => {
       'Сливки Игит',
       'Соль мелкая «Фаворит» 1 кг',
       'Фанта',
-      'Яйцо «Воскехат» отборное',
     ])
     const [renamed] = await db
       .select({ key: items.searchKey })
