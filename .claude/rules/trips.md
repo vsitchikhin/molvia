@@ -292,20 +292,23 @@ answer. A retry of the history ends with the screen that asked (И1).
 **The connection of «Покупки» is one strip for the history and the receipts** (MOL-204, Ф-14): a receipt is
 a purchase on its way to «Записаны», so their two reads are one list to the person, and three ways of «from
 memory» on one screen — a card, «Показаны данные…», a line of the receipts — were one too many. **Over
-what a failed read drew from memory** — rows of «Записаны» or of the receipts the phone kept — it is a
+what a failed read drew from memory** — rows of «Записаны» or of the receipts the phone kept, never a
+record finished here or a receipt of the queue, which stand with an answer as without one (Б1–Б3) — it is a
 `StatusStrip`, and speaks for both reads: offline, or «Сервер не ответил» with «Повторить» (MOL-181's rule, as
 «Счета» and «Что брать»). **«Записаны» failed with nothing of it shown is the screen's state**, the strip or no
 — the quiet card of an error, or «Без связи» in the screen's own words — since a strip over a receipt alone
 reads as every purchase there is (adversarial А3 of MOL-204). **The receipts failed with nothing of them shown,
 and no strip, are their own quiet card**, «Чеки не загрузились»: «Покупки не загрузились» over a list that came,
-or under its skeleton, is untrue (А2). A read answered every time under a list another window kept moving failed
-nothing it shows, and draws no strip (А4). The kind is the worse of the two reads; **the time is the older of
+or under its skeleton, is untrue (А2). A read answered every time under a list another window kept moving with
+an answer of the same while failed nothing it shows, and draws no strip (А4); a page put back from before the
+load is memory, and the strip names its moment (Б4). The kind is the worse of the two reads; **the time is the older of
 the reads that failed and drew a row** — nothing on screen is newer than that. The strip says its words again
 for a try of the person's that failed, never for the receipts' own poll every five seconds (А1). **The moment of
 the history's answer is a key of its own** (`molvia.trip-history-at`), for the reason the «empty» flag is: a
 field of the strict cache would be no cache to a window on the previous build, which would write its own over a
-finish made with no signal. Moved with the first page only, and let go of where a shelf refused the page, since
-that shelf keeps the one before (А5); a cache from before it has none, and the strip says no time. **The price,
+finish made with no signal. Moved with the first page only, written with every page a window puts on the shelf
+— the page `apply` puts back is that window's last answer, and its moment comes with it (Б4) — and let go of
+where a shelf refused either, since that shelf keeps the page before (А5); a cache from before it has none, and the strip says no time. **The price,
 named:** a window on the previous build loads the history without moving it, so the strip may name a moment
 older than the list, never a newer one. **Offline, «Показать ещё» gives way to «Раньше {day} — со связью»** —
 the day of the last row shown, always as a date — so the list does not read as whole (П.5 of MOL-128). **The
