@@ -91,7 +91,7 @@ jobs:
     # bin/check-playwright-image.mjs holds in `npm run lint`. The runner's own uid, as Playwright's
     # documentation has it, so the workspace stays the runner's.
     container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: --user 1001
 
     # The API migrates at boot and refuses to start without a database, which is correct:
