@@ -62,6 +62,50 @@ describe('StatusStrip', () => {
       const view = mount(StatusStrip, { props: { kind: 'unanswered', text: 'Words' } })
       expect(view.find('.action').exists()).toBe(false)
     })
+
+    // «Повторить» answered takes the strip away: a focus on it went to the body (MOL-194, Б1).
+    describe('going with the focus on it', () => {
+      const Screen = (inSheet: boolean) =>
+        defineComponent({
+          props: { shown: Boolean },
+          setup: (props) => () => {
+            const strip = props.shown
+              ? h(StatusStrip, { kind: 'unanswered', text: 'Сервер не ответил' }, action)
+              : null
+            return [
+              h('h1', { tabindex: -1 }, 'Счёт'),
+              h('button', { class: 'row' }, 'Такси'),
+              inSheet ? h('dialog', { open: true }, [strip]) : strip,
+            ]
+          },
+        })
+      afterEach(() => (document.body.innerHTML = ''))
+
+      it('hands it to the screen’s title, as a full error does', async () => {
+        const view = mount(Screen(false), { props: { shown: true }, attachTo: document.body })
+        ;(view.get('.action button').element as HTMLElement).focus()
+        await view.setProps({ shown: false })
+        expect(document.activeElement).toBe(view.get('h1').element)
+        view.unmount()
+      })
+
+      it('must not take a focus that stands elsewhere', async () => {
+        const view = mount(Screen(false), { props: { shown: true }, attachTo: document.body })
+        ;(view.get('.row').element as HTMLElement).focus()
+        await view.setProps({ shown: false })
+        expect(document.activeElement).toBe(view.get('.row').element)
+        view.unmount()
+      })
+
+      // The page under a sheet is inert: its title is no place for a focus that was in the sheet.
+      it('must not take it out of a sheet', async () => {
+        const view = mount(Screen(true), { props: { shown: true }, attachTo: document.body })
+        ;(view.get('.action button').element as HTMLElement).focus()
+        await view.setProps({ shown: false })
+        expect(document.activeElement).not.toBe(view.get('h1').element)
+        view.unmount()
+      })
+    })
   })
 
   describe('its words out loud', () => {

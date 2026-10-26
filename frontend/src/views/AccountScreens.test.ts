@@ -920,6 +920,8 @@ describe('the account’s screen on the kit (MOL-194)', () => {
     const view = await open(AccountView, `/money/accounts/${CASH}`, session())
     const strip = view.getComponent(StatusStrip)
     expect(strip.props('kind')).toBe('unanswered')
+    // The balance is the phone's too: the hour of the page it came from (review №1).
+    expect(strip.props('text')).toMatch(/^The server did not answer · balances as of /)
     expect(view.findComponent(ScreenState).exists()).toBe(false)
     const before = strip.props('attempt') as number
     await button(view, en.state.retry)?.trigger('click')
@@ -933,5 +935,91 @@ describe('the account’s screen on the kit (MOL-194)', () => {
     const cloud = away.getComponent(StatusStrip)
     expect(cloud.props('kind')).toBe('offline')
     expect(cloud.props('text')).toMatch(/^Offline · balances as of /)
+  })
+
+  // By the last read, as «Счета» (MOL-183, Б1): an answer earlier in this session hid a read that
+  // failed after it, and the transfer the balance has was in no journal, with nothing to say so (А1).
+  it('a journal answered, then a re-read failed: «Сервер не ответил» with «Повторить», no hour over a fresh page', async () => {
+    const pinia = session()
+    const store = useAccountsStore(pinia)
+    moneyAccounts.mockResolvedValue(page([cash(), second]))
+    accountJournal.mockResolvedValue(journal(cash(), [spendingRow(TAXI, '-500', CASH)]))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    expect(view.findComponent(StatusStrip).exists()).toBe(false)
+
+    accountJournal.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    store.accept(page([cash({ balance: amd('90000') }), second]))
+    store.transfers += 1
+    await settle()
+    const strip = view.getComponent(StatusStrip)
+    expect(strip.props('kind')).toBe('unanswered')
+    expect(strip.props('text')).toBe(en.accounts.account.unanswered)
+
+    accountJournal.mockResolvedValue(journal(cash({ balance: amd('90000') }), []))
+    await button(view, en.state.retry)?.trigger('click')
+    await settle()
+    expect(view.findComponent(StatusStrip).exists()).toBe(false)
+  })
+
+  it('a journal answered, then the connection lost: the cloud, as «Счета» a step back say it (А2)', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([cash(), second]))
+    accountJournal.mockResolvedValue(journal(cash(), []))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    expect(view.findComponent(StatusStrip).exists()).toBe(false)
+    offline()
+    window.dispatchEvent(new Event('offline'))
+    await settle()
+    expect(view.getComponent(StatusStrip).props('kind')).toBe('offline')
+  })
+
+  // The strip's actions swapped under the focus by an answer, not the person's tap (Б2, Б3).
+  it.each([
+    [
+      'put away on another phone: to «Вернуть»',
+      () => {
+        moneyAccounts.mockResolvedValue(page([removed({ revision: 2 })]))
+        accountJournal.mockResolvedValue(journal(removed({ revision: 2 }), []))
+      },
+      en.accounts.screen.restore,
+    ],
+    [
+      'deleted on another phone: to «К счетам»',
+      () => {
+        moneyAccounts.mockResolvedValue(page([]))
+        accountJournal.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, 'gone', true))
+      },
+      en.accounts.account.to_list,
+    ],
+  ])('the account %s — the focus on «Сверить» goes with the strip', async (_, gone, next) => {
+    const pinia = session()
+    const store = useAccountsStore(pinia)
+    moneyAccounts.mockResolvedValue(page([cash()]))
+    accountJournal.mockResolvedValue(journal(cash(), []))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    ;(button(view, en.accounts.account.reconcile)?.element as HTMLElement).focus()
+    gone()
+    await store.refresh()
+    store.transfers += 1
+    await settle()
+    expect(docked(view)).toEqual([next])
+    expect(document.activeElement?.textContent.trim()).toBe(next)
+  })
+
+  it('must not fire: «Вернуть» answered leaves a focus the person took elsewhere meanwhile (В)', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([removed()]))
+    accountJournal.mockResolvedValue(journal(removed(), [spendingRow(TAXI, '-500', CASH)]))
+    let land: (value: MoneyAccountsResponse) => void = () => undefined
+    restoreMoneyAccount.mockImplementation(() => new Promise((resolve) => (land = resolve)))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    await button(view, en.accounts.screen.restore)?.trigger('click')
+    await settle()
+    const row = view.getComponent(OperationRow).get('button').element as HTMLElement
+    row.focus()
+    land(page([cash({ revision: 2 })]))
+    await settle()
+    expect(docked(view)).toEqual([en.accounts.account.reconcile])
+    expect(document.activeElement).toBe(row)
   })
 })

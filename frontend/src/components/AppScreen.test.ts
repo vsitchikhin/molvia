@@ -852,6 +852,80 @@ describe('AppScreen with an error of the whole screen', () => {
     view.unmount()
   })
 
+  // The strip's actions swapped under the focus — an account put away on another phone — left it on
+  // the body: it goes to the strip's first button, or to the title where the strip went whole
+  // (MOL-194, Б2, Б3).
+  it.each([
+    ['to the strip’s first button where its actions were swapped', true],
+    ['to the title where the strip went whole', false],
+  ])('brings a focus the strip lost %s', async (_, swapped) => {
+    const away = ref(false)
+    const view = mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            AppScreen,
+            { title: 'Cash' },
+            away.value && !swapped
+              ? { default: () => h('p', 'Gone') }
+              : {
+                  default: () => h('button', { class: 'elsewhere' }, 'Taxi'),
+                  docked: () =>
+                    away.value
+                      ? h('button', { key: 'restore', class: 'restore' }, 'Restore')
+                      : h('button', { key: 'own', class: 'own' }, 'Check'),
+                },
+          ),
+      }),
+      {
+        attachTo: document.body,
+        global: {
+          plugins: [await routed('/'), createPinia(), createAppI18n('en')],
+          provide: { [pwaUpdateKey as symbol]: waiting('none') },
+        },
+      },
+    )
+    ;(view.get('.own').element as HTMLElement).focus()
+    away.value = true
+    await nextTick()
+    expect(document.activeElement).toBe(
+      swapped ? view.get('.restore').element : view.get('h1').element,
+    )
+    view.unmount()
+  })
+
+  it('must not take a focus from outside the strip when its actions are swapped', async () => {
+    const away = ref(false)
+    const view = mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            AppScreen,
+            { title: 'Cash' },
+            {
+              default: () => h('button', { class: 'elsewhere' }, 'Taxi'),
+              docked: () =>
+                h('button', { key: String(away.value), class: away.value ? 'restore' : 'own' }, [
+                  'Check',
+                ]),
+            },
+          ),
+      }),
+      {
+        attachTo: document.body,
+        global: {
+          plugins: [await routed('/'), createPinia(), createAppI18n('en')],
+          provide: { [pwaUpdateKey as symbol]: waiting('none') },
+        },
+      },
+    )
+    ;(view.get('.elsewhere').element as HTMLElement).focus()
+    away.value = true
+    await nextTick()
+    expect(document.activeElement).toBe(view.get('.elsewhere').element)
+    view.unmount()
+  })
+
   // Only an error is a second one: a notice of the whole screen beside it stays an alert (review №5).
   it('keeps a full «attention» beside an error that holds the strip an alert', async () => {
     const { view } = await render('/', {
