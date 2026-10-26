@@ -187,7 +187,8 @@ export default defineComponent({
     const foreign = computed(() =>
       props.month.foreign.map(({ amount, counted }) =>
         t('spending.foreign_part', {
-          amount: formatEstimate(amount, locale.value),
+          // The money as spent, as its row in «Траты» says it; only what it came to is «≈» (MOL-205, В-1 «в»).
+          amount: formatMoney(amount, locale.value),
           counted: whole(counted),
         }),
       ),

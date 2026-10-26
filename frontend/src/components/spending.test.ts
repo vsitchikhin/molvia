@@ -317,6 +317,10 @@ describe('what the screen prints', () => {
       plain(dayTotalText({ total: amd(total), estimated, uncounted }, 'ru-RU') ?? '')
     expect(day('5000', false)).toBe('5 000 ֏')
     expect(day('4400', true)).toBe('≈ 4 400 ֏')
+    // Counted with no rate it is exact, as the row under it: a receipt of 5 403,12 ֏ is not «5 403 ֏»
+    // over itself; only «≈» is whole (MOL-205, adversarial Б1а).
+    expect(day('5403.12', false)).toBe('5 403,12 ֏')
+    expect(day('5403.12', true)).toBe('≈ 5 403 ֏')
     expect(day('5000', false, [usd('50')])).toBe('5 000 ֏ + 50 $')
     expect(day('4400', true, [parseMoney('10', 'EUR'), usd('50')])).toBe('≈ 4 400 ֏ + 10 € + 50 $')
     expect(day('0', false, [usd('50')])).toBe('50 $')
