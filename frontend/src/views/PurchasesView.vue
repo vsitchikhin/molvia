@@ -4,7 +4,13 @@
          the history and the receipts are one list of purchases, so one strip says both — never three
          ways of «from memory» on one screen. Only over something of an answer: with nothing shown it
          is the state below. -->
-    <StatusStrip v-if="strip" :kind="strip.kind" :text="strip.text" :attempt="strip.attempt">
+    <StatusStrip
+      v-if="strip"
+      class="connection"
+      :kind="strip.kind"
+      :text="strip.text"
+      :attempt="strip.attempt"
+    >
       <template #action>
         <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
       </template>
@@ -113,7 +119,7 @@
     <!-- The answer's shape (Ф-13, Р-7): «Записаны» and three rows with a sum and a chevron, no icon —
          a recorded row has none. The record going on is no part of it: drawn from the phone, it stands
          over the skeleton already, and a bar in its place would go from under a person with none. -->
-    <ScreenSkeleton v-if="shown === 'loading'">
+    <ScreenSkeleton v-if="shown === 'loading'" class="loading">
       <SkeletonPart kind="caption" :width="22" />
       <SkeletonPart kind="rows" tail next />
     </ScreenSkeleton>
@@ -595,6 +601,16 @@ export default defineComponent({
 <style scoped lang="scss">
 .block {
   margin-bottom: var(--space-3);
+}
+
+// 8 to what it dates, as the handoff's 3k draws it.
+.connection {
+  margin-bottom: var(--space-2);
+}
+
+// Where «Записаны» of the answer stands: its caption has 24 above it, the frame's first part none.
+.loading {
+  margin-top: var(--space-6);
 }
 
 .caption {
