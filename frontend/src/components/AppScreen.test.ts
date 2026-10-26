@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { enableAutoUnmount, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -89,6 +89,9 @@ afterEach(() => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
+// A test that failed before its own `unmount()` left its heading in the page, and the next one's
+// focus went to it: one breakage read as three.
+enableAutoUnmount(afterEach)
 
 describe('AppScreen', () => {
   it('titles the screen with one heading, focusable for the router to land on', async () => {
@@ -814,6 +817,46 @@ describe('AppScreen with an error of the whole screen', () => {
     await nextTick()
     await nextTick()
     expect(document.activeElement).toBe(view.get('.dock button').element)
+    expect(document.activeElement?.textContent).toContain(en.state.retry)
+    view.unmount()
+  })
+
+  // A version waiting: the error offers its own «Обновить» first (MOL-132, В-2), and a focus brought
+  // there let the next Enter, meant for the screen's action, reload the app — «Повторить» takes it
+  // (MOL-194, adversarial Е).
+  it.each([
+    ['the action swapped for the error', false],
+    ['the strip gone as the error came', true],
+  ])('hands a focus to «Try again», past the error’s «Update»: %s', async (_, together) => {
+    const failed = ref(false)
+    const update = waiting('ready')
+    const view = mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            AppScreen,
+            { title: 'What to buy' },
+            together && failed.value
+              ? { default: () => error() }
+              : {
+                  default: () => (failed.value ? error() : h('p', 'Ready')),
+                  docked: () => h('button', { class: 'own' }, 'Record purchases'),
+                },
+          ),
+      }),
+      {
+        attachTo: document.body,
+        global: {
+          plugins: [await routed('/'), createPinia(), createAppI18n('en')],
+          provide: { [pwaUpdateKey as symbol]: update },
+        },
+      },
+    )
+    ;(view.get('.own').element as HTMLElement).focus()
+    failed.value = true
+    await nextTick()
+    await nextTick()
+    expect(buttons(view.get('.dock'))).toEqual([en.update.apply, en.state.retry])
     expect(document.activeElement?.textContent).toContain(en.state.retry)
     view.unmount()
   })
