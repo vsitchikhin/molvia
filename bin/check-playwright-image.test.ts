@@ -98,6 +98,21 @@ describe('imageProblems', () => {
     ).toHaveLength(3)
   })
 
+  // Adversarial Б1: a digest pins the tag; the tag is still what is checked.
+  it('reads the tag before a digest, and asks for the digest with a tag moved', () => {
+    const digest = `@sha256:${'a1'.repeat(32)}`
+    expect(imageProblems(workflow(`v1.63.0-noble${digest}`), ALL)).toEqual([])
+    expect(imageProblems(workflow(`v1.62.0-noble${digest}`), ALL)[0]).toBe(
+      told(
+        `v1.62.0-noble${digest}`,
+        '@playwright/test',
+        '1.63.0',
+        'v1.63.0-noble, and its digest with it',
+      ),
+    )
+    expect(imageProblems(`    container:\n      image: ${IMAGE}${digest}\n`, ALL)).toHaveLength(3)
+  })
+
   it('refuses a second image that is not the version', () => {
     expect(imageProblems(workflow('v1.63.0-noble', 'v1.62.0-noble'), ALL)).toHaveLength(3)
   })
