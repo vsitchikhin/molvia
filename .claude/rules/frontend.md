@@ -627,7 +627,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   went whole. **Never to «Обновить»** — a button marked `reload`: the row of a version waiting over
   them (review №3, adversarial Г1, Г2) and the full error's own, first in the strip it takes (Е,
   inherited from MOL-180 review №6: the focus held from the screen's action now goes to «Повторить»):
-  the next Enter, meant for the screen, let a reload in. The row of the version changes in a render
+  the next Enter, meant for the screen, let a reload in. A focus that stood on a «Обновить» itself goes
+  to the «Обновить» in its place (Ж): that Enter was meant for the reload. The row of the version changes in a render
   of its own, which the frame does not see, so the frame watches its phase too: «Обновить» swapped
   for «Не обновилось» gives the focus to the screen's action (Д, inherited from MOL-132). A focus
   outside the strip stays where the person put it.
