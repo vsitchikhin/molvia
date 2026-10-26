@@ -25,7 +25,8 @@ The shape worth knowing here:
   packages export TypeScript source, which a runtime image could not read. The API's image
   carries the owner's tools beside it, `dist/forget.js` — the fallback for erasure (MOL-58) —,
   `dist/seed-catalogue.js` (MOL-112), `dist/gates.js` (MOL-91), `dist/failures.js` (MOL-143),
-  `dist/merge.js` (MOL-106), `dist/notify.js` (MOL-237) and `dist/repack-receipts.js` (MOL-264), since the
+  `dist/merge.js` (MOL-106), `dist/notify.js` (MOL-237), `dist/repack-receipts.js` (MOL-264) and
+  `dist/rename-receipt-items.js` (MOL-261), since the
   machine has neither the source nor a published database port.
   **One module beside the file, and the model** (MOL-105, owner's decision В-1): onnxruntime's
   native library cannot be bundled, so `bin/bundle.mjs` leaves `onnxruntime-node` out and the image
