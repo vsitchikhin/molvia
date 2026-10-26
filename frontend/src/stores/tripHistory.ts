@@ -129,6 +129,23 @@ const KEY = 'molvia.trip-history'
  */
 const EMPTY_KEY = 'molvia.trip-history-empty'
 const empty = (): TripHistory => ({ trips: [], nextCursor: null })
+/**
+ * When the server last answered the first page (MOL-204): what «Без связи · покупки на 27 сент. в
+ * 14:05» says. A key of its own for the reason `EMPTY_KEY` is one — a field of the strict cache would be
+ * no cache at all to a window on the previous build, which would write its own over a finish made with
+ * no signal. Moved with the first page only, by `load()`; «Показать ещё» reads older rows, not a newer
+ * list. **The price, named:** a window on the previous build loads the history without moving it, and
+ * the strip then names a moment older than the list — never a newer one. A cache from before this key
+ * has none, and the strip says no time.
+ */
+const AT_KEY = 'molvia.trip-history-at'
+
+/** The moment kept under `AT_KEY`, read leniently: anything but a date is no moment. */
+function momentOf(raw: string | null): Date | null {
+  if (raw === null) return null
+  const at = new Date(raw)
+  return Number.isNaN(at.getTime()) ? null : at
+}
 
 /**
  * A bounded read cache. A full snapshot is kept only for a completion the server has not
@@ -155,6 +172,8 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   const stale = ref(true)
   /** The server's last first page for this owner was empty (`EMPTY_KEY`). */
   const answeredEmpty = ref(false)
+  /** When the server answered the first page this cache holds (`AT_KEY`); `null` if not known. */
+  const answeredAt = ref<Date | null>(null)
   let firstPage: TripHistory = empty()
   // What «Показать ещё» brought, and the cursor standing after it. Only the first page is
   // remembered on the phone; these live for as long as the screen does.
@@ -212,6 +231,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     selected.value = held?.selected ?? null
     local.value = held?.local ?? []
     answeredEmpty.value = actor.id !== null && read(`${EMPTY_KEY}.${actor.id}`) === '1'
+    answeredAt.value = actor.id === null ? null : momentOf(read(`${AT_KEY}.${actor.id}`))
     stale.value = true
   }
   restore()
@@ -423,6 +443,9 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
       answeredEmpty.value = answer.trips.length === 0
       if (owner && answeredEmpty.value) write(`${EMPTY_KEY}.${owner}`, '1')
       else if (owner) forget(`${EMPTY_KEY}.${owner}`)
+      // Before the cache, so a window that hears the cache's write reads the moment that came with it.
+      answeredAt.value = new Date()
+      if (owner) write(`${AT_KEY}.${owner}`, answeredAt.value.toISOString())
     }
     stale.value = false
     persist()
@@ -473,6 +496,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     local,
     stale,
     answeredEmpty,
+    answeredAt,
     capture,
     apply,
     forgetLocal,

@@ -182,6 +182,51 @@ describe('whether the server has answered an empty history (MOL-77)', () => {
   })
 })
 
+describe('when the server answered the first page (MOL-204)', () => {
+  const AT = `molvia.trip-history-at.${OWNER}`
+
+  it('is kept with the first page, under a key of its own, and read back after a restart', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-27T10:05:00Z'))
+    const store = useTripHistoryStore()
+    expect(store.answeredAt).toBeNull()
+    tripHistory.mockResolvedValue({ trips: [entry(A)], nextCursor: cursor(A) })
+    await store.load()
+    vi.useRealTimers()
+    expect(store.answeredAt?.toISOString()).toBe('2026-09-27T10:05:00.000Z')
+    expect(localStorage.getItem(AT)).toBe('2026-09-27T10:05:00.000Z')
+    // Not a field of the cache: the previous build reads that strictly (Р-3).
+    expect(localStorage.getItem(`molvia.trip-history.${OWNER}`)).not.toContain('2026-09-27T10:05')
+    expect(restart().answeredAt?.toISOString()).toBe('2026-09-27T10:05:00.000Z')
+  })
+
+  it('is not moved by «Показать ещё», a failed load or a write to a trip', async () => {
+    localStorage.setItem(AT, '2026-09-27T10:05:00.000Z')
+    const store = restart()
+    tripHistory.mockResolvedValueOnce({ trips: [entry(B)], nextCursor: null })
+    // A next page is asked for only past a cursor, so the first page is put there first.
+    store.page = { trips: [entry(A)], nextCursor: cursor(A) }
+    await store.load(true)
+    tripHistory.mockRejectedValueOnce(new Error('Failed to fetch'))
+    await expect(store.load()).rejects.toThrow()
+    store.apply(view(C, false))
+    expect(store.answeredAt?.toISOString()).toBe('2026-09-27T10:05:00.000Z')
+    expect(localStorage.getItem(AT)).toBe('2026-09-27T10:05:00.000Z')
+  })
+
+  it('a cache from before the key, or anything but a date under it, is no moment', () => {
+    useTripHistoryStore().apply(view(A))
+    expect(restart().answeredAt).toBeNull()
+    localStorage.setItem(AT, 'вчера')
+    expect(restart().answeredAt).toBeNull()
+  })
+
+  it('another owner’s moment is not this owner’s', () => {
+    localStorage.setItem(`molvia.trip-history-at.${A}`, '2026-09-27T10:05:00.000Z')
+    expect(restart().answeredAt).toBeNull()
+  })
+})
+
 describe('history memory', () => {
   it('keeps a local completion across restart, before a server trip exists', () => {
     const store = useTripHistoryStore()
