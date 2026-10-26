@@ -324,17 +324,20 @@ balance, total and difference is the server's.
   другую сумму» does not take the sheet back. A recount that failed leaves the difference stale with
   «Повторить»; offline is the kit's `StatusStrip`, first in the sheet over either step, drawn by the
   connection and gone with it, never red (MOL-195) — over an answered count in words of what waits,
-  «Сверка посчитана — разницу можно записать со связью», never «сверить» (review Р2-4). **What was
+  «Сверка посчитана — разницу можно записать со связью», never «сверить» (review Р2-4), and over
+  «Сходится» or a difference written, with no write to offer, «Сверка посчитана» (Р3-1). **What was
   typed stays while no answer came** (adversarial А2): the line promises it, and a person closes the
-  sheet to come back with the connection; an answered check, or another account, starts afresh, and a
+  sheet to come back with the connection; once an answer was shown — a fact typed after «Ввести другую
+  сумму» too, typed with the count in sight (Б3) — or for another account, it starts afresh, and a
   reload or a screen left loses it — no draft is kept. **«Записать разницу» is tinted, and not now says
   why on it** (Ф-6, С-10): `inactive`, in the focus order — «Запишем, когда будет связь» offline, first,
   since nothing is recounted without it; «Запишем после ответа в «Покупках»» while a trip's write waits
   for the person there (owner's В-1 «а» of MOL-195, the line above it says the same); «Запишем после
   пересчёта» while a correction is on its way. «Сверим, когда будет связь» of step one likewise. **Every
   way in waits as the button does** (adversarial А1): the write itself refuses while any of the three
-  holds, and «Повторить» of «Прочее» not found is not drawn then — it wrote over a count its neighbour
-  called stale, the correction and «Прочее» the same money twice.
+  holds, and «Повторить» of «Прочее» not found is not now then — it wrote over a count its neighbour
+  called stale, the correction and «Прочее» the same money twice; not now rather than gone, so a focus
+  on it stays as the connection drops (Б2), its reason said by the button beside it.
 - **«Записать разницу»** writes the server's `difference` as «Прочее» with the note «сверка» — read
   back as «Прочее · сверка» in either language. **Below zero**: a spending through its queue, named
   once per answer, and the same check once more after that spending has landed, kept in the store
