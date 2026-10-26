@@ -166,6 +166,10 @@ export default defineComponent({
     // render instead: a row filled late is pinned and alive, not drawn inside an invisible one.
     const hasRow = (): boolean => Boolean(parentTitleKey.value ?? slots.meta ?? slots.trailing)
     const docked = ref(hasRow())
+    const firstAction = (within: HTMLElement | null) =>
+      [...(within?.querySelectorAll('button') ?? [])].find(
+        (one) => !one.classList.contains('reload'),
+      )
     // Whether the focus stood in the strip as this render began (adversarial Г1, below).
     let focusInDock = false
     onBeforeUpdate(() => {
@@ -175,14 +179,12 @@ export default defineComponent({
     // A render that swapped the strip's actions under the focus — an account put away or deleted on
     // another phone, «Вернуть» answered — left it on the body: it goes to the strip's first button,
     // where the one it stood on was, or to the title where the strip went whole (MOL-194, Б2, Б3).
-    // The screen's own first button, never the row of a version waiting over it: «Обновить» is a
-    // reload the person did not ask for, the next Enter away (review №3, adversarial Г1, Г2).
+    // The screen's own first button, never a «Обновить» (`.reload`) — of the version's row or of an
+    // error: a reload the person did not ask for, the next Enter away (review №3, adversarial Г, Е).
     function bringFocus(): void {
       const focused = document.activeElement
       if (focused !== null && focused !== document.body) return
-      const first = [...(dock.value?.querySelectorAll('button') ?? [])].find(
-        (one) => !one.closest('.update'),
-      )
+      const first = firstAction(dock.value)
       if (first) first.focus()
       else focusScreenTitle()
     }
@@ -231,7 +233,7 @@ export default defineComponent({
     const strip = provideStateStrip(stateTarget)
     // An error taking the strip unmounts the screen's own action, and a focus on it fell to the body
     // («Где вы?» closed over a failed «Что брать» hands it back to «Записать покупки», review №6): it
-    // goes to the error's first button, which stands where that action stood. Where the action went
+    // goes to the error's first button but «Обновить» (MOL-194, Е), where that action stood. Where the action went
     // in the very render the error came in — «Что брать» draws its strip only for a newcomer — the
     // whole strip went before the error held it, and the focus with it (adversarial Г1): so whether
     // it stood in the strip is read before the frame patches, and a focus lost to the body is brought.
@@ -242,7 +244,7 @@ export default defineComponent({
         const focused = document.activeElement
         const lost = focused === null || focused === document.body
         if (!dock.value?.contains(focused) && !(focusInDock && lost)) return
-        void nextTick(() => stateTarget.value?.querySelector('button')?.focus())
+        void nextTick(() => firstAction(stateTarget.value)?.focus())
       },
       { flush: 'pre' },
     )

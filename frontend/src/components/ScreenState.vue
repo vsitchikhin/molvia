@@ -31,6 +31,7 @@
              and the reload loses nothing (MOL-132, В-2). -->
         <AppButton
           v-if="kind === 'error' && updating && !card"
+          class="reload"
           block
           :size="dockTarget ? 'large' : 'regular'"
           :busy="applying"

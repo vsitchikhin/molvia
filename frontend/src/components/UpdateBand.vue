@@ -8,7 +8,7 @@
       <p class="title">{{ t('update.ready') }}</p>
       <AppButton
         variant="secondary"
-        class="apply"
+        class="apply reload"
         :busy="phase === 'applying'"
         :busy-label="t('update.applying')"
         @click="apply"
