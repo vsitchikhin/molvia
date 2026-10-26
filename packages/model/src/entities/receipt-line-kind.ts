@@ -166,6 +166,8 @@ export function receiptLineParts(printed: string): ReceiptLineParts {
 // Armenian letters in Russian ones, as a name is spelt across the border: «Ճաշկինո» Чашкино, «Երեմյան»
 // Еремян, «Մախեև» Махеев. Pairs are read before letters.
 const PAIRS: readonly (readonly [string, string])[] = [
+  // a Russian brand's «-ое», «Ալեքսեևսկոյե» Алексеевское (MOL-261)
+  ['ոյե', 'ое'],
   ['ու', 'у'],
   ['յա', 'я'],
   ['յու', 'ю'],
@@ -269,6 +271,38 @@ export const armenianInRussian = (text: string): string =>
   text.replace(/[ա-ֆԱ-Ֆև]+/gu, (word) => spellWord(word))
 
 /**
+ * What a new item's name is written with beyond the till's words (MOL-261). Each part is the backend's
+ * dictionary, as the till's words are; without one the name is as MOL-293 made it.
+ */
+export interface NameLexicon {
+  /**
+   * A brand or a product line as the till prints it, lower case, «և» one letter, to how its package spells it:
+   * «կոկա կոլա» Coca-Cola, «լովիտա» Lovita, «ալյոնկա» Алёнка (owner's В-2 «а»).
+   */
+  readonly brands?: Readonly<Record<string, string>>
+}
+
+const lexiconKey = (text: string): string =>
+  text.toLowerCase().replace(/եվ|եւ/gu, 'և').replace(/\s+/gu, ' ').trim()
+
+// a package's spelling in Latin letters is written bare, as the shelf writes it: «Печенье Roshen Lovita»
+const LATIN_NAME = /^[\p{Script=Latin}\d\s'&.-]+$/u
+
+/** The package's spelling of a brand or a line the lexicon knows, else none. */
+const shelfOf = (text: string, lexicon: NameLexicon): string | null =>
+  lexicon.brands?.[lexiconKey(text)] ?? null
+
+/**
+ * A brand as a name writes it (MOL-261, owner's В-2 «а»): the package's spelling, a Latin one with no quotes —
+ * «Coca-Cola», «Roshen» — a Cyrillic one in «…»; a brand the lexicon has not, in Russian letters in «…».
+ */
+function brandInName(brand: string, lexicon: NameLexicon): string {
+  const shelf = shelfOf(brand, lexicon)
+  if (shelf === null) return `«${armenianInRussian(brand)}»`
+  return LATIN_NAME.test(shelf) ? shelf : `«${shelf}»`
+}
+
+/**
  * A word's senses by the dictionary of till words, «креветка/краб» two of them, the first the one a name
  * takes. An abbreviation by its own entry first, «գազ.» — «газированный», then as a word.
  */
@@ -304,12 +338,25 @@ export interface LineName {
 export function newLineName(
   parts: ReceiptLineParts,
   dictionary: Readonly<Record<string, string>>,
+  lexicon: NameLexicon = {},
 ): LineName | null {
   let spelled = false
   const said: string[] = []
 
+  // a product line of two words is the lexicon's before either of them: «Արտ Բեյքրի» Art Bakery
+  const lines = (tokens: readonly string[]): string[] =>
+    tokens.flatMap((token, at) => {
+      const pair = `${tokens[at - 1] ?? ''} ${token}`
+      if (at > 0 && shelfOf(pair, lexicon) !== null) return []
+      const next = `${token} ${tokens[at + 1] ?? ''}`
+      if (at + 1 < tokens.length && shelfOf(next, lexicon) !== null) return [next]
+      return [token]
+    })
+
   const words = (tokens: readonly string[]): string[] =>
-    tokens.flatMap((token) => {
+    lines(tokens).flatMap((token) => {
+      const shelf = shelfOf(token, lexicon)
+      if (shelf !== null) return [shelf]
       if (!isNameWord(token) || UNIT_WORDS.has(keyed(token))) return []
       if (LATIN.test(token)) return [token]
       const gloss = glossOf(token, dictionary)
@@ -331,7 +378,7 @@ export function newLineName(
       : [parts.before[kindAt] ?? '', ...parts.before.filter((_, at) => at !== kindAt)]
   const name = [
     ...words(before),
-    ...(parts.brand === null ? [] : [`«${armenianInRussian(parts.brand)}»`]),
+    ...(parts.brand === null ? [] : [brandInName(parts.brand, lexicon)]),
     ...words(parts.after),
     ...(parts.percent === null ? [] : [parts.percent]),
     ...(parts.size === null ? [] : [parts.size]),
@@ -568,16 +615,23 @@ export interface FitOptions {
 export function lineFitter(
   parts: ReceiptLineParts,
   dictionary: Readonly<Record<string, string>>,
+  lexicon: NameLexicon = {},
 ): (itemName: string, options?: FitOptions) => boolean {
   const tokens = [...parts.before, ...(parts.brand === null ? [] : [parts.brand]), ...parts.after]
   const glossed = tokens.flatMap((token) => sensesOf(token, dictionary).flatMap(wordsOf))
-  const spelt = tokens.flatMap(wordsOf)
+  // a brand or a line the lexicon knows is the line's in its package's spelling too: «Կինդեր» is Kinder
+  const shelves = [...tokens, ...tokens.slice(1).map((token, at) => `${tokens[at] ?? ''} ${token}`)]
+    .map((token) => shelfOf(token, lexicon))
+    .filter((shelf): shelf is string => shelf !== null)
+  const spelt = [...tokens, ...shelves].flatMap(wordsOf)
   const figures = [
     ...tokens.flatMap(figuresOf),
     ...figuresOf(parts.percent ?? ''),
     ...figuresOf(parts.size ?? ''),
   ]
   const brand = wordsOf(parts.brand ?? '')
+  const shelfBrand = wordsOf(parts.brand === null ? '' : (shelfOf(parts.brand, lexicon) ?? ''))
+  const brands = shelfBrand.length > 0 ? [brand, shelfBrand] : [brand]
   // any of the kind's senses: «հրուշակեղեն» is pastry and confectionery
   const kinds = parts.kind === null ? [] : sensesOf(parts.kind, dictionary).map(wordsOf)
   const next = nextThing(parts, dictionary)
@@ -599,8 +653,11 @@ export function lineFitter(
     if (parts.brand !== null && options.generic === true) return false
     if (!item.every(lineHas)) return false
     if (!figuresOf(itemName).every((figure) => figures.includes(figure))) return false
-    if (!brand.every((word) => item.some((one) => sameLetters(word, one)))) return false
-    if (brand.length > 0 && item.every((word) => brand.some((one) => sameLetters(word, one))))
+    const named = brands.find((one) =>
+      one.every((word) => item.some((other) => sameLetters(word, other))),
+    )
+    if (named === undefined) return false
+    if (named.length > 0 && item.every((word) => named.some((one) => sameLetters(word, one))))
       return true
     return says(kinds, item) && saysNext(item)
   }

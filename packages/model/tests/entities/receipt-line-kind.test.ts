@@ -79,6 +79,18 @@ const fits = (printed: string, item: string, generic = false) =>
   lineFitter(receiptLineParts(printed), WORDS)(item, { generic })
 const named = (printed: string) => newLineName(receiptLineParts(printed), WORDS)
 
+const BRANDS = {
+  'կոկա կոլա': 'Coca-Cola',
+  ռոշեն: 'Roshen',
+  լովիտա: 'Lovita',
+  'արտ բեյքրի': 'Art Bakery',
+  կինդեր: 'Kinder',
+  դելիս: 'Délice',
+  ալյոնկա: 'Алёнка',
+}
+const shelved = (printed: string) =>
+  newLineName(receiptLineParts(printed), WORDS, { brands: BRANDS })
+
 describe('a line taken apart (MOL-293)', () => {
   it('finds the brand in «…», the fat and the package', () => {
     expect(receiptLineParts('Ըմպելի յոգուրտ «Մարիաննա» ելակ 1.5% 270գր')).toEqual({
@@ -219,6 +231,47 @@ describe('Armenian letters in Russian ones', () => {
     expect(armenianInRussian('Գլավպրոդուկտ')).toBe('Главпродукт')
     expect(armenianInRussian('ԳԵԳ')).toBe('ГЕГ')
     expect(armenianInRussian('Coca-Cola')).toBe('Coca-Cola')
+  })
+
+  it('spells a Russian brand’s «-ое» as Russian does (MOL-261)', () => {
+    expect(armenianInRussian('Ալեքսեևսկոյե')).toBe('Алексеевское')
+    expect(armenianInRussian('Յուբիլեյնոյե')).toBe('Юбилейное')
+  })
+})
+
+describe('a brand as its package spells it (MOL-261, В-2 «а»)', () => {
+  it('writes a Latin brand and its line bare, as the shelf does', () => {
+    expect(shelved('Թխվածքաբլիթ «Ռոշեն» Լովիտա, ելակ 135գր')).toEqual({
+      name: 'Печенье Roshen Lovita клубника 135 г',
+      spelled: false,
+    })
+    expect(shelved('Գազավորված ըմպելիք «Կոկա Կոլա» 1.5լ')?.name).toBe(
+      'Напиток газированный Coca-Cola 1,5 л',
+    )
+  })
+
+  it('takes a line of two words whole, and a brand printed with no quotes', () => {
+    expect(shelved('Թխվածքաբլիթ «Ռոշեն» Արտ Բեյքրի 140գր')?.name).toBe(
+      'Печенье Roshen Art Bakery 140 г',
+    )
+    expect(shelved('Թխվածքաբլիթ Ռոշեն Լովիտա')?.name).toBe('Печенье Roshen Lovita')
+  })
+
+  it('writes a Cyrillic one in «…», and one it does not know in Russian letters, as before', () => {
+    expect(shelved('Շոկոլադ «Ալյոնկա» 100գր')?.name).toBe('Шоколад «Алёнка» 100 г')
+    expect(shelved('Յոգուրտ «Երեմյան Փրոդաքթս» ելակ')?.name).toBe(
+      'Йогурт «Еремян Продактс» клубника',
+    )
+  })
+
+  it('lets an item named by the package’s spelling stand on the line', () => {
+    const delice = receiptLineParts('Թխվածքաբլիթ «Կինդեր» դելիս 39գր')
+    const fit = lineFitter(delice, WORDS, { brands: BRANDS })
+    expect(fit('Печенье Kinder Délice')).toBe(true)
+    expect(fit('Печенье Kinder')).toBe(true)
+    expect(fit('Печенье Roshen Lovita')).toBe(false)
+    // without the lexicon the brand is two letters off its package, and another
+    expect(lineFitter(delice, WORDS)('Печенье Kinder Délice')).toBe(false)
   })
 })
 
