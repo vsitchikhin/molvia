@@ -129,7 +129,7 @@ jobs:
 
       # Failed, not cancelled, so the traces below still go up (adversarial А5): the job's 40 minutes
       # less the image, `npm ci` and the upload.
-      # Атака Б2: медленная подготовка — пять минут задания до шага тестов.
+      # Атака Б2, раунд 4 (MOL-295): медленная подготовка — пять минут из запаса задания.
       - run: sleep 300
       - run: npm run test:e2e
         timeout-minutes: 35
