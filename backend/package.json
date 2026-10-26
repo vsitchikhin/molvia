@@ -10,6 +10,7 @@
     "forget": "tsx src/forget-cli.ts",
     "seed": "tsx src/seed-catalogue-cli.ts",
     "repack": "tsx src/repack-receipts-cli.ts",
+    "rename-items": "tsx src/rename-receipt-items-cli.ts",
     "gates": "tsx src/gates-cli.ts",
     "failures": "tsx src/failures-cli.ts",
     "merge": "tsx src/merge-cli.ts",

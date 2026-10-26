@@ -62,6 +62,8 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 
 - `backend/src/db/receipts-repository.ts` — Repository of receipts: the receipt and its parts named by the phone, the summary and the lines, removal with «Вернуть», the timer's purge (10 minutes, 28 days, a recorded receipt's photo), and the queue — people in turn, claim, release, retry at the end, finish, a reading cut short begun again.
 
+- `backend/src/db/rename-repository.ts` — The items recorded from receipts before MOL-261 given the name their line proposes now (owner's В-3 «а»): one transaction, an item only where that very record made it and still under the line's proposal, a name another item holds left and listed, the key anew and the vector gone, a dry run rolled back.
+
 - `backend/src/db/repack-repository.ts` — The purchases recorded from receipts before MOL-264 put into their line's package (owner's В-3 «а»): one transaction, a purchase only while it is still the till's pieces, an item only where that record made it, a dry run rolled back.
 
 - `backend/src/db/model-spend-repository.ts` — The month's spending on the model (MOL-272): `reserve` holds the cap in one statement a call and tells the stop, `settle` puts a call's own price in place of its worst and tells the share passed, each once a month.
@@ -71,11 +73,14 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 ## backend · tools
 
 - `backend/src/repack-receipts.ts` — The command behind `make repack` (MOL-264): dry run unless `--yes`, every purchase «было → станет» and every item it gives a package.
+- `backend/src/rename-receipt-items.ts` — The command behind `make rename-items` (MOL-261): dry run unless `--yes`, the lexicon of a line's name with the seed's nodes, every item «было → станет» and every name taken.
+- `backend/src/rename-receipt-items-cli.ts` — Entry point of `dist/rename-receipt-items.js`: connects to the database and runs the command.
 - `backend/src/repack-receipts-cli.ts` — Entry point of `dist/repack-receipts.js`: connects to the database and runs the command.
 
 ## backend · tests
 
 - `backend/tests/repack-receipts.integration.test.ts` — Integration test of `make repack`: a dry run changes nothing, a purchase in pieces gets its package and the item its record made a usual quantity, the person's own quantity and the catalogue's item stay, a second run finds nothing.
+- `backend/tests/rename-receipt-items.integration.test.ts` — Integration test of `make rename-items`: a dry run changes nothing and lists every name, an item its record made under the proposal takes the line's name now with its key and without its vector, one the person named and the catalogue's stay, a name another item holds is listed, a second run finds nothing.
 
 - `backend/tests/receipt-review.integration.test.ts` — Integration test of the review (MOL-126): the memory's own word, majority, tie and erased vote; the memory laid over the parse; В-5 and В-1; the place by tax number and city; the receipt recorded before; the rate of the receipt's day.
 - `backend/tests/receipt-record.integration.test.ts` — Integration test of «Записать»: the trip on the receipt's day, purchases and new items, memory and the place's tax number, the photo and the rows left, «Деньги» and «Оценки», a repeat, the receipt recorded before, the refusals, the lines left out in the trip's money.
