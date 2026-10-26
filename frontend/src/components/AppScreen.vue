@@ -196,7 +196,7 @@ export default defineComponent({
         ? `calc(${String(dockHeight.value)}px${over} + var(--space-4))`
         : undefined
     })
-    // What stands over the list — «Вернуть», `FloatingDock` — rises above the strip by its height.
+    // What stands over the list — «Вернуть» — rises above the strip by its height.
     const dockStyle = computed(() =>
       dockHeight.value > 0 ? { '--dock-height': `${String(dockHeight.value)}px` } : undefined,
     )
