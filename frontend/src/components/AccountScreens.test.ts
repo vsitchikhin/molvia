@@ -708,6 +708,14 @@ describe('ReconcileSheet (handoff 05)', () => {
     await button(view, en.accounts.reconcile.retry_wait_online)?.trigger('click')
     await flushPromises()
     expect(checkAccount).toHaveBeenCalledTimes(2)
+
+    // Back online, «Повторить» asks again (review Р5-2).
+    checkAccount.mockResolvedValueOnce(answer('185000', '190132'))
+    await view.setProps({ online: true })
+    await button(view, en.state.retry)?.trigger('click')
+    await flushPromises()
+    expect(checkAccount).toHaveBeenCalledTimes(3)
+    expect(view.text()).not.toContain(en.accounts.reconcile.failed)
   })
 
   it('adversarial Б3: a fact typed after «Ввести другую сумму» is gone with the sheet — the count was in sight', async () => {

@@ -110,7 +110,7 @@
       <!-- Offline or the server: decided after the failure, and offline is never red (MOL-19).
            Offline is said above, by the connection itself, and goes with it (review 34). -->
       <div v-if="failure === 'error' || failure === 'categories'" class="failed" role="alert">
-        <span>{{
+        <span class="failed-words">{{
           t(failure === 'categories' ? 'accounts.reconcile.no_other' : 'accounts.reconcile.failed')
         }}</span>
         <!-- «Повторить» of «Прочее» writes: it waits as «Записать разницу» does (adversarial А1); a
@@ -118,6 +118,7 @@
              (Б2), and saying why on itself (Ф-6, В1). -->
         <AppButton
           v-if="result"
+          class="retry"
           variant="ghost"
           :inactive="retryWait !== null"
           @click="failure === 'categories' ? writeDifference() : recount(true)"
@@ -1012,14 +1013,26 @@ export default defineComponent({
   color: var(--text-muted);
 }
 
+/* The words beside a short «Повторить» while they have 8rem; a long word of waiting goes under them,
+   at the right, rather than squeezing both into columns at 320 (review Р5-1). */
 .failed {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
   margin: 0 0 var(--space-2);
   color: var(--bad-ink);
   font-size: var(--text-footnote);
+}
+
+.failed-words {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+.retry {
+  margin-left: auto;
 }
 
 .undo {
