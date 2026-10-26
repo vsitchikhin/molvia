@@ -815,6 +815,37 @@ describe('MoneyView: the ways out, one figure each (MOL-81, MOL-159)', () => {
     expect(entries(view)).toHaveLength(6)
   })
 
+  // Adversarial А1: «Повторить» keeps the phase `error` until its answer, which puts the month in place
+  // of the error card — the rows stood the whole retry and went from under the finger with it.
+  it('must not fire: none while a failed month is read again; back with its answer or its refusal', async () => {
+    let answer: (value: MoneyMonthView) => void = () => undefined
+    let refuse: (error: unknown) => void = () => undefined
+    moneyMonth
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+      .mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const view = await render()
+    expect(view.text()).toContain(en.spending.load_error.title)
+    expect(entries(view)).toHaveLength(6)
+
+    await button(view, en.state.retry).trigger('click')
+    await flushPromises()
+    expect(moneyMonth).toHaveBeenCalledTimes(2)
+    expect(view.text()).toContain(en.spending.load_error.title)
+    expect(entries(view)).toEqual([])
+    refuse(new ApiError(ERROR.INTERNAL))
+    await flushPromises()
+    expect(entries(view)).toHaveLength(6)
+
+    await button(view, en.state.retry).trigger('click')
+    await flushPromises()
+    expect(entries(view)).toEqual([])
+    answer(month())
+    await flushPromises()
+    expect(view.text()).not.toContain(en.spending.load_error.title)
+    expect(entries(view)).toHaveLength(6)
+  })
+
   it('come once «Счета» failed, and at once over a month and «Счета» the phone keeps', async () => {
     moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
     moneyMonth.mockResolvedValue(month())

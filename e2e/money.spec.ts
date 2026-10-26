@@ -1134,6 +1134,43 @@ test('the ways out come with the answers of the month and «Счета», and a 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Обмен денег')
 })
 
+// A failed month read again (MOL-269, adversarial А1): «Повторить» leaves the phase `error` until the
+// answer, which puts the month in place of the error card. The rows stood the whole retry and went
+// from under the finger with the answer — the tap of CI, one press after «Повторить». They go with the
+// retry and come back with its answer.
+test('a failed month read again takes the ways out until its answer, and a tap then leads where it says', async ({
+  page,
+}) => {
+  let failed = false
+  let release: () => void = () => undefined
+  const released = new Promise<void>((resolve) => (release = resolve))
+  // Laid before the page opens (MOL-249): the first read fails, the retry is held.
+  await page.route('**/api/money/months/**', async (route) => {
+    if (!failed) {
+      failed = true
+      await route.fulfill({ status: 500, body: '{}' })
+      return
+    }
+    await released
+    await route.continue()
+  })
+  await openMoney(page)
+  const ways = page.getByRole('navigation', { name: 'Разделы «Денег»' })
+  const exchange = page.getByRole('link', { name: /^Обмен денег/ })
+  await expect(page.getByRole('heading', { name: 'Не удалось загрузить траты' })).toBeVisible()
+  await expect(exchange).toBeVisible()
+
+  await page.getByRole('button', { name: 'Повторить' }).click()
+  await expect(ways).toHaveCount(0)
+
+  const answered = page.waitForResponse('**/api/money/months/**')
+  release()
+  await answered
+  await expect(page.getByRole('heading', { name: 'Не удалось загрузить траты' })).toHaveCount(0)
+  await exchange.click()
+  await expect(page).toHaveURL(/\/money\/exchange$/)
+})
+
 // The summary broke, the connection did not: a section's quiet card with its «Повторить», and
 // «Добавить трату» keeps the strip — a spending goes through the queue with the server down
 // (MOL-180, В-1, 157 v2 1k). The month is turned back before this month answers — the order that

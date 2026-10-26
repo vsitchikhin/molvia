@@ -967,15 +967,23 @@ The detail behind the frontend lines of `CLAUDE.md`.
   (MOL-269): a thing to press under a skeleton is moved by the answer from under the finger, and a press
   on it with a release on what took its place is a click on neither. So what is tapped under a skeleton
   comes with the answer instead — the ways out of «Деньги» (`money-spendings.md`), the groups of
-  «Настройки» — or the skeleton is the answer's shape, as the newcomer's «Что брать» (MOL-203). An answer
-  of another read that moves them counts the same where the phone keeps it: the ways out wait for
-  «Счета» too, kept after the first opening. The groups of «Настройки» are mounted under the skeleton
-  and only hidden (`v-show`), so their own reads go at once, and wait for the form alone — **not for the
-  salary's day**: nothing of it is kept on the phone, so waiting for it hid the groups at every opening,
-  and a step back the browser showed whole came in again under its picture (`motion.spec` А5, CI of
-  #226). **The prices, named:** the first opening waits for those answers before «Выйти» or «Обмен
-  денег» can be pressed; and the salary's day, on, still grows its card over the groups at every opening
-  of «Настройки» — over frames, by `AppReveal` — until the setting is kept on the phone. The notices of the record typed
+  «Настройки» — or the skeleton is the answer's shape, as the newcomer's «Что брать» (MOL-203). **A
+  failed read read again is a skeleton for this rule** where its answer replaces a state of another
+  height: the ways out of «Деньги» go while a failed month is read again (adversarial А1), and the
+  groups of «Настройки» go under the form's skeleton of a read after a failure — «Повторить», the
+  connection back, the app back in view (review Р3-1) — the one condition being the skeleton's own
+  (`!(loading && !draft)`). An answer of another read that moves them counts the same where the phone
+  keeps it: the ways out wait for «Счета»'s first answer. The groups of «Настройки» are mounted under the
+  skeleton and only hidden (`v-show`), so their own reads go at once — and shown again they come in by
+  `appear`, as every child of the screen does — **not waiting for the salary's day**: nothing of it is
+  kept on the phone, so waiting for it hid the groups at every opening, and a step back the browser
+  showed whole came in again under its picture (`motion.spec` А5, CI of #226). **The prices, named:** the
+  first opening, and a read after a failure, wait for those answers before «Выйти» or «Обмен денег» can
+  be pressed; the salary's day, on, still grows its card over the groups at every opening of
+  «Настройки» — over frames, by `AppReveal` — until the setting is kept on the phone; and where a form is
+  shown from the person's own settings, the groups stand from the start, so a read of it that fails puts
+  its quiet error card over them (adversarial А7) — the card stands under nothing that chooses it, and
+  hiding the groups for every read would hide «Выйти» at every opening. The notices of the record typed
   by hand (`TripNotices` under its skeleton) are a task of their own, MOL-311.
   **Above the control, nothing that belongs to the answer stands**: the strips «Нет связи» and
   «Сервер не ответил», the card of a failed refresh, the card of a refusal of the queue (a row of

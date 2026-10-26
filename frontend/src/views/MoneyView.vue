@@ -295,10 +295,13 @@ export default defineComponent({
      * The ways out once nothing that answers above them can move them (MOL-269): the month answered,
      * failed or kept, and «Счета» too — their card over the switcher comes with their answer. Under
      * the skeleton they jumped 291 px up for a newcomer and 99 down with a spending, and the tap aimed
-     * at one landed on another, or on nothing.
+     * at one landed on another, or on nothing. Nor under a failed month read again — «Повторить», the
+     * connection back — which stays `error` until its answer puts the month in place of the card
+     * (adversarial А1).
      */
     const entriesShown = computed(() => {
       const phase = screen.phase.value
+      if (phase === 'error' && screen.reading.value) return false
       return phase !== 'loading' && phase !== 'offline' && accounts.phase !== 'loading'
     })
 

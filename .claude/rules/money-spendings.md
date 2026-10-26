@@ -200,10 +200,18 @@ nothing up.
   «Бюджет». The rows come with no `appear`: they are an answer read whole (MOL-151). **The price,
   named:** the very first opening, with nothing kept, waits for both answers before it can go to
   «Обмен денег» — under a second as a rule, as long as the client waits with a server that hangs; a
-  month turned to that the phone has not read, and «Повторить» after a month that failed, bring the
-  skeleton back and take the ways out with it until the answer — under that skeleton they would have
-  moved all the same; and a fresh answer over a month kept still moves them by whatever it changed —
-  the price of showing the memory at once. e2e holds both answers back in turn (`money.spec`). **A refusal stands once, and always somewhere it can be put
+  month turned to that the phone has not read brings the skeleton back and takes the ways out with it
+  until the answer — under that skeleton they would have moved all the same. **A failed month read
+  again takes them away too** (`reading`, adversarial А1): «Повторить», the connection back or the app
+  back in view leave the phase `error` until the answer, which puts the month in place of the error
+  card — the rows stood the whole retry and the tap on «Обмен денег» was lost as in CI; they are back
+  with the answer or with the next refusal. **What still moves them, named** (adversarial А2, А6): a
+  fresh answer over a month kept, by whatever it changed — the price of showing the memory at once; the
+  strip «Сервер не ответил» under the switcher when that re-read fails, since a refusal stands under
+  the control that chooses (MOL-138) and the rows are already there; and «Счета» that failed, then
+  answer a later read — a connection back, a spending landed, «Повторить» — putting their card over the
+  switcher and taking the row «Счета» away: hiding the rows on every read of «Счета» after a failure
+  would take them away at every spending that lands. e2e holds both answers back in turn (`money.spec`). **A refusal stands once, and always somewhere it can be put
   right** (MOL-159): about a row the journal on screen shows, it marks that row, and any amendment of
   the row takes it away; with no such row, it is a row of «Не приняты» on top of «Траты», in every
   month and whatever its pages (`refusedRows`). «Не приняты» names the marked ones too and leads to the
