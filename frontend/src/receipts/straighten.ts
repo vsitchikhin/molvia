@@ -88,7 +88,8 @@ export function proposeCorners(photo: HTMLCanvasElement): { quad: Quad; found: b
   let copy = photo
   for (const step of halvingSteps(photo)) {
     const next = canvasOf(step)
-    // no `willReadFrequently`, not even on the last step: read once, it cost WebKit 6 → 9…11 ms, Chromium nothing
+    // no `willReadFrequently`, not even on the last step: read once, it only cost more — WebKit 6 → 9…11 ms,
+    // Chromium on the GPU 0.6…2 ms, the step pulled off it to be read
     const drawn = next.getContext('2d')
     if (!drawn) {
       letGo(copy, photo)

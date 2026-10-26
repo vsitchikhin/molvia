@@ -1729,10 +1729,11 @@ Requirements, decisions and the measurement of the photo check: `.scratch/tasks/
   tore the paper's region in two, and the phone proposed half a receipt the bench had found whole —
   am-05c, a long crumpled «Ереван Сити», lost its top half in Chromium and its foot in WebKit; the bench
   never saw it, measuring the mean. **The bench makes the phone's copy by `halvedCopy`** — the same
-  steps without a canvas — and an engine's own drawing is checked in Playwright's Chromium and WebKit
-  (`.scratch/tasks/research/MOL-259/`): the copy within 2 of 255 of `halvedCopy` on every frame, odd or
-  even. No `willReadFrequently` on it: read once, it cost WebKit half as much again, Chromium nothing. Not `imageSmoothingQuality = 'high'`, which matched the bench
-  as well: what filter it names is each engine's to choose, iOS's among them. **The price, named:** the
+  steps without a canvas — and an engine's own drawing is checked in Chromium (on the GPU too), WebKit
+  and Firefox (`.scratch/tasks/research/MOL-259/`, the adversarial rounds of MOL-259): the copy within 2
+  of 255 of `halvedCopy` on every frame, odd or even. No `willReadFrequently` on it: read once, it only
+  cost more — WebKit half as much again, Chromium on the GPU 0.6–2 ms, the step pulled off it to be
+  read. Not `imageSmoothingQuality = 'high'`, which matched the bench as well: what filter it names is each engine's to choose, iOS's among them. **The price, named:** the
   cut of am-26 that brought the task, a table's column of sums, is not reproduced — its frame is gone,
   only the cut is on production — so it is explained by the mechanism, not proven on itself; and
   a crease across a receipt deep enough tears the region under the mean too, as MOL-228's Russian frames
