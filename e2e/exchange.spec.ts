@@ -147,7 +147,7 @@ test('an amended exchange changes the rate and keeps what it said before', async
   await expect(page.locator('.note')).toHaveText('ВТБ банкомат')
 
   await page.getByRole('button', { name: /^Исправить обмен/ }).click()
-  await expect(sheet.locator('.versions')).toContainText('100 000,00')
+  await expect(sheet.locator('.versions')).toContainText('100 000 ֏')
 })
 
 /**

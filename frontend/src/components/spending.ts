@@ -163,16 +163,6 @@ export function bankWords(base: Currency, quote: Currency, t: (key: string) => s
   return t(`exchange.card_source_${homeBankOf(base, quote)}`)
 }
 
-/**
- * An amount as it was typed (handoff 06): «5 000 ֏» for five thousand, «2 495,69 ₽» with its
- * kopecks. Whole units need no «,00» — the totals already print none — and a fraction is never
- * rounded away: this is money spent, not an estimate.
- */
-export function asTyped(value: Money, locale: string): string {
-  const unit = 10n ** BigInt(MINOR_EXPONENT[value.currency])
-  return value.minor % unit === 0n ? formatEstimate(value, locale) : formatMoney(value, locale)
-}
-
 /** The colour of a category as a custom property — the tokens decide which colour it is. */
 export function categoryColour(category: SpendingCategoryView): string {
   return category.preset
@@ -269,10 +259,14 @@ export function dayTotalText(
   const counted = day.total.minor !== 0n || day.uncounted.length === 0
   // A long sum breaks only after its «+»: «≈» stays with its figure, «+» never starts a line, and `Intl`
   // binds a figure to its sign already (MOL-184, round 2 at 320 px).
+  // Whole only under «≈»: a day of one receipt of 5 403,12 ֏ says it over that very row (MOL-205, В-1 «в»).
+  const total = day.estimated
+    ? `≈\u00a0${formatEstimate(day.total, locale)}`
+    : formatMoney(day.total, locale)
   return [
-    ...(counted ? [(day.estimated ? '≈\u00a0' : '') + formatEstimate(day.total, locale)] : []),
+    ...(counted ? [total] : []),
     // As written, never rounded: there is no «≈» before it (adversarial А2 — «€6» over «€5.50»).
-    ...day.uncounted.map((amount) => asTyped(amount, locale)),
+    ...day.uncounted.map((amount) => formatMoney(amount, locale)),
   ].join('\u00a0+ ')
 }
 
@@ -669,7 +663,7 @@ export function journalRowProps(
           t('transfer.fee_spending', {})
         : (row.spending.note ?? categoryName),
     meta: [context.when, line].filter(Boolean).join(' · '),
-    amount: asTyped(money, locale),
+    amount: formatMoney(money, locale),
     sub,
     tag:
       mark === null

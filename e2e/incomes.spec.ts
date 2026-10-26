@@ -58,7 +58,7 @@ test('an income lands in its month, is amended with a trace, and comes back afte
   // «исправлен» stands in the card's head, beside the day (MOL-81) — inside its one button (MOL-189).
   await expect(page.locator('article .amended')).toContainText('исправлен')
   await row.click()
-  await expect(sheet.locator('.versions')).toContainText('99 615,00 ₽')
+  await expect(sheet.locator('.versions')).toContainText('99 615 ₽')
   await page.keyboard.press('Escape')
   await expect(sheet).toBeHidden()
 

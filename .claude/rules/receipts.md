@@ -1610,8 +1610,8 @@ a receipt read before the rollout and not yet recorded gets it too.
 **On the wire to a phone that asks** (`pack`, `RECEIPT_PACK_HEADER`, as `spelled`): an installed app of an earlier build
 reads a line strictly. **The review shows the purchase** — the line's quantity is the pieces times the package, the
 sheet opens at «1,5 л» with «За единицу» and «Тут дешевле» by the litre — and **the row keeps the till's figures where
-they stood, the package after them, «2 шт × 370,00 ֏ · 2 л»** (owner's В-2 «а»): the person checks the paper by the
-till's figures. «кол-во × цена» of the sheet is a weighed line's alone: a bottle's shelf price times its litres is no
+they stood, the package after them, «2 шт × 370 ֏ · 2 л»** (owner's В-2 «а»): the person checks the paper by the
+till's figures — printed by the rule of money (MOL-205), so the paper's «370,00» reads «370 ֏». «кол-во × цена» of the sheet is a weighed line's alone: a bottle's shelf price times its litres is no
 figure of the line.
 
 **At «Записать» the quantity shown is no edit, in either form** (Р-9, Р-10): the pieces times the package, or the till's

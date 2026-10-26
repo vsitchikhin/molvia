@@ -279,7 +279,7 @@ nothing up.
 - **A day's sum is what was counted and, beside it, what had no rate, in its own currency** (MOL-184,
   owner's decision В-1 «а»): «≈ 5 000 ֏ + 50 $», «50 $» where nothing was counted — a day of one
   $50 with no rate read «≈ 0 ֏», nothing spent. **What had no rate is printed as written**
-  (`asTyped`, adversarial А2), never rounded — no «≈» stands before it: «5,50 €», not «6 €» over a
+  (`formatMoney`, adversarial А2), never rounded — no «≈» stands before it: «5,50 €», not «6 €» over a
   row of «5,50 €», and a day of one 0,40 $ is not «0 $»; so is every line of the month that names
   what no rate counted — «Не посчитано: …» of «Деньги» and «Траты», «и … не посчитано» under
   «Пришло» (review Р3-1), and the notes of «Графики», the month's ring and the year's bars (adversarial

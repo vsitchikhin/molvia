@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { parseMoney } from '@molvia/model'
+import { formatMoney, parseMoney } from '@molvia/model'
 import type { MoneyMonthView, SpendingCategoryView } from '@molvia/model'
 import {
   OWN_ICONS,
-  asTyped,
   categoriesWith,
   categoryIcon,
   dayTotalText,
@@ -295,8 +294,8 @@ describe('the categories as the phone knows them', () => {
 
 describe('what the screen prints', () => {
   it('an amount as it was typed — no «,00», never a fraction rounded away', () => {
-    expect(plain(asTyped(amd('5000'), 'ru-RU'))).toBe('5 000 ֏')
-    expect(plain(asTyped(parseMoney('2495.69', 'RUB'), 'ru-RU'))).toBe('2 495,69 ₽')
+    expect(plain(formatMoney(amd('5000'), 'ru-RU'))).toBe('5 000 ֏')
+    expect(plain(formatMoney(parseMoney('2495.69', 'RUB'), 'ru-RU'))).toBe('2 495,69 ₽')
   })
 
   it('a rate in words on its side of one', () => {
@@ -318,6 +317,10 @@ describe('what the screen prints', () => {
       plain(dayTotalText({ total: amd(total), estimated, uncounted }, 'ru-RU') ?? '')
     expect(day('5000', false)).toBe('5 000 ֏')
     expect(day('4400', true)).toBe('≈ 4 400 ֏')
+    // Counted with no rate it is exact, as the row under it: a receipt of 5 403,12 ֏ is not «5 403 ֏»
+    // over itself; only «≈» is whole (MOL-205, adversarial Б1а).
+    expect(day('5403.12', false)).toBe('5 403,12 ֏')
+    expect(day('5403.12', true)).toBe('≈ 5 403 ֏')
     expect(day('5000', false, [usd('50')])).toBe('5 000 ֏ + 50 $')
     expect(day('4400', true, [parseMoney('10', 'EUR'), usd('50')])).toBe('≈ 4 400 ֏ + 10 € + 50 $')
     expect(day('0', false, [usd('50')])).toBe('50 $')
