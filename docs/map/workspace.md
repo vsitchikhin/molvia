@@ -58,7 +58,7 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `.githooks/commit-msg` — Git hook: refuses a subject that is not a Conventional Commit with the Jira key as scope.
 - `.githooks/pre-commit` — Git hook: refuses a commit whose files are not formatted by Prettier; every other check is CI's.
 - `.github/dependabot.yml` — Dependabot: weekly grouped npm updates and monthly GitHub Actions updates.
-- `.github/workflows/ci.yml` — CI on push and pull request: format check, lint, types and tests against Postgres, the receipt reader's image and its live test, and end-to-end in a phone browser — the only place any check runs unasked; both jobs gate a merge.
+- `.github/workflows/ci.yml` — CI on push and pull request: format check, lint, types and tests against Postgres, the receipt reader's image and its live test, and end-to-end in a phone browser, in the image of Playwright of the lockfile's version (MOL-295) — the only place any check runs unasked; both jobs gate a merge.
 - `.gitignore` — Ignored files: env files, the `.scratch` and `.lavish` links, dependencies, builds, certificates, Playwright output.
 - `.nvmrc` — The Node major version, 22.
 - `.prettierignore` — What Prettier leaves alone: builds, the lockfile, the shared links, hooks, recorded rate-provider responses.
@@ -68,6 +68,9 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `bin/check-clock-bounds.d.mts` — Types of the clock check for its test: the check is plain JS.
 - `bin/check-clock-bounds.test.ts` — Test: a bound on a duration found written any way — a name, a helper of the file and a mention of it, an object it is put in, `expect(d < n)` asserted either way, a budget, a clock under another name, real time beside fake timers; a lower bound, `expectWithin`, the age of a stamp and fake time left alone.
 - `bin/check-code-map.mjs` — Refuses a code map that lies: a file it does not cover, a path that does not exist, a file with two homes; run by `npm run lint`.
+- `bin/check-playwright-image.mjs` — Refuses an image of Playwright in `ci.yml` that is not the version of `@playwright/test` and `playwright` in `package-lock.json` (MOL-295), with the tag to set; run by `npm run lint`.
+- `bin/check-playwright-image.d.mts` — Types of the image check for its test: the check is plain JS.
+- `bin/check-playwright-image.test.ts` — Test: the image of both packages' version passes; a lockfile raised without it, the packages apart, a second image, no image and no packages are refused; the repository as it stands passes.
 - `bin/design-md.mjs` — The token block of `frontend/DESIGN.md` from `_tokens.scss`, through Prettier: `--write` in `npm run format`, `--check` in `npm run lint`.
 - `bin/init-env.sh` — Generates this copy's `.env` from its index: ports — the receipt reader's too — databases, compose project; keeps bot settings across `--force`.
 - `bin/fetch-model.mjs` — Fetches the pinned embedding model (MOL-105) into `.models/` or a given directory, file by file against its sha256, with the notice of its terms; `make model`, CI and the API's image.
