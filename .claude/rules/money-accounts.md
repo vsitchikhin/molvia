@@ -132,8 +132,9 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   first opening of «Деньги» on a phone, with nothing kept, moves the switcher down once by its height
   as the answer comes, and in the same frame the row «Счета» goes from the ways out — the page grows by
   the card and shortens by 52 at its foot, a growth all told (self-review Р2-4); a placeholder would
-  stand for a newcomer with no account and go again. **The ways out wait for «Счета» since MOL-269**,
-  so that move carries no row anyone can tap — `money-spendings.md`.
+  stand for a newcomer with no account and go again. **The ways out wait for «Счета»'s first answer
+  since MOL-269**, so that move carries no row anyone can tap on the first opening — `money-spendings.md`;
+  «Счета» that failed and answer a later read still move them (adversarial А2), a price named there.
 - **«Счета» show the total in both currencies of the settings** (MOL-193, owner's В-19 «в», В-1 «б»): the income
   one large — the figure «На счетах сейчас» shows, so one money is one number on both screens — the spending one
   under it, and the tiles «Можно тратить» / «Сбережения» in both. One currency, or a page kept from before
