@@ -175,13 +175,19 @@ export default defineComponent({
     // A render that swapped the strip's actions under the focus — an account put away or deleted on
     // another phone, «Вернуть» answered — left it on the body: it goes to the strip's first button,
     // where the one it stood on was, or to the title where the strip went whole (MOL-194, Б2, Б3).
-    onUpdated(() => {
+    // The screen's own first button, never the row of a version waiting over it: «Обновить» is a
+    // reload the person did not ask for, the next Enter away (review №3, adversarial Г1, Г2).
+    function bringFocus(): void {
       const focused = document.activeElement
-      if (focusInDock && (focused === null || focused === document.body)) {
-        const first = dock.value?.querySelector('button')
-        if (first) first.focus()
-        else focusScreenTitle()
-      }
+      if (focused !== null && focused !== document.body) return
+      const first = [...(dock.value?.querySelectorAll('button') ?? [])].find(
+        (one) => !one.closest('.update'),
+      )
+      if (first) first.focus()
+      else focusScreenTitle()
+    }
+    onUpdated(() => {
+      if (focusInDock) bringFocus()
       focusInDock = false
     })
     const tabbed = computed(() => Boolean(route.meta.tab))
@@ -212,6 +218,15 @@ export default defineComponent({
     )
     const update = usePwaUpdate()
     const updating = computed(() => update.phase.value !== 'none')
+    // The row of the version swaps its button for words in its own render, which the frame does not
+    // see: a version that did not take left the focus on the body (adversarial Д).
+    watch(
+      () => update.phase.value,
+      () => {
+        if (dock.value?.contains(document.activeElement)) void nextTick(bringFocus)
+      },
+      { flush: 'pre' },
+    )
     const stateTarget = ref<HTMLElement | null>(null)
     const strip = provideStateStrip(stateTarget)
     // An error taking the strip unmounts the screen's own action, and a focus on it fell to the body
