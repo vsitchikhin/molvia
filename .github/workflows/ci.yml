@@ -129,6 +129,8 @@ jobs:
 
       # Failed, not cancelled, so the traces below still go up (adversarial А5): the job's 40 minutes
       # less the image, `npm ci` and the upload.
+      # Атака Б2 (MOL-295, раунд 2): медленное скачивание образа или npm ci — пять минут из запаса задания.
+      - run: sleep 300
       - run: npm run test:e2e
         timeout-minutes: 35
 
