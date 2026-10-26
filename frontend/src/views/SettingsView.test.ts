@@ -16,11 +16,12 @@ import SettingsView from './SettingsView.vue'
 
 const me = vi.fn<() => Promise<ActorView>>()
 const save = vi.fn<(input: SettingsUpdate) => Promise<ActorView>>()
+const salaryShift = vi.fn<() => Promise<{ day: number | null }>>()
 vi.mock('@/api', () => ({
   api: {
     me: () => me(),
     saveSettings: (input: SettingsUpdate) => save(input),
-    salaryShift: () => Promise.resolve({ day: null }),
+    salaryShift: () => salaryShift(),
     analyticsSetting: () => Promise.resolve({ off: false }),
   },
 }))
@@ -52,6 +53,8 @@ beforeEach(() => {
   vi.restoreAllMocks()
   me.mockReset()
   save.mockReset()
+  salaryShift.mockReset()
+  salaryShift.mockResolvedValue({ day: null })
   localStorage.clear()
   sessionStorage.clear()
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
@@ -76,6 +79,88 @@ it('loads without invented fields, and keeps a focusable inactive save action', 
   expect(view.get('.dock > button').attributes('aria-disabled')).toBe('true')
   expect(view.get('.dock > button').attributes('disabled')).toBeUndefined()
 })
+// MOL-269: the form coming in place of the skeleton moved the groups under it from under the finger
+// — «Выйти» tapped became another row.
+describe('the groups under the form come with its answer (MOL-269)', () => {
+  // `v-show` on the group: the view is not in a document, so its own style is read up the tree.
+  const seen = (node: Element | undefined): boolean => {
+    for (let at = node; at instanceof HTMLElement; at = at.parentElement ?? undefined)
+      if (at.style.display === 'none') return false
+    return !!node
+  }
+  // Each group by a thing of its own: the salary's switch, the bot's page, the scheme, «Выйти».
+  const shown = (view: VueWrapper) =>
+    [
+      view.find('[role="switch"]').element,
+      view.find('a[href="/settings/bot"]').element,
+      view
+        .findAll('*')
+        .find(
+          (node) => node.element.children.length === 0 && node.text() === en.settings.group_scheme,
+        )?.element,
+      view.findAll('button').find((button) => button.text() === en.settings.sign_out)?.element,
+    ].map(seen)
+  const leave = (view: VueWrapper) =>
+    seen(view.findAll('button').find((button) => button.text() === en.settings.sign_out)?.element)
+
+  it('must not fire: none under the skeleton, though the salary answered', async () => {
+    me.mockReturnValue(new Promise(() => undefined))
+    const view = await render(false)
+    expect(view.find('.skeleton').exists()).toBe(true)
+    expect(shown(view)).toEqual([false, false, false, false])
+  })
+
+  // Not kept on the phone, the salary's day would hide them at every opening — a step back the
+  // browser showed whole came in again under its picture (motion.spec, А5).
+  it('all with the form, not waiting for the salary’s day', async () => {
+    salaryShift.mockReturnValue(new Promise(() => undefined))
+    const view = await render(false)
+    expect(view.find('select').exists()).toBe(true)
+    expect(shown(view)).toEqual([true, true, true, true])
+  })
+
+  // Review Р3-1: a read after a failure — «Повторить», the app back in view — stands the skeleton
+  // again with the failure still there; the groups went under it.
+  it('must not fire: none under the skeleton of a read after a failure, by a tap or by itself', async () => {
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render(false)
+    expect(view.text()).toContain(en.settings.load_error.title)
+    expect(shown(view)).toEqual([true, true, true, true])
+
+    me.mockReturnValue(new Promise(() => undefined))
+    await view
+      .findAll('button')
+      .find((button) => button.text() === en.state.retry)
+      ?.trigger('click')
+    await flushPromises()
+    expect(view.find('.skeleton').exists()).toBe(true)
+    expect(shown(view)).toEqual([false, false, false, false])
+
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const back = await render(false)
+    me.mockReturnValue(new Promise(() => undefined))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(back.find('.skeleton').exists()).toBe(true)
+    expect(shown(back)).toEqual([false, false, false, false])
+  })
+
+  it('come when the form failed, or offline with nothing kept', async () => {
+    salaryShift.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const failed = await render(false)
+    expect(failed.text()).toContain(en.settings.load_error.title)
+    expect(leave(failed)).toBe(true)
+
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    me.mockRejectedValue(new TypeError('network'))
+    salaryShift.mockRejectedValue(new TypeError('network'))
+    const offline = await render(false)
+    expect(offline.text()).toContain(en.settings.offline.body)
+    expect(leave(offline)).toBe(true)
+  })
+})
+
 it('a failed initial read shows retry, not a creation form', async () => {
   me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
   const view = await render(false)
