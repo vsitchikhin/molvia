@@ -830,6 +830,12 @@ describe('AppScreen with an error of the whole screen', () => {
     ['the action swapped for the error', false, '.own', en.state.retry],
     ['the strip gone as the error came', true, '.own', en.state.retry],
     ['the focus on the version’s «Update»', false, '.update button', en.update.apply],
+    [
+      'the focus on the version’s «Update», the strip gone as the error came',
+      true,
+      '.update button',
+      en.update.apply,
+    ],
   ])('hands a focus past the error’s «Update» but from one: %s', async (_, together, from, to) => {
     const failed = ref(false)
     const update = waiting('ready')
