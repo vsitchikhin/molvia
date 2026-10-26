@@ -81,6 +81,8 @@ jobs:
     name: end-to-end
     runs-on: ubuntu-latest
     # A run is 13–18 minutes. A step that hangs is otherwise held for six hours (MOL-295, В-2).
+    # The job's limit cancels it, and a cancelled job uploads no trace; the tests' own limit, below,
+    # fails the step instead.
     timeout-minutes: 40
 
     # The browsers and every system package they need come in the image (MOL-295): `playwright install
@@ -122,10 +124,13 @@ jobs:
           ONNXRUNTIME_NODE_INSTALL: skip
       - run: ./bin/init-env.sh 0
         env:
-          PG_HOST: postgres
-          PG_HOST_PORT: 5432
+          MOLVIA_PG_HOST: postgres
+          MOLVIA_PG_PORT: 5432
 
+      # Failed, not cancelled, so the traces below still go up (adversarial А5): the job's 40 minutes
+      # less the image, `npm ci` and the upload.
       - run: npm run test:e2e
+        timeout-minutes: 35
 
       # The traces CI records — a retry's, and the first attempt's where a spec asks for it (MOL-217):
       # the `github` reporter writes no `playwright-report/`, so a flake left nothing here but its message.

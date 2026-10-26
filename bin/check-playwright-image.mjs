@@ -1,8 +1,9 @@
 // Refuses an image of Playwright in CI that is not the version the lockfile installs (MOL-295): the
 // end-to-end job runs in `mcr.microsoft.com/playwright:v<version>-noble`, whose browsers are built for
-// that one version, and Playwright of another refuses to start — but only at the first test, after
-// `npm ci` and every server is up. Dependabot raises @playwright/test with the weekly group and never
-// the tag, so the check says it here, in a sentence, a minute after the push.
+// that one version, and Playwright of another refuses to start at the first test. Playwright names the
+// tag itself there, in the end-to-end job; this says it in the checks job too, in one sentence, so a
+// pull request of Dependabot that raised @playwright/test with its weekly group — never the tag — reads
+// as the tag to move, not as a broken suite.
 //
 //   node bin/check-playwright-image.mjs
 
@@ -11,33 +12,59 @@ import process from 'node:process'
 
 const WORKFLOW = '.github/workflows/ci.yml'
 const LOCKFILE = 'package-lock.json'
+const REPOSITORY = 'mcr.microsoft.com/playwright'
 
-// The packages whose version the image must be: the runner and the library it drives.
-const PACKAGES = ['@playwright/test', 'playwright']
+// The runner, the library it loads and the core that refuses an image of another version — each where
+// Node finds it from the one before, so a `playwright` another dependency hoisted is not taken for the
+// runner's own (adversarial А1).
+const CHAIN = ['@playwright/test', 'playwright', 'playwright-core']
 
-const IMAGE = /mcr\.microsoft\.com\/playwright:v([^\s'"-]+)/g
+// The value of an `image:` key, or of `container:` given as a string — never a comment's words
+// (adversarial А3).
+const IMAGE =
+  /^[\t ]*(?:-[\t ]+)?(?:image|container):[\t ]*['"]?(mcr\.microsoft\.com\/playwright[^#\n]*?)['"]?[\t ]*(?:#.*)?$/gm
+
+// A tag is `v<version>`, or that with the Ubuntu it is built on. Matched against the bases Playwright
+// publishes rather than any word, so a version with a hyphen of its own, `1.64.0-beta-1761300000000`,
+// stays whole (adversarial А2) and `v1.64.0-beta` is no base of 1.64.0; a new base is a word here.
+const BASE = /-(?:noble|jammy|focal)$/
+
+/** Where Node resolves `name` from the package at `from` (a lockfile path, '' for the root). */
+function resolved(packages, from, name) {
+  for (let dir = from; ; dir = dir.slice(0, Math.max(dir.lastIndexOf('/node_modules/'), 0))) {
+    const path = `${dir ? `${dir}/` : ''}node_modules/${name}`
+    if (packages[path]) return path
+    if (!dir) return undefined
+  }
+}
 
 /**
- * What is wrong between the workflow and the lockfile, in sentences; empty when the image is the
- * version every package of Playwright is installed at.
+ * What is wrong between the workflow and the lockfile, in sentences; empty when every image of
+ * Playwright is the version the runner loads.
  */
 export function imageProblems(workflow, lockfile) {
-  const tags = [...workflow.matchAll(IMAGE)].map((match) => match[1])
-  if (tags.length === 0) return [`no image mcr.microsoft.com/playwright:v… in ${WORKFLOW}`]
+  const images = [...workflow.matchAll(IMAGE)].map((match) => match[1])
+  if (images.length === 0) return [`no image ${REPOSITORY}:v… in ${WORKFLOW}`]
   const packages = JSON.parse(lockfile).packages ?? {}
+  const installed = []
+  let from = ''
+  for (const name of CHAIN) {
+    const path = resolved(packages, from, name)
+    const version = path && packages[path].version
+    if (!version) return [`${name} is not in ${LOCKFILE}${from ? `, from ${from}` : ''}`]
+    installed.push({ name, version })
+    from = path
+  }
   const problems = []
-  for (const name of PACKAGES) {
-    const version = packages[`node_modules/${name}`]?.version
-    if (!version) {
-      problems.push(`${name} is not in ${LOCKFILE}`)
-      continue
-    }
-    for (const tag of new Set(tags)) {
-      if (tag !== version) {
-        problems.push(
-          `the image is v${tag}, ${LOCKFILE} has ${name} ${version}: set the tag in ${WORKFLOW} to v${version}`,
-        )
-      }
+  for (const image of new Set(images)) {
+    const tag = image.slice(REPOSITORY.length + 1)
+    const base = tag.match(BASE)?.[0] ?? ''
+    for (const { name, version } of installed) {
+      if (tag === `v${version}` || tag === `v${version}${base}`) continue
+      problems.push(
+        `the image is ${image}, ${LOCKFILE} has ${name} ${version}: set the tag in ${WORKFLOW} to ` +
+          `v${version}${base || '-noble'}`,
+      )
     }
   }
   return problems

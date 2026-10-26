@@ -6,7 +6,7 @@
 #   bin/init-env.sh          # индекс из имени каталога: molvia → 0, molvia2 → 2
 #   bin/init-env.sh 7        # индекс явно
 #   bin/init-env.sh 7 --force  # перезаписать существующий .env
-#   PG_HOST=postgres PG_HOST_PORT=5432 bin/init-env.sh 0   # база не на петле (контейнер CI, MOL-295)
+#   MOLVIA_PG_HOST=postgres MOLVIA_PG_PORT=5432 bin/init-env.sh 0   # база не на петле (контейнер CI, MOL-295)
 #
 # Порты разводятся смещением индекс*10, база и compose-проект — суффиксом.
 # Полоса портов у молвии своя (3300 / 5300 / 5500), а не дефолтная: на машине
@@ -68,9 +68,15 @@ reader_port=$(( api_port + 3 ))
 
 # Where the applications reach the database. The end-to-end job of CI runs in a container (MOL-295),
 # where the loopback is the container's own and the Postgres service is its name on its own port.
-# POSTGRES_PORT stays the band's: it is what compose publishes, not what a URL names.
-pg_host="${PG_HOST:-127.0.0.1}"
-pg_url_port="${PG_HOST_PORT:-$pg_port}"
+# POSTGRES_PORT stays the band's: it is what compose publishes, not what a URL names. The names are
+# the project's own: a PG_HOST another project left in a terminal would have sent every URL to its
+# Postgres (adversarial А4).
+pg_host="${MOLVIA_PG_HOST:-127.0.0.1}"
+pg_url_port="${MOLVIA_PG_PORT:-$pg_port}"
+printf '%s' "$pg_host" | grep -Eq '^[A-Za-z0-9._-]+$' \
+  || { echo "MOLVIA_PG_HOST должен быть именем или адресом: $pg_host" >&2; exit 1; }
+{ printf '%s' "$pg_url_port" | grep -Eq '^[0-9]{1,5}$' && [ "$pg_url_port" -ge 1 ] && [ "$pg_url_port" -le 65535 ]; } \
+  || { echo "MOLVIA_PG_PORT должен быть портом 1–65535: $pg_url_port" >&2; exit 1; }
 
 # Все шесть портов, которые займёт копия, вместе с читателем чеков: против чужого процесса на
 # соседнем порту полоса не помогает, а предупреждение здесь — да.
@@ -128,6 +134,9 @@ ENV
 
 echo ".env создан: CLONE_INDEX=$index, api=$api_port pwa=$pwa_port postgres=$pg_port, база molvia_$index"
 echo "                e2e: api=$e2e_api_port pwa=$e2e_pwa_port, база molvia_${index}_e2e"
+if [ "$pg_host:$pg_url_port" != "127.0.0.1:$pg_port" ]; then
+  echo "                базы — на $pg_host:$pg_url_port (MOLVIA_PG_HOST, MOLVIA_PG_PORT), не на 127.0.0.1:$pg_port"
+fi
 [ -n "$busy" ] && echo "ВНИМАНИЕ порты заняты:$busy — другая копия уже поднята или индекс совпал" >&2
 if [ -n "$kept_token" ]; then
   echo "TELEGRAM_BOT_TOKEN перенесён из прежнего .env."
