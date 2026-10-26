@@ -11,6 +11,7 @@
       inactive,
       selected,
       active,
+      [`tone-${tone}`]: tone !== '',
     }"
     :type="tag === 'button' ? 'button' : undefined"
     :href="inactive ? undefined : link?.href.value"
@@ -87,6 +88,10 @@ const SELECTED = new Set([
  *              sheet with fields, or a fork on the way to them (MOL-203). A row that acts at once or asks
  *              to confirm has none, and one card never mixes the two (DESIGN.md; held by review, the card
  *              is the screen's);
+ *   tone     — the icon alone in `warn-ink` or `good-ink` (Ф-4, MOL-204): a status worth the eye — a
+ *              receipt not accepted or not read, a receipt recorded; every other icon is `text-muted`, since
+ *              the accent says «press here» and a status says nothing of the kind. `danger` and `inactive`
+ *              colour the icon their own way, over it;
  *   danger   — the title and the icon in `bad-ink`: the row destroys;
  *   inactive — not now (Ф-6, MOL-174): focusable, `aria-disabled`, a press reaching nobody, the link
  *              followed nowhere — a link loses its `href` too, or a middle click or a long press would
@@ -119,6 +124,11 @@ export default defineComponent({
     wrap: { type: Boolean, default: false },
     whole: { type: Boolean, default: false },
     next: { type: Boolean, default: false },
+    tone: {
+      type: String as PropType<'' | 'warn' | 'good'>,
+      default: '',
+      validator: (tone: string) => ['', 'warn', 'good'].includes(tone),
+    },
     danger: { type: Boolean, default: false },
     inactive: { type: Boolean, default: false },
     selected: { type: Boolean, default: false },
@@ -367,6 +377,14 @@ export default defineComponent({
 
   font-size: var(--icon-md);
   color: var(--accent-ink);
+}
+
+.tone-warn > .icon {
+  color: var(--warn-ink);
+}
+
+.tone-good > .icon {
+  color: var(--good-ink);
 }
 
 .danger {

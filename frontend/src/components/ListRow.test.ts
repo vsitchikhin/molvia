@@ -95,6 +95,15 @@ describe('ListRow', () => {
     expect(view.get('.icon').attributes('aria-hidden')).toBe('true')
   })
 
+  it('tones the icon of a status, and only when asked (Ф-4, MOL-204)', () => {
+    const plain = mount(ListRow, { props: { title: 'Чек', icon: IconWallet } })
+    expect(plain.classes().some((name) => name.startsWith('tone-'))).toBe(false)
+    const warn = mount(ListRow, { props: { title: 'Чек', icon: IconWallet, tone: 'warn' } })
+    expect(warn.classes()).toContain('tone-warn')
+    const good = mount(ListRow, { props: { title: 'Чек', icon: IconWallet, tone: 'good' } })
+    expect(good.classes()).toContain('tone-good')
+  })
+
   it('carries a tail beside the words', () => {
     const view = mount(ListRow, {
       props: { title: 'Наличные' },
