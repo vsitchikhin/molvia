@@ -22,6 +22,7 @@ import type {
   TripView,
 } from '@molvia/model'
 import AccountSheet from '@/components/AccountSheet.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
 import IncomeSheet from '@/components/IncomeSheet.vue'
 import OperationRow from '@/components/OperationRow.vue'
@@ -1141,6 +1142,15 @@ describe('the check is blind behind its sheet (MOL-195, Ф-33)', () => {
     await startCheck(view)
     expect(card(view)).not.toContain('190,132')
     expect(figure(view).text()).toContain(en.accounts.account.balance_hidden)
+  })
+
+  it('adversarial А4: «≈ … по моему курсу» grows and shrinks, never in one frame (MOL-151)', async () => {
+    const view = await screen(amd('190132'), parseMoney('5921.05', 'RUB'))
+    const reveal = view.get('.balance').findComponent(AppReveal)
+    expect(reveal.exists()).toBe(true)
+    expect(reveal.find('.approx').exists()).toBe(true)
+    await startCheck(view)
+    expect(view.find('.balance .approx').exists()).toBe(false)
   })
 
   it('a balance below zero is not told by its colour while hidden', async () => {

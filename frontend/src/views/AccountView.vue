@@ -73,9 +73,13 @@
           <p v-else class="figure" :class="{ negative: account.balance.minor < 0n }">
             {{ money(account.balance) }}
           </p>
-          <p v-if="account.inSpend && !balanceHidden" class="approx">
-            {{ t('accounts.account.approx', { amount: `≈ ${estimate(account.inSpend)}` }) }}
-          </p>
+          <!-- It pushes the footnote and the journal in sight over the sheet: it grows and shrinks
+               (MOL-151, adversarial А4). -->
+          <AppReveal>
+            <p v-if="account.inSpend && !balanceHidden" class="approx">
+              {{ t('accounts.account.approx', { amount: `≈ ${estimate(account.inSpend)}` }) }}
+            </p>
+          </AppReveal>
           <p class="footnote">{{ startLine }}</p>
         </AppCard>
 
@@ -597,8 +601,11 @@ export default defineComponent({
   gap: var(--space-2);
 }
 
+/* A column, not a grid: «≈» grows and goes by `AppReveal`, which takes a flex column's gap back with
+   it — a grid's stays and jumped (MOL-151). */
 .balance {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-1);
   padding: var(--space-4);
 }

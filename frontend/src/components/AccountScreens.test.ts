@@ -561,6 +561,80 @@ describe('ReconcileSheet (handoff 05)', () => {
     expect(useSpendingQueueStore(pinia).pending).toHaveLength(0)
   })
 
+  it('adversarial А1: «Повторить» of «Прочее» waits for the recount as the button does', async () => {
+    checkAccount.mockResolvedValue(answer('185000', '190132'))
+    spendingCategories.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'down', true))
+    const pinia = withAccounts([cash])
+    moneyAccounts.mockResolvedValue(page([cash]))
+    const view = await mounted(
+      ReconcileSheet,
+      { open: true, account: cash, categories: [], nameOf: () => 'Other', accountName: () => null },
+      pinia,
+    )
+    await view.get('input').setValue('185000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    await button(view, en.accounts.reconcile.write_difference)?.trigger('click')
+    await flushPromises()
+    expect(view.text()).toContain(en.accounts.reconcile.no_other)
+    // Control: before anything was put right, «Повторить» is there and writes.
+    expect(button(view, en.state.retry)).toBeDefined()
+
+    // A reason put right in its own sheet: the count is stale until it lands.
+    view.findComponent(OperationSheet).vm.$emit('saved')
+    await flushPromises()
+    expectNotNow(view, en.accounts.reconcile.write_after_recount)
+    expect(button(view, en.state.retry)).toBeUndefined()
+    // Every way in waits, not only the buttons drawn: the write itself refuses a stale count.
+    spendingCategories.mockResolvedValueOnce({ categories })
+    await (view.vm as unknown as { writeDifference: () => Promise<void> }).writeDifference()
+    await flushPromises()
+    const records = () =>
+      useSpendingQueueStore(pinia).pending.filter((one) => one.kind === 'record')
+    expect(records()).toHaveLength(0)
+  })
+
+  it('adversarial А2: what was typed stays while no answer came — not across an answer or another account', async () => {
+    checkAccount.mockResolvedValue(answer('185000', '190132'))
+    const view = await reconcile(withAccounts([cash]))
+    const field = () => (view.get('input').element as HTMLInputElement).value
+    const reopen = async (props: Record<string, unknown> = {}) => {
+      await view.setProps({ open: false })
+      await view.setProps({ ...props, open: true })
+      await flushPromises()
+    }
+
+    // Answered, the next check starts afresh.
+    await view.get('input').setValue('185000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    expect(view.text()).toContain(en.accounts.reconcile.difference)
+    await reopen()
+    expect(field()).toBe('')
+
+    // Offline: closed to come back with the connection, as the line says — what was typed stays.
+    await view.setProps({ online: false })
+    await view.get('input').setValue('6500')
+    await reopen({ online: true })
+    expect(field()).toBe('6500')
+
+    // A fact is of its account.
+    await reopen({ account: account('Card ֏') })
+    expect(field()).toBe('')
+  })
+
+  it('review Р2-4, adversarial А2б: offline over an answered check the line says what waits', async () => {
+    checkAccount.mockResolvedValue(answer('185000', '190132'))
+    const view = await reconcile(withAccounts([cash]))
+    await view.get('input').setValue('185000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    await view.setProps({ online: false })
+    expect(view.getComponent(StatusStrip).props('text')).toBe(en.accounts.reconcile.offline_result)
+    await button(view, en.accounts.reconcile.edit_fact)?.trigger('click')
+    expect(view.getComponent(StatusStrip).props('text')).toBe(en.accounts.reconcile.offline)
+  })
+
   it('tells the screen its step: the fact, the answer, the fact again (Ф-33)', async () => {
     checkAccount.mockResolvedValue(answer('185000', '190132'))
     const view = await reconcile(withAccounts([cash]))

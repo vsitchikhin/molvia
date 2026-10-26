@@ -6,12 +6,13 @@
     </template>
 
     <!-- The connection is the kit's line, first in the sheet over either step, said in the sheet's
-         own region (MOL-181, Ф-19); drawn by the connection and gone with it. -->
+         own region (MOL-181, Ф-19); drawn by the connection and gone with it. Over a count already
+         answered it says what waits, not «сверить» (review Р2-4, adversarial А2б). -->
     <StatusStrip
       v-if="!online"
       class="status"
       kind="offline"
-      :text="t('accounts.reconcile.offline')"
+      :text="t(result ? 'accounts.reconcile.offline_result' : 'accounts.reconcile.offline')"
     />
 
     <!-- Step one: the fact, before the count — so as not to fit the number (В-4 MOL-43). -->
@@ -116,8 +117,10 @@
         <span>{{
           t(failure === 'categories' ? 'accounts.reconcile.no_other' : 'accounts.reconcile.failed')
         }}</span>
+        <!-- «Повторить» of «Прочее» writes: it waits as «Записать разницу» does, and that button
+             says why (adversarial А1). -->
         <AppButton
-          v-if="result"
+          v-if="result && !(failure === 'categories' && writeWait)"
           variant="ghost"
           @click="failure === 'categories' ? writeDifference() : recount(true)"
         >
@@ -338,7 +341,9 @@ export default defineComponent({
         // Every opening is blind, whatever the screen was last told — a sheet mounted anew has no
         // answer to clear, and said nothing (review Р2-3).
         emit('step', 'fact')
-        fact.value = ''
+        // What was typed stays while no answer came — closed to come back with the connection, as the
+        // offline line promises (adversarial А2); an answered check starts afresh.
+        if (result.value !== null) fact.value = ''
         factBad.value = false
         result.value = null
         failure.value = null
@@ -351,6 +356,14 @@ export default defineComponent({
         recountOnLanding = false
         await nextTick()
         factInput.value?.focus()
+      },
+    )
+
+    // A fact typed is of its account: the screen reused for another one starts afresh.
+    watch(
+      () => props.account.id,
+      () => {
+        fact.value = ''
       },
     )
 
@@ -662,7 +675,9 @@ export default defineComponent({
      */
     async function writeDifference(): Promise<void> {
       const value = result.value
-      if (!value || writing.value || written.value || tripsHeld.value || !sent) return
+      // Every way in waits as the button does: «Повторить» of «Прочее» wrote over a count its
+      // neighbour called stale — the correction and «Прочее» the same money twice (adversarial А1).
+      if (!value || writing.value || written.value || writeWait.value !== null || !sent) return
       const size = {
         ...value.difference,
         minor: value.difference.minor < 0n ? -value.difference.minor : value.difference.minor,

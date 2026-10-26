@@ -2028,6 +2028,7 @@
       "checking": "Checking…",
       "wait_online": "Will check once online",
       "offline": "No connection. You can reconcile once online — what you typed stays here",
+      "offline_result": "No connection. The check is counted — the difference can be recorded once online",
       "match_title": "Matches the app",
       "match_body": "We'll remember this check for today, {date}. The next one starts from here",
       "mismatch": "The app counts {app}, the account has {fact}",
