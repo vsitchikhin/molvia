@@ -85,7 +85,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 - `frontend/src/composables/useSelectedTrip.ts` — Composable: one trip chosen by id, from the history cache and the server, with loading, missing and offline states.
 - `frontend/src/composables/useSettings.ts` — Composable and store of the settings form: draft kept per account, base, conflict per choice, save and its notices.
 - `frontend/src/composables/useTripContext.ts` — Composable behind the trip-context sheet: a draft of the settings handed to the queue for the held trip.
-- `frontend/src/composables/useTripHistory.ts` — Composable behind «Записаны» on «Покупки»: rows with the server's count and sums, paging, reload after a moved list (`moved`: the server answered and the shelf holds an answer of the same while, no strip), rows finished on this phone marked `onPhone`, the failed loads counted for the strip.
+- `frontend/src/composables/useTripHistory.ts` — Composable behind «Записаны» on «Покупки»: rows with the server's count and sums, paging, reload after a moved list (`moved`: the server answered and the page shown is its answer, `showsAnswer`, no strip), rows finished on this phone marked `onPhone`, the failed loads counted for the strip.
 - `frontend/src/composables/useTripReceipt.ts` — Composable: «Сумма по чеку» of one record — the sheet, the sum still in the queue, whether it is offered.
 - `frontend/src/composables/useTripRows.ts` — Composable: a trip's rows merged with what the queue still holds (waiting, editing, removing).
 
