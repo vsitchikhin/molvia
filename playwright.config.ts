@@ -62,7 +62,7 @@ const pursPort = String(Number(apiPort) + 4)
 // spec that wants the camera grants it — without the grant Chromium refuses, which is the case of
 // «no permission». The full Chromium, not the headless shell every other spec runs in: the shell
 // answers any `getUserMedia` with `NotSupportedError`, fake camera or not (measured 29.09.2026).
-// `playwright install chromium` brings both, here and in CI.
+// `playwright install chromium` brings both, and CI's image has both (MOL-295).
 // In this copy's own cache, not a shared temporary folder: two copies running e2e at once must not
 // rewrite each other's. Handed to `globalSetup` through the environment, which it shares with this.
 const barcodeVideo = fileURLToPath(
