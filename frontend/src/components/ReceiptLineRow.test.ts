@@ -84,10 +84,10 @@ describe('ReceiptLineRow — a line’s package (MOL-264, В-2 «а»)', () => {
 
   it('keeps the till’s count beside its price, and says the purchase after it', () => {
     const wrapper = render(packed())
-    expect(wrapper.find('.figures').text().replace(/\s+/gu, ' ')).toBe('2 шт × 300,00 ֏ · 0,26 кг')
+    expect(wrapper.find('.figures').text().replace(/\s+/gu, ' ')).toBe('2 шт × 300 ֏ · 0,26 кг')
     expect(wrapper.find('.packed').text()).toBe('0,26 кг')
     expect(wrapper.attributes('aria-label')?.replace(/\s+/gu, ' ')).toContain(
-      '2 шт × 300,00 ֏, запишем 0,26 кг',
+      '2 шт × 300 ֏, запишем 0,26 кг',
     )
   })
 

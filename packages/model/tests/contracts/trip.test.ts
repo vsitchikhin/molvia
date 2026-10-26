@@ -111,7 +111,7 @@ describe('tripViewOf', () => {
 
     // Only the figures and the unit: the symbol is Intl's to choose, and `formatUnitPrice` has
     // its own tests.
-    expect(shown).toEqual(['570,00/l', '577,78/l', '4790,00/kg'])
+    expect(shown).toEqual(['570/l', '577,78/l', '4790/kg'])
   })
 
   it('totals the trip, 6 493,12 ֏', () => {

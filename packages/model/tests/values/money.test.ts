@@ -10,7 +10,9 @@ import {
   currencySign,
   currencySchema,
   decimalFromMinor,
+  exactFigures,
   formatEstimate,
+  formatInCurrency,
   formatMoney,
   minorPerMajor,
   money,
@@ -105,8 +107,28 @@ describe('formatMoney', () => {
     expect(digits(formatMoney(money(540312n, 'AMD')))).toContain('5403,12')
   })
 
-  it('shows a whole amount with its zeroes rather than bare', () => {
-    expect(digits(formatMoney(money(57000n, 'AMD')))).toContain('570,00')
+  it('prints a whole amount without «,00», as DESIGN.md has it (MOL-205)', () => {
+    expect(digits(formatMoney(money(987000n, 'AMD')))).toBe('9870֏')
+    expect(digits(formatMoney(money(0n, 'AMD')))).toBe('0֏')
+    expect(digits(formatMoney(money(-20000n, 'AMD')))).toMatch(/^[-−]200֏$/)
+  })
+
+  it('prints a fraction with every digit of the currency, never rounded or trimmed', () => {
+    // Money spent, not an estimate: a kopeck is never rounded away, and 40,50 is not 40,5.
+    expect(digits(formatMoney(money(1n, 'USD')))).toBe('0,01$')
+    expect(digits(formatMoney(money(100n, 'USD')))).toBe('1$')
+    expect(digits(formatMoney(money(101n, 'USD')))).toBe('1,01$')
+    expect(digits(formatMoney(money(4050n, 'RUB')))).toBe('40,50₽')
+    expect(digits(formatMoney(money(249569n, 'RUB')))).toBe('2495,69₽')
+  })
+
+  it('tells a group of thousands from a fraction in English', () => {
+    expect(formatMoney(money(2_000_000n, 'RUB'), 'en-US')).toBe('₽20,000')
+    expect(formatMoney(money(2_000_050n, 'RUB'), 'en-US')).toBe('₽20,000.50')
+  })
+
+  it('leaves the estimate whole as it was — the rule is for money, not for «≈»', () => {
+    expect(digits(formatEstimate(money(10788n, 'RUB')))).toBe('108₽')
   })
 
   it('keeps the sign of a negative amount', () => {
@@ -151,6 +173,32 @@ describe('formatMoney', () => {
     // Exact all the way to the ceiling the model accepts, which is the bigint column.
     const ceiling = formatMoney(money(INT8_MAX, 'USD'), 'en-US').replace(/[\s,]/g, '')
     expect(ceiling).toContain('92233720368547758.07')
+
+    // A whole amount that large loses its «.00» and not a digit.
+    const whole = formatMoney(money(9_007_199_254_740_900n, 'USD'), 'en-US').replace(/[\s,]/g, '')
+    expect(whole).toBe('$90071992547409')
+  })
+})
+
+describe('exactFigures', () => {
+  // No currency keeps three digits or none today, and the exponent table is frozen, so the rule is
+  // held here, by the digits a currency would keep (MOL-205).
+  const printed = (decimal: `${number}`, figures: number): string =>
+    digits(formatInCurrency(decimal, 'AMD', 'ru-RU', exactFigures(figures)))
+
+  it('prints every digit of a currency of three, and none of a whole amount in it', () => {
+    expect(printed('1.500', 3)).toBe('1,500֏')
+    expect(printed('1.005', 3)).toBe('1,005֏')
+    expect(printed('2.000', 3)).toBe('2֏')
+  })
+
+  it('prints a currency of none as it is', () => {
+    expect(printed('7', 0)).toBe('7֏')
+  })
+
+  it('decides whole by what is printed: a fraction rounded into a whole number goes bare', () => {
+    expect(printed('569.995', 2)).toBe('570֏')
+    expect(printed('569.994', 2)).toBe('569,99֏')
   })
 })
 

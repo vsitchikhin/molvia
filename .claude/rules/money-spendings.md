@@ -197,16 +197,23 @@ nothing up.
   the skeleton, and it went 99 down; and the strip «Добавить трату» comes with the first answer over the
   bottom 93 px of the window. A press on one row and its release on another is a click on neither — in
   CI the tap on «Обмен денег» left «Деньги» unmoved (run 38706549474), and on a phone it opened
-  «Бюджет». The rows come with no `appear`: they are an answer read whole (MOL-151). **The price,
+  «Бюджет». The rows come faded only, with no rise — `appear(0)`, as everything the screen puts in its field (MOL-151). **The price,
   named:** the very first opening, with nothing kept, waits for both answers before it can go to
   «Обмен денег» — under a second as a rule, as long as the client waits with a server that hangs; a
   month turned to that the phone has not read brings the skeleton back and takes the ways out with it
-  until the answer — under that skeleton they would have moved all the same. **A failed month read
-  again takes them away too** (`reading`, adversarial А1): «Повторить», the connection back or the app
-  back in view leave the phase `error` until the answer, which puts the month in place of the error
-  card — the rows stood the whole retry and the tap on «Обмен денег» was lost as in CI; they are back
-  with the answer or with the next refusal. **What still moves them, named** (adversarial А2, А6): a
-  fresh answer over a month kept, by whatever it changed — the price of showing the memory at once; the
+  until the answer — under that skeleton they would have moved all the same. **«Повторить» under a
+  failed month hides them in their place** (`ways-held`, adversarial А1): the phase stays `error` until
+  the answer, which puts the month in place of the error card — the rows stood the whole retry and the
+  tap on «Обмен денег» was lost as in CI. Unseen with their place kept (`visibility`), never taken out:
+  taken out, the page under a small phone scrolled down shortened, the browser brought the scroll up,
+  and the card of «Повторить» itself dropped under the finger (adversarial Б2); they are back with the
+  answer or with the next refusal. **Only the person's own «Повторить»** (review Р4-1, adversarial Б1):
+  a read nobody asked for — the connection or the app back, a spending, a record or a transfer landed —
+  is refused as a rule under a month that fails, and hiding the rows for it made them blink for
+  nothing and closed the way to «Доходы» that Т-1 keeps open, up to the client's 15 s with a server that
+  hangs. **What still moves them, named** (adversarial А2, А6, Б1): such a read when it does answer, the
+  rows standing; a fresh answer over a month kept, by whatever it changed — the price of showing the
+  memory at once; the
   strip «Сервер не ответил» under the switcher when that re-read fails, since a refusal stands under
   the control that chooses (MOL-138) and the rows are already there; and «Счета» that failed, then
   answer a later read — a connection back, a spending landed, «Повторить» — putting their card over the
@@ -302,7 +309,7 @@ nothing up.
 - **A day's sum is what was counted and, beside it, what had no rate, in its own currency** (MOL-184,
   owner's decision В-1 «а»): «≈ 5 000 ֏ + 50 $», «50 $» where nothing was counted — a day of one
   $50 with no rate read «≈ 0 ֏», nothing spent. **What had no rate is printed as written**
-  (`asTyped`, adversarial А2), never rounded — no «≈» stands before it: «5,50 €», not «6 €» over a
+  (`formatMoney`, adversarial А2), never rounded — no «≈» stands before it: «5,50 €», not «6 €» over a
   row of «5,50 €», and a day of one 0,40 $ is not «0 $»; so is every line of the month that names
   what no rate counted — «Не посчитано: …» of «Деньги» and «Траты», «и … не посчитано» under
   «Пришло» (review Р3-1), and the notes of «Графики», the month's ring and the year's bars (adversarial

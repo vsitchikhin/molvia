@@ -2,9 +2,8 @@ import { ref } from 'vue'
 import type { Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ApiError } from '@molvia/client'
-import { ERROR } from '@molvia/model'
+import { ERROR, formatMoney } from '@molvia/model'
 import type { TransferOutcome } from '@/components/TransferSheet.vue'
-import { asTyped } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useTransfers } from '@/composables/useTransfers'
 import { useAccountsStore } from '@/stores/accounts'
@@ -45,7 +44,7 @@ export function useTransferOutcome(): TransferOutcomes {
     const target = store.accounts.find(({ id }) => id === outcome.transfer.toAccountId)
     announce?.(
       t('transfer.done', {
-        amount: asTyped(outcome.transfer.amount, locale.value),
+        amount: formatMoney(outcome.transfer.amount, locale.value),
         name: target?.name ?? '',
       }),
     )

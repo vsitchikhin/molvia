@@ -34,7 +34,7 @@ import { formatMoney, formatQuantity, formatUnitPrice } from '@molvia/model'
 import type { TripRowView } from './tripRow'
 
 /**
- * «Молоко «Ашхар» · 1 л · 570,00 ֏ · 570,00 ֏/л» — and the price per unit is the whole point of
+ * «Молоко «Ашхар» · 1 л · 570 ֏ · 570 ֏/л» — and the price per unit is the whole point of
  * the line: 520 ֏ for 0,9 l is dearer than 570 ֏ for a litre, and nobody works that out at a
  * shelf. The number is the server's for a row it has answered; for one still in the queue the
  * screen computes it with the domain's own `unitPrice`, as the sheet does.

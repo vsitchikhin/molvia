@@ -611,7 +611,7 @@ describe('PurchasesView (MOL-128)', () => {
       const [row, other] = rows(view)
       expect(row?.text()).toContain('Ереван Сити')
       expect(row?.text()).toContain('12 позиций · вчера')
-      expect(row?.get('.tail').text().replaceAll('\u00a0', ' ')).toBe('9 870,00 ֏ · 12,00 $')
+      expect(row?.get('.tail').text().replaceAll('\u00a0', ' ')).toBe('9 870 ֏ · 12 $')
       // A row read back from the phone, or from an older server, says where and when, nothing more.
       expect(other?.find('.tail').exists()).toBe(false)
       expect(other?.text()).not.toContain('позиц')

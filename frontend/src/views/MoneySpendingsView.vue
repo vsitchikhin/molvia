@@ -246,7 +246,7 @@ import { computed, defineComponent, nextTick, onUnmounted, ref, watch } from 'vu
 import { useI18n } from 'vue-i18n'
 import IconPlus from '~icons/mdi/plus'
 import IconWallet from '~icons/mdi/wallet-outline'
-import { formatEstimate, monthOf as monthOfDay } from '@molvia/model'
+import { formatEstimate, formatMoney, monthOf as monthOfDay } from '@molvia/model'
 import type { Currency, Money, MoneyMonthView, SpendingCategoryView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -265,7 +265,7 @@ import type { TransferOutcome } from '@/components/TransferSheet.vue'
 import type { Removed } from '@/components/spending'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
-import { asTyped, dayTotalText, journalRowProps, spentApprox } from '@/components/spending'
+import { dayTotalText, journalRowProps, spentApprox } from '@/components/spending'
 import type { JournalRow, OperationRowProps } from '@/components/spending'
 import { useMoneyScreen } from '@/composables/useMoneyScreen'
 import { useTransferOutcome } from '@/composables/useTransferOutcome'
@@ -324,7 +324,7 @@ export default defineComponent({
 
     /** What no rate counted, as written: no «≈» stands before it (adversarial А2). */
     const uncountedOf = (value: MoneyMonthView) =>
-      value.uncounted.map((amount) => asTyped(amount, locale.value)).join(', ')
+      value.uncounted.map((amount) => formatMoney(amount, locale.value)).join(', ')
 
     const groceries = computed(
       () => categories.value.find((category) => category.preset === 'groceries') ?? null,

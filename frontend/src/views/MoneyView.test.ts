@@ -339,6 +339,14 @@ describe('MoneyView: the month', () => {
     expect(text).toContain('At my rate of 4.62 ֏ per 1 ₽ today')
   })
 
+  it('names the dollars as spent, only what they came to whole (MOL-205, adversarial Б1в)', async () => {
+    moneyMonth.mockResolvedValue(
+      month({ foreign: [{ amount: parseMoney('11.50', 'USD'), counted: amd('4485') }] }),
+    )
+    const text = plain((await render()).text())
+    expect(text).toContain('Including $11.50 (≈ ֏4,485)')
+  })
+
   it('no «≈» under exact drams for one who earns and spends in drams (MOL-184, adversarial А4)', async () => {
     moneyMonth.mockResolvedValue(
       month({ incomeCurrency: 'AMD', spentIncome: amd('317800'), rate: null }),
@@ -816,8 +824,12 @@ describe('MoneyView: the ways out, one figure each (MOL-81, MOL-159)', () => {
   })
 
   // Adversarial А1: «Повторить» keeps the phase `error` until its answer, which puts the month in place
-  // of the error card — the rows stood the whole retry and went from under the finger with it.
-  it('must not fire: none while a failed month is read again; back with its answer or its refusal', async () => {
+  // of the error card — the rows stood the whole retry and went from under the finger with it. Unseen
+  // with their place kept, never taken out: the page shortened under a phone scrolled down (Б2).
+  const held = (view: VueWrapper) =>
+    view.get(`nav[aria-label="${en.spending.entries_label}"]`).classes('ways-held')
+
+  it('must not fire: none seen while «Повторить» reads a failed month; back with its answer or refusal', async () => {
     let answer: (value: MoneyMonthView) => void = () => undefined
     let refuse: (error: unknown) => void = () => undefined
     moneyMonth
@@ -826,24 +838,43 @@ describe('MoneyView: the ways out, one figure each (MOL-81, MOL-159)', () => {
       .mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
     const view = await render()
     expect(view.text()).toContain(en.spending.load_error.title)
-    expect(entries(view)).toHaveLength(6)
+    expect(held(view)).toBe(false)
 
     await button(view, en.state.retry).trigger('click')
     await flushPromises()
     expect(moneyMonth).toHaveBeenCalledTimes(2)
     expect(view.text()).toContain(en.spending.load_error.title)
-    expect(entries(view)).toEqual([])
+    expect(entries(view)).toHaveLength(6)
+    expect(held(view)).toBe(true)
     refuse(new ApiError(ERROR.INTERNAL))
     await flushPromises()
-    expect(entries(view)).toHaveLength(6)
+    expect(held(view)).toBe(false)
 
     await button(view, en.state.retry).trigger('click')
     await flushPromises()
-    expect(entries(view)).toEqual([])
+    expect(held(view)).toBe(true)
     answer(month())
     await flushPromises()
     expect(view.text()).not.toContain(en.spending.load_error.title)
+    expect(held(view)).toBe(false)
+  })
+
+  // Review Р4-1, adversarial Б1: a read nobody asked for — the app back in view, the connection back —
+  // is refused as a rule under a month that fails; taking the rows away for it made them blink for nothing.
+  it('must not fire: a read nobody asked for leaves the rows as they are', async () => {
+    moneyMonth
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    expect(view.text()).toContain(en.spending.load_error.title)
+
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    document.dispatchEvent(new Event('visibilitychange'))
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(moneyMonth.mock.calls.length).toBeGreaterThan(1)
     expect(entries(view)).toHaveLength(6)
+    expect(held(view)).toBe(false)
   })
 
   it('come once «Счета» failed, and at once over a month and «Счета» the phone keeps', async () => {
