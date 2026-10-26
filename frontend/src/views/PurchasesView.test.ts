@@ -770,8 +770,12 @@ describe('PurchasesView (MOL-128)', () => {
 
     it('соседнее окно ответило до вопроса и шлёт очередь — на экране его ответ, тот же, что у сервера: полосы нет (адверсариальное В1, А4)', async () => {
       const before = new Date(NOW.getTime() - 5000)
-      // One answer, the same every time it is asked: `trip` reads the clock.
-      const answer = [trip(1), trip(5, 'SAS')]
+      // One answer, the same every time it is asked: `trip` reads the clock. With its count and sum,
+      // which the shelf does not keep: the copy is the answer all the same (adversarial Г1, the price).
+      const answer = [
+        { ...trip(1), itemCount: 12, total: [{ minor: 987000n, currency: 'AMD' as const }] },
+        trip(5, 'SAS'),
+      ]
       for (const moment of [before.toISOString(), null]) {
         while (mounted.length) mounted.pop()?.unmount()
         localStorage.clear()

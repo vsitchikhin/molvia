@@ -302,7 +302,9 @@ and no strip, are their own quiet card**, «Чеки не загрузились
 or under its skeleton, is untrue (А2). A read answered every time under a list another window kept moving failed
 nothing it shows when the page shown is the server's last answer, row for row as the shelf keeps them, and draws
 no strip (А4, В1) — whatever moment came with it, none included; a page put back that is not the answer is
-memory, and the strip names its moment (Б4). The kind is the worse of the two reads; **the time is the older of
+memory, and the strip names its moment (Б4). **The price, named:** the rows are then the shelf's copy, with no
+count and no sum — as after any write of another window to a list answered (Г1, MOL-307); the discarded answer's
+own are not taken, since the other window may have sent a purchase while it was on its way. The kind is the worse of the two reads; **the time is the older of
 the reads that failed and drew a row** — nothing on screen is newer than that. The strip says its words again
 for a try of the person's that failed, never for the receipts' own poll every five seconds (А1). **The moment of
 the history's answer is a key of its own** (`molvia.trip-history-at`), for the reason the «empty» flag is: a
