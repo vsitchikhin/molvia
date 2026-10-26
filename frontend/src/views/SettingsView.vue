@@ -62,9 +62,9 @@
     </template>
     <!-- Saved on the tap, beside the form and never under its «Сохранить»: the form's four fields
          are also a trip's context (MOL-134, Н-1, В-5). The groups are mounted under the skeleton, so
-         their reads go at once, and shown once the form and the salary's day have answered or failed
-         (MOL-269): either answer grows what stands over them, and moved them from under the finger. -->
-    <SalaryShiftGroup v-show="groupsShown" class="group" @known="shiftKnown = $event" />
+         their reads go at once, and shown once the form has answered, failed or stands offline
+         (MOL-269): the form coming in place of the skeleton moved them from under the finger. -->
+    <SalaryShiftGroup v-show="groupsShown" class="group" />
     <!-- The bot's messages, a switch each, on a page of their own (MOL-129, В-2). -->
     <section v-show="groupsShown" class="group">
       <h2 class="caption">{{ t('settings.group_bot') }}</h2>
@@ -284,11 +284,12 @@ export default defineComponent({
       if (!open) signOut.stay()
     })
 
-    // The form answered, failed or stands offline, and so did the salary's day (MOL-269).
-    const shiftKnown = ref(false)
+    // The form answered, failed or stands offline (MOL-269). Not the salary's day: nothing of it is
+    // kept on the phone, so waiting for it hid the groups at every opening, and a step back the browser
+    // showed whole came in again under its picture.
     const groupsShown = computed(() => {
       const form = settings.form
-      return (!!form.draft || form.failure || !settings.online.value) && shiftKnown.value
+      return !!form.draft || form.failure || !settings.online.value
     })
 
     return {
@@ -300,7 +301,6 @@ export default defineComponent({
       signOut,
       unsent,
       askToLeave,
-      shiftKnown,
       groupsShown,
       feedback: useFeedbackSheetStore(),
     }
