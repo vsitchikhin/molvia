@@ -6,6 +6,7 @@
 
 import { levenshtein } from '#model/support/edits'
 import { toSearchKey } from '#model/support/search-key'
+import { kindKey } from '#model/support/synonyms'
 
 /** A line taken apart: its words as printed, around its brand. */
 export interface ReceiptLineParts {
@@ -513,6 +514,9 @@ const MASCULINE_SOFT = new Set([
 // nouns of no ending of their own: «кофе» is masculine, «киви» and «чили» one fruit
 const INDECLINABLE: Readonly<Record<string, Agreement>> = {
   кофе: 'masculine',
+  // a loan in «-ки», «-чи» the spelling rule would read as a plural (adversarial Б3)
+  виски: 'masculine',
+  кимчи: 'neuter',
   фри: 'masculine',
   киви: 'masculine',
   чили: 'masculine',
@@ -575,7 +579,8 @@ const isNoun = (word: string): boolean => {
  * an adjective's — «целлофановый пакет» is a «пакет»; none where the ending does not say. A plural only by an
  * ending no singular has (adversarial А3): «-ы», «-ья», «-и» after «к», «г», «х» or a hushing letter, which
  * spelling gives a plural there — «сливки», «желудки». Any other «-и» is a loan as often, «сулугуни», «салями»,
- * and says nothing; the price, named: «пельмени», «вафли» keep the dictionary's adjective, as before.
+ * and says nothing; the prices, named: «пельмени», «вафли» keep the dictionary's adjective, as before, and a loan in
+ * «-ки» or «-чи» the list of the indeclinable has not reads as a plural — «виски», «кимчи» are in it.
  */
 function agreementOf(noun: string): Agreement | null {
   const words = noun.split(' ').map(lowerRussian)
@@ -699,6 +704,16 @@ function seedKindOf(
 }
 
 /**
+ * The word a seed's item names its kind by — `kindKey`'s, past an adjective in front: «Лавровый лист» is a «лист»,
+ * and its number is the kind's, never «Листы для лазаньи»'s (adversarial Б4).
+ */
+function seedHeadOf(name: string): string {
+  const key = kindKey(name)
+  const words = name.split(/\s+/u)
+  return words.find((word) => toSearchKey(word) === key) ?? words[0] ?? ''
+}
+
+/**
  * The kind's gloss in the form the seed names that kind by, its number: «яйцо» is the seed's «Яйца», «шампиньон»
  * its «Шампиньоны» (MOL-261, Т-2). Only the head word, only for the line's kind, only the same noun in another
  * number — never an adjective of it nor a noun for an adjective, «Сахарная» for «сахар», «Макароны» for
@@ -713,7 +728,7 @@ function asSeedSays(
   const [head, ...rest] = gloss.split(' ')
   if (head === undefined) return gloss
   const key = lowerRussian(head)
-  const heads = seed.map((item) => lowerRussian(item.name.split(' ')[0] ?? ''))
+  const heads = seed.map((item) => lowerRussian(seedHeadOf(item.name)))
   // the seed's own form of it is the form: «Сахар» beside «Сахарная пудра» (adversarial А1)
   if (heads.includes(key)) return gloss
   const form = heads.find((first) => sameNoun(key, first))
@@ -834,18 +849,6 @@ function formsOf(word: string): Set<string> {
 
 /** Two Russian words one word by its forms, either way. */
 const sameRussian = (a: string, b: string): boolean => formsOf(a).has(b) || formsOf(b).has(a)
-
-/**
- * Whether a new name says every word an old one did, in any form or script (MOL-261, adversarial А6): «Соль
- * мелкий» — «Соль мелкая», «Кока Кола» — «Coca-Cola». A rename that loses one — «чили» of a sweet chili sauce — is
- * a name worse than the one the person took, and is not made.
- */
-export function keepsEveryWord(from: string, to: string): boolean {
-  const now = wordsOf(to)
-  return wordsOf(from).every((word) =>
-    now.some((one) => sameRussian(word, one) || sameLetters(word, one)),
-  )
-}
 
 /**
  * Two names one by their letters — a brand, a word of no dictionary spelt across scripts: the same by the

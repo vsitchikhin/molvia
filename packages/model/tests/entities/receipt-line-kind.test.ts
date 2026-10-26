@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   armenianInRussian,
-  keepsEveryWord,
   lineFitter,
   newLineName,
   receiptLineParts,
@@ -374,6 +373,17 @@ describe('a new item of the seed’s kind (MOL-261, Т-2)', () => {
     expect(sauce?.name).toBe('Соус «Чим Чим» сладкий чили 220 г')
   })
 
+  it('takes the number of the seed’s word of the kind, past its adjective, never another item’s (adversarial Б4)', () => {
+    const leaf = { ...words, տերև: 'лист', դափնու: 'лавровый' }
+    const seed = [
+      { name: 'Листы для лазаньи', names: ['լազանյայի թերթեր'] },
+      { name: 'Лавровый лист', names: ['դափնու տերև'] },
+    ]
+    expect(newLineName(receiptLineParts('Դափնու տերև «Արտֆուդ» 10գր'), leaf, { seed })?.name).toBe(
+      'Лист лавровый «Артфуд» 10 г',
+    )
+  })
+
   it('takes the seed’s number of the same noun only, never an adjective of it (adversarial А1)', () => {
     const sugar = { ...words, շաքար: 'сахар', մակարոնեղեն: 'макаронные изделия' }
     const seed = [
@@ -489,6 +499,13 @@ describe('a new item’s name in Russian grammar (MOL-261, Т-3, Т-4)', () => {
     expect(of('Սերուցք «Մարիաննա» ապխտած')).toBe('Сливки «Марианна» копчёные')
   })
 
+  it('reads a loan in «-ки» the indeclinable list holds as one: «Виски … шотландский» (adversarial Б3)', () => {
+    const whisky = { ...words, վիսկի: 'виски', շոտլանդական: 'шотландский' }
+    expect(newLineName(receiptLineParts('Վիսկի «Բելլս» շոտլանդական 0.7լ'), whisky)?.name).toBe(
+      'Виски «Беллс» шотландский 0,7 л',
+    )
+  })
+
   it('keeps the soft sign of a possessive: «коровье», «телячьи» (self-review Р1-1)', () => {
     const milk = {
       ...words,
@@ -539,18 +556,6 @@ describe('a phrase of the till (MOL-261, Т-5)', () => {
 
   it('reads its words one by one where they do not stand together', () => {
     expect(phrased('Սալիկ շոկոլադե')).toBe('Плитка шоколадная')
-  })
-})
-
-describe('a rename that keeps every word (MOL-261, adversarial А6)', () => {
-  it('takes a new form, script or order of a word, and refuses a word lost', () => {
-    expect(keepsEveryWord('Соль мелкий «Фаворит» 1 кг', 'Соль мелкая «Фаворит» 1 кг')).toBe(true)
-    expect(
-      keepsEveryWord('Напиток газированный «Кока Кола»', 'Напиток газированный Coca-Cola'),
-    ).toBe(true)
-    expect(keepsEveryWord('Соус «Чим Чим» сладкий чили', 'Соус острый «Чим Чим» сладкий')).toBe(
-      false,
-    )
   })
 })
 
