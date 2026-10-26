@@ -107,10 +107,16 @@ test('счёт, трата с него, «без счёта» в сверке �
   const check = topSheet(page)
   await expect(check).toContainText('Сколько на счёте сейчас?')
   await expect(check).not.toContainText('7 500')
+  // Blind behind it too (Ф-33): «•••» on the balance while the fact is typed.
+  const figure = page.locator('.balance .figure')
+  await expect(figure).toContainText('•••')
+  await expect(figure).not.toContainText(/7\s500/)
   await page.waitForTimeout(400)
   await check.getByLabel('Сколько на счёте сейчас?').fill('6500')
   await check.getByRole('button', { name: 'Сверить', exact: true }).click()
   await expect(check).toContainText(/Разница\s*−1\s000\s֏/)
+  // The server answered: the balance is back behind the sheet.
+  await expect(figure).toHaveText(/7\s500\s֏/)
   const reason = check.getByRole('button', { name: /Трата 1\s000\s֏ без счёта/ })
   await expect(reason).toBeVisible()
 
@@ -294,7 +300,7 @@ test('без связи счета не красные, а шторка счёт
   await expect(sheet.getByRole('button', { name: 'Сохранить' })).toBeEnabled()
 })
 
-test('без связи «Сверить» ждёт связь и не красная; со связью — сверяет', async ({
+test('без связи «Сверить» ждёт связь словами и не красная; со связью — сверяет', async ({
   page,
   context,
 }) => {
@@ -307,8 +313,13 @@ test('без связи «Сверить» ждёт связь и не крас�
   await context.setOffline(true)
   await page.getByRole('button', { name: 'Сверить с фактом' }).click()
   const check = topSheet(page)
-  await expect(check).toContainText('Сверку считает сервер')
-  await expect(check.getByRole('button', { name: 'Сверим, когда будет связь' })).toBeDisabled()
+  await expect(check).toContainText('Сверить можно со связью — введённое останется здесь')
+  // Not now in the kit's one look: in the focus order, saying why (Ф-6) — a native `disabled` takes
+  // no focus. Not `toBeEnabled`: Playwright reads `aria-disabled` as disabled.
+  const wait = check.getByRole('button', { name: 'Сверим, когда будет связь' })
+  await expect(wait).toHaveAttribute('aria-disabled', 'true')
+  await wait.focus()
+  await expect(wait).toBeFocused()
   await expect(check.getByRole('alert')).toHaveCount(0)
   await page.waitForTimeout(400)
   await check.getByLabel('Сколько на счёте сейчас?').fill('1000')
