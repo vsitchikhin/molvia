@@ -300,7 +300,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod \
 
 It prints every item «было → станет»: only one that very record made, by that person, still under the name the line
 proposed — one the person named themselves stays — and not merged since. A name another item holds already is listed
-under `taken`, and one that would lose a word of the old name under `kept`; both are left as they were. The API's writer gives a renamed item its vector again within a minute. A second
+under `taken` and left as it was. The list is the guard: read it whole before `--yes`. The API's writer gives a renamed item its vector again within a minute. A second
 run says `renamed 0`. In a working copy the same thing is `make rename-items [YES=1]`.
 
 ## Seeding the catalogue (MOL-112)

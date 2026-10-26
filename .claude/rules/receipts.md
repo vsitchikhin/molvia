@@ -538,7 +538,9 @@ Armenian, this the name). Word by word the dictionary gave «Напиток га
 - **The kind is the seed's** (Т-2, `seedKindOf`, `asSeedSays`): the seed's item whose name in the till's language says the
   line's kind (by `seedNameFits`'s rule, on a branded line too) names it — «Желудки куриные «Аштарак»» — only where its
   head word is the kind's gloss or the same noun in another number, or the dictionary has none: else the seed reads the
-  line its own way, «Лимонад» for «газированный напиток», «Пломбир» for an ice cream. **It names nothing the line does not
+  line its own way, «Лимонад» for «газированный напиток», «Пломбир» for an ice cream. The seed's word of a kind is the one
+  `kindKey` reads, past an adjective in front — «Лавровый лист» is a «лист», never the «Листы» of «Листы для лазаньи»
+  (adversarial Б4). **It names nothing the line does not
   say** (adversarial А2): its whole name only where every word of it is the line's — by a form of a gloss, or of the
   adjective of a word's genitive («լոլիկ», «томатный» of «լոլիկի»); the seed lumps, «Соус острый» knows «սոուս չիլի», and a
   sweet chili stays «Соус «Чим Чим» сладкий чили». Then it stands for every word it covers where it has as many words;
@@ -561,7 +563,8 @@ Armenian, this the name). Word by word the dictionary gave «Напиток га
   noun: a brand printed bare or a thing nobody knows, «Салфетки … антибактериальные Смайл». **The prices, named:** a noun
   in apposition takes it, «Колбаса сырокопчёное чоризо»; a flavour after the adjective too, «Йогурт … обезжиренная
   клубника», and before a preposition the head, «Семена … морские с солью» (adversarial А4) — Armenian prints no case to
-  tell them; «Пельмени», «Вафли» keep the dictionary's masculine.
+  tell them; «Пельмени», «Вафли» keep the dictionary's masculine; a loan in «-ки», «-чи» the list of the indeclinable has
+  not reads as a plural — «виски», «кимчи» are in it (adversarial Б3).
 - **A genitive as its adjective** (Т-4, `TILL_GENITIVES_RU`): «լոլիկի» «томатный», «հավի» «куриный» — keyed by the
   genitive itself, never its ending: «ազնվամորի», «կիվի», «չիլի» end so as a flavour named in the nominative, and stay
   «малина». A genitive the table has not stays the gloss's noun, as before. The gloss itself stays the noun the search
@@ -585,11 +588,14 @@ test of the domain, and the reviewer's attacks are red (`.scratch/tasks/selftest
 in production), a dry run unless `YES=1`, every item «было → станет». It renames an item only where that very record made
 it, by that person — its `created_at` the record's `recorded_at`, as `make repack` tells — still under the name the line
 proposed then, and not merged since: one the person named themselves stays theirs. A name another item holds already is
-listed and left — the two would be one item, the night's to decide. **A name that loses a word of the one taken is not
-given** (adversarial А6, `keepsEveryWord`): every word of the old name must stand in the new in some form or script —
-«Соль мелкий» — «Соль мелкая», «Кока Кола» — «Coca-Cola» — else the item keeps its name and is listed under `kept`;
-whatever a rule of the name breaks one day, the command does not carry into what people took. The key goes with the
-name, and the vector goes, for the API's writer to make again. A second run finds nothing.
+listed and left — the two would be one item, the night's to decide. **What guards the names people took is the owner's
+reading of the dry run** (В-3 «а»), and the rules of the name with their tests: the command carries whatever they say, so
+a rule broken one day — «Сахарная «Гюмри»» of adversarial А1 — would be offered for every such item. **A guard by the
+words was tried and dropped** (adversarial А6, round 2 Б1, Б2): «every word of the old name in the new, in some form or
+script» kept a quarter of the bench's renames, the very ones the task is for — a genitive «курица» for «куриные», a
+phrase, «Мак Кофе» for MacCoffee, «Киндер» for Kinder — and let a form gone wrong through, «шотландский» to «шотландские»:
+it tells a word replaced from a word in another form, never better from worse. The key goes with the name, and the
+vector goes, for the API's writer to make again. A second run finds nothing.
 
 ## The shops' memory (MOL-126)
 
