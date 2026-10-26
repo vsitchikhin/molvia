@@ -11,8 +11,9 @@
 // person by hand (MOL-58), `dist/seed-catalogue.js`, which puts the common names into the catalogue
 // (MOL-112), `dist/gates.js`, which reads gates 0.2 and 0.3 (MOL-91), `dist/failures.js`, which reads
 // the table of failures (MOL-143), `dist/merge.js`, the merge of twins by hand (MOL-106), and
-// `dist/notify.js`, which writes to people about a leak (MOL-237), and `dist/repack-receipts.js`, which puts the
-// purchases recorded before MOL-264 into their packages. The production machine has
+// `dist/notify.js`, which writes to people about a leak (MOL-237), `dist/repack-receipts.js`, which puts the
+// purchases recorded before MOL-264 into their packages, and `dist/rename-receipt-items.js`, which names the items
+// recorded before MOL-261 as a line names them now. The production machine has
 // neither the source nor a published database port, so the image it
 // already runs is the only place such a tool can live.
 
@@ -38,6 +39,7 @@ const entries = {
     merge: 'src/merge-cli.ts',
     notify: 'src/notify-cli.ts',
     'repack-receipts': 'src/repack-receipts-cli.ts',
+    'rename-receipt-items': 'src/rename-receipt-items-cli.ts',
   },
   bot: { index: 'src/index.ts' },
 }

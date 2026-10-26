@@ -2038,3 +2038,51 @@ export const TILL_WORDS_RU: Readonly<Record<string, string>> = {
   սուպեր: 'супер',
   մելիսսա: 'мелисса',
 }
+
+/**
+ * A till's word in the genitive as a new item's name says it, an adjective (MOL-261, Т-4): «Հյութ լոլիկի» is
+ * «Сок томатный», not «Сок помидор»; «Հավի … քարաճիկ», «Желудки куриные». The gloss above stays the noun, which
+ * the search asks. Keyed by the genitive itself, never by its ending: «ազնվամորի», «կիվի», «չիլի» end so in the
+ * nominative, a flavour named as it is. A word the name says only where its form here is.
+ */
+export const TILL_GENITIVES_RU: Readonly<Record<string, string>> = {
+  հավի: 'куриный',
+  կաթի: 'молочный',
+  կարտոֆիլի: 'картофельный',
+  լոլիկի: 'томатный',
+  դդմի: 'тыквенный',
+  եգիպտացորենի: 'кукурузный',
+  խնձորի: 'яблочный',
+  նարնջի: 'апельсиновый',
+  ծիրանի: 'абрикосовый',
+  դեղձի: 'персиковый',
+  բալի: 'вишнёвый',
+  ելակի: 'клубничный',
+  ազնվամորու: 'малиновый',
+  հապալասի: 'черничный',
+  կոկոսի: 'кокосовый',
+  պիցցայի: 'для пиццы',
+  ձիթապտղի: 'оливковый',
+  զուգարանի: 'туалетный',
+  աղբի: 'мусорный',
+}
+
+/**
+ * Phrases of the till, two or three words as printed, to the name a shelf gives the thing (MOL-261, Т-5): word by
+ * word they read «Кондитерские изделия французский», «Плитка шоколадный». The bench's lines and the owner's
+ * receipts; a phrase is added here, never in code.
+ */
+export const TILL_PHRASES_RU: Readonly<Record<string, string>> = {
+  'ֆրանսիական հրուշակեղեն': 'пирожные французские',
+  'շոկոլադե սալիկ': 'шоколад',
+  'շոկ. սալիկ': 'шоколад',
+  'էներգետիկ ըմպելիք': 'энергетик',
+  'էներգ. ըմպելիք': 'энергетик',
+  'հնդկական ընկույզ': 'кешью',
+  'կոճակ զուգարանի': 'таблетки для унитаза',
+  'ջեռոցի տոպրակ': 'рукав для запекания',
+  'ճզմիչ կարտոֆիլի': 'картофелемялка',
+  'սրիչ դանակի քար': 'точильный камень для ножей',
+  'բացիչ լիմոնադի': 'открывалка для бутылок',
+  'կոկոսի կաթի ըմպելիք': 'напиток из кокосового молока',
+}

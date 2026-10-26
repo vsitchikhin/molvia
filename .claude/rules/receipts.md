@@ -457,7 +457,7 @@ cat's litter, found «Тофу»). **The shop's memory is above all of it**: the
 
 **Anything else is a new item, named in full and «проверьте»** (`match: weak` with no item, В-1 «а», on the wire too —
 the review sends `new` only for a line whose item is gone since, adversarial А6): `newLineName` — the kind first, as a
-shelf names it, the other words before the brand in order, the brand in «…» in Russian letters (`armenianInRussian`),
+shelf names it, the other words before the brand in order, the brand as its package spells it (MOL-261, below),
 the words after it, the fat and the package — «Йогурт «Еремян Продактс» клубника 2% 130 г» (В-1 «б»: the weight is in
 the name, so a package is an item). A word the dictionary has not is spelt in letters, and the line says so
 (`receipt_lines.spelled`, 0069, В-4 «а» with the owner's note): the review offers the name, and «Убрать имя — оставить
@@ -488,10 +488,9 @@ and on the bench every capital past the kind is a sort or a brand (12 of 12; adv
 past one letter finds nothing, and its new name is the cut spelt in letters — «Թխվածքաբլ» is «Тхвацкабл», for one
 press to take away (review 3, №1); a genitive before the kind is asked of no seed's name
 — «Թեյի տոպրակ», a tea bag, is «Пакеты фасовочные», sure (review 2, №4); a diminutive is another word — «16 Թև» is
-no «Крылья куриные» (`թևիկներ`), as «թել» is no «թելիկ»; a brand two letters off is another — the owner's «Бисквит
-Kinder Délice» for «Բիսքվիթ «Կինդեր» դելիս» is a new item beside it; a Russian word of a form these rules do not make
-(«крылья» for «крылышко») is another word; and the new item's name is the dictionary's words as they stand, an
-adjective unagreed («Плёнка пищевой») — under «проверьте», for the person to put right. **And the measure of 0.2
+no «Крылья куриные» (`թևիկներ`), as «թել» is no «թելիկ»; a brand two letters off is another — unless the lexicon of
+MOL-261 spells it, as it does «Կինդեր» Kinder, which now finds the owner's «Бисквит Kinder Délice»; a Russian word of a
+form these rules do not make («крылья» for «крылышко») is another word. **And the measure of 0.2
 moves with it** (review №6): a new line the person binds to an item of the catalogue is an item put right, so the
 share of «0.2r» may rise by the caution of this rule, not by the reading.
 
@@ -522,6 +521,88 @@ search: it reads `items.name` as before.
 **The gloss is the dictionary of till words, in Russian** (`till-words-ru.ts`): the catalogue's
 language, so the search asks it whatever the receipt's; it is shown only on a receipt read out in
 Russian, and a receipt in English shows the line as printed (Т-3).
+
+## A new item's name as a shelf writes it (MOL-261)
+
+**The name MOL-293 proposes is put in the words a shelf uses** (owner, 08.10.2026 on 122b8e5f: «йогурт ананасовый
+записался просто как „ананас“… супер длинные названия на армянском, без перевода»; MOL-293 closed the binding and the
+Armenian, this the name). Word by word the dictionary gave «Напиток газированный «Кока Кола»», «Соль мелкий», «Яйцо»,
+«Сок помидор», «Кондитерские изделия французский». The rules, each a part of `NameLexicon` the backend passes
+(`namingLexicon`), so a test without one names as MOL-293 did:
+
+- **A brand as its package spells it** (`TILL_BRANDS`, owner's В-2 «а»): a Latin one bare — «Печенье Roshen Lovita
+  клубника 135 г», «Coca-Cola» — a Cyrillic one in «…» («Алёнка», «Белая шляпка»), a product line of one or two words
+  likewise («Արտ Բեյքրի» Art Bakery) — the till's «…» or not, a word of the lexicon is written so: «Շոկոլադ Ալյոնկա» is
+  «Шоколад «Алёнка»» (adversarial А5); a brand the lexicon has not in Russian letters in «…», as before, a Russian brand's
+  «-ոյե» as «-ое» («Алексеевское»). **A line may name an item by either spelling** (`lineFitter`): «Կինդեր» is Kinder.
+- **The kind is the seed's** (Т-2, `seedKindOf`, `asSeedSays`): the seed's item whose name in the till's language says the
+  line's kind (by `seedNameFits`'s rule, on a branded line too) names it — «Желудки куриные «Аштарак»» — only where its
+  head word is the kind's gloss or the same noun in another number, or the dictionary has none: else the seed reads the
+  line its own way, «Лимонад» for «газированный напиток», «Пломбир» for an ice cream. The seed's word of a kind is the one
+  `kindKey` reads, past an adjective in front — «Лавровый лист» is a «лист», never the «Листы» of «Листы для лазаньи»
+  (adversarial Б4). **It names nothing the line does not
+  say** (adversarial А2): its whole name only where every word of it is the line's — by a form of a gloss, or of the
+  adjective of a word's genitive («լոլիկ», «томатный» of «լոլիկի»); the seed lumps, «Соус острый» knows «սոուս չիլի», and a
+  sweet chili stays «Соус «Чим Чим» сладкий чили». **And it stands for no word it does not say** (adversarial В1): a word
+  its till name covered goes only where its Russian name says it — «Желудки куриные» says «հավի» by its genitive's
+  adjective — and the rest stay, since the seed lumps the other way too: «ծամոն անշաքար» is its «Жевательная резинка»,
+  and the line keeps «без сахара»; «Кофе» for «սուրճ աղացած» leaves «молотый». A kind the dictionary has not takes the
+  seed's head only where its till name covered the kind alone: «Այս» of «այս թի» is no «Чай» (adversarial В3), and the
+  line is spelt as before. Else the gloss gets **the seed's number of
+  the same noun** — «Яйца», «Шампиньоны» — **so `kindKey` of the new item is the seed's** and «Тут дешевле» reads them as
+  one kind: the «связь вида» of the task, with no column. **The same noun, never an adjective of it nor a noun for an
+  adjective** (adversarial А1): `formsOf` holds «сахар» and «Сахарная», «макаронные» and «Макароны», and the kind became
+  «Сахарная «Гюмри»», «Макароны изделия» — `sameNoun` takes a number and a case only, and the seed's very form stays
+  («Сахар» beside «Сахарная пудра»). **The prices, named:** a seed's name that says a word another way is not taken —
+  «Рис круглый» for the seed's «Рис круглозёрный», «Палочки ушные» for «Палочки ватные».
+- **Russian grammar** (Т-3, `agreeing`): an adjective of the dictionary, given in the masculine, takes the gender or number of
+  the next noun of the dictionary the line printed after it — «тёмная вишня», «ягодный крем» — else of the head:
+  «Соль мелкая», «Желудки … свежие», «Сливки … ультрапастеризованные». The gender is the ending's, a soft sign's and an
+  indeclinable's by a list, «яйца», «семена» plural; **a noun of the seed by the seed's own adjective** (adversarial Г1):
+  the seed gives a kind its number, «Окорочка», «Рёбра», «Полотенца», and its «куриные», «бумажные» say it, where the
+  ending «-а» reads a feminine — an adjective next to the head and of it alone, last after it or first before it, never
+  «высший» of «Мука высший сорт»; **a plural only by an ending no singular has** (adversarial А3) —
+  «-ы», «-ья», «-и» after «к», «г», «х» or a hushing letter, «Хлопья шоколадные», «Сливки»; any other «-и» is a loan as
+  often, «сулугуни», «салями», and one no ending tells leaves the word as the dictionary has it — «Сулугуни … копчёный».
+  **A possessive keeps its soft sign** (self-review Р1-1): «говяжья», «коровье», «телячьи» — a list, since «телячий» ends
+  as «горячий»; so is a noun of an adjective's ending, «цикорий», and **a test of the backend holds every word in «-ий» of
+  the dictionaries to one of them or to the ordinary**, a new word red until it is read. A word spelt in letters is no
+  noun: a brand printed bare or a thing nobody knows, «Салфетки … антибактериальные Смайл». **The prices, named:** a noun
+  in apposition takes it, «Колбаса сырокопчёное чоризо»; a flavour after the adjective too, «Йогурт … обезжиренная
+  клубника», and before a preposition the head, «Семена … морские с солью» (adversarial А4) — Armenian prints no case to
+  tell them; «Пельмени», «Вафли» keep the dictionary's masculine; a loan in «-ки», «-чи» the list of the indeclinable has
+  not reads as a plural — «виски», «кимчи» are in it (adversarial Б3).
+- **A genitive as its adjective** (Т-4, `TILL_GENITIVES_RU`): «լոլիկի» «томатный», «հավի» «куриный» — keyed by the
+  genitive itself, never its ending: «ազնվամորի», «կիվի», «չիլի» end so as a flavour named in the nominative, and stay
+  «малина». A genitive the table has not stays the gloss's noun, as before. The gloss itself stays the noun the search
+  asks.
+- **A phrase of the till** (Т-5, `TILL_PHRASES_RU`): two or three words a shelf names as one — «Ֆրանսիական հրուշակեղեն»
+  «пирожные французские», «Շոկոլադե սալիկ» «шоколад» — read in the line's order before the kind is put first; a phrase
+  that holds the kind is the kind, before the seed's, **in the seed's number of it** (self-review Р1-2): a test holds the
+  head of every phrase to the seed's, «Пирожные».
+
+**Each table is filled from the bench's lines and the owner's items, and grows by commits** — never in code. **The bench**
+(`.scratch/tasks/status/MOL-261/`, `research/MOL-261.md`): the 321 lines of MOL-114's truth through `newLineName` with the
+seed's nodes, against `meaning` and the owner's `item` — words of the name exactly as the truth writes them 595 → 783 of
+some 1 070, names whole 87 → 158, the brand as the truth 138 → 205 of 226, a word the truth has in no form 266 → 137,
+spelt in letters 67 → 48, Armenian 0 as before. **The honest figure**, the tables only where the odd receipts print them,
+measured on the even (122 lines): words 234 → 275 (all tables 293), names 34 → 51 (59), the brand 57 → 69 (84) — most of
+the gain is the rules, not the tables. The binding bench of MOL-293 with the brands: right 124 → 133, wrong 0. **The
+bench has none of the review's lines** — sugar, pasta and olive oil of a brand, a sweet chili, a suluguni — so each is a
+test of the domain, and the reviewer's attacks are red (`.scratch/tasks/selftests/MOL-261-adversarial*`).
+
+**What was recorded before is named once, by hand** (owner's В-3 «а»): `make rename-items` (`dist/rename-receipt-items.js`
+in production), a dry run unless `YES=1`, every item «было → станет». It renames an item only where that very record made
+it, by that person — its `created_at` the record's `recorded_at`, as `make repack` tells — still under the name the line
+proposed then, and not merged since: one the person named themselves stays theirs. A name another item holds already is
+listed and left — the two would be one item, the night's to decide. **What guards the names people took is the owner's
+reading of the dry run** (В-3 «а»), and the rules of the name with their tests: the command carries whatever they say, so
+a rule broken one day — «Сахарная «Гюмри»» of adversarial А1 — would be offered for every such item. **A guard by the
+words was tried and dropped** (adversarial А6, round 2 Б1, Б2): «every word of the old name in the new, in some form or
+script» kept a quarter of the bench's renames, the very ones the task is for — a genitive «курица» for «куриные», a
+phrase, «Мак Кофе» for MacCoffee, «Киндер» for Kinder — and let a form gone wrong through, «шотландский» to «шотландские»:
+it tells a word replaced from a word in another form, never better from worse. The key goes with the name, and the
+vector goes, for the API's writer to make again. A second run finds nothing.
 
 ## The shops' memory (MOL-126)
 

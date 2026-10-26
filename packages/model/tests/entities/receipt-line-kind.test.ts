@@ -6,6 +6,7 @@ import {
   receiptLineParts,
   seedNameFits,
 } from '#model/entities/receipt-line-kind'
+import type { SeedName } from '#model/entities/receipt-line-kind'
 import { receiptWords } from '#model/entities/receipt-match'
 
 const WORDS = {
@@ -78,6 +79,18 @@ const kind = (printed: string) => receiptLineParts(printed).kind
 const fits = (printed: string, item: string, generic = false) =>
   lineFitter(receiptLineParts(printed), WORDS)(item, { generic })
 const named = (printed: string) => newLineName(receiptLineParts(printed), WORDS)
+
+const BRANDS = {
+  'կոկա կոլա': 'Coca-Cola',
+  ռոշեն: 'Roshen',
+  լովիտա: 'Lovita',
+  'արտ բեյքրի': 'Art Bakery',
+  կինդեր: 'Kinder',
+  դելիս: 'Délice',
+  ալյոնկա: 'Алёнка',
+}
+const shelved = (printed: string) =>
+  newLineName(receiptLineParts(printed), WORDS, { brands: BRANDS })
 
 describe('a line taken apart (MOL-293)', () => {
   it('finds the brand in «…», the fat and the package', () => {
@@ -220,6 +233,47 @@ describe('Armenian letters in Russian ones', () => {
     expect(armenianInRussian('ԳԵԳ')).toBe('ГЕГ')
     expect(armenianInRussian('Coca-Cola')).toBe('Coca-Cola')
   })
+
+  it('spells a Russian brand’s «-ое» as Russian does (MOL-261)', () => {
+    expect(armenianInRussian('Ալեքսեևսկոյե')).toBe('Алексеевское')
+    expect(armenianInRussian('Յուբիլեյնոյե')).toBe('Юбилейное')
+  })
+})
+
+describe('a brand as its package spells it (MOL-261, В-2 «а»)', () => {
+  it('writes a Latin brand and its line bare, as the shelf does', () => {
+    expect(shelved('Թխվածքաբլիթ «Ռոշեն» Լովիտա, ելակ 135գր')).toEqual({
+      name: 'Печенье Roshen Lovita клубника 135 г',
+      spelled: false,
+    })
+    expect(shelved('Գազավորված ըմպելիք «Կոկա Կոլա» 1.5լ')?.name).toBe(
+      'Напиток газированный Coca-Cola 1,5 л',
+    )
+  })
+
+  it('takes a line of two words whole, and a brand printed with no quotes', () => {
+    expect(shelved('Թխվածքաբլիթ «Ռոշեն» Արտ Բեյքրի 140գր')?.name).toBe(
+      'Печенье Roshen Art Bakery 140 г',
+    )
+    expect(shelved('Թխվածքաբլիթ Ռոշեն Լովիտա')?.name).toBe('Печенье Roshen Lovita')
+  })
+
+  it('writes a Cyrillic one in «…», and one it does not know in Russian letters, as before', () => {
+    expect(shelved('Շոկոլադ «Ալյոնկա» 100գր')?.name).toBe('Шоколад «Алёнка» 100 г')
+    expect(shelved('Յոգուրտ «Երեմյան Փրոդաքթս» ելակ')?.name).toBe(
+      'Йогурт «Еремян Продактс» клубника',
+    )
+  })
+
+  it('lets an item named by the package’s spelling stand on the line', () => {
+    const delice = receiptLineParts('Թխվածքաբլիթ «Կինդեր» դելիս 39գր')
+    const fit = lineFitter(delice, WORDS, { brands: BRANDS })
+    expect(fit('Печенье Kinder Délice')).toBe(true)
+    expect(fit('Печенье Kinder')).toBe(true)
+    expect(fit('Печенье Roshen Lovita')).toBe(false)
+    // without the lexicon the brand is two letters off its package, and another
+    expect(lineFitter(delice, WORDS)('Печенье Kinder Délice')).toBe(false)
+  })
 })
 
 describe('a new item’s name (MOL-293, В-1 «б»)', () => {
@@ -274,6 +328,271 @@ describe('a new item’s name (MOL-293, В-1 «б»)', () => {
 
   it('is none for a line with no word', () => {
     expect(named('1234 5.6')).toBeNull()
+  })
+})
+
+describe('a new item of the seed’s kind (MOL-261, Т-2)', () => {
+  const words = {
+    ...WORDS,
+    հավի: 'курица',
+    թարմ: 'свежий',
+    քարաճիկ: 'желудок',
+    բրինձ: 'рис',
+    կլոր: 'круглый',
+    աղացած: 'молотый',
+    ձվիկ: 'яйцо',
+    կուպատի: 'купаты',
+  }
+  const seed = [
+    { name: 'Рис круглозёрный', names: ['բրինձ կլոր', 'բրինձ'] },
+    { name: 'Кофе', names: ['սուրճ', 'սուրճ աղացած'] },
+    { name: 'Яйца', names: ['ձու', 'ձվեր'] },
+    { name: 'Желудки куриные', names: ['քարաճիկ'] },
+    { name: 'Лимонад', names: ['գազավորված ըմպելիք'] },
+    { name: 'Колбаски для гриля', names: ['կուպատի'] },
+    { name: 'Молоко 3,2%', names: ['կաթ 3.2%'] },
+  ]
+  const kinded = (printed: string, dictionary: Record<string, string> = words) =>
+    newLineName(receiptLineParts(printed), dictionary, { seed })?.name
+
+  it('names the line by the seed’s item that says its kind, for every word it covers', () => {
+    const chicken = newLineName(receiptLineParts('Հավի թարմ քարաճիկ «Աշտարակ» 950գր'), words, {
+      seed: [{ name: 'Желудки куриные', names: ['հավի քարաճիկ'] }],
+      genitives: { հավի: 'куриный' },
+    })
+    expect(chicken?.name).toBe('Желудки куриные свежие «Аштарак» 950 г')
+  })
+
+  it('never names what the line does not say: the seed lumps (adversarial А2)', () => {
+    expect(kinded('Բրինձ կլոր «Միստրալ» 900գր')).toBe('Рис круглый «Мистрал» 900 г')
+    const sauce = newLineName(
+      receiptLineParts('Սոուս «Չիմ Չիմ» քաղցր չիլի ա/տ 220գր'),
+      { ...words, սոուս: 'соус', քաղցր: 'сладкий', չիլի: 'чили' },
+      { seed: [{ name: 'Соус острый', names: ['սոուս չիլի'] }] },
+    )
+    expect(sauce?.name).toBe('Соус «Чим Чим» сладкий чили 220 г')
+  })
+
+  it('stands for no word of the line its name does not say: the seed lumps (adversarial В1)', () => {
+    const gum = { ...words, ծամոն: 'жевательная резинка', անշաքար: 'без сахара', դաղձով: 'с мятой' }
+    const seed = [
+      { name: 'Жевательная резинка', names: ['ծամոն', 'ծամոն անշաքար', 'ծամոն դաղձով'] },
+    ]
+    const of = (printed: string) => newLineName(receiptLineParts(printed), gum, { seed })?.name
+    expect(of('Ծամոն «Օրբիտ» անշաքար 14գր')).toBe('Жевательная резинка «Орбит» без сахара 14 г')
+    expect(of('Ծամոն «Դիրոլ» դաղձով 14գր')).toBe('Жевательная резинка «Дирол» с мятой 14 г')
+  })
+
+  it('agrees with the number the seed gives a kind, told by the seed’s own adjective (adversarial Г1)', () => {
+    const more = {
+      ...words,
+      բդիկ: 'окорочок',
+      հավի: 'курица',
+      թարմ: 'свежий',
+      սրբիչ: 'полотенце',
+      թղթե: 'бумажный',
+      սպիտակ: 'белый',
+    }
+    const seed = [
+      { name: 'Окорочка куриные', names: ['հավի բդիկ'] },
+      { name: 'Полотенца бумажные', names: ['թղթե սրբիչ'] },
+    ]
+    const of = (printed: string) =>
+      newLineName(receiptLineParts(printed), more, { seed, genitives: { հավի: 'куриный' } })?.name
+    expect(of('Հավի թարմ բդիկ «Աշտարակ» 1կգ')).toBe('Окорочка куриные свежие «Аштарак» 1 кг')
+    expect(of('Թղթե սրբիչ «Զևա» սպիտակ 2հտ')).toBe('Полотенца бумажные «Зева» белые')
+  })
+
+  it('takes no seed’s head for a kind the dictionary has not where its name covers more (adversarial В3)', () => {
+    const seed = [{ name: 'Чай холодный', names: ['այս թի'] }]
+    expect(newLineName(receiptLineParts('Այս թի «Լիփթոն» դեղձ 0.5լ'), words, { seed })?.name).toBe(
+      'Айс ти «Липтон» персик 0,5 л',
+    )
+  })
+
+  it('takes the number of the seed’s word of the kind, past its adjective, never another item’s (adversarial Б4)', () => {
+    const leaf = { ...words, տերև: 'лист', դափնու: 'лавровый' }
+    const seed = [
+      { name: 'Листы для лазаньи', names: ['լազանյայի թերթեր'] },
+      { name: 'Лавровый лист', names: ['դափնու տերև'] },
+    ]
+    expect(newLineName(receiptLineParts('Դափնու տերև «Արտֆուդ» 10գր'), leaf, { seed })?.name).toBe(
+      'Лист лавровый «Артфуд» 10 г',
+    )
+  })
+
+  it('takes the seed’s number of the same noun only, never an adjective of it (adversarial А1)', () => {
+    const sugar = { ...words, շաքար: 'сахар', մակարոնեղեն: 'макаронные изделия' }
+    const seed = [
+      { name: 'Сахарная пудра', names: ['շաքարափոշի'] },
+      { name: 'Сахар', names: ['շաքարավազ'] },
+      { name: 'Макароны', names: ['մակարոն'] },
+    ]
+    const name = (printed: string) => newLineName(receiptLineParts(printed), sugar, { seed })?.name
+    expect(name('Շաքար «Գյումրի» 1կգ')).toBe('Сахар «Гюмри» 1 кг')
+    expect(name('Մակարոնեղեն «Մաքֆա» 450գր')).toBe('Макаронные изделия «Макфа» 450 г')
+    // without the seed's own form, its adjective is still no form of the noun
+    expect(
+      newLineName(receiptLineParts('Շաքար «Գյումրի» 1կգ'), sugar, { seed: seed.slice(0, 1) })?.name,
+    ).toBe('Сахар «Гюмри» 1 кг')
+  })
+
+  it('says the other words where the seed lumps them: «Кофе» for «սուրճ աղացած»', () => {
+    expect(kinded('Սուրճ աղացած «Կաֆֆա» 100գ')).toBe('Кофе молотый «Каффа» 100 г')
+  })
+
+  it('writes the kind in the seed’s number, its figures apart', () => {
+    expect(kinded('Ձվիկ «Ոսկեհատ» 10հտ')).toBe('Яйца «Воскехат»')
+    expect(kinded('Հավի թարմ քարաճիկ «Աշտարակ» 950գր')).toBe(
+      'Желудки курица свежие «Аштарак» 950 г',
+    )
+    expect(kinded('Կաթ «Իգիթ» 3.2% 1լ')).toBe('Молоко «Игит» 3,2% 1 л')
+  })
+
+  it('keeps the line’s own word where the seed reads it its own way', () => {
+    expect(kinded('Գազավորված ըմպելիք «Ֆանտա» 0.25լ')).toBe('Напиток газированный «Фанта» 0,25 л')
+    expect(kinded('Կուպատի «ԳԵԳ» կգ')).toBe('Купаты «ГЕГ»')
+  })
+
+  it('takes the seed’s word for a kind the dictionary has not, instead of its letters', () => {
+    const unknown = Object.fromEntries(Object.entries(words).filter(([word]) => word !== 'կուպատի'))
+    expect(newLineName(receiptLineParts('Կուպատի «ԳԵԳ» կգ'), unknown, { seed })).toEqual({
+      name: 'Колбаски «ГЕГ»',
+      spelled: false,
+    })
+  })
+})
+
+describe('a new item’s name in Russian grammar (MOL-261, Т-3, Т-4)', () => {
+  const words = {
+    ...WORDS,
+    աղ: 'соль',
+    մանր: 'мелкий',
+    ուլտրապաստերիզացված: 'ультрапастеризованный',
+    խտացրած: 'сгущённый',
+    մուգ: 'тёмный',
+    բալ: 'вишня',
+    'հում-ապխտած': 'сырокопчёный',
+    թարմ: 'свежий',
+    տավարի: 'говядина',
+    լոլիկի: 'помидор',
+    ջեմ: 'джем',
+    կահույք: 'мебель',
+    ցելաֆոն: 'целлофановый пакет',
+    հատապտղային: 'ягодный',
+    կրեմ: 'крем',
+    միանգամյա: 'одноразовый',
+  }
+  const genitives = { տավարի: 'говяжий', լոլիկի: 'томатный', ելակի: 'клубничный' }
+  const seed = [{ name: 'Яйца', names: ['ձու'] }]
+  const grammar = (printed: string) =>
+    newLineName(receiptLineParts(printed), words, { genitives, seed })?.name
+
+  it('puts an adjective in the gender and number of the kind', () => {
+    expect(grammar('Աղ մանր «Ֆավորիտ» 1կգ')).toBe('Соль мелкая «Фаворит» 1 кг')
+    expect(grammar('Խտացրած կաթ')).toBe('Молоко сгущённое')
+    expect(grammar('Սերուցք «Մարիաննա» ուլտրապաստերիզացված 10%')).toBe(
+      'Сливки «Марианна» ультрапастеризованные 10%',
+    )
+    expect(grammar('Հավկիթ թարմ')).toBe('Яйца свежие')
+    expect(grammar('Ցելաֆոն միանգամյա')).toBe('Целлофановый пакет одноразовый')
+  })
+
+  it('agrees an adjective with the noun it stands before, past the brand', () => {
+    expect(grammar('Գազավորված ըմպելիք «Ֆանտա» մուգ բալ')).toBe(
+      'Напиток газированный «Фанта» тёмная вишня',
+    )
+  })
+
+  it('agrees with the next noun of the dictionary only, a word spelt in letters being none', () => {
+    expect(grammar('Հրուշակեղեն հատապտղային կրեմ')).toBe('Кондитерские изделия ягодный крем')
+    expect(grammar('Երշիկ հում-ապխտած Սմայլ')).toBe('Колбаса сырокопчёная Смайл')
+    // the price, named: a noun in apposition takes it
+    expect(grammar('Երշիկ հում-ապխտած չորիզո')).toBe('Колбаса сырокопчёное чоризо')
+  })
+
+  it('says a genitive by its adjective where the lexicon has one, and a flavour as it is', () => {
+    expect(grammar('Հյութ լոլիկի')).toBe('Сок томатный')
+    expect(grammar('Լյարդ տավարի')).toBe('Печень говяжья')
+    expect(grammar('Ջեմ ելակի')).toBe('Джем клубничный')
+    expect(grammar('Յոգուրտ «Մարիաննա» ելակ')).toBe('Йогурт «Марианна» клубника')
+  })
+
+  it('leaves an adjective as the dictionary has it where no ending tells the gender', () => {
+    expect(grammar('Կահույք մանր')).toBe('Мебель мелкий')
+  })
+
+  it('reads a plural only by an ending no singular has, never a loan’s «-и» (adversarial А3)', () => {
+    const more = {
+      ...words,
+      սուլուգունի: 'сулугуни',
+      ապխտած: 'копчёный',
+      փաթիլներ: 'хлопья',
+      շոկոլադե: 'шоколадный',
+    }
+    const of = (printed: string) => newLineName(receiptLineParts(printed), more)?.name
+    expect(of('Սուլուգունի «Մարիաննա» ապխտած կգ')).toBe('Сулугуни «Марианна» копчёный')
+    expect(of('Փաթիլներ շոկոլադե «Նեստլե» 250գր')).toBe('Хлопья шоколадные «Нестле» 250 г')
+    expect(of('Սերուցք «Մարիաննա» ապխտած')).toBe('Сливки «Марианна» копчёные')
+  })
+
+  it('reads a loan in «-ки» the indeclinable list holds as one: «Виски … шотландский» (adversarial Б3)', () => {
+    const whisky = { ...words, վիսկի: 'виски', շոտլանդական: 'шотландский' }
+    expect(newLineName(receiptLineParts('Վիսկի «Բելլս» շոտլանդական 0.7լ'), whisky)?.name).toBe(
+      'Виски «Беллс» шотландский 0,7 л',
+    )
+  })
+
+  it('keeps the soft sign of a possessive: «коровье», «телячьи» (self-review Р1-1)', () => {
+    const milk = {
+      ...words,
+      կովի: 'коровий',
+      հորթի: 'телячий',
+      նրբերշիկ: 'сосиски',
+      ցիկորի: 'цикорий',
+    }
+    const of = (printed: string) => newLineName(receiptLineParts(printed), milk)?.name
+    expect(of('Կաթ կովի 3.2%')).toBe('Молоко коровье 3,2%')
+    expect(of('Նրբերշիկ հորթի')).toBe('Сосиски телячьи')
+    expect(of('Կաթ ցիկորի')).toBe('Молоко цикорий')
+  })
+})
+
+describe('a phrase of the till (MOL-261, Т-5)', () => {
+  const phrases = {
+    'ֆրանսիական հրուշակեղեն': 'пирожное французское',
+    'շոկոլադե սալիկ': 'шоколад',
+    'սրիչ դանակի քար': 'точильный камень для ножей',
+  }
+  const words = {
+    ...WORDS,
+    հատապտղային: 'ягодный',
+    կրեմ: 'крем',
+    շոկոլադե: 'шоколадный',
+    սալիկ: 'плитка',
+  }
+  const phrased = (printed: string, seed: readonly SeedName[] = []) =>
+    newLineName(receiptLineParts(printed), words, { phrases, seed, brands: BRANDS })?.name
+
+  it('names the thing as a shelf does, the kind it holds first', () => {
+    expect(phrased('Ֆրանսիական հրուշակեղեն, հատապտղային կրեմ')).toBe(
+      'Пирожное французское ягодный крем',
+    )
+    expect(phrased('Շոկոլադե սալիկ «Ալյոնկա» 15գր')).toBe('Шоколад «Алёнка» 15 г')
+    expect(phrased('Սրիչ դանակի քար 465')).toBe('Точильный камень для ножей')
+  })
+
+  it('reads a phrase before the seed’s item for its kind', () => {
+    const seed = [{ name: 'Плитка шоколадная', names: ['սալիկ'] }]
+    expect(phrased('Շոկոլադե սալիկ «Ռոշեն» 85գր', seed)).toBe('Шоколад Roshen 85 г')
+  })
+
+  it('writes a Cyrillic brand the till printed bare in «…», as its package (adversarial А5)', () => {
+    expect(phrased('Շոկոլադ Ալյոնկա 90գր')).toBe(phrased('Շոկոլադ «Ալյոնկա» 90գր'))
+  })
+
+  it('reads its words one by one where they do not stand together', () => {
+    expect(phrased('Սալիկ շոկոլադե')).toBe('Плитка шоколадная')
   })
 })
 

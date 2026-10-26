@@ -17,7 +17,7 @@ NEED_SCAFFOLD = @test -f package.json || { echo "no scaffold yet (package.json i
 # The heavy checks of every copy on this machine take turns, the push's among them (MOL-139).
 ONE_AT_A_TIME = ./bin/one-at-a-time.sh "make $@"
 
-.PHONY: help setup hooks up down reup ps logs psql migrate forget notify seed repack gates failures merge unmerge apart merge-night merge-candidates db-reset dev format lint typecheck test e2e check prod-build watcher certs icons ports
+.PHONY: help setup hooks up down reup ps logs psql migrate forget notify seed repack rename-items gates failures merge unmerge apart merge-night merge-candidates db-reset dev format lint typecheck test e2e check prod-build watcher certs icons ports
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -105,6 +105,12 @@ seed: ## Put the common names into the catalogue: make seed [YES=1] (dry run wit
 repack: ## Purchases from receipts into their packages: make repack [YES=1] (dry run without YES=1)
 	$(NEED_SCAFFOLD)
 	npm run --silent repack -w @molvia/backend -- $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
+
+# The items recorded from receipts before MOL-261 given the name their line proposes now — once, after the rollout.
+# Writes only for YES=1 typed on this command line, as `seed` does.
+rename-items: ## Items from receipts named as a line names them now: make rename-items [YES=1] (dry run without YES=1)
+	$(NEED_SCAFFOLD)
+	npm run --silent rename-items -w @molvia/backend -- $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
 
 # FROM and TO reach the script through the environment, never pasted into the recipe, for the
 # reason `forget` gives (MOL-58, П-3). It only reads. Only a value typed on this command line
