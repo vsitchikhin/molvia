@@ -84,6 +84,30 @@ describe('binding the lines of a parsed receipt (MOL-126)', () => {
     expect(search).toHaveBeenCalledOnce()
   })
 
+  it('names a new item with the brand as its package spells it, and finds one by that spelling (MOL-261)', async () => {
+    const DELICE = '00000000-0000-4000-8000-000000000005'
+    const { items } = fakeItems({
+      items: [item(DELICE, 'Бисквит Kinder Délice')],
+      near: true,
+      nearIds: [DELICE],
+    })
+    const [lovita, delice] = await bindReceiptLines(
+      { items, embedder: NO_EMBEDDER },
+      ACTOR,
+      'AM',
+      'ru',
+      [line('Թխվածքաբլիթ «Ռոշեն» Լովիտա, ելակ 135գր'), line('Բիսքվիթ «Կինդեր» դելիս 39գր')],
+    )
+    expect(lovita).toEqual({
+      itemId: null,
+      match: 'weak',
+      translation: 'Печенье Roshen Lovita клубника 135 г',
+      spelled: false,
+    })
+    // spelt «Киндер», the brand is two letters off the owner's Kinder: the lexicon alone finds it
+    expect(delice).toEqual({ itemId: DELICE, match: 'search', translation: 'бисквит' })
+  })
+
   it('takes the first of the search’s items the line lets stand, past those it does not', async () => {
     const STRAWBERRY = '00000000-0000-4000-8000-000000000004'
     const { items } = fakeItems({
