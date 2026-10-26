@@ -187,8 +187,21 @@ nothing up.
   inside (Р-6) and no «Траты» under it, nothing to see there — the price, named (adversarial В of
   MOL-159): «newcomer» is a guess from the month and the month before, so a person back after a whole
   empty month is greeted as one and finds «Траты» by flipping a month back. **«Счета», «Обмен денег»
-  and «Категории» keep their figures under the skeleton and the error** (adversarial Г): they are
-  «now», read from answers of their own, and the month that failed is not theirs. **A refusal stands once, and always somewhere it can be put
+  and «Категории» keep their figures under the error** (adversarial Г): they are «now», read from
+  answers of their own, and the month that failed is not theirs. **Under the skeleton there are no ways
+  out at all** (MOL-269, owner's В-1 «а»): they come once the month has answered, failed or is kept —
+  **and «Счета» too**, answered, failed or kept, since their card over the switcher comes with their
+  answer and the row «Счета» goes with it. Under the skeleton the answer moved them from under the
+  finger: a newcomer's empty state is 239 px shorter than the skeleton and has no «Траты», so
+  «Обмен денег» went 291 px up; a month with a spending stands its card and ring some 100 px taller than
+  the skeleton, and it went 99 down; and the strip «Добавить трату» comes with the first answer over the
+  bottom 93 px of the window. A press on one row and its release on another is a click on neither — in
+  CI the tap on «Обмен денег» left «Деньги» unmoved (run 38706549474), and on a phone it opened
+  «Бюджет». The rows come with no `appear`: they are an answer read whole (MOL-151). **The price,
+  named:** the very first opening, with nothing kept, waits for both answers before it can go to
+  «Обмен денег» — under a second as a rule, as long as the client waits with a server that hangs; and a
+  fresh answer over a month kept still moves them by whatever it changed — the price of showing the
+  memory at once. e2e holds both answers back in turn (`money.spec`). **A refusal stands once, and always somewhere it can be put
   right** (MOL-159): about a row the journal on screen shows, it marks that row, and any amendment of
   the row takes it away; with no such row, it is a row of «Не приняты» on top of «Траты», in every
   month and whatever its pages (`refusedRows`). «Не приняты» names the marked ones too and leads to the

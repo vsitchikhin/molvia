@@ -963,7 +963,17 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the screen redraw: `--page-hold` on `#app`, as far as the bottom of the window and no further —
   more is empty room to scroll into. `#app` is a block, so the hold is room under the screen and
   never the screen stretched: a state that takes the free height would carry «Повторить» down with
-  it. **Above the control, nothing that belongs to the answer stands**: the strips «Нет связи» and
+  it. **Below the control the page may grow and shrink only where nothing below is tapped**
+  (MOL-269): a thing to press under a skeleton is moved by the answer from under the finger, and a press
+  on it with a release on what took its place is a click on neither. So what is tapped under a skeleton
+  comes with the answer instead — the ways out of «Деньги» (`money-spendings.md`), the groups of
+  «Настройки» — or the skeleton is the answer's shape, as the newcomer's «Что брать» (MOL-203). An answer
+  of another read that moves them counts the same: the ways out wait for «Счета» too, the groups of
+  «Настройки» for the salary's day, whose field grows the card over them. The groups are mounted under
+  the skeleton and only hidden (`v-show`), so their own reads go at once. **The price, named:** the first
+  opening waits for those answers before «Выйти» or «Обмен денег» can be pressed. The notices of the record typed
+  by hand (`TripNotices` under its skeleton) are a task of their own, MOL-311.
+  **Above the control, nothing that belongs to the answer stands**: the strips «Нет связи» and
   «Сервер не ответил», the card of a failed refresh, the card of a refusal of the queue (a row of
   its own month, a card on any other — adversarial round 3, Ж), the line «Этой категории на графиках
   нет» are drawn under the control that chooses the answer — the owner's decision В-2, against
