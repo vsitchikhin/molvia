@@ -5,11 +5,17 @@
       {{ t('accounts.reconcile.meta', { name: account.name, currency: currencyName }) }}
     </template>
 
+    <!-- The connection is the kit's line, first in the sheet over either step, said in the sheet's
+         own region (MOL-181, Ф-19); drawn by the connection and gone with it. -->
+    <StatusStrip
+      v-if="!online"
+      class="status"
+      kind="offline"
+      :text="t('accounts.reconcile.offline')"
+    />
+
     <!-- Step one: the fact, before the count — so as not to fit the number (В-4 MOL-43). -->
     <form v-if="!result" class="form" novalidate @submit.prevent="check">
-      <p v-if="!online" class="strip">
-        <IconCloudOff class="strip-icon" aria-hidden="true" />{{ t('accounts.reconcile.offline') }}
-      </p>
       <div class="field">
         <label :for="factId" class="question">{{ t('accounts.reconcile.question') }}</label>
         <div class="well" :class="{ bad: factBad }">
@@ -38,9 +44,6 @@
     <!-- Said through the app's one live region (MOL-19), and the focus comes here: the field and
          the button it was on are gone (review 20). -->
     <div v-else ref="resultBox" class="result" tabindex="-1">
-      <p v-if="!online" class="strip">
-        <IconCloudOff class="strip-icon" aria-hidden="true" />{{ t('accounts.reconcile.offline') }}
-      </p>
       <template v-if="matched">
         <div class="matched">
           <span class="circle" aria-hidden="true"><IconCheck class="circle-icon" /></span>
@@ -138,7 +141,7 @@
           block
           :busy="sending"
           :busy-label="t('accounts.reconcile.checking')"
-          :disabled="!online && !sending"
+          :inactive="!online && !sending"
           @click="check"
         >
           <template #icon><IconScale v-if="online || sending" /><IconCloudOff v-else /></template>
@@ -147,15 +150,23 @@
       </template>
       <template v-else>
         <template v-if="!matched && !written">
+          <!-- Tinted over «Готово», never a second fill (Ф-12, Ф-15); not now, it says why (Ф-6, С-10). -->
           <AppButton
-            variant="secondary"
+            variant="tinted"
             block
             :busy="writing"
             :busy-label="t('accounts.reconcile.writing')"
-            :disabled="!writing && (!online || recountPending || tripsHeld)"
+            :inactive="!writing && writeWait !== null"
             @click="writeDifference"
           >
-            {{ t('accounts.reconcile.write_difference') }}
+            <template v-if="writeWait === 'write_wait_online' && !writing" #icon>
+              <IconCloudOff />
+            </template>
+            {{
+              writeWait && !writing
+                ? t(`accounts.reconcile.${writeWait}`)
+                : t('accounts.reconcile.write_difference')
+            }}
           </AppButton>
           <p class="note">{{ writeNote }}</p>
         </template>
@@ -210,6 +221,7 @@ import OperationRow from '@/components/OperationRow.vue'
 import OperationIncomeSheet from '@/components/OperationIncomeSheet.vue'
 import OperationSheet from '@/components/OperationSheet.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import {
   operationRowProps,
@@ -266,6 +278,7 @@ export default defineComponent({
     OperationRow,
     OperationSheet,
     SectionCaption,
+    StatusStrip,
     UndoStrip,
   },
   props: {
@@ -473,6 +486,18 @@ export default defineComponent({
     const tripsHeld = computed(() =>
       trips.pending.some((write) => countsMoney(write) && !tripsSend(write)),
     )
+
+    /**
+     * Why «Записать разницу» cannot be pressed now, in the words on it (Ф-6, С-10): the connection
+     * first — nothing is recounted without it — then the answer «Покупки» waits for, which the line
+     * above says too (owner's В-1 «а»), then a correction still on its way.
+     */
+    const writeWait = computed(() => {
+      if (!props.online) return 'write_wait_online'
+      if (tripsHeld.value) return 'write_after_answer'
+      if (recountPending.value) return 'write_after_recount'
+      return null
+    })
 
     // A spending is put right through the queue, a trip too: its answer comes after the sheet, and
     // the count is asked again once it has — any landing will do, the check is cheap. The queues
@@ -737,6 +762,7 @@ export default defineComponent({
       reasonRemoved,
       reasons,
       tripsHeld,
+      writeWait,
       incomeDraft,
       incomeOpen,
       incomeSaved,
@@ -775,24 +801,8 @@ export default defineComponent({
   gap: var(--space-4);
 }
 
-.strip {
-  @include appear;
-
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--warn-tint);
-  color: var(--warn-ink);
-  font-size: var(--text-footnote);
-}
-
-.strip-icon {
-  @include icon;
-
-  font-size: var(--icon-sm);
+.status {
+  margin-bottom: var(--space-4);
 }
 
 .field {
@@ -953,7 +963,7 @@ export default defineComponent({
 .none-icon {
   @include icon;
 
-  font-size: var(--icon-sm);
+  font-size: var(--icon-md);
   color: var(--text-muted);
 }
 
