@@ -122,8 +122,8 @@ jobs:
           ONNXRUNTIME_NODE_INSTALL: skip
       - run: ./bin/init-env.sh 0
         env:
-          PG_HOST: postgres
-          PG_HOST_PORT: 5432
+          MOLVIA_PG_HOST: postgres
+          MOLVIA_PG_PORT: 5432
 
       - run: npm run test:e2e
 
