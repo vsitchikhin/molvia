@@ -292,21 +292,28 @@ answer. A retry of the history ends with the screen that asked (И1).
 **The connection of «Покупки» is one strip for the history and the receipts** (MOL-204, Ф-14): a receipt is
 a purchase on its way to «Записаны», so their two reads are one list to the person, and three ways of «from
 memory» on one screen — a card, «Показаны данные…», a line of the receipts — were one too many. **Over
-something of an answer** — rows of «Записаны» or of the receipts the phone kept — it is a `StatusStrip`:
-offline, or «Сервер не ответил» with «Повторить» (MOL-181's rule, as «Счета» and «Что брать»); **with nothing of
-an answer**, the state — the quiet card of an error, or «Без связи» in the screen's own words, never «what is on
-the phone» over nothing. The kind is the worse of the two reads; **the time is the older of the reads that failed
-and drew a row** — nothing on screen is newer than that — and a read with nothing of it on screen dates nothing
-unless no other did. **The moment of the history's answer is a key of its own** (`molvia.trip-history-at`), for
-the reason the «empty» flag is: a field of the strict cache would be no cache to a window on the previous build,
-which would write its own over a finish made with no signal. Moved with the first page only; a cache from before
-it has none, and the strip says no time. **The price, named:** a window on the previous build loads the history
-without moving it, so the strip may name a moment older than the list, never a newer one. **Offline, «Показать
-ещё» gives way to «Раньше {day} — со связью»** — the day of the last row shown, always as a date — so the list
-does not read as whole (П.5 of MOL-128). **Every row of «Покупки» is the kit's `ListRow`** (MOL-204, Ф-12): the
-record going on is a row of `div` with «Продолжить», a `secondary` button, in its tail — its one control, named
-with the place (owner's В-1 «а»): a button in a button is no HTML; the price, a tap on the place's name does
-nothing. The pencil and the star are statuses, muted (Ф-4); a receipt's second line stands under its meta
+what a failed read drew from memory** — rows of «Записаны» or of the receipts the phone kept — it is a
+`StatusStrip`, and speaks for both reads: offline, or «Сервер не ответил» with «Повторить» (MOL-181's rule, as
+«Счета» and «Что брать»). **«Записаны» failed with nothing of it shown is the screen's state**, the strip or no
+— the quiet card of an error, or «Без связи» in the screen's own words — since a strip over a receipt alone
+reads as every purchase there is (adversarial А3 of MOL-204). **The receipts failed with nothing of them shown,
+and no strip, are their own quiet card**, «Чеки не загрузились»: «Покупки не загрузились» over a list that came,
+or under its skeleton, is untrue (А2). A read answered every time under a list another window kept moving failed
+nothing it shows, and draws no strip (А4). The kind is the worse of the two reads; **the time is the older of
+the reads that failed and drew a row** — nothing on screen is newer than that. The strip says its words again
+for a try of the person's that failed, never for the receipts' own poll every five seconds (А1). **The moment of
+the history's answer is a key of its own** (`molvia.trip-history-at`), for the reason the «empty» flag is: a
+field of the strict cache would be no cache to a window on the previous build, which would write its own over a
+finish made with no signal. Moved with the first page only, and let go of where a shelf refused the page, since
+that shelf keeps the one before (А5); a cache from before it has none, and the strip says no time. **The price,
+named:** a window on the previous build loads the history without moving it, so the strip may name a moment
+older than the list, never a newer one. **Offline, «Показать ещё» gives way to «Раньше {day} — со связью»** —
+the day of the last row shown, always as a date — so the list does not read as whole (П.5 of MOL-128). **The
+price, named:** a page may end inside a day, so rows of that day may lie past it too; the day after would be
+untrue the other way, all its rows being shown. **Every row of «Покупки» is the kit's `ListRow`** (MOL-204,
+Ф-12): the record going on is a row of `div` with «Продолжить», a `secondary` button, in its tail — its one
+control, named with the place (owner's В-1 «а»): a button in a button is no HTML; the price, a tap on the
+place's name does nothing. The pencil and the star are statuses, muted (Ф-4); a receipt's second line stands under its meta
 (`#below`), never cut with it.
 
 **The newcomer's home is «Что брать»** (`AdviceHomeNew`, handoff `02`): «Запишите первые

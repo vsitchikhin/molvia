@@ -91,7 +91,8 @@ const SELECTED = new Set([
  *   tone     — the icon alone in `warn-ink` or `good-ink` (Ф-4, MOL-204): a status worth the eye — a
  *              receipt not accepted or not read, a receipt recorded; every other icon is `text-muted`, since
  *              the accent says «press here» and a status says nothing of the kind. `danger` and `inactive`
- *              colour the icon their own way, over it;
+ *              colour the icon their own way, over it; not with `tint`, whose circle is the category's colour
+ *              and stays so;
  *   danger   — the title and the icon in `bad-ink`: the row destroys;
  *   inactive — not now (Ф-6, MOL-174): focusable, `aria-disabled`, a press reaching nobody, the link
  *              followed nowhere — a link loses its `href` too, or a middle click or a long press would
