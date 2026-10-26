@@ -204,7 +204,9 @@ nothing up.
   until the answer — under that skeleton they would have moved all the same. **«Повторить» under a
   failed month hides them in their place** (`ways-held`, adversarial А1): the phase stays `error` until
   the answer, which puts the month in place of the error card — the rows stood the whole retry and the
-  tap on «Обмен денег» was lost as in CI. Unseen with their place kept (`visibility`), never taken out:
+  tap on «Обмен денег» was lost as in CI. Unseen with their place kept (`visibility`), faded out and back
+  over frames by `--appear-duration` — gone in one frame and back in one on a refusal, no answer read,
+  broke MOL-151 (adversarial В1) — and no tap from the press on; never taken out:
   taken out, the page under a small phone scrolled down shortened, the browser brought the scroll up,
   and the card of «Повторить» itself dropped under the finger (adversarial Б2); they are back with the
   answer or with the next refusal. **Only the person's own «Повторить»** (review Р4-1, adversarial Б1):

@@ -877,6 +877,25 @@ describe('MoneyView: the ways out, one figure each (MOL-81, MOL-159)', () => {
     expect(held(view)).toBe(false)
   })
 
+  // Review Р5: a spending landed — the commonest read nobody asked for under a month that fails.
+  it('must not fire: a spending landed under a failed month leaves the rows as they are', async () => {
+    let refuse: (error: unknown) => void = () => undefined
+    moneyMonth
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+    const view = await render()
+    expect(view.text()).toContain(en.spending.load_error.title)
+
+    useSpendingQueueStore().landed++
+    await flushPromises()
+    expect(moneyMonth).toHaveBeenCalledTimes(2)
+    expect(entries(view)).toHaveLength(6)
+    expect(held(view)).toBe(false)
+    refuse(new ApiError(ERROR.INTERNAL))
+    await flushPromises()
+    expect(held(view)).toBe(false)
+  })
+
   it('come once «Счета» failed, and at once over a month and «Счета» the phone keeps', async () => {
     moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
     moneyMonth.mockResolvedValue(month())
