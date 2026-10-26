@@ -91,7 +91,7 @@ jobs:
     # bin/check-playwright-image.mjs holds in `npm run lint`. The runner's own uid, as Playwright's
     # documentation has it, so the workspace stays the runner's.
     container:
-      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: --user 1001
 
     # The API migrates at boot and refuses to start without a database, which is correct:
@@ -129,6 +129,8 @@ jobs:
 
       # Failed, not cancelled, so the traces below still go up (adversarial А5): the job's 40 minutes
       # less the image, `npm ci` and the upload.
+      # Атака Б2: медленная подготовка — пять минут задания до шага тестов.
+      - run: sleep 300
       - run: npm run test:e2e
         timeout-minutes: 35
 
