@@ -623,8 +623,12 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the version out loud in the row's place (`useUpdateAnnouncement`, А3). **A focus the strip loses is brought
   back by the frame** (MOL-194, adversarial Б2, Б3): a render that swaps the strip's actions under
   the focus — an account put away or deleted on another phone — left it on the body; it goes to the
-  strip's first button, where the one it stood on was, or to the title where the strip went whole. A
-  focus outside the strip stays where the person put it.
+  screen's first button in the strip, where the one it stood on was, or to the title where the strip
+  went whole. **Never to «Обновить»** of a version waiting over them (review №3, adversarial Г1, Г2):
+  the next Enter, meant for the screen, let a reload in. The row of the version changes in a render
+  of its own, which the frame does not see, so the frame watches its phase too: «Обновить» swapped
+  for «Не обновилось» gives the focus to the screen's action (Д, inherited from MOL-132). A focus
+  outside the strip stays where the person put it.
 - **The connection is one line, `StatusStrip`** (MOL-181, Ф-14, Н-7). «Без связи», «из памяти» and
   «сервер не ответил» were drawn five ways — a strip copied into seventeen files, a card of
   `ScreenState` over the screen, a note in a sheet — two or three on one screen, and a strip shared
