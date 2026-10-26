@@ -280,6 +280,18 @@ export interface NameLexicon {
    * «կոկա կոլա» Coca-Cola, «լովիտա» Lovita, «ալյոնկա» Алёнка (owner's В-2 «а»).
    */
   readonly brands?: Readonly<Record<string, string>>
+  /**
+   * The seed's items with their names in the till's language (the catalogue's nodes): a new item is of the kind
+   * of one of them, and is named so — «Желудки куриные «Аштарак»», «Яйца «Воскеат»» — so that `kindKey` of the
+   * two is one and «Тут дешевле» reads them as one kind.
+   */
+  readonly seed?: readonly SeedName[]
+}
+
+/** An item of the seed: its name and its names in the till's language. */
+export interface SeedName {
+  readonly name: string
+  readonly names: readonly string[]
 }
 
 const lexiconKey = (text: string): string =>
@@ -341,7 +353,10 @@ export function newLineName(
   lexicon: NameLexicon = {},
 ): LineName | null {
   let spelled = false
-  const said: string[] = []
+  const kindOf = seedKindOf(parts, dictionary, lexicon.seed ?? [])
+  // the seed's words the name begins with stand for what they covered: «Желудки куриные» for «հավի … քարաճիկ»
+  const said: string[] = kindOf === null ? [] : wordsOf(kindOf.name)
+  const covered = kindOf?.covered ?? new Set<string>()
 
   // a product line of two words is the lexicon's before either of them: «Արտ Բեյքրի» Art Bakery
   const lines = (tokens: readonly string[]): string[] =>
@@ -355,11 +370,13 @@ export function newLineName(
 
   const words = (tokens: readonly string[]): string[] =>
     lines(tokens).flatMap((token) => {
+      // what the seed's name stands for
+      if (covered.has(token)) return []
       const shelf = shelfOf(token, lexicon)
       if (shelf !== null) return [shelf]
       if (!isNameWord(token) || UNIT_WORDS.has(keyed(token))) return []
       if (LATIN.test(token)) return [token]
-      const gloss = glossOf(token, dictionary)
+      const gloss = asSeedSays(glossOf(token, dictionary), token === parts.kind, lexicon.seed ?? [])
       // an abbreviation the dictionary has not, «անտ.», is no word to spell
       if (gloss === null && token.endsWith('.')) return []
       if (gloss === null) spelled = true
@@ -377,6 +394,7 @@ export function newLineName(
       ? parts.before
       : [parts.before[kindAt] ?? '', ...parts.before.filter((_, at) => at !== kindAt)]
   const name = [
+    ...(kindOf === null ? [] : [kindOf.name]),
     ...words(before),
     ...(parts.brand === null ? [] : [brandInName(parts.brand, lexicon)]),
     ...words(parts.after),
@@ -385,6 +403,85 @@ export function newLineName(
   ].join(' ')
   if (!/\p{L}/u.test(name)) return null
   return { name: name.charAt(0).toUpperCase() + name.slice(1), spelled }
+}
+
+/** The seed's item a new one is of the kind of, and the line's tokens its name in the till's language covers. */
+interface SeedKind {
+  readonly name: string
+  readonly covered: ReadonlySet<string>
+}
+
+/**
+ * The seed's item whose name in the till's language says the line's kind (MOL-261, Т-2) — by `seedNameFits`'s
+ * rule but on a branded line too, since a name may begin with a kind the line's brand is of — and has every word
+ * of it in the line: the one that covers most of the line, else the shorter name. Its head word must be the
+ * kind's gloss in some form — else the seed reads the line its own way, «Лимонад» for «газированный напиток»,
+ * «Пломбир» for an ice cream — or the dictionary have none. A name that covers more than the kind stands for the
+ * kind, its figures apart, and for every word it covered where it has as many words — «Желудки куриные» for
+ * «հավի … քարաճիկ», «Рис круглозёрный» for «բրինձ կլոր». With fewer the seed lumps, and the other words are
+ * said: «Кофе» for «սուրճ աղացած» leaves «молотый». One that covers the kind alone says only the word of the
+ * kind, and only where the dictionary has none: else the gloss is the line's own word, in the seed's number
+ * (`asSeedSays`).
+ */
+function seedKindOf(
+  parts: ReceiptLineParts,
+  dictionary: Readonly<Record<string, string>>,
+  seed: readonly SeedName[],
+): SeedKind | null {
+  if (parts.kind === null || seed.length === 0) return null
+  const tokens = [...parts.before, ...parts.after].filter(
+    (token) => isNameWord(token) && ARMENIAN.test(token),
+  )
+  let best: { name: string; covered: Set<string> } | null = null
+  for (const item of seed) {
+    for (const name of item.names) {
+      const nameWords = name
+        .toLowerCase()
+        .split(/[^ա-ֆև-]+/u)
+        .filter((word) => word.length >= 2)
+      if (nameWords.length === 0 || !saysKind(parts, nameWords, dictionary)) continue
+      const covered = new Set(
+        tokens.filter((token) => nameWords.some((word) => sameArmenian(token, word, dictionary))),
+      )
+      if (!nameWords.every((word) => tokens.some((token) => sameArmenian(token, word, dictionary))))
+        continue
+      const russian = item.name.replace(/\s+\d.*$/u, '')
+      if (
+        best === null ||
+        covered.size > best.covered.size ||
+        (covered.size === best.covered.size && russian.length < best.name.length)
+      )
+        best = { name: russian, covered }
+    }
+  }
+  if (best === null) return null
+  const head = best.name.split(' ')[0] ?? best.name
+  const gloss = glossOf(parts.kind, dictionary)
+  if (gloss === null) return { name: head, covered: new Set([parts.kind]) }
+  const glossHead = (gloss.split(' ')[0] ?? '').toLowerCase().replace(/ё/gu, 'е')
+  if (!sameRussian(glossHead, head.toLowerCase().replace(/ё/gu, 'е'))) return null
+  if (best.covered.size === 1) return null
+  const all = wordsOf(best.name).length >= best.covered.size
+  return { name: best.name, covered: all ? best.covered : new Set([parts.kind]) }
+}
+
+/**
+ * The kind's gloss in the form the seed names that kind by, its number: «яйцо» is the seed's «Яйца», «шампиньон»
+ * its «Шампиньоны» (MOL-261, Т-2). Only the head word, only for the line's kind, only a form of the same word.
+ */
+function asSeedSays(
+  gloss: string | null,
+  isKind: boolean,
+  seed: readonly SeedName[],
+): string | null {
+  if (gloss === null || !isKind) return gloss
+  const [head, ...rest] = gloss.split(' ')
+  if (head === undefined) return gloss
+  const key = head.toLowerCase().replace(/ё/gu, 'е')
+  const form = seed
+    .map((item) => (item.name.split(' ')[0] ?? '').toLowerCase())
+    .find((first) => first !== key && sameRussian(key, first.replace(/ё/gu, 'е')))
+  return form === undefined ? gloss : [form, ...rest].join(' ')
 }
 
 // a preposition of an item's name asks nothing of the line: «Рулет … с фруктовой начинкой»
@@ -702,7 +799,16 @@ export function seedNameFits(
   nameWords: readonly string[],
   dictionary: Readonly<Record<string, string>>,
 ): boolean {
-  if (parts.brand !== null || parts.kind === null) return false
+  return parts.brand === null && saysKind(parts, nameWords, dictionary)
+}
+
+/** Whether a name in the till's language says the line's kind, and both of two things side by side. */
+function saysKind(
+  parts: ReceiptLineParts,
+  nameWords: readonly string[],
+  dictionary: Readonly<Record<string, string>>,
+): boolean {
+  if (parts.kind === null) return false
   // «Կուս-կուս», «Բալզամ-ողողիչ»: the names are matched hyphen apart
   const says = (printed: string): boolean =>
     printed

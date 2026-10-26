@@ -9,7 +9,13 @@ import {
   receiptLineParts,
   serbianServiceLine,
 } from '@molvia/model'
-import type { AppLocale, NameLexicon, ReceiptCountry, ReceiptLine } from '@molvia/model'
+import type {
+  AppLocale,
+  CatalogueNode,
+  NameLexicon,
+  ReceiptCountry,
+  ReceiptLine,
+} from '@molvia/model'
 import type { ItemRepository } from '@/db/items-repository'
 import type { LineBinding } from '@/db/receipts-repository'
 import type { Embedder } from '@/embeddings/embedder'
@@ -47,9 +53,12 @@ const SEARCH_ROWS = 10
 /** The seed's names: kinds, never brands — no branded line stands on one (MOL-293, «Бекон» for a sausage of «Բեկոն»). */
 const SEED_NAMES = new Set(CATALOGUE_SEED.map(([name]) => name))
 
-/** What a new item's name is written with beyond the till's words (MOL-261): the brands as their packages spell them. */
-export function namingLexicon(): NameLexicon {
-  return { brands: TILL_BRANDS }
+/**
+ * What a new item's name is written with beyond the till's words (MOL-261): the brands as their packages spell
+ * them, and the seed's items in the till's language — the country's nodes — for the kind it is of.
+ */
+export function namingLexicon(nodes: readonly CatalogueNode[]): NameLexicon {
+  return { brands: TILL_BRANDS, seed: nodes }
 }
 
 /** A name shorter than this is no item to search by: «Ko», a unit's cut that stood alone. */
@@ -83,7 +92,7 @@ export async function bindReceiptLines(
   const nodes = names === null ? [] : await items.nodes(names)
   if (names !== null && nodes.length === 0) namesMissing?.(new CatalogueNamesMissing(names))
   const matcher = createLineMatcher(nodes, TILL_WORDS_RU)
-  const lexicon = namingLexicon()
+  const lexicon = namingLexicon(nodes)
   // the headings the seed gave the catalogue's nodes; an item the search finds outside them has none known
   const headings = new Map(nodes.map((node) => [node.itemId, node.headings]))
   const bound: LineBinding[] = []

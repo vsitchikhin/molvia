@@ -330,6 +330,60 @@ describe('a new item’s name (MOL-293, В-1 «б»)', () => {
   })
 })
 
+describe('a new item of the seed’s kind (MOL-261, Т-2)', () => {
+  const words = {
+    ...WORDS,
+    հավի: 'курица',
+    թարմ: 'свежий',
+    քարաճիկ: 'желудок',
+    բրինձ: 'рис',
+    կլոր: 'круглый',
+    աղացած: 'молотый',
+    ձվիկ: 'яйцо',
+    կուպատի: 'купаты',
+  }
+  const seed = [
+    { name: 'Рис круглозёрный', names: ['բրինձ կլոր', 'բրինձ'] },
+    { name: 'Кофе', names: ['սուրճ', 'սուրճ աղացած'] },
+    { name: 'Яйца', names: ['ձու', 'ձվեր'] },
+    { name: 'Желудки куриные', names: ['քարաճիկ'] },
+    { name: 'Лимонад', names: ['գազավորված ըմպելիք'] },
+    { name: 'Колбаски для гриля', names: ['կուպատի'] },
+    { name: 'Молоко 3,2%', names: ['կաթ 3.2%'] },
+  ]
+  const kinded = (printed: string, dictionary: Record<string, string> = words) =>
+    newLineName(receiptLineParts(printed), dictionary, { seed })?.name
+
+  it('names the line by the seed’s item that says its kind, for every word it covers', () => {
+    expect(kinded('Բրինձ կլոր «Միստրալ» 900գր')).toBe('Рис круглозёрный «Мистрал» 900 г')
+  })
+
+  it('says the other words where the seed lumps them: «Кофе» for «սուրճ աղացած»', () => {
+    expect(kinded('Սուրճ աղացած «Կաֆֆա» 100գ')).toBe('Кофе молотый «Каффа» 100 г')
+  })
+
+  it('writes the kind in the seed’s number, its figures apart', () => {
+    expect(kinded('Ձվիկ «Ոսկեհատ» 10հտ')).toBe('Яйца «Воскехат»')
+    expect(kinded('Հավի թարմ քարաճիկ «Աշտարակ» 950գր')).toBe(
+      'Желудки курица свежий «Аштарак» 950 г',
+    )
+    expect(kinded('Կաթ «Իգիթ» 3.2% 1լ')).toBe('Молоко «Игит» 3,2% 1 л')
+  })
+
+  it('keeps the line’s own word where the seed reads it its own way', () => {
+    expect(kinded('Գազավորված ըմպելիք «Ֆանտա» 0.25լ')).toBe('Напиток газированный «Фанта» 0,25 л')
+    expect(kinded('Կուպատի «ԳԵԳ» կգ')).toBe('Купаты «ГЕГ»')
+  })
+
+  it('takes the seed’s word for a kind the dictionary has not, instead of its letters', () => {
+    const unknown = Object.fromEntries(Object.entries(words).filter(([word]) => word !== 'կուպատի'))
+    expect(newLineName(receiptLineParts('Կուպատի «ԳԵԳ» կգ'), unknown, { seed })).toEqual({
+      name: 'Колбаски «ГЕГ»',
+      spelled: false,
+    })
+  })
+})
+
 describe('an item standing on a line (MOL-293, В-1 «а», В-2 «а»)', () => {
   const yoghurt = 'Յոգուրտ «Երեմյան Փրոդաքթս» ելակ 2% 130գր'
 
