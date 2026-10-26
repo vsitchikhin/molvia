@@ -968,10 +968,14 @@ The detail behind the frontend lines of `CLAUDE.md`.
   on it with a release on what took its place is a click on neither. So what is tapped under a skeleton
   comes with the answer instead — the ways out of «Деньги» (`money-spendings.md`), the groups of
   «Настройки» — or the skeleton is the answer's shape, as the newcomer's «Что брать» (MOL-203). An answer
-  of another read that moves them counts the same: the ways out wait for «Счета» too, the groups of
-  «Настройки» for the salary's day, whose field grows the card over them. The groups are mounted under
-  the skeleton and only hidden (`v-show`), so their own reads go at once. **The price, named:** the first
-  opening waits for those answers before «Выйти» or «Обмен денег» can be pressed. The notices of the record typed
+  of another read that moves them counts the same where the phone keeps it: the ways out wait for
+  «Счета» too, kept after the first opening. The groups of «Настройки» are mounted under the skeleton
+  and only hidden (`v-show`), so their own reads go at once, and wait for the form alone — **not for the
+  salary's day**: nothing of it is kept on the phone, so waiting for it hid the groups at every opening,
+  and a step back the browser showed whole came in again under its picture (`motion.spec` А5, CI of
+  #226). **The prices, named:** the first opening waits for those answers before «Выйти» or «Обмен
+  денег» can be pressed; and the salary's day, on, still grows its card over the groups at every opening
+  of «Настройки» — over frames, by `AppReveal` — until the setting is kept on the phone. The notices of the record typed
   by hand (`TripNotices` under its skeleton) are a task of their own, MOL-311.
   **Above the control, nothing that belongs to the answer stands**: the strips «Нет связи» and
   «Сервер не ответил», the card of a failed refresh, the card of a refusal of the queue (a row of
