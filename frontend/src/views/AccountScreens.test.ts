@@ -1057,3 +1057,92 @@ describe('the account’s screen on the kit (MOL-194)', () => {
     expect(document.activeElement).toBe(row)
   })
 })
+
+describe('the check is blind behind its sheet (MOL-195, Ф-33)', () => {
+  /** The card of the balance, whole: its words, its attributes and what it would say aloud. */
+  const card = (view: VueWrapper) => plain(view.get('.balance').html())
+  const figure = (view: VueWrapper) => view.get('.balance .figure')
+
+  async function screen(balance = amd('190132'), inSpend: MoneyAccountView['inSpend'] = null) {
+    const pinia = session()
+    const account = cash({ balance, inSpend, lastCheckedOn: '2026-09-20' })
+    moneyAccounts.mockResolvedValue(page([account]))
+    accountJournal.mockResolvedValue(journal(account, []))
+    return open(AccountView, `/money/accounts/${CASH}`, pinia)
+  }
+  async function startCheck(view: VueWrapper): Promise<void> {
+    await button(view, en.accounts.account.reconcile)?.trigger('click')
+    await settle()
+  }
+
+  it('step one: «•••» and its words for a reader — no figure, no «≈», the start and «сверено» stay', async () => {
+    const view = await screen(amd('190132'), parseMoney('5921.05', 'RUB'))
+    expect(card(view)).toContain('190,132')
+    expect(view.find('.balance .approx').exists()).toBe(true)
+    await startCheck(view)
+    expect(card(view)).not.toContain('190,132')
+    expect(card(view)).not.toContain('5,921')
+    expect(view.find('.balance .approx').exists()).toBe(false)
+    expect(figure(view).text()).toContain('•••')
+    expect(figure(view).text()).toContain(en.accounts.account.balance_hidden)
+    expect(figure(view).get('[aria-hidden="true"]').text()).toBe('•••')
+    expect(plain(view.get('.balance .footnote').text())).toMatch(/^started .* · checked Sep 20$/)
+    // Nothing of it on the page, the open sheet and the live regions included; a shut sheet — the
+    // picker of «Перевести», mounted with the screen — is neither drawn nor read.
+    expect(view.findAll('dialog[open]')).toHaveLength(1)
+    const seen = document.body.cloneNode(true) as HTMLElement
+    for (const shut of seen.querySelectorAll('dialog:not([open])')) shut.remove()
+    expect(seen.textContent).not.toMatch(/190,132/)
+  })
+
+  it('the answer gives it back, «Ввести другую сумму» hides it again, closing shows it', async () => {
+    checkAccount.mockResolvedValue(answer('185000', '190132'))
+    const view = await screen()
+    await startCheck(view)
+    const sheet = view.getComponent(ReconcileSheet)
+    await sheet.get('input').setValue('185000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await settle()
+    expect(figure(view).text()).toContain('190,132')
+
+    await button(view, en.accounts.reconcile.edit_fact)?.trigger('click')
+    await settle()
+    expect(figure(view).text()).not.toContain('190,132')
+    expect(figure(view).text()).toContain(en.accounts.account.balance_hidden)
+
+    sheet.vm.$emit('update:open', false)
+    await settle()
+    expect(figure(view).text()).toContain('190,132')
+  })
+
+  it('every opening starts blind, the last answer of the sheet notwithstanding', async () => {
+    checkAccount.mockResolvedValue(answer('190132', '190132'))
+    const view = await screen()
+    await startCheck(view)
+    await view.getComponent(ReconcileSheet).get('input').setValue('190132')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await settle()
+    view.getComponent(ReconcileSheet).vm.$emit('update:open', false)
+    await settle()
+
+    await button(view, en.accounts.account.reconcile)?.trigger('click')
+    // The sheet is put back on the fact as it opens, and tells the screen before anything is drawn.
+    await view.vm.$nextTick()
+    expect(card(view)).not.toContain('190,132')
+  })
+
+  it('a balance below zero is not told by its colour while hidden', async () => {
+    const view = await screen(amd('-1200'))
+    expect(figure(view).classes()).toContain('negative')
+    await startCheck(view)
+    expect(figure(view).classes()).not.toContain('negative')
+    expect(card(view)).not.toContain('1,200')
+  })
+
+  it('must not fire: no sheet, no dots — and the figure is no live region (С-12)', async () => {
+    const view = await screen()
+    expect(figure(view).text()).not.toContain('•••')
+    expect(figure(view).attributes('aria-live')).toBeUndefined()
+    expect(view.text()).not.toContain(en.accounts.account.balance_hidden)
+  })
+})

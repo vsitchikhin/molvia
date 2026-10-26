@@ -19,6 +19,7 @@ import type {
 import AccountSheet from './AccountSheet.vue'
 import OperationSheet from './OperationSheet.vue'
 import ReconcileSheet from './ReconcileSheet.vue'
+import StatusStrip from './StatusStrip.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -149,6 +150,14 @@ const button = (view: VueWrapper, text: string | RegExp) =>
   view
     .findAll('button')
     .find((one) => (typeof text === 'string' ? one.text() === text : text.test(one.text())))
+
+/** Not now in the kit's one look (Ф-6): saying why, `aria-disabled` and in the focus order. */
+function expectNotNow(view: VueWrapper, word: string): void {
+  const found = button(view, word)
+  expect(found, word).toBeDefined()
+  expect(found?.attributes('aria-disabled')).toBe('true')
+  expect(found?.attributes('disabled')).toBeUndefined()
+}
 
 function taxi(): AccountOperationView {
   return {
@@ -323,7 +332,7 @@ describe('ReconcileSheet (handoff 05)', () => {
     await button(view, en.accounts.reconcile.check)?.trigger('click')
     await flushPromises()
     expect(view.text()).toContain(en.accounts.reconcile.recounting)
-    expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
+    expectNotNow(view, en.accounts.reconcile.write_after_recount)
 
     checkAccount.mockResolvedValue(answer('185000', '185000'))
     trips.pending = []
@@ -346,7 +355,7 @@ describe('ReconcileSheet (handoff 05)', () => {
     await button(view, en.accounts.reconcile.check)?.trigger('click')
     await flushPromises()
     expect(view.text()).not.toContain(en.accounts.reconcile.recounting)
-    expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
+    expectNotNow(view, en.accounts.reconcile.write_after_answer)
     expect(view.text()).toContain(en.accounts.reconcile.trips_held)
 
     // Control: a write the queue sends by itself is waited on, and the wait is said.
@@ -371,7 +380,7 @@ describe('ReconcileSheet (handoff 05)', () => {
     await flushPromises()
     // Counted without it — honest — but its money cannot become «Прочее».
     expect(view.text()).not.toContain(en.accounts.reconcile.recounting)
-    expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
+    expectNotNow(view, en.accounts.reconcile.write_after_answer)
     expect(view.text()).toContain(en.accounts.reconcile.trips_held)
 
     // The person answers on «Поход», the account lands: the same check once more.
@@ -399,7 +408,7 @@ describe('ReconcileSheet (handoff 05)', () => {
     trips.elsewhere = null
     await flushPromises()
     expect(view.text()).toContain(en.accounts.reconcile.recounting)
-    expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
+    expectNotNow(view, en.accounts.reconcile.write_after_recount)
     expect(checkAccount).toHaveBeenCalledTimes(1)
   })
 
@@ -421,7 +430,7 @@ describe('ReconcileSheet (handoff 05)', () => {
     await button(view, en.accounts.reconcile.check)?.trigger('click')
     await flushPromises()
     expect(view.text()).toContain(en.accounts.reconcile.recounting)
-    expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
+    expectNotNow(view, en.accounts.reconcile.write_after_recount)
 
     // Behind a question of «Поход»: not waited on, named, and nothing written over it.
     trips.elsewhere = { tripId: TRIP, place: 'Ереван Сити', mine: 'Рынок' }
@@ -430,7 +439,7 @@ describe('ReconcileSheet (handoff 05)', () => {
     await button(view, en.accounts.reconcile.check)?.trigger('click')
     await flushPromises()
     expect(view.text()).not.toContain(en.accounts.reconcile.recounting)
-    expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
+    expectNotNow(view, en.accounts.reconcile.write_after_answer)
     expect(view.text()).toContain(en.accounts.reconcile.trips_held)
   })
 
@@ -508,9 +517,61 @@ describe('ReconcileSheet (handoff 05)', () => {
       },
       withAccounts([cash]),
     )
-    const wait = button(view, en.accounts.reconcile.wait_online)
-    expect(wait?.attributes('disabled')).toBeDefined()
+    // Not now in the kit's one look, in the focus order, saying why (Ф-6).
+    expectNotNow(view, en.accounts.reconcile.wait_online)
     expect(view.find('[role="alert"]').exists()).toBe(false)
+    expect(view.getComponent(StatusStrip).props()).toMatchObject({
+      kind: 'offline',
+      text: en.accounts.reconcile.offline,
+    })
+    await button(view, en.accounts.reconcile.wait_online)?.trigger('click')
+    expect(checkAccount).not.toHaveBeenCalled()
+  })
+
+  it('«Записать разницу» is tinted, and live once nothing waits — no word of waiting (must not fire)', async () => {
+    checkAccount.mockResolvedValue(answer('185000', '190132'))
+    const view = await reconcile(withAccounts([cash]))
+    await view.get('input').setValue('185000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    const write = button(view, en.accounts.reconcile.write_difference)
+    expect(write?.classes()).toContain('tinted')
+    expect(write?.attributes('aria-disabled')).toBeUndefined()
+    expect(write?.attributes('disabled')).toBeUndefined()
+    for (const word of ['write_wait_online', 'write_after_recount', 'write_after_answer'] as const)
+      expect(view.text()).not.toContain(en.accounts.reconcile[word])
+  })
+
+  it('offline on step two the connection is named first, before the recount it holds back (Ф-6)', async () => {
+    checkAccount.mockResolvedValue(answer('185000', '190132'))
+    const pinia = withAccounts([cash])
+    const view = await reconcile(pinia)
+    await view.get('input').setValue('185000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    view.findComponent(OperationSheet).vm.$emit('saved')
+    await flushPromises()
+    expectNotNow(view, en.accounts.reconcile.write_after_recount)
+
+    await view.setProps({ online: false })
+    expectNotNow(view, en.accounts.reconcile.write_wait_online)
+    expect(view.findAllComponents(StatusStrip)).toHaveLength(1)
+    // A tap on what cannot be pressed writes nothing.
+    await button(view, en.accounts.reconcile.write_wait_online)?.trigger('click')
+    expect(useSpendingQueueStore(pinia).pending).toHaveLength(0)
+  })
+
+  it('tells the screen its step: the fact, the answer, the fact again (Ф-33)', async () => {
+    checkAccount.mockResolvedValue(answer('185000', '190132'))
+    const view = await reconcile(withAccounts([cash]))
+    expect(view.emitted('step')).toBeUndefined()
+    await view.get('input').setValue('185000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    expect(view.emitted('step')).toEqual([['result']])
+    await button(view, en.accounts.reconcile.edit_fact)?.trigger('click')
+    await flushPromises()
+    expect(view.emitted('step')).toEqual([['result'], ['fact']])
   })
 })
 
