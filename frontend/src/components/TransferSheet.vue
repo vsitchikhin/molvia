@@ -189,6 +189,7 @@ import {
   currencySign,
   decimalFromMinor,
   exchangeNoteSchema,
+  formatMoney,
   isRateDay,
   parseMoney,
 } from '@molvia/model'
@@ -204,7 +205,6 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { pageOrder, shortDay } from '@/components/accounts'
-import { asTyped } from '@/components/spending'
 import { shown } from '@/composables/useItemDetails'
 import { useReconnect } from '@/composables/useReconnect'
 import { useTransfers } from '@/composables/useTransfers'
@@ -411,7 +411,7 @@ export default defineComponent({
       const charge = money(fee.value)
       if (!sum || !charge) return hint
       const total = { minor: sum.minor + charge.minor, currency: sum.currency }
-      return `${hint} · ${t('transfer.fee_total', { amount: asTyped(total, locale.value) })}`
+      return `${hint} · ${t('transfer.fee_total', { amount: formatMoney(total, locale.value) })}`
     })
 
     /** What «Перевести» still needs, the first missing in order (Ф-6); null when it can go. */
@@ -429,7 +429,7 @@ export default defineComponent({
     const mainWord = computed(() => {
       if (editing.value) return t('transfer.save')
       const sum = money(amount.value)
-      return t('transfer.send', { amount: sum ? asTyped(sum, locale.value) : '' }).trim()
+      return t('transfer.send', { amount: sum ? formatMoney(sum, locale.value) : '' }).trim()
     })
 
     const amendedLine = computed(() => {
@@ -450,9 +450,9 @@ export default defineComponent({
     function currentOf(transfer: TransferView): string {
       const to = byId(transfer.toAccountId)?.name ?? ''
       return [
-        `${asTyped(transfer.amount, locale.value)} → «${to}»`,
+        `${formatMoney(transfer.amount, locale.value)} → «${to}»`,
         ...(transfer.fee
-          ? [t('transfer.current_fee', { amount: asTyped(transfer.fee, locale.value) })]
+          ? [t('transfer.current_fee', { amount: formatMoney(transfer.fee, locale.value) })]
           : []),
         shortDay(transfer.transferredOn, locale.value),
         ...(transfer.note ? [transfer.note] : []),
@@ -474,7 +474,7 @@ export default defineComponent({
         return t('transfer.amend_conflict', { details: currentOf(held) })
       if (failure.value === 'written' && held)
         return t('transfer.written', {
-          amount: asTyped(held.amount, locale.value),
+          amount: formatMoney(held.amount, locale.value),
           name: byId(held.toAccountId)?.name ?? '',
         })
       return t('transfer.failed_retry')

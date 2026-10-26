@@ -215,7 +215,7 @@ import type { Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconDonut from '~icons/mdi/chart-donut'
-import { formatEstimate, previousMonth } from '@molvia/model'
+import { formatEstimate, formatMoney, previousMonth } from '@molvia/model'
 import type { Money, MoneyChartYearView, SpendingCategoryView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -236,7 +236,7 @@ import {
   shortMonth,
   signedPercent,
 } from '@/components/charts'
-import { asTyped, categoryColour } from '@/components/spending'
+import { categoryColour } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { useLocalDay } from '@/composables/useLocalDay'
@@ -294,7 +294,7 @@ export default defineComponent({
     const whole = (value: Money) => formatEstimate(value, locale.value)
     /** What no rate counted, as written: no «≈» stands before it (MOL-184, adversarial Б1). */
     const written = (amounts: readonly Money[]) =>
-      amounts.map((amount) => asTyped(amount, locale.value)).join(', ')
+      amounts.map((amount) => formatMoney(amount, locale.value)).join(', ')
     const approx = (value: Money | null) =>
       value ? `≈ ${whole(value)}` : t('spending.charts.no_rate')
     const signedApprox = (value: Money) =>

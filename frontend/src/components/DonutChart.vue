@@ -47,12 +47,12 @@
 import { computed, defineComponent, ref, useId } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { CHART_LEVEL, formatEstimate, shareOf } from '@molvia/model'
+import { CHART_LEVEL, formatEstimate, formatMoney, shareOf } from '@molvia/model'
 import type { Currency, Money, MoneyChartMonthView, SpendingCategoryView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import DonutRing, { CHOSEN_THICKER } from '@/components/DonutRing.vue'
 import type { RingSector } from '@/components/DonutRing.vue'
-import { asTyped, categoryColour } from '@/components/spending'
+import { categoryColour } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
 
 /**
@@ -173,7 +173,7 @@ export default defineComponent({
         ? t('spending.charts.uncounted', {
             // As written, never rounded: no «≈» stands before it (MOL-184, adversarial Б1).
             amounts: props.charts.uncounted
-              .map((amount) => asTyped(amount, locale.value))
+              .map((amount) => formatMoney(amount, locale.value))
               .join(', '),
           })
         : null,

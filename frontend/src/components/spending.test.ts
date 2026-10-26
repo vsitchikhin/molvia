@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { parseMoney } from '@molvia/model'
+import { formatMoney, parseMoney } from '@molvia/model'
 import type { MoneyMonthView, SpendingCategoryView } from '@molvia/model'
 import {
   OWN_ICONS,
-  asTyped,
   categoriesWith,
   categoryIcon,
   dayTotalText,
@@ -295,8 +294,8 @@ describe('the categories as the phone knows them', () => {
 
 describe('what the screen prints', () => {
   it('an amount as it was typed — no «,00», never a fraction rounded away', () => {
-    expect(plain(asTyped(amd('5000'), 'ru-RU'))).toBe('5 000 ֏')
-    expect(plain(asTyped(parseMoney('2495.69', 'RUB'), 'ru-RU'))).toBe('2 495,69 ₽')
+    expect(plain(formatMoney(amd('5000'), 'ru-RU'))).toBe('5 000 ֏')
+    expect(plain(formatMoney(parseMoney('2495.69', 'RUB'), 'ru-RU'))).toBe('2 495,69 ₽')
   })
 
   it('a rate in words on its side of one', () => {

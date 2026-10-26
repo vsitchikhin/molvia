@@ -161,6 +161,7 @@
 <script lang="ts">
 import { defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatMoney } from '@molvia/model'
 import type { IncomeView as Row, Money } from '@molvia/model'
 import IconCashPlus from '~icons/mdi/cash-plus'
 import IconPlus from '~icons/mdi/plus'
@@ -173,7 +174,6 @@ import IncomeSheet from '@/components/IncomeSheet.vue'
 import OperationSkeleton from '@/components/OperationSkeleton.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import { defaultAccount } from '@/components/accounts'
-import { asTyped } from '@/components/spending'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SkeletonPart from '@/components/SkeletonPart.vue'
@@ -340,7 +340,7 @@ export default defineComponent({
     })
 
     // As typed, as everywhere in «Деньги» (owner's decision В-1 of MOL-81).
-    const amountOf = (income: Row): string => asTyped(income.amount, locale.value)
+    const amountOf = (income: Row): string => formatMoney(income.amount, locale.value)
     /** «Зарплата · 15 сент.» */
     const lineOf = (income: Row): string =>
       t('income.row_line', {
@@ -349,7 +349,7 @@ export default defineComponent({
         date: calendarDay(income.receivedOn, locale.value, { day: 'numeric', month: 'short' }),
       })
     const sumsOf = (sums: readonly Money[]): string =>
-      sums.map((sum) => asTyped(sum, locale.value)).join(' · ')
+      sums.map((sum) => formatMoney(sum, locale.value)).join(' · ')
     // «14 окт., 14:05» — the answer's day and time, as «Обмен денег», «Деньги» and «Траты» print it;
     // by the day the screen holds, so a night offline turns «сегодня» into «вчера» (MOL-187, А2).
     const whenOf = (at: Date): string => answeredAt(at, locale.value, today.value)
