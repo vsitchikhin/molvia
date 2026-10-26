@@ -27,12 +27,13 @@ import OperationRow from '@/components/OperationRow.vue'
 import OperationSheet from '@/components/OperationSheet.vue'
 import ReconcileSheet from '@/components/ReconcileSheet.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
-import { useAccountsStore } from '@/stores/accounts'
+import { rememberJournal, useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 import AccountView from '@/views/AccountView.vue'
 import AccountsView from '@/views/AccountsView.vue'
@@ -796,5 +797,141 @@ describe('«Счета» on the kit (MOL-193)', () => {
     await view.get('.removed-head').trigger('click')
     await settle()
     expect(view.get('.removed-open .meta').text()).toMatch(/· put away Oct\u00a021$/)
+  })
+})
+
+describe('the account’s screen on the kit (MOL-194)', () => {
+  const second = cash({ id: '22222222-0000-4000-8000-000000000002', name: 'Card ֏' })
+  const removed = (patch: Partial<MoneyAccountView> = {}) =>
+    cash({ archivedAt: new Date('2026-09-21T10:00:00Z'), ...patch })
+  const offline = () => vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+  const docked = (view: VueWrapper) => view.findAll('.dock button').map((one) => one.text())
+  const title = (view: VueWrapper) => view.get('h1.title').text()
+
+  it('«Сверить с фактом» is the strip’s, «Перевести» a ghost under it, the header «Править» alone (В-1 «б»)', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([cash(), second]))
+    accountJournal.mockResolvedValue(journal(cash(), []))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    expect(docked(view)).toEqual([en.accounts.account.reconcile, en.accounts.account.transfer])
+    expect(view.findAll('.dock button')[1]?.classes()).toContain('ghost')
+    expect(view.get('.trailing').text()).toBe(en.accounts.account.edit)
+    expect(view.find('.undo-place').exists()).toBe(false)
+
+    await button(view, en.accounts.account.reconcile)?.trigger('click')
+    await settle()
+    expect(view.getComponent(ReconcileSheet).props('open')).toBe(true)
+  })
+
+  it('must not fire: a removed account offers neither «Сверить» nor «Перевести», «Вернуть» in their place', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([removed(), second]))
+    accountJournal.mockResolvedValue(journal(removed(), []))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    expect(docked(view)).toEqual([en.accounts.screen.restore])
+    expect(view.get('.trailing').text()).toBe(en.accounts.account.edit)
+    // The note of the kit, its date whole (handoff 03 п. 4).
+    expect(view.get('.balance ~ .note').text()).toContain('September 21')
+  })
+
+  it('«Вернуть» offline is not now and says why; online it works under its word and gives the focus to «Сверить»', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([removed()]))
+    accountJournal.mockResolvedValue(journal(removed(), []))
+    const spy = offline()
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    const waiting = button(view, en.accounts.screen.restore_wait)
+    expect(waiting?.attributes('aria-disabled')).toBe('true')
+    await waiting?.trigger('click')
+    expect(restoreMoneyAccount).not.toHaveBeenCalled()
+
+    spy.mockReturnValue(true)
+    window.dispatchEvent(new Event('online'))
+    await settle()
+    let land: (value: MoneyAccountsResponse) => void = () => undefined
+    restoreMoneyAccount.mockImplementation(() => new Promise((resolve) => (land = resolve)))
+    await button(view, en.accounts.screen.restore)?.trigger('click')
+    await settle()
+    expect(docked(view)).toEqual([en.accounts.screen.restoring])
+
+    land(page([cash()]))
+    await settle()
+    expect(view.find('.balance ~ .note').exists()).toBe(false)
+    expect(docked(view)).toEqual([en.accounts.account.reconcile])
+    expect(document.activeElement?.textContent.trim()).toBe(en.accounts.account.reconcile)
+  })
+
+  it('a spending removed from a removed account’s journal: two «Вернуть» at once, the strip kept (С-8)', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([removed()]))
+    accountJournal.mockResolvedValue(journal(removed(), [spendingRow(TAXI, '-500', CASH)]))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    view.findComponent(OperationSheet).vm.$emit('removed', {
+      undo: { id: TAXI, kind: 'restore' },
+      title: 'Taxi',
+      amount: '֏500',
+    })
+    await settle()
+    expect(view.findComponent(UndoStrip).exists()).toBe(true)
+    expect(docked(view)).toEqual([en.accounts.screen.restore])
+  })
+
+  it('«Такого счёта нет»: attention, «К счетам» in the strip, no «Повторить», and «Счёт» over it whatever was kept (8h)', async () => {
+    useAccountsStore(session()).accept(page([cash()]))
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([]))
+    accountJournal.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, 'gone', true))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    expect(view.getComponent(ScreenState).props('kind')).toBe('attention')
+    expect(docked(view)).toEqual([en.accounts.account.to_list])
+    expect(button(view, en.state.retry)).toBeUndefined()
+    expect(title(view)).toBe(en.accounts.account.title)
+    expect(view.find('.trailing').text()).toBe('')
+  })
+
+  it('the title is the name the phone keeps while the journal is on its way or failed, else «Счёт» (Е-6)', async () => {
+    moneyAccounts.mockImplementation(() => new Promise(() => undefined))
+    accountJournal.mockImplementation(() => new Promise(() => undefined))
+    const cold = await open(AccountView, `/money/accounts/${CASH}`, session())
+    expect(title(cold)).toBe(en.accounts.account.title)
+    // No strip over the skeleton: nothing is known to act on yet.
+    expect(cold.find('.dock').exists()).toBe(false)
+
+    useAccountsStore(session()).accept(page([cash({ inSpend: amd('100') })]))
+    const kept = await open(AccountView, `/money/accounts/${CASH}`, session())
+    expect(title(kept)).toBe('Cash ֏')
+    // The skeleton in the answer's shape, «≈» where the kept account has it.
+    const parts = kept.findAllComponents(SkeletonPart).map((one) => one.props('kind'))
+    expect(parts).toEqual(['figure', 'caption', 'rows'])
+    expect(kept.findAllComponents(SkeletonPart)[0]?.props('approx')).toBe(true)
+
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    accountJournal.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const failed = await open(AccountView, `/money/accounts/${CASH}`, session())
+    expect(failed.getComponent(ScreenState).props('kind')).toBe('error')
+    expect(title(failed)).toBe('Cash ֏')
+  })
+
+  it('a journal kept, the server silent: one strip with «Повторить», a failed retry said again; offline the cloud', async () => {
+    useAccountsStore(session()).accept(page([cash()], new Date('2026-09-26T10:05:00Z')))
+    rememberJournal(OWNER, journal(cash(), [spendingRow(TAXI, '-500', CASH)]))
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    accountJournal.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, session())
+    const strip = view.getComponent(StatusStrip)
+    expect(strip.props('kind')).toBe('unanswered')
+    expect(view.findComponent(ScreenState).exists()).toBe(false)
+    const before = strip.props('attempt') as number
+    await button(view, en.state.retry)?.trigger('click')
+    await settle()
+    expect(view.getComponent(StatusStrip).props('attempt')).toBe(before + 1)
+    // The strip of the screen keeps its action under the strip of the connection.
+    expect(docked(view)).toEqual([en.accounts.account.reconcile])
+
+    offline()
+    const away = await open(AccountView, `/money/accounts/${CASH}`, session())
+    const cloud = away.getComponent(StatusStrip)
+    expect(cloud.props('kind')).toBe('offline')
+    expect(cloud.props('text')).toMatch(/^Offline · balances as of /)
   })
 })
