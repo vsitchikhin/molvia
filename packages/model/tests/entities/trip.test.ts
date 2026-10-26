@@ -163,7 +163,7 @@ describe('tripTotal', () => {
     const perSmall = unitPrice(parseMoney('520', 'AMD'), parseQuantity('0.9', 'l'))
     const perKilo = unitPrice(parseMoney('5403.12', 'AMD'), parseQuantity('1.128', 'kg'))
     expect(digits(formatUnitPrice(perLitre))).toBe('570֏')
-    expect(digits(formatUnitPrice(perSmall))).toContain('577,78')
+    expect(digits(formatUnitPrice(perSmall))).toBe('577,78֏')
     expect(digits(formatUnitPrice(perKilo))).toBe('4790֏')
   })
 })
