@@ -3,7 +3,7 @@ import IconCashPlus from '~icons/mdi/cash-plus'
 import IconSwap from '~icons/mdi/swap-horizontal'
 import IconTransferIn from '~icons/mdi/bank-transfer-in'
 import IconTransferOut from '~icons/mdi/bank-transfer-out'
-import { formatEstimate, parseMoney } from '@molvia/model'
+import { formatEstimate, formatMoney, parseMoney } from '@molvia/model'
 import type {
   AccountOperationView,
   Currency,
@@ -13,7 +13,7 @@ import type {
 } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
-import { asTyped, spendingLook, tripIcon, tripTint, unbroken } from '@/components/spending'
+import { spendingLook, tripIcon, tripTint, unbroken } from '@/components/spending'
 import type { OperationRowProps, Translate } from '@/components/spending'
 import { calendarDay, timeOfDay } from '@/days'
 
@@ -31,7 +31,7 @@ export function signedAmount(
   options: { plus?: boolean; estimate?: boolean } = {},
 ): string {
   const size = { ...value, minor: value.minor < 0n ? -value.minor : value.minor }
-  const text = options.estimate ? formatEstimate(size, locale) : asTyped(size, locale)
+  const text = options.estimate ? formatEstimate(size, locale) : formatMoney(size, locale)
   if (value.minor < 0n) return `${MINUS}${text}`
   return options.plus && value.minor > 0n ? `+${text}` : text
 }
@@ -135,7 +135,7 @@ const RECONCILE_NOTES = new Set([ru.accounts.reconcile.note, en.accounts.reconci
 
 /** A size of money with no sign — the words around it say which way it went. */
 function unsigned(value: Money, locale: string): string {
-  return asTyped({ ...value, minor: value.minor < 0n ? -value.minor : value.minor }, locale)
+  return formatMoney({ ...value, minor: value.minor < 0n ? -value.minor : value.minor }, locale)
 }
 
 /**

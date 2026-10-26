@@ -339,6 +339,14 @@ describe('MoneyView: the month', () => {
     expect(text).toContain('At my rate of 4.62 ֏ per 1 ₽ today')
   })
 
+  it('names the dollars as spent, only what they came to whole (MOL-205, adversarial Б1в)', async () => {
+    moneyMonth.mockResolvedValue(
+      month({ foreign: [{ amount: parseMoney('11.50', 'USD'), counted: amd('4485') }] }),
+    )
+    const text = plain((await render()).text())
+    expect(text).toContain('Including $11.50 (≈ ֏4,485)')
+  })
+
   it('no «≈» under exact drams for one who earns and spends in drams (MOL-184, adversarial А4)', async () => {
     moneyMonth.mockResolvedValue(
       month({ incomeCurrency: 'AMD', spentIncome: amd('317800'), rate: null }),

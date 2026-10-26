@@ -1,8 +1,8 @@
 import { useI18n } from 'vue-i18n'
-import { formatRate, formatRateBeside, yerevanDate } from '@molvia/model'
+import { formatMoney, formatRate, formatRateBeside, yerevanDate } from '@molvia/model'
 import type { ExchangeRate, ExchangeView } from '@molvia/model'
 import { signedAmount } from '@/components/accounts'
-import { asTyped, bankWords } from '@/components/spending'
+import { bankWords } from '@/components/spending'
 import { calendarDay } from '@/days'
 
 /** What the card of an exchange says of the central bank of its day, each part on its own line. */
@@ -67,7 +67,7 @@ export function useExchangeWords(): ExchangeWords {
     calendarDay(date, locale.value, { day: 'numeric', month: 'short' })
   const dayOf = (exchange: ExchangeView): string => day(exchange.exchangedOn)
   /** Amounts as they were typed, as everywhere in «Деньги» (owner's decision В-1). */
-  const moneyOf = (value: ExchangeView['given']): string => asTyped(value, locale.value)
+  const moneyOf = (value: ExchangeView['given']): string => formatMoney(value, locale.value)
 
   function amountsOf(exchange: ExchangeView): string {
     return t('exchange.row_amounts', {

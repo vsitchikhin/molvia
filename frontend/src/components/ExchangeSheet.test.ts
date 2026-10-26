@@ -210,7 +210,7 @@ describe('ExchangeSheet', () => {
     const second = await render()
     expect(second.text()).toContain('held before the exchange')
     expect(second.text()).toContain('By the recorded spending')
-    expect(second.text()).toContain('20,000.00')
+    expect(second.text()).toContain('20,000')
   })
 
   it('asks by days, not by the order of entry: a day before every exchange is the first link (С-3)', async () => {
@@ -226,7 +226,7 @@ describe('ExchangeSheet', () => {
     const [given, received] = view.findAll('select')
     await given?.setValue('USD')
     expect(view.text()).toContain('held before the exchange')
-    expect(view.text()).toContain('20,000.00')
+    expect(view.text()).toContain('20,000')
 
     // Roubles back for drams: the currency of conversion always costs one, nothing to weigh.
     await given?.setValue('AMD')
@@ -304,7 +304,7 @@ describe('ExchangeSheet', () => {
       }),
     )
     expect(view.text()).toContain('Of the last exchange ≈')
-    expect(view.text()).toContain('70,000.00')
+    expect(view.text()).toContain('70,000')
   })
 
   it('names an income when the hint starts from one (MOL-66, Р-8)', async () => {
@@ -430,7 +430,7 @@ describe('ExchangeSheet: an amendment (MOL-42, В-3)', () => {
     expect(value(en.exchange.sheet.received)).toBe('95000')
     expect(value(en.exchange.sheet.day)).toBe('2026-09-01')
     expect(value(en.exchange.sheet.note)).toBe('VTB')
-    expect(view.get('.versions').text()).toContain('100,000.00')
+    expect(view.get('.versions').text()).toContain('100,000')
     // The day of the version as the day it was, in UTC too — not «Aug 31» (adversarial Ж′).
     expect(view.get('.versions').text()).toMatch(/· Sep 1$/)
     // Its own entry is not an earlier exchange: the first link is asked nothing.
@@ -492,7 +492,7 @@ describe('ExchangeSheet: an amendment (MOL-42, В-3)', () => {
     expect(view.emitted('update:open')).toBeUndefined()
     expect(view.text()).toContain(en.exchange.sheet.amend_conflict)
     // What the other device wrote is in the sheet itself, not only in the list under it (Л4).
-    expect(view.get('.current').text()).toContain('Now recorded: ₽20,000.00 → ֏95,000.00')
+    expect(view.get('.current').text()).toContain('Now recorded: ₽20,000 → ֏95,000')
     expect(view.get('.current').text()).toContain('VTB')
     expect(
       (field(view, en.exchange.sheet.received).get('input').element as HTMLInputElement).value,
@@ -504,7 +504,7 @@ describe('ExchangeSheet: an amendment (MOL-42, В-3)', () => {
     const theirs: ExchangeView = { ...amended, heldBefore: { minor: 3_000_000n, currency: 'AMD' } }
     const view = await render(overview({ exchanges: [theirs] }), theirs)
     await saveAmendment(view)
-    expect(view.get('.current').text()).toContain('held before ֏30,000.00')
+    expect(view.get('.current').text()).toContain('held before ֏30,000')
   })
 
   // MOL-189 review №1: a save after the conflict that did not land — lost on the way, refused under a
