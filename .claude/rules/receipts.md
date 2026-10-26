@@ -1720,13 +1720,18 @@ Requirements, decisions and the measurement of the photo check: `.scratch/tasks/
   readings are in `.scratch/tasks/research/MOL-222.md`; a change of the detector is measured there.
 - **The copy is a mean, never a sample** (MOL-259): the phone halves the photo on canvas until it is
   within 1 280 (`halvingSteps`) — a step of exactly half is the mean of four pixels in any engine — and
-  `grayOf` takes it the rest of the way, as it took the bench's whole frame. One `drawImage` from 4 032
+  `grayOf` takes it the rest of the way, as it took the bench's whole frame. **Exactly half on an odd side
+  too: its last pixel is left out** (`halvedSource`). Drawn 4 619 into 2 310, the canvas samples again —
+  its point drifts across the photo until it reads one pixel of two in the middle, where the receipt is —
+  and a long receipt of 1 513 × 2 013 tore at its crease in both engines while the bench found it whole
+  (adversarial А1); such a side is any photo over 16 Mp `fittedSize` brought down, a crop, a screenshot. One `drawImage` from 4 032
   straight to 640 bilinearly reads four pixels of some forty: the print and the sensor's noise it keeps
   tore the paper's region in two, and the phone proposed half a receipt the bench had found whole —
   am-05c, a long crumpled «Ереван Сити», lost its top half in Chromium and its foot in WebKit; the bench
   never saw it, measuring the mean. **The bench makes the phone's copy by `halvedCopy`** — the same
   steps without a canvas — and an engine's own drawing is checked in Playwright's Chromium and WebKit
-  (`.scratch/tasks/research/MOL-259/`). Not `imageSmoothingQuality = 'high'`, which matched the bench
+  (`.scratch/tasks/research/MOL-259/`): the copy within 2 of 255 of `halvedCopy` on every frame, odd or
+  even. No `willReadFrequently` on it: read once, it cost WebKit half as much again, Chromium nothing. Not `imageSmoothingQuality = 'high'`, which matched the bench
   as well: what filter it names is each engine's to choose, iOS's among them. **The price, named:** the
   cut of am-26 that brought the task, a table's column of sums, is not reproduced — its frame is gone,
   only the cut is on production — so it is explained by the mechanism, not proven on itself; and
