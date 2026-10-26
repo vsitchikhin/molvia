@@ -373,6 +373,23 @@ describe('a new item of the seed’s kind (MOL-261, Т-2)', () => {
     expect(sauce?.name).toBe('Соус «Чим Чим» сладкий чили 220 г')
   })
 
+  it('stands for no word of the line its name does not say: the seed lumps (adversarial В1)', () => {
+    const gum = { ...words, ծամոն: 'жевательная резинка', անշաքար: 'без сахара', դաղձով: 'с мятой' }
+    const seed = [
+      { name: 'Жевательная резинка', names: ['ծամոն', 'ծամոն անշաքար', 'ծամոն դաղձով'] },
+    ]
+    const of = (printed: string) => newLineName(receiptLineParts(printed), gum, { seed })?.name
+    expect(of('Ծամոն «Օրբիտ» անշաքար 14գր')).toBe('Жевательная резинка «Орбит» без сахара 14 г')
+    expect(of('Ծամոն «Դիրոլ» դաղձով 14գր')).toBe('Жевательная резинка «Дирол» с мятой 14 г')
+  })
+
+  it('takes no seed’s head for a kind the dictionary has not where its name covers more (adversarial В3)', () => {
+    const seed = [{ name: 'Чай холодный', names: ['այս թի'] }]
+    expect(newLineName(receiptLineParts('Այս թի «Լիփթոն» դեղձ 0.5լ'), words, { seed })?.name).toBe(
+      'Айс ти «Липтон» персик 0,5 л',
+    )
+  })
+
   it('takes the number of the seed’s word of the kind, past its adjective, never another item’s (adversarial Б4)', () => {
     const leaf = { ...words, տերև: 'лист', դափնու: 'лавровый' }
     const seed = [

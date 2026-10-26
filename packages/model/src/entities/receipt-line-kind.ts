@@ -646,10 +646,11 @@ interface SeedKind {
  * «газированный напиток», «Пломбир» for an ice cream — or the dictionary have none. **It names nothing the line
  * does not say** (adversarial А2): the seed lumps — «Соус острый» knows «սոուս չիլի», a sweet chili is no hot sauce —
  * so its whole name stands for the kind, its figures apart, only where every word of it is the line's, by a form of
- * a gloss or of a genitive's adjective: «Желудки куриные» for «հավի … քարաճիկ»; then for every word it covered
- * where it has as many words, else the other words are said. One that covers the kind alone, or names more, says
- * only the word of the kind, and only where the dictionary has none: else the gloss is the line's own word, in the
- * seed's number (`asSeedSays`).
+ * a gloss or of a genitive's adjective: «Желудки куриные» for «հավի … քարաճիկ». **And it stands for no word it does
+ * not say** (adversarial В1): a word its till name covered goes only where its Russian name says it — the seed lumps
+ * «ծամոն անշաքար» into «Жевательная резинка», and «без сахара» stays. One that covers the kind alone says only the
+ * word of the kind, and only where the dictionary has none (adversarial В3: «այս թի» is «Чай холодный», and «Այս» alone
+ * is no «Чай»): else the gloss is the line's own word, in the seed's number (`asSeedSays`).
  */
 function seedKindOf(
   parts: ReceiptLineParts,
@@ -686,21 +687,28 @@ function seedKindOf(
   if (best === null) return null
   const head = best.name.split(' ')[0] ?? best.name
   const gloss = glossOf(parts.kind, dictionary)
-  if (gloss === null) return { name: head, covered: new Set([parts.kind]) }
+  if (gloss === null) {
+    return best.covered.size === 1 ? { name: head, covered: new Set([parts.kind]) } : null
+  }
   const glossHead = lowerRussian(gloss.split(' ')[0] ?? '')
   const seedHead = lowerRussian(head)
   if (glossHead !== seedHead && !sameNoun(glossHead, seedHead)) return null
   if (best.covered.size === 1) return null
-  const said = tokens.flatMap((token) => [
+  // what a token says: its gloss, and the adjective of its genitive, the regular «-ի» — «լոլիկ», «томатный» of «լոլիկի»
+  const saysOf = (token: string): string[] => [
     ...sensesOf(token, dictionary).flatMap(wordsOf),
-    // a noun's adjective is its genitive's, the regular «-ի» — «լոլիկ», «томатный» of «լոլիկի» — as the seed says it
     ...sensesOf(`${token}ի`, dictionary).flatMap(wordsOf),
     ...wordsOf(genitives[lexiconKey(token)] ?? genitives[`${lexiconKey(token)}ի`] ?? ''),
-  ])
-  const own = wordsOf(best.name).every((word) => said.some((one) => sameRussian(word, one)))
-  if (!own) return null
-  const all = wordsOf(best.name).length >= best.covered.size
-  return { name: best.name, covered: all ? best.covered : new Set([parts.kind]) }
+  ]
+  const named = wordsOf(best.name)
+  const said = tokens.flatMap(saysOf)
+  if (!named.every((word) => said.some((one) => sameRussian(word, one)))) return null
+  const covered = [...best.covered].filter(
+    (token) =>
+      token === parts.kind ||
+      saysOf(token).some((word) => named.some((one) => sameRussian(word, one))),
+  )
+  return { name: best.name, covered: new Set(covered) }
 }
 
 /**
