@@ -458,7 +458,7 @@ export function newLineName(
         (other) =>
           other.at > one.at && other.letters !== true && (other.kind || isNoun(other.word)),
       )
-      return agreeing(one.word, noun?.word ?? head)
+      return agreeing(one.word, noun?.word ?? head, seedAgreements(lexicon.seed ?? []))
     })
   }
   const name = [
@@ -574,6 +574,38 @@ const isNoun = (word: string): boolean => {
   )
 }
 
+const ADJECTIVE_AGREEMENT: readonly (readonly [RegExp, Agreement])[] = [
+  [/^[а-я-]{3,}(?:ые|ие)$/u, 'plural'],
+  [/^[а-я-]{3,}(?:ая|яя)$/u, 'feminine'],
+  [/^[а-я-]{3,}(?:ое|ее)$/u, 'neuter'],
+  [/^[а-я-]{3,}(?:ый|ий|ой)$/u, 'masculine'],
+]
+const agreementsOfSeed = new WeakMap<readonly SeedName[], ReadonlyMap<string, Agreement>>()
+
+/**
+ * The gender or number of the seed's nouns, told by the adjective its name agrees with them (MOL-261, adversarial
+ * Г1): the seed gives a kind its number — «Окорочка», «Рёбра», «Полотенца» — and its own «куриные», «свиные»,
+ * «бумажные» say that number, where the ending «-а» would read a feminine. Only an adjective next to the head and
+ * of it alone tells; a noun of the seed with none is read by its ending, as any other.
+ */
+function seedAgreements(seed: readonly SeedName[]): ReadonlyMap<string, Agreement> {
+  const kept = agreementsOfSeed.get(seed)
+  if (kept !== undefined) return kept
+  const out = new Map<string, Agreement>()
+  for (const { name } of seed) {
+    const words = name.split(/\s+/u).map(lowerRussian)
+    const head = lowerRussian(seedHeadOf(name))
+    const at = words.indexOf(head)
+    // the adjective of the head alone: right after it and last — «Мука кукурузная», never «Мука высший сорт» — or
+    // first, right before it, «Ватные палочки»; «Средство для ванной» says nothing of the «средство»
+    const adjective = at === words.length - 2 ? words[at + 1] : at === 1 ? words[0] : undefined
+    const told = ADJECTIVE_AGREEMENT.find(([form]) => form.test(adjective ?? ''))?.[1]
+    if (told !== undefined && !ADJECTIVE_SHAPED.test(head) && !out.has(head)) out.set(head, told)
+  }
+  agreementsOfSeed.set(seed, out)
+  return out
+}
+
 /**
  * The gender or number of a Russian noun by its ending (MOL-261, Т-3), the first word of a gloss that is not
  * an adjective's — «целлофановый пакет» is a «пакет»; none where the ending does not say. A plural only by an
@@ -582,8 +614,13 @@ const isNoun = (word: string): boolean => {
  * and says nothing; the prices, named: «пельмени», «вафли» keep the dictionary's adjective, as before, and a loan in
  * «-ки» or «-чи» the list of the indeclinable has not reads as a plural — «виски», «кимчи» are in it.
  */
-function agreementOf(noun: string): Agreement | null {
+function agreementOf(
+  noun: string,
+  known: ReadonlyMap<string, Agreement> = new Map(),
+): Agreement | null {
   const words = noun.split(' ').map(lowerRussian)
+  const told = words.map((one) => known.get(one)).find((one) => one !== undefined)
+  if (told !== undefined) return told
   // an adjective of the gloss already agreed says it: «кондитерские изделия», «растительное масло»
   const [first = ''] = words
   if (/^[а-я-]{4,}(?:ые|ие)$/u.test(first)) return 'plural'
@@ -615,8 +652,12 @@ function agreementOf(noun: string): Agreement | null {
  * «Соль мелкая», «Желудки … свежие», «Мороженое … пломбирное». A noun whose gender no ending tells leaves it
  * as the dictionary has it, as before.
  */
-function agreeing(adjective: string, noun: string): string {
-  const to = agreementOf(noun)
+function agreeing(
+  adjective: string,
+  noun: string,
+  known: ReadonlyMap<string, Agreement> = new Map(),
+): string {
+  const to = agreementOf(noun, known)
   const found = /^(.*?)(ый|ий|ой)$/u.exec(adjective)
   if (to === null || to === 'masculine' || found === null) return adjective
   const [, stem = '', ending = ''] = found

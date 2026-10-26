@@ -383,6 +383,26 @@ describe('a new item of the seed’s kind (MOL-261, Т-2)', () => {
     expect(of('Ծամոն «Դիրոլ» դաղձով 14գր')).toBe('Жевательная резинка «Дирол» с мятой 14 г')
   })
 
+  it('agrees with the number the seed gives a kind, told by the seed’s own adjective (adversarial Г1)', () => {
+    const more = {
+      ...words,
+      բդիկ: 'окорочок',
+      հավի: 'курица',
+      թարմ: 'свежий',
+      սրբիչ: 'полотенце',
+      թղթե: 'бумажный',
+      սպիտակ: 'белый',
+    }
+    const seed = [
+      { name: 'Окорочка куриные', names: ['հավի բդիկ'] },
+      { name: 'Полотенца бумажные', names: ['թղթե սրբիչ'] },
+    ]
+    const of = (printed: string) =>
+      newLineName(receiptLineParts(printed), more, { seed, genitives: { հավի: 'куриный' } })?.name
+    expect(of('Հավի թարմ բդիկ «Աշտարակ» 1կգ')).toBe('Окорочка куриные свежие «Аштарак» 1 кг')
+    expect(of('Թղթե սրբիչ «Զևա» սպիտակ 2հտ')).toBe('Полотенца бумажные «Зева» белые')
+  })
+
   it('takes no seed’s head for a kind the dictionary has not where its name covers more (adversarial В3)', () => {
     const seed = [{ name: 'Чай холодный', names: ['այս թի'] }]
     expect(newLineName(receiptLineParts('Այս թի «Լիփթոն» դեղձ 0.5լ'), words, { seed })?.name).toBe(
