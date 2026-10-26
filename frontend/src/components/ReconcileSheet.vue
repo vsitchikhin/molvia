@@ -335,6 +335,9 @@ export default defineComponent({
       () => props.open,
       async (open) => {
         if (!open) return
+        // Every opening is blind, whatever the screen was last told — a sheet mounted anew has no
+        // answer to clear, and said nothing (review Р2-3).
+        emit('step', 'fact')
         fact.value = ''
         factBad.value = false
         result.value = null
@@ -359,7 +362,7 @@ export default defineComponent({
     const matched = computed(() => result.value?.difference.minor === 0n)
 
     // The screen is told the step as it changes: an answer shows the balance behind, «Ввести другую
-    // сумму» and an opening hide it again (Ф-33).
+    // сумму» hides it again (Ф-33).
     watch(
       () => result.value === null,
       (none) => {

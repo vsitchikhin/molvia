@@ -314,10 +314,12 @@ test('без связи «Сверить» ждёт связь словами и
   await page.getByRole('button', { name: 'Сверить с фактом' }).click()
   const check = topSheet(page)
   await expect(check).toContainText('Сверить можно со связью — введённое останется здесь')
-  // Not now in the kit's one look: in the focus order, saying why (Ф-6).
+  // Not now in the kit's one look: in the focus order, saying why (Ф-6) — a native `disabled` takes
+  // no focus. Not `toBeEnabled`: Playwright reads `aria-disabled` as disabled.
   const wait = check.getByRole('button', { name: 'Сверим, когда будет связь' })
   await expect(wait).toHaveAttribute('aria-disabled', 'true')
-  await expect(wait).toBeEnabled()
+  await wait.focus()
+  await expect(wait).toBeFocused()
   await expect(check.getByRole('alert')).toHaveCount(0)
   await page.waitForTimeout(400)
   await check.getByLabel('Сколько на счёте сейчас?').fill('1000')

@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import type { Pinia } from 'pinia'
-import { shallowRef } from 'vue'
+import { nextTick, shallowRef } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
@@ -1127,8 +1127,20 @@ describe('the check is blind behind its sheet (MOL-195, Ф-33)', () => {
 
     await button(view, en.accounts.account.reconcile)?.trigger('click')
     // The sheet is put back on the fact as it opens, and tells the screen before anything is drawn.
-    await view.vm.$nextTick()
+    await nextTick()
     expect(card(view)).not.toContain('190,132')
+  })
+
+  it('review Р2-3: an opening is blind with no answer to clear — a sheet mounted anew says «fact» too', async () => {
+    const view = await screen()
+    // The screen was last told «result», and the sheet holds no answer — as one mounted anew would.
+    view.getComponent(ReconcileSheet).vm.$emit('step', 'result')
+    await settle()
+    expect(card(view)).toContain('190,132')
+
+    await startCheck(view)
+    expect(card(view)).not.toContain('190,132')
+    expect(figure(view).text()).toContain(en.accounts.account.balance_hidden)
   })
 
   it('a balance below zero is not told by its colour while hidden', async () => {
