@@ -277,6 +277,51 @@ describe('when the server answered the first page (MOL-204)', () => {
     expect(localStorage.getItem(AT)).toBeNull()
   })
 
+  it('shows the answer while the page on the phone is the server’s last, row for row (adversarial В1, Б4)', async () => {
+    const store = useTripHistoryStore()
+    expect(store.showsAnswer()).toBe(false)
+    tripHistory.mockResolvedValueOnce({ trips: [entry(A)], nextCursor: null })
+    await store.load()
+    expect(store.showsAnswer()).toBe(true)
+    // Another window puts back a page the answer is not: memory.
+    localStorage.setItem(
+      `molvia.trip-history.${OWNER}`,
+      JSON.stringify({
+        page: {
+          trips: [
+            {
+              id: B,
+              place: entry(B).place,
+              startedAt: entry(B).startedAt.toISOString(),
+              finishedAt: entry(B).finishedAt.toISOString(),
+              finishedOnDeviceAt: null,
+            },
+          ],
+          nextCursor: null,
+        },
+        selected: null,
+        local: [],
+      }),
+    )
+    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-history.${OWNER}` }))
+    expect(store.showsAnswer()).toBe(false)
+  })
+
+  it('an answer with counts and sums is the same page as its shelf copy, which keeps neither (adversarial В1)', async () => {
+    const store = useTripHistoryStore()
+    const counted = {
+      ...entry(A),
+      itemCount: 3,
+      total: [{ minor: 120000n, currency: 'AMD' as const }],
+    }
+    tripHistory.mockResolvedValueOnce({ trips: [counted], nextCursor: null })
+    await store.load()
+    // Another window wrote this very answer: the page is read back from the shelf, with no counts.
+    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-history.${OWNER}` }))
+    expect(store.page.trips[0]?.itemCount).toBeNull()
+    expect(store.showsAnswer()).toBe(true)
+  })
+
   it('another owner’s moment is not this owner’s', () => {
     localStorage.setItem(`molvia.trip-history-at.${A}`, '2026-09-27T10:05:00.000Z')
     expect(restart().answeredAt).toBeNull()

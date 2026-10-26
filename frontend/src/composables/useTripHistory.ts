@@ -36,8 +36,8 @@ interface TripHistoryScreen {
   failures: Ref<number>
   /**
    * The last load's «did not load» came of a list that kept moving, not of the server: every ask was
-   * answered, under a cache another window was writing with an answer of the same while (MOL-204,
-   * adversarial А4). A page put back from before the load is no such answer (Б4).
+   * answered, under a cache another window was writing, and the page shown is the server's answer
+   * (MOL-204, adversarial А4, В1). A page put back that is not the answer is memory (Б4).
    */
   moved: Ref<boolean>
   load(): void
@@ -124,7 +124,6 @@ export function useTripHistory(): TripHistoryScreen {
   async function load(more = false): Promise<void> {
     if (!actor.id) return
     const token = ++run
-    const askedAt = Date.now()
     busy.value = true
     loadingMore.value = more
     history.stale = true
@@ -140,7 +139,7 @@ export function useTripHistory(): TripHistoryScreen {
       }
       if (token === run) {
         trouble.value = taken ? null : 'error'
-        moved.value = !taken && (history.answeredAt?.getTime() ?? -Infinity) >= askedAt
+        moved.value = !taken && history.showsAnswer()
       }
       if (token === run && !taken) failures.value += 1
     } catch (error) {

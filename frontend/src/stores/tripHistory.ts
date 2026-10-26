@@ -103,6 +103,17 @@ function toShelf(cache: z.output<typeof cacheCodec>): string {
   )
 }
 
+/** A first page as the shelf keeps it: what tells a page shown from the server's answer (В1). */
+function asShelvedPage(page: TripHistory): string {
+  return JSON.stringify(
+    everyView(
+      { page: tripHistoryCodec.encode(page) },
+      () => true,
+      (key) => !ENTRY_NOT_CACHED_YET.has(key),
+    ),
+  )
+}
+
 /**
  * A trip as the shelf keeps it: what two copies are compared by when another window writes the
  * shelf. The fields the shelf does not keep yet are left out, so an answer and its own shelf copy
@@ -179,6 +190,8 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   // What «Показать ещё» brought, and the cursor standing after it. Only the first page is
   // remembered on the phone; these live for as long as the screen does.
   let deeper: TripHistoryEntry[] = []
+  /** The first page the server gave last, taken or not (adversarial В1). */
+  let lastAnswer: TripHistory | null = null
   let deepCursor: TripHistory['nextCursor'] = null
   let generation = 0
   let selection = 0
@@ -401,6 +414,15 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   }
 
   /**
+   * Whether the first page on the phone is the one the server gave last, row for row as the shelf keeps
+   * them: a list another window kept moving under every answer is then that answer all the same, and
+   * no memory (adversarial А4, В1); a page put back from before it is (Б4).
+   */
+  function showsAnswer(): boolean {
+    return lastAnswer !== null && asShelvedPage(firstPage) === asShelvedPage(lastAnswer)
+  }
+
+  /**
    * Whether the answer was taken. A false one is not a failure: the list changed under the
    * request — another window wrote the cache, a finish was taken back — and the answer may no
    * longer be true. The caller asks again rather than wait for a reconnect that may never come:
@@ -412,6 +434,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     const cursor = more ? page.value.nextCursor : null
     if (more && !cursor) return true
     const answer = await api.tripHistory(cursor ?? undefined)
+    if (!more && owner === actor.id) lastAnswer = answer
     // A next page cannot be cancelled by a change somewhere else: it lies deeper than anything
     // held, and it is merged by id. Under the shared guard a correction sent to a trip finished
     // last week threw it away, and «Показать ещё» did nothing at all (В5).
@@ -508,6 +531,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     forgetLocal,
     drop,
     load,
+    showsAnswer,
     known,
     answered,
     open,

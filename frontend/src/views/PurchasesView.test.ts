@@ -737,9 +737,11 @@ describe('PurchasesView (MOL-128)', () => {
     })
 
     it('список сдвигается под каждым ответом над строками другого окна — полосы нет (MOL-204, адверсариальное А4)', async () => {
+      // One answer, the same every time it is asked: `trip` reads the clock.
+      const answer = [trip(1)]
       const full = JSON.stringify({
         page: {
-          trips: [trip(1)].map((row) => ({
+          trips: answer.map((row) => ({
             id: row.id,
             place: row.place,
             startedAt: row.startedAt.toISOString(),
@@ -752,11 +754,9 @@ describe('PurchasesView (MOL-128)', () => {
         local: [],
       })
       tripHistory.mockImplementation(() => {
-        // its answer, with its moment before it, as `persist` writes them
-        localStorage.setItem(`molvia.trip-history-at.${ME}`, new Date().toISOString())
         localStorage.setItem(key, full)
         window.dispatchEvent(new StorageEvent('storage', { key }))
-        return Promise.resolve({ trips: [trip(1)], nextCursor: null })
+        return Promise.resolve({ trips: answer, nextCursor: null })
       })
       const { view } = await render()
       await pausesPass()
@@ -766,6 +766,32 @@ describe('PurchasesView (MOL-128)', () => {
       expect(rows(view)).toHaveLength(1)
       expect(view.findAll('.strip')).toHaveLength(0)
       expect(view.find('.state').exists()).toBe(false)
+    })
+
+    it('соседнее окно ответило до вопроса и шлёт очередь — на экране его ответ, тот же, что у сервера: полосы нет (адверсариальное В1, А4)', async () => {
+      const before = new Date(NOW.getTime() - 5000)
+      // One answer, the same every time it is asked: `trip` reads the clock.
+      const answer = [trip(1), trip(5, 'SAS')]
+      for (const moment of [before.toISOString(), null]) {
+        while (mounted.length) mounted.pop()?.unmount()
+        localStorage.clear()
+        tripHistory.mockReset()
+        // its answer of five seconds before this window asked — or, on the previous build, of no moment
+        tripHistory.mockImplementation(() => {
+          if (moment) localStorage.setItem(`molvia.trip-history-at.${ME}`, moment)
+          else localStorage.removeItem(`molvia.trip-history-at.${ME}`)
+          remember(answer)
+          window.dispatchEvent(new StorageEvent('storage', { key }))
+          return Promise.resolve({ trips: answer, nextCursor: null })
+        })
+        const { view } = await render()
+        await pausesPass()
+
+        expect(tripHistory).toHaveBeenCalledTimes(4)
+        expect(rows(view)).toHaveLength(2)
+        expect(view.findAll('.strip')).toHaveLength(0)
+        expect(view.find('.state').exists()).toBe(false)
+      }
     })
 
     it('другое окно кладёт назад свою старую страницу — полоса со временем той страницы (адверсариальное Б4)', async () => {
