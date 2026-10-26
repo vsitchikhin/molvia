@@ -339,7 +339,10 @@ balance, total and difference is the server's.
   called stale, the correction and «Прочее» the same money twice; not now rather than gone, so a focus
   on it stays as the connection drops (Б2), and saying why on itself (В1): «Повторим, когда будет
   связь», «… после ответа в «Покупках»», «… после пересчёта». «Повторить» of a recount that failed is
-  not now offline too, in the first of these words (В2): it asked nothing and said nothing.
+  not now offline too, in the first of these words (В2): it asked nothing and said nothing. **The
+  price, named** (review round 6): «Прочее» not found while the write waits leaves two buttons not now
+  with near the same words — «Повторим …» over «Запишем …» — a third of the screen at 320; rare, and
+  each stays where a focus may be.
 - **«Записать разницу»** writes the server's `difference` as «Прочее» with the note «сверка» — read
   back as «Прочее · сверка» in either language. **Below zero**: a spending through its queue, named
   once per answer, and the same check once more after that spending has landed, kept in the store
