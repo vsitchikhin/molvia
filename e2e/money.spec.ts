@@ -1095,6 +1095,45 @@ test('the spending sheet rises as high as the keys leave it, before they come (M
   expect(await within(page, 'dialog[open]', covered)).toEqual({ top: true, bottom: true })
 })
 
+// The ways out are not under the month's skeleton (MOL-269): there the answer moved them from under
+// the finger — 291 px up for a newcomer, 99 down with a spending — and the tap aimed at «Обмен денег»
+// went nowhere, as it did in CI. They come once the month and «Счета» have both answered, «Счета»
+// too since their card over the switcher moves them as well. The test holds the order, not the runner.
+test('the ways out come with the answers of the month and «Счета», and a tap leads where it says', async ({
+  page,
+}) => {
+  const hold = async (url: string): Promise<() => void> => {
+    let release: () => void = () => undefined
+    const released = new Promise<void>((resolve) => (release = resolve))
+    await page.route(url, async (route) => {
+      await released
+      await route.continue()
+    })
+    return release
+  }
+  // Laid before the page opens (MOL-249).
+  const month = await hold('**/api/money/months/**')
+  const accounts = await hold('**/api/money/accounts')
+  await openMoney(page)
+  const ways = page.getByRole('navigation', { name: 'Разделы «Денег»' })
+  const exchange = page.getByRole('link', { name: /^Обмен денег/ })
+
+  await expect(page.locator('.skeleton')).toBeVisible()
+  await expect(ways).toHaveCount(0)
+
+  const answered = page.waitForResponse('**/api/money/months/**')
+  month()
+  await answered
+  await expect(page.locator('.skeleton')).toHaveCount(0)
+  await expect(ways).toHaveCount(0)
+
+  accounts()
+  await expect(exchange).toBeVisible()
+  await exchange.click()
+  await expect(page).toHaveURL(/\/money\/exchange$/)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Обмен денег')
+})
+
 // The summary broke, the connection did not: a section's quiet card with its «Повторить», and
 // «Добавить трату» keeps the strip — a spending goes through the queue with the server down
 // (MOL-180, В-1, 157 v2 1k). The month is turned back before this month answers — the order that
