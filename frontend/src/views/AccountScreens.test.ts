@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import type { Pinia } from 'pinia'
+import { shallowRef } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
@@ -32,6 +33,8 @@ import StatusStrip from '@/components/StatusStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
+import { pwaUpdateKey } from '@/pwaUpdate'
+import type { PwaUpdate, UpdatePhase } from '@/pwaUpdate'
 import { routes } from '@/router'
 import { rememberJournal, useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
@@ -195,13 +198,22 @@ async function settle(): Promise<void> {
   await flushPromises()
 }
 
-async function open(component: unknown, path: string, pinia: Pinia, props = {}) {
+async function open(
+  component: unknown,
+  path: string,
+  pinia: Pinia,
+  props = {},
+  update?: PwaUpdate,
+) {
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push(path)
   const view = mount(component as never, {
     props: props as never,
     attachTo: document.body,
-    global: { plugins: [router, pinia, createAppI18n('en')] },
+    global: {
+      plugins: [router, pinia, createAppI18n('en')],
+      provide: update ? { [pwaUpdateKey as symbol]: update } : {},
+    },
   })
   views.push(view)
   await settle()
@@ -1004,6 +1016,28 @@ describe('the account’s screen on the kit (MOL-194)', () => {
     await settle()
     expect(docked(view)).toEqual([next])
     expect(document.activeElement?.textContent.trim()).toBe(next)
+  })
+
+  // «Обновить» of a version waiting stands over «Сверить» in the strip: the focus brought back is the
+  // screen's, never a reload the next Enter would let in (review №3, adversarial Г2).
+  it('«Вернуть» answered with a version waiting: the focus to «Сверить с фактом», not to «Обновить»', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([removed()]))
+    accountJournal.mockResolvedValue(journal(removed(), []))
+    restoreMoneyAccount.mockResolvedValue(page([cash({ revision: 2 })]))
+    const update: PwaUpdate = {
+      phase: shallowRef<UpdatePhase>('ready'),
+      apply: vi.fn(),
+      serverVersion: vi.fn(),
+      build: () => null,
+    }
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia, {}, update)
+    const back = button(view, en.accounts.screen.restore)
+    ;(back?.element as HTMLElement).focus()
+    await back?.trigger('click')
+    await settle()
+    expect(docked(view)).toEqual([en.update.apply, en.accounts.account.reconcile])
+    expect(document.activeElement?.textContent.trim()).toBe(en.accounts.account.reconcile)
   })
 
   it('must not fire: «Вернуть» answered leaves a focus the person took elsewhere meanwhile (В)', async () => {

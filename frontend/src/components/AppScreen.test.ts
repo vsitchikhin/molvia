@@ -854,11 +854,14 @@ describe('AppScreen with an error of the whole screen', () => {
 
   // The strip's actions swapped under the focus — an account put away on another phone — left it on
   // the body: it goes to the strip's first button, or to the title where the strip went whole
-  // (MOL-194, Б2, Б3).
+  // (MOL-194, Б2, Б3) — never to «Обновить» of a version waiting over them, a reload the person did
+  // not ask for (review №3, adversarial Г1, Г2).
   it.each([
-    ['to the strip’s first button where its actions were swapped', true],
-    ['to the title where the strip went whole', false],
-  ])('brings a focus the strip lost %s', async (_, swapped) => {
+    ['to the strip’s first button where its actions were swapped', true, 'none'],
+    ['to the screen’s first button, past a version waiting', true, 'ready'],
+    ['to the title where the strip went whole', false, 'none'],
+    ['to the title where only a version waiting is left', false, 'ready'],
+  ] as const)('brings a focus the strip lost %s', async (_, swapped, phase) => {
     const away = ref(false)
     const view = mount(
       defineComponent({
@@ -881,16 +884,48 @@ describe('AppScreen with an error of the whole screen', () => {
         attachTo: document.body,
         global: {
           plugins: [await routed('/'), createPinia(), createAppI18n('en')],
-          provide: { [pwaUpdateKey as symbol]: waiting('none') },
+          provide: { [pwaUpdateKey as symbol]: waiting(phase) },
         },
       },
     )
+    expect(view.find('.dock .update').exists()).toBe(phase === 'ready')
     ;(view.get('.own').element as HTMLElement).focus()
     away.value = true
     await nextTick()
     expect(document.activeElement).toBe(
       swapped ? view.get('.restore').element : view.get('h1').element,
     )
+    view.unmount()
+  })
+
+  // The row of the version swaps «Обновить» for its words in a render of its own, which the frame
+  // never saw: a version that did not take left the focus on the body (adversarial Д).
+  it('brings a focus on «Обновить» to the screen’s action when the version did not take', async () => {
+    const update = waiting('ready')
+    const view = mount(
+      defineComponent({
+        setup: () => () =>
+          h(AppScreen, { title: 'Cash' }, { docked: () => h('button', { class: 'own' }, 'Check') }),
+      }),
+      {
+        attachTo: document.body,
+        global: {
+          plugins: [await routed('/'), createPinia(), createAppI18n('en')],
+          provide: { [pwaUpdateKey as symbol]: update },
+        },
+      },
+    )
+    const apply = view.get('.update button').element as HTMLElement
+    apply.focus()
+    update.phase.value = 'applying'
+    await nextTick()
+    await nextTick()
+    expect(document.activeElement).toBe(apply)
+    update.phase.value = 'failed'
+    await nextTick()
+    await nextTick()
+    expect(view.find('.update button').exists()).toBe(false)
+    expect(document.activeElement).toBe(view.get('.own').element)
     view.unmount()
   })
 
