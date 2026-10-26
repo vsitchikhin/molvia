@@ -73,15 +73,12 @@ test('А1e: «Повторить», a press on «Обмен денег», the an
     ([px, py]) =>
       document
         .elementFromPoint(px ?? 0, py ?? 0)
-        ?.textContent?.trim()
+        ?.textContent.trim()
         .slice(0, 60) ?? null,
     [x, y],
   )
   await page.mouse.up()
-  test.info().annotations.push({
-    type: 'А1e',
-    description: `«Обмен денег» y ${before.y} → ${after?.y}; under the finger at the release: ${under}`,
-  })
+  console.log('А1e', JSON.stringify({ before: before.y, after: after?.y ?? null, under }))
 
   expect(after?.y).not.toBe(before.y)
   // The press went nowhere: no screen of the exchange, after a wait for a move that would have begun.
@@ -169,7 +166,7 @@ test('А5e: a step back by the browser to «Настройки» — six groups 
       (window as unknown as { move: { marked: boolean; atShown: number | null; groups: number } })
         .move,
   )
-  test.info().annotations.push({ type: 'А5e', description: JSON.stringify(move) })
+  console.log('А5e', JSON.stringify(move))
   expect(move.marked).toBe(true)
   expect(move.groups).toBe(6)
   expect(move.atShown).toBe(6)

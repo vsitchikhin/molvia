@@ -23,7 +23,7 @@
     "typecheck": "tsc --noEmit -p packages/model && tsc --noEmit -p packages/client && tsc --noEmit -p backend && tsc --noEmit -p bot && tsc --noEmit -p deploy/watch && tsc --noEmit -p deploy/watch/tests && vue-tsc --noEmit -p frontend && tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test e2e/MOL-269-adversarial-1.attack.spec.ts",
+    "test:e2e": "playwright test e2e/MOL-269-adversarial-1.attack.spec.ts --reporter=list",
     "migrate": "npm run migrate -w @molvia/backend"
   },
   "devDependencies": {
