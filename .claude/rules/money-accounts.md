@@ -295,9 +295,11 @@ balance, total and difference is the server's.
   so no frame shows it. The figure is no live region (С-12): back with the answer, it would be said over
   the check's result. **The price, named:** the balance is on the screen before «Сверить с фактом» is
   pressed — it is what the screen is for; the dots keep the count out of sight while the fact is typed,
-  not out of memory. And an account with no operations since its start tells its balance anyway: the
-  start stays, and the empty journal says «Пока остаток — это старт» — the journal behind the sheet is
-  the handoff's, and a check of such an account has nothing to find. The same fact goes again under the same name, also after an answer that never came (Р-19). A reason
+  not out of memory. **Nor out of arithmetic** (review Р2-2): the start in the footnote and the journal
+  behind the sheet stay in sight — the sheet covers the lower part of the screen, as the handoff draws
+  it — so a balance of the start and a few rows adds up from them, and one with no operations is the
+  start itself («Пока остаток — это старт»). The dots take the figure out of sight; a sheet the
+  height of the screen, the other half of Ф-33, was not chosen. The same fact goes again under the same name, also after an answer that never came (Р-19). A reason
   is put right in its own sheet over the check, and the same check is sent again **once nothing put
   right is still waiting** — no spending, and no write of a trip but its start and finish (its account,
   its removal or «Вернуть», a purchase added, amended or removed) in either queue: «some queue landed»
