@@ -66,6 +66,10 @@ export interface ReceiptsScreen {
   readonly knownEmpty: ComputedRef<boolean>
   /** Why the list on screen is not this visit's, or why there is none (MOL-19). */
   readonly trouble: ComputedRef<'error' | 'offline' | null>
+  /** When the list on screen was answered (MOL-204): the time «Покупки» name in their one strip. */
+  readonly fetchedAt: ComputedRef<Date | null>
+  /** Which failed answer the screen stands for: the strip says the same words again (MOL-181, C1). */
+  readonly attempt: ComputedRef<number>
   readonly retry: () => Promise<void>
   readonly total: (row: ReceiptRow) => Money | null
   readonly online: Ref<boolean>
@@ -231,6 +235,8 @@ export function useReceipts(): ReceiptsScreen {
       const phase = kept.phase.value
       return phase === 'error' || phase === 'offline' ? phase : null
     }),
+    fetchedAt: kept.fetchedAt,
+    attempt: kept.attempt,
     retry: kept.retry,
     total: (row) => row.summary?.total ?? null,
     online,

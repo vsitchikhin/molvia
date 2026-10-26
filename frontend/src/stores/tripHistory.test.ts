@@ -182,6 +182,152 @@ describe('whether the server has answered an empty history (MOL-77)', () => {
   })
 })
 
+describe('when the server answered the first page (MOL-204)', () => {
+  const AT = `molvia.trip-history-at.${OWNER}`
+
+  it('is kept with the first page, under a key of its own, and read back after a restart', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-27T10:05:00Z'))
+    const store = useTripHistoryStore()
+    expect(store.answeredAt).toBeNull()
+    tripHistory.mockResolvedValue({ trips: [entry(A)], nextCursor: cursor(A) })
+    await store.load()
+    vi.useRealTimers()
+    expect(store.answeredAt?.toISOString()).toBe('2026-09-27T10:05:00.000Z')
+    expect(localStorage.getItem(AT)).toBe('2026-09-27T10:05:00.000Z')
+    // Not a field of the cache: the previous build reads that strictly (Р-3).
+    expect(localStorage.getItem(`molvia.trip-history.${OWNER}`)).not.toContain('2026-09-27T10:05')
+    expect(restart().answeredAt?.toISOString()).toBe('2026-09-27T10:05:00.000Z')
+  })
+
+  it('is not moved by «Показать ещё», a failed load or a write to a trip', async () => {
+    localStorage.setItem(AT, '2026-09-27T10:05:00.000Z')
+    const store = restart()
+    tripHistory.mockResolvedValueOnce({ trips: [entry(B)], nextCursor: null })
+    // A next page is asked for only past a cursor, so the first page is put there first.
+    store.page = { trips: [entry(A)], nextCursor: cursor(A) }
+    await store.load(true)
+    tripHistory.mockRejectedValueOnce(new Error('Failed to fetch'))
+    await expect(store.load()).rejects.toThrow()
+    store.apply(view(C, false))
+    expect(store.answeredAt?.toISOString()).toBe('2026-09-27T10:05:00.000Z')
+    expect(localStorage.getItem(AT)).toBe('2026-09-27T10:05:00.000Z')
+  })
+
+  it('a cache from before the key, or anything but a date under it, is no moment', () => {
+    useTripHistoryStore().apply(view(A))
+    expect(restart().answeredAt).toBeNull()
+    localStorage.setItem(AT, 'вчера')
+    expect(restart().answeredAt).toBeNull()
+  })
+
+  it('a shelf that refuses the page keeps no moment newer than the page it keeps (adversarial А5)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-20T10:00:00Z'))
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({ trips: [entry(A)], nextCursor: null })
+    await store.load()
+    // The shared shelf is full: the page with one more trip does not fit, a date would. happy-dom
+    // keeps `setItem` on the instance, so it is replaced there.
+    const working = localStorage.setItem.bind(localStorage)
+    const define = (value: Storage['setItem']) =>
+      Object.defineProperty(localStorage, 'setItem', { configurable: true, writable: true, value })
+    define((key: string, value: string) => {
+      if (key === `molvia.trip-history.${OWNER}` && value.includes(B))
+        throw new DOMException('quota', 'QuotaExceededError')
+      working(key, value)
+    })
+    try {
+      vi.setSystemTime(new Date('2026-09-27T14:05:00Z'))
+      tripHistory.mockResolvedValueOnce({ trips: [entry(B), entry(A)], nextCursor: null })
+      await store.load()
+    } finally {
+      define(working)
+      vi.useRealTimers()
+    }
+    // This window holds the new page, and its moment.
+    expect(store.answeredAt?.toISOString()).toBe('2026-09-27T14:05:00.000Z')
+    // Opened again at the shelf: the page of 20 Sept., and no moment of 27 Sept. over it.
+    sessionStorage.clear()
+    const again = restart()
+    expect(again.page.trips.map((row) => row.id)).toEqual([A])
+    expect(again.answeredAt).toBeNull()
+  })
+
+  it('a page put back on the shelf takes back its own moment, not a newer one (adversarial Б4)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-20T10:00:00Z'))
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({ trips: [entry(A)], nextCursor: null })
+    await store.load()
+    vi.useRealTimers()
+    // Another window answered on 27 Sept. and this one did not hear it before its own write.
+    localStorage.setItem(AT, '2026-09-27T14:05:00.000Z')
+    store.apply(view(C, false))
+    expect(localStorage.getItem(AT)).toBe('2026-09-20T10:00:00.000Z')
+    sessionStorage.clear()
+    expect(restart().answeredAt?.toISOString()).toBe('2026-09-20T10:00:00.000Z')
+  })
+
+  it('a page with no moment known puts none on the shelf', () => {
+    localStorage.setItem(AT, '2026-09-27T14:05:00.000Z')
+    const store = useTripHistoryStore()
+    store.answeredAt = null
+    store.apply(view(C))
+    expect(localStorage.getItem(AT)).toBeNull()
+  })
+
+  it('shows the answer while the page on the phone is the server’s last, row for row (adversarial В1, Б4)', async () => {
+    const store = useTripHistoryStore()
+    expect(store.showsAnswer()).toBe(false)
+    tripHistory.mockResolvedValueOnce({ trips: [entry(A)], nextCursor: null })
+    await store.load()
+    expect(store.showsAnswer()).toBe(true)
+    // Another window puts back a page the answer is not: memory.
+    localStorage.setItem(
+      `molvia.trip-history.${OWNER}`,
+      JSON.stringify({
+        page: {
+          trips: [
+            {
+              id: B,
+              place: entry(B).place,
+              startedAt: entry(B).startedAt.toISOString(),
+              finishedAt: entry(B).finishedAt.toISOString(),
+              finishedOnDeviceAt: null,
+            },
+          ],
+          nextCursor: null,
+        },
+        selected: null,
+        local: [],
+      }),
+    )
+    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-history.${OWNER}` }))
+    expect(store.showsAnswer()).toBe(false)
+  })
+
+  it('an answer with counts and sums is the same page as its shelf copy, which keeps neither (adversarial В1)', async () => {
+    const store = useTripHistoryStore()
+    const counted = {
+      ...entry(A),
+      itemCount: 3,
+      total: [{ minor: 120000n, currency: 'AMD' as const }],
+    }
+    tripHistory.mockResolvedValueOnce({ trips: [counted], nextCursor: null })
+    await store.load()
+    // Another window wrote this very answer: the page is read back from the shelf, with no counts.
+    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-history.${OWNER}` }))
+    expect(store.page.trips[0]?.itemCount).toBeNull()
+    expect(store.showsAnswer()).toBe(true)
+  })
+
+  it('another owner’s moment is not this owner’s', () => {
+    localStorage.setItem(`molvia.trip-history-at.${A}`, '2026-09-27T10:05:00.000Z')
+    expect(restart().answeredAt).toBeNull()
+  })
+})
+
 describe('history memory', () => {
   it('keeps a local completion across restart, before a server trip exists', () => {
     const store = useTripHistoryStore()

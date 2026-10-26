@@ -1,31 +1,58 @@
 <template>
   <AppScreen :title="t('purchases.title')">
+    <!-- The connection is one line under the header, over what a failed read drew from memory (Ф-14,
+         MOL-181): the history and the receipts are one list of purchases, so one strip says both — never
+         three ways of «from memory» on one screen. «Записаны» with nothing of it shown is the state
+         below instead, and the receipts with nothing shown are their own quiet card. -->
+    <StatusStrip
+      v-if="strip"
+      class="connection"
+      :kind="strip.kind"
+      :text="strip.text"
+      :attempt="strip.attempt"
+    >
+      <template #action>
+        <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+      </template>
+    </StatusStrip>
     <TripNotices :ready="asked" />
 
     <!-- The record going on comes first, without a caption: it is the one thing on this screen
          that is still being done (handoff `03`, Р-4). From the phone as much as from the server —
          a record started with no signal is open all the same. -->
     <AppReveal>
+      <!-- «Продолжить» is the row's one control, a button of the kit in its tail (В-1 «а»): a button in
+           a button is no HTML. Its name carries the place, so a screen reader hears what goes on. -->
       <AppCard v-if="open" class="block open" list>
-        <PurchaseRow
+        <ListRow
+          as="div"
           :icon="IconPencil"
-          accent
           :title="open.place"
           :meta="t('purchases.open_manual_meta', { count: positions(open.count) })"
-          :tag="t('purchases.continue')"
-          @open="goOn"
-        />
+          wrap
+        >
+          <template #tail>
+            <AppButton
+              variant="secondary"
+              :label="t('purchases.manual_ask.continue', { place: open.place })"
+              @click="goOn"
+              >{{ t('purchases.continue') }}</AppButton
+            >
+          </template>
+        </ListRow>
       </AppCard>
     </AppReveal>
 
     <AppReveal>
+      <!-- The star is a status, not a button: muted, the chevron says it opens (Ф-4). -->
       <AppCard v-if="pending > 0 && !country" class="block pending" list>
-        <PurchaseRow
+        <ListRow
           :icon="IconStar"
-          accent
           :title="t('verdict.pending_count', { n: pending }, pending)"
-          :meta="pendingFrom"
-          @open="goTab('verdicts')"
+          :meta="pendingFrom ?? ''"
+          wrap
+          next
+          @click="goTab('verdicts')"
         />
       </AppCard>
     </AppReveal>
@@ -36,15 +63,17 @@
       <SectionCaption as="p" class="caption">{{ t('purchases.group_working') }}</SectionCaption>
       <AppCard class="block" list>
         <AppReveal group>
-          <PurchaseRow
+          <ListRow
             v-for="row in working"
             :key="row.id"
             :icon="iconOf(row)"
             :class="{ breathing: row.state === 'parsing' && receipts.online.value }"
-            :warn="row.state === 'rejected' || row.state === 'stuck'"
+            :tone="row.state === 'rejected' || row.state === 'stuck' ? 'warn' : ''"
             :title="receiptTitle(row)"
             :meta="receiptMeta(row)"
-            @open="openReceipt(row)"
+            wrap
+            next
+            @click="openReceipt(row)"
           />
         </AppReveal>
       </AppCard>
@@ -53,33 +82,67 @@
       <SectionCaption as="p" class="caption">{{ t('purchases.group_review') }}</SectionCaption>
       <AppCard class="block" list>
         <AppReveal group>
-          <PurchaseRow
+          <ListRow
             v-for="row in review"
             :key="row.id"
             :icon="iconOf(row)"
-            :warn="row.state === 'failed'"
+            :tone="row.state === 'failed' ? 'warn' : ''"
             :title="receiptTitle(row)"
             :meta="receiptMeta(row)"
-            :note="receiptNote(row)"
-            :sum="receiptSum(row)"
-            @open="openReceipt(row)"
-          />
+            wrap
+            next
+            @click="openReceipt(row)"
+          >
+            <!-- Under the meta, not in it: cut with it at two lines it would be lost (Р-5). -->
+            <template v-if="receiptNote(row)" #below>
+              <span class="note">{{ receiptNote(row) }}</span>
+            </template>
+            <template v-if="receiptSum(row)" #tail>{{ receiptSum(row) }}</template>
+          </ListRow>
         </AppReveal>
       </AppCard>
     </template>
 
+    <!-- The receipts did not come and nothing of them is shown, while «Записаны» did or is on its way:
+         a section's error, in its own words — «Покупки не загрузились» over the list would be untrue
+         (adversarial А2, review 1). -->
+    <ScreenState
+      v-if="receiptsState === 'error'"
+      kind="error"
+      inline
+      :title="t('purchases.receipts_error.title')"
+      :body="t('purchases.receipts_error.body')"
+      @retry="retry"
+    />
+    <ScreenState
+      v-else-if="receiptsState === 'offline'"
+      kind="offline"
+      tone="warn"
+      inline
+      :title="t('purchases.offline.title')"
+      :body="t('purchases.receipts_offline')"
+    />
+
     <AppReveal>
       <AppCard v-if="pending > 0 && country" class="block pending" list>
-        <PurchaseRow
+        <ListRow
           :icon="IconStar"
           :title="t('verdict.pending_count', { n: pending }, pending)"
-          :meta="pendingFrom"
-          @open="goTab('verdicts')"
+          :meta="pendingFrom ?? ''"
+          wrap
+          next
+          @click="goTab('verdicts')"
         />
       </AppCard>
     </AppReveal>
 
-    <ScreenSkeleton v-if="shown === 'loading'" :groups="[34, 70, 56, 74, 62]" />
+    <!-- The answer's shape (Ф-13, Р-7): «Записаны» and three rows with a sum and a chevron, no icon —
+         a recorded row has none. The record going on is no part of it: drawn from the phone, it stands
+         over the skeleton already, and a bar in its place would go from under a person with none. -->
+    <ScreenSkeleton v-if="shown === 'loading'" class="loading">
+      <SkeletonPart kind="caption" :width="22" />
+      <SkeletonPart kind="rows" tail next />
+    </ScreenSkeleton>
 
     <!-- No button: the action is in the strip below. The circle is the quiet one, which does not
          read as a button (Ф-16, MOL-77). Only for a history known to be empty (`answeredEmpty`). -->
@@ -94,46 +157,42 @@
     <!-- Always a section's error: the strip records a purchase with the server down, through the
          queue, and stays the screen's (Ф-15, 124 3l; MOL-180, В-1). -->
     <ScreenState
-      v-if="trouble === 'error'"
+      v-if="state === 'error'"
       kind="error"
       inline
       :title="t('purchases.error.title')"
       :body="t(country ? 'purchases.error_capture' : 'purchases.error.body')"
       @retry="retry"
     />
+    <!-- Nothing of «Записаны» to show: the screen's own words, never «what is on the phone» over
+         nothing (Ф-19). -->
     <ScreenState
-      v-else-if="trouble === 'offline'"
+      v-else-if="state === 'offline'"
       kind="offline"
       tone="warn"
-      :inline="rows.length > 0 || !!open || receiptRows.length > 0"
-      :title="t('trip.history.offline_title')"
-      :body="t('trip.history.offline_body')"
+      :inline="!!open || pending > 0 || receiptRows.length > 0 || rows.length > 0"
+      :title="t('purchases.offline.title')"
+      :body="t(country ? 'purchases.offline_capture' : 'purchases.offline.body')"
     />
-    <p v-if="history.stale && rows.length > 0" class="memory">{{ t('trip.history.cached') }}</p>
-    <!-- The receipts' own trouble, quietly: the screen's red block is the history's (review 7). -->
-    <p v-if="receipts.trouble.value" class="memory">
-      {{
-        t(
-          receipts.trouble.value === 'offline'
-            ? 'purchases.receipts_offline'
-            : 'purchases.receipts_error',
-        )
-      }}
-    </p>
 
     <template v-if="rows.length > 0">
       <SectionCaption as="p" class="caption">{{ t('purchases.group_recorded') }}</SectionCaption>
       <AppCard class="recorded" list>
         <AppReveal group>
-          <PurchaseRow
+          <ListRow
             v-for="row in rows"
             :key="row.id"
             :title="row.name"
             :meta="recordedMeta(row)"
-            :note="row.pending ? t('trip.history.local_finish') : null"
-            :sum="sum(row)"
-            @open="openRow(row.id)"
-          />
+            wrap
+            next
+            @click="openRow(row.id)"
+          >
+            <template v-if="row.pending" #below>
+              <span class="note">{{ t('trip.history.local_finish') }}</span>
+            </template>
+            <template v-if="sum(row)" #tail>{{ sum(row) }}</template>
+          </ListRow>
         </AppReveal>
       </AppCard>
       <AppButton
@@ -146,6 +205,10 @@
         @click="more"
         >{{ t('trip.history.more') }}</AppButton
       >
+      <!-- With no connection the list is not whole, and says where it stops (MOL-128, П.5). -->
+      <p v-else-if="history.page.nextCursor" class="earlier">
+        {{ t('purchases.earlier_online', { day: earlierDay }) }}
+      </p>
     </template>
 
     <ReceiptWorkSheet
@@ -192,14 +255,17 @@ import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import CaptureButton from '@/components/CaptureButton.vue'
+import ListRow from '@/components/ListRow.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
-import PurchaseRow from '@/components/PurchaseRow.vue'
 import ReceiptSentLine from '@/components/ReceiptSentLine.vue'
 import ReceiptUndoStrip from '@/components/ReceiptUndoStrip.vue'
 import ReceiptWorkSheet from '@/components/ReceiptWorkSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
+import type { StripKind } from '@/components/StatusStrip.vue'
 import TripNotices from '@/components/TripNotices.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
@@ -212,7 +278,7 @@ import { useTripHistory } from '@/composables/useTripHistory'
 import type { HistoryRow } from '@/composables/useTripHistory'
 import { useTripRows } from '@/composables/useTripRows'
 import { useVerdictQueue } from '@/composables/useVerdictQueue'
-import { calendarDay, dayOfAnyYear, purchaseDay, timeOfDay } from '@/days'
+import { calendarDay, dateOfAnyYear, dayOfAnyYear, purchaseDay, timeOfDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
@@ -236,14 +302,16 @@ export default defineComponent({
     AppReveal,
     AppScreen,
     CaptureButton,
+    ListRow,
     ManualEntryButton,
-    PurchaseRow,
     ReceiptSentLine,
     ReceiptUndoStrip,
     ReceiptWorkSheet,
     ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    SkeletonPart,
+    StatusStrip,
     TripNotices,
     TripUndoStrip,
   },
@@ -254,7 +322,7 @@ export default defineComponent({
     const actor = useActorStore()
     const trips = useTripStore()
     const screen = useTripHistory()
-    const { history, rows, loading, loadingMore, trouble } = screen
+    const { history, rows, loading, loadingMore, trouble, failures, moved } = screen
     const verdicts = useVerdictQueue()
     const pending = computed(() => verdicts.count.value)
     const pendingFrom = usePendingFrom(verdicts)
@@ -315,6 +383,91 @@ export default defineComponent({
       }
       return loading.value ? 'loading' : 'list'
     })
+
+    const worse = (
+      a: 'offline' | 'error' | null,
+      b: 'offline' | 'error' | null,
+    ): 'offline' | 'error' | null => {
+      if (a === 'offline' || b === 'offline') return 'offline'
+      return a === 'error' || b === 'error' ? 'error' : null
+    }
+    /**
+     * What the reads drew, failed or not: a record finished here and a receipt the queue holds or the
+     * server refused are the phone's own word, and stand with an answer as without one (adversarial
+     * Б1–Б3).
+     */
+    const served = computed(() => rows.value.filter((row) => !row.onPhone).length)
+    const receiptsServed = computed(
+      () => receiptRows.value.filter((row) => row.summary !== null).length,
+    )
+    /**
+     * The history's read failed — unless every ask was answered under a list another window kept
+     * moving: the rows shown are then that window's answer, and «Сервер не ответил» over them would be
+     * untrue (adversarial А4). With nothing shown the quiet «did not load» is true either way.
+     */
+    const historyTrouble = computed(() => (moved.value && served.value > 0 ? null : trouble.value))
+    /**
+     * «Записаны» did not come and nothing of it is shown: the screen's state, for both reads. A strip
+     * over a receipt alone would read as every purchase there is (adversarial А3).
+     */
+    const state = computed(() =>
+      historyTrouble.value !== null && served.value === 0
+        ? worse(historyTrouble.value, receipts.trouble.value)
+        : null,
+    )
+    /** Failed reads of the person's own asking, since the receipts' read repeats itself (А1). */
+    const retriesFailed = ref(0)
+    /**
+     * The one strip (Р-2, Р-6 of MOL-204): only over what a failed read drew from memory, and then for
+     * both reads — the kind the worse of the two. As old as the older of the failed reads that drew
+     * something: nothing on screen is newer than that. A read whose moment the phone does not know — a
+     * cache from before the moment was kept — names no time at all. Said again only when a try of the
+     * person's failed: the receipts' poll every five seconds is nobody's question (adversarial А1).
+     */
+    const strip = computed<{ kind: StripKind; text: string; attempt: number } | null>(() => {
+      if (state.value !== null) return null
+      const failed = [
+        ...(historyTrouble.value === null
+          ? []
+          : [{ trouble: historyTrouble.value, at: history.answeredAt, drawn: served.value }]),
+        ...(receipts.trouble.value === null
+          ? []
+          : [
+              {
+                trouble: receipts.trouble.value,
+                at: receipts.fetchedAt.value,
+                drawn: receiptsServed.value,
+              },
+            ]),
+      ]
+      const moments = failed.filter((read) => read.drawn > 0).map((read) => read.at)
+      if (moments.length === 0) return null
+      const kind = failed
+        .map((read) => read.trouble)
+        .reduce<'offline' | 'error' | null>(worse, null)
+      const known = moments.filter((at): at is Date => at !== null)
+      const at =
+        known.length === moments.length
+          ? known.reduce((older, one) => (one < older ? one : older))
+          : null
+      const key = kind === 'offline' ? 'purchases.stale' : 'purchases.stale_error'
+      return {
+        kind: kind === 'offline' ? 'offline' : 'unanswered',
+        text: at ? t(key, when(at)) : t(`${key}_untimed`),
+        attempt: failures.value + retriesFailed.value,
+      }
+    })
+    /** The receipts failed with nothing of them shown, and no strip or state speaks for them. */
+    const receiptsState = computed(() =>
+      state.value === null && strip.value === null && receiptsServed.value === 0
+        ? receipts.trouble.value
+        : null,
+    )
+    async function retryReceipts(): Promise<void> {
+      const before = receipts.attempt.value
+      await receipts.retry()
+      if (receipts.attempt.value > before) retriesFailed.value += 1
+    }
 
     const when = (at: Date) => ({
       day: purchaseDay(at, locale.value),
@@ -448,6 +601,13 @@ export default defineComponent({
       loadingMore,
       trouble,
       shown,
+      strip,
+      state,
+      receiptsState,
+      earlierDay: computed(() => {
+        const last = rows.value.at(-1)
+        return last ? dateOfAnyYear(last.at, locale.value) : ''
+      }),
       open,
       pending,
       pendingFrom,
@@ -497,7 +657,7 @@ export default defineComponent({
       retry: () => {
         screen.load()
         void loadTrip()
-        void receipts.retry()
+        void retryReceipts()
       },
     }
   },
@@ -509,18 +669,34 @@ export default defineComponent({
   margin-bottom: var(--space-3);
 }
 
+// 8 to what it dates, as the handoff's 3k draws it.
+.connection {
+  margin-bottom: var(--space-2);
+}
+
+// Where «Записаны» of the answer stands: its caption has 24 above it, the frame's first part none.
+.loading {
+  margin-top: var(--space-6);
+}
+
 .caption {
   margin-top: var(--space-6);
 }
 
-.memory {
-  margin: var(--space-4) 0 0;
+.earlier {
+  margin: var(--space-2) 0 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
+  text-align: center;
 }
 
 .more {
-  margin-top: var(--space-4);
+  margin-top: var(--space-2);
+}
+
+.note {
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
 }
 
 // A receipt being read «breathes» (handoff 03): no percent, no timer — work that takes a while.

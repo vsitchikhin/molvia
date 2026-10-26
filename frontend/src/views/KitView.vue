@@ -242,6 +242,24 @@
           </li>
           <li>
             <ListRow
+              :icon="IconFileAlert"
+              tone="warn"
+              :title="t('dev.kit.row_warn')"
+              :meta="t('dev.kit.row_warn_meta')"
+              next
+            />
+          </li>
+          <li>
+            <ListRow
+              :icon="IconReceiptCheck"
+              tone="good"
+              :title="t('dev.kit.row_good')"
+              :meta="t('dev.kit.row_good_meta')"
+              next
+            />
+          </li>
+          <li>
+            <ListRow
               as="router-link"
               :to="{ query: { followed: 'live' } }"
               :icon="IconDevices"
@@ -591,6 +609,8 @@ import type { AccountOperationView, MoneyMonthView, SpendingCategoryView } from 
 import IconAlert from '~icons/mdi/alert-outline'
 import IconBarcode from '~icons/mdi/barcode-scan'
 import IconCart from '~icons/mdi/cart-outline'
+import IconFileAlert from '~icons/mdi/file-alert-outline'
+import IconReceiptCheck from '~icons/mdi/receipt-text-check-outline'
 import IconDevices from '~icons/mdi/cellphone-link'
 import IconPhone from '~icons/mdi/cellphone'
 import IconClose from '~icons/mdi/close'
@@ -979,6 +999,8 @@ export default defineComponent({
       // Icons a row draws at its own step are handed to it as components.
       IconAlert,
       IconCart,
+      IconFileAlert,
+      IconReceiptCheck,
       IconDelete,
       IconDevices,
       IconDownload,

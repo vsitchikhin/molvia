@@ -117,7 +117,7 @@ test('a receipt photographed from «What to buy»: its QR read on the phone, the
   await expect(sheet(page)).toHaveCount(0, READ)
   await expect(page).toHaveURL(/\/purchases$/)
 
-  const ready = page.locator('.purchase-row').filter({ hasText: '2 items' })
+  const ready = page.locator('.list-row').filter({ hasText: '2 items' })
   await expect(ready).toBeVisible(READ)
   await ready.click()
   await expect(page.getByText('Lines from the Serbian tax office')).toBeVisible()
@@ -137,5 +137,5 @@ test('a refund’s QR is said by its reason, and nothing is queued', async ({ pa
   await shoot(page, link(1))
   await expect(sheet(page)).toContainText('This is a refund receipt — it is not recorded', READ)
   await expect(sheet(page).getByRole('button', { name: 'Shoot another' })).toBeVisible()
-  await expect(page.locator('.purchase-row').filter({ hasText: 'by link' })).toHaveCount(0)
+  await expect(page.locator('.list-row').filter({ hasText: 'by link' })).toHaveCount(0)
 })
