@@ -6,7 +6,7 @@ import {
   scaledFromDecimal,
 } from '#model/support/decimal'
 import { DomainError, ERROR, ISSUE } from '#model/support/errors'
-import { MINOR_EXPONENT, currencySchema, formatInCurrency } from './money'
+import { MINOR_EXPONENT, currencySchema, exactFigures, formatInCurrency } from './money'
 import type { Currency, Money } from './money'
 
 export const baseUnitSchema = z.enum(['kg', 'l', 'piece'])
@@ -131,8 +131,8 @@ export function compareUnitPrice(a: UnitPrice, b: UnitPrice): number {
 }
 
 /**
- * The amount of a unit price, with at least two digits whatever the currency keeps: the point is
- * telling 570,00 from 577,78.
+ * The amount of a unit price, by the rule money is printed by (`exactFigures`, MOL-205) with at least
+ * two digits whatever the currency keeps: the point is telling 570 from 577,78.
  *
  * Only the amount: the unit is a word of the interface («л», «шт»), not of the domain, so the
  * screen names it. The first version printed the unit's code and the currency's ISO symbol —
@@ -144,10 +144,7 @@ export function formatUnitPrice(price: UnitPrice, locale = 'ru-RU'): string {
     price.scaledMinor,
     UNIT_PRICE_DIGITS + MINOR_EXPONENT[price.currency],
   )
-  return formatInCurrency(major, price.currency, locale, {
-    minimumFractionDigits: exponent,
-    maximumFractionDigits: exponent,
-  })
+  return formatInCurrency(major, price.currency, locale, exactFigures(exponent))
 }
 
 /**
