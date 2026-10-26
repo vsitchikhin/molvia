@@ -372,9 +372,13 @@ The detail behind the frontend lines of `CLAUDE.md`.
   сохранилось ли» on top in the middle of «Ваши данные» (round 2, Б1, Б2). `kit-rows` holds a first, a middle
   and a last row, `advice.spec` the newcomer's row, `devices.spec` and `settings.spec` the two that are not
   rows. **The price, named** (self-review 7): a row built in place, not of the kit — «Написать разработчику»,
-  «Бот», «Устройства» and «Выйти» of «Настройки», «Сканировать штрихкод» of a record, `PurchaseRow`, `TripRow` —
+  «Бот», «Устройства» and «Выйти» of «Настройки», «Сканировать штрихкод» of a record, `TripRow` —
   keeps its ring cut at the card's edge, as on master, until its screen comes to the kit; the
   selector is not widened for them.
+  **The icon of a status may take its ink** (`tone`, MOL-204, Ф-4): `warn-ink` for a receipt not accepted
+  or not read, `good-ink` for one recorded — every other icon of a row is `text-muted`, since the accent
+  says «press here» and a status says nothing of the kind; `danger` and `inactive` colour it their own way,
+  over it. A screen does not reach into the row for it: the icon is the kit's.
   **Active** is the row the keyboard stands on in a list a field owns (К-4): the fill without the
   ring, since the focus is in the field; on a chosen row the fill is the layer's alone — the row's own
   square fill stood out past the round ring at every corner (adversarial В1). Only a `div` row takes a button into its tail — a button

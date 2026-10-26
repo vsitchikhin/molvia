@@ -53,7 +53,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 ## frontend · views
 
 - `frontend/src/views/FinishedTripView.vue` — «Записанные покупки» (`/purchases/:id`): a finished trip's purchases, adding and amending them, and «Удалить запись».
-- `frontend/src/views/PurchasesView.vue` — «Покупки» tab (MOL-128): the record going on first, «ждут оценки», «Записаны» with count and sum, «Записать покупки» in the strip, four states.
+- `frontend/src/views/PurchasesView.vue` — «Покупки» tab (MOL-128): the record going on first, «ждут оценки», «Записаны» with count and sum, rows of the kit (`ListRow`, MOL-204), one `StatusStrip` for the history and the receipts dated by the older read, «Раньше … — со связью» offline, «Записать покупки» in the strip, four states.
 - `frontend/src/views/SettingsView.vue` — «Настройки» screen: the four settings with draft and conflict notices, links to devices and «Выйти», and the group «Ваши данные» (`YourDataGroup`).
 - `frontend/src/views/TripView.vue` — The record typed by hand (`/purchases/manual`, MOL-128): named by its place, rows, total, «Закончить»/«Удалить запись»; goes up to «Покупки» once no record is open.
 
@@ -85,7 +85,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 - `frontend/src/composables/useSelectedTrip.ts` — Composable: one trip chosen by id, from the history cache and the server, with loading, missing and offline states.
 - `frontend/src/composables/useSettings.ts` — Composable and store of the settings form: draft kept per account, base, conflict per choice, save and its notices.
 - `frontend/src/composables/useTripContext.ts` — Composable behind the trip-context sheet: a draft of the settings handed to the queue for the held trip.
-- `frontend/src/composables/useTripHistory.ts` — Composable behind «Записаны» on «Покупки»: rows with the server's count and sums, paging, reload after a moved list.
+- `frontend/src/composables/useTripHistory.ts` — Composable behind «Записаны» on «Покупки»: rows with the server's count and sums, paging, reload after a moved list, the failed loads counted for the strip.
 - `frontend/src/composables/useTripReceipt.ts` — Composable: «Сумма по чеку» of one record — the sheet, the sum still in the queue, whether it is offered.
 - `frontend/src/composables/useTripRows.ts` — Composable: a trip's rows merged with what the queue still holds (waiting, editing, removing).
 
@@ -95,7 +95,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 - `frontend/src/stores/recentPlaces.ts` — Store: the shops this identity went to, kept on the device for «Где вы?» without a signal.
 - `frontend/src/stores/settingsMemory.ts` — The last known settings of an identity, remembered on the device and read back.
 - `frontend/src/stores/trip.ts` — Store: the trip as the server last answered it, remembered per identity and read leniently across builds.
-- `frontend/src/stores/tripHistory.ts` — Store: the history cache (a row's count and sums not kept yet, `ENTRY_NOT_CACHED_YET`), local snapshots of finishes not yet confirmed, and the «answered empty» flag.
+- `frontend/src/stores/tripHistory.ts` — Store: the history cache (a row's count and sums not kept yet, `ENTRY_NOT_CACHED_YET`), local snapshots of finishes not yet confirmed, the «answered empty» flag and the moment of the last answer (`answeredAt`, a key of its own, MOL-204).
 - `frontend/src/stores/tripQueue.ts` — Store: the on-device queue of every write to a trip (start, purchases, finish, removal, «Вернуть», payment, receipt's sum), sent in order.
 
 ## e2e

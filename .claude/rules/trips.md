@@ -10,7 +10,7 @@ paths:
   - 'backend/tests/{trip*,place*,settings*}.ts'
   - 'backend/drizzle/*trip*.sql'
   - 'frontend/src/views/{TripView,PurchasesView,FinishedTripView,SettingsView}*'
-  - 'frontend/src/components/{Trip*,tripRow*,StartTripSheet*,ItemDetailsSheet*,SettingsFields*,PurchaseRow*,ManualEntryButton*,Receipt*,receipt*}'
+  - 'frontend/src/components/{Trip*,tripRow*,StartTripSheet*,ItemDetailsSheet*,SettingsFields*,ManualEntryButton*,Receipt*,receipt*}'
   - 'frontend/src/composables/{useCurrentTrip,useSelectedTrip,useFinishedTrip,useTripContext,useTripHistory,useTripRows,useTripReceipt,useItemDetails,useSettings,usePendingFrom}*'
   - 'frontend/src/stores/{trip,tripQueue,tripHistory,queueing,recentPlaces,settingsMemory,storage}*'
   - 'e2e/{trip,trip-history,settings,item-details}.spec.ts'
@@ -288,6 +288,26 @@ cache, a finish was taken back — is asked for again after a doubling pause, si
 be sending its whole queue, rather than taken for a success (А, Ж2), and what is left after that is
 an error that blames nobody. Purchases waiting for a verdict, and a record open, outweigh an empty
 answer. A retry of the history ends with the screen that asked (И1).
+
+**The connection of «Покупки» is one strip for the history and the receipts** (MOL-204, Ф-14): a receipt is
+a purchase on its way to «Записаны», so their two reads are one list to the person, and three ways of «from
+memory» on one screen — a card, «Показаны данные…», a line of the receipts — were one too many. **Over
+something of an answer** — rows of «Записаны» or of the receipts the phone kept — it is a `StatusStrip`:
+offline, or «Сервер не ответил» with «Повторить» (MOL-181's rule, as «Счета» and «Что брать»); **with nothing of
+an answer**, the state — the quiet card of an error, or «Без связи» in the screen's own words, never «what is on
+the phone» over nothing. The kind is the worse of the two reads; **the time is the older of the reads that failed
+and drew a row** — nothing on screen is newer than that — and a read with nothing of it on screen dates nothing
+unless no other did. **The moment of the history's answer is a key of its own** (`molvia.trip-history-at`), for
+the reason the «empty» flag is: a field of the strict cache would be no cache to a window on the previous build,
+which would write its own over a finish made with no signal. Moved with the first page only; a cache from before
+it has none, and the strip says no time. **The price, named:** a window on the previous build loads the history
+without moving it, so the strip may name a moment older than the list, never a newer one. **Offline, «Показать
+ещё» gives way to «Раньше {day} — со связью»** — the day of the last row shown, always as a date — so the list
+does not read as whole (П.5 of MOL-128). **Every row of «Покупки» is the kit's `ListRow`** (MOL-204, Ф-12): the
+record going on is a row of `div` with «Продолжить», a `secondary` button, in its tail — its one control, named
+with the place (owner's В-1 «а»): a button in a button is no HTML; the price, a tap on the place's name does
+nothing. The pencil and the star are statuses, muted (Ф-4); a receipt's second line stands under its meta
+(`#below`), never cut with it.
 
 **The newcomer's home is «Что брать»** (`AdviceHomeNew`, handoff `02`): «Запишите первые
 покупки», or «Осталось оценить» once purchases wait for a verdict, the cycle of three steps whose
