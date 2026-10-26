@@ -129,7 +129,14 @@ The detail behind the frontend lines of `CLAUDE.md`.
   (`exactFigures`, by `trailingZeroDisplay`, which the floor of the browsers has). Until then «Деньги»
   printed by `asTyped` of their own and «Покупки», the receipt and «Что брать» by `formatMoney`, which
   kept the «,00» — one app, two rules. No screen formats money with an `Intl.NumberFormat` of its own;
-  a rate, a percent and a quantity are not money and keep theirs.
+  a rate, a percent and a quantity are not money and keep theirs. **Beside its row, a sum is exact;
+  a summary figure is whole** (owner's В-1 «в» of the review): the day over its rows says «5 403,12 ֏»
+  where the one receipt of the day is 5 403,12 ֏, and «Включая 11,50 $ (≈ 4 485 ֏)» names the dollars
+  as their row does — only what they came to is «≈». **The prices, named:** the large figures of
+  «Деньги», «Графики», «Бюджет» and «Счета» stay whole, as the frames draw them («5 633 ֏»), so
+  «Потрачено 5 403 ֏» stands for a month of that one receipt with no «≈» (adversarial Б1б); and a price
+  per unit under half a cent prints as a nought, «0 $/шт» for 0,99 $ the 300 cotton buds — as master's
+  «0,00 $» did (В-2 «а», adversarial Б2).
 - **Native HTML first, then Reka UI, never a styled kit.** On a phone `<select>`,
   `<input type="date">` and `<input inputmode="decimal">` open the system pickers, which
   beat anything a library renders; `<dialog>` already brings a focus trap and a backdrop.

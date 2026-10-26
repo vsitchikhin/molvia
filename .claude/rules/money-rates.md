@@ -685,7 +685,7 @@ rate exactly as before.
   (Р-4 of MOL-187: one sign a row, the money's): a point carries `sign`, since 0,00 % may stand over
   −0,30 ֏ and the card says «хуже». **The sign is the card's** — of its market's difference in the currency
   received — never of `measured`, the same money in the spending currency rounded to its cent:
-  spent in dollars, −1,00 ֏ is 0,00 $, and the point said nothing where the card said «хуже»
+  spent in dollars, −1 ֏ is under a cent, 0 $, and the point said nothing where the card said «хуже»
   (adversarial А1). **The price, named:** «Обмены против рынка» sums the money in the spending
   currency, so its place may read «0 $» with no tone beside a mark of `--bad`; the chart is the
   exchange's, not the place's. No comparison and nothing at all are `--graphic`. An answer of a server
