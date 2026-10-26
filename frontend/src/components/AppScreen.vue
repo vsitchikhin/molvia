@@ -166,31 +166,41 @@ export default defineComponent({
     // render instead: a row filled late is pinned and alive, not drawn inside an invisible one.
     const hasRow = (): boolean => Boolean(parentTitleKey.value ?? slots.meta ?? slots.trailing)
     const docked = ref(hasRow())
-    const firstAction = (within: HTMLElement | null) =>
-      [...(within?.querySelectorAll('button') ?? [])].find(
-        (one) => !one.classList.contains('reload'),
+    const isReload = (element: Element | null) => element?.classList.contains('reload') ?? false
+    /**
+     * Where a focus lost in the strip goes: its first button but a «Обновить» (`.reload`) — a reload
+     * the person did not ask for, the next Enter away (review №3, adversarial Г, Е) — unless the focus
+     * stood on a «Обновить» itself, and then the one in its place (adversarial Ж).
+     */
+    const nextAction = (within: HTMLElement | null, onReload: boolean) => {
+      const all = [...(within?.querySelectorAll('button') ?? [])]
+      return (
+        (onReload ? all.find((one) => isReload(one)) : undefined) ??
+        all.find((one) => !isReload(one))
       )
-    // Whether the focus stood in the strip as this render began (adversarial Г1, below).
+    }
+    // Whether the focus stood in the strip as this render began (adversarial Г1, below), and on what.
     let focusInDock = false
+    let focusOnReload = false
     onBeforeUpdate(() => {
       docked.value = hasRow()
       focusInDock = dock.value?.contains(document.activeElement) ?? false
+      focusOnReload = focusInDock && isReload(document.activeElement)
     })
     // A render that swapped the strip's actions under the focus — an account put away or deleted on
     // another phone, «Вернуть» answered — left it on the body: it goes to the strip's first button,
     // where the one it stood on was, or to the title where the strip went whole (MOL-194, Б2, Б3).
-    // The screen's own first button, never a «Обновить» (`.reload`) — of the version's row or of an
-    // error: a reload the person did not ask for, the next Enter away (review №3, adversarial Г, Е).
-    function bringFocus(): void {
+    function bringFocus(onReload: boolean): void {
       const focused = document.activeElement
       if (focused !== null && focused !== document.body) return
-      const first = firstAction(dock.value)
-      if (first) first.focus()
+      const next = nextAction(dock.value, onReload)
+      if (next) next.focus()
       else focusScreenTitle()
     }
     onUpdated(() => {
-      if (focusInDock) bringFocus()
+      if (focusInDock) bringFocus(focusOnReload)
       focusInDock = false
+      focusOnReload = false
     })
     const tabbed = computed(() => Boolean(route.meta.tab))
 
@@ -225,7 +235,11 @@ export default defineComponent({
     watch(
       () => update.phase.value,
       () => {
-        if (dock.value?.contains(document.activeElement)) void nextTick(bringFocus)
+        const focused = document.activeElement
+        if (dock.value?.contains(focused))
+          void nextTick(() => {
+            bringFocus(isReload(focused))
+          })
       },
       { flush: 'pre' },
     )
@@ -233,7 +247,7 @@ export default defineComponent({
     const strip = provideStateStrip(stateTarget)
     // An error taking the strip unmounts the screen's own action, and a focus on it fell to the body
     // («Где вы?» closed over a failed «Что брать» hands it back to «Записать покупки», review №6): it
-    // goes to the error's first button but «Обновить» (MOL-194, Е), where that action stood. Where the action went
+    // goes to the error's first button, where that action stood (`nextAction`). Where the action went
     // in the very render the error came in — «Что брать» draws its strip only for a newcomer — the
     // whole strip went before the error held it, and the focus with it (adversarial Г1): so whether
     // it stood in the strip is read before the frame patches, and a focus lost to the body is brought.
@@ -244,7 +258,8 @@ export default defineComponent({
         const focused = document.activeElement
         const lost = focused === null || focused === document.body
         if (!dock.value?.contains(focused) && !(focusInDock && lost)) return
-        void nextTick(() => firstAction(stateTarget.value)?.focus())
+        const onReload = lost ? focusOnReload : isReload(focused)
+        void nextTick(() => nextAction(stateTarget.value, onReload)?.focus())
       },
       { flush: 'pre' },
     )
