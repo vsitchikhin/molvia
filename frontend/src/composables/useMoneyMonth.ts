@@ -45,6 +45,11 @@ export interface MoneyMonth {
   readonly more: ComputedRef<'idle' | 'loading' | 'failed'>
   readonly loadMore: () => Promise<void>
   readonly retry: () => Promise<void>
+  /**
+   * A read of the month is on its way. Under a failed month nothing else says so — «Повторить» keeps the
+   * phase `error` until the answer — and the screen holds what that answer would move (MOL-269).
+   */
+  readonly reading: ComputedRef<boolean>
 }
 
 /**
@@ -183,6 +188,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
 
   let latest = 0
   let running: Promise<void> | null = null
+  const reading = ref(false)
   /** A next page was asked for while a read from the start was running: asked again after it. */
   let moreAfterRead = false
   let asks = 0
@@ -244,6 +250,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
     if (!actor.id) return
     asks += 1
     if (running) return running
+    reading.value = true
     running = (async () => {
       let served = 0
       while (served !== asks) {
@@ -254,6 +261,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
       }
     })().finally(() => {
       running = null
+      reading.value = false
     })
     return running
   }
@@ -343,5 +351,6 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
     more: computed(() => more.value),
     loadMore,
     retry: load,
+    reading: computed(() => reading.value),
   }
 }
