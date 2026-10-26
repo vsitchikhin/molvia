@@ -1718,6 +1718,20 @@ Requirements, decisions and the measurement of the photo check: `.scratch/tasks/
   closed edges 0.72) — brightness alone took a hand on the receipt for paper (am-04). Not found — the
   corners of the photo itself, so nothing is cut that the person did not move. The figures and the
   readings are in `.scratch/tasks/research/MOL-222.md`; a change of the detector is measured there.
+- **The copy is a mean, never a sample** (MOL-259): the phone halves the photo on canvas until it is
+  within 1 280 (`halvingSteps`) — a step of exactly half is the mean of four pixels in any engine — and
+  `grayOf` takes it the rest of the way, as it took the bench's whole frame. One `drawImage` from 4 032
+  straight to 640 bilinearly reads four pixels of some forty: the print and the sensor's noise it keeps
+  tore the paper's region in two, and the phone proposed half a receipt the bench had found whole —
+  am-05c, a long crumpled «Ереван Сити», lost its top half in Chromium and its foot in WebKit; the bench
+  never saw it, measuring the mean. **The bench makes the phone's copy by `halvedCopy`** — the same
+  steps without a canvas — and an engine's own drawing is checked in Playwright's Chromium and WebKit
+  (`.scratch/tasks/research/MOL-259/`). Not `imageSmoothingQuality = 'high'`, which matched the bench
+  as well: what filter it names is each engine's to choose, iOS's among them. **The price, named:** the
+  cut of am-26 that brought the task, a table's column of sums, is not reproduced — its frame is gone,
+  only the cut is on production — so it is explained by the mechanism, not proven on itself; and
+  a crease across a receipt deep enough tears the region under the mean too, as MOL-228's Russian frames
+  showed (a fold, two receipts end to end) — another mechanism, not this one.
 - **A warp redraws every pixel, and the reader pays for it** (`warp.ts`): the bench read the same cut
   fewer lines drawn anew from four neighbours, and still fewer than as the photo's own pixels. So the
   corners go on whole pixels, a receipt standing square within 1.5 % of its side is cut as its box —
