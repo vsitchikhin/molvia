@@ -982,7 +982,7 @@ describe('TripView', () => {
       expect(view.get('.dock').text()).toContain(ru.purchases.manual_by_hand)
       // Иначе поход, который сервер держит, но о котором не спросили, читается как «похода нет».
       // Своими словами главной: начать можно и без сети — и одно уведомление, а не два.
-      expect(view.text()).toContain(ru.trip.history.offline_title)
+      expect(view.text()).toContain(ru.purchases.offline.title)
       expect(view.text()).not.toContain(ru.trip.offline.title)
     })
 

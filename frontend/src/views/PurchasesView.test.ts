@@ -3,7 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import { RouterView, createRouter, createWebHistory } from 'vue-router'
-import { ERROR, currentTripResponseSchema, parseMoney, tripViewCodec } from '@molvia/model'
+import {
+  ERROR,
+  currentTripResponseSchema,
+  parseMoney,
+  receiptsResponseCodec,
+  tripViewCodec,
+} from '@molvia/model'
 import type {
   ReceiptsResponse,
   AdviceResponse,
@@ -14,6 +20,7 @@ import type {
 } from '@molvia/model'
 import { ApiError } from '@molvia/client'
 import ru from '@/i18n/ru.json'
+import { purchaseDay, timeOfDay } from '@/days'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
@@ -239,7 +246,7 @@ describe('PurchasesView (MOL-128)', () => {
       expect(view.get('.dock').text()).toContain(ru.purchases.manual)
       expect(view.get('.dock').text()).not.toContain(ru.purchases.capture)
       expect(captions(view)).not.toContain(ru.purchases.group_review)
-      expect(view.text()).not.toContain(ru.purchases.receipts_error)
+      expect(view.text()).not.toContain(ru.purchases.error.title)
     })
 
     it('у человека из Грузии «пусто» — только после ответа о чеках; сбой списка сказан (MOL-109, Б1)', async () => {
@@ -252,7 +259,7 @@ describe('PurchasesView (MOL-128)', () => {
       receipts.mockRejectedValue(new Error('HTTP 500'))
       const failed = await render({ country: 'GE' })
       expect(failed.view.text()).not.toContain(ru.purchases.empty.title)
-      expect(failed.view.text()).toContain(ru.purchases.receipts_error)
+      expect(failed.view.text()).toContain(ru.purchases.error.title)
     })
 
     it('армянский чек, снятый до переезда в Грузию, — в «Покупках», чтобы записать или удалить (MOL-109, А2)', async () => {
@@ -403,7 +410,7 @@ describe('PurchasesView (MOL-128)', () => {
       receipts.mockRejectedValue(new Error('HTTP 500'))
       const { view } = await render()
       expect(view.text()).not.toContain(ru.purchases.empty.title)
-      expect(view.text()).toContain(ru.purchases.receipts_error)
+      expect(view.text()).toContain(ru.purchases.error.title)
     })
 
     it('чек, доставленный этим телефоном целиком, — «разбираем», хоть список и прочитан раньше (Б1)', async () => {
@@ -516,7 +523,7 @@ describe('PurchasesView (MOL-128)', () => {
       tripHistory.mockRejectedValue(new Error('Failed to fetch'))
       vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
       const { view } = await render()
-      expect(view.text()).toContain(ru.trip.history.offline_title)
+      expect(view.text()).toContain(ru.purchases.offline.title)
       expect(view.find('.state.bad').exists()).toBe(false)
       expect(view.text()).not.toContain(ru.state.retry)
       expect(view.text()).not.toContain(ru.purchases.empty.title)
@@ -888,6 +895,164 @@ describe('PurchasesView (MOL-128)', () => {
       const { view } = await render()
       expect(view.get('.pending .meta').text()).toMatch(/и других мест$/)
       expect(view.get('.pending .meta').text()).not.toMatch(/\d/)
+    })
+  })
+
+  describe('связь — одна полоса со временем (MOL-204, Ф-14)', () => {
+    const AT = new Date(NOW.getTime() - 3 * 60 * 60 * 1000)
+    const said = (key: string) =>
+      key.replace('{day}', purchaseDay(AT, 'ru')).replace('{time}', timeOfDay(AT, 'ru'))
+    const strips = (view: VueWrapper) => view.findAll('.strip')
+    function offline() {
+      tripHistory.mockRejectedValue(new Error('Failed to fetch'))
+      receipts.mockRejectedValue(new Error('Failed to fetch'))
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    }
+
+    it('без связи над «Записаны» из памяти — одна полоса со временем ответа, не красная', async () => {
+      offline()
+      const { view } = await render({
+        before: () => {
+          remember([trip(1), trip(2, 'SAS')])
+          localStorage.setItem(`molvia.trip-history-at.${ME}`, AT.toISOString())
+        },
+      })
+      expect(rows(view)).toHaveLength(2)
+      expect(strips(view)).toHaveLength(1)
+      expect(strips(view)[0]?.classes()).toContain('offline')
+      expect(strips(view)[0]?.text()).toBe(said(ru.purchases.stale))
+      // No second way of «from memory»: no card, no line, no word of the receipts of their own.
+      expect(view.find('.state').exists()).toBe(false)
+      expect(view.text()).not.toContain(ru.trip.history.cached)
+      expect(view.text()).not.toContain(ru.state.retry)
+    })
+
+    it('старая память без момента ответа — полоса без времени', async () => {
+      offline()
+      const { view } = await render({
+        before: () => {
+          remember([trip(1)])
+        },
+      })
+      expect(strips(view)).toHaveLength(1)
+      expect(strips(view)[0]?.text()).toBe(ru.purchases.stale_untimed)
+    })
+
+    it('сервер не ответил над памятью — полоса «Сервер не ответил» и одна «Повторить», не залитая', async () => {
+      tripHistory.mockRejectedValue(new Error('HTTP 500'))
+      const { view } = await render({
+        before: () => {
+          remember([trip(1)])
+          localStorage.setItem(`molvia.trip-history-at.${ME}`, AT.toISOString())
+        },
+      })
+      expect(strips(view)).toHaveLength(1)
+      expect(strips(view)[0]?.classes()).toContain('unanswered')
+      expect(strips(view)[0]?.text()).toContain(said(ru.purchases.stale_error))
+      // The quiet card is for a screen with nothing of an answer (3l); here the rows are shown.
+      expect(view.find('.state').exists()).toBe(false)
+      const retries = view.findAll('button').filter((b) => b.text() === ru.state.retry)
+      expect(retries).toHaveLength(1)
+      expect(retries[0]?.classes()).toContain('ghost')
+      expect(view.get('.dock').text()).toContain(ru.purchases.capture)
+
+      tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
+      await retries[0]?.trigger('click')
+      await flushPromises()
+      expect(strips(view)).toHaveLength(0)
+    })
+
+    describe('время — старшее из чтений, что не удались и нарисовали строки', () => {
+      const later = new Date(NOW.getTime() - 60_000)
+      const kept = (list: unknown[]) =>
+        JSON.stringify({
+          all: {
+            answer: receiptsResponseCodec.encode(receiptsResponseCodec.parse({ receipts: list })),
+            fetchedAt: AT.toISOString(),
+          },
+        })
+      const parsed = {
+        id: 'cccccccc-0000-4000-8000-000000000001',
+        status: 'parsed',
+        failure: null,
+        parts: 1,
+        received: 1,
+        capturedAt: '2026-09-26T16:00:00.000Z',
+        country: 'AM',
+        language: 'ru',
+        header: null,
+        total: { amount: '740.00', currency: 'AMD' },
+        balanced: true,
+        lineCount: 1,
+        unsettled: 0,
+        place: null,
+        tripId: null,
+      }
+
+      it('чеки из памяти старше истории — время чеков', async () => {
+        offline()
+        const { view } = await render({
+          before: () => {
+            remember([trip(1)])
+            localStorage.setItem(`molvia.trip-history-at.${ME}`, later.toISOString())
+            localStorage.setItem(`molvia.receipts.${ME}`, kept([parsed]))
+          },
+        })
+        expect(strips(view)).toHaveLength(1)
+        expect(strips(view)[0]?.text()).toBe(said(ru.purchases.stale))
+      })
+
+      it('«не должно сработать»: список чеков пуст — он ничего не датирует', async () => {
+        offline()
+        const { view } = await render({
+          before: () => {
+            remember([trip(1)])
+            localStorage.setItem(`molvia.trip-history-at.${ME}`, later.toISOString())
+            localStorage.setItem(`molvia.receipts.${ME}`, kept([]))
+          },
+        })
+        expect(strips(view)[0]?.text()).toBe(
+          ru.purchases.stale
+            .replace('{day}', purchaseDay(later, 'ru'))
+            .replace('{time}', timeOfDay(later, 'ru')),
+        )
+      })
+    })
+
+    it('без связи с памятью дальше первой страницы — «Раньше … — со связью» вместо «Показать ещё»', async () => {
+      offline()
+      const { view } = await render({
+        before: () => {
+          remember([trip(1), trip(2, 'SAS')])
+          const kept = JSON.parse(localStorage.getItem(`molvia.trip-history.${ME}`) ?? '{}') as {
+            page: { nextCursor: unknown }
+          }
+          kept.page.nextCursor = { at: '2026-09-01T00:00:00.000000Z', id: trip(2).id }
+          localStorage.setItem(`molvia.trip-history.${ME}`, JSON.stringify(kept))
+        },
+      })
+      expect(view.text()).not.toContain(ru.trip.history.more)
+      expect(view.get('.earlier').text()).toMatch(/^Раньше \d{1,2} \S+ — со связью$/)
+    })
+
+    it('«не должно сработать»: со связью «Раньше …» нет, есть «Показать ещё»', async () => {
+      tripHistory.mockResolvedValue({
+        trips: [trip(1)],
+        nextCursor: { at: '2026-09-01T00:00:00.000000Z', id: trip(1).id },
+      })
+      const { view } = await render()
+      expect(view.find('.earlier').exists()).toBe(false)
+      expect(view.text()).toContain(ru.trip.history.more)
+      expect(strips(view)).toHaveLength(0)
+    })
+
+    it('без связи и без памяти — «Без связи» словами экрана, не «сохранённые покупки»', async () => {
+      offline()
+      const { view } = await render()
+      expect(strips(view)).toHaveLength(0)
+      expect(view.text()).toContain(ru.purchases.offline.title)
+      expect(view.text()).toContain(ru.purchases.offline_capture)
+      expect(view.text()).not.toContain(ru.trip.history.offline_title)
     })
   })
 

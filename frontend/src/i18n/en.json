@@ -253,10 +253,18 @@
       "body": "Photograph a receipt — we read the lines, you check them and save with one button. No receipt — “Add by hand”."
     },
     "error_capture": "You can still photograph a receipt or add by hand",
+    "stale": "Offline · purchases as of {day}, {time}",
+    "stale_untimed": "Offline · purchases saved on this phone",
+    "stale_error": "The server did not answer · purchases as of {day}, {time}",
+    "stale_error_untimed": "The server did not answer · purchases saved on this phone",
+    "earlier_online": "Earlier than {day} — once online",
+    "offline": {
+      "title": "Offline",
+      "body": "We’ll show your purchases once you’re online. You can record new ones now — the button below"
+    },
+    "offline_capture": "We’ll show your purchases once you’re online. You can photograph a receipt or add by hand now",
     "stuck_meta": "{parts} · not all parts arrived",
     "record_refused": "not saved — open it and fix it",
-    "receipts_error": "Receipts didn’t load — we’ll show them once the server answers",
-    "receipts_offline": "Offline · receipts from this phone",
     "capture_link": "Receipt by link",
     "by_link": "by link",
     "asking_tax_office": "asking the tax office",

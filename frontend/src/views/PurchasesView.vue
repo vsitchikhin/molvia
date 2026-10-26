@@ -1,5 +1,14 @@
 <template>
   <AppScreen :title="t('purchases.title')">
+    <!-- The connection is one line under the header, over everything the answer drew (Ф-14, MOL-181):
+         the history and the receipts are one list of purchases, so one strip says both — never three
+         ways of «from memory» on one screen. Only over something of an answer: with nothing shown it
+         is the state below. -->
+    <StatusStrip v-if="strip" :kind="strip.kind" :text="strip.text" :attempt="strip.attempt">
+      <template #action>
+        <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+      </template>
+    </StatusStrip>
     <TripNotices :ready="asked" />
 
     <!-- The record going on comes first, without a caption: it is the one thing on this screen
@@ -116,32 +125,23 @@
     <!-- Always a section's error: the strip records a purchase with the server down, through the
          queue, and stays the screen's (Ф-15, 124 3l; MOL-180, В-1). -->
     <ScreenState
-      v-if="trouble === 'error'"
+      v-if="state === 'error'"
       kind="error"
       inline
       :title="t('purchases.error.title')"
       :body="t(country ? 'purchases.error_capture' : 'purchases.error.body')"
       @retry="retry"
     />
+    <!-- Nothing of an answer to show: the screen's own words, never «what is on the phone» over
+         nothing (Ф-19). -->
     <ScreenState
-      v-else-if="trouble === 'offline'"
+      v-else-if="state === 'offline'"
       kind="offline"
       tone="warn"
-      :inline="rows.length > 0 || !!open || receiptRows.length > 0"
-      :title="t('trip.history.offline_title')"
-      :body="t('trip.history.offline_body')"
+      :inline="!!open || pending > 0"
+      :title="t('purchases.offline.title')"
+      :body="t(country ? 'purchases.offline_capture' : 'purchases.offline.body')"
     />
-    <p v-if="history.stale && rows.length > 0" class="memory">{{ t('trip.history.cached') }}</p>
-    <!-- The receipts' own trouble, quietly: the screen's red block is the history's (review 7). -->
-    <p v-if="receipts.trouble.value" class="memory">
-      {{
-        t(
-          receipts.trouble.value === 'offline'
-            ? 'purchases.receipts_offline'
-            : 'purchases.receipts_error',
-        )
-      }}
-    </p>
 
     <template v-if="rows.length > 0">
       <SectionCaption as="p" class="caption">{{ t('purchases.group_recorded') }}</SectionCaption>
@@ -173,6 +173,10 @@
         @click="more"
         >{{ t('trip.history.more') }}</AppButton
       >
+      <!-- With no connection the list is not whole, and says where it stops (MOL-128, П.5). -->
+      <p v-else-if="history.page.nextCursor" class="earlier">
+        {{ t('purchases.earlier_online', { day: earlierDay }) }}
+      </p>
     </template>
 
     <ReceiptWorkSheet
@@ -227,6 +231,8 @@ import ReceiptWorkSheet from '@/components/ReceiptWorkSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
+import type { StripKind } from '@/components/StatusStrip.vue'
 import TripNotices from '@/components/TripNotices.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
@@ -239,7 +245,7 @@ import { useTripHistory } from '@/composables/useTripHistory'
 import type { HistoryRow } from '@/composables/useTripHistory'
 import { useTripRows } from '@/composables/useTripRows'
 import { useVerdictQueue } from '@/composables/useVerdictQueue'
-import { calendarDay, dayOfAnyYear, purchaseDay, timeOfDay } from '@/days'
+import { calendarDay, dateOfAnyYear, dayOfAnyYear, purchaseDay, timeOfDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
@@ -271,6 +277,7 @@ export default defineComponent({
     ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    StatusStrip,
     TripNotices,
     TripUndoStrip,
   },
@@ -281,7 +288,7 @@ export default defineComponent({
     const actor = useActorStore()
     const trips = useTripStore()
     const screen = useTripHistory()
-    const { history, rows, loading, loadingMore, trouble } = screen
+    const { history, rows, loading, loadingMore, trouble, failures } = screen
     const verdicts = useVerdictQueue()
     const pending = computed(() => verdicts.count.value)
     const pendingFrom = usePendingFrom(verdicts)
@@ -342,6 +349,46 @@ export default defineComponent({
       }
       return loading.value ? 'loading' : 'list'
     })
+
+    /** The worse of the two reads behind the screen — the history's and the receipts'. */
+    const connection = computed<'offline' | 'error' | null>(() => {
+      const both = [trouble.value, receipts.trouble.value]
+      if (both.includes('offline')) return 'offline'
+      return both.includes('error') ? 'error' : null
+    })
+    /** Something of an answer is drawn: the rows the phone kept of «Записаны» or of the receipts. */
+    const fromMemory = computed(() => rows.value.length > 0 || receiptRows.value.length > 0)
+    /**
+     * The one strip (Р-2, Р-6 of MOL-204): over what is shown from memory, as old as the older of the
+     * reads that failed and drew something — nothing on screen is newer than that; a read that failed
+     * with nothing of it on screen dates nothing, unless no other did. A read whose moment the phone
+     * does not know — a cache from before the moment was kept — names no time at all.
+     */
+    const strip = computed<{ kind: StripKind; text: string; attempt: number } | null>(() => {
+      const kind = connection.value
+      if (kind === null || !fromMemory.value) return null
+      const failed = [
+        ...(trouble.value === null ? [] : [{ at: history.answeredAt, drawn: rows.value.length }]),
+        ...(receipts.trouble.value === null
+          ? []
+          : [{ at: receipts.fetchedAt.value, drawn: receiptRows.value.length }]),
+      ]
+      const drawn = failed.filter((read) => read.drawn > 0)
+      const moments = (drawn.length > 0 ? drawn : failed).map((read) => read.at)
+      const known = moments.filter((at): at is Date => at !== null)
+      const at =
+        known.length === moments.length && known.length > 0
+          ? known.reduce((older, one) => (one < older ? one : older))
+          : null
+      const key = kind === 'offline' ? 'purchases.stale' : 'purchases.stale_error'
+      return {
+        kind: kind === 'offline' ? 'offline' : 'unanswered',
+        text: at ? t(key, when(at)) : t(`${key}_untimed`),
+        attempt: failures.value + receipts.attempt.value,
+      }
+    })
+    /** With nothing of an answer to show, the state says it instead of the strip. */
+    const state = computed(() => (fromMemory.value ? null : connection.value))
 
     const when = (at: Date) => ({
       day: purchaseDay(at, locale.value),
@@ -475,6 +522,12 @@ export default defineComponent({
       loadingMore,
       trouble,
       shown,
+      strip,
+      state,
+      earlierDay: computed(() => {
+        const last = rows.value.at(-1)
+        return last ? dateOfAnyYear(last.at, locale.value) : ''
+      }),
       open,
       pending,
       pendingFrom,
@@ -540,10 +593,11 @@ export default defineComponent({
   margin-top: var(--space-6);
 }
 
-.memory {
-  margin: var(--space-4) 0 0;
+.earlier {
+  margin: var(--space-2) 0 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
+  text-align: center;
 }
 
 .more {

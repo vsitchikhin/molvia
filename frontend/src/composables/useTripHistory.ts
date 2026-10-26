@@ -30,6 +30,8 @@ interface TripHistoryScreen {
   /** The load «Показать ещё» asked for — the one that button says it is at work on (MOL-225). */
   loadingMore: Ref<boolean>
   trouble: Ref<'error' | 'offline' | null>
+  /** How many loads failed: the strip says the same words again for each (MOL-181, C1). */
+  failures: Ref<number>
   load(): void
   more(): void
   open(tripId: string): void
@@ -55,6 +57,7 @@ export function useTripHistory(): TripHistoryScreen {
   const loading = computed(() => busy.value || !actor.id)
   const loadingMore = ref(false)
   const trouble = ref<'error' | 'offline' | null>(null)
+  const failures = ref(0)
   let run = 0
   const rows = computed(() => {
     const rows = new Map(
@@ -123,9 +126,13 @@ export function useTripHistory(): TripHistoryScreen {
         if (token === run) taken = await history.load(more)
       }
       if (token === run) trouble.value = taken ? null : 'error'
+      if (token === run && !taken) failures.value += 1
     } catch (error) {
       reportFailure(error, 'screen')
-      if (token === run) trouble.value = navigator.onLine ? 'error' : 'offline'
+      if (token === run) {
+        trouble.value = navigator.onLine ? 'error' : 'offline'
+        failures.value += 1
+      }
     } finally {
       if (token === run) {
         busy.value = false
@@ -171,6 +178,7 @@ export function useTripHistory(): TripHistoryScreen {
     loading,
     loadingMore,
     trouble,
+    failures,
     load: () => void load(),
     more: () => void load(true),
     open: (tripId: string) => void router.push({ name: 'purchase', params: { tripId } }),
