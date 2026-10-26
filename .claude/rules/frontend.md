@@ -620,7 +620,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the strip is up (adversarial А1): taken, the strip took the sheet and what was typed in it. A
   second full error while the first holds the strip is drawn as the quiet card (А4); the same error
   turning a section's where it stands gives its focus back to «Повторить» (А2); and the error says
-  the version out loud in the row's place (`useUpdateAnnouncement`, А3).
+  the version out loud in the row's place (`useUpdateAnnouncement`, А3). **A focus the strip loses is brought
+  back by the frame** (MOL-194, adversarial Б2, Б3): a render that swaps the strip's actions under
+  the focus — an account put away or deleted on another phone — left it on the body; it goes to the
+  strip's first button, where the one it stood on was, or to the title where the strip went whole. A
+  focus outside the strip stays where the person put it.
 - **The connection is one line, `StatusStrip`** (MOL-181, Ф-14, Н-7). «Без связи», «из памяти» and
   «сервер не ответил» were drawn five ways — a strip copied into seventeen files, a card of
   `ScreenState` over the screen, a note in a sheet — two or three on one screen, and a strip shared
@@ -644,7 +648,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   on coming and on new words, taken back when it goes. Drawn again with the same words it says
   nothing new; **a retry that failed the same way is still an answer** (C1, review С-7, adversarial
   А4): the screen counts its failed answers in `attempt`, and a new one says the same words again —
-  the strip stays through the retry, so nothing else would. «From
+  the strip stays through the retry, so nothing else would. **Gone with the focus on «Повторить», it gives it to the
+  title** (MOL-194, Б1), as a full error does: the retry answered is exactly when it goes. Not in a
+  sheet — the page under it is inert and a sheet's title takes no focus; there it falls as before, a
+  price. «From
   memory» has two forms only: `ScreenState` when there is no answer, the strip when an old one is
   shown. One per screen is held by the screens' tests, not a linter: two strips in a template are
   often `v-if` and `v-else`. `AppNote` stays the note — the «i», 400, no voice. The seventeen copies

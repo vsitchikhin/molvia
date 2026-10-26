@@ -338,13 +338,20 @@ balance, total and difference is the server's.
   never in the header, where «Править» alone stands: the header was out of the thumb's reach and, in
   English at 320, had no room for «Check against reality» beside «Edit». A removed account holds
   «Вернуть» there — at work «Возвращаем…», offline not now saying «Вернём, когда будет связь» (Ф-6) —
-  and, brought back, gives the focus to «Сверить с фактом», which takes its place. «Вернуть» of a
+  and, brought back, gives the focus to «Сверить с фактом», which takes its place — a focus that stood
+  on it or fell to the page (a tap Safari never focused), never one the person took to a row while
+  the answer was on its way (adversarial В). «Вернуть» of a
   spending removed from the journal stands over the strip, which stays: on a removed account two
   «Вернуть» at once, each saying what it brings back (С-8). «Нет такого счёта» is attention, not an
   error — no «Повторить» — and the screen puts «К счетам» in its strip itself, since the kit gives
   the strip to an error alone. The strip comes over an answer only (Р-1 MOL-193). The title is the
   name the phone keeps while the journal is on its way, failed or offline, else «Счёт» — and «Счёт»
-  over «нет такого», whatever the phone kept (Е-6, handoff 8h).
+  over «нет такого», whatever the phone kept (Е-6, handoff 8h). **The strip of the connection is the last read's**, as on
+  «Счета» (`failed` of the journal, not `stale`; adversarial А1, А2): a transfer re-reads the journal,
+  and a read that failed after an answer of the session left it without the transfer the balance
+  already had, with no strip and no «Повторить». Offline is the cloud whatever was answered. «Сервер
+  не ответил» carries the hour of «Счета» only where the balance is the phone's too — over a page this
+  session read, it named the minute of an answer the journal under it never had (review №1).
 - **«По счетам на …: … · Подставить» under «сколько было до»** (owner's decision В-3): the server's sum
   of the accounts of the currency (Р-20 MOL-115), put in by a tap only; nothing below zero; no
   answer, no line.
