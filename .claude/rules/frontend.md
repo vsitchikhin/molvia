@@ -985,7 +985,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   comes with the answer instead — the ways out of «Деньги» (`money-spendings.md`), the groups of
   «Настройки» — or the skeleton is the answer's shape, as the newcomer's «Что брать» (MOL-203). **A
   failed read read again is a skeleton for this rule** where its answer replaces a state of another
-  height: the ways out of «Деньги» go while a failed month is read again (adversarial А1), and the
+  height: the ways out of «Деньги» are unseen in their place while «Повторить» reads a failed month
+  again — never taken out, which shortened the page under the finger (adversarial А1, Б2), and never for
+  a read nobody asked for, refused as a rule and blinking the rows for nothing (review Р4-1) — and the
   groups of «Настройки» go under the form's skeleton of a read after a failure — «Повторить», the
   connection back, the app back in view (review Р3-1) — the one condition being the skeleton's own
   (`!(loading && !draft)`). An answer of another read that moves them counts the same where the phone
