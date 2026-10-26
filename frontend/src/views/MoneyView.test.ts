@@ -785,17 +785,51 @@ describe('MoneyView: the ways out, one figure each (MOL-81, MOL-159)', () => {
   })
 
   // A month that will not load must not close the way to the income that broke it (review Т-1).
-  it('stands beside the error and under the skeleton, with no figure of the month', async () => {
+  it('stands beside the error, with no figure of the month', async () => {
     moneyMonth.mockRejectedValue(new ApiError(ERROR.INTERNAL))
     const failed = await render()
     expect(failed.text()).toContain(en.spending.load_error.title)
     expect(entries(failed).map(({ href }) => href)).toContain('/money/incomes')
     expect(entries(failed)[0]).toMatchObject({ text: en.spending.list.title })
+  })
 
+  // MOL-269: under the skeleton the answer moved them from under the finger — a newcomer's 291 px
+  // up, a month with a spending 99 down — and the tap aimed at one landed on another or on nothing.
+  it('must not fire: nothing under the skeleton', async () => {
     moneyMonth.mockReturnValue(new Promise(() => undefined))
     const loading = await render()
     expect(loading.find('.skeleton').exists()).toBe(true)
-    expect(entries(loading)).toHaveLength(6)
+    expect(entries(loading)).toEqual([])
+  })
+
+  it('must not fire: nothing while «Счета» have not answered, all of them once they have', async () => {
+    // The month answered first: «Счета» on their way would still put their card over the switcher.
+    let answer: (value: MoneyAccountsResponse) => void = () => undefined
+    moneyAccounts.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    expect(view.find('.skeleton').exists()).toBe(false)
+    expect(entries(view)).toEqual([])
+    answer(noAccounts())
+    await flushPromises()
+    expect(entries(view)).toHaveLength(6)
+  })
+
+  it('come once «Счета» failed, and at once over a month and «Счета» the phone keeps', async () => {
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    moneyMonth.mockResolvedValue(month())
+    const failed = await render()
+    expect(entries(failed).map(({ href }) => href)).toContain('/money/accounts')
+    failed.unmount()
+
+    // Both kept from the opening before: the next one draws them before either answers again.
+    moneyAccounts.mockResolvedValue(noAccounts())
+    ;(await render()).unmount()
+    moneyAccounts.mockReturnValue(new Promise(() => undefined))
+    moneyMonth.mockReturnValue(new Promise(() => undefined))
+    const kept = await render()
+    expect(kept.find('.skeleton').exists()).toBe(false)
+    expect(entries(kept)).toHaveLength(6)
   })
 
   it('says of «Бюджет» what is over, that no plan is set, and nothing it does not know (MOL-117)', async () => {

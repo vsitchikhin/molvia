@@ -131,12 +131,13 @@
           :running="month.month === currentMonth"
         />
 
-        <!-- The ways out of the month, each with one figure: they stand by the error and under the
-             skeleton too — a month that will not load must not close the way to the income that
-             broke it (MOL-81; review Т-1, as MOL-66 argued) — but not offline with nothing kept,
-             where the screens behind them would show nothing either. -->
+        <!-- The ways out of the month, each with one figure: they stand by the error too — a month
+             that will not load must not close the way to the income that broke it (MOL-81; review
+             Т-1, as MOL-66 argued) — but not offline with nothing kept, where the screens behind
+             them would show nothing either. Never under the skeleton (MOL-269): the answer moved
+             them from under the finger, and «Счета» answering moves them too. -->
         <MoneyEntries
-          v-if="phase !== 'offline'"
+          v-if="entriesShown"
           :month="selected === currentMonth ? null : selected"
           :values="entries"
           :spendings="!newcomer"
@@ -290,6 +291,17 @@ export default defineComponent({
       }
     })
 
+    /**
+     * The ways out once nothing that answers above them can move them (MOL-269): the month answered,
+     * failed or kept, and «Счета» too — their card over the switcher comes with their answer. Under
+     * the skeleton they jumped 291 px up for a newcomer and 99 down with a spending, and the tap aimed
+     * at one landed on another, or on nothing.
+     */
+    const entriesShown = computed(() => {
+      const phase = screen.phase.value
+      return phase !== 'loading' && phase !== 'offline' && accounts.phase !== 'loading'
+    })
+
     /** «Повторить» asks «Счета» again too: the server that broke the month broke them as well (А2). */
     function retryAll(): Promise<void> {
       void accounts.refresh()
@@ -393,6 +405,7 @@ export default defineComponent({
       newcomer,
       refusedHere,
       entries,
+      entriesShown,
       saved,
       openSpendings,
     }
