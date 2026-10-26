@@ -84,9 +84,8 @@ test('the corners found on the paper, «Done» makes the receipt a part', async 
  * its middle, on a dark table — 1 512 × 2 016, the paper from 6 % to 94 % of the height. One
  * `drawImage` straight to 640 tears it at the crease; the canvas halved to 1 008 does not.
  */
-async function longCreased(page: Page): Promise<Buffer> {
-  const encoded = await page.evaluate(async () => {
-    const [width, height] = [1512, 2016]
+async function longCreased(page: Page, size = { width: 1512, height: 2016 }): Promise<Buffer> {
+  const encoded = await page.evaluate(async ({ width, height }) => {
     const [x0, x1, y0, y1] = [575, 975, 125, 1900]
     let seed = 1
     const random = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32
@@ -122,20 +121,28 @@ async function longCreased(page: Page): Promise<Buffer> {
     let binary = ''
     for (const byte of bytes) binary += String.fromCharCode(byte)
     return btoa(binary)
-  })
+  }, size)
   return Buffer.from(encoded, 'base64')
 }
 
+const handleTop = (page: Page, index: number) =>
+  edges(page)
+    .locator('.handle')
+    .nth(index)
+    .evaluate((node) => parseFloat((node as HTMLElement).style.top))
+
 test('a long receipt creased across is found whole, its top and its foot', async ({ page }) => {
   await shoot(page, longCreased)
-  const top = (index: number) =>
-    edges(page)
-      .locator('.handle')
-      .nth(index)
-      .evaluate((node) => parseFloat((node as HTMLElement).style.top))
   // the paper stands from 6.2 % to 94.2 % of the photo; torn at the crease, the foot stood at 50 %
-  expect(await top(0)).toBeLessThan(8)
-  expect(await top(2)).toBeGreaterThan(92)
+  expect(await handleTop(page, 0)).toBeLessThan(8)
+  expect(await handleTop(page, 2)).toBeGreaterThan(92)
+})
+
+test('a long receipt on a photo of odd sides is found whole too', async ({ page }) => {
+  // 2 013 halved to 1 007 drew one row of two across the middle and tore it again (adversarial А1)
+  await shoot(page, (p) => longCreased(p, { width: 1513, height: 2013 }))
+  expect(await handleTop(page, 0)).toBeLessThan(8)
+  expect(await handleTop(page, 2)).toBeGreaterThan(92)
 })
 
 test('a corner dragged by the pointer moves, and the sheet stays where it is', async ({ page }) => {
