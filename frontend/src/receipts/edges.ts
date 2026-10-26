@@ -20,41 +20,49 @@ export const EDGES_LONG_SIDE = 640
 /**
  * The long side the phone halves a photo down to before `grayOf` takes it the rest of the way (MOL-259):
  * one `drawImage` from 4 000 px straight to 640 samples four pixels of forty, and the noise and print it
- * keeps tore a long receipt's paper in two — am-05c lost its top half in Chromium. Each half is a mean.
+ * keeps tore a long receipt's paper in two — am-05c lost its top half in Chromium. Each step is exactly
+ * half, so a mean of 2 × 2.
  */
 export const EDGES_HALVED_SIDE = 2 * EDGES_LONG_SIDE
 
-/** The sizes a photo goes through, each half the one before, until its long side is within `longSide`. */
+/**
+ * The sizes a photo goes through, each exactly half the one before, until its long side is within
+ * `longSide`: an odd side drops its last pixel (`halvedSource`), since a canvas drawing 4 619 into 2 310
+ * is no longer a mean of two but samples one of them across the middle of the photo (MOL-259, adversarial А1).
+ */
 export function halvingSteps(size: Size, longSide = EDGES_HALVED_SIDE): Size[] {
   const steps: Size[] = []
   let { width, height } = size
   while (Math.max(width, height) > longSide) {
-    width = Math.max(1, Math.round(width / 2))
-    height = Math.max(1, Math.round(height / 2))
+    width = Math.max(1, Math.floor(width / 2))
+    height = Math.max(1, Math.floor(height / 2))
     steps.push({ width, height })
   }
   return steps
 }
 
-/** The photo brought to `size`, each pixel the mean of the ones it covers: a step of `halvingSteps`. */
+/** The part of `from` a step to `to` draws from: twice the step, the odd last pixel left out. */
+export function halvedSource(from: Size, to: Size): Size {
+  return { width: Math.min(2 * to.width, from.width), height: Math.min(2 * to.height, from.height) }
+}
+
+/** The photo brought to `size`, a step of `halvingSteps`: each pixel the mean of the 2 × 2 it covers. */
 export function halved(photo: Pixels, size: Size): Pixels {
   const { width, height } = size
-  const sum = new Float64Array(width * height * 4)
-  const count = new Uint32Array(width * height)
-  for (let y = 0; y < photo.height; y++) {
-    const ty = Math.min(height - 1, Math.floor((y * height) / photo.height))
-    for (let x = 0; x < photo.width; x++) {
-      const tx = Math.min(width - 1, Math.floor((x * width) / photo.width))
-      const to = ty * width + tx
-      const at = (y * photo.width + x) * 4
-      for (let c = 0; c < 4; c++)
-        sum[to * 4 + c] = (sum[to * 4 + c] ?? 0) + (photo.data[at + c] ?? 0)
-      count[to] = (count[to] ?? 0) + 1
+  const data = new Uint8ClampedArray(width * height * 4)
+  for (let y = 0; y < height; y++) {
+    // a side of one pixel stays one: its pixel is taken twice, the mean the pixel itself
+    const rows = [2 * y, Math.min(2 * y + 1, photo.height - 1)]
+    for (let x = 0; x < width; x++) {
+      const columns = [2 * x, Math.min(2 * x + 1, photo.width - 1)]
+      for (let c = 0; c < 4; c++) {
+        let sum = 0
+        for (const row of rows)
+          for (const column of columns) sum += photo.data[(row * photo.width + column) * 4 + c] ?? 0
+        data[(y * width + x) * 4 + c] = Math.round(sum / 4)
+      }
     }
   }
-  const data = new Uint8ClampedArray(width * height * 4)
-  for (let i = 0; i < data.length; i++)
-    data[i] = Math.round((sum[i] ?? 0) / Math.max(1, count[i >> 2] ?? 0))
   return { data, width, height }
 }
 

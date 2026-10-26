@@ -3,6 +3,7 @@ import {
   EDGES_LONG_SIDE,
   halved,
   halvedCopy,
+  halvedSource,
   halvingSteps,
   proposedCorners,
 } from '@/receipts/edges'
@@ -80,26 +81,38 @@ describe('the copy the corners are looked for on (MOL-259)', () => {
       { width: 756, height: 1008 },
     ])
     expect(halvingSteps({ width: 4762, height: 3571 })).toEqual([
-      { width: 2381, height: 1786 },
-      { width: 1191, height: 893 },
+      { width: 2381, height: 1785 },
+      { width: 1190, height: 892 },
     ])
+  })
+
+  it('halves an odd side exactly, its last pixel left out — 24 Mp brought under 16 Mp', () => {
+    expect(halvingSteps({ width: 4619, height: 3464 })).toEqual([
+      { width: 2309, height: 1732 },
+      { width: 1154, height: 866 },
+    ])
+    expect(halvedSource({ width: 4619, height: 3464 }, { width: 2309, height: 1732 })).toEqual({
+      width: 4618,
+      height: 3464,
+    })
   })
 
   it('leaves a photo already within it alone, and halves one a pixel over', () => {
     expect(halvingSteps({ width: 960, height: 1280 })).toEqual([])
     expect(halvingSteps({ width: 200, height: 300 })).toEqual([])
-    expect(halvingSteps({ width: 961, height: 1281 })).toEqual([{ width: 481, height: 641 }])
+    expect(halvingSteps({ width: 961, height: 1281 })).toEqual([{ width: 480, height: 640 }])
+    expect(halvingSteps({ width: 1, height: 1500 })).toEqual([{ width: 1, height: 750 }])
   })
 
-  it('takes every pixel of a step as the mean of the ones it covers', () => {
+  it('takes every pixel of a step as the mean of the 2 × 2 it covers', () => {
     expect(
       greys(halved(photoOf(4, 2, [0, 100, 200, 200, 100, 0, 40, 40]), { width: 2, height: 1 })),
     ).toEqual([50, 120])
   })
 
-  it('gives the odd last pixel of a side to the last pixel of the step', () => {
-    const odd = halved(photoOf(3, 1, [10, 30, 90]), { width: 2, height: 1 })
-    expect(greys(odd)).toEqual([20, 90])
+  it('leaves the odd last pixel of a side out, as the canvas does drawing twice the step', () => {
+    expect(greys(halved(photoOf(3, 1, [10, 30, 90]), { width: 1, height: 1 }))).toEqual([20])
+    expect(greys(halved(photoOf(1, 2, [10, 30]), { width: 1, height: 1 }))).toEqual([20])
   })
 
   it('makes the copy by the steps alone, the photo untouched', () => {
@@ -113,14 +126,16 @@ describe('the copy the corners are looked for on (MOL-259)', () => {
   it('finds a long receipt whole, where one sampled step tore it at its crease', () => {
     const photo = longReceipt()
     const { paper } = photo
-    const whole = proposedCorners(halvedCopy(photo))
-    const k = photo.height / halvedCopy(photo).height
+    const copy = halvedCopy(photo)
+    const whole = proposedCorners(copy)
+    const k = photo.height / copy.height
     expect(whole.found).toBe(true)
     expect(Math.abs(whole.quad[0].y * k - paper.top)).toBeLessThan(8)
     expect(Math.abs(whole.quad[2].y * k - paper.bottom)).toBeLessThan(8)
     // the photo is one the old copy cuts: drop `halvedCopy` from the phone and this is what it proposes
-    const torn = proposedCorners(sampled(photo))
-    const j = photo.height / sampled(photo).height
+    const sample = sampled(photo)
+    const torn = proposedCorners(sample)
+    const j = photo.height / sample.height
     expect(torn.quad[2].y * j).toBeLessThan(paper.bottom - (paper.bottom - paper.top) / 3)
   }, 20_000)
 })

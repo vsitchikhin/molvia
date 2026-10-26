@@ -1,6 +1,6 @@
 import { RECEIPT_SIDE_MIN } from '@molvia/model'
 import { RECEIPT_PHOTO_SIDE } from '@/receipts/photo'
-import { halvingSteps, proposedCorners } from '@/receipts/edges'
+import { halvedSource, halvingSteps, proposedCorners } from '@/receipts/edges'
 import { boundsOf, orderCorners, rectOf, shifted, snapped, warp, within } from '@/receipts/warp'
 import type { Quad, Size } from '@/receipts/warp'
 import type { WarpReply, WarpRequest } from '@/receipts/warpWorker'
@@ -74,9 +74,9 @@ function letGo(copy: HTMLCanvasElement, photo: HTMLCanvasElement): void {
 
 /**
  * Where the phone proposes the corners (Т-2): looked for on a copy halved down to at most
- * `EDGES_HALVED_SIDE` — each step a mean of four pixels, as the bench's `halvedCopy`, never one
- * `drawImage` straight to the size, which samples (MOL-259) — read whole by `grayOf` to
- * `EDGES_LONG_SIDE`, and carried back to the photo.
+ * `EDGES_HALVED_SIDE` — each step exactly half, a mean of 2 × 2 in any engine, as the bench's
+ * `halvedCopy`, never one `drawImage` straight to the size, which samples (MOL-259) — read whole by
+ * `grayOf` to `EDGES_LONG_SIDE`, and carried back to the photo.
  */
 export function proposeCorners(photo: HTMLCanvasElement): { quad: Quad; found: boolean } {
   const whole: Quad = [
@@ -88,18 +88,27 @@ export function proposeCorners(photo: HTMLCanvasElement): { quad: Quad; found: b
   let copy = photo
   for (const step of halvingSteps(photo)) {
     const next = canvasOf(step)
+    // no `willReadFrequently`, not even on the last step: read once, it cost WebKit 6 → 9…11 ms, Chromium nothing
     const drawn = next.getContext('2d')
-    if (!drawn) return { quad: whole, found: false }
-    drawn.drawImage(copy, 0, 0, step.width, step.height)
+    if (!drawn) {
+      letGo(copy, photo)
+      return { quad: whole, found: false }
+    }
+    const source = halvedSource(copy, step)
+    drawn.drawImage(copy, 0, 0, source.width, source.height, 0, 0, step.width, step.height)
     letGo(copy, photo)
     copy = next
   }
-  const context = copy.getContext('2d', { willReadFrequently: true })
-  if (!context) return { quad: whole, found: false }
+  const context = copy.getContext('2d')
+  if (!context) {
+    letGo(copy, photo)
+    return { quad: whole, found: false }
+  }
   const pixels = context.getImageData(0, 0, copy.width, copy.height)
   letGo(copy, photo)
   const { quad, found } = proposedCorners(pixels)
   if (!found) return { quad: whole, found: false }
+  // the odd pixels the steps left out are under one pixel of the copy: the copy stands for the whole photo
   const sx = photo.width / pixels.width
   const sy = photo.height / pixels.height
   return {
