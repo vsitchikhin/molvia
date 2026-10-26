@@ -574,7 +574,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17); no gesture
   is intercepted but the sheet's own pull down (MOL-80); only the page scrolls, except a sheet.
   **Nothing to tap stands under a skeleton where the answer moves it** (MOL-269): the ways out of
-  «Деньги» wait for the month and «Счета», the groups of «Настройки» for the form and the salary's day.
+  «Деньги» wait for the month and «Счета», the groups of «Настройки» for the form.
   **«Что брать» is home** (MOL-128): the `tabMove` of «back»; old addresses of «Поход» redirect for
   good. **A change of a screen's own query is not another screen** (MOL-136): no scroll, no
   animation, no arrival, and the page is held as tall as the window (MOL-138); **nothing of the

@@ -79,9 +79,9 @@ it('loads without invented fields, and keeps a focusable inactive save action', 
   expect(view.get('.dock > button').attributes('aria-disabled')).toBe('true')
   expect(view.get('.dock > button').attributes('disabled')).toBeUndefined()
 })
-// MOL-269: the form and the salary's day both grow what stands under them as they come, and the
-// groups under the skeleton moved from under the finger — «Выйти» tapped became another row.
-describe('the groups under the form come with its answer and the salary’s (MOL-269)', () => {
+// MOL-269: the form coming in place of the skeleton moved the groups under it from under the finger
+// — «Выйти» tapped became another row.
+describe('the groups under the form come with its answer (MOL-269)', () => {
   // `v-show` on the group: the view is not in a document, so its own style is read up the tree.
   const seen = (node: Element | undefined): boolean => {
     for (let at = node; at instanceof HTMLElement; at = at.parentElement ?? undefined)
@@ -110,18 +110,16 @@ describe('the groups under the form come with its answer and the salary’s (MOL
     expect(shown(view)).toEqual([false, false, false, false])
   })
 
-  it('must not fire: none while the salary’s day is on its way, all once it answers', async () => {
-    let answer: (value: { day: number | null }) => void = () => undefined
-    salaryShift.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+  // Not kept on the phone, the salary's day would hide them at every opening — a step back the
+  // browser showed whole came in again under its picture (motion.spec, А5).
+  it('all with the form, not waiting for the salary’s day', async () => {
+    salaryShift.mockReturnValue(new Promise(() => undefined))
     const view = await render(false)
     expect(view.find('select').exists()).toBe(true)
-    expect(shown(view)).toEqual([false, false, false, false])
-    answer({ day: 25 })
-    await flushPromises()
     expect(shown(view)).toEqual([true, true, true, true])
   })
 
-  it('come when either read failed, or offline with nothing kept', async () => {
+  it('come when the form failed, or offline with nothing kept', async () => {
     salaryShift.mockRejectedValue(new ApiError(ERROR.INTERNAL))
     me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
     const failed = await render(false)
