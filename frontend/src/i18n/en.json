@@ -263,6 +263,11 @@
       "body": "We’ll show your purchases once you’re online. You can record new ones now — the button below"
     },
     "offline_capture": "We’ll show your purchases once you’re online. You can photograph a receipt or add by hand now",
+    "receipts_error": {
+      "title": "Receipts didn’t load",
+      "body": "We’ll show them once the server answers"
+    },
+    "receipts_offline": "We’ll show your receipts once you’re online",
     "stuck_meta": "{parts} · not all parts arrived",
     "record_refused": "not saved — open it and fix it",
     "capture_link": "Receipt by link",

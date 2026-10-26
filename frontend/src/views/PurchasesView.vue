@@ -1,9 +1,9 @@
 <template>
   <AppScreen :title="t('purchases.title')">
-    <!-- The connection is one line under the header, over everything the answer drew (Ф-14, MOL-181):
-         the history and the receipts are one list of purchases, so one strip says both — never three
-         ways of «from memory» on one screen. Only over something of an answer: with nothing shown it
-         is the state below. -->
+    <!-- The connection is one line under the header, over what a failed read drew from memory (Ф-14,
+         MOL-181): the history and the receipts are one list of purchases, so one strip says both — never
+         three ways of «from memory» on one screen. «Записаны» with nothing of it shown is the state
+         below instead, and the receipts with nothing shown are their own quiet card. -->
     <StatusStrip
       v-if="strip"
       class="connection"
@@ -103,6 +103,26 @@
       </AppCard>
     </template>
 
+    <!-- The receipts did not come and nothing of them is shown, while «Записаны» did or is on its way:
+         a section's error, in its own words — «Покупки не загрузились» over the list would be untrue
+         (adversarial А2, review 1). -->
+    <ScreenState
+      v-if="receiptsState === 'error'"
+      kind="error"
+      inline
+      :title="t('purchases.receipts_error.title')"
+      :body="t('purchases.receipts_error.body')"
+      @retry="retry"
+    />
+    <ScreenState
+      v-else-if="receiptsState === 'offline'"
+      kind="offline"
+      tone="warn"
+      inline
+      :title="t('purchases.offline.title')"
+      :body="t('purchases.receipts_offline')"
+    />
+
     <AppReveal>
       <AppCard v-if="pending > 0 && country" class="block pending" list>
         <ListRow
@@ -144,13 +164,13 @@
       :body="t(country ? 'purchases.error_capture' : 'purchases.error.body')"
       @retry="retry"
     />
-    <!-- Nothing of an answer to show: the screen's own words, never «what is on the phone» over
+    <!-- Nothing of «Записаны» to show: the screen's own words, never «what is on the phone» over
          nothing (Ф-19). -->
     <ScreenState
       v-else-if="state === 'offline'"
       kind="offline"
       tone="warn"
-      :inline="!!open || pending > 0"
+      :inline="!!open || pending > 0 || receiptRows.length > 0"
       :title="t('purchases.offline.title')"
       :body="t(country ? 'purchases.offline_capture' : 'purchases.offline.body')"
     />
@@ -302,7 +322,7 @@ export default defineComponent({
     const actor = useActorStore()
     const trips = useTripStore()
     const screen = useTripHistory()
-    const { history, rows, loading, loadingMore, trouble, failures } = screen
+    const { history, rows, loading, loadingMore, trouble, failures, moved } = screen
     const verdicts = useVerdictQueue()
     const pending = computed(() => verdicts.count.value)
     const pendingFrom = usePendingFrom(verdicts)
@@ -364,45 +384,83 @@ export default defineComponent({
       return loading.value ? 'loading' : 'list'
     })
 
-    /** The worse of the two reads behind the screen — the history's and the receipts'. */
-    const connection = computed<'offline' | 'error' | null>(() => {
-      const both = [trouble.value, receipts.trouble.value]
-      if (both.includes('offline')) return 'offline'
-      return both.includes('error') ? 'error' : null
-    })
-    /** Something of an answer is drawn: the rows the phone kept of «Записаны» or of the receipts. */
-    const fromMemory = computed(() => rows.value.length > 0 || receiptRows.value.length > 0)
+    const worse = (
+      a: 'offline' | 'error' | null,
+      b: 'offline' | 'error' | null,
+    ): 'offline' | 'error' | null => {
+      if (a === 'offline' || b === 'offline') return 'offline'
+      return a === 'error' || b === 'error' ? 'error' : null
+    }
     /**
-     * The one strip (Р-2, Р-6 of MOL-204): over what is shown from memory, as old as the older of the
-     * reads that failed and drew something — nothing on screen is newer than that; a read that failed
-     * with nothing of it on screen dates nothing, unless no other did. A read whose moment the phone
-     * does not know — a cache from before the moment was kept — names no time at all.
+     * The history's read failed — unless every ask was answered under a list another window kept
+     * moving: the rows shown are then that window's answer, and «Сервер не ответил» over them would be
+     * untrue (adversarial А4). With nothing shown the quiet «did not load» is true either way.
+     */
+    const historyTrouble = computed(() =>
+      moved.value && rows.value.length > 0 ? null : trouble.value,
+    )
+    /**
+     * «Записаны» did not come and nothing of it is shown: the screen's state, for both reads. A strip
+     * over a receipt alone would read as every purchase there is (adversarial А3).
+     */
+    const state = computed(() =>
+      historyTrouble.value !== null && rows.value.length === 0
+        ? worse(historyTrouble.value, receipts.trouble.value)
+        : null,
+    )
+    /** Failed reads of the person's own asking, since the receipts' read repeats itself (А1). */
+    const retriesFailed = ref(0)
+    /**
+     * The one strip (Р-2, Р-6 of MOL-204): only over what a failed read drew from memory, and then for
+     * both reads — the kind the worse of the two. As old as the older of the failed reads that drew
+     * something: nothing on screen is newer than that. A read whose moment the phone does not know — a
+     * cache from before the moment was kept — names no time at all. Said again only when a try of the
+     * person's failed: the receipts' poll every five seconds is nobody's question (adversarial А1).
      */
     const strip = computed<{ kind: StripKind; text: string; attempt: number } | null>(() => {
-      const kind = connection.value
-      if (kind === null || !fromMemory.value) return null
+      if (state.value !== null) return null
       const failed = [
-        ...(trouble.value === null ? [] : [{ at: history.answeredAt, drawn: rows.value.length }]),
+        ...(historyTrouble.value === null
+          ? []
+          : [{ trouble: historyTrouble.value, at: history.answeredAt, drawn: rows.value.length }]),
         ...(receipts.trouble.value === null
           ? []
-          : [{ at: receipts.fetchedAt.value, drawn: receiptRows.value.length }]),
+          : [
+              {
+                trouble: receipts.trouble.value,
+                at: receipts.fetchedAt.value,
+                drawn: receiptRows.value.length,
+              },
+            ]),
       ]
-      const drawn = failed.filter((read) => read.drawn > 0)
-      const moments = (drawn.length > 0 ? drawn : failed).map((read) => read.at)
+      const moments = failed.filter((read) => read.drawn > 0).map((read) => read.at)
+      if (moments.length === 0) return null
+      const kind = failed
+        .map((read) => read.trouble)
+        .reduce<'offline' | 'error' | null>(worse, null)
       const known = moments.filter((at): at is Date => at !== null)
       const at =
-        known.length === moments.length && known.length > 0
+        known.length === moments.length
           ? known.reduce((older, one) => (one < older ? one : older))
           : null
       const key = kind === 'offline' ? 'purchases.stale' : 'purchases.stale_error'
       return {
         kind: kind === 'offline' ? 'offline' : 'unanswered',
         text: at ? t(key, when(at)) : t(`${key}_untimed`),
-        attempt: failures.value + receipts.attempt.value,
+        attempt: failures.value + retriesFailed.value,
       }
     })
-    /** With nothing of an answer to show, the state says it instead of the strip. */
-    const state = computed(() => (fromMemory.value ? null : connection.value))
+    /** The receipts failed with nothing of them shown, and no strip or state speaks for them. */
+    const receiptsState = computed(() =>
+      state.value === null && strip.value === null && receiptRows.value.length === 0
+        ? receipts.trouble.value
+        : null,
+    )
+    async function retryReceipts(): Promise<void> {
+      const before = receipts.attempt.value
+      await receipts.retry()
+      if (receipts.attempt.value > before) retriesFailed.value += 1
+    }
 
     const when = (at: Date) => ({
       day: purchaseDay(at, locale.value),
@@ -538,6 +596,7 @@ export default defineComponent({
       shown,
       strip,
       state,
+      receiptsState,
       earlierDay: computed(() => {
         const last = rows.value.at(-1)
         return last ? dateOfAnyYear(last.at, locale.value) : ''
@@ -591,7 +650,7 @@ export default defineComponent({
       retry: () => {
         screen.load()
         void loadTrip()
-        void receipts.retry()
+        void retryReceipts()
       },
     }
   },

@@ -32,6 +32,11 @@ interface TripHistoryScreen {
   trouble: Ref<'error' | 'offline' | null>
   /** How many loads failed: the strip says the same words again for each (MOL-181, C1). */
   failures: Ref<number>
+  /**
+   * The last load's «did not load» came of a list that kept moving, not of the server: every ask was
+   * answered, under a cache another window was writing (MOL-204, adversarial А4).
+   */
+  moved: Ref<boolean>
   load(): void
   more(): void
   open(tripId: string): void
@@ -58,6 +63,7 @@ export function useTripHistory(): TripHistoryScreen {
   const loadingMore = ref(false)
   const trouble = ref<'error' | 'offline' | null>(null)
   const failures = ref(0)
+  const moved = ref(false)
   let run = 0
   const rows = computed(() => {
     const rows = new Map(
@@ -125,12 +131,16 @@ export function useTripHistory(): TripHistoryScreen {
         await new Promise((resolve) => setTimeout(resolve, RETRY_PAUSE_MS * 2 ** (again - 1)))
         if (token === run) taken = await history.load(more)
       }
-      if (token === run) trouble.value = taken ? null : 'error'
+      if (token === run) {
+        trouble.value = taken ? null : 'error'
+        moved.value = !taken
+      }
       if (token === run && !taken) failures.value += 1
     } catch (error) {
       reportFailure(error, 'screen')
       if (token === run) {
         trouble.value = navigator.onLine ? 'error' : 'offline'
+        moved.value = false
         failures.value += 1
       }
     } finally {
@@ -179,6 +189,7 @@ export function useTripHistory(): TripHistoryScreen {
     loadingMore,
     trouble,
     failures,
+    moved,
     load: () => void load(),
     more: () => void load(true),
     open: (tripId: string) => void router.push({ name: 'purchase', params: { tripId } }),
