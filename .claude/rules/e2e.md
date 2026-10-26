@@ -39,7 +39,8 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
     after the push in the mutation of #215. `bin/check-playwright-image.mjs` in `npm run lint` says
     it in the checks job too, in one sentence with the tag to set (4:10 there), so the pull request
     reads as a tag to move rather than a broken suite. It reads the value of `image:`, never a
-    comment (А3), and a version with a hyphen of its own whole (А2).
+    comment (А3), a version with a hyphen of its own whole (А2), and the tag before a digest — a tag
+    moved asks for its digest too, which only the registry knows (Б1).
   - **Dependabot never moves the tag, so its pull request of Playwright is red until we do — on
     purpose** (owner's В-1 «а»). Playwright is a group of its own in `dependabot.yml`, so the rest of
     the week's packages go green without it. The tag is moved by a commit to Dependabot's branch;
@@ -59,11 +60,12 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
     so a test hung with no timeout of its own is named nowhere — every spec keeps one, and none sets
     `0`. Not `globalTimeout`: it waits as long again for a hung worker's teardown.
   - **The prices, named:** the image, 956 MB compressed, is pulled on every run — 27 s on the first
-    run, the containers up in 39–41 s against 12–14 (26.10.2026), in place of apt's half-minute and the
-    cache's six seconds, so an ordinary run is no shorter, and the win is the tail. The tests took 16.4 and 17.3 minutes there, against
-    11.6–16.7 on the runner: whether the container is slower, two runs do not say, and `--ipc=host`,
-    which Playwright advises for Chromium in Docker, was not tried. Its fallback fonts are not the
-    runner's: the app's faces are its own, but a glyph outside them falls back to the image's.
+    run, the containers up in 39–41 s against 12–14 (26.10.2026), in place of apt's half-minute and
+    the cache's six seconds, so an ordinary run is no shorter, and the win is the tail. The tests took
+    16.4, 17.3 and 15.7 minutes there, against 11.6–16.7 on the runner: whether the container is
+    slower, three runs do not say, and `--ipc=host`, which Playwright advises for Chromium in Docker,
+    was not tried. Its fallback fonts are not the runner's: the app's faces are its own, but a glyph
+    outside them falls back to the image's.
 - **End-to-end has a database of its own too, and it is dropped before every run**
   (`molvia_<index>_e2e`, MOL-60). Until then the suite started the API without a
   `DATABASE_URL` of its own and wrote into the dev database, so every pass left a catalogue
