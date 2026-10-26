@@ -3526,3 +3526,22 @@ Release пропущен. vitest делает `window` самим `globalThis` �
 
 Требования и план — `.scratch/tasks/{requirements,plans}/MOL-264.md`, артефакт — `.lavish/mol-264-plan.html`; стенд —
 `.scratch/tasks/status/MOL-264/bench.mts`; правила — `.claude/rules/receipts.md` («The package a line's name prints»).
+
+## e2e в CI в образе Playwright (MOL-295)
+
+22–23.10.2026 задание end-to-end раз за разом стояло на `npx playwright install --with-deps`: браузеры шли из кэша,
+а 181 системный пакет (108 МБ) apt тянул с медленного зеркала Ubuntu. Замер 21 прогона за 23.10: в 7 шаг шёл 17–60 мин
+при 0,4–0,7 мин обычно, задание — до 74 мин при 13–18; держит и DoD каждого PR, и выкатку (Release ждёт CI master).
+
+- **Образ** (решение владельца 22.10, вариант «а»): задание в `mcr.microsoft.com/playwright:v1.63.0-noble`, `--user 1001`;
+  шаги установки и кэш браузеров ушли. Образ — 956 МБ в сжатом виде, Node 24 (свой — по `.nvmrc`), все браузеры.
+- **Версия** (В-1 «а»): тег буквально в `ci.yml`, `bin/check-playwright-image.mjs` в `npm run lint` сверяет его с
+  `@playwright/test` и `playwright` в lockfile и называет тег — PR Dependabot с новым Playwright красный, пока тег не
+  поправят. Сам Playwright отказал бы тоже, но только на первом тесте.
+- **База** (В-3 «а»): в контейнере сервис — `postgres:5432`; `init-env.sh` берёт `PG_HOST` и `PG_HOST_PORT` из окружения,
+  по умолчанию петля и порт полосы.
+- **Предел** (В-2 «а»): `timeout-minutes: 40` — застрявший шаг GitHub держал до 6 ч.
+- **Цена:** образ качается каждый прогон — обычный прогон не короче, выигрыш в хвосте; запасные шрифты образа не раннера.
+
+Требования и план — `.scratch/tasks/{requirements,plans}/MOL-295.md`, артефакт — `.lavish/mol-295-plan.html`; замер —
+`.scratch/tasks/status/MOL-295-timings.md`; правило — `.claude/rules/e2e.md`.

@@ -234,7 +234,7 @@ lies on an iPad (as MOL-132 Р-3).
 - **The scanner's specs run in a project of their own, `camera`: the full Chromium with a fake
   camera.** The headless shell every other spec runs in answers any `getUserMedia` with
   `NotSupportedError`, fake camera or not (measured 29.09.2026). `playwright install chromium`
-  brings both, here and in CI.
+  brings both, and CI's image has both (MOL-295).
 - **The camera films a file drawn at every run** (`e2e/barcode-video.ts`, `globalSetup`): an EAN-13
   from an encoder of its own — not zxing's writer, so the reader is checked against a hand that is
   not its own — as one Y4M frame, which Chromium plays in a loop. No binary in git, no ffmpeg in CI.

@@ -24,6 +24,27 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   «done» waits for it (`gh pr checks --watch`). Since MOL-165 every other check is CI's as well. `make e2e` is the same suite here, on demand — for a
   spec being written, or a change the agent wants seen before it leaves the machine.
 
+- **CI runs end-to-end in the image of Playwright, `mcr.microsoft.com/playwright:v<version>-noble`**
+  (MOL-295). Until then the job installed the browsers with `--with-deps` on every run: the browsers
+  came from a cache, but their system packages — 181 through apt, gstreamer, fonts, WebKit's
+  libraries — go into the system, where no cache reaches, and on a slow mirror of Ubuntu the step took
+  17 to 60 minutes in 7 of the 21 runs of 23.10.2026, against half a minute otherwise, holding the
+  pull request and the deploy behind it. **The tag is the version of `@playwright/test` and
+  `playwright` in the lockfile**: the image's browsers are built for that one, and Playwright of
+  another refuses — but only at the first test, after `npm ci` and every server. So
+  `bin/check-playwright-image.mjs` in `npm run lint` says it a minute after the push, with the tag to
+  set; Dependabot raises the package with its weekly group and never the tag, and its pull request is
+  red until the tag is moved — on purpose (owner's В-1 «а»). In the container the loopback is the
+  container's own, and the database is the service by its name, `postgres:5432`, which
+  `bin/init-env.sh` writes when given `PG_HOST` and `PG_HOST_PORT` (В-3 «а») — one generator of
+  `.env` still. The image's Node is 24; `setup-node` keeps `.nvmrc`'s. The job runs as the runner's
+  uid (`--user 1001`, as Playwright's documentation has it) and has 40 minutes (`timeout-minutes`,
+  В-2 «а»): a run takes 13–18, and a hung step was held for six hours. Rejected: caching the `.deb`s
+  of `/var/cache/apt` (fragile, or an action of a third party) and dropping `--with-deps` (WebKit does
+  not start without gstreamer). **The prices, named:** the image, 956 MB compressed, is pulled on
+  every run — it takes the place of apt's half-minute rather than shortening an ordinary run, and the
+  win is the tail; and its fallback fonts are not the runner's: the app's faces are its own, but a
+  glyph outside them falls back to the image's.
 - **End-to-end has a database of its own too, and it is dropped before every run**
   (`molvia_<index>_e2e`, MOL-60). Until then the suite started the API without a
   `DATABASE_URL` of its own and wrote into the dev database, so every pass left a catalogue
@@ -101,9 +122,8 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   cookie on http://127.0.0.1**, so every page load after the first comes in signed out (a reload, a
   `goto`); and **CDP** — the rise held still, a touch moved — is Chromium's alone. Playwright's
   WebKit is not an iPhone either: its touches do not go through UIKit, and the scrim bug of MOL-80
-  did not show in it. CI installs both browsers; a new machine installs them once,
-  `npx playwright install chromium webkit`, or its first push fails on `Executable doesn't exist`
-  (review Р-5).
+  did not show in it. A machine installs both browsers once, `npx playwright install chromium
+webkit`, or `make e2e` fails on `Executable doesn't exist` (review Р-5); CI has them in its image.
 - **Outside CI a failed test keeps its trace** (`retain-on-failure`, MOL-67), since there are no
   retries to write one. It is recorded for every test and dropped when it passes, which costs
   12–22 % of a full local run (measured in four pairs); and under an overload that times a test
