@@ -286,6 +286,11 @@ export interface NameLexicon {
    * two is one and «Тут дешевле» reads them as one kind.
    */
   readonly seed?: readonly SeedName[]
+  /**
+   * A till's word in the genitive as an adjective, «լոլիկի» «томатный» (Т-4): keyed by the genitive itself, since
+   * «-ի» ends a nominative as often.
+   */
+  readonly genitives?: Readonly<Record<string, string>>
 }
 
 /** An item of the seed: its name and its names in the till's language. */
@@ -358,25 +363,34 @@ export function newLineName(
   const said: string[] = kindOf === null ? [] : wordsOf(kindOf.name)
   const covered = kindOf?.covered ?? new Set<string>()
 
+  // a word of the name, with where its token stood on the line and whether it was the kind
+  interface Said {
+    readonly word: string
+    readonly at: number
+    readonly kind: boolean
+  }
+
   // a product line of two words is the lexicon's before either of them: «Արտ Բեյքրի» Art Bakery
-  const lines = (tokens: readonly string[]): string[] =>
-    tokens.flatMap((token, at) => {
-      const pair = `${tokens[at - 1] ?? ''} ${token}`
-      if (at > 0 && shelfOf(pair, lexicon) !== null) return []
-      const next = `${token} ${tokens[at + 1] ?? ''}`
-      if (at + 1 < tokens.length && shelfOf(next, lexicon) !== null) return [next]
-      return [token]
+  const lines = (tokens: readonly (readonly [string, number])[]): (readonly [string, number])[] =>
+    tokens.flatMap(([token, at], i) => {
+      const pair = `${tokens[i - 1]?.[0] ?? ''} ${token}`
+      if (i > 0 && shelfOf(pair, lexicon) !== null) return []
+      const next = `${token} ${tokens[i + 1]?.[0] ?? ''}`
+      if (i + 1 < tokens.length && shelfOf(next, lexicon) !== null) return [[next, at] as const]
+      return [[token, at] as const]
     })
 
-  const words = (tokens: readonly string[]): string[] =>
-    lines(tokens).flatMap((token) => {
+  const words = (tokens: readonly (readonly [string, number])[]): Said[] =>
+    lines(tokens).flatMap(([token, at]): Said[] => {
+      const kind = token === parts.kind
       // what the seed's name stands for
       if (covered.has(token)) return []
       const shelf = shelfOf(token, lexicon)
-      if (shelf !== null) return [shelf]
+      if (shelf !== null) return [{ word: shelf, at, kind }]
       if (!isNameWord(token) || UNIT_WORDS.has(keyed(token))) return []
-      if (LATIN.test(token)) return [token]
-      const gloss = asSeedSays(glossOf(token, dictionary), token === parts.kind, lexicon.seed ?? [])
+      if (LATIN.test(token)) return [{ word: token, at, kind }]
+      const genitive = kind ? undefined : lexicon.genitives?.[lexiconKey(token)]
+      const gloss = genitive ?? asSeedSays(glossOf(token, dictionary), kind, lexicon.seed ?? [])
       // an abbreviation the dictionary has not, «անտ.», is no word to spell
       if (gloss === null && token.endsWith('.')) return []
       if (gloss === null) spelled = true
@@ -385,24 +399,177 @@ export function newLineName(
       const own = wordsOf(word)
       if (own.length > 0 && own.every((one) => said.some((was) => sameRussian(one, was)))) return []
       said.push(...own)
-      return [word]
+      return [{ word, at, kind }]
     })
-  // the kind first, as a shelf names it: «Капуста квашеная», «Напиток газированный»
+  const indexed = (tokens: readonly string[]): (readonly [string, number])[] =>
+    tokens.map((token, at) => [token, at] as const)
+  // the kind first, as a shelf names it: «Капуста квашеная», «Напиток газированный» — the seed's name in its
+  // place where it stands for the kind; read first, so that what it says is not said again
   const kindAt = parts.kind === null ? -1 : parts.before.indexOf(parts.kind)
-  const before =
-    kindAt <= 0
-      ? parts.before
-      : [parts.before[kindAt] ?? '', ...parts.before.filter((_, at) => at !== kindAt)]
+  const before = indexed(parts.before)
+  const kindFirst =
+    kindAt < 0 ? before : [before[kindAt] ?? ['', 0], ...before.filter((_, at) => at !== kindAt)]
+  const beforeSaid = words(kindFirst)
+  const afterSaid = words(indexed(parts.after))
+  const head =
+    kindOf?.name ??
+    [...beforeSaid, ...afterSaid].find((one) => one.kind)?.word ??
+    beforeSaid[0]?.word ??
+    ''
+  // an Armenian adjective stands before its noun: it agrees with the next noun the line printed, else the head;
+  // past the kind a till lists what qualifies the kind, «Երշիկ հում-ապխտած չորիզո» is a sausage, raw-smoked
+  const agreed = (segment: readonly Said[], kindAt: number): string[] => {
+    const inOrder = [...segment].sort((a, b) => a.at - b.at)
+    return segment.map((one) => {
+      if (!isAdjective(one.word)) return one.word
+      if (kindAt >= 0 && one.at > kindAt) return agreeing(one.word, head)
+      const noun = inOrder.find((other) => other.at > one.at && (other.kind || isNoun(other.word)))
+      return agreeing(one.word, noun?.word ?? head)
+    })
+  }
   const name = [
     ...(kindOf === null ? [] : [kindOf.name]),
-    ...words(before),
+    ...agreed(beforeSaid, kindAt),
     ...(parts.brand === null ? [] : [brandInName(parts.brand, lexicon)]),
-    ...words(parts.after),
+    ...agreed(afterSaid, -1),
     ...(parts.percent === null ? [] : [parts.percent]),
     ...(parts.size === null ? [] : [parts.size]),
   ].join(' ')
   if (!/\p{L}/u.test(name)) return null
   return { name: name.charAt(0).toUpperCase() + name.slice(1), spelled }
+}
+
+/** A Russian noun's gender or plural, which an adjective agrees with. */
+type Agreement = 'masculine' | 'feminine' | 'neuter' | 'plural'
+
+// nouns of a soft sign, by their gender: no ending tells «соль» from «картофель»
+const FEMININE_SOFT = new Set([
+  'соль',
+  'морковь',
+  'фасоль',
+  'смесь',
+  'мазь',
+  'сельдь',
+  'печень',
+  'зелень',
+  'вермишель',
+  'тушь',
+  'нить',
+  'ткань',
+  'кисть',
+  'форель',
+  'ваниль',
+  'обувь',
+  'постель',
+  'часть',
+])
+const MASCULINE_SOFT = new Set([
+  'картофель',
+  'кисель',
+  'миндаль',
+  'щавель',
+  'имбирь',
+  'уголь',
+  'пельмень',
+  'шампунь',
+  'гель',
+  'лосось',
+  'окунь',
+  'ячмень',
+])
+// nouns of no ending of their own: «кофе» is masculine, «киви» and «чили» one fruit
+const INDECLINABLE: Readonly<Record<string, Agreement>> = {
+  кофе: 'masculine',
+  фри: 'masculine',
+  киви: 'masculine',
+  чили: 'masculine',
+  мини: 'masculine',
+}
+// plurals in «-а», «-я», never a feminine: «Яйца куриные», «Семена тыквенные»
+const PLURAL_A = new Set(['яйца', 'семена', 'бедра', 'крылья', 'окорока', 'перья'])
+// nouns of an adjective's ending, never agreed: «Пакет … алюминий» is no adjective
+const NOT_ADJECTIVES = new Set(['алюминий', 'магний', 'кальций', 'натрий', 'калий', 'гербарий'])
+// the possessive adjectives, «говяжья», «рыбье»: their ending keeps a soft sign
+const POSSESSIVE = new Set([
+  'говяжий',
+  'рыбий',
+  'козий',
+  'овечий',
+  'бараний',
+  'кошачий',
+  'собачий',
+  'птичий',
+])
+
+const lowerRussian = (word: string): string => word.toLowerCase().replace(/ё/gu, 'е')
+
+/** A word a dictionary gives as an adjective, in the masculine: «мелкий», «сгущённый», «пищевой». */
+const isAdjective = (word: string): boolean =>
+  /^[а-яё-]{5,}$/iu.test(word) &&
+  /(?:ый|ий|ой)$/u.test(word) &&
+  !NOT_ADJECTIVES.has(lowerRussian(word))
+
+/** A word that may be the noun an adjective agrees with: Russian letters, no adjective's ending, no preposition. */
+const isNoun = (word: string): boolean => {
+  const first = lowerRussian(word.split(' ')[0] ?? '')
+  return (
+    /^[а-я-]+$/u.test(first) &&
+    !/(?:ый|ий|ой|ая|яя|ое|ее|ые|ие)$/u.test(first) &&
+    !['с', 'со', 'для', 'на', 'в', 'во', 'из', 'без', 'по'].includes(first)
+  )
+}
+
+/**
+ * The gender or number of a Russian noun by its ending (MOL-261, Т-3), the first word of a gloss that is not
+ * an adjective's — «целлофановый пакет» is a «пакет»; none where the ending does not say.
+ */
+function agreementOf(noun: string): Agreement | null {
+  const words = noun.split(' ').map(lowerRussian)
+  // an adjective of the gloss already agreed says it: «кондитерские изделия», «растительное масло»
+  const [first = ''] = words
+  if (/^[а-я-]{4,}(?:ые|ие)$/u.test(first)) return 'plural'
+  if (/^[а-я-]{4,}(?:ое|ее)$/u.test(first) && words.length > 1) return 'neuter'
+  if (/^[а-я-]{4,}(?:ая|яя)$/u.test(first) && words.length > 1) return 'feminine'
+  const word = words.find((one) => !/(?:ый|ий|ой|ая|яя|ое|ее|ые|ие)$/u.test(one)) ?? first
+  if (!/^[а-я-]+$/u.test(word)) return null
+  if (PLURAL_A.has(word)) return 'plural'
+  const indeclinable = INDECLINABLE[word]
+  if (indeclinable !== undefined) return indeclinable
+  // a head that is an adjective's noun keeps its own: «Мороженое», «Пирожное»
+  if (/(?:ое|ее)$/u.test(word)) return 'neuter'
+  if (/(?:ая|яя)$/u.test(word)) return 'feminine'
+  if (/(?:ые|ие)$/u.test(word)) return 'plural'
+  if (/(?:ий|й)$/u.test(word)) return 'masculine'
+  if (/[ыи]$/u.test(word)) return 'plural'
+  if (/[ая]$/u.test(word)) return 'feminine'
+  if (/[оеё]$/u.test(word)) return 'neuter'
+  if (word.endsWith('ь')) {
+    if (FEMININE_SOFT.has(word)) return 'feminine'
+    return MASCULINE_SOFT.has(word) ? 'masculine' : null
+  }
+  return 'masculine'
+}
+
+/**
+ * An adjective of the dictionary, given in the masculine, in the gender or number of its noun (MOL-261, Т-3):
+ * «Соль мелкая», «Желудки … свежие», «Мороженое … пломбирное». A noun whose gender no ending tells leaves it
+ * as the dictionary has it, as before.
+ */
+function agreeing(adjective: string, noun: string): string {
+  const to = agreementOf(noun)
+  const found = /^(.*?)(ый|ий|ой)$/u.exec(adjective)
+  if (to === null || to === 'masculine' || found === null) return adjective
+  const [, stem = '', ending = ''] = found
+  if (POSSESSIVE.has(lowerRussian(adjective))) {
+    return stem + { feminine: 'ья', neuter: 'ье', plural: 'ьи' }[to]
+  }
+  const last = lowerRussian(stem.slice(-1))
+  const velar = 'гкх'.includes(last)
+  const hushing = 'жшчщ'.includes(last)
+  const soft = ending === 'ий' && !velar && !hushing
+  if (to === 'feminine') return stem + (soft ? 'яя' : 'ая')
+  if (to === 'neuter') return stem + (soft || (hushing && ending === 'ий') ? 'ее' : 'ое')
+  return stem + (soft || velar || hushing ? 'ие' : 'ые')
 }
 
 /** The seed's item a new one is of the kind of, and the line's tokens its name in the till's language covers. */

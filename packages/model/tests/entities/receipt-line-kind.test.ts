@@ -365,7 +365,7 @@ describe('a new item of the seed’s kind (MOL-261, Т-2)', () => {
   it('writes the kind in the seed’s number, its figures apart', () => {
     expect(kinded('Ձվիկ «Ոսկեհատ» 10հտ')).toBe('Яйца «Воскехат»')
     expect(kinded('Հավի թարմ քարաճիկ «Աշտարակ» 950գր')).toBe(
-      'Желудки курица свежий «Аштарак» 950 г',
+      'Желудки курица свежие «Аштарак» 950 г',
     )
     expect(kinded('Կաթ «Իգիթ» 3.2% 1լ')).toBe('Молоко «Игит» 3,2% 1 л')
   })
@@ -381,6 +381,61 @@ describe('a new item of the seed’s kind (MOL-261, Т-2)', () => {
       name: 'Колбаски «ГЕГ»',
       spelled: false,
     })
+  })
+})
+
+describe('a new item’s name in Russian grammar (MOL-261, Т-3, Т-4)', () => {
+  const words = {
+    ...WORDS,
+    աղ: 'соль',
+    մանր: 'мелкий',
+    ուլտրապաստերիզացված: 'ультрапастеризованный',
+    խտացրած: 'сгущённый',
+    մուգ: 'тёмный',
+    բալ: 'вишня',
+    'հում-ապխտած': 'сырокопчёный',
+    թարմ: 'свежий',
+    տավարի: 'говядина',
+    լոլիկի: 'помидор',
+    ջեմ: 'джем',
+    կահույք: 'мебель',
+    ցելաֆոն: 'целлофановый пакет',
+    միանգամյա: 'одноразовый',
+  }
+  const genitives = { տավարի: 'говяжий', լոլիկի: 'томатный', ելակի: 'клубничный' }
+  const seed = [{ name: 'Яйца', names: ['ձու'] }]
+  const grammar = (printed: string) =>
+    newLineName(receiptLineParts(printed), words, { genitives, seed })?.name
+
+  it('puts an adjective in the gender and number of the kind', () => {
+    expect(grammar('Աղ մանր «Ֆավորիտ» 1կգ')).toBe('Соль мелкая «Фаворит» 1 кг')
+    expect(grammar('Խտացրած կաթ')).toBe('Молоко сгущённое')
+    expect(grammar('Սերուցք «Մարիաննա» ուլտրապաստերիզացված 10%')).toBe(
+      'Сливки «Марианна» ультрапастеризованные 10%',
+    )
+    expect(grammar('Հավկիթ թարմ')).toBe('Яйца свежие')
+    expect(grammar('Ցելաֆոն միանգամյա')).toBe('Целлофановый пакет одноразовый')
+  })
+
+  it('agrees an adjective with the noun it stands before, past the brand', () => {
+    expect(grammar('Գազավորված ըմպելիք «Ֆանտա» մուգ բալ')).toBe(
+      'Напиток газированный «Фанта» тёмная вишня',
+    )
+  })
+
+  it('agrees what follows the kind with the kind: a till lists its qualities after it', () => {
+    expect(grammar('Երշիկ հում-ապխտած չորիզո')).toBe('Колбаса сырокопчёная чоризо')
+  })
+
+  it('says a genitive by its adjective where the lexicon has one, and a flavour as it is', () => {
+    expect(grammar('Հյութ լոլիկի')).toBe('Сок томатный')
+    expect(grammar('Լյարդ տավարի')).toBe('Печень говяжья')
+    expect(grammar('Ջեմ ելակի')).toBe('Джем клубничный')
+    expect(grammar('Յոգուրտ «Մարիաննա» ելակ')).toBe('Йогурт «Марианна» клубника')
+  })
+
+  it('leaves an adjective as the dictionary has it where no ending tells the gender', () => {
+    expect(grammar('Կահույք մանր')).toBe('Мебель мелкий')
   })
 })
 
