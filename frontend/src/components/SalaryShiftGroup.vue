@@ -52,7 +52,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, useId } from 'vue'
+import { defineComponent, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { SALARY_SHIFT_DAY_MAX } from '@molvia/model'
 import IconAlert from '~icons/mdi/alert-circle-outline'
@@ -82,9 +82,19 @@ export default defineComponent({
     SectionCaption,
     TapUnsureLine,
   },
-  setup() {
+  // Whether the answer is known, failed included: the day it brings grows the card, and the screen
+  // holds what stands under it until then (MOL-269).
+  emits: { known: (known: boolean) => typeof known === 'boolean' },
+  setup(_, { emit }) {
     const { t } = useI18n()
     const shift = useSalaryShift()
+    watch(
+      () => shift.day.value !== undefined || shift.failure.value !== null,
+      (known) => {
+        emit('known', known)
+      },
+      { immediate: true },
+    )
     const days = Array.from({ length: SALARY_SHIFT_DAY_MAX }, (_, index) => ({
       value: String(index + 1),
       label: t('settings.salary_shift.day_option', { day: index + 1 }),

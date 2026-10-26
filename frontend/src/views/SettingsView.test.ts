@@ -16,11 +16,12 @@ import SettingsView from './SettingsView.vue'
 
 const me = vi.fn<() => Promise<ActorView>>()
 const save = vi.fn<(input: SettingsUpdate) => Promise<ActorView>>()
+const salaryShift = vi.fn<() => Promise<{ day: number | null }>>()
 vi.mock('@/api', () => ({
   api: {
     me: () => me(),
     saveSettings: (input: SettingsUpdate) => save(input),
-    salaryShift: () => Promise.resolve({ day: null }),
+    salaryShift: () => salaryShift(),
     analyticsSetting: () => Promise.resolve({ off: false }),
   },
 }))
@@ -52,6 +53,8 @@ beforeEach(() => {
   vi.restoreAllMocks()
   me.mockReset()
   save.mockReset()
+  salaryShift.mockReset()
+  salaryShift.mockResolvedValue({ day: null })
   localStorage.clear()
   sessionStorage.clear()
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
@@ -76,6 +79,64 @@ it('loads without invented fields, and keeps a focusable inactive save action', 
   expect(view.get('.dock > button').attributes('aria-disabled')).toBe('true')
   expect(view.get('.dock > button').attributes('disabled')).toBeUndefined()
 })
+// MOL-269: the form and the salary's day both grow what stands under them as they come, and the
+// groups under the skeleton moved from under the finger — «Выйти» tapped became another row.
+describe('the groups under the form come with its answer and the salary’s (MOL-269)', () => {
+  // `v-show` on the group: the view is not in a document, so its own style is read up the tree.
+  const seen = (node: Element | undefined): boolean => {
+    for (let at = node; at instanceof HTMLElement; at = at.parentElement ?? undefined)
+      if (at.style.display === 'none') return false
+    return !!node
+  }
+  // Each group by a thing of its own: the salary's switch, the bot's page, the scheme, «Выйти».
+  const shown = (view: VueWrapper) =>
+    [
+      view.find('[role="switch"]').element,
+      view.find('a[href="/settings/bot"]').element,
+      view
+        .findAll('*')
+        .find(
+          (node) => node.element.children.length === 0 && node.text() === en.settings.group_scheme,
+        )?.element,
+      view.findAll('button').find((button) => button.text() === en.settings.sign_out)?.element,
+    ].map(seen)
+  const leave = (view: VueWrapper) =>
+    seen(view.findAll('button').find((button) => button.text() === en.settings.sign_out)?.element)
+
+  it('must not fire: none under the skeleton, though the salary answered', async () => {
+    me.mockReturnValue(new Promise(() => undefined))
+    const view = await render(false)
+    expect(view.find('.skeleton').exists()).toBe(true)
+    expect(shown(view)).toEqual([false, false, false, false])
+  })
+
+  it('must not fire: none while the salary’s day is on its way, all once it answers', async () => {
+    let answer: (value: { day: number | null }) => void = () => undefined
+    salaryShift.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    const view = await render(false)
+    expect(view.find('select').exists()).toBe(true)
+    expect(shown(view)).toEqual([false, false, false, false])
+    answer({ day: 25 })
+    await flushPromises()
+    expect(shown(view)).toEqual([true, true, true, true])
+  })
+
+  it('come when either read failed, or offline with nothing kept', async () => {
+    salaryShift.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const failed = await render(false)
+    expect(failed.text()).toContain(en.settings.load_error.title)
+    expect(leave(failed)).toBe(true)
+
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    me.mockRejectedValue(new TypeError('network'))
+    salaryShift.mockRejectedValue(new TypeError('network'))
+    const offline = await render(false)
+    expect(offline.text()).toContain(en.settings.offline.body)
+    expect(leave(offline)).toBe(true)
+  })
+})
+
 it('a failed initial read shows retry, not a creation form', async () => {
   me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
   const view = await render(false)

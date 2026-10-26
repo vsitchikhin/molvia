@@ -61,10 +61,12 @@
       </form>
     </template>
     <!-- Saved on the tap, beside the form and never under its «Сохранить»: the form's four fields
-         are also a trip's context (MOL-134, Н-1, В-5). -->
-    <SalaryShiftGroup class="group" />
+         are also a trip's context (MOL-134, Н-1, В-5). The groups are mounted under the skeleton, so
+         their reads go at once, and shown once the form and the salary's day have answered or failed
+         (MOL-269): either answer grows what stands over them, and moved them from under the finger. -->
+    <SalaryShiftGroup v-show="groupsShown" class="group" @known="shiftKnown = $event" />
     <!-- The bot's messages, a switch each, on a page of their own (MOL-129, В-2). -->
-    <section class="group">
+    <section v-show="groupsShown" class="group">
       <h2 class="caption">{{ t('settings.group_bot') }}</h2>
       <AppCard as="ul" list>
         <li>
@@ -80,10 +82,10 @@
       </AppCard>
     </section>
     <!-- This device's own, not the account's: nothing goes to the server (MOL-111). -->
-    <SchemeGroup class="group" />
+    <SchemeGroup v-show="groupsShown" class="group" />
     <!-- Outside the form's states: the way into the account does not depend on whether its
          settings loaded (MOL-57). -->
-    <section class="group">
+    <section v-show="groupsShown" class="group">
       <SectionCaption>{{ t('settings.group_account') }}</SectionCaption>
       <AppCard as="ul" list>
         <li>
@@ -106,7 +108,7 @@
     <!-- «Написать разработчику» (MOL-147): opens the app's one sheet rather than a screen, as «Выйти»
          and «Удалить мои данные» do, so there is no chevron. Offline it opens all the same: written
          now, sent once there is a connection. -->
-    <section class="group">
+    <section v-show="groupsShown" class="group">
       <SectionCaption>{{ t('settings.group_app') }}</SectionCaption>
       <AppCard as="ul" list>
         <li>
@@ -128,7 +130,7 @@
         </li>
       </AppCard>
     </section>
-    <YourDataGroup />
+    <YourDataGroup v-show="groupsShown" />
     <SignOutSheet
       v-model:open="leaveOpen"
       :unsent="unsent"
@@ -282,6 +284,13 @@ export default defineComponent({
       if (!open) signOut.stay()
     })
 
+    // The form answered, failed or stands offline, and so did the salary's day (MOL-269).
+    const shiftKnown = ref(false)
+    const groupsShown = computed(() => {
+      const form = settings.form
+      return (!!form.draft || form.failure || !settings.online.value) && shiftKnown.value
+    })
+
     return {
       t,
       saidIn,
@@ -291,6 +300,8 @@ export default defineComponent({
       signOut,
       unsent,
       askToLeave,
+      shiftKnown,
+      groupsShown,
       feedback: useFeedbackSheetStore(),
     }
   },
