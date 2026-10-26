@@ -113,15 +113,17 @@
         <span>{{
           t(failure === 'categories' ? 'accounts.reconcile.no_other' : 'accounts.reconcile.failed')
         }}</span>
-        <!-- «Повторить» of «Прочее» writes: it waits as «Записать разницу» does, which says why
-             (adversarial А1) — not now rather than gone, so a focus on it stays (Б2). -->
+        <!-- «Повторить» of «Прочее» writes: it waits as «Записать разницу» does (adversarial А1); a
+             recount waits for the connection (В2). Not now rather than gone, so a focus on it stays
+             (Б2), and saying why on itself (Ф-6, В1). -->
         <AppButton
           v-if="result"
           variant="ghost"
-          :inactive="failure === 'categories' && writeWait !== null"
+          :inactive="retryWait !== null"
           @click="failure === 'categories' ? writeDifference() : recount(true)"
         >
-          {{ t('state.retry') }}
+          <template v-if="retryWait === 'retry_wait_online'" #icon><IconCloudOff /></template>
+          {{ retryWait ? t(`accounts.reconcile.${retryWait}`) : t('state.retry') }}
         </AppButton>
       </div>
       <!-- A reason removed from its own sheet over this one comes back here (MOL-82's ten seconds). -->
@@ -524,6 +526,20 @@ export default defineComponent({
       return null
     })
 
+    /**
+     * Why «Повторить» of the footer cannot be pressed now, in the words on it: a write waits as the
+     * write does, a recount for the connection alone (adversarial В1, В2).
+     */
+    const retryWait = computed(() => {
+      if (failure.value === 'categories') {
+        if (writeWait.value === 'write_wait_online') return 'retry_wait_online'
+        if (writeWait.value === 'write_after_answer') return 'retry_after_answer'
+        if (writeWait.value === 'write_after_recount') return 'retry_after_recount'
+        return null
+      }
+      return props.online ? null : 'retry_wait_online'
+    })
+
     // A spending is put right through the queue, a trip too: its answer comes after the sheet, and
     // the count is asked again once it has — any landing will do, the check is cheap. The queues
     // emptying count too: a write set aside lands nowhere.
@@ -790,6 +806,7 @@ export default defineComponent({
       reasons,
       tripsHeld,
       writeWait,
+      retryWait,
       offlineLine,
       incomeDraft,
       incomeOpen,

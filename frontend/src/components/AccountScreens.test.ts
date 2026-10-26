@@ -584,10 +584,10 @@ describe('ReconcileSheet (handoff 05)', () => {
     view.findComponent(OperationSheet).vm.$emit('saved')
     await flushPromises()
     expectNotNow(view, en.accounts.reconcile.write_after_recount)
-    // «Повторить» waits too, not now beside the button that says why (Б2: kept, not gone).
-    expectNotNow(view, en.state.retry)
+    // «Повторить» waits too, not now and saying why on itself (Б2: kept, not gone; В1).
+    expectNotNow(view, en.accounts.reconcile.retry_after_recount)
     spendingCategories.mockResolvedValue({ categories })
-    await button(view, en.state.retry)?.trigger('click')
+    await button(view, en.accounts.reconcile.retry_after_recount)?.trigger('click')
     await flushPromises()
     // Every way in waits, not only the buttons drawn: the write itself refuses a stale count.
     await (view.vm as unknown as { writeDifference: () => Promise<void> }).writeDifference()
@@ -683,8 +683,31 @@ describe('ReconcileSheet (handoff 05)', () => {
     ;(retry?.element as HTMLElement).focus()
 
     await view.setProps({ online: false })
-    expectNotNow(view, en.state.retry)
-    expect(document.activeElement).toBe(button(view, en.state.retry)?.element)
+    expectNotNow(view, en.accounts.reconcile.retry_wait_online)
+    expect(document.activeElement).toBe(
+      button(view, en.accounts.reconcile.retry_wait_online)?.element,
+    )
+  })
+
+  it('adversarial В2: «Повторить» of a recount offline is not now and says why — online it asks again', async () => {
+    checkAccount.mockResolvedValueOnce(answer('185000', '190132'))
+    const view = await reconcile(withAccounts([cash]))
+    await view.get('input').setValue('185000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    // A recount that failed: «Не удалось сверить» with «Повторить».
+    checkAccount.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'down', true))
+    await (view.vm as unknown as { recount: (say: boolean) => Promise<void> }).recount(true)
+    await flushPromises()
+    expect(view.text()).toContain(en.accounts.reconcile.failed)
+    // Control: with the connection it is live.
+    expect(button(view, en.state.retry)?.attributes('aria-disabled')).toBeUndefined()
+
+    await view.setProps({ online: false })
+    expectNotNow(view, en.accounts.reconcile.retry_wait_online)
+    await button(view, en.accounts.reconcile.retry_wait_online)?.trigger('click')
+    await flushPromises()
+    expect(checkAccount).toHaveBeenCalledTimes(2)
   })
 
   it('adversarial Б3: a fact typed after «Ввести другую сумму» is gone with the sheet — the count was in sight', async () => {
