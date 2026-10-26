@@ -7,13 +7,9 @@
 
     <!-- The connection is the kit's line, first in the sheet over either step, said in the sheet's
          own region (MOL-181, Ф-19); drawn by the connection and gone with it. Over a count already
-         answered it says what waits, not «сверить» (review Р2-4, adversarial А2б). -->
-    <StatusStrip
-      v-if="!online"
-      class="status"
-      kind="offline"
-      :text="t(result ? 'accounts.reconcile.offline_result' : 'accounts.reconcile.offline')"
-    />
+         answered it says what waits, not «сверить» (review Р2-4, adversarial А2б) — the write only
+         where it is offered, not over «Сходится» or a difference written (Р3-1, Б1). -->
+    <StatusStrip v-if="!online" class="status" kind="offline" :text="t(offlineLine)" />
 
     <!-- Step one: the fact, before the count — so as not to fit the number (В-4 MOL-43). -->
     <form v-if="!result" class="form" novalidate @submit.prevent="check">
@@ -117,11 +113,12 @@
         <span>{{
           t(failure === 'categories' ? 'accounts.reconcile.no_other' : 'accounts.reconcile.failed')
         }}</span>
-        <!-- «Повторить» of «Прочее» writes: it waits as «Записать разницу» does, and that button
-             says why (adversarial А1). -->
+        <!-- «Повторить» of «Прочее» writes: it waits as «Записать разницу» does, which says why
+             (adversarial А1) — not now rather than gone, so a focus on it stays (Б2). -->
         <AppButton
-          v-if="result && !(failure === 'categories' && writeWait)"
+          v-if="result"
           variant="ghost"
+          :inactive="failure === 'categories' && writeWait !== null"
           @click="failure === 'categories' ? writeDifference() : recount(true)"
         >
           {{ t('state.retry') }}
@@ -333,6 +330,8 @@ export default defineComponent({
     let asking = 0
     /** The name of «Прочее · сверка» for this difference: a second tap writes the same one. */
     let differenceId = newId()
+    /** An answer was shown since the sheet last started afresh: the count was in sight. */
+    let answered = false
 
     watch(
       () => props.open,
@@ -342,8 +341,10 @@ export default defineComponent({
         // answer to clear, and said nothing (review Р2-3).
         emit('step', 'fact')
         // What was typed stays while no answer came — closed to come back with the connection, as the
-        // offline line promises (adversarial А2); an answered check starts afresh.
-        if (result.value !== null) fact.value = ''
+        // offline line promises (adversarial А2). Once an answer was shown, the next check starts
+        // afresh, a fact typed after «Ввести другую сумму» too: it was typed with the count in sight (Б3).
+        if (answered) fact.value = ''
+        answered = false
         factBad.value = false
         result.value = null
         failure.value = null
@@ -373,6 +374,13 @@ export default defineComponent({
     const signed = (value: Money) => signedAmount(value, locale.value, { plus: true })
     const shortDay = (day: string) => dayOf(day, locale.value)
     const matched = computed(() => result.value?.difference.minor === 0n)
+    /** Offline, in words of what waits for the connection: the check, the write, or nothing. */
+    const offlineLine = computed(() => {
+      if (!result.value) return 'accounts.reconcile.offline'
+      return matched.value || written.value
+        ? 'accounts.reconcile.offline_counted'
+        : 'accounts.reconcile.offline_result'
+    })
 
     // The screen is told the step as it changes: an answer shows the balance behind, «Ввести другую
     // сумму» hides it again (Ф-33).
@@ -390,6 +398,7 @@ export default defineComponent({
         const answer = await api.checkAccount(props.account.id, check)
         if (mine !== asking) return false
         sent = check
+        answered = true
         result.value = answer
         differenceId = newId()
         written.value = false
@@ -781,6 +790,7 @@ export default defineComponent({
       reasons,
       tripsHeld,
       writeWait,
+      offlineLine,
       incomeDraft,
       incomeOpen,
       incomeSaved,

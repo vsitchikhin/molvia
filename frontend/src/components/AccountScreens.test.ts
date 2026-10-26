@@ -584,9 +584,12 @@ describe('ReconcileSheet (handoff 05)', () => {
     view.findComponent(OperationSheet).vm.$emit('saved')
     await flushPromises()
     expectNotNow(view, en.accounts.reconcile.write_after_recount)
-    expect(button(view, en.state.retry)).toBeUndefined()
+    // «Повторить» waits too, not now beside the button that says why (Б2: kept, not gone).
+    expectNotNow(view, en.state.retry)
+    spendingCategories.mockResolvedValue({ categories })
+    await button(view, en.state.retry)?.trigger('click')
+    await flushPromises()
     // Every way in waits, not only the buttons drawn: the write itself refuses a stale count.
-    spendingCategories.mockResolvedValueOnce({ categories })
     await (view.vm as unknown as { writeDifference: () => Promise<void> }).writeDifference()
     await flushPromises()
     const records = () =>
@@ -633,6 +636,69 @@ describe('ReconcileSheet (handoff 05)', () => {
     expect(view.getComponent(StatusStrip).props('text')).toBe(en.accounts.reconcile.offline_result)
     await button(view, en.accounts.reconcile.edit_fact)?.trigger('click')
     expect(view.getComponent(StatusStrip).props('text')).toBe(en.accounts.reconcile.offline)
+  })
+
+  it('review Р3-1, adversarial Б1: offline over «Сходится» or a difference written, nothing to write is offered', async () => {
+    checkAccount.mockResolvedValue(answer('190132', '190132'))
+    const even = await reconcile(withAccounts([cash]))
+    await even.get('input').setValue('190132')
+    await button(even, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    await even.setProps({ online: false })
+    expect(even.getComponent(StatusStrip).props('text')).toBe(en.accounts.reconcile.offline_counted)
+
+    // An income written for a difference above zero; the recount waits for the connection.
+    checkAccount.mockResolvedValue(answer('195000', '190132'))
+    const above = await reconcile(withAccounts([cash]))
+    await above.get('input').setValue('195000')
+    await button(above, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    await above.setProps({ online: false })
+    // Control: the difference still waits to be written — the line says so.
+    expect(above.getComponent(StatusStrip).props('text')).toBe(en.accounts.reconcile.offline_result)
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    ;(above.vm as unknown as { incomeSaved: () => void }).incomeSaved()
+    await flushPromises()
+    expect(above.getComponent(StatusStrip).props('text')).toBe(
+      en.accounts.reconcile.offline_counted,
+    )
+  })
+
+  it('adversarial Б2: «Повторить» of «Прочее» goes not now as the connection drops, and keeps the focus', async () => {
+    checkAccount.mockResolvedValue(answer('185000', '190132'))
+    spendingCategories.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'down', true))
+    const pinia = withAccounts([cash])
+    const view = await mounted(
+      ReconcileSheet,
+      { open: true, account: cash, categories: [], nameOf: () => 'Other', accountName: () => null },
+      pinia,
+    )
+    await view.get('input').setValue('185000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    await button(view, en.accounts.reconcile.write_difference)?.trigger('click')
+    await flushPromises()
+    const retry = button(view, en.state.retry)
+    expect(retry?.attributes('aria-disabled')).toBeUndefined()
+    ;(retry?.element as HTMLElement).focus()
+
+    await view.setProps({ online: false })
+    expectNotNow(view, en.state.retry)
+    expect(document.activeElement).toBe(button(view, en.state.retry)?.element)
+  })
+
+  it('adversarial Б3: a fact typed after «Ввести другую сумму» is gone with the sheet — the count was in sight', async () => {
+    checkAccount.mockResolvedValue(answer('185000', '190132'))
+    const view = await reconcile(withAccounts([cash]))
+    await view.get('input').setValue('185000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    await button(view, en.accounts.reconcile.edit_fact)?.trigger('click')
+    await view.get('input').setValue('190132')
+    await view.setProps({ open: false })
+    await view.setProps({ open: true })
+    await flushPromises()
+    expect((view.get('input').element as HTMLInputElement).value).toBe('')
   })
 
   it('tells the screen its step: the fact, the answer, the fact again (Ф-33)', async () => {
