@@ -434,7 +434,7 @@ export default defineComponent({
         (!!props.editing?.heldBefore && currency.value === props.editing.amount.currency),
     )
 
-    /** «до 25 сент.: 99 615,00 ₽ · Зарплата · 15 сент. · Викаса» */
+    /** «до 25 сент.: 99 615 ₽ · Зарплата · 15 сент. · Викаса» */
     function versionOf(version: IncomeView['history'][number]): string {
       const words = {
         until: purchaseDay(version.replacedAt, locale.value),
@@ -447,7 +447,7 @@ export default defineComponent({
         : t('income.sheet.version', words)
     }
 
-    /** «Сейчас записано: 99 615,00 ₽ · Зарплата · 15 сент. · было до поступления … · Викаса» */
+    /** «Сейчас записано: 99 615 ₽ · Зарплата · 15 сент. · было до поступления … · Викаса» */
     function currentOf(income: IncomeView): string {
       const details = [
         formatMoney(income.amount, locale.value),

@@ -177,7 +177,7 @@ describe('TripTotal', () => {
     })
 
     expect(plain(view.get('.sum'))).toBe('6 493,12 ֏')
-    expect(plain(view.get('.rest'))).toContain('1 500,00 ₽')
+    expect(plain(view.get('.rest'))).toContain('1 500 ₽')
     expect(view.text()).toContain('пересчёт только по AMD')
   })
 
@@ -213,11 +213,11 @@ describe('TripTotal', () => {
     it('главная цифра — сумма чека, под ней «с ценой 7 из 12» и «без цены 5» с суммами сервера (В-2)', () => {
       const view = render({ trip: partial() })
       expect(view.get('.caption').text()).toBe(ru.trip.receipt.total)
-      expect(plain(view.get('.sum'))).toBe('12 400,00 ֏')
+      expect(plain(view.get('.sum'))).toBe('12 400 ֏')
       const lines = view.findAll('.split li').map((line) => line.findAll('span').map(plain))
       expect(lines).toEqual([
-        ['С ценой — 7 из 12', '8 300,00 ֏'],
-        ['Без цены — 5', '4 100,00 ֏'],
+        ['С ценой — 7 из 12', '8 300 ֏'],
+        ['Без цены — 5', '4 100 ֏'],
       ])
     })
 
@@ -231,7 +231,7 @@ describe('TripTotal', () => {
           rows: [amd('10170')],
         }),
       })
-      expect(plain(over.get('.split .warn'))).toContain('Цены больше чека на 300,00 ֏')
+      expect(plain(over.get('.split .warn'))).toContain('Цены больше чека на 300 ֏')
 
       const even = render({
         trip: trip({
@@ -241,7 +241,7 @@ describe('TripTotal', () => {
           rows: [amd('500')],
         }),
       })
-      expect(even.findAll('.split li span').map(plain)).toEqual(['С ценой — 1 из 1', '500,00 ֏'])
+      expect(even.findAll('.split li span').map(plain)).toEqual(['С ценой — 1 из 1', '500 ֏'])
     })
 
     it('без суммы — «Итого» как было, и «+ Сумма по чеку» только когда её предлагают (В-1)', async () => {
@@ -268,7 +268,7 @@ describe('TripTotal', () => {
     it('сумма в очереди — строка «отправляется», итог остаётся серверным (Р-7)', () => {
       const typed = render({ receiptWaiting: { receipt: { minor: 1_240_000n, currency: 'AMD' } } })
       expect(plain(typed.get('.sum'))).toBe('6 493,12 ֏')
-      expect(plain(typed.get('.waiting'))).toBe('Сумма по чеку 12 400,00 ֏ · отправляется')
+      expect(plain(typed.get('.waiting'))).toBe('Сумма по чеку 12 400 ֏ · отправляется')
       expect(typed.get('.receipt').text()).toBe(ru.trip.receipt.edit)
 
       const off = render({ trip: partial(), receiptWaiting: { receipt: null } })

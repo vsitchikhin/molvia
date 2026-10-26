@@ -684,7 +684,7 @@ test.describe('the sheet', () => {
         block.style.fontSize = 'var(--text-footnote)'
         const lines = [
           'This exchange was changed on another device — here is how it stands now. Change it again if you need to',
-          'Gave 20,000.00 ₽ · got 87,540.00 ֏ · 5 Oct',
+          'Gave 20,000 ₽ · got 87,540 ֏ · 5 Oct',
         ]
         for (const [index, text] of lines.entries()) {
           const line = document.createElement('p')

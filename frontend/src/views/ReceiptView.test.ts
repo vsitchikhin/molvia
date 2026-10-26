@@ -583,8 +583,8 @@ describe('ReceiptView (MOL-127)', () => {
     expect(view.find('.partly').exists()).toBe(false)
     expect(view.find('.difference').exists()).toBe(false)
     const foot = view.get('.total').text()
-    expect(foot).toMatch(/Кэшбэк на карту\s*9,00/)
-    expect(foot).toMatch(/Оплачено бонусом карты\s*100,00/)
+    expect(foot).toMatch(/Кэшбэк на карту\s*9\s֏/)
+    expect(foot).toMatch(/Оплачено бонусом карты\s*100\s֏/)
     // what left the card, 809 ֏ at 4 ֏ the rouble — never the total's 909
     expect(foot).toMatch(/≈ 202/)
   })
@@ -651,7 +651,7 @@ describe('ReceiptView (MOL-127)', () => {
     // read whole by OCR: a retake reads the same, so neither the hint nor «Переснять» stand over it
     expect(view.find('.partly').exists()).toBe(false)
     expect(view.text()).toMatch(/Строки\s*500/)
-    expect(view.get('.difference').text()).toMatch(/Не хватает 400,00\s֏ — у 1 строки нет цифр/)
+    expect(view.get('.difference').text()).toMatch(/Не хватает 400\s֏ — у 1 строки нет цифр/)
   })
 
   // MOL-255, adversarial А6 «а»: an emptied line and a lost one look alike here; the server measured

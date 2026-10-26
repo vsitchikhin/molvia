@@ -127,8 +127,8 @@ describe('ReceiptLineSheet (MOL-127)', () => {
   it('says the mismatch with quantity × price, not with the sum it is recorded at (review 10)', async () => {
     await render()
     const text = (sheet()?.textContent ?? '').replace(/\s/gu, ' ')
-    expect(text).toContain('В чеке у строки 980,00 ֏')
-    expect(text).toContain('— это 890,00 ֏')
+    expect(text).toContain('В чеке у строки 980 ֏')
+    expect(text).toContain('— это 890 ֏')
   })
 
   it('names the remembered price on a line the check emptied, and only one confused digit off a price read (MOL-291)', async () => {

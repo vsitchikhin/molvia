@@ -72,7 +72,7 @@ export const whereKey = (view: PlacesView): string =>
 type Translate = (key: string, named: Record<string, unknown>) => string
 
 /**
- * «570,00 ֏/л» — a unit price as this screen prints it. One copy for both forms of row that
+ * «570 ֏/л» — a unit price as this screen prints it. One copy for both forms of row that
  * show one: the card and the line say the same number the same way, or the eye catches the
  * difference before any test does.
  */

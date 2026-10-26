@@ -504,7 +504,7 @@ export default defineComponent({
         (!!props.editing?.heldBefore && currencies.received === props.editing.received.currency),
     )
 
-    /** «до 25 сент.: 20 000,00 ₽ → 100 000,00 ֏ · 16 сент. · ВТБ банкомат» */
+    /** «до 25 сент.: 20 000 ₽ → 100 000 ֏ · 16 сент. · ВТБ банкомат» */
     function versionOf(version: ExchangeView['history'][number]): string {
       const words = {
         until: purchaseDay(version.replacedAt, locale.value),
@@ -525,7 +525,7 @@ export default defineComponent({
     }
 
     /**
-     * «Сейчас записано: 21 000,00 ₽ → 99 000,00 ֏ · 16 сент. · было до обмена 30 000,00 ֏ · ВТБ»
+     * «Сейчас записано: 21 000 ₽ → 99 000 ֏ · 16 сент. · было до обмена 30 000 ֏ · ВТБ»
      * — every field an amendment replaces, the remainder too: it moves the rate, and a change of it
      * alone made on the other phone read as «nothing changed» (round 3, М2).
      */

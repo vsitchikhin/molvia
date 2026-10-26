@@ -207,7 +207,7 @@ import IconCheck from '~icons/mdi/check'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconHelp from '~icons/mdi/help-circle-outline'
 import IconScale from '~icons/mdi/scale-balance'
-import { currencySign } from '@molvia/model'
+import { currencySign, formatMoney } from '@molvia/model'
 import type {
   AccountCheckResponse,
   AccountOperationView,
@@ -232,7 +232,6 @@ import {
   shortDay as dayOf,
   signedAmount,
 } from '@/components/accounts'
-import { asTyped } from '@/components/spending'
 import type { Removed } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import type { IncomeDraft } from '@/composables/useIncomes'
@@ -628,7 +627,7 @@ export default defineComponent({
     function reasonTitle({ kind, operation }: Reason): string {
       const [own] = operation.amounts
       const amount = own
-        ? asTyped({ ...own, minor: own.minor < 0n ? -own.minor : own.minor }, locale.value)
+        ? formatMoney({ ...own, minor: own.minor < 0n ? -own.minor : own.minor }, locale.value)
         : ''
       if (kind === 'unassigned')
         return t(`accounts.reconcile.cause_no_account_${operation.kind}`, { amount })
@@ -649,7 +648,7 @@ export default defineComponent({
     function reasonMeta({ kind, operation }: Reason): string {
       const [own] = operation.amounts
       const amount = own
-        ? asTyped({ ...own, minor: own.minor < 0n ? -own.minor : own.minor }, locale.value)
+        ? formatMoney({ ...own, minor: own.minor < 0n ? -own.minor : own.minor }, locale.value)
         : ''
       if (kind === 'unpriced')
         return t(
@@ -684,7 +683,7 @@ export default defineComponent({
       const value = result.value
       if (!value) return ''
       const size = value.difference.minor < 0n ? -value.difference.minor : value.difference.minor
-      const amount = asTyped({ ...value.difference, minor: size }, locale.value)
+      const amount = formatMoney({ ...value.difference, minor: size }, locale.value)
       return t(
         value.difference.minor < 0n
           ? 'accounts.reconcile.write_out_note'
