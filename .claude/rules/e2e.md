@@ -56,11 +56,14 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   - The image's Node is 24; `setup-node` keeps `.nvmrc`'s. The job runs as the runner's uid
     (`--user 1001`, as Playwright's documentation has it).
   - **The job has 40 minutes and its tests 35** (`timeout-minutes`, В-2 «а»): a hung step was held
-    for six hours. The job's limit cancels it, and a cancelled job skips `if: failure()` — the traces
-    already written went with the container (adversarial А5); the step's own limit fails the step,
-    and the traces go up (run 40313375737). **The price, named:** the step is killed with no summary,
-    so a test hung with no timeout of its own is named nowhere — every spec keeps one, and none sets
-    `0`. Not `globalTimeout`: it waits as long again for a hung worker's teardown.
+    for six hours. The job's limit cancels it, and a cancelled job skipped `if: failure()` — the traces
+    already written went with the container (adversarial А5). So the step has a limit of its own,
+    which fails it and the traces go up (run 40313375737); and since a slow pull or `npm ci` leaves it
+    less than 35 minutes, the job's limit may come first (Б2), so the upload runs on `cancelled()` too
+    — it did on a run cancelled by a newer push (run 40326400563). **The price, named:** the step is
+    killed with no summary, so a test hung with no timeout of its own is named nowhere — every spec
+    keeps one, and none sets `0`. Not `globalTimeout`: it waits as long again for a hung worker's
+    teardown.
   - **The prices, named:** the image, 956 MB compressed, is pulled on every run — 27 s on the first
     run, the containers up in 39–41 s against 12–14 (26.10.2026), in place of apt's half-minute and
     the cache's six seconds, so an ordinary run is no shorter, and the win is the tail. The tests took
