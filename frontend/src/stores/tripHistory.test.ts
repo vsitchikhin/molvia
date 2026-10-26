@@ -221,6 +221,39 @@ describe('when the server answered the first page (MOL-204)', () => {
     expect(restart().answeredAt).toBeNull()
   })
 
+  it('a shelf that refuses the page keeps no moment newer than the page it keeps (adversarial А5)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-20T10:00:00Z'))
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({ trips: [entry(A)], nextCursor: null })
+    await store.load()
+    // The shared shelf is full: the page with one more trip does not fit, a date would. happy-dom
+    // keeps `setItem` on the instance, so it is replaced there.
+    const working = localStorage.setItem.bind(localStorage)
+    const define = (value: Storage['setItem']) =>
+      Object.defineProperty(localStorage, 'setItem', { configurable: true, writable: true, value })
+    define((key: string, value: string) => {
+      if (key === `molvia.trip-history.${OWNER}` && value.includes(B))
+        throw new DOMException('quota', 'QuotaExceededError')
+      working(key, value)
+    })
+    try {
+      vi.setSystemTime(new Date('2026-09-27T14:05:00Z'))
+      tripHistory.mockResolvedValueOnce({ trips: [entry(B), entry(A)], nextCursor: null })
+      await store.load()
+    } finally {
+      define(working)
+      vi.useRealTimers()
+    }
+    // This window holds the new page, and its moment.
+    expect(store.answeredAt?.toISOString()).toBe('2026-09-27T14:05:00.000Z')
+    // Opened again at the shelf: the page of 20 Sept., and no moment of 27 Sept. over it.
+    sessionStorage.clear()
+    const again = restart()
+    expect(again.page.trips.map((row) => row.id)).toEqual([A])
+    expect(again.answeredAt).toBeNull()
+  })
+
   it('another owner’s moment is not this owner’s', () => {
     localStorage.setItem(`molvia.trip-history-at.${A}`, '2026-09-27T10:05:00.000Z')
     expect(restart().answeredAt).toBeNull()

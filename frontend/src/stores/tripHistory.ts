@@ -136,7 +136,8 @@ const empty = (): TripHistory => ({ trips: [], nextCursor: null })
  * no signal. Moved with the first page only, by `load()`; «Показать ещё» reads older rows, not a newer
  * list. **The price, named:** a window on the previous build loads the history without moving it, and
  * the strip then names a moment older than the list — never a newer one. A cache from before this key
- * has none, and the strip says no time.
+ * has none, and the strip says no time; nor does a page some shelf refused, since that shelf keeps the
+ * page before it (adversarial А5).
  */
 const AT_KEY = 'molvia.trip-history-at'
 
@@ -449,6 +450,9 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     }
     stale.value = false
     persist()
+    // A shelf too full for the page keeps the one before, and would take the moment all the same: no
+    // moment is older than any, a newer one is the lie (adversarial А5). This window keeps its own.
+    if (!more && owner && ahead) forget(`${AT_KEY}.${owner}`)
     return true
   }
 
