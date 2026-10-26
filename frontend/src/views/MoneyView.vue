@@ -139,7 +139,7 @@
              kept, while «Повторить» reads a failed month again (`ways-held`). -->
         <MoneyEntries
           v-if="entriesShown"
-          :class="{ 'ways-held': entriesHeld }"
+          :class="['ways', { 'ways-held': entriesHeld }]"
           :month="selected === currentMonth ? null : selected"
           :values="entries"
           :spendings="!newcomer"
@@ -503,10 +503,20 @@ export default defineComponent({
   width: 54%;
 }
 
-/* The ways out while «Повторить» reads a failed month again: their place kept (MOL-269, Б2). Not
-   `held`: that is `AppScreen`'s own class on its root, which carries this screen's scope too. */
+/* The ways out while «Повторить» reads a failed month again: their place kept (MOL-269, Б2), faded out
+   and back over frames, never in one (MOL-151, adversarial В1) — and no tap from the press on, the
+   fade still under way. Not `held`: that is `AppScreen`'s own class on its root, which carries this
+   screen's scope too. */
+.ways {
+  transition:
+    opacity var(--appear-duration) var(--ease-out),
+    visibility var(--appear-duration);
+}
+
 .ways-held {
   visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* The answer comes in where the skeleton stood, faded only: the screen keeps it in one block of its
