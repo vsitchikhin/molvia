@@ -29,22 +29,41 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   came from a cache, but their system packages — 181 through apt, gstreamer, fonts, WebKit's
   libraries — go into the system, where no cache reaches, and on a slow mirror of Ubuntu the step took
   17 to 60 minutes in 7 of the 21 runs of 23.10.2026, against half a minute otherwise, holding the
-  pull request and the deploy behind it. **The tag is the version of `@playwright/test` and
-  `playwright` in the lockfile**: the image's browsers are built for that one, and Playwright of
-  another refuses — but only at the first test, after `npm ci` and every server. So
-  `bin/check-playwright-image.mjs` in `npm run lint` says it a minute after the push, with the tag to
-  set; Dependabot raises the package with its weekly group and never the tag, and its pull request is
-  red until the tag is moved — on purpose (owner's В-1 «а»). In the container the loopback is the
-  container's own, and the database is the service by its name, `postgres:5432`, which
-  `bin/init-env.sh` writes when given `PG_HOST` and `PG_HOST_PORT` (В-3 «а») — one generator of
-  `.env` still. The image's Node is 24; `setup-node` keeps `.nvmrc`'s. The job runs as the runner's
-  uid (`--user 1001`, as Playwright's documentation has it) and has 40 minutes (`timeout-minutes`,
-  В-2 «а»): a run takes 13–18, and a hung step was held for six hours. Rejected: caching the `.deb`s
-  of `/var/cache/apt` (fragile, or an action of a third party) and dropping `--with-deps` (WebKit does
-  not start without gstreamer). **The prices, named:** the image, 956 MB compressed, is pulled on
-  every run — 27 s on the first runs (26.10.2026), in place of apt's half-minute and the cache's six
-  seconds, so an ordinary run is no shorter, and the win is the tail; and its fallback fonts are not the runner's: the app's faces are its own, but a
-  glyph outside them falls back to the image's.
+  pull request and the deploy behind it. Rejected: caching the `.deb`s of `/var/cache/apt` (fragile,
+  or an action of a third party) and dropping `--with-deps` (WebKit does not start without
+  gstreamer).
+  - **The tag is the version the runner loads**: `@playwright/test`, its `playwright` and that one's
+    `playwright-core`, each where Node resolves it from the one before — a `playwright` another
+    dependency hoisted is not the runner's (adversarial А1). The image's browsers are built for that
+    one version, and Playwright of another refuses at the first test, naming the tag itself — 1:24
+    after the push in the mutation of #215. `bin/check-playwright-image.mjs` in `npm run lint` says
+    it in the checks job too, in one sentence with the tag to set (4:10 there), so the pull request
+    reads as a tag to move rather than a broken suite. It reads the value of `image:`, never a
+    comment (А3), and a version with a hyphen of its own whole (А2).
+  - **Dependabot never moves the tag, so its pull request of Playwright is red until we do — on
+    purpose** (owner's В-1 «а»). Playwright is a group of its own in `dependabot.yml`, so the rest of
+    the week's packages go green without it. The tag is moved by a commit to Dependabot's branch;
+    after that commit Dependabot no longer rebases the branch, and `@dependabot recreate` throws the
+    commit away — so it is merged once green, or the tag moved again.
+  - **The database is the service by its name**, `postgres:5432`: in the container the loopback is
+    the container's own. `bin/init-env.sh` writes it when given `MOLVIA_PG_HOST` and `MOLVIA_PG_PORT`
+    (В-3 «а») — one generator of `.env` still. The names are the project's: a `PG_HOST` another
+    project left in a terminal would have sent every URL of a copy to that project's Postgres
+    (adversarial А4). Both are checked, and a run given them says where the databases are.
+  - The image's Node is 24; `setup-node` keeps `.nvmrc`'s. The job runs as the runner's uid
+    (`--user 1001`, as Playwright's documentation has it).
+  - **The job has 40 minutes and its tests 35** (`timeout-minutes`, В-2 «а»): a hung step was held
+    for six hours. The job's limit cancels it, and a cancelled job skips `if: failure()` — the traces
+    already written went with the container (adversarial А5); the step's own limit fails the step,
+    and the traces go up (run 40313375737). **The price, named:** the step is killed with no summary,
+    so a test hung with no timeout of its own is named nowhere — every spec keeps one, and none sets
+    `0`. Not `globalTimeout`: it waits as long again for a hung worker's teardown.
+  - **The prices, named:** the image, 956 MB compressed, is pulled on every run — 27 s on the first
+    run, the containers up in 39–41 s against 12–14 (26.10.2026), in place of apt's half-minute and the
+    cache's six seconds, so an ordinary run is no shorter, and the win is the tail. The tests took 16.4 and 17.3 minutes there, against
+    11.6–16.7 on the runner: whether the container is slower, two runs do not say, and `--ipc=host`,
+    which Playwright advises for Chromium in Docker, was not tried. Its fallback fonts are not the
+    runner's: the app's faces are its own, but a glyph outside them falls back to the image's.
 - **End-to-end has a database of its own too, and it is dropped before every run**
   (`molvia_<index>_e2e`, MOL-60). Until then the suite started the API without a
   `DATABASE_URL` of its own and wrote into the dev database, so every pass left a catalogue
@@ -122,8 +141,8 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   cookie on http://127.0.0.1**, so every page load after the first comes in signed out (a reload, a
   `goto`); and **CDP** — the rise held still, a touch moved — is Chromium's alone. Playwright's
   WebKit is not an iPhone either: its touches do not go through UIKit, and the scrim bug of MOL-80
-  did not show in it. A machine installs both browsers once, `npx playwright install chromium
-webkit`, or `make e2e` fails on `Executable doesn't exist` (review Р-5); CI has them in its image.
+  did not show in it. A machine installs both browsers once, `npx playwright install chromium webkit`,
+  or `make e2e` fails on `Executable doesn't exist` (review Р-5); CI has them in its image.
 - **Outside CI a failed test keeps its trace** (`retain-on-failure`, MOL-67), since there are no
   retries to write one. It is recorded for every test and dropped when it passes, which costs
   12–22 % of a full local run (measured in four pairs); and under an overload that times a test

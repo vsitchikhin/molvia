@@ -24,10 +24,11 @@ const CHAIN = ['@playwright/test', 'playwright', 'playwright-core']
 const IMAGE =
   /^[\t ]*(?:-[\t ]+)?(?:image|container):[\t ]*['"]?(mcr\.microsoft\.com\/playwright[^#\n]*?)['"]?[\t ]*(?:#.*)?$/gm
 
-// A tag is `v<version>`, or that with the Ubuntu it is built on. Matched against the bases Playwright
-// publishes rather than any word, so a version with a hyphen of its own, `1.64.0-beta-1761300000000`,
-// stays whole (adversarial А2) and `v1.64.0-beta` is no base of 1.64.0; a new base is a word here.
-const BASE = /-(?:noble|jammy|focal)$/
+// A tag is `v<version>`, then the Ubuntu the image is built on and its architecture, each optional —
+// the suffixes MCR publishes (26.10.2026). Matched as these words rather than any, so a version with a
+// hyphen of its own, `1.64.0-beta-1761300000000`, stays whole (adversarial А2) and `v1.64.0-beta` is no
+// suffix of 1.64.0; a new base is a word here.
+const SUFFIX = /(?:-(?:bionic|focal|jammy|noble|resolute))?(?:-(?:amd64|arm64))?$/
 
 /** Where Node resolves `name` from the package at `from` (a lockfile path, '' for the root). */
 function resolved(packages, from, name) {
@@ -58,12 +59,12 @@ export function imageProblems(workflow, lockfile) {
   const problems = []
   for (const image of new Set(images)) {
     const tag = image.slice(REPOSITORY.length + 1)
-    const base = tag.match(BASE)?.[0] ?? ''
+    const suffix = tag.match(SUFFIX)?.[0] ?? ''
     for (const { name, version } of installed) {
-      if (tag === `v${version}` || tag === `v${version}${base}`) continue
+      if (tag === `v${version}${suffix}`) continue
       problems.push(
         `the image is ${image}, ${LOCKFILE} has ${name} ${version}: set the tag in ${WORKFLOW} to ` +
-          `v${version}${base || '-noble'}`,
+          `v${version}${suffix || '-noble'}`,
       )
     }
   }

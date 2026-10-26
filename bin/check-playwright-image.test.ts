@@ -33,6 +33,7 @@ describe('imageProblems', () => {
   it('is quiet when the image is the version of the whole chain', () => {
     expect(imageProblems(workflow('v1.63.0-noble'), ALL)).toEqual([])
     expect(imageProblems(workflow('v1.63.0'), ALL)).toEqual([])
+    expect(imageProblems(workflow('v1.63.0-resolute-amd64', 'v1.63.0-arm64'), ALL)).toEqual([])
   })
 
   it('names the tag to set when the lockfile was raised without the image', () => {
@@ -43,7 +44,7 @@ describe('imageProblems', () => {
     ])
   })
 
-  it('keeps the base of the tag it names, and refuses a patch apart', () => {
+  it('keeps the suffix of the tag it names, and refuses a patch apart', () => {
     expect(imageProblems(workflow('v1.63.1-jammy'), ALL)[0]).toBe(
       told('v1.63.1-jammy', '@playwright/test', '1.63.0', 'v1.63.0-jammy'),
     )
