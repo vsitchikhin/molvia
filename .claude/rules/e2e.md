@@ -42,8 +42,8 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   В-2 «а»): a run takes 13–18, and a hung step was held for six hours. Rejected: caching the `.deb`s
   of `/var/cache/apt` (fragile, or an action of a third party) and dropping `--with-deps` (WebKit does
   not start without gstreamer). **The prices, named:** the image, 956 MB compressed, is pulled on
-  every run — it takes the place of apt's half-minute rather than shortening an ordinary run, and the
-  win is the tail; and its fallback fonts are not the runner's: the app's faces are its own, but a
+  every run — 27 s on the first runs (26.10.2026), in place of apt's half-minute and the cache's six
+  seconds, so an ordinary run is no shorter, and the win is the tail; and its fallback fonts are not the runner's: the app's faces are its own, but a
   glyph outside them falls back to the image's.
 - **End-to-end has a database of its own too, and it is dropped before every run**
   (`molvia_<index>_e2e`, MOL-60). Until then the suite started the API without a
