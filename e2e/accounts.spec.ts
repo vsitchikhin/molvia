@@ -535,6 +535,60 @@ test('выбор счёта: строки 64, у выбранной кольцо
   })
 })
 
+// MOL-197, adversarial round 2, Б1: the chosen row's balance goes to ink only while it is not below zero —
+// a card in debt stays `bad-ink` on the tint; the e2e above sees two balances above zero, the unit test a class.
+test('выбор счёта: минус выбранной строки — bad-ink, плюс соседней — приглушённый', async ({
+  page,
+}) => {
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  for (const [name, currency, amount] of [
+    ['Кредитка ֏', 'AMD', '-12000'],
+    ['Карта ₽', 'RUB', '1000'],
+  ] as const) {
+    const response = await page.request.post('/api/money/accounts', {
+      headers,
+      data: {
+        id: randomUUID(),
+        name,
+        currency,
+        savings: false,
+        start: { amount, currency },
+        startOn: yesterday(),
+      },
+    })
+    expect(response.status(), await response.text()).toBe(201)
+  }
+  await open(page, '/money')
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  await expect(topSheet(page)).toContainText('Новая трата')
+  await page.waitForTimeout(400)
+  await topSheet(page)
+    .getByRole('button', { name: /Выбрать счёт:/ })
+    .click()
+  const picker = topSheet(page)
+  await expect(picker.getByRole('radio', { name: /Кредитка ֏/ })).toBeChecked()
+  const look = await picker.evaluate((sheet) => {
+    const ink = (token: string) => {
+      const probe = document.createElement('span')
+      probe.style.color = `var(${token})`
+      sheet.append(probe)
+      const colour = getComputedStyle(probe).color
+      probe.remove()
+      return colour
+    }
+    const balance = (checked: string) => {
+      const one = sheet.querySelector(`[role="radio"][aria-checked="${checked}"] .balance`)
+      return one ? getComputedStyle(one).color : ''
+    }
+    return {
+      chosenMinus: balance('true') === ink('--bad-ink'),
+      otherPlus: balance('false') === ink('--text-muted'),
+    }
+  })
+  expect(look).toEqual({ chosenMinus: true, otherPlus: true })
+})
+
 // MOL-197: the name's whole line was the least width of «Счёт ›», and a long one pushed the sheet of a
 // spending to 483 px on a phone of 320 — every field past the edge — instead of ending in «…».
 test('длинное имя счёта на 320: строка «Счёт ›» кончается «…», шторка не шире экрана', async ({
