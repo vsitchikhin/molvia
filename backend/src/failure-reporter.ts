@@ -153,8 +153,8 @@ export interface ApiFailureReporter extends FailureReporter {
    */
   tellHeld(at: Date): Promise<void>
   /**
-   * Lets go of the phones' senders with nothing in the hour before `at` (MOL-241): the minute timer
-   * calls it first, so the memory waits neither for the database nor for an owner.
+   * Lets go of the phones' senders with nothing in the hour before `at` (MOL-241): a minute timer of
+   * its own calls it, so the memory waits neither for the database nor for an owner.
    */
   forget(at: Date): void
 }

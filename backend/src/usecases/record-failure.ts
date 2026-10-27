@@ -229,8 +229,8 @@ export interface PhoneNoticeBudget {
  * price, named:** seven networks — seven IPv4 addresses, seven `/48` — silence the names of the
  * phone's new failures for an hour; the table keeps them and the owner hears «скрыто M» every hour.
  * In the process's memory: a restart starts the hour over and forgets what was held — a rollout is a
- * restart. A sender is let go an hour after its last notice by `forget`, which the minute timer calls
- * before anything of the database (MOL-241).
+ * restart. A sender is let go an hour after its last notice by `forget`, on a minute timer that waits
+ * on no database (MOL-241).
  */
 export function phoneNoticeBudget(
   perHour = PHONE_NOTICES_PER_HOUR,

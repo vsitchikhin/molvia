@@ -281,8 +281,9 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
   the new rows of every phone behind the same address — telling phones apart would need a mark of the
   device, which is tracking. The nightly copy keeps the table: what is in it is bounded.
 - **A sender is let go an hour after its last failure, by both budgets** (MOL-241, owner's В-1 «а»):
-  `forget`, the first line of the minute timer of the failures, before anything of the database and
-  whether or not an owner is set. `claim` is asked of every failure of a phone, a known fingerprint
+  `forget`, on a minute timer of its own — the failures' cleanup waits on the database, and a query
+  hung there would hold the next tick as long, since the pool has no timeout — whether or not an
+  owner is set. `claim` is asked of every failure of a phone, a known fingerprint
   too, and the row budget let go of nobody: every address that ever sent a failure stayed in memory,
   with its moment, until a restart, while the comment of `recordFailure` promised the hour
   (adversarial А3 of MOL-97).

@@ -623,6 +623,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     let stopSessionCleanup: (() => Promise<void>) | undefined
     let stopFeedbackCleanup: (() => Promise<void>) | undefined
     let stopFailureCleanup: (() => Promise<void>) | undefined
+    let stopSenderForget: (() => Promise<void>) | undefined
     let stopMergeTwins: (() => Promise<void>) | undefined
     const embedder = options.embedder?.(instance.log) ?? NO_EMBEDDER
     let itemEmbedding: ReturnType<typeof startItemEmbedding> | undefined
@@ -690,9 +691,6 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       stopFailureCleanup = startLoginCleanup(
         async () => {
           const now = new Date()
-          // The phones' addresses an hour after their last failure (MOL-241) — first, since a
-          // database that is down would otherwise keep them for as long as it is.
-          failures.forget(now)
           await createFailureRepository(db).purgeStale(now)
           await createOwnerNoticeRepository(db).purgeStale(now)
           // The phone's notices held back, told once the hour has room (MOL-144, review №7).
@@ -700,6 +698,17 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         },
         (error) => {
           failures.report(error, job('failure-cleanup'), 'failure cleanup failed')
+        },
+      )
+      // The phones' addresses an hour after their last failure (MOL-241): a timer of its own, since
+      // the cleanup above waits on the database, and one down or hung would keep them as long.
+      stopSenderForget = startLoginCleanup(
+        () => {
+          failures.forget(new Date())
+          return Promise.resolve()
+        },
+        (error) => {
+          failures.report(error, job('sender-forget'), 'phone sender forget failed')
         },
       )
       // A message to the developer lives a year from the last word of its thread (MOL-147, В-4 of
@@ -922,6 +931,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopSessionCleanup?.()
       await stopFeedbackCleanup?.()
       await stopFailureCleanup?.()
+      await stopSenderForget?.()
       await stopMergeTwins?.()
       await itemEmbedding?.stop()
       await stopReceiptCleanup?.()
