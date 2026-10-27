@@ -377,6 +377,30 @@ describe('why a line was not shown as read, and the receipt not whole (MOL-309)'
     expect(receipt([line()], 70_000)).toBe('lines_over')
   })
 
+  // adversarial А1, А2: a line found whole with its sum not read, or read low by the font's 5↔6, makes the lines
+  // short too — the line's miss, never a line lost
+  it('names a line lost only where every line is as printed', () => {
+    const receipt = (lines: ReceiptTextLine[], total: number) =>
+      explainedReading(reading(lines, total)).receipt
+    const cheese = { quantityMilli: 500, priceHundredths: 130_000, discountHundredths: 0 }
+    expect(receipt([line(), line({ sumHundredths: null, asPrinted: false })], 148_000)).toBe(
+      'line_not_as_printed',
+    )
+    // 650 read as 560 and 560 read as 650: one swap, one reason, whichever way the digit went
+    const low = line({ ...cheese, sumHundredths: 56_000, asPrinted: false, settled: false })
+    const high = line({
+      ...cheese,
+      priceHundredths: 112_000,
+      sumHundredths: 65_000,
+      asPrinted: false,
+      settled: false,
+    })
+    expect(receipt([line(), low], 139_000)).toBe('line_not_as_printed')
+    expect(receipt([line(), high], 130_000)).toBe('line_not_as_printed')
+    // the bread lost at a seam, the rest as printed
+    expect(receipt([line()], 103_000)).toBe('lines_lost')
+  })
+
   it('shows exactly what verifiedReading shows', () => {
     const lines = [
       line(),

@@ -63,10 +63,14 @@ export const RECEIPT_REASONS = [
   'no_lines',
   /** No total two sources vouch for (MOL-244). */
   'no_total',
-  /** The lines as read make less than the total: lines lost, at a seam or past a fold. */
-  'lines_lost',
   'line_doubted',
   'line_not_as_printed',
+  /**
+   * Every line as printed, and still they make less than the total: a line lost, at a seam or past a fold.
+   * After the lines' own reasons, never before (adversarial А1, А2 of MOL-309): a sum not read, or one read
+   * low by the font's 5↔6, makes the lines short as well — and that is the line's miss, not a line lost.
+   */
+  'lines_lost',
   'lines_over',
 ] as const
 export type ReceiptReason = (typeof RECEIPT_REASONS)[number]
@@ -95,16 +99,16 @@ export function explainedReading(text: ReceiptText, { byModel = false } = {}): E
 function notWhole(text: ReceiptText): ReceiptReason | null {
   if (text.lines.length === 0) return 'no_lines'
   if (text.totalHundredths === null) return 'no_total'
-  // a card that sends its discount to the card prints the total without it (MOL-289)
-  const total = text.totalHundredths - (text.cashbackHundredths ?? 0)
-  const sum = text.lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0)
-  if (sum < total) return 'lines_lost'
   // a line the memory doubts is no line proven (MOL-291)
   if (text.lines.some((line) => line.remembered === 'doubted')) return 'line_doubted'
   const asRead = (line: ReceiptTextLine) =>
     (line.asPrinted || line.repaired === true) && line.sumHundredths !== null
   if (!text.lines.every(asRead)) return 'line_not_as_printed'
-  return sum === total ? null : 'lines_over'
+  // a card that sends its discount to the card prints the total without it (MOL-289)
+  const total = text.totalHundredths - (text.cashbackHundredths ?? 0)
+  const sum = text.lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0)
+  if (sum === total) return null
+  return sum < total ? 'lines_lost' : 'lines_over'
 }
 
 interface CheckedLine {
