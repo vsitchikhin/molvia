@@ -286,6 +286,14 @@ balance, total and difference is the server's.
   was, and an income or an exchange moved to another currency leaves an account that cannot hold it
   for the default. No account at all — no row. An income and an exchange offer only their own
   currency and never «Списано»; a spending and a trip offer the others with «Списано» under the row.
+- **A receipt and a record by hand start on the account last recorded for a purchase paid the same way**
+  (MOL-312, owner's В-1 «б», Р-4; `rememberedAccount`): per currency on the device — a receipt by card, in cash,
+  any receipt, a record by hand — each its own, so cash at the market does not move the default of a receipt
+  paid by card; an account of another currency is remembered too, «Списано» typed anew. A slot whose account is
+  removed or gone is passed over; **«Без счёта» is never remembered** — a default of none would send every later
+  receipt past the balances unseen; nothing remembered — `defaultAccount`. The screen puts it in, the server never
+  guesses. **The trip from a receipt is put on its account by «Записать»** (`receipts.md`), and a record by hand by
+  «Закончить» (`trips.md`), so neither waits in «не попали» for «Траты».
 - **The check asks the fact first and shows nothing of the count until the server answers** — not in
   text, not in `aria`; the result is said through the app's live region and takes the focus. **Nor
   does the screen behind it** (MOL-195, Ф-33): while the fact is typed the balance of the account's

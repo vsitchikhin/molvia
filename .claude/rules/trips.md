@@ -119,7 +119,11 @@ The detail behind the trip lines of `CLAUDE.md`.
   key by an older window does not send it to the head (adversarial Л). **The price, named** (review
   30): a `payment` waits behind a start held for an answer — another trip open, a missing context —
   with no timer; a check does not wait for it — it counts without it and says the trip waits for an
-  answer in «Покупки» (adversarial round 3, Н4). **The price, named:** removing a trip dated before
+  answer in «Покупки» (adversarial round 3, Н4). **«Закончить» of a record by hand chooses the account too**
+  (MOL-312, owner's В-3 «б», Р-2): finished is paid, so the row «Счёт покупок» and «Списано» stand in its sheet
+  beside the receipt's sum, and the `payment` goes into the queue before the `finish`, as the sum does; «Без
+  счёта» sends none. Only for the account's own currency against the record's: a purchase in a third currency
+  is the summary's to cover in «Траты», a price named. **The price, named:** removing a trip dated before
   a check that came out even moves the balance with no reason the check can name, as a removed
   spending does.
 

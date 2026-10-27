@@ -702,6 +702,20 @@ that a `started_on` a day before the server's start is a wrong clock does not ho
 the printed one or their correction of it, held only against a day still to come (`latestDay`). A
 receipt of a week ago is a purchase of a week ago.
 
+**The trip is on the account the phone names** (MOL-312, owner's В-1…В-3 «б», 27.10.2026: «важно понимать, где
+сколько осталось денег», and every recorded receipt lay in «Не попали в остатки» until set by hand in «Траты»). The
+body's `account` is the body of `PUT /trips/:id/payment`, one schema, settled by the same `paymentOf` in the record's
+transaction: an account the person has not got, or «списано» in another currency than its, is «без счёта», never a
+refusal — the record came from a queue; a marked or removed one is taken; «списано» an account of the receipt's own
+currency does not need is dropped. `account_set_at` is the record's moment, so a check sees the trip as new. Absent
+— an earlier build, or «Без счёта» — the trip is on no account, as before. A repeat of «Записать» is answered before
+it is read and never moves an account chosen since in «Траты». **On the phone the choice is a draft beside the
+review's** (`molvia.receipt-payment`), never inside it — the build before reads a draft strictly and would drop the
+receipt's edits whole; «Без счёта» chosen is kept as a choice. A row only while some account lives; «Списано» under it
+for an account of another currency; not now while «Записать» waits. **The prices, named:** a server rolled back
+refuses a body with it and the queue of the build before drops it, as `edited` and `barcodes`; an account whose ten
+minutes of «Вернуть» run out in the very transaction is a 404, as `payTrip`'s is.
+
 **The same trip sent again is the same answer, another trip a 409** — the phone names the trip, as every
 write offline (MOL-24). **The same receipt recorded before is refused** (Т-11,
 `error.receipt_recorded_before`): its seller's tax number and number, the person's, while its purchases
@@ -1371,6 +1385,31 @@ shown**: «1 × p = p» stands only where the memory's price is p — the lower 
 has none, a figure their own paper prints. **Ceilings**: `REMEMBERED_COMBINATIONS_MAX` 10 000 readings a line — past it
 that line alone says nothing, the receipt's budget untouched (adversarial А5) — and `REMEMBERED_RECEIPT_COMBINATIONS_MAX`
 50 000 a receipt; a line of the bench tries some dozens.
+
+## How a receipt was paid (MOL-312)
+
+**The receipt's words of payment suggest the account, and never choose it** (owner's В-2 «б», 27.10.2026). Cash is
+«Վճարված է Առձեռն» — in hand — or «Կանխիկ»; a card is «Անկանխիկ» or «Վճարված է PosTerminal» (`ReceiptCard.cash`,
+`cashless`). **One way only** (`paidByOf`): a word of one way beside a sum above nothing and no word of the other so —
+«Ереван Сити» prints the other way at 0; both with a sum, a mixed payment, or neither is nothing, since an account
+suggested wrong is one the person may not look at (MOL-255). **The closed list is the rule**: the model copies «Առձեռն»
+as «Առեն», «Առեղն», «Առնեռն» — so cash is a whole word «Առ…ն» of two to six letters — and once as «Առևտուր», trade,
+which is none; a word nobody listed («Վճարված է Yandex», a delivery app) is none; «Կանխավճարի մարում», the card's
+bonus spent, is no payment, though the model has copied it «Կանխիկ վճարի մարում»; «միայն քարտապան», a promotion for
+the card's holders, is no card. **Tesseract's rows count from the total down** (`receiptPaidBy`): above it «ձեռնոց»,
+gloves, is an item; a reading that lost the total's word says nothing. The model's summary is all summary
+(`modelPaidBy`). **Stored at reading** (`receipts.paid_by`, 0072), for either reader of a photo; **a receipt by its link
+has none** — the tax office's payments are never read (MOL-232, privacy). On the wire only to a phone that asks
+(`RECEIPT_PAID_BY_HEADER`): an installed app of an earlier build reads the detail strictly. In the copy (version 23).
+
+**On the bench** (`.scratch/tasks/status/MOL-312/bench.mts`, truth by the photos' words): the model's answers of v5, two
+runs, and am-44's eight — 105 right, 0 wrong, 10 none, five of them receipts that print no way; Tesseract's two page
+modes — 15 right, 0 wrong, 28 none, its readings of «Առձեռն» («Առձերե», «Ueto») unread.
+
+**How it is used** (В-1 «б», Р-1): the phone remembers the account last recorded per currency and way of payment
+(`stores/paymentAccounts`) — a receipt by card starts on the account of the last receipt by card, else of the last
+receipt, else the first account of its currency; no column of «cash or card» on an account. **The price, named:** the
+first receipt of a way after the phone is new starts on the last receipt's account, and the person changes it once.
 
 ## A Serbian receipt by its link (MOL-232)
 
