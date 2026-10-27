@@ -124,8 +124,13 @@ The detail behind the trip lines of `CLAUDE.md`.
   beside the receipt's sum, and the `payment` goes into the queue before the `finish`, as the sum does; «Без
   счёта» sends none. **A record on an account already** — set in «не попали» while open — opens the sheet on it,
   «Списано» typed in, and sends nothing unless changed (self-review Р1-1): sent again whole, a payment with no
-  «Списано» takes it off; «Без счёта» there takes the account off. «Счета» are read as the sheet opens, never with
-  every opening of the record (Р1-2). Only for the account's own currency against the record's: a purchase in a third currency
+  «Списано» takes it off; «Без счёта» there takes the account off. **The record's account is the newest word of
+  it**: a `payment` still in the queue — chosen in «не попали» with no connection, or not landed yet — before the
+  server's answer, since a new one would take its place there (review Р2-2, adversarial А7). **The same account
+  with no field of «Списано» on screen sends nothing** — one of the record's currency, «Списано» for a purchase in
+  a third, or an account this phone does not know (Р2-1, А8): nothing typed, nothing changed. «Счета» are read as
+  the sheet opens, never with every opening of the record (Р1-2). **The price, named:** an account this phone
+  does not know reads «Без счёта» in the row until «Счета» answer, the record staying on it. Only for the account's own currency against the record's: a purchase in a third currency
   is the summary's to cover in «Траты», a price named. **The price, named:** removing a trip dated before
   a check that came out even moves the balance with no reason the check can name, as a removed
   spending does.

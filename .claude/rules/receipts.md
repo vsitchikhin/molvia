@@ -1396,7 +1396,8 @@ that line alone says nothing, the receipt's budget untouched (adversarial А5) �
 `cashless`). **One way only** (`paidByOf`): a word of one way beside a sum above nothing and no word of the other so —
 «Ереван Сити» prints the other way at 0; both with a sum, a mixed payment, or neither is nothing, since an account
 suggested wrong is one the person may not look at (MOL-255). **The closed list is the rule**: the model copies «Առձեռն»
-as «Առեն», «Առեղն», «Առնեռն» — so cash is a whole word «Առ…ն» whose third letter is what they make of «ձ» (`ձծճեն`) —
+as «Առեն», «Առեղն», «Առնեռն», «Առոեոն», «Առժեն» — so cash is a whole word «Առ…ն» whose third letter is what they make of
+«ձ» (`ձծճենոժ`; a form with another is unread, the price) —
 and once as «Առևտուր», trade, which is none; a word nobody listed («Վճարված է Yandex», a delivery app) is none;
 «Կանխավճարի մարում», the card's bonus spent, is no payment, though the model has copied it «Կանխիկ վճարի մարում»;
 «միայն քարտապան», a promotion for the card's holders, is no card. **A word of cash is the last word before its sum**
@@ -1412,7 +1413,7 @@ has none** — the tax office's payments are never read (MOL-232, privacy). On t
 **On the bench** (`.scratch/tasks/status/MOL-312/bench.mts`, truth by the photos' words): the model's answers of v5, two
 runs, and am-44's eight — 106 right, 0 wrong, 9 none, five of them receipts that print no way; Tesseract's two page
 modes — 15 right, 0 wrong, 28 none, its readings of «Առձեռն» («Առձերե», «Ueto») unread. Over every answer of the
-bench of MOL-272, 882 of them — 710 right, 0 wrong (the reviewer's probe).
+bench of MOL-272, 882 of them — 712 right, 0 wrong (the reviewer's probe).
 
 **How it is used** (В-1 «б», Р-1): the phone remembers the account last recorded per currency and way of payment
 (`stores/paymentAccounts`) — a receipt by card starts on the account of the last receipt by card, else of the last
