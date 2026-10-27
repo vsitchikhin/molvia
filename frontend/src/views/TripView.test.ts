@@ -1324,6 +1324,51 @@ describe('TripView', () => {
       expect(second.queue.pending.map((write) => write.kind)).toEqual(['finish'])
     })
 
+    it('сумма по чеку в той же шторке — показанное «Списано» уходит снова, после неё (А9)', async () => {
+      // the bread has no price: the sum is asked beside the account
+      currentTrip.mockResolvedValue({
+        ...trip([...handoff(), { id: BREAD, name: 'Хлеб' }]),
+        accountId: roubles.id,
+        debited: parseMoney('1100', 'RUB'),
+      })
+      const { view, queue } = await render()
+      await askFinish(view)
+      expect(row()?.textContent).toContain('Карта ₽')
+      const sum = openSheets()[0]?.querySelector<HTMLInputElement>('input[data-field="receipt"]')
+      if (!sum) throw new Error('нет поля суммы')
+      sum.value = '12 400'
+      sum.dispatchEvent(new Event('input'))
+      await flushPromises()
+      inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      // the sum takes «списано» off on the server: the account and the 1 100 shown go again after it
+      expect(queue.pending.map((write) => write.kind)).toEqual(['receipt', 'payment', 'finish'])
+      expect(queue.pending[1]).toMatchObject({
+        body: { accountId: roubles.id, debited: parseMoney('1100', 'RUB') },
+      })
+    })
+
+    it('сумма по чеку, а поля «Списано» нет — уходит «Списано» записи, после суммы (А9)', async () => {
+      currentTrip.mockResolvedValue({
+        ...trip([...handoff(), { id: BREAD, name: 'Хлеб' }]),
+        accountId: card.id,
+        debited: parseMoney('41000', 'AMD'),
+      })
+      const { view, queue } = await render()
+      await askFinish(view)
+      const sum = openSheets()[0]?.querySelector<HTMLInputElement>('input[data-field="receipt"]')
+      if (!sum) throw new Error('нет поля суммы')
+      sum.value = '12 400'
+      sum.dispatchEvent(new Event('input'))
+      await flushPromises()
+      inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      expect(queue.pending[1]).toMatchObject({
+        kind: 'payment',
+        body: { accountId: card.id, debited: parseMoney('41000', 'AMD') },
+      })
+    })
+
     it('«Счета» читаются при «Закончить», а не при каждом открытии записи (Р1-2)', async () => {
       const { view } = await render()
       expect(moneyAccounts).not.toHaveBeenCalled()

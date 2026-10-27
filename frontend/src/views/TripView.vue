@@ -456,7 +456,7 @@ export default defineComponent({
       debitedBad.value = paid === 'bad'
       if (receipt === null || paid === 'bad') return
       if (id && receipt) queue.enqueue({ kind: 'receipt', tripId: id, body: { receipt } })
-      const payment = changedPayment(paid)
+      const payment = receipt ? paymentAfterSum(paid) : changedPayment(paid)
       if (id && payment) {
         queue.enqueue({ kind: 'payment', tripId: id, body: payment })
         if (heldPayment === null) {
@@ -564,6 +564,20 @@ export default defineComponent({
         (paid.debited?.minor ?? null) === (held.debited?.minor ?? null) &&
         (paid.debited?.currency ?? null) === (held.debited?.currency ?? null)
       return same ? undefined : paid
+    }
+    /**
+     * A sum typed in the same sheet goes first and takes «Списано» off on the server (MOL-78, Р-32 MOL-115): what
+     * the sheet showed beside it is sent again after it — the field as typed, or the record's own where no field
+     * was on screen (adversarial А9).
+     */
+    function paymentAfterSum(paid: TripPaymentBody | undefined): TripPaymentBody | undefined {
+      const held = heldPayment
+      if (paid === undefined || held?.accountId !== paid.accountId || !held.debited) {
+        return changedPayment(paid)
+      }
+      return !charged.value || !account.value
+        ? { accountId: paid.accountId, debited: held.debited }
+        : paid
     }
     /** The trip's payment: none for «Без счёта», which the record already is. */
     function paymentBody(): TripPaymentBody | 'bad' | undefined {
