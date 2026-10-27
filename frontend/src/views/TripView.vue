@@ -104,18 +104,19 @@
          corner the thumb does not reach. -->
     <template v-if="phase === 'going'" #docked>
       <div class="pair">
-        <!-- The verb out loud, the short word on the pill: the glyph that says «add» or «scan» is
-             hidden, and «Позиция, кнопка» says nothing of what it does (review 2, №3). Hidden text
-             in front, never an `aria-label`, as the total's card names its flip. -->
+        <!-- The verb out loud, the short word on the pill (review 2, №3): the glyph that says «add» or
+             «scan» is hidden, and «Позиция, кнопка» says nothing of what it does. The word stays in the
+             name, so a voice that says what it sees finds the button — «Новая Позиция», «Сканировать
+             Штрихкод» (review 3, №3, WCAG 2.5.3). Hidden text in front, never an `aria-label`. -->
         <AppButton variant="secondary" size="large" @click="scan">
           <template #icon><IconBarcode /></template>
-          <span class="hidden">{{ t('item.barcode.scan') }}</span>
-          <span aria-hidden="true">{{ t('trip.scan_short') }}</span>
+          <span class="hidden">{{ t('trip.scan_lead') }}</span>
+          {{ t('trip.scan_short') }}
         </AppButton>
         <AppButton size="large" @click="find">
           <template #icon><IconPlus /></template>
-          <span class="hidden">{{ t('trip.add_item') }}</span>
-          <span aria-hidden="true">{{ t('trip.add_short') }}</span>
+          <span class="hidden">{{ t('trip.add_lead') }}</span>
+          {{ t('trip.add_short') }}
         </AppButton>
       </div>
       <AppButton variant="ghost" block @click="askFinish">
@@ -465,7 +466,7 @@ export default defineComponent({
     const receiptBad = ref(false)
 
     function askFinish(): void {
-      finishingEmpty.value = kept.value === 0
+      finishingEmpty.value = kept.value === 0 && !receiptCurrent.value
       askingReceipt.value = unpriced.value > 0 && receiptCurrent.value === null
       finishCounts.value = { n: unpriced.value, total: kept.value }
       receiptText.value = ''
@@ -476,10 +477,12 @@ export default defineComponent({
 
     /**
      * «Удалить запись»: an empty one goes at once, with «Вернуть» on «Покупки»; one with purchases
-     * is asked about first, naming them (MOL-76, Р-2).
+     * is asked about first, naming them (MOL-76, Р-2) — and so is one whose only money is a receipt's
+     * sum, which leaves «Деньги» and the accounts with it (adversarial Б1). «Закончить» counts that sum
+     * the same way: such a record is not «ничего нет».
      */
     function askRemove(): void {
-      if (kept.value === 0) {
+      if (kept.value === 0 && !receiptCurrent.value) {
         remove()
         return
       }

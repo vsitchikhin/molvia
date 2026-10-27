@@ -86,12 +86,16 @@ export default defineComponent({
     const { t } = useI18n()
     const total = useTripTotal(props)
 
-    // «≈» stays with its amount where the line wraps: «≈» at a line's end read as a sign of nothing.
-    const estimate = computed(() => total.estimate.value?.replace(/^≈ /, '≈\u00a0') ?? null)
+    /**
+     * The line breaks only between its parts, never inside one (review 3, №2): a rate's figure and its
+     * signs, a day and its month, «≈» and its amount come with ordinary spaces, and «курс 4,24 / ֏/₽» or
+     * «27 / окт.» read as two things. Each part split at its own «·», its spaces made no-break.
+     */
     const parts = computed(() =>
-      [total.priced.value, estimate.value, total.rateLine.value].filter(
-        (part): part is string => part !== null,
-      ),
+      [total.priced.value, total.estimate.value, total.rateLine.value]
+        .filter((part): part is string => part !== null)
+        .flatMap((part) => part.split(' · '))
+        .map((part) => part.replaceAll(' ', '\u00a0')),
     )
 
     return {
@@ -164,9 +168,8 @@ export default defineComponent({
   line-height: var(--leading-snug);
 }
 
-/* A part breaks inside where it must: the rate named with its bank, «rate … · National Bank of
-   Serbia», is wider than the card on any phone (review 2, №1). The figures keep their no-break
-   spaces, so no amount or rate splits. */
+/* A part is whole (review 3, №2), and breaks inside only where it alone is wider than the card — the
+   rate named with its bank once stood past it on every phone (review 2, №1). */
 .part {
   overflow-wrap: anywhere;
 }

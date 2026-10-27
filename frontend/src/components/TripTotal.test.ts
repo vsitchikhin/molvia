@@ -289,7 +289,7 @@ describe('TripTotalCard', () => {
     const view = card()
     expect(view.get('.caption').text()).toBe(ru.trip.total)
     expect(plain(view.get('.sum'))).toBe('6 493,12 ֏')
-    expect(parts(view)).toEqual(['≈ 1 347 ₽', 'курс 4,82 ֏/₽ · 15 янв.'])
+    expect(parts(view)).toEqual(['≈ 1 347 ₽', 'курс 4,82 ֏/₽', '15 янв.'])
   })
 
   it('«С ценой — n из m · без цены — k» — по строкам экрана, только когда цена есть не у всех', () => {
@@ -297,7 +297,7 @@ describe('TripTotalCard', () => {
       trip: trip({ total: [amd('1000')], rows: [amd('1000'), null] }),
       rows: { kept: 2, unpriced: 1 },
     })
-    expect(parts(some)[0]).toBe('С ценой — 1 из 2 · без цены — 1')
+    expect(parts(some).slice(0, 2)).toEqual(['С ценой — 1 из 2', 'без цены — 1'])
 
     const all = card({ trip: trip({ total: [amd('1000')] }), rows: { kept: 1, unpriced: 0 } })
     expect(parts(all).some((part) => part.startsWith('С ценой'))).toBe(false)
@@ -323,10 +323,18 @@ describe('TripTotalCard', () => {
     expect(view.get('.sum').classes()).toContain('guess')
     // Точная сумма — строкой под оценкой, курс — в строке частей.
     expect(plain(view.findAll('.line')[0] ?? view.get('.line'))).toBe('6 493,12 ֏')
-    expect(parts(view)).toEqual(['курс 4,82 ֏/₽ · 15 янв.'])
+    expect(parts(view)).toEqual(['курс 4,82 ֏/₽', '15 янв.'])
 
     // Выбор общий с полосой записанных: одна память на телефон.
     expect(plain(render().get('.sum'))).toBe('≈ 1 347 ₽')
+  })
+
+  it('строка рвётся только между частями: у курса, дня и «≈» пробелы неразрывные (ревью 3, №2)', () => {
+    const raw = card({ rows: { kept: 2, unpriced: 1 } })
+      .findAll('.line .part')
+      .map((part) => part.text())
+    expect(raw.length).toBeGreaterThan(2)
+    for (const part of raw) expect(part, part).not.toContain(' ')
   })
 
   it('без курса переворачивать нечего — карточка не кнопка', () => {
@@ -343,7 +351,7 @@ describe('TripTotalCard', () => {
     const lines = view.findAll('.line').map(plain)
     // «1 500 ₽ · ≈ 1 347 ₽» читалось «1 500 ₽ ≈ 1 347 ₽» (адверсариальное А4).
     expect(lines[0]).toBe('1 500 ₽')
-    expect(parts(view)).toEqual(['≈ 1 347 ₽', 'курс 4,82 ֏/₽ · 15 янв.'])
+    expect(parts(view)).toEqual(['≈ 1 347 ₽', 'курс 4,82 ֏/₽', '15 янв.'])
     expect(view.get('.note').text()).toBe('+ 2 позиции ещё не ушли · пересчёт только по AMD')
   })
 

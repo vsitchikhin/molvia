@@ -144,14 +144,16 @@ function inside(sheet: Element | null, text: string): HTMLButtonElement {
 }
 
 /**
- * Кнопка полосы записи (Ф-22) по её имени для диктора — скрытый глагол, где он есть («Добавить
- * позицию» над словом «Позиция»): «Закончить» шторки висит в дереве раньше и не в счёт.
+ * Кнопка полосы записи (Ф-22) по её имени для диктора — скрытое ведущее слово и видимое («Новая
+ * Позиция»): «Закончить» шторки висит в дереве раньше и не в счёт.
  */
+/** Имена кнопок полосы для диктора (ревью 3, №3). */
+const ADD = `${ru.trip.add_lead} ${ru.trip.add_short}`
+const SCAN = `${ru.trip.scan_lead} ${ru.trip.scan_short}`
+
 function docked(view: VueWrapper, text: string): DOMWrapper<HTMLButtonElement> {
-  const name = (candidate: DOMWrapper<HTMLButtonElement>) => {
-    const hidden = candidate.find('.hidden')
-    return hidden.exists() ? hidden.text() : candidate.text()
-  }
+  const name = (candidate: DOMWrapper<HTMLButtonElement>) =>
+    candidate.element.textContent.replace(/\s+/g, ' ').trim()
   const found = view
     .get('.dock')
     .findAll('button')
@@ -328,23 +330,26 @@ describe('TripView', () => {
     expect(state.findAll('button')).toHaveLength(0)
     expect(state.element.closest('.card')).not.toBeNull()
     // Полоса та же, что у записи с позициями: она не меняется с первой позицией (77 v2, п. 5).
-    expect(docked(view, ru.item.barcode.scan).exists()).toBe(true)
-    expect(docked(view, ru.trip.add_item).exists()).toBe(true)
+    expect(docked(view, SCAN).exists()).toBe(true)
+    expect(docked(view, ADD).exists()).toBe(true)
     expect(docked(view, ru.trip.finish).exists()).toBe(true)
     // Итога у пустой записи нет: «—» — число без числа.
     expect(view.findComponent({ name: 'TripTotalCard' }).exists()).toBe(false)
   })
 
-  it('кнопки полосы говорят диктору глагол, а на пилюле — короткое слово (ревью 2, №3)', async () => {
+  it('кнопки полосы говорят диктору, что делают, и видимое слово — в имени (ревью 2 №3, ревью 3 №3)', async () => {
     currentTrip.mockResolvedValue(trip(handoff()))
     const { view } = await render()
     for (const [name, word] of [
-      [ru.trip.add_item, ru.trip.add_short],
-      [ru.item.barcode.scan, ru.trip.scan_short],
+      [ADD, ru.trip.add_short],
+      [SCAN, ru.trip.scan_short],
     ] as const) {
       const button = docked(view, name)
       expect(button.attributes('aria-label')).toBeUndefined()
-      expect(button.get('[aria-hidden="true"]:not(.glyph)').text()).toBe(word)
+      // WCAG 2.5.3: голос «нажать Позиция» находит кнопку — видимое слово стоит в имени как есть.
+      expect(button.find('.hidden').exists()).toBe(true)
+      expect(button.find('[aria-hidden="true"]:not(.glyph)').exists()).toBe(false)
+      expect(name.endsWith(word)).toBe(true)
     }
   })
 
@@ -376,13 +381,42 @@ describe('TripView', () => {
     expect(view.find('.footnote').exists()).toBe(false)
   })
 
+  describe('запись с одной суммой по чеку — не «ничего нет» (адверсариальное Б1)', () => {
+    const sumOnly = () => ({
+      ...trip(),
+      receipt: parseMoney('5000', 'AMD'),
+      total: [parseMoney('5000', 'AMD')],
+    })
+
+    it('«Закончить» спрашивает как обычно, без «Записать тратой»', async () => {
+      currentTrip.mockResolvedValue(sumOnly())
+      const { view } = await render()
+      await docked(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      const finishing = document.body.querySelector('dialog[open]')?.textContent ?? ''
+      expect(finishing).toContain(ru.trip.finish_confirm.title)
+      expect(finishing).not.toContain(ru.trip.remove.empty.spending)
+    })
+
+    it('«Удалить запись» сначала спрашивает: деньги записи уходят из «Денег» и счетов (MOL-76)', async () => {
+      currentTrip.mockResolvedValue(sumOnly())
+      const { view, queue } = await render()
+      await button(view, ru.trip.remove.action).trigger('click')
+      await flushPromises()
+      expect(document.body.querySelector('dialog[open]')?.textContent).toContain(
+        ru.trip.remove.sheet.title,
+      )
+      expect(queue.pending.some((write) => write.kind === 'delete')).toBe(false)
+    })
+  })
+
   it('строка без цены, удаляемая без связи, — не «без цены» в итоге, как и у «Закончить» (адверсариальное А2)', async () => {
     currentTrip.mockResolvedValue(trip([...handoff(), { id: BREAD, name: 'Хлеб «Матнакаш»' }]))
     const { view, queue } = await render()
-    expect(view.get('.total').text()).toContain('без цены — 1')
+    expect(plain(view.get('.total').text())).toContain('без цены — 1')
     queue.enqueue({ kind: 'remove', tripId: TRIP, expenseId: BREAD })
     await flushPromises()
-    expect(view.get('.total').text()).not.toContain('без цены')
+    expect(plain(view.get('.total').text())).not.toContain('без цены')
     // «Закончить» по тому же счёту о сумме не спрашивает: цены у всех оставшихся.
     await docked(view, ru.trip.finish).trigger('click')
     await flushPromises()
@@ -1101,7 +1135,7 @@ describe('TripView', () => {
       expect(view.findAllComponents({ name: 'ScreenState' })).toHaveLength(0)
       // Запись остаётся на экране, и полоса пишет в очередь: покупки целы, ими продолжают пользоваться.
       expect(view.findAll('.row')).toHaveLength(2)
-      expect(docked(view, ru.trip.add_item).exists()).toBe(true)
+      expect(docked(view, ADD).exists()).toBe(true)
       expect(docked(view, ru.trip.finish).exists()).toBe(true)
     })
 
@@ -1130,7 +1164,7 @@ describe('TripView', () => {
       const retries = view.findAll('button').filter((node) => node.text() === ru.state.retry)
       expect(retries).toHaveLength(1)
       expect(retries[0]?.classes()).toContain('ghost')
-      expect(docked(view, ru.trip.add_item).classes()).toContain('primary')
+      expect(docked(view, ADD).classes()).toContain('primary')
       expect(docked(view, ru.trip.finish).exists()).toBe(true)
 
       currentTrip.mockResolvedValue(trip(handoff()))
@@ -1220,7 +1254,7 @@ describe('TripView', () => {
   it('«Добавить позицию» ведёт на поиск', async () => {
     currentTrip.mockResolvedValue(trip(handoff()))
     const { view, router } = await render()
-    await docked(view, ru.trip.add_item).trigger('click')
+    await docked(view, ADD).trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('item-search')
@@ -1230,7 +1264,7 @@ describe('TripView', () => {
     currentTrip.mockResolvedValue(trip(handoff()))
     const { view, router } = await render()
     const asked = vi.spyOn(useItemEntryStore(), 'askToScan')
-    await docked(view, ru.item.barcode.scan).trigger('click')
+    await docked(view, SCAN).trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('item-search')
@@ -1241,7 +1275,7 @@ describe('TripView', () => {
     currentTrip.mockResolvedValue(trip(handoff()))
     const { view } = await render()
     const asked = vi.spyOn(useItemEntryStore(), 'askToScan')
-    await docked(view, ru.trip.add_item).trigger('click')
+    await docked(view, ADD).trigger('click')
     await flushPromises()
 
     expect(asked).not.toHaveBeenCalled()

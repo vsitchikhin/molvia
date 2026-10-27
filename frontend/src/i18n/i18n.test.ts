@@ -173,8 +173,10 @@ describe('словарь: повторяющиеся тексты', () => {
       // Кнопка полосы и заголовок шторки, которую она открывает, — одни слова (MOL-127), как у
       // «Написать разработчику».
       'Сфотографировать чек': ['purchases.capture', 'receipt.capture.title'],
-      // Кнопка полосы записи и шторка сканера, которую она поднимает (MOL-206, В-1 «в»).
+      // Кнопка полосы записи и шторка сканера, которую она поднимает (MOL-206, В-1 «в»), — слово и
+      // глагол, скрытый перед ним для диктора (ревью 3, №3).
       Штрихкод: ['scanner.title', 'trip.scan_short'],
+      Сканировать: ['scanner.scan', 'trip.scan_lead'],
       // «+ Позиция» полосы и позиция без имени в очереди — одно слово о строке записи (MOL-206).
       Позиция: ['trip.add_short', 'trip.queued.unnamed'],
       // Строка записи без цены и покупка без цены на счёте — одна мета (MOL-206).
@@ -354,7 +356,8 @@ describe('словарь: повторяющиеся тексты', () => {
       // «Товар» of a receipt line and a purchase not named yet: one word in English.
       Item: ['receipt.line.product', 'trip.add_short', 'trip.queued.unnamed'],
       // MOL-206, as in Russian.
-      Scan: ['scanner.scan', 'trip.scan_short'],
+      Scan: ['scanner.scan', 'trip.scan_lead'],
+      Barcode: ['scanner.title', 'trip.scan_short'],
       'no price': ['accounts.trip_unpriced', 'trip.unpriced'],
       // «проверьте» on a receipt line and «сверить» of a check: one verb in English.
       check: ['accounts.reconcile.note', 'receipt.review.tag_check'],
