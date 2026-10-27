@@ -26,6 +26,7 @@ import {
   ratingReminders,
   receiptLines,
   storeMemory,
+  receiptMisses,
   receipts,
   searchPicks,
   sessions,
@@ -86,7 +87,9 @@ export const EXPORT_COLUMNS: Readonly<
     | 'receipt_lines'
     | 'receipt_links'
     | 'receipt_parts'
-    | 'receipt_line_images',
+    | 'receipt_line_images'
+    | 'receipt_misses'
+    | 'receipt_miss_parts',
     { readonly exported: readonly string[]; readonly omitted?: Readonly<Record<string, string>> }
   >
 > = {
@@ -412,6 +415,33 @@ export const EXPORT_COLUMNS: Readonly<
       width: 'a measure of the photo that is not in the file',
       height: 'a measure of the photo that is not in the file',
       created_at: 'when a photo that is not in the file arrived',
+    },
+  },
+  // A receipt read not whole kept for the review (MOL-309): what is kept, until when and why — never the photo or
+  // the reading (self-review №4). It goes with the person, a receipt «Переснять» replaced too (В-6 «а»).
+  receipt_misses: {
+    exported: [
+      'receipt',
+      'receipt_id',
+      'read_at',
+      'keep_until',
+      'retaken_at',
+      'reader_version',
+      'reasons',
+    ],
+    omitted: {
+      actor_id: OWNER,
+      reading:
+        'what the reader read, as it read it — the developer’s copy for the review; the lines in the file are what came of it',
+    },
+  },
+  receipt_miss_parts: {
+    exported: [],
+    omitted: {
+      receipt: 'the receipt it is a photo of, in `receiptReviews`',
+      position: 'a part of a photo that is not in the file',
+      photo:
+        'the photo, copied for the developer’s review (MOL-309): never copied out, as the receipt’s own',
     },
   },
   receipt_line_images: {
@@ -774,6 +804,19 @@ export function createExportRepository(db: Db): ExportRepository {
             .from(itemBarcodes)
             .where(eq(itemBarcodes.addedBy, actorId))
             .orderBy(asc(itemBarcodes.addedAt), asc(itemBarcodes.code))
+          const reviewRows = await tx
+            .select({
+              receipt: receiptMisses.receipt,
+              receiptId: receiptMisses.receiptId,
+              readAt: receiptMisses.readAt,
+              keepUntil: receiptMisses.keepUntil,
+              retakenAt: receiptMisses.retakenAt,
+              readerVersion: receiptMisses.readerVersion,
+              reasons: receiptMisses.reasons,
+            })
+            .from(receiptMisses)
+            .where(eq(receiptMisses.actorId, actorId))
+            .orderBy(asc(receiptMisses.readAt), asc(receiptMisses.receipt))
           const memoryRows = await tx
             .select({
               tin: storeMemory.tin,
@@ -1236,6 +1279,14 @@ export function createExportRepository(db: Db): ExportRepository {
               createdAt: row.createdAt,
             })),
             addedBarcodes: addedCodeRows,
+            receiptReviews: reviewRows.map((row) => ({
+              ...row,
+              reasons: {
+                receipt: row.reasons.receipt,
+                lines: [...row.reasons.lines],
+                ...(row.reasons.partly === undefined ? {} : { partly: row.reasons.partly }),
+              },
+            })),
             storeMemory: memoryRows.map((row) => ({
               tin: row.tin,
               kind: row.kind,

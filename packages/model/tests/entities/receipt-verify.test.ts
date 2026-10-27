@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { verifiedReading } from '#model/entities/receipt-verify'
+import { explainedReading, verifiedReading } from '#model/entities/receipt-verify'
 import type { ReceiptText, ReceiptTextLine } from '#model/entities/receipt-text'
 
 const line = (over: Partial<ReceiptTextLine> = {}): ReceiptTextLine => ({
@@ -328,5 +328,88 @@ describe('what the shop’s memory said of a line (MOL-291)', () => {
   it('empties a line the memory doubts, even on a receipt proven whole', () => {
     const got = verifiedReading(reading([line({ remembered: 'doubted' })], 74_000))
     expect([figures(got.lines[0]!), got.balanced]).toEqual([BLANK, false])
+  })
+})
+
+describe('why a line was not shown as read, and the receipt not whole (MOL-309)', () => {
+  const why = (over: Partial<ReceiptTextLine>, total: number | null = null) =>
+    explainedReading(reading([line(over)], total)).lines[0]
+
+  it('names nothing of a line shown as read, nor of a receipt proven whole', () => {
+    const got = explainedReading(reading([line()], 74_000))
+    expect([got.lines, got.receipt]).toEqual([[null], null])
+  })
+
+  it('names each branch of the check by its kind', () => {
+    expect(why({ remembered: 'doubted' }, 74_000)).toBe('doubted')
+    expect(why({ sumHundredths: null })).toBe('missing_figure')
+    expect(why({ quantityMilli: null })).toBe('missing_figure')
+    expect(why({ asPrinted: false, repaired: true })).toBe('repaired_unproven')
+    expect(why({ asPrinted: false, settled: false })).toBe('unsettled')
+    expect(why({ asPrinted: false, settled: true })).toBe('bent')
+    expect(why({ sumHundredths: 0, priceHundredths: 50_000, discountHundredths: 0 })).toBe(
+      'zero_not_gift',
+    )
+    expect(why({ quantityMilli: 1_000, priceHundredths: 66_000, sumHundredths: 66_000 })).toBe(
+      'one_alike_unproven',
+    )
+    expect(why({ priceHundredths: 36_000 })).toBe('price_dropped')
+  })
+
+  it('says nothing of a gift of one piece on a receipt proven whole: kept with no price by design', () => {
+    const gift = line({
+      quantityMilli: 1_000,
+      priceHundredths: 50_000,
+      sumHundredths: 0,
+      discountHundredths: 50_000,
+    })
+    expect(explainedReading(reading([line(), gift], 74_000)).lines).toEqual([null, null])
+  })
+
+  it('names one reason a receipt, the first that holds', () => {
+    const receipt = (lines: ReceiptTextLine[], total: number | null) =>
+      explainedReading(reading(lines, total)).receipt
+    expect(receipt([], 74_000)).toBe('no_lines')
+    expect(receipt([line()], null)).toBe('no_total')
+    expect(receipt([line()], 90_000)).toBe('lines_lost')
+    expect(receipt([line({ remembered: 'doubted' })], 74_000)).toBe('line_doubted')
+    expect(receipt([line({ asPrinted: false })], 74_000)).toBe('line_not_as_printed')
+    expect(receipt([line()], 70_000)).toBe('lines_over')
+  })
+
+  // adversarial А1, А2: a line found whole with its sum not read, or read low by the font's 5↔6, makes the lines
+  // short too — the line's miss, never a line lost
+  it('names a line lost only where every line is as printed', () => {
+    const receipt = (lines: ReceiptTextLine[], total: number) =>
+      explainedReading(reading(lines, total)).receipt
+    const cheese = { quantityMilli: 500, priceHundredths: 130_000, discountHundredths: 0 }
+    expect(receipt([line(), line({ sumHundredths: null, asPrinted: false })], 148_000)).toBe(
+      'line_not_as_printed',
+    )
+    // 650 read as 560 and 560 read as 650: one swap, one reason, whichever way the digit went
+    const low = line({ ...cheese, sumHundredths: 56_000, asPrinted: false, settled: false })
+    const high = line({
+      ...cheese,
+      priceHundredths: 112_000,
+      sumHundredths: 65_000,
+      asPrinted: false,
+      settled: false,
+    })
+    expect(receipt([line(), low], 139_000)).toBe('line_not_as_printed')
+    expect(receipt([line(), high], 130_000)).toBe('line_not_as_printed')
+    // the bread lost at a seam, the rest as printed
+    expect(receipt([line()], 103_000)).toBe('lines_lost')
+  })
+
+  it('shows exactly what verifiedReading shows', () => {
+    const lines = [
+      line(),
+      line({ asPrinted: false, settled: false }),
+      line({ quantityMilli: 1_000, priceHundredths: 66_000, sumHundredths: 66_000 }),
+    ]
+    for (const total of [null, 74_000, 206_000]) {
+      const text = reading(lines, total)
+      expect(explainedReading(text).shown).toEqual(verifiedReading(text))
+    }
   })
 })

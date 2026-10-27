@@ -757,3 +757,59 @@ describe('ownerText — траты на чтение чеков моделью (
     )
   })
 })
+
+describe('ownerText — чек, прочитанный моделью не целиком (MOL-309)', () => {
+  const notice: OwnerNotice = {
+    kind: 'receipt_partial',
+    receipt: '122b8e5f',
+    country: 'AM',
+    lines: 21,
+    shown: 16,
+    reason: 'lines_lost',
+    lineReasons: { one_alike_unproven: 1, doubted: 2, unsettled: 2 },
+    keptUntil: '2026-11-17',
+  }
+
+  it('называет чек началом id, причины по видам — частые первыми, и как открыть разбор', () => {
+    expect(ownerText(notice).split('\n')).toEqual([
+      '🧾 Чек не целиком · 122b8e5f · модель · AM',
+      'Строк 21: с цифрами 16, без цифр 5',
+      'Чек: строки дают меньше итога',
+      'Строки: сомнение памяти — 2, не сходится арифметика — 2, «1 × цена» на нецелом чеке — 1',
+      'Фото и ответ модели — до 2026-11-17: make receipt-miss ID=122b8e5f',
+    ])
+  })
+
+  it('без причин строк и без разбора — без этих строк', () => {
+    const text = ownerText({ ...notice, lineReasons: {}, keptUntil: undefined, reason: 'failed' })
+    expect(text).toBe(
+      '🧾 Чек не целиком · 122b8e5f · модель · AM\nСтрок 21: с цифрами 16, без цифр 5\nЧек: не прочитано ни одной строки',
+    )
+  })
+
+  it('не хранится (редакция 4 не принята) — без id чека и без команды разбора', () => {
+    const unkept = { ...notice, receipt: undefined, keptUntil: undefined }
+    expect(ownerText(unkept).split('\n')[0]).toBe(
+      '🧾 Чек не целиком · модель · AM · не хранится: редакция 4 не принята',
+    )
+    expect(ownerText(unkept)).not.toContain('make receipt-miss')
+  })
+
+  it('чек доказан целым, а строка опустошена — без строки «Чек:» (адверсариальное А3)', () => {
+    expect(
+      ownerText({ ...notice, reason: undefined, lineReasons: { zero_not_gift: 1 } }),
+    ).not.toContain('Чек:')
+  })
+
+  it('«Прочитали не всё» — своей строкой рядом с причиной чека (адверсариальное Б1)', () => {
+    expect(ownerText({ ...notice, reason: 'line_not_as_printed', partly: true })).toContain(
+      'Прочитали не всё: строки дают меньше итога',
+    )
+  })
+
+  it('отложенные сверх предела — одним счётом', () => {
+    expect(ownerText({ kind: 'receipt_partial_muted', count: 4 })).toBe(
+      '🔕 Скрыто сигналов о чеках не целиком: 4 — make receipt-reasons',
+    )
+  })
+})

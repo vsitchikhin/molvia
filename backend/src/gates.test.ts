@@ -80,6 +80,7 @@ const REPORT: GatesReport = {
     linesItem: 38,
     linesFigures: 19,
     totalsCorrected: 4,
+    added: 0,
     within5m: 9,
     within15m: 7,
     within1h: 4,
@@ -101,6 +102,7 @@ const REPORT: GatesReport = {
     linesItem: 5,
     linesFigures: 2,
     totalsCorrected: 1,
+    added: 0,
     within5m: 8,
     within15m: 3,
     within1h: 1,
@@ -131,6 +133,7 @@ const REPORT: GatesReport = {
     linesItem: 2,
     linesFigures: 0,
     totalsCorrected: 0,
+    added: 0,
     codesWritten: 1,
     within5m: 2,
     within15m: 2,
@@ -200,6 +203,19 @@ describe('gates — чтение ворот вручную', () => {
     const edited = lines.find((line) => line.includes('lines put right'))
     expect(edited).toContain('1000 of 3000')
     expect(edited).toContain('33.4 %')
+  })
+
+  it('чеки: дописанные строки — в доле правок, в числителе и знаменателе, и своей строкой (MOL-273, В-1 «а»)', async () => {
+    const { exit, lines } = run(['--from', '2026-10-05'], {
+      ...REPORT,
+      modelReceipts: { ...REPORT.modelReceipts, lines: 21, linesEdited: 2, added: 5 },
+    })
+    await exit
+    const model = lines.slice(
+      lines.findIndex((line) => line.startsWith('0.2r · read by the model')),
+    )
+    expect(model.find((line) => line.includes('lines put right'))).toContain('7 of 26')
+    expect(model.find((line) => line.includes('added on the review'))).toContain('5')
   })
 
   it('чеки модели — своим блоком со своей чертой, между Tesseract и налоговой (MOL-272, В-6)', async () => {
@@ -393,6 +409,7 @@ describe('gates — чтение ворот вручную', () => {
       '       left out                          12',
       '       another item                      38',
       '       quantity or sum                   19',
+      '       added on the review               0          lines the reader lost',
       '     total put right                     4          receipts',
       '     sent to recorded, within 5 min      9          receipts',
       '       15 min                            7',
@@ -412,6 +429,7 @@ describe('gates — чтение ворот вручную', () => {
       '       left out                          3',
       '       another item                      5',
       '       quantity or sum                   2',
+      '       added on the review               0          lines the reader lost',
       '     total put right                     1          receipts',
       '     sent to recorded, within 5 min      8          receipts',
       '       15 min                            3',
@@ -440,6 +458,7 @@ describe('gates — чтение ворот вручную', () => {
       '       left out                          1',
       '       another item                      2          the matcher missed',
       '       quantity or sum                   0',
+      '       added on the review               0          lines the journal lacked',
       '     total put right                     0          receipts',
       '     codes bound to items                1',
       '     sent to recorded, within 5 min      2          receipts',

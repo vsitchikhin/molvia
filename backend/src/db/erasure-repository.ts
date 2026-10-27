@@ -25,6 +25,7 @@ export const ACTOR_REFERENCES = [
   'money_accounts.actor_id',
   'money_month_rates.actor_id',
   'rating_reminders.actor_id',
+  'receipt_misses.actor_id',
   'receipts.actor_id',
   'search_picks.actor_id',
   'sessions.actor_id',

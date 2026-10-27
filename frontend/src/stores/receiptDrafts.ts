@@ -116,6 +116,56 @@ export interface PaymentDraft {
 
 const paymentCodec = z.strictObject({ accountId: z.uuid().nullable(), debited: z.string() })
 
+/**
+ * The lines the reader lost and the person typed on the review (MOL-273), in the order typed. **Beside the
+ * drafts, never inside**, as `SHOWN_KEY`: a draft is read strictly by the build before, which would drop the
+ * whole receipt's edits for them.
+ */
+const ADDED_KEY = 'molvia.receipt-added'
+
+/** A line typed on the review: the phone's own key, the item, and the figures once typed. */
+export interface AddedLineDraft {
+  readonly key: string
+  readonly item: { readonly id: string; readonly name: string } | { readonly name: string }
+  readonly figures: LineFigures
+}
+
+const addedCodec = z.strictObject({
+  key: z.uuid(),
+  item: z.union([
+    z.strictObject({ id: z.uuid(), name: z.string() }),
+    z.strictObject({ name: z.string() }),
+  ]),
+  figures: z.strictObject({
+    quantity: quantityCodec.nullable(),
+    amount: moneyCodec.nullable(),
+  }),
+})
+
+/** One broken line is dropped alone, as a draft is: the others are somebody's typing. */
+function recallAdded(owner: string | null): Record<string, readonly AddedLineDraft[]> {
+  if (!owner) return {}
+  const raw = read(`${ADDED_KEY}.${owner}`)
+  if (!raw) return {}
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return {}
+  }
+  if (!isRecord(parsed)) return {}
+  return Object.fromEntries(
+    Object.entries(parsed).flatMap(([id, value]) => {
+      if (!Array.isArray(value)) return []
+      const lines = value.flatMap((one: unknown) => {
+        const line = addedCodec.safeParse(one)
+        return line.success ? [line.data] : []
+      })
+      return lines.length === 0 ? [] : [[id, lines]]
+    }),
+  )
+}
+
 /** One broken entry is dropped alone, as a draft is: the others are somebody's choices (adversarial А6). */
 function recallPayments(owner: string | null): Record<string, PaymentDraft> {
   if (!owner) return {}
@@ -185,6 +235,7 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
   const drafts = ref<Record<string, ReceiptDraft>>(recall(actor.id))
   const shown = ref<Shown>(recallShown(actor.id))
   const payments = ref<Record<string, PaymentDraft>>(recallPayments(actor.id))
+  const added = ref<Record<string, readonly AddedLineDraft[]>>(recallAdded(actor.id))
 
   watch(
     () => actor.id,
@@ -192,6 +243,7 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
       drafts.value = recall(id)
       shown.value = recallShown(id)
       payments.value = recallPayments(id)
+      added.value = recallAdded(id)
     },
   )
   window.addEventListener('storage', (event) => {
@@ -199,7 +251,32 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
     if (actor.id && event.key === `${SHOWN_KEY}.${actor.id}`) shown.value = recallShown(actor.id)
     if (actor.id && event.key === `${PAYMENT_KEY}.${actor.id}`)
       payments.value = recallPayments(actor.id)
+    if (actor.id && event.key === `${ADDED_KEY}.${actor.id}`) added.value = recallAdded(actor.id)
   })
+
+  function keepAdded(
+    edit: (
+      all: Record<string, readonly AddedLineDraft[]>,
+    ) => Record<string, readonly AddedLineDraft[]>,
+  ): void {
+    const owner = actor.id
+    if (!owner) return
+    // read again first: another window may have typed a line of the same receipt
+    added.value = Object.fromEntries(
+      Object.entries(edit(recallAdded(owner))).filter(([, lines]) => lines.length > 0),
+    )
+    write(
+      `${ADDED_KEY}.${owner}`,
+      JSON.stringify(
+        Object.fromEntries(
+          Object.entries(added.value).map(([id, lines]) => [
+            id,
+            lines.map((line) => addedCodec.encode(line)),
+          ]),
+        ),
+      ),
+    )
+  }
 
   function keepPayments(
     edit: (all: Record<string, PaymentDraft>) => Record<string, PaymentDraft>,
@@ -281,8 +358,32 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
     setPayment(receiptId: string, payment: PaymentDraft): void {
       keepPayments((all) => ({ ...all, [receiptId]: payment }))
     },
+    /** The lines typed on the review (MOL-273), in the order typed. */
+    addedOf: (receiptId: string): readonly AddedLineDraft[] => added.value[receiptId] ?? [],
+    /** A line typed, or one typed before put right — by its key. */
+    setAdded(receiptId: string, line: AddedLineDraft): void {
+      keepAdded((all) => {
+        const lines = all[receiptId] ?? []
+        const at = lines.findIndex((one) => one.key === line.key)
+        return {
+          ...all,
+          [receiptId]: at < 0 ? [...lines, line] : lines.map((one, i) => (i === at ? line : one)),
+        }
+      })
+    },
+    removeAdded(receiptId: string, key: string): void {
+      keepAdded((all) => ({
+        ...all,
+        [receiptId]: (all[receiptId] ?? []).filter((one) => one.key !== key),
+      }))
+    },
     forget(receiptId: string): void {
       keepShown((all) => Object.fromEntries(Object.entries(all).filter(([id]) => id !== receiptId)))
+      if (receiptId in recallAdded(actor.id)) {
+        keepAdded((all) =>
+          Object.fromEntries(Object.entries(all).filter(([id]) => id !== receiptId)),
+        )
+      }
       if (receiptId in recallPayments(actor.id)) {
         keepPayments((all) =>
           Object.fromEntries(Object.entries(all).filter(([id]) => id !== receiptId)),
@@ -297,6 +398,11 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
     },
     /** Lets go of the drafts of every receipt not named — recorded, removed, gone (Т-4). */
     keepOnly(receiptIds: ReadonlySet<string>): void {
+      if (Object.keys(recallAdded(actor.id)).some((id) => !receiptIds.has(id))) {
+        keepAdded((all) =>
+          Object.fromEntries(Object.entries(all).filter(([id]) => receiptIds.has(id))),
+        )
+      }
       if (Object.keys(recallPayments(actor.id)).some((id) => !receiptIds.has(id))) {
         keepPayments((all) =>
           Object.fromEntries(Object.entries(all).filter(([id]) => receiptIds.has(id))),

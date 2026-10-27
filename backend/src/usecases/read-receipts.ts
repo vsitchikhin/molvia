@@ -22,12 +22,15 @@ import {
   receiptLineOf,
   receiptLineCodec,
   spendMonthOf,
-  verifiedReading,
+  dayIn,
+  explainedReading,
   worstCallMicroUsd,
 } from '@molvia/model'
 import type {
   Currency,
+  OwnerNotice,
   PhotoReading,
+  ReceiptLineReason,
   ReceiptLine,
   ReceiptPaidBy,
   ReceiptText,
@@ -37,6 +40,7 @@ import type {
 } from '@molvia/model'
 import { z } from 'zod'
 import type { ModelSpendRepository } from '@/db/model-spend-repository'
+import type { OwnerNoticeRepository } from '@/db/owner-notices-repository'
 import { memoryKey } from '@/db/store-memory-repository'
 import type { StoreMemoryRepository } from '@/db/store-memory-repository'
 import type {
@@ -44,6 +48,7 @@ import type {
   LineBinding,
   LineImage,
   ReadOutcome,
+  ReadReasons,
   ReceiptHead,
   ReceiptRepository,
 } from '@/db/receipts-repository'
@@ -53,6 +58,7 @@ import { PhotoUnreadable, ReaderDropped, ReaderUnavailable } from '@/receipts/re
 import { TILL_KINDS_LATIN } from '@/receipts/till-kinds-latin'
 import { TILL_WORDS_RU } from '@/receipts/till-words-ru'
 import type { Box, ReceiptReader } from '@/receipts/reader'
+import type { PhoneNoticeBudget } from './record-failure'
 
 // The kinds of goods a till names: an item named after a city names its kind beside it (MOL-126).
 const TILL_WORDS: ReadonlySet<string> = new Set([
@@ -98,6 +104,14 @@ export interface ReadReceiptsDeps {
   readonly model?: ReceiptModelDeps | null
   /** The shops' memory, whose shelf prices vote in a line's digits (MOL-291); without it none do. */
   readonly storeMemory?: Pick<StoreMemoryRepository, 'recall'> | null
+  /**
+   * The developer's channel for a receipt the model read not whole (MOL-309), with its budget: three an hour
+   * a person and twenty in all (Р-6). None where nobody is there to tell (`OWNER_TELEGRAM_ID`).
+   */
+  readonly told?: {
+    readonly notices: Pick<OwnerNoticeRepository, 'queue'>
+    readonly budget: PhoneNoticeBudget
+  } | null
   readonly now?: () => Date
 }
 
@@ -278,7 +292,11 @@ async function readByModel(
   const prices = await rememberedPrices(deps, claimed, first, currency)
   const text = prices.size === 0 ? first : receiptTextOfModel(photoReading, reading.answer, prices)
   const unparsed = unparsedFigures(photoReading, reading.answer)
-  const shown = verifiedReading(text, { byModel: true })
+  const explained = explainedReading(text, { byModel: true })
+  const { shown } = explained
+  // the photo and the answer, for the developer's review where the person has something to type and accepted
+  // the edition that says so (MOL-309)
+  const miss = claimed.reviewable ? { reading: reading.answer, parts: claimed.parts } : undefined
   const head = headOf(
     shown,
     currency,
@@ -291,6 +309,8 @@ async function readByModel(
       failure: 'reshoot',
       readerVersion: model.version,
       head,
+      ...(miss === undefined ? {} : { miss }),
+      tell: true,
     }
     return { outcome, paid, unparsed }
   }
@@ -302,7 +322,25 @@ async function readByModel(
     version: model.version,
     images: [],
   })
-  return { outcome, paid, unparsed }
+  if (outcome.kind !== 'parsed') {
+    return {
+      outcome: { ...outcome, ...(miss === undefined ? {} : { miss }), tell: true },
+      paid,
+      unparsed,
+    }
+  }
+  const reasons: ReadReasons = { receipt: explained.receipt, lines: explained.lines }
+  return {
+    outcome: {
+      ...outcome,
+      reasons,
+      ...(toType(outcome.partly, reasons)
+        ? { ...(miss === undefined ? {} : { miss }), tell: true as const }
+        : {}),
+    },
+    paid,
+    unparsed,
+  }
 }
 
 /**
@@ -338,7 +376,8 @@ async function readByOcr(
   const prices = await rememberedPrices(deps, claimed, chosen, currency)
   const text = rememberedReading(chosen, prices, photoReading)
   // a figure goes to the review as read only where it is verified, the rest is left empty (MOL-255)
-  const shown = verifiedReading(text)
+  const explained = explainedReading(text)
+  const { shown } = explained
   const head = headOf(shown, currency, readings, receiptPaidBy(photoReading, readings))
   if (needsReshoot(text))
     return { kind: 'failed', failure: 'reshoot', readerVersion: version, head }
@@ -356,7 +395,81 @@ async function readByOcr(
     }
     report({ kind: 'strips_failed', reason: error.reason })
   }
-  return parsed(deps, claimed, { text, shown, head, version: version ?? '', images })
+  const outcome = await parsed(deps, claimed, { text, shown, head, version: version ?? '', images })
+  // Tesseract's: counted, never kept nor told (owner, 27.10.2026, MOL-309 В-4)
+  return outcome.kind === 'parsed'
+    ? { ...outcome, reasons: { receipt: explained.receipt, lines: explained.lines } }
+    : outcome
+}
+
+/**
+ * Whether the person has something to type on the review (MOL-309, В-4 «б»): a line emptied — one that kept its
+ * sum and lost its price is no field to fill — or lines lost against the total.
+ */
+function toType(partly: boolean, reasons: ReadReasons): boolean {
+  const fills = (reason: ReceiptLineReason | null) => reason !== null && reason !== 'price_dropped'
+  return partly || reasons.lines.some(fills)
+}
+
+/**
+ * Tells the developer of a receipt the model read not whole (MOL-309), once it is written, within the hour's
+ * budget — the person's three and everybody's twenty (Р-6) — and of those held back, at most once an hour. A
+ * notice that cannot be queued is the owner's to hear as a failure; the reading stands.
+ */
+async function tell(
+  deps: ReadReceiptsDeps,
+  claimed: ClaimedReceipt,
+  outcome: ReadOutcome,
+  keptUntil: Date | null,
+  at: Date,
+): Promise<void> {
+  const { told } = deps
+  if (!told || outcome.tell !== true) return
+  const reasons =
+    outcome.kind === 'parsed' ? outcome.reasons : { receipt: 'failed' as const, lines: [] }
+  if (reasons === undefined) return
+  const lineReasons: Partial<Record<ReceiptLineReason, number>> = {}
+  for (const reason of reasons.lines) {
+    if (reason !== null) lineReasons[reason] = (lineReasons[reason] ?? 0) + 1
+  }
+  const lines = outcome.kind === 'parsed' ? outcome.lines : []
+  const notice: OwnerNotice = {
+    kind: 'receipt_partial',
+    country: claimed.country,
+    lines: lines.length,
+    shown: lines.filter((line) => line.sum !== null).length,
+    // proven whole, a line emptied all the same: no reason of the receipt to give (adversarial А3)
+    ...(reasons.receipt === null ? {} : { reason: reasons.receipt }),
+    lineReasons,
+    // «Прочитали не всё»: lines lost may stand behind a line not as printed (adversarial Б1)
+    ...(outcome.kind === 'parsed' && outcome.partly ? { partly: true } : {}),
+    // where it is kept — its owner accepted the edition that says so — named by its id; one not kept by none, since
+    // nothing here would open it (self-review №3); the day of `keep_until` as written, in Yerevan (№13)
+    ...(keptUntil === null ? {} : { receipt: claimed.id.slice(0, 8), keptUntil: dayIn(keptUntil) }),
+  }
+  const given = told.budget.ask([notice], at, claimed.actorId)
+  try {
+    for (const one of given.told) await told.notices.queue(one, at)
+  } catch (error) {
+    told.budget.refund(given.told.length, at, claimed.actorId)
+    deps.report({ kind: 'error', error })
+    return
+  }
+  told.budget.hold(given.held)
+}
+
+/** The receipts held back past the hour's budget, at most once an hour (MOL-309, Р-6). */
+async function tellHeld(deps: ReadReceiptsDeps, at: Date): Promise<void> {
+  const { told } = deps
+  if (!told) return
+  told.budget.forget(at)
+  const held = told.budget.held(at)
+  if (held === null) return
+  try {
+    await told.notices.queue(held, at)
+  } catch (error) {
+    deps.report({ kind: 'error', error })
+  }
 }
 
 /**
@@ -514,6 +627,8 @@ async function cutLines(
  * Returns how many were read.
  */
 export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number> {
+  const now = deps.now ?? (() => new Date())
+  await tellHeld(deps, now())
   let read = 0
   for (;;) {
     const claimed = await deps.receipts.claimNext()
@@ -548,15 +663,18 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
       if (!(error instanceof PhotoUnreadable)) deps.report({ kind: 'error', error })
       outcome = { kind: 'failed', failure: 'unreadable', readerVersion: null, head: null }
     }
+    let written: { readonly keptUntil: Date | null } | null
     try {
-      await deps.receipts.finish(claimed.id, outcome)
+      written = await deps.receipts.finish(claimed.id, outcome)
     } catch (error) {
       // a reading the schema let through and the table refused: failed now, not read a second time
       deps.report({ kind: 'error', error })
       outcome = { kind: 'failed', failure: 'unreadable', readerVersion: null, head: null }
-      await deps.receipts.finish(claimed.id, outcome)
+      written = await deps.receipts.finish(claimed.id, outcome)
     }
     read += 1
+    // a reading not written — the receipt gone or taken meanwhile — is nothing to tell of (self-review №7)
+    if (written !== null) await tell(deps, claimed, outcome, written.keptUntil, now())
     deps.report({
       kind: 'read',
       status: outcome.kind,

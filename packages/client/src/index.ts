@@ -9,6 +9,7 @@ import {
   RECEIPT_READ_PARTLY_HEADER,
   RECEIPT_READ_TOTAL_HEADER,
   RECEIPT_REPAIRED_HEADER,
+  RECEIPT_RETAKE_HEADER,
   RECEIPT_SPELLED_HEADER,
   RECEIPT_PACK_HEADER,
   RECEIPT_PAID_BY_HEADER,
@@ -477,7 +478,8 @@ export interface MolviaClient {
    * and how it was paid (`RECEIPT_PAID_BY_HEADER`, MOL-312).
    */
   receipt(id: string, options?: { readonly shown?: boolean }): Promise<ReceiptDetail>
-  removeReceipt(id: string): Promise<void>
+  /** `retake` — «Переснять» replaced it (`RECEIPT_RETAKE_HEADER`, MOL-309): its review stays. */
+  removeReceipt(id: string, options?: { readonly retake?: boolean }): Promise<void>
   /** «Вернуть» within ten minutes of «Удалить чек». */
   restoreReceipt(id: string): Promise<ReceiptSummary>
   /**
@@ -1034,8 +1036,13 @@ export function createClient(options: ClientOptions): MolviaClient {
       }),
     receiptSettled: (id) => request(`/receipts/${segment(id)}/settled`, receiptSettledCodec),
 
-    removeReceipt: async (id) => {
-      noContent(await exchange(`/receipts/${segment(id)}`, z.undefined(), { method: 'DELETE' }))
+    removeReceipt: async (id, options) => {
+      noContent(
+        await exchange(`/receipts/${segment(id)}`, z.undefined(), {
+          method: 'DELETE',
+          ...(options?.retake ? { headers: new Headers({ [RECEIPT_RETAKE_HEADER]: '1' }) } : {}),
+        }),
+      )
     },
 
     restoreReceipt: async (id) =>

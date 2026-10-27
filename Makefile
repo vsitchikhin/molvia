@@ -17,7 +17,7 @@ NEED_SCAFFOLD = @test -f package.json || { echo "no scaffold yet (package.json i
 # The heavy checks of every copy on this machine take turns, the push's among them (MOL-139).
 ONE_AT_A_TIME = ./bin/one-at-a-time.sh "make $@"
 
-.PHONY: help setup hooks up down reup ps logs psql migrate forget notify seed repack rename-items gates failures merge unmerge apart merge-night merge-candidates db-reset dev format lint typecheck test e2e check prod-build watcher certs icons ports
+.PHONY: help setup hooks up down reup ps logs psql migrate forget notify seed repack rename-items gates receipt-reasons receipt-miss receipt-miss-forget failures merge unmerge apart merge-night merge-candidates db-reset dev format lint typecheck test e2e check prod-build watcher certs icons ports
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -119,6 +119,20 @@ rename-items: ## Items from receipts named as a line names them now: make rename
 gates: ## Read gates 0.2 and 0.3: make gates FROM=<day|moment> [TO=<day|moment>]
 	$(NEED_SCAFFOLD)
 	$(if $(filter command line,$(origin FROM)),,unset FROM;) $(if $(filter command line,$(origin TO)),,unset TO;) ./bin/gates.sh "$${FROM:-}" "$${TO:-}"
+
+# Receipts read not whole (MOL-309) — the input of the fortnightly review (MOL-310). The values reach the
+# script through the environment and count only when typed on this command line, as for `gates`.
+receipt-reasons: ## Why receipts were not read whole, by reader and country: make receipt-reasons FROM=<day> [TO=<day>]
+	$(NEED_SCAFFOLD)
+	$(if $(filter command line,$(origin FROM)),,unset FROM;) $(if $(filter command line,$(origin TO)),,unset TO;) ./bin/receipt-misses.sh reasons "$${FROM:-}" "$${TO:-}"
+
+receipt-miss: ## One receipt kept for the review, its photo written out: make receipt-miss ID=<id start> [OUT=<dir>]
+	$(NEED_SCAFFOLD)
+	$(if $(filter command line,$(origin ID)),,unset ID;) $(if $(filter command line,$(origin OUT)),,unset OUT;) ./bin/receipt-misses.sh show "$${ID:-}" "$${OUT:-}"
+
+receipt-miss-forget: ## Let go what the review took: make receipt-miss-forget ID=<id start>|BEFORE=<day> [YES=1]
+	$(NEED_SCAFFOLD)
+	$(if $(filter command line,$(origin ID)),,unset ID;) $(if $(filter command line,$(origin BEFORE)),,unset BEFORE;) ./bin/receipt-misses.sh forget "$${ID:-}" "$${BEFORE:-}" $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),yes)
 
 failures: ## The latest failures of the API and the bot: make failures [LIMIT=20] (MOL-143)
 	$(NEED_SCAFFOLD)

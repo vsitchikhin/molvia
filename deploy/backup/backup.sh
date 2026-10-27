@@ -40,11 +40,13 @@ partial="$RCLONE_REMOTE/partial/$name"
 # of messages to the developer stay out for the same reason (MOL-167): kept only until the owner's
 # Telegram has them, at most a week. The link of a Serbian receipt still being asked of the tax office
 # stays out too (MOL-232, adversarial А4): it may carry the buyer's tax id, and /privacy keeps it only
-# until the tax office answered — up to two days, never the copy's fourteen.
+# until the tax office answered — up to two days, never the copy's fourteen. So does a receipt read not
+# whole kept for the developer's review (MOL-309): its photo and what its reader read, until the review.
 docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T postgres \
   sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom \
     --exclude-table-data=receipt_parts --exclude-table-data=receipt_line_images \
-    --exclude-table-data=feedback_picture_files --exclude-table-data=receipt_links' \
+    --exclude-table-data=feedback_picture_files --exclude-table-data=receipt_links \
+    --exclude-table-data=receipt_misses --exclude-table-data=receipt_miss_parts' \
   | age --encrypt --recipient "$AGE_RECIPIENT" \
   | rclone rcat --streaming-upload-cutoff 1G "$partial"
 

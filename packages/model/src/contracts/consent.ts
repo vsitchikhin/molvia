@@ -13,7 +13,7 @@ import { z } from 'zod'
  * not exist yet. Which edition to ask about is the phone's (Р-3): the person accepts the text they
  * are shown, and that is the text of their build.
  */
-export const POLICY_VERSION = 3
+export const POLICY_VERSION = 4
 
 /**
  * The first edition whose text asks consent to the statistics (MOL-236): Armenia's law knows no
@@ -29,6 +29,13 @@ export const STATISTICS_CONSENT_EDITION = 2
  * Who accepted an older edition is read by Tesseract, whatever was granted to them.
  */
 export const MODEL_CONSENT_EDITION = 3
+
+/**
+ * The first edition that says a receipt read not whole keeps its photo and what was read for the developer's
+ * review, past «Записать» (MOL-309, owner's В-3 «б»): a new purpose. Who accepted an older edition keeps the
+ * promise they read — the photo goes at «Записать» — and their receipt is counted, never kept.
+ */
+export const REVIEW_CONSENT_EDITION = 4
 
 /**
  * `GET` and the answer of `PUT /actors/me/consent` (MOL-95): the edition this person accepted, or

@@ -9,7 +9,7 @@ import { feedbackPictureFiles, feedbackPictures, ownerNotices } from './schema'
  * A notice about a failure not handed within a day goes: `make failures` still has its count (Р-7).
  * So does a morning's report of the merge (MOL-106): the next morning brings its own, and the journal
  * keeps every merge. And what reading receipts by a model has cost (MOL-272): `model_spend` keeps the
- * month's sum.
+ * month's sum. And a receipt the model read not whole (MOL-309): `make receipt-reasons` keeps the count.
  */
 const FAILURE_NOTICE_KINDS = [
   'failure',
@@ -17,6 +17,8 @@ const FAILURE_NOTICE_KINDS = [
   'failure_muted',
   'catalogue_merged',
   'model_spend',
+  'receipt_partial',
+  'receipt_partial_muted',
 ] as const satisfies readonly OwnerNoticeKind[]
 const UNHANDED_FAILURE_NOTICE_MS = 24 * 60 * 60 * 1000
 

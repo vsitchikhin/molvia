@@ -10,7 +10,9 @@
       <span class="name">{{ line.name }}</span>
       <!-- The line as the till printed it, in the system's face and the receipt's language: one
            line, its height fixed, so an Armenian or Georgian word does not move the row. -->
-      <span class="printed" :lang="lang">{{ line.line.printed }}</span>
+      <span v-if="line.added === undefined" class="printed" :lang="lang">{{
+        line.line.printed
+      }}</span>
       <!-- a new item's name is the proposal itself: «в чеке — …» would only repeat it (MOL-293) -->
       <span v-if="line.check && !line.isNew && line.line.translation" class="figures">{{
         t('receipt.review.check_note', { text: line.line.translation })
@@ -100,9 +102,18 @@ export default defineComponent({
       props.line.amount ? formatMoney(props.line.amount, locale.value) : null,
     )
     const unread = computed(
-      () => !props.line.skip && props.line.quantity === null && props.line.amount === null,
+      () =>
+        // a line typed with no figures was read by nobody: nothing to look up on the paper (MOL-273)
+        props.line.added === undefined &&
+        !props.line.skip &&
+        props.line.quantity === null &&
+        props.line.amount === null,
     )
     const tags = computed(() => [
+      // typed by the person, not read (MOL-273)
+      ...(props.line.added !== undefined
+        ? [{ key: 'added', text: t('receipt.review.tag_added') }]
+        : []),
       ...(props.line.skip ? [{ key: 'skip', text: t('receipt.review.tag_skip') }] : []),
       ...(!props.line.skip && props.line.isNew
         ? [{ key: 'new', text: t('receipt.review.tag_new') }]

@@ -2191,6 +2191,11 @@ const readerDays = <const Name extends string>(name: Name) =>
       linesFigures: integer('lines_figures').notNull().default(0),
       /** Receipts whose total the person put right — one edit of the receipt, never of its lines. */
       totalsCorrected: integer('totals_corrected').notNull().default(0),
+      /**
+       * Lines the reader lost and the person typed on the review (MOL-273): none of `lines`, and in the share of
+       * 0.2r with them — `(lines_edited + added) / (lines + added)`, owner's В-1 «а».
+       */
+      added: integer('added').notNull().default(0),
       /** From the server taking the receipt to its record — never the phone's clock. */
       within5m: integer('within_5m').notNull().default(0),
       within15m: integer('within_15m').notNull().default(0),
@@ -2201,7 +2206,7 @@ const readerDays = <const Name extends string>(name: Name) =>
     (table) => [
       check(
         `${name}_counts_non_negative`,
-        sql`least(${table.read}, ${table.readPartly}, ${table.reshoot}, ${table.noItems}, ${table.unreadable}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
+        sql`least(${table.read}, ${table.readPartly}, ${table.reshoot}, ${table.noItems}, ${table.unreadable}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.added}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
       ),
       check(`${name}_edited_within_lines`, sql`${table.linesEdited} <= ${table.lines}`),
     ],
@@ -2262,6 +2267,8 @@ export const taxReceiptDays = pgTable(
     linesItem: integer('lines_item').notNull().default(0),
     linesFigures: integer('lines_figures').notNull().default(0),
     totalsCorrected: integer('totals_corrected').notNull().default(0),
+    /** Lines the person typed that the tax office's journal lacked (MOL-273). */
+    added: integer('added').notNull().default(0),
     /** Codes of its lines the person bound to items at «Записать» (В-2). */
     codesWritten: integer('codes_written').notNull().default(0),
     within5m: integer('within_5m').notNull().default(0),
@@ -2273,7 +2280,7 @@ export const taxReceiptDays = pgTable(
   (table) => [
     check(
       'tax_receipt_days_counts_non_negative',
-      sql`least(${table.sentQr}, ${table.sentQrMissed}, ${table.sentPaste}, ${table.sentPasteMissed}, ${table.sentUnnamed}, ${table.read}, ${table.missing}, ${table.invalid}, ${table.empty}, ${table.unreadable}, ${table.specsOk}, ${table.specsFailed}, ${table.specsSkipped}, ${table.linesCoded}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.codesWritten}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
+      sql`least(${table.sentQr}, ${table.sentQrMissed}, ${table.sentPaste}, ${table.sentPasteMissed}, ${table.sentUnnamed}, ${table.read}, ${table.missing}, ${table.invalid}, ${table.empty}, ${table.unreadable}, ${table.specsOk}, ${table.specsFailed}, ${table.specsSkipped}, ${table.linesCoded}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.added}, ${table.codesWritten}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
     ),
     check('tax_receipt_days_edited_within_lines', sql`${table.linesEdited} <= ${table.lines}`),
   ],
@@ -3042,6 +3049,103 @@ export const receiptLineImages = pgTable(
     check(
       'receipt_line_images_confirmed_whole',
       sql`(${table.confirmedText} is null) = (${table.confirmedAt} is null)`,
+    ),
+  ],
+)
+
+/**
+ * Why receipts were not read whole (MOL-309), by day in Yerevan and with no id of anyone, as `receipt_days`
+ * is: of each reader and country, how many receipts were read and how many lines found (`scope` «read»,
+ * the denominators), why a receipt was not proven whole (`receipt`) and why a line went to the review
+ * emptied or without its price (`line`), by the domain's names (`RECEIPT_REASONS`, `RECEIPT_LINE_REASONS`).
+ * **A reason is a row, never a column**: a new one needs no migration and moves no key, so an image a
+ * failed deploy puts back still writes. Counted in the transaction of the reading; erasure does not reach it.
+ * The input of the fortnightly review (MOL-310), read by `make receipt-reasons`.
+ */
+export const receiptReasonDays = pgTable(
+  'receipt_reason_days',
+  {
+    day: date('day').notNull(),
+    reader: text('reader').$type<'model' | 'ocr'>().notNull(),
+    country: char('country', { length: 2 }).notNull(),
+    scope: text('scope').$type<'read' | 'receipt' | 'line'>().notNull(),
+    reason: text('reason').notNull(),
+    n: integer('n').notNull().default(0),
+  },
+  (table) => [
+    primaryKey({ columns: [table.day, table.reader, table.country, table.scope, table.reason] }),
+    check('receipt_reason_days_reader_known', oneOf(table.reader, ['model', 'ocr'])),
+    check('receipt_reason_days_scope_known', oneOf(table.scope, ['read', 'receipt', 'line'])),
+    check('receipt_reason_days_n_non_negative', sql`${table.n} >= 0`),
+  ],
+)
+
+/**
+ * A receipt read not whole, kept for the developer's review (MOL-309, owner's В-3 «б»): what its reader
+ * read — the model's answer as it came — and why each line was not shown as read; its photo in
+ * `receipt_miss_parts`. **Kept after «Записать»**, which deletes the receipt's own photo, until the fortnightly
+ * review (MOL-310) lets it go — `make receipt-miss-forget` — or `keep_until` passes (`RECEIPT_MISS_KEEP_DAYS`).
+ *
+ * **Its key is the receipt's id as it was read** (`receipt`), never a key to it: «Переснять» removes the receipt it
+ * replaces, and the review of exactly such a receipt stays (owner's В-6 «а») — `retaken_at` marks it at the removal,
+ * and the purge lets go of the link (`receipt_id` to null) before the receipt goes. Any other removal takes it by
+ * the cascade of `receipt_id`: «Удалить чек», its trip gone for good, the 28 days of a receipt not recorded. **It goes
+ * with its person** (`actor_id`, `ACTOR_REFERENCES`), the retaken one too. Never in the nightly copy, never in the
+ * log; the person's copy says it is kept, until when and why — never the photo or the reading.
+ */
+export const receiptMisses = pgTable(
+  'receipt_misses',
+  {
+    receipt: uuid('receipt').primaryKey(),
+    receiptId: uuid('receipt_id').references(() => receipts.id, { onDelete: 'cascade' }),
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id, { onDelete: 'cascade' }),
+    readAt: timestamp('read_at', { withTimezone: true }).notNull(),
+    keepUntil: timestamp('keep_until', { withTimezone: true }).notNull(),
+    /** «Переснять» removed its receipt (В-6 «а»): the review stays past it; «Вернуть» takes the mark back. */
+    retakenAt: timestamp('retaken_at', { withTimezone: true }),
+    readerVersion: text('reader_version').notNull(),
+    /** Why the receipt was not proven whole, and why each line was not shown as read, in their order. */
+    reasons: jsonb('reasons')
+      .$type<{
+        readonly receipt: string | null
+        readonly lines: readonly (string | null)[]
+        /** «Прочитали не всё», the server's word beside the reasons (adversarial Б1). */
+        readonly partly?: boolean
+      }>()
+      .notNull(),
+    /** What the reader read, as it read it. */
+    reading: jsonb('reading').notNull(),
+  },
+  (table) => [
+    index('receipt_misses_keep_until_idx').on(table.keepUntil),
+    index('receipt_misses_receipt_id_idx').on(table.receiptId),
+    index('receipt_misses_actor_idx').on(table.actorId),
+    check('receipt_misses_kept_after_read', sql`${table.keepUntil} > ${table.readAt}`),
+    // linked, it is its own receipt's
+    check(
+      'receipt_misses_receipt_own',
+      sql`${table.receiptId} is null or ${table.receiptId} = ${table.receipt}`,
+    ),
+  ],
+)
+
+/** The parts of a receipt's photo kept with its miss (MOL-309), copied when it was read. */
+export const receiptMissParts = pgTable(
+  'receipt_miss_parts',
+  {
+    receipt: uuid('receipt')
+      .notNull()
+      .references(() => receiptMisses.receipt, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    photo: bytea('photo').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.receipt, table.position] }),
+    check(
+      'receipt_miss_parts_position_range',
+      sql`${table.position} between 1 and ${sql.raw(String(RECEIPT_PARTS_MAX))}`,
     ),
   ],
 )

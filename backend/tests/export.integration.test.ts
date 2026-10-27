@@ -26,6 +26,9 @@ import {
   moneyAccounts,
   moneyMonthRates,
   ratingReminders,
+  receiptMissParts,
+  receiptMisses,
+  receipts,
   searchPicks,
   sessions,
   spendingCategories,
@@ -765,6 +768,77 @@ describe('экспорт всего своего (MOL-93)', () => {
     expect(wire.catalogue.items.map((item) => item.name)).toContain('Молоко Ашхар 1 л')
     expect(wire.proposedItems[0]?.barcodes).toEqual(['4870001234567'])
     expect(text).not.toContain(boris.actorId)
+  })
+
+  // MOL-309, self-review №4: a receipt kept for the review is the person's — what, until when and why — never the
+  // photo or what the reader read; a receipt «Переснять» replaced too, with no link to a receipt gone (В-6 «а»)
+  it('чеки на разборе — что хранится, до когда и почему; ни фото, ни прочитанного', async () => {
+    const at = (minute: number) => new Date(Date.UTC(2026, 9, 27, 10, minute))
+    const { actorId } = await someone()
+    const receipt = randomUUID()
+    await db.insert(receipts).values({
+      id: receipt,
+      actorId,
+      status: 'parsed',
+      parts: 1,
+      country: 'AM',
+      language: 'ru',
+      currency: 'AMD',
+      capturedAt: at(1),
+      queuedAt: at(1),
+    })
+    const gone = randomUUID()
+    const reasons = { receipt: 'lines_lost', lines: [null, 'unsettled'] }
+    await db.insert(receiptMisses).values([
+      {
+        receipt,
+        receiptId: receipt,
+        actorId,
+        readAt: at(2),
+        keepUntil: at(30),
+        readerVersion: 'claude-haiku-5-5@v5',
+        reasons,
+        reading: { shop: 'Խանութ' },
+      },
+      {
+        receipt: gone,
+        receiptId: null,
+        actorId,
+        readAt: at(3),
+        keepUntil: at(31),
+        retakenAt: at(4),
+        readerVersion: 'claude-haiku-5-5@v5',
+        reasons,
+        reading: { shop: 'Խանութ' },
+      },
+    ])
+    await db
+      .insert(receiptMissParts)
+      .values({ receipt, position: 1, photo: Buffer.from([0xff, 0xd8]) })
+
+    const { wire } = await fileOf(actorId)
+
+    expect(wire.receiptReviews).toEqual([
+      {
+        receipt,
+        receiptId: receipt,
+        readAt: at(2).toISOString(),
+        keepUntil: at(30).toISOString(),
+        retakenAt: null,
+        readerVersion: 'claude-haiku-5-5@v5',
+        reasons,
+      },
+      {
+        receipt: gone,
+        receiptId: null,
+        readAt: at(3).toISOString(),
+        keepUntil: at(31).toISOString(),
+        retakenAt: at(4).toISOString(),
+        readerVersion: 'claude-haiku-5-5@v5',
+        reasons,
+      },
+    ])
+    expect(JSON.stringify(wire)).not.toContain('Խանութ')
   })
 
   it('человек без единой строки — файл с пустыми разделами, а не ошибка', async () => {

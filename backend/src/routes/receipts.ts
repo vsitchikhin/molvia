@@ -6,6 +6,7 @@ import {
   RECEIPT_CODES_HEADER,
   RECEIPT_READ_PARTLY_HEADER,
   RECEIPT_REPAIRED_HEADER,
+  RECEIPT_RETAKE_HEADER,
   RECEIPT_SPELLED_HEADER,
   RECEIPT_PACK_HEADER,
   RECEIPT_PAID_BY_HEADER,
@@ -60,7 +61,7 @@ export interface ReceiptsApi {
     pack: boolean,
     paidBy: boolean,
   ): Promise<ReceiptDetail>
-  remove(actorId: string, id: string): Promise<void>
+  remove(actorId: string, id: string, retake: boolean): Promise<void>
   restore(actorId: string, id: string): Promise<ReceiptSummary>
   /** «Записать» (MOL-126): the receipt's day and «today» are the phone's (MOL-121). */
   record(actor: Actor & Today, id: string, body: ReceiptRecordBody): Promise<ReceiptRecorded>
@@ -257,7 +258,9 @@ export function receiptRoutes(app: FastifyInstance, api: ReceiptsApi): void {
     scope.delete<{ Params: { receiptId: string } }>(
       '/receipts/:receiptId',
       async (request, reply) => {
-        await api.remove(ownerOf(request), request.params.receiptId)
+        // «Переснять»: the review of the receipt it replaces stays (MOL-309, В-6 «а»)
+        const retake = request.headers[RECEIPT_RETAKE_HEADER.toLowerCase()] === '1'
+        await api.remove(ownerOf(request), request.params.receiptId, retake)
         return privately(reply.code(204)).send()
       },
     )

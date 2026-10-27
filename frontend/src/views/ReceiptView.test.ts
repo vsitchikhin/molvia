@@ -5,7 +5,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import { RouterView, createRouter, createWebHistory } from 'vue-router'
 import { ApiError } from '@molvia/client'
-import { ERROR, parseMoney, parseQuantity } from '@molvia/model'
+import { ERROR, RECEIPT_ADDED_MAX, parseMoney, parseQuantity } from '@molvia/model'
 import type {
   Currency,
   MoneyAccountView,
@@ -190,6 +190,133 @@ describe('ReceiptView (MOL-127)', () => {
     expect(recordReceipt.mock.calls[0]?.[1].place).toEqual({ id: PLACE })
     expect(router.currentRoute.value.name).toBe('purchase')
     expect(router.currentRoute.value.params.tripId).toBe(TRIP)
+  })
+
+  describe('a line the reader lost, typed on the review (MOL-273)', () => {
+    const KEY = 'eeeeeeee-0000-4000-8000-000000000001'
+    const typed = (amount: string | null) => {
+      localStorage.setItem(
+        `molvia.receipt-added.${ME}`,
+        JSON.stringify({
+          [ID]: [
+            {
+              key: KEY,
+              item: { name: 'Сметана 20%' },
+              figures: {
+                quantity: null,
+                amount: amount === null ? null : { amount, currency: 'AMD' },
+              },
+            },
+          ],
+        }),
+      )
+    }
+    const inSheet = (text: string) =>
+      [...(sheet()?.querySelectorAll('button') ?? [])].find((one) => one.textContent.includes(text))
+
+    it('stands after the lines read, closes the difference and goes with «Записать», apart from them', async () => {
+      const one = detail()
+      receipt.mockResolvedValue({ ...one, receipt: { ...one.receipt, total: amd('1000') } })
+      typed('100')
+      const { view } = await render()
+      const rows = view.findAll('.receipt-line')
+      expect(rows).toHaveLength(3)
+      expect(rows[2]?.text()).toContain('Сметана 20%')
+      expect(rows[2]?.text()).toContain(ru.receipt.review.tag_added)
+      expect(rows[2]?.text()).not.toContain(ru.receipt.review.unread)
+      expect(view.find('.difference').exists()).toBe(false)
+      await button(view, 'Записать 3 покупки').trigger('click')
+      await flushPromises()
+      const body = recordReceipt.mock.calls[0]?.[1]
+      expect(body?.lines.map((line) => line.position)).toEqual([0, 1])
+      expect(body?.added).toEqual([
+        { item: { name: 'Сметана 20%' }, quantity: null, amount: amd('100') },
+      ])
+      // recorded: the typed lines go with the draft
+      expect(useReceiptDraftsStore().addedOf(ID)).toEqual([])
+    })
+
+    it('«Добавить строку» opens «Новая строка»; with no item «Готово» says so and keeps nothing', async () => {
+      const { view } = await render()
+      await button(view, ru.receipt.added.add).trigger('click')
+      await flushPromises()
+      expect(sheet()?.textContent).toContain(ru.receipt.added.title)
+      expect(sheet()?.textContent).not.toContain(ru.receipt.line.printed)
+      // a sheet takes no tap before it is up (MOL-69)
+      clock += 1000
+      inSheet(ru.receipt.place.done)?.click()
+      await flushPromises()
+      expect(sheet()?.textContent).toContain(ru.receipt.added.item_missing)
+      expect(useReceiptDraftsStore().addedOf(ID)).toEqual([])
+      // a new line has nothing to take away
+      expect(inSheet(ru.receipt.added.remove)).toBeUndefined()
+    })
+
+    // self-review №2: a receipt with no items takes purchases by a typed line, and becomes a receipt with lines
+    it('a receipt with no items and a typed line records the line, with no total required', async () => {
+      const one = detail()
+      receipt.mockResolvedValue({
+        ...one,
+        receipt: { ...one.receipt, lineCount: 0, total: null },
+        lines: [],
+      })
+      typed('100')
+      const { view } = await render()
+      expect(view.find('.no-items').exists()).toBe(false)
+      const record = button(view, 'Записать 1 покупку')
+      expect(record.attributes('aria-disabled')).not.toBe('true')
+      await record.trigger('click')
+      await flushPromises()
+      const body = recordReceipt.mock.calls[0]?.[1]
+      expect([body?.lines, body?.added?.length, body?.total]).toEqual([[], 1, undefined])
+    })
+
+    it('«Добавить строку» is not now while «Записать» waits: no sheet', async () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const first = await render()
+      await button(first.view, 'Записать 2 покупки').trigger('click')
+      await flushPromises()
+      while (mounted.length) mounted.pop()?.unmount()
+      const { view } = await render()
+      const add = button(view, ru.receipt.added.add)
+      expect(add.attributes('aria-disabled')).toBe('true')
+      await add.trigger('click')
+      await flushPromises()
+      expect(sheet()).toBeNull()
+    })
+
+    // self-review №4: one past the server's limit would refuse the whole «Записать»
+    it('«Добавить строку» is not now at the limit, and says why', async () => {
+      localStorage.setItem(
+        `molvia.receipt-added.${ME}`,
+        JSON.stringify({
+          [ID]: Array.from({ length: RECEIPT_ADDED_MAX }, (_, n) => ({
+            key: `eeeeeeee-0000-4000-8000-${String(n).padStart(12, '0')}`,
+            item: { name: `Строка ${String(n)}` },
+            figures: { quantity: null, amount: null },
+          })),
+        }),
+      )
+      const { view } = await render()
+      const add = button(view, ru.receipt.added.add)
+      expect(add.attributes('aria-disabled')).toBe('true')
+      expect(add.text()).toContain(`Больше ${String(RECEIPT_ADDED_MAX)} строк не дописать`)
+      await add.trigger('click')
+      await flushPromises()
+      expect(sheet()).toBeNull()
+    })
+
+    it('a typed line opens its own sheet, and «Убрать строку» takes it away', async () => {
+      typed(null)
+      const { view } = await render()
+      await view.findAll('.receipt-line')[2]?.trigger('click')
+      await flushPromises()
+      expect(sheet()?.textContent).toContain('Сметана 20%')
+      clock += 1000
+      inSheet(ru.receipt.added.remove)?.click()
+      await flushPromises()
+      expect(useReceiptDraftsStore().addedOf(ID)).toEqual([])
+    })
   })
 
   // MOL-222, adversarial В1: the line was put right while the review showed the parse's item; read

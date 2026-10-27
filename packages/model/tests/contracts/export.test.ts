@@ -262,6 +262,17 @@ const file: ExportFile = {
       ],
     },
   ],
+  receiptReviews: [
+    {
+      receipt: id(30),
+      receiptId: id(30),
+      readAt: at,
+      keepUntil: at,
+      retakenAt: at,
+      readerVersion: 'claude-haiku-5-5@v5',
+      reasons: { receipt: 'lines_lost', lines: [null, 'unsettled'] },
+    },
+  ],
   spendingCategories: [
     {
       id: id(14),
@@ -403,7 +414,7 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(24)
+    expect(wire.version).toBe(25)
     expect(wire.account.lastSeenAt).toBe('2026-09-20T10:00:00.000Z')
     expect(wire.account.consentedAt).toBe('2026-09-20T10:00:00.000Z')
     expect(wire.account.analyticsOnAt).toBe('2026-09-20T10:00:00.000Z')

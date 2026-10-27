@@ -22,7 +22,14 @@ import type { LoginConfiguration } from '@/login-config'
 import { startLoginCleanup } from '@/login-cleanup'
 import { apiFailureReporter } from '@/failure-reporter'
 import type { HttpMetrics } from '@/metrics'
-import { botFailure, phoneReportLimit, takePhoneFailures } from '@/usecases/record-failure'
+import {
+  PHONE_NOTICES_PER_HOUR,
+  PHONE_NOTICES_PER_SENDER,
+  botFailure,
+  phoneNoticeBudget,
+  phoneReportLimit,
+  takePhoneFailures,
+} from '@/usecases/record-failure'
 import { claimOwnerNotices } from '@/usecases/owner-notices'
 import { broadcastDone, claimBroadcast } from '@/usecases/broadcast'
 import {
@@ -835,6 +842,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
             failures.report(event.error, job('receipt-reading'), 'receipt reading failed')
           }
         }
+        // a receipt the model read not whole, told to the developer within the phone's budget (MOL-309, Р-6)
+        const receiptNotices = phoneNoticeBudget(
+          PHONE_NOTICES_PER_HOUR,
+          PHONE_NOTICES_PER_SENDER,
+          (count) => ({ kind: 'receipt_partial_muted', count }),
+        )
         const queue = startItemEmbedding(
           async () => {
             await receipts.requeueInterrupted()
@@ -843,6 +856,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
               reader,
               report,
               storeMemory: createStoreMemoryRepository(db),
+              told:
+                owner === null
+                  ? null
+                  : { notices: createOwnerNoticeRepository(db), budget: receiptNotices },
               model:
                 model === null
                   ? null
@@ -1182,7 +1199,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
             pack,
             paidBy,
           ),
-        remove: (actorId, id) => removeReceipt(receipts, actorId, id),
+        remove: (actorId, id, retake) => removeReceipt(receipts, actorId, id, retake),
         restore: (actorId, id) => restoreReceipt(receipts, actorId, id),
         record: (actor, id, body) => recordReceipt(transact, actor, id, body),
         settled: (actor, id) => receiptSettled(transact, actor, id),

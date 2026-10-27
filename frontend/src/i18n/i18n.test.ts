@@ -113,10 +113,12 @@ describe('словарь: повторяющиеся тексты', () => {
     // дубль уронит тест, а заявленные видно списком.
     expect(duplicates(RU)).toEqual({
       // Один глагол у шторок, где закончено дело: баланс счёта, цифры штрихкода (MOL-98),
-      // отправленное сообщение разработчику (MOL-147), место чека и края чека (MOL-222).
+      // отправленное сообщение разработчику (MOL-147), место чека и края чека (MOL-222), дописанная строка
+      // чека (MOL-273).
       Готово: [
         'accounts.done',
         'feedback.done',
+        'receipt.added.done',
         'receipt.edges.done',
         'receipt.place.done',
         'scanner.done',
@@ -335,6 +337,7 @@ describe('словарь: повторяющиеся тексты', () => {
       Done: [
         'accounts.done',
         'feedback.done',
+        'receipt.added.done',
         'receipt.edges.done',
         'receipt.place.done',
         'scanner.done',

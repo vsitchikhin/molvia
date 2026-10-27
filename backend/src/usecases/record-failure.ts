@@ -235,6 +235,13 @@ export interface PhoneNoticeBudget {
 export function phoneNoticeBudget(
   perHour = PHONE_NOTICES_PER_HOUR,
   perSender = PHONE_NOTICES_PER_SENDER,
+  /** The notice of what was held back: the phone's, or another channel's by the same rule (MOL-309). */
+  mutedOf: (count: number, unwritten: number) => OwnerNotice = (count, unwritten) => ({
+    kind: 'failure_muted',
+    source: 'phone',
+    count,
+    ...(unwritten > 0 ? { unwritten } : {}),
+  }),
 ): PhoneNoticeBudget {
   let told: number[] = []
   const bySender = new Map<string, number[]>()
@@ -296,12 +303,7 @@ export function phoneNoticeBudget(
       if (muted === 0 && lost === 0) return null
       if (lastHeld !== undefined && now - lastHeld < HOUR_MS) return null
       lastHeld = now
-      const notice: OwnerNotice = {
-        kind: 'failure_muted',
-        source: 'phone',
-        count: muted,
-        ...(lost > 0 ? { unwritten: lost } : {}),
-      }
+      const notice = mutedOf(muted, lost)
       muted = 0
       lost = 0
       return notice
