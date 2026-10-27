@@ -840,7 +840,15 @@ describe('the key against a second record (Т-11, adversarial А5, А6, review �
       expenses: [],
       confirmed: [],
       priced: [],
-      edits: { lines: 1, edited: 0, skipped: 0, item: 0, figures: 0, totalCorrected: false },
+      edits: {
+        lines: 1,
+        edited: 0,
+        skipped: 0,
+        item: 0,
+        figures: 0,
+        totalCorrected: false,
+        added: 0,
+      },
       source: 'photo',
       codesWritten: 0,
     })
@@ -927,7 +935,15 @@ describe('the measure of 0.2r by its reader (MOL-272, В-6 «а»)', () => {
       expenses: [],
       confirmed: [],
       priced: [],
-      edits: { lines: 2, edited: 1, skipped: 0, item: 1, figures: 0, totalCorrected: false },
+      edits: {
+        lines: 2,
+        edited: 1,
+        skipped: 0,
+        item: 1,
+        figures: 0,
+        totalCorrected: false,
+        added: 0,
+      },
       source: 'photo',
       codesWritten: 0,
     })

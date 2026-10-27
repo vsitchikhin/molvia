@@ -108,6 +108,8 @@ export interface ReceiptsInWindow {
   readonly linesItem: number
   readonly linesFigures: number
   readonly totalsCorrected: number
+  /** Lines the reader lost and the person typed on the review (MOL-273). */
+  readonly added: number
   readonly within5m: number
   readonly within15m: number
   readonly within1h: number
@@ -269,6 +271,7 @@ async function receiptsIn(
       linesItem: sum(table.linesItem),
       linesFigures: sum(table.linesFigures),
       totalsCorrected: sum(table.totalsCorrected),
+      added: sum(table.added),
       within5m: sum(table.within5m),
       within15m: sum(table.within15m),
       within1h: sum(table.within1h),
@@ -290,6 +293,7 @@ async function receiptsIn(
     linesItem: 0,
     linesFigures: 0,
     totalsCorrected: 0,
+    added: 0,
     within5m: 0,
     within15m: 0,
     within1h: 0,

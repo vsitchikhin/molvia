@@ -2182,6 +2182,11 @@ const readerDays = <const Name extends string>(name: Name) =>
       linesFigures: integer('lines_figures').notNull().default(0),
       /** Receipts whose total the person put right — one edit of the receipt, never of its lines. */
       totalsCorrected: integer('totals_corrected').notNull().default(0),
+      /**
+       * Lines the reader lost and the person typed on the review (MOL-273): none of `lines`, and in the share of
+       * 0.2r with them — `(lines_edited + added) / (lines + added)`, owner's В-1 «а».
+       */
+      added: integer('added').notNull().default(0),
       /** From the server taking the receipt to its record — never the phone's clock. */
       within5m: integer('within_5m').notNull().default(0),
       within15m: integer('within_15m').notNull().default(0),
@@ -2192,7 +2197,7 @@ const readerDays = <const Name extends string>(name: Name) =>
     (table) => [
       check(
         `${name}_counts_non_negative`,
-        sql`least(${table.read}, ${table.readPartly}, ${table.reshoot}, ${table.noItems}, ${table.unreadable}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
+        sql`least(${table.read}, ${table.readPartly}, ${table.reshoot}, ${table.noItems}, ${table.unreadable}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.added}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
       ),
       check(`${name}_edited_within_lines`, sql`${table.linesEdited} <= ${table.lines}`),
     ],
@@ -2253,6 +2258,8 @@ export const taxReceiptDays = pgTable(
     linesItem: integer('lines_item').notNull().default(0),
     linesFigures: integer('lines_figures').notNull().default(0),
     totalsCorrected: integer('totals_corrected').notNull().default(0),
+    /** Lines the person typed that the tax office's journal lacked (MOL-273). */
+    added: integer('added').notNull().default(0),
     /** Codes of its lines the person bound to items at «Записать» (В-2). */
     codesWritten: integer('codes_written').notNull().default(0),
     within5m: integer('within_5m').notNull().default(0),
@@ -2264,7 +2271,7 @@ export const taxReceiptDays = pgTable(
   (table) => [
     check(
       'tax_receipt_days_counts_non_negative',
-      sql`least(${table.sentQr}, ${table.sentQrMissed}, ${table.sentPaste}, ${table.sentPasteMissed}, ${table.sentUnnamed}, ${table.read}, ${table.missing}, ${table.invalid}, ${table.empty}, ${table.unreadable}, ${table.specsOk}, ${table.specsFailed}, ${table.specsSkipped}, ${table.linesCoded}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.codesWritten}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
+      sql`least(${table.sentQr}, ${table.sentQrMissed}, ${table.sentPaste}, ${table.sentPasteMissed}, ${table.sentUnnamed}, ${table.read}, ${table.missing}, ${table.invalid}, ${table.empty}, ${table.unreadable}, ${table.specsOk}, ${table.specsFailed}, ${table.specsSkipped}, ${table.linesCoded}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.added}, ${table.codesWritten}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
     ),
     check('tax_receipt_days_edited_within_lines', sql`${table.linesEdited} <= ${table.lines}`),
   ],

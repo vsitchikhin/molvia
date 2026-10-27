@@ -37,6 +37,8 @@ import { tripRateOn } from './start-trip'
 import type { Today } from './today'
 
 type RecordedLine = Extract<ReceiptRecordBody['lines'][number], { skip: false }>
+/** A line the reader lost, typed on the review (MOL-273). */
+type AddedLine = NonNullable<ReceiptRecordBody['added']>[number]
 
 const sameMoney = (a: Money | null, b: Money | null) =>
   a === null || b === null ? a === b : a.minor === b.minor && a.currency === b.currency
@@ -144,6 +146,7 @@ function editsOf(
     figures: figures.size,
     // the total the review showed, opened and saved as it was, is a check, not an edit (review 10)
     totalCorrected: body.total !== undefined && !sameMoney(body.total, total),
+    added: body.added?.length ?? 0,
   }
 }
 
@@ -191,8 +194,12 @@ function receiptTotal(held: ReceiptToRecord, body: ReceiptRecordBody): Money | n
   // the lines make the total less what a card sent to the card (MOL-289)
   const left = recordedSums(stored, linesTotalOf(printed, held.cashback), digits)
   let sum: Money | null = { minor: 0n, currency }
-  for (const line of body.lines) {
-    const amount = line.skip ? (left[line.position] ?? null) : line.amount
+  const amounts = [
+    ...body.lines.map((line) => (line.skip ? (left[line.position] ?? null) : line.amount)),
+    // a line the person typed was paid for as any other (MOL-273)
+    ...(body.added ?? []).map((line) => line.amount),
+  ]
+  for (const amount of amounts) {
     // `addMoney` holds the column's bound: lines each within it may add up past it (round 3, Р3-В1),
     // which is `error.invalid_amount`, not a 500 from the table
     sum = sum === null || amount?.currency !== currency ? null : addMoney(sum, amount)
@@ -304,14 +311,21 @@ export async function recordReceipt(
     const recorded = body.lines
       .filter((line): line is RecordedLine => !line.skip)
       .sort((a, b) => a.position - b.position)
+    const added = body.added ?? []
+    // the receipt's currency is printed on it: a line typed in another is the phone's mistake (Р2-В2)
+    if (added.some((line) => line.amount !== null && line.amount.currency !== held.currency)) {
+      throw new DomainError(ERROR.CURRENCY_MISMATCH)
+    }
     const money = receiptMoney(held, body)
     // a trip with no money and no purchase is an empty row of «Деньги»: a receipt with no items needs
     // its total, read or typed (MOL-227, Р-4)
-    if (money === null && recorded.length === 0) {
+    if (money === null && recorded.length === 0 && added.length === 0) {
       throw new DomainError(ERROR.RECEIPT_TOTAL_REQUIRED)
     }
     const chosen = [
-      ...new Set(recorded.flatMap((line) => ('id' in line.item ? [line.item.id] : []))),
+      ...new Set(
+        [...recorded, ...added].flatMap((line) => ('id' in line.item ? [line.item.id] : [])),
+      ),
     ]
     if ((await items.byIds(chosen)).length !== chosen.length) throw new DomainError(ERROR.CONFLICT)
 
@@ -347,9 +361,9 @@ export async function recordReceipt(
     // new items before the purchases, in the order of their names: each name is locked to the end of
     // the transaction, and two records of the same names in two orders would otherwise deadlock
     const newItems = new Map<string, string>()
-    // one item a name, spelt as its first line spells it
-    const named = new Map<string, { name: string; line: RecordedLine }>()
-    for (const line of recorded) {
+    // one item a name, spelt as its first line spells it — a line read before one typed (MOL-273)
+    const named = new Map<string, { name: string; line: RecordedLine | AddedLine }>()
+    for (const line of [...recorded, ...added]) {
       if ('name' in line.item && !named.has(nameIdentity(line.item.name))) {
         named.set(nameIdentity(line.item.name), { name: line.item.name, line })
       }
@@ -361,7 +375,8 @@ export async function recordReceipt(
     for (const [identity, { name, line }] of toCreate) {
       // what one package holds is what the next purchase typed by hand is offered (MOL-264): «1,5 л», never the
       // two bottles of this one; a quantity the person put in another unit says nothing of it
-      const stored = held.lines[line.position]
+      // a line typed prints no name, and so no package (MOL-273)
+      const stored = 'position' in line ? held.lines[line.position] : undefined
       const pack = stored === undefined ? null : linePack(stored, held.country)
       const unit = line.quantity?.unit ?? 'piece'
       const proposal = await items.createUnlessNamed(
@@ -384,7 +399,7 @@ export async function recordReceipt(
     const confirmed: number[] = []
     const priced: number[] = []
     const asked = new Set(body.barcodes ?? [])
-    const itemOf = (line: RecordedLine) =>
+    const itemOf = (line: RecordedLine | AddedLine) =>
       'id' in line.item ? line.item.id : newItems.get(nameIdentity(line.item.name))
     // «Привязать и записать» (MOL-234, В-2): the codes the person said yes to, by the rules of MOL-100
     const binds = recorded.flatMap((line) => {
@@ -397,7 +412,7 @@ export async function recordReceipt(
     // every item this record touches, locked first and in one order (adversarial А1)
     await items.lockForRecord(
       binds.map((bind) => bind.itemId),
-      recorded.flatMap((line) => itemOf(line) ?? []),
+      [...recorded, ...added].flatMap((line) => itemOf(line) ?? []),
     )
     for (const line of recorded) {
       const stored = held.lines[line.position]
@@ -418,6 +433,19 @@ export async function recordReceipt(
       for (const word of storeMemoryWords(stored)) {
         words.push({ ...word, itemId, price: kept ? stored.price : null })
       }
+    }
+    // the lines the reader lost: purchases of the same trip, with no line of the receipt — nothing printed
+    // to remember a shop by, no row to confirm (MOL-273)
+    for (const line of added) {
+      const itemId = itemOf(line)
+      if (itemId === undefined) throw new Error('a new item was not made before its purchase')
+      await expenses.add(actor.id, {
+        id: randomUUID(),
+        tripId: trip.id,
+        itemId,
+        ...(line.quantity === null ? {} : { quantity: line.quantity }),
+        ...(line.amount === null ? {} : { amount: line.amount }),
+      })
     }
     // in the order of the codes: each code's lock is held to the end of the record (adversarial А1)
     const codes: CodeOutcome[] = []

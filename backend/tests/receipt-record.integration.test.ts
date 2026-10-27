@@ -629,6 +629,107 @@ describe('«Записать»', () => {
     expect(trip?.receiptMinor).toBe(215_000n)
   }, 15_000)
 
+  describe('lines the reader lost, typed on the review (MOL-273)', () => {
+    it('records them as purchases of the trip, counted in its money and apart in the measure', async () => {
+      const me = await insertActor(db)
+      const place = await insertPlace(db)
+      const milk = await insertItem(db)
+      const id = await parsedReceipt(me, LINES.slice(0, 1), { totalMinor: null })
+      const tripId = randomUUID()
+      const body = {
+        tripId,
+        place: { id: place },
+        purchasedOn: '2026-09-26',
+        lines: [
+          {
+            position: 0,
+            skip: false,
+            item: { name: 'Сметана 20%' },
+            quantity: pieces(2),
+            amount: amount(740),
+          },
+        ],
+        added: [
+          // the same new name as the line read: one item, spelt as the line read spells it
+          { item: { name: 'сметана 20%' }, quantity: pieces(1), amount: amount(890) },
+          { item: { id: milk }, quantity: null, amount: amount(500) },
+          { item: { name: 'Творог 9%' }, quantity: null, amount: amount(1_000) },
+        ],
+      }
+      const response = await record(me, id, body)
+      expect(response.statusCode).toBe(200)
+      const bought = await db
+        .select({ itemId: expenses.itemId, amountMinor: expenses.amountMinor })
+        .from(expenses)
+        .where(eq(expenses.tripId, tripId))
+      expect(bought).toHaveLength(4)
+      const made = await db.select({ id: items.id, name: items.name }).from(items)
+      expect(made.filter((item) => item.name.toLowerCase() === 'сметана 20%')).toEqual([
+        expect.objectContaining({ name: 'Сметана 20%' }),
+      ])
+      // no total read: the money is the lines, the typed ones too
+      const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
+      expect(trip?.receiptMinor).toBe(313_000n)
+      // a line typed has no row of the receipt, and teaches the shop nothing
+      expect(
+        await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id)),
+      ).toHaveLength(1)
+      const sourCream = made.find((item) => item.name === 'Сметана 20%')?.id
+      const remembered = await db.select({ itemId: storeMemory.itemId }).from(storeMemory)
+      expect(remembered.length).toBeGreaterThan(0)
+      expect(remembered.every((word) => word.itemId === sourCream)).toBe(true)
+      expect(await db.select().from(receiptDays)).toMatchObject([
+        { recorded: 1, lines: 1, linesEdited: 0, added: 3 },
+      ])
+      // a repeat is the same record: nothing typed twice
+      expect((await record(me, id, body)).statusCode).toBe(200)
+      expect(await db.select().from(expenses).where(eq(expenses.tripId, tripId))).toHaveLength(4)
+      expect(await db.select().from(receiptDays)).toMatchObject([{ recorded: 1, added: 3 }])
+    }, 15_000)
+
+    it('records purchases on a receipt with no items, its money still the total', async () => {
+      const me = await insertActor(db)
+      const id = await parsedReceipt(me, [], {
+        layout: 'department',
+        receiptNo: null,
+        totalMinor: 170_000n,
+      })
+      const tripId = randomUUID()
+      const response = await record(me, id, {
+        tripId,
+        place: { name: 'Гая 5', city: 'Гюмри' },
+        purchasedOn: '2026-09-26',
+        lines: [],
+        added: [
+          { item: { name: 'Хачапури' }, quantity: pieces(2), amount: amount(1_700) },
+          // only the item is required
+          { item: { name: 'Тан' }, quantity: null, amount: null },
+        ],
+      })
+      expect(response.statusCode).toBe(200)
+      const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
+      expect(trip?.receiptMinor).toBe(170_000n)
+      expect(await db.select().from(expenses).where(eq(expenses.tripId, tripId))).toHaveLength(2)
+    })
+
+    it('refuses a line typed in another currency than the receipt’s', async () => {
+      const me = await insertActor(db)
+      const place = await insertPlace(db)
+      const id = await parsedReceipt(me, LINES.slice(0, 1))
+      const response = await record(me, id, {
+        tripId: randomUUID(),
+        place: { id: place },
+        purchasedOn: '2026-09-26',
+        lines: [{ position: 0, skip: true }],
+        added: [
+          { item: { name: 'Сметана' }, quantity: null, amount: { amount: '5', currency: 'USD' } },
+        ],
+      })
+      expect(codeOf(response)).toBe(ERROR.CURRENCY_MISMATCH)
+      expect(await db.select().from(trips)).toEqual([])
+    })
+  })
+
   it('records a gift at 0 as a purchase of the trip, and as no price of its place (MOL-274, А8)', async () => {
     const me = await insertActor(db)
     const place = await insertPlace(db)

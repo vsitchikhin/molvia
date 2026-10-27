@@ -304,6 +304,8 @@ export interface ReceiptEdits {
   readonly figures: number
   /** The total was put right: one edit of the receipt (review 2). */
   readonly totalCorrected: boolean
+  /** Lines the reader lost and the person typed on the review (MOL-273): none of `lines`. */
+  readonly added: number
 }
 
 /** What a reading or a record adds to its day of `receipt_days`, by column. */
@@ -986,6 +988,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         linesItem: sql`${edits.item}::int`,
         linesFigures: sql`${edits.figures}::int`,
         totalsCorrected: sql`${edits.totalCorrected ? 1 : 0}::int`,
+        added: sql`${edits.added}::int`,
         within5m: within('5 minutes', null),
         within15m: within('15 minutes', '5 minutes'),
         within1h: within('1 hour', '15 minutes'),
