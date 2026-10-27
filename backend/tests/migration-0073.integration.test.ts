@@ -12,9 +12,10 @@ import { expenses } from '@/db/schema'
 
 /**
  * 0073 on a database of people from before it (MOL-238): the last visit is the latest the server knows
- * of each in the app — a session's use, else a record of theirs, the catalogue's included, else the
- * moment the account appeared; a reply through the bot is none (В-1 «а») — and the fill moves no one's
- * `updated_at`, since the trigger stops seeing the column before it runs.
+ * of each in the app — a session's use, else a record of theirs, the catalogue's included, or a later
+ * moment of one (an account set, a removal, the archive), else the moment the account appeared; a
+ * reply through the bot is none (В-1 «а») — and the fill moves no one's `updated_at`, since the
+ * trigger stops seeing the column before it runs.
  *
  * Its own database, created and dropped here, as in `migration-0061.integration.test.ts`: the chain
  * has to be left one step short of 0073. The owners and the sessions are written by SQL of their own —
@@ -172,6 +173,31 @@ describe('0073: the last visit of everyone already there', () => {
     await sql`
       insert into item_barcodes (code, item_id, added_by, added_at)
       values ('4850001234567', ${milk}, ${bound}, '2026-10-18T08:00:00.000Z')`
+    // a trip and a card of June, the trip put on the card on the 19th — in the app, after the record
+    const debited = await owner()
+    const [card] = await sql<{ id: string }[]>`
+      insert into money_accounts (id, actor_id, name, currency, start_minor, start_on, created_on, created_at)
+      values (${randomUUID()}, ${debited}, 'Карта', 'AMD', 0, '2026-06-01', '2026-06-01', '2026-06-01T08:00:00.000Z')
+      returning id`
+    await insertTrip(db, {
+      actorId: debited,
+      placeId: place,
+      startedAt: new Date('2026-06-01T08:00:00.000Z'),
+      accountId: card?.id,
+      accountSetAt: new Date('2026-10-19T08:00:00.000Z'),
+    })
+    // a card of June put away on the 21st
+    const archived = await owner()
+    await sql`
+      insert into money_accounts (id, actor_id, name, currency, start_minor, start_on, created_on, created_at, archived_at)
+      values (${randomUUID()}, ${archived}, 'Карта', 'AMD', 0, '2026-06-01', '2026-06-01',
+        '2026-06-01T08:00:00.000Z', '2026-10-21T08:00:00.000Z')`
+    // a verdict of June withdrawn on the 22nd
+    const withdrew = await owner()
+    await sql`
+      insert into verdicts (id, actor_id, item_id, item_kind, score, rated_at, updated_at, deleted_at)
+      values (${randomUUID()}, ${withdrew}, ${milk}, 'product', 4, '2026-06-01T08:00:00.000Z',
+        '2026-06-01T08:00:00.000Z', '2026-10-22T08:00:00.000Z')`
     // a trip whose phone's clock ran a year ahead: never later than the migration itself
     const ahead = await owner()
     await insertTrip(db, {
@@ -201,6 +227,9 @@ describe('0073: the last visit of everyone already there', () => {
     expect(await seenOf(inTelegram)).toEqual({ seen: '2026-10-04T08:00:00.000Z', updated: UPDATED })
     expect(await seenOf(proposed)).toEqual({ seen: '2026-10-17T08:00:00.000Z', updated: UPDATED })
     expect(await seenOf(bound)).toEqual({ seen: '2026-10-18T08:00:00.000Z', updated: UPDATED })
+    expect(await seenOf(debited)).toEqual({ seen: '2026-10-19T08:00:00.000Z', updated: UPDATED })
+    expect(await seenOf(archived)).toEqual({ seen: '2026-10-21T08:00:00.000Z', updated: UPDATED })
+    expect(await seenOf(withdrew)).toEqual({ seen: '2026-10-22T08:00:00.000Z', updated: UPDATED })
     const capped = await seenOf(ahead)
     expect(new Date(capped.seen).getTime()).toBeLessThanOrEqual(Date.now())
     expect(new Date(capped.seen).getTime()).toBeGreaterThanOrEqual(started - 60_000)

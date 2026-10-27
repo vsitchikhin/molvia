@@ -163,13 +163,14 @@ is in `bot.md`.
   updating a session and then its owner would take the two the other way round. **A login is the
   account's visit** whenever the last one was (`signIn`, the development seam included), and a new
   owner starts at the moment it appeared. **The bot is not one** (owner's В-1 «а»): a press under a
-  reminder or a word to the developer moves nothing. **Opening the app is a visit only while a
-  session lives** (adversarial А1): after 180 days unused the session is gone, the app opens on the
-  door and only the login marks the visit — and whoever MOL-239 warns has been silent some 700 days.
-  So the page says «открыть приложение и войти, если оно попросит», and the warnings ask the same.
-  **It is not a change of the row**: `actors_touch_updated_at` ignores the column (0073), or the first request of every day
-  would make the owner «newer» to the phone, which compares `updatedAt` to know whose settings are
-  fresher. Nor is it the statistics: it is written whatever the switch and the edition accepted —
+  reminder or a word to the developer in Telegram moves nothing — a word from the app's sheet goes
+  through the guard like any request. **Opening the app is a visit only while a session lives**
+  (adversarial А1): after 180 days unused the session is gone, the app opens on the door and only
+  the login marks the visit — and whoever MOL-239 warns has been silent some 700 days. So the page
+  says «открыть приложение и войти, если оно попросит», and the warnings ask the same. **It is not a
+  change of the row**: `actors_touch_updated_at` ignores the column (0073), or the first request of
+  every day would make the owner «newer» to the phone, which compares `updatedAt` to know whose
+  settings are fresher. Nor is it the statistics: it is written whatever the switch and the edition accepted —
   a term of keeping, not a count. Not on the wire; in the copy (version 24); the precision is a day.
 - **Four refusals, one answer.** No cookie, a token nobody was issued, a token of a revoked
   session, a token of an expired one: `401` with `error.no_actor`, identical byte for byte.
