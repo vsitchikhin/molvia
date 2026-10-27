@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  ACCOUNT_SEEN_AFTER_HOURS,
   ERROR,
   SESSION_LIFETIME_DAYS,
   SESSION_TOUCH_AFTER_HOURS,
@@ -141,13 +142,12 @@ describe('последний визит (MOL-238)', () => {
     // Вход с нового телефона вчера вечером: сессия свежая, а день аккаунта — нет.
     const markSeen = vi.fn(() => Promise.resolve(true))
     const sessions = fakeSessions({
-      liveByToken: () =>
-        Promise.resolve(live(hoursAgo(1), hoursAgo(SESSION_TOUCH_AFTER_HOURS + 1))),
+      liveByToken: () => Promise.resolve(live(hoursAgo(1), hoursAgo(ACCOUNT_SEEN_AFTER_HOURS + 1))),
     })
 
     const authenticated = await authenticate(sessions, { markSeen }, TOKEN)
 
-    expect(markSeen).toHaveBeenCalledExactlyOnceWith(ACTOR_ID, SESSION_TOUCH_AFTER_HOURS)
+    expect(markSeen).toHaveBeenCalledExactlyOnceWith(ACTOR_ID, ACCOUNT_SEEN_AFTER_HOURS)
     expect(authenticated.refreshedUntil).toBeNull()
   })
 
@@ -156,7 +156,7 @@ describe('последний визит (MOL-238)', () => {
     const sessions = fakeSessions({
       liveByToken: () =>
         Promise.resolve(
-          live(hoursAgo(SESSION_TOUCH_AFTER_HOURS + 1), hoursAgo(SESSION_TOUCH_AFTER_HOURS - 1)),
+          live(hoursAgo(SESSION_TOUCH_AFTER_HOURS + 1), hoursAgo(ACCOUNT_SEEN_AFTER_HOURS - 1)),
         ),
       touch: () => Promise.resolve(until),
     })
@@ -171,7 +171,7 @@ describe('последний визит (MOL-238)', () => {
     const sessions = fakeSessions({
       liveByToken: () =>
         Promise.resolve(
-          live(hoursAgo(SESSION_TOUCH_AFTER_HOURS + 1), hoursAgo(SESSION_TOUCH_AFTER_HOURS + 1)),
+          live(hoursAgo(SESSION_TOUCH_AFTER_HOURS + 1), hoursAgo(ACCOUNT_SEEN_AFTER_HOURS + 1)),
         ),
       touch: () => {
         order.push('touch')

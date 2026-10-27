@@ -6,7 +6,7 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { SESSION_COOKIE, SESSION_TOUCH_AFTER_HOURS } from '@molvia/model'
+import { ACCOUNT_SEEN_AFTER_HOURS, SESSION_COOKIE } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { actors, sessions } from '@/db/schema'
 import { createActorRepository } from '@/db/actors-repository'
@@ -97,11 +97,11 @@ describe('первый запрос дня', () => {
   it('граница — сутки: без минуты не пишет, через минуту пишет', async () => {
     const { actorId, cookie } = await owner()
 
-    const recent = await seenAgo(actorId, SESSION_TOUCH_AFTER_HOURS - 1 / 60)
+    const recent = await seenAgo(actorId, ACCOUNT_SEEN_AFTER_HOURS - 1 / 60)
     await whoAmI(cookie)
     expect((await rowOf(actorId)).lastSeenAt).toEqual(recent)
 
-    await seenAgo(actorId, SESSION_TOUCH_AFTER_HOURS + 1 / 60)
+    await seenAgo(actorId, ACCOUNT_SEEN_AFTER_HOURS + 1 / 60)
     await whoAmI(cookie)
     expect(isNow((await rowOf(actorId)).lastSeenAt)).toBe(true)
   })
@@ -129,8 +129,8 @@ describe('первый запрос дня', () => {
     const { actorId } = await owner()
 
     const written = await Promise.all([
-      actorRepository.markSeen(actorId, SESSION_TOUCH_AFTER_HOURS),
-      actorRepository.markSeen(actorId, SESSION_TOUCH_AFTER_HOURS),
+      actorRepository.markSeen(actorId, ACCOUNT_SEEN_AFTER_HOURS),
+      actorRepository.markSeen(actorId, ACCOUNT_SEEN_AFTER_HOURS),
     ])
 
     expect(written.toSorted()).toEqual([false, true])
