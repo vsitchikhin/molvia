@@ -62,7 +62,8 @@ export default defineComponent({
   components: { AppCard, BottomSheet, SearchField },
   props: {
     open: { type: Boolean, required: true },
-    printed: { type: String, required: true },
+    /** The line as printed; empty for a line the person typed (MOL-273), which has none. */
+    printed: { type: String, default: '' },
     translation: { type: String as PropType<string | null>, default: null },
     /** What the line is called now — the first query, and the name a new item would take. */
     start: { type: String, default: '' },
@@ -97,9 +98,14 @@ export default defineComponent({
         () => newName.value !== null && newItemSchema.shape.name.safeParse(newName.value).success,
       ),
       meta: computed(() =>
-        props.translation
-          ? t('receipt.pick.meta_translation', { printed: props.printed, text: props.translation })
-          : t('receipt.pick.meta', { printed: props.printed }),
+        props.printed === ''
+          ? t('receipt.pick.meta_added')
+          : props.translation
+            ? t('receipt.pick.meta_translation', {
+                printed: props.printed,
+                text: props.translation,
+              })
+            : t('receipt.pick.meta', { printed: props.printed }),
       ),
     }
   },

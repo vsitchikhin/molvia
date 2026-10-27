@@ -2306,6 +2306,7 @@
       "tag_new": "new item",
       "tag_check": "check",
       "tag_skip": "not saved",
+      "tag_added": "added",
       "issues_check": "to check: {n}",
       "check_note": "on the receipt — “{text}”",
       "qty_price": "{qty} × {price}",
@@ -2352,6 +2353,16 @@
       "place_line_pib": "{city} · PIB {inn} · {day}",
       "place_line_pib_time": "{city} · PIB {inn} · {day}, {time}"
     },
+    "added": {
+      "add": "Add a line",
+      "title": "New line",
+      "meta": "It is not among the lines read — type it from the paper",
+      "pick": "Pick an item",
+      "item_missing": "Pick an item — a line cannot be recorded without one",
+      "figures_note": "May be left empty: only the item is required",
+      "save": "Done",
+      "remove": "Remove the line"
+    },
     "line": {
       "title": "Receipt line",
       "meta": "{n} of {total} · {place}",
@@ -2380,6 +2391,7 @@
       "title": "Pick an item",
       "meta": "For the line “{printed}”",
       "meta_translation": "For the line “{printed}” · translation “{text}”",
+      "meta_added": "For the line you are adding",
       "keep_new": "Keep as a new item “{text}”",
       "keep_new_note": "Saving adds it to the catalogue",
       "note": "Items come from the catalogue only: the same Save button adds a new one",

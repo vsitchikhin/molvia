@@ -18,7 +18,7 @@ import type {
   TripPaymentBody,
 } from '@molvia/model'
 import { placeIdOf } from '@/stores/receiptDrafts'
-import type { PlaceDraft, ReceiptDraft } from '@/stores/receiptDrafts'
+import type { AddedLineDraft, PlaceDraft, ReceiptDraft } from '@/stores/receiptDrafts'
 
 /**
  * A line of the review as it stands now (MOL-127, Т-7): the server's reading, with the person's edit
@@ -26,7 +26,14 @@ import type { PlaceDraft, ReceiptDraft } from '@/stores/receiptDrafts'
  * are `receiptBalance` of the model, the function the server records by (В-6).
  */
 export interface ReviewLine {
+  /** Its place on the review: a line of the receipt's own, or after them one typed (`added`). */
   readonly position: number
+  /**
+   * A line the reader lost, typed on the review (MOL-273): its key in the drafts. Its `line` holds no
+   * reading — nothing printed, the figures the person's — and «Записать» sends it apart from the
+   * receipt's lines, which keep their positions.
+   */
+  readonly added?: string
   readonly line: ReceiptReviewLine
   /** The item: one of the catalogue (`id`), or a new one by its name. */
   readonly itemId: string | null
@@ -105,6 +112,57 @@ export function reviewLines(
   draft: ReceiptDraft | null,
   /** The item each line showed at its first edit (`receiptDrafts.shownOf`, adversarial В1). */
   shown: Readonly<Record<number, string | null>> = {},
+  /** The lines typed on the review (`receiptDrafts.addedOf`, MOL-273), after the receipt's own. */
+  added: readonly AddedLineDraft[] = [],
+): ReviewLine[] {
+  return [
+    ...readLines(detail, draft, shown),
+    ...added.map((one, i) => addedLine(one, detail.lines.length + i)),
+  ]
+}
+
+/** A line typed on the review, as the rows and the balance read a line: nothing printed, nothing to check. */
+function addedLine(one: AddedLineDraft, position: number): ReviewLine {
+  const itemId = 'id' in one.item ? one.item.id : null
+  return {
+    position,
+    added: one.key,
+    line: {
+      printed: '',
+      hs: null,
+      sku: null,
+      quantity: one.figures.quantity,
+      price: null,
+      sum: null,
+      discount: null,
+      settled: true,
+      itemId,
+      itemName: one.item.name,
+      match: itemId === null ? 'new' : 'search',
+      translation: null,
+      amount: one.figures.amount,
+      rememberedPrice: null,
+    },
+    itemId,
+    name: one.item.name,
+    isNew: itemId === null,
+    check: false,
+    repaired: false,
+    mismatch: false,
+    quantity: one.figures.quantity,
+    amount: one.figures.amount,
+    skip: false,
+    edited: true,
+    ownFigures: true,
+    // counted apart, as added (MOL-273, В-1 «а»): not a line of the reading put right
+    changed: { item: false, figures: false },
+  }
+}
+
+function readLines(
+  detail: ReceiptDetail,
+  draft: ReceiptDraft | null,
+  shown: Readonly<Record<number, string | null>>,
 ): ReviewLine[] {
   const amounts = amountsOf(detail, draft)
   const country = detail.receipt.country
@@ -214,6 +272,8 @@ export function recordBody(
   const place = reviewPlace(detail, draft)
   if (!place) return null
   const id = placeIdOf(place)
+  const read = lines.filter((one) => one.added === undefined)
+  const typed = lines.filter((one) => one.added !== undefined)
   return {
     tripId,
     place: id ? { id } : { name: place.name, city: place.city },
@@ -223,10 +283,20 @@ export function recordBody(
     ...(account === undefined ? {} : { account }),
     // what was put right, which only the phone knows (MOL-222): counted by the server, never recorded
     edited: {
-      item: lines.filter((one) => !one.skip && one.changed.item).map((one) => one.position),
-      figures: lines.filter((one) => !one.skip && one.changed.figures).map((one) => one.position),
+      item: read.filter((one) => !one.skip && one.changed.item).map((one) => one.position),
+      figures: read.filter((one) => !one.skip && one.changed.figures).map((one) => one.position),
     },
-    lines: lines.map((one) =>
+    // the lines the reader lost, apart: the receipt's own keep their positions (MOL-273)
+    ...(typed.length === 0
+      ? {}
+      : {
+          added: typed.map((one) => ({
+            item: one.itemId ? { id: one.itemId } : { name: one.name },
+            quantity: one.quantity,
+            amount: one.amount,
+          })),
+        }),
+    lines: read.map((one) =>
       one.skip
         ? { position: one.position, skip: true as const }
         : {

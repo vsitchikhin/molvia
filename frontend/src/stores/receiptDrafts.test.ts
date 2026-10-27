@@ -94,3 +94,63 @@ describe('receiptDrafts — the account chosen on the review (MOL-312)', () => {
     expect(drafts.paymentOf(OTHER)).toBeNull()
   })
 })
+
+describe('receiptDrafts — the lines typed on the review (MOL-273)', () => {
+  const A = 'eeeeeeee-0000-4000-8000-000000000001'
+  const B = 'eeeeeeee-0000-4000-8000-000000000002'
+  const OTHER = 'cccccccc-0000-4000-8000-000000000002'
+  const none = { quantity: null, amount: null }
+
+  beforeEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+    setActivePinia(createPinia())
+    useActorStore().id = ME
+  })
+
+  it('keeps them in the order typed, beside the drafts, and puts one right by its key', () => {
+    const drafts = useReceiptDraftsStore()
+    drafts.setAdded(RECEIPT, { key: A, item: { name: 'Сметана' }, figures: none })
+    drafts.setAdded(RECEIPT, { key: B, item: { id: MILK, name: 'Молоко' }, figures: none })
+    drafts.setAdded(RECEIPT, { key: A, item: { name: 'Творог' }, figures: none })
+    expect(drafts.addedOf(RECEIPT).map((one) => [one.key, one.item.name])).toEqual([
+      [A, 'Творог'],
+      [B, 'Молоко'],
+    ])
+    expect(localStorage.getItem(`molvia.receipt-drafts.${ME}`)).toBeNull()
+    // read again by a new window of the app
+    setActivePinia(createPinia())
+    useActorStore().id = ME
+    expect(useReceiptDraftsStore().addedOf(RECEIPT)).toHaveLength(2)
+  })
+
+  it('drops a broken line alone, never the others', () => {
+    localStorage.setItem(
+      `molvia.receipt-added.${ME}`,
+      JSON.stringify({
+        [RECEIPT]: [
+          { key: 'not a key', item: { name: 'Сметана' }, figures: none },
+          { key: B, item: { name: 'Хлеб' }, figures: none },
+        ],
+      }),
+    )
+    expect(
+      useReceiptDraftsStore()
+        .addedOf(RECEIPT)
+        .map((one) => one.key),
+    ).toEqual([B])
+  })
+
+  it('removes one, and lets them all go with the receipt’s draft: recorded, removed, gone', () => {
+    const drafts = useReceiptDraftsStore()
+    drafts.setAdded(RECEIPT, { key: A, item: { name: 'Сметана' }, figures: none })
+    drafts.setAdded(RECEIPT, { key: B, item: { name: 'Хлеб' }, figures: none })
+    drafts.removeAdded(RECEIPT, A)
+    expect(drafts.addedOf(RECEIPT).map((one) => one.key)).toEqual([B])
+    drafts.setAdded(OTHER, { key: A, item: { name: 'Сметана' }, figures: none })
+    drafts.forget(RECEIPT)
+    expect(drafts.addedOf(RECEIPT)).toEqual([])
+    drafts.keepOnly(new Set([RECEIPT]))
+    expect(drafts.addedOf(OTHER)).toEqual([])
+  })
+})

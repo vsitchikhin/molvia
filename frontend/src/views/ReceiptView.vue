@@ -163,13 +163,23 @@
             {{ t('receipt.capture.retake') }}
           </AppButton>
         </AppNote>
-        <AppCard v-if="!noItems" class="block" list>
+        <AppCard class="block" list>
           <ReceiptLineRow
             v-for="one in lines"
-            :key="one.position"
+            :key="one.added ?? one.position"
             :line="one"
             :lang="lang"
             @open="!locked && openLine(one.position)"
+          />
+          <!-- A line the reader lost, typed from the paper (MOL-273, В-2 «а»): last in the card, by the
+               foot that says what the lines lack. -->
+          <ListRow
+            class="add-line"
+            :icon="IconPlus"
+            :title="t('receipt.added.add')"
+            :inactive="locked"
+            next
+            @click="!locked && openAdded(null)"
           />
         </AppCard>
         <ReceiptTotal
@@ -301,6 +311,17 @@
       @update:open="lineOpen = $event"
       @saved="saveLine"
     />
+    <ReceiptAddedLineSheet
+      v-if="addedMounted && detail"
+      :key="`${detail.receipt.id}-added-${openings}`"
+      :open="addedOpen"
+      :line="openedAdded"
+      :currency="currency"
+      :on-closed="addedClosed"
+      @update:open="addedOpen = $event"
+      @saved="saveAdded"
+      @removed="removeAdded"
+    />
     <ReceiptPlaceSheet
       v-if="detail"
       v-model:open="placeOpen"
@@ -360,6 +381,7 @@ import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconDelete from '~icons/mdi/delete-outline'
 import IconImageOff from '~icons/mdi/image-off-outline'
 import IconMessage from '~icons/mdi/message-text-outline'
+import IconPlus from '~icons/mdi/plus'
 import IconReceiptCheck from '~icons/mdi/receipt-text-check-outline'
 import { ApiError } from '@molvia/client'
 import {
@@ -392,6 +414,7 @@ import ReceiptLineRow from '@/components/ReceiptLineRow.vue'
 import ReceiptBarcodesSheet from '@/components/ReceiptBarcodesSheet.vue'
 import ReceiptLineSheet from '@/components/ReceiptLineSheet.vue'
 import ReceiptPlaceSheet from '@/components/ReceiptPlaceSheet.vue'
+import ReceiptAddedLineSheet from '@/components/ReceiptAddedLineSheet.vue'
 import ReceiptTotal from '@/components/ReceiptTotal.vue'
 import ReceiptTotalSheet from '@/components/ReceiptTotalSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
@@ -413,7 +436,7 @@ import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 import { receiptSlots, rememberPaymentAccount, rememberedAccount } from '@/stores/paymentAccounts'
 import { useReceiptDraftsStore } from '@/stores/receiptDrafts'
 import { placeIdOf } from '@/stores/receiptDrafts'
-import type { LineDraft, PlaceDraft } from '@/stores/receiptDrafts'
+import type { AddedLineDraft, LineDraft, PlaceDraft } from '@/stores/receiptDrafts'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
 
 /** The language a receipt of a country is printed in, for the system's face to pick its glyphs. */
@@ -450,6 +473,7 @@ export default defineComponent({
     ListRow,
     ReceiptLineRow,
     ReceiptBarcodesSheet,
+    ReceiptAddedLineSheet,
     ReceiptLineSheet,
     ReceiptPlaceSheet,
     ReceiptTotal,
@@ -488,9 +512,12 @@ export default defineComponent({
     })
     // A retake is the camera's, of a photo: a receipt by its link is pasted again, not shot
     const canRetake = computed(() => country.value !== null && !byLink.value)
+    /** The lines typed on the review (MOL-273): a receipt with no items takes purchases too. */
+    const added = computed(() => drafts.addedOf(id.value))
     const noItems = computed(() =>
       detail.value
-        ? withoutItems({
+        ? added.value.length === 0 &&
+          withoutItems({
             status: detail.value.receipt.status,
             lineCount: detail.value.lines.length,
           })
@@ -501,7 +528,9 @@ export default defineComponent({
     const taken = computed(() => localDay(detail.value?.receipt.capturedAt ?? new Date()))
 
     const lines = computed(() =>
-      detail.value ? reviewLines(detail.value, draft.value, drafts.shownOf(id.value)) : [],
+      detail.value
+        ? reviewLines(detail.value, draft.value, drafts.shownOf(id.value), added.value)
+        : [],
     )
     const balance = computed(() =>
       detail.value
@@ -807,9 +836,25 @@ export default defineComponent({
     const lineOpen = ref(false)
     const openings = ref(0)
     function openLine(position: number): void {
+      const typed = lines.value[position]?.added
+      if (typed !== undefined) {
+        openAdded(added.value.find((one) => one.key === typed) ?? null)
+        return
+      }
       opened.value = position
       openings.value += 1
       lineOpen.value = true
+    }
+
+    // The sheet of a line typed (MOL-273): mounted per opening, a new line or one typed before.
+    const addedMounted = ref(false)
+    const addedOpen = ref(false)
+    const openedAdded = ref<AddedLineDraft | null>(null)
+    function openAdded(line: AddedLineDraft | null): void {
+      openedAdded.value = line
+      openings.value += 1
+      addedMounted.value = true
+      addedOpen.value = true
     }
 
     const placeOpen = ref(false)
@@ -961,6 +1006,21 @@ export default defineComponent({
       lineOpen,
       openings,
       openLine,
+      addedMounted,
+      addedOpen,
+      openedAdded,
+      openAdded,
+      addedClosed: () => {
+        addedMounted.value = false
+        openedAdded.value = null
+      },
+      saveAdded: (line: AddedLineDraft) => {
+        drafts.setAdded(id.value, line)
+      },
+      removeAdded: (key: string) => {
+        drafts.removeAdded(id.value, key)
+      },
+      IconPlus,
       placeOpen,
       recordAfterPlace,
       totalOpen,

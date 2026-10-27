@@ -500,3 +500,46 @@ describe('what «Записать» says was put right', () => {
     })
   })
 })
+
+describe('lines the reader lost, typed on the review (MOL-273)', () => {
+  const KEY = 'eeeeeeee-0000-4000-8000-000000000001'
+  const sourCream = { key: KEY, item: { name: 'Сметана 20%' } }
+  const typed = [{ ...sourCream, figures: { quantity: null, amount: amd('90') } }]
+
+  it('stand after the receipt’s own lines, and the balance counts them: the difference closes', () => {
+    const lines = reviewLines(receiptA(), null, {}, typed)
+    expect(lines.map((one) => [one.position, one.added ?? null])).toEqual([
+      [0, null],
+      [1, null],
+      [2, null],
+      [3, null],
+      [4, KEY],
+    ])
+    expect(lines[4]).toMatchObject({ name: 'Сметана 20%', isNew: true, check: false })
+    expect(reviewBalance(receiptA(), lines, null)).toMatchObject({
+      difference: amd('0'),
+      recorded: 5,
+    })
+  })
+
+  it('a line typed with no sum is one with no figures, and leaves «Строки» to the rest', () => {
+    const empty = [{ ...sourCream, figures: { quantity: null, amount: null } }]
+    const balance = reviewBalance(receiptA(), reviewLines(receiptA(), null, {}, empty), null)
+    expect(balance).toMatchObject({ blank: 1, difference: amd('90') })
+  })
+
+  it('go apart from the receipt’s lines at «Записать», and are no line put right', () => {
+    const lines = reviewLines(receiptA(), null, {}, typed)
+    const body = recordBody(receiptA(), null, lines, TRIP, '2026-09-26')
+    expect(body?.lines.map((one) => one.position)).toEqual([0, 1, 2, 3])
+    expect(body?.added).toEqual([
+      { item: { name: 'Сметана 20%' }, quantity: null, amount: amd('90') },
+    ])
+    expect(body?.edited).toEqual({ item: [], figures: [] })
+  })
+
+  it('send nothing of their own when none was typed — a body the earlier server reads', () => {
+    const body = recordBody(receiptA(), null, reviewLines(receiptA(), null), TRIP, '2026-09-26')
+    expect(body).not.toHaveProperty('added')
+  })
+})
