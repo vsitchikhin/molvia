@@ -456,6 +456,174 @@ test('a phone of 430: the rent’s amount beside its words, as the handoff draws
   expect(await rentRow(page, 430)).toMatchObject({ under: false, lines: 1, inside: true })
 })
 
+// MOL-197, handoff 116 v2/06: the chosen account is the kit's chosen row — a ring of 2 on its layer, not
+// a fill alone, which the dark scheme did not show (Ф-5) — every row 64, the groups 24 apart and the
+// footnote 8 under the last card. The kit's ring and focus are held on WebKit by `kit-rows`.
+test('выбор счёта: строки 64, у выбранной кольцо 2 px, группы через 24, сноска через 8', async ({
+  page,
+}) => {
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  for (const [name, currency] of [
+    ['Наличные ֏', 'AMD'],
+    ['Карта ₽', 'RUB'],
+  ] as const) {
+    const response = await page.request.post('/api/money/accounts', {
+      headers,
+      data: {
+        id: randomUUID(),
+        name,
+        currency,
+        savings: false,
+        start: { amount: '1000', currency },
+        startOn: yesterday(),
+      },
+    })
+    expect(response.status(), await response.text()).toBe(201)
+  }
+  await open(page, '/money')
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  await expect(topSheet(page)).toContainText('Новая трата')
+  await page.waitForTimeout(400)
+  await topSheet(page)
+    .getByRole('button', { name: /Выбрать счёт:/ })
+    .click()
+  const picker = topSheet(page)
+  await expect(picker).toContainText('Остатки — на сейчас')
+  await expect(picker.getByRole('radio', { name: /Наличные ֏/ })).toBeChecked()
+
+  const look = await picker.evaluate((sheet) => {
+    const box = (one: Element | undefined | null) => {
+      if (!one) throw new Error('another shape')
+      return one.getBoundingClientRect()
+    }
+    const group = sheet.querySelector('[role="radiogroup"]')
+    const cards = [...(group?.querySelectorAll('ul') ?? [])]
+    const captions = [...(group?.querySelectorAll('h3') ?? [])]
+    const chosen = sheet.querySelector('[role="radio"][aria-checked="true"]')
+    if (!chosen) throw new Error('no chosen row')
+    const ring = /(-?[\d.]+)px inset|inset[^,]*?(-?[\d.]+)px\s*$/.exec(
+      getComputedStyle(chosen, '::before').boxShadow,
+    )
+    return {
+      heights: [...sheet.querySelectorAll('[role="radio"]')].map((row) =>
+        Math.round(box(row).height),
+      ),
+      ring: parseFloat(ring?.[1] ?? ring?.[2] ?? 'NaN'),
+      toCaption: Math.round(box(captions[1]).top - box(cards[0]).bottom),
+      toNone: Math.round(box(cards[2]).top - box(cards[1]).bottom),
+      toFootnote: Math.round(box(sheet.querySelector('.footnote')).top - box(cards[2]).bottom),
+      // On the tint muted is under 4.5:1 (MOL-172): the chosen balance is the title's ink, another's muted.
+      ink: [...sheet.querySelectorAll('[role="radio"]')]
+        .filter((row) => row.querySelector('.balance'))
+        .map((row) => {
+          const colour = (selector: string) => {
+            const one = row.querySelector(selector)
+            return one ? getComputedStyle(one).color : ''
+          }
+          return colour('.balance') === colour('.title')
+        }),
+    }
+  })
+  expect(look).toEqual({
+    heights: [64, 64, 64],
+    ring: 2,
+    toCaption: 24,
+    toNone: 24,
+    toFootnote: 8,
+    ink: [true, false],
+  })
+})
+
+// MOL-197, adversarial round 2, Б1: the chosen row's balance goes to ink only while it is not below zero —
+// a card in debt stays `bad-ink` on the tint; the e2e above sees two balances above zero, the unit test a class.
+test('выбор счёта: минус выбранной строки — bad-ink, плюс соседней — приглушённый', async ({
+  page,
+}) => {
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  for (const [name, currency, amount] of [
+    ['Кредитка ֏', 'AMD', '-12000'],
+    ['Карта ₽', 'RUB', '1000'],
+  ] as const) {
+    const response = await page.request.post('/api/money/accounts', {
+      headers,
+      data: {
+        id: randomUUID(),
+        name,
+        currency,
+        savings: false,
+        start: { amount, currency },
+        startOn: yesterday(),
+      },
+    })
+    expect(response.status(), await response.text()).toBe(201)
+  }
+  await open(page, '/money')
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  await expect(topSheet(page)).toContainText('Новая трата')
+  await page.waitForTimeout(400)
+  await topSheet(page)
+    .getByRole('button', { name: /Выбрать счёт:/ })
+    .click()
+  const picker = topSheet(page)
+  await expect(picker.getByRole('radio', { name: /Кредитка ֏/ })).toBeChecked()
+  const look = await picker.evaluate((sheet) => {
+    const ink = (token: string) => {
+      const probe = document.createElement('span')
+      probe.style.color = `var(${token})`
+      sheet.append(probe)
+      const colour = getComputedStyle(probe).color
+      probe.remove()
+      return colour
+    }
+    const balance = (checked: string) => {
+      const one = sheet.querySelector(`[role="radio"][aria-checked="${checked}"] .balance`)
+      return one ? getComputedStyle(one).color : ''
+    }
+    return {
+      chosenMinus: balance('true') === ink('--bad-ink'),
+      otherPlus: balance('false') === ink('--text-muted'),
+    }
+  })
+  expect(look).toEqual({ chosenMinus: true, otherPlus: true })
+})
+
+// MOL-197: the name's whole line was the least width of «Счёт ›», and a long one pushed the sheet of a
+// spending to 483 px on a phone of 320 — every field past the edge — instead of ending in «…».
+test('длинное имя счёта на 320: строка «Счёт ›» кончается «…», шторка не шире экрана', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 740 })
+  await signedIn(page)
+  const response = await page.request.post('/api/money/accounts', {
+    headers: await asBrowser(page),
+    data: {
+      id: randomUUID(),
+      name: 'Кредитка с очень длинным именем ֏',
+      currency: 'AMD',
+      savings: false,
+      start: { amount: '1000', currency: 'AMD' },
+      startOn: yesterday(),
+    },
+  })
+  expect(response.status(), await response.text()).toBe(201)
+  await open(page, '/money')
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  const sheet = topSheet(page)
+  const row = sheet.getByRole('button', { name: /Выбрать счёт:/ })
+  await expect(row).toContainText('Кредитка с очень длинным именем')
+  const look = await sheet.evaluate((dialog) => {
+    const value = dialog.querySelector('.row .value')
+    if (!value) throw new Error('no row')
+    return {
+      sideways: dialog.scrollWidth - dialog.clientWidth,
+      cut: value.scrollWidth > value.clientWidth,
+    }
+  })
+  expect(look).toEqual({ sideways: 0, cut: true })
+})
+
 // MOL-225, adversarial Р1-А3: the line drops while «Сохранить» works. A native `disabled` put on the
 // button at work took the focus out of the sheet to the page; the button keeps it, and its word.
 test('связь пропала, пока «Сохранить» работает: кнопка держит фокус и слово «Сохраняем…»', async ({
