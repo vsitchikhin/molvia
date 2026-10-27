@@ -29,6 +29,7 @@ import type { ItemRepository } from '@/db/items-repository'
 import type { ReceiptEdits, ReceiptToRecord, StoredReceiptLine } from '@/db/receipts-repository'
 import type { MemoryWord } from '@/db/store-memory-repository'
 import type { Transact } from '@/db/unit-of-work'
+import { knownAccounts, paymentOf } from './account-of'
 import { findByBarcode } from './find-by-barcode'
 import { shownLines } from './receipts'
 import type { ShownLines } from './receipts'
@@ -213,7 +214,8 @@ function receiptTotal(held: ReceiptToRecord, body: ReceiptRecordBody): Money | n
  * «Записать» (MOL-126): the receipt, as the phone holds it, written in one go — a trip finished on the
  * receipt's day at the rate of that day (Т-9), its purchases with their own sums, new items by the rules
  * of MOL-12, the shop's memory taught, the photo gone, the
- * rows of the lines recorded as read confirmed for the reader's retraining (В-4). The server works out
+ * rows of the lines recorded as read confirmed for the reader's retraining (В-4), the trip on the account
+ * the phone names (MOL-312). The server works out
  * every figure itself; the phone's are not trusted.
  *
  * Sent again with the same trip — the same answer; with another — a 409. The same receipt recorded
@@ -313,6 +315,12 @@ export async function recordReceipt(
     ]
     if ((await items.byIds(chosen)).length !== chosen.length) throw new DomainError(ERROR.CONFLICT)
 
+    // the account it was paid from, by the rules of the trip's own payment (MOL-312): one the person has
+    // not got, or «списано» in another currency than its, is «без счёта», never a refusal — the record
+    // came from a queue. The trip's money is the receipt's currency alone, its lines too
+    const payment = paymentOf(await knownAccounts(repositories, actor), null, body.account ?? {}, [
+      held.currency,
+    ])
     const snapshot = await tripRateOn(
       repositories,
       actor,
@@ -329,6 +337,7 @@ export async function recordReceipt(
           held.printedOn === body.purchasedOn
             ? receiptMomentOf(body.purchasedOn, held.printedTime, held.country)
             : null,
+        ...payment,
       },
       held.currency,
       snapshot,
