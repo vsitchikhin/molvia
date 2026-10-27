@@ -375,10 +375,10 @@ balance, total and difference is the server's.
   yesterday's balance over a card printing today's journal (adversarial А1), and the lock and the meta
   go by the same version as the footer (А1б). After a conflict it is the balance of the version read
   again, printed as the account's screen prints it — no «≈», no colour — and is the field's
-  description. **It stands only while the form holds the account's currency**: under a field already
-  in dollars a balance in roubles read as two currencies of one account (self-review Р1-1, А2). **The
-  price, named:** it is never worked out from what is typed — the phone adds nothing up — so 8 920 →
-  9 000 typed leaves «сейчас 8 470,12 $» until «Сохранить»; «сейчас» says it is what is recorded. **Offline the kit's `StatusStrip` is the sheet's first line, outside the form**, and
+  description. **The price, named:** it is never worked out from what is typed — the phone adds
+  nothing up — so 8 920 → 9 000 typed leaves «сейчас 8 470,12 $» until «Сохранить», and on an account
+  with no operations another currency chosen leaves it in the old one: «$» at the field, «сейчас 5 405 ₽»
+  under it (owner's «б» on self-review Р1-1, adversarial А2); «сейчас» says it is what is recorded. **Offline the kit's `StatusStrip` is the sheet's first line, outside the form**, and
   every button is not now in the focus order saying why on itself (Ф-6, owner's В-1 «а»): «Сохраним /
   Удалим / Уберём, когда будет связь». **«Убрать из выбора» is a ghost, «Удалить счёт» danger-ghost**:
   taken out of the choice an account loses nothing (Ф-34 by its pattern).
