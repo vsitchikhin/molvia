@@ -391,7 +391,7 @@ describe('TripView', () => {
     expect(plain(total.text())).toContain('5 000 ֏')
     expect(view.get('.receipt').text()).toBe(ru.trip.receipt.edit)
     // Сноска о позициях — только при позициях.
-    expect(view.find('.footnote').exists()).toBe(false)
+    expect(view.text()).not.toContain(ru.trip.footnote)
   })
 
   describe('запись с одной суммой по чеку — не «ничего нет» (адверсариальное Б1)', () => {
@@ -1347,7 +1347,7 @@ describe('TripView', () => {
     })
 
     async function askFinish(view: VueWrapper): Promise<void> {
-      await button(view, ru.trip.finish).trigger('click')
+      await docked(view, ru.trip.finish).trigger('click')
       await flushPromises()
       clock += 1000
     }
