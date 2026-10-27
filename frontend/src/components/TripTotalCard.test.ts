@@ -1,10 +1,12 @@
 import { mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { nextTick } from 'vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tripViewCodec } from '@molvia/model'
 import type { TripView } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
+import { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import TripTotalCard from '@/components/TripTotalCard.vue'
 
 interface Wire {
@@ -94,7 +96,6 @@ describe('TripTotalCard', () => {
   }
 
   const parts = (view: ReturnType<typeof card>) => view.findAll('.line .part').map(plain)
-  const stale = (view: ReturnType<typeof card>) => view.findAll('.line .part.stale').map(plain)
 
   it('сумма крупно, а под ней одной строкой — ≈ в валюте дохода и курс с датой', () => {
     const view = card()
@@ -326,34 +327,73 @@ describe('TripTotalCard', () => {
       expect(parts(view)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 0 ֏'])
     })
 
-    // Adversarial А1: a purchase removed or added is on the screen and not in the server's figures yet
-    // — the line spoke of a list no longer shown as if it were. It stays, as the previous answer while
-    // the next is on its way (round 3, В1: taken away, it moved the buttons under the card).
-    it('строки на экране не те, что посчитал сервер, — строка чека прежняя и приглушена (А1, В1)', () => {
+    // Adversarial А1: a purchase removed or added is on the screen and not in the server's figures yet.
+    // The line stands as it is for a second, as «обновляем» does (MOL-201) — sent with a connection,
+    // the answer comes first (round 3, В1) — and late, it says in words the prices will be counted
+    // again: whole contrast, heard by a screen reader (owner's В-3 «а», round 4, Г1, Г2).
+    describe('строки на экране не те, что посчитал сервер (А1, В1, В-3 «а»)', () => {
       const server = {
         receipt: amd('1400'),
         prices: [amd('570')],
         gap: { kind: 'unpriced' as const, amount: amd('830') },
         rows: [amd('570'), null],
       }
-      const removing = card({
-        trip: trip({ converted: null, rate: null, total: [amd('1400')], ...server }),
-        rows: { kept: 1, unpriced: 0 },
+      const was = ['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏']
+      const late = (view: ReturnType<typeof card>) => view.findAll('.line .part.late').map(plain)
+      afterEach(() => {
+        vi.useRealTimers()
       })
-      expect(plain(removing.get('.sum'))).toBe('1 400 ֏')
-      expect(stale(removing)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
-      const adding = card({
-        trip: trip({ converted: null, rate: null, total: [amd('1400')], ...server }),
-        rows: { kept: 3, unpriced: 1 },
+
+      for (const [name, rows] of [
+        ['покупка удаляется', { kept: 1, unpriced: 0 }],
+        ['покупка добавлена', { kept: 3, unpriced: 1 }],
+        ['обмен при тех же числах (Б1)', { kept: 2, unpriced: 1, settled: false }],
+      ] as const)
+        it(`${name}: секунду строка как есть, потом — слова пересчёта`, async () => {
+          vi.useFakeTimers()
+          const view = card({
+            trip: trip({ converted: null, rate: null, total: [amd('1400')], ...server }),
+            rows,
+          })
+          expect(plain(view.get('.sum'))).toBe('1 400 ֏')
+          expect(parts(view)).toEqual(was)
+          expect(late(view)).toEqual([])
+          vi.advanceTimersByTime(STRIP_LATE_MS - 1)
+          await nextTick()
+          expect(parts(view)).toEqual(was)
+          vi.advanceTimersByTime(1)
+          await nextTick()
+          expect(late(view)).toEqual([ru.trip.receipt.line_pending])
+          expect(parts(view)).toEqual([ru.trip.receipt.line_pending])
+        })
+
+      it('ответ пришёл до секунды — ничего не менялось, и слова не приходят', async () => {
+        vi.useFakeTimers()
+        const view = card({
+          trip: trip({ converted: null, rate: null, total: [amd('1400')], ...server }),
+          rows: { kept: 2, unpriced: 1, settled: false },
+        })
+        await view.setProps({ rows: { kept: 2, unpriced: 1, settled: true } })
+        vi.advanceTimersByTime(STRIP_LATE_MS * 2)
+        await nextTick()
+        expect(parts(view)).toEqual(was)
       })
-      expect(stale(adding)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
-      // Control: the same list on screen as the server's — the line is said.
-      const same = card({
-        trip: trip({ converted: null, rate: null, total: [amd('1400')], ...server }),
-        rows: { kept: 2, unpriced: 1 },
+
+      it('с курсом — словами только части чека: «≈» и курс не о списке', async () => {
+        vi.useFakeTimers()
+        const view = card({
+          trip: trip({ total: [amd('1400')], ...server }),
+          rows: { kept: 2, unpriced: 1, settled: false },
+        })
+        vi.advanceTimersByTime(STRIP_LATE_MS)
+        await nextTick()
+        expect(parts(view)).toEqual([
+          ru.trip.receipt.line_pending,
+          '≈ 1 347 ₽',
+          'курс 4,82 ֏/₽',
+          '15 янв.',
+        ])
       })
-      expect(parts(same)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
-      expect(stale(same)).toEqual([])
     })
 
     it('ни одной цены — так и сказано, сумма без цены не повторяет итог', () => {
@@ -363,24 +403,6 @@ describe('TripTotalCard', () => {
         rows: [null, null],
       })
       expect(parts(view)).toEqual([ru.trip.receipt.line_none])
-    })
-
-    it('строка, где покупка удаляется или ждёт отправки, — строка чека приглушена и при тех же числах (Б1)', () => {
-      const view = card({
-        trip: trip({
-          converted: null,
-          rate: null,
-          total: [amd('1400')],
-          receipt: amd('1400'),
-          prices: [amd('570')],
-          gap: { kind: 'unpriced', amount: amd('830') },
-          rows: [amd('570'), null],
-        }),
-        rows: { kept: 2, unpriced: 1, settled: false },
-      })
-      expect(stale(view)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
-      // Only the receipt's parts: the rate and «≈» are not about the list.
-      expect(view.findAll('.line .part').length).toBe(stale(view).length)
     })
 
     it('тире не начинает строку, «n из m» не рвётся: хвост после тире неразрывный (ревью 2, №3, П1)', () => {

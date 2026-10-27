@@ -40,6 +40,7 @@
       "line_under": "the receipt is {amount} more than the prices",
       "line_unpriced": "no price — {amount}",
       "line_none": "no prices yet",
+      "line_pending": "prices will be counted again once the items are sent",
       "sending": "Receipt total {amount} · sending",
       "removing": "Receipt total being removed · sending",
       "sheet": {

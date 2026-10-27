@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -9,6 +9,7 @@ import {
   yerevanDate,
 } from '@molvia/model'
 import type { Money, RateProvider, TripView } from '@molvia/model'
+import { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import { calendarDay } from '@/days'
 import { read, writeEverywhere } from '@/stores/storage'
 
@@ -55,7 +56,8 @@ export interface TripTotal {
   readonly flipped: Ref<boolean>
   readonly flip: () => void
   readonly receiptParts: ComputedRef<string[]>
-  readonly receiptStale: ComputedRef<boolean>
+  /** The receipt's line is the words of a recount: a write of the record late on its way. */
+  readonly receiptLate: Ref<boolean>
   readonly waiting: ComputedRef<string | null>
 }
 
@@ -199,6 +201,35 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
   // Nothing to swap without a conversion: a lone total is not two numbers.
   const flippable = computed(() => converted.value !== null)
 
+  /** The rows on screen are not the list `prices` and `gap` were counted on: a write is on its way. */
+  const receiptStale = computed(() => {
+    const trip = props.trip
+    const rows = props.rows
+    if (!trip?.receipt || !rows) return false
+    const all = trip.expenses.length
+    const priced = trip.expenses.filter((expense) => expense.amount !== null).length
+    return rows.settled === false || rows.kept !== all || rows.unpriced !== all - priced
+  })
+
+  /** A write still on its way past `STRIP_LATE_MS`: then the line says so in words. */
+  const receiptLate = ref(false)
+  let late: ReturnType<typeof setTimeout> | undefined
+  watch(
+    receiptStale,
+    (stale) => {
+      clearTimeout(late)
+      receiptLate.value = false
+      if (stale)
+        late = setTimeout(() => {
+          receiptLate.value = true
+        }, STRIP_LATE_MS)
+    },
+    { immediate: true },
+  )
+  onScopeDispose(() => {
+    clearTimeout(late)
+  })
+
   /**
    * «по ценам 10 070 ֏ · чек меньше цен на 200 ֏» — what the prices say beside the receipt's sum, as parts
    * of the card's one line (MOL-207, Ф-23): every figure the server's (`prices`, `gap`), each with its
@@ -216,11 +247,14 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
    *
    * **Of the list the server counted** (adversarial А1): a purchase removed or added is on the screen
    * and not in `prices` and `gap` until its answer, and «— 1 из 2 · без цены — 830 ֏» over a struck-out
-   * loaf spoke of a list no longer shown as if it were. While a row is being removed or waits to be sent
-   * the line is that previous answer while the next is on its way — `receiptStale`, drawn at
-   * `--opacity-stale`, judged by the rows and not their counts: milk swapped for cheese keeps both (round
-   * 2, Б1). Taken away instead, it went and came back in one frame with every purchase sent online,
-   * moving the buttons under the card (round 3, В1). The receipt's sum above it is the server's and true.
+   * loaf spoke of a list no longer shown. While a row is being removed or waits to be sent — judged by
+   * the rows, not their counts: milk swapped for cheese keeps both (round 2, Б1) — the line stands as
+   * it is for `STRIP_LATE_MS`, as «обновляем» does (MOL-201): sent with a connection, the answer comes
+   * first and nothing changes. Late, the line says in words that the prices will be counted again —
+   * whole contrast, heard by a screen reader (owner's В-3 «а», round 4). Taken away at once it went and
+   * came back with every purchase sent (round 3, В1); dimmed it read 2.1:1 for as long as the phone had
+   * no signal, and said nothing to a screen reader (round 4, Г1, Г2). The receipt's sum above it is the
+   * server's and true.
    *
    * **A dash never starts a line, and «12 из 14» is never cut** (review round 2, №3, П1): what follows
    * the dash of a part — the count, the sum — goes with it, no-break; the words before wrap.
@@ -228,6 +262,7 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
   const receiptParts = computed(() => {
     const trip = props.trip
     if (!trip?.receipt || trip.expenses.length === 0) return []
+    if (receiptLate.value) return [t('trip.receipt.line_pending')]
     const all = trip.expenses.length
     const priced = trip.expenses.filter((expense) => expense.amount !== null).length
     if (trip.prices.length === 0) return [t('trip.receipt.line_none')]
@@ -254,16 +289,6 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
     })
   })
 
-  /** The rows on screen are not the list `prices` and `gap` were counted on: a write is on its way. */
-  const receiptStale = computed(() => {
-    const trip = props.trip
-    const rows = props.rows
-    if (!trip?.receipt || !rows) return false
-    const all = trip.expenses.length
-    const priced = trip.expenses.filter((expense) => expense.amount !== null).length
-    return rows.settled === false || rows.kept !== all || rows.unpriced !== all - priced
-  })
-
   const waiting = computed(() => {
     const held = props.receiptWaiting
     if (!held) return null
@@ -283,7 +308,7 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
     flipped,
     flip,
     receiptParts,
-    receiptStale,
+    receiptLate,
     waiting,
   }
 }

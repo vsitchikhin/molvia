@@ -7,7 +7,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, getActivePinia, setActivePinia } from 'pinia'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, nextTick } from 'vue'
 import { RouterView, createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
@@ -16,6 +16,7 @@ import type { TripView } from '@molvia/model'
 import ru from '@/i18n/ru.json'
 import { dayOfAnyYear, timeOfDay } from '@/days'
 import { createAppI18n } from '@/i18n'
+import { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useTripHistoryStore } from '@/stores/tripHistory'
@@ -291,8 +292,6 @@ describe('FinishedTripView: строка чека и удаление запис
   const plainText = (view: VueWrapper) => view.text().replaceAll('\u00a0', ' ')
   const parts = (view: VueWrapper) =>
     view.findAll('.total .line .part').map((part) => part.text().replaceAll('\u00a0', ' '))
-  const stale = (view: VueWrapper) =>
-    view.findAll('.total .line .part.stale').map((part) => part.text().replaceAll('\u00a0', ' '))
   const removeButton = (view: VueWrapper) =>
     view.findAll('button').find((button) => button.text().includes(ru.trip.remove.action))
   const BREAD = row(null, 2).id
@@ -308,26 +307,32 @@ describe('FinishedTripView: строка чека и удаление запис
     gap: null,
   })
 
-  it('А1: хлеб без цены удаляется без связи — строка чека прежняя, приглушена; сумма чека стоит', async () => {
+  it('А1: хлеб без цены удаляется — секунду строка чека как есть, потом слова пересчёта', async () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
     trip.mockResolvedValue(finished)
     const view = await render(null)
     expect(parts(view)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
 
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     useTripQueueStore().enqueue({ kind: 'remove', tripId: TRIP, expenseId: BREAD })
-    await flushPromises()
+    await nextTick()
 
     expect(view.findAll('.row')[1]?.classes()).toContain('gone')
-    expect(stale(view)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
+    expect(parts(view)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
+    vi.advanceTimersByTime(STRIP_LATE_MS)
+    await nextTick()
+    expect(parts(view)).toEqual([ru.trip.receipt.line_pending])
     expect(plainText(view)).toContain('1 400 ֏')
+    vi.useRealTimers()
   })
 
   // Round 2, Б1: milk swapped for cheese keeps both counts — the list is judged by its rows.
-  it('Б1: молоко заменено сыром без связи — счёт строк тот же, а строка чека приглушена', async () => {
+  it('Б1: молоко заменено сыром — счёт строк тот же, а через секунду строка чека говорит о пересчёте', async () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
     trip.mockResolvedValue(finished)
     const view = await render(null)
     const queue = useTripQueueStore()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     queue.enqueue({ kind: 'remove', tripId: TRIP, expenseId: row(null, 1).id })
     queue.enqueue({
       kind: 'add',
@@ -346,10 +351,13 @@ describe('FinishedTripView: строка чека и удаление запис
         amount: parseMoney('900', 'AMD'),
       },
     })
-    await flushPromises()
+    await nextTick()
     expect(view.findAll('.row')).toHaveLength(3)
-    expect(stale(view)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
+    vi.advanceTimersByTime(STRIP_LATE_MS)
+    await nextTick()
+    expect(parts(view)).toEqual([ru.trip.receipt.line_pending])
     expect(plainText(view)).toContain('1 400 ֏')
+    vi.useRealTimers()
   })
 
   // Round 2, Б2: read back from the shelf the total of a record whose purchases are being removed may
