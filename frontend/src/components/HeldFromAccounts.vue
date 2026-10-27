@@ -88,16 +88,30 @@ export default defineComponent({
   background: var(--surface-2);
   color: var(--text-muted);
   font-size: var(--text-footnote);
+  font-variant-numeric: tabular-nums;
 }
 
+/* The one thing to press in the line (handoff 116 v2/07): its own 13/700 with sides of 8, which a
+   ghost of the kit — 17 and 16 — is not; the kit's hover and focus all the same. */
 .fill {
   min-height: var(--touch-target);
   padding: 0 var(--space-2);
   border: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--accent-ink);
   font: inherit;
   font-weight: var(--weight-bold);
   cursor: pointer;
+
+  @media (hover: hover) {
+    &:hover {
+      background: var(--accent-tint);
+    }
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
 }
 </style>

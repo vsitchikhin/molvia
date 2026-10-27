@@ -16,6 +16,7 @@ import type {
 } from '@molvia/model'
 import AccountPickerSheet from './AccountPickerSheet.vue'
 import IncomeSheet from './IncomeSheet.vue'
+import ListRow from './ListRow.vue'
 import SpendingSheet from './SpendingSheet.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
@@ -372,6 +373,70 @@ describe('AccountPickerSheet', () => {
     expect(names.join()).not.toContain('Old card')
     expect(view.get('[aria-checked="true"]').text()).toContain('Cash ֏')
   })
+
+  // Ф-5: the chosen account is the kit's chosen row — the fill, the ring and the ✓ — not a fill alone,
+  // which the dark scheme did not show (handoff 116 v2/06, MOL-197).
+  it('draws every account as a row of the kit, the chosen one selected and alone checked', async () => {
+    const view = await mounted(
+      AccountPickerSheet,
+      { open: true, title: 'Account', accounts: [card, cash], currency: 'AMD', selected: card.id },
+      withAccounts([cash]),
+    )
+    const rows = view.findAllComponents(ListRow)
+    expect(rows.map((row) => row.props('title'))).toEqual([
+      'Cash ֏',
+      'Card ₽',
+      en.accounts.picker.none,
+    ])
+    expect(rows.map((row) => row.props('selected'))).toEqual([false, true, false])
+    expect(view.findAll('[aria-checked="true"]')).toHaveLength(1)
+    expect(view.get('[aria-checked="true"]').text()).toContain('Card ₽')
+    expect(rows[1]?.props('meta')).toBe('RUB')
+  })
+
+  it('«Без счёта» is the chosen row when no account is', async () => {
+    const view = await mounted(
+      AccountPickerSheet,
+      { open: true, title: 'Account', accounts: [cash], currency: 'AMD', selected: null },
+      withAccounts([cash]),
+    )
+    expect(view.get('[aria-checked="true"]').text()).toContain(en.accounts.picker.none)
+    expect(view.get('[aria-checked="true"]').text()).toContain(en.accounts.picker.none_hint)
+  })
+
+  it('a balance below zero is the bad ink, on the chosen row too', async () => {
+    const debt = account('Credit card ֏', 'AMD', { balance: { minor: -12_000n, currency: 'AMD' } })
+    const view = await mounted(
+      AccountPickerSheet,
+      { open: true, title: 'Account', accounts: [cash, debt], currency: 'AMD', selected: debt.id },
+      withAccounts([cash, debt]),
+    )
+    const balances = view.findAll('.balance')
+    expect(balances.map((one) => one.classes('negative'))).toEqual([false, true])
+    expect(view.get('[aria-checked="true"] .balance').classes()).toContain('negative')
+  })
+
+  // Muted under 4.5:1 on the tint (MOL-172): the chosen row's balance is ink, by the sheet's own choice.
+  it('only the chosen row’s balance is marked chosen, which the ink goes by', async () => {
+    const view = await mounted(
+      AccountPickerSheet,
+      { open: true, title: 'Account', accounts: [cash, card], currency: 'AMD', selected: card.id },
+      withAccounts([cash, card]),
+    )
+    expect(view.findAll('.balance').map((one) => one.classes('chosen'))).toEqual([false, true])
+    expect(view.get('[aria-checked="true"] .balance').classes()).toContain('chosen')
+  })
+
+  it('a tap on a row picks it and closes the sheet', async () => {
+    const view = await mounted(
+      AccountPickerSheet,
+      { open: true, title: 'Account', accounts: [cash, card], currency: 'AMD', selected: cash.id },
+      withAccounts([cash, card]),
+    )
+    await view.findAll('[role="radio"]')[1]?.trigger('click')
+    expect(view.emitted('pick')).toEqual([[card.id]])
+    expect(view.emitted('update:open')).toEqual([[false]])
+  })
 })
 
 describe('the picker of a transfer (MOL-253, handoff 02)', () => {
@@ -386,7 +451,7 @@ describe('the picker of a transfer (MOL-253, handoff 02)', () => {
     )
   }
   const names = () =>
-    [...document.body.querySelectorAll('button[role="radio"] .name')].map((one) =>
+    [...document.body.querySelectorAll('button[role="radio"] .title')].map((one) =>
       one.textContent.trim(),
     )
 
