@@ -15,6 +15,7 @@ import type {
   ReceiptDetail,
   ReceiptRecordBody,
   ReceiptReviewLine,
+  TripPaymentBody,
 } from '@molvia/model'
 import { placeIdOf } from '@/stores/receiptDrafts'
 import type { PlaceDraft, ReceiptDraft } from '@/stores/receiptDrafts'
@@ -207,6 +208,8 @@ export function recordBody(
   taken: string,
   /** The lines whose code the person binds (MOL-234): absent — none was asked about. */
   barcodes?: readonly number[],
+  /** The account it was paid from (MOL-312): absent — «Без счёта», or no account at all. */
+  account?: TripPaymentBody,
 ): ReceiptRecordBody | null {
   const place = reviewPlace(detail, draft)
   if (!place) return null
@@ -217,6 +220,7 @@ export function recordBody(
     purchasedOn: reviewDay(detail, draft, taken),
     ...(draft?.total ? { total: draft.total } : {}),
     ...(barcodes === undefined ? {} : { barcodes: [...barcodes] }),
+    ...(account === undefined ? {} : { account }),
     // what was put right, which only the phone knows (MOL-222): counted by the server, never recorded
     edited: {
       item: lines.filter((one) => !one.skip && one.changed.item).map((one) => one.position),

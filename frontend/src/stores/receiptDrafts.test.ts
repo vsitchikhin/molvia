@@ -45,3 +45,39 @@ describe('receiptDrafts — what the review showed at the first edit (MOL-222, a
     expect(drafts.shownOf(RECEIPT)).toEqual({})
   })
 })
+
+describe('receiptDrafts — the account chosen on the review (MOL-312)', () => {
+  const CARD = '00000000-0000-4000-8000-000000000001'
+  const OTHER = 'cccccccc-0000-4000-8000-000000000002'
+
+  beforeEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+    setActivePinia(createPinia())
+    useActorStore().id = ME
+  })
+
+  it('keeps it beside the drafts, where the build before never reads it', () => {
+    const drafts = useReceiptDraftsStore()
+    drafts.setPayment(RECEIPT, { accountId: CARD, debited: '1100,50' })
+    expect(drafts.paymentOf(RECEIPT)).toEqual({ accountId: CARD, debited: '1100,50' })
+    expect(localStorage.getItem(`molvia.receipt-drafts.${ME}`)).toBeNull()
+    // read again by a new window of the app
+    setActivePinia(createPinia())
+    useActorStore().id = ME
+    expect(useReceiptDraftsStore().paymentOf(RECEIPT)).toEqual({
+      accountId: CARD,
+      debited: '1100,50',
+    })
+  })
+
+  it('lets it go with the receipt’s draft: recorded, removed, gone', () => {
+    const drafts = useReceiptDraftsStore()
+    drafts.setPayment(RECEIPT, { accountId: null, debited: '' })
+    drafts.setPayment(OTHER, { accountId: CARD, debited: '' })
+    drafts.forget(RECEIPT)
+    expect(drafts.paymentOf(RECEIPT)).toBeNull()
+    drafts.keepOnly(new Set([RECEIPT]))
+    expect(drafts.paymentOf(OTHER)).toBeNull()
+  })
+})
