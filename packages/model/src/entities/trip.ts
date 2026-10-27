@@ -61,6 +61,12 @@ const tripFields = z.object({
   manualRate: exchangeRateSchema.nullable().default(null),
   rateChoice: rateChoiceSchema.nullable().default(null),
   startedAt: z.date(),
+  /**
+   * The day the trip is dated by for the person (MOL-121): the phone's day of «Начать», or a receipt's
+   * day of purchase (MOL-126) — a receipt recorded weeks later is still of its own day. Absent for a
+   * trip from an old queue: then the day of `startedAt` in Yerevan.
+   */
+  startedOn: z.iso.date().nullable().optional(),
   finishedAt: z.date().nullable(),
   /** Device completion is a separate clock: an offline finish may precede server start. */
   finishedOnDeviceAt: z.date().nullable().optional(),
@@ -169,14 +175,22 @@ export function manualRateFor(
 }
 
 /**
- * Whether the official rate a trip counts by was over a week old when the trip started — the
- * screen's «курс на 1 сентября, с тех пор ЦБ РА не менялся» (MOL-39, Р-18). A personal rate is
+ * Whether the official rate a trip counts by was over a week old on the day the trip is dated by —
+ * the screen's «курс на 1 сентября, с тех пор ЦБ РА не менялся» (MOL-39, Р-18). A personal rate is
  * the person's own and never stale here.
+ *
+ * **Judged by the trip's day, never by when the server got it** (MOL-207, Е-14): a receipt of the 1st
+ * recorded on the 12th counts by the rate of the 1st, and measured from the 12th it was «silent
+ * since» while the bank had published every day. **A rate newer than that day is not stale** — a
+ * start the queue sent days late takes the rate of the day it arrived (Ж1), and «с тех пор» about a
+ * day after the trip is untrue; its date stands beside it in the rate's line anyway.
  */
 export function isTripRateStale(trip: Trip): boolean {
   const rate = effectiveRate(trip)
   if (rate === null || rate.source === 'personal') return false
-  return !isRateFresh(yerevanDate(rate.asOf), yerevanDate(trip.startedAt))
+  const day = trip.startedOn ?? yerevanDate(trip.startedAt)
+  const rateDay = yerevanDate(rate.asOf)
+  return rateDay < day && !isRateFresh(rateDay, day)
 }
 
 /**

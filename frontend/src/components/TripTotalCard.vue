@@ -22,21 +22,17 @@
       <!-- Money paid in another currency — and, flipped, the exact sum — under the figure on a line of
            its own: beside «≈» in the same currency it read «1 000 ₽ ≈ 1 347 ₽» (adversarial А4). -->
       <span v-if="rest.length > 0" class="line">{{ rest.join(' · ') }}</span>
-      <!-- One line of parts, every figure the strip had, each with its words (MOL-206, Ф-23). -->
+      <!-- One line of parts, every figure with its words (Ф-23): what the prices say beside a receipt's
+           sum (MOL-207), how much has a price, «≈» and the rate. -->
       <span v-if="parts.length > 0" class="line">
-        <template v-for="(part, index) in parts" :key="part">
+        <template v-for="(part, index) in parts" :key="part.text">
           <template v-if="index > 0"> · </template>
-          <span class="part">{{ part }}</span>
+          <span class="part" :class="{ 'receipt-part': part.receipt, late: part.late }">{{
+            part.text
+          }}</span>
         </template>
       </span>
       <span v-if="caveat" class="note">{{ caveat }}</span>
-      <!-- What the prices say beside the receipt's sum (MOL-78, В-2): every figure the server's. -->
-      <span v-if="split.length > 0" class="split">
-        <span v-for="line in split" :key="line.key" class="split-line" :class="{ warn: line.warn }">
-          <span>{{ line.label }}</span>
-          <span v-if="line.amount" class="amount">{{ line.amount }}</span>
-        </span>
-      </span>
       <span v-if="waiting" class="note waiting">{{ waiting }}</span>
     </component>
   </AppCard>
@@ -53,10 +49,10 @@ import { useTripTotal } from '@/composables/useTripTotal'
 
 /**
  * «ИТОГО 1 000 ֏ · С ценой — 1 из 2 · без цены — 1 · ≈ 236 ₽ · курс 4,24 ֏/₽ · 27 окт.» — the total
- * of the record typed by hand as a card under its list (MOL-206, handoff 7a, owner's В-17 «а»). The
- * strip went to the actions (Ф-22); what it said stays, every figure the server's (`useTripTotal`):
- * the other currencies, how much of the list has a price, «≈» in the income currency and the rate,
- * the caveats, and with a receipt's sum what the prices say beside it.
+ * of a record as a card under its list: the one typed by hand (MOL-206, handoff 7a, owner's В-17 «а»)
+ * and the finished one (MOL-207, Ф-23). Every figure the server's (`useTripTotal`): the other
+ * currencies, how much of the list has a price, «≈» in the income currency and the rate, the caveats,
+ * and with a receipt's sum what the prices say beside it — one line of parts, no column.
  *
  * **The card holds no other control**: «+ Сумма по чеку» stands under it on the screen — a button in
  * a button is no HTML, and the whole card is the flip.
@@ -76,9 +72,16 @@ export default defineComponent({
       type: Object as PropType<{ readonly receipt: Money | null } | null>,
       default: null,
     },
-    /** The rows on screen and those with no price, as «Закончить» counts them (`useTripReceipt`). */
+    /**
+     * The rows on screen and those with no price, as «Закончить» counts them, and whether they are the
+     * server's list (`useTripReceipt`).
+     */
     rows: {
-      type: Object as PropType<{ readonly kept: number; readonly unpriced: number } | null>,
+      type: Object as PropType<{
+        readonly kept: number
+        readonly unpriced: number
+        readonly settled?: boolean
+      } | null>,
       default: null,
     },
   },
@@ -87,18 +90,27 @@ export default defineComponent({
     const total = useTripTotal(props)
 
     /**
-     * The line breaks only between its parts, never inside one (review 3, №2): a rate's figure and its
-     * signs, a day and its month, «≈» and its amount come with ordinary spaces, and «курс 4,24 / ֏/₽» or
-     * «27 / окт.» read as two things. Each part split at its own «·», its spaces made no-break. The «·»
-     * is the dictionary's: `trip.total_line` and `trip.rate_line*` put one between their pieces in every
-     * locale, and `TripTotal.test.ts` holds both dictionaries to it (review 4, №1).
+     * The rate, «≈» and «С ценой» break only between their parts, never inside one (review 3, №2): a
+     * rate's figure and its signs, a day and its month, «≈» and its amount come with ordinary spaces,
+     * and «курс 4,24 / ֏/₽» or «27 / окт.» read as two things. Each part split at its own «·», its spaces
+     * made no-break. The «·» is the dictionary's: `trip.total_line` and `trip.rate_line*` put one between
+     * their pieces in every locale, and `TripTotalCard.test.ts` holds both dictionaries to it (review 4,
+     * №1). **The receipt's parts are phrases and wrap between their words** (MOL-207, review №1): whole,
+     * they broke at any letter past the card's width — «the receipt is ֏10,070 less than the pri / ces»
+     * at 320; their sums come non-breaking from `formatMoney`, and the tail after a dash from
+     * `receiptParts`.
      */
-    const parts = computed(() =>
-      [total.priced.value, total.estimate.value, total.rateLine.value]
+    const parts = computed(() => [
+      ...total.receiptParts.value.map((text) => ({
+        text,
+        receipt: true,
+        late: total.receiptLate.value,
+      })),
+      ...[total.priced.value, total.estimate.value, total.rateLine.value]
         .filter((part): part is string => part !== null)
         .flatMap((part) => part.split(' · '))
-        .map((part) => part.replaceAll(' ', '\u00a0')),
-    )
+        .map((part) => ({ text: part.replaceAll(' ', '\u00a0'), receipt: false, late: false })),
+    ])
 
     return {
       t,
@@ -106,7 +118,6 @@ export default defineComponent({
       rest: total.rest,
       parts,
       caveat: total.caveat,
-      split: total.split,
       waiting: total.waiting,
       flippable: total.flippable,
       flipped: total.flipped,
@@ -158,8 +169,7 @@ export default defineComponent({
 }
 
 .line,
-.note,
-.split {
+.note {
   color: var(--text-muted);
   font-size: var(--text-footnote);
   font-variant-numeric: tabular-nums;
@@ -170,36 +180,18 @@ export default defineComponent({
   line-height: var(--leading-snug);
 }
 
-/* A part is whole (review 3, №2), and breaks inside only where it alone is wider than the card — the
+/* A part of the rate, «≈» or «С ценой» is whole (review 3, №2), a phrase of the receipt wraps between
+   its words (MOL-207); either breaks inside a word only where that alone is wider than the card — the
    rate named with its bank once stood past it on every phone (review 2, №1). */
 .part {
   overflow-wrap: anywhere;
-}
 
-.split {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  margin-top: var(--space-1);
-}
-
-.split-line {
-  display: flex;
-  gap: var(--space-3);
-  justify-content: space-between;
-
-  &.warn {
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
-    background: var(--warn-tint);
-    color: var(--warn-ink);
+  /* The receipt's parts come in faded, never in one frame (MOL-151), with no rise — they stand in a line
+     of text: the words of a recount once a write is late (owner's В-3 «а»), and the figures of the
+     answer after them (MOL-207, round 5, Д1). A part is keyed by its text, so only what changed plays. */
+  &.receipt-part {
+    @include appear(0);
   }
-}
-
-.amount {
-  color: var(--text);
-  font-weight: var(--weight-medium);
-  white-space: nowrap;
 }
 
 .hidden {

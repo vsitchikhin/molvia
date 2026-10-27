@@ -52,7 +52,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 
 ## frontend · views
 
-- `frontend/src/views/FinishedTripView.vue` — «Записанные покупки» (`/purchases/:id`): a finished trip's purchases, adding and amending them, and «Удалить запись».
+- `frontend/src/views/FinishedTripView.vue` — «Записанные покупки» (`/purchases/:id`, MOL-207): named by its place, «город · день, время» under it, the purchases, the total as the card of the record typed by hand under them, «+ Сумма по чеку», «Добавить позицию» and «Удалить запись» after it; one `StatusStrip` of the connection, the answer's skeleton.
 - `frontend/src/views/PurchasesView.vue` — «Покупки» tab (MOL-128): the record going on first, «ждут оценки», «Записаны» with count and sum, rows of the kit (`ListRow`, MOL-204), one `StatusStrip` over what a failed read drew from memory, dated by the older such read, the receipts' own quiet card with none of them shown, «Раньше … — со связью» offline, «Записать покупки» in the strip, four states.
 - `frontend/src/views/SettingsView.vue` — «Настройки» screen: the four settings with draft and conflict notices, links to devices and «Выйти», and the group «Ваши данные» (`YourDataGroup`).
 - `frontend/src/views/TripView.vue` — The record typed by hand (`/purchases/manual`, MOL-128): named by its place, rows, the total as a card under them, «Удалить запись»; the strip «Штрихкод · + Позиция · Закончить» (MOL-206), one `StatusStrip` of the connection, the queue's notices over the skeleton; goes up to «Покупки» once no record is open.
@@ -72,15 +72,14 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 - `frontend/src/components/TripRateSheet.vue` — Sheet «По какому курсу считать» after a jump: new, previous or own rate, sent directly rather than queued.
 - `frontend/src/components/TripRemoveSheet.vue` — Sheet «Удалить запись?»: names the shop, the day and how many rows go.
 - `frontend/src/components/TripRow.vue` — One purchase line of a trip on the kit's `ListRow` (MOL-206): item, quantity and price per unit, the amount or «—», the chevron of a row that opens, its queue mark.
-- `frontend/src/components/TripTotal.vue` — «ИТОГО» of a finished record as a strip in `#docked`, what `useTripTotal` says, the receipt's button by the screen's word; goes with MOL-207.
-- `frontend/src/components/TripTotalCard.vue` — The total of the record typed by hand as a card under its list (MOL-206, В-17 «а»): what `useTripTotal` says, one line of parts, the whole card the flip.
+- `frontend/src/components/TripTotalCard.vue` — The total of a record, open or finished, as a card under its list (MOL-206, В-17 «а»; MOL-207): what `useTripTotal` says, one line of parts, the whole card the flip.
 - `frontend/src/components/TripUndoStrip.vue` — Strip «Запись удалена · Вернуть» on every screen a removed trip lands on, ten seconds from the removal.
 - `frontend/src/components/tripRow.ts` — Type of one trip line (`TripRowView`, `RowMark`) built by the screen and drawn by `TripRow`.
 
 ## frontend · composables
 
 - `frontend/src/composables/useCurrentTrip.ts` — Composable: the trip going on, from the store's last answer and the queue's unsent start/finish.
-- `frontend/src/composables/useFinishedTrip.ts` — Composable behind «Записанные покупки»: rows, amending, adding, removal and the refused-write notices.
+- `frontend/src/composables/useFinishedTrip.ts` — Composable behind «Записанные покупки»: the header's line, rows, amending, adding, removal, the failed reads the strip counts and the refused-write notices.
 - `frontend/src/composables/useItemDetails.ts` — Composable: the state of «сколько, в чём, почём», parsed as typed, with unit price and estimate from the domain.
 - `frontend/src/composables/usePendingFrom.ts` — The line under «N покупок ждут оценки»: places by name — and city, where one name stands in two (MOL-120) — never counted (MOL-77), on «Покупки» and the newcomer's «Что брать».
 - `frontend/src/composables/useSelectedTrip.ts` — Composable: one trip chosen by id, from the history cache and the server, with loading, missing and offline states.
@@ -88,7 +87,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 - `frontend/src/composables/useTripContext.ts` — Composable behind the trip-context sheet: a draft of the settings handed to the queue for the held trip.
 - `frontend/src/composables/useTripHistory.ts` — Composable behind «Записаны» on «Покупки»: rows with the server's count and sums, paging, reload after a moved list (`moved`: the server answered and the page shown is its answer, `showsAnswer`, no strip), rows finished on this phone marked `onPhone`, the failed loads counted for the strip.
 - `frontend/src/composables/useTripReceipt.ts` — Composable: «Сумма по чеку» of one record — the sheet, the sum still in the queue, whether it is offered, the button's one word for the open and the finished record, the rows «Закончить» and the total count.
-- `frontend/src/composables/useTripTotal.ts` — What a trip's total says, for the strip and the card alike: the server's total, its estimate in the income currency, the rate and the flip of the two; with a receipt's sum, what the prices say beside it.
+- `frontend/src/composables/useTripTotal.ts` — What a trip's total says, for the card of either record: the server's total, its estimate in the income currency, the rate and the flip of the two; with a receipt's sum, what the prices say beside it.
 - `frontend/src/composables/useTripRows.ts` — Composable: a trip's rows merged with what the queue still holds (waiting, editing, removing).
 
 ## frontend · stores

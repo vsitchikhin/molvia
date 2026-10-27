@@ -7,17 +7,20 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, getActivePinia, setActivePinia } from 'pinia'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, nextTick } from 'vue'
 import { RouterView, createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
-import { ERROR, tripViewCodec } from '@molvia/model'
+import { ERROR, parseMoney, tripViewCodec } from '@molvia/model'
 import type { TripView } from '@molvia/model'
 import ru from '@/i18n/ru.json'
+import { dayOfAnyYear, timeOfDay } from '@/days'
 import { createAppI18n } from '@/i18n'
+import { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useTripHistoryStore } from '@/stores/tripHistory'
+import { useTripQueueStore } from '@/stores/tripQueue'
 
 const trip = vi.fn<(id: string) => Promise<TripView>>()
 vi.mock('@/api', () => ({
@@ -26,6 +29,10 @@ vi.mock('@/api', () => ({
     tripHistory: () => new Promise(() => undefined),
     pendingVerdicts: () => new Promise(() => undefined),
     currentTrip: () => new Promise(() => undefined),
+    receipts: () => new Promise(() => undefined),
+    // The trip's queue: nothing leaves — no signal at the shelf.
+    removeExpense: () => new Promise(() => undefined),
+    removeTrip: () => new Promise(() => undefined),
   },
 }))
 
@@ -59,6 +66,7 @@ const finished: TripView = tripViewCodec.parse({
   rateJump: null,
   rateStale: false,
   place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Ереван Сити' },
+  placeCity: 'Гюмри',
   expenses: [row({ amount: '570', currency: 'AMD' }, 1), row(null, 2)],
   total: [{ amount: '1400', currency: 'AMD' }],
   receipt: { amount: '1400', currency: 'AMD' },
@@ -70,11 +78,11 @@ const finished: TripView = tripViewCodec.parse({
 const App = defineComponent(() => () => h(RouterView))
 const views: VueWrapper[] = []
 
-async function render(): Promise<VueWrapper> {
+async function render(cached: TripView | null = finished): Promise<VueWrapper> {
   // The record was opened once, and the app launched anew: the cache is all the phone has.
   setActivePinia(createPinia())
   useActorStore().id = ME
-  useTripHistoryStore().apply(finished)
+  if (cached) useTripHistoryStore().apply(cached)
   const pinia = createPinia()
   setActivePinia(pinia)
   const actor = useActorStore()
@@ -108,6 +116,8 @@ describe('FinishedTripView: «Сумма по чеку» (MOL-78)', () => {
     expect(view.text()).toContain('Ереван Сити')
     expect(view.text()).not.toContain(ru.trip.receipt.add)
     expect(view.text()).not.toContain(ru.trip.receipt.edit)
+    // Its total is the receipt with nothing saying so: «С ценой — 1 из 2» beside it read as the prices.
+    expect(view.text().replaceAll('\u00a0', ' ')).not.toContain('С ценой')
   })
 
   /** Another window — its own pinia, the same phone storage — wrote this record to the shelf. */
@@ -130,7 +140,7 @@ describe('FinishedTripView: «Сумма по чеку» (MOL-78)', () => {
     await otherWindowWrites(finished)
 
     expect(view.text()).toContain(ru.trip.receipt.total)
-    expect(view.text()).toContain('Без цены — 1')
+    expect(view.text().replaceAll('\u00a0', ' ')).toContain('без цены — 830 ֏')
     expect(view.text()).toContain(ru.trip.receipt.edit)
     expect(view.text()).not.toContain(ru.trip.receipt.add)
     // Nothing was asked again from here: two windows on one trip would ask each other in a circle.
@@ -159,7 +169,7 @@ describe('FinishedTripView: «Сумма по чеку» (MOL-78)', () => {
     trip.mockResolvedValue(finished)
     const view = await render()
     expect(view.text()).toContain(ru.trip.receipt.total)
-    expect(view.text()).toContain('Без цены — 1')
+    expect(view.text().replaceAll('\u00a0', ' ')).toContain('без цены — 830 ֏')
     expect(view.text()).toContain(ru.trip.receipt.edit)
   })
 })
@@ -181,5 +191,232 @@ describe('FinishedTripView: код из чека уже у другой пози
     window.history.replaceState({ recorded: 1, codesHeld: 'garbage' }, '')
     const view = await render()
     expect(view.text()).not.toContain('уже у «')
+  })
+})
+
+// Е-4 of MOL-207: a finished record is never «ещё не закончена», and what the screen knows of it is
+// said in the header — the place, its city and its day — while the connection is one strip.
+describe('FinishedTripView: шапка и состояния (MOL-207)', () => {
+  const NOT_FINISHED = 'ещё не закончена'
+  const at = new Date('2026-09-19T09:00:00.000Z')
+  const subtitle = (view: VueWrapper) => view.find('.subtitle')
+
+  it('загрузка без памяти — «Покупки» без строки под ним, скелетон строк и карточки итога', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    trip.mockReturnValue(new Promise(() => undefined))
+    const view = await render(null)
+    expect(view.get('h1').text()).toBe(ru.trip.history.title)
+    expect(subtitle(view).exists()).toBe(false)
+    expect(view.find('.skeleton-rows').exists()).toBe(true)
+    expect(view.find('.skeleton-figure').exists()).toBe(true)
+    expect(view.text()).not.toContain(NOT_FINISHED)
+  })
+
+  it('ошибка без памяти — «Покупки», ни строки под ним, ни «ещё не закончена»; полосы нет', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    trip.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'boom'))
+    const view = await render(null)
+    expect(view.get('h1').text()).toBe(ru.trip.history.title)
+    expect(subtitle(view).exists()).toBe(false)
+    expect(view.text()).toContain(ru.trip.history.error_title)
+    expect(view.findAll('.strip')).toHaveLength(0)
+    expect(view.text()).not.toContain(NOT_FINISHED)
+  })
+
+  it('офлайн с памятью — место, город и день в шапке, одна полоса без «Повторить»', async () => {
+    trip.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+    const view = await render()
+    expect(view.get('h1').text()).toBe('Ереван Сити')
+    expect(subtitle(view).text()).toBe(`Гюмри · ${dayOfAnyYear(at, 'ru')}, ${timeOfDay(at, 'ru')}`)
+    const strips = view.findAll('.strip')
+    expect(strips).toHaveLength(1)
+    expect(strips[0]?.classes()).toContain('offline')
+    expect(strips[0]?.text()).toContain(ru.trip.offline.strip)
+    expect(view.text()).not.toContain(ru.state.retry)
+    // «Показаны данные…» and the offline card were two more ways of the same word (Е-4).
+    expect(view.text()).not.toContain('Показаны данные')
+    expect(view.text()).not.toContain(ru.trip.history.offline_title)
+    expect(view.text()).not.toContain(NOT_FINISHED)
+  })
+
+  it('сервер не ответил при памяти — полоса «Сервер не ответил» с одной «Повторить», и она читает снова', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    trip.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'boom'))
+    const view = await render()
+    const strips = view.findAll('.strip')
+    expect(strips).toHaveLength(1)
+    expect(strips[0]?.classes()).toContain('unanswered')
+    const retry = view.findAll('button').filter((button) => button.text() === ru.state.retry)
+    expect(retry).toHaveLength(1)
+
+    trip.mockResolvedValue(finished)
+    await retry[0]?.trigger('click')
+    await flushPromises()
+    expect(view.findAll('.strip')).toHaveLength(0)
+    expect(trip).toHaveBeenCalledTimes(2)
+  })
+
+  it('с ответом — одно крупное число: карточка итога под списком, в полосе внизу ничего', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    trip.mockResolvedValue(finished)
+    const view = await render()
+    expect(view.findAll('.sum')).toHaveLength(1)
+    expect(view.findComponent({ name: 'TripTotalCard' }).exists()).toBe(true)
+    expect(view.find('.dock').exists()).toBe(false)
+    // Everything under the total, in this order (owner's В-2 «а»).
+    const words = view.findAll('button').map((button) => button.text())
+    const places = [ru.trip.receipt.edit, ru.trip.add_item, ru.trip.remove.action].map((word) =>
+      words.findIndex((text) => text.includes(word)),
+    )
+    expect(places[0]).toBeGreaterThanOrEqual(0)
+    expect(places[1]).toBeGreaterThan(places[0] ?? Infinity)
+    expect(places[2]).toBeGreaterThan(places[1] ?? Infinity)
+  })
+
+  it('записанная из чека — «· из чека» после дня; без города — один день', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    const fromReceipt = tripViewCodec.parse({
+      ...tripViewCodec.encode(finished),
+      placeCity: undefined,
+      receiptId: 'cccccccc-0000-4000-8000-000000000001',
+    })
+    trip.mockResolvedValue(fromReceipt)
+    const view = await render(null)
+    expect(subtitle(view).text()).toBe(
+      `${dayOfAnyYear(at, 'ru')}, ${timeOfDay(at, 'ru')} · ${ru.receipt.recorded.from_receipt}`,
+    )
+  })
+})
+
+describe('FinishedTripView: строка чека и удаление записи одной суммы (MOL-207, адверсариальное)', () => {
+  const plainText = (view: VueWrapper) => view.text().replaceAll('\u00a0', ' ')
+  const parts = (view: VueWrapper) =>
+    view.findAll('.total .line .part').map((part) => part.text().replaceAll('\u00a0', ' '))
+  const removeButton = (view: VueWrapper) =>
+    view.findAll('button').find((button) => button.text().includes(ru.trip.remove.action))
+  const BREAD = row(null, 2).id
+
+  /** A receipt with no items (MOL-227): the record is its sum alone. */
+  const sumOnly = tripViewCodec.parse({
+    ...tripViewCodec.encode(finished),
+    receiptId: 'cccccccc-0000-4000-8000-000000000001',
+    expenses: [],
+    total: [{ amount: '5000', currency: 'AMD' }],
+    receipt: { amount: '5000', currency: 'AMD' },
+    prices: [],
+    gap: null,
+  })
+
+  it('А1: хлеб без цены удаляется — секунду строка чека как есть, потом слова пересчёта', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    trip.mockResolvedValue(finished)
+    const view = await render(null)
+    expect(parts(view)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    useTripQueueStore().enqueue({ kind: 'remove', tripId: TRIP, expenseId: BREAD })
+    await nextTick()
+
+    expect(view.findAll('.row')[1]?.classes()).toContain('gone')
+    expect(parts(view)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
+    vi.advanceTimersByTime(STRIP_LATE_MS)
+    await nextTick()
+    expect(parts(view)).toEqual([ru.trip.receipt.line_pending])
+    expect(plainText(view)).toContain('1 400 ֏')
+    vi.useRealTimers()
+  })
+
+  // Round 2, Б1: milk swapped for cheese keeps both counts — the list is judged by its rows.
+  it('Б1: молоко заменено сыром — счёт строк тот же, а через секунду строка чека говорит о пересчёте', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    trip.mockResolvedValue(finished)
+    const view = await render(null)
+    const queue = useTripQueueStore()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    queue.enqueue({ kind: 'remove', tripId: TRIP, expenseId: row(null, 1).id })
+    queue.enqueue({
+      kind: 'add',
+      tripId: TRIP,
+      entry: {
+        id: row(null, 9).item.id,
+        kind: 'product',
+        name: 'Сыр',
+        note: null,
+        defaultUnit: 'piece',
+        typicalQuantity: null,
+      },
+      body: {
+        id: row(null, 9).id,
+        itemId: row(null, 9).item.id,
+        amount: parseMoney('900', 'AMD'),
+      },
+    })
+    await nextTick()
+    expect(view.findAll('.row')).toHaveLength(3)
+    vi.advanceTimersByTime(STRIP_LATE_MS)
+    await nextTick()
+    expect(parts(view)).toEqual([ru.trip.receipt.line_pending])
+    expect(plainText(view)).toContain('1 400 ֏')
+    vi.useRealTimers()
+  })
+
+  // Round 2, Б2: read back from the shelf the total of a record whose purchases are being removed may
+  // be its receipt — asked about, with no sum named, since the shelf cannot say which.
+  it('Б2: с полки все покупки удаляются, итог остался — удаление спрашивает, суммы не называя', async () => {
+    trip.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+    const view = await render()
+    const queue = useTripQueueStore()
+    queue.enqueue({ kind: 'remove', tripId: TRIP, expenseId: row(null, 1).id })
+    queue.enqueue({ kind: 'remove', tripId: TRIP, expenseId: BREAD })
+    await flushPromises()
+    await removeButton(view)?.trigger('click')
+    await flushPromises()
+    const sheet = view.findComponent({ name: 'TripRemoveSheet' })
+    expect(sheet.props('open')).toBe(true)
+    expect(sheet.props('receipt')).toBeNull()
+    expect(queue.pending.some((write) => write.kind === 'delete')).toBe(false)
+  })
+
+  it('А2: запись одной суммы по чеку спрашивает перед удалением и называет сумму', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    trip.mockResolvedValue(sumOnly)
+    const view = await render(null)
+    await removeButton(view)?.trigger('click')
+    await flushPromises()
+    const sheet = view.findComponent({ name: 'TripRemoveSheet' })
+    expect(sheet.props('open')).toBe(true)
+    expect(String(sheet.props('receipt')).replaceAll('\u00a0', ' ')).toBe('5 000 ֏')
+    expect(useTripQueueStore().pending).toEqual([])
+  })
+
+  it('А2: и с полки, где суммы чека нет, — итог записи без покупок и есть сумма', async () => {
+    trip.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+    const view = await render(sumOnly)
+    await removeButton(view)?.trigger('click')
+    await flushPromises()
+    expect(view.findComponent({ name: 'TripRemoveSheet' }).props('open')).toBe(true)
+    expect(useTripQueueStore().pending).toEqual([])
+  })
+
+  it('А2 (К): без суммы, все покупки уже в удалении — уходит сразу, без вопроса', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    const priced = tripViewCodec.parse({
+      ...tripViewCodec.encode(finished),
+      expenses: [row({ amount: '570', currency: 'AMD' }, 1)],
+      total: [{ amount: '570', currency: 'AMD' }],
+      receipt: null,
+      prices: [{ amount: '570', currency: 'AMD' }],
+      gap: null,
+    })
+    trip.mockResolvedValue(priced)
+    const view = await render(null)
+    useTripQueueStore().enqueue({ kind: 'remove', tripId: TRIP, expenseId: row(null, 1).id })
+    await flushPromises()
+    await removeButton(view)?.trigger('click')
+    await flushPromises()
+    // Gone at once: the screen stepped back with no sheet, the removal is in the queue.
+    const sheet = view.findComponent({ name: 'TripRemoveSheet' })
+    expect(sheet.exists() && sheet.props('open')).toBe(false)
+    expect(useTripQueueStore().pending.some((write) => write.kind === 'delete')).toBe(true)
   })
 })

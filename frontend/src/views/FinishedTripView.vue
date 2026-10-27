@@ -1,7 +1,36 @@
 <template>
-  <AppScreen :title="name || t('trip.history.finished_title')">
-    <template #subtitle>{{ meta }}</template>
-    <ScreenSkeleton v-if="loading && !available" :groups="[72, 54, 84]" />
+  <AppScreen :title="name || t('trip.history.title')">
+    <template v-if="meta" #subtitle>{{ meta }}</template>
+
+    <!-- The connection, one strip first under the header (MOL-181, Ф-14), over the record the phone
+         remembers — as on the record typed by hand (MOL-206, owner's В-3 «а»): «Показаны данные…» and
+         a card of its own were three ways of saying it on one screen (Е-4). -->
+    <template v-if="available">
+      <StatusStrip
+        v-if="trouble === 'offline'"
+        class="connection"
+        kind="offline"
+        :text="t('trip.offline.strip')"
+        :attempt="attempt"
+      />
+      <StatusStrip
+        v-else-if="trouble === 'error'"
+        class="connection"
+        kind="unanswered"
+        :text="t('trip.error.strip')"
+        :attempt="attempt"
+      >
+        <template #action>
+          <AppButton variant="ghost" @click="load">{{ t('state.retry') }}</AppButton>
+        </template>
+      </StatusStrip>
+    </template>
+
+    <!-- The answer's shape (MOL-178, Ф-13): the rows of the record and the card of its total. -->
+    <ScreenSkeleton v-if="loading && !available">
+      <SkeletonPart kind="rows" tail next />
+      <SkeletonPart kind="figure" />
+    </ScreenSkeleton>
     <ScreenState
       v-else-if="missing"
       kind="attention"
@@ -38,23 +67,23 @@
       <p v-for="one in codesHeld" :key="one.code" class="held">
         {{ t('receipt.codes.held', { code: one.code, name: one.holder }) }}
       </p>
-      <ScreenState
-        v-if="trouble === 'error'"
-        kind="error"
-        :inline="available"
-        :title="t('trip.history.error_title')"
-        :body="t('trip.history.error_body')"
-        @retry="load"
-      />
-      <ScreenState
-        v-else-if="trouble === 'offline'"
-        kind="offline"
-        tone="warn"
-        :inline="available"
-        :title="t('trip.history.offline_title')"
-        :body="t('trip.history.offline_body')"
-      />
-      <p v-if="available && stale" class="note">{{ t('trip.history.cached') }}</p>
+      <!-- Nothing of the record to show: the screen's own state, never a strip over nothing. -->
+      <template v-if="!available">
+        <ScreenState
+          v-if="trouble === 'error'"
+          kind="error"
+          :title="t('trip.history.error_title')"
+          :body="t('trip.history.error_body')"
+          @retry="load"
+        />
+        <ScreenState
+          v-else-if="trouble === 'offline'"
+          kind="offline"
+          tone="warn"
+          :title="t('trip.history.offline_title')"
+          :body="t('trip.history.offline_body')"
+        />
+      </template>
       <ScreenState
         v-if="rejected"
         kind="attention"
@@ -75,24 +104,45 @@
           ><TripRow v-for="row in rows" :key="row.key" :row="row" @open="amend"
         /></AppCard>
         <p v-else class="note">{{ t('trip.history.no_purchases') }}</p>
-        <AppButton class="add" variant="ghost" block @click="find">{{
-          t('trip.add_item')
-        }}</AppButton>
+        <!-- Under the list, the card of the record typed by hand (MOL-206): one sum and one line of
+             parts, no figure without its words (Ф-23). With a receipt's sum and no purchase too — the
+             sum is the record's money (MOL-227). -->
+        <TripTotalCard
+          v-if="rows.length > 0 || receiptCurrent"
+          class="total"
+          :trip="trip"
+          :pending="waiting"
+          :local="trip === null"
+          :receipt-waiting="receiptWaiting"
+          :rows="priced"
+        />
+        <!-- Everything under the total, no strip (owner's В-2 «а»): a finished record is not one going
+             on, and adding a forgotten purchase is rare. -->
+        <AppButton
+          v-if="receiptAction"
+          class="receipt"
+          variant="ghost"
+          block
+          @click="receiptOpen = true"
+          >{{ receiptAction }}</AppButton
+        >
+        <AppButton
+          class="add"
+          :class="{ alone: !receiptAction }"
+          variant="ghost"
+          block
+          @click="find"
+        >
+          <template #icon><IconPlus /></template>
+          {{ t('trip.add_item') }}
+        </AppButton>
         <!-- The same place as on an open trip: the end of the list (MOL-76, В-1). -->
-        <AppButton variant="danger-ghost" block @click="askRemove">{{
-          t('trip.remove.action')
-        }}</AppButton>
+        <AppButton class="remove" variant="danger-ghost" block @click="askRemove">
+          <template #icon><IconDelete /></template>
+          {{ t('trip.remove.action') }}
+        </AppButton>
       </template>
     </template>
-    <template v-if="available" #docked
-      ><TripTotal
-        :trip="trip"
-        :pending="waiting"
-        :local="trip === null"
-        :receipt-waiting="receiptWaiting"
-        :receipt-action="receiptAction"
-        @receipt="receiptOpen = true"
-    /></template>
     <ReceiptSheet
       v-if="id"
       v-model:open="receiptOpen"
@@ -106,6 +156,7 @@
       :place="removal.place"
       :day="removal.day"
       :items="removal.items"
+      :receipt="removal.receipt"
       :steps="2"
       :on-closed="afterRemoveSheet"
       @confirm="confirmRemove"
@@ -128,15 +179,19 @@
 <script lang="ts">
 import { defineComponent } from 'vue'
 import IconCheck from '~icons/mdi/check-circle-outline'
+import IconDelete from '~icons/mdi/delete-outline'
+import IconPlus from '~icons/mdi/plus'
 import IconStar from '~icons/mdi/star-outline'
 import AppScreen from '@/components/AppScreen.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import TripRemoveSheet from '@/components/TripRemoveSheet.vue'
 import TripRow from '@/components/TripRow.vue'
-import TripTotal from '@/components/TripTotal.vue'
+import TripTotalCard from '@/components/TripTotalCard.vue'
 import TripRateNotes from '@/components/TripRateNotes.vue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ReceiptSheet from '@/components/ReceiptSheet.vue'
@@ -149,10 +204,14 @@ export default defineComponent({
     AppCard,
     ScreenSkeleton,
     ScreenState,
+    SkeletonPart,
+    StatusStrip,
     TripRemoveSheet,
     TripRow,
-    TripTotal,
+    TripTotalCard,
     TripRateNotes,
+    IconDelete,
+    IconPlus,
     IconStar,
     ItemDetailsSheet,
     ReceiptSheet,
@@ -168,8 +227,30 @@ export default defineComponent({
   margin-bottom: var(--space-4);
 }
 
+// 8 to the card it stands over, as on the record typed by hand.
+.connection {
+  margin-bottom: var(--space-2);
+}
+
+.total {
+  margin-top: var(--space-2);
+}
+
+/* 24 under the card, 8 between the quiet actions after it (handoffs 7a and 77 v2). */
+.receipt {
+  margin-top: var(--space-6);
+}
+
 .add {
-  margin-top: var(--space-4);
+  margin-top: var(--space-2);
+
+  &.alone {
+    margin-top: var(--space-6);
+  }
+}
+
+.remove {
+  margin-top: var(--space-2);
 }
 
 .held {
