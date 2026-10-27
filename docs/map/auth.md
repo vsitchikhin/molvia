@@ -58,6 +58,7 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 - `backend/tests/last-seen.integration.test.ts` — Integration test: the account's last visit (MOL-238) — the first request of a day marks it and the rest do not, on any device; a login always does, the bot never; `updated_at` stays.
 - `backend/tests/MOL-238-adversarial-1.attack.integration.test.ts` — Attack of the review of #234, not for merging.
 - `backend/tests/MOL-238-adversarial-2.attack.integration.test.ts` — Attack of the review of #234, not for merging.
+- `backend/tests/MOL-238-adversarial-round-2-1.attack.integration.test.ts` — Attack of the review of #234, not for merging.
 - `backend/tests/login-days.integration.test.ts` — Integration test: the login funnel in `login_days` — each step counted once on the day the login began, a repeated «Войти» and a rolled-back collection not at all, what ran out split by confirmed, the quota's refusals.
 - `backend/tests/login-log.integration.test.ts` — Integration test: a login or bot erasure failing in the database logs the error's kind, never the Telegram id, the query or its parameters.
 - `backend/tests/login-quota.integration.test.ts` — Integration test: login starts get independent secrets and five minutes, the quota holds across instances, expired rows are removed.
