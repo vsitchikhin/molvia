@@ -28,9 +28,12 @@ function topSheet(page: Page): Locator {
 async function pickerWith(page: Page, width: number, name: string) {
   await page.setViewportSize({ width, height: 740 })
   let cookie = ''
-  await page.route('**/api/**', (route) =>
-    route.continue(cookie ? { headers: { ...route.request().headers(), cookie } } : undefined),
-  )
+  // Every request of the app to the API goes through Playwright with the seam's cookie: WebKit takes no
+  // `cookie` put in by `route.continue` (round 1, run 40499850771 — the door stayed «Вход»).
+  await page.route('**/api/**', async (route) => {
+    const headers = cookie ? { ...route.request().headers(), cookie } : undefined
+    await route.fulfill({ response: await route.fetch(headers ? { headers } : undefined) })
+  })
   // The seam's cookie is taken before the page gets the answer, so no request of the app goes without it.
   await page.route('**/api/dev/login', async (route) => {
     const answer = await route.fetch()
@@ -83,7 +86,9 @@ async function pickerWith(page: Page, width: number, name: string) {
       titleCut: title.scrollWidth > title.clientWidth,
     }
   })
-  console.log(`MOL-197 A2 ${test.info().project.name} ${width} «${name}»: ${JSON.stringify(look)}`)
+  console.log(
+    `MOL-197 A2 ${test.info().project.name} ${String(width)} «${name}»: ${JSON.stringify(look)}`,
+  )
   return look
 }
 

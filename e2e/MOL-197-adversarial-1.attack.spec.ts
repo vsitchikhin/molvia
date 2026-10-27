@@ -68,7 +68,7 @@ async function pickerWith(page: Page, width: number, name: string) {
       titleCut: title.scrollWidth > title.clientWidth,
     }
   })
-  console.log(`MOL-197 A1 ${width} «${name}»: ${JSON.stringify(look)}`)
+  console.log(`MOL-197 A1 ${String(width)} «${name}»: ${JSON.stringify(look)}`)
   return look
 }
 
