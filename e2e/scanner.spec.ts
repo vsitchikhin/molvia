@@ -720,11 +720,11 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
 })
 
 /**
- * «Scan a barcode» on the record (MOL-99, В-4, review С-4): the search opens with the scanner up
+ * «Barcode» in the record's strip, «Scan Barcode» out loud (MOL-99, В-4, review С-4; MOL-206): the search opens with the scanner up
  * over it, with no tap of its own there — the entry the sheet lays rides on the tap on the record.
  * «Back» takes the scanner away and leaves the search by name; «back» again is the record.
  */
-test('«Scan a barcode» on the record: the scanner is up at once, and «back» walks out one step at a time', async ({
+test('«Barcode» on the record: the scanner is up at once, and «back» walks out one step at a time', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -741,7 +741,7 @@ test('«Scan a barcode» on the record: the scanner is up at once, and «back» 
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page).toHaveURL(/\/purchases\/manual$/)
 
-  await page.getByRole('button', { name: 'Scan a barcode' }).click()
+  await page.getByRole('button', { name: 'Scan Barcode', exact: true }).click()
 
   await expect(page).toHaveURL(/\/purchases\/manual\/add$/)
   await expect(scanner(page)).toBeVisible()

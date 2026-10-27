@@ -250,8 +250,8 @@ lies on an iPad (as MOL-132 Р-3).
 
 ## The item by its code (MOL-99)
 
-- **Where it opens** (owner's decision В-4): from the field of «Что взяли?», and from «Сканировать
-  штрихкод» on the record beside «Добавить позицию», which opens «Что взяли?» with the scanner already
+- **Where it opens** (owner's decision В-4): from the field of «Что взяли?», and from «Штрихкод» in the
+  record's strip beside «+ Позиция» (MOL-206), which opens «Что взяли?» with the scanner already
   up — one tap less at the shelf; put away, it leaves the search by name. The ask lives in memory
   (`itemEntry.askToScan`), so a reload of the search is not a tap on «Сканировать».
 - **`GET /catalogue/barcode?code=…`, the code in the query, not the path**: the API logs a request

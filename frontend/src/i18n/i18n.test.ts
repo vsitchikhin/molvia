@@ -173,6 +173,14 @@ describe('словарь: повторяющиеся тексты', () => {
       // Кнопка полосы и заголовок шторки, которую она открывает, — одни слова (MOL-127), как у
       // «Написать разработчику».
       'Сфотографировать чек': ['purchases.capture', 'receipt.capture.title'],
+      // Кнопка полосы записи и шторка сканера, которую она поднимает (MOL-206, В-1 «в»), — слово и
+      // глагол, скрытый перед ним для диктора (ревью 3, №3).
+      Штрихкод: ['scanner.title', 'trip.scan_short'],
+      Сканировать: ['scanner.scan', 'trip.scan_lead'],
+      // «+ Позиция» полосы и позиция без имени в очереди — одно слово о строке записи (MOL-206).
+      Позиция: ['trip.add_short', 'trip.queued.unnamed'],
+      // Строка записи без цены и покупка без цены на счёте — одна мета (MOL-206).
+      'без цены': ['accounts.trip_unpriced', 'trip.unpriced'],
       // Шторка места чека и шторка траты спрашивают о дне одним словом (MOL-127).
       Когда: ['receipt.place.when', 'spending.sheet.date'],
       // Выход с экрана чека, которого больше нет, и с шторки покупки без записи — одни слова о
@@ -346,7 +354,11 @@ describe('словарь: повторяющиеся тексты', () => {
       'Photograph a receipt': ['purchases.capture', 'receipt.capture.title'],
       When: ['receipt.place.when', 'spending.sheet.date'],
       // «Товар» of a receipt line and a purchase not named yet: one word in English.
-      Item: ['receipt.line.product', 'trip.queued.unnamed'],
+      Item: ['receipt.line.product', 'trip.add_short', 'trip.queued.unnamed'],
+      // MOL-206, as in Russian.
+      Scan: ['scanner.scan', 'trip.scan_lead'],
+      Barcode: ['scanner.title', 'trip.scan_short'],
+      'no price': ['accounts.trip_unpriced', 'trip.unpriced'],
       // «проверьте» on a receipt line and «сверить» of a check: one verb in English.
       check: ['accounts.reconcile.note', 'receipt.review.tag_check'],
       // The word of a button at work (MOL-225), each beside its action's key, as in Russian; «Записываем…»

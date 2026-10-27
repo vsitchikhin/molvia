@@ -88,7 +88,7 @@ async function startTrip(page: Page, place: string): Promise<void> {
   await expect(page).toHaveURL(/\/purchases\/manual$/)
 }
 
-/** «Закончить» in the record's header, then the sheet's own «Finish». */
+/** «Закончить» in the record's strip, then the sheet's own «Finish». */
 async function finish(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Finish', exact: true }).click()
   await page.waitForTimeout(400)
@@ -102,8 +102,8 @@ async function toPurchases(page: Page): Promise<void> {
 }
 
 async function addItem(page: Page, word: string, price: string): Promise<void> {
-  // An empty trip asks for the first item; one with rows has «Add an item» at the end of the card.
-  await page.getByRole('button', { name: /Add an item|Find an item/ }).click()
+  // «+ Item» in the record's strip, the same with rows and without (MOL-206, Ф-22).
+  await page.getByRole('button', { name: 'Add an Item', exact: true }).click()
   await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(word)
   await page.getByRole('option').first().click()
   await expect(sheet(page)).toContainText(word)
@@ -117,7 +117,7 @@ async function addItem(page: Page, word: string, price: string): Promise<void> {
 
 /** A purchase with no price: the item and how much, the price left for later (or never). */
 async function addUnpriced(page: Page, word: string): Promise<void> {
-  await page.getByRole('button', { name: /Add an item|Find an item/ }).click()
+  await page.getByRole('button', { name: 'Add an Item', exact: true }).click()
   await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(word)
   await page.getByRole('option').first().click()
   await expect(sheet(page)).toContainText(word)
@@ -678,3 +678,133 @@ test.describe('the receipt total (MOL-78)', () => {
     await expect.poll(setting.current).toBeNull()
   })
 })
+
+/**
+ * The record's strip (MOL-206, Ф-22): «Штрихкод» and «+ Позиция» side by side where both words fit,
+ * one over the other where they do not — «+ Позиция» under, nearer the thumb (owner's В-1 «в») — and
+ * «Закончить» under the pair. Nothing of a button is cut or stands past the strip, in either language,
+ * on the narrowest phone and the commonest; with a purchase and its total, the list ends over the strip
+ * (review 2, №6). The buttons go by the names a screen reader says — a hidden lead and the word seen
+ * (review 2, №3; review 3, №3).
+ */
+const STRIP_WORDS = {
+  'en-US': {
+    scan: 'Scan Barcode',
+    add: 'Add an Item',
+    finish: 'Finish',
+    remove: 'Delete the entry',
+  },
+  'ru-RU': {
+    scan: 'Сканировать Штрихкод',
+    add: 'Новая Позиция',
+    finish: 'Закончить',
+    remove: 'Удалить запись',
+  },
+} as const
+
+for (const locale of ['en-US', 'ru-RU'] as const)
+  test.describe(`the record's strip in ${locale}`, () => {
+    test.use({ locale })
+    const words = STRIP_WORDS[locale]
+
+    for (const width of [320, 390])
+      test(`at ${String(width)} holds its three buttons whole`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 640 })
+        const setting = await device(page)
+        const headers = await asBrowser(page)
+        // Started and filled through the API, so the test reads the strip and not «Где вы?» in two
+        // languages: one purchase, so the total, the footnote and «+ Сумма по чеку» stand over it.
+        const context = settingsOf(
+          actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
+        )
+        const trip = randomUUID()
+        const started = await page.request.post('/api/trips', {
+          headers,
+          data: { context, id: trip, place: { name: 'Ереван Сити', kind: 'store' } },
+        })
+        expect(started.status()).toBe(201)
+        const item = await page.request.post('/api/catalogue/items', {
+          headers,
+          data: { kind: 'product', name: `Сыр «${nonsense()}»`, defaultUnit: 'kg' },
+        })
+        const added = await page.request.post(`/api/trips/${trip}/expenses`, {
+          headers,
+          data: {
+            id: randomUUID(),
+            itemId: ((await item.json()) as { id: string }).id,
+            quantity: { value: '1', unit: 'kg' },
+            amount: { amount: '1000', currency: 'AMD' },
+          },
+        })
+        expect(added.ok()).toBe(true)
+        await page.goto('/purchases/manual')
+        await expect.poll(async () => (await setting.current())?.place.name).toBe('Ереван Сити')
+        await expect(row(page)).toHaveCount(1)
+
+        const dock = page.locator('.dock')
+        for (const name of [words.scan, words.add, words.finish])
+          await expect(dock.getByRole('button', { name, exact: true })).toBeVisible()
+        // Measured at once, once the strip has come in: it rises from below (`appear`), and boxes
+        // read one by one meanwhile stood at different heights.
+        const { frame, buttons } = await dock.evaluate(async (node) => {
+          await Promise.all(node.getAnimations({ subtree: true }).map((one) => one.finished))
+          const box = node.getBoundingClientRect()
+          return {
+            frame: { left: box.left, right: box.right, top: box.top },
+            buttons: [...node.querySelectorAll('button')].map((button) => {
+              const own = button.getBoundingClientRect()
+              return {
+                left: own.left,
+                right: own.right,
+                top: own.top,
+                bottom: own.bottom,
+                width: own.width,
+                // The word inside its button: an overflow is a word wider than its pill.
+                cut: button.scrollWidth > button.clientWidth + 0.5,
+              }
+            }),
+          }
+        })
+        // In the strip's order: the scanner, «+ Позиция», «Закончить».
+        expect(buttons).toHaveLength(3)
+        const [scanBox, addBox, endBox] = buttons as [
+          (typeof buttons)[number],
+          (typeof buttons)[number],
+          (typeof buttons)[number],
+        ]
+        for (const [name, box] of [
+          [words.scan, scanBox],
+          [words.add, addBox],
+          [words.finish, endBox],
+        ] as const) {
+          expect(box.cut, name).toBe(false)
+          expect(box.left, name).toBeGreaterThanOrEqual(frame.left + 15)
+          expect(box.right, name).toBeLessThanOrEqual(frame.right - 15)
+        }
+        // Russian «Штрихкод» beside «+ Позиция» needs some 334 px; English fits everywhere.
+        const sideBySide = locale === 'en-US' || width > 334
+        if (sideBySide) {
+          expect(addBox.top).toBeCloseTo(scanBox.top, 0)
+          expect(addBox.width).toBeCloseTo(scanBox.width, 0)
+          expect(addBox.left).toBeGreaterThan(scanBox.right)
+        } else {
+          expect(addBox.top).toBeGreaterThanOrEqual(scanBox.bottom)
+        }
+        expect(endBox.top).toBeGreaterThanOrEqual(Math.max(scanBox.bottom, addBox.bottom))
+
+        // The list ends over the strip: the last thing of the record is not under it.
+        const remove = page.getByRole('button', { name: words.remove, exact: true })
+        await page.evaluate(() => {
+          window.scrollTo(0, document.documentElement.scrollHeight)
+        })
+        const removeBottom = await remove.evaluate((node) => node.getBoundingClientRect().bottom)
+        const dockTop = await dock.evaluate((node) => node.getBoundingClientRect().top)
+        expect(removeBottom).toBeLessThanOrEqual(dockTop)
+        // Nothing of the page scrolls sideways — the total's line included.
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+          ),
+        ).toBe(true)
+      })
+  })

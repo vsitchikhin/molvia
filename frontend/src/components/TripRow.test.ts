@@ -73,16 +73,31 @@ describe('TripRow', () => {
 
   it('печатает цену как на ценнике и цену за единицу — ради неё строка и существует', () => {
     const view = render()
-    expect(plain(view)).toContain('0,9 л')
-    expect(plain(view)).toContain('520 ֏')
     // 520 за 0,9 л — это 577,78 за литр: то самое число, которое в уме не считают.
-    expect(plain(view)).toContain('577,78 ֏ за л')
+    expect(plain(view.get('.meta'))).toBe('0,9 л · 577,78 ֏ за л')
+    expect(plain(view.get('.tail'))).toBe('520 ֏')
   })
 
-  it('без цены зовёт её дописать, а не показывает пустоту', () => {
+  it('строка кита (MOL-206, 7a): шеврон у каждой — суммы карточки кончаются одной колонкой (А3)', () => {
+    for (const over of [{}, { entry: null }, { mark: 'removing' as const }]) {
+      const view = render(over)
+      expect(view.find('.chevron').exists()).toBe(true)
+      // За суммой — шеврон, а не конец строки: колонка сумм одна у всех строк.
+      expect(view.get('.list-row').element.lastElementChild?.classList.contains('chevron')).toBe(
+        true,
+      )
+    }
+  })
+
+  it('без цены — «без цены» под названием и прочерк в хвосте, а не пустота (7a)', () => {
     const view = render({ amount: null })
-    expect(view.text()).toContain(ru.trip.add_price)
-    expect(view.find('.amount').exists()).toBe(false)
+    expect(plain(view.get('.meta'))).toBe(`0,9 л · ${ru.trip.unpriced}`)
+    expect(view.get('.tail').text()).toBe('—')
+    expect(render({ amount: null, quantity: null }).get('.meta').text()).toBe(ru.trip.unpriced)
+  })
+
+  it('цена без количества — без пустой строки под названием', () => {
+    expect(render({ quantity: null }).find('.meta').exists()).toBe(false)
   })
 
   it('метка очереди говорит, что именно ещё не ушло', () => {
@@ -97,15 +112,16 @@ describe('TripRow', () => {
     await open.trigger('click')
     expect(open.emitted('open')).toHaveLength(1)
 
+    // «Не сейчас» кита: строка на месте и в порядке фокуса, нажатие никуда не идёт, тег говорит почему.
     const removing = render({ mark: 'removing' })
-    expect(removing.element.tagName).toBe('DIV')
+    expect(removing.attributes('aria-disabled')).toBe('true')
     await removing.trigger('click')
     expect(removing.emitted('open')).toBeUndefined()
   })
 
   it('без карточки товара строка не открывается — открывать нечем', async () => {
     const unknown = render({ entry: null })
-    expect(unknown.element.tagName).toBe('DIV')
+    expect(unknown.attributes('aria-disabled')).toBe('true')
     await unknown.trigger('click')
     expect(unknown.emitted('open')).toBeUndefined()
   })
