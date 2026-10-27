@@ -73,16 +73,26 @@ describe('TripRow', () => {
 
   it('печатает цену как на ценнике и цену за единицу — ради неё строка и существует', () => {
     const view = render()
-    expect(plain(view)).toContain('0,9 л')
-    expect(plain(view)).toContain('520 ֏')
     // 520 за 0,9 л — это 577,78 за литр: то самое число, которое в уме не считают.
-    expect(plain(view)).toContain('577,78 ֏ за л')
+    expect(plain(view.get('.meta'))).toBe('0,9 л · 577,78 ֏ за л')
+    expect(plain(view.get('.tail'))).toBe('520 ֏')
   })
 
-  it('без цены зовёт её дописать, а не показывает пустоту', () => {
+  it('строка кита (MOL-206, 7a): шеврон у той, что открывается, и нет его у той, что нет', () => {
+    expect(render().get('.list-row').find('.chevron').exists()).toBe(true)
+    expect(render({ entry: null }).find('.chevron').exists()).toBe(false)
+    expect(render({ mark: 'removing' }).find('.chevron').exists()).toBe(false)
+  })
+
+  it('без цены — «без цены» под названием и прочерк в хвосте, а не пустота (7a)', () => {
     const view = render({ amount: null })
-    expect(view.text()).toContain(ru.trip.add_price)
-    expect(view.find('.amount').exists()).toBe(false)
+    expect(plain(view.get('.meta'))).toBe(`0,9 л · ${ru.trip.unpriced}`)
+    expect(view.get('.tail').text()).toBe('—')
+    expect(render({ amount: null, quantity: null }).get('.meta').text()).toBe(ru.trip.unpriced)
+  })
+
+  it('цена без количества — без пустой строки под названием', () => {
+    expect(render({ quantity: null }).find('.meta').exists()).toBe(false)
   })
 
   it('метка очереди говорит, что именно ещё не ушло', () => {

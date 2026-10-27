@@ -355,10 +355,12 @@ describe('TripView', () => {
     expect(plain(rows[1]?.text())).toContain('577,78 ֏ за л')
   })
 
-  it('строка без цены зовёт её дописать', async () => {
+  it('строка без цены говорит «без цены» и ведёт шевроном в шторку (7a)', async () => {
     currentTrip.mockResolvedValue(trip([{ id: BREAD, name: 'Хлеб «Матнакаш»' }]))
     const { view } = await render()
-    expect(view.get('.row').text()).toContain(ru.trip.add_price)
+    expect(view.get('.row .meta').text()).toBe(ru.trip.unpriced)
+    expect(view.get('.row .tail').text()).toBe('—')
+    expect(view.get('.row').find('.chevron').exists()).toBe(true)
   })
 
   it('место и день в строке над заголовком', async () => {

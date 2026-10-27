@@ -22,7 +22,7 @@
   "trip": {
     "title": "Entry",
     "add_item": "Add an item",
-    "add_price": "Add a price",
+    "unpriced": "no price",
     "total": "Total",
     "total_line": "Priced — {priced} of {total} · unpriced — {unpriced}",
     "receipt": {

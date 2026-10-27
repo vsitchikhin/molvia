@@ -22,7 +22,7 @@
   "trip": {
     "title": "Запись",
     "add_item": "Добавить позицию",
-    "add_price": "Добавить цену",
+    "unpriced": "без цены",
     "total": "Итого",
     "total_line": "С ценой — {priced} из {total} · без цены — {unpriced}",
     "receipt": {
