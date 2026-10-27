@@ -776,7 +776,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   at `--leading-tight` and the line of its parts at `--leading-snug`, the part's own, so it is as tall as its
   bars — `e2e/kit-rows` holds the pair at 390 and 320. **The price, named:** a line that wraps — «С ценой —
   1 из 2» beside «≈» and the rate at 320, a caveat, a receipt's split — grows the card under the list, below
-  nothing that chooses. The sums of an account and «Обмен» still stand at the body's
+  nothing that chooses; and so does a line the part has not got: money paid in another currency, on a line
+  of its own under the figure (adversarial А4), and the exact sum under the flipped estimate — the flip is the
+  phone's, so whoever turned it gets an answer a line taller than its bars at every opening (review 3, №4). The sums of an account and «Обмен» still stand at the body's
   leading, some 8 px taller than the part — their tasks set the part against their answer. **«Счета» stand
   at the part's leading** (MOL-193): the figure and the line under it as «Деньги», so the tiles start within
   4 px of where the plate stood; two lines each in two currencies, the card comes 30 px taller than the part at
