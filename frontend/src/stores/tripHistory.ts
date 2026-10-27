@@ -103,6 +103,17 @@ function toShelf(cache: z.output<typeof cacheCodec>): string {
   )
 }
 
+/** A first page as the shelf keeps it: what tells a page shown from the server's answer (В1). */
+function asShelvedPage(page: TripHistory): string {
+  return JSON.stringify(
+    everyView(
+      { page: tripHistoryCodec.encode(page) },
+      () => true,
+      (key) => !ENTRY_NOT_CACHED_YET.has(key),
+    ),
+  )
+}
+
 /**
  * A trip as the shelf keeps it: what two copies are compared by when another window writes the
  * shelf. The fields the shelf does not keep yet are left out, so an answer and its own shelf copy
@@ -129,6 +140,24 @@ const KEY = 'molvia.trip-history'
  */
 const EMPTY_KEY = 'molvia.trip-history-empty'
 const empty = (): TripHistory => ({ trips: [], nextCursor: null })
+/**
+ * When the server last answered the first page (MOL-204): what «Без связи · покупки на 27 сент. в
+ * 14:05» says. A key of its own for the reason `EMPTY_KEY` is one — a field of the strict cache would be
+ * no cache at all to a window on the previous build, which would write its own over a finish made with
+ * no signal. Moved with the first page only, by `load()`; «Показать ещё» reads older rows, not a newer
+ * list. Written with every page a window puts on the shelf, as old as that page (adversarial Б4). **The price, named:** a window on the previous build loads the history without moving it, and
+ * the strip then names a moment older than the list — never a newer one. A cache from before this key
+ * has none, and the strip says no time; nor does a page some shelf refused, since that shelf keeps the
+ * page before it (adversarial А5).
+ */
+const AT_KEY = 'molvia.trip-history-at'
+
+/** The moment kept under `AT_KEY`, read leniently: anything but a date is no moment. */
+function momentOf(raw: string | null): Date | null {
+  if (raw === null) return null
+  const at = new Date(raw)
+  return Number.isNaN(at.getTime()) ? null : at
+}
 
 /**
  * A bounded read cache. A full snapshot is kept only for a completion the server has not
@@ -155,10 +184,14 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   const stale = ref(true)
   /** The server's last first page for this owner was empty (`EMPTY_KEY`). */
   const answeredEmpty = ref(false)
+  /** When the server answered the first page this cache holds (`AT_KEY`); `null` if not known. */
+  const answeredAt = ref<Date | null>(null)
   let firstPage: TripHistory = empty()
   // What «Показать ещё» brought, and the cursor standing after it. Only the first page is
   // remembered on the phone; these live for as long as the screen does.
   let deeper: TripHistoryEntry[] = []
+  /** The first page the server gave last, taken or not (adversarial В1). */
+  let lastAnswer: TripHistory | null = null
   let deepCursor: TripHistory['nextCursor'] = null
   let generation = 0
   let selection = 0
@@ -212,6 +245,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     selected.value = held?.selected ?? null
     local.value = held?.local ?? []
     answeredEmpty.value = actor.id !== null && read(`${EMPTY_KEY}.${actor.id}`) === '1'
+    answeredAt.value = actor.id === null ? null : momentOf(read(`${AT_KEY}.${actor.id}`))
     stale.value = true
   }
   restore()
@@ -252,6 +286,12 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
       // memory, and the start or finish it came with is queued all the same (MOL-121, round 3 С).
       return
     }
+    // The moment goes on the shelf with the page it belongs to, and before it, so a window that hears
+    // the cache's write reads the moment that came with it: a page put back by `apply` or `forgetLocal`
+    // is this window's last answer, as old as this window's moment (adversarial Б4). A shelf that
+    // refused either keeps no moment — none is older than any, a newer one is the lie (А5).
+    const at = `${AT_KEY}.${actor.id}`
+    const timed = answeredAt.value !== null && writeEverywhere(at, answeredAt.value.toISOString())
     ahead = !writeEverywhere(`${KEY}.${actor.id}`, shelf, (past) => {
       try {
         const held = cacheCodec.parse(fromShelf(past))
@@ -261,6 +301,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
         return null
       }
     })
+    if (!timed || ahead) forget(at)
   }
 
   function capture(
@@ -373,6 +414,15 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   }
 
   /**
+   * Whether the first page on the phone is the one the server gave last, row for row as the shelf keeps
+   * them: a list another window kept moving under every answer is then that answer all the same, and
+   * no memory (adversarial А4, В1); a page put back from before it is (Б4).
+   */
+  function showsAnswer(): boolean {
+    return lastAnswer !== null && asShelvedPage(firstPage) === asShelvedPage(lastAnswer)
+  }
+
+  /**
    * Whether the answer was taken. A false one is not a failure: the list changed under the
    * request — another window wrote the cache, a finish was taken back — and the answer may no
    * longer be true. The caller asks again rather than wait for a reconnect that may never come:
@@ -384,6 +434,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     const cursor = more ? page.value.nextCursor : null
     if (more && !cursor) return true
     const answer = await api.tripHistory(cursor ?? undefined)
+    if (!more && owner === actor.id) lastAnswer = answer
     // A next page cannot be cancelled by a change somewhere else: it lies deeper than anything
     // held, and it is merged by id. Under the shared guard a correction sent to a trip finished
     // last week threw it away, and «Показать ещё» did nothing at all (В5).
@@ -423,6 +474,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
       answeredEmpty.value = answer.trips.length === 0
       if (owner && answeredEmpty.value) write(`${EMPTY_KEY}.${owner}`, '1')
       else if (owner) forget(`${EMPTY_KEY}.${owner}`)
+      answeredAt.value = new Date()
     }
     stale.value = false
     persist()
@@ -473,11 +525,13 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     local,
     stale,
     answeredEmpty,
+    answeredAt,
     capture,
     apply,
     forgetLocal,
     drop,
     load,
+    showsAnswer,
     known,
     answered,
     open,

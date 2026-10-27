@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import type { Pinia } from 'pinia'
+import { nextTick, shallowRef } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
@@ -21,18 +22,22 @@ import type {
   TripView,
 } from '@molvia/model'
 import AccountSheet from '@/components/AccountSheet.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
 import IncomeSheet from '@/components/IncomeSheet.vue'
 import OperationRow from '@/components/OperationRow.vue'
 import OperationSheet from '@/components/OperationSheet.vue'
 import ReconcileSheet from '@/components/ReconcileSheet.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
+import { pwaUpdateKey } from '@/pwaUpdate'
+import type { PwaUpdate, UpdatePhase } from '@/pwaUpdate'
 import { routes } from '@/router'
-import { useAccountsStore } from '@/stores/accounts'
+import { rememberJournal, useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 import AccountView from '@/views/AccountView.vue'
 import AccountsView from '@/views/AccountsView.vue'
@@ -194,13 +199,22 @@ async function settle(): Promise<void> {
   await flushPromises()
 }
 
-async function open(component: unknown, path: string, pinia: Pinia, props = {}) {
+async function open(
+  component: unknown,
+  path: string,
+  pinia: Pinia,
+  props = {},
+  update?: PwaUpdate,
+) {
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push(path)
   const view = mount(component as never, {
     props: props as never,
     attachTo: document.body,
-    global: { plugins: [router, pinia, createAppI18n('en')] },
+    global: {
+      plugins: [router, pinia, createAppI18n('en')],
+      provide: update ? { [pwaUpdateKey as symbol]: update } : {},
+    },
   })
   views.push(view)
   await settle()
@@ -796,5 +810,361 @@ describe('«Счета» on the kit (MOL-193)', () => {
     await view.get('.removed-head').trigger('click')
     await settle()
     expect(view.get('.removed-open .meta').text()).toMatch(/· put away Oct\u00a021$/)
+  })
+})
+
+describe('the account’s screen on the kit (MOL-194)', () => {
+  const second = cash({ id: '22222222-0000-4000-8000-000000000002', name: 'Card ֏' })
+  const removed = (patch: Partial<MoneyAccountView> = {}) =>
+    cash({ archivedAt: new Date('2026-09-21T10:00:00Z'), ...patch })
+  const offline = () => vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+  const docked = (view: VueWrapper) => view.findAll('.dock button').map((one) => one.text())
+  const title = (view: VueWrapper) => view.get('h1.title').text()
+
+  it('«Сверить с фактом» is the strip’s, «Перевести» a ghost under it, the header «Править» alone (В-1 «б»)', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([cash(), second]))
+    accountJournal.mockResolvedValue(journal(cash(), []))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    expect(docked(view)).toEqual([en.accounts.account.reconcile, en.accounts.account.transfer])
+    expect(view.findAll('.dock button')[1]?.classes()).toContain('ghost')
+    expect(view.get('.trailing').text()).toBe(en.accounts.account.edit)
+    expect(view.find('.undo-place').exists()).toBe(false)
+
+    await button(view, en.accounts.account.reconcile)?.trigger('click')
+    await settle()
+    expect(view.getComponent(ReconcileSheet).props('open')).toBe(true)
+  })
+
+  it('must not fire: a removed account offers neither «Сверить» nor «Перевести», «Вернуть» in their place', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([removed(), second]))
+    accountJournal.mockResolvedValue(journal(removed(), []))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    expect(docked(view)).toEqual([en.accounts.screen.restore])
+    expect(view.get('.trailing').text()).toBe(en.accounts.account.edit)
+    // The note of the kit, its date whole (handoff 03 п. 4).
+    expect(view.get('.balance ~ .note').text()).toContain('September 21')
+  })
+
+  it('«Вернуть» offline is not now and says why; online it works under its word and gives the focus to «Сверить»', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([removed()]))
+    accountJournal.mockResolvedValue(journal(removed(), []))
+    const spy = offline()
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    const waiting = button(view, en.accounts.screen.restore_wait)
+    expect(waiting?.attributes('aria-disabled')).toBe('true')
+    await waiting?.trigger('click')
+    expect(restoreMoneyAccount).not.toHaveBeenCalled()
+
+    spy.mockReturnValue(true)
+    window.dispatchEvent(new Event('online'))
+    await settle()
+    let land: (value: MoneyAccountsResponse) => void = () => undefined
+    restoreMoneyAccount.mockImplementation(() => new Promise((resolve) => (land = resolve)))
+    await button(view, en.accounts.screen.restore)?.trigger('click')
+    await settle()
+    expect(docked(view)).toEqual([en.accounts.screen.restoring])
+
+    land(page([cash()]))
+    await settle()
+    expect(view.find('.balance ~ .note').exists()).toBe(false)
+    expect(docked(view)).toEqual([en.accounts.account.reconcile])
+    expect(document.activeElement?.textContent.trim()).toBe(en.accounts.account.reconcile)
+  })
+
+  it('a spending removed from a removed account’s journal: two «Вернуть» at once, the strip kept (С-8)', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([removed()]))
+    accountJournal.mockResolvedValue(journal(removed(), [spendingRow(TAXI, '-500', CASH)]))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    view.findComponent(OperationSheet).vm.$emit('removed', {
+      undo: { id: TAXI, kind: 'restore' },
+      title: 'Taxi',
+      amount: '֏500',
+    })
+    await settle()
+    expect(view.findComponent(UndoStrip).exists()).toBe(true)
+    expect(docked(view)).toEqual([en.accounts.screen.restore])
+  })
+
+  it('«Такого счёта нет»: attention, «К счетам» in the strip, no «Повторить», and «Счёт» over it whatever was kept (8h)', async () => {
+    useAccountsStore(session()).accept(page([cash()]))
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([]))
+    accountJournal.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, 'gone', true))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    expect(view.getComponent(ScreenState).props('kind')).toBe('attention')
+    expect(docked(view)).toEqual([en.accounts.account.to_list])
+    expect(button(view, en.state.retry)).toBeUndefined()
+    expect(title(view)).toBe(en.accounts.account.title)
+    expect(view.find('.trailing').text()).toBe('')
+  })
+
+  it('the title is the name the phone keeps while the journal is on its way or failed, else «Счёт» (Е-6)', async () => {
+    moneyAccounts.mockImplementation(() => new Promise(() => undefined))
+    accountJournal.mockImplementation(() => new Promise(() => undefined))
+    const cold = await open(AccountView, `/money/accounts/${CASH}`, session())
+    expect(title(cold)).toBe(en.accounts.account.title)
+    // No strip over the skeleton: nothing is known to act on yet.
+    expect(cold.find('.dock').exists()).toBe(false)
+
+    useAccountsStore(session()).accept(page([cash({ inSpend: amd('100') })]))
+    const kept = await open(AccountView, `/money/accounts/${CASH}`, session())
+    expect(title(kept)).toBe('Cash ֏')
+    // The skeleton in the answer's shape, «≈» where the kept account has it.
+    const parts = kept.findAllComponents(SkeletonPart).map((one) => one.props('kind'))
+    expect(parts).toEqual(['figure', 'caption', 'rows'])
+    expect(kept.findAllComponents(SkeletonPart)[0]?.props('approx')).toBe(true)
+
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    accountJournal.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const failed = await open(AccountView, `/money/accounts/${CASH}`, session())
+    expect(failed.getComponent(ScreenState).props('kind')).toBe('error')
+    expect(title(failed)).toBe('Cash ֏')
+  })
+
+  it('a journal kept, the server silent: one strip with «Повторить», a failed retry said again; offline the cloud', async () => {
+    useAccountsStore(session()).accept(page([cash()], new Date('2026-09-26T10:05:00Z')))
+    rememberJournal(OWNER, journal(cash(), [spendingRow(TAXI, '-500', CASH)]))
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    accountJournal.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, session())
+    const strip = view.getComponent(StatusStrip)
+    expect(strip.props('kind')).toBe('unanswered')
+    // The balance is the phone's too: the hour of the page it came from (review №1).
+    expect(strip.props('text')).toMatch(/^The server did not answer · balances as of /)
+    expect(view.findComponent(ScreenState).exists()).toBe(false)
+    const before = strip.props('attempt') as number
+    await button(view, en.state.retry)?.trigger('click')
+    await settle()
+    expect(view.getComponent(StatusStrip).props('attempt')).toBe(before + 1)
+    // The strip of the screen keeps its action under the strip of the connection.
+    expect(docked(view)).toEqual([en.accounts.account.reconcile])
+
+    offline()
+    const away = await open(AccountView, `/money/accounts/${CASH}`, session())
+    const cloud = away.getComponent(StatusStrip)
+    expect(cloud.props('kind')).toBe('offline')
+    expect(cloud.props('text')).toMatch(/^Offline · balances as of /)
+  })
+
+  // By the last read, as «Счета» (MOL-183, Б1): an answer earlier in this session hid a read that
+  // failed after it, and the transfer the balance has was in no journal, with nothing to say so (А1).
+  it('a journal answered, then a re-read failed: «Сервер не ответил» with «Повторить», no hour over a fresh page', async () => {
+    const pinia = session()
+    const store = useAccountsStore(pinia)
+    moneyAccounts.mockResolvedValue(page([cash(), second]))
+    accountJournal.mockResolvedValue(journal(cash(), [spendingRow(TAXI, '-500', CASH)]))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    expect(view.findComponent(StatusStrip).exists()).toBe(false)
+
+    accountJournal.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    store.accept(page([cash({ balance: amd('90000') }), second]))
+    store.transfers += 1
+    await settle()
+    const strip = view.getComponent(StatusStrip)
+    expect(strip.props('kind')).toBe('unanswered')
+    expect(strip.props('text')).toBe(en.accounts.account.unanswered)
+
+    accountJournal.mockResolvedValue(journal(cash({ balance: amd('90000') }), []))
+    await button(view, en.state.retry)?.trigger('click')
+    await settle()
+    expect(view.findComponent(StatusStrip).exists()).toBe(false)
+  })
+
+  it('a journal answered, then the connection lost: the cloud, as «Счета» a step back say it (А2)', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([cash(), second]))
+    accountJournal.mockResolvedValue(journal(cash(), []))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    expect(view.findComponent(StatusStrip).exists()).toBe(false)
+    offline()
+    window.dispatchEvent(new Event('offline'))
+    await settle()
+    expect(view.getComponent(StatusStrip).props('kind')).toBe('offline')
+  })
+
+  // The strip's actions swapped under the focus by an answer, not the person's tap (Б2, Б3).
+  it.each([
+    [
+      'put away on another phone: to «Вернуть»',
+      () => {
+        moneyAccounts.mockResolvedValue(page([removed({ revision: 2 })]))
+        accountJournal.mockResolvedValue(journal(removed({ revision: 2 }), []))
+      },
+      en.accounts.screen.restore,
+    ],
+    [
+      'deleted on another phone: to «К счетам»',
+      () => {
+        moneyAccounts.mockResolvedValue(page([]))
+        accountJournal.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, 'gone', true))
+      },
+      en.accounts.account.to_list,
+    ],
+  ])('the account %s — the focus on «Сверить» goes with the strip', async (_, gone, next) => {
+    const pinia = session()
+    const store = useAccountsStore(pinia)
+    moneyAccounts.mockResolvedValue(page([cash()]))
+    accountJournal.mockResolvedValue(journal(cash(), []))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    ;(button(view, en.accounts.account.reconcile)?.element as HTMLElement).focus()
+    gone()
+    await store.refresh()
+    store.transfers += 1
+    await settle()
+    expect(docked(view)).toEqual([next])
+    expect(document.activeElement?.textContent.trim()).toBe(next)
+  })
+
+  // «Обновить» of a version waiting stands over «Сверить» in the strip: the focus brought back is the
+  // screen's, never a reload the next Enter would let in (review №3, adversarial Г2).
+  it('«Вернуть» answered with a version waiting: the focus to «Сверить с фактом», not to «Обновить»', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([removed()]))
+    accountJournal.mockResolvedValue(journal(removed(), []))
+    restoreMoneyAccount.mockResolvedValue(page([cash({ revision: 2 })]))
+    const update: PwaUpdate = {
+      phase: shallowRef<UpdatePhase>('ready'),
+      apply: vi.fn(),
+      serverVersion: vi.fn(),
+      build: () => null,
+    }
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia, {}, update)
+    const back = button(view, en.accounts.screen.restore)
+    ;(back?.element as HTMLElement).focus()
+    await back?.trigger('click')
+    await settle()
+    expect(docked(view)).toEqual([en.update.apply, en.accounts.account.reconcile])
+    expect(document.activeElement?.textContent.trim()).toBe(en.accounts.account.reconcile)
+  })
+
+  it('must not fire: «Вернуть» answered leaves a focus the person took elsewhere meanwhile (В)', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([removed()]))
+    accountJournal.mockResolvedValue(journal(removed(), [spendingRow(TAXI, '-500', CASH)]))
+    let land: (value: MoneyAccountsResponse) => void = () => undefined
+    restoreMoneyAccount.mockImplementation(() => new Promise((resolve) => (land = resolve)))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, pinia)
+    await button(view, en.accounts.screen.restore)?.trigger('click')
+    await settle()
+    const row = view.getComponent(OperationRow).get('button').element as HTMLElement
+    row.focus()
+    land(page([cash({ revision: 2 })]))
+    await settle()
+    expect(docked(view)).toEqual([en.accounts.account.reconcile])
+    expect(document.activeElement).toBe(row)
+  })
+})
+
+describe('the check is blind behind its sheet (MOL-195, Ф-33)', () => {
+  /** The card of the balance, whole: its words, its attributes and what it would say aloud. */
+  const card = (view: VueWrapper) => plain(view.get('.balance').html())
+  const figure = (view: VueWrapper) => view.get('.balance .figure')
+
+  async function screen(balance = amd('190132'), inSpend: MoneyAccountView['inSpend'] = null) {
+    const pinia = session()
+    const account = cash({ balance, inSpend, lastCheckedOn: '2026-09-20' })
+    moneyAccounts.mockResolvedValue(page([account]))
+    accountJournal.mockResolvedValue(journal(account, []))
+    return open(AccountView, `/money/accounts/${CASH}`, pinia)
+  }
+  async function startCheck(view: VueWrapper): Promise<void> {
+    await button(view, en.accounts.account.reconcile)?.trigger('click')
+    await settle()
+  }
+
+  it('step one: «•••» and its words for a reader — no figure, no «≈», the start and «сверено» stay', async () => {
+    const view = await screen(amd('190132'), parseMoney('5921.05', 'RUB'))
+    expect(card(view)).toContain('190,132')
+    expect(view.find('.balance .approx').exists()).toBe(true)
+    await startCheck(view)
+    expect(card(view)).not.toContain('190,132')
+    expect(card(view)).not.toContain('5,921')
+    expect(view.find('.balance .approx').exists()).toBe(false)
+    expect(figure(view).text()).toContain('•••')
+    expect(figure(view).text()).toContain(en.accounts.account.balance_hidden)
+    expect(figure(view).get('[aria-hidden="true"]').text()).toBe('•••')
+    expect(plain(view.get('.balance .footnote').text())).toMatch(/^started .* · checked Sep 20$/)
+    // Nothing of it on the page, the open sheet and the live regions included; a shut sheet — the
+    // picker of «Перевести», mounted with the screen — is neither drawn nor read.
+    expect(view.findAll('dialog[open]')).toHaveLength(1)
+    const seen = document.body.cloneNode(true) as HTMLElement
+    for (const shut of seen.querySelectorAll('dialog:not([open])')) shut.remove()
+    expect(seen.textContent).not.toMatch(/190,132/)
+  })
+
+  it('the answer gives it back, «Ввести другую сумму» hides it again, closing shows it', async () => {
+    checkAccount.mockResolvedValue(answer('185000', '190132'))
+    const view = await screen()
+    await startCheck(view)
+    const sheet = view.getComponent(ReconcileSheet)
+    await sheet.get('input').setValue('185000')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await settle()
+    expect(figure(view).text()).toContain('190,132')
+
+    await button(view, en.accounts.reconcile.edit_fact)?.trigger('click')
+    await settle()
+    expect(figure(view).text()).not.toContain('190,132')
+    expect(figure(view).text()).toContain(en.accounts.account.balance_hidden)
+
+    sheet.vm.$emit('update:open', false)
+    await settle()
+    expect(figure(view).text()).toContain('190,132')
+  })
+
+  it('every opening starts blind, the last answer of the sheet notwithstanding', async () => {
+    checkAccount.mockResolvedValue(answer('190132', '190132'))
+    const view = await screen()
+    await startCheck(view)
+    await view.getComponent(ReconcileSheet).get('input').setValue('190132')
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await settle()
+    view.getComponent(ReconcileSheet).vm.$emit('update:open', false)
+    await settle()
+
+    await button(view, en.accounts.account.reconcile)?.trigger('click')
+    // The sheet is put back on the fact as it opens, and tells the screen before anything is drawn.
+    await nextTick()
+    expect(card(view)).not.toContain('190,132')
+  })
+
+  it('review Р2-3: an opening is blind with no answer to clear — a sheet mounted anew says «fact» too', async () => {
+    const view = await screen()
+    // The screen was last told «result», and the sheet holds no answer — as one mounted anew would.
+    view.getComponent(ReconcileSheet).vm.$emit('step', 'result')
+    await settle()
+    expect(card(view)).toContain('190,132')
+
+    await startCheck(view)
+    expect(card(view)).not.toContain('190,132')
+    expect(figure(view).text()).toContain(en.accounts.account.balance_hidden)
+  })
+
+  it('adversarial А4: «≈ … по моему курсу» grows and shrinks, never in one frame (MOL-151)', async () => {
+    const view = await screen(amd('190132'), parseMoney('5921.05', 'RUB'))
+    const reveal = view.get('.balance').findComponent(AppReveal)
+    expect(reveal.exists()).toBe(true)
+    expect(reveal.find('.approx').exists()).toBe(true)
+    await startCheck(view)
+    expect(view.find('.balance .approx').exists()).toBe(false)
+  })
+
+  it('a balance below zero is not told by its colour while hidden', async () => {
+    const view = await screen(amd('-1200'))
+    expect(figure(view).classes()).toContain('negative')
+    await startCheck(view)
+    expect(figure(view).classes()).not.toContain('negative')
+    expect(card(view)).not.toContain('1,200')
+  })
+
+  it('must not fire: no sheet, no dots — and the figure is no live region (С-12)', async () => {
+    const view = await screen()
+    expect(figure(view).text()).not.toContain('•••')
+    expect(figure(view).attributes('aria-live')).toBeUndefined()
+    expect(view.text()).not.toContain(en.accounts.account.balance_hidden)
   })
 })

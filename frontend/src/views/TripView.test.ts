@@ -349,9 +349,9 @@ describe('TripView', () => {
 
     const rows = view.findAll('.row')
     expect(rows).toHaveLength(2)
-    expect(plain(rows[0]?.text())).toContain('570,00 ֏ за л')
+    expect(plain(rows[0]?.text())).toContain('570 ֏ за л')
     // Дешевле на ценнике и дороже за литр — ради этой строки экран и существует.
-    expect(plain(rows[1]?.text())).toContain('520,00 ֏')
+    expect(plain(rows[1]?.text())).toContain('520 ֏')
     expect(plain(rows[1]?.text())).toContain('577,78 ֏ за л')
   })
 
@@ -469,7 +469,7 @@ describe('TripView', () => {
       expect(rows).toHaveLength(3)
       const last = rows[2]
       expect(last?.text()).toContain(ru.trip.queued.waiting)
-      expect(plain(last?.text())).toContain('300,00 ֏ за л')
+      expect(plain(last?.text())).toContain('300 ֏ за л')
     })
 
     it('правка и удаление помечают серверную строку, а не заводят новую', async () => {
@@ -982,7 +982,7 @@ describe('TripView', () => {
       expect(view.get('.dock').text()).toContain(ru.purchases.manual_by_hand)
       // Иначе поход, который сервер держит, но о котором не спросили, читается как «похода нет».
       // Своими словами главной: начать можно и без сети — и одно уведомление, а не два.
-      expect(view.text()).toContain(ru.trip.history.offline_title)
+      expect(view.text()).toContain(ru.purchases.offline.title)
       expect(view.text()).not.toContain(ru.trip.offline.title)
     })
 
@@ -1362,7 +1362,7 @@ describe('TripView', () => {
     it('удалён единственный поход истории — главная встречает знакомством, а не скелетом (А5)', async () => {
       tripHistory.mockResolvedValueOnce(single)
       const { view, queue } = await render()
-      expect(view.findAll('.purchase-row')).toHaveLength(1)
+      expect(view.findAll('.recorded .list-row')).toHaveLength(1)
 
       tripHistory.mockResolvedValue({ trips: [], nextCursor: null })
       removeTrip.mockResolvedValue(undefined)
@@ -1427,7 +1427,7 @@ describe('TripView', () => {
     it('отказ «Вернуть» единственного похода истории — главная перечитывает историю (раунд 2, Б2)', async () => {
       tripHistory.mockResolvedValueOnce(single)
       const { view, queue } = await render()
-      expect(view.findAll('.purchase-row')).toHaveLength(1)
+      expect(view.findAll('.recorded .list-row')).toHaveLength(1)
 
       let land: () => void = () => undefined
       removeTrip.mockReturnValueOnce(

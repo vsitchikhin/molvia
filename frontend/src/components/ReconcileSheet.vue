@@ -5,11 +5,14 @@
       {{ t('accounts.reconcile.meta', { name: account.name, currency: currencyName }) }}
     </template>
 
+    <!-- The connection is the kit's line, first in the sheet over either step, said in the sheet's
+         own region (MOL-181, Ф-19); drawn by the connection and gone with it. Over a count already
+         answered it says what waits, not «сверить» (review Р2-4, adversarial А2б) — the write only
+         where it is offered, not over «Сходится» or a difference written (Р3-1, Б1). -->
+    <StatusStrip v-if="!online" class="status" kind="offline" :text="t(offlineLine)" />
+
     <!-- Step one: the fact, before the count — so as not to fit the number (В-4 MOL-43). -->
     <form v-if="!result" class="form" novalidate @submit.prevent="check">
-      <p v-if="!online" class="strip">
-        <IconCloudOff class="strip-icon" aria-hidden="true" />{{ t('accounts.reconcile.offline') }}
-      </p>
       <div class="field">
         <label :for="factId" class="question">{{ t('accounts.reconcile.question') }}</label>
         <div class="well" :class="{ bad: factBad }">
@@ -38,9 +41,6 @@
     <!-- Said through the app's one live region (MOL-19), and the focus comes here: the field and
          the button it was on are gone (review 20). -->
     <div v-else ref="resultBox" class="result" tabindex="-1">
-      <p v-if="!online" class="strip">
-        <IconCloudOff class="strip-icon" aria-hidden="true" />{{ t('accounts.reconcile.offline') }}
-      </p>
       <template v-if="matched">
         <div class="matched">
           <span class="circle" aria-hidden="true"><IconCheck class="circle-icon" /></span>
@@ -110,15 +110,21 @@
       <!-- Offline or the server: decided after the failure, and offline is never red (MOL-19).
            Offline is said above, by the connection itself, and goes with it (review 34). -->
       <div v-if="failure === 'error' || failure === 'categories'" class="failed" role="alert">
-        <span>{{
+        <span class="failed-words">{{
           t(failure === 'categories' ? 'accounts.reconcile.no_other' : 'accounts.reconcile.failed')
         }}</span>
+        <!-- «Повторить» of «Прочее» writes: it waits as «Записать разницу» does (adversarial А1); a
+             recount waits for the connection (В2). Not now rather than gone, so a focus on it stays
+             (Б2), and saying why on itself (Ф-6, В1). -->
         <AppButton
           v-if="result"
+          class="retry"
           variant="ghost"
+          :inactive="retryWait !== null"
           @click="failure === 'categories' ? writeDifference() : recount(true)"
         >
-          {{ t('state.retry') }}
+          <template v-if="retryWait === 'retry_wait_online'" #icon><IconCloudOff /></template>
+          {{ retryWait ? t(`accounts.reconcile.${retryWait}`) : t('state.retry') }}
         </AppButton>
       </div>
       <!-- A reason removed from its own sheet over this one comes back here (MOL-82's ten seconds). -->
@@ -138,7 +144,7 @@
           block
           :busy="sending"
           :busy-label="t('accounts.reconcile.checking')"
-          :disabled="!online && !sending"
+          :inactive="!online && !sending"
           @click="check"
         >
           <template #icon><IconScale v-if="online || sending" /><IconCloudOff v-else /></template>
@@ -147,15 +153,23 @@
       </template>
       <template v-else>
         <template v-if="!matched && !written">
+          <!-- Tinted over «Готово», never a second fill (Ф-12, Ф-15); not now, it says why (Ф-6, С-10). -->
           <AppButton
-            variant="secondary"
+            variant="tinted"
             block
             :busy="writing"
             :busy-label="t('accounts.reconcile.writing')"
-            :disabled="!writing && (!online || recountPending || tripsHeld)"
+            :inactive="!writing && writeWait !== null"
             @click="writeDifference"
           >
-            {{ t('accounts.reconcile.write_difference') }}
+            <template v-if="writeWait === 'write_wait_online' && !writing" #icon>
+              <IconCloudOff />
+            </template>
+            {{
+              writeWait && !writing
+                ? t(`accounts.reconcile.${writeWait}`)
+                : t('accounts.reconcile.write_difference')
+            }}
           </AppButton>
           <p class="note">{{ writeNote }}</p>
         </template>
@@ -193,7 +207,7 @@ import IconCheck from '~icons/mdi/check'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconHelp from '~icons/mdi/help-circle-outline'
 import IconScale from '~icons/mdi/scale-balance'
-import { currencySign } from '@molvia/model'
+import { currencySign, formatMoney } from '@molvia/model'
 import type {
   AccountCheckResponse,
   AccountOperationView,
@@ -210,6 +224,7 @@ import OperationRow from '@/components/OperationRow.vue'
 import OperationIncomeSheet from '@/components/OperationIncomeSheet.vue'
 import OperationSheet from '@/components/OperationSheet.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import {
   operationRowProps,
@@ -217,7 +232,6 @@ import {
   shortDay as dayOf,
   signedAmount,
 } from '@/components/accounts'
-import { asTyped } from '@/components/spending'
 import type { Removed } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import type { IncomeDraft } from '@/composables/useIncomes'
@@ -230,6 +244,11 @@ import type { QueuedWrite } from '@/stores/tripQueue'
 import { reportFailure } from '@/failures'
 
 type Reason = AccountCheckResponse['reasons'][number]
+/**
+ * The fact being typed, or the server's answer shown: the screen behind hides its balance while the
+ * fact is typed (Ф-33).
+ */
+export type ReconcileStep = 'fact' | 'result'
 /** A check as this sheet sends it: the day is the request's (MOL-121). */
 interface Check {
   readonly id: string
@@ -261,6 +280,7 @@ export default defineComponent({
     OperationRow,
     OperationSheet,
     SectionCaption,
+    StatusStrip,
     UndoStrip,
   },
   props: {
@@ -279,6 +299,7 @@ export default defineComponent({
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
+    step: (step: ReconcileStep) => typeof step === 'string',
   },
   setup(props, { emit }) {
     const { t, locale } = useI18n()
@@ -311,12 +332,21 @@ export default defineComponent({
     let asking = 0
     /** The name of «Прочее · сверка» for this difference: a second tap writes the same one. */
     let differenceId = newId()
+    /** An answer was shown since the sheet last started afresh: the count was in sight. */
+    let answered = false
 
     watch(
       () => props.open,
       async (open) => {
         if (!open) return
-        fact.value = ''
+        // Every opening is blind, whatever the screen was last told — a sheet mounted anew has no
+        // answer to clear, and said nothing (review Р2-3).
+        emit('step', 'fact')
+        // What was typed stays while no answer came — closed to come back with the connection, as the
+        // offline line promises (adversarial А2). Once an answer was shown, the next check starts
+        // afresh, a fact typed after «Ввести другую сумму» too: it was typed with the count in sight (Б3).
+        if (answered) fact.value = ''
+        answered = false
         factBad.value = false
         result.value = null
         failure.value = null
@@ -332,12 +362,36 @@ export default defineComponent({
       },
     )
 
+    // A fact typed is of its account: the screen reused for another one starts afresh.
+    watch(
+      () => props.account.id,
+      () => {
+        fact.value = ''
+      },
+    )
+
     const sign = computed(() => currencySign(props.account.currency, locale.value))
     const currencyName = computed(() => t(`spending.currency_name.${props.account.currency}`))
     const money = (value: Money) => signedAmount(value, locale.value)
     const signed = (value: Money) => signedAmount(value, locale.value, { plus: true })
     const shortDay = (day: string) => dayOf(day, locale.value)
     const matched = computed(() => result.value?.difference.minor === 0n)
+    /** Offline, in words of what waits for the connection: the check, the write, or nothing. */
+    const offlineLine = computed(() => {
+      if (!result.value) return 'accounts.reconcile.offline'
+      return matched.value || written.value
+        ? 'accounts.reconcile.offline_counted'
+        : 'accounts.reconcile.offline_result'
+    })
+
+    // The screen is told the step as it changes: an answer shows the balance behind, «Ввести другую
+    // сумму» hides it again (Ф-33).
+    watch(
+      () => result.value === null,
+      (none) => {
+        emit('step', none ? 'fact' : 'result')
+      },
+    )
 
     async function ask(check: Check): Promise<boolean> {
       failure.value = null
@@ -346,6 +400,7 @@ export default defineComponent({
         const answer = await api.checkAccount(props.account.id, check)
         if (mine !== asking) return false
         sent = check
+        answered = true
         result.value = answer
         differenceId = newId()
         written.value = false
@@ -459,6 +514,32 @@ export default defineComponent({
       trips.pending.some((write) => countsMoney(write) && !tripsSend(write)),
     )
 
+    /**
+     * Why «Записать разницу» cannot be pressed now, in the words on it (Ф-6, С-10): the connection
+     * first — nothing is recounted without it — then the answer «Покупки» waits for, which the line
+     * above says too (owner's В-1 «а»), then a correction still on its way.
+     */
+    const writeWait = computed(() => {
+      if (!props.online) return 'write_wait_online'
+      if (tripsHeld.value) return 'write_after_answer'
+      if (recountPending.value) return 'write_after_recount'
+      return null
+    })
+
+    /**
+     * Why «Повторить» of the footer cannot be pressed now, in the words on it: a write waits as the
+     * write does, a recount for the connection alone (adversarial В1, В2).
+     */
+    const retryWait = computed(() => {
+      if (failure.value === 'categories') {
+        if (writeWait.value === 'write_wait_online') return 'retry_wait_online'
+        if (writeWait.value === 'write_after_answer') return 'retry_after_answer'
+        if (writeWait.value === 'write_after_recount') return 'retry_after_recount'
+        return null
+      }
+      return props.online ? null : 'retry_wait_online'
+    })
+
     // A spending is put right through the queue, a trip too: its answer comes after the sheet, and
     // the count is asked again once it has — any landing will do, the check is cheap. The queues
     // emptying count too: a write set aside lands nowhere.
@@ -546,7 +627,7 @@ export default defineComponent({
     function reasonTitle({ kind, operation }: Reason): string {
       const [own] = operation.amounts
       const amount = own
-        ? asTyped({ ...own, minor: own.minor < 0n ? -own.minor : own.minor }, locale.value)
+        ? formatMoney({ ...own, minor: own.minor < 0n ? -own.minor : own.minor }, locale.value)
         : ''
       if (kind === 'unassigned')
         return t(`accounts.reconcile.cause_no_account_${operation.kind}`, { amount })
@@ -567,7 +648,7 @@ export default defineComponent({
     function reasonMeta({ kind, operation }: Reason): string {
       const [own] = operation.amounts
       const amount = own
-        ? asTyped({ ...own, minor: own.minor < 0n ? -own.minor : own.minor }, locale.value)
+        ? formatMoney({ ...own, minor: own.minor < 0n ? -own.minor : own.minor }, locale.value)
         : ''
       if (kind === 'unpriced')
         return t(
@@ -602,7 +683,7 @@ export default defineComponent({
       const value = result.value
       if (!value) return ''
       const size = value.difference.minor < 0n ? -value.difference.minor : value.difference.minor
-      const amount = asTyped({ ...value.difference, minor: size }, locale.value)
+      const amount = formatMoney({ ...value.difference, minor: size }, locale.value)
       return t(
         value.difference.minor < 0n
           ? 'accounts.reconcile.write_out_note'
@@ -619,7 +700,9 @@ export default defineComponent({
      */
     async function writeDifference(): Promise<void> {
       const value = result.value
-      if (!value || writing.value || written.value || tripsHeld.value || !sent) return
+      // Every way in waits as the button does: «Повторить» of «Прочее» wrote over a count its
+      // neighbour called stale — the correction and «Прочее» the same money twice (adversarial А1).
+      if (!value || writing.value || written.value || writeWait.value !== null || !sent) return
       const size = {
         ...value.difference,
         minor: value.difference.minor < 0n ? -value.difference.minor : value.difference.minor,
@@ -722,6 +805,9 @@ export default defineComponent({
       reasonRemoved,
       reasons,
       tripsHeld,
+      writeWait,
+      retryWait,
+      offlineLine,
       incomeDraft,
       incomeOpen,
       incomeSaved,
@@ -760,24 +846,8 @@ export default defineComponent({
   gap: var(--space-4);
 }
 
-.strip {
-  @include appear;
-
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--warn-tint);
-  color: var(--warn-ink);
-  font-size: var(--text-footnote);
-}
-
-.strip-icon {
-  @include icon;
-
-  font-size: var(--icon-sm);
+.status {
+  margin-bottom: var(--space-4);
 }
 
 .field {
@@ -938,18 +1008,30 @@ export default defineComponent({
 .none-icon {
   @include icon;
 
-  font-size: var(--icon-sm);
+  font-size: var(--icon-md);
   color: var(--text-muted);
 }
 
+/* The words beside a short «Повторить» while they have 8rem; a long word of waiting goes under them,
+   at the right, rather than squeezing both into columns at 320 (review Р5-1). */
 .failed {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
   margin: 0 0 var(--space-2);
   color: var(--bad-ink);
   font-size: var(--text-footnote);
+}
+
+.failed-words {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+.retry {
+  margin-left: auto;
 }
 
 .undo {

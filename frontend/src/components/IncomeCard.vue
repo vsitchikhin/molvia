@@ -33,10 +33,10 @@ import { computed, defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconNote from '~icons/mdi/note-text-outline'
+import { formatMoney } from '@molvia/model'
 import type { IncomeView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import OperationCardHead from '@/components/OperationCardHead.vue'
-import { asTyped } from '@/components/spending'
 import { calendarDay, dayWords, purchaseDay } from '@/days'
 import { useAccountsStore } from '@/stores/accounts'
 
@@ -77,7 +77,7 @@ export default defineComponent({
       // «Сегодня», «Вчера» by the phone's today (MOL-121, В-1); the button says the date.
       head: computed(() => dayWords(props.income.receivedOn, locale.value, props.today)),
       // As it was typed, as everywhere in «Деньги» (owner's decision В-1).
-      amount: computed(() => asTyped(props.income.amount, locale.value)),
+      amount: computed(() => formatMoney(props.income.amount, locale.value)),
     }
   },
 })

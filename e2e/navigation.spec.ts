@@ -414,7 +414,7 @@ test.describe('safe areas', () => {
     })
     expect(expense.status()).toBe(201)
     await open(page, '/purchases')
-    await page.locator('.recorded .purchase-row').filter({ hasText: 'Removed shop' }).click()
+    await page.locator('.recorded .list-row').filter({ hasText: 'Removed shop' }).click()
     await expect(page).toHaveURL(new RegExp(`/purchases/${removed}$`))
     await page.getByRole('button', { name: 'Delete the entry' }).click()
     await page.waitForTimeout(400)
@@ -431,7 +431,7 @@ test.describe('safe areas', () => {
     const [undo, dock, last] = await Promise.all([
       strip.boundingBox(),
       page.locator('.dock').boundingBox(),
-      page.locator('.recorded .purchase-row').last().boundingBox(),
+      page.locator('.recorded .list-row').last().boundingBox(),
     ])
     expect(Math.round((dock?.y ?? 0) - ((undo?.y ?? 0) + (undo?.height ?? 0)))).toBe(8)
     expect((last?.y ?? 0) + (last?.height ?? 0)).toBeLessThanOrEqual(undo?.y ?? 0)
@@ -512,9 +512,10 @@ test.describe('safe areas', () => {
       )
     })
 
-    // With no strip — an account's screen, `#undo` and no `#docked` (С-9) — «Вернуть» stands 8 over
-    // the home indicator (adversarial А5: «Счета» held this until they got their strip).
-    test('«Вернуть» on a nested screen with no strip stands 8 over the indicator', async ({
+    // An account's screen held «Вернуть» with no strip under it (С-9) until its actions went into
+    // the strip (MOL-194, В-1 «б»): now «Вернуть» of a spending stands 8 over «Сверить с фактом», which
+    // stays — no screen is left with `#undo` and no `#docked`.
+    test('«Вернуть» on an account’s screen stands 8 over «Сверить с фактом», which stays', async ({
       page,
     }) => {
       await insets(page, portrait)
@@ -561,13 +562,20 @@ test.describe('safe areas', () => {
         .click()
       const strip = page.locator('.undo-strip')
       await expect(strip).toBeVisible()
-      // The frame's strip, not `FloatingDock`, which wears `dock` too and only hides under «Вернуть».
-      await expect(page.locator('.screen > .dock')).toHaveCount(0)
       await strip.locator('.text').hover()
       await page.waitForFunction(() => !document.documentElement.hasAttribute('data-nav'))
-      const box = await strip.boundingBox()
+      const reconcile = page.locator('.dock').getByRole('button', { name: 'Сверить с фактом' })
+      await expect(reconcile).toBeVisible()
+      const [box, dock, button] = await Promise.all([
+        strip.boundingBox(),
+        page.locator('.dock').boundingBox(),
+        reconcile.boundingBox(),
+      ])
+      expect(Math.round((dock?.y ?? 0) - ((box?.y ?? 0) + (box?.height ?? 0)))).toBe(8)
       const height = await page.evaluate(() => window.innerHeight)
-      expect(Math.round(height - ((box?.y ?? 0) + (box?.height ?? 0)))).toBe(portrait.bottom + 8)
+      expect(Math.round(height - ((button?.y ?? 0) + (button?.height ?? 0)))).toBe(
+        portrait.bottom + 12,
+      )
     })
   })
 

@@ -122,6 +122,22 @@ The detail behind the frontend lines of `CLAUDE.md`.
   Of the 321 Google fonts covering Cyrillic, four also cover Armenian and none is usable
   here. Without this the glyph falls back to a system font and shifts the baseline in the
   one place it must not: the prices.
+- **Money is printed by one rule, in the domain** (MOL-205, DESIGN.md «whole amounts print without
+  ",00"»): `formatMoney` for an amount, `formatUnitPrice` for a price per unit, `formatEstimate` for
+  «≈». Whole is bare — «9 870 ֏», «570 ֏/л»; a fraction keeps every digit of its currency, never
+  rounded or trimmed — «2 495,69 ₽», «40,50 ₽»; whole is what is printed, so 569,995 ֏/л is «570 ֏/л»
+  (`exactFigures`, by `trailingZeroDisplay`, which the floor of the browsers has). Until then «Деньги»
+  printed by `asTyped` of their own and «Покупки», the receipt and «Что брать» by `formatMoney`, which
+  kept the «,00» — one app, two rules. No screen formats money with an `Intl.NumberFormat` of its own;
+  a rate, a percent and a quantity are not money and keep theirs. **Beside its row, a sum is exact;
+  a summary figure is whole** (owner's В-1 «в» of the review): the day over its rows says «5 403,12 ֏»
+  where the one receipt of the day is 5 403,12 ֏, and «Включая 11,50 $ (≈ 4 485 ֏)» names the dollars
+  as their row does — only what they came to is «≈». **The prices, named:** the large figures of
+  «Деньги», «Траты», «Графики», «Бюджет» and «Счета» stay whole, as the frames draw them («5 633 ֏»), so
+  «Потрачено 5 403 ֏» stands for a month of that one receipt with no «≈» (adversarial Б1б) — and on
+  «Траты» the month's «5 403 ֏» stands over its day and its row of «5 403,12 ֏» (Г1); and a price
+  per unit under half a cent prints as a nought, «0 $/шт» for 0,99 $ the 300 cotton buds — as master's
+  «0,00 $» did (В-2 «а», adversarial Б2).
 - **Native HTML first, then Reka UI, never a styled kit.** On a phone `<select>`,
   `<input type="date">` and `<input inputmode="decimal">` open the system pickers, which
   beat anything a library renders; `<dialog>` already brings a focus trap and a backdrop.
@@ -243,10 +259,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   footer read as two buttons of equal weight. The price, accepted (А4): the `surface-2` pill stands
   1.10:1 on a sheet, so in a footer that sends, primary and ghost read as two muted words; an edge
   would make it a secondary, which is `surface` with a `border-strong` edge. **The lift of a floating
-  action is the dock's, not a state's** (reviews 1 and 6): `FloatingDock` gives `--shadow-md` to
-  whatever it holds, live or not, by a weight above any variant's shadow — lifted only when
-  inactive, a dead «Восстановить» floated above the live one; the kit drops an inactive primary's
-  rest shadow by a light `:where`. The hover and the press are written on `:not(:disabled, [aria-disabled])`,
+  action was the dock's, not a state's** (reviews 1 and 6): a dead «Восстановить» floated above the
+  live one; the kit drops an inactive primary's rest shadow by a light `:where`, and since MOL-194 no
+  action floats — every screen of «Деньги» holds its own in the docked strip. The hover and the press are written on `:not(:disabled, [aria-disabled])`,
   since `aria-disabled` is still `:enabled` and an inactive primary lit up under the pointer. A button that is only an icon draws its glyph in `text`, inactive in
   `text-muted` (owner's В-15 «а») — `text-muted` for both made the month's arrow at the edge look
   like the live one. **Chosen is a fill or a form, never a weight**: a segment is filled
@@ -372,9 +387,13 @@ The detail behind the frontend lines of `CLAUDE.md`.
   сохранилось ли» on top in the middle of «Ваши данные» (round 2, Б1, Б2). `kit-rows` holds a first, a middle
   and a last row, `advice.spec` the newcomer's row, `devices.spec` and `settings.spec` the two that are not
   rows. **The price, named** (self-review 7): a row built in place, not of the kit — «Написать разработчику»,
-  «Бот», «Устройства» and «Выйти» of «Настройки», «Сканировать штрихкод» of a record, `PurchaseRow`, `TripRow` —
+  «Бот», «Устройства» and «Выйти» of «Настройки», «Сканировать штрихкод» of a record, `TripRow` —
   keeps its ring cut at the card's edge, as on master, until its screen comes to the kit; the
   selector is not widened for them.
+  **The icon of a status may take its ink** (`tone`, MOL-204, Ф-4): `warn-ink` for a receipt not accepted
+  or not read, `good-ink` for one recorded — every other icon of a row is `text-muted`, since the accent
+  says «press here» and a status says nothing of the kind; `danger` and `inactive` colour it their own way,
+  over it. A screen does not reach into the row for it: the icon is the kit's.
   **Active** is the row the keyboard stands on in a list a field owns (К-4): the fill without the
   ring, since the focus is in the field; on a chosen row the fill is the layer's alone — the row's own
   square fill stood out past the round ring at every corner (adversarial В1). Only a `div` row takes a button into its tail — a button
@@ -621,7 +640,18 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the strip is up (adversarial А1): taken, the strip took the sheet and what was typed in it. A
   second full error while the first holds the strip is drawn as the quiet card (А4); the same error
   turning a section's where it stands gives its focus back to «Повторить» (А2); and the error says
-  the version out loud in the row's place (`useUpdateAnnouncement`, А3).
+  the version out loud in the row's place (`useUpdateAnnouncement`, А3). **A focus the strip loses is brought
+  back by the frame** (MOL-194, adversarial Б2, Б3): a render that swaps the strip's actions under
+  the focus — an account put away or deleted on another phone — left it on the body; it goes to the
+  screen's first button in the strip, where the one it stood on was, or to the title where the strip
+  went whole. **Never to «Обновить»** — a button marked `reload`: the row of a version waiting over
+  them (review №3, adversarial Г1, Г2) and the full error's own, first in the strip it takes (Е,
+  inherited from MOL-180 review №6: the focus held from the screen's action now goes to «Повторить»):
+  the next Enter, meant for the screen, let a reload in. A focus that stood on a «Обновить» itself goes
+  to the «Обновить» in its place (Ж): that Enter was meant for the reload. The row of the version changes in a render
+  of its own, which the frame does not see, so the frame watches its phase too: «Обновить» swapped
+  for «Не обновилось» gives the focus to the screen's action (Д, inherited from MOL-132). A focus
+  outside the strip stays where the person put it.
 - **The connection is one line, `StatusStrip`** (MOL-181, Ф-14, Н-7). «Без связи», «из памяти» and
   «сервер не ответил» were drawn five ways — a strip copied into seventeen files, a card of
   `ScreenState` over the screen, a note in a sheet — two or three on one screen, and a strip shared
@@ -645,7 +675,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   on coming and on new words, taken back when it goes. Drawn again with the same words it says
   nothing new; **a retry that failed the same way is still an answer** (C1, review С-7, adversarial
   А4): the screen counts its failed answers in `attempt`, and a new one says the same words again —
-  the strip stays through the retry, so nothing else would. «From
+  the strip stays through the retry, so nothing else would. **Gone with the focus on «Повторить», it gives it to the
+  title** (MOL-194, Б1), as a full error does: the retry answered is exactly when it goes. Not in a
+  sheet — the page under it is inert and a sheet's title takes no focus; there it falls as before, a
+  price. «From
   memory» has two forms only: `ScreenState` when there is no answer, the strip when an old one is
   shown. One per screen is held by the screens' tests, not a linter: two strips in a template are
   often `v-if` and `v-else`. `AppNote` stays the note — the «i», 400, no voice. The seventeen copies
@@ -818,7 +851,7 @@ The detail behind the frontend lines of `CLAUDE.md`.
   server, the tests — it is `none`. **The strip is the top row of `AppScreen`'s pinned strip over the
   tab bar** (owner's decision В-1, Р-6): the screen's own main action — «Начать поход», the trip's
   total, «Сохранить» — stays under it, nearer the thumb, the room for the list is the strip's as
-  ever, and what stands over the list — «Вернуть» in `#undo`, `FloatingDock` — rises by
+  ever, and what stands over the list — «Вернуть» in `#undo` — rises by
   `--dock-height`, a token like `--keyboard-inset` that `AppScreen` sets. On the login screen, its own frame, it stands under the
   screen's action. «Обновить» lets the waiting worker in and reloads when it takes over; a version
   another window already let in (`owed`) is a reload alone. **A sheet opened between the tap and
@@ -873,9 +906,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   `#docked` — it pushed «Сфотографировать чек» up on «Покупки» — and never `position: fixed`
   inside `UndoStrip` itself: a parent playing `appear` (`translate`) becomes the containing block
   of a fixed child, and the strip would ride the card for the length of the animation; a sheet's
-  «Вернуть» is in its own footer, which the same component serves unchanged. A screen whose
-  `FloatingDock` still holds its action hides it while «Вернуть» stands (16 over the tab bar under
-  8 would overlap), until its task moves the action into the strip. `UndoStrip` reads «words ·
+  «Вернуть» is in its own footer, which the same component serves unchanged. No action floats any
+  more: the last, the account's screen, went into its strip with MOL-194. `UndoStrip` reads «words ·
   count · Вернуть», the count in a ring of `--graphic`, `aria-hidden` — the announcement says the
   ten seconds once, a live region ticking would talk over a person reaching for the button (81 v2
   asked for a label; declined, MOL-179 Р-5). **A «Вернуть» that waits for the server** — an exchange's,
@@ -947,7 +979,31 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the screen redraw: `--page-hold` on `#app`, as far as the bottom of the window and no further —
   more is empty room to scroll into. `#app` is a block, so the hold is room under the screen and
   never the screen stretched: a state that takes the free height would carry «Повторить» down with
-  it. **Above the control, nothing that belongs to the answer stands**: the strips «Нет связи» and
+  it. **Below the control the page may grow and shrink only where nothing below is tapped**
+  (MOL-269): a thing to press under a skeleton is moved by the answer from under the finger, and a press
+  on it with a release on what took its place is a click on neither. So what is tapped under a skeleton
+  comes with the answer instead — the ways out of «Деньги» (`money-spendings.md`), the groups of
+  «Настройки» — or the skeleton is the answer's shape, as the newcomer's «Что брать» (MOL-203). **A
+  failed read read again is a skeleton for this rule** where its answer replaces a state of another
+  height: the ways out of «Деньги» are unseen in their place while «Повторить» reads a failed month
+  again — never taken out, which shortened the page under the finger (adversarial А1, Б2), and never for
+  a read nobody asked for, refused as a rule and blinking the rows for nothing (review Р4-1) — and the
+  groups of «Настройки» go under the form's skeleton of a read after a failure — «Повторить», the
+  connection back, the app back in view (review Р3-1) — the one condition being the skeleton's own
+  (`!(loading && !draft)`). An answer of another read that moves them counts the same where the phone
+  keeps it: the ways out wait for «Счета»'s first answer. The groups of «Настройки» are mounted under the
+  skeleton and only hidden (`v-show`), so their own reads go at once — and shown again they come in by
+  `appear`, as every child of the screen does — **not waiting for the salary's day**: nothing of it is
+  kept on the phone, so waiting for it hid the groups at every opening, and a step back the browser
+  showed whole came in again under its picture (`motion.spec` А5, CI of #226). **The prices, named:** the
+  first opening, and a read after a failure, wait for those answers before «Выйти» or «Обмен денег» can
+  be pressed; the salary's day, on, still grows its card over the groups at every opening of
+  «Настройки» — over frames, by `AppReveal` — until the setting is kept on the phone; and where a form is
+  shown from the person's own settings, the groups stand from the start, so a read of it that fails puts
+  its quiet error card over them (adversarial А7) — the card stands under nothing that chooses it, and
+  hiding the groups for every read would hide «Выйти» at every opening. The notices of the record typed
+  by hand (`TripNotices` under its skeleton) are a task of their own, MOL-311.
+  **Above the control, nothing that belongs to the answer stands**: the strips «Нет связи» and
   «Сервер не ответил», the card of a failed refresh, the card of a refusal of the queue (a row of
   its own month, a card on any other — adversarial round 3, Ж), the line «Этой категории на графиках
   нет» are drawn under the control that chooses the answer — the owner's decision В-2, against

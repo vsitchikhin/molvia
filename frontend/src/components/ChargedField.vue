@@ -22,10 +22,9 @@
 import { computed, defineComponent, useId } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { currencySign, parseMoney } from '@molvia/model'
+import { currencySign, formatMoney, parseMoney } from '@molvia/model'
 import type { Currency, Money, MoneyAccountView } from '@molvia/model'
 import AppField from '@/components/AppField.vue'
-import { asTyped } from '@/components/spending'
 
 /** What was typed, as money of the account — null when empty or not money. */
 function typedCharge(text: string, currency: Currency): Money | null {
@@ -61,17 +60,17 @@ export default defineComponent({
     const hintId = useId()
     const sign = computed(() => currencySign(props.account.currency, locale.value))
     const placeholder = computed(() =>
-      props.estimate ? asTyped(props.estimate, locale.value).replace(/\s*\D+$/u, '') : '',
+      props.estimate ? formatMoney(props.estimate, locale.value).replace(/\s*\D+$/u, '') : '',
     )
     const hint = computed(() => {
       const filled = typedCharge(props.modelValue, props.account.currency)
       if (filled && filled.minor > 0n)
         return t('accounts.charged.hint_filled', {
           name: props.account.name,
-          amount: asTyped(filled, locale.value),
+          amount: formatMoney(filled, locale.value),
         })
       return props.estimate
-        ? t('accounts.charged.hint_empty', { amount: asTyped(props.estimate, locale.value) })
+        ? t('accounts.charged.hint_empty', { amount: formatMoney(props.estimate, locale.value) })
         : t('accounts.charged.hint_empty_plain')
     })
     return { t, hintId, sign, placeholder, hint }

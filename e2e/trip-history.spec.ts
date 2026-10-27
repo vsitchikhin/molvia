@@ -13,7 +13,7 @@ interface WireTrip {
 }
 const sheet = (page: Page) => page.locator('dialog[open]')
 /** A row of «Записаны» on «Покупки» (MOL-128). */
-const recorded = (page: Page) => page.locator('.recorded .purchase-row')
+const recorded = (page: Page) => page.locator('.recorded .list-row')
 async function createTrip(page: Page, name: string): Promise<WireTrip> {
   const headers = await asBrowser(page)
   // A trip names the settings it was started with since MOL-65; the server takes its city and
@@ -86,12 +86,12 @@ test('pages through all of «Записаны» and adds, amends and removes in 
   await sheet(page).getByRole('button', { name: 'Record' }).click()
   await expect(page).toHaveURL(new RegExp(`/purchases/${oldest}$`))
   await expect.poll(async () => (await read(page, oldest)).expenses.length).toBe(1)
-  await expect(page.locator('.row')).toContainText('1,200.00')
+  await expect(page.locator('.row')).toContainText('֏1,200')
   await page.locator('.row').click()
   await page.waitForTimeout(400)
   await sheet(page).getByLabel('Price as on the tag').fill('1300')
   await sheet(page).getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(page.locator('.row')).toContainText('1,300.00')
+  await expect(page.locator('.row')).toContainText('֏1,300')
   expect(
     await page.locator('.row .name').evaluate((node) => node.scrollWidth <= node.clientWidth),
   ).toBe(true)

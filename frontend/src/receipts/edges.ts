@@ -1,5 +1,6 @@
 // MOL-222 — where the receipt is on the photo: four corners the phone proposes and the person moves.
-// No DOM, so the bench of MOL-114 measures the very code the phone runs (Т-2, Р-2).
+// No DOM, so the bench of MOL-114 measures the very code the phone runs (Т-2, Р-2) — from the copy the
+// phone's canvas halves the photo to, which the bench makes by `halvedCopy` (MOL-259).
 
 import { orderCorners } from '@/receipts/warp'
 import type { Pixels, Point, Quad, Size } from '@/receipts/warp'
@@ -15,6 +16,62 @@ export interface Gray extends Size {
 
 /** The long side corners are looked for at: the paper's edge is a few pixels wide even here. */
 export const EDGES_LONG_SIDE = 640
+
+/**
+ * The long side the phone halves a photo down to before `grayOf` takes it the rest of the way (MOL-259):
+ * one `drawImage` from 4 000 px straight to 640 samples four pixels of forty, and the noise and print it
+ * keeps tore a long receipt's paper in two — am-05c lost its top half in Chromium. Each step is exactly
+ * half, so a mean of 2 × 2.
+ */
+export const EDGES_HALVED_SIDE = 2 * EDGES_LONG_SIDE
+
+/**
+ * The sizes a photo goes through, each exactly half the one before, until its long side is within
+ * `longSide`: an odd side drops its last pixel (`halvedSource`), since a canvas drawing 4 619 into 2 310
+ * is no longer a mean of two but samples one of them across the middle of the photo (MOL-259, adversarial А1).
+ */
+export function halvingSteps(size: Size, longSide = EDGES_HALVED_SIDE): Size[] {
+  const steps: Size[] = []
+  let { width, height } = size
+  while (Math.max(width, height) > longSide) {
+    width = Math.max(1, Math.floor(width / 2))
+    height = Math.max(1, Math.floor(height / 2))
+    steps.push({ width, height })
+  }
+  return steps
+}
+
+/** The part of `from` a step to `to` draws from: twice the step, the odd last pixel left out. */
+export function halvedSource(from: Size, to: Size): Size {
+  return { width: Math.min(2 * to.width, from.width), height: Math.min(2 * to.height, from.height) }
+}
+
+/** The photo brought to `size`, a step of `halvingSteps`: each pixel the mean of the 2 × 2 it covers. */
+export function halved(photo: Pixels, size: Size): Pixels {
+  const { width, height } = size
+  const data = new Uint8ClampedArray(width * height * 4)
+  for (let y = 0; y < height; y++) {
+    // a side of one pixel stays one: its pixel is taken twice, the mean the pixel itself
+    const rows = [2 * y, Math.min(2 * y + 1, photo.height - 1)]
+    for (let x = 0; x < width; x++) {
+      const columns = [2 * x, Math.min(2 * x + 1, photo.width - 1)]
+      for (let c = 0; c < 4; c++) {
+        let sum = 0
+        for (const row of rows)
+          for (const column of columns) sum += photo.data[(row * photo.width + column) * 4 + c] ?? 0
+        data[(y * width + x) * 4 + c] = Math.round(sum / 4)
+      }
+    }
+  }
+  return { data, width, height }
+}
+
+/** The copy the phone's canvas halves a photo to (`proposeCorners`), made without one: what the bench reads. */
+export function halvedCopy(photo: Pixels): Pixels {
+  let copy = photo
+  for (const step of halvingSteps(photo)) copy = halved(copy, step)
+  return copy
+}
 
 /** Below this share of the photo it is no receipt but a label, above it no edge was found. */
 const AREA_MIN = 0.03

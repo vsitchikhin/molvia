@@ -52,8 +52,8 @@ describe('AdviceCheapRow', () => {
   it('Ф-21: the price and its place first, the threshold under them', () => {
     const view = render([sas], price(300_000_000_000n))
 
-    expect(plain(view.get('.at').text())).toBe('3 200,00 ֏/кг · SAS')
-    expect(plain(view.get('.threshold').text())).toBe('Стоит брать дешевле 3 000,00 ֏/кг')
+    expect(plain(view.get('.at').text())).toBe('3 200 ֏/кг · SAS')
+    expect(plain(view.get('.threshold').text())).toBe('Стоит брать дешевле 3 000 ֏/кг')
     expect(plain(view.get('.title').text())).toBe('Сыр «Чанах»2,8 из 5 · 4 оценки')
   })
 
@@ -61,7 +61,7 @@ describe('AdviceCheapRow', () => {
     // A median of two is a number with nothing under it (MOL-33).
     const view = render([sas], null)
 
-    expect(plain(view.get('.at').text())).toBe('3 200,00 ֏/кг · SAS')
+    expect(plain(view.get('.at').text())).toBe('3 200 ֏/кг · SAS')
     expect(view.find('.threshold').exists()).toBe(false)
   })
 
@@ -69,7 +69,7 @@ describe('AdviceCheapRow', () => {
     const view = render([], price(300_000_000_000n))
 
     expect(view.find('.at').exists()).toBe(false)
-    expect(plain(view.get('.threshold').text())).toBe('Стоит брать дешевле 3 000,00 ֏/кг')
+    expect(plain(view.get('.threshold').text())).toBe('Стоит брать дешевле 3 000 ֏/кг')
   })
 
   it('neither a threshold nor a place: the name and the rating, and no empty line', () => {
@@ -85,9 +85,9 @@ describe('AdviceCheapRow', () => {
     const yerevan = { ...place('sas', 335_000_000_000n), city: 'Ереван' }
 
     expect(plain(render([gyumri, yerevan], null).get('.at').text())).toBe(
-      '3 200,00 ֏/кг · SAS в Гюмри',
+      '3 200 ֏/кг · SAS в Гюмри',
     )
-    expect(plain(render([gyumri], null).get('.at').text())).toBe('3 200,00 ֏/кг · SAS')
+    expect(plain(render([gyumri], null).get('.at').text())).toBe('3 200 ֏/кг · SAS')
   })
 
   it('А1: the price shown is the named place`s, and no word claims anything of the others', () => {
@@ -96,8 +96,8 @@ describe('AdviceCheapRow', () => {
     const dearerFirst = render([market, sas], null)
     const cheaperFirst = render([sas, market], null)
 
-    expect(plain(dearerFirst.get('.at').text())).toBe('3 350,00 ֏/кг · Рынок в Гюмри')
-    expect(plain(cheaperFirst.get('.at').text())).toBe('3 200,00 ֏/кг · SAS')
+    expect(plain(dearerFirst.get('.at').text())).toBe('3 350 ֏/кг · Рынок в Гюмри')
+    expect(plain(cheaperFirst.get('.at').text())).toBe('3 200 ֏/кг · SAS')
     for (const view of [dearerFirst, cheaperFirst]) {
       expect(view.text()).not.toMatch(/Дешевле всего|Брали здесь/)
     }

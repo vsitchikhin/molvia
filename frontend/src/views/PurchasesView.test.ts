@@ -3,7 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import { RouterView, createRouter, createWebHistory } from 'vue-router'
-import { ERROR, currentTripResponseSchema, parseMoney, tripViewCodec } from '@molvia/model'
+import {
+  ERROR,
+  currentTripResponseSchema,
+  parseMoney,
+  receiptsResponseCodec,
+  tripViewCodec,
+} from '@molvia/model'
 import type {
   ReceiptsResponse,
   AdviceResponse,
@@ -14,6 +20,7 @@ import type {
 } from '@molvia/model'
 import { ApiError } from '@molvia/client'
 import ru from '@/i18n/ru.json'
+import { purchaseDay, timeOfDay } from '@/days'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
@@ -175,7 +182,7 @@ function remember(trips: TripHistoryEntry[] = []) {
   if (trips.length === 0) localStorage.setItem(`molvia.trip-history-empty.${ME}`, '1')
 }
 
-const rows = (view: VueWrapper) => view.findAll('.recorded .purchase-row')
+const rows = (view: VueWrapper) => view.findAll('.recorded .list-row')
 /** The headings of the screen's groups: «Разбираем», «Посмотреть и записать». */
 const captions = (view: VueWrapper) => view.findAll('p.caption').map((caption) => caption.text())
 
@@ -239,7 +246,7 @@ describe('PurchasesView (MOL-128)', () => {
       expect(view.get('.dock').text()).toContain(ru.purchases.manual)
       expect(view.get('.dock').text()).not.toContain(ru.purchases.capture)
       expect(captions(view)).not.toContain(ru.purchases.group_review)
-      expect(view.text()).not.toContain(ru.purchases.receipts_error)
+      expect(view.text()).not.toContain(ru.purchases.error.title)
     })
 
     it('у человека из Грузии «пусто» — только после ответа о чеках; сбой списка сказан (MOL-109, Б1)', async () => {
@@ -252,7 +259,7 @@ describe('PurchasesView (MOL-128)', () => {
       receipts.mockRejectedValue(new Error('HTTP 500'))
       const failed = await render({ country: 'GE' })
       expect(failed.view.text()).not.toContain(ru.purchases.empty.title)
-      expect(failed.view.text()).toContain(ru.purchases.receipts_error)
+      expect(failed.view.text()).toContain(ru.purchases.receipts_error.title)
     })
 
     it('армянский чек, снятый до переезда в Грузию, — в «Покупках», чтобы записать или удалить (MOL-109, А2)', async () => {
@@ -399,11 +406,13 @@ describe('PurchasesView (MOL-128)', () => {
       expect(view.find('.skeleton').exists()).toBe(true)
     })
 
-    it('список чеков упал — «пусто» нет, есть тихая строка о чеках (ревью 7)', async () => {
+    it('список чеков упал — «пусто» нет, есть тихая карточка о чеках (ревью 7)', async () => {
       receipts.mockRejectedValue(new Error('HTTP 500'))
       const { view } = await render()
       expect(view.text()).not.toContain(ru.purchases.empty.title)
-      expect(view.text()).toContain(ru.purchases.receipts_error)
+      expect(view.text()).toContain(ru.purchases.receipts_error.title)
+      // «Записаны» answered: the screen's «Покупки не загрузились» would be untrue (review 1 of MOL-204).
+      expect(view.text()).not.toContain(ru.purchases.error.title)
     })
 
     it('чек, доставленный этим телефоном целиком, — «разбираем», хоть список и прочитан раньше (Б1)', async () => {
@@ -467,8 +476,10 @@ describe('PurchasesView (MOL-128)', () => {
           )
         },
       })
-      const row = view.findAll('.purchase-row').find((one) => one.text().includes('Не принят'))
+      const row = view.findAll('.list-row').find((one) => one.text().includes('Не принят'))
       expect(row).toBeDefined()
+      // The one icon of a row in the warning's ink (Ф-4, MOL-204).
+      expect(row?.classes()).toContain('tone-warn')
       await row?.trigger('click')
       await flushPromises()
       expect(openSheet()?.textContent).toContain(ru.purchases.remove)
@@ -491,6 +502,10 @@ describe('PurchasesView (MOL-128)', () => {
       tripHistory.mockReturnValue(new Promise(() => undefined))
       const { view } = await render()
       expect(view.find('.skeleton').exists()).toBe(true)
+      // The answer's shape (Ф-13): «Записаны» and its rows with a sum, never the paragraphs of `groups`.
+      expect(view.find('.skeleton-caption').exists()).toBe(true)
+      expect(view.find('.skeleton-rows').exists()).toBe(true)
+      expect(view.find('.skeleton-lines').exists()).toBe(false)
       expect(view.text()).not.toContain(ru.purchases.empty.title)
       expect(view.get('.dock').text()).toContain(ru.purchases.capture)
     })
@@ -514,7 +529,7 @@ describe('PurchasesView (MOL-128)', () => {
       tripHistory.mockRejectedValue(new Error('Failed to fetch'))
       vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
       const { view } = await render()
-      expect(view.text()).toContain(ru.trip.history.offline_title)
+      expect(view.text()).toContain(ru.purchases.offline.title)
       expect(view.find('.state.bad').exists()).toBe(false)
       expect(view.text()).not.toContain(ru.state.retry)
       expect(view.text()).not.toContain(ru.purchases.empty.title)
@@ -571,7 +586,7 @@ describe('PurchasesView (MOL-128)', () => {
       for (const row of rows(view)) {
         expect(row.text()).toContain('сумма по чеку · ')
         expect(row.text()).not.toMatch(/0 позиций|из чека/)
-        expect(row.find('.sum').exists()).toBe(true)
+        expect(row.find('.tail').exists()).toBe(true)
       }
     })
 
@@ -596,9 +611,9 @@ describe('PurchasesView (MOL-128)', () => {
       const [row, other] = rows(view)
       expect(row?.text()).toContain('Ереван Сити')
       expect(row?.text()).toContain('12 позиций · вчера')
-      expect(row?.get('.sum').text().replaceAll('\u00a0', ' ')).toBe('9 870,00 ֏ · 12,00 $')
+      expect(row?.get('.tail').text().replaceAll('\u00a0', ' ')).toBe('9 870 ֏ · 12 $')
       // A row read back from the phone, or from an older server, says where and when, nothing more.
-      expect(other?.find('.sum').exists()).toBe(false)
+      expect(other?.find('.tail').exists()).toBe(false)
       expect(other?.text()).not.toContain('позиц')
 
       await row?.trigger('click')
@@ -639,7 +654,7 @@ describe('PurchasesView (MOL-128)', () => {
       })
       await flushPromises()
       expect(rows(view)).toHaveLength(1)
-      expect(rows(view)[0]?.text()).toContain(ru.trip.history.local_finish)
+      expect(rows(view)[0]?.get('.below').text()).toBe(ru.trip.history.local_finish)
       expect(view.text()).not.toContain(ru.purchases.empty.title)
     })
   })
@@ -721,6 +736,91 @@ describe('PurchasesView (MOL-128)', () => {
       expect(view.text()).not.toContain('Сервер не ответил')
     })
 
+    it('список сдвигается под каждым ответом над строками другого окна — полосы нет (MOL-204, адверсариальное А4)', async () => {
+      // One answer, the same every time it is asked: `trip` reads the clock.
+      const answer = [trip(1)]
+      const full = JSON.stringify({
+        page: {
+          trips: answer.map((row) => ({
+            id: row.id,
+            place: row.place,
+            startedAt: row.startedAt.toISOString(),
+            finishedAt: row.finishedAt.toISOString(),
+            finishedOnDeviceAt: null,
+          })),
+          nextCursor: null,
+        },
+        selected: null,
+        local: [],
+      })
+      tripHistory.mockImplementation(() => {
+        localStorage.setItem(key, full)
+        window.dispatchEvent(new StorageEvent('storage', { key }))
+        return Promise.resolve({ trips: answer, nextCursor: null })
+      })
+      const { view } = await render()
+      await pausesPass()
+
+      expect(tripHistory).toHaveBeenCalledTimes(4)
+      // The rows are the other window's answer: nothing on screen is from memory, nobody failed.
+      expect(rows(view)).toHaveLength(1)
+      expect(view.findAll('.strip')).toHaveLength(0)
+      expect(view.find('.state').exists()).toBe(false)
+    })
+
+    it('соседнее окно ответило до вопроса и шлёт очередь — на экране его ответ, тот же, что у сервера: полосы нет (адверсариальное В1, А4)', async () => {
+      const before = new Date(NOW.getTime() - 5000)
+      // One answer, the same every time it is asked: `trip` reads the clock. With its count and sum,
+      // which the shelf does not keep: the copy is the answer all the same (adversarial Г1, the price).
+      const answer = [
+        { ...trip(1), itemCount: 12, total: [{ minor: 987000n, currency: 'AMD' as const }] },
+        trip(5, 'SAS'),
+      ]
+      for (const moment of [before.toISOString(), null]) {
+        while (mounted.length) mounted.pop()?.unmount()
+        localStorage.clear()
+        tripHistory.mockReset()
+        // its answer of five seconds before this window asked — or, on the previous build, of no moment
+        tripHistory.mockImplementation(() => {
+          if (moment) localStorage.setItem(`molvia.trip-history-at.${ME}`, moment)
+          else localStorage.removeItem(`molvia.trip-history-at.${ME}`)
+          remember(answer)
+          window.dispatchEvent(new StorageEvent('storage', { key }))
+          return Promise.resolve({ trips: answer, nextCursor: null })
+        })
+        const { view } = await render()
+        await pausesPass()
+
+        expect(tripHistory).toHaveBeenCalledTimes(4)
+        expect(rows(view)).toHaveLength(2)
+        expect(view.findAll('.strip')).toHaveLength(0)
+        expect(view.find('.state').exists()).toBe(false)
+      }
+    })
+
+    it('другое окно кладёт назад свою старую страницу — полоса со временем той страницы (адверсариальное Б4)', async () => {
+      const old = new Date(NOW.getTime() - 3 * 86_400_000)
+      // An `apply` of a window sending its queue: the page it read three days ago, with that moment.
+      tripHistory.mockImplementation(() => {
+        localStorage.setItem(`molvia.trip-history-at.${ME}`, old.toISOString())
+        remember([trip(5, 'SAS')])
+        window.dispatchEvent(new StorageEvent('storage', { key }))
+        return Promise.resolve({ trips: [trip(1), trip(5, 'SAS')], nextCursor: null })
+      })
+      const { view } = await render()
+      await pausesPass()
+
+      expect(tripHistory).toHaveBeenCalledTimes(4)
+      expect(rows(view)).toHaveLength(1)
+      const strips = view.findAll('.strip')
+      expect(strips).toHaveLength(1)
+      expect(strips[0]?.text()).toContain(
+        ru.purchases.stale_error
+          .replace('{day}', purchaseDay(old, 'ru'))
+          .replace('{time}', timeOfDay(old, 'ru')),
+      )
+    })
+
     it('экран снят во время паузы повтора — больше ничего не спрашивается', async () => {
       tripHistory.mockImplementation(() => {
         neighbourWrites()
@@ -754,8 +854,11 @@ describe('PurchasesView (MOL-128)', () => {
       const { view, router } = await render()
       expect(view.get('.pending').text()).toContain('2 покупки ждут оценки')
       expect(view.get('.pending .meta').text()).toBe('Из «Ереван Сити», последняя — вчера')
+      // A status, not a button: no accent on the star, the chevron says it opens (Ф-4).
+      expect(view.find('.pending .accent').exists()).toBe(false)
+      expect(view.find('.pending .chevron').exists()).toBe(true)
 
-      await view.get('.pending .purchase-row').trigger('click')
+      await view.get('.pending .list-row').trigger('click')
       await flushPromises()
       expect(router.currentRoute.value.name).toBe('verdicts')
     })
@@ -886,6 +989,409 @@ describe('PurchasesView (MOL-128)', () => {
     })
   })
 
+  describe('связь — одна полоса со временем (MOL-204, Ф-14)', () => {
+    const AT = new Date(NOW.getTime() - 3 * 60 * 60 * 1000)
+    const said = (key: string) =>
+      key.replace('{day}', purchaseDay(AT, 'ru')).replace('{time}', timeOfDay(AT, 'ru'))
+    const strips = (view: VueWrapper) => view.findAll('.strip')
+    function offline() {
+      tripHistory.mockRejectedValue(new Error('Failed to fetch'))
+      receipts.mockRejectedValue(new Error('Failed to fetch'))
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    }
+
+    it('без связи над «Записаны» из памяти — одна полоса со временем ответа, не красная', async () => {
+      offline()
+      const { view } = await render({
+        before: () => {
+          remember([trip(1), trip(2, 'SAS')])
+          localStorage.setItem(`molvia.trip-history-at.${ME}`, AT.toISOString())
+        },
+      })
+      expect(rows(view)).toHaveLength(2)
+      expect(strips(view)).toHaveLength(1)
+      expect(strips(view)[0]?.classes()).toContain('offline')
+      expect(strips(view)[0]?.text()).toBe(said(ru.purchases.stale))
+      // No second way of «from memory»: no card, no line, no word of the receipts of their own.
+      expect(view.find('.state').exists()).toBe(false)
+      expect(view.text()).not.toContain(ru.trip.history.cached)
+      expect(view.text()).not.toContain(ru.state.retry)
+    })
+
+    it('старая память без момента ответа — полоса без времени', async () => {
+      offline()
+      const { view } = await render({
+        before: () => {
+          remember([trip(1)])
+        },
+      })
+      expect(strips(view)).toHaveLength(1)
+      expect(strips(view)[0]?.text()).toBe(ru.purchases.stale_untimed)
+    })
+
+    it('сервер не ответил над памятью — полоса «Сервер не ответил» и одна «Повторить», не залитая', async () => {
+      tripHistory.mockRejectedValue(new Error('HTTP 500'))
+      const { view } = await render({
+        before: () => {
+          remember([trip(1)])
+          localStorage.setItem(`molvia.trip-history-at.${ME}`, AT.toISOString())
+        },
+      })
+      expect(strips(view)).toHaveLength(1)
+      expect(strips(view)[0]?.classes()).toContain('unanswered')
+      expect(strips(view)[0]?.text()).toContain(said(ru.purchases.stale_error))
+      // The quiet card is for a screen with nothing of an answer (3l); here the rows are shown.
+      expect(view.find('.state').exists()).toBe(false)
+      const retries = view.findAll('button').filter((b) => b.text() === ru.state.retry)
+      expect(retries).toHaveLength(1)
+      expect(retries[0]?.classes()).toContain('ghost')
+      expect(view.get('.dock').text()).toContain(ru.purchases.capture)
+
+      tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
+      await retries[0]?.trigger('click')
+      await flushPromises()
+      expect(strips(view)).toHaveLength(0)
+    })
+
+    describe('время — старшее из чтений, что не удались и нарисовали строки', () => {
+      const later = new Date(NOW.getTime() - 60_000)
+      const kept = (list: unknown[]) =>
+        JSON.stringify({
+          all: {
+            answer: receiptsResponseCodec.encode(receiptsResponseCodec.parse({ receipts: list })),
+            fetchedAt: AT.toISOString(),
+          },
+        })
+      const parsed = {
+        id: 'cccccccc-0000-4000-8000-000000000001',
+        status: 'parsed',
+        failure: null,
+        parts: 1,
+        received: 1,
+        capturedAt: '2026-09-26T16:00:00.000Z',
+        country: 'AM',
+        language: 'ru',
+        header: null,
+        total: { amount: '740.00', currency: 'AMD' },
+        balanced: true,
+        lineCount: 1,
+        unsettled: 0,
+        place: null,
+        tripId: null,
+      }
+
+      it('чеки из памяти старше истории — время чеков', async () => {
+        offline()
+        const { view } = await render({
+          before: () => {
+            remember([trip(1)])
+            localStorage.setItem(`molvia.trip-history-at.${ME}`, later.toISOString())
+            localStorage.setItem(`molvia.receipts.${ME}`, kept([parsed]))
+          },
+        })
+        expect(strips(view)).toHaveLength(1)
+        expect(strips(view)[0]?.text()).toBe(said(ru.purchases.stale))
+      })
+
+      it('«не должно сработать»: список чеков пуст — он ничего не датирует', async () => {
+        offline()
+        const { view } = await render({
+          before: () => {
+            remember([trip(1)])
+            localStorage.setItem(`molvia.trip-history-at.${ME}`, later.toISOString())
+            localStorage.setItem(`molvia.receipts.${ME}`, kept([]))
+          },
+        })
+        expect(strips(view)[0]?.text()).toBe(
+          ru.purchases.stale
+            .replace('{day}', purchaseDay(later, 'ru'))
+            .replace('{time}', timeOfDay(later, 'ru')),
+        )
+      })
+    })
+
+    describe('слова полосы — заново только на попытку человека (адверсариальное А1)', () => {
+      beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+      })
+      afterEach(() => {
+        vi.useRealTimers()
+      })
+
+      it('чек разбирается, опрос падает — попытка полосы та же; «Повторить», упавший, — новая', async () => {
+        const parsing = {
+          id: 'cccccccc-0000-4000-8000-000000000003',
+          status: 'reading',
+          failure: null,
+          parts: 1,
+          received: 1,
+          capturedAt: AT.toISOString(),
+          country: 'AM',
+          language: 'ru',
+          header: null,
+          total: null,
+          balanced: false,
+          lineCount: 0,
+          unsettled: 0,
+          place: null,
+          tripId: null,
+        }
+        tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
+        receipts.mockRejectedValue(new Error('HTTP 500'))
+        const { view } = await render({
+          before: () => {
+            localStorage.setItem(
+              `molvia.receipts.${ME}`,
+              JSON.stringify({
+                all: {
+                  answer: receiptsResponseCodec.encode(
+                    receiptsResponseCodec.parse({ receipts: [parsing] }),
+                  ),
+                  fetchedAt: AT.toISOString(),
+                },
+              }),
+            )
+          },
+        })
+        const strip = () => view.getComponent({ name: 'StatusStrip' })
+        const first = strip().props('attempt') as number
+        const asked = receipts.mock.calls.length
+
+        await vi.advanceTimersByTimeAsync(15_000)
+        await flushPromises()
+        expect(receipts.mock.calls.length).toBeGreaterThan(asked)
+        expect(strip().props('attempt')).toBe(first)
+
+        const retry = view.findAll('button').find((b) => b.text() === ru.state.retry)
+        await retry?.trigger('click')
+        await flushPromises()
+        expect(strip().props('attempt')).toBeGreaterThan(first)
+      })
+    })
+
+    describe('раздел без ничего на экране — своё состояние, не полоса (селфревью 1, адверсариальное А2, А3)', () => {
+      const reading = {
+        id: 'cccccccc-0000-4000-8000-000000000002',
+        status: 'parsed',
+        failure: null,
+        parts: 1,
+        received: 1,
+        capturedAt: AT.toISOString(),
+        country: 'AM',
+        language: 'ru',
+        header: null,
+        total: { amount: '740.00', currency: 'AMD' },
+        balanced: true,
+        lineCount: 1,
+        unsettled: 0,
+        place: null,
+        tripId: null,
+      } as const
+      const keepReceipt = () => {
+        localStorage.setItem(
+          `molvia.receipts.${ME}`,
+          JSON.stringify({
+            all: {
+              answer: receiptsResponseCodec.encode(
+                receiptsResponseCodec.parse({ receipts: [reading] }),
+              ),
+              fetchedAt: AT.toISOString(),
+            },
+          }),
+        )
+      }
+
+      it('история упала без памяти, чеки свежие — карточка «Покупки не загрузились», полосы нет', async () => {
+        tripHistory.mockRejectedValue(new Error('HTTP 500'))
+        receipts.mockResolvedValue(receiptsResponseCodec.parse({ receipts: [reading] }))
+        const { view } = await render()
+        expect(captions(view)).toContain(ru.purchases.group_review)
+        expect(strips(view)).toHaveLength(0)
+        expect(view.text()).toContain(ru.purchases.error.title)
+      })
+
+      it('без связи, истории нет, чек из памяти — «Без связи» словами экрана, полоса чеков не говорит за «Записаны»', async () => {
+        offline()
+        const { view } = await render({ before: keepReceipt })
+        expect(captions(view)).toContain(ru.purchases.group_review)
+        expect(strips(view)).toHaveLength(0)
+        expect(view.get('.state').text()).toContain(ru.purchases.offline.title)
+        expect(view.get('.state').classes()).toContain('inline')
+      })
+
+      it('сервер не ответил, истории нет, чек из памяти — тихая карточка, одна «Повторить», полосы нет', async () => {
+        tripHistory.mockRejectedValue(new Error('HTTP 500'))
+        receipts.mockRejectedValue(new Error('HTTP 500'))
+        const { view } = await render({ before: keepReceipt })
+        expect(strips(view)).toHaveLength(0)
+        expect(view.text()).toContain(ru.purchases.error.title)
+        expect(view.findAll('button').filter((b) => b.text() === ru.state.retry)).toHaveLength(1)
+      })
+
+      it('история ответила, чеки упали без памяти — «Чеки не загрузились», не «из памяти телефона»', async () => {
+        tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
+        receipts.mockRejectedValue(new Error('HTTP 500'))
+        const { view } = await render()
+        expect(rows(view)).toHaveLength(1)
+        expect(strips(view)).toHaveLength(0)
+        expect(view.text()).toContain(ru.purchases.receipts_error.title)
+        expect(view.text()).not.toContain(ru.purchases.error.title)
+      })
+
+      it('история в пути, чеки упали — скелетон и «Чеки не загрузились», не «Покупки не загрузились»', async () => {
+        tripHistory.mockReturnValue(new Promise(() => undefined))
+        receipts.mockRejectedValue(new Error('HTTP 500'))
+        const { view } = await render()
+        expect(view.find('.skeleton').exists()).toBe(true)
+        expect(view.text()).toContain(ru.purchases.receipts_error.title)
+        expect(view.text()).not.toContain(ru.purchases.error.title)
+      })
+
+      const refusedReceipt = () => {
+        localStorage.setItem(
+          `molvia.receipt-rejected.${ME}`,
+          JSON.stringify([
+            {
+              key: 'k1',
+              code: 'error.receipt_not_photo',
+              at: Date.now(),
+              write: {
+                kind: 'create',
+                body: {
+                  id: 'cccccccc-0000-4000-8000-000000000001',
+                  parts: 1,
+                  country: 'AM',
+                  language: 'ru',
+                  capturedAt: new Date().toISOString(),
+                },
+              },
+            },
+          ]),
+        )
+      }
+
+      it('история ответила, чеки упали, на экране только «Не принят» с телефона — «Чеки не загрузились», полосы нет (адверсариальное Б1)', async () => {
+        tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
+        receipts.mockRejectedValue(new Error('HTTP 500'))
+        const { view } = await render({
+          before: () => {
+            localStorage.setItem(
+              `molvia.receipts.${ME}`,
+              JSON.stringify({
+                all: {
+                  answer: receiptsResponseCodec.encode(
+                    receiptsResponseCodec.parse({ receipts: [] }),
+                  ),
+                  fetchedAt: AT.toISOString(),
+                },
+              }),
+            )
+            refusedReceipt()
+          },
+        })
+        expect(view.text()).toContain('Не принят')
+        expect(strips(view)).toHaveLength(0)
+        expect(view.text()).toContain(ru.purchases.receipts_error.title)
+      })
+
+      it('без связи, «Записаны» из памяти со временем и «Не принят» с телефона — время на полосе остаётся (адверсариальное Б2)', async () => {
+        offline()
+        const { view } = await render({
+          before: () => {
+            remember([trip(1)])
+            localStorage.setItem(`molvia.trip-history-at.${ME}`, AT.toISOString())
+            refusedReceipt()
+          },
+        })
+        expect(view.text()).toContain('Не принят')
+        expect(strips(view)).toHaveLength(1)
+        expect(strips(view)[0]?.text()).toBe(said(ru.purchases.stale))
+      })
+
+      it('без связи, «Записаны» нет, одна запись, законченная на телефоне, — «Без связи» словами экрана, не полоса (адверсариальное Б3)', async () => {
+        offline()
+        const id = 'bbbbbbbb-0000-4000-8000-000000000009'
+        const { view, queue } = await render({
+          before: () => {
+            localStorage.setItem(
+              `molvia.trip-history.${ME}`,
+              JSON.stringify({
+                page: { trips: [], nextCursor: null },
+                selected: null,
+                local: [
+                  {
+                    id,
+                    name: 'SAS',
+                    startedAt: NOW.toISOString(),
+                    completedAt: NOW.toISOString(),
+                    currency: 'AMD',
+                    view: null,
+                  },
+                ],
+              }),
+            )
+          },
+        })
+        queue.enqueue({ kind: 'finish', tripId: id, finishedOnDeviceAt: NOW })
+        await flushPromises()
+        expect(rows(view)).toHaveLength(1)
+        expect(strips(view)).toHaveLength(0)
+        expect(view.get('.state').text()).toContain(ru.purchases.offline.title)
+        expect(view.get('.state').classes()).toContain('inline')
+      })
+
+      it('«не должно сработать»: история упала с памятью, чеки свежие — полоса со временем истории', async () => {
+        tripHistory.mockRejectedValue(new Error('HTTP 500'))
+        receipts.mockResolvedValue(receiptsResponseCodec.parse({ receipts: [reading] }))
+        const { view } = await render({
+          before: () => {
+            remember([trip(1)])
+            localStorage.setItem(`molvia.trip-history-at.${ME}`, AT.toISOString())
+          },
+        })
+        expect(strips(view)).toHaveLength(1)
+        expect(strips(view)[0]?.text()).toContain(said(ru.purchases.stale_error))
+        expect(view.find('.state').exists()).toBe(false)
+      })
+    })
+
+    it('без связи с памятью дальше первой страницы — «Раньше … — со связью» вместо «Показать ещё»', async () => {
+      offline()
+      const { view } = await render({
+        before: () => {
+          remember([trip(1), trip(2, 'SAS')])
+          const kept = JSON.parse(localStorage.getItem(`molvia.trip-history.${ME}`) ?? '{}') as {
+            page: { nextCursor: unknown }
+          }
+          kept.page.nextCursor = { at: '2026-09-01T00:00:00.000000Z', id: trip(2).id }
+          localStorage.setItem(`molvia.trip-history.${ME}`, JSON.stringify(kept))
+        },
+      })
+      expect(view.text()).not.toContain(ru.trip.history.more)
+      expect(view.get('.earlier').text()).toMatch(/^Раньше \d{1,2} \S+ — со связью$/)
+    })
+
+    it('«не должно сработать»: со связью «Раньше …» нет, есть «Показать ещё»', async () => {
+      tripHistory.mockResolvedValue({
+        trips: [trip(1)],
+        nextCursor: { at: '2026-09-01T00:00:00.000000Z', id: trip(1).id },
+      })
+      const { view } = await render()
+      expect(view.find('.earlier').exists()).toBe(false)
+      expect(view.text()).toContain(ru.trip.history.more)
+      expect(strips(view)).toHaveLength(0)
+    })
+
+    it('без связи и без памяти — «Без связи» словами экрана, не «сохранённые покупки»', async () => {
+      offline()
+      const { view } = await render()
+      expect(strips(view)).toHaveLength(0)
+      expect(view.text()).toContain(ru.purchases.offline.title)
+      expect(view.text()).toContain(ru.purchases.offline_capture)
+      expect(view.text()).not.toContain(ru.trip.history.offline_title)
+    })
+  })
+
   describe('открытая запись и «Записать покупки»', () => {
     it('открытая запись — первой строкой, с «Продолжить», и ведёт в неё', async () => {
       currentTrip.mockResolvedValue(openTrip())
@@ -901,7 +1407,16 @@ describe('PurchasesView (MOL-128)', () => {
         view.html().indexOf('recorded'),
       )
 
-      await open.get('.purchase-row').trigger('click')
+      // One control in the row, the kit's secondary button (В-1 «а»), named with its place; the row
+      // itself is no button, and the pencil is a status, not the accent (Ф-4).
+      expect(open.get('.list-row').element.tagName).toBe('DIV')
+      expect(open.findAll('button')).toHaveLength(1)
+      expect(open.get('button').classes()).toContain('secondary')
+      expect(open.get('button').attributes('aria-label')).toBe('Продолжить «Рынок»')
+      expect(open.find('.accent').exists()).toBe(false)
+      expect(open.find('.chevron').exists()).toBe(false)
+
+      await open.get('button').trigger('click')
       await flushPromises()
       expect(router.currentRoute.value.name).toBe('purchase-manual')
     })
@@ -951,6 +1466,9 @@ describe('PurchasesView (MOL-128)', () => {
       clock += 1000
       const sheet = openSheet()
       expect(sheet?.textContent).toContain('Уже записываете «Рынок»')
+      // When it began is the sheet's head, under its name — not a paragraph of its body (К-П-17).
+      expect(sheet?.querySelector('.head .meta')?.textContent).toMatch(/, с \d{1,2}:\d{2}$/)
+      expect(sheet?.querySelectorAll('.meta')).toHaveLength(1)
 
       inside(sheet, 'Продолжить «Рынок»').click()
       await vi.waitFor(() => {

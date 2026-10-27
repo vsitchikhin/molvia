@@ -1161,7 +1161,6 @@ describe('IncomesView: recording, amending and removing', () => {
     expect(record?.attributes('aria-disabled')).toBeUndefined()
     // The frame's strip, under the list — the room for it is kept at the end of the content.
     expect(full.find('.dock-room').exists()).toBe(true)
-    expect(full.findComponent({ name: 'FloatingDock' }).exists()).toBe(false)
 
     incomes.mockResolvedValue(overview({ months: [] }))
     const empty = await render()

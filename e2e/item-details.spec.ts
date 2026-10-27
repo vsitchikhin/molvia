@@ -299,7 +299,7 @@ test.describe('«Тут дешевле»', () => {
     await expect(hint(page)).toContainText('Cheapest you paid: Зовуни')
     await sheet(page).getByLabel('How much').fill('1')
     await sheet(page).getByLabel('Price as on the tag').fill('620')
-    await expect(hint(page)).toContainText('You paid ֏540.00/l at Зовуни')
+    await expect(hint(page)).toContainText('You paid ֏540/l at Зовуни')
     // The fields stay where they were: the hint is below them.
     const price = await sheet(page).getByLabel('Price as on the tag').boundingBox()
     const line = await hint(page).boundingBox()
@@ -341,7 +341,7 @@ test.describe('«Тут дешевле»', () => {
     await sheet(page).getByLabel('Price as on the tag').fill('620')
 
     const line = sheet(page).locator('[data-hint="alternative"]')
-    await expect(line).toContainText(`${other ?? ''} — ֏480.00/l at Зовуни`)
+    await expect(line).toContainText(`${other ?? ''} — ֏480/l at Зовуни`)
     await expect(line).toContainText('rated 5.0')
   })
 

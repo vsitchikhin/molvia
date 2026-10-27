@@ -182,7 +182,10 @@ export function formatInCurrency(
   decimal: `${number}`,
   currency: Currency,
   locale: string,
-  digits: Pick<Intl.NumberFormatOptions, 'minimumFractionDigits' | 'maximumFractionDigits'>,
+  digits: Pick<
+    Intl.NumberFormatOptions,
+    'minimumFractionDigits' | 'maximumFractionDigits' | 'trailingZeroDisplay'
+  >,
 ): string {
   const parts = new Intl.NumberFormat(locale, {
     style: 'currency',
@@ -194,13 +197,36 @@ export function formatInCurrency(
   return parts.map((part) => (part.type === 'currency' && sign ? sign : part.value)).join('')
 }
 
-/** Formats the decimal string, not a Number: that bridge rewrote digits past 2^53. */
+/**
+ * The one rule a figure of money is printed by (MOL-205, DESIGN.md): whole — no fraction, «9 870 ֏»;
+ * otherwise every one of `digits`, «40,50 ₽», never «40,5». Whole is what is printed: a fraction
+ * rounded to `digits` into a whole number goes without «,00» too, so 569,995 ֏/л reads «570 ֏/л».
+ */
+export function exactFigures(
+  digits: number,
+): Pick<
+  Intl.NumberFormatOptions,
+  'minimumFractionDigits' | 'maximumFractionDigits' | 'trailingZeroDisplay'
+> {
+  return {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+    trailingZeroDisplay: 'stripIfInteger',
+  }
+}
+
+/**
+ * Money as it is: «5 000 ֏» for five thousand, «2 495,69 ₽» with its kopecks — a fraction is never
+ * rounded away, this is money spent, not an estimate. Formats the decimal string, not a Number: that
+ * bridge rewrote digits past 2^53.
+ */
 export function formatMoney(value: Money, locale = 'ru-RU'): string {
-  const exponent = MINOR_EXPONENT[value.currency]
-  return formatInCurrency(decimalFromMinor(value), value.currency, locale, {
-    minimumFractionDigits: exponent,
-    maximumFractionDigits: exponent,
-  })
+  return formatInCurrency(
+    decimalFromMinor(value),
+    value.currency,
+    locale,
+    exactFigures(MINOR_EXPONENT[value.currency]),
+  )
 }
 
 /**

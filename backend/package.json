@@ -10,6 +10,7 @@
     "forget": "tsx src/forget-cli.ts",
     "seed": "tsx src/seed-catalogue-cli.ts",
     "repack": "tsx src/repack-receipts-cli.ts",
+    "rename-items": "tsx src/rename-receipt-items-cli.ts",
     "gates": "tsx src/gates-cli.ts",
     "failures": "tsx src/failures-cli.ts",
     "merge": "tsx src/merge-cli.ts",
@@ -22,7 +23,7 @@
     "test:attack": "vitest run -c vitest.attack.config.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.135.0",
+    "@anthropic-ai/sdk": "1.1.0",
     "@huggingface/tokenizers": "0.2.0",
     "@molvia/model": "*",
     "drizzle-orm": "^0.45.4",

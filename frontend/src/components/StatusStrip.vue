@@ -1,5 +1,5 @@
 <template>
-  <div class="strip" :class="kind" :role="role">
+  <div ref="root" class="strip" :class="kind" :role="role">
     <component :is="glyph" class="icon" aria-hidden="true" />
     <p class="words">{{ text }}</p>
     <div v-if="kind === 'unanswered' && $slots.action" class="action">
@@ -9,12 +9,13 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onBeforeUnmount, onMounted, watch } from 'vue'
+import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import IconUnanswered from '~icons/mdi/alert-circle-outline'
 import IconOffline from '~icons/mdi/cloud-off-outline'
 import IconRefreshing from '~icons/mdi/sync'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { focusScreenTitle } from '@/transitions'
 
 /**
  * `offline` — no connection; `unanswered` — the server did not answer, and the last answer is shown;
@@ -72,9 +73,19 @@ export default defineComponent({
     }
     onMounted(speak)
     watch([() => props.text, () => props.attempt], speak)
-    onBeforeUnmount(() => withdraw?.())
 
-    return { glyph, role }
+    // «Повторить» answered takes the strip away, and a focus on it fell to the body: it goes to the
+    // title, as a full error's does (MOL-194, Б1). Not in a sheet: the page under it is inert, and a
+    // sheet's title takes no focus — there it falls as before, a price.
+    const root = ref<HTMLElement | null>(null)
+    onBeforeUnmount(() => {
+      withdraw?.()
+      const element = root.value
+      if (element?.contains(document.activeElement) && !element.closest('dialog'))
+        focusScreenTitle()
+    })
+
+    return { glyph, role, root }
   },
 })
 </script>

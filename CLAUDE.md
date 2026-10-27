@@ -573,6 +573,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   padding in a screen; a sheet's «Вернуть» stays in its footer.
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17); no gesture
   is intercepted but the sheet's own pull down (MOL-80); only the page scrolls, except a sheet.
+  **Nothing to tap stands under a skeleton where the answer moves it** (MOL-269): the ways out of
+  «Деньги» wait for the month and «Счета» and are unseen in their place while «Повторить» reads a failed
+  month again, the groups of
+  «Настройки» never stand under the form's skeleton.
   **«Что брать» is home** (MOL-128): the `tabMove` of «back»; old addresses of «Поход» redirect for
   good. **A change of a screen's own query is not another screen** (MOL-136): no scroll, no
   animation, no arrival, and the page is held as tall as the window (MOL-138); **nothing of the
@@ -662,6 +666,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   kind — or all of it that brand; two things side by side, both; a heading's item it rules out is none. Else a new
   item named in full, «проверьте» on the wire too — a word spelt in letters taken away by one press (`spelled`). A
   dictionary's word is read exactly, never one edit off.
+- **A new item's name is a shelf's** (MOL-261): the brand as its package spells it — a Latin one bare, else in «…»,
+  a line may name an item by either (`TILL_BRANDS`, В-2 «а») — the kind the seed's, in its number, so `kindKey` is one;
+  adjectives agreed, a genitive by its own form's adjective, a till's phrase whole — each a table of the backend, never
+  code; what was recorded before is renamed once by `make rename-items`, by the owner's word (В-3 «а»).
 - **The shops' memory is shared** (owner, 30.09.2026): the person's own word first, else the item most
   people said, the later on a tie; the erased still count; nobody's word is shown as someone's, and
   another person's shelf price only with access and from three prices, their lower median. **A person's word

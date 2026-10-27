@@ -74,7 +74,7 @@ describe('TripRow', () => {
   it('печатает цену как на ценнике и цену за единицу — ради неё строка и существует', () => {
     const view = render()
     expect(plain(view)).toContain('0,9 л')
-    expect(plain(view)).toContain('520,00 ֏')
+    expect(plain(view)).toContain('520 ֏')
     // 520 за 0,9 л — это 577,78 за литр: то самое число, которое в уме не считают.
     expect(plain(view)).toContain('577,78 ֏ за л')
   })

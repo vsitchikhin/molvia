@@ -189,7 +189,7 @@ export default defineComponent({
 }
 
 /* The rest shadow is a live primary's. Light in weight (`:where`), so a place that lifts what it
-   holds over the cards — the floating dock — keeps its lift on an inactive one (review 1). */
+   holds over the cards keeps its lift on an inactive one (review 1). */
 .primary:where(:disabled, [aria-disabled='true']):where(:not([aria-busy='true'])) {
   box-shadow: none;
 }

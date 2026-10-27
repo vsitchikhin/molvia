@@ -1095,6 +1095,100 @@ test('the spending sheet rises as high as the keys leave it, before they come (M
   expect(await within(page, 'dialog[open]', covered)).toEqual({ top: true, bottom: true })
 })
 
+// The ways out are not under the month's skeleton (MOL-269): there the answer moved them from under
+// the finger — 291 px up for a newcomer, 99 down with a spending — and the tap aimed at «Обмен денег»
+// went nowhere, as it did in CI. They come once the month and «Счета» have both answered, «Счета»
+// too since their card over the switcher moves them as well. The test holds the order, not the runner.
+test('the ways out come with the answers of the month and «Счета», and a tap leads where it says', async ({
+  page,
+}) => {
+  const hold = async (url: string): Promise<() => void> => {
+    let release: () => void = () => undefined
+    const released = new Promise<void>((resolve) => (release = resolve))
+    await page.route(url, async (route) => {
+      await released
+      await route.continue()
+    })
+    return release
+  }
+  // Laid before the page opens (MOL-249).
+  const month = await hold('**/api/money/months/**')
+  const accounts = await hold('**/api/money/accounts')
+  await openMoney(page)
+  const ways = page.getByRole('navigation', { name: 'Разделы «Денег»' })
+  const exchange = page.getByRole('link', { name: /^Обмен денег/ })
+
+  await expect(page.locator('.skeleton')).toBeVisible()
+  await expect(ways).toHaveCount(0)
+
+  const answered = page.waitForResponse('**/api/money/months/**')
+  month()
+  await answered
+  await expect(page.locator('.skeleton')).toHaveCount(0)
+  await expect(ways).toHaveCount(0)
+
+  accounts()
+  await expect(exchange).toBeVisible()
+  await exchange.click()
+  await expect(page).toHaveURL(/\/money\/exchange$/)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Обмен денег')
+})
+
+// A failed month read again by «Повторить» (MOL-269, adversarial А1): the phase stays `error` until the
+// answer, which puts the month in place of the error card. The rows stood the whole retry and went from
+// under the finger with the answer — the tap of CI, one press after «Повторить». They are unseen for the
+// retry with their place kept: taken out, the page under a small phone scrolled down shortened, and the
+// card of «Повторить» itself dropped under the finger (adversarial Б2).
+test.describe('a small phone', () => {
+  test.use({ viewport: { width: 375, height: 667 } })
+
+  test('«Повторить» hides the ways out in their place until its answer, and a tap then leads where it says', async ({
+    page,
+  }) => {
+    let failed = false
+    let release: () => void = () => undefined
+    const released = new Promise<void>((resolve) => (release = resolve))
+    // Laid before the page opens (MOL-249): the first read fails, the retry is held.
+    await page.route('**/api/money/months/**', async (route) => {
+      if (!failed) {
+        failed = true
+        await route.fulfill({ status: 500, body: '{}' })
+        return
+      }
+      await released
+      await route.continue()
+    })
+    await openMoney(page)
+    const ways = page.getByRole('navigation', { name: 'Разделы «Денег»' })
+    const exchange = page.getByRole('link', { name: /^Обмен денег/ })
+    const retry = page.getByRole('button', { name: 'Повторить' })
+    await expect(page.getByRole('heading', { name: 'Не удалось загрузить траты' })).toBeVisible()
+    await expect(exchange).toBeVisible()
+    await facesIn(page)
+    await page.evaluate(() => {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' })
+    })
+    const scrolled = await page.evaluate(() => window.scrollY)
+    expect(scrolled).toBeGreaterThan(0)
+    const before = await topOf(retry)
+    const box = await retry.boundingBox()
+    if (!box) throw new Error('no «Повторить» in sight')
+
+    // Pressed where it stands, as a finger does: `click()` would scroll it into view first.
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+    await expect(ways).toBeHidden()
+    expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
+    expect(await topOf(retry)).toBe(before)
+
+    const answered = page.waitForResponse('**/api/money/months/**')
+    release()
+    await answered
+    await expect(page.getByRole('heading', { name: 'Не удалось загрузить траты' })).toHaveCount(0)
+    await exchange.click()
+    await expect(page).toHaveURL(/\/money\/exchange$/)
+  })
+})
+
 // The summary broke, the connection did not: a section's quiet card with its «Повторить», and
 // «Добавить трату» keeps the strip — a spending goes through the queue with the server down
 // (MOL-180, В-1, 157 v2 1k). The month is turned back before this month answers — the order that

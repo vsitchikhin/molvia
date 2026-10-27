@@ -1,39 +1,48 @@
 <template>
-  <AppScreen :title="account?.name ?? ''">
+  <AppScreen :title="title">
     <template v-if="account && phase !== 'missing'" #trailing>
       <AppButton variant="ghost" @click="editOpen = true">{{
         t('accounts.account.edit')
       }}</AppButton>
     </template>
-    <template v-if="account" #subtitle>{{ subtitle }}</template>
+    <template v-if="account && phase !== 'missing'" #subtitle>{{ subtitle }}</template>
 
-    <div class="content" :class="{ roomy: phase === 'ready' }">
-      <p v-if="phase === 'ready' && stale === 'offline'" class="strip">
-        <IconCloudOff class="strip-icon" aria-hidden="true" />
-        {{ countedAt ? t('accounts.stale', { time: countedAt }) : t('spending.offline.title') }}
-      </p>
-      <ScreenState
-        v-else-if="phase === 'ready' && stale === 'error'"
-        kind="error"
-        inline
-        :title="t('accounts.account.error.title')"
-        :body="t('accounts.error_body')"
-        @retry="retry"
+    <div class="content">
+      <!-- The connection in one line, the screen's words with the hour of the answer shown (MOL-181,
+           Ф-14). The strip holds «Сверить с фактом», so «Повторить» is here (К-5). By the last read,
+           as on «Счета», not by whether this session had an answer before it: a transfer re-reads
+           the journal, and a read that failed left it without the transfer the balance has (А1). -->
+      <StatusStrip
+        v-if="phase === 'ready' && (!online || failed === 'offline')"
+        kind="offline"
+        :text="countedAt ? t('accounts.stale', { time: countedAt }) : t('spending.offline.title')"
       />
+      <StatusStrip
+        v-else-if="phase === 'ready' && failed === 'error'"
+        kind="unanswered"
+        :text="unansweredLine"
+        :attempt="failures"
+      >
+        <template #action>
+          <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+        </template>
+      </StatusStrip>
 
-      <ScreenSkeleton v-if="phase === 'loading'" :groups="[40, 70, 60, 24, 80, 64, 72]" />
+      <!-- The shape of the answer (Ф-13): the balance with «≈» where the account kept on the phone is
+           in another currency, the caption and a day of rows with the circle. -->
+      <ScreenSkeleton v-if="phase === 'loading'">
+        <SkeletonPart kind="figure" :approx="!!account?.inSpend" />
+        <SkeletonPart kind="caption" :width="24" />
+        <SkeletonPart kind="rows" lead="circle" tail next />
+      </ScreenSkeleton>
 
+      <!-- «К счетам» is the strip's (handoff 02, 8h): attention is no failure of the screen, so the
+           block does not take the strip as an error does — the screen puts it there itself (Р-1). -->
       <ScreenState
         v-else-if="phase === 'missing'"
         kind="attention"
         :title="t('accounts.account.not_found')"
-      >
-        <template #action>
-          <AppButton size="large" block @click="toList">
-            {{ t('accounts.account.to_list') }}
-          </AppButton>
-        </template>
-      </ScreenState>
+      />
 
       <ScreenState
         v-else-if="phase === 'error'"
@@ -54,23 +63,30 @@
       <template v-else-if="journal && account">
         <AppCard class="balance">
           <SectionCaption as="p" inset>{{ t('accounts.balance') }}</SectionCaption>
-          <p class="figure" :class="{ negative: account.balance.minor < 0n }" aria-live="polite">
+          <!-- Blind while the fact is typed (Ф-33): no figure, no sign by colour, no «≈» — the start and
+               «сверено» stay, they tell nothing of the count. No live region on the figure: it comes
+               back as the check answers, and the check says its result itself (С-12). -->
+          <p v-if="balanceHidden" class="figure hidden">
+            <span aria-hidden="true">•••</span>
+            <span class="unseen">{{ t('accounts.account.balance_hidden') }}</span>
+          </p>
+          <p v-else class="figure" :class="{ negative: account.balance.minor < 0n }">
             {{ money(account.balance) }}
           </p>
-          <p v-if="account.inSpend" class="approx">
-            {{ t('accounts.account.approx', { amount: `≈ ${estimate(account.inSpend)}` }) }}
-          </p>
+          <!-- It pushes the footnote and the journal in sight over the sheet: it grows and shrinks
+               (MOL-151, adversarial А4). -->
+          <AppReveal>
+            <p v-if="account.inSpend && !balanceHidden" class="approx">
+              {{ t('accounts.account.approx', { amount: `≈ ${estimate(account.inSpend)}` }) }}
+            </p>
+          </AppReveal>
           <p class="footnote">{{ startLine }}</p>
         </AppCard>
 
-        <p v-if="account.archivedAt" class="archived">
-          <IconArchive class="strip-icon" aria-hidden="true" />{{ archivedLine }}
-        </p>
+        <AppNote v-if="account.archivedAt" :icon="IconArchive">{{ archivedLine }}</AppNote>
 
         <section class="operations">
-          <SectionCaption class="group-caption">{{
-            t('accounts.account.operations')
-          }}</SectionCaption>
+          <SectionCaption>{{ t('accounts.account.operations') }}</SectionCaption>
           <div class="days">
             <AppCard v-if="journal.rows.length === 0" class="empty">
               <p class="empty-title">{{ t('accounts.no_operations') }}</p>
@@ -102,6 +118,8 @@
       </template>
     </div>
 
+    <!-- «Вернуть» over the strip, which stays under it (Ф-29, С-8): on a removed account both, the
+         strip saying what it brings back and «Вернуть» of the account under it. -->
     <template v-if="removed || transferRemoved" #undo>
       <UndoStrip
         v-if="removed"
@@ -123,29 +141,43 @@
         @expire="transferRemoved = null"
       />
     </template>
-    <!-- Not under «Вернуть», as on «Счета», until its actions go into the docked strip (MOL-194). -->
-    <FloatingDock v-if="!removed && !transferRemoved && phase === 'ready' && account" class="float">
+
+    <!-- The screen's actions in its strip (Ф-28, owner's В-1 «б»): «Сверить с фактом» the main one and
+         «Перевести» a ghost under it (Р-9 MOL-253); on a removed account «Вернуть» in their place
+         (В-2 MOL-123). Over an answer only, as on «Счета» (Р-1 MOL-193). -->
+    <template v-if="phase === 'missing'" #docked>
+      <AppButton size="large" block @click="toList">
+        <template #icon><IconList /></template>
+        {{ t('accounts.account.to_list') }}
+      </AppButton>
+    </template>
+    <template v-else-if="phase === 'ready' && account" #docked>
+      <!-- Without a connection not now, saying why (Ф-6); at work its own word, the connection lost
+           meanwhile or not (MOL-225). -->
       <AppButton
-        v-if="account?.archivedAt"
+        v-if="account.archivedAt"
         size="large"
-        :disabled="!online && !restoring"
+        block
+        :inactive="!online && !restoring"
         :busy="restoring"
         :busy-label="t('accounts.screen.restoring')"
         @click="bringBack"
       >
-        <template #icon><IconUndo /></template>
-        {{ t('accounts.screen.restore') }}
+        <template #icon>
+          <IconCloudOff v-if="!online && !restoring" />
+          <IconUndo v-else />
+        </template>
+        {{ online || restoring ? t('accounts.screen.restore') : t('accounts.screen.restore_wait') }}
       </AppButton>
       <template v-else>
-        <AppButton size="large" @click="reconcileOpen = true">
+        <AppButton ref="reconcileButton" size="large" block @click="reconcileOpen = true">
           <template #icon><IconScale /></template>
           {{ t('accounts.account.reconcile') }}
         </AppButton>
-        <!-- The second action under the first: one main action a screen (Ф-15, Р-9). Floating over
-             the cards it needs a fill, so not the ghost of the docked strip until MOL-194. -->
         <AppButton
           v-if="transferable"
-          variant="secondary"
+          variant="ghost"
+          block
           aria-haspopup="dialog"
           @click="transferOpen = true"
         >
@@ -153,7 +185,7 @@
           {{ t('accounts.account.transfer') }}
         </AppButton>
       </template>
-    </FloatingDock>
+    </template>
 
     <AccountSheet
       v-model:open="editOpen"
@@ -170,6 +202,7 @@
       :categories="categories"
       :name-of="nameOf"
       :account-name="accountName"
+      @step="reconcileStep = $event"
     />
     <OperationSheet
       v-model:open="operationOpen"
@@ -190,11 +223,13 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import IconArchive from '~icons/mdi/archive-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
+import IconList from '~icons/mdi/format-list-bulleted'
 import IconScale from '~icons/mdi/scale-balance'
 import IconTransfer from '~icons/mdi/bank-transfer'
 import IconUndo from '~icons/mdi/undo-variant'
@@ -204,15 +239,18 @@ import AccountSheet from '@/components/AccountSheet.vue'
 import type { AccountOutcome } from '@/components/AccountSheet.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppNote from '@/components/AppNote.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
-import FloatingDock from '@/components/FloatingDock.vue'
 import OperationRow from '@/components/OperationRow.vue'
 import OperationSheet from '@/components/OperationSheet.vue'
 import ReconcileSheet from '@/components/ReconcileSheet.vue'
+import type { ReconcileStep } from '@/components/ReconcileSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import TransferSheet from '@/components/TransferSheet.vue'
 import type { TransferOutcome } from '@/components/TransferSheet.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
@@ -239,8 +277,9 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 /**
  * One account (MOL-123, handoff 04): what it holds — the server's count, «≈» where a rate counted
  * something — its start and last check, and every operation on it by day, newest first, a page at a
- * time. A row opens its own sheet, where the account is changed too. «Сверить с фактом» floats
- * under the thumb; on an account taken out of the choice, «Вернуть» stands there instead (В-2).
+ * time. A row opens its own sheet, where the account is changed too. «Сверить с фактом» is the
+ * strip's, «Перевести» under it; on an account taken out of the choice, «Вернуть» stands there
+ * instead (В-2, MOL-194).
  */
 export default defineComponent({
   name: 'AccountView',
@@ -248,11 +287,11 @@ export default defineComponent({
     AccountSheet,
     AppButton,
     AppCard,
+    AppNote,
     AppReveal,
     AppScreen,
-    FloatingDock,
-    IconArchive,
     IconCloudOff,
+    IconList,
     IconScale,
     IconTransfer,
     IconUndo,
@@ -262,6 +301,8 @@ export default defineComponent({
     ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    SkeletonPart,
+    StatusStrip,
     TransferSheet,
     UndoStrip,
   },
@@ -277,7 +318,8 @@ export default defineComponent({
     const { categories, nameOf } = useOwnCategories()
 
     const accountId = computed(() => String(route.params.accountId ?? ''))
-    const { phase, journal, stale, more, loadMore, retry } = useAccountJournal(accountId)
+    const { phase, journal, stale, failed, more, failures, loadMore, retry } =
+      useAccountJournal(accountId)
 
     const online = ref(navigator.onLine)
     const onLine = () => (online.value = true)
@@ -309,6 +351,13 @@ export default defineComponent({
       if (fromJournal && stale.value === null) return fromJournal
       return fromPage ?? fromJournal
     })
+    // The name the phone knows while the journal is on its way, failed or offline, else «Счёт» (Е-6);
+    // never the name of an account the server says is not there (8h).
+    const title = computed(() =>
+      phase.value === 'missing'
+        ? t('accounts.account.title')
+        : (account.value?.name ?? t('accounts.account.title')),
+    )
     const accountName = (id: string) => store.accounts.find((one) => one.id === id)?.name ?? null
     const rowOf = (row: AccountOperationView) =>
       operationRowProps(row, {
@@ -324,6 +373,13 @@ export default defineComponent({
     const estimate = (value: Money) => signedAmount(value, locale.value, { estimate: true })
     const countedAt = computed(() =>
       store.overview ? countedWhen(store.overview.countedAt, locale.value) : null,
+    )
+    // The hour only where the balance is the phone's too: over a page this session read, it named the
+    // minute of an answer the journal under it never had (review №1).
+    const unansweredLine = computed(() =>
+      countedAt.value && store.stale !== null
+        ? t('accounts.screen.unanswered', { time: countedAt.value })
+        : t('accounts.account.unanswered'),
     )
 
     const subtitle = computed(() => {
@@ -347,7 +403,8 @@ export default defineComponent({
     const archivedLine = computed(() => {
       const at = account.value?.archivedAt
       if (!at) return ''
-      const date = new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'short' }).format(
+      // Whole: after «21 сент.» the full stop of the sentence doubled (handoff 03).
+      const date = new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'long' }).format(
         at,
       )
       return t('accounts.account.archived', { date })
@@ -395,6 +452,12 @@ export default defineComponent({
 
     const editOpen = ref(false)
     const reconcileOpen = ref(false)
+    /**
+     * Where the check stands, as its sheet tells: the balance is hidden while the fact is typed. An
+     * opening puts the sheet back on the fact, and it says so before anything is drawn.
+     */
+    const reconcileStep = ref<ReconcileStep>('fact')
+    const balanceHidden = computed(() => reconcileOpen.value && reconcileStep.value !== 'result')
     const operationOpen = ref(false)
     const operation = ref<AccountOperationView | null>(null)
     function openRow(row: AccountOperationView): void {
@@ -419,6 +482,7 @@ export default defineComponent({
     }
 
     const restoring = ref(false)
+    const reconcileButton = ref<ComponentPublicInstance | null>(null)
     async function bringBack(): Promise<void> {
       const value = account.value
       if (!value) return
@@ -426,6 +490,14 @@ export default defineComponent({
       try {
         store.accept(await api.restoreMoneyAccount(value.id))
         announce?.(t('accounts.screen.restored', { name: value.name }))
+        // The button pressed is gone with the mark: the focus goes to the action in its place, not to
+        // the page (Р-5) — the frame brings a focus that stood on it, this a tap Safari never focused
+        // (MOL-80); a focus the person took elsewhere meanwhile stays there (adversarial В).
+        await nextTick()
+        const focused = document.activeElement
+        const next = reconcileButton.value?.$el as unknown
+        if ((focused === null || focused === document.body) && next instanceof HTMLElement)
+          next.focus()
       } catch {
         announce?.(t('accounts.sheet.failed'))
       } finally {
@@ -468,6 +540,10 @@ export default defineComponent({
     }
 
     return {
+      IconArchive,
+      title,
+      failures,
+      reconcileButton,
       transferable,
       transferOpen,
       transferRemoved,
@@ -476,7 +552,8 @@ export default defineComponent({
       t,
       phase,
       journal,
-      stale,
+      failed,
+      unansweredLine,
       more,
       loadMore,
       retry,
@@ -496,6 +573,8 @@ export default defineComponent({
       sentinel,
       editOpen,
       reconcileOpen,
+      reconcileStep,
+      balanceHidden,
       operationOpen,
       operation,
       openRow,
@@ -513,61 +592,34 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* The page's gutter and the room over the strip are the frame's (MOL-179): 8 within the balance's
+   group, 24 to the operations (Ф-10). */
 .content {
   display: flex;
   flex-direction: column;
   flex: 1;
-  gap: var(--space-3);
-  padding: var(--space-4);
-
-  &.roomy {
-    padding-bottom: calc(var(--space-8) + var(--space-8) + var(--space-6));
-  }
-}
-
-.strip,
-.archived {
-  display: flex;
-  align-items: flex-start;
   gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  font-size: var(--text-footnote);
 }
 
-.strip {
-  @include appear;
-
-  background: var(--warn-tint);
-  color: var(--warn-ink);
-}
-
-.archived {
-  background: var(--surface-2);
-  color: var(--text-muted);
-}
-
-.strip-icon {
-  @include icon;
-
-  font-size: var(--icon-sm);
-}
-
+/* A column, not a grid: «≈» grows and goes by `AppReveal`, which takes a flex column's gap back with
+   it — a grid's stays and jumped (MOL-151). */
 .balance {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-1);
   padding: var(--space-4);
 }
 
-.group-caption {
-  margin-top: var(--space-3);
+/* The caption and the days in a block of their own, 24 from the card above (Ф-10); a caption's own
+   8 is the card's under it. */
+.operations {
+  margin-top: var(--space-4);
 }
 
-/* The caption and the days in a block of their own: in the content's gap the 8 under it would be 20. */
+/* Days 24 apart (handoff 02 п. 5, Ф-10). */
 .days {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-6);
 }
 
 .figure {
@@ -576,10 +628,19 @@ export default defineComponent({
   margin: 0;
   font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
+  line-height: var(--leading-tight);
 
   &.negative {
     color: var(--bad-ink);
   }
+
+  &.hidden {
+    color: var(--text-muted);
+  }
+}
+
+.unseen {
+  @include visually-hidden;
 }
 
 .approx {
@@ -587,6 +648,7 @@ export default defineComponent({
   font-size: var(--text-headline);
   font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
+  line-height: var(--leading-tight);
 }
 
 .footnote {

@@ -287,6 +287,22 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod \
 It prints every purchase «было → станет» and every item it gives a package; a purchase the person changed, and an item
 no record made, stay. A second run says `purchases 0`. In a working copy the same thing is `make repack [YES=1]`.
 
+## Items from receipts named as a line names them now (MOL-261)
+
+Once, after the rollout of MOL-261 and by the owner's word: the items recorded from receipts before it carry the name
+the line proposed then — «Напиток газированный «Кока Кола»», «Соль мелкий». A dry run first, then `--yes` once the
+owner read the list:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod \
+  exec backend node dist/rename-receipt-items.js
+```
+
+It prints every item «было → станет»: only one that very record made, by that person, still under the name the line
+proposed — one the person named themselves stays — and not merged since. A name another item holds already is listed
+under `taken` and left as it was. The list is the guard: read it whole before `--yes`. The API's writer gives a renamed item its vector again within a minute. A second
+run says `renamed 0`. In a working copy the same thing is `make rename-items [YES=1]`.
+
 ## Seeding the catalogue (MOL-112)
 
 `backend/src/catalogue-seed.ts` is some six hundred common names — «Молоко», «Говядина», «Хлеб» —

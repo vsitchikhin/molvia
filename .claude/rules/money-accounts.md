@@ -132,7 +132,9 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   first opening of «Деньги» on a phone, with nothing kept, moves the switcher down once by its height
   as the answer comes, and in the same frame the row «Счета» goes from the ways out — the page grows by
   the card and shortens by 52 at its foot, a growth all told (self-review Р2-4); a placeholder would
-  stand for a newcomer with no account and go again.
+  stand for a newcomer with no account and go again. **The ways out wait for «Счета»'s first answer
+  since MOL-269**, so that move carries no row anyone can tap on the first opening — `money-spendings.md`;
+  «Счета» that failed and answer a later read still move them (adversarial А2), a price named there.
 - **«Счета» show the total in both currencies of the settings** (MOL-193, owner's В-19 «в», В-1 «б»): the income
   one large — the figure «На счетах сейчас» shows, so one money is one number on both screens — the spending one
   under it, and the tiles «Можно тратить» / «Сбережения» in both. One currency, or a page kept from before
@@ -212,7 +214,7 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   taken anew, a corrected note moved a closed month by today's cache (adversarial А1). **A removal and
   «Вернуть» take the owner's lock** an amendment holds: removed between an amendment's read and its
   write, the transfer was marked and its fee written live beside it (А2).
-- **On the phone** (`TransferSheet`, handoff MOL-253): the way in is «Перевести» under «Сверить» on an
+- **On the phone** (`TransferSheet`, handoff MOL-253): the way in is «Перевести», a ghost under «Сверить» in the strip of an
   account's screen and «Перевод между счетами» under the total of «Счета», only while some currency —
   the account's own there — has two live accounts (`canTransfer`). «Куда» offers only the source's
   currency without the source and without «Без счёта», and the one account it can be is put in (Р-6);
@@ -237,8 +239,7 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   Every write answers with «Счета» whole, and `accounts.transfers` tells the journals and the month to
   read again. **The price, named:** one day for both halves — a transfer that arrives the next day is
   written on one; the fee only in the money's currency and only from the source; no list of
-  transfers of their own; and «Перевести» floats as a secondary button under «Сверить» until the
-  screen's actions go into its docked strip (MOL-194).
+  transfers of their own.
 - **The prices, named:** the balance of a view counts live operations while «удалить или убрать» asks
   of every row — a spending in its ten minutes of «Вернуть» makes an account «убран» rather than
   deleted; an operation naming a marked account is in no balance until the timer unlinks it; a check
@@ -286,8 +287,22 @@ balance, total and difference is the server's.
   for the default. No account at all — no row. An income and an exchange offer only their own
   currency and never «Списано»; a spending and a trip offer the others with «Списано» under the row.
 - **The check asks the fact first and shows nothing of the count until the server answers** — not in
-  text, not in `aria`; the result is said through the app's live region and takes the focus. The
-  same fact goes again under the same name, also after an answer that never came (Р-19). A reason
+  text, not in `aria`; the result is said through the app's live region and takes the focus. **Nor
+  does the screen behind it** (MOL-195, Ф-33): while the fact is typed the balance of the account's
+  screen is «•••» in `text-muted` — never red, which would tell a balance below zero — its «≈ … по моему
+  курсу» is gone, and a reader hears «Остаток скрыт, пока идёт сверка» from a visually hidden line beside
+  the dots (`aria-label` on a `<p>` is read by nothing); the start and «сверено» stay, they tell nothing
+  of the count. The sheet tells the screen its step (`step`: `fact` / `result`) as it changes — an
+  answer gives the balance back, «Ввести другую сумму» and every opening hide it — in the same render,
+  so no frame shows it. The figure is no live region (С-12): back with the answer, it would be said over
+  the check's result. «≈» goes and comes back through `AppReveal` — it pushes the footnote and the
+  journal in sight over the sheet (MOL-151, adversarial А4). **The price, named:** the balance is on the screen before «Сверить с фактом» is
+  pressed — it is what the screen is for; the dots keep the count out of sight while the fact is typed,
+  not out of memory. **Nor out of arithmetic** (review Р2-2): the start in the footnote and the journal
+  behind the sheet stay in sight — the sheet covers the lower part of the screen, as the handoff draws
+  it — so a balance of the start and a few rows adds up from them, and one with no operations is the
+  start itself («Пока остаток — это старт»). The dots take the figure out of sight; a sheet the
+  height of the screen, the other half of Ф-33, was not chosen. The same fact goes again under the same name, also after an answer that never came (Р-19). A reason
   is put right in its own sheet over the check, and the same check is sent again **once nothing put
   right is still waiting** — no spending, and no write of a trip but its start and finish (its account,
   its removal or «Вернуть», a purchase added, amended or removed) in either queue: «some queue landed»
@@ -309,7 +324,27 @@ balance, total and difference is the server's.
   away in another window — it is asked again at once. A reason removed from its sheet is offered back in the check and in «не
   попали», where the person is. Only the newest answer is taken: a recount landing after «Ввести
   другую сумму» does not take the sheet back. A recount that failed leaves the difference stale with
-  «Повторить»; offline is one yellow line, drawn by the connection and gone with it, never red.
+  «Повторить»; offline is the kit's `StatusStrip`, first in the sheet over either step, drawn by the
+  connection and gone with it, never red (MOL-195) — over an answered count in words of what waits,
+  «Сверка посчитана — разницу можно записать со связью», never «сверить» (review Р2-4), and over
+  «Сходится» or a difference written, with no write to offer, «Сверка посчитана» (Р3-1). **What was
+  typed stays while no answer came** (adversarial А2): the line promises it, and a person closes the
+  sheet to come back with the connection; once an answer was shown — a fact typed after «Ввести другую
+  сумму» too, typed with the count in sight (Б3) — or for another account, it starts afresh, and a
+  reload or a screen left loses it — no draft is kept. **«Записать разницу» is tinted, and not now says
+  why on it** (Ф-6, С-10): `inactive`, in the focus order — «Запишем, когда будет связь» offline, first,
+  since nothing is recounted without it; «Запишем после ответа в «Покупках»» while a trip's write waits
+  for the person there (owner's В-1 «а» of MOL-195, the line above it says the same); «Запишем после
+  пересчёта» while a correction is on its way. «Сверим, когда будет связь» of step one likewise. **Every
+  way in waits as the button does** (adversarial А1): the write itself refuses while any of the three
+  holds, and «Повторить» of «Прочее» not found is not now then — it wrote over a count its neighbour
+  called stale, the correction and «Прочее» the same money twice; not now rather than gone, so a focus
+  on it stays as the connection drops (Б2), and saying why on itself (В1): «Повторим, когда будет
+  связь», «… после ответа в «Покупках»», «… после пересчёта». «Повторить» of a recount that failed is
+  not now offline too, in the first of these words (В2): it asked nothing and said nothing. **The
+  price, named** (review round 6): «Прочее» not found while the write waits leaves two buttons not now
+  with near the same words — «Повторим …» over «Запишем …» — a third of the screen at 320; rare, and
+  each stays where a focus may be.
 - **«Записать разницу»** writes the server's `difference` as «Прочее» with the note «сверка» — read
   back as «Прочее · сверка» in either language. **Below zero**: a spending through its queue, named
   once per answer, and the same check once more after that spending has landed, kept in the store
@@ -334,6 +369,25 @@ balance, total and difference is the server's.
   «Вернуть» of a deleted account goes with the answer, never with the tap; 404 is «too late».
 - **A removed account's screen says so and offers «Вернуть» where «Сверить» stands** (owner's decision
   В-2); its sheet offers no «Убрать». «Все ›» stands while there is any account, a removed one too.
+- **The account's actions are its docked strip** (MOL-194, owner's В-1 «б» of 26.10.2026 over the
+  last line of Ф-28): «Сверить с фактом» the main one, «Перевести» a ghost under it (Р-9 MOL-253) —
+  never in the header, where «Править» alone stands: the header was out of the thumb's reach and, in
+  English at 320, had no room for «Check against reality» beside «Edit». A removed account holds
+  «Вернуть» there — at work «Возвращаем…», offline not now saying «Вернём, когда будет связь» (Ф-6) —
+  and, brought back, gives the focus to «Сверить с фактом», which takes its place — a focus that stood
+  on it or fell to the page (a tap Safari never focused), never one the person took to a row while
+  the answer was on its way (adversarial В). «Вернуть» of a
+  spending removed from the journal stands over the strip, which stays: on a removed account two
+  «Вернуть» at once, each saying what it brings back (С-8). «Нет такого счёта» is attention, not an
+  error — no «Повторить» — and the screen puts «К счетам» in its strip itself, since the kit gives
+  the strip to an error alone. The strip comes over an answer only (Р-1 MOL-193). The title is the
+  name the phone keeps while the journal is on its way, failed or offline, else «Счёт» — and «Счёт»
+  over «нет такого», whatever the phone kept (Е-6, handoff 8h). **The strip of the connection is the last read's**, as on
+  «Счета» (`failed` of the journal, not `stale`; adversarial А1, А2): a transfer re-reads the journal,
+  and a read that failed after an answer of the session left it without the transfer the balance
+  already had, with no strip and no «Повторить». Offline is the cloud whatever was answered. «Сервер
+  не ответил» carries the hour of «Счета» only where the balance is the phone's too — over a page this
+  session read, it named the minute of an answer the journal under it never had (review №1).
 - **«По счетам на …: … · Подставить» under «сколько было до»** (owner's decision В-3): the server's sum
   of the accounts of the currency (Р-20 MOL-115), put in by a tap only; nothing below zero; no
   answer, no line.

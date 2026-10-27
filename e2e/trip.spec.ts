@@ -66,7 +66,7 @@ const row = (page: Page) => page.locator('.row')
 const heading = (page: Page) => page.getByRole('heading', { level: 1 })
 /** A row of «Записаны» on «Покупки». */
 const recorded = (page: Page, place: string) =>
-  page.locator('.recorded .purchase-row').filter({ hasText: place })
+  page.locator('.recorded .list-row').filter({ hasText: place })
 
 /**
  * «Записать вручную» stands in the strip of «Покупки» and under the cycle of the newcomer's «Что
@@ -139,9 +139,9 @@ test.describe('the trip', () => {
     await addItem(page, setting.word, '570')
     await expect(row(page)).toHaveCount(1)
     // The price per litre is the server's: the phone divides nothing once the row is written.
-    await expect(row(page).first()).toContainText('570.00')
+    await expect(row(page).first()).toContainText('֏570')
     await expect(row(page).first()).toContainText('per l')
-    await expect(page.locator('.sum')).toContainText('570.00')
+    await expect(page.locator('.sum')).toContainText('֏570')
     await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
 
     await row(page).first().click()
@@ -149,8 +149,8 @@ test.describe('the trip', () => {
     await sheet(page).getByLabel('Price as on the tag').fill('580')
     await sheet(page).getByRole('button', { name: 'Save' }).click()
     await expect(sheet(page)).toBeHidden()
-    await expect(row(page).first()).toContainText('580.00')
-    await expect(page.locator('.sum')).toContainText('580.00')
+    await expect(row(page).first()).toContainText('֏580')
+    await expect(page.locator('.sum')).toContainText('֏580')
 
     await row(page).first().click()
     await page.waitForTimeout(400)
@@ -226,7 +226,7 @@ test.describe('the trip', () => {
 
     // Back as the record going on: first on «Покупки», and whole inside.
     await page.getByRole('button', { name: 'Undo' }).click()
-    await page.locator('.open .purchase-row').click()
+    await page.locator('.open button').click()
     await expect(row(page)).toHaveCount(1)
     await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
   })
@@ -251,7 +251,7 @@ test.describe('the trip', () => {
     await page.waitForTimeout(400)
     await sheet(page).getByRole('button', { name: 'Delete the entry' }).click()
     await expect(page).toHaveURL(/\/purchases$/)
-    await page.locator('.open .purchase-row').click()
+    await page.locator('.open button').click()
     await expect(heading(page)).toHaveText('Ереван Сити')
 
     await context.setOffline(false)
@@ -290,7 +290,7 @@ test.describe('the trip', () => {
     await sheet(page).getByRole('button', { name: 'Delete the entry' }).click()
     await expect(page).toHaveURL(/\/purchases$/)
     await page.getByRole('button', { name: 'Undo' }).click()
-    await page.locator('.open .purchase-row').click()
+    await page.locator('.open button').click()
     await expect(heading(page)).toHaveText('Ереван Сити')
 
     await context.setOffline(false)
@@ -336,7 +336,7 @@ test.describe('the trip', () => {
       .poll(async () => (await setting.current())?.place.name, { timeout: 15_000 })
       .toBe('Ереван Сити')
     await expect(page.getByRole('button', { name: 'Undo' })).toHaveCount(0)
-    await page.locator('.open .purchase-row').click()
+    await page.locator('.open button').click()
     await expect(heading(page)).toHaveText('Ереван Сити')
     await expect(page.getByRole('heading', { name: /is already open/ })).toHaveCount(0)
   })
@@ -551,7 +551,7 @@ test.describe('the receipt total (MOL-78)', () => {
     await expect(page).toHaveURL(/\/purchases$/)
 
     // The receipt went before the finish, and «Записаны» shows it as the record's money.
-    await expect(recorded(page, 'Ереван Сити')).toContainText('1,400.00', { timeout: 15_000 })
+    await expect(recorded(page, 'Ереван Сити')).toContainText('֏1,400', { timeout: 15_000 })
     const history = (await (await page.request.get('/api/trips/history', { headers })).json()) as {
       trips: { total: { amount: string }[] | null }[]
     }
@@ -572,20 +572,20 @@ test.describe('the receipt total (MOL-78)', () => {
 
     await recorded(page, 'Ереван Сити').click()
     await expect(page.locator('.caption')).toHaveText('Total by receipt')
-    await expect(page.locator('.sum')).toContainText('1,400.00')
+    await expect(page.locator('.sum')).toContainText('֏1,400')
     await expect(page.locator('.split')).toContainText('With a price — 1 of 2')
-    await expect(page.locator('.split')).toContainText('570.00')
+    await expect(page.locator('.split')).toContainText('֏570')
     await expect(page.locator('.split')).toContainText('Without a price — 1')
-    await expect(page.locator('.split')).toContainText('830.00')
+    await expect(page.locator('.split')).toContainText('֏830')
     // The price of the milk stayed what it was: nothing is worked out of the sum.
-    await expect(row(page).first()).toContainText('570.00')
+    await expect(row(page).first()).toContainText('֏570')
 
     await page.getByRole('button', { name: 'Change the receipt total' }).click()
     await page.waitForTimeout(400)
     await expect(sheet(page).getByLabel('Amount')).toHaveValue('1400')
     await sheet(page).getByRole('button', { name: 'Remove the total' }).click()
     await expect(page.locator('.caption')).toHaveText('Total')
-    await expect(page.locator('.sum')).toContainText('570.00')
+    await expect(page.locator('.sum')).toContainText('֏570')
   })
 
   test('typed with no connection goes when it comes back, and the total says it is on its way', async ({
@@ -608,7 +608,7 @@ test.describe('the receipt total (MOL-78)', () => {
     await context.setOffline(false)
     await page.evaluate(() => window.dispatchEvent(new Event('online')))
     await expect(page.locator('.caption')).toHaveText('Total by receipt', { timeout: 15_000 })
-    await expect(page.locator('.sum')).toContainText('2,500.00')
+    await expect(page.locator('.sum')).toContainText('֏2,500')
     await expect(page.locator('.waiting')).toHaveCount(0)
   })
 

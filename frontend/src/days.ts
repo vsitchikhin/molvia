@@ -33,6 +33,19 @@ export function dayOfAnyYear(when: Date, locale: string, now = new Date()): stri
 }
 
 /**
+ * A day as a date always, the year only when not this one: «19 сент.», never «вчера» — for a sentence
+ * that puts its own word before the day, «Раньше 19 сент. — со связью» (MOL-204, Р-9), where «Раньше
+ * вчера» is no Russian.
+ */
+export function dateOfAnyYear(when: Date, locale: string, now = new Date()): string {
+  return new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+    ...(when.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }),
+  }).format(when)
+}
+
+/**
  * The clock beside that day: «21:40» (MOL-32). The age of a remembered answer is named
  * exactly — «вчера в 21:40» is what a person judges by, while «данные могут быть неактуальны»
  * says nothing — and the two halves travel as separate placeholders because the word between

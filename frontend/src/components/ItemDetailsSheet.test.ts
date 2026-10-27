@@ -202,7 +202,7 @@ describe('ItemDetailsSheet', () => {
     const { view, queue } = await render({ trip: active, selected })
     await type(view, 'quantity', '1')
     await type(view, 'amount', '800')
-    expect(perUnit(view)).toBe('800,00֏/л')
+    expect(perUnit(view)).toBe('800֏/л')
     expect(view.text().replace(/\s/g, ' ')).toContain('≈ 2 ₽')
     await button(view, 'Записать').trigger('click')
     const write = queue.pending.find((row) => row.kind === 'add')
@@ -221,10 +221,10 @@ describe('ItemDetailsSheet', () => {
   })
 
   it.each([
-    ['570', '1', 'l', '570,00֏/л'],
+    ['570', '1', 'l', '570֏/л'],
     ['520', '0,9', 'l', '577,78֏/л'],
-    ['5 403,12', '1,128', 'kg', '4790,00֏/кг'],
-    ['250', '1', 'piece', '250,00֏/шт'],
+    ['5 403,12', '1,128', 'kg', '4790֏/кг'],
+    ['250', '1', 'piece', '250֏/шт'],
   ] as const)('%s ֏ for %s %s shows %s', async (price, qty, unit, shown) => {
     const { view } = await render()
     await pickUnit(view, unit)
@@ -238,9 +238,9 @@ describe('ItemDetailsSheet', () => {
     const { view } = await render()
     await type(view, 'quantity', '2')
     await type(view, 'amount', '500')
-    expect(perUnit(view)).toBe('250,00֏/л')
+    expect(perUnit(view)).toBe('250֏/л')
     await pickUnit(view, 'kg')
-    expect(perUnit(view)).toBe('250,00֏/кг')
+    expect(perUnit(view)).toBe('250֏/кг')
   })
 
   it('shows the error of half a piece at once, under the field', async () => {
@@ -463,7 +463,7 @@ describe('ItemDetailsSheet', () => {
       await type(view, 'quantity', '0,25')
       await pickUnit(view, 'kg')
       await type(view, 'amount', '390')
-      expect(perUnit(view)).toBe('1560,00₽/кг')
+      expect(perUnit(view)).toBe('1560₽/кг')
       expect(view.text()).not.toContain('≈')
     })
   })
@@ -483,7 +483,7 @@ describe('ItemDetailsSheet', () => {
     it('opens with the row, and saves only what changed', async () => {
       const { view, queue } = await render({ expense: row })
       expect((input(view, 'quantity').element as HTMLInputElement).value).toBe('0,35')
-      expect(perUnit(view)).toBe('4400,00֏/кг')
+      expect(perUnit(view)).toBe('4400֏/кг')
 
       await type(view, 'amount', '1600')
       await button(view, 'Сохранить').trigger('click')
@@ -646,7 +646,7 @@ describe('ItemDetailsSheet · «Тут дешевле» (MOL-92)', () => {
 
     expect(ownPrices).toHaveBeenCalledWith({ item: milk.id, trip: TRIP })
     expect(hint(view).classes()).toContain('hint-best')
-    expect(spaced(hint(view).text())).toBe('Дешевле всего брали в Зовуни — 540,00 ֏/л, 12.09')
+    expect(spaced(hint(view).text())).toBe('Дешевле всего брали в Зовуни — 540 ֏/л, 12.09')
   })
 
   it('asks by the city of a record still in the queue — the server has not seen it (review №1)', async () => {
@@ -670,7 +670,7 @@ describe('ItemDetailsSheet · «Тут дешевле» (MOL-92)', () => {
 
     await settle()
     expect(hint(view).classes()).toContain('hint-there')
-    expect(spaced(hint(view).text())).toBe('В Зовуни брали по 540,00 ֏/л — 12.09')
+    expect(spaced(hint(view).text())).toBe('В Зовуни брали по 540 ֏/л — 12.09')
   }, 10_000)
 
   it('says «как в …» at the same price and «тут дешевле» below it (В-2)', async () => {
@@ -680,14 +680,14 @@ describe('ItemDetailsSheet · «Тут дешевле» (MOL-92)', () => {
 
     await typed(view, '510')
     expect(hint(view).classes()).toContain('hint-cheaper')
-    expect(spaced(hint(view).text())).toBe('Тут дешевле — в Зовуни было 540,00 ֏/л, 12.09')
+    expect(spaced(hint(view).text())).toBe('Тут дешевле — в Зовуни было 540 ֏/л, 12.09')
   }, 20_000)
 
   it('says «здесь же» when the record’s own place was the cheapest (Р-3)', async () => {
     const { view } = await priced(history([place(HERE, 600, '2026-09-03')]))
     await typed(view, '650')
 
-    expect(spaced(hint(view).text())).toBe('Здесь же брали по 600,00 ֏/л — 03.09')
+    expect(spaced(hint(view).text())).toBe('Здесь же брали по 600 ֏/л — 03.09')
   }, 10_000)
 
   it('names a cheaper item of the kind rated no worse, second (В-3)', async () => {
@@ -695,7 +695,7 @@ describe('ItemDetailsSheet · «Тут дешевле» (MOL-92)', () => {
     await typed(view, '620')
 
     expect(spaced(hint(view, 'alternative').text())).toBe(
-      'Молоко Марианна — 480,00 ֏/л в Зовуни, 28.09 · оценка 4,5',
+      'Молоко Марианна — 480 ֏/л в Зовуни, 28.09 · оценка 4,5',
     )
   }, 10_000)
 

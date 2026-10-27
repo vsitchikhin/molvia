@@ -66,8 +66,9 @@
           :body="t('receipt.duplicate.body')"
         />
         <AppCard class="block" list>
-          <PurchaseRow
+          <ListRow
             :icon="IconReceiptCheck"
+            tone="good"
             :title="detail.receipt.place?.name ?? title"
             :meta="
               t('purchases.recorded_receipt', {
@@ -75,7 +76,9 @@
                 day: dayOf(duplicate.recordedAt),
               })
             "
-            @open="openTrip(duplicate.tripId)"
+            wrap
+            next
+            @click="openTrip(duplicate.tripId)"
           />
         </AppCard>
       </template>
@@ -346,8 +349,8 @@ import AppCard from '@/components/AppCard.vue'
 import AppNote from '@/components/AppNote.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import CaptureSheet from '@/components/CaptureSheet.vue'
+import ListRow from '@/components/ListRow.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
-import PurchaseRow from '@/components/PurchaseRow.vue'
 import ReceiptLineRow from '@/components/ReceiptLineRow.vue'
 import ReceiptBarcodesSheet from '@/components/ReceiptBarcodesSheet.vue'
 import ReceiptLineSheet from '@/components/ReceiptLineSheet.vue'
@@ -401,7 +404,7 @@ export default defineComponent({
     IconImageOff,
     IconMessage,
     ManualEntryButton,
-    PurchaseRow,
+    ListRow,
     ReceiptLineRow,
     ReceiptBarcodesSheet,
     ReceiptLineSheet,

@@ -107,10 +107,16 @@ test('счёт, трата с него, «без счёта» в сверке �
   const check = topSheet(page)
   await expect(check).toContainText('Сколько на счёте сейчас?')
   await expect(check).not.toContainText('7 500')
+  // Blind behind it too (Ф-33): «•••» on the balance while the fact is typed.
+  const figure = page.locator('.balance .figure')
+  await expect(figure).toContainText('•••')
+  await expect(figure).not.toContainText(/7\s500/)
   await page.waitForTimeout(400)
   await check.getByLabel('Сколько на счёте сейчас?').fill('6500')
   await check.getByRole('button', { name: 'Сверить', exact: true }).click()
   await expect(check).toContainText(/Разница\s*−1\s000\s֏/)
+  // The server answered: the balance is back behind the sheet.
+  await expect(figure).toHaveText(/7\s500\s֏/)
   const reason = check.getByRole('button', { name: /Трата 1\s000\s֏ без счёта/ })
   await expect(reason).toBeVisible()
 
@@ -159,6 +165,7 @@ test('разницу, которой нет причины, закрывает �
 
 test('счёт без операций удаляется с «Вернуть», с операциями — убирается в «Убранные»', async ({
   page,
+  context,
 }) => {
   await openMoney(page)
   await openAccounts(page)
@@ -195,7 +202,22 @@ test('счёт без операций удаляется с «Вернуть»,
   const removed = page.getByRole('button', { name: 'Убранные (1)' })
   await removed.click()
   await expect(removed).toHaveAttribute('aria-expanded', 'true')
-  await page.getByRole('button', { name: 'Вернуть' }).click()
+
+  // Its own screen: «Вернуть» in the strip where «Сверить» stood, not now offline and saying why;
+  // brought back, «Сверить с фактом» takes its place and the focus (MOL-194).
+  await page.getByRole('link', { name: /Лишний/ }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Лишний')
+  const dock = page.locator('.dock')
+  await expect(dock.getByRole('button')).toHaveText(['Вернуть'])
+  await context.setOffline(true)
+  const waiting = dock.getByRole('button', { name: 'Вернём, когда будет связь' })
+  await expect(waiting).toHaveAttribute('aria-disabled', 'true')
+  await context.setOffline(false)
+  await dock.getByRole('button', { name: 'Вернуть' }).click()
+  const reconcile = dock.getByRole('button', { name: 'Сверить с фактом' })
+  await expect(reconcile).toBeFocused()
+  await expect(page.getByText(/Убран из выбора/)).toBeHidden()
+  await page.getByRole('button', { name: /Счета/ }).click()
   await expect(removed).toBeHidden()
   await expect(page.getByRole('link', { name: /Лишний/ })).toBeVisible()
 })
@@ -278,7 +300,7 @@ test('без связи счета не красные, а шторка счёт
   await expect(sheet.getByRole('button', { name: 'Сохранить' })).toBeEnabled()
 })
 
-test('без связи «Сверить» ждёт связь и не красная; со связью — сверяет', async ({
+test('без связи «Сверить» ждёт связь словами и не красная; со связью — сверяет', async ({
   page,
   context,
 }) => {
@@ -291,8 +313,13 @@ test('без связи «Сверить» ждёт связь и не крас�
   await context.setOffline(true)
   await page.getByRole('button', { name: 'Сверить с фактом' }).click()
   const check = topSheet(page)
-  await expect(check).toContainText('Сверку считает сервер')
-  await expect(check.getByRole('button', { name: 'Сверим, когда будет связь' })).toBeDisabled()
+  await expect(check).toContainText('Сверить можно со связью — введённое останется здесь')
+  // Not now in the kit's one look: in the focus order, saying why (Ф-6) — a native `disabled` takes
+  // no focus. Not `toBeEnabled`: Playwright reads `aria-disabled` as disabled.
+  const wait = check.getByRole('button', { name: 'Сверим, когда будет связь' })
+  await expect(wait).toHaveAttribute('aria-disabled', 'true')
+  await wait.focus()
+  await expect(wait).toBeFocused()
   await expect(check.getByRole('alert')).toHaveCount(0)
   await page.waitForTimeout(400)
   await check.getByLabel('Сколько на счёте сейчас?').fill('1000')
@@ -334,6 +361,13 @@ test.describe('320 px, English', () => {
     await page.getByRole('link', { name: /Card in roubles/ }).click()
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Card in roubles')
     expect(await noSideScroll()).toBe(true)
+    // The account's actions are its strip, the header «Edit» alone, «‹ Accounts» whole (MOL-194).
+    await expect(page.locator('.dock').getByRole('button')).toHaveText(['Check against reality'])
+    await expect(page.locator('.bar .back')).toContainText('Accounts')
+    const cutInDock = await page
+      .locator('.dock button')
+      .evaluateAll((nodes) => nodes.filter((node) => node.scrollWidth > node.clientWidth).length)
+    expect(cutInDock).toBe(0)
 
     await page.getByRole('button', { name: 'Check against reality' }).click()
     const check = topSheet(page)

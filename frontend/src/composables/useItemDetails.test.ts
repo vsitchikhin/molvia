@@ -52,10 +52,10 @@ const digits = (text: string): string => text.replace(/[\s\u00a0\u202f]/g, '')
 
 describe('useItemDetails', () => {
   it.each([
-    ['570', '1', 'l', '570,00֏'],
+    ['570', '1', 'l', '570֏'],
     ['520', '0,9', 'l', '577,78֏'],
-    ['5 403,12', '1,128', 'kg', '4790,00֏'],
-    ['250', '1', 'piece', '250,00֏'],
+    ['5 403,12', '1,128', 'kg', '4790֏'],
+    ['250', '1', 'piece', '250֏'],
   ] as const)(
     '%s ֏ for %s %s is %s per unit — the check values of the sheet',
     (price, qty, unit, per) => {

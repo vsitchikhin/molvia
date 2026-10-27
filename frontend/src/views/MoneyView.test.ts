@@ -339,6 +339,14 @@ describe('MoneyView: the month', () => {
     expect(text).toContain('At my rate of 4.62 ֏ per 1 ₽ today')
   })
 
+  it('names the dollars as spent, only what they came to whole (MOL-205, adversarial Б1в)', async () => {
+    moneyMonth.mockResolvedValue(
+      month({ foreign: [{ amount: parseMoney('11.50', 'USD'), counted: amd('4485') }] }),
+    )
+    const text = plain((await render()).text())
+    expect(text).toContain('Including $11.50 (≈ ֏4,485)')
+  })
+
   it('no «≈» under exact drams for one who earns and spends in drams (MOL-184, adversarial А4)', async () => {
     moneyMonth.mockResolvedValue(
       month({ incomeCurrency: 'AMD', spentIncome: amd('317800'), rate: null }),
@@ -785,17 +793,124 @@ describe('MoneyView: the ways out, one figure each (MOL-81, MOL-159)', () => {
   })
 
   // A month that will not load must not close the way to the income that broke it (review Т-1).
-  it('stands beside the error and under the skeleton, with no figure of the month', async () => {
+  it('stands beside the error, with no figure of the month', async () => {
     moneyMonth.mockRejectedValue(new ApiError(ERROR.INTERNAL))
     const failed = await render()
     expect(failed.text()).toContain(en.spending.load_error.title)
     expect(entries(failed).map(({ href }) => href)).toContain('/money/incomes')
     expect(entries(failed)[0]).toMatchObject({ text: en.spending.list.title })
+  })
 
+  // MOL-269: under the skeleton the answer moved them from under the finger — a newcomer's 291 px
+  // up, a month with a spending 99 down — and the tap aimed at one landed on another or on nothing.
+  it('must not fire: nothing under the skeleton', async () => {
     moneyMonth.mockReturnValue(new Promise(() => undefined))
     const loading = await render()
     expect(loading.find('.skeleton').exists()).toBe(true)
-    expect(entries(loading)).toHaveLength(6)
+    expect(entries(loading)).toEqual([])
+  })
+
+  it('must not fire: nothing while «Счета» have not answered, all of them once they have', async () => {
+    // The month answered first: «Счета» on their way would still put their card over the switcher.
+    let answer: (value: MoneyAccountsResponse) => void = () => undefined
+    moneyAccounts.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    expect(view.find('.skeleton').exists()).toBe(false)
+    expect(entries(view)).toEqual([])
+    answer(noAccounts())
+    await flushPromises()
+    expect(entries(view)).toHaveLength(6)
+  })
+
+  // Adversarial А1: «Повторить» keeps the phase `error` until its answer, which puts the month in place
+  // of the error card — the rows stood the whole retry and went from under the finger with it. Unseen
+  // with their place kept, never taken out: the page shortened under a phone scrolled down (Б2).
+  const held = (view: VueWrapper) =>
+    view.get(`nav[aria-label="${en.spending.entries_label}"]`).classes('ways-held')
+
+  it('must not fire: none seen while «Повторить» reads a failed month; back with its answer or refusal', async () => {
+    let answer: (value: MoneyMonthView) => void = () => undefined
+    let refuse: (error: unknown) => void = () => undefined
+    moneyMonth
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+      .mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const view = await render()
+    expect(view.text()).toContain(en.spending.load_error.title)
+    expect(held(view)).toBe(false)
+
+    await button(view, en.state.retry).trigger('click')
+    await flushPromises()
+    expect(moneyMonth).toHaveBeenCalledTimes(2)
+    expect(view.text()).toContain(en.spending.load_error.title)
+    expect(entries(view)).toHaveLength(6)
+    expect(held(view)).toBe(true)
+    refuse(new ApiError(ERROR.INTERNAL))
+    await flushPromises()
+    expect(held(view)).toBe(false)
+
+    await button(view, en.state.retry).trigger('click')
+    await flushPromises()
+    expect(held(view)).toBe(true)
+    answer(month())
+    await flushPromises()
+    expect(view.text()).not.toContain(en.spending.load_error.title)
+    expect(held(view)).toBe(false)
+  })
+
+  // Review Р4-1, adversarial Б1: a read nobody asked for — the app back in view, the connection back —
+  // is refused as a rule under a month that fails; taking the rows away for it made them blink for nothing.
+  it('must not fire: a read nobody asked for leaves the rows as they are', async () => {
+    moneyMonth
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    expect(view.text()).toContain(en.spending.load_error.title)
+
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    document.dispatchEvent(new Event('visibilitychange'))
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(moneyMonth.mock.calls.length).toBeGreaterThan(1)
+    expect(entries(view)).toHaveLength(6)
+    expect(held(view)).toBe(false)
+  })
+
+  // Review Р5: a spending landed — the commonest read nobody asked for under a month that fails.
+  it('must not fire: a spending landed under a failed month leaves the rows as they are', async () => {
+    let refuse: (error: unknown) => void = () => undefined
+    moneyMonth
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+    const view = await render()
+    expect(view.text()).toContain(en.spending.load_error.title)
+
+    useSpendingQueueStore().landed++
+    await flushPromises()
+    expect(moneyMonth).toHaveBeenCalledTimes(2)
+    expect(entries(view)).toHaveLength(6)
+    expect(held(view)).toBe(false)
+    refuse(new ApiError(ERROR.INTERNAL))
+    await flushPromises()
+    expect(held(view)).toBe(false)
+  })
+
+  it('come once «Счета» failed, and at once over a month and «Счета» the phone keeps', async () => {
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    moneyMonth.mockResolvedValue(month())
+    const failed = await render()
+    expect(entries(failed).map(({ href }) => href)).toContain('/money/accounts')
+    failed.unmount()
+
+    // Both kept from the opening before: the next one draws them before either answers again.
+    moneyAccounts.mockResolvedValue(noAccounts())
+    ;(await render()).unmount()
+    moneyAccounts.mockReturnValue(new Promise(() => undefined))
+    moneyMonth.mockReturnValue(new Promise(() => undefined))
+    const kept = await render()
+    expect(kept.find('.skeleton').exists()).toBe(false)
+    expect(entries(kept)).toHaveLength(6)
   })
 
   it('says of «Бюджет» what is over, that no plan is set, and nothing it does not know (MOL-117)', async () => {

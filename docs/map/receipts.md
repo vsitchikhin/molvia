@@ -41,6 +41,7 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 - `backend/src/receipts/model-reader.test.ts` — Unit test of the reader against a fake of the Messages API: what goes out, the workspace, the schema without lengths, each outcome and what it cost, a time out at a price not known.
 - `backend/src/receipts/model-prompt.ts` — What the model is asked (MOL-272, prompt v5 of the bench): every number of a line in its place, the summary's amounts with their words, «Ереван Сити»'s columns by its header, the rows of numbers with their labels; its version goes into `reader_version`.
 - `backend/src/receipts/till-kinds-latin.ts` — The kinds a till prints in Latin letters (MOL-126): beside a city they make a receipt's row an item's, not its address; not the gloss's.
+- `backend/src/receipts/till-brands.ts` — Brands and product lines as an Armenian till prints them, to how their package spells them (MOL-261): a new item's name writes a Latin one bare, a Cyrillic one in «…»; a line may name an item by either spelling.
 - `backend/src/receipts/till-words-ru.ts` — The dictionary of Armenian till words in Russian (MOL-114's `words-hy-ru.json`): a line's gloss, a new item's proposed name, the query of the search when the names find nothing.
 - `backend/src/receipts/reader.ts` — The client of the receipt reader: a part read in a page mode, item lines cut out; `ReaderUnavailable` (nothing answered: the receipt waits), `ReaderDropped` (lost on the photo: counted, to the end), `PhotoUnreadable` (it fails).
 
@@ -61,6 +62,8 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 
 - `backend/src/db/receipts-repository.ts` — Repository of receipts: the receipt and its parts named by the phone, the summary and the lines, removal with «Вернуть», the timer's purge (10 minutes, 28 days, a recorded receipt's photo), and the queue — people in turn, claim, release, retry at the end, finish, a reading cut short begun again.
 
+- `backend/src/db/rename-repository.ts` — The items recorded from receipts before MOL-261 given the name their line proposes now (owner's В-3 «а»): one transaction, an item only where that very record made it and still under the line's proposal, a name another item holds left and listed, the key anew and the vector gone, a dry run rolled back.
+
 - `backend/src/db/repack-repository.ts` — The purchases recorded from receipts before MOL-264 put into their line's package (owner's В-3 «а»): one transaction, a purchase only while it is still the till's pieces, an item only where that record made it, a dry run rolled back.
 
 - `backend/src/db/model-spend-repository.ts` — The month's spending on the model (MOL-272): `reserve` holds the cap in one statement a call and tells the stop, `settle` puts a call's own price in place of its worst and tells the share passed, each once a month.
@@ -70,11 +73,14 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 ## backend · tools
 
 - `backend/src/repack-receipts.ts` — The command behind `make repack` (MOL-264): dry run unless `--yes`, every purchase «было → станет» and every item it gives a package.
+- `backend/src/rename-receipt-items.ts` — The command behind `make rename-items` (MOL-261): dry run unless `--yes`, the lexicon of a line's name with the seed's nodes, every item «было → станет» and every name taken.
+- `backend/src/rename-receipt-items-cli.ts` — Entry point of `dist/rename-receipt-items.js`: connects to the database and runs the command.
 - `backend/src/repack-receipts-cli.ts` — Entry point of `dist/repack-receipts.js`: connects to the database and runs the command.
 
 ## backend · tests
 
 - `backend/tests/repack-receipts.integration.test.ts` — Integration test of `make repack`: a dry run changes nothing, a purchase in pieces gets its package and the item its record made a usual quantity, the person's own quantity and the catalogue's item stay, a second run finds nothing.
+- `backend/tests/rename-receipt-items.integration.test.ts` — Integration test of `make rename-items`: a dry run changes nothing and lists every name, an item its record made under the proposal takes the line's name now with its key and without its vector, one the person named and the catalogue's stay, a name another item holds is listed, a second run finds nothing.
 
 - `backend/tests/receipt-review.integration.test.ts` — Integration test of the review (MOL-126): the memory's own word, majority, tie and erased vote; the memory laid over the parse; В-5 and В-1; the place by tax number and city; the receipt recorded before; the rate of the receipt's day.
 - `backend/tests/receipt-record.integration.test.ts` — Integration test of «Записать»: the trip on the receipt's day, purchases and new items, memory and the place's tax number, the photo and the rows left, «Деньги» and «Оценки», a repeat, the receipt recorded before, the refusals, the lines left out in the trip's money.
@@ -105,8 +111,8 @@ is `receipt_links`, a table the nightly copy leaves out. MOL-289/290 (`0068_rece
 ## frontend · the phone (MOL-127)
 
 - `frontend/src/receipts/warp.ts` — The receipt straightened by its four corners (MOL-222), with no DOM so the bench runs it: the corners in reading order, «Повернуть» as a turn of them, the receipt's own size, the corners on whole pixels and the box when square enough (`snapped`), the perspective and a warp from sixteen neighbours — or the photo's own pixels copied.
-- `frontend/src/receipts/edges.ts` — Where the receipt is on the photo (MOL-222, Т-2): a grey copy at most 640 long and its colour, the candidates the bench measured (bright, enclosed, flattened, paper), and the corners proposed — paper's, else the photo's own.
-- `frontend/src/receipts/straighten.ts` — «Края чека» on the page: the corners proposed on a small copy, the photo turned a quarter, the receipt cut out and straightened in the worker — on the page when the worker fails — and `RECEIPT_PHOTO_NARROW`.
+- `frontend/src/receipts/edges.ts` — Where the receipt is on the photo (MOL-222, Т-2): the halving steps the phone's canvas takes, each exactly half, and the same steps without one for the bench (MOL-259), a grey copy at most 640 long and its colour, the candidates the bench measured (bright, enclosed, flattened, paper), and the corners proposed — paper's, else the photo's own.
+- `frontend/src/receipts/straighten.ts` — «Края чека» on the page: the corners proposed on a copy halved on canvas (MOL-259), the photo turned a quarter, the receipt cut out and straightened in the worker — on the page when the worker fails — and `RECEIPT_PHOTO_NARROW`.
 - `frontend/src/receipts/qrDecode.ts` — The QR codes of a receipt's photo (MOL-233): `QRCode`, `tryHarder`, up to four symbols — a shop prints its own beside the tax office's; never the scanner's options.
 - `frontend/src/receipts/qrWorker.ts` — The worker reading a receipt's QR codes, the scanner's wasm from the app's own origin.
 - `frontend/src/receipts/qrReader.ts` — A receipt's QR seen from the page: its own worker, the photo read whole, `receiptLinkOfCodes` — the first code that is a Serbian receipt's link by `serbianReceiptLink`, else a refund or a copy said by its reason, else nothing.
@@ -116,7 +122,7 @@ is `receipt_links`, a table the nightly copy leaves out. MOL-289/290 (`0068_rece
 - `frontend/src/receipts/review.ts` — The review as it stands: each line the server's reading with the person's edit over it, «Строки» and the difference by `receiptBalance` of the model (В-6), the place and the day, and the body of «Записать» — every line once.
 - `frontend/src/stores/receiptQueue.ts` — The receipts' queue by the rules of MOL-24: the receipt, its parts in order, removal and «Вернуть», «Записать» under a trip the phone names, and «Отменить запись» of one still waiting (MOL-169); 413/415 and a lost photo «не принят»; «Выйти» waits for it (`whileReceiptsAreStill`).
 - `frontend/src/stores/receiptDrafts.ts` — The edits of a receipt before it is recorded, on the phone and with no connection (Т-9): lines, the place and day, a corrected total; beside them, the item the review showed at each line's first edit (MOL-222).
-- `frontend/src/composables/useReceipts.ts` — The receipts of «Покупки»: the queue and `GET /receipts` as one row each, the phone's state first; asked every five seconds while one is read (Р-4); every list lets the photos and drafts of what it no longer names go.
+- `frontend/src/composables/useReceipts.ts` — The receipts of «Покупки»: the queue and `GET /receipts` as one row each, the phone's state first; asked every five seconds while one is read (Р-4); every list lets the photos and drafts of what it no longer names go; when the list was answered and its failures, for the strip of «Покупки».
 - `frontend/src/composables/useReceipt.ts` — One receipt for the review, kept on the phone for offline; `gone` when the server has none for this person.
 - `frontend/src/composables/useReceiptCapture.ts` — The version «с чеком» (Д-3): the country of the settings, if the server reads its receipts (Р-1) — by photo or by the QR read off the photo (MOL-233); `photoCountry`, the one «Переснять» is for.
 - `frontend/src/composables/useOnline.ts` — Whether the browser believes it is online, now, on every change and when the app comes back into view (MOL-192) — for words said ahead of time, never for a failure.
@@ -135,7 +141,7 @@ is `receipt_links`, a table the nightly copy leaves out. MOL-289/290 (`0068_rece
 - `frontend/src/components/ReceiptPlaceSheet.vue` — «Где купили?»: the place read, the shops of this phone or a new one, and the day; «Записать» with no place opens it.
 - `frontend/src/components/ReceiptTotalSheet.vue` — «Итог чека» put right, in the receipt's currency, into the draft.
 - `frontend/src/views/ReceiptView.vue` — `/purchases/receipts/:id`: the review, «не разобран» with its photos, «уже записан», gone; «Записать N» through the queue, then `router.replace` to the purchases.
-- `e2e/receipt-edges.spec.ts` — Spec of «Края чека» (MOL-222) on a receipt the browser draws on a dark table: the corners found, a corner dragged with its loupe, «Чек мелкий» and «Оставить так», «‹» giving the shot up.
+- `e2e/receipt-edges.spec.ts` — Spec of «Края чека» (MOL-222) on a receipt the browser draws on a dark table: the corners found, a long creased receipt found whole, on odd sides too (MOL-259), a corner dragged with its loupe, «Чек мелкий» and «Оставить так», «‹» giving the shot up.
 - `e2e/receipts-link.spec.ts` — Spec of a Serbian receipt by its link (MOL-232) against the fake tax office, a phone in Belgrade: pasted past the sheet's camera, read, reviewed with the tax office's lines and recorded in dinars at the premises proposed; a damaged link and a refund refused under the field; a link kept with no connection; a receipt not shown yet stays asked.
 - `e2e/receipts-qr.spec.ts` — Spec of a Serbian receipt photographed (MOL-233): a receipt drawn with the tax office's QR at four pixels a module, read on the phone in its worker from «Что брать», the link asked of the fake tax office and reviewed; a photo with no QR and «Вставить ссылку»; a refund's QR said by its reason.
 - `e2e/receipts.spec.ts` — Spec against the fake reader: a receipt from the gallery to the purchases under a place named, «back» to «Покупки»; taken with no connection and kept across a reload; not a photo; four parts and no fifth; «Удалить чек» and «Вернуть».
