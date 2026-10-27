@@ -45,6 +45,8 @@ const ACCOUNTS_M2 = `(SELECT max(greatest("created_at", "archived_at")) FROM "mo
 function migration(tag: string, mutant: boolean): string {
   const file = readFileSync(`${MIGRATIONS}/${tag}.sql`, 'utf8')
   if (!mutant || tag !== '0073_actor_last_seen') return file
+  // the fix of PR #234 (6e45d766) reads the late moments itself: then the mutant is the file as it is
+  if (file.includes('"t"."account_set_at"') && file.includes('greatest("created_at", "archived_at"')) return file
   if (!file.includes(TRIPS) || !file.includes(ACCOUNTS)) {
     throw new Error('0073 changed: the mutant has nothing to replace')
   }
