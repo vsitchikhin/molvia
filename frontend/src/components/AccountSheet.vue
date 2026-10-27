@@ -10,11 +10,10 @@
     }}</template>
     <template #meta>{{ meta }}</template>
 
-    <form class="form" novalidate @submit.prevent="submit">
-      <p v-if="!online" class="strip">
-        <IconCloudOff class="strip-icon" aria-hidden="true" />{{ t('accounts.sheet.offline') }}
-      </p>
+    <!-- First in the sheet (MOL-181), outside the form: a line of the sheet, not a field. -->
+    <StatusStrip v-if="!online" class="status" kind="offline" :text="t('accounts.sheet.offline')" />
 
+    <form class="form" novalidate @submit.prevent="submit">
       <AppField
         ref="nameField"
         v-model="name"
@@ -47,17 +46,23 @@
         <p class="hint">{{ t('accounts.sheet.kind_hint') }}</p>
       </div>
 
-      <AppField
-        ref="startField"
-        v-model="start"
-        :label="t('accounts.balance')"
-        kind="decimal"
-        :error-text="startBad ? t('accounts.sheet.bad_start') : null"
-        enterkeyhint="done"
-        @update:model-value="startBad = false"
-      >
-        <template #suffix>{{ sign(currency) }}</template>
-      </AppField>
+      <!-- «Остаток» is what lies on the account now (Ф-31): the field amends the start, and what the
+           server counts from it stands under it — as recorded, never worked out from what is typed. -->
+      <div>
+        <AppField
+          ref="startField"
+          v-model="start"
+          :label="t(account ? 'accounts.sheet.start_amount' : 'accounts.balance')"
+          kind="decimal"
+          :error-text="startBad ? t('accounts.sheet.bad_start') : null"
+          :aria-describedby="now ? `${id}-now` : undefined"
+          enterkeyhint="done"
+          @update:model-value="startBad = false"
+        >
+          <template #suffix>{{ sign(currency) }}</template>
+        </AppField>
+        <p v-if="now" :id="`${id}-now`" class="hint">{{ now }}</p>
+      </div>
 
       <div>
         <AppField
@@ -85,29 +90,28 @@
         block
         :busy="sending && !removing"
         :busy-label="t('accounts.sheet.saving')"
-        :inactive="removing"
-        :disabled="!online && !sending"
+        :inactive="removing || (!online && !sending)"
         @click="submit"
       >
         <template #icon><IconCheck v-if="online || sending" /><IconCloudOff v-else /></template>
         {{ online ? t('accounts.sheet.save') : t('accounts.sheet.wait_online') }}
       </AppButton>
       <template v-if="account && !account.archivedAt">
+        <!-- «Убрать» loses nothing, so it is quiet; «Удалить» deletes for good (Ф-34 by its pattern). -->
         <AppButton
-          variant="danger-ghost"
+          :variant="account.hasOperations ? 'ghost' : 'danger-ghost'"
           block
           :busy="removing"
           :busy-label="
             t(account.hasOperations ? 'accounts.sheet.archiving' : 'accounts.sheet.deleting')
           "
-          :inactive="sending && !removing"
-          :disabled="!online && !sending"
+          :inactive="(sending && !removing) || (!online && !sending)"
           @click="remove"
         >
           <template #icon>
             <IconArchive v-if="account.hasOperations" /><IconDelete v-else />
           </template>
-          {{ t(account.hasOperations ? 'accounts.sheet.archive' : 'accounts.sheet.delete') }}
+          {{ removeWord(account.hasOperations) }}
         </AppButton>
         <p class="note">
           {{
@@ -120,7 +124,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, nextTick, ref, watch } from 'vue'
+import { computed, defineComponent, nextTick, ref, useId, watch } from 'vue'
 import type { ComponentPublicInstance, PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconArchive from '~icons/mdi/archive-arrow-down-outline'
@@ -144,6 +148,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { parseSigned, shortDay, signedAmount } from '@/components/accounts'
 import { shown } from '@/composables/useItemDetails'
 import { calendarDay, localDay, shiftDay } from '@/days'
@@ -179,6 +184,7 @@ export default defineComponent({
     IconDelete,
     IconLock,
     SegmentedControl,
+    StatusStrip,
   },
   props: {
     open: { type: Boolean, required: true },
@@ -197,6 +203,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t, locale } = useI18n()
     const store = useAccountsStore()
+    const id = useId()
 
     const name = ref('')
     const currency = ref<Currency>('AMD')
@@ -254,18 +261,31 @@ export default defineComponent({
 
     /** The one the screen holds now — after a conflict, the version another device wrote. */
     /**
-     * The account amended — the page's version where the page has it, the one the sheet was opened
-     * on where it has not (a screen opened cold, the page not read): an amendment is decided by
-     * what was opened, never by what the page happens to hold (review 23, adversarial Б).
+     * The account amended — the page's version where the page is an answer of this session, the one
+     * the sheet was opened on otherwise (a screen opened cold, the page not read): an amendment is
+     * decided by what was opened, never by what the page happens to hold (review 23, adversarial Б).
+     * A page kept from an earlier launch is no answer: the screen under the sheet prints the journal
+     * then, and the sheet spoke of yesterday's balance and lock over it (MOL-196, adversarial А1).
      */
-    const current = computed(() =>
-      props.account
-        ? (store.accounts.find(({ id }) => id === props.account?.id) ?? props.account)
-        : null,
-    )
+    const current = computed(() => {
+      const opened = props.account
+      if (!opened) return null
+      const page = store.stale === null ? store.accounts.find(({ id }) => id === opened.id) : null
+      return page ?? opened
+    })
     const locked = computed(() => current.value?.hasOperations === true)
     /** The account's own currency — never the one typed before the lock came (adversarial Ж). */
     const lockedCurrency = computed(() => current.value?.currency ?? currency.value)
+
+    /**
+     * «сейчас …»: the balance the server counted, printed as the account's screen prints it (Р-1) —
+     * as recorded, in the account's currency too while another is chosen (owner's «б», Р1-1).
+     */
+    const now = computed(() => {
+      const held = current.value
+      if (!held) return null
+      return t('accounts.sheet.start_now', { amount: signedAmount(held.balance, locale.value) })
+    })
 
     const meta = computed(() => {
       const account = current.value
@@ -298,6 +318,13 @@ export default defineComponent({
         return t('spending.sheet.date_yesterday', { date })
       return date
     })
+
+    /** Not now offline says why on itself (Ф-6, owner's В-1 «а»), as «Сохранить» does. */
+    function removeWord(archives: boolean): string {
+      if (!props.online)
+        return t(archives ? 'accounts.sheet.archive_offline' : 'accounts.sheet.delete_offline')
+      return t(archives ? 'accounts.sheet.archive' : 'accounts.sheet.delete')
+    }
 
     /** «Сейчас записано»: the version the other device wrote, so the next save is not blind. */
     function currentOf(account: MoneyAccountView): string {
@@ -463,6 +490,8 @@ export default defineComponent({
 
     return {
       t,
+      id,
+      now,
       name,
       nameMax: MONEY_ACCOUNT_NAME_MAX,
       currency,
@@ -486,6 +515,7 @@ export default defineComponent({
       currencyName,
       currencyOptions,
       currentOf,
+      removeWord,
       nameField,
       startField,
       submit,
@@ -497,29 +527,15 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* The panel's gap is 16: with 8 more the strip stands 24 over the first field, as the fields do. */
+.status {
+  margin-bottom: var(--space-2);
+}
+
+/* 24 between the fields, 8 within one — the label, the field, its hint (Ф-10). */
 .form {
   display: grid;
-  gap: var(--space-4);
-}
-
-.strip {
-  @include appear;
-
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--warn-tint);
-  color: var(--warn-ink);
-  font-size: var(--text-footnote);
-}
-
-.strip-icon {
-  @include icon;
-
-  font-size: var(--icon-sm);
+  gap: var(--space-6);
 }
 
 .hint,

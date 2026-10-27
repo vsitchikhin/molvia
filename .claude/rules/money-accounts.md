@@ -367,6 +367,21 @@ balance, total and difference is the server's.
   «Деньги» does — an account opened from a line of the card stepped back to «Деньги», and its
   «Вернуть», which stands on «Счета», was nowhere (review 32).
   «Вернуть» of a deleted account goes with the answer, never with the tap; 404 is «too late».
+  **In an amendment the field is the start, «Было на старте», and under it «сейчас …» is the server's
+  balance** (MOL-196, Ф-31): «Остаток» means one thing — what lies on the account now — and the field
+  amends what it held at the start; a new account keeps «Остаток», its start being what it holds. The
+  line is the sheet's version of the account (`current`) — the page where it is an answer of this
+  session, else the one the screen opened it on: a page kept from an earlier launch spoke of
+  yesterday's balance over a card printing today's journal (adversarial А1), and the lock and the meta
+  go by the same version as the footer (А1б). After a conflict it is the balance of the version read
+  again, printed as the account's screen prints it — no «≈», no colour — and is the field's
+  description. **The price, named:** it is never worked out from what is typed — the phone adds
+  nothing up — so 8 920 → 9 000 typed leaves «сейчас 8 470,12 $» until «Сохранить», and on an account
+  with no operations another currency chosen leaves it in the old one: «$» at the field, «сейчас 5 405 ₽»
+  under it (owner's «б» on self-review Р1-1, adversarial А2); «сейчас» says it is what is recorded. **Offline the kit's `StatusStrip` is the sheet's first line, outside the form**, and
+  every button is not now in the focus order saying why on itself (Ф-6, owner's В-1 «а»): «Сохраним /
+  Удалим / Уберём, когда будет связь». **«Убрать из выбора» is a ghost, «Удалить счёт» danger-ghost**:
+  taken out of the choice an account loses nothing (Ф-34 by its pattern).
 - **A removed account's screen says so and offers «Вернуть» where «Сверить» stands** (owner's decision
   В-2); its sheet offers no «Убрать». «Все ›» stands while there is any account, a removed one too.
 - **The account's actions are its docked strip** (MOL-194, owner's В-1 «б» of 26.10.2026 over the

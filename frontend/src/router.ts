@@ -305,5 +305,6 @@ export const scrollBehavior: RouterScrollBehavior = (to, from, saved) => {
 export const router = createRouter({
   history: createWebHistory(),
   routes,
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- its replacement is still vue-router/experimental
   scrollBehavior,
 })
