@@ -243,23 +243,102 @@ describe('TripTotalCard', () => {
     expect(view.text()).toContain(ru.trip.caveat.local)
   })
 
-  it('с суммой чека — «Итого по чеку» и разбивка сервера вместо счёта позиций', () => {
-    const view = card({
-      trip: trip({
-        total: [amd('12400')],
+  // MOL-207, Ф-23: what the prices say beside a receipt's sum is parts of the one line, no column.
+  describe('сумма по чеку — частями строки (MOL-207)', () => {
+    const receipt = (over: Over) =>
+      card({
+        trip: trip({
+          converted: null,
+          rate: null,
+          total: over.receipt ? [over.receipt] : [],
+          ...over,
+        }),
+      })
+
+    it('«Итого по чеку» крупно; под ним цены, сколько с ценой и что без цены — суммы сервера', () => {
+      const view = receipt({
         receipt: amd('12400'),
         prices: [amd('8300')],
         gap: { kind: 'unpriced', amount: amd('4100') },
-        converted: null,
         rows: [amd('8300'), null],
-      }),
+      })
+      expect(view.get('.caption').text()).toBe(ru.trip.receipt.total)
+      expect(plain(view.get('.sum'))).toBe('12 400 ֏')
+      expect(parts(view)).toEqual(['по ценам 8 300 ֏ — 1 из 2', 'без цены — 4 100 ֏'])
+      // «С ценой — n из m» of the record is not said twice beside it.
+      expect(plain(view)).not.toContain('С ценой')
+      expect(view.find('.split').exists()).toBe(false)
     })
-    expect(view.get('.caption').text()).toBe(ru.trip.receipt.total)
-    expect(parts(view).some((part) => part.startsWith('С ценой'))).toBe(false)
-    expect(view.findAll('.split-line').map((line) => line.findAll('span').map(plain))).toEqual([
-      ['С ценой — 1 из 2', '8 300 ֏'],
-      ['Без цены — 1', '4 100 ֏'],
-    ])
+
+    it('цены сошлись с чеком — «с чеком сходится»', () => {
+      const view = receipt({ receipt: amd('5633'), prices: [amd('5633')], rows: [amd('5633')] })
+      expect(parts(view)).toEqual(['по ценам 5 633 ֏', 'с чеком сходится'])
+    })
+
+    it('цены больше чека — «чек меньше цен», без слова «скидка» и без плашки (В-1 «а»)', () => {
+      const view = receipt({
+        receipt: amd('9870'),
+        prices: [amd('10070')],
+        gap: { kind: 'over', amount: amd('200') },
+        rows: [amd('10070')],
+      })
+      expect(parts(view)).toEqual(['по ценам 10 070 ֏', 'чек меньше цен на 200 ֏'])
+      expect(plain(view)).not.toContain('скидк')
+      expect(view.find('.warn').exists()).toBe(false)
+    })
+
+    it('чек больше цен, все с ценой — «чек больше цен»', () => {
+      const view = receipt({
+        receipt: amd('8200'),
+        prices: [amd('8000')],
+        gap: { kind: 'under', amount: amd('200') },
+        rows: [amd('8000')],
+      })
+      expect(parts(view)).toEqual(['по ценам 8 000 ֏', 'чек больше цен на 200 ֏'])
+    })
+
+    it('цены в другой валюте — суммы цен, и ни слова о сходстве: вычесть нельзя', () => {
+      const view = receipt({
+        receipt: amd('8200'),
+        prices: [amd('8000'), { amount: '20', currency: 'USD' }],
+        rows: [amd('8000'), { amount: '20', currency: 'USD' }],
+      })
+      expect(parts(view)).toEqual(['по ценам 8 000 ֏ + 20 $'])
+    })
+
+    it('ни одной цены — так и сказано, сумма без цены не повторяет итог', () => {
+      const view = receipt({
+        receipt: amd('8200'),
+        gap: { kind: 'unpriced', amount: amd('8200') },
+        rows: [null, null],
+      })
+      expect(parts(view)).toEqual([ru.trip.receipt.line_none])
+    })
+
+    it('сумма без покупок — ни слова о ценах, которых нет', () => {
+      expect(parts(receipt({ receipt: amd('1700') }))).toEqual([])
+    })
+
+    it('с курсом — части чека, затем «≈» и курс; ни одного числа без слова', () => {
+      const view = card({
+        trip: trip({
+          total: [amd('9870')],
+          receipt: amd('9870'),
+          prices: [amd('10070')],
+          gap: { kind: 'over', amount: amd('200') },
+          rows: [amd('10070')],
+          converted: { amount: '2328', currency: 'RUB' },
+        }),
+      })
+      expect(parts(view)).toEqual([
+        'по ценам 10 070 ֏',
+        'чек меньше цен на 200 ֏',
+        '≈ 2 328 ₽',
+        'курс 4,82 ֏/₽',
+        '15 янв.',
+      ])
+      for (const part of parts(view)) expect(part, part).toMatch(/[а-яё≈]/iu)
+    })
   })
 
   it('в карточке нет «+ Сумма по чеку» — кнопка стоит под ней; сумма в очереди — строкой', () => {

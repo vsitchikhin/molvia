@@ -132,7 +132,7 @@ describe('FinishedTripView: «Сумма по чеку» (MOL-78)', () => {
     await otherWindowWrites(finished)
 
     expect(view.text()).toContain(ru.trip.receipt.total)
-    expect(view.text()).toContain('Без цены — 1')
+    expect(view.text().replaceAll('\u00a0', ' ')).toContain('без цены — 830 ֏')
     expect(view.text()).toContain(ru.trip.receipt.edit)
     expect(view.text()).not.toContain(ru.trip.receipt.add)
     // Nothing was asked again from here: two windows on one trip would ask each other in a circle.
@@ -161,7 +161,7 @@ describe('FinishedTripView: «Сумма по чеку» (MOL-78)', () => {
     trip.mockResolvedValue(finished)
     const view = await render()
     expect(view.text()).toContain(ru.trip.receipt.total)
-    expect(view.text()).toContain('Без цены — 1')
+    expect(view.text().replaceAll('\u00a0', ' ')).toContain('без цены — 830 ֏')
     expect(view.text()).toContain(ru.trip.receipt.edit)
   })
 })

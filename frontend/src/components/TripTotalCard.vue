@@ -22,7 +22,8 @@
       <!-- Money paid in another currency — and, flipped, the exact sum — under the figure on a line of
            its own: beside «≈» in the same currency it read «1 000 ₽ ≈ 1 347 ₽» (adversarial А4). -->
       <span v-if="rest.length > 0" class="line">{{ rest.join(' · ') }}</span>
-      <!-- One line of parts, every figure the strip had, each with its words (MOL-206, Ф-23). -->
+      <!-- One line of parts, every figure with its words (Ф-23): what the prices say beside a receipt's
+           sum (MOL-207), how much has a price, «≈» and the rate. -->
       <span v-if="parts.length > 0" class="line">
         <template v-for="(part, index) in parts" :key="part">
           <template v-if="index > 0"> · </template>
@@ -30,13 +31,6 @@
         </template>
       </span>
       <span v-if="caveat" class="note">{{ caveat }}</span>
-      <!-- What the prices say beside the receipt's sum (MOL-78, В-2): every figure the server's. -->
-      <span v-if="split.length > 0" class="split">
-        <span v-for="line in split" :key="line.key" class="split-line" :class="{ warn: line.warn }">
-          <span>{{ line.label }}</span>
-          <span v-if="line.amount" class="amount">{{ line.amount }}</span>
-        </span>
-      </span>
       <span v-if="waiting" class="note waiting">{{ waiting }}</span>
     </component>
   </AppCard>
@@ -53,10 +47,10 @@ import { useTripTotal } from '@/composables/useTripTotal'
 
 /**
  * «ИТОГО 1 000 ֏ · С ценой — 1 из 2 · без цены — 1 · ≈ 236 ₽ · курс 4,24 ֏/₽ · 27 окт.» — the total
- * of the record typed by hand as a card under its list (MOL-206, handoff 7a, owner's В-17 «а»). The
- * strip went to the actions (Ф-22); what it said stays, every figure the server's (`useTripTotal`):
- * the other currencies, how much of the list has a price, «≈» in the income currency and the rate,
- * the caveats, and with a receipt's sum what the prices say beside it.
+ * of a record as a card under its list: the one typed by hand (MOL-206, handoff 7a, owner's В-17 «а»)
+ * and the finished one (MOL-207, Ф-23). Every figure the server's (`useTripTotal`): the other
+ * currencies, how much of the list has a price, «≈» in the income currency and the rate, the caveats,
+ * and with a receipt's sum what the prices say beside it — one line of parts, no column.
  *
  * **The card holds no other control**: «+ Сумма по чеку» stands under it on the screen — a button in
  * a button is no HTML, and the whole card is the flip.
@@ -94,7 +88,7 @@ export default defineComponent({
      * locale, and `TripTotal.test.ts` holds both dictionaries to it (review 4, №1).
      */
     const parts = computed(() =>
-      [total.priced.value, total.estimate.value, total.rateLine.value]
+      [...total.receiptParts.value, total.priced.value, total.estimate.value, total.rateLine.value]
         .filter((part): part is string => part !== null)
         .flatMap((part) => part.split(' · '))
         .map((part) => part.replaceAll(' ', '\u00a0')),
@@ -106,7 +100,6 @@ export default defineComponent({
       rest: total.rest,
       parts,
       caveat: total.caveat,
-      split: total.split,
       waiting: total.waiting,
       flippable: total.flippable,
       flipped: total.flipped,
@@ -158,8 +151,7 @@ export default defineComponent({
 }
 
 .line,
-.note,
-.split {
+.note {
   color: var(--text-muted);
   font-size: var(--text-footnote);
   font-variant-numeric: tabular-nums;
@@ -174,32 +166,6 @@ export default defineComponent({
    rate named with its bank once stood past it on every phone (review 2, №1). */
 .part {
   overflow-wrap: anywhere;
-}
-
-.split {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  margin-top: var(--space-1);
-}
-
-.split-line {
-  display: flex;
-  gap: var(--space-3);
-  justify-content: space-between;
-
-  &.warn {
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
-    background: var(--warn-tint);
-    color: var(--warn-ink);
-  }
-}
-
-.amount {
-  color: var(--text);
-  font-weight: var(--weight-medium);
-  white-space: nowrap;
 }
 
 .hidden {

@@ -39,14 +39,6 @@ export interface TripTotalInput {
   readonly rows?: { readonly kept: number; readonly unpriced: number } | null
 }
 
-/** One line of what the prices say beside the receipt's sum. */
-export interface SplitLine {
-  readonly key: string
-  readonly label: string
-  readonly amount: string | null
-  readonly warn: boolean
-}
-
 export interface TripTotal {
   readonly big: ComputedRef<string>
   readonly rest: ComputedRef<string[]>
@@ -57,7 +49,7 @@ export interface TripTotal {
   readonly flippable: ComputedRef<boolean>
   readonly flipped: Ref<boolean>
   readonly flip: () => void
-  readonly split: ComputedRef<SplitLine[]>
+  readonly receiptParts: ComputedRef<string[]>
   readonly waiting: ComputedRef<string | null>
 }
 
@@ -79,10 +71,10 @@ export interface TripTotal {
  * **Only the trip's own currency is converted.** A purchase paid for in another is its own line
  * under the total: adding two currencies is refused by the domain and meaningless on a screen.
  *
- * **With a receipt's sum the big number is the receipt** (MOL-78, В-2): «Итого по чеку», and under
- * it what the prices say — how many purchases have one and what they came to, what the rest came
- * to, or by how much the prices miss the receipt. Those figures are the server's (`prices`, `gap`);
- * the phone only counts the rows with a price among the rows the server sent. A sum still in the
+ * **With a receipt's sum the big number is the receipt** (MOL-78, В-2): «Итого по чеку», and in the
+ * line under it what the prices say — what they came to and for how many purchases, what the rest came
+ * to, or by how much the prices miss the receipt (MOL-207). Those figures are the server's (`prices`,
+ * `gap`); the phone only counts the rows with a price among the rows the server sent. A sum still in the
  * queue is a line of its own, never the total (MOL-82's rule).
  */
 export function useTripTotal(props: TripTotalInput): TripTotal {
@@ -201,37 +193,34 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
   // Nothing to swap without a conversion: a lone total is not two numbers.
   const flippable = computed(() => converted.value !== null)
 
-  const split = computed(() => {
+  /**
+   * «по ценам 10 070 ֏ · чек меньше цен на 200 ֏» — what the prices say beside the receipt's sum, as parts
+   * of the card's one line (MOL-207, Ф-23): every figure the server's (`prices`, `gap`), each with its
+   * words; the phone only counts the rows with a price among those the server sent. The column of
+   * «С ценой / Без цены / Цены больше чека» went with the strip.
+   *
+   * **Prices more than the receipt are said as they are** (owner's В-1 «а»): «чек меньше цен» — a
+   * discount on the receipt and a price typed wrong look alike to the phone, and «скидка» about a typo
+   * would be a figure made up. **Agreeing is said only where it was measured**: the prices in the
+   * receipt's own currency, one sum, and no gap — two currencies do not subtract (`receiptGap`).
+   */
+  const receiptParts = computed(() => {
     const trip = props.trip
-    if (!trip?.receipt) return []
+    if (!trip?.receipt || trip.expenses.length === 0) return []
     const all = trip.expenses.length
     const priced = trip.expenses.filter((expense) => expense.amount !== null).length
-    const lines: SplitLine[] = []
-    if (priced > 0 && trip.prices.length > 0) {
-      lines.push({
-        key: 'priced',
-        label: t('trip.receipt.priced', { n: priced, total: all }),
-        amount: trip.prices.map((value) => money(value)).join(' · '),
-        warn: false,
-      })
-    }
+    if (trip.prices.length === 0) return [t('trip.receipt.line_none')]
+    const amount = trip.prices.map((value) => money(value)).join(' + ')
+    const parts = [
+      priced < all
+        ? t('trip.receipt.line_prices_part', { amount, n: priced, total: all })
+        : t('trip.receipt.line_prices', { amount }),
+    ]
     const gap = trip.gap
-    if (gap?.kind === 'unpriced') {
-      lines.push({
-        key: 'unpriced',
-        label: t('trip.receipt.unpriced', { n: all - priced }),
-        amount: money(gap.amount),
-        warn: false,
-      })
-    } else if (gap) {
-      lines.push({
-        key: gap.kind,
-        label: t(`trip.receipt.${gap.kind}`, { amount: money(gap.amount) }),
-        amount: null,
-        warn: gap.kind === 'over',
-      })
-    }
-    return lines
+    if (gap) parts.push(t(`trip.receipt.line_${gap.kind}`, { amount: money(gap.amount) }))
+    else if (trip.prices.length === 1 && trip.prices[0]?.currency === trip.receipt.currency)
+      parts.push(t('trip.receipt.line_meets'))
+    return parts
   })
 
   const waiting = computed(() => {
@@ -252,7 +241,7 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
     flippable,
     flipped,
     flip,
-    split,
+    receiptParts,
     waiting,
   }
 }
