@@ -13,6 +13,7 @@
     "rename-items": "tsx src/rename-receipt-items-cli.ts",
     "gates": "tsx src/gates-cli.ts",
     "failures": "tsx src/failures-cli.ts",
+    "receipt-misses": "tsx src/receipt-misses-cli.ts",
     "merge": "tsx src/merge-cli.ts",
     "notify": "tsx src/notify-cli.ts",
     "bundle": "node ../bin/bundle.mjs backend",
