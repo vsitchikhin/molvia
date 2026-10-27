@@ -6,7 +6,8 @@
 
 import { cardRate, rememberedLines } from '#model/entities/receipt-remembered'
 import type { RememberedPrices } from '#model/entities/receipt-remembered'
-import { DEPARTMENT, TOLERANCE_HUNDREDTHS } from '#model/entities/receipt-text'
+import { DEPARTMENT, TOLERANCE_HUNDREDTHS, paidByOf } from '#model/entities/receipt-text'
+import type { ReceiptPaidBy } from '#model/entities/receipt'
 import type { PhotoReading } from '#model/entities/receipt-card'
 import type { ReceiptText, ReceiptTextLine, TextRow } from '#model/entities/receipt-text'
 import { z } from 'zod'
@@ -676,6 +677,21 @@ export function receiptTextOfModel(
     redeemedHundredths: redeemed,
     lines,
   }
+}
+
+/**
+ * How the model's summary says the receipt was paid (MOL-312): its rows as copied, each word beside its amount —
+ * the rule Tesseract's readings are read by (`paidByOf`).
+ */
+export function modelPaidBy(reading: PhotoReading, written: ModelReceipt): ReceiptPaidBy | null {
+  const { answer } = canonicalAnswer(reading, written)
+  return paidByOf(
+    reading,
+    answer.totals.map(({ label, amount }) => ({
+      text: label,
+      amounts: [figureOf(amount, 2) ?? 0],
+    })),
+  )
 }
 
 /** The head the model read as rows of a reading: where `receiptCityOf` looks for the city. */

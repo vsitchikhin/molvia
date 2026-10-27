@@ -8,6 +8,7 @@ import {
   receiptCountrySchema,
   receiptFailureSchema,
   receiptMatchSchema,
+  receiptPaidBySchema,
   receiptStatusSchema,
   receiptViaSchema,
 } from '#model/entities/receipt'
@@ -193,10 +194,6 @@ export const receiptDuplicateCodec = z.strictObject({
   tripId: z.uuid(),
   recordedAt: isoDate,
 })
-
-/** How a receipt was paid (MOL-312): `cash` — «Կանխիկ», `card` — «Անկանխիկ». */
-export const receiptPaidBySchema = z.enum(['cash', 'card'])
-export type ReceiptPaidBy = z.infer<typeof receiptPaidBySchema>
 
 /**
  * One receipt with its lines, in the order printed, and what the review needs beside them: the rate
