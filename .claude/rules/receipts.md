@@ -1833,14 +1833,17 @@ edition 4 says.
 **The person's copy says it** (`receiptReviews`, version 24, self-review №4): which receipt, the link while
 there is one, when it was read and by what, until when it is kept, whether a retake replaced it and why it was
 not whole — never the photo or what was read. **`make receipt-miss` writes out of the working directory** — a
-directory `receipt-miss-<id>` under a root, `.scratch/receipts/misses/` from the make target and the system's
-temporary one from the command itself (self-review №1, adversarial А5): a person's photo and purchases never
+directory `receipt-miss-<id>` under a root, `.scratch/receipts/misses/copy-<CLONE_INDEX>/` from the make target and the
+system's temporary one from the command itself (self-review №1, adversarial А5): a person's photo and purchases never
 stand in the public repository's tree, nor fail on the API image's `/app`; `receipt-miss-*/` is ignored besides.
 **`forget --yes` lets the copies under its root go with the rows** (adversarial Б2), **and every copy there whose
 review the database no longer keeps** — gone by its 21 days or with its person (Б3): a copy must not outlive what it
-was copied from. Only the root's own `receipt-miss-<id>` directories: copies brought from production lie under
-`prod/`, which a copy's database cannot judge, and are the review's to delete by hand, as one written by `--out` —
-the README of receipts says how.
+was copied from. **The root is one database's** (round 4, В1б): `.scratch` is one for every working copy and each has
+a database of its own, so a shared root let one copy's `forget` delete the copies another still reviewed — hence
+`copy-<CLONE_INDEX>`, as the ports are. **The dry run names the copies `--yes` would delete** (В1а): it is the one guard
+of a command that deletes, and it named the rows alone. Only the root's own `receipt-miss-<id>` directories: copies
+brought from production lie under `prod/`, which no copy's database can judge, and are the review's to delete by hand,
+as one written by `--out` — the README of receipts says how.
 
 **Told** — `receipt_partial` in `owner_notices`, after the reading is written, and only then (a receipt removed
 or taken meanwhile is nothing to tell of, self-review №7): the country, lines found and with figures, the
