@@ -566,18 +566,17 @@ export default defineComponent({
       return same ? undefined : paid
     }
     /**
-     * A sum typed in the same sheet goes first and takes «Списано» off on the server (MOL-78, Р-32 MOL-115): what
-     * the sheet showed beside it is sent again after it — the field as typed, or the record's own where no field
-     * was on screen (adversarial А9).
+     * A sum typed in the same sheet goes first and takes «Списано» off on the server (MOL-78, Р-32 MOL-115): the
+     * field the sheet showed beside it is sent again after it (adversarial А9). With no field on screen nothing
+     * is put back — the figure covered the money before the sum, and the sum takes it off, as on the server
+     * (review Р4-1).
      */
     function paymentAfterSum(paid: TripPaymentBody | undefined): TripPaymentBody | undefined {
       const held = heldPayment
       if (paid === undefined || held?.accountId !== paid.accountId || !held.debited) {
         return changedPayment(paid)
       }
-      return !charged.value || !account.value
-        ? { accountId: paid.accountId, debited: held.debited }
-        : paid
+      return charged.value && account.value ? paid : changedPayment(paid)
     }
     /** The trip's payment: none for «Без счёта», which the record already is. */
     function paymentBody(): TripPaymentBody | 'bad' | undefined {

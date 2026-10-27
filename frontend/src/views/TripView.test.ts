@@ -1165,6 +1165,13 @@ describe('TripView', () => {
       clock += 1000
     }
     const row = () => openSheets()[0]?.querySelector<HTMLButtonElement>('.account .row')
+    async function typeSum(value: string): Promise<void> {
+      const sum = openSheets()[0]?.querySelector<HTMLInputElement>('input[data-field="receipt"]')
+      if (!sum) throw new Error('нет поля суммы')
+      sum.value = value
+      sum.dispatchEvent(new Event('input'))
+      await flushPromises()
+    }
     async function choose(name: string): Promise<void> {
       row()?.click()
       await flushPromises()
@@ -1348,7 +1355,8 @@ describe('TripView', () => {
       })
     })
 
-    it('сумма по чеку, а поля «Списано» нет — уходит «Списано» записи, после суммы (А9)', async () => {
+    it('«не должно сработать»: сумма по чеку, а поля «Списано» нет — его не возвращают (Р4-1)', async () => {
+      // the record's own currency, «Списано» for a purchase in a third one: the sum takes it off, as on the server
       currentTrip.mockResolvedValue({
         ...trip([...handoff(), { id: BREAD, name: 'Хлеб' }]),
         accountId: card.id,
@@ -1356,17 +1364,29 @@ describe('TripView', () => {
       })
       const { view, queue } = await render()
       await askFinish(view)
-      const sum = openSheets()[0]?.querySelector<HTMLInputElement>('input[data-field="receipt"]')
-      if (!sum) throw new Error('нет поля суммы')
-      sum.value = '12 400'
-      sum.dispatchEvent(new Event('input'))
-      await flushPromises()
+      await typeSum('12 400')
       inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
       await flushPromises()
-      expect(queue.pending[1]).toMatchObject({
-        kind: 'payment',
-        body: { accountId: card.id, debited: parseMoney('41000', 'AMD') },
+      expect(queue.pending.map((write) => write.kind)).toEqual(['receipt', 'finish'])
+    })
+
+    it('«не должно сработать»: сумма по чеку, а счёта записи телефон не знает — платежа нет (Р4-1)', async () => {
+      localStorage.setItem(
+        `molvia.accounts.${ME}`,
+        JSON.stringify({ overview: moneyAccountsCodec.encode(page([cash, card])) }),
+      )
+      moneyAccounts.mockReturnValue(new Promise(() => undefined))
+      currentTrip.mockResolvedValue({
+        ...trip([...handoff(), { id: BREAD, name: 'Хлеб' }]),
+        accountId: roubles.id,
+        debited: parseMoney('1100', 'RUB'),
       })
+      const { view, queue } = await render()
+      await askFinish(view)
+      await typeSum('15 000')
+      inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      expect(queue.pending.map((write) => write.kind)).toEqual(['receipt', 'finish'])
     })
 
     it('«Счета» читаются при «Закончить», а не при каждом открытии записи (Р1-2)', async () => {
