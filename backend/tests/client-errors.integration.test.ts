@@ -3,7 +3,7 @@
  * the page's own build and platform, refused past the schema and past the limit, and the address
  * the limit counts by is written nowhere.
  */
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import {
   ERROR,
@@ -323,6 +323,73 @@ describe('поток выдуманных сбоев не топит канал 
     expect(kinds).toContainEqual({ kind: 'failure_muted', source: 'phone', count: 1 })
     await reporter.tellHeld(new Date())
     expect(await db.select().from(ownerNotices)).toHaveLength(PHONE_NOTICES_PER_SENDER + 1)
+  })
+
+  it('без владельца адрес отправителя уходит из памяти через час (MOL-241)', async () => {
+    // The budgets' Maps, caught by their `set`, as adversarial А3 of MOL-97 did.
+    const spy = vi.spyOn(Map.prototype, 'set')
+    const kept = (sender: string) =>
+      (spy.mock.contexts as Map<unknown, unknown>[]).some((map) => map.has(sender))
+    try {
+      const reporter = apiFailureReporter(
+        () => db,
+        null,
+        app.log,
+        (recording) => recordings.push(recording),
+      )
+      reporter.take(
+        { errorName: 'Forgotten', frames: ['at Xe (/assets/index-BTCsHrpw.js:1:1)'] },
+        { source: 'phone', route: 'screen:advice', platform: 'ios 18 app' },
+        'index-BTCsHrpw',
+        '203.0.113.7',
+      )
+      await recorded()
+      const now = Date.now()
+      reporter.forget(new Date(now + 30 * 60 * 1000))
+      expect(kept('203.0.113.7')).toBe(true)
+      reporter.forget(new Date(now + 61 * 60 * 1000))
+      expect(kept('203.0.113.7')).toBe(false)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('минутный таймер сервера отпускает адрес: минута маршрута, строки и уведомления (MOL-241)', async () => {
+    const spy = vi.spyOn(Map.prototype, 'set')
+    const kept = (sender: string) =>
+      (spy.mock.contexts as Map<unknown, unknown>[]).some((map) => map.has(sender))
+    // Only the intervals and the clock: the server's timers tick when the test moves them, and the
+    // budgets read the moment of the fake clock (`new Date()`), the route `Date.now()`.
+    vi.useFakeTimers({ toFake: ['setInterval', 'Date'] })
+    const served = buildServer({
+      db,
+      owner: null,
+      failureRecorded: (recording) => recordings.push(recording),
+      logStream: { write: () => true },
+    })
+    try {
+      await served.ready()
+      const response = await served.inject({
+        method: 'POST',
+        url: '/client-errors',
+        headers: { 'x-forwarded-for': '203.0.113.7' },
+        payload: { reports: [REPORT] },
+      })
+      expect(response.statusCode).toBe(204)
+      await recorded()
+      // Half an hour on, one tick: the route's minute is gone, the hour of the budgets is not.
+      vi.setSystemTime(Date.now() + 30 * 60_000)
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(kept('203.0.113.7')).toBe(true)
+      // An hour and more on, one tick: nothing of the address is left.
+      vi.setSystemTime(Date.now() + 30 * 60_000)
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(kept('203.0.113.7')).toBe(false)
+    } finally {
+      await served.close()
+      vi.useRealTimers()
+      spy.mockRestore()
+    }
   })
 
   it('сбой API после потока — в первой выдаче бота, раньше телефона', async () => {

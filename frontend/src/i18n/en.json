@@ -1769,7 +1769,7 @@
     },
     "failures": {
       "title": "App failures",
-      "text": "When something in the app breaks, the phone sends the developer the kind of error, the screen it happened on, the app version and the phone’s system — none of your data: not what you typed, not your purchases, not your account. The phone’s address is not recorded in the database, but for now it stays in the server’s memory until the server restarts — this is a bug, and we are fixing it. With no connection it waits on the phone. Kept for 30 days."
+      "text": "When something in the app breaks, the phone sends the developer the kind of error, the screen it happened on, the app version and the phone’s system — none of your data: not what you typed, not your purchases, not your account. The phone’s address is not recorded in the database: the server keeps it in memory for an hour after the last failure sent from that address, so that no single address can send too many. With no connection it waits on the phone. Kept for 30 days."
     },
     "backups": {
       "title": "Where the data and its copies are",
