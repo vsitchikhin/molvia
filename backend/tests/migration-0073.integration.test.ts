@@ -12,8 +12,9 @@ import { expenses } from '@/db/schema'
 
 /**
  * 0073 on a database of people from before it (MOL-238): the last visit is the latest the server knows
- * of each — a session's use, else a record of theirs, else the moment the account appeared — and the
- * fill moves no one's `updated_at`, since the trigger stops seeing the column before it runs.
+ * of each in the app — a session's use, else a record of theirs, the catalogue's included, else the
+ * moment the account appeared; a reply through the bot is none (В-1 «а») — and the fill moves no one's
+ * `updated_at`, since the trigger stops seeing the column before it runs.
  *
  * Its own database, created and dropped here, as in `migration-0061.integration.test.ts`: the chain
  * has to be left one step short of 0073. The owners and the sessions are written by SQL of their own —
@@ -77,6 +78,24 @@ async function session(actorId: string, lastSeenAt: string): Promise<void> {
       ${lastSeenAt}, now() + interval '1 day')`
 }
 
+/** A message from the app's sheet at `at`, the owner's reply a day later — the thread a continuation names. */
+async function messageFromApp(
+  actorId: string,
+  at: string,
+): Promise<{ head: string; reply: string }> {
+  const [head] = await sql<{ id: string }[]>`
+    insert into feedback (actor_id, kind, text, locale, api_build, created_at)
+    values (${actorId}, 'bug', 'Не открывается чек', 'ru', 'test', ${at})
+    returning id`
+  if (head === undefined) throw new Error('no message')
+  const [reply] = await sql<{ id: string }[]>`
+    insert into feedback_replies (feedback_id, actor_id, thread_id, text, created_at)
+    values (${head.id}, ${actorId}, ${head.id}, 'Пришлите фото', ${at}::timestamptz + interval '1 day')
+    returning id`
+  if (reply === undefined) throw new Error('no reply')
+  return { head: head.id, reply: reply.id }
+}
+
 async function seenOf(id: string): Promise<{ seen: string; updated: string }> {
   const [row] = await sql<{ seen: string; updated: string }[]>`
     select last_seen_at as seen, updated_at as updated from actors where id = ${id}`
@@ -131,6 +150,28 @@ describe('0073: the last visit of everyone already there', () => {
     })
     // nothing at all: the moment the account appeared
     const nothing = await owner()
+    // a word to the developer from the app's sheet on the 4th is a visit
+    const fromApp = await owner()
+    await messageFromApp(fromApp, '2026-10-04T08:00:00.000Z')
+    // a reply to the owner in Telegram on the 16th is the bot's, not one (В-1 «а»): the sheet's 4th
+    const inTelegram = await owner()
+    const thread = await messageFromApp(inTelegram, '2026-10-04T08:00:00.000Z')
+    await sql`
+      insert into feedback (actor_id, kind, text, locale, api_build, thread_id, in_reply_to, created_at)
+      values (${inTelegram}, 'bug', 'Вот фото', 'ru', 'test', ${thread.head}, ${thread.reply},
+        '2026-10-16T08:00:00.000Z')`
+    // signed out everywhere, then proposed an item on the 17th, or bound a code to one on the 18th
+    const proposed = await owner()
+    await insertItem(db, {
+      name: 'Сыр «Лори»',
+      searchKey: 'syr lori',
+      createdBy: proposed,
+      createdAt: new Date('2026-10-17T08:00:00.000Z'),
+    })
+    const bound = await owner()
+    await sql`
+      insert into item_barcodes (code, item_id, added_by, added_at)
+      values ('4850001234567', ${milk}, ${bound}, '2026-10-18T08:00:00.000Z')`
     // a trip whose phone's clock ran a year ahead: never later than the migration itself
     const ahead = await owner()
     await insertTrip(db, {
@@ -156,6 +197,10 @@ describe('0073: the last visit of everyone already there', () => {
     })
     expect(await seenOf(noSession)).toEqual({ seen: '2026-10-15T08:00:00.000Z', updated: UPDATED })
     expect(await seenOf(nothing)).toEqual({ seen: CREATED, updated: UPDATED })
+    expect(await seenOf(fromApp)).toEqual({ seen: '2026-10-04T08:00:00.000Z', updated: UPDATED })
+    expect(await seenOf(inTelegram)).toEqual({ seen: '2026-10-04T08:00:00.000Z', updated: UPDATED })
+    expect(await seenOf(proposed)).toEqual({ seen: '2026-10-17T08:00:00.000Z', updated: UPDATED })
+    expect(await seenOf(bound)).toEqual({ seen: '2026-10-18T08:00:00.000Z', updated: UPDATED })
     const capped = await seenOf(ahead)
     expect(new Date(capped.seen).getTime()).toBeLessThanOrEqual(Date.now())
     expect(new Date(capped.seen).getTime()).toBeGreaterThanOrEqual(started - 60_000)
@@ -177,5 +222,5 @@ describe('0073: the last visit of everyone already there', () => {
     expect((await seenOf(nothing)).updated).toBe(UPDATED)
     await sql`update actors set city = 'Ереван' where id = ${nothing}`
     expect((await seenOf(nothing)).updated).not.toBe(UPDATED)
-  }, 30_000)
+  }, 60_000)
 })

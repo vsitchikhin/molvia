@@ -9,8 +9,12 @@ CREATE TRIGGER "actors_touch_updated_at" BEFORE UPDATE ON "actors"
   FOR EACH ROW WHEN ((to_jsonb(OLD) - 'last_seen_at') IS DISTINCT FROM (to_jsonb(NEW) - 'last_seen_at'))
   EXECUTE FUNCTION "set_updated_at"();--> statement-breakpoint
 ALTER TABLE "actors" ADD COLUMN "last_seen_at" timestamp with time zone;--> statement-breakpoint
--- Самое позднее, что сервер знает о человеке: использование сессии, но и записи — сессия отмечает
--- использование раз в сутки и бывает уже удалена. `greatest` пропускает пустые; `least(now())` — на
+-- Самое позднее, что сервер знает о человеке в приложении: использование сессии, но и записи — сессия
+-- отмечает использование раз в сутки и бывает уже удалена; товар и штрихкод в каталоге — тоже его записи.
+-- Бот визитом не считается (В-1 «а»): ответ разработчику в Telegram — продолжение нити (`thread_id`), и
+-- его нет. Цена: оценка кнопкой напоминания двигает `verdicts.updated_at`, а в строке оценки не видно,
+-- откуда она, — без `verdicts` целиком потерялась бы оценка из «Оценок». Перекос — в «позже»: аккаунт
+-- хранится дольше двух лет, а не стирается раньше. `greatest` пропускает пустые; `least(now())` — на
 -- случай момента с телефона, ушедшего вперёд.
 UPDATE "actors" AS "a" SET "last_seen_at" = least(now(), greatest(
   "a"."created_at", "a"."consented_at", "a"."analytics_off_at", "a"."analytics_on_at",
@@ -27,7 +31,9 @@ UPDATE "actors" AS "a" SET "last_seen_at" = least(now(), greatest(
   (SELECT max("created_at") FROM "money_account_checks" WHERE "actor_id" = "a"."id"),
   (SELECT max("created_at") FROM "spending_categories" WHERE "actor_id" = "a"."id"),
   (SELECT max("updated_at") FROM "budget_plans" WHERE "actor_id" = "a"."id"),
-  (SELECT max("created_at") FROM "feedback" WHERE "actor_id" = "a"."id"),
+  (SELECT max("created_at") FROM "feedback" WHERE "actor_id" = "a"."id" AND "thread_id" IS NULL),
+  (SELECT max("created_at") FROM "items" WHERE "created_by" = "a"."id"),
+  (SELECT max("added_at") FROM "item_barcodes" WHERE "added_by" = "a"."id"),
   (SELECT max("last_picked_at") FROM "search_picks" WHERE "actor_id" = "a"."id"),
   (SELECT max("occurred_at") FROM "events" WHERE "actor_id" = "a"."id")
 ));--> statement-breakpoint
