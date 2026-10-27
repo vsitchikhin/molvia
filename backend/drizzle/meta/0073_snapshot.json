@@ -1,5 +1,5 @@
 {
-  "id": "bdee3b51-15a3-4b36-9d20-0c519554156b",
+  "id": "425a3766-a26a-4edd-841e-df31bea42b36",
   "prevId": "4d5bccf8-eaf2-48de-98f5-cf7a708267dd",
   "version": "7",
   "dialect": "postgresql",
@@ -385,6 +385,13 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         },
         "created_at": {
           "name": "created_at",
@@ -3554,13 +3561,6 @@
           "notNull": true,
           "default": 0
         },
-        "added": {
-          "name": "added",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
         "within_5m": {
           "name": "within_5m",
           "type": "integer",
@@ -3605,7 +3605,7 @@
       "checkConstraints": {
         "model_receipt_days_counts_non_negative": {
           "name": "model_receipt_days_counts_non_negative",
-          "value": "least(\"model_receipt_days\".\"read\", \"model_receipt_days\".\"read_partly\", \"model_receipt_days\".\"reshoot\", \"model_receipt_days\".\"no_items\", \"model_receipt_days\".\"unreadable\", \"model_receipt_days\".\"recorded\", \"model_receipt_days\".\"lines\", \"model_receipt_days\".\"lines_edited\", \"model_receipt_days\".\"lines_skipped\", \"model_receipt_days\".\"lines_item\", \"model_receipt_days\".\"lines_figures\", \"model_receipt_days\".\"totals_corrected\", \"model_receipt_days\".\"added\", \"model_receipt_days\".\"within_5m\", \"model_receipt_days\".\"within_15m\", \"model_receipt_days\".\"within_1h\", \"model_receipt_days\".\"within_1d\", \"model_receipt_days\".\"later\") >= 0"
+          "value": "least(\"model_receipt_days\".\"read\", \"model_receipt_days\".\"read_partly\", \"model_receipt_days\".\"reshoot\", \"model_receipt_days\".\"no_items\", \"model_receipt_days\".\"unreadable\", \"model_receipt_days\".\"recorded\", \"model_receipt_days\".\"lines\", \"model_receipt_days\".\"lines_edited\", \"model_receipt_days\".\"lines_skipped\", \"model_receipt_days\".\"lines_item\", \"model_receipt_days\".\"lines_figures\", \"model_receipt_days\".\"totals_corrected\", \"model_receipt_days\".\"within_5m\", \"model_receipt_days\".\"within_15m\", \"model_receipt_days\".\"within_1h\", \"model_receipt_days\".\"within_1d\", \"model_receipt_days\".\"later\") >= 0"
         },
         "model_receipt_days_edited_within_lines": {
           "name": "model_receipt_days_edited_within_lines",
@@ -4573,13 +4573,6 @@
           "notNull": true,
           "default": 0
         },
-        "added": {
-          "name": "added",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
         "within_5m": {
           "name": "within_5m",
           "type": "integer",
@@ -4624,7 +4617,7 @@
       "checkConstraints": {
         "receipt_days_counts_non_negative": {
           "name": "receipt_days_counts_non_negative",
-          "value": "least(\"receipt_days\".\"read\", \"receipt_days\".\"read_partly\", \"receipt_days\".\"reshoot\", \"receipt_days\".\"no_items\", \"receipt_days\".\"unreadable\", \"receipt_days\".\"recorded\", \"receipt_days\".\"lines\", \"receipt_days\".\"lines_edited\", \"receipt_days\".\"lines_skipped\", \"receipt_days\".\"lines_item\", \"receipt_days\".\"lines_figures\", \"receipt_days\".\"totals_corrected\", \"receipt_days\".\"added\", \"receipt_days\".\"within_5m\", \"receipt_days\".\"within_15m\", \"receipt_days\".\"within_1h\", \"receipt_days\".\"within_1d\", \"receipt_days\".\"later\") >= 0"
+          "value": "least(\"receipt_days\".\"read\", \"receipt_days\".\"read_partly\", \"receipt_days\".\"reshoot\", \"receipt_days\".\"no_items\", \"receipt_days\".\"unreadable\", \"receipt_days\".\"recorded\", \"receipt_days\".\"lines\", \"receipt_days\".\"lines_edited\", \"receipt_days\".\"lines_skipped\", \"receipt_days\".\"lines_item\", \"receipt_days\".\"lines_figures\", \"receipt_days\".\"totals_corrected\", \"receipt_days\".\"within_5m\", \"receipt_days\".\"within_15m\", \"receipt_days\".\"within_1h\", \"receipt_days\".\"within_1d\", \"receipt_days\".\"later\") >= 0"
         },
         "receipt_days_edited_within_lines": {
           "name": "receipt_days_edited_within_lines",
@@ -6553,13 +6546,6 @@
           "notNull": true,
           "default": 0
         },
-        "added": {
-          "name": "added",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
         "codes_written": {
           "name": "codes_written",
           "type": "integer",
@@ -6611,7 +6597,7 @@
       "checkConstraints": {
         "tax_receipt_days_counts_non_negative": {
           "name": "tax_receipt_days_counts_non_negative",
-          "value": "least(\"tax_receipt_days\".\"sent_qr\", \"tax_receipt_days\".\"sent_qr_missed\", \"tax_receipt_days\".\"sent_paste\", \"tax_receipt_days\".\"sent_paste_missed\", \"tax_receipt_days\".\"sent_unnamed\", \"tax_receipt_days\".\"read\", \"tax_receipt_days\".\"missing\", \"tax_receipt_days\".\"invalid\", \"tax_receipt_days\".\"empty\", \"tax_receipt_days\".\"unreadable\", \"tax_receipt_days\".\"specs_ok\", \"tax_receipt_days\".\"specs_failed\", \"tax_receipt_days\".\"specs_skipped\", \"tax_receipt_days\".\"lines_coded\", \"tax_receipt_days\".\"recorded\", \"tax_receipt_days\".\"lines\", \"tax_receipt_days\".\"lines_edited\", \"tax_receipt_days\".\"lines_skipped\", \"tax_receipt_days\".\"lines_item\", \"tax_receipt_days\".\"lines_figures\", \"tax_receipt_days\".\"totals_corrected\", \"tax_receipt_days\".\"added\", \"tax_receipt_days\".\"codes_written\", \"tax_receipt_days\".\"within_5m\", \"tax_receipt_days\".\"within_15m\", \"tax_receipt_days\".\"within_1h\", \"tax_receipt_days\".\"within_1d\", \"tax_receipt_days\".\"later\") >= 0"
+          "value": "least(\"tax_receipt_days\".\"sent_qr\", \"tax_receipt_days\".\"sent_qr_missed\", \"tax_receipt_days\".\"sent_paste\", \"tax_receipt_days\".\"sent_paste_missed\", \"tax_receipt_days\".\"sent_unnamed\", \"tax_receipt_days\".\"read\", \"tax_receipt_days\".\"missing\", \"tax_receipt_days\".\"invalid\", \"tax_receipt_days\".\"empty\", \"tax_receipt_days\".\"unreadable\", \"tax_receipt_days\".\"specs_ok\", \"tax_receipt_days\".\"specs_failed\", \"tax_receipt_days\".\"specs_skipped\", \"tax_receipt_days\".\"lines_coded\", \"tax_receipt_days\".\"recorded\", \"tax_receipt_days\".\"lines\", \"tax_receipt_days\".\"lines_edited\", \"tax_receipt_days\".\"lines_skipped\", \"tax_receipt_days\".\"lines_item\", \"tax_receipt_days\".\"lines_figures\", \"tax_receipt_days\".\"totals_corrected\", \"tax_receipt_days\".\"codes_written\", \"tax_receipt_days\".\"within_5m\", \"tax_receipt_days\".\"within_15m\", \"tax_receipt_days\".\"within_1h\", \"tax_receipt_days\".\"within_1d\", \"tax_receipt_days\".\"later\") >= 0"
         },
         "tax_receipt_days_edited_within_lines": {
           "name": "tax_receipt_days_edited_within_lines",

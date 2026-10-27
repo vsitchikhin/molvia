@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  ACCOUNT_SEEN_AFTER_HOURS,
   ERROR,
   SESSION_LIFETIME_DAYS,
   SESSION_TOUCH_AFTER_HOURS,
   actorSchema,
   sessionSchema,
 } from '@molvia/model'
+import type { ActorRepository } from '@/db/actors-repository'
 import type { LiveSession, SessionRepository } from '@/db/sessions-repository'
 import { authenticate } from './authenticate'
 
@@ -25,9 +27,10 @@ const actor = actorSchema.parse({
   updatedAt: new Date('2026-09-16T10:00:00.000Z'),
 })
 
-function live(lastSeenAt: Date): LiveSession {
+function live(lastSeenAt: Date, actorSeenAt: Date = new Date(Date.now() - 3_600_000)): LiveSession {
   return {
     actor,
+    actorSeenAt,
     session: sessionSchema.parse({
       id: SESSION_ID,
       actorId: ACTOR_ID,
@@ -52,13 +55,20 @@ function fakeSessions(overrides: Partial<SessionRepository> = {}): SessionReposi
   }
 }
 
+type Visits = Pick<ActorRepository, 'markSeen'>
+
+/** A visit is not expected unless a test says so: the fresh one must not go to the database. */
+const noVisit: Visits = {
+  markSeen: () => Promise.reject(new Error('markSeen was not expected')),
+}
+
 const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000)
 
 describe('чем запрос доказывает личность', () => {
   it('отдаёт владельца живой сессии', async () => {
     const sessions = fakeSessions({ liveByToken: () => Promise.resolve(live(hoursAgo(1))) })
 
-    await expect(authenticate(sessions, TOKEN)).resolves.toEqual({
+    await expect(authenticate(sessions, noVisit, TOKEN)).resolves.toEqual({
       actor,
       sessionId: SESSION_ID,
       refreshedUntil: null,
@@ -71,9 +81,15 @@ describe('чем запрос доказывает личность', () => {
     // способ подбирать чужое по ответам сервера.
     const sessions = fakeSessions({ liveByToken: () => Promise.resolve(null) })
 
-    await expect(authenticate(sessions, TOKEN)).rejects.toMatchObject({ code: ERROR.NO_ACTOR })
-    await expect(authenticate(sessions, '')).rejects.toMatchObject({ code: ERROR.NO_ACTOR })
-    await expect(authenticate(sessions, 'мусор')).rejects.toMatchObject({ code: ERROR.NO_ACTOR })
+    await expect(authenticate(sessions, noVisit, TOKEN)).rejects.toMatchObject({
+      code: ERROR.NO_ACTOR,
+    })
+    await expect(authenticate(sessions, noVisit, '')).rejects.toMatchObject({
+      code: ERROR.NO_ACTOR,
+    })
+    await expect(authenticate(sessions, noVisit, 'мусор')).rejects.toMatchObject({
+      code: ERROR.NO_ACTOR,
+    })
   })
 })
 
@@ -87,7 +103,7 @@ describe('скользящий срок', () => {
       touch,
     })
 
-    const authenticated = await authenticate(sessions, TOKEN)
+    const authenticated = await authenticate(sessions, noVisit, TOKEN)
 
     expect(touch).not.toHaveBeenCalled()
     expect(authenticated.refreshedUntil).toBeNull()
@@ -101,7 +117,7 @@ describe('скользящий срок', () => {
       touch,
     })
 
-    const authenticated = await authenticate(sessions, TOKEN)
+    const authenticated = await authenticate(sessions, noVisit, TOKEN)
 
     expect(touch).toHaveBeenCalledWith(SESSION_ID, SESSION_TOUCH_AFTER_HOURS, SESSION_LIFETIME_DAYS)
     expect(authenticated.refreshedUntil).toBe(until)
@@ -115,6 +131,60 @@ describe('скользящий срок', () => {
       touch: () => Promise.resolve(null),
     })
 
-    await expect(authenticate(sessions, TOKEN)).resolves.toMatchObject({ refreshedUntil: null })
+    await expect(authenticate(sessions, noVisit, TOKEN)).resolves.toMatchObject({
+      refreshedUntil: null,
+    })
+  })
+})
+
+describe('последний визит (MOL-238)', () => {
+  it('отмечает первый запрос дня, отдельно от срока сессии', async () => {
+    // Вход с нового телефона вчера вечером: сессия свежая, а день аккаунта — нет.
+    const markSeen = vi.fn(() => Promise.resolve(true))
+    const sessions = fakeSessions({
+      liveByToken: () => Promise.resolve(live(hoursAgo(1), hoursAgo(ACCOUNT_SEEN_AFTER_HOURS + 1))),
+    })
+
+    const authenticated = await authenticate(sessions, { markSeen }, TOKEN)
+
+    expect(markSeen).toHaveBeenCalledExactlyOnceWith(ACTOR_ID, ACCOUNT_SEEN_AFTER_HOURS)
+    expect(authenticated.refreshedUntil).toBeNull()
+  })
+
+  it('свежий визит в базу не ходит, даже когда сессия засиделась', async () => {
+    const until = new Date(Date.now() + SESSION_LIFETIME_DAYS * 24 * 3_600_000)
+    const sessions = fakeSessions({
+      liveByToken: () =>
+        Promise.resolve(
+          live(hoursAgo(SESSION_TOUCH_AFTER_HOURS + 1), hoursAgo(ACCOUNT_SEEN_AFTER_HOURS - 1)),
+        ),
+      touch: () => Promise.resolve(until),
+    })
+
+    await expect(authenticate(sessions, noVisit, TOKEN)).resolves.toMatchObject({
+      refreshedUntil: until,
+    })
+  })
+
+  it('пишет визит и после продления, оба раза по одному оператору', async () => {
+    const order: string[] = []
+    const sessions = fakeSessions({
+      liveByToken: () =>
+        Promise.resolve(
+          live(hoursAgo(SESSION_TOUCH_AFTER_HOURS + 1), hoursAgo(ACCOUNT_SEEN_AFTER_HOURS + 1)),
+        ),
+      touch: () => {
+        order.push('touch')
+        return Promise.resolve(null)
+      },
+    })
+    const markSeen = vi.fn(() => {
+      order.push('seen')
+      return Promise.resolve(false)
+    })
+
+    await authenticate(sessions, { markSeen }, TOKEN)
+
+    expect(order).toEqual(['touch', 'seen'])
   })
 })

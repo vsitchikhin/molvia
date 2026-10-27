@@ -1719,7 +1719,7 @@
       },
       "settings": {
         "term": "Your settings",
-        "text": "Country, city, currencies, and the day you changed the currency of conversion — and for “Count me in the statistics”: since when it is off, and when you last turned it back on."
+        "text": "Country, city, currencies, and the day you changed the currency of conversion — and for “Count me in the statistics”: since when it is off, and when you last turned it back on. And when you last used the app or signed in to it: the two years of “An inactive account” are counted from that day."
       },
       "consent": {
         "term": "Consent to the terms",
@@ -1803,7 +1803,7 @@
     },
     "inactive": {
       "title": "An inactive account",
-      "text": "If you do not open Molvia for two years, the account is deleted by itself — just as by «Delete my data». The Molvia bot warns you 30 and 7 days before; to keep the account, opening the app is enough. If you have blocked the bot, there is no way to warn you, and the account is deleted without a warning."
+      "text": "If you do not open Molvia for two years, the account is deleted by itself — just as by «Delete my data». The Molvia bot warns you 30 and 7 days before; to keep the account, opening the app is enough — and signing in, if it asks. If you have blocked the bot, there is no way to warn you, and the account is deleted without a warning."
     },
     "rights": {
       "title": "Your rights",

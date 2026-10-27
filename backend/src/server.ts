@@ -1075,7 +1075,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     // is only true if the guarded place is where routes are actually added. MOL-21 and MOL-27
     // add theirs next to these.
     void instance.register((guarded, _guardedOptions, guardedDone) => {
-      withActor(guarded, (token) => authenticate(sessions, token))
+      withActor(guarded, (token) => authenticate(sessions, actors, token))
       actorMeRoute(guarded)
       actorExportRoute(guarded, (actorId, sessionId) =>
         exportMine(createExportRepository(db), actorId, sessionId),

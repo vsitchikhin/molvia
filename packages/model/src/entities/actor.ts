@@ -16,6 +16,13 @@ import { PATCH_EMPTY, changesSomething } from '#model/support/patch'
 export const telegramUserIdSchema = z.int().positive().max(Number.MAX_SAFE_INTEGER)
 export type TelegramUserId = z.infer<typeof telegramUserIdSchema>
 
+/**
+ * How often the account's last visit is marked (MOL-238): the clock of the two years of silence needs a
+ * day, not a request. Its own number beside the session's `SESSION_TOUCH_AFTER_HOURS` — the same today,
+ * but a change of how a way in slides is not a change of how a visit is counted.
+ */
+export const ACCOUNT_SEEN_AFTER_HOURS = 24
+
 export const actorSchema = z.object({
   id: z.uuid(),
   /** Never leaves the server: `actorWireSchema` takes it back off. */
