@@ -279,12 +279,11 @@ export default defineComponent({
 
     /**
      * «сейчас …»: the balance the server counted, printed as the account's screen prints it (Р-1) —
-     * and only while the form holds its currency: under a field already in dollars a balance in
-     * roubles read as two currencies of one account (self-review Р1-1, adversarial А2).
+     * as recorded, in the account's currency too while another is chosen (owner's «б», Р1-1).
      */
     const now = computed(() => {
       const held = current.value
-      if (held?.currency !== currency.value) return null
+      if (!held) return null
       return t('accounts.sheet.start_now', { amount: signedAmount(held.balance, locale.value) })
     })
 
