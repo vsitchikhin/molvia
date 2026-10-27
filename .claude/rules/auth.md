@@ -170,8 +170,9 @@ is in `bot.md`.
   says «открыть приложение и войти, если оно попросит», and the warnings ask the same. **It is not a
   change of the row**: `actors_touch_updated_at` ignores the column (0073), or the first request of
   every day would make the owner «newer» to the phone, which compares `updatedAt` to know whose
-  settings are fresher. Nor is it the statistics: it is written whatever the switch and the edition accepted —
-  a term of keeping, not a count. Not on the wire; in the copy (version 24); the precision is a day.
+  settings are fresher. Nor is it the statistics: it is written whatever the switch and the edition
+  accepted — a term of keeping, not a count. Not on the wire; in the copy (version 24); the precision
+  is a day.
 - **Four refusals, one answer.** No cookie, a token nobody was issued, a token of a revoked
   session, a token of an expired one: `401` with `error.no_actor`, identical byte for byte.
   Nothing arranges that — they fail one `WHERE` in the repository, and a value this server could
