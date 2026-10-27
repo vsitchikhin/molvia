@@ -144,13 +144,14 @@ describe('«Условия и приватность» (MOL-95)', () => {
     expect(view.find('.changes').exists()).toBe(false)
   })
 
-  it('whoever accepted edition 1 is told what changed in 2 and in 3, and sees the statistics too', async () => {
+  it('whoever accepted edition 1 is told what changed in 2, 3 and 4, and sees the statistics too', async () => {
     consent.mockResolvedValue({ version: 1 })
     const { view } = await render()
     expect(view.text()).toContain(en.consent.updated.title)
     expect(view.findAll('.changes-text').map((p) => p.text())).toEqual([
       en.consent.changes['2'],
       en.consent.changes['3'],
+      en.consent.changes['4'],
     ])
     // It is told what edition 1 told it wrong: the catalogue and a receipt's word have no threshold (Р3-А1).
     expect(en.consent.changes['2']).toMatch(/with no threshold/)
@@ -163,12 +164,23 @@ describe('«Условия и приватность» (MOL-95)', () => {
     expect(acceptConsent).toHaveBeenCalledWith(POLICY_VERSION)
   })
 
-  it('whoever accepted edition 2 is told only what changed in 3: Anthropic, a new recipient (MOL-272)', async () => {
+  it('whoever accepted edition 2 is told what changed in 3 and 4: Anthropic, a new recipient (MOL-272)', async () => {
     consent.mockResolvedValue({ version: 2 })
     const { view } = await render()
-    expect(view.findAll('.changes-text').map((p) => p.text())).toEqual([en.consent.changes['3']])
+    expect(view.findAll('.changes-text').map((p) => p.text())).toEqual([
+      en.consent.changes['3'],
+      en.consent.changes['4'],
+    ])
     expect(en.consent.changes['3']).toMatch(/Anthropic/)
     expect(ru.consent.changes['3']).toMatch(/Anthropic/)
+  })
+
+  it('whoever accepted edition 3 is told only what changed in 4: a receipt kept for the review (MOL-309)', async () => {
+    consent.mockResolvedValue({ version: 3 })
+    const { view } = await render()
+    expect(view.findAll('.changes-text').map((p) => p.text())).toEqual([en.consent.changes['4']])
+    expect(en.consent.changes['4']).toMatch(/21 days/)
+    expect(ru.consent.changes['4']).toMatch(/21 дня/)
   })
 
   it('sends nothing of the age: the edition alone is the answer', async () => {
