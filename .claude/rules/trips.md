@@ -70,7 +70,13 @@ The detail behind the trip lines of `CLAUDE.md`.
   9999, a day of five digits — and the history on the phone keeps such a trip in memory rather than
   fail the write it came with. **A trip's rate is snapshotted on the day it is dated by** — the tap
   of «Начать», within a day of the server's (Ж1), else the request's today (review Т-7): a start
-  the queue sent after midnight takes the wallet of the evening it was tapped in.
+  the queue sent after midnight takes the wallet of the evening it was tapped in. **And «курс устарел» is judged
+  by that day too** (MOL-207, Е-14): a week of the bank's silence before `started_on`, never before the moment the
+  server got the trip — a receipt of the 1st recorded on the 12th counts by the rate of the 1st and said «с тех пор ЦБ
+  РА ничего не публиковал» of a bank that published every day; and **a rate newer than the trip's day is never
+  stale** — a start sent days late takes the rate of the day it arrived (Ж1), and «с тех пор» of a day after the trip
+  is untrue; its day stands in the rate's line anyway. A trip with no `started_on` — an old queue — is judged by its
+  `started_at` in Yerevan, as before.
 - **A removed trip is marked, by the money rule (MOL-76).** `DELETE /trips/:id` sets
   `trips.deleted_at`; «Вернуть» (`POST /trips/:id/restore`) is there for ten minutes
   (`TRIP_UNDO_MINUTES`), and then the minute timer deletes the trip with its purchases. A trip is
@@ -300,6 +306,20 @@ under it. **The queue's notices stand over the skeleton** (MOL-311): under it, t
 №5): the strip stands first, over them, as the kit puts it, and comes and goes with an answer — a read that failed on
 opening, «Повторить» answered — so the notices move by its height then, four lines at 320; a failure is rare, and
 the notices over the strip would put an answer's words above the connection the whole screen hangs on.
+
+**The finished record draws the same card** (MOL-207, Ф-23): one sum and one line of parts under the list, no
+strip at the bottom; with a receipt's sum the line says what the prices say beside it — «по ценам 10 070 ֏ · чек
+меньше цен на 200 ֏», «· с чеком сходится» only where the prices are the receipt's currency and meet it, «по ценам
+8 300 ֏ — 7 из 12 · без цены — 4 100 ֏» — on both screens, the column of «С ценой / Без цены» gone. **Prices more than
+the receipt are said as they are** (owner's В-1 «а»): «чек меньше цен», never «скидка» — the phone cannot tell a
+discount on the receipt from a price typed wrong. Under the card «+ Сумма по чеку», «Добавить позицию», «Удалить
+запись», no strip (В-2 «а»): a finished record is no record going on, and a purchase forgotten is rare. Its header is
+the place, «город · день, время» under it by the moment and the day «Записаны» print — and while nothing of the record
+is known, «Покупки» with no line under it, never «Эта запись ещё не закончена» about the record the screen is for
+(Е-4). **The price, named:** a receipt whose time was not printed is dated by its record's moment, as in «Записаны»;
+the city is the answer's, so a record known only to the phone, with no copy of the answer, says its day alone. Its connection is the same strip over what the phone remembers; with nothing of the
+record remembered, the screen's own `ScreenState` — the finished record does not go up, so there may be nothing under
+a strip.
 
 **What the queue says about any record is said on both screens** (`TripNotices`): purchases the
 server refused, a record already open elsewhere, purchases not sent for a record that is over, a
