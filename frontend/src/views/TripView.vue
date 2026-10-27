@@ -622,8 +622,10 @@ export default defineComponent({
   flex-wrap: wrap;
   gap: var(--space-2);
 
+  /* Half the line each by the outer box — a basis of 0 left the secondary's edge out, and the pair
+     came 2 px apart — and never narrower than its word, which is what sends one under the other. */
   > * {
-    flex: 1 0 0;
+    flex: 1 0 calc((100% - var(--space-2)) / 2);
     min-width: max-content;
   }
 }

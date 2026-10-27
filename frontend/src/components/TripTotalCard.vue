@@ -35,7 +35,7 @@
           <span v-if="line.amount" class="amount">{{ line.amount }}</span>
         </span>
       </span>
-      <span v-if="waiting" class="note">{{ waiting }}</span>
+      <span v-if="waiting" class="note waiting">{{ waiting }}</span>
     </component>
   </AppCard>
 </template>
@@ -146,6 +146,11 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-footnote);
   font-variant-numeric: tabular-nums;
+}
+
+/* At the leading of the skeleton's line, so the card is as tall as its bars (MOL-178). */
+.line {
+  line-height: var(--leading-snug);
 }
 
 .part {
