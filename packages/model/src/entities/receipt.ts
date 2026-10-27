@@ -36,6 +36,13 @@ export const RECEIPT_SIDE_MIN = 200
  */
 export const RECEIPT_KEEP_DAYS = 28
 
+/**
+ * How long a receipt read not whole keeps its photo and what its reader read, for the developer's review
+ * (MOL-309, owner's В-3 «б», Р-8): until the fortnightly review of MOL-310 takes it, recorded or not — two
+ * weeks of its cycle and one for the review itself — then the timer lets it go.
+ */
+export const RECEIPT_MISS_KEEP_DAYS = 21
+
 /** «Удалить чек · Вернуть» (П-8): the ten minutes every removal of one's own money has (MOL-73). */
 export const RECEIPT_UNDO_MINUTES = EXCHANGE_UNDO_MINUTES
 
