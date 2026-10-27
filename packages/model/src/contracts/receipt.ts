@@ -247,19 +247,35 @@ export type ReceiptDetail = z.output<typeof receiptDetailCodec>
  * the name the person settled on (created by the rules of MOL-12), the quantity and what was paid for
  * the line, «цена за всё, как в чеке»: the unit price is the server's to work out.
  */
+const receiptRecordItemSchema = z.union([
+  z.strictObject({ id: z.uuid() }),
+  z.strictObject({ name: newItemSchema.shape.name }),
+])
+
 export const receiptRecordLineSchema = z.discriminatedUnion('skip', [
   z.strictObject({ position: z.int().min(0), skip: z.literal(true) }),
   z.strictObject({
     position: z.int().min(0),
     skip: z.literal(false),
-    item: z.union([
-      z.strictObject({ id: z.uuid() }),
-      z.strictObject({ name: newItemSchema.shape.name }),
-    ]),
+    item: receiptRecordItemSchema,
     quantity: quantityCodec.nullable(),
     amount: moneyCodec.nullable(),
   }),
 ])
+
+/**
+ * A line the reader lost, typed on the review (MOL-273): no position — it is none of the receipt's —
+ * and nothing printed; only the item is required, as for any purchase.
+ */
+export const receiptAddedLineSchema = z.strictObject({
+  item: receiptRecordItemSchema,
+  quantity: quantityCodec.nullable(),
+  amount: moneyCodec.nullable(),
+})
+export type ReceiptAddedLine = z.output<typeof receiptAddedLineSchema>
+
+/** How many lines a review may add: a receipt holds at most 500, and what is lost is a part of it. */
+export const RECEIPT_ADDED_MAX = 100
 
 /**
  * «Записать» (MOL-126): the whole receipt as the phone holds it, never its edits alone — the server's
@@ -283,6 +299,11 @@ export const receiptRecordBodySchema = z.strictObject({
    */
   total: moneyCodec.refine((value) => value.minor > 0n, { error: ERROR.INVALID_AMOUNT }).optional(),
   lines: z.array(receiptRecordLineSchema).max(500),
+  /**
+   * The lines the reader lost and the person typed on the review (MOL-273): purchases of the same trip,
+   * apart from `lines`, whose positions stay the receipt's. Absent — none, or a phone of an earlier build.
+   */
+  added: z.array(receiptAddedLineSchema).max(RECEIPT_ADDED_MAX).optional(),
   /**
    * What the person put right on the review (MOL-222, the measure of 0.2): the positions of the lines
    * whose item they changed from the one the review showed, and of those whose quantity or sum they
