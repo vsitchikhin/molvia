@@ -7,13 +7,16 @@ import {
   moneyAccountsCodec,
   receiptRecordedCodec,
   tripHistoryCodec,
+  parseRate,
   tripViewCodec,
 } from '@molvia/model'
+import type { CachedRate } from '@molvia/model'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import type { FastifyInstance } from 'fastify'
 import postgres from 'postgres'
 import { createExpenseRepository } from '@/db/expenses-repository'
 import { createMoneyRepository } from '@/db/money-repository'
+import { createRateRepository } from '@/db/rates-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
 import {
   expenses,
@@ -942,6 +945,46 @@ describe('«Записать»', () => {
       (await app.inject({ method: 'GET', url: '/trips/history', headers: { cookie } })).json(),
     )
     expect(history.trips.map((row) => [row.id, row.fromReceipt])).toEqual([[tripId, true]])
+  })
+
+  // Е-14 of MOL-207: the rate is the receipt's day's, and the server records it weeks later — judged
+  // from the moment of recording, a rate the bank had just published read «silent since».
+  it('judges the rate stale by the receipt’s day, never by the moment it was recorded', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const rates = createRateRepository(db)
+    const rub = (date: string): CachedRate => ({
+      provider: 'cba',
+      currency: 'RUB',
+      date,
+      scaled: parseRate('4.3123'),
+      jump: false,
+    })
+    async function stale(purchasedOn: string): Promise<boolean> {
+      const id = await parsedReceipt(me, [], {
+        layout: 'department',
+        receiptNo: null,
+        totalMinor: 500_000n,
+        printedOn: purchasedOn,
+      })
+      const tripId = randomUUID()
+      const response = await record(me, id, {
+        tripId,
+        place: { id: place },
+        purchasedOn,
+        lines: [],
+      })
+      expect(response.statusCode).toBe(200)
+      const cookie = await signIn(db, me)
+      return tripViewCodec.parse(
+        (await app.inject({ method: 'GET', url: `/trips/${tripId}`, headers: { cookie } })).json(),
+      ).rateStale
+    }
+
+    await rates.upsert([rub('2026-09-01')])
+    expect(await stale('2026-09-01')).toBe(false)
+    // The bank silent eight days before the purchase: stale, as it was.
+    expect(await stale('2026-09-09')).toBe(true)
   })
 
   it('is the owner’s alone, and takes a place by its id only in the receipt’s geography (В8)', async () => {

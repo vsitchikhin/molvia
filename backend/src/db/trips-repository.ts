@@ -208,6 +208,7 @@ function toTrip(row: TripRow): Trip {
     manualRate: sideRateFrom(snapshot, row.rateManualScaled, row.rateManualAsOf, 'personal'),
     rateChoice: row.rateChoice,
     startedAt: row.startedAt,
+    startedOn: row.startedOn,
     finishedAt: row.finishedAt,
     finishedOnDeviceAt: row.finishedOnDeviceAt,
     accountId: row.accountId,
