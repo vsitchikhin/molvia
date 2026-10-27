@@ -864,6 +864,13 @@ describe('how the model’s summary says the receipt was paid (MOL-312)', () => 
     }
   })
 
+  it('reads the year’s trade the model copied «Առաջին» as no payment (adversarial А1, А2)', () => {
+    const trade: [string, string] = ['Առաջին ամսվա սկզբից', '152889.00']
+    expect(paid(['Վճարված է PosTerminal', '22521.00'], trade)).toBe('card')
+    expect(paid(['Վճարված է:', '22521.00'], trade)).toBeNull()
+    expect(paid(['Առնեն ամբողջ ակզբից:', '152889.00'])).toBeNull()
+  })
+
   it('reads no bonus spent as cash, nor a payment of an unknown way', () => {
     // must not: the model copied «Կանխավճարի մարում» as «Կանխիկ վճարի մարում», and a delivery app
     expect(paid(['Կանխիկ վճարի մարում', '700.00'])).toBeNull()

@@ -2746,6 +2746,25 @@ describe('how a receipt was paid (MOL-312)', () => {
     ).toBeNull()
   })
 
+  it('reads a word of cash only as the last before its sum (adversarial А1–А3)', () => {
+    const total = 'Ընդամենը: 1 000,00'
+    const card = 'Վճարված է PosTerminal: 1 000,00'
+    // the year's trade as the model copied it, «Առաջին»; a prepayment's rest as «Կանխիկավճար»
+    for (const row of [
+      'Առաջին ամսվա սկզբից: 152 889,00',
+      'Կանխիկավճարի մնացորդ: 6 847,63',
+      'Կանխիկով մուծում 1 000,00',
+    ]) {
+      expect(paid(...lines, total, card, row), row).toBe('card')
+      // must not: alone, it names no way of payment — a card's receipt whose word was lost is no cash
+      expect(paid(...lines, total, 'Վճարված է: 1 000,00', row), row).toBeNull()
+    }
+  })
+
+  it('reads «Անկանխիկ» torn by OCR as a card, never as cash (adversarial А4)', () => {
+    expect(paid(...lines, 'Ընդամենը 8510.00', 'Վճարված Է Ան կանխիկ 8510.00')).toBe('card')
+  })
+
   it('reads every reading, and two readings saying two ways say nothing', () => {
     const cash = rowsOf(['Ընդամենը: 1 000,00', 'Առձեռն: 1 000,00'].join('\n'), 0)
     const card = rowsOf(['Ընդամենը: 1 000,00', 'PosTerminal: 1 000,00'].join('\n'), 0)
