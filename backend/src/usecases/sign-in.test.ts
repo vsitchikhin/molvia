@@ -36,6 +36,7 @@ function fakeActors(overrides: Partial<ActorRepository> = {}): ActorRepository {
     lockAccount: () => Promise.reject(new Error('lockAccount was not expected')),
     consentVersion: () => Promise.reject(new Error('consentVersion was not expected')),
     acceptConsent: () => Promise.reject(new Error('acceptConsent was not expected')),
+    markSeen: () => Promise.resolve(true),
     ...overrides,
   }
 }
@@ -135,6 +136,34 @@ describe('вход', () => {
     // 32 байта в base64url — алфавит, который принимает `secretOrNull` и который cookie везёт
     // без экранирования.
     expect(first.token).toMatch(/^[A-Za-z0-9_-]{43}$/)
+  })
+
+  it('вход — это визит: отмечает его владельцу после сессии, когда бы ни был прошлый (MOL-238)', async () => {
+    const order: string[] = []
+    const markSeen = vi.fn((id: string, afterHours: number) => {
+      order.push(`seen ${id} ${String(afterHours)}`)
+      return Promise.resolve(true)
+    })
+    const actors = fakeActors({ byTelegramUserId: () => Promise.resolve(returning), markSeen })
+    const sessions = fakeSessions({
+      create: (id, actorId, _token, deviceName, expiresAt) => {
+        order.push('session')
+        return Promise.resolve(
+          sessionSchema.parse({
+            id,
+            actorId,
+            deviceName,
+            createdAt: new Date(),
+            lastSeenAt: new Date(),
+            expiresAt,
+          }),
+        )
+      },
+    })
+
+    await signIn(actors, sessions, TELEGRAM_ID)
+
+    expect(order).toEqual(['session', `seen ${RETURNING_ID} 0`])
   })
 
   it('называет срок, который потом станет Max-Age у cookie', async () => {

@@ -44,6 +44,8 @@ export async function signIn(
   const token = mintToken()
   const expiresAt = new Date(Date.now() + SESSION_LIFETIME_DAYS * 24 * 3_600_000)
   await sessions.create(randomUUID(), actor.id, token, deviceName, expiresAt)
+  // A login is a visit (MOL-238), whenever the last one was: the person is here.
+  await actors.markSeen(actor.id, 0)
 
   return { actor, token, expiresAt }
 }
