@@ -460,3 +460,41 @@ for (const width of [390, 320])
     expect(sizes.sumBars).toBeCloseTo(sizes.sumAnswer, 0)
     expect(sizes.bars).toBeCloseTo(sizes.answer, 0)
   })
+
+// The longest line of the record's total — a rate named with its bank, as the National Bank of Serbia
+// asks, beside «С ценой — 12 из 14»: it wraps inside the card, never past it (MOL-206, review 2, №1:
+// every part kept on one line, «rate … · National Bank of Serbia» stood past the card and the page
+// scrolled sideways).
+for (const width of [390, 320])
+  test(`at ${String(width)} the record's total with a named rate stays inside its card`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 720 })
+    await open(page, '/_kit')
+    const card = page.locator('[data-part="trip-total-named"]')
+    await expect(card.locator('.sum')).toBeVisible()
+    const fits = await card.evaluate((root) => {
+      const face = root.querySelector('.face')
+      const box = root.getBoundingClientRect()
+      const parts = [...root.querySelectorAll('.part')].map((part) => part.getBoundingClientRect())
+      return {
+        face: face ? face.scrollWidth <= face.clientWidth : false,
+        parts: parts.every((part) => part.right <= box.right + 0.5),
+        page: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      }
+    })
+    expect(fits).toEqual({ face: true, parts: true, page: true })
+  })
+
+// The whole card is the flip (owner's В-17 «а»), in Chromium and WebKit alike: a tap anywhere on it
+// turns the big number into the estimate, and says so by `aria-pressed`.
+test("a tap on the record's total flips it to the estimate", async ({ page }) => {
+  await open(page, '/_kit')
+  const face = page.locator('[data-part="trip-total"] .face')
+  await expect(face).toHaveAttribute('aria-pressed', 'false')
+  await face.click()
+  await expect(face).toHaveAttribute('aria-pressed', 'true')
+  await expect(face.locator('.sum')).toHaveText(/^≈/)
+  await face.click()
+  await expect(face).toHaveAttribute('aria-pressed', 'false')
+})

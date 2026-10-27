@@ -103,7 +103,7 @@ async function toPurchases(page: Page): Promise<void> {
 
 async function addItem(page: Page, word: string, price: string): Promise<void> {
   // «+ Item» in the record's strip, the same with rows and without (MOL-206, Ф-22).
-  await page.getByRole('button', { name: 'Item', exact: true }).click()
+  await page.getByRole('button', { name: 'Add an item', exact: true }).click()
   await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(word)
   await page.getByRole('option').first().click()
   await expect(sheet(page)).toContainText(word)
@@ -117,7 +117,7 @@ async function addItem(page: Page, word: string, price: string): Promise<void> {
 
 /** A purchase with no price: the item and how much, the price left for later (or never). */
 async function addUnpriced(page: Page, word: string): Promise<void> {
-  await page.getByRole('button', { name: 'Item', exact: true }).click()
+  await page.getByRole('button', { name: 'Add an item', exact: true }).click()
   await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(word)
   await page.getByRole('option').first().click()
   await expect(sheet(page)).toContainText(word)
@@ -636,11 +636,22 @@ test.describe('the receipt total (MOL-78)', () => {
  * The record's strip (MOL-206, Ф-22): «Штрихкод» and «+ Позиция» side by side where both words fit,
  * one over the other where they do not — «+ Позиция» under, nearer the thumb (owner's В-1 «в») — and
  * «Закончить» under the pair. Nothing of a button is cut or stands past the strip, in either language,
- * on the narrowest phone and the commonest; the list ends over the strip.
+ * on the narrowest phone and the commonest; with a purchase and its total, the list ends over the strip
+ * (review 2, №6). The buttons go by the names a screen reader says, the verb (№3).
  */
 const STRIP_WORDS = {
-  'en-US': { scan: 'Scan', add: 'Item', finish: 'Finish', remove: 'Delete the entry' },
-  'ru-RU': { scan: 'Штрихкод', add: 'Позиция', finish: 'Закончить', remove: 'Удалить запись' },
+  'en-US': {
+    scan: 'Scan a barcode',
+    add: 'Add an item',
+    finish: 'Finish',
+    remove: 'Delete the entry',
+  },
+  'ru-RU': {
+    scan: 'Сканировать штрихкод',
+    add: 'Добавить позицию',
+    finish: 'Закончить',
+    remove: 'Удалить запись',
+  },
 } as const
 
 for (const locale of ['en-US', 'ru-RU'] as const)
@@ -653,56 +664,74 @@ for (const locale of ['en-US', 'ru-RU'] as const)
         await page.setViewportSize({ width, height: 640 })
         const setting = await device(page)
         const headers = await asBrowser(page)
-        // Started through the API, so the test reads the strip and not «Где вы?» in two languages.
+        // Started and filled through the API, so the test reads the strip and not «Где вы?» in two
+        // languages: one purchase, so the total, the footnote and «+ Сумма по чеку» stand over it.
         const context = settingsOf(
           actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
         )
+        const trip = randomUUID()
         const started = await page.request.post('/api/trips', {
           headers,
-          data: { context, id: randomUUID(), place: { name: 'Ереван Сити', kind: 'store' } },
+          data: { context, id: trip, place: { name: 'Ереван Сити', kind: 'store' } },
         })
         expect(started.status()).toBe(201)
+        const item = await page.request.post('/api/catalogue/items', {
+          headers,
+          data: { kind: 'product', name: `Сыр «${nonsense()}»`, defaultUnit: 'kg' },
+        })
+        const added = await page.request.post(`/api/trips/${trip}/expenses`, {
+          headers,
+          data: {
+            id: randomUUID(),
+            itemId: ((await item.json()) as { id: string }).id,
+            quantity: { value: '1', unit: 'kg' },
+            amount: { amount: '1000', currency: 'AMD' },
+          },
+        })
+        expect(added.ok()).toBe(true)
         await page.goto('/purchases/manual')
         await expect.poll(async () => (await setting.current())?.place.name).toBe('Ереван Сити')
+        await expect(row(page)).toHaveCount(1)
 
         const dock = page.locator('.dock')
-        const scan = dock.getByRole('button', { name: words.scan, exact: true })
-        const add = dock.getByRole('button', { name: words.add, exact: true })
-        const end = dock.getByRole('button', { name: words.finish, exact: true })
-        await expect(add).toBeVisible()
-
-        const boxes = await dock.evaluate((root) => {
-          const buttons = [...root.querySelectorAll('button')]
-          const frame = root.getBoundingClientRect()
+        for (const name of [words.scan, words.add, words.finish])
+          await expect(dock.getByRole('button', { name, exact: true })).toBeVisible()
+        // Measured at once, once the strip has come in: it rises from below (`appear`), and boxes
+        // read one by one meanwhile stood at different heights.
+        const { frame, buttons } = await dock.evaluate(async (node) => {
+          await Promise.all(node.getAnimations({ subtree: true }).map((one) => one.finished))
+          const box = node.getBoundingClientRect()
           return {
-            frame: { left: frame.left, right: frame.right, top: frame.top },
-            buttons: buttons.map((button) => {
-              const box = button.getBoundingClientRect()
+            frame: { left: box.left, right: box.right, top: box.top },
+            buttons: [...node.querySelectorAll('button')].map((button) => {
+              const own = button.getBoundingClientRect()
               return {
-                text: button.textContent.trim(),
-                left: box.left,
-                right: box.right,
-                top: box.top,
-                bottom: box.bottom,
-                width: box.width,
+                left: own.left,
+                right: own.right,
+                top: own.top,
+                bottom: own.bottom,
+                width: own.width,
                 // The word inside its button: an overflow is a word wider than its pill.
                 cut: button.scrollWidth > button.clientWidth + 0.5,
               }
             }),
           }
         })
-        const boxOf = (word: string) => {
-          const found = boxes.buttons.find((box) => box.text === word)
-          if (!found) throw new Error(`no ${word} in the strip`)
-          return found
-        }
-        const scanBox = boxOf(words.scan)
-        const addBox = boxOf(words.add)
-        const endBox = boxOf(words.finish)
-        for (const box of [scanBox, addBox, endBox]) {
-          expect(box.cut, box.text).toBe(false)
-          expect(box.left).toBeGreaterThanOrEqual(boxes.frame.left + 15)
-          expect(box.right).toBeLessThanOrEqual(boxes.frame.right - 15)
+        // In the strip's order: the scanner, «+ Позиция», «Закончить».
+        expect(buttons).toHaveLength(3)
+        const [scanBox, addBox, endBox] = buttons as [
+          (typeof buttons)[number],
+          (typeof buttons)[number],
+          (typeof buttons)[number],
+        ]
+        for (const [name, box] of [
+          [words.scan, scanBox],
+          [words.add, addBox],
+          [words.finish, endBox],
+        ] as const) {
+          expect(box.cut, name).toBe(false)
+          expect(box.left, name).toBeGreaterThanOrEqual(frame.left + 15)
+          expect(box.right, name).toBeLessThanOrEqual(frame.right - 15)
         }
         // Russian «Штрихкод» beside «+ Позиция» needs some 334 px; English fits everywhere.
         const sideBySide = locale === 'en-US' || width > 334
@@ -714,17 +743,20 @@ for (const locale of ['en-US', 'ru-RU'] as const)
           expect(addBox.top).toBeGreaterThanOrEqual(scanBox.bottom)
         }
         expect(endBox.top).toBeGreaterThanOrEqual(Math.max(scanBox.bottom, addBox.bottom))
-        await expect(scan).toBeVisible()
-        await expect(end).toBeVisible()
 
         // The list ends over the strip: the last thing of the record is not under it.
         const remove = page.getByRole('button', { name: words.remove, exact: true })
-        await remove.scrollIntoViewIfNeeded()
         await page.evaluate(() => {
           window.scrollTo(0, document.documentElement.scrollHeight)
         })
         const removeBottom = await remove.evaluate((node) => node.getBoundingClientRect().bottom)
         const dockTop = await dock.evaluate((node) => node.getBoundingClientRect().top)
         expect(removeBottom).toBeLessThanOrEqual(dockTop)
+        // Nothing of the page scrolls sideways — the total's line included.
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+          ),
+        ).toBe(true)
       })
   })
