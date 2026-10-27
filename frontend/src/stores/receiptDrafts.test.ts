@@ -71,6 +71,19 @@ describe('receiptDrafts — the account chosen on the review (MOL-312)', () => {
     })
   })
 
+  it('drops a broken choice alone, never the others (adversarial А6)', () => {
+    localStorage.setItem(
+      `molvia.receipt-payment.${ME}`,
+      JSON.stringify({
+        [RECEIPT]: { accountId: 'not an id', debited: '' },
+        [OTHER]: { accountId: CARD, debited: '' },
+      }),
+    )
+    const drafts = useReceiptDraftsStore()
+    expect(drafts.paymentOf(RECEIPT)).toBeNull()
+    expect(drafts.paymentOf(OTHER)).toEqual({ accountId: CARD, debited: '' })
+  })
+
   it('lets it go with the receipt’s draft: recorded, removed, gone', () => {
     const drafts = useReceiptDraftsStore()
     drafts.setPayment(RECEIPT, { accountId: null, debited: '' })

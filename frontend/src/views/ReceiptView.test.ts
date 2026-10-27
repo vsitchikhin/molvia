@@ -1134,6 +1134,35 @@ describe('ReceiptView — the account it was paid from (MOL-312)', () => {
     expect(localStorage.getItem(`molvia.payment-accounts.${ME}`)).toBeNull()
   })
 
+  it('keeps a choice that is the default too: the default moves, the choice does not (adversarial А5)', async () => {
+    const memory = `molvia.payment-accounts.${ME}`
+    localStorage.setItem(memory, JSON.stringify({ AMD: { receipt: card.id } }))
+    const { view } = await render()
+    expect(row(view).text()).toContain('Карта ֏')
+    await choose(view, 'Карта ֏')
+    // another receipt recorded in cash meanwhile moves the default
+    localStorage.setItem(memory, JSON.stringify({ AMD: { receipt: cash.id } }))
+    while (mounted.length) mounted.pop()?.unmount()
+    const again = await render()
+    expect(row(again.view).text()).toContain('Карта ֏')
+    expect((await recorded(again.view))?.account).toEqual({ accountId: card.id })
+  })
+
+  it('keeps a «Списано» of any length, and the other receipts’ choices with it (adversarial А6)', async () => {
+    const OTHER = 'cccccccc-0000-4000-8000-000000000099'
+    localStorage.setItem(
+      `molvia.receipt-payment.${ME}`,
+      JSON.stringify({ [OTHER]: { accountId: roubles.id, debited: '' } }),
+    )
+    const { view } = await render()
+    await choose(view, 'Карта ₽')
+    await view.find('.charged input').setValue('1 100,50 RUB списано, баланс 12 345,67 руб')
+    while (mounted.length) mounted.pop()?.unmount()
+    const again = await render()
+    expect(row(again.view).text()).toContain('Карта ₽')
+    expect(useReceiptDraftsStore().paymentOf(OTHER)).toEqual({ accountId: roubles.id, debited: '' })
+  })
+
   it('records nothing while «Списано» is not money, and says so under the field', async () => {
     localStorage.setItem(
       `molvia.receipt-payment.${ME}`,

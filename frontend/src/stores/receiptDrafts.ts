@@ -114,21 +114,26 @@ export interface PaymentDraft {
   readonly debited: string
 }
 
-const paymentsCodec = z.record(
-  z.string(),
-  z.strictObject({ accountId: z.uuid().nullable(), debited: z.string().max(40) }),
-)
+const paymentCodec = z.strictObject({ accountId: z.uuid().nullable(), debited: z.string() })
 
+/** One broken entry is dropped alone, as a draft is: the others are somebody's choices (adversarial А6). */
 function recallPayments(owner: string | null): Record<string, PaymentDraft> {
   if (!owner) return {}
   const raw = read(`${PAYMENT_KEY}.${owner}`)
   if (!raw) return {}
+  let parsed: unknown
   try {
-    const parsed = paymentsCodec.safeParse(JSON.parse(raw))
-    return parsed.success ? parsed.data : {}
+    parsed = JSON.parse(raw)
   } catch {
     return {}
   }
+  if (!isRecord(parsed)) return {}
+  return Object.fromEntries(
+    Object.entries(parsed).flatMap(([id, value]) => {
+      const entry = paymentCodec.safeParse(value)
+      return entry.success ? [[id, entry.data]] : []
+    }),
+  )
 }
 
 function recall(owner: string | null): Record<string, ReceiptDraft> {

@@ -184,25 +184,28 @@
           :no-items="noItems"
           @total="!locked && (totalOpen = true)"
         />
-        <!-- The account it was paid from (MOL-312): a draft of the review, recorded with «Записать». -->
-        <AppCard v-if="showsAccount" class="block account">
-          <AccountRow
-            :label="t('accounts.picker.row_spending')"
-            :account="account"
-            :disabled="locked"
-            @open="pickerOpen = true"
-          />
-          <AppReveal>
-            <ChargedField
-              v-if="charged && account"
-              v-model="debited"
+        <!-- The account it was paid from (MOL-312): a draft of the review, recorded with «Записать». Grown in
+             where «Счета» answer after the review, as it pushes what stands under it (review Р1-3). -->
+        <AppReveal>
+          <AppCard v-if="showsAccount" class="block account">
+            <AccountRow
+              :label="t('accounts.picker.row_spending')"
               :account="account"
-              :bad="debitedBad"
-              :readonly="locked"
-              @update:model-value="debitedBad = false"
+              :disabled="locked"
+              @open="pickerOpen = true"
             />
-          </AppReveal>
-        </AppCard>
+            <AppReveal>
+              <ChargedField
+                v-if="charged && account"
+                v-model="debited"
+                :account="account"
+                :bad="debitedBad"
+                :readonly="locked"
+                @update:model-value="debitedBad = false"
+              />
+            </AppReveal>
+          </AppCard>
+        </AppReveal>
         <p v-if="!byLink" class="note">
           <IconImageOff class="note-icon" aria-hidden="true" />
           {{ t(noItems ? 'receipt.review.photo_note_sum' : 'receipt.review.photo_note') }}
@@ -582,7 +585,12 @@ export default defineComponent({
     const pickerOpen = ref(false)
     function pickAccount(next: string | null): void {
       debitedBad.value = false
-      if (next !== accountId.value) drafts.setPayment(id.value, { accountId: next, debited: '' })
+      // a choice is kept even where it is the default: the default moves with the next receipt recorded, the
+      // choice must not (adversarial А5)
+      drafts.setPayment(id.value, {
+        accountId: next,
+        debited: next === accountId.value ? debited.value : '',
+      })
     }
     /** What «Записать» sends of the account: none, or the account with «списано» where it applies. */
     function paymentBody(): TripPaymentBody | 'bad' | undefined {
