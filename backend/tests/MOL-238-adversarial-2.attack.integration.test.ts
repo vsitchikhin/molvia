@@ -50,6 +50,8 @@ const FEEDBACK_IN_APP = `(SELECT max("created_at") FROM "feedback" WHERE "actor_
 function migration(tag: string, mutant: boolean): string {
   const file = readFileSync(`${MIGRATIONS}/${tag}.sql`, 'utf8')
   if (!mutant || tag !== '0073_actor_last_seen') return file
+  // the fix of PR #234 is m1 itself: then the mutant is the file as it is
+  if (file.includes(FEEDBACK_IN_APP)) return file
   if (!file.includes(FEEDBACK_ALL)) throw new Error('0073 changed: the mutant has nothing to replace')
   return file.replace(FEEDBACK_ALL, FEEDBACK_IN_APP)
 }
