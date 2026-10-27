@@ -370,11 +370,15 @@ balance, total and difference is the server's.
   **In an amendment the field is the start, «Было на старте», and under it «сейчас …» is the server's
   balance** (MOL-196, Ф-31): «Остаток» means one thing — what lies on the account now — and the field
   amends what it held at the start; a new account keeps «Остаток», its start being what it holds. The
-  line is the page's version of the account (`current`), so after a conflict it is the balance of the
-  version read again, printed as the account's screen prints it — no «≈», no colour — and is the
-  field's description. **The price, named:** it is never worked out from what is typed — the phone adds
-  nothing up — so 8 920 → 9 000 typed leaves «сейчас 8 470,12 $» until «Сохранить»; «сейчас» says it is
-  what is recorded. **Offline the kit's `StatusStrip` is the sheet's first line, outside the form**, and
+  line is the sheet's version of the account (`current`) — the page where it is an answer of this
+  session, else the one the screen opened it on: a page kept from an earlier launch spoke of
+  yesterday's balance over a card printing today's journal (adversarial А1), and the lock and the meta
+  go by the same version as the footer (А1б). After a conflict it is the balance of the version read
+  again, printed as the account's screen prints it — no «≈», no colour — and is the field's
+  description. **It stands only while the form holds the account's currency**: under a field already
+  in dollars a balance in roubles read as two currencies of one account (self-review Р1-1, А2). **The
+  price, named:** it is never worked out from what is typed — the phone adds nothing up — so 8 920 →
+  9 000 typed leaves «сейчас 8 470,12 $» until «Сохранить»; «сейчас» says it is what is recorded. **Offline the kit's `StatusStrip` is the sheet's first line, outside the form**, and
   every button is not now in the focus order saying why on itself (Ф-6, owner's В-1 «а»): «Сохраним /
   Удалим / Уберём, когда будет связь». **«Убрать из выбора» is a ghost, «Удалить счёт» danger-ghost**:
   taken out of the choice an account loses nothing (Ф-34 by its pattern).
