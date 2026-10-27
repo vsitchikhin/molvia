@@ -3045,6 +3045,82 @@ export const receiptLineImages = pgTable(
 )
 
 /**
+ * Why receipts were not read whole (MOL-309), by day in Yerevan and with no id of anyone, as `receipt_days`
+ * is: of each reader and country, how many receipts were read and how many lines found (`scope` «read»,
+ * the denominators), why a receipt was not proven whole (`receipt`) and why a line went to the review
+ * emptied or without its price (`line`), by the domain's names (`RECEIPT_REASONS`, `RECEIPT_LINE_REASONS`).
+ * **A reason is a row, never a column**: a new one needs no migration and moves no key, so an image a
+ * failed deploy puts back still writes. Counted in the transaction of the reading; erasure does not reach it.
+ * The input of the fortnightly review (MOL-310), read by `make receipt-reasons`.
+ */
+export const receiptReasonDays = pgTable(
+  'receipt_reason_days',
+  {
+    day: date('day').notNull(),
+    reader: text('reader').$type<'model' | 'ocr'>().notNull(),
+    country: char('country', { length: 2 }).notNull(),
+    scope: text('scope').$type<'read' | 'receipt' | 'line'>().notNull(),
+    reason: text('reason').notNull(),
+    n: integer('n').notNull().default(0),
+  },
+  (table) => [
+    primaryKey({ columns: [table.day, table.reader, table.country, table.scope, table.reason] }),
+    check('receipt_reason_days_reader_known', oneOf(table.reader, ['model', 'ocr'])),
+    check('receipt_reason_days_scope_known', oneOf(table.scope, ['read', 'receipt', 'line'])),
+    check('receipt_reason_days_n_non_negative', sql`${table.n} >= 0`),
+  ],
+)
+
+/**
+ * A receipt read not whole, kept for the developer's review (MOL-309, owner's В-3 «б»): what its reader
+ * read — the model's answer as it came, or Tesseract's rows of both page modes — and why each line was
+ * not shown as read; its photo in `receipt_miss_parts`. **Kept after «Записать»**, which deletes the
+ * receipt's own photo, until the fortnightly review (MOL-310) lets it go — `make receipt-miss-forget` —
+ * or `keep_until` passes (`RECEIPT_MISS_KEEP_DAYS`). It goes with its receipt: removed, its trip gone for
+ * good, the person erased. Never in the nightly copy, never in the log, never in the person's copy.
+ */
+export const receiptMisses = pgTable(
+  'receipt_misses',
+  {
+    receiptId: uuid('receipt_id')
+      .primaryKey()
+      .references(() => receipts.id, { onDelete: 'cascade' }),
+    readAt: timestamp('read_at', { withTimezone: true }).notNull(),
+    keepUntil: timestamp('keep_until', { withTimezone: true }).notNull(),
+    readerVersion: text('reader_version').notNull(),
+    /** Why the receipt was not proven whole, and why each line was not shown as read, in their order. */
+    reasons: jsonb('reasons')
+      .$type<{ readonly receipt: string | null; readonly lines: readonly (string | null)[] }>()
+      .notNull(),
+    /** What the reader read, as it read it. */
+    reading: jsonb('reading').notNull(),
+  },
+  (table) => [
+    index('receipt_misses_keep_until_idx').on(table.keepUntil),
+    check('receipt_misses_kept_after_read', sql`${table.keepUntil} > ${table.readAt}`),
+  ],
+)
+
+/** The parts of a receipt's photo kept with its miss (MOL-309), copied when it was read. */
+export const receiptMissParts = pgTable(
+  'receipt_miss_parts',
+  {
+    receiptId: uuid('receipt_id')
+      .notNull()
+      .references(() => receiptMisses.receiptId, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    photo: bytea('photo').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.receiptId, table.position] }),
+    check(
+      'receipt_miss_parts_position_range',
+      sql`${table.position} between 1 and ${sql.raw(String(RECEIPT_PARTS_MAX))}`,
+    ),
+  ],
+)
+
+/**
  * The shop's memory (MOL-126): «01282006 + 1163909 — молоко 3,2 %» is a fact about the shop, not the
  * person (owner, 30.09.2026), so it is shared. A row is one person's word on one key: recording a
  * receipt writes it, a change of a recorded line's item rewrites it. Read: the person's own word first,

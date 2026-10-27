@@ -519,6 +519,13 @@
       "when": 1793098694254,
       "tag": "0073_receipt_lines_added",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1793099710483,
+      "tag": "0074_receipt_reasons",
+      "breakpoints": true
     }
   ]
 }
