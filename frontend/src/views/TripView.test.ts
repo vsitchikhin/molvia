@@ -396,6 +396,9 @@ describe('TripView', () => {
       const finishing = document.body.querySelector('dialog[open]')?.textContent ?? ''
       expect(finishing).toContain(ru.trip.finish_confirm.title)
       expect(finishing).not.toContain(ru.trip.remove.empty.spending)
+      // Слова о сумме, а не о покупках, которых нет (адверсариальное В1).
+      expect(plain(finishing)).toContain('Сумма по чеку 5 000 ֏ останется в «Деньгах»')
+      expect(finishing).not.toContain(ru.trip.finish_confirm.body)
     })
 
     it('«Удалить запись» сначала спрашивает: деньги записи уходят из «Денег» и счетов (MOL-76)', async () => {
@@ -403,9 +406,10 @@ describe('TripView', () => {
       const { view, queue } = await render()
       await button(view, ru.trip.remove.action).trigger('click')
       await flushPromises()
-      expect(document.body.querySelector('dialog[open]')?.textContent).toContain(
-        ru.trip.remove.sheet.title,
-      )
+      const asking = document.body.querySelector('dialog[open]')?.textContent ?? ''
+      expect(asking).toContain(ru.trip.remove.sheet.title)
+      expect(plain(asking)).toContain('Сумма по чеку 5 000 ֏ уйдёт из «Денег» и счетов')
+      expect(asking).not.toContain(ru.trip.remove.sheet.body)
       expect(queue.pending.some((write) => write.kind === 'delete')).toBe(false)
     })
   })

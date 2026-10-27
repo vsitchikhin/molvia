@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { tripViewCodec } from '@molvia/model'
 import type { TripView } from '@molvia/model'
+import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import TripTotal from '@/components/TripTotal.vue'
@@ -335,6 +336,16 @@ describe('TripTotalCard', () => {
       .map((part) => part.text())
     expect(raw.length).toBeGreaterThan(2)
     for (const part of raw) expect(part, part).not.toContain(' ')
+  })
+
+  it('строки, что карточка режет по «·», в обоих словарях делятся одинаково и не теряют подстановок (ревью 4, №1)', () => {
+    const keys = ['total_line', 'rate_line', 'rate_line_source', 'rate_line_mine'] as const
+    for (const key of keys) {
+      const [mine, theirs] = [ru.trip[key], en.trip[key]].map((line) => line.split(' · '))
+      expect(theirs?.length, key).toBe(mine?.length)
+      // Каждая часть — со своей подстановкой: «·» стоит между кусками, а не внутри одного.
+      for (const part of [...(mine ?? []), ...(theirs ?? [])]) expect(part, key).toMatch(/\{\w+\}/)
+    }
   })
 
   it('без курса переворачивать нечего — карточка не кнопка', () => {

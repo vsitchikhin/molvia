@@ -58,6 +58,7 @@
     "finish_confirm": {
       "title": "Finish this entry?",
       "body": "The items stay recorded. Anything forgotten can be added later",
+      "body_receipt": "The receipt total {amount} stays in “Money”. Items can be added later",
       "ok": "Finish",
       "cancel": "Cancel"
     },
@@ -65,7 +66,8 @@
       "action": "Delete the entry",
       "sheet": {
         "title": "Delete this entry?",
-        "body": "The purchases and prices go, from “Money” and the accounts too. The ratings stay"
+        "body": "The purchases and prices go, from “Money” and the accounts too. The ratings stay",
+        "body_receipt": "The receipt total {amount} goes from “Money” and the accounts"
       },
       "empty": {
         "title": "Nothing in this entry",

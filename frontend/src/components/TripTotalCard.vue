@@ -89,7 +89,9 @@ export default defineComponent({
     /**
      * The line breaks only between its parts, never inside one (review 3, №2): a rate's figure and its
      * signs, a day and its month, «≈» and its amount come with ordinary spaces, and «курс 4,24 / ֏/₽» or
-     * «27 / окт.» read as two things. Each part split at its own «·», its spaces made no-break.
+     * «27 / окт.» read as two things. Each part split at its own «·», its spaces made no-break. The «·»
+     * is the dictionary's: `trip.total_line` and `trip.rate_line*` put one between their pieces in every
+     * locale, and `TripTotal.test.ts` holds both dictionaries to it (review 4, №1).
      */
     const parts = computed(() =>
       [total.priced.value, total.estimate.value, total.rateLine.value]

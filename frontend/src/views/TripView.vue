@@ -139,7 +139,9 @@
             ? t('trip.remove.empty.body')
             : askingReceipt
               ? t('trip.receipt.finish.body', finishCounts)
-              : t('trip.finish_confirm.body')
+              : finishingSum
+                ? t('trip.finish_confirm.body_receipt', { amount: finishingSum })
+                : t('trip.finish_confirm.body')
         }}
       </p>
       <!-- «Сколько вышло по чеку?» — only while some purchase has no price and no sum is there yet
@@ -183,6 +185,7 @@
       :place="removal.place"
       :day="removal.day"
       :items="removal.items"
+      :receipt="removal.receipt"
       :on-closed="leaveIfOver"
       @confirm="remove"
     />
@@ -220,6 +223,7 @@ import IconBasket from '~icons/mdi/basket-outline'
 import IconDelete from '~icons/mdi/delete-outline'
 import IconFlag from '~icons/mdi/flag-checkered'
 import IconPlus from '~icons/mdi/plus'
+import { formatMoney } from '@molvia/model'
 import type { CatalogueEntry, TripExpenseView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -328,11 +332,14 @@ export default defineComponent({
     const finishingEmpty = ref(false)
     const removing = ref(false)
     /** What the question names, taken when it is asked (MOL-76, Р-2). */
-    const removal = ref<{ place: string; day: Date | null; items: number }>({
-      place: '',
-      day: null,
-      items: 0,
-    })
+    const removal = ref<{ place: string; day: Date | null; items: number; receipt: string | null }>(
+      {
+        place: '',
+        day: null,
+        items: 0,
+        receipt: null,
+      },
+    )
 
     async function load(): Promise<void> {
       // No identity yet — the first launch is still making one, and there is nothing to ask for
@@ -460,6 +467,12 @@ export default defineComponent({
 
     /** Taken when «Закончить» is tapped, like `finishingEmpty`: rows arriving do not reword it. */
     const askingReceipt = ref(false)
+    /** The receipt's sum of a record with no purchases, said by both questions (adversarial В1). */
+    const finishingSum = ref<string | null>(null)
+    function sumOnly(): string | null {
+      const sum = receiptCurrent.value
+      return kept.value === 0 && sum ? formatMoney(sum, locale.value) : null
+    }
     const finishCounts = ref({ n: 0, total: 0 })
     const receiptText = ref('')
     const receiptCurrency = ref(currency.value)
@@ -467,6 +480,7 @@ export default defineComponent({
 
     function askFinish(): void {
       finishingEmpty.value = kept.value === 0 && !receiptCurrent.value
+      finishingSum.value = sumOnly()
       askingReceipt.value = unpriced.value > 0 && receiptCurrent.value === null
       finishCounts.value = { n: unpriced.value, total: kept.value }
       receiptText.value = ''
@@ -490,6 +504,7 @@ export default defineComponent({
         place: place.value,
         day: trip.value?.startedAt ?? local.value?.startedAt ?? null,
         items: kept.value,
+        receipt: sumOnly(),
       }
       removing.value = true
     }
@@ -570,6 +585,7 @@ export default defineComponent({
       removeEmpty,
       toSpending,
       askingReceipt,
+      finishingSum,
       finishCounts,
       receiptText,
       receiptCurrency,
