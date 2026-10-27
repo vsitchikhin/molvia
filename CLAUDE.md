@@ -398,8 +398,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **What a secret may look like is one rule, in `backend/src/secret.ts`**; more than one cookie of
   that name is refused, and the refusal clears nothing.
 - **The term slides, moved by one write a day**; four refusals give one answer, `401 error.no_actor`.
-- **The last visit is `actors.last_seen_at`** (MOL-238): once a day per account by the guard and at
-  every login, a statement apart from `touch`, never the bot, never `updated_at` — MOL-239's clock.
+- **The account's last visit is `actors.last_seen_at`** (MOL-238), never the visit of «Что брать»: once
+  a day per account by the guard and at every login, a statement apart from `touch`, never the bot,
+  never `updated_at` — MOL-239's clock; past a session's 180 days only the login marks it.
 - **The login is a gate, not a route** (MOL-56): the door has one definition, `login.closed`; the
   device remembers the request and never the secret; whose account this is, is asked before anyone
   is let in; the queue and the drafts send only once the server has said who we are.

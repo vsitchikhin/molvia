@@ -49,7 +49,7 @@ export interface ActorRepository {
   acceptConsent(id: string, version: number): Promise<number | null>
 
   /**
-   * Marks a visit (MOL-238): `last_seen_at` to now — but only if the mark is older than
+   * Marks the account's visit (MOL-238): `last_seen_at` to now — but only if the mark is older than
    * `afterHours`, so the first request of a day writes and the rest do not, whichever device sends
    * them. Answers whether it wrote. The condition is in the `WHERE`, as `touch`'s is: two requests
    * arriving together write once. `now()`, the database's clock, as everywhere a moment is stamped.
