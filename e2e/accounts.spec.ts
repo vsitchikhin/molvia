@@ -456,6 +456,74 @@ test('a phone of 430: the rent’s amount beside its words, as the handoff draws
   expect(await rentRow(page, 430)).toMatchObject({ under: false, lines: 1, inside: true })
 })
 
+// MOL-197, handoff 116 v2/06: the chosen account is the kit's chosen row — a ring of 2 on its layer, not
+// a fill alone, which the dark scheme did not show (Ф-5) — every row 64, the groups 24 apart and the
+// footnote 8 under the last card. The kit's ring and focus are held on WebKit by `kit-rows`.
+test('выбор счёта: строки 64, у выбранной кольцо 2 px, группы через 24, сноска через 8', async ({
+  page,
+}) => {
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  for (const [name, currency] of [
+    ['Наличные ֏', 'AMD'],
+    ['Карта ₽', 'RUB'],
+  ] as const) {
+    const response = await page.request.post('/api/money/accounts', {
+      headers,
+      data: {
+        id: randomUUID(),
+        name,
+        currency,
+        savings: false,
+        start: { amount: '1000', currency },
+        startOn: yesterday(),
+      },
+    })
+    expect(response.status(), await response.text()).toBe(201)
+  }
+  await open(page, '/money')
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  await expect(topSheet(page)).toContainText('Новая трата')
+  await page.waitForTimeout(400)
+  await topSheet(page)
+    .getByRole('button', { name: /Выбрать счёт:/ })
+    .click()
+  const picker = topSheet(page)
+  await expect(picker).toContainText('Остатки — на сейчас')
+  await expect(picker.getByRole('radio', { name: /Наличные ֏/ })).toBeChecked()
+
+  const look = await picker.evaluate((sheet) => {
+    const box = (one: Element | undefined | null) => {
+      if (!one) throw new Error('another shape')
+      return one.getBoundingClientRect()
+    }
+    const group = sheet.querySelector('[role="radiogroup"]')
+    const cards = [...(group?.querySelectorAll('ul') ?? [])]
+    const captions = [...(group?.querySelectorAll('h3') ?? [])]
+    const chosen = sheet.querySelector('[role="radio"][aria-checked="true"]')
+    if (!chosen) throw new Error('no chosen row')
+    const ring = /(-?[\d.]+)px inset|inset[^,]*?(-?[\d.]+)px\s*$/.exec(
+      getComputedStyle(chosen, '::before').boxShadow,
+    )
+    return {
+      heights: [...sheet.querySelectorAll('[role="radio"]')].map((row) =>
+        Math.round(box(row).height),
+      ),
+      ring: parseFloat(ring?.[1] ?? ring?.[2] ?? 'NaN'),
+      toCaption: Math.round(box(captions[1]).top - box(cards[0]).bottom),
+      toNone: Math.round(box(cards[2]).top - box(cards[1]).bottom),
+      toFootnote: Math.round(box(sheet.querySelector('.footnote')).top - box(cards[2]).bottom),
+    }
+  })
+  expect(look).toEqual({
+    heights: [64, 64, 64],
+    ring: 2,
+    toCaption: 24,
+    toNone: 24,
+    toFootnote: 8,
+  })
+})
+
 // MOL-225, adversarial Р1-А3: the line drops while «Сохранить» works. A native `disabled` put on the
 // button at work took the focus out of the sheet to the page; the button keeps it, and its word.
 test('связь пропала, пока «Сохранить» работает: кнопка держит фокус и слово «Сохраняем…»', async ({
