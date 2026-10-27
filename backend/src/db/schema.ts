@@ -367,11 +367,12 @@ export const actors = pgTable(
      */
     analyticsOnAt: timestamp('analytics_on_at', { withTimezone: true }),
     /**
-     * When the person last opened the app (MOL-238): the clock of «two years of silence», after
-     * which MOL-239 erases the account (owner's В-2 of MOL-97). A session knows its own last use,
-     * but goes after 180 days unused, or at «Выйти» — and with it the only trace of the visit.
-     * Moved once a day by the first request through the guard and by every login, never by the bot
-     * (owner's В-1); not by `updated_at`'s trigger either, which marks a change, not a visit.
+     * The account's last visit (MOL-238) — not the visit «Что брать» logs: when the person last used
+     * the app or signed in. The clock of «two years of silence», after which MOL-239 erases the
+     * account (owner's В-2 of MOL-97). A session knows its own last use, but goes after 180 days
+     * unused, or at «Выйти» — and with it the only trace of the visit. Moved once a day by the first
+     * request through the guard and by every login, never by the bot (owner's В-1); not by
+     * `updated_at`'s trigger either, which marks a change, not a visit.
      */
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

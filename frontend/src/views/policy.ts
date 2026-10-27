@@ -16,7 +16,7 @@ import { calendarDay } from '@/days'
 export const POLICY_REVISION = {
   day: '2026-10-27',
   version: 3,
-  digest: '253bbdca6e068ec8d2c9ecf210ca205aea74830b58f9baac87f9326ccda2286e',
+  digest: '5688706aabdafcb23674b5b6b86175b1064c7c115ea8777c1fb30456890c8ee9',
 } as const
 
 // Which parts each page shows, in order — here and not in the pages, so the fingerprint holds them

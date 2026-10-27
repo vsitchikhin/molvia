@@ -30,12 +30,12 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 - `backend/src/usecases/complete-login.ts` — Use case: the poll that collects a confirmed login — locks, consumes the request and signs in within one transaction. Tests: `backend/tests/login-transaction.integration.test.ts`.
 - `backend/src/usecases/create-actor.ts` — Use case: a new owner for a Telegram id, with the first settings the server names (country, city, currencies).
 - `backend/src/usecases/sessions.ts` — Use cases of «Устройства» and «Выйти»: list the owner's live sessions, end one of them, log out by token.
-- `backend/src/usecases/sign-in.ts` — Use case: find or create the owner of a Telegram id, mint a new session token for them and mark the visit (MOL-238).
+- `backend/src/usecases/sign-in.ts` — Use case: find or create the owner of a Telegram id, mint a new session token for them and mark the account's visit (MOL-238).
 - `backend/src/usecases/start-login.ts` — Use case: start a login — code, secret and the `t.me` link, under the database-wide quota. Tests: `backend/tests/login-quota.integration.test.ts`.
 
 ## backend · db
 
-- `backend/src/db/actors-repository.ts` — Repository of owners: create under the account lock, find by id or Telegram id, update the settings, lock an account, mark a visit once a day (MOL-238).
+- `backend/src/db/actors-repository.ts` — Repository of owners: create under the account lock, find by id or Telegram id, update the settings, lock an account, mark the account's visit once a day (MOL-238).
 - `backend/src/db/auth-unit-of-work.ts` — Unit of work of the login: the owner, session and login-request repositories built on one transaction.
 - `backend/src/db/login-requests-repository.ts` — Repository of login requests: quota-limited create, confirm, decline, lock, consume, expired cleanup; secrets kept only as hashes; every step counted into `login_days` in its own transaction. Tests: `backend/tests/login-requests.integration.test.ts`, `backend/tests/login-days.integration.test.ts`.
 - `backend/src/db/sessions-repository.ts` — Repository of sessions: create by token hash, live lookup with its owner, daily touch, list and remove for «Устройства», expired cleanup. Tests: `backend/tests/sessions.integration.test.ts`.
