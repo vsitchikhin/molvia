@@ -524,6 +524,41 @@ test('выбор счёта: строки 64, у выбранной кольцо
   })
 })
 
+// MOL-197: the name's whole line was the least width of «Счёт ›», and a long one pushed the sheet of a
+// spending to 483 px on a phone of 320 — every field past the edge — instead of ending in «…».
+test('длинное имя счёта на 320: строка «Счёт ›» кончается «…», шторка не шире экрана', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 740 })
+  await signedIn(page)
+  const response = await page.request.post('/api/money/accounts', {
+    headers: await asBrowser(page),
+    data: {
+      id: randomUUID(),
+      name: 'Кредитка с очень длинным именем ֏',
+      currency: 'AMD',
+      savings: false,
+      start: { amount: '1000', currency: 'AMD' },
+      startOn: yesterday(),
+    },
+  })
+  expect(response.status(), await response.text()).toBe(201)
+  await open(page, '/money')
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  const sheet = topSheet(page)
+  const row = sheet.getByRole('button', { name: /Выбрать счёт:/ })
+  await expect(row).toContainText('Кредитка с очень длинным именем')
+  const look = await sheet.evaluate((dialog) => {
+    const value = dialog.querySelector('.row .value')
+    if (!value) throw new Error('no row')
+    return {
+      sideways: dialog.scrollWidth - dialog.clientWidth,
+      cut: value.scrollWidth > value.clientWidth,
+    }
+  })
+  expect(look).toEqual({ sideways: 0, cut: true })
+})
+
 // MOL-225, adversarial Р1-А3: the line drops while «Сохранить» works. A native `disabled` put on the
 // button at work took the focus out of the sheet to the page; the button keeps it, and its word.
 test('связь пропала, пока «Сохранить» работает: кнопка держит фокус и слово «Сохраняем…»', async ({
