@@ -164,7 +164,11 @@ describe('Telegram login over HTTP', () => {
     })
     expect(trip.statusCode).toBe(200)
     expect(trip.json<{ trip: { id: string } }>().trip.id).toBe(tripId)
-    expect((await db.select().from(actors))[0]).toEqual(original)
+    // Nothing of the account moves, `updated_at` included — but the login is a visit (MOL-238)
+    const [after] = await db.select().from(actors)
+    if (original === undefined || after === undefined) throw new Error('the owner is gone')
+    expect({ ...after, lastSeenAt: original.lastSeenAt }).toEqual(original)
+    expect(after.lastSeenAt.getTime()).toBeGreaterThan(original.lastSeenAt.getTime())
   })
 
   it('unknown, expired, refused, consumed, malformed and foreign requests answer alike', async () => {

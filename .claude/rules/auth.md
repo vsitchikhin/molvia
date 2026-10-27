@@ -150,6 +150,29 @@ is in `bot.md`.
   checks it too, off the row it already holds, because an `UPDATE` on **every** request would
   bloat the one table every request touches. The cookie is re-set by the same write, or the
   browser would drop a session the server still holds.
+- **The account's last visit is `actors.last_seen_at`, marked once a day (MOL-238)** — the clock of
+  the two years of silence after which MOL-239 erases the account (owner's В-2 of MOL-97). **Not the
+  visit of «Что брать»** (`advice_viewed`, MOL-31), which is a statistic and wants edition 2: the two
+  share a word and nothing else, so a rule names which one it means. A session knows its own last use,
+  but goes after 180 days unused or at «Выйти», and with it the only trace of the visit. **Once a day
+  per account, not per session** (`ACCOUNT_SEEN_AFTER_HOURS`, its own number beside the session's —
+  the same 24 today, but how a way in slides is not how a visit is counted): the guard judges it off
+  the owner's row `liveByToken` already read, and `markSeen` repeats the condition in its `WHERE`, as
+  `touch` does — two devices, or two requests at once, write once. **A statement of its own after
+  `touch`, never one with it**: erasure locks the owner before the sessions, and one statement
+  updating a session and then its owner would take the two the other way round. **A login is the
+  account's visit** whenever the last one was (`signIn`, the development seam included), and a new
+  owner starts at the moment it appeared. **The bot is not one** (owner's В-1 «а»): a press under a
+  reminder or a word to the developer in Telegram moves nothing — a word from the app's sheet goes
+  through the guard like any request. **Opening the app is a visit only while a session lives**
+  (adversarial А1): after 180 days unused the session is gone, the app opens on the door and only
+  the login marks the visit — and whoever MOL-239 warns has been silent some 700 days. So the page
+  says «открыть приложение и войти, если оно попросит», and the warnings ask the same. **It is not a
+  change of the row**: `actors_touch_updated_at` ignores the column (0073), or the first request of
+  every day would make the owner «newer» to the phone, which compares `updatedAt` to know whose
+  settings are fresher. Nor is it the statistics: it is written whatever the switch and the edition
+  accepted — a term of keeping, not a count. Not on the wire; in the copy (version 24); the precision
+  is a day.
 - **Four refusals, one answer.** No cookie, a token nobody was issued, a token of a revoked
   session, a token of an expired one: `401` with `error.no_actor`, identical byte for byte.
   Nothing arranges that — they fail one `WHERE` in the repository, and a value this server could
