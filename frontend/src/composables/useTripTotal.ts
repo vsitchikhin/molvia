@@ -31,10 +31,12 @@ export interface TripTotalInput {
   readonly local: boolean
   /** «Сумма по чеку» still in the queue: the sum typed, or `receipt: null` for one taken off. */
   readonly receiptWaiting: { readonly receipt: Money | null } | null
-  /** Whether «+ Сумма по чеку» is offered: a record with purchases (В-1). Left out, not offered. */
-  readonly offerReceipt?: boolean
-  /** Whether the trip is the server's answer, which knows the receipt (review 4). Left out, it is. */
-  readonly receiptKnown?: boolean
+  /**
+   * The rows on screen, one being removed not among them, and those of them with no price — what
+   * «С ценой — n из m» counts: the same count «Закончить» asks by (Р-5 of MOL-76, adversarial А2).
+   * Left out, the line is not said.
+   */
+  readonly rows?: { readonly kept: number; readonly unpriced: number } | null
 }
 
 /** One line of what the prices say beside the receipt's sum. */
@@ -57,7 +59,6 @@ export interface TripTotal {
   readonly flip: () => void
   readonly split: ComputedRef<SplitLine[]>
   readonly waiting: ComputedRef<string | null>
-  readonly receiptAction: ComputedRef<string | null>
 }
 
 /**
@@ -182,17 +183,19 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
   })
 
   /**
-   * «С ценой — 1 из 2 · без цены — 1» (MOL-206, Ф-23): said only while some purchase the server
-   * holds has no price, so the total reads as the part it is; with a receipt's sum the split below
-   * says it instead. Rows of the server's answer, as the total is — never the queue's.
+   * «С ценой — 1 из 2 · без цены — 1» (MOL-206, Ф-23): said only while some purchase on screen has no
+   * price, so the total reads as the part it is; with a receipt's sum the split below says it instead.
+   * The rows the screen shows, as «Закончить» counts them: a purchase without a price being removed
+   * with no signal is no longer «без цены» here while the question at «Закончить» has forgotten it.
    */
   const priced = computed(() => {
-    const trip = props.trip
-    if (!trip || trip.receipt) return null
-    const all = trip.expenses.length
-    const withPrice = trip.expenses.filter((expense) => expense.amount !== null).length
-    if (withPrice === all) return null
-    return t('trip.total_line', { priced: withPrice, total: all, unpriced: all - withPrice })
+    const rows = props.rows
+    if (!rows || rows.unpriced === 0 || props.trip?.receipt) return null
+    return t('trip.total_line', {
+      priced: rows.kept - rows.unpriced,
+      total: rows.kept,
+      unpriced: rows.unpriced,
+    })
   })
 
   // Nothing to swap without a conversion: a lone total is not two numbers.
@@ -239,12 +242,6 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
       : t('trip.receipt.removing')
   })
 
-  const receiptAction = computed(() => {
-    if (props.receiptKnown === false) return null
-    if (props.trip?.receipt || props.receiptWaiting?.receipt) return t('trip.receipt.edit')
-    return props.offerReceipt ? t('trip.receipt.add') : null
-  })
-
   return {
     big,
     rest,
@@ -257,6 +254,5 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
     flip,
     split,
     waiting,
-    receiptAction,
   }
 }

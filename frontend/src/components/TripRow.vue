@@ -1,12 +1,11 @@
 <template>
   <ListRow
-    :key="open ? 'open' : 'still'"
-    :as="open ? 'button' : 'div'"
     class="row"
     :class="{ waiting: row.mark !== null, gone: row.mark === 'removing' }"
     wrap
-    :next="open"
-    @click="open && $emit('open', row)"
+    next
+    :inactive="!open"
+    @click="$emit('open', row)"
   >
     <template #title
       ><span class="name">{{ row.name }}</span></template
@@ -41,7 +40,7 @@ import type { TripRowView } from './tripRow'
  * screen computes it with the domain's own `unitPrice`, as the sheet does.
  *
  * A row of the kit (MOL-206, handoff 7a): the name, then the quantity and the price per unit in the
- * meta, the amount in the tail and the chevron of a row that opens the sheet. A price nobody entered
+ * meta, the amount in the tail and the chevron on every row. A price nobody entered
  * is «без цены» under the name and «—» in the tail — the chevron says the row is one tap from the
  * same sheet. There is no conversion here on purpose (handoff «Валюты»): eight rows × two numbers, half of
  * them estimates, is a screen nobody can read.
@@ -61,8 +60,9 @@ export default defineComponent({
     /**
      * A row opens the sheet when there is a card to open it on — and not while it is being
      * removed: an amendment queued behind the removal would reach a row the server no longer has,
-     * and come back as «не принято» about a purchase the person threw away themselves. A row of the
-     * kit keeps its tag for its life, so one that stops opening is another row, drawn anew (`key`).
+     * and come back as «не принято» about a purchase the person threw away themselves. Such a row is
+     * the kit's «not now» and keeps its chevron, so the amounts of a card end in one column, as an
+     * operation's do (MOL-176, adversarial А3); its tag says why.
      */
     const open = computed(() => props.row.entry !== null && props.row.mark !== 'removing')
 

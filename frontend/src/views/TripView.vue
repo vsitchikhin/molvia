@@ -53,22 +53,26 @@
         />
       </AppCard>
 
-      <template v-else>
-        <AppCard list>
-          <AppReveal group>
-            <TripRow v-for="row in rows" :key="row.key" :row="row" @open="amend" />
-          </AppReveal>
-        </AppCard>
-        <!-- Under the list, with «≈» and the rate (handoff 7a, owner's В-17 «а»): the strip went to
-             the actions, and the total stays the server's. -->
+      <AppCard v-else list>
+        <AppReveal group>
+          <TripRow v-for="row in rows" :key="row.key" :row="row" @open="amend" />
+        </AppReveal>
+      </AppCard>
+
+      <!-- Under the list, with «≈» and the rate (handoff 7a, owner's В-17 «а»): the strip went to the
+           actions, and the total stays the server's. With the first purchase — or with a receipt's sum
+           whose purchases were all removed since, which is still the record's money (MOL-78, review 5;
+           adversarial А1): the screen does not lose the one figure it has. -->
+      <template v-if="rows.length > 0 || receiptCurrent">
         <TripTotalCard
           class="total"
           :trip="trip"
           :pending="waiting"
           :local="local !== null"
           :receipt-waiting="receiptWaiting"
+          :rows="{ kept, unpriced }"
         />
-        <p class="footnote">{{ t('trip.footnote') }}</p>
+        <p v-if="rows.length > 0" class="footnote">{{ t('trip.footnote') }}</p>
         <AppButton
           v-if="receiptAction"
           class="receipt"
@@ -83,7 +87,7 @@
            under the thumb (MOL-76, В-1). -->
       <AppButton
         class="remove"
-        :class="{ alone: rows.length === 0 || !receiptAction }"
+        :class="{ alone: !receiptAction }"
         variant="danger-ghost"
         block
         @click="askRemove"
@@ -100,13 +104,18 @@
          corner the thumb does not reach. -->
     <template v-if="phase === 'going'" #docked>
       <div class="pair">
+        <!-- The verb out loud, the short word on the pill: the glyph that says «add» or «scan» is
+             hidden, and «Позиция, кнопка» says nothing of what it does (review 2, №3). Hidden text
+             in front, never an `aria-label`, as the total's card names its flip. -->
         <AppButton variant="secondary" size="large" @click="scan">
           <template #icon><IconBarcode /></template>
-          {{ t('trip.scan_short') }}
+          <span class="hidden">{{ t('item.barcode.scan') }}</span>
+          <span aria-hidden="true">{{ t('trip.scan_short') }}</span>
         </AppButton>
         <AppButton size="large" @click="find">
           <template #icon><IconPlus /></template>
-          {{ t('trip.add_short') }}
+          <span class="hidden">{{ t('trip.add_item') }}</span>
+          <span aria-hidden="true">{{ t('trip.add_short') }}</span>
         </AppButton>
       </div>
       <AppButton variant="ghost" block @click="askFinish">
@@ -364,16 +373,8 @@ export default defineComponent({
     })
 
     const { rows, waiting } = useTripRows(tripId, trip, () => t('trip.queued.unnamed'))
-    const { receiptOpen, receiptWaiting, receiptCurrent, offerReceipt, unpriced } = useTripReceipt(
-      tripId,
-      trip,
-      rows,
-    )
-    /** «+ Сумма по чеку» under the total, or «Изменить» once a sum is there or on its way (MOL-78). */
-    const receiptAction = computed(() => {
-      if (receiptCurrent.value) return t('trip.receipt.edit')
-      return offerReceipt.value ? t('trip.receipt.add') : null
-    })
+    const { receiptOpen, receiptWaiting, receiptCurrent, receiptAction, kept, unpriced } =
+      useTripReceipt(tripId, trip, rows)
     const handoff = useSpendingHandoffStore()
     /** «Записать тратой в «Деньгах»» was chosen: the screen goes there once the record is away. */
     let toMoney = false
@@ -455,12 +456,6 @@ export default defineComponent({
       if (id) queue.enqueue({ kind: 'finish', tripId: id, finishedOnDeviceAt: new Date() })
       finishing.value = false
     }
-
-    /**
-     * The rows still on screen: one being removed is on its way out already. One count for both
-     * questions, or «Закончить» and «Удалить запись» called one record empty and not (review Р-5).
-     */
-    const kept = computed(() => rows.value.filter((row) => row.mark !== 'removing').length)
 
     /** Taken when «Закончить» is tapped, like `finishingEmpty`: rows arriving do not reword it. */
     const askingReceipt = ref(false)
@@ -580,6 +575,8 @@ export default defineComponent({
       receiptWaiting,
       receiptCurrent,
       receiptAction,
+      kept,
+      unpriced,
       tripId,
       currency,
       leaveIfOver,
@@ -632,6 +629,10 @@ export default defineComponent({
 
 .total {
   margin-top: var(--space-2);
+}
+
+.hidden {
+  @include visually-hidden;
 }
 
 .footnote {

@@ -19,8 +19,10 @@
       <!-- Flipped, the big number is the conversion and keeps every sign of being one: «≈» and the
            muted colour (handoff «Валюты», В2-5). -->
       <span class="sum" :class="{ guess: flipped }">{{ big }}</span>
-      <!-- One line of parts, broken only between them (MOL-206, Ф-23): every figure the strip had,
-           each with its words. -->
+      <!-- Money paid in another currency — and, flipped, the exact sum — under the figure on a line of
+           its own: beside «≈» in the same currency it read «1 000 ₽ ≈ 1 347 ₽» (adversarial А4). -->
+      <span v-if="rest.length > 0" class="line">{{ rest.join(' · ') }}</span>
+      <!-- One line of parts, every figure the strip had, each with its words (MOL-206, Ф-23). -->
       <span v-if="parts.length > 0" class="line">
         <template v-for="(part, index) in parts" :key="part">
           <template v-if="index > 0"> · </template>
@@ -74,13 +76,20 @@ export default defineComponent({
       type: Object as PropType<{ readonly receipt: Money | null } | null>,
       default: null,
     },
+    /** The rows on screen and those with no price, as «Закончить» counts them (`useTripReceipt`). */
+    rows: {
+      type: Object as PropType<{ readonly kept: number; readonly unpriced: number } | null>,
+      default: null,
+    },
   },
   setup(props) {
     const { t } = useI18n()
     const total = useTripTotal(props)
 
+    // «≈» stays with its amount where the line wraps: «≈» at a line's end read as a sign of nothing.
+    const estimate = computed(() => total.estimate.value?.replace(/^≈ /, '≈\u00a0') ?? null)
     const parts = computed(() =>
-      [...total.rest.value, total.priced.value, total.estimate.value, total.rateLine.value].filter(
+      [total.priced.value, estimate.value, total.rateLine.value].filter(
         (part): part is string => part !== null,
       ),
     )
@@ -88,6 +97,7 @@ export default defineComponent({
     return {
       t,
       big: total.big,
+      rest: total.rest,
       parts,
       caveat: total.caveat,
       split: total.split,
@@ -102,7 +112,8 @@ export default defineComponent({
 
 <style scoped lang="scss">
 /* The face is the card's whole surface, its padding over the card's own, so the flip is a tap
-   anywhere on it and its focus ring follows the card's corners. */
+   anywhere on it and its focus ring follows the card's corners. The 16 is `AppCard`'s padding: a card
+   whose padding changes moves this with it. */
 .face {
   display: flex;
   flex-direction: column;
@@ -153,8 +164,11 @@ export default defineComponent({
   line-height: var(--leading-snug);
 }
 
+/* A part breaks inside where it must: the rate named with its bank, «rate … · National Bank of
+   Serbia», is wider than the card on any phone (review 2, №1). The figures keep their no-break
+   spaces, so no amount or rate splits. */
 .part {
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .split {

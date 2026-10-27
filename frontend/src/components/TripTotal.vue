@@ -73,15 +73,8 @@ export default defineComponent({
       type: Object as PropType<{ readonly receipt: Money | null } | null>,
       default: null,
     },
-    /** Whether «+ Сумма по чеку» is offered: a record with purchases (В-1). */
-    offerReceipt: { type: Boolean, default: false },
-    /**
-     * Whether the trip is the server's answer, which knows the receipt. A finished record read back
-     * from the phone's cache does not keep it yet (the previous build reads that cache strictly), so
-     * its total may be a receipt with nothing saying so: neither «+» nor «Изменить» is offered over
-     * it — the sheet would open empty over a sum that is there (review 4).
-     */
-    receiptKnown: { type: Boolean, default: true },
+    /** «+ Сумма по чеку» or «Изменить сумму по чеку», by the screen's one rule (`useTripReceipt`). */
+    receiptAction: { type: String as PropType<string | null>, default: null },
   },
   emits: {
     receipt: () => true,

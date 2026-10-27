@@ -245,32 +245,20 @@ describe('TripTotal', () => {
       expect(even.findAll('.split li span').map(plain)).toEqual(['С ценой — 1 из 1', '500 ֏'])
     })
 
-    it('без суммы — «Итого» как было, и «+ Сумма по чеку» только когда её предлагают (В-1)', async () => {
-      const offered = render({ offerReceipt: true })
+    it('без суммы — «Итого» как было, и кнопка суммы — та, что дал экран (`useTripReceipt`)', async () => {
+      const offered = render({ receiptAction: ru.trip.receipt.add })
       expect(offered.get('.caption').text()).toBe(ru.trip.total)
       expect(offered.find('.split').exists()).toBe(false)
       await offered.get('.receipt').trigger('click')
       expect(offered.emitted('receipt')).toHaveLength(1)
 
       expect(render().find('.receipt').exists()).toBe(false)
-      expect(render({ trip: partial() }).get('.receipt').text()).toBe(ru.trip.receipt.edit)
-    })
-
-    it('запись из памяти телефона — суммы не знает: ни «+», ни «Изменить» (ревью 4)', () => {
-      const cached = render({
-        trip: trip({ total: [amd('1400')] }),
-        offerReceipt: true,
-        receiptKnown: false,
-      })
-      expect(cached.find('.receipt').exists()).toBe(false)
-      expect(cached.find('.split').exists()).toBe(false)
     })
 
     it('сумма в очереди — строка «отправляется», итог остаётся серверным (Р-7)', () => {
       const typed = render({ receiptWaiting: { receipt: { minor: 1_240_000n, currency: 'AMD' } } })
       expect(plain(typed.get('.sum'))).toBe('6 493,12 ֏')
       expect(plain(typed.get('.waiting'))).toBe('Сумма по чеку 12 400 ֏ · отправляется')
-      expect(typed.get('.receipt').text()).toBe(ru.trip.receipt.edit)
 
       const off = render({ trip: partial(), receiptWaiting: { receipt: null } })
       expect(off.get('.waiting').text()).toBe(ru.trip.receipt.removing)
@@ -304,12 +292,21 @@ describe('TripTotalCard', () => {
     expect(parts(view)).toEqual(['≈ 1 347 ₽', 'курс 4,82 ֏/₽ · 15 янв.'])
   })
 
-  it('«С ценой — n из m · без цены — k» — только когда цена есть не у всех', () => {
-    const some = card({ trip: trip({ total: [amd('1000')], rows: [amd('1000'), null] }) })
+  it('«С ценой — n из m · без цены — k» — по строкам экрана, только когда цена есть не у всех', () => {
+    const some = card({
+      trip: trip({ total: [amd('1000')], rows: [amd('1000'), null] }),
+      rows: { kept: 2, unpriced: 1 },
+    })
     expect(parts(some)[0]).toBe('С ценой — 1 из 2 · без цены — 1')
 
-    const all = card({ trip: trip({ total: [amd('1000')], rows: [amd('1000')] }) })
+    const all = card({ trip: trip({ total: [amd('1000')] }), rows: { kept: 1, unpriced: 0 } })
     expect(parts(all).some((part) => part.startsWith('С ценой'))).toBe(false)
+    // Строка без цены удаляется без связи: сервер её ещё держит, экран — уже нет (адверсариальное А2).
+    const removing = card({
+      trip: trip({ total: [amd('1000')], rows: [amd('1000'), null] }),
+      rows: { kept: 1, unpriced: 0 },
+    })
+    expect(parts(removing).some((part) => part.startsWith('С ценой'))).toBe(false)
   })
 
   it('вся карточка — кнопка переворота: «≈» остаётся на пересчёте, точная сумма уходит в строку', async () => {
@@ -324,7 +321,9 @@ describe('TripTotalCard', () => {
     expect(face.attributes('aria-pressed')).toBe('true')
     expect(plain(view.get('.sum'))).toBe('≈ 1 347 ₽')
     expect(view.get('.sum').classes()).toContain('guess')
-    expect(parts(view)).toEqual(['6 493,12 ֏', 'курс 4,82 ֏/₽ · 15 янв.'])
+    // Точная сумма — строкой под оценкой, курс — в строке частей.
+    expect(plain(view.findAll('.line')[0] ?? view.get('.line'))).toBe('6 493,12 ֏')
+    expect(parts(view)).toEqual(['курс 4,82 ֏/₽ · 15 янв.'])
 
     // Выбор общий с полосой записанных: одна память на телефон.
     expect(plain(render().get('.sum'))).toBe('≈ 1 347 ₽')
@@ -336,12 +335,15 @@ describe('TripTotalCard', () => {
     expect(view.text()).not.toContain('≈')
   })
 
-  it('прочие валюты и оговорки остаются: итог не тише корзины', () => {
+  it('прочие валюты — своей строкой под суммой, не соседом оценки; оговорки остаются', () => {
     const view = card({
       trip: trip({ total: [amd('6493.12'), { amount: '1500', currency: 'RUB' }] }),
       pending: 2,
     })
-    expect(parts(view)[0]).toBe('1 500 ₽')
+    const lines = view.findAll('.line').map(plain)
+    // «1 500 ₽ · ≈ 1 347 ₽» читалось «1 500 ₽ ≈ 1 347 ₽» (адверсариальное А4).
+    expect(lines[0]).toBe('1 500 ₽')
+    expect(parts(view)).toEqual(['≈ 1 347 ₽', 'курс 4,82 ֏/₽ · 15 янв.'])
     expect(view.get('.note').text()).toBe('+ 2 позиции ещё не ушли · пересчёт только по AMD')
   })
 

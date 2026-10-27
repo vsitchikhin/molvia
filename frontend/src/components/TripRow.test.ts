@@ -78,10 +78,15 @@ describe('TripRow', () => {
     expect(plain(view.get('.tail'))).toBe('520 ֏')
   })
 
-  it('строка кита (MOL-206, 7a): шеврон у той, что открывается, и нет его у той, что нет', () => {
-    expect(render().get('.list-row').find('.chevron').exists()).toBe(true)
-    expect(render({ entry: null }).find('.chevron').exists()).toBe(false)
-    expect(render({ mark: 'removing' }).find('.chevron').exists()).toBe(false)
+  it('строка кита (MOL-206, 7a): шеврон у каждой — суммы карточки кончаются одной колонкой (А3)', () => {
+    for (const over of [{}, { entry: null }, { mark: 'removing' as const }]) {
+      const view = render(over)
+      expect(view.find('.chevron').exists()).toBe(true)
+      // За суммой — шеврон, а не конец строки: колонка сумм одна у всех строк.
+      expect(view.get('.list-row').element.lastElementChild?.classList.contains('chevron')).toBe(
+        true,
+      )
+    }
   })
 
   it('без цены — «без цены» под названием и прочерк в хвосте, а не пустота (7a)', () => {
@@ -107,15 +112,16 @@ describe('TripRow', () => {
     await open.trigger('click')
     expect(open.emitted('open')).toHaveLength(1)
 
+    // «Не сейчас» кита: строка на месте и в порядке фокуса, нажатие никуда не идёт, тег говорит почему.
     const removing = render({ mark: 'removing' })
-    expect(removing.element.tagName).toBe('DIV')
+    expect(removing.attributes('aria-disabled')).toBe('true')
     await removing.trigger('click')
     expect(removing.emitted('open')).toBeUndefined()
   })
 
   it('без карточки товара строка не открывается — открывать нечем', async () => {
     const unknown = render({ entry: null })
-    expect(unknown.element.tagName).toBe('DIV')
+    expect(unknown.attributes('aria-disabled')).toBe('true')
     await unknown.trigger('click')
     expect(unknown.emitted('open')).toBeUndefined()
   })

@@ -520,6 +520,13 @@
         <TripTotalCard :trip="kitTrip" />
         <SkeletonPart kind="figure" />
       </div>
+      <!-- The longest line it has: a rate named with its bank, as the National Bank of Serbia asks, and
+           purchases with no price — wraps inside the card, never past it (MOL-206, review 2). -->
+      <TripTotalCard
+        data-part="trip-total-named"
+        :trip="kitTripNamed"
+        :rows="{ kept: 14, unpriced: 2 }"
+      />
       <SkeletonPart kind="figure" plate />
       <SkeletonPart kind="lines" :widths="[64, 78]" />
     </section>
@@ -694,7 +701,6 @@ export default defineComponent({
     IconShape,
     ListRow,
     MoneyMonthCard,
-    TripTotalCard,
     MonthSwitcher,
     NavRow,
     OperationRow,
@@ -705,6 +711,7 @@ export default defineComponent({
     SegmentedControl,
     SkeletonPart,
     StatusStrip,
+    TripTotalCard,
     VerdictBadge,
     VerdictCard,
   },
@@ -761,6 +768,14 @@ export default defineComponent({
       prices: [],
       gap: null,
     })
+    const kitTripNamed: TripView = {
+      ...kitTrip,
+      currency: 'RSD',
+      rate: kitTrip.rate && { ...kitTrip.rate, quote: 'RSD', scaled: 1_630_000n },
+      rateProvider: 'nbs',
+      total: [money(12_840_000n, 'RSD')],
+      converted: money(7_877_300n, 'RUB'),
+    }
     // August of handoff MOL-157 v2 1b, as the server answers it: the card of a closed month.
     const moneyMonth: MoneyMonthView = {
       month: '2026-08',
@@ -1043,6 +1058,7 @@ export default defineComponent({
       units,
       moneyMonth,
       kitTrip,
+      kitTripNamed,
       chartMonth,
       chartSector,
       paceDays,
