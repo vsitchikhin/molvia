@@ -213,8 +213,8 @@ import { useRouter } from 'vue-router'
 import IconBarcode from '~icons/mdi/barcode-scan'
 import IconBasket from '~icons/mdi/basket-outline'
 import IconPlus from '~icons/mdi/plus'
-import { parseMoney } from '@molvia/model'
-import type { CatalogueEntry, TripExpenseView, TripPaymentBody } from '@molvia/model'
+import { decimalFromMinor, parseMoney } from '@molvia/model'
+import type { CatalogueEntry, Money, TripExpenseView, TripPaymentBody } from '@molvia/model'
 import AccountPickerSheet from '@/components/AccountPickerSheet.vue'
 import AccountRow from '@/components/AccountRow.vue'
 import AppButton from '@/components/AppButton.vue'
@@ -238,6 +238,7 @@ import TripTotal from '@/components/TripTotal.vue'
 import type { TripRowView } from '@/components/tripRow'
 import { useTripRows } from '@/composables/useTripRows'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
+import { shown } from '@/composables/useItemDetails'
 import type { RetryPurchase } from '@/composables/useItemDetails'
 import { useReconnect } from '@/composables/useReconnect'
 import { useTripReceipt } from '@/composables/useTripReceipt'
@@ -455,9 +456,12 @@ export default defineComponent({
       debitedBad.value = paid === 'bad'
       if (receipt === null || paid === 'bad') return
       if (id && receipt) queue.enqueue({ kind: 'receipt', tripId: id, body: { receipt } })
-      if (id && paid) {
-        queue.enqueue({ kind: 'payment', tripId: id, body: paid })
-        rememberPaymentAccount(actor.id, currency.value, ['hand'], paid.accountId)
+      const payment = changedPayment(paid)
+      if (id && payment) {
+        queue.enqueue({ kind: 'payment', tripId: id, body: payment })
+        if (heldPayment === null) {
+          rememberPaymentAccount(actor.id, currency.value, ['hand'], payment.accountId)
+        }
       }
       if (id) queue.enqueue({ kind: 'finish', tripId: id, finishedOnDeviceAt: new Date() })
       finishing.value = false
@@ -483,11 +487,18 @@ export default defineComponent({
       receiptText.value = ''
       receiptCurrency.value = currency.value
       receiptBad.value = false
-      // the account of a record by hand starts on the one the last was finished with (MOL-312, Р-4)
-      byHand.value = false
-      followDefault()
-      debited.value = ''
+      // the account the record is on already — set in «не попали» before «Закончить» — is where the sheet opens,
+      // «Списано» with it: an amendment opens on what it was written with (review Р1-1); a record on none
+      // starts on the one the last was finished with (MOL-312, Р-4)
+      const own = trip.value
+      heldPayment = own?.accountId ? { accountId: own.accountId, debited: own.debited } : null
+      byHand.value = heldPayment !== null
+      if (heldPayment) accountId.value = heldPayment.accountId
+      debited.value = heldPayment?.debited ? typedMoney(heldPayment.debited) : ''
       debitedBad.value = false
+      followDefault()
+      // «Счета» read when the sheet opens, never with every opening of «Покупки» (review Р1-2)
+      void accounts.refresh()
       finishing.value = true
     }
 
@@ -497,8 +508,11 @@ export default defineComponent({
      * is not the record's; a purchase in a third currency is the summary's to cover, as before.
      */
     const accounts = useAccountsStore()
-    void accounts.refresh()
     const accountId = ref<string | null>(null)
+    /** The account and «Списано» the record was on when «Закончить» was asked: sent again, they move nothing. */
+    let heldPayment: { accountId: string; debited: Money | null } | null = null
+    const typedMoney = (value: Money) =>
+      shown(decimalFromMinor(value), locale.value === 'ru' ? ',' : '.')
     /** Chosen in the picker: «Счета» answering late no longer move it. */
     const byHand = ref(false)
     function followDefault(): void {
@@ -523,6 +537,22 @@ export default defineComponent({
       accountId.value = next
       debited.value = ''
       debitedBad.value = false
+    }
+    /**
+     * What «Закончить» sends of the account: nothing where the sheet left the record's own, «Без счёта» only off
+     * an account the record was on — sent whole, a payment of the same account with no «Списано» would take it
+     * off (`payTrip` reads an absent one as none).
+     */
+    function changedPayment(paid: TripPaymentBody | undefined): TripPaymentBody | undefined {
+      const held = heldPayment
+      if (paid === undefined) return held ? { accountId: null } : undefined
+      if (
+        held?.accountId === paid.accountId &&
+        (paid.debited?.minor ?? null) === (held.debited?.minor ?? null) &&
+        (paid.debited?.currency ?? null) === (held.debited?.currency ?? null)
+      )
+        return undefined
+      return paid
     }
     /** The trip's payment: none for «Без счёта», which the record already is. */
     function paymentBody(): TripPaymentBody | 'bad' | undefined {

@@ -1227,6 +1227,46 @@ describe('TripView', () => {
       expect(memory()).toBeNull()
     })
 
+    it('запись уже на счёте — «Закончить» открывается на нём со «Списано» и счёт не трогает (Р1-1)', async () => {
+      currentTrip.mockResolvedValue({
+        ...trip(handoff()),
+        accountId: roubles.id,
+        debited: parseMoney('1100', 'RUB'),
+      })
+      const { view, queue } = await render()
+      await askFinish(view)
+      expect(row()?.textContent).toContain('Карта ₽')
+      const charged = openSheets()[0]?.querySelector<HTMLInputElement>('.charged input')
+      expect(charged?.value).toBe('1100')
+      inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      // must not: a payment of the same account and «Списано» — nothing to move
+      expect(queue.pending.map((write) => write.kind)).toEqual(['finish'])
+      expect(memory()).toBeNull()
+    })
+
+    it('запись уже на счёте — «Без счёта» снимает его, другая сумма «Списано» уходит', async () => {
+      currentTrip.mockResolvedValue({
+        ...trip(handoff()),
+        accountId: roubles.id,
+        debited: parseMoney('1100', 'RUB'),
+      })
+      const first = await render()
+      await askFinish(first.view)
+      await choose('Без счёта')
+      inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      expect(first.queue.pending.map((write) => write.kind)).toEqual(['payment', 'finish'])
+      expect(first.queue.pending[0]).toMatchObject({ body: { accountId: null } })
+    })
+
+    it('«Счета» читаются при «Закончить», а не при каждом открытии записи (Р1-2)', async () => {
+      const { view } = await render()
+      expect(moneyAccounts).not.toHaveBeenCalled()
+      await askFinish(view)
+      expect(moneyAccounts).toHaveBeenCalled()
+    })
+
     it('«не должно сработать»: без счетов строки нет', async () => {
       moneyAccounts.mockResolvedValue(page([]))
       const { view, queue } = await render()
