@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import type { SelectedTrip } from './useSelectedTrip'
 import { useRoute, useRouter } from 'vue-router'
@@ -8,6 +8,7 @@ import { currencySchema } from '@molvia/model'
 import type { CatalogueEntry, Currency, Money, TripExpenseView } from '@molvia/model'
 import type { TripRowView } from '@/components/tripRow'
 import type { CodeHeld } from '@/stores/receiptQueue'
+import { dayOfAnyYear, timeOfDay } from '@/days'
 import { upTarget, useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
 import { useTripHistoryStore } from '@/stores/tripHistory'
@@ -26,7 +27,10 @@ interface OpenedPurchase {
 interface FinishedTrip extends Omit<SelectedTrip, 'load'> {
   t: ReturnType<typeof useI18n>['t']
   name: ComputedRef<string>
-  meta: ComputedRef<string>
+  /** «Гюмри · вчера, 18:40 · из чека»; none while nothing of the record is known (Е-4). */
+  meta: ComputedRef<string | null>
+  /** The failed reads in a row, for the strip to say its words again (MOL-181). */
+  attempt: Ref<number>
   /** The purchases just written from a receipt, said once on arrival (MOL-127, 5o). */
   recorded: Ref<number | null>
   codesHeld: Ref<CodeHeld[]>
@@ -38,6 +42,9 @@ interface FinishedTrip extends Omit<SelectedTrip, 'load'> {
   receiptWaiting: ComputedRef<{ readonly receipt: Money | null } | null>
   receiptCurrent: ComputedRef<Money | null>
   receiptAction: ComputedRef<string | null>
+  /** The rows on screen and those with no price, as the card's «С ценой» counts them (MOL-206). */
+  kept: ComputedRef<number>
+  unpriced: ComputedRef<number>
   /** What a new sum starts in: the record's currency, as the purchase sheet takes it. */
   receiptCurrency: ComputedRef<Currency>
   opened: Ref<OpenedPurchase | null>
@@ -78,12 +85,8 @@ export function useFinishedTrip(): FinishedTrip {
   const history = useTripHistoryStore()
   // Whether the trip shown is the server's answer, which knows its receipt's sum — not one read back
   // from the phone's shelf, here or by another window (MOL-78, reviews 4 and Е).
-  const { receiptOpen, receiptWaiting, receiptCurrent, receiptAction } = useTripReceipt(
-    selected.id,
-    selected.trip,
-    rows,
-    () => history.answered(selected.trip.value),
-  )
+  const { receiptOpen, receiptWaiting, receiptCurrent, receiptAction, kept, unpriced } =
+    useTripReceipt(selected.id, selected.trip, rows, () => history.answered(selected.trip.value))
   const receiptCurrency = computed<Currency>(
     () =>
       selected.trip.value?.currency ??
@@ -98,17 +101,27 @@ export function useFinishedTrip(): FinishedTrip {
       selected.trip.value?.finishedOnDeviceAt ??
       selected.trip.value?.finishedAt,
   )
+  /**
+   * «Гюмри · вчера, 18:40» (handoff 5q) — the place is the title. The moment and its day are the ones
+   * the record's row in «Записаны» says, one record one day on both screens; the city is the answer's
+   * (`placeCity`), and a record with none says the day alone. Nothing at all while no moment is known
+   * — never «Эта запись ещё не закончена» about a record the screen is for (Е-4).
+   */
   const meta = computed(() => {
-    const line = finished.value
-      ? t('trip.history.finished_at', {
-          when: new Intl.DateTimeFormat(locale.value, {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-          }).format(finished.value),
-        })
-      : t('trip.history.unfinished')
+    const at = finished.value
+    if (!at) return null
+    const city = selected.trip.value?.placeCity ?? selected.local.value?.view?.placeCity
+    const when = t('trip.history.when', {
+      day: dayOfAnyYear(at, locale.value),
+      time: timeOfDay(at, locale.value),
+    })
     // Recorded from a receipt (MOL-126): said beside the day, as «Записаны» says it (MOL-127).
-    return selected.trip.value?.receiptId ? `${line} · ${t('receipt.recorded.from_receipt')}` : line
+    const source = selected.trip.value?.receiptId ? t('receipt.recorded.from_receipt') : null
+    return [city, when, source].filter((part) => part).join(' · ')
+  })
+  const attempt = ref(0)
+  watch(selected.loading, (now, was) => {
+    if (was && !now && selected.trouble.value) attempt.value += 1
   })
   /**
    * «Записали N покупок» (handoff 05, 5o): the review hands the count over in the history's state
@@ -206,6 +219,7 @@ export function useFinishedTrip(): FinishedTrip {
     t,
     name,
     meta,
+    attempt,
     recorded,
     codesHeld,
     toVerdicts: () => void goTab('verdicts'),
@@ -215,6 +229,8 @@ export function useFinishedTrip(): FinishedTrip {
     receiptWaiting,
     receiptCurrent,
     receiptAction,
+    kept,
+    unpriced,
     receiptCurrency,
     opened,
     amend,

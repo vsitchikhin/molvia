@@ -5,7 +5,6 @@ import type { TripView } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
-import TripTotal from '@/components/TripTotal.vue'
 import TripTotalCard from '@/components/TripTotalCard.vue'
 
 interface Wire {
@@ -77,196 +76,6 @@ function trip(over: Over = {}): TripView {
 /** Прочитанное с экрана: деньги печатаются с неразрывным пробелом, тесты — обычным. */
 const plain = (found: { text: () => string }): string => found.text().replaceAll('\u00a0', ' ')
 
-function render(props: Record<string, unknown> = {}) {
-  return mount(TripTotal, {
-    props: { trip: trip(), ...props },
-    global: { plugins: [createAppI18n('ru')] },
-  })
-}
-
-describe('TripTotal', () => {
-  beforeEach(() => {
-    localStorage.clear()
-    sessionStorage.clear()
-  })
-
-  it('сумма похода крупно, пересчёт рядом со знаком «≈» и датой курса', () => {
-    const view = render()
-    expect(plain(view)).toContain('6 493,12 ֏')
-    expect(plain(view)).toContain('≈ 1 347 ₽')
-    expect(plain(view)).toContain('курс 4,82 ֏/₽ · 15 янв.')
-  })
-
-  it('свой курс из обменов подписан как свой, а не как курс банка (MOL-40)', () => {
-    const own = trip()
-    const view = render({
-      trip: { ...own, rate: own.rate && { ...own.rate, source: 'personal' }, rateProvider: null },
-    })
-    expect(plain(view)).toContain('мой курс 4,82 ֏/₽ · 15 янв.')
-    expect(plain(view)).not.toContain('ЦБ')
-  })
-
-  it('курс НБ Сербии назван рядом с числом — так требуют условия НБС (MOL-230, ревью 1)', () => {
-    const own = trip()
-    const dinar = {
-      ...own,
-      currency: 'RSD' as const,
-      rate: own.rate && { ...own.rate, quote: 'RSD' as const, scaled: 1_225_700n },
-      rateProvider: 'nbs' as const,
-    }
-    expect(plain(render({ trip: dinar }))).toContain('курс 1,23 RSD/₽ · 15 янв. · НБ Сербии')
-    // ЦБ РА и запасной под строкой не называются: у них своё место — заметка курса.
-    expect(plain(render())).not.toContain('ЦБ РА')
-    const mine = { ...dinar, rate: dinar.rate && { ...dinar.rate, source: 'personal' as const } }
-    expect(plain(render({ trip: { ...mine, rateProvider: null } }))).not.toContain('НБ Сербии')
-  })
-
-  // Прыжок запятой через единицу: строка под суммой — той же стороной, что заметка и шторка
-  // (ревью Т-11, адв. А‴), и день курса — днём Еревана, в UTC тоже (адв. Ж″).
-  it('после прыжка через единицу курс под суммой — стороной прежнего, день — днём Еревана', () => {
-    const rate = (value: string) => ({
-      base: 'RUB' as const,
-      quote: 'AMD' as const,
-      scaled: BigInt(Math.round(Number(value) * 1_000_000)),
-      source: 'official' as const,
-      // Полночь Еревана 26 сентября — вечер 25-го в UTC.
-      asOf: new Date('2026-09-25T20:00:00.000Z'),
-    })
-    const jumped = rate('0.043')
-    const view = render({
-      trip: {
-        ...trip(),
-        rate: jumped,
-        rateJump: { jumped, previous: rate('4.305'), manual: null, choice: null },
-      },
-    })
-    expect(plain(view)).toContain('курс 0,043 ֏/₽ · 26 сент.')
-    expect(plain(view)).not.toContain('₽/֏')
-  })
-
-  it('до переворота крупное число — факт, без признаков оценки', () => {
-    const view = render()
-    expect(view.get('.sum').classes()).not.toContain('guess')
-  })
-
-  it('без курса пересчёта нет и переворачивать нечего', () => {
-    const view = render({ trip: trip({ rate: null, converted: null }) })
-    expect(view.text()).not.toContain('≈')
-    expect(view.find('button').exists()).toBe(false)
-  })
-
-  it('тап переворачивает, «≈» остаётся на пересчёте, и выбор помнится', async () => {
-    const view = render()
-    await view.get('button').trigger('click')
-
-    // Крупным стал рубль, но признаки оценки с него не снялись: «≈» и приглушённый цвет.
-    expect(plain(view.get('.sum'))).toBe('≈ 1 347 ₽')
-    expect(view.get('.sum').classes()).toContain('guess')
-    expect(plain(view.get('.rest'))).toContain('6 493,12 ֏')
-
-    const again = render()
-    expect(plain(again.get('.sum'))).toBe('≈ 1 347 ₽')
-  })
-
-  it('чужая валюта — строкой ниже, и пересчёт честно говорит, что покрывает не всё', () => {
-    const view = render({
-      trip: trip({
-        total: [
-          { amount: '6493.12', currency: 'AMD' },
-          { amount: '1500', currency: 'RUB' },
-        ],
-      }),
-    })
-
-    expect(plain(view.get('.sum'))).toBe('6 493,12 ֏')
-    expect(plain(view.get('.rest'))).toContain('1 500 ₽')
-    expect(view.text()).toContain('пересчёт только по AMD')
-  })
-
-  it('пока очередь не пуста, у итога есть оговорка — иначе он тихо меньше корзины', () => {
-    const view = render({ pending: 2 })
-    expect(view.text()).toContain('+ 2 позиции ещё не ушли')
-  })
-
-  it('поход, который ещё не ушёл: итога нет и сказано почему', () => {
-    const view = render({ trip: null, local: true })
-    expect(view.get('.sum').text()).toBe('—')
-    expect(view.text()).toContain(ru.trip.caveat.local)
-  })
-
-  it('нет ни одной цены — прочерк, а не ноль', () => {
-    const view = render({ trip: trip({ total: [], converted: null }) })
-    expect(view.get('.sum').text()).toBe('—')
-  })
-
-  describe('сумма по чеку (MOL-78)', () => {
-    const amd = (amount: string): Wire => ({ amount, currency: 'AMD' })
-    /** 7 из 12 с ценой на 8 300 ֏, чек на 12 400 ֏. */
-    const partial = () =>
-      trip({
-        total: [amd('12400')],
-        receipt: amd('12400'),
-        prices: [amd('8300')],
-        gap: { kind: 'unpriced', amount: amd('4100') },
-        converted: null,
-        rows: [...Array.from({ length: 7 }, () => amd('1185.71')), null, null, null, null, null],
-      })
-
-    it('главная цифра — сумма чека, под ней «с ценой 7 из 12» и «без цены 5» с суммами сервера (В-2)', () => {
-      const view = render({ trip: partial() })
-      expect(view.get('.caption').text()).toBe(ru.trip.receipt.total)
-      expect(plain(view.get('.sum'))).toBe('12 400 ֏')
-      const lines = view.findAll('.split li').map((line) => line.findAll('span').map(plain))
-      expect(lines).toEqual([
-        ['С ценой — 7 из 12', '8 300 ֏'],
-        ['Без цены — 5', '4 100 ֏'],
-      ])
-    })
-
-    it('цены больше чека — строка-предупреждение, не отказ; всё сошлось — строк нет', () => {
-      const over = render({
-        trip: trip({
-          total: [amd('9870')],
-          receipt: amd('9870'),
-          prices: [amd('10170')],
-          gap: { kind: 'over', amount: amd('300') },
-          rows: [amd('10170')],
-        }),
-      })
-      expect(plain(over.get('.split .warn'))).toContain('Цены больше чека на 300 ֏')
-
-      const even = render({
-        trip: trip({
-          total: [amd('500')],
-          receipt: amd('500'),
-          prices: [amd('500')],
-          rows: [amd('500')],
-        }),
-      })
-      expect(even.findAll('.split li span').map(plain)).toEqual(['С ценой — 1 из 1', '500 ֏'])
-    })
-
-    it('без суммы — «Итого» как было, и кнопка суммы — та, что дал экран (`useTripReceipt`)', async () => {
-      const offered = render({ receiptAction: ru.trip.receipt.add })
-      expect(offered.get('.caption').text()).toBe(ru.trip.total)
-      expect(offered.find('.split').exists()).toBe(false)
-      await offered.get('.receipt').trigger('click')
-      expect(offered.emitted('receipt')).toHaveLength(1)
-
-      expect(render().find('.receipt').exists()).toBe(false)
-    })
-
-    it('сумма в очереди — строка «отправляется», итог остаётся серверным (Р-7)', () => {
-      const typed = render({ receiptWaiting: { receipt: { minor: 1_240_000n, currency: 'AMD' } } })
-      expect(plain(typed.get('.sum'))).toBe('6 493,12 ֏')
-      expect(plain(typed.get('.waiting'))).toBe('Сумма по чеку 12 400 ֏ · отправляется')
-
-      const off = render({ trip: partial(), receiptWaiting: { receipt: null } })
-      expect(off.get('.waiting').text()).toBe(ru.trip.receipt.removing)
-    })
-  })
-})
-
 // Итог ручной записи карточкой под списком (MOL-206, В-17 «а»): то же, что говорила полоса, одной
 // строкой частей, и переворот — нажатием на всю карточку.
 describe('TripTotalCard', () => {
@@ -326,8 +135,8 @@ describe('TripTotalCard', () => {
     expect(plain(view.findAll('.line')[0] ?? view.get('.line'))).toBe('6 493,12 ֏')
     expect(parts(view)).toEqual(['курс 4,82 ֏/₽', '15 янв.'])
 
-    // Выбор общий с полосой записанных: одна память на телефон.
-    expect(plain(render().get('.sum'))).toBe('≈ 1 347 ₽')
+    // Выбор помнится: одна память на телефон, для записи и записанных покупок.
+    expect(plain(card().get('.sum'))).toBe('≈ 1 347 ₽')
   })
 
   it('строка рвётся только между частями: у курса, дня и «≈» пробелы неразрывные (ревью 3, №2)', () => {
@@ -346,6 +155,68 @@ describe('TripTotalCard', () => {
       // Каждая часть — со своей подстановкой: «·» стоит между кусками, а не внутри одного.
       for (const part of [...(mine ?? []), ...(theirs ?? [])]) expect(part, key).toMatch(/\{\w+\}/)
     }
+  })
+
+  it('свой курс из обменов подписан как свой, а не как курс банка (MOL-40)', () => {
+    const own = trip()
+    const view = card({
+      trip: { ...own, rate: own.rate && { ...own.rate, source: 'personal' }, rateProvider: null },
+    })
+    expect(parts(view)).toContain('мой курс 4,82 ֏/₽')
+    expect(plain(view)).not.toContain('ЦБ')
+  })
+
+  it('курс НБ Сербии назван рядом с числом — так требуют условия НБС (MOL-230, ревью 1)', () => {
+    const own = trip()
+    const dinar = {
+      ...own,
+      currency: 'RSD' as const,
+      rate: own.rate && { ...own.rate, quote: 'RSD' as const, scaled: 1_225_700n },
+      rateProvider: 'nbs' as const,
+    }
+    expect(parts(card({ trip: dinar }))).toEqual([
+      '≈ 1 347 ₽',
+      'курс 1,23 RSD/₽',
+      '15 янв.',
+      'НБ Сербии',
+    ])
+    // ЦБ РА и запасной под строкой не называются: у них своё место — заметка курса.
+    expect(plain(card())).not.toContain('ЦБ РА')
+    const mine = { ...dinar, rate: dinar.rate && { ...dinar.rate, source: 'personal' as const } }
+    expect(plain(card({ trip: { ...mine, rateProvider: null } }))).not.toContain('НБ Сербии')
+  })
+
+  // Прыжок запятой через единицу: строка под суммой — той же стороной, что заметка и шторка
+  // (ревью Т-11, адв. А‴), и день курса — днём Еревана, в UTC тоже (адв. Ж″).
+  it('после прыжка через единицу курс под суммой — стороной прежнего, день — днём Еревана', () => {
+    const rate = (value: string) => ({
+      base: 'RUB' as const,
+      quote: 'AMD' as const,
+      scaled: BigInt(Math.round(Number(value) * 1_000_000)),
+      source: 'official' as const,
+      // Полночь Еревана 26 сентября — вечер 25-го в UTC.
+      asOf: new Date('2026-09-25T20:00:00.000Z'),
+    })
+    const jumped = rate('0.043')
+    const view = card({
+      trip: {
+        ...trip(),
+        rate: jumped,
+        rateJump: { jumped, previous: rate('4.305'), manual: null, choice: null },
+      },
+    })
+    expect(parts(view)).toContain('курс 0,043 ֏/₽')
+    expect(parts(view)).toContain('26 сент.')
+    expect(plain(view)).not.toContain('₽/֏')
+  })
+
+  it('до переворота крупное число — факт, без признаков оценки', () => {
+    expect(card().get('.sum').classes()).not.toContain('guess')
+  })
+
+  it('нет ни одной цены — прочерк, а не ноль', () => {
+    const view = card({ trip: trip({ total: [], converted: null }) })
+    expect(view.get('.sum').text()).toBe('—')
   })
 
   it('без курса переворачивать нечего — карточка не кнопка', () => {

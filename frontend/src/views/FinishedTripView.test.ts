@@ -14,6 +14,7 @@ import { ApiError } from '@molvia/client'
 import { ERROR, tripViewCodec } from '@molvia/model'
 import type { TripView } from '@molvia/model'
 import ru from '@/i18n/ru.json'
+import { dayOfAnyYear, timeOfDay } from '@/days'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
@@ -59,6 +60,7 @@ const finished: TripView = tripViewCodec.parse({
   rateJump: null,
   rateStale: false,
   place: { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'store', name: 'Ереван Сити' },
+  placeCity: 'Гюмри',
   expenses: [row({ amount: '570', currency: 'AMD' }, 1), row(null, 2)],
   total: [{ amount: '1400', currency: 'AMD' }],
   receipt: { amount: '1400', currency: 'AMD' },
@@ -70,11 +72,11 @@ const finished: TripView = tripViewCodec.parse({
 const App = defineComponent(() => () => h(RouterView))
 const views: VueWrapper[] = []
 
-async function render(): Promise<VueWrapper> {
+async function render(cached: TripView | null = finished): Promise<VueWrapper> {
   // The record was opened once, and the app launched anew: the cache is all the phone has.
   setActivePinia(createPinia())
   useActorStore().id = ME
-  useTripHistoryStore().apply(finished)
+  if (cached) useTripHistoryStore().apply(cached)
   const pinia = createPinia()
   setActivePinia(pinia)
   const actor = useActorStore()
@@ -181,5 +183,99 @@ describe('FinishedTripView: код из чека уже у другой пози
     window.history.replaceState({ recorded: 1, codesHeld: 'garbage' }, '')
     const view = await render()
     expect(view.text()).not.toContain('уже у «')
+  })
+})
+
+// Е-4 of MOL-207: a finished record is never «ещё не закончена», and what the screen knows of it is
+// said in the header — the place, its city and its day — while the connection is one strip.
+describe('FinishedTripView: шапка и состояния (MOL-207)', () => {
+  const NOT_FINISHED = 'ещё не закончена'
+  const at = new Date('2026-09-19T09:00:00.000Z')
+  const subtitle = (view: VueWrapper) => view.find('.subtitle')
+
+  it('загрузка без памяти — «Покупки» без строки под ним, скелетон строк и карточки итога', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    trip.mockReturnValue(new Promise(() => undefined))
+    const view = await render(null)
+    expect(view.get('h1').text()).toBe(ru.trip.history.title)
+    expect(subtitle(view).exists()).toBe(false)
+    expect(view.find('.skeleton-rows').exists()).toBe(true)
+    expect(view.find('.skeleton-figure').exists()).toBe(true)
+    expect(view.text()).not.toContain(NOT_FINISHED)
+  })
+
+  it('ошибка без памяти — «Покупки», ни строки под ним, ни «ещё не закончена»; полосы нет', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    trip.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'boom'))
+    const view = await render(null)
+    expect(view.get('h1').text()).toBe(ru.trip.history.title)
+    expect(subtitle(view).exists()).toBe(false)
+    expect(view.text()).toContain(ru.trip.history.error_title)
+    expect(view.findAll('.strip')).toHaveLength(0)
+    expect(view.text()).not.toContain(NOT_FINISHED)
+  })
+
+  it('офлайн с памятью — место, город и день в шапке, одна полоса без «Повторить»', async () => {
+    trip.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+    const view = await render()
+    expect(view.get('h1').text()).toBe('Ереван Сити')
+    expect(subtitle(view).text()).toBe(`Гюмри · ${dayOfAnyYear(at, 'ru')}, ${timeOfDay(at, 'ru')}`)
+    const strips = view.findAll('.strip')
+    expect(strips).toHaveLength(1)
+    expect(strips[0]?.classes()).toContain('offline')
+    expect(strips[0]?.text()).toContain(ru.trip.offline.strip)
+    expect(view.text()).not.toContain(ru.state.retry)
+    // «Показаны данные…» and the offline card were two more ways of the same word (Е-4).
+    expect(view.text()).not.toContain('Показаны данные')
+    expect(view.text()).not.toContain(ru.trip.history.offline_title)
+    expect(view.text()).not.toContain(NOT_FINISHED)
+  })
+
+  it('сервер не ответил при памяти — полоса «Сервер не ответил» с одной «Повторить», и она читает снова', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    trip.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'boom'))
+    const view = await render()
+    const strips = view.findAll('.strip')
+    expect(strips).toHaveLength(1)
+    expect(strips[0]?.classes()).toContain('unanswered')
+    const retry = view.findAll('button').filter((button) => button.text() === ru.state.retry)
+    expect(retry).toHaveLength(1)
+
+    trip.mockResolvedValue(finished)
+    await retry[0]?.trigger('click')
+    await flushPromises()
+    expect(view.findAll('.strip')).toHaveLength(0)
+    expect(trip).toHaveBeenCalledTimes(2)
+  })
+
+  it('с ответом — одно крупное число: карточка итога под списком, в полосе внизу ничего', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    trip.mockResolvedValue(finished)
+    const view = await render()
+    expect(view.findAll('.sum')).toHaveLength(1)
+    expect(view.findComponent({ name: 'TripTotalCard' }).exists()).toBe(true)
+    expect(view.find('.dock').exists()).toBe(false)
+    // Everything under the total, in this order (owner's В-2 «а»).
+    const words = view.findAll('button').map((button) => button.text())
+    const places = [ru.trip.receipt.edit, ru.trip.add_item, ru.trip.remove.action].map((word) =>
+      words.findIndex((text) => text.includes(word)),
+    )
+    expect(places[0]).toBeGreaterThanOrEqual(0)
+    expect(places[1]).toBeGreaterThan(places[0] ?? Infinity)
+    expect(places[2]).toBeGreaterThan(places[1] ?? Infinity)
+  })
+
+  it('записанная из чека — «· из чека» после дня; без города — один день', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    const fromReceipt = tripViewCodec.parse({
+      ...tripViewCodec.encode(finished),
+      placeCity: undefined,
+      receiptId: 'cccccccc-0000-4000-8000-000000000001',
+    })
+    trip.mockResolvedValue(fromReceipt)
+    const view = await render(null)
+    expect(subtitle(view).text()).toBe(
+      `${dayOfAnyYear(at, 'ru')}, ${timeOfDay(at, 'ru')} · ${ru.receipt.recorded.from_receipt}`,
+    )
   })
 })

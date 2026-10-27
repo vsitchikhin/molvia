@@ -1014,7 +1014,7 @@ describe('PurchasesView (MOL-128)', () => {
       expect(strips(view)[0]?.text()).toBe(said(ru.purchases.stale))
       // No second way of «from memory»: no card, no line, no word of the receipts of their own.
       expect(view.find('.state').exists()).toBe(false)
-      expect(view.text()).not.toContain(ru.trip.history.cached)
+      expect(view.text()).not.toContain('Показаны данные')
       expect(view.text()).not.toContain(ru.state.retry)
     })
 
