@@ -523,8 +523,9 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* The panel's gap is 16: with 8 more the strip stands 24 over the first field, as the fields do. */
 .status {
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-2);
 }
 
 /* 24 between the fields, 8 within one — the label, the field, its hint (Ф-10). */
