@@ -486,6 +486,56 @@ for (const width of [390, 320])
     expect(fits).toEqual({ face: true, parts: true, page: true })
   })
 
+// The receipt's line of the total (MOL-207, review №1): phrases with five-digit sums beside «≈» and the
+// rate, and prices in two currencies, wrap between their words — never inside a word or a sum, never past
+// the card. Made whole by no-break spaces, a phrase broke at any letter once past the card's width.
+for (const locale of ['ru-RU', 'en-US'])
+  test.describe(`the receipt's line of the total in ${locale}`, () => {
+    test.use({ locale })
+    for (const width of [390, 320])
+      test(`at ${String(width)} wraps between words, inside its card`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 720 })
+        await open(page, '/_kit')
+        for (const name of ['trip-total-receipt', 'trip-total-currencies']) {
+          const card = page.locator(`[data-part="${name}"]`)
+          await expect(card.locator('.part').first()).toBeVisible()
+          const fits = await card.evaluate((root) => {
+            const box = root.getBoundingClientRect()
+            const parts = [...root.querySelectorAll('.part')]
+            // Each word — what an ordinary space parts — stands on one line: a word or a sum broken
+            // across two has two boxes of its text.
+            const broken: string[] = []
+            for (const part of parts) {
+              const text = part.firstChild
+              if (text?.nodeType !== Node.TEXT_NODE) continue
+              const value = text.textContent ?? ''
+              let at = 0
+              for (const word of value.split(' ')) {
+                if (word) {
+                  const range = document.createRange()
+                  range.setStart(text, at)
+                  range.setEnd(text, at + word.length)
+                  const lines = new Set(
+                    [...range.getClientRects()].map((rect) => Math.round(rect.top)),
+                  )
+                  if (lines.size > 1) broken.push(word)
+                }
+                at += word.length + 1
+              }
+            }
+            return {
+              parts:
+                parts.length > 0 &&
+                parts.every((part) => part.getBoundingClientRect().right <= box.right + 0.5),
+              broken,
+              page: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+            }
+          })
+          expect(fits, name).toEqual({ parts: true, broken: [], page: true })
+        }
+      })
+  })
+
 // The whole card is the flip (owner's В-17 «а»), in Chromium and WebKit alike: a tap anywhere on it
 // turns the big number into the estimate, and says so by `aria-pressed`.
 test("a tap on the record's total flips it to the estimate", async ({ page }) => {

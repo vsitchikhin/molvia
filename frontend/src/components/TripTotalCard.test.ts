@@ -155,6 +155,19 @@ describe('TripTotalCard', () => {
       // Каждая часть — со своей подстановкой: «·» стоит между кусками, а не внутри одного.
       for (const part of [...(mine ?? []), ...(theirs ?? [])]) expect(part, key).toMatch(/\{\w+\}/)
     }
+    // Части строки чека — каждая одна часть (ревью №3): «·» внутри развалил бы её молча, а подстановки
+    // у обоих словарей одни.
+    const lines = Object.keys(ru.trip.receipt).filter((key) => key.startsWith('line_'))
+    expect(lines.length).toBeGreaterThan(0)
+    const slots = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((found) => found[1]).sort()
+    for (const key of lines) {
+      const [mine, theirs] = [ru, en].map(
+        (book) => (book.trip.receipt as Record<string, unknown>)[key],
+      )
+      expect(typeof theirs, key).toBe('string')
+      for (const line of [mine, theirs] as string[]) expect(line, key).not.toContain(' · ')
+      expect(slots(theirs as string), key).toEqual(slots(mine as string))
+    }
   })
 
   it('свой курс из обменов подписан как свой, а не как курс банка (MOL-40)', () => {
@@ -297,13 +310,47 @@ describe('TripTotalCard', () => {
       expect(parts(view)).toEqual(['по ценам 8 000 ֏', 'чек больше цен на 200 ֏'])
     })
 
-    it('цены в другой валюте — суммы цен, и ни слова о сходстве: вычесть нельзя', () => {
+    it('цены в другой валюте — суммы цен списком, не сложением, и ни слова о сходстве (ревью №2, А3)', () => {
       const view = receipt({
         receipt: amd('8200'),
         prices: [amd('8000'), { amount: '20', currency: 'USD' }],
         rows: [amd('8000'), { amount: '20', currency: 'USD' }],
       })
-      expect(parts(view)).toEqual(['по ценам 8 000 ֏ + 20 $'])
+      expect(parts(view)).toEqual(['по ценам 8 000 ֏ и 20 $'])
+      expect(plain(view)).not.toContain('+')
+    })
+
+    it('цены сошлись с чеком, а у позиции цены нет — «без цены — 0 ֏», не «сходится» (А4)', () => {
+      const view = receipt({ receipt: amd('570'), prices: [amd('570')], rows: [amd('570'), null] })
+      expect(parts(view)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 0 ֏'])
+    })
+
+    // Adversarial А1: a purchase removed or added with no signal is on the screen and not in the
+    // server's figures yet — the line spoke of a list no longer shown.
+    it('строки на экране не те, что посчитал сервер, — о ценах ни слова, сумма чека остаётся (А1)', () => {
+      const server = {
+        receipt: amd('1400'),
+        prices: [amd('570')],
+        gap: { kind: 'unpriced' as const, amount: amd('830') },
+        rows: [amd('570'), null],
+      }
+      const removing = card({
+        trip: trip({ converted: null, rate: null, total: [amd('1400')], ...server }),
+        rows: { kept: 1, unpriced: 0 },
+      })
+      expect(plain(removing.get('.sum'))).toBe('1 400 ֏')
+      expect(parts(removing)).toEqual([])
+      const adding = card({
+        trip: trip({ converted: null, rate: null, total: [amd('1400')], ...server }),
+        rows: { kept: 3, unpriced: 1 },
+      })
+      expect(parts(adding)).toEqual([])
+      // Control: the same list on screen as the server's — the line is said.
+      const same = card({
+        trip: trip({ converted: null, rate: null, total: [amd('1400')], ...server }),
+        rows: { kept: 2, unpriced: 1 },
+      })
+      expect(parts(same)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
     })
 
     it('ни одной цены — так и сказано, сумма без цены не повторяет итог', () => {

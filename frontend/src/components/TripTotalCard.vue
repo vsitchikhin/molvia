@@ -87,12 +87,16 @@ export default defineComponent({
      * is the dictionary's: `trip.total_line` and `trip.rate_line*` put one between their pieces in every
      * locale, and `TripTotal.test.ts` holds both dictionaries to it (review 4, №1).
      */
-    const parts = computed(() =>
-      [...total.receiptParts.value, total.priced.value, total.estimate.value, total.rateLine.value]
+    const parts = computed(() => [
+      // Phrases, not figures (review №1): whole they broke at any letter past the card's width — «the
+      // receipt is ֏10,070 less than the pri / ces» at 320. Their sums come non-breaking from
+      // `formatMoney`, so a phrase wraps between its words and never inside an amount.
+      ...total.receiptParts.value,
+      ...[total.priced.value, total.estimate.value, total.rateLine.value]
         .filter((part): part is string => part !== null)
         .flatMap((part) => part.split(' · '))
         .map((part) => part.replaceAll(' ', '\u00a0')),
-    )
+    ])
 
     return {
       t,

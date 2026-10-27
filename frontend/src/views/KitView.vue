@@ -529,6 +529,11 @@
       />
       <SkeletonPart kind="figure" plate />
       <SkeletonPart kind="lines" :widths="[64, 78]" />
+      <!-- The receipt's line (MOL-207, review №1): phrases with five-digit sums beside «≈» and the rate,
+           and prices in two currencies — they wrap between their words, never inside a word or a sum,
+           and never past the card. -->
+      <TripTotalCard data-part="trip-total-receipt" :trip="kitTripReceipt" />
+      <TripTotalCard data-part="trip-total-currencies" :trip="kitTripCurrencies" />
     </section>
 
     <!-- «Графики» (MOL-186): the ring's legend with a row to choose, and «Темп» with its slider — what a
@@ -775,6 +780,34 @@ export default defineComponent({
       rateProvider: 'nbs',
       total: [money(12_840_000n, 'RSD')],
       converted: money(7_877_300n, 'RUB'),
+    }
+    // Fourteen purchases, two of them with no price: «— 12 из 14» on the receipt's line.
+    const fourteen = Array.from({ length: 14 }, (_, n) => {
+      const [first] = kitTrip.expenses
+      if (!first) throw new Error('the kit trip has a purchase')
+      return {
+        ...first,
+        id: `00000000-0000-4000-8000-${String(400 + n).padStart(12, '0')}`,
+        amount: n < 12 ? money(906_400n, 'AMD') : null,
+      }
+    })
+    const kitTripReceipt: TripView = {
+      ...kitTrip,
+      expenses: fourteen,
+      total: [money(9_870_000n, 'AMD')],
+      receipt: money(9_870_000n, 'AMD'),
+      prices: [money(10_876_800n, 'AMD')],
+      gap: { kind: 'over', amount: money(1_006_800n, 'AMD') },
+      converted: money(2_327_800n, 'RUB'),
+    }
+    const kitTripCurrencies: TripView = {
+      ...kitTrip,
+      expenses: fourteen,
+      total: [money(12_000_000n, 'AMD')],
+      receipt: money(12_000_000n, 'AMD'),
+      prices: [money(10_876_800n, 'AMD'), money(123_450n, 'USD')],
+      gap: null,
+      converted: money(2_830_200n, 'RUB'),
     }
     // August of handoff MOL-157 v2 1b, as the server answers it: the card of a closed month.
     const moneyMonth: MoneyMonthView = {
@@ -1059,6 +1092,8 @@ export default defineComponent({
       moneyMonth,
       kitTrip,
       kitTripNamed,
+      kitTripReceipt,
+      kitTripCurrencies,
       chartMonth,
       chartSector,
       paceDays,

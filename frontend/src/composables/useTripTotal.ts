@@ -201,25 +201,43 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
    *
    * **Prices more than the receipt are said as they are** (owner's В-1 «а»): «чек меньше цен» — a
    * discount on the receipt and a price typed wrong look alike to the phone, and «скидка» about a typo
-   * would be a figure made up. **Agreeing is said only where it was measured**: the prices in the
-   * receipt's own currency, one sum, and no gap — two currencies do not subtract (`receiptGap`).
+   * would be a figure made up. **Agreeing is said only where it was measured and nothing is left
+   * unpriced**: the prices in the receipt's own currency, one sum, and no gap — two currencies do not
+   * subtract (`receiptGap`); prices that meet the receipt beside a purchase with none leave it nothing,
+   * and that is said — «без цены — 0 ֏», never «сходится» (adversarial А4). **Two currencies are a list,
+   * never a sum** — «8 000 ֏ и 20 $» by the locale's own conjunction: a «+» read as adding what the domain
+   * refuses to add (review №2, А3).
+   *
+   * **Said only of the list the server counted** (adversarial А1): a purchase removed or added with no
+   * signal is on the screen and not in `prices` and `gap` yet, and «— 1 из 2 · без цены — 830 ֏» over a
+   * struck-out loaf spoke of a list no longer shown. While the rows on screen are not the server's, the
+   * line says nothing of the prices — the receipt's sum above it is still the server's and true.
    */
   const receiptParts = computed(() => {
     const trip = props.trip
     if (!trip?.receipt || trip.expenses.length === 0) return []
     const all = trip.expenses.length
     const priced = trip.expenses.filter((expense) => expense.amount !== null).length
+    const rows = props.rows
+    if (rows && (rows.kept !== all || rows.unpriced !== all - priced)) return []
     if (trip.prices.length === 0) return [t('trip.receipt.line_none')]
-    const amount = trip.prices.map((value) => money(value)).join(' + ')
+    const amount = new Intl.ListFormat(locale.value, { type: 'conjunction' }).format(
+      trip.prices.map((value) => money(value)),
+    )
     const parts = [
       priced < all
         ? t('trip.receipt.line_prices_part', { amount, n: priced, total: all })
         : t('trip.receipt.line_prices', { amount }),
     ]
     const gap = trip.gap
+    const currency = trip.receipt.currency
     if (gap) parts.push(t(`trip.receipt.line_${gap.kind}`, { amount: money(gap.amount) }))
-    else if (trip.prices.length === 1 && trip.prices[0]?.currency === trip.receipt.currency)
-      parts.push(t('trip.receipt.line_meets'))
+    else if (trip.prices.length === 1 && trip.prices[0]?.currency === currency)
+      parts.push(
+        priced < all
+          ? t('trip.receipt.line_unpriced', { amount: money({ minor: 0n, currency }) })
+          : t('trip.receipt.line_meets'),
+      )
     return parts
   })
 
