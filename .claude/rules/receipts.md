@@ -1788,7 +1788,9 @@ kept with no price by design. **`lines_lost` comes after the lines' own reasons*
 found whole with its sum not read, or one read low by the font's 5↔6, makes the lines short as well — on the
 bench both receipts named `lines_lost` before had lost no line — so a line lost is said only of a receipt whose
 every line is as printed. **The price, named:** lines lost beside a line not as printed are said as the latter;
-the server's word «Прочитали не всё» is counted apart for that (`partly`, below). Finer kinds of «not as printed»
+the server's word «Прочитали не всё» is counted apart for that (`partly`, below), and goes with the reasons
+into the notice, the review and the copy (adversarial Б1 of round 2: a line lost hidden behind a line not as
+printed was said nowhere a person reads). Finer kinds of «not as printed»
 (which swap) are the parse's, not here: an iteration of MOL-310 that needs them opens the parse.
 
 **Counted for every reading of a photo, by either reader** (`receipt_reason_days`): day in Yerevan × reader ×
@@ -1818,22 +1820,32 @@ kept beside the queue — the build before reads a write strictly), the server m
 the mark back, and the purge lets go of the link (`receipt_id` to null) before the receipt goes. Every other
 removal takes it by the cascade of `receipt_id` — «Удалить чек», its trip gone for good, the 28 days of a
 receipt not recorded — and **the person erased takes it whatever it is linked to** (`actor_id`,
-`ACTOR_REFERENCES`). **The price, named:** a phone of an earlier build names no retake, and its review goes as
-it did; a server rolled back takes the removal and ignores the header.
+`ACTOR_REFERENCES`). **The mark is kept before the removal is queued** (self-review №11): the queue may send it in
+the same task, and the header is read as it goes — kept after, the removal of a phone with no `navigator.locks`
+went with no header; it is let go once the removal leaves the queue, sent or set aside (№12). **The purge lets go
+of the link and deletes the receipt in one transaction, at one moment** (`now()`): two statements of their own
+clocks let a receipt whose ten minutes ended between them go with its review. **The prices, named:** a phone of an
+earlier build names no retake, and its review goes as it did; a server rolled back takes the removal and ignores
+the header; and the review of a receipt replaced is no longer the person's to remove by «Удалить чек» — the new
+receipt is not the one it was read from — only «Удалить мои данные» takes it before its days, which «Чеки» of
+edition 4 says.
 
 **The person's copy says it** (`receiptReviews`, version 24, self-review №4): which receipt, the link while
 there is one, when it was read and by what, until when it is kept, whether a retake replaced it and why it was
-not whole — never the photo or what was read. **`make receipt-miss` writes out of the working directory** —
-`.scratch/receipts/misses/<id>/` from the make target, the system's temporary directory from the command
-itself (self-review №1, adversarial А5): a person's photo and purchases never stand in the public repository's
-tree, nor fail on the API image's `/app`; `receipt-miss-*/` is ignored besides.
+not whole — never the photo or what was read. **`make receipt-miss` writes out of the working directory** — a
+directory `receipt-miss-<id>` under a root, `.scratch/receipts/misses/` from the make target and the system's
+temporary one from the command itself (self-review №1, adversarial А5): a person's photo and purchases never
+stand in the public repository's tree, nor fail on the API image's `/app`; `receipt-miss-*/` is ignored besides.
+**`forget --yes` lets the copies under its root go with the rows** (adversarial Б2); a copy written elsewhere by
+`--out`, or carried off the server by hand, is the review's own to delete — the README of receipts says how.
 
 **Told** — `receipt_partial` in `owner_notices`, after the reading is written, and only then (a receipt removed
 or taken meanwhile is nothing to tell of, self-review №7): the country, lines found and with figures, the
 receipt's reason — none where it was proven whole and a line emptied all the same (adversarial А3) — and the
-lines' by kind; **the id's first eight characters and until when, only for a receipt kept** — of one not kept
-the id would name a person's receipt nothing here opens (self-review №3) — no name, no sum, no shop; the day
-is Yerevan's, as `keep_until` is read. **Three a person an hour and twenty in all** (Р-6, the phone's budget by
+lines' by kind, and «Прочитали не всё» where the server said it; **the id's first eight characters and until
+when, only for a receipt kept** — of one not kept the id would name a person's receipt nothing here opens
+(self-review №3) — no name, no sum, no shop; the day is the one of `keep_until` as written, in Yerevan
+(`dayIn`, self-review №13), never worked out beside it. **Three a person an hour and twenty in all** (Р-6, the phone's budget by
 the person's id in memory, `phoneNoticeBudget` with its own muted notice): the rest counted and told once an
 hour, `receipt_partial_muted`; dropped unclaimed after a day, as a failure's notice. No `OWNER_TELEGRAM_ID`,
 nothing told; kept all the same. **The prices, named:** a rollback past this leaves the old API unable to read
