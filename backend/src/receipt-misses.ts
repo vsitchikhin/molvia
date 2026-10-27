@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describeFailure } from '@molvia/model'
@@ -26,6 +26,30 @@ const share = (part: number, whole: number) =>
  */
 const copyOf = (root: string | undefined, receipt: string): string =>
   join(root ?? tmpdir(), `receipt-miss-${receipt.slice(0, 8)}`)
+
+/**
+ * Lets go of every copy under the root whose review the database no longer keeps: a review goes by itself — its 21
+ * days, its person erased — and its copy must not outlive it (adversarial Б3). Only the root's own directories, by
+ * their name: what is under a directory of another name — copies brought from production — is not this database's.
+ */
+async function sweep(root: string | undefined, kept: readonly string[]): Promise<number> {
+  const at = root ?? tmpdir()
+  const starts = new Set(kept.map((one) => one.slice(0, 8)))
+  let entries: string[]
+  try {
+    entries = await readdir(at)
+  } catch {
+    return 0
+  }
+  let swept = 0
+  for (const entry of entries) {
+    const start = /^receipt-miss-([\da-f]{8})$/.exec(entry)?.[1]
+    if (start === undefined || starts.has(start)) continue
+    await rm(join(at, entry), { recursive: true, force: true })
+    swept += 1
+  }
+  return swept
+}
 
 /** Today in Yerevan, the day the window ends on by default. */
 const yerevanToday = (now: Date) =>
@@ -128,6 +152,10 @@ export async function receiptMisses(
       if (!dryRun) {
         for (const one of gone)
           await rm(copyOf(flag('--root'), one), { recursive: true, force: true })
+        // and those of a review gone by itself — its days, its person erased — which no `forget` names
+        // (adversarial Б3)
+        const swept = await sweep(flag('--root'), await misses.keptIds())
+        if (swept > 0) write(`  copies of reviews gone by themselves let go: ${String(swept)}`)
       }
       write(
         dryRun

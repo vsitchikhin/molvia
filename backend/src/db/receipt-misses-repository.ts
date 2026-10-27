@@ -44,6 +44,8 @@ export interface ReceiptMissesRepository {
   reasons(from: string, to: string): Promise<readonly ReasonCount[]>
   /** The receipts kept whose id starts so; more than one says the start is too short. */
   kept(idStart: string): Promise<readonly KeptMiss[]>
+  /** The receipts kept for the review now, by their ids: what a copy under the root may still stand for. */
+  keptIds(): Promise<readonly string[]>
   /** Lets the receipts go, or — a dry run — says which would go, in a transaction rolled back. */
   forget(which: MissesToForget, dryRun: boolean): Promise<readonly string[]>
 }
@@ -103,6 +105,11 @@ export function createReceiptMissesRepository(db: Conn): ReceiptMissesRepository
           .filter((part) => part.receipt === miss.receipt)
           .map(({ position, photo }) => ({ position, photo })),
       }))
+    },
+
+    async keptIds() {
+      const rows = await db.select({ receipt: receiptMisses.receipt }).from(receiptMisses)
+      return rows.map((row) => row.receipt)
     },
 
     async forget(which, dryRun) {

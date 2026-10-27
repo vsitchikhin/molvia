@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq, sql } from 'drizzle-orm'
@@ -1398,6 +1398,33 @@ describe('a receipt read not whole: its reasons, its review and the developer to
       expect(exit).toBe(0)
       expect(lines.join('\n')).toMatch(/model AM[\s\S]*not whole\s+1\s+100\.0 %/)
       expect(lines.join('\n')).toMatch(/unsettled\s+1\s+33\.3 %/)
+    }, 30_000)
+
+    // adversarial Б3: a review gone by itself — its days, its person erased — leaves no copy behind
+    it('lets go of the copy of a review gone by itself, and never one brought from production', async () => {
+      const me = await person(LATER, REVIEW_CONSENT_EDITION)
+      const id = await queued(me)
+      await readAll(benchReader(), fakeModel(notWhole))
+      const root = await mkdtemp(join(tmpdir(), 'receipt-misses-'))
+      const copy = join(root, `receipt-miss-${id.slice(0, 8)}`)
+      const brought = join(root, 'prod', 'receipt-miss-0badcafe')
+      try {
+        expect((await run(['show', id.slice(0, 8), '--root', root])).exit).toBe(0)
+        await mkdir(brought, { recursive: true })
+        await writeFile(join(brought, 'reading.json'), '{}')
+        // its 21 days over: the timer lets it go, and nothing names it to `forget`
+        await db.update(receiptMisses).set({
+          readAt: sql`clock_timestamp() - interval '22 days'`,
+          keepUntil: sql`clock_timestamp() - interval '1 day'`,
+        })
+        await repository.purgeStale()
+        const done = await run(['forget', '--read-before', '2026-01-01', '--root', root, '--yes'])
+        expect(done.lines).toContain('  copies of reviews gone by themselves let go: 1')
+        await expect(readFile(join(copy, 'reading.json'))).rejects.toThrow()
+        expect(await readFile(join(brought, 'reading.json'), 'utf8')).toBe('{}')
+      } finally {
+        await rm(root, { recursive: true, force: true })
+      }
     }, 30_000)
 
     it('shows one receipt with its photo written out, and lets it go only with --yes — its copy too', async () => {
