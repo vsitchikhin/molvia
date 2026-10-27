@@ -1830,7 +1830,7 @@ the header; and the review of a receipt replaced is no longer the person's to re
 receipt is not the one it was read from — only «Удалить мои данные» takes it before its days, which «Чеки» of
 edition 4 says.
 
-**The person's copy says it** (`receiptReviews`, version 24, self-review №4): which receipt, the link while
+**The person's copy says it** (`receiptReviews`, version 25, self-review №4): which receipt, the link while
 there is one, when it was read and by what, until when it is kept, whether a retake replaced it and why it was
 not whole — never the photo or what was read. **`make receipt-miss` writes out of the working directory** — a
 directory `receipt-miss-<id>` under a root, `.scratch/receipts/misses/copy-<CLONE_INDEX>/` from the make target and the

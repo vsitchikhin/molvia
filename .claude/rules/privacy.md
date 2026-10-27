@@ -153,6 +153,11 @@ The detail behind the privacy lines of `CLAUDE.md`.
   (adversarial Б).
   `/privacy` says what the copy holds — the removed and the withdrawn included — under «Копия ваших
   данных», and names the row by its words.
+- **The account's last visit is kept to erase the silent** (MOL-238, `auth.md`): `actors.last_seen_at`,
+  a term of keeping rather than a statistic — never the visit of «Что брать», which is one — written
+  with the switch off and with no edition accepted, in the copy (version 24), gone with the row, a line
+  of the record of processing; the page names it under «Ваши настройки», and says that after a long
+  silence keeping the account takes a login, not only opening the app — both revisions.
 - **A person can object to being counted** (MOL-96): «Учитывать меня в статистике» in «Ваши
   данные» erases their event log at once, stops it, and takes them out of both gates — the reasons
   and the rules are in `advice.md`. The two moments it keeps are on `actors`, so erasure takes them
@@ -297,7 +302,7 @@ The detail behind the privacy lines of `CLAUDE.md`.
   (`REVIEW_CONSENT_EDITION`); a receipt «Переснять» replaced leaves it (owner's В-6 «а»), any other removal of
   the receipt takes it by the cascade, and **the person erased takes it always** (`receipt_misses.actor_id`, in
   `ACTOR_REFERENCES`). It enters no nightly copy; **the person's copy says what is kept, until when and why**
-  (`receiptReviews`, version 24) — never the photo or the reading; the developer's notice of it names no name,
+  (`receiptReviews`, version 25) — never the photo or the reading; the developer's notice of it names no name,
   sum or shop, and the id's start only of a receipt kept. Its reasons are counted with no id, as `receipt_days` is. The copy of one's data carries receipts and their lines,
   never a photo. `/privacy` says all of it under «Чеки». `.claude/rules/receipts.md`.
 - **Logs live fourteen days and carry no address and no query** (MOL-58). The API logs a request
