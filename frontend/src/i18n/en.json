@@ -22,6 +22,8 @@
   "trip": {
     "title": "Entry",
     "add_item": "Add an item",
+    "add_short": "Item",
+    "scan_short": "Scan",
     "unpriced": "no price",
     "total": "Total",
     "total_line": "Priced — {priced} of {total} · unpriced — {unpriced}",
@@ -80,16 +82,15 @@
     },
     "empty": {
       "title": "The entry has started",
-      "body": "Add the first item — the rest can be filled in later",
-      "action": "Find an item"
+      "body": "Add the first item — the rest can be filled in later"
     },
     "error": {
       "title": "The server did not answer",
-      "body": "Your items are still on the phone, nothing is lost"
+      "body": "Your items are still on the phone, nothing is lost",
+      "strip": "The server did not answer · your items are still on the phone"
     },
     "offline": {
-      "title": "No connection — no matter",
-      "body": "The items are saved on the phone and will be sent on their own. The entry goes on"
+      "strip": "Offline · items are kept on the phone and will be sent on their own"
     },
     "none": {
       "action": "Start the entry"

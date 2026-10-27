@@ -55,7 +55,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 - `frontend/src/views/FinishedTripView.vue` — «Записанные покупки» (`/purchases/:id`): a finished trip's purchases, adding and amending them, and «Удалить запись».
 - `frontend/src/views/PurchasesView.vue` — «Покупки» tab (MOL-128): the record going on first, «ждут оценки», «Записаны» with count and sum, rows of the kit (`ListRow`, MOL-204), one `StatusStrip` over what a failed read drew from memory, dated by the older such read, the receipts' own quiet card with none of them shown, «Раньше … — со связью» offline, «Записать покупки» in the strip, four states.
 - `frontend/src/views/SettingsView.vue` — «Настройки» screen: the four settings with draft and conflict notices, links to devices and «Выйти», and the group «Ваши данные» (`YourDataGroup`).
-- `frontend/src/views/TripView.vue` — The record typed by hand (`/purchases/manual`, MOL-128): named by its place, rows, total, «Закончить»/«Удалить запись»; goes up to «Покупки» once no record is open.
+- `frontend/src/views/TripView.vue` — The record typed by hand (`/purchases/manual`, MOL-128): named by its place, rows, the total as a card under them, «Удалить запись»; the strip «Штрихкод · + Позиция · Закончить» (MOL-206), one `StatusStrip` of the connection, the queue's notices over the skeleton; goes up to «Покупки» once no record is open.
 
 ## frontend · components
 

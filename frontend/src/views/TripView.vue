@@ -2,95 +2,117 @@
   <AppScreen :title="place || t('trip.title')">
     <template v-if="meta" #subtitle>{{ meta }}</template>
 
-    <template v-if="phase === 'going'" #trailing>
-      <button class="finish" type="button" @click="askFinish">{{ t('trip.finish') }}</button>
-    </template>
-
-    <ScreenSkeleton v-if="phase === 'loading'" :groups="[72, 54, 84, 46]" />
-
-    <template v-else>
-      <!-- Over whatever the screen shows, never instead of it: at a shelf the list the phone
-           remembers is worth more than a red square, and the purchases are all still there
-           (MOL-19). -->
-      <ScreenState
+    <!-- The connection, one strip first under the header (MOL-181, Ф-14), over the record the phone
+         remembers and never instead of it: at a shelf that list is worth more than a red square, and
+         the strip below writes through the queue either way (MOL-19, MOL-24). -->
+    <template v-if="phase === 'going'">
+      <StatusStrip
         v-if="trouble === 'offline'"
-        class="notice"
+        class="connection"
         kind="offline"
-        tone="good"
-        inline
-        :title="t('trip.offline.title')"
-        :body="t('trip.offline.body')"
+        :text="t('trip.offline.strip')"
+        :attempt="attempt"
       />
-      <ScreenState
+      <StatusStrip
         v-else-if="trouble === 'error'"
-        class="notice"
-        kind="error"
-        inline
-        :title="t('trip.error.title')"
-        :body="t('trip.error.body')"
-        @retry="retry"
-      />
+        class="connection"
+        kind="unanswered"
+        :text="t('trip.error.strip')"
+        :attempt="attempt"
+      >
+        <template #action>
+          <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+        </template>
+      </StatusStrip>
     </template>
 
     <!-- What the queue has to say about any record, this one or another — on «Покупки» as well
-         (MOL-128). Its sheets, like every sheet here, ask to leave once they are away (Р-7). -->
+         (MOL-128). Over the skeleton and the record alike, so the answer coming in under it never
+         moves its buttons from under a finger (MOL-311). Its sheets, like every sheet here, ask to
+         leave once they are away (Р-7). -->
     <TripNotices :ready="phase !== 'loading'" @settled="leaveIfOver" />
+
+    <!-- The answer's shape (MOL-178, Ф-13): the rows of the record and the card of its total. -->
+    <ScreenSkeleton v-if="phase === 'loading'">
+      <SkeletonPart kind="rows" tail next />
+      <SkeletonPart kind="figure" />
+    </ScreenSkeleton>
 
     <template v-if="phase === 'going'">
       <TripRateNotes v-if="trip" :trip="trip" />
 
-      <!-- The quiet circle: a terracotta one over «Найти товар» read as a button and was tapped
-           (MOL-77); `--surface-2` does not (Ф-16). -->
-      <ScreenState
-        v-if="rows.length === 0"
-        kind="empty"
-        :icon="IconBasket"
-        :title="t('trip.empty.title')"
-        :body="t('trip.empty.body')"
-      >
-        <template #action>
-          <AppButton size="large" block @click="find">{{ t('trip.empty.action') }}</AppButton>
-          <AppButton variant="secondary" block @click="scan">
-            <template #icon><IconBarcode /></template>
-            {{ t('item.barcode.scan') }}
-          </AppButton>
-        </template>
-      </ScreenState>
+      <!-- The quiet circle in a card (Ф-16): on the page's ground it is not seen, and the list of the
+           first purchase stands in its place. No buttons — the strip holds them (Ф-22). -->
+      <AppCard v-if="rows.length === 0">
+        <ScreenState
+          kind="empty"
+          inline
+          :icon="IconBasket"
+          :title="t('trip.empty.title')"
+          :body="t('trip.empty.body')"
+        />
+      </AppCard>
 
       <template v-else>
         <AppCard list>
           <AppReveal group>
             <TripRow v-for="row in rows" :key="row.key" :row="row" @open="amend" />
           </AppReveal>
-          <button class="add" type="button" @click="find">
-            <IconPlus class="add-icon" aria-hidden="true" />
-            {{ t('trip.add_item') }}
-          </button>
-          <button class="add" type="button" @click="scan">
-            <IconBarcode class="add-icon" aria-hidden="true" />
-            {{ t('item.barcode.scan') }}
-          </button>
         </AppCard>
+        <!-- Under the list, with «≈» and the rate (handoff 7a, owner's В-17 «а»): the strip went to
+             the actions, and the total stays the server's. -->
+        <TripTotalCard
+          class="total"
+          :trip="trip"
+          :pending="waiting"
+          :local="local !== null"
+          :receipt-waiting="receiptWaiting"
+        />
         <p class="footnote">{{ t('trip.footnote') }}</p>
+        <AppButton
+          v-if="receiptAction"
+          class="receipt"
+          variant="ghost"
+          block
+          @click="receiptOpen = true"
+          >{{ receiptAction }}</AppButton
+        >
       </template>
 
       <!-- At the end of the list, one and the same on an open and a finished record, and never
            under the thumb (MOL-76, В-1). -->
-      <AppButton class="remove" variant="danger-ghost" block @click="askRemove">{{
-        t('trip.remove.action')
-      }}</AppButton>
+      <AppButton
+        class="remove"
+        :class="{ alone: rows.length === 0 || !receiptAction }"
+        variant="danger-ghost"
+        block
+        @click="askRemove"
+      >
+        <template #icon><IconDelete /></template>
+        {{ t('trip.remove.action') }}
+      </AppButton>
     </template>
 
-    <!-- The one permanent place money is converted, and it stays put while the list scrolls. -->
+    <!-- The actions, one strip for an empty record and a full one, offline and on an error too —
+         every one of them writes through the queue (Ф-22, handoff 7a). The main one at the right,
+         under the thumb; where both words do not fit side by side the pair stands one over the
+         other, «+ Позиция» nearer the thumb (owner's В-1 «в»). «Закончить» is here, not in the
+         corner the thumb does not reach. -->
     <template v-if="phase === 'going'" #docked>
-      <TripTotal
-        :trip="trip"
-        :pending="waiting"
-        :local="local !== null"
-        :receipt-waiting="receiptWaiting"
-        :offer-receipt="offerReceipt"
-        @receipt="receiptOpen = true"
-      />
+      <div class="pair">
+        <AppButton variant="secondary" size="large" @click="scan">
+          <template #icon><IconBarcode /></template>
+          {{ t('trip.scan_short') }}
+        </AppButton>
+        <AppButton size="large" @click="find">
+          <template #icon><IconPlus /></template>
+          {{ t('trip.add_short') }}
+        </AppButton>
+      </div>
+      <AppButton variant="ghost" block @click="askFinish">
+        <template #icon><IconFlag /></template>
+        {{ t('trip.finish') }}
+      </AppButton>
     </template>
 
     <!-- Asked before, not undone after: a record cannot be reopened in 0.1, and «Закончить» is one
@@ -185,6 +207,8 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconBarcode from '~icons/mdi/barcode-scan'
 import IconBasket from '~icons/mdi/basket-outline'
+import IconDelete from '~icons/mdi/delete-outline'
+import IconFlag from '~icons/mdi/flag-checkered'
 import IconPlus from '~icons/mdi/plus'
 import type { CatalogueEntry, TripExpenseView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
@@ -198,11 +222,13 @@ import ReceiptSheet from '@/components/ReceiptSheet.vue'
 import { typedReceipt } from '@/components/receipt'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import TripNotices from '@/components/TripNotices.vue'
 import TripRateNotes from '@/components/TripRateNotes.vue'
 import TripRemoveSheet from '@/components/TripRemoveSheet.vue'
 import TripRow from '@/components/TripRow.vue'
-import TripTotal from '@/components/TripTotal.vue'
+import TripTotalCard from '@/components/TripTotalCard.vue'
 import type { TripRowView } from '@/components/tripRow'
 import { useTripRows } from '@/composables/useTripRows'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
@@ -255,17 +281,21 @@ export default defineComponent({
     AppScreen,
     BottomSheet,
     IconBarcode,
+    IconDelete,
+    IconFlag,
     IconPlus,
     ItemDetailsSheet,
     ReceiptField,
     ReceiptSheet,
     ScreenSkeleton,
     ScreenState,
+    SkeletonPart,
+    StatusStrip,
     TripNotices,
     TripRateNotes,
     TripRemoveSheet,
     TripRow,
-    TripTotal,
+    TripTotalCard,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -281,6 +311,8 @@ export default defineComponent({
     /** Asked once at the start; the memory covers every later opening (MOL-24, Н-7). */
     const asked = ref(trips.current !== null)
     const trouble = ref<'offline' | 'error' | null>(null)
+    /** Answers that failed, so a retry failing the same way is said again (MOL-181, C1). */
+    const attempt = ref(0)
     const finishing = ref(false)
     /** Taken when «Закончить» is tapped: a row arriving while the sheet is up does not reword it. */
     const finishingEmpty = ref(false)
@@ -305,6 +337,7 @@ export default defineComponent({
         // Which of the two it was is decided after the failure, never narrowed from a check made
         // before the request: a connection that drops mid-answer is the commonest break (MOL-19).
         trouble.value = navigator.onLine ? 'error' : 'offline'
+        attempt.value += 1
       } finally {
         asked.value = true
       }
@@ -336,6 +369,11 @@ export default defineComponent({
       trip,
       rows,
     )
+    /** «+ Сумма по чеку» under the total, or «Изменить» once a sum is there or on its way (MOL-78). */
+    const receiptAction = computed(() => {
+      if (receiptCurrent.value) return t('trip.receipt.edit')
+      return offerReceipt.value ? t('trip.receipt.add') : null
+    })
     const handoff = useSpendingHandoffStore()
     /** «Записать тратой в «Деньгах»» was chosen: the screen goes there once the record is away. */
     let toMoney = false
@@ -518,6 +556,7 @@ export default defineComponent({
       waiting,
       phase,
       trouble,
+      attempt,
       place,
       meta,
       rows,
@@ -540,7 +579,7 @@ export default defineComponent({
       receiptOpen,
       receiptWaiting,
       receiptCurrent,
-      offerReceipt,
+      receiptAction,
       tripId,
       currency,
       leaveIfOver,
@@ -560,27 +599,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.finish {
-  @include touch-target;
-
-  /* Its optical edge lines up with the field below, not its box (handoff). */
-  margin-right: calc(var(--space-2) * -1);
-  padding: 0 var(--space-2);
-  border: none;
-  background: none;
-  color: var(--accent-ink);
-  font: inherit;
-  font-size: var(--text-callout);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-
-  &:focus-visible {
-    @include focus-ring;
-
-    border-radius: var(--radius-sm);
-  }
-}
-
 .confirm {
   margin: 0;
   color: var(--text-muted);
@@ -591,42 +609,45 @@ export default defineComponent({
   margin-top: var(--space-4);
 }
 
-.notice {
-  margin-bottom: var(--space-3);
+// 8 to the card it stands over, as the handoff's 2b draws it.
+.connection {
+  margin-bottom: var(--space-2);
 }
 
-.add {
-  @include touch-target;
+/* Side by side where both words fit, one over the other where they do not, the main one under: each
+   at least its word, the two equal on a line (owner's В-1 «в»). By the words, not by a width, so a
+   language longer than Russian takes the same way. */
+.pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 
-  gap: var(--space-3);
-  width: 100%;
-  padding: var(--space-3) var(--space-4);
-  border: none;
-  background: none;
-  color: var(--accent-ink);
-  font: inherit;
-  font-size: var(--text-body);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-
-  &:focus-visible {
-    @include focus-ring;
+  > * {
+    flex: 1 0 0;
+    min-width: max-content;
   }
 }
 
-.add-icon {
-  @include icon;
-
-  font-size: var(--icon-button);
-}
-
-.remove {
-  margin-top: var(--space-6);
+.total {
+  margin-top: var(--space-2);
 }
 
 .footnote {
-  margin: var(--space-3) 0 0;
+  margin: var(--space-3) var(--space-1) 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
+}
+
+.receipt {
+  margin-top: var(--space-6);
+}
+
+/* 8 under «+ Сумма по чеку», 24 under a card where there is none (handoffs 7a and 77 v2). */
+.remove {
+  margin-top: var(--space-2);
+
+  &.alone {
+    margin-top: var(--space-6);
+  }
 }
 </style>

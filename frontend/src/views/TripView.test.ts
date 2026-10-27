@@ -143,6 +143,16 @@ function inside(sheet: Element | null, text: string): HTMLButtonElement {
   return found
 }
 
+/** Кнопка полосы записи (Ф-22): «Закончить» шторки висит в дереве раньше и не в счёт. */
+function docked(view: VueWrapper, text: string): DOMWrapper<HTMLButtonElement> {
+  const found = view
+    .get('.dock')
+    .findAll('button')
+    .find((candidate) => candidate.text() === text)
+  if (!found) throw new Error(`нет кнопки «${text}» в полосе`)
+  return found
+}
+
 function button(view: VueWrapper, text: string): DOMWrapper<HTMLButtonElement> {
   const found = view.findAll('button').find((candidate) => candidate.text() === text)
   if (!found) throw new Error(`нет кнопки «${text}»`)
@@ -301,13 +311,44 @@ describe('TripView', () => {
     })
   })
 
-  it('поход без позиций зовёт добавить первую', async () => {
+  it('пустая запись — тихий круг в карточке без кнопок, а действия в полосе (Ф-16, Ф-22)', async () => {
     currentTrip.mockResolvedValue(trip())
     const { view } = await render()
-    expect(view.text()).toContain(ru.trip.empty.title)
-    expect(button(view, ru.trip.empty.action).exists()).toBe(true)
+    const state = view.getComponent({ name: 'ScreenState' })
+    expect(state.text()).toContain(ru.trip.empty.title)
     // Терракотовый круг над «Найти товар» читался кнопкой (MOL-77); тихий — нет (Ф-16).
-    expect(view.get('.state').classes()).toContain('quiet')
+    expect(state.classes()).toContain('quiet')
+    expect(state.findAll('button')).toHaveLength(0)
+    expect(state.element.closest('.card')).not.toBeNull()
+    // Полоса та же, что у записи с позициями: она не меняется с первой позицией (77 v2, п. 5).
+    expect(docked(view, ru.trip.scan_short).exists()).toBe(true)
+    expect(docked(view, ru.trip.add_short).exists()).toBe(true)
+    expect(docked(view, ru.trip.finish).exists()).toBe(true)
+    // Итога у пустой записи нет: «—» — число без числа.
+    expect(view.findComponent({ name: 'TripTotalCard' }).exists()).toBe(false)
+  })
+
+  it('в шапке «Закончить» нет: она в полосе, в зоне пальца (Ф-22)', async () => {
+    currentTrip.mockResolvedValue(trip(handoff()))
+    const { view } = await render()
+    expect(view.get('.bar').text()).not.toContain(ru.trip.finish)
+    expect(view.get('.head').text()).not.toContain(ru.trip.finish)
+    expect(view.findAll('button').filter((node) => node.text() === ru.trip.finish)).toHaveLength(
+      // В полосе и в подвале закрытой шторки «Закончить запись?».
+      2,
+    )
+  })
+
+  it('строк-действий в списке нет — «+ Позиция» и «Штрихкод» только в полосе (С-8)', async () => {
+    currentTrip.mockResolvedValue(trip(handoff()))
+    const { view } = await render()
+    const list = view.get('.card.list')
+    expect(list.text()).not.toContain(ru.trip.add_item)
+    expect(list.text()).not.toContain(ru.item.barcode.scan)
+    expect(list.findAll('.row')).toHaveLength(2)
+    // Итог — карточкой под списком, а не в полосе.
+    expect(view.get('.dock').findComponent({ name: 'TripTotalCard' }).exists()).toBe(false)
+    expect(view.findComponent({ name: 'TripTotalCard' }).exists()).toBe(true)
   })
 
   it('пока сервера не спросили и памяти нет — скелетон, а не «Новый поход»', async () => {
@@ -331,6 +372,34 @@ describe('TripView', () => {
     expect(view.findAll('.bar')).not.toHaveLength(0)
     // Not left for «Покупки» either: until the server is asked, «no record» is not known.
     expect(router.currentRoute.value.name).toBe('purchase-manual')
+
+    // The answer's shape (Ф-13): the rows of the record and the card of its total, and no strip —
+    // its buttons would act on a record nobody knows yet.
+    const parts = view.findAllComponents({ name: 'SkeletonPart' }).map((part) => part.props('kind'))
+    expect(parts).toEqual(['rows', 'figure'])
+    expect(view.find('.dock').exists()).toBe(false)
+    // What the queue says stands over the skeleton, so the answer coming in under it moves none of
+    // its buttons from under a finger (MOL-311): a refused purchase, «Поправить» and «Убрать» on it.
+    addExpense.mockRejectedValue(new ApiError(ERROR.INVALID_AMOUNT, undefined, true))
+    const queue = useTripQueueStore(pinia)
+    queue.enqueue({
+      kind: 'add',
+      tripId: TRIP,
+      entry: milk,
+      body: {
+        id: 'eeeeeeee-0000-4000-8000-000000000003',
+        itemId: milk.id,
+        quantity: parseQuantity('1', 'l'),
+        amount: parseMoney('600', 'AMD'),
+      },
+    })
+    await queue.flush()
+    await flushPromises()
+    const notices = view.get('.notices').element
+    const skeleton = view.getComponent({ name: 'ScreenSkeleton' }).element
+    expect(
+      notices.compareDocumentPosition(skeleton) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 
   // Review Р-18: before the record going on is known, its own waiting purchases are not «не
@@ -590,7 +659,7 @@ describe('TripView', () => {
       queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000009'))
       await flushPromises()
 
-      await button(view, ru.trip.finish).trigger('click')
+      await docked(view, ru.trip.finish).trigger('click')
       await flushPromises()
       clock += 1000
       inside(document.body.querySelector('dialog[open]'), ru.trip.finish_confirm.ok).click()
@@ -608,7 +677,7 @@ describe('TripView', () => {
       queue.enqueue(queued('eeeeeeee-0000-4000-8000-000000000012'))
       await flushPromises()
 
-      await button(view, ru.trip.finish).trigger('click')
+      await docked(view, ru.trip.finish).trigger('click')
       await flushPromises()
       clock += 1000
       inside(document.body.querySelector('dialog[open]'), ru.trip.finish_confirm.ok).click()
@@ -916,7 +985,7 @@ describe('TripView', () => {
 
     it('отвергнутая покупка не исчезает вместе с завершённым походом', async () => {
       const { view, queue } = await refused()
-      await button(view, ru.trip.finish).trigger('click')
+      await docked(view, ru.trip.finish).trigger('click')
       await flushPromises()
       clock += 1000
       inside(document.body.querySelector('dialog[open]'), ru.trip.finish_confirm.ok).click()
@@ -965,14 +1034,22 @@ describe('TripView', () => {
   })
 
   describe('сервер не ответил', () => {
-    it('без сети — зелёная плашка поверх похода, который помнит телефон', async () => {
+    it('без сети — одна полоса связи над записью, которую помнит телефон, не красная и без «Повторить»', async () => {
       currentTrip.mockRejectedValue(new Error('Failed to fetch'))
       vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
       const { view } = await render({ memory: trip(handoff()) })
 
-      expect(view.text()).toContain(ru.trip.offline.title)
-      // Поход остаётся на экране: покупки целы, и ими продолжают пользоваться.
+      const strips = view.findAllComponents({ name: 'StatusStrip' })
+      expect(strips).toHaveLength(1)
+      expect(strips[0]?.props('kind')).toBe('offline')
+      expect(strips[0]?.text()).toBe(ru.trip.offline.strip)
+      expect(strips[0]?.find('button').exists()).toBe(false)
+      // Карточки «Нет сети — и ладно» больше нет (Ф-14).
+      expect(view.findAllComponents({ name: 'ScreenState' })).toHaveLength(0)
+      // Запись остаётся на экране, и полоса пишет в очередь: покупки целы, ими продолжают пользоваться.
       expect(view.findAll('.row')).toHaveLength(2)
+      expect(docked(view, ru.trip.add_short).exists()).toBe(true)
+      expect(docked(view, ru.trip.finish).exists()).toBe(true)
     })
 
     it('похода нет и спросить не удалось — главная не молчит об этом', async () => {
@@ -985,20 +1062,37 @@ describe('TripView', () => {
       // Иначе поход, который сервер держит, но о котором не спросили, читается как «похода нет».
       // Своими словами главной: начать можно и без сети — и одно уведомление, а не два.
       expect(view.text()).toContain(ru.purchases.offline.title)
-      expect(view.text()).not.toContain(ru.trip.offline.title)
+      expect(view.text()).not.toContain(ru.trip.offline.strip)
     })
 
-    it('сеть есть, а сервер молчит — ошибка, тоже поверх похода, и «Повторить»', async () => {
+    it('сеть есть, а сервер молчит — полоса «не ответил» над записью, и одна «Повторить», не залитая', async () => {
       currentTrip.mockRejectedValue(new Error('HTTP 500'))
       const { view } = await render({ memory: trip(handoff()) })
 
-      expect(view.text()).toContain(ru.trip.error.title)
+      const strip = view.getComponent({ name: 'StatusStrip' })
+      expect(strip.props('kind')).toBe('unanswered')
+      expect(strip.text()).toContain(ru.trip.error.strip)
       expect(view.findAll('.row')).toHaveLength(2)
+      // Одна «Повторить», и она не основная: основная на экране одна — «+ Позиция» (Ф-15).
+      const retries = view.findAll('button').filter((node) => node.text() === ru.state.retry)
+      expect(retries).toHaveLength(1)
+      expect(retries[0]?.classes()).toContain('ghost')
+      expect(docked(view, ru.trip.add_short).classes()).toContain('primary')
+      expect(docked(view, ru.trip.finish).exists()).toBe(true)
 
       currentTrip.mockResolvedValue(trip(handoff()))
       await button(view, ru.state.retry).trigger('click')
       await flushPromises()
-      expect(view.text()).not.toContain(ru.trip.error.title)
+      expect(view.findComponent({ name: 'StatusStrip' }).exists()).toBe(false)
+    })
+
+    it('повтор, упавший так же, — новая попытка: полоса скажет свои слова ещё раз (C1)', async () => {
+      currentTrip.mockRejectedValue(new Error('HTTP 500'))
+      const { view } = await render({ memory: trip(handoff()) })
+      const before = view.getComponent({ name: 'StatusStrip' }).props('attempt') as number
+      await button(view, ru.state.retry).trigger('click')
+      await flushPromises()
+      expect(view.getComponent({ name: 'StatusStrip' }).props('attempt')).toBe(before + 1)
     })
   })
 
@@ -1045,7 +1139,7 @@ describe('TripView', () => {
     it('«Завершить» сначала спрашивает, и отмена ничего не пишет', async () => {
       currentTrip.mockResolvedValue(trip(handoff()))
       const { view, queue } = await render()
-      await button(view, ru.trip.finish).trigger('click')
+      await docked(view, ru.trip.finish).trigger('click')
       await flushPromises()
       clock += 1000
 
@@ -1058,7 +1152,7 @@ describe('TripView', () => {
     it('подтверждённое завершение уходит в очередь, и экран зовёт начать новый', async () => {
       currentTrip.mockResolvedValue(trip(handoff()))
       const { view, queue } = await render()
-      await button(view, ru.trip.finish).trigger('click')
+      await docked(view, ru.trip.finish).trigger('click')
       await flushPromises()
       clock += 1000
       inside(document.body.querySelector('dialog[open]'), ru.trip.finish_confirm.ok).click()
@@ -1073,7 +1167,7 @@ describe('TripView', () => {
   it('«Добавить позицию» ведёт на поиск', async () => {
     currentTrip.mockResolvedValue(trip(handoff()))
     const { view, router } = await render()
-    await button(view, ru.trip.add_item).trigger('click')
+    await docked(view, ru.trip.add_short).trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('item-search')
@@ -1083,7 +1177,7 @@ describe('TripView', () => {
     currentTrip.mockResolvedValue(trip(handoff()))
     const { view, router } = await render()
     const asked = vi.spyOn(useItemEntryStore(), 'askToScan')
-    await button(view, ru.item.barcode.scan).trigger('click')
+    await docked(view, ru.trip.scan_short).trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('item-search')
@@ -1094,7 +1188,7 @@ describe('TripView', () => {
     currentTrip.mockResolvedValue(trip(handoff()))
     const { view } = await render()
     const asked = vi.spyOn(useItemEntryStore(), 'askToScan')
-    await button(view, ru.trip.add_item).trigger('click')
+    await docked(view, ru.trip.add_short).trigger('click')
     await flushPromises()
 
     expect(asked).not.toHaveBeenCalled()
@@ -1107,7 +1201,7 @@ describe('TripView', () => {
     const field = () => openSheet()?.querySelector<HTMLInputElement>('input[data-field="receipt"]')
 
     async function askFinish(view: VueWrapper): Promise<void> {
-      await button(view, ru.trip.finish).trigger('click')
+      await docked(view, ru.trip.finish).trigger('click')
       await flushPromises()
       await new Promise((resolve) => setTimeout(resolve, 0))
       clock += 1000
@@ -1189,7 +1283,10 @@ describe('TripView', () => {
       expect(queue.pending).toEqual([
         { kind: 'receipt', tripId: TRIP, body: { receipt: parseMoney('9870.50', 'AMD') } },
       ])
-      expect(plain(view.get('.dock').text())).toContain('Сумма по чеку 9 870,50 ֏ · отправляется')
+      // Строкой в карточке итога, а кнопка под ней — уже «Изменить»: сумма в пути (MOL-206).
+      expect(plain(view.get('.total').text())).toContain('Сумма по чеку 9 870,50 ֏ · отправляется')
+      expect(view.get('.receipt').text()).toBe(ru.trip.receipt.edit)
+      expect(view.get('.dock').text()).not.toContain('Сумма по чеку')
     })
 
     it('«Изменить сумму по чеку» открывает шторку на сумме, «Убрать сумму» кладёт null', async () => {
@@ -1203,7 +1300,9 @@ describe('TripView', () => {
       inside(openSheet(), ru.trip.receipt.sheet.remove).click()
       await flushPromises()
       expect(queue.pending).toEqual([{ kind: 'receipt', tripId: TRIP, body: { receipt: null } }])
-      expect(view.get('.dock').text()).toContain(ru.trip.receipt.removing)
+      expect(view.get('.total').text()).toContain(ru.trip.receipt.removing)
+      // Сумма уходит — под итогом снова «+ Сумма по чеку».
+      expect(view.get('.receipt').text()).toBe(ru.trip.receipt.add)
     })
 
     it('у пустой записи суммы нет: «Закончить» предлагает записать тратой в «Деньгах» (В-1)', async () => {
@@ -1273,7 +1372,7 @@ describe('TripView', () => {
       currentTrip.mockResolvedValue(trip())
       const { view, queue } = await render()
 
-      await button(view, ru.trip.finish).trigger('click')
+      await docked(view, ru.trip.finish).trigger('click')
       await flushPromises()
       const sheet = openSheet()
       expect(sheet?.textContent).toContain(ru.trip.remove.empty.title)
@@ -1289,7 +1388,7 @@ describe('TripView', () => {
     it('у похода с покупками «Завершить» спрашивает как раньше', async () => {
       currentTrip.mockResolvedValue(trip(handoff()))
       const { view } = await render()
-      await button(view, ru.trip.finish).trigger('click')
+      await docked(view, ru.trip.finish).trigger('click')
       await flushPromises()
       expect(openSheet()?.textContent).toContain(ru.trip.finish_confirm.title)
       expect(openSheet()?.textContent).not.toContain(ru.trip.remove.empty.finish)
@@ -1459,7 +1558,7 @@ describe('TripView', () => {
       queue.enqueue({ kind: 'remove', tripId: TRIP, expenseId: ASHKHAR })
       await flushPromises()
 
-      await button(view, ru.trip.finish).trigger('click')
+      await docked(view, ru.trip.finish).trigger('click')
       await flushPromises()
       expect(document.body.querySelector('dialog[open]')?.textContent).toContain(
         ru.trip.remove.empty.title,
