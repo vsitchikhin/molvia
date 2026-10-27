@@ -1,5 +1,12 @@
-import { DomainError, ERROR, SESSION_LIFETIME_DAYS, SESSION_TOUCH_AFTER_HOURS } from '@molvia/model'
+import {
+  ACCOUNT_SEEN_AFTER_HOURS,
+  DomainError,
+  ERROR,
+  SESSION_LIFETIME_DAYS,
+  SESSION_TOUCH_AFTER_HOURS,
+} from '@molvia/model'
 import type { Actor } from '@molvia/model'
+import type { ActorRepository } from '@/db/actors-repository'
 import type { SessionRepository } from '@/db/sessions-repository'
 
 export interface Authenticated {
@@ -38,15 +45,24 @@ export interface Authenticated {
  */
 export async function authenticate(
   sessions: SessionRepository,
+  actors: Pick<ActorRepository, 'markSeen'>,
   token: string,
 ): Promise<Authenticated> {
   const live = await sessions.liveByToken(token)
   if (!live) throw new DomainError(ERROR.NO_ACTOR)
 
-  const due = live.session.lastSeenAt.getTime() < Date.now() - SESSION_TOUCH_AFTER_HOURS * 3_600_000
-  const refreshedUntil = due
-    ? await sessions.touch(live.session.id, SESSION_TOUCH_AFTER_HOURS, SESSION_LIFETIME_DAYS)
-    : null
+  const now = Date.now()
+  const refreshedUntil =
+    live.session.lastSeenAt.getTime() < now - SESSION_TOUCH_AFTER_HOURS * 3_600_000
+      ? await sessions.touch(live.session.id, SESSION_TOUCH_AFTER_HOURS, SESSION_LIFETIME_DAYS)
+      : null
+  // The account's last visit (MOL-238), judged the same way and apart from the session's: a
+  // device signed in yesterday has a fresh session on an account whose day may still be due. A
+  // statement of its own, never in one with `touch` — erasure locks the owner before the sessions,
+  // and one statement locking a session and then its owner could wait on it the other way round.
+  if (live.actorSeenAt.getTime() < now - ACCOUNT_SEEN_AFTER_HOURS * 3_600_000) {
+    await actors.markSeen(live.actor.id, ACCOUNT_SEEN_AFTER_HOURS)
+  }
 
   return { actor: live.actor, sessionId: live.session.id, refreshedUntil }
 }

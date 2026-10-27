@@ -153,6 +153,11 @@ The detail behind the privacy lines of `CLAUDE.md`.
   (adversarial Б).
   `/privacy` says what the copy holds — the removed and the withdrawn included — under «Копия ваших
   данных», and names the row by its words.
+- **The account's last visit is kept to erase the silent** (MOL-238, `auth.md`): `actors.last_seen_at`,
+  a term of keeping rather than a statistic — never the visit of «Что брать», which is one — written
+  with the switch off and with no edition accepted, in the copy (version 24), gone with the row, a line
+  of the record of processing; the page names it under «Ваши настройки», and says that after a long
+  silence keeping the account takes a login, not only opening the app — both revisions.
 - **A person can object to being counted** (MOL-96): «Учитывать меня в статистике» in «Ваши
   данные» erases their event log at once, stops it, and takes them out of both gates — the reasons
   and the rules are in `advice.md`. The two moments it keeps are on `actors`, so erasure takes them

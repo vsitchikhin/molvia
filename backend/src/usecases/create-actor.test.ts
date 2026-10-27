@@ -16,6 +16,7 @@ function fakeActors(overrides: Partial<ActorRepository> = {}): ActorRepository {
     lockAccount: () => Promise.reject(new Error('lockAccount was not expected')),
     consentVersion: () => Promise.reject(new Error('consentVersion was not expected')),
     acceptConsent: () => Promise.reject(new Error('acceptConsent was not expected')),
+    markSeen: () => Promise.reject(new Error('markSeen was not expected')),
     ...overrides,
   }
 }

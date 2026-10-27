@@ -47,6 +47,14 @@ export interface ActorRepository {
    * older one, from a build that has not updated, changes nothing. The moment is the database's.
    */
   acceptConsent(id: string, version: number): Promise<number | null>
+
+  /**
+   * Marks the account's visit (MOL-238): `last_seen_at` to now — but only if the mark is older than
+   * `afterHours`, so the first request of a day writes and the rest do not, whichever device sends
+   * them. Answers whether it wrote. The condition is in the `WHERE`, as `touch`'s is: two requests
+   * arriving together write once. `now()`, the database's clock, as everywhere a moment is stamped.
+   */
+  markSeen(id: string, afterHours: number): Promise<boolean>
 }
 
 /**
@@ -171,6 +179,21 @@ export function createActorRepository(db: Conn): ActorRepository {
         )
         .returning({ version: actors.consentVersion })
       return row ? row.version : consentVersion(id)
+    },
+
+    async markSeen(id, afterHours) {
+      if (idOrNull(id) === null) return false
+      const written = await db
+        .update(actors)
+        .set({ lastSeenAt: sql`now()` })
+        .where(
+          and(
+            eq(actors.id, id),
+            sql`${actors.lastSeenAt} < now() - make_interval(hours => ${afterHours}::int)`,
+          ),
+        )
+        .returning({ id: actors.id })
+      return written.length > 0
     },
 
     async update(id, patch) {

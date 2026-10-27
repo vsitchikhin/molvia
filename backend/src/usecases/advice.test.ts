@@ -101,6 +101,7 @@ function deps(world: World = {}) {
     lockAccount: () => Promise.reject(new Error('lockAccount was not expected')),
     consentVersion: () => Promise.reject(new Error('consentVersion was not expected')),
     acceptConsent: () => Promise.reject(new Error('acceptConsent was not expected')),
+    markSeen: () => Promise.reject(new Error('markSeen was not expected')),
   }
 
   const verdicts: VerdictRepository = {

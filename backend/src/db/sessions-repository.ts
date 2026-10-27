@@ -12,6 +12,12 @@ import { actors, sessions } from './schema'
 export interface LiveSession {
   readonly session: Session
   readonly actor: Actor
+  /**
+   * The owner's last visit (MOL-238), from the same read: the guard judges whether the day's mark
+   * is due off it for free, as it does the session's term. Beside the entity rather than in it —
+   * nothing past the guard reads it.
+   */
+  readonly actorSeenAt: Date
 }
 
 /** A page of an owner's sessions and how many there are past it. */
@@ -172,7 +178,13 @@ export function createSessionRepository(db: Conn): SessionRepository {
         .innerJoin(actors, eq(actors.id, sessions.actorId))
         .where(and(eq(sessions.tokenHash, sha256Hex(token)), gt(sessions.expiresAt, sql`now()`)))
         .limit(1)
-      return row ? { session: toSession(row.session), actor: actorSchema.parse(row.actor) } : null
+      return row
+        ? {
+            session: toSession(row.session),
+            actor: actorSchema.parse(row.actor),
+            actorSeenAt: row.actor.lastSeenAt,
+          }
+        : null
     },
 
     async touch(id, afterHours, lifetimeDays) {
