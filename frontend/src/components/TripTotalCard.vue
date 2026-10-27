@@ -70,9 +70,16 @@ export default defineComponent({
       type: Object as PropType<{ readonly receipt: Money | null } | null>,
       default: null,
     },
-    /** The rows on screen and those with no price, as «Закончить» counts them (`useTripReceipt`). */
+    /**
+     * The rows on screen and those with no price, as «Закончить» counts them, and whether they are the
+     * server's list (`useTripReceipt`).
+     */
     rows: {
-      type: Object as PropType<{ readonly kept: number; readonly unpriced: number } | null>,
+      type: Object as PropType<{
+        readonly kept: number
+        readonly unpriced: number
+        readonly settled?: boolean
+      } | null>,
       default: null,
     },
   },
@@ -81,16 +88,17 @@ export default defineComponent({
     const total = useTripTotal(props)
 
     /**
-     * The line breaks only between its parts, never inside one (review 3, №2): a rate's figure and its
-     * signs, a day and its month, «≈» and its amount come with ordinary spaces, and «курс 4,24 / ֏/₽» or
-     * «27 / окт.» read as two things. Each part split at its own «·», its spaces made no-break. The «·»
-     * is the dictionary's: `trip.total_line` and `trip.rate_line*` put one between their pieces in every
-     * locale, and `TripTotal.test.ts` holds both dictionaries to it (review 4, №1).
+     * The rate, «≈» and «С ценой» break only between their parts, never inside one (review 3, №2): a
+     * rate's figure and its signs, a day and its month, «≈» and its amount come with ordinary spaces,
+     * and «курс 4,24 / ֏/₽» or «27 / окт.» read as two things. Each part split at its own «·», its spaces
+     * made no-break. The «·» is the dictionary's: `trip.total_line` and `trip.rate_line*` put one between
+     * their pieces in every locale, and `TripTotalCard.test.ts` holds both dictionaries to it (review 4,
+     * №1). **The receipt's parts are phrases and wrap between their words** (MOL-207, review №1): whole,
+     * they broke at any letter past the card's width — «the receipt is ֏10,070 less than the pri / ces»
+     * at 320; their sums come non-breaking from `formatMoney`, and the tail after a dash from
+     * `receiptParts`.
      */
     const parts = computed(() => [
-      // Phrases, not figures (review №1): whole they broke at any letter past the card's width — «the
-      // receipt is ֏10,070 less than the pri / ces» at 320. Their sums come non-breaking from
-      // `formatMoney`, so a phrase wraps between its words and never inside an amount.
       ...total.receiptParts.value,
       ...[total.priced.value, total.estimate.value, total.rateLine.value]
         .filter((part): part is string => part !== null)
@@ -166,7 +174,8 @@ export default defineComponent({
   line-height: var(--leading-snug);
 }
 
-/* A part is whole (review 3, №2), and breaks inside only where it alone is wider than the card — the
+/* A part of the rate, «≈» or «С ценой» is whole (review 3, №2), a phrase of the receipt wraps between
+   its words (MOL-207); either breaks inside a word only where that alone is wider than the card — the
    rate named with its bank once stood past it on every phone (review 2, №1). */
 .part {
   overflow-wrap: anywhere;

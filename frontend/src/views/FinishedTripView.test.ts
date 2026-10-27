@@ -11,7 +11,7 @@ import { defineComponent, h } from 'vue'
 import { RouterView, createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
-import { ERROR, tripViewCodec } from '@molvia/model'
+import { ERROR, parseMoney, tripViewCodec } from '@molvia/model'
 import type { TripView } from '@molvia/model'
 import ru from '@/i18n/ru.json'
 import { dayOfAnyYear, timeOfDay } from '@/days'
@@ -318,6 +318,53 @@ describe('FinishedTripView: строка чека и удаление запис
     expect(view.findAll('.row')[1]?.classes()).toContain('gone')
     expect(parts(view)).toEqual([])
     expect(plainText(view)).toContain('1 400 ֏')
+  })
+
+  // Round 2, Б1: milk swapped for cheese keeps both counts — the list is judged by its rows.
+  it('Б1: молоко заменено сыром без связи — счёт строк тот же, а о ценах строка чека молчит', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    trip.mockResolvedValue(finished)
+    const view = await render(null)
+    const queue = useTripQueueStore()
+    queue.enqueue({ kind: 'remove', tripId: TRIP, expenseId: row(null, 1).id })
+    queue.enqueue({
+      kind: 'add',
+      tripId: TRIP,
+      entry: {
+        id: row(null, 9).item.id,
+        kind: 'product',
+        name: 'Сыр',
+        note: null,
+        defaultUnit: 'piece',
+        typicalQuantity: null,
+      },
+      body: {
+        id: row(null, 9).id,
+        itemId: row(null, 9).item.id,
+        amount: parseMoney('900', 'AMD'),
+      },
+    })
+    await flushPromises()
+    expect(view.findAll('.row')).toHaveLength(3)
+    expect(parts(view)).toEqual([])
+    expect(plainText(view)).toContain('1 400 ֏')
+  })
+
+  // Round 2, Б2: read back from the shelf the total of a record whose purchases are being removed may
+  // be its receipt — asked about, with no sum named, since the shelf cannot say which.
+  it('Б2: с полки все покупки удаляются, итог остался — удаление спрашивает, суммы не называя', async () => {
+    trip.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+    const view = await render()
+    const queue = useTripQueueStore()
+    queue.enqueue({ kind: 'remove', tripId: TRIP, expenseId: row(null, 1).id })
+    queue.enqueue({ kind: 'remove', tripId: TRIP, expenseId: BREAD })
+    await flushPromises()
+    await removeButton(view)?.trigger('click')
+    await flushPromises()
+    const sheet = view.findComponent({ name: 'TripRemoveSheet' })
+    expect(sheet.props('open')).toBe(true)
+    expect(sheet.props('receipt')).toBeNull()
+    expect(queue.pending.some((write) => write.kind === 'delete')).toBe(false)
   })
 
   it('А2: запись одной суммы по чеку спрашивает перед удалением и называет сумму', async () => {

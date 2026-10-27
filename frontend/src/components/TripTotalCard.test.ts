@@ -155,8 +155,8 @@ describe('TripTotalCard', () => {
       // Каждая часть — со своей подстановкой: «·» стоит между кусками, а не внутри одного.
       for (const part of [...(mine ?? []), ...(theirs ?? [])]) expect(part, key).toMatch(/\{\w+\}/)
     }
-    // Части строки чека — каждая одна часть (ревью №3): «·» внутри развалил бы её молча, а подстановки
-    // у обоих словарей одни.
+    // Части строки чека — каждая одна часть (ревью №3): «·» внутри нарисовал бы ложный разделитель
+    // частей, а подстановки у обоих словарей одни.
     const lines = Object.keys(ru.trip.receipt).filter((key) => key.startsWith('line_'))
     expect(lines.length).toBeGreaterThan(0)
     const slots = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((found) => found[1]).sort()
@@ -360,6 +360,36 @@ describe('TripTotalCard', () => {
         rows: [null, null],
       })
       expect(parts(view)).toEqual([ru.trip.receipt.line_none])
+    })
+
+    it('строка, где покупка удаляется или ждёт отправки, — о ценах ни слова, даже при тех же числах (Б1)', () => {
+      const view = card({
+        trip: trip({
+          converted: null,
+          rate: null,
+          total: [amd('1400')],
+          receipt: amd('1400'),
+          prices: [amd('570')],
+          gap: { kind: 'unpriced', amount: amd('830') },
+          rows: [amd('570'), null],
+        }),
+        rows: { kept: 2, unpriced: 1, settled: false },
+      })
+      expect(parts(view)).toEqual([])
+    })
+
+    it('тире не начинает строку, «n из m» не рвётся: хвост после тире неразрывный (ревью 2, №3, П1)', () => {
+      const view = receipt({
+        receipt: amd('12400'),
+        prices: [amd('8300')],
+        gap: { kind: 'unpriced', amount: amd('4100') },
+        rows: [amd('8300'), null],
+      })
+      const raw = view.findAll('.line .part').map((part) => part.text())
+      expect(raw).toEqual([
+        `по ценам 8\u00a0300\u00a0֏\u00a0—\u00a01\u00a0из\u00a02`,
+        `без цены\u00a0—\u00a04\u00a0100\u00a0֏`,
+      ])
     })
 
     it('сумма без покупок — ни слова о ценах, которых нет', () => {

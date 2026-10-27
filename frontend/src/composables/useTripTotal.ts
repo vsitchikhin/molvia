@@ -36,7 +36,12 @@ export interface TripTotalInput {
    * «С ценой — n из m» counts: the same count «Закончить» asks by (Р-5 of MOL-76, adversarial А2).
    * Left out, the line is not said.
    */
-  readonly rows?: { readonly kept: number; readonly unpriced: number } | null
+  readonly rows?: {
+    readonly kept: number
+    readonly unpriced: number
+    /** None of them being removed or waiting to be sent: the list the server counted (MOL-207). */
+    readonly settled?: boolean
+  } | null
 }
 
 export interface TripTotal {
@@ -210,8 +215,12 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
    *
    * **Said only of the list the server counted** (adversarial А1): a purchase removed or added with no
    * signal is on the screen and not in `prices` and `gap` yet, and «— 1 из 2 · без цены — 830 ֏» over a
-   * struck-out loaf spoke of a list no longer shown. While the rows on screen are not the server's, the
-   * line says nothing of the prices — the receipt's sum above it is still the server's and true.
+   * struck-out loaf spoke of a list no longer shown. While a row is being removed or waits to be sent,
+   * the line says nothing of the prices — judged by the rows, not their counts: milk swapped for cheese
+   * keeps both (round 2, Б1). The receipt's sum above it is still the server's and true.
+   *
+   * **A dash never starts a line, and «12 из 14» is never cut** (review round 2, №3, П1): what follows
+   * the dash of a part — the count, the sum — goes with it, no-break; the words before wrap.
    */
   const receiptParts = computed(() => {
     const trip = props.trip
@@ -219,7 +228,8 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
     const all = trip.expenses.length
     const priced = trip.expenses.filter((expense) => expense.amount !== null).length
     const rows = props.rows
-    if (rows && (rows.kept !== all || rows.unpriced !== all - priced)) return []
+    if (rows && (rows.settled === false || rows.kept !== all || rows.unpriced !== all - priced))
+      return []
     if (trip.prices.length === 0) return [t('trip.receipt.line_none')]
     const amount = new Intl.ListFormat(locale.value, { type: 'conjunction' }).format(
       trip.prices.map((value) => money(value)),
@@ -238,7 +248,10 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
           ? t('trip.receipt.line_unpriced', { amount: money({ minor: 0n, currency }) })
           : t('trip.receipt.line_meets'),
       )
-    return parts
+    return parts.map((part) => {
+      const dash = part.lastIndexOf(' — ')
+      return dash < 0 ? part : part.slice(0, dash) + part.slice(dash).replaceAll(' ', '\u00a0')
+    })
   })
 
   const waiting = computed(() => {

@@ -47,7 +47,11 @@ interface FinishedTrip extends Omit<SelectedTrip, 'load'> {
    * over a record read back from the phone's shelf, which keeps no receipt's sum yet: its total may be
    * the receipt, and «С ценой — 1 из 2» beside it read as the prices (MOL-207).
    */
-  priced: ComputedRef<{ readonly kept: number; readonly unpriced: number } | null>
+  priced: ComputedRef<{
+    readonly kept: number
+    readonly unpriced: number
+    readonly settled: boolean
+  } | null>
   /** What a new sum starts in: the record's currency, as the purchase sheet takes it. */
   receiptCurrency: ComputedRef<Currency>
   opened: Ref<OpenedPurchase | null>
@@ -89,10 +93,10 @@ export function useFinishedTrip(): FinishedTrip {
   // Whether the trip shown is the server's answer, which knows its receipt's sum — not one read back
   // from the phone's shelf, here or by another window (MOL-78, reviews 4 and Е).
   const answered = (): boolean => history.answered(selected.trip.value)
-  const { receiptOpen, receiptWaiting, receiptCurrent, receiptAction, kept, unpriced } =
+  const { receiptOpen, receiptWaiting, receiptCurrent, receiptAction, kept, unpriced, settled } =
     useTripReceipt(selected.id, selected.trip, rows, answered)
   const priced = computed(() =>
-    answered() ? { kept: kept.value, unpriced: unpriced.value } : null,
+    answered() ? { kept: kept.value, unpriced: unpriced.value, settled: settled.value } : null,
   )
   const receiptCurrency = computed<Currency>(
     () =>
@@ -207,12 +211,14 @@ export function useFinishedTrip(): FinishedTrip {
   function askRemove(): void {
     const items = rows.value.filter((row) => row.mark !== 'removing').length
     // Read back from the phone's shelf the receipt is not kept, but a record the server holds with no
-    // purchase has no money but its receipt: its total is that sum. Never one whose purchases are only
-    // being removed — its total is their prices.
+    // purchase has no money but its receipt: its total is that sum. One whose purchases are only being
+    // removed has a total that may be their prices or a receipt — the shelf cannot say which, so it is
+    // asked about with no sum named (round 2, Б2); answered by the server, its receipt is known.
     const held = selected.trip.value
     const sum =
       receiptCurrent.value ?? (held?.expenses.length === 0 ? (held.total[0] ?? null) : null)
-    if (items === 0 && !sum) {
+    const unknown = held !== null && !answered() && held.total.length > 0
+    if (items === 0 && !sum && !unknown) {
       drop()
       void goBack()
       return
