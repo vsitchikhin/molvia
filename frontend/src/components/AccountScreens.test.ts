@@ -901,6 +901,178 @@ describe('AccountSheet (handoff 03)', () => {
       withAccounts([]),
     )
     expect(view.text()).toContain(en.accounts.sheet.offline)
-    expect(button(view, en.accounts.sheet.wait_online)?.attributes('disabled')).toBeDefined()
+    expectNotNow(view, en.accounts.sheet.wait_online)
   })
+
+  /** The field of the amount and the line under it, as a reader meets them. */
+  function startOf(view: VueWrapper) {
+    const field = view
+      .findAll('.field')
+      .find((one) => one.find('input[inputmode="decimal"]').exists())
+    if (!field) throw new Error('no amount field')
+    const input = field.get('input')
+    const hint = (input.attributes('aria-describedby') ?? '')
+      .split(' ')
+      .map((id) => document.getElementById(id))
+      .find((one) => one?.classList.contains('hint'))
+    return { label: field.get('label').text(), input, hint: hint?.textContent.trim() ?? null }
+  }
+
+  // Ф-31: «Остаток» is what lies on the account now, so the field of an amendment is its start, and
+  // the server's balance stands under it — read with the field, never worked out from what is typed.
+  it('an amendment: «Held at the start», the server’s balance under it, as the field’s description', async () => {
+    const card = account('Card $', 'USD', {
+      start: parseMoney('8920', 'USD'),
+      balance: parseMoney('8470.12', 'USD'),
+      hasOperations: true,
+    })
+    const view = await mounted(
+      AccountSheet,
+      { open: true, account: card, spendCurrency: 'AMD' },
+      withAccounts([card]),
+    )
+    const start = startOf(view)
+    expect(start.label).toBe(en.accounts.sheet.start_amount)
+    expect(start.hint).toBe('now $8,470.12')
+
+    // Р-3: what is typed moves nothing on the phone — «now» is what is recorded.
+    await start.input.setValue('9000')
+    expect(startOf(view).hint).toBe('now $8,470.12')
+  })
+
+  it('«now» below zero takes the minus sign, and a removed account says it too (Р-1, Р-4)', async () => {
+    const card = account('Credit card', 'RUB', {
+      balance: { minor: -1_240_050n, currency: 'RUB' },
+      hasOperations: true,
+      archivedAt: new Date('2026-10-01T10:00:00Z'),
+    })
+    const view = await mounted(
+      AccountSheet,
+      { open: true, account: card, spendCurrency: 'AMD' },
+      withAccounts([card]),
+    )
+    const start = startOf(view)
+    expect(start.label).toBe(en.accounts.sheet.start_amount)
+    expect(start.hint).toBe('now \u2212₽12,400.50')
+    expect(button(view, en.accounts.sheet.archive)).toBeUndefined()
+    expect(button(view, en.accounts.sheet.delete)).toBeUndefined()
+  })
+
+  it('a new account: «Balance», with no «now» and nothing more describing the field (must not fire)', async () => {
+    const view = await mounted(AccountSheet, { open: true, spendCurrency: 'AMD' }, withAccounts([]))
+    const start = startOf(view)
+    expect(start.label).toBe(en.accounts.balance)
+    expect(start.hint).toBeNull()
+    expect(start.input.attributes('aria-describedby') ?? '').not.toMatch(/-now\b/)
+    expect(view.text()).not.toContain('now ')
+  })
+
+  // Owner's «б» on self-review Р1-1 (adversarial А2): «now» is what is recorded, in the account's own
+  // currency while another is chosen — the price is named, not hidden.
+  it('another currency chosen: «now» stays as recorded, in the account’s currency', async () => {
+    const card = account('Card ₽', 'RUB', {
+      start: parseMoney('5000', 'RUB'),
+      balance: parseMoney('5000', 'RUB'),
+    })
+    const view = await mounted(
+      AccountSheet,
+      { open: true, account: card, spendCurrency: 'AMD' },
+      withAccounts([card]),
+    )
+    await view.get('select').setValue('USD')
+    expect(startOf(view).hint).toBe('now ₽5,000')
+  })
+
+  it('after a conflict «now» is the balance of the version read again (Р-2)', async () => {
+    const card = account('Card ₽', 'RUB', { balance: parseMoney('5000', 'RUB') })
+    const view = await mounted(
+      AccountSheet,
+      { open: true, account: card, spendCurrency: 'AMD' },
+      withAccounts([card]),
+    )
+    expect(startOf(view).hint).toBe('now ₽5,000')
+    const { api } = await import('@/api')
+    ;(api as unknown as Record<string, unknown>).amendMoneyAccount = vi
+      .fn()
+      .mockRejectedValue(new ApiError(ERROR.CONFLICT, 'revision'))
+    moneyAccounts.mockResolvedValue(
+      page([{ ...card, balance: parseMoney('4200', 'RUB'), revision: 2 }]),
+    )
+    await button(view, en.accounts.sheet.save)?.trigger('click')
+    await flushPromises()
+    expect(view.text()).toContain(en.accounts.sheet.conflict)
+    expect(startOf(view).hint).toBe('now ₽4,200')
+  })
+
+  // Ф-34 by its pattern: «Put away» loses nothing and is quiet; «Delete account» deletes for good.
+  it('«Put away» is a ghost, «Delete account» stays danger-ghost', async () => {
+    const used = account('Card $', 'USD', { hasOperations: true })
+    const spare = account('Spare')
+    const archive = await mounted(
+      AccountSheet,
+      { open: true, account: used, spendCurrency: 'AMD' },
+      withAccounts([used, spare]),
+    )
+    expect(button(archive, en.accounts.sheet.archive)?.classes()).toContain('ghost')
+    expect(button(archive, en.accounts.sheet.archive)?.classes()).not.toContain('danger-ghost')
+    archive.unmount()
+    const remove = await mounted(
+      AccountSheet,
+      { open: true, account: spare, spendCurrency: 'AMD' },
+      withAccounts([used, spare]),
+    )
+    expect(button(remove, en.accounts.sheet.delete)?.classes()).toContain('danger-ghost')
+  })
+
+  // Ф-6, С-11, owner's В-1 «а»: offline the kit's one strip comes first in the sheet, and every
+  // button is not now in the focus order, saying why on itself — a tap sends nothing.
+  it.each([
+    {
+      hasOperations: true,
+      word: en.accounts.sheet.archive_offline,
+      live: en.accounts.sheet.archive,
+    },
+    {
+      hasOperations: false,
+      word: en.accounts.sheet.delete_offline,
+      live: en.accounts.sheet.delete,
+    },
+  ])(
+    'offline: one strip first, «Save» and «$live» not now saying why, nothing sent',
+    async ({ hasOperations, word, live }) => {
+      const card = account('Card ₽', 'RUB', { hasOperations })
+      const amendMoneyAccount = vi.fn()
+      const { api } = await import('@/api')
+      ;(api as unknown as Record<string, unknown>).amendMoneyAccount = amendMoneyAccount
+      const view = await mounted(
+        AccountSheet,
+        { open: true, account: card, spendCurrency: 'AMD', online: false },
+        withAccounts([card]),
+      )
+      const strips = view.findAllComponents(StatusStrip)
+      expect(strips).toHaveLength(1)
+      expect(strips[0]?.props()).toMatchObject({ kind: 'offline', text: en.accounts.sheet.offline })
+      const form = view.get('form').element
+      expect(
+        strips[0]?.element.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
+      expect(form.contains(strips[0]?.element ?? null)).toBe(false)
+
+      expectNotNow(view, en.accounts.sheet.wait_online)
+      expectNotNow(view, word)
+      expect(button(view, word)?.classes()).toContain(hasOperations ? 'ghost' : 'danger-ghost')
+      await button(view, en.accounts.sheet.wait_online)?.trigger('click')
+      await button(view, word)?.trigger('click')
+      await flushPromises()
+      expect(amendMoneyAccount).not.toHaveBeenCalled()
+      expect(removeMoneyAccount).not.toHaveBeenCalled()
+
+      await view.setProps({ online: true })
+      expect(view.findAllComponents(StatusStrip)).toHaveLength(0)
+      for (const text of [en.accounts.sheet.save, live]) {
+        expect(button(view, text)?.attributes('aria-disabled'), text).toBeUndefined()
+        expect(button(view, text)?.attributes('disabled'), text).toBeUndefined()
+      }
+    },
+  )
 })

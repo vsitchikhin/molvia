@@ -299,7 +299,9 @@ describe('словарь: повторяющиеся тексты', () => {
       ],
       // Правка обмена и дохода без связи (MOL-189, Ф-6): те же слова неактивной кнопки, что у
       // перевода и счёта, и одно «Вернём» у полос «Вернуть» — и у «Вернуть» «Счетов» (MOL-193).
+      // «Удалить счёт» без связи — те же слова (MOL-196, В-1 «а»).
       'Удалим, когда будет связь': [
+        'accounts.sheet.delete_offline',
         'exchange.sheet.remove_offline',
         'income.sheet.remove_offline',
         'transfer.remove_wait',
@@ -430,6 +432,8 @@ describe('словарь: повторяющиеся тексты', () => {
         'exchange.sheet.save_offline',
         'income.sheet.save_offline',
       ],
+      // MOL-196, as in Russian: «Delete account» offline says what an exchange's removal says.
+      'Will delete once online': ['accounts.sheet.delete_offline', 'exchange.sheet.remove_offline'],
       // Английский не различает отмену диалога и отмену ввода; русский различает.
       Cancel: ['item.cancel', 'trip.finish_confirm.cancel'],
       // Отметка строки и заголовок «Не приняты» над такими строками: число есть только в русском.

@@ -623,6 +623,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     let stopSessionCleanup: (() => Promise<void>) | undefined
     let stopFeedbackCleanup: (() => Promise<void>) | undefined
     let stopFailureCleanup: (() => Promise<void>) | undefined
+    let stopSenderForget: (() => Promise<void>) | undefined
+    // The route's minute of the phone's reports (MOL-144), let go by the timer below too (MOL-241).
+    const phoneLimit = phoneReportLimit()
     let stopMergeTwins: (() => Promise<void>) | undefined
     const embedder = options.embedder?.(instance.log) ?? NO_EMBEDDER
     let itemEmbedding: ReturnType<typeof startItemEmbedding> | undefined
@@ -697,6 +700,20 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         },
         (error) => {
           failures.report(error, job('failure-cleanup'), 'failure cleanup failed')
+        },
+      )
+      // The phones' addresses an hour after their last failure, and the route's minute (MOL-241): a
+      // timer of its own, since the cleanup above waits on the database, and one down or hung would
+      // keep them as long.
+      stopSenderForget = startLoginCleanup(
+        () => {
+          const now = new Date()
+          failures.forget(now)
+          phoneLimit.forget(now.getTime())
+          return Promise.resolve()
+        },
+        (error) => {
+          failures.report(error, job('sender-forget'), 'phone sender forget failed')
         },
       )
       // A message to the developer lives a year from the last word of its thread (MOL-147, В-4 of
@@ -919,6 +936,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopSessionCleanup?.()
       await stopFeedbackCleanup?.()
       await stopFailureCleanup?.()
+      await stopSenderForget?.()
       await stopMergeTwins?.()
       await itemEmbedding?.stop()
       await stopReceiptCleanup?.()
@@ -1004,7 +1022,6 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     })
 
     // The phone's failures (MOL-144): no session, a limit in memory, the page's own build.
-    const phoneLimit = phoneReportLimit()
     clientErrorsRoute(instance, (body, address) => {
       takePhoneFailures(
         {

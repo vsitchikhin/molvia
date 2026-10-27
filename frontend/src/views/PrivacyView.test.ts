@@ -76,9 +76,12 @@ it("says what a failure of the app sends, and that it is nobody's (MOL-144)", as
     /вид ошибки, экран, где она случилась, версию приложения/,
   )
   expect(ru.privacy.failures.text).toMatch(/без текста, который вы ввели/)
-  // MOL-241 is named as it is until it is fixed (MOL-236, owner's decision В-3).
+  // MOL-241: named as a defect by edition 2 (В-3) until fixed; a narrower processing is a revision
   expect(ru.privacy.failures.text).toMatch(/Адрес телефона в базу не записывается/)
-  expect(ru.privacy.failures.text).toMatch(/держится в памяти сервера до его перезапуска/)
+  expect(ru.privacy.failures.text).toMatch(
+    /держит его в памяти час после последнего сбоя, присланного с этого адреса/,
+  )
+  expect(ru.privacy.failures.text).not.toMatch(/перезапуск|исправляем/)
   expect(ru.privacy.failures.text).toContain(`${String(FAILURE_KEEP_DAYS)} дней`)
 })
 
@@ -164,7 +167,7 @@ it('says the consent is kept — the edition and when — and nothing of the age
   expect(view.text()).toContain(ru.privacy.stored.consent.text)
   expect(ru.privacy.stored.consent.text).toMatch(/Возраст и дату рождения мы не храним/)
   // The subtitle is the revision written in code, not a sentence of the dictionary.
-  expect(view.text()).toContain('Редакция 3 от 20 октября 2026')
+  expect(view.text()).toContain('Редакция 3 от 27 октября 2026')
 })
 
 describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for (MOL-236)', () => {

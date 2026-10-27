@@ -206,9 +206,9 @@ The detail behind the privacy lines of `CLAUDE.md`.
   price (counting is a use for another purpose) is in «Персональные данные», 2.1. **Telegram is named a
   transfer abroad** with its basis — the sign-in and the bot are Telegram (owner's 2-а on review С-3);
   that the Agency's permission for a country off its list was not asked is the price in 2.1. **A recipient is a line of `PRIVACY_RECIPIENTS`** (`policy.ts`, in the fingerprint), and a
-  new one is a new edition. **A known defect is named as it is** (В-3): MOL-241 stands on the page as
-  «ошибка, исправляем» until fixed, and its line goes by a revision — a narrower processing needs no new
-  consent, as MOL-240's went (08.10.2026). **A breach is announced at the top of the page** by the key `privacy.notice`
+  new one is a new edition. **A known defect is named as it is** (В-3) until fixed, and its line goes by a
+  revision — a narrower processing needs no new consent: MOL-240's went on 08.10.2026, MOL-241's on
+  27.10.2026 (the phone's address an hour after its last failure, `observability.md`). **A breach is announced at the top of the page** by the key `privacy.notice`
   (`title`, `text`), absent until then: a revision, not an edition, and its merge is the deploy
   («Порядок при утечке», step 4). The subject's own name of art. 10 §2.1 cannot be given — none is
   kept; the price is in «Персональные данные», 2.1.
