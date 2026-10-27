@@ -7,6 +7,9 @@ import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE, parseMoney, parseQuantity, tripViewCodec } from '@molvia/model'
 import type {
   CatalogueEntry,
+  Currency,
+  MoneyAccountView,
+  MoneyAccountsResponse,
   PendingVerdicts,
   TripHistory,
   TripView as TripViewModel,
@@ -30,6 +33,9 @@ const tripHistory = vi.fn<() => Promise<TripHistory>>()
 const pendingVerdicts = vi.fn<() => Promise<PendingVerdicts>>()
 const removeTrip = vi.fn<(tripId: string) => Promise<void>>()
 const restoreTrip = vi.fn()
+const moneyAccounts = vi.fn<() => Promise<MoneyAccountsResponse>>(
+  () => new Promise(() => undefined),
+)
 vi.mock('@/api', () => ({
   api: {
     receipts: () => Promise.resolve({ receipts: [] }),
@@ -47,7 +53,7 @@ vi.mock('@/api', () => ({
     setTripReceipt: () => new Promise(() => undefined),
     // «Деньги», where an empty record is handed over as a spending (MOL-78, В-1).
     moneyMonth: () => new Promise(() => undefined),
-    moneyAccounts: () => new Promise(() => undefined),
+    moneyAccounts: () => moneyAccounts(),
     // «Тут дешевле» on the purchase sheet (MOL-92): never answered here.
     ownPrices: () => new Promise(() => undefined),
   },
@@ -1096,6 +1102,140 @@ describe('TripView', () => {
     await flushPromises()
 
     expect(asked).not.toHaveBeenCalled()
+  })
+
+  // MOL-312, В-3 «б»: finished is paid — the account is chosen in «Закончить» and goes before the finish
+  describe('счёт записи вручную (MOL-312)', () => {
+    const openSheets = () => [...document.body.querySelectorAll('dialog[open]')]
+    let next = 0
+    function account(name: string, currency: Currency): MoneyAccountView {
+      next += 1
+      return {
+        id: `00000000-0000-4000-8000-${String(next).padStart(12, '0')}`,
+        name,
+        currency,
+        savings: false,
+        start: parseMoney('0', currency),
+        startOn: '2026-09-16',
+        balance: parseMoney('1000', currency),
+        approximate: false,
+        uncounted: 0,
+        inSpend: null,
+        rate: null,
+        lastCheckedOn: null,
+        hasOperations: false,
+        archivedAt: null,
+        revision: 1,
+      }
+    }
+    const cash = account('Наличные ֏', 'AMD')
+    const card = account('Карта ֏', 'AMD')
+    const roubles = account('Карта ₽', 'RUB')
+    const page = (accounts: MoneyAccountView[]): MoneyAccountsResponse => {
+      const zero = parseMoney('0', 'AMD')
+      return {
+        spendCurrency: 'AMD',
+        accounts,
+        totals: { total: zero, spendable: zero, savings: zero, uncounted: 0 },
+        incomeTotals: null,
+        unassigned: 0,
+        countedAt: new Date(),
+      }
+    }
+
+    beforeEach(() => {
+      moneyAccounts.mockReset()
+      moneyAccounts.mockResolvedValue(page([cash, card, roubles]))
+      currentTrip.mockResolvedValue(trip(handoff()))
+    })
+    afterEach(() => {
+      moneyAccounts.mockImplementation(() => new Promise(() => undefined))
+    })
+
+    async function askFinish(view: VueWrapper): Promise<void> {
+      await button(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      clock += 1000
+    }
+    const row = () => openSheets()[0]?.querySelector<HTMLButtonElement>('.account .row')
+    async function choose(name: string): Promise<void> {
+      row()?.click()
+      await flushPromises()
+      clock += 1000
+      const option = [...(openSheets().at(-1)?.querySelectorAll('[role="radio"]') ?? [])].find(
+        (one) => one.textContent.includes(name),
+      )
+      if (!(option instanceof HTMLElement)) throw new Error(`нет счёта «${name}»`)
+      option.click()
+      await flushPromises()
+    }
+    const memory = () =>
+      JSON.parse(localStorage.getItem(`molvia.payment-accounts.${ME}`) ?? 'null') as unknown
+
+    it('ставит первый счёт валюты и отправляет его перед завершением', async () => {
+      const { view, queue } = await render()
+      await askFinish(view)
+      expect(row()?.textContent).toContain('Наличные ֏')
+      inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      expect(queue.pending.map((write) => write.kind)).toEqual(['payment', 'finish'])
+      expect(queue.pending[0]).toMatchObject({ tripId: TRIP, body: { accountId: cash.id } })
+      expect(memory()).toEqual({ AMD: { hand: cash.id } })
+    })
+
+    it('начинает со счёта, которым закончена прошлая запись, — не со счёта чеков', async () => {
+      localStorage.setItem(
+        `molvia.payment-accounts.${ME}`,
+        JSON.stringify({ AMD: { hand: card.id, receipt: cash.id } }),
+      )
+      const { view } = await render()
+      await askFinish(view)
+      expect(row()?.textContent).toContain('Карта ֏')
+    })
+
+    it('счёт в другой валюте — «Списано» уходит с ним, ноль не уходит вовсе', async () => {
+      const { view, queue } = await render()
+      await askFinish(view)
+      await choose('Карта ₽')
+      const charged = openSheets()[0]?.querySelector<HTMLInputElement>('.charged input')
+      if (!charged) throw new Error('нет поля «Списано»')
+      charged.value = '0'
+      charged.dispatchEvent(new Event('input'))
+      await flushPromises()
+      inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      expect(queue.pending).toEqual([])
+      expect(openSheets()[0]?.textContent).toContain(ru.spending.sheet.bad_amount)
+      charged.value = '1100,50'
+      charged.dispatchEvent(new Event('input'))
+      await flushPromises()
+      inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      expect(queue.pending[0]).toMatchObject({
+        kind: 'payment',
+        body: { accountId: roubles.id, debited: parseMoney('1100.50', 'RUB') },
+      })
+    })
+
+    it('«не должно сработать»: «Без счёта» — уходит одно завершение, умолчание не запоминается', async () => {
+      const { view, queue } = await render()
+      await askFinish(view)
+      await choose('Без счёта')
+      inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      expect(queue.pending.map((write) => write.kind)).toEqual(['finish'])
+      expect(memory()).toBeNull()
+    })
+
+    it('«не должно сработать»: без счетов строки нет', async () => {
+      moneyAccounts.mockResolvedValue(page([]))
+      const { view, queue } = await render()
+      await askFinish(view)
+      expect(row()).toBeFalsy()
+      inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      expect(queue.pending.map((write) => write.kind)).toEqual(['finish'])
+    })
   })
 
   describe('сумма по чеку (MOL-78)', () => {
