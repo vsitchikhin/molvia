@@ -17,7 +17,7 @@ paths:
   - 'services/receipt-reader/**'
   - 'frontend/src/receipts/**'
   - 'frontend/src/stores/{receiptQueue,receiptDrafts}.ts'
-  - 'frontend/src/composables/{useReceipts,useReceipt,useReceiptCapture}.ts'
+  - 'frontend/src/composables/{useReceipts,useReceipt,useReceiptCapture,useLineFigures}.ts'
   - 'frontend/src/components/{Capture*,Receipt*,ItemPickSheet,LinkReceiptSheet}.vue'
   - 'frontend/src/views/ReceiptView.vue'
   - 'e2e/{receipts,receipts-link}.spec.ts'
@@ -711,7 +711,13 @@ no article. The trip's money with no total counts it as a line; «Строки»
 **The measure counts it apart and in the share** (`added` of `receipt_days`, `model_receipt_days`,
 `tax_receipt_days`): «0.2r» reads «lines put right» as `(edited + added) / (lines + added)` — a line lost is the
 reader's miss as an emptied one is — and «added on the review» on a row of its own. A receipt with no items
-takes purchases so too. **The price, named:** a server rolled back refuses a body with `added` — «не принят»
+takes purchases so too, and is a receipt of lines then: no «В чеке нет списка», «Записать N», no total
+required. **«Новая строка» is a sheet of its own, not a mode of «Строка чека»** — that one is the printed line,
+its gloss, «≠», «проверьте», the memory and «Тут дешевле», none of which a typed line has — **and the two read
+their fields by one composable** (`useLineFigures`, self-review №1), so what draws nothing, the unit and the sum
+are read once; their scoped styles of the item's button and «За единицу» are each sheet's own, the kit having no
+such button — a price. **At `RECEIPT_ADDED_MAX` (100) «Добавить строку» is not now, and says so** (self-review
+№4): one past it would refuse the whole «Записать». **The price, named:** a server rolled back refuses a body with `added` — «не принят»
 in the queue, the draft kept — as it does `edited` and `account`; and a line typed teaches the reader nothing,
 so the next such receipt loses it again — MOL-310's to find.
 
@@ -1776,14 +1782,20 @@ at «Записать» and the model's answer nowhere, and 122b8e5f's five empt
 find. **The reasons are named by the check that took the figures** (`explainedReading`, beside
 `verifiedReading`, which is its `shown`): a line's — `doubted`, `missing_figure`, `repaired_unproven`,
 `unsettled`, `bent`, `zero_not_gift`, `one_alike_unproven`, `price_dropped` — and one a receipt, the first of
-`no_lines`, `no_total`, `lines_lost` (the lines as read come to less than the total), `line_doubted`,
-`line_not_as_printed`, `lines_over`; `failed` where the reading found no line. By kind, never a figure; a
-gift of one piece on a receipt proven whole is no reason — kept with no price by design. Finer kinds of
-«not as printed» (which swap) are the parse's, not here: an iteration of MOL-310 that needs them opens the parse.
+`no_lines`, `no_total`, `line_doubted`, `line_not_as_printed`, `lines_lost`, `lines_over`; `failed` where the
+reading found no line. By kind, never a figure; a gift of one piece on a receipt proven whole is no reason —
+kept with no price by design. **`lines_lost` comes after the lines' own reasons** (adversarial А1, А2): a line
+found whole with its sum not read, or one read low by the font's 5↔6, makes the lines short as well — on the
+bench both receipts named `lines_lost` before had lost no line — so a line lost is said only of a receipt whose
+every line is as printed. **The price, named:** lines lost beside a line not as printed are said as the latter;
+the server's word «Прочитали не всё» is counted apart for that (`partly`, below). Finer kinds of «not as printed»
+(which swap) are the parse's, not here: an iteration of MOL-310 that needs them opens the parse.
 
 **Counted for every reading of a photo, by either reader** (`receipt_reason_days`): day in Yerevan × reader ×
 country × scope × reason, with the receipts read and the lines found as the denominators, in the transaction
-of the reading, no id — erasure does not reach it. **A reason is a row, never a column**: a new one needs no
+of the reading, no id — erasure does not reach it. **Beside them, two counts of the reading, never reasons**
+(self-review №5, №6): `partly`, the server's «Прочитали не всё», and `no_items`, a receipt with no item lines —
+a sum read whole (MOL-227), never «not whole». **A reason is a row, never a column**: a new one needs no
 migration and moves no key. Read by `make receipt-reasons FROM= [TO=]`, a block a reader and country, each
 share beside its n — the input of the fortnightly review (MOL-310). Not `make gates`: the gates have stop
 lines, the reasons none.
@@ -1793,19 +1805,40 @@ emptied (a sum kept with its price taken off is no field to fill), lines lost ag
 read. **Tesseract's are counted and never kept or told** (owner: «с ним потом разберёмся»). **Kept** —
 `receipt_misses`, the model's answer as it came and the reasons, `receipt_miss_parts`, the photo copied at the
 reading — **past «Записать»**, which deletes the receipt's own, **until the review lets it go**
-(`make receipt-miss-forget ID=|BEFORE= [YES=1]`) **or 21 days pass** (`RECEIPT_MISS_KEEP_DAYS`, Р-8: the
-fortnight of MOL-310 and a week for the review itself; the minute timer). **Only for whoever accepted edition
-4** (`REVIEW_CONSENT_EDITION`, owner's В-3 «б»: everybody's, under a new edition — a new purpose): the
-edition before promised the photo goes at «Записать», and a receipt of whoever has not accepted it is
-counted and told, never kept. It goes with its receipt — removed, its trip gone for good, the person erased
-— by the cascade. **Told** — `receipt_partial` in `owner_notices`, after the reading's commit: the id's first
-eight characters, the country, lines found and with figures, the receipt's reason and the lines' by kind,
-until when it is kept and `make receipt-miss ID=` — no name, no sum, no shop. **Three a person an hour and
-twenty in all** (Р-6, the phone's budget by the person's id in memory, `phoneNoticeBudget` with its own
-muted notice): the rest counted and told once an hour, `receipt_partial_muted`; dropped unclaimed after a
-day, as a failure's notice. No `OWNER_TELEGRAM_ID`, nothing told; kept all the same. **The prices, named:** a
-rollback past this leaves the old API unable to read a `receipt_partial` row (`OwnerNoticeUnreadable`, a
-failure of the claim); a restart forgets the hour's budget, as the phone's.
+(`make receipt-miss-forget ID=|BEFORE= [YES=1]`; a start of an id naming more than one receipt lets none go, as
+`show` refuses it) **or 21 days pass** (`RECEIPT_MISS_KEEP_DAYS`, Р-8: the fortnight of MOL-310 and a week for
+the review itself; the minute timer). **Only for whoever accepted edition 4** (`REVIEW_CONSENT_EDITION`,
+owner's В-3 «б»: everybody's, under a new edition — a new purpose): the edition before promised the photo goes
+at «Записать», and a receipt of whoever has not accepted it is counted and told, never kept.
+
+**Its key is the receipt's id as read, never a key to the receipt** (`receipt`; owner's В-6 «а»): «Переснять»
+stands on exactly the receipts the review is kept for, and removes the one it replaces. **So a retake leaves the
+review**: the phone names it (`RECEIPT_RETAKE_HEADER` on `DELETE /receipts/:id`, from `molvia.receipt-retakes`
+kept beside the queue — the build before reads a write strictly), the server marks `retaken_at`, «Вернуть» takes
+the mark back, and the purge lets go of the link (`receipt_id` to null) before the receipt goes. Every other
+removal takes it by the cascade of `receipt_id` — «Удалить чек», its trip gone for good, the 28 days of a
+receipt not recorded — and **the person erased takes it whatever it is linked to** (`actor_id`,
+`ACTOR_REFERENCES`). **The price, named:** a phone of an earlier build names no retake, and its review goes as
+it did; a server rolled back takes the removal and ignores the header.
+
+**The person's copy says it** (`receiptReviews`, version 24, self-review №4): which receipt, the link while
+there is one, when it was read and by what, until when it is kept, whether a retake replaced it and why it was
+not whole — never the photo or what was read. **`make receipt-miss` writes out of the working directory** —
+`.scratch/receipts/misses/<id>/` from the make target, the system's temporary directory from the command
+itself (self-review №1, adversarial А5): a person's photo and purchases never stand in the public repository's
+tree, nor fail on the API image's `/app`; `receipt-miss-*/` is ignored besides.
+
+**Told** — `receipt_partial` in `owner_notices`, after the reading is written, and only then (a receipt removed
+or taken meanwhile is nothing to tell of, self-review №7): the country, lines found and with figures, the
+receipt's reason — none where it was proven whole and a line emptied all the same (adversarial А3) — and the
+lines' by kind; **the id's first eight characters and until when, only for a receipt kept** — of one not kept
+the id would name a person's receipt nothing here opens (self-review №3) — no name, no sum, no shop; the day
+is Yerevan's, as `keep_until` is read. **Three a person an hour and twenty in all** (Р-6, the phone's budget by
+the person's id in memory, `phoneNoticeBudget` with its own muted notice): the rest counted and told once an
+hour, `receipt_partial_muted`; dropped unclaimed after a day, as a failure's notice. No `OWNER_TELEGRAM_ID`,
+nothing told; kept all the same. **The prices, named:** a rollback past this leaves the old API unable to read
+a `receipt_partial` row (`OwnerNoticeUnreadable`, a failure of the claim); a restart forgets the hour's budget,
+as the phone's.
 
 ## What lives how long
 

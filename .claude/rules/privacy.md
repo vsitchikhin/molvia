@@ -294,9 +294,11 @@ The detail behind the privacy lines of `CLAUDE.md`.
   fourteen days, longer than the promise. **A receipt the model read not whole keeps its photo and the
   model's answer for the developer's review** (MOL-309, owner's В-3 «б»): past «Записать», until the review
   lets it go, 21 days at most — a new purpose, so **only for whoever accepted edition 4**
-  (`REVIEW_CONSENT_EDITION`); it goes with its receipt by the cascade, enters neither the nightly copy nor the
-  person's copy (every column left out with its reason), and the developer's notice of it names no name, sum
-  or shop. Its reasons are counted with no id, as `receipt_days` is. The copy of one's data carries receipts and their lines,
+  (`REVIEW_CONSENT_EDITION`); a receipt «Переснять» replaced leaves it (owner's В-6 «а»), any other removal of
+  the receipt takes it by the cascade, and **the person erased takes it always** (`receipt_misses.actor_id`, in
+  `ACTOR_REFERENCES`). It enters no nightly copy; **the person's copy says what is kept, until when and why**
+  (`receiptReviews`, version 24) — never the photo or the reading; the developer's notice of it names no name,
+  sum or shop, and the id's start only of a receipt kept. Its reasons are counted with no id, as `receipt_days` is. The copy of one's data carries receipts and their lines,
   never a photo. `/privacy` says all of it under «Чеки». `.claude/rules/receipts.md`.
 - **Logs live fourteen days and carry no address and no query** (MOL-58). The API logs a request
   as its method and path — the query of `/catalogue/search` is what a person looked for; Caddy

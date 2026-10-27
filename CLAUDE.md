@@ -647,8 +647,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   «Записать», no `receipt_lines`, no word of the memory; counted in 0.2r's share and on a row of its own (В-1 «а»).
 - **Why a receipt was not whole is named by the check itself** (`explainedReading`, MOL-309) and counted with no
   id for both readers (`receipt_reason_days`, `make receipt-reasons`); the model's with something to type keeps
-  its photo and answer past «Записать» for the review — edition 4 only, 21 days at most — and tells the developer
-  within the phone's budget; Tesseract's are only counted.
+  its photo and answer past «Записать» and «Переснять» for the review — edition 4 only, 21 days at most, gone with
+  the person — and tells the developer within the phone's budget; Tesseract's are only counted.
 - **The reader away leaves a receipt queued; a photo it drops goes to the end with its attempt
   counted; a photo it cannot read fails** — never lost, never read forever; people read in turn.
 - **The class code is a boundary, not a layout** (MOL-226): «Դաս. 56.10» opens an item on any fiscal till,
