@@ -232,6 +232,7 @@ const file: ExportFile = {
       cashback: money(740n, 'AMD'),
       redeemed: null,
       readPartly: false,
+      paidBy: 'card',
       balanced: true,
       city: 'Гюмри',
       recordedAt: at,
