@@ -261,27 +261,32 @@ export default defineComponent({
 
     /** The one the screen holds now — after a conflict, the version another device wrote. */
     /**
-     * The account amended — the page's version where the page has it, the one the sheet was opened
-     * on where it has not (a screen opened cold, the page not read): an amendment is decided by
-     * what was opened, never by what the page happens to hold (review 23, adversarial Б).
+     * The account amended — the page's version where the page is an answer of this session, the one
+     * the sheet was opened on otherwise (a screen opened cold, the page not read): an amendment is
+     * decided by what was opened, never by what the page happens to hold (review 23, adversarial Б).
+     * A page kept from an earlier launch is no answer: the screen under the sheet prints the journal
+     * then, and the sheet spoke of yesterday's balance and lock over it (MOL-196, adversarial А1).
      */
-    const current = computed(() =>
-      props.account
-        ? (store.accounts.find(({ id }) => id === props.account?.id) ?? props.account)
-        : null,
-    )
+    const current = computed(() => {
+      const opened = props.account
+      if (!opened) return null
+      const page = store.stale === null ? store.accounts.find(({ id }) => id === opened.id) : null
+      return page ?? opened
+    })
     const locked = computed(() => current.value?.hasOperations === true)
     /** The account's own currency — never the one typed before the lock came (adversarial Ж). */
     const lockedCurrency = computed(() => current.value?.currency ?? currency.value)
 
-    /** «сейчас …»: the balance the server counted, printed as the account's screen prints it (Р-1). */
-    const now = computed(() =>
-      current.value
-        ? t('accounts.sheet.start_now', {
-            amount: signedAmount(current.value.balance, locale.value),
-          })
-        : null,
-    )
+    /**
+     * «сейчас …»: the balance the server counted, printed as the account's screen prints it (Р-1) —
+     * and only while the form holds its currency: under a field already in dollars a balance in
+     * roubles read as two currencies of one account (self-review Р1-1, adversarial А2).
+     */
+    const now = computed(() => {
+      const held = current.value
+      if (held?.currency !== currency.value) return null
+      return t('accounts.sheet.start_now', { amount: signedAmount(held.balance, locale.value) })
+    })
 
     const meta = computed(() => {
       const account = current.value

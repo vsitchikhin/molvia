@@ -967,6 +967,26 @@ describe('AccountSheet (handoff 03)', () => {
     expect(view.text()).not.toContain('now ')
   })
 
+  // Self-review Р1-1, adversarial А2: an account with no entries keeps its currency open, and a
+  // balance in roubles under a field already in dollars read as two currencies of one account.
+  it('another currency chosen: no «now» until the account’s own is back', async () => {
+    const card = account('Card ₽', 'RUB', {
+      start: parseMoney('5000', 'RUB'),
+      balance: parseMoney('5000', 'RUB'),
+    })
+    const view = await mounted(
+      AccountSheet,
+      { open: true, account: card, spendCurrency: 'AMD' },
+      withAccounts([card]),
+    )
+    expect(startOf(view).hint).toBe('now ₽5,000')
+    await view.get('select').setValue('USD')
+    expect(startOf(view).hint).toBeNull()
+    expect(startOf(view).input.attributes('aria-describedby') ?? '').not.toMatch(/-now\b/)
+    await view.get('select').setValue('RUB')
+    expect(startOf(view).hint).toBe('now ₽5,000')
+  })
+
   it('after a conflict «now» is the balance of the version read again (Р-2)', async () => {
     const card = account('Card ₽', 'RUB', { balance: parseMoney('5000', 'RUB') })
     const view = await mounted(
