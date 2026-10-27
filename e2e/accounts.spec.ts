@@ -295,7 +295,10 @@ test('без связи счета не красные, а шторка счёт
   await page.getByRole('button', { name: 'Добавить счёт' }).click()
   const sheet = topSheet(page)
   await expect(sheet).toContainText('Счета меняются только со связью')
-  await expect(sheet.getByRole('button', { name: /Сохраним, когда будет связь/ })).toBeDisabled()
+  // Not now in the focus order (Ф-6): `aria-disabled`, never `disabled`, which `toBeDisabled` takes alike.
+  const waits = sheet.getByRole('button', { name: /Сохраним, когда будет связь/ })
+  await expect(waits).toHaveAttribute('aria-disabled', 'true')
+  await expect(waits).not.toHaveAttribute('disabled')
   await context.setOffline(false)
   await expect(sheet.getByRole('button', { name: 'Сохранить' })).toBeEnabled()
 })

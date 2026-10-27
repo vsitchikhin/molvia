@@ -1168,3 +1168,88 @@ describe('the check is blind behind its sheet (MOL-195, Ф-33)', () => {
     expect(view.text()).not.toContain(en.accounts.account.balance_hidden)
   })
 })
+
+/**
+ * MOL-196, adversarial А1: a page kept from an earlier launch is no answer, so the sheet speaks of the
+ * account the screen under it prints — the journal's — never of yesterday's page over it.
+ */
+describe('the account’s sheet over a page kept from before (MOL-196, adversarial А1)', () => {
+  /** «now …», as a reader meets it: by the description of the amount's field. */
+  function nowOf(view: VueWrapper): string | null {
+    const input = view
+      .findComponent(AccountSheet)
+      .findAll('input')
+      .find((one) => one.attributes('inputmode') === 'decimal')
+    if (!input) throw new Error('no amount field')
+    const hint = (input.attributes('aria-describedby') ?? '')
+      .split(' ')
+      .map((id) => document.getElementById(id))
+      .find((one) => one?.classList.contains('hint'))
+    return hint ? plain(hint.textContent.trim()) : null
+  }
+  const taxi = () => spendingRow(TAXI, '-2000', CASH)
+
+  it('the page’s read failed: «now» is the card’s 98,000, not yesterday’s 100,000', async () => {
+    useAccountsStore(session()).accept(page([cash()], new Date('2026-09-26T21:00:00Z')))
+    const today = cash({ balance: amd('98000'), revision: 2 })
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'down', true))
+    accountJournal.mockResolvedValue(journal(today, [taxi()]))
+
+    const view = await open(AccountView, `/money/accounts/${CASH}`, session())
+    expect(plain(view.get('.balance .figure').text())).toContain('98,000')
+    await button(view, en.accounts.account.edit)?.trigger('click')
+    await settle()
+    expect(nowOf(view)).toBe('now ֏98,000')
+  })
+
+  it('the page still on its way: «now» is the journal’s, and stays when the page lands (А1в)', async () => {
+    useAccountsStore(session()).accept(page([cash()], new Date('2026-09-26T21:00:00Z')))
+    const today = cash({ balance: amd('98000'), revision: 2 })
+    let land: (value: MoneyAccountsResponse) => void = () => undefined
+    moneyAccounts.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          land = resolve
+        }),
+    )
+    accountJournal.mockResolvedValue(journal(today, [taxi()]))
+
+    const view = await open(AccountView, `/money/accounts/${CASH}`, session())
+    await button(view, en.accounts.account.edit)?.trigger('click')
+    await settle()
+    expect(nowOf(view)).toBe('now ֏98,000')
+    land(page([today]))
+    await settle()
+    expect(nowOf(view)).toBe('now ֏98,000')
+  })
+
+  it('one version in the whole sheet: the lock and the meta agree with «Put away» (А1б)', async () => {
+    useAccountsStore(session()).accept(
+      page([cash({ hasOperations: false })], new Date('2026-09-26T21:00:00Z')),
+    )
+    const today = cash({ balance: amd('98000'), revision: 2, hasOperations: true })
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'down', true))
+    accountJournal.mockResolvedValue(journal(today, [taxi()]))
+
+    const view = await open(AccountView, `/money/accounts/${CASH}`, session())
+    await button(view, en.accounts.account.edit)?.trigger('click')
+    await settle()
+    const sheet = view.findComponent(AccountSheet)
+    expect(sheet.text()).not.toContain(en.accounts.no_operations)
+    expect(sheet.find('select').exists()).toBe(false)
+    expect(button(view, en.accounts.sheet.archive)).toBeDefined()
+  })
+
+  it('the page answered in this session: the sheet reads it, as the card does (must not fire)', async () => {
+    useAccountsStore(session()).accept(page([cash()], new Date('2026-09-26T21:00:00Z')))
+    const today = cash({ balance: amd('98000'), revision: 2 })
+    moneyAccounts.mockResolvedValue(page([today]))
+    accountJournal.mockResolvedValue(journal(today, [taxi()]))
+
+    const view = await open(AccountView, `/money/accounts/${CASH}`, session())
+    await button(view, en.accounts.account.edit)?.trigger('click')
+    await settle()
+    expect(plain(view.get('.balance .figure').text())).toContain('98,000')
+    expect(nowOf(view)).toBe('now ֏98,000')
+  })
+})
