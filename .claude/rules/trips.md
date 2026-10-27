@@ -262,15 +262,26 @@ thumb does not reach; offline and on an error alike, since all three write throu
 not fit, one stands over the other, «+ Позиция» under** (owner's В-1 «в»): the handoff checked English alone, and
 «Сканировать» with its glyph is 170 px of a half that is 140 on a phone of 320 and 160 on one of 360 — «Штрихкод» is
 147 and fits from some 334; the pair goes by the words, not by a width, so a longer language takes the same way.
+The pills say a short word and a screen reader the verb — «Добавить позицию», «Сканировать штрихкод» — as hidden
+text before it, never an `aria-label` (review 2, №3).
 **The total is a card under the list** (owner's В-17 «а», `TripTotalCard`): everything the strip said — the other
-currencies, «С ценой — n из m · без цены — k» while some purchase has none, «≈», the rate, the caveats, a receipt's
-split — and the whole card is the flip; «+ Сумма по чеку» stands under it, a button in a button being no HTML. **The
-price, named:** at a shelf with a list longer than the screen the total is seen only scrolled to — the owner's
-choice over a strip 24 px taller. An empty record is the quiet circle in a card with no buttons — the strip holds
-them — and no total. **The connection is one `StatusStrip`** over the record the phone remembers — offline, or
+currencies on a line of their own under the figure, never beside «≈» in the same currency (adversarial А4),
+«С ценой — n из m · без цены — k» while some purchase has none, «≈», the rate, the caveats, a receipt's split — and
+the whole card is the flip; «+ Сумма по чеку» stands under it, a button in a button being no HTML. **«С ценой» counts
+the rows on screen, as «Закончить» does** (Р-5 of MOL-76, adversarial А2): a purchase with no price removed with no
+signal is gone from both, and the button's word is one rule for the open record and the finished one
+(`useTripReceipt`, review 2, №4). **The price, named:** at a shelf with a list longer than the screen the total is seen
+only scrolled to — the owner's choice over a strip 24 px taller. An empty record is the quiet circle in a card with no
+buttons — the strip holds them — and no total, **unless a receipt's sum stays from purchases removed since**: that is
+the record's money, and the card and «Изменить» stand under the circle (adversarial А1). **Every row has its chevron**,
+a row that does not open — its removal queued, its card unread — being the kit's «not now», so the amounts end in one
+column (adversarial А3). **The connection is one `StatusStrip`** over the record the phone remembers — offline, or
 «Сервер не ответил» with «Повторить» — never a card: with no record the screen goes up, so there is always one
 under it. **The queue's notices stand over the skeleton** (MOL-311): under it, the answer coming in moved
-«Поправить», «Выбрать», «Уточнить» from under a finger, as MOL-269 found on «Деньги».
+«Поправить», «Выбрать», «Уточнить» from under a finger, as MOL-269 found on «Деньги». **The price, named** (review 2,
+№5): the strip stands first, over them, as the kit puts it, and comes and goes with an answer — a read that failed on
+opening, «Повторить» answered — so the notices move by its height then, four lines at 320; a failure is rare, and
+the notices over the strip would put an answer's words above the connection the whole screen hangs on.
 
 **What the queue says about any record is said on both screens** (`TripNotices`): purchases the
 server refused, a record already open elsewhere, purchases not sent for a record that is over, a
