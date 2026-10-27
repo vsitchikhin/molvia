@@ -1,0 +1,2 @@
+ALTER TABLE "receipts" ADD COLUMN "paid_by" text;--> statement-breakpoint
+ALTER TABLE "receipts" ADD CONSTRAINT "receipts_paid_by_known" CHECK ("receipts"."paid_by" is null or "receipts"."paid_by" in ('cash', 'card'));

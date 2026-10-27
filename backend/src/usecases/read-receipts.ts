@@ -7,9 +7,11 @@ import {
   linesTotalOf,
   mergeParts,
   modelHeadRows,
+  modelPaidBy,
   moneyOfHundredths,
   needsReshoot,
   readPartly,
+  receiptPaidBy,
   receiptCard,
   receiptCityOf,
   receiptDateOf,
@@ -27,6 +29,7 @@ import type {
   Currency,
   PhotoReading,
   ReceiptLine,
+  ReceiptPaidBy,
   ReceiptText,
   RememberedPrice,
   RememberedPrices,
@@ -159,6 +162,7 @@ function headOf(
   text: ReceiptText,
   currency: Currency,
   readings: readonly (readonly TextRow[])[],
+  paidBy: ReceiptPaidBy | null,
 ): ReceiptHead {
   return {
     tin: text.tin,
@@ -169,6 +173,7 @@ function headOf(
     readTotalMinor: moneyOfHundredths(text.readTotalHundredths, currency)?.minor ?? null,
     cashbackMinor: moneyOfHundredths(text.cashbackHundredths ?? null, currency)?.minor ?? null,
     redeemedMinor: moneyOfHundredths(text.redeemedHundredths ?? null, currency)?.minor ?? null,
+    paidBy,
     balanced: text.balanced,
     layout: text.layout,
     city:
@@ -274,7 +279,12 @@ async function readByModel(
   const text = prices.size === 0 ? first : receiptTextOfModel(photoReading, reading.answer, prices)
   const unparsed = unparsedFigures(photoReading, reading.answer)
   const shown = verifiedReading(text, { byModel: true })
-  const head = headOf(shown, currency, [modelHeadRows(reading.answer)])
+  const head = headOf(
+    shown,
+    currency,
+    [modelHeadRows(reading.answer)],
+    modelPaidBy(photoReading, reading.answer),
+  )
   if (needsReshoot(text)) {
     const outcome: ReadOutcome = {
       kind: 'failed',
@@ -329,7 +339,7 @@ async function readByOcr(
   const text = rememberedReading(chosen, prices, photoReading)
   // a figure goes to the review as read only where it is verified, the rest is left empty (MOL-255)
   const shown = verifiedReading(text)
-  const head = headOf(shown, currency, readings)
+  const head = headOf(shown, currency, readings, receiptPaidBy(photoReading, readings))
   if (needsReshoot(text))
     return { kind: 'failed', failure: 'reshoot', readerVersion: version, head }
   let images: LineImage[] = []

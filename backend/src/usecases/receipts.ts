@@ -252,6 +252,8 @@ export async function receiptOfOwner(
   spelled = false,
   /** The phone knows a line's `pack` (`RECEIPT_PACK_HEADER`, MOL-264). */
   pack = false,
+  /** The phone knows the detail's `paidBy` (`RECEIPT_PAID_BY_HEADER`, MOL-312). */
+  paidBy = false,
 ): Promise<ReceiptDetail> {
   const found = await repositories.receipts.one(actor.id, id)
   if (found === null) throw new DomainError(ERROR.NOT_FOUND)
@@ -368,6 +370,7 @@ export async function receiptOfOwner(
     ...(readTotal ? { readTotal: found.readTotal } : {}),
     ...(readPartly ? { readPartly: found.readPartly } : {}),
     ...(cashback ? { cashback: found.cashback, redeemed: found.redeemed } : {}),
+    ...(paidBy ? { paidBy: found.paidBy } : {}),
   }
 }
 
