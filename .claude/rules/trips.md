@@ -314,11 +314,16 @@ strip at the bottom; with a receipt's sum the line says what the prices say besi
 the receipt beside a purchase with none are «без цены — 0 ֏», never «сходится» (adversarial А4); prices in two
 currencies are a list by the locale's conjunction, «8 000 ֏ и 20 $», never «+», which reads as adding what the
 domain refuses to add (review №2, А3). **The line speaks of the list the server counted** (adversarial А1): with a purchase removed or added
-on its way, the rows on screen are not the ones `prices` and `gap` measured, and until the answer the line is that
-previous answer, at `--opacity-stale` (`receiptStale`) — judged by the rows, any of them being removed or waiting to
-be sent (`useTripReceipt.settled`), never by their counts: milk swapped for cheese keeps both (round 2, Б1). Taken
-away instead, it went and came back in one frame with every purchase sent online, moving the buttons under the card
-(round 3, В1). The receipt's sum above it stays the server's. **Its phrases wrap between their
+on its way, the rows on screen are not the ones `prices` and `gap` measured — judged by the rows, any of them being
+removed or waiting to be sent (`useTripReceipt.settled`), never by their counts: milk swapped for cheese keeps both
+(round 2, Б1). **For `STRIP_LATE_MS` the line stands as it is**, as «обновляем» does (MOL-201): sent with a connection
+the answer comes first and nothing changes; **late, it says in words that the prices will be counted again**
+(`trip.receipt.line_pending`, owner's В-3 «а» of the review): whole contrast and heard by a screen reader, faded in.
+Taken away at once it went and came back with every purchase sent (round 3, В1); dimmed by `--opacity-stale` it read
+2.1:1 for as long as the phone had no signal and said nothing to a screen reader (round 4, Г1, Г2) — that token stays
+the searches' alone. **The price, named:** for that one second a line offline still speaks of the list before, and
+the words in the place of the prices may change the card's height by a line of text — once, faded, since `AppReveal`
+moves blocks and the words stand in one line with «≈» and the rate. The receipt's sum above it stays the server's. **Its phrases wrap between their
 words** (review №1): whole, as the rate's parts are, «the receipt is ֏10,068 less than the prices» broke at any letter
 at 320; their sums come non-breaking from `formatMoney`, and what follows a dash — «— 12 из 14», «— 0 ֏» — with the
 dash, so a line never starts with it and a count is never cut (round 2, №3, П1); `e2e/kit-rows` holds both at 320 and
