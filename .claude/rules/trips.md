@@ -317,7 +317,10 @@ discount on the receipt from a price typed wrong. Under the card «+ Сумма 
 the place, «город · день, время» under it by the moment and the day «Записаны» print — and while nothing of the record
 is known, «Покупки» with no line under it, never «Эта запись ещё не закончена» about the record the screen is for
 (Е-4). **The price, named:** a receipt whose time was not printed is dated by its record's moment, as in «Записаны»;
-the city is the answer's, so a record known only to the phone, with no copy of the answer, says its day alone. Its connection is the same strip over what the phone remembers; with nothing of the
+the city is the answer's, so a record known only to the phone, with no copy of the answer, says its day alone. **Over a
+record read back from the phone's shelf the card says no «С ценой»** (self-test of MOL-207): the shelf keeps no
+receipt's sum yet, so its total may be the receipt with nothing saying so, and «900 ֏ · С ценой — 1 из 2» read the
+900 as the prices — the rule «+ Сумма по чеку» is withheld by there (`tripHistory.answered`). Its connection is the same strip over what the phone remembers; with nothing of the
 record remembered, the screen's own `ScreenState` — the finished record does not go up, so there may be nothing under
 a strip.
 

@@ -114,7 +114,7 @@
           :pending="waiting"
           :local="trip === null"
           :receipt-waiting="receiptWaiting"
-          :rows="{ kept, unpriced }"
+          :rows="priced"
         />
         <!-- Everything under the total, no strip (owner's В-2 «а»): a finished record is not one going
              on, and adding a forgotten purchase is rare. -->

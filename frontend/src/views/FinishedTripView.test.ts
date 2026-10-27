@@ -110,6 +110,8 @@ describe('FinishedTripView: «Сумма по чеку» (MOL-78)', () => {
     expect(view.text()).toContain('Ереван Сити')
     expect(view.text()).not.toContain(ru.trip.receipt.add)
     expect(view.text()).not.toContain(ru.trip.receipt.edit)
+    // Its total is the receipt with nothing saying so: «С ценой — 1 из 2» beside it read as the prices.
+    expect(view.text().replaceAll('\u00a0', ' ')).not.toContain('С ценой')
   })
 
   /** Another window — its own pinia, the same phone storage — wrote this record to the shelf. */

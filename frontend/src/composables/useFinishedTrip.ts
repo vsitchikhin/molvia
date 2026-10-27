@@ -42,9 +42,12 @@ interface FinishedTrip extends Omit<SelectedTrip, 'load'> {
   receiptWaiting: ComputedRef<{ readonly receipt: Money | null } | null>
   receiptCurrent: ComputedRef<Money | null>
   receiptAction: ComputedRef<string | null>
-  /** The rows on screen and those with no price, as the card's «С ценой» counts them (MOL-206). */
-  kept: ComputedRef<number>
-  unpriced: ComputedRef<number>
+  /**
+   * The rows on screen and those with no price, as the card's «С ценой» counts them (MOL-206) — none
+   * over a record read back from the phone's shelf, which keeps no receipt's sum yet: its total may be
+   * the receipt, and «С ценой — 1 из 2» beside it read as the prices (MOL-207).
+   */
+  priced: ComputedRef<{ readonly kept: number; readonly unpriced: number } | null>
   /** What a new sum starts in: the record's currency, as the purchase sheet takes it. */
   receiptCurrency: ComputedRef<Currency>
   opened: Ref<OpenedPurchase | null>
@@ -85,8 +88,12 @@ export function useFinishedTrip(): FinishedTrip {
   const history = useTripHistoryStore()
   // Whether the trip shown is the server's answer, which knows its receipt's sum — not one read back
   // from the phone's shelf, here or by another window (MOL-78, reviews 4 and Е).
+  const answered = (): boolean => history.answered(selected.trip.value)
   const { receiptOpen, receiptWaiting, receiptCurrent, receiptAction, kept, unpriced } =
-    useTripReceipt(selected.id, selected.trip, rows, () => history.answered(selected.trip.value))
+    useTripReceipt(selected.id, selected.trip, rows, answered)
+  const priced = computed(() =>
+    answered() ? { kept: kept.value, unpriced: unpriced.value } : null,
+  )
   const receiptCurrency = computed<Currency>(
     () =>
       selected.trip.value?.currency ??
@@ -229,8 +236,7 @@ export function useFinishedTrip(): FinishedTrip {
     receiptWaiting,
     receiptCurrent,
     receiptAction,
-    kept,
-    unpriced,
+    priced,
     receiptCurrency,
     opened,
     amend,
