@@ -77,8 +77,9 @@ async function capture(page: Page, parts = 1, square = false): Promise<void> {
  * number once any receipt of that seller was recorded — by another spec on the same database too —
  * so the sheet comes or does not, and neither is the point of a spec: the spec takes whichever came.
  */
-async function saveAll(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Save 13 purchases' }).click()
+async function saveAll(page: Page, purchases = 13): Promise<void> {
+  const save = `Save ${String(purchases)} purchases`
+  await page.getByRole('button', { name: save }).click()
   // One of two outcomes, waited for and never timed (review 30): the sheet asks, or the review
   // gave way.
   const asked = async () => {
@@ -95,8 +96,18 @@ async function saveAll(page: Page): Promise<void> {
     await page.waitForTimeout(350)
     await expect(sheet(page)).toContainText('Where was it?')
     await sheet(page).getByLabel('Another place').fill('Ереван Сити')
-    await sheet(page).getByRole('button', { name: 'Save 13 purchases' }).click()
+    await sheet(page).getByRole('button', { name: save }).click()
   }
+}
+
+/** A sheet has come up: its rise, then the double-tap floor — until then it takes no tap (MOL-69). */
+async function risen(page: Page): Promise<void> {
+  await sheet(page)
+    .last()
+    .evaluate((dialog) =>
+      Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished)),
+    )
+  await page.waitForTimeout(350)
 }
 
 test('a receipt from the photo to the purchases: read, reviewed, recorded under a place named', async ({
@@ -343,4 +354,46 @@ test('a line put right goes with «Записать»; recorded with no connecti
   await expect(
     page.locator('.recorded .list-row').filter({ hasText: 'from a receipt' }),
   ).toBeVisible(READ)
+})
+
+// MOL-273: a line the reader lost is typed on the review from the paper, and goes with «Записать» — one purchase
+// more, of a new item, apart from the receipt's own lines.
+test('a line the reader lost, typed on the review, is one purchase more of the record', async ({
+  page,
+}) => {
+  test.setTimeout(90_000)
+  await signedIn(page, '/purchases')
+  await capture(page)
+
+  const ready = page.locator('.list-row').filter({ hasText: '13 items' })
+  await expect(ready).toBeVisible(READ)
+  await ready.click()
+  await expect(page.locator('.receipt-line')).toHaveCount(13)
+
+  await page.getByRole('button', { name: 'Add a line' }).click()
+  await expect(sheet(page)).toContainText('New line')
+  await risen(page)
+  await sheet(page).getByRole('button', { name: 'Pick an item' }).click()
+  await expect(sheet(page).last()).toContainText('For the line you are adding')
+  await risen(page)
+  const name = `Сметана ${randomUUID().slice(0, 8)}`
+  await sheet(page).last().getByRole('searchbox').fill(name)
+  await sheet(page)
+    .last()
+    .getByRole('button', { name: `Keep as a new item “${name}”` })
+    .click()
+  await expect(sheet(page)).toHaveCount(1)
+  await expect(sheet(page)).toContainText(name)
+  await sheet(page).getByLabel('Price for all, as on the receipt').fill('500')
+  await sheet(page).getByRole('button', { name: 'Done' }).click()
+  await expect(sheet(page)).toHaveCount(0)
+
+  const typed = page.locator('.receipt-line').filter({ hasText: name })
+  await expect(typed).toContainText('added')
+  await expect(page.locator('.receipt-line')).toHaveCount(14)
+  await saveAll(page, 14)
+
+  await expect(page).toHaveURL(/\/purchases\/[0-9a-f-]+$/, READ)
+  await expect(page.getByRole('heading', { name: 'Saved 14 purchases' })).toBeVisible()
+  await expect(page.getByText(name)).toBeVisible()
 })

@@ -400,7 +400,9 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
         return
       case 'record': {
         const answer = await api.recordReceipt(write.id, write.body)
-        const count = write.body.lines.filter((line) => !line.skip).length
+        // the lines typed on the review are purchases of it too (MOL-273)
+        const count =
+          write.body.lines.filter((line) => !line.skip).length + (write.body.added?.length ?? 0)
         const held = (answer.codes ?? []).flatMap((one) =>
           one.outcome === 'held' && one.holder !== undefined
             ? [{ code: one.code, holder: one.holder }]
