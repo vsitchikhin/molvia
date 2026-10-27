@@ -248,6 +248,7 @@ describe('scrollBehavior', () => {
     const router = createRouter({
       history: createMemoryHistory(),
       routes,
+      // eslint-disable-next-line @typescript-eslint/no-deprecated -- the router's own option, as router.ts sets it
       scrollBehavior: (to, from, position) => {
         const answer = scrollBehavior(to, from, position)
         asked.push({ to: to.fullPath, from: from.fullPath, answer })
