@@ -14,7 +14,8 @@ import { useReceiptQueueStore } from '@/stores/receiptQueue'
 
 const sendReceipt = vi.fn<(body: ReceiptBody) => Promise<unknown>>()
 const putReceiptPart = vi.fn<(id: string, part: number, photo: Blob) => Promise<unknown>>()
-const removeReceipt = vi.fn<(id: string) => Promise<void>>()
+const removeReceipt =
+  vi.fn<(id: string, options?: { readonly retake?: boolean }) => Promise<void>>()
 const restoreReceipt = vi.fn<(id: string) => Promise<unknown>>()
 const recordReceipt = vi.fn<(id: string, body: ReceiptRecordBody) => Promise<{ tripId: string }>>()
 const calls: string[] = []
@@ -25,7 +26,10 @@ vi.mock('@/api', () => ({
       calls.push(`part ${id} ${String(part)}`),
       putReceiptPart(id, part, photo)
     ),
-    removeReceipt: (id: string) => (calls.push(`remove ${id}`), removeReceipt(id)),
+    removeReceipt: (id: string, options?: { readonly retake?: boolean }) => (
+      calls.push(`remove ${id}`),
+      removeReceipt(id, options)
+    ),
     restoreReceipt: (id: string) => (calls.push(`restore ${id}`), restoreReceipt(id)),
     recordReceipt: (id: string, body: ReceiptRecordBody) => (
       calls.push(`record ${id}`),
@@ -368,6 +372,46 @@ describe('receipt queue', () => {
       queue.remove(RECEIPT)
       await queue.flush()
       expect(queue.rejected).toEqual([])
+    })
+  })
+
+  // MOL-309, owner's В-6 «а»: «Переснять» removes the receipt it replaces saying so, and its review stays
+  describe('«Переснять» — the removal says so (self-review №11, №12)', () => {
+    const retakes = () => localStorage.getItem(`molvia.receipt-retakes.${ME}`)
+
+    it('sends the removal of a receipt replaced with the retake, and forgets the mark once it went', async () => {
+      const queue = fresh()
+      await queue.capture(body(RECEIPT, 1), shots(1))
+      await queue.flush()
+      queue.remove(RECEIPT, true)
+      await queue.flush()
+      expect(removeReceipt).toHaveBeenCalledWith(RECEIPT, { retake: true })
+      expect(JSON.parse(retakes() ?? '[]')).toEqual([])
+    })
+
+    it('sends «Удалить чек» with no retake', async () => {
+      const queue = fresh()
+      await queue.capture(body(RECEIPT, 1), shots(1))
+      await queue.flush()
+      queue.remove(RECEIPT)
+      await queue.flush()
+      expect(removeReceipt).toHaveBeenCalledWith(RECEIPT, undefined)
+    })
+
+    it('forgets the mark of a removal refused, and of a receipt that never left', async () => {
+      removeReceipt.mockRejectedValueOnce(new ApiError(ERROR.RECEIPT_NOT_PHOTO, 'x'))
+      const queue = fresh()
+      await queue.capture(body(RECEIPT, 1), shots(1))
+      await queue.flush()
+      queue.remove(RECEIPT, true)
+      await queue.flush()
+      expect(queue.rejected.map((one) => one.write.kind)).toEqual(['remove'])
+      expect(JSON.parse(retakes() ?? '[]')).toEqual([])
+      const local = 'cccccccc-0000-4000-8000-000000000009'
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      await queue.capture(body(local, 1), shots(1))
+      queue.remove(local, true)
+      expect(JSON.parse(retakes() ?? '[]')).toEqual([])
     })
   })
 

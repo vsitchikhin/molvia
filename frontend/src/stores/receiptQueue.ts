@@ -419,7 +419,6 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
       case 'remove': {
         const retake = recallRetakes(actor.id).includes(write.id)
         await api.removeReceipt(write.id, retake ? { retake } : undefined)
-        if (retake) keepRetakes(actor.id, (ids) => ids.filter((one) => one !== write.id))
         return
       }
       case 'restore':
@@ -487,6 +486,9 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
       sync(owner)
       const write = head.write
       kept = kept.filter((item) => item.key !== head.key)
+      // a removal done or set aside says nothing more of a retake (self-review №12)
+      if (write.kind === 'remove')
+        keepRetakes(owner, (ids) => ids.filter((one) => one !== write.id))
       if (refusal) {
         console.warn(`[receipt queue] ${write.kind} refused: ${refusal}`)
         // A receipt refused, or a part of it, takes the parts behind it along: they belong to a
@@ -599,6 +601,9 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
    */
   function remove(id: string, quiet = false): ReceiptUndo {
     let undo: ReceiptUndo = { id }
+    // «Переснять»: marked before the removal is queued — `change` may send it at once, and its header is read
+    // as it goes (self-review №11)
+    if (quiet) keepRetakes(actor.id, (ids) => (ids.includes(id) ? ids : [...ids, id]))
     change(() => {
       rejected.value = rejected.value.filter((item) => receiptOf(item.write) !== id)
       const own = kept.filter(
@@ -625,9 +630,11 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     // «Переснять» removes the receipt it replaces with no strip: the person asked for a new one.
     const owner = actor.id
     if (!quiet) lastRemoved.value = { undo, stamp: Date.now(), left: 0, at: Date.now() }
-    else if (owner && undo.local) void photoShelf(owner).drop(id)
-    // the server's removal of a receipt replaced says so: its review stays (MOL-309, В-6 «а»)
-    else keepRetakes(owner, (ids) => (ids.includes(id) ? ids : [...ids, id]))
+    else if (undo.local) {
+      // a receipt that never left has no review on the server: nothing to say of it
+      keepRetakes(owner, (ids) => ids.filter((one) => one !== id))
+      if (owner) void photoShelf(owner).drop(id)
+    }
     return undo
   }
 
