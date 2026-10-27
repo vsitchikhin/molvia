@@ -4,7 +4,7 @@ import type { SelectedTrip } from './useSelectedTrip'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { z } from 'zod'
-import { currencySchema } from '@molvia/model'
+import { currencySchema, formatMoney } from '@molvia/model'
 import type { CatalogueEntry, Currency, Money, TripExpenseView } from '@molvia/model'
 import type { TripRowView } from '@/components/tripRow'
 import type { CodeHeld } from '@/stores/receiptQueue'
@@ -54,7 +54,7 @@ interface FinishedTrip extends Omit<SelectedTrip, 'load'> {
   pending: ComputedRef<boolean>
   rejected: ComputedRef<boolean>
   removing: Ref<boolean>
-  removal: Ref<{ place: string; day: Date | null; items: number }>
+  removal: Ref<{ place: string; day: Date | null; items: number; receipt: string | null }>
   askRemove(): void
   confirmRemove(): void
   afterRemoveSheet(): void
@@ -187,15 +187,18 @@ export function useFinishedTrip(): FinishedTrip {
   const pending = computed(() => queue.pending.some((w) => w.tripId === selected.id.value))
 
   const removing = ref(false)
-  const removal = ref<{ place: string; day: Date | null; items: number }>({
+  const removal = ref<{ place: string; day: Date | null; items: number; receipt: string | null }>({
     place: '',
     day: null,
     items: 0,
+    receipt: null,
   })
   /**
    * «Удалить поход» of a finished trip (MOL-76, В-1): the same as an open one's — an empty one goes
    * at once, one with purchases is asked about. Then back to where the person came from, the
-   * history, the home screen or «Деньги», where «Вернуть» stands.
+   * history, the home screen or «Деньги», where «Вернуть» stands. **A sum by the receipt is not empty**
+   * (adversarial А2 of MOL-207, as Б1 of MOL-206 on the open record): a receipt with no items (MOL-227)
+   * is a record of its sum alone, and the sheet asks, naming that sum, before it goes.
    */
   function drop(): void {
     const tripId = selected.id.value
@@ -203,12 +206,23 @@ export function useFinishedTrip(): FinishedTrip {
   }
   function askRemove(): void {
     const items = rows.value.filter((row) => row.mark !== 'removing').length
-    if (items === 0) {
+    // Read back from the phone's shelf the receipt is not kept, but a record the server holds with no
+    // purchase has no money but its receipt: its total is that sum. Never one whose purchases are only
+    // being removed — its total is their prices.
+    const held = selected.trip.value
+    const sum =
+      receiptCurrent.value ?? (held?.expenses.length === 0 ? (held.total[0] ?? null) : null)
+    if (items === 0 && !sum) {
       drop()
       void goBack()
       return
     }
-    removal.value = { place: name.value, day: finished.value ?? null, items }
+    removal.value = {
+      place: name.value,
+      day: finished.value ?? null,
+      items,
+      receipt: items === 0 && sum ? formatMoney(sum, locale.value) : null,
+    }
     removing.value = true
   }
   /** The sheet puts itself and this screen away in one step back (`steps` 2). */

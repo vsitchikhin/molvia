@@ -5,7 +5,7 @@
     <!-- The connection, one strip first under the header (MOL-181, Ф-14), over the record the phone
          remembers — as on the record typed by hand (MOL-206, owner's В-3 «а»): «Показаны данные…» and
          a card of its own were three ways of saying it on one screen (Е-4). -->
-    <template v-if="available && !missing">
+    <template v-if="available">
       <StatusStrip
         v-if="trouble === 'offline'"
         class="connection"
@@ -156,6 +156,7 @@
       :place="removal.place"
       :day="removal.day"
       :items="removal.items"
+      :receipt="removal.receipt"
       :steps="2"
       :on-closed="afterRemoveSheet"
       @confirm="confirmRemove"

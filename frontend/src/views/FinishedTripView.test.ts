@@ -19,6 +19,7 @@ import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useTripHistoryStore } from '@/stores/tripHistory'
+import { useTripQueueStore } from '@/stores/tripQueue'
 
 const trip = vi.fn<(id: string) => Promise<TripView>>()
 vi.mock('@/api', () => ({
@@ -27,6 +28,10 @@ vi.mock('@/api', () => ({
     tripHistory: () => new Promise(() => undefined),
     pendingVerdicts: () => new Promise(() => undefined),
     currentTrip: () => new Promise(() => undefined),
+    receipts: () => new Promise(() => undefined),
+    // The trip's queue: nothing leaves — no signal at the shelf.
+    removeExpense: () => new Promise(() => undefined),
+    removeTrip: () => new Promise(() => undefined),
   },
 }))
 
@@ -279,5 +284,82 @@ describe('FinishedTripView: шапка и состояния (MOL-207)', () => {
     expect(subtitle(view).text()).toBe(
       `${dayOfAnyYear(at, 'ru')}, ${timeOfDay(at, 'ru')} · ${ru.receipt.recorded.from_receipt}`,
     )
+  })
+})
+
+describe('FinishedTripView: строка чека и удаление записи одной суммы (MOL-207, адверсариальное)', () => {
+  const plainText = (view: VueWrapper) => view.text().replaceAll('\u00a0', ' ')
+  const parts = (view: VueWrapper) =>
+    view.findAll('.total .line .part').map((part) => part.text().replaceAll('\u00a0', ' '))
+  const removeButton = (view: VueWrapper) =>
+    view.findAll('button').find((button) => button.text().includes(ru.trip.remove.action))
+  const BREAD = row(null, 2).id
+
+  /** A receipt with no items (MOL-227): the record is its sum alone. */
+  const sumOnly = tripViewCodec.parse({
+    ...tripViewCodec.encode(finished),
+    receiptId: 'cccccccc-0000-4000-8000-000000000001',
+    expenses: [],
+    total: [{ amount: '5000', currency: 'AMD' }],
+    receipt: { amount: '5000', currency: 'AMD' },
+    prices: [],
+    gap: null,
+  })
+
+  it('А1: хлеб без цены удаляется без связи — строка чека о ценах молчит, сумма чека стоит', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    trip.mockResolvedValue(finished)
+    const view = await render(null)
+    expect(parts(view)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
+
+    useTripQueueStore().enqueue({ kind: 'remove', tripId: TRIP, expenseId: BREAD })
+    await flushPromises()
+
+    expect(view.findAll('.row')[1]?.classes()).toContain('gone')
+    expect(parts(view)).toEqual([])
+    expect(plainText(view)).toContain('1 400 ֏')
+  })
+
+  it('А2: запись одной суммы по чеку спрашивает перед удалением и называет сумму', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    trip.mockResolvedValue(sumOnly)
+    const view = await render(null)
+    await removeButton(view)?.trigger('click')
+    await flushPromises()
+    const sheet = view.findComponent({ name: 'TripRemoveSheet' })
+    expect(sheet.props('open')).toBe(true)
+    expect(String(sheet.props('receipt')).replaceAll('\u00a0', ' ')).toBe('5 000 ֏')
+    expect(useTripQueueStore().pending).toEqual([])
+  })
+
+  it('А2: и с полки, где суммы чека нет, — итог записи без покупок и есть сумма', async () => {
+    trip.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+    const view = await render(sumOnly)
+    await removeButton(view)?.trigger('click')
+    await flushPromises()
+    expect(view.findComponent({ name: 'TripRemoveSheet' }).props('open')).toBe(true)
+    expect(useTripQueueStore().pending).toEqual([])
+  })
+
+  it('А2 (К): без суммы, все покупки уже в удалении — уходит сразу, без вопроса', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    const priced = tripViewCodec.parse({
+      ...tripViewCodec.encode(finished),
+      expenses: [row({ amount: '570', currency: 'AMD' }, 1)],
+      total: [{ amount: '570', currency: 'AMD' }],
+      receipt: null,
+      prices: [{ amount: '570', currency: 'AMD' }],
+      gap: null,
+    })
+    trip.mockResolvedValue(priced)
+    const view = await render(null)
+    useTripQueueStore().enqueue({ kind: 'remove', tripId: TRIP, expenseId: row(null, 1).id })
+    await flushPromises()
+    await removeButton(view)?.trigger('click')
+    await flushPromises()
+    // Gone at once: the screen stepped back with no sheet, the removal is in the queue.
+    const sheet = view.findComponent({ name: 'TripRemoveSheet' })
+    expect(sheet.exists() && sheet.props('open')).toBe(false)
+    expect(useTripQueueStore().pending.some((write) => write.kind === 'delete')).toBe(true)
   })
 })
