@@ -291,6 +291,8 @@ describe('FinishedTripView: строка чека и удаление запис
   const plainText = (view: VueWrapper) => view.text().replaceAll('\u00a0', ' ')
   const parts = (view: VueWrapper) =>
     view.findAll('.total .line .part').map((part) => part.text().replaceAll('\u00a0', ' '))
+  const stale = (view: VueWrapper) =>
+    view.findAll('.total .line .part.stale').map((part) => part.text().replaceAll('\u00a0', ' '))
   const removeButton = (view: VueWrapper) =>
     view.findAll('button').find((button) => button.text().includes(ru.trip.remove.action))
   const BREAD = row(null, 2).id
@@ -306,7 +308,7 @@ describe('FinishedTripView: строка чека и удаление запис
     gap: null,
   })
 
-  it('А1: хлеб без цены удаляется без связи — строка чека о ценах молчит, сумма чека стоит', async () => {
+  it('А1: хлеб без цены удаляется без связи — строка чека прежняя, приглушена; сумма чека стоит', async () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
     trip.mockResolvedValue(finished)
     const view = await render(null)
@@ -316,12 +318,12 @@ describe('FinishedTripView: строка чека и удаление запис
     await flushPromises()
 
     expect(view.findAll('.row')[1]?.classes()).toContain('gone')
-    expect(parts(view)).toEqual([])
+    expect(stale(view)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
     expect(plainText(view)).toContain('1 400 ֏')
   })
 
   // Round 2, Б1: milk swapped for cheese keeps both counts — the list is judged by its rows.
-  it('Б1: молоко заменено сыром без связи — счёт строк тот же, а о ценах строка чека молчит', async () => {
+  it('Б1: молоко заменено сыром без связи — счёт строк тот же, а строка чека приглушена', async () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
     trip.mockResolvedValue(finished)
     const view = await render(null)
@@ -346,7 +348,7 @@ describe('FinishedTripView: строка чека и удаление запис
     })
     await flushPromises()
     expect(view.findAll('.row')).toHaveLength(3)
-    expect(parts(view)).toEqual([])
+    expect(stale(view)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
     expect(plainText(view)).toContain('1 400 ֏')
   })
 

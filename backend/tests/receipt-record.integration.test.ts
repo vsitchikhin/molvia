@@ -43,6 +43,7 @@ import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtur
 // than any yet seen.
 // The 3 of MOL-264 took 1.2–1.5 s on a Mac under the lock: twenty times, as the reporter advises, is 30 s.
 // Three more went past ten times their worst on CI in MOL-264's run (1 112, 534 and 702 ms): the advice's 25 s, 15 s.
+// «writes «без счёта»…» took 552 ms on a busy runner of MOL-207's run: the advice's 15 s.
 
 /**
  * «Записать» (MOL-126): a parsed receipt written in one go as a finished trip on its own day, its
@@ -2015,7 +2016,7 @@ describe('the account of «Записать» (MOL-312)', () => {
       expect(response.statusCode, response.body).toBe(200)
       expect(await tripOf(body.tripId)).toMatchObject({ accountId: null, debitedMinor: null })
     }
-  })
+  }, 15_000)
 
   it('takes an account marked for deletion, as a queue written offline names it', async () => {
     const me = await insertActor(db)

@@ -25,9 +25,9 @@
       <!-- One line of parts, every figure with its words (Ф-23): what the prices say beside a receipt's
            sum (MOL-207), how much has a price, «≈» and the rate. -->
       <span v-if="parts.length > 0" class="line">
-        <template v-for="(part, index) in parts" :key="part">
+        <template v-for="(part, index) in parts" :key="part.text">
           <template v-if="index > 0"> · </template>
-          <span class="part">{{ part }}</span>
+          <span class="part" :class="{ stale: part.stale }">{{ part.text }}</span>
         </template>
       </span>
       <span v-if="caveat" class="note">{{ caveat }}</span>
@@ -99,11 +99,11 @@ export default defineComponent({
      * `receiptParts`.
      */
     const parts = computed(() => [
-      ...total.receiptParts.value,
+      ...total.receiptParts.value.map((text) => ({ text, stale: total.receiptStale.value })),
       ...[total.priced.value, total.estimate.value, total.rateLine.value]
         .filter((part): part is string => part !== null)
         .flatMap((part) => part.split(' · '))
-        .map((part) => part.replaceAll(' ', '\u00a0')),
+        .map((part) => ({ text: part.replaceAll(' ', '\u00a0'), stale: false })),
     ])
 
     return {
@@ -179,6 +179,13 @@ export default defineComponent({
    rate named with its bank once stood past it on every phone (review 2, №1). */
 .part {
   overflow-wrap: anywhere;
+  transition: opacity var(--dur-fast) var(--ease-out);
+
+  /* The receipt's parts while a write of the record is on its way: the previous answer, never taken
+     away — gone and back, they moved the buttons under the card (MOL-207, round 3, В1). */
+  &.stale {
+    opacity: var(--opacity-stale);
+  }
 }
 
 .hidden {

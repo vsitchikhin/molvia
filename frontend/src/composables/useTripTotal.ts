@@ -55,6 +55,7 @@ export interface TripTotal {
   readonly flipped: Ref<boolean>
   readonly flip: () => void
   readonly receiptParts: ComputedRef<string[]>
+  readonly receiptStale: ComputedRef<boolean>
   readonly waiting: ComputedRef<string | null>
 }
 
@@ -213,11 +214,13 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
    * never a sum** — «8 000 ֏ и 20 $» by the locale's own conjunction: a «+» read as adding what the domain
    * refuses to add (review №2, А3).
    *
-   * **Said only of the list the server counted** (adversarial А1): a purchase removed or added with no
-   * signal is on the screen and not in `prices` and `gap` yet, and «— 1 из 2 · без цены — 830 ֏» over a
-   * struck-out loaf spoke of a list no longer shown. While a row is being removed or waits to be sent,
-   * the line says nothing of the prices — judged by the rows, not their counts: milk swapped for cheese
-   * keeps both (round 2, Б1). The receipt's sum above it is still the server's and true.
+   * **Of the list the server counted** (adversarial А1): a purchase removed or added is on the screen
+   * and not in `prices` and `gap` until its answer, and «— 1 из 2 · без цены — 830 ֏» over a struck-out
+   * loaf spoke of a list no longer shown as if it were. While a row is being removed or waits to be sent
+   * the line is that previous answer while the next is on its way — `receiptStale`, drawn at
+   * `--opacity-stale`, judged by the rows and not their counts: milk swapped for cheese keeps both (round
+   * 2, Б1). Taken away instead, it went and came back in one frame with every purchase sent online,
+   * moving the buttons under the card (round 3, В1). The receipt's sum above it is the server's and true.
    *
    * **A dash never starts a line, and «12 из 14» is never cut** (review round 2, №3, П1): what follows
    * the dash of a part — the count, the sum — goes with it, no-break; the words before wrap.
@@ -227,9 +230,6 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
     if (!trip?.receipt || trip.expenses.length === 0) return []
     const all = trip.expenses.length
     const priced = trip.expenses.filter((expense) => expense.amount !== null).length
-    const rows = props.rows
-    if (rows && (rows.settled === false || rows.kept !== all || rows.unpriced !== all - priced))
-      return []
     if (trip.prices.length === 0) return [t('trip.receipt.line_none')]
     const amount = new Intl.ListFormat(locale.value, { type: 'conjunction' }).format(
       trip.prices.map((value) => money(value)),
@@ -254,6 +254,16 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
     })
   })
 
+  /** The rows on screen are not the list `prices` and `gap` were counted on: a write is on its way. */
+  const receiptStale = computed(() => {
+    const trip = props.trip
+    const rows = props.rows
+    if (!trip?.receipt || !rows) return false
+    const all = trip.expenses.length
+    const priced = trip.expenses.filter((expense) => expense.amount !== null).length
+    return rows.settled === false || rows.kept !== all || rows.unpriced !== all - priced
+  })
+
   const waiting = computed(() => {
     const held = props.receiptWaiting
     if (!held) return null
@@ -273,6 +283,7 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
     flipped,
     flip,
     receiptParts,
+    receiptStale,
     waiting,
   }
 }

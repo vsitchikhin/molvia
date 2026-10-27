@@ -94,6 +94,7 @@ describe('TripTotalCard', () => {
   }
 
   const parts = (view: ReturnType<typeof card>) => view.findAll('.line .part').map(plain)
+  const stale = (view: ReturnType<typeof card>) => view.findAll('.line .part.stale').map(plain)
 
   it('сумма крупно, а под ней одной строкой — ≈ в валюте дохода и курс с датой', () => {
     const view = card()
@@ -325,9 +326,10 @@ describe('TripTotalCard', () => {
       expect(parts(view)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 0 ֏'])
     })
 
-    // Adversarial А1: a purchase removed or added with no signal is on the screen and not in the
-    // server's figures yet — the line spoke of a list no longer shown.
-    it('строки на экране не те, что посчитал сервер, — о ценах ни слова, сумма чека остаётся (А1)', () => {
+    // Adversarial А1: a purchase removed or added is on the screen and not in the server's figures yet
+    // — the line spoke of a list no longer shown as if it were. It stays, as the previous answer while
+    // the next is on its way (round 3, В1: taken away, it moved the buttons under the card).
+    it('строки на экране не те, что посчитал сервер, — строка чека прежняя и приглушена (А1, В1)', () => {
       const server = {
         receipt: amd('1400'),
         prices: [amd('570')],
@@ -339,18 +341,19 @@ describe('TripTotalCard', () => {
         rows: { kept: 1, unpriced: 0 },
       })
       expect(plain(removing.get('.sum'))).toBe('1 400 ֏')
-      expect(parts(removing)).toEqual([])
+      expect(stale(removing)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
       const adding = card({
         trip: trip({ converted: null, rate: null, total: [amd('1400')], ...server }),
         rows: { kept: 3, unpriced: 1 },
       })
-      expect(parts(adding)).toEqual([])
+      expect(stale(adding)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
       // Control: the same list on screen as the server's — the line is said.
       const same = card({
         trip: trip({ converted: null, rate: null, total: [amd('1400')], ...server }),
         rows: { kept: 2, unpriced: 1 },
       })
       expect(parts(same)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
+      expect(stale(same)).toEqual([])
     })
 
     it('ни одной цены — так и сказано, сумма без цены не повторяет итог', () => {
@@ -362,7 +365,7 @@ describe('TripTotalCard', () => {
       expect(parts(view)).toEqual([ru.trip.receipt.line_none])
     })
 
-    it('строка, где покупка удаляется или ждёт отправки, — о ценах ни слова, даже при тех же числах (Б1)', () => {
+    it('строка, где покупка удаляется или ждёт отправки, — строка чека приглушена и при тех же числах (Б1)', () => {
       const view = card({
         trip: trip({
           converted: null,
@@ -375,7 +378,9 @@ describe('TripTotalCard', () => {
         }),
         rows: { kept: 2, unpriced: 1, settled: false },
       })
-      expect(parts(view)).toEqual([])
+      expect(stale(view)).toEqual(['по ценам 570 ֏ — 1 из 2', 'без цены — 830 ֏'])
+      // Only the receipt's parts: the rate and «≈» are not about the list.
+      expect(view.findAll('.line .part').length).toBe(stale(view).length)
     })
 
     it('тире не начинает строку, «n из m» не рвётся: хвост после тире неразрывный (ревью 2, №3, П1)', () => {
