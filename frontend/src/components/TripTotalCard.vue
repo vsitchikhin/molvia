@@ -27,7 +27,9 @@
       <span v-if="parts.length > 0" class="line">
         <template v-for="(part, index) in parts" :key="part.text">
           <template v-if="index > 0"> · </template>
-          <span class="part" :class="{ late: part.late }">{{ part.text }}</span>
+          <span class="part" :class="{ 'receipt-part': part.receipt, late: part.late }">{{
+            part.text
+          }}</span>
         </template>
       </span>
       <span v-if="caveat" class="note">{{ caveat }}</span>
@@ -99,11 +101,15 @@ export default defineComponent({
      * `receiptParts`.
      */
     const parts = computed(() => [
-      ...total.receiptParts.value.map((text) => ({ text, late: total.receiptLate.value })),
+      ...total.receiptParts.value.map((text) => ({
+        text,
+        receipt: true,
+        late: total.receiptLate.value,
+      })),
       ...[total.priced.value, total.estimate.value, total.rateLine.value]
         .filter((part): part is string => part !== null)
         .flatMap((part) => part.split(' · '))
-        .map((part) => ({ text: part.replaceAll(' ', '\u00a0'), late: false })),
+        .map((part) => ({ text: part.replaceAll(' ', '\u00a0'), receipt: false, late: false })),
     ])
 
     return {
@@ -180,9 +186,10 @@ export default defineComponent({
 .part {
   overflow-wrap: anywhere;
 
-  /* The words of a recount, put in the line once a write is late (MOL-207, owner's В-3 «а»): faded in,
-     never in one frame (MOL-151), with no rise — they stand in a line of text. */
-  &.late {
+  /* The receipt's parts come in faded, never in one frame (MOL-151), with no rise — they stand in a line
+     of text: the words of a recount once a write is late (owner's В-3 «а»), and the figures of the
+     answer after them (MOL-207, round 5, Д1). A part is keyed by its text, so only what changed plays. */
+  &.receipt-part {
     @include appear(0);
   }
 }

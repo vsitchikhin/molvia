@@ -379,6 +379,40 @@ describe('TripTotalCard', () => {
         expect(parts(view)).toEqual(was)
       })
 
+      // Round 5, Д1: on a slow line the words come, then the answer's figures — both faded, never in
+      // one frame. Keyed by their text, only the parts that changed are new elements and play.
+      it('слова, а за ними цифры ответа приходят частями чека — с проявлением; курс и «≈» нет', async () => {
+        vi.useFakeTimers()
+        const view = card({
+          trip: trip({ total: [amd('1400')], ...server }),
+          rows: { kept: 2, unpriced: 1, settled: false },
+        })
+        vi.advanceTimersByTime(STRIP_LATE_MS)
+        await nextTick()
+        expect(view.findAll('.line .part.receipt-part').map(plain)).toEqual([
+          ru.trip.receipt.line_pending,
+        ])
+        await view.setProps({
+          trip: trip({
+            total: [amd('1400')],
+            receipt: amd('1400'),
+            prices: [amd('1470')],
+            gap: { kind: 'over', amount: amd('70') },
+            rows: [amd('570'), amd('900'), null],
+          }),
+          rows: { kept: 3, unpriced: 1, settled: true },
+        })
+        expect(view.findAll('.line .part.receipt-part').map(plain)).toEqual([
+          'по ценам 1 470 ֏ — 2 из 3',
+          'чек меньше цен на 70 ֏',
+        ])
+        expect(view.findAll('.line .part:not(.receipt-part)').map(plain)).toEqual([
+          '≈ 1 347 ₽',
+          'курс 4,82 ֏/₽',
+          '15 янв.',
+        ])
+      })
+
       it('с курсом — словами только части чека: «≈» и курс не о списке', async () => {
         vi.useFakeTimers()
         const view = card({
