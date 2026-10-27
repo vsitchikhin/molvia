@@ -109,7 +109,9 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
   lock, so each threshold is crossed by exactly one write.
 - **The owner's channel is one** (Р-9 of MOL-149): `owner_notices`, a kind and its fields as
   `ownerNoticeSchema` reads them — a union by `kind`, the feedback of MOL-148 two branches of it
-  (`feedback`, `feedback_continued`). **A notice about a message names it by `feedback_id`** and goes
+  (`feedback`, `feedback_continued`), a receipt the model read not whole two more (`receipt_partial`,
+  `receipt_partial_muted`, MOL-309: within the phone's budget, by the person, and dropped unclaimed after a
+  day as a failure's — `receipts.md`). **A notice about a message names it by `feedback_id`** and goes
   with it (`feedback.md`); a notice about a failure cannot carry one — a check holds both — so the
   failures still belong to nobody. The
   bot claims them every minute (`POST /internal/owner/claim`), the API marks them handed in the same
