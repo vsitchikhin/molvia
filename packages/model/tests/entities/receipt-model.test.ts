@@ -859,7 +859,7 @@ describe('how the model’s summary says the receipt was paid (MOL-312)', () => 
     expect(paid(['Ընդամենը', '1680.00'], ['Վճարված է Առծեռն', '5000.00'])).toBe('cash')
     expect(paid(['Ընդամենը', '19098.00'], ['Վճարված է PosTerminal:', '19 098,00'])).toBe('card')
     // the forms the bench's answers made of «Առձեռն»
-    for (const word of ['Առեն', 'Առնեռն', 'Առեղեն', 'Առճեռն']) {
+    for (const word of ['Առեն', 'Առնեռն', 'Առեղեն', 'Առճեռն', 'Առոեոն', 'Առժեն']) {
       expect(paid([`Վճարված է ${word}`, '1000.00']), word).toBe('cash')
     }
   })
