@@ -586,6 +586,33 @@ describe('forget — адрес телефона уходит из памяти 
     })
   })
 
+  describe('phoneReportLimit — минута маршрута (адверсариальный А1)', () => {
+    it('адрес через минуту ушёл без чужого отчёта, адрес внутри минуты остался', () => {
+      const kept = memory()
+      const limit = phoneReportLimit()
+      expect(limit('old', 1, 0)).toBe(true)
+      expect(limit('young', 1, 1)).toBe(true)
+      limit.forget(60_000)
+      expect(kept.moments('old')).toBeUndefined()
+      expect(kept.moments('young')).toEqual([{ at: 1, count: 1 }])
+    })
+
+    it('уборка не возвращает отчётов раньше минуты', () => {
+      const limit = phoneReportLimit()
+      expect(limit('a', PHONE_REPORTS_PER_ADDRESS, 0)).toBe(true)
+      limit.forget(30_000)
+      expect(limit('a', 1, 30_000)).toBe(false)
+      expect(limit('b', 1, 30_000)).toBe(true)
+    })
+
+    it('отказ не оставляет адреса', () => {
+      const kept = memory()
+      const limit = phoneReportLimit()
+      expect(limit('greedy', PHONE_REPORTS_PER_ADDRESS + 1, 0)).toBe(false)
+      expect(kept.moments('greedy')).toBeUndefined()
+    })
+  })
+
   describe('phoneNoticeBudget', () => {
     it('адрес через час ушёл, адрес внутри часа остался', () => {
       const kept = memory()

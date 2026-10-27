@@ -624,6 +624,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     let stopFeedbackCleanup: (() => Promise<void>) | undefined
     let stopFailureCleanup: (() => Promise<void>) | undefined
     let stopSenderForget: (() => Promise<void>) | undefined
+    // The route's minute of the phone's reports (MOL-144), let go by the timer below too (MOL-241).
+    const phoneLimit = phoneReportLimit()
     let stopMergeTwins: (() => Promise<void>) | undefined
     const embedder = options.embedder?.(instance.log) ?? NO_EMBEDDER
     let itemEmbedding: ReturnType<typeof startItemEmbedding> | undefined
@@ -700,11 +702,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           failures.report(error, job('failure-cleanup'), 'failure cleanup failed')
         },
       )
-      // The phones' addresses an hour after their last failure (MOL-241): a timer of its own, since
-      // the cleanup above waits on the database, and one down or hung would keep them as long.
+      // The phones' addresses an hour after their last failure, and the route's minute (MOL-241): a
+      // timer of its own, since the cleanup above waits on the database, and one down or hung would
+      // keep them as long.
       stopSenderForget = startLoginCleanup(
         () => {
-          failures.forget(new Date())
+          const now = new Date()
+          failures.forget(now)
+          phoneLimit.forget(now.getTime())
           return Promise.resolve()
         },
         (error) => {
@@ -1017,7 +1022,6 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     })
 
     // The phone's failures (MOL-144): no session, a limit in memory, the page's own build.
-    const phoneLimit = phoneReportLimit()
     clientErrorsRoute(instance, (body, address) => {
       takePhoneFailures(
         {

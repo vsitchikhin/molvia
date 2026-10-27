@@ -354,6 +354,44 @@ describe('поток выдуманных сбоев не топит канал 
     }
   })
 
+  it('минутный таймер сервера отпускает адрес: минута маршрута, строки и уведомления (MOL-241)', async () => {
+    const spy = vi.spyOn(Map.prototype, 'set')
+    const kept = (sender: string) =>
+      (spy.mock.contexts as Map<unknown, unknown>[]).some((map) => map.has(sender))
+    // Only the intervals and the clock: the server's timers tick when the test moves them, and the
+    // budgets read the moment of the fake clock (`new Date()`), the route `Date.now()`.
+    vi.useFakeTimers({ toFake: ['setInterval', 'Date'] })
+    const served = buildServer({
+      db,
+      owner: null,
+      failureRecorded: (recording) => recordings.push(recording),
+      logStream: { write: () => true },
+    })
+    try {
+      await served.ready()
+      const response = await served.inject({
+        method: 'POST',
+        url: '/client-errors',
+        headers: { 'x-forwarded-for': '203.0.113.7' },
+        payload: { reports: [REPORT] },
+      })
+      expect(response.statusCode).toBe(204)
+      await recorded()
+      // Half an hour on, one tick: the route's minute is gone, the hour of the budgets is not.
+      vi.setSystemTime(Date.now() + 30 * 60_000)
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(kept('203.0.113.7')).toBe(true)
+      // An hour and more on, one tick: nothing of the address is left.
+      vi.setSystemTime(Date.now() + 30 * 60_000)
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(kept('203.0.113.7')).toBe(false)
+    } finally {
+      await served.close()
+      vi.useRealTimers()
+      spy.mockRestore()
+    }
+  })
+
   it('сбой API после потока — в первой выдаче бота, раньше телефона', async () => {
     for (let host = 1; host <= 10; host += 1) {
       expect(
