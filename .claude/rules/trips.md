@@ -256,6 +256,22 @@ purchase** (adversarial М): it waits on «Покупки» to be put right, a r
 a record holding one is finished. **Every sheet over the record asks it to leave once it is away** — the
 purchase's, the queue's notices' (review Р-7): the record may end under any of them. With receipts (MOL-127) it becomes «Записать вручную».
 
+**The record's actions are one strip, the same empty and full** (MOL-206, Ф-22, handoff 7a): «Штрихкод» and
+«+ Позиция» side by side, the main one at the right, and «Закончить» under them — never in the header's corner the
+thumb does not reach; offline and on an error alike, since all three write through the queue. **Where both words do
+not fit, one stands over the other, «+ Позиция» under** (owner's В-1 «в»): the handoff checked English alone, and
+«Сканировать» with its glyph is 170 px of a half that is 140 on a phone of 320 and 160 on one of 360 — «Штрихкод» is
+147 and fits from some 334; the pair goes by the words, not by a width, so a longer language takes the same way.
+**The total is a card under the list** (owner's В-17 «а», `TripTotalCard`): everything the strip said — the other
+currencies, «С ценой — n из m · без цены — k» while some purchase has none, «≈», the rate, the caveats, a receipt's
+split — and the whole card is the flip; «+ Сумма по чеку» stands under it, a button in a button being no HTML. **The
+price, named:** at a shelf with a list longer than the screen the total is seen only scrolled to — the owner's
+choice over a strip 24 px taller. An empty record is the quiet circle in a card with no buttons — the strip holds
+them — and no total. **The connection is one `StatusStrip`** over the record the phone remembers — offline, or
+«Сервер не ответил» with «Повторить» — never a card: with no record the screen goes up, so there is always one
+under it. **The queue's notices stand over the skeleton** (MOL-311): under it, the answer coming in moved
+«Поправить», «Выбрать», «Уточнить» from under a finger, as MOL-269 found on «Деньги».
+
 **What the queue says about any record is said on both screens** (`TripNotices`): purchases the
 server refused, a record already open elsewhere, purchases not sent for a record that is over, a
 city to name. «Поход» said them in every phase, its home without a trip included; with the record
