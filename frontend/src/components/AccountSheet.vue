@@ -47,17 +47,23 @@
         <p class="hint">{{ t('accounts.sheet.kind_hint') }}</p>
       </div>
 
-      <AppField
-        ref="startField"
-        v-model="start"
-        :label="t('accounts.balance')"
-        kind="decimal"
-        :error-text="startBad ? t('accounts.sheet.bad_start') : null"
-        enterkeyhint="done"
-        @update:model-value="startBad = false"
-      >
-        <template #suffix>{{ sign(currency) }}</template>
-      </AppField>
+      <!-- «Остаток» is what lies on the account now (Ф-31): the field amends the start, and what the
+           server counts from it stands under it — as recorded, never worked out from what is typed. -->
+      <div>
+        <AppField
+          ref="startField"
+          v-model="start"
+          :label="t(account ? 'accounts.sheet.start_amount' : 'accounts.balance')"
+          kind="decimal"
+          :error-text="startBad ? t('accounts.sheet.bad_start') : null"
+          :aria-describedby="now ? `${id}-now` : undefined"
+          enterkeyhint="done"
+          @update:model-value="startBad = false"
+        >
+          <template #suffix>{{ sign(currency) }}</template>
+        </AppField>
+        <p v-if="now" :id="`${id}-now`" class="hint">{{ now }}</p>
+      </div>
 
       <div>
         <AppField
@@ -120,7 +126,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, nextTick, ref, watch } from 'vue'
+import { computed, defineComponent, nextTick, ref, useId, watch } from 'vue'
 import type { ComponentPublicInstance, PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconArchive from '~icons/mdi/archive-arrow-down-outline'
@@ -197,6 +203,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t, locale } = useI18n()
     const store = useAccountsStore()
+    const id = useId()
 
     const name = ref('')
     const currency = ref<Currency>('AMD')
@@ -266,6 +273,15 @@ export default defineComponent({
     const locked = computed(() => current.value?.hasOperations === true)
     /** The account's own currency — never the one typed before the lock came (adversarial Ж). */
     const lockedCurrency = computed(() => current.value?.currency ?? currency.value)
+
+    /** «сейчас …»: the balance the server counted, printed as the account's screen prints it (Р-1). */
+    const now = computed(() =>
+      current.value
+        ? t('accounts.sheet.start_now', {
+            amount: signedAmount(current.value.balance, locale.value),
+          })
+        : null,
+    )
 
     const meta = computed(() => {
       const account = current.value
@@ -463,6 +479,8 @@ export default defineComponent({
 
     return {
       t,
+      id,
+      now,
       name,
       nameMax: MONEY_ACCOUNT_NAME_MAX,
       currency,

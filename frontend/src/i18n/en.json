@@ -2000,6 +2000,8 @@
       "kind_hint": "Savings aren't counted as spendable",
       "start_day": "As of",
       "start_hint": "Today — the balance when the account was made: everything recorded on it after changes it. A past day — the balance that evening",
+      "start_amount": "Held at the start",
+      "start_now": "now {amount}",
       "save": "Save",
       "saving": "Saving…",
       "wait_online": "Will save once online",
