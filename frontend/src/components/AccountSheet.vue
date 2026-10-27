@@ -10,11 +10,10 @@
     }}</template>
     <template #meta>{{ meta }}</template>
 
-    <form class="form" novalidate @submit.prevent="submit">
-      <p v-if="!online" class="strip">
-        <IconCloudOff class="strip-icon" aria-hidden="true" />{{ t('accounts.sheet.offline') }}
-      </p>
+    <!-- First in the sheet (MOL-181), outside the form: a line of the sheet, not a field. -->
+    <StatusStrip v-if="!online" class="status" kind="offline" :text="t('accounts.sheet.offline')" />
 
+    <form class="form" novalidate @submit.prevent="submit">
       <AppField
         ref="nameField"
         v-model="name"
@@ -91,29 +90,28 @@
         block
         :busy="sending && !removing"
         :busy-label="t('accounts.sheet.saving')"
-        :inactive="removing"
-        :disabled="!online && !sending"
+        :inactive="removing || (!online && !sending)"
         @click="submit"
       >
         <template #icon><IconCheck v-if="online || sending" /><IconCloudOff v-else /></template>
         {{ online ? t('accounts.sheet.save') : t('accounts.sheet.wait_online') }}
       </AppButton>
       <template v-if="account && !account.archivedAt">
+        <!-- «Убрать» loses nothing, so it is quiet; «Удалить» deletes for good (Ф-34 by its pattern). -->
         <AppButton
-          variant="danger-ghost"
+          :variant="account.hasOperations ? 'ghost' : 'danger-ghost'"
           block
           :busy="removing"
           :busy-label="
             t(account.hasOperations ? 'accounts.sheet.archiving' : 'accounts.sheet.deleting')
           "
-          :inactive="sending && !removing"
-          :disabled="!online && !sending"
+          :inactive="(sending && !removing) || (!online && !sending)"
           @click="remove"
         >
           <template #icon>
             <IconArchive v-if="account.hasOperations" /><IconDelete v-else />
           </template>
-          {{ t(account.hasOperations ? 'accounts.sheet.archive' : 'accounts.sheet.delete') }}
+          {{ removeWord(account.hasOperations) }}
         </AppButton>
         <p class="note">
           {{
@@ -150,6 +148,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { parseSigned, shortDay, signedAmount } from '@/components/accounts'
 import { shown } from '@/composables/useItemDetails'
 import { calendarDay, localDay, shiftDay } from '@/days'
@@ -185,6 +184,7 @@ export default defineComponent({
     IconDelete,
     IconLock,
     SegmentedControl,
+    StatusStrip,
   },
   props: {
     open: { type: Boolean, required: true },
@@ -314,6 +314,13 @@ export default defineComponent({
         return t('spending.sheet.date_yesterday', { date })
       return date
     })
+
+    /** Not now offline says why on itself (Ф-6, owner's В-1 «а»), as «Сохранить» does. */
+    function removeWord(archives: boolean): string {
+      if (!props.online)
+        return t(archives ? 'accounts.sheet.archive_offline' : 'accounts.sheet.delete_offline')
+      return t(archives ? 'accounts.sheet.archive' : 'accounts.sheet.delete')
+    }
 
     /** «Сейчас записано»: the version the other device wrote, so the next save is not blind. */
     function currentOf(account: MoneyAccountView): string {
@@ -504,6 +511,7 @@ export default defineComponent({
       currencyName,
       currencyOptions,
       currentOf,
+      removeWord,
       nameField,
       startField,
       submit,
@@ -515,29 +523,14 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.status {
+  margin-bottom: var(--space-6);
+}
+
+/* 24 between the fields, 8 within one — the label, the field, its hint (Ф-10). */
 .form {
   display: grid;
-  gap: var(--space-4);
-}
-
-.strip {
-  @include appear;
-
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--warn-tint);
-  color: var(--warn-ink);
-  font-size: var(--text-footnote);
-}
-
-.strip-icon {
-  @include icon;
-
-  font-size: var(--icon-sm);
+  gap: var(--space-6);
 }
 
 .hint,

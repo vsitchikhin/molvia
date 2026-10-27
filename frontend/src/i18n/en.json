@@ -2015,9 +2015,11 @@
       "bad_start": "Enter a balance — 0 is fine",
       "delete": "Delete account",
       "deleting": "Deleting…",
+      "delete_offline": "Will delete once online",
       "delete_note": "No entries yet — it will be deleted for good. You can undo for 10 seconds",
       "archive": "Put away",
       "archiving": "Putting away…",
+      "archive_offline": "Will put away once online",
       "archive_note": "History and balance stay; the account moves to “Put away” and can be restored"
     },
     "reconcile": {
