@@ -256,7 +256,8 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
   addresses, seven `/48` — silence the names of the phone's new failures for an hour; the table keeps
   them and the owner hears «скрыто M» every hour. Never silenced would take another bot: the phone's
   failures one message a minute, with no cap. A restart starts the hour over and forgets what was
-  held — and a rollout is a restart. **The API's and the bot's go first** (adversarial А5): the
+  held — and a rollout is a restart. **A sender is let go an hour after its last failure** — the
+  next bullet. **The API's and the bot's go first** (adversarial А5): the
   claim hands them out before the phone's, and the reporter writes them first and keeps fifty of its
   two hundred places at most for the phone's — a stream of invented failures while the database was
   slow filled the queue, and the API's own was the log's alone. **The price, named:** past four in
@@ -279,6 +280,17 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
   sender is an address, so one subscriber of an operator sending sixty invented reports an hour takes
   the new rows of every phone behind the same address — telling phones apart would need a mark of the
   device, which is tracking. The nightly copy keeps the table: what is in it is bounded.
+- **A sender is let go an hour after its last failure, by both budgets** (MOL-241, owner's В-1 «а»):
+  `forget`, the first line of the minute timer of the failures, before anything of the database and
+  whether or not an owner is set. `claim` is asked of every failure of a phone, a known fingerprint
+  too, and the row budget let go of nobody: every address that ever sent a failure stayed in memory,
+  with its moment, until a restart, while the comment of `recordFailure` promised the hour
+  (adversarial А3 of MOL-97).
+  The notices' budget let go of its senders in `held`, after the tables' cleanup — a database down
+  kept them for as long as it was — and only with an owner, so in a copy never. **A sender with a
+  moment in the hour stays**: the limit is not given back early. `/privacy` says «час после
+  последнего сбоя» (В-2 «а»): the minute of the timer on top is not named, as «через 10 минут» of a
+  receipt does not name its minute.
 - **The scanner's worker carries no model** (`barcodes.md`), so its failure travels to the page as
   the error's name, message and stack and is described there by the one rule (Р-11) — the message
   never leaves the phone; a throw it did not catch is `WorkerError` at its file, line and column.
