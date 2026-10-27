@@ -251,6 +251,7 @@ describe('какие ключи приложение пишет на устро�
       'molvia.money',
       // Последний ответ «Тут дешевле» по позиции и городу — для офлайна (MOL-92).
       'molvia.own-prices',
+      'molvia.payment-accounts',
       'molvia.places',
       'molvia.recent',
       // Коды, по которым найдены недавние позиции, — поиск по коду офлайн (MOL-99).
@@ -261,6 +262,7 @@ describe('какие ключи приложение пишет на устро�
       'molvia.receipt-delivered',
       // Правки строк чека до записи — на телефоне, без связи (MOL-127, Т-9).
       'molvia.receipt-drafts',
+      'molvia.receipt-payment',
       // Фото чеков — база IndexedDB, а не ключ полки: `forgetOwner` удаляет её по имени (MOL-127).
       'molvia.receipt-photos',
       // Очередь чеков и её отказы (MOL-127).

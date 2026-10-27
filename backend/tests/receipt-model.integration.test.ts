@@ -241,6 +241,8 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
       totalMinor: 102_710n,
       balanced: true,
       city: 'Гюмри',
+      // «Վճարված է Առձեռն» — in hand (MOL-312)
+      paidBy: 'cash',
     })
     const lines = await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id))
     expect(lines.map((line) => [line.printed, line.sumMinor])).toEqual([
@@ -509,6 +511,8 @@ describe('what the model read', () => {
       redeemedMinor: 10_000n,
       balanced: true,
       readPartly: false,
+      // by the POS terminal; the bonus spent is no payment (MOL-312)
+      paidBy: 'card',
     })
     expect(reports.find((r) => r.kind === 'read')).toMatchObject({ partly: false })
   }, 30_000)

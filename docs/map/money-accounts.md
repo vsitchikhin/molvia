@@ -65,6 +65,7 @@ Rules: `.claude/rules/money-accounts.md`. A test beside its source, or mirroring
 ## frontend · stores
 
 - `frontend/src/stores/accounts.ts` — Store: the accounts page and recent journals as this phone last heard them, per owner, shared by every screen that shows or picks an account.
+- `frontend/src/stores/paymentAccounts.ts` — The account a purchase starts on (MOL-312): the one last recorded for a receipt paid the same way, or a record by hand, per currency on the device; else the first of the currency.
 
 ## e2e
 

@@ -3,6 +3,7 @@ import type { z } from 'zod'
 import {
   receiptBodySchema,
   receiptDetailCodec,
+  receiptRecordBodySchema,
   receiptSummaryCodec,
 } from '#model/contracts/receipt'
 
@@ -150,5 +151,52 @@ describe('a receipt on the wire', () => {
       receiptDetailCodec.safeParse({ ...detail, lines: [{ printed: 'x', match: 'later' }] })
         .success,
     ).toBe(false)
+  })
+
+  it('carries how the receipt was paid on the detail, or nothing', () => {
+    const detail = {
+      receipt: view,
+      lines: [],
+      rate: null,
+      duplicateOf: null,
+    }
+    expect(receiptDetailCodec.parse({ ...detail, paidBy: 'card' }).paidBy).toBe('card')
+    expect(receiptDetailCodec.parse({ ...detail, paidBy: null }).paidBy).toBeNull()
+    expect(receiptDetailCodec.parse(detail).paidBy).toBeUndefined()
+    expect(receiptDetailCodec.safeParse({ ...detail, paidBy: 'bonus' }).success).toBe(false)
+  })
+})
+
+// MOL-312: the account of «Записать» is the body of `PUT /trips/:id/payment`, and optional
+describe('«Записать» with its account', () => {
+  const record = {
+    tripId: '7c1e0f52-3b4d-4a8e-9f61-2d0c5b7a9e13',
+    place: { id: body.id },
+    purchasedOn: '2026-10-27',
+    lines: [{ position: 0, skip: true }],
+  }
+  const card = '5A2B7C10-4D3E-4F6A-8B9C-0D1E2F3A4B5C'
+
+  it('takes a body with no account, as an earlier build sends it', () => {
+    expect(receiptRecordBodySchema.parse(record).account).toBeUndefined()
+  })
+
+  it('takes an account, in lower case, and «списано» from it', () => {
+    const parsed = receiptRecordBodySchema.parse({
+      ...record,
+      account: { accountId: card, debited: { amount: '331.11', currency: 'RUB' } },
+    })
+    expect(parsed.account).toEqual({
+      accountId: card.toLowerCase(),
+      debited: { minor: 33_111n, currency: 'RUB' },
+    })
+  })
+
+  it('refuses «списано» with no account, as the payment of a trip does', () => {
+    const parsed = receiptRecordBodySchema.safeParse({
+      ...record,
+      account: { accountId: null, debited: { amount: '331.11', currency: 'RUB' } },
+    })
+    expect(parsed.success).toBe(false)
   })
 })

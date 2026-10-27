@@ -12,6 +12,7 @@
 // currency after a sum — and the digits OCR confuses are the country's card (MOL-247): every pattern
 // with a word in it is built from the card, once a card. The tills' layouts stay the parse's own.
 
+import type { ReceiptPaidBy } from '#model/entities/receipt'
 import { PARSED_FRACTION_DIGITS } from '#model/entities/receipt-card'
 import type { PhotoReading } from '#model/entities/receipt-card'
 
@@ -175,6 +176,9 @@ interface Lexicon {
   readonly discountKept: RegExp
   readonly sinceStart: RegExp
   readonly paid: RegExp
+  readonly cash: RegExp
+  readonly cashless: RegExp
+  readonly redeemed: RegExp
 }
 
 const lexicons = new WeakMap<PhotoReading, Lexicon>()
@@ -199,6 +203,7 @@ function lexiconOf(reading: PhotoReading): Lexicon {
     ...[w.total, w.totalKept, w.discountKept, w.sinceStart, w.cashback, w.taxed, w.redeemed],
     ...[w.control, w.fiscalSign, w.tin],
     ...[w.fiscal, w.fiscalNumber, w.receiptNumber, w.sumSign, ...w.paid, ...w.sectionTax],
+    ...[...w.cash, ...w.cashless],
     ...w.tinMisread,
     ...[...w.head, ...w.currency, ...Object.values(u)],
   ]
@@ -301,6 +306,9 @@ function lexiconOf(reading: PhotoReading): Lexicon {
     discountKept: new RegExp(word(w.discountKept), 'u'),
     sinceStart: new RegExp(word(w.sinceStart), 'u'),
     paid: new RegExp(any(w.paid), 'u'),
+    cash: new RegExp(any(w.cash), 'u'),
+    cashless: new RegExp(any(w.cashless), 'u'),
+    redeemed: new RegExp(word(w.redeemed), 'u'),
   }
   lexicons.set(reading, lexicon)
   return lexicon
@@ -1719,6 +1727,44 @@ function placedAmounts(
     else if (lx.paid.test(text)) add('paid', amountsOf(text))
   })
   return found
+}
+
+/**
+ * How the receipt was paid, by the words of its payment (MOL-312): one way only — a word of cash or of a card
+ * beside a sum above nothing, and no word of the other so. A receipt that says both, a mixed payment, or
+ * neither says nothing: an account suggested wrong is one the person may not look at (MOL-255). A redemption
+ * of the card's bonus is no payment, «Կանխավճարի մարում» — the model has copied it «Կանխիկ վճարի մարում».
+ */
+export function paidByOf(
+  reading: PhotoReading,
+  places: readonly { readonly text: string; readonly amounts: readonly number[] }[],
+): ReceiptPaidBy | null {
+  const lx = lexiconOf(reading)
+  const ways = new Set<ReceiptPaidBy>()
+  for (const { text, amounts } of places) {
+    if (!amounts.some((amount) => amount > 0) || lx.redeemed.test(text)) continue
+    if (lx.cashless.test(text)) ways.add('card')
+    else if (lx.cash.test(text)) ways.add('cash')
+  }
+  return ways.size === 1 ? ([...ways][0] ?? null) : null
+}
+
+/**
+ * How Tesseract's readings say the receipt was paid (MOL-312): the rows from the total down, each reading's —
+ * the payment is printed under the total, and a word above it is an item's («ձեռնոց», gloves). A reading that
+ * lost the total's word says nothing.
+ */
+export function receiptPaidBy(
+  reading: PhotoReading,
+  readings: readonly (readonly TextRow[])[],
+): ReceiptPaidBy | null {
+  const lx = lexiconOf(reading)
+  const places = readings.flatMap((rows) => {
+    const texts = rowTexts(rows)
+    const from = texts.findIndex((text) => totalRow(text, lx) || DEPARTMENT.test(text))
+    return from < 0 ? [] : texts.slice(from).map((text) => ({ text, amounts: amountsOf(text) }))
+  })
+  return paidByOf(reading, places)
 }
 
 /**

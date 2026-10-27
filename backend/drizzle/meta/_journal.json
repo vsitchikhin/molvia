@@ -505,6 +505,13 @@
       "when": 1792680632713,
       "tag": "0071_spending_category_icon",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1793087405618,
+      "tag": "0072_receipt_paid_by",
+      "breakpoints": true
     }
   ]
 }

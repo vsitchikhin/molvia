@@ -54,6 +54,12 @@ export interface ReceiptWords {
   readonly redeemed: string
   /** The payment, in cash or by card. */
   readonly paid: readonly string[]
+  /**
+   * How it was paid (MOL-312): the words of a payment in cash, and of one by card. A word of either is read
+   * only beside a sum above nothing, and a receipt that says both — or neither — says nothing.
+   */
+  readonly cash: readonly string[]
+  readonly cashless: readonly string[]
   /** The tax a section prints its sum beside: the section's sum, read again. */
   readonly sectionTax: readonly string[]
   /** The control row that closes the list of items. */
@@ -143,6 +149,19 @@ export const ARMENIAN_RECEIPTS: PhotoReading = {
     redeemed: 'մարում',
     // «Առձեռն» as OCR reads it, «Կանխիկ», «Անկանխիկ», «Վճարված»
     paid: ['ձեռն', 'ձեոն', 'ձեդն', 'Կանխիկ', 'Անկանխ', 'Վճար'],
+    // «Վճարված է Առձեռն» — in hand — a whole word «Առ…ն» as OCR and the model make of it, its third letter what
+    // they make of «ձ» («Առեղն», «Առնեռն», «Առծեն», «Առոեոն», «Առժեն»), never «Առաջին»; «Կանխիկ» whole,
+    // never «Անկանխիկ» — «Ան կանխիկ» torn by OCR too — nor «Կանխավճար» as «Կանխիկավճար». And the last word
+    // before its sum: a
+    // word of cash with words after it is another row's, «Առաջին ամսվա սկզբից», the year's trade as the model
+    // copied it, «Կանխիկով մուծում» (MOL-312, adversarial А1–А4). (Letters alone: «Ա-և» holds the marks
+    // «՝», «՛» an amount follows, «Առձեռն՝ 1700.00».)
+    cash: [
+      '(?<![Ա-Ֆա-և])[Աա]ռ[ձծճենոժ][Ա-Ֆա-և]{0,3}ն(?![^\\d]*[Ա-Ֆա-և])',
+      '(?<![Աա]ն\\s?)[Կկ]անխիկ(?![^\\d]*[Ա-Ֆա-և])',
+    ],
+    // «Անկանխիկ», «Ան կանխիկ», «Վճարված է PosTerminal» — never «միայն քարտապան», a promotion for the card's holders
+    cashless: ['[Աա]ն\\s?կանխիկ', '[Pp][Oo][Ss]\\s?[Tt]erminal'],
     // «Շրջանառության հարկ», its «կ» read «լ»
     sectionTax: ['Շրջ', 'հար[կլ]'],
     control: 'Հսկիչ',

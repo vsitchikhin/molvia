@@ -184,6 +184,28 @@
           :no-items="noItems"
           @total="!locked && (totalOpen = true)"
         />
+        <!-- The account it was paid from (MOL-312): a draft of the review, recorded with «Записать». Grown in
+             where «Счета» answer after the review, as it pushes what stands under it (review Р1-3). -->
+        <AppReveal>
+          <AppCard v-if="showsAccount" class="block account">
+            <AccountRow
+              :label="t('accounts.picker.row_spending')"
+              :account="account"
+              :disabled="locked"
+              @open="pickerOpen = true"
+            />
+            <AppReveal>
+              <ChargedField
+                v-if="charged && account"
+                v-model="debited"
+                :account="account"
+                :bad="debitedBad"
+                :readonly="locked"
+                @update:model-value="debitedBad = false"
+              />
+            </AppReveal>
+          </AppCard>
+        </AppReveal>
         <p v-if="!byLink" class="note">
           <IconImageOff class="note-icon" aria-hidden="true" />
           {{ t(noItems ? 'receipt.review.photo_note_sum' : 'receipt.review.photo_note') }}
@@ -298,6 +320,15 @@
       :on-closed="codesClosed"
       @answered="codesAnswered"
     />
+    <AccountPickerSheet
+      v-if="detail"
+      v-model:open="pickerOpen"
+      :title="t('accounts.picker.row_spending')"
+      :accounts="accounts.accounts"
+      :currency="currency"
+      :selected="accountId"
+      @pick="pickAccount"
+    />
     <ReceiptTotalSheet
       v-if="detail"
       v-model:open="totalOpen"
@@ -335,6 +366,7 @@ import {
   ERROR,
   formatMoney,
   linesTotalOf,
+  parseMoney,
   readCovered,
   readPartly,
   receiptCard,
@@ -343,12 +375,17 @@ import {
   withoutItems,
   yerevanDate,
 } from '@molvia/model'
-import type { Money, ReceiptCountry } from '@molvia/model'
+import type { Money, ReceiptCountry, TripPaymentBody } from '@molvia/model'
+import AccountPickerSheet from '@/components/AccountPickerSheet.vue'
+import AccountRow from '@/components/AccountRow.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppNote from '@/components/AppNote.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import CaptureSheet from '@/components/CaptureSheet.vue'
+import ChargedField from '@/components/ChargedField.vue'
+import { pageOrder } from '@/components/accounts'
 import ListRow from '@/components/ListRow.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
 import ReceiptLineRow from '@/components/ReceiptLineRow.vue'
@@ -370,8 +407,10 @@ import { newId } from '@/ids'
 import { afterStep, useNavigation } from '@/navigation'
 import { photoShelf } from '@/receipts/photoShelf'
 import { recordBody, reviewBalance, reviewDay, reviewLines, reviewPlace } from '@/receipts/review'
+import { useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
+import { receiptSlots, rememberPaymentAccount, rememberedAccount } from '@/stores/paymentAccounts'
 import { useReceiptDraftsStore } from '@/stores/receiptDrafts'
 import { placeIdOf } from '@/stores/receiptDrafts'
 import type { LineDraft, PlaceDraft } from '@/stores/receiptDrafts'
@@ -392,11 +431,15 @@ const PRINTED_LANG: Readonly<Record<ReceiptCountry, string>> = { AM: 'hy', RS: '
 export default defineComponent({
   name: 'ReceiptView',
   components: {
+    AccountPickerSheet,
+    AccountRow,
     AppButton,
     AppCard,
     AppNote,
+    AppReveal,
     AppScreen,
     CaptureSheet,
+    ChargedField,
     IconCamera,
     IconChevronRight,
     IconCloudOff,
@@ -504,6 +547,64 @@ export default defineComponent({
       const asOf = detail.value?.rate?.asOf
       return asOf ? yerevanDate(asOf) : day.value
     })
+
+    /**
+     * The account the receipt was paid from (MOL-312): the person's choice on this review, else the one last
+     * recorded for a receipt paid the same way, else the first of its currency (`rememberedAccount`). A choice
+     * of an account this phone no longer knows gives way to the default: the row says what is sent.
+     */
+    const accounts = useAccountsStore()
+    void accounts.refresh()
+    const slots = computed(() => receiptSlots(detail.value?.paidBy))
+    const payment = computed(() => drafts.paymentOf(id.value))
+    const accountId = computed(() => {
+      const chosen = payment.value
+      if (
+        chosen &&
+        (chosen.accountId === null || accounts.accounts.some((one) => one.id === chosen.accountId))
+      )
+        return chosen.accountId
+      return rememberedAccount(accounts.accounts, currency.value, slots.value, actor.id)?.id ?? null
+    })
+    const account = computed(
+      () => accounts.accounts.find((one) => one.id === accountId.value) ?? null,
+    )
+    // no account at all — no row, the review as before accounts (handoff 06)
+    const showsAccount = computed(
+      () => pageOrder(accounts.accounts).length > 0 || account.value !== null,
+    )
+    /** «Списано со счёта»: an account of another currency than the receipt's (MOL-43 В-3). */
+    const charged = computed(() => !!account.value && account.value.currency !== currency.value)
+    const debited = computed({
+      get: () => (payment.value?.accountId === accountId.value ? payment.value.debited : ''),
+      set: (text: string) => {
+        drafts.setPayment(id.value, { accountId: accountId.value, debited: text })
+      },
+    })
+    const debitedBad = ref(false)
+    const pickerOpen = ref(false)
+    function pickAccount(next: string | null): void {
+      debitedBad.value = false
+      // a choice is kept even where it is the default: the default moves with the next receipt recorded, the
+      // choice must not (adversarial А5)
+      drafts.setPayment(id.value, {
+        accountId: next,
+        debited: next === accountId.value ? debited.value : '',
+      })
+    }
+    /** What «Записать» sends of the account: none, or the account with «списано» where it applies. */
+    function paymentBody(): TripPaymentBody | 'bad' | undefined {
+      if (accountId.value === null) return undefined
+      const held = account.value
+      const text = debited.value.trim()
+      if (!held || !charged.value || !text) return { accountId: accountId.value }
+      try {
+        const value = parseMoney(text, held.currency)
+        return value.minor > 0n ? { accountId: accountId.value, debited: value } : 'bad'
+      } catch {
+        return 'bad'
+      }
+    }
 
     const dayOf = (at: Date | string) =>
       typeof at === 'string'
@@ -752,8 +853,13 @@ export default defineComponent({
         codesOpen.value = true
         return
       }
+      const paid = paymentBody()
+      if (paid === 'bad') {
+        debitedBad.value = true
+        return
+      }
       const barcodes = bind === true ? lineCodes.value.map((code) => code.position) : undefined
-      const body = recordBody(one, draft.value, lines.value, newId(), taken.value, barcodes)
+      const body = recordBody(one, draft.value, lines.value, newId(), taken.value, barcodes, paid)
       if (!body) {
         askPlace(true)
         return
@@ -761,6 +867,8 @@ export default defineComponent({
       sending.value = true
       try {
         queue.record(one.receipt.id, body)
+        // the next receipt paid the same way starts on this account (MOL-312, В-1 «б»)
+        rememberPaymentAccount(actor.id, currency.value, slots.value, paid?.accountId ?? null)
         if (!navigator.onLine) {
           await goUp()
           return
@@ -798,6 +906,15 @@ export default defineComponent({
       t,
       IconReceiptCheck,
       detail,
+      accounts,
+      accountId,
+      account,
+      showsAccount,
+      charged,
+      debited,
+      debitedBad,
+      pickerOpen,
+      pickAccount,
       draft,
       phase: kept.phase,
       stale: kept.stale,
@@ -992,6 +1109,12 @@ export default defineComponent({
 
 .block {
   margin-bottom: var(--space-3);
+}
+
+.account {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .part {

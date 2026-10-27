@@ -155,6 +155,24 @@
         optional
         :bad="receiptBad"
       />
+      <!-- The account it was paid from (MOL-312, В-3 «б»): finished is paid, so it is chosen here and
+           goes through the queue before the finish, as the sum does. -->
+      <div v-if="!finishingEmpty && showsAccount" class="account">
+        <AccountRow
+          :label="t('accounts.picker.row_trip')"
+          :account="account"
+          @open="pickerOpen = true"
+        />
+        <AppReveal>
+          <ChargedField
+            v-if="charged && account"
+            v-model="debited"
+            :account="account"
+            :bad="debitedBad"
+            @update:model-value="debitedBad = false"
+          />
+        </AppReveal>
+      </div>
       <template #footer>
         <template v-if="finishingEmpty">
           <AppButton size="large" block @click="removeEmpty">
@@ -179,6 +197,15 @@
         </template>
       </template>
     </BottomSheet>
+
+    <AccountPickerSheet
+      v-model:open="pickerOpen"
+      :title="t('accounts.picker.row_trip')"
+      :accounts="accounts.accounts"
+      :currency="currency"
+      :selected="accountId"
+      @pick="pickAccount"
+    />
 
     <TripRemoveSheet
       v-model:open="removing"
@@ -223,13 +250,17 @@ import IconBasket from '~icons/mdi/basket-outline'
 import IconDelete from '~icons/mdi/delete-outline'
 import IconFlag from '~icons/mdi/flag-checkered'
 import IconPlus from '~icons/mdi/plus'
-import { formatMoney } from '@molvia/model'
-import type { CatalogueEntry, TripExpenseView } from '@molvia/model'
+import { decimalFromMinor, formatMoney, parseMoney } from '@molvia/model'
+import type { CatalogueEntry, Money, TripExpenseView, TripPaymentBody } from '@molvia/model'
+import AccountPickerSheet from '@/components/AccountPickerSheet.vue'
+import AccountRow from '@/components/AccountRow.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import ChargedField from '@/components/ChargedField.vue'
+import { pageOrder } from '@/components/accounts'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ReceiptField from '@/components/ReceiptField.vue'
 import ReceiptSheet from '@/components/ReceiptSheet.vue'
@@ -246,13 +277,16 @@ import TripTotalCard from '@/components/TripTotalCard.vue'
 import type { TripRowView } from '@/components/tripRow'
 import { useTripRows } from '@/composables/useTripRows'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
+import { shown } from '@/composables/useItemDetails'
 import type { RetryPurchase } from '@/composables/useItemDetails'
 import { useReconnect } from '@/composables/useReconnect'
 import { useTripReceipt } from '@/composables/useTripReceipt'
 import { localDay, purchaseDay, timeOfDay } from '@/days'
 import { afterStep, useNavigation } from '@/navigation'
+import { useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 import { useItemEntryStore } from '@/stores/itemEntry'
+import { rememberPaymentAccount, rememberedAccount } from '@/stores/paymentAccounts'
 import { useSpendingHandoffStore } from '@/stores/spendingHandoff'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -289,11 +323,14 @@ interface Opened {
 export default defineComponent({
   name: 'TripView',
   components: {
+    AccountPickerSheet,
+    AccountRow,
     AppButton,
     AppCard,
     AppReveal,
     AppScreen,
     BottomSheet,
+    ChargedField,
     IconBarcode,
     IconDelete,
     IconFlag,
@@ -455,11 +492,22 @@ export default defineComponent({
       const id = tripId.value
       // The sum typed into the question goes before the finish, in the queue's order (MOL-78, В-4);
       // one that is not money is said so, and nothing is sent until it is right or left empty.
-      if (id && !finishingEmpty.value && askingReceipt.value && receiptText.value.trim()) {
-        const receipt = typedReceipt(receiptText.value, receiptCurrency.value)
-        receiptBad.value = receipt === null
-        if (!receipt) return
-        queue.enqueue({ kind: 'receipt', tripId: id, body: { receipt } })
+      const receipt =
+        id && !finishingEmpty.value && askingReceipt.value && receiptText.value.trim()
+          ? typedReceipt(receiptText.value, receiptCurrency.value)
+          : undefined
+      receiptBad.value = receipt === null
+      // the account likewise (MOL-312): «Списано» that is not money holds the finish
+      const paid = finishingEmpty.value ? undefined : paymentBody()
+      debitedBad.value = paid === 'bad'
+      if (receipt === null || paid === 'bad') return
+      if (id && receipt) queue.enqueue({ kind: 'receipt', tripId: id, body: { receipt } })
+      const payment = receipt ? paymentAfterSum(paid) : changedPayment(paid)
+      if (id && payment) {
+        queue.enqueue({ kind: 'payment', tripId: id, body: payment })
+        if (heldPayment === null) {
+          rememberPaymentAccount(actor.id, currency.value, ['hand'], payment.accountId)
+        }
       }
       if (id) queue.enqueue({ kind: 'finish', tripId: id, finishedOnDeviceAt: new Date() })
       finishing.value = false
@@ -486,7 +534,109 @@ export default defineComponent({
       receiptText.value = ''
       receiptCurrency.value = currency.value
       receiptBad.value = false
+      // the account the record is on already — set in «не попали» before «Закончить» — is where the sheet opens,
+      // «Списано» with it: an amendment opens on what it was written with (review Р1-1); a record on none
+      // starts on the one the last was finished with (MOL-312, Р-4)
+      // A payment still in the queue is the newest word of the record's account — chosen in «не попали» with no
+      // connection, or not landed yet — and a new one would take its place there (review Р2-2, adversarial А7).
+      const own = trip.value
+      const waiting = queue.pending.findLast(
+        (write) => write.kind === 'payment' && write.tripId === tripId.value,
+      )
+      heldPayment =
+        waiting?.kind === 'payment'
+          ? { accountId: waiting.body.accountId, debited: waiting.body.debited ?? null }
+          : own?.accountId
+            ? { accountId: own.accountId, debited: own.debited }
+            : null
+      byHand.value = heldPayment !== null
+      if (heldPayment) accountId.value = heldPayment.accountId
+      debited.value = heldPayment?.debited ? typedMoney(heldPayment.debited) : ''
+      debitedBad.value = false
+      followDefault()
+      // «Счета» read when the sheet opens, never with every opening of «Покупки» (review Р1-2)
+      void accounts.refresh()
       finishing.value = true
+    }
+
+    /**
+     * The account of the record (MOL-312, В-3 «б»): a choice of the sheet, sent as the trip's payment —
+     * `PUT /trips/:id/payment`, as the summary in «Траты» sends it. «Списано» where the account's currency
+     * is not the record's; a purchase in a third currency is the summary's to cover, as before.
+     */
+    const accounts = useAccountsStore()
+    const accountId = ref<string | null>(null)
+    /** The account and «Списано» the record was on when «Закончить» was asked: sent again, they move nothing. */
+    let heldPayment: { accountId: string | null; debited: Money | null } | null = null
+    const typedMoney = (value: Money) =>
+      shown(decimalFromMinor(value), locale.value === 'ru' ? ',' : '.')
+    /** Chosen in the picker: «Счета» answering late no longer move it. */
+    const byHand = ref(false)
+    function followDefault(): void {
+      if (byHand.value) return
+      accountId.value =
+        rememberedAccount(accounts.accounts, currency.value, ['hand'], actor.id)?.id ?? null
+    }
+    watch(() => accounts.accounts, followDefault)
+    const account = computed(
+      () => accounts.accounts.find((one) => one.id === accountId.value) ?? null,
+    )
+    const showsAccount = computed(
+      () => pageOrder(accounts.accounts).length > 0 || account.value !== null,
+    )
+    const charged = computed(() => !!account.value && account.value.currency !== currency.value)
+    const debited = ref('')
+    const debitedBad = ref(false)
+    const pickerOpen = ref(false)
+    function pickAccount(next: string | null): void {
+      byHand.value = true
+      if (next === accountId.value) return
+      accountId.value = next
+      debited.value = ''
+      debitedBad.value = false
+    }
+    /**
+     * What «Закончить» sends of the account: nothing where the sheet left the record's own, «Без счёта» only off
+     * an account the record was on — sent whole, a payment of the same account with no «Списано» would take it
+     * off (`payTrip` reads an absent one as none).
+     */
+    function changedPayment(paid: TripPaymentBody | undefined): TripPaymentBody | undefined {
+      const held = heldPayment
+      if (paid === undefined) return held?.accountId ? { accountId: null } : undefined
+      if (held?.accountId !== paid.accountId) return paid
+      // the same account with no field of «Списано» on screen — one of the record's currency, a third currency's
+      // purchase it covers, or an account this phone does not know: nothing typed, so nothing changed (Р2-1, А8)
+      if (!charged.value || !account.value) return undefined
+      const same =
+        (paid.debited?.minor ?? null) === (held.debited?.minor ?? null) &&
+        (paid.debited?.currency ?? null) === (held.debited?.currency ?? null)
+      return same ? undefined : paid
+    }
+    /**
+     * A sum typed in the same sheet goes first and takes «Списано» off on the server (MOL-78, Р-32 MOL-115): the
+     * field the sheet showed beside it is sent again after it (adversarial А9). With no field on screen nothing
+     * is put back — the figure covered the money before the sum, and the sum takes it off, as on the server
+     * (review Р4-1).
+     */
+    function paymentAfterSum(paid: TripPaymentBody | undefined): TripPaymentBody | undefined {
+      const held = heldPayment
+      if (paid === undefined || held?.accountId !== paid.accountId || !held.debited) {
+        return changedPayment(paid)
+      }
+      return charged.value && account.value ? paid : changedPayment(paid)
+    }
+    /** The trip's payment: none for «Без счёта», which the record already is. */
+    function paymentBody(): TripPaymentBody | 'bad' | undefined {
+      if (accountId.value === null) return undefined
+      const held = account.value
+      const text = debited.value.trim()
+      if (!held || !charged.value || !text) return { accountId: accountId.value }
+      try {
+        const value = parseMoney(text, held.currency)
+        return value.minor > 0n ? { accountId: accountId.value, debited: value } : 'bad'
+      } catch {
+        return 'bad'
+      }
     }
 
     /**
@@ -598,6 +748,15 @@ export default defineComponent({
       unpriced,
       tripId,
       currency,
+      accounts,
+      accountId,
+      account,
+      showsAccount,
+      charged,
+      debited,
+      debitedBad,
+      pickerOpen,
+      pickAccount,
       leaveIfOver,
       retry: () => void load(),
       amend,
@@ -628,6 +787,13 @@ export default defineComponent({
 // 8 to the card it stands over, as the handoff's 2b draws it.
 .connection {
   margin-bottom: var(--space-2);
+}
+
+.account {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
 }
 
 /* Side by side where both words fit, one over the other where they do not, the main one under: each

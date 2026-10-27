@@ -48,8 +48,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // 20: the account's `receiptsModelUntil`, until when a model reads the person's receipts (MOL-272). 21:
 // a receipt's `cashback` and `redeemed`, what a card sent to the card and the bonus it was paid with
 // (MOL-289), and a line's `repaired`, put right by the digits the till's font confuses (MOL-290). 22: a
-// category's `icon`, chosen for one's own (MOL-285).
-export const EXPORT_VERSION = 22
+// category's `icon`, chosen for one's own (MOL-285). 23: a receipt's `paidBy`, cash or a card as its words
+// of payment say (MOL-312).
+export const EXPORT_VERSION = 23
 
 const day = z.iso.date()
 
@@ -353,6 +354,7 @@ const receiptSchema = z.strictObject({
   cashback: signedMoneyCodec.nullable(),
   redeemed: signedMoneyCodec.nullable(),
   readPartly: z.boolean().nullable(),
+  paidBy: z.string().nullable(),
   balanced: z.boolean(),
   city: z.string().nullable(),
   recordedAt: isoDate.nullable(),

@@ -4,6 +4,7 @@
       :model-value="modelValue"
       :label="t('accounts.charged.label', { sign })"
       kind="decimal"
+      :readonly="readonly"
       :placeholder="placeholder"
       :error-text="bad ? t('spending.sheet.bad_amount') : null"
       :aria-describedby="hintId"
@@ -51,6 +52,8 @@ export default defineComponent({
     /** The operation's amount by the rate of the day, when the phone can tell it — the placeholder. */
     estimate: { type: Object as PropType<Money | null>, default: null },
     bad: { type: Boolean, default: false },
+    /** What was sent and cannot be changed now: a receipt whose «Записать» waits (MOL-312). */
+    readonly: { type: Boolean, default: false },
   },
   emits: {
     'update:modelValue': (value: string) => typeof value === 'string',

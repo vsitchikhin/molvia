@@ -70,6 +70,7 @@ import {
   receiptFailureSchema,
   receiptHeardSchema,
   receiptSourceSchema,
+  receiptPaidBySchema,
   receiptViaSchema,
   receiptParsedMatchSchema,
   receiptStatusSchema,
@@ -103,6 +104,7 @@ import type {
   ReceiptCountry,
   ReceiptFailure,
   ReceiptSource,
+  ReceiptPaidBy,
   ReceiptVia,
   ReceiptHeard,
   ReceiptParsedMatch,
@@ -2739,6 +2741,10 @@ export const receipts = pgTable(
     // А6 «а»): what the phone, which sees only the lines shown, says «Прочитали не всё» by. Null — read
     // before it, or not read.
     readPartly: boolean('read_partly'),
+    // How it was paid, as its words of payment say (MOL-312): a hint of the account, read for either reader of
+    // a photo, never of a receipt by its link — the tax office's payments are not read (MOL-232). Null — the
+    // receipt does not say, or says both.
+    paidBy: text('paid_by').$type<ReceiptPaidBy>(),
     balanced: boolean('balanced').notNull().default(false),
     // The city of the settings its address prints (MOL-126, Р-6), where its place is looked for.
     city: text('city').$type<ReceiptCity>(),
@@ -2852,6 +2858,10 @@ export const receipts = pgTable(
     check(
       'receipts_redeemed_positive',
       sql`${table.redeemedMinor} is null or ${table.redeemedMinor} > 0`,
+    ),
+    check(
+      'receipts_paid_by_known',
+      sql`${table.paidBy} is null or ${oneOf(table.paidBy, receiptPaidBySchema.options)}`,
     ),
   ],
 )

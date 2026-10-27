@@ -119,7 +119,22 @@ The detail behind the trip lines of `CLAUDE.md`.
   key by an older window does not send it to the head (adversarial Л). **The price, named** (review
   30): a `payment` waits behind a start held for an answer — another trip open, a missing context —
   with no timer; a check does not wait for it — it counts without it and says the trip waits for an
-  answer in «Покупки» (adversarial round 3, Н4). **The price, named:** removing a trip dated before
+  answer in «Покупки» (adversarial round 3, Н4). **«Закончить» of a record by hand chooses the account too**
+  (MOL-312, owner's В-3 «б», Р-2): finished is paid, so the row «Счёт покупок» and «Списано» stand in its sheet
+  beside the receipt's sum, and the `payment` goes into the queue before the `finish`, as the sum does; «Без
+  счёта» sends none. **A record on an account already** — set in «не попали» while open — opens the sheet on it,
+  «Списано» typed in, and sends nothing unless changed (self-review Р1-1): sent again whole, a payment with no
+  «Списано» takes it off; «Без счёта» there takes the account off. **The record's account is the newest word of
+  it**: a `payment` still in the queue — chosen in «не попали» with no connection, or not landed yet — before the
+  server's answer, since a new one would take its place there (review Р2-2, adversarial А7). **The same account
+  with no field of «Списано» on screen sends nothing** — one of the record's currency, «Списано» for a purchase in
+  a third, or an account this phone does not know (Р2-1, А8): nothing typed, nothing changed. **A sum typed in the same
+  sheet sends the payment again after it** (adversarial А9): the sum goes first and takes «Списано» off on the
+  server, so the field the sheet showed beside it is put back by a `payment` behind the `receipt`; where none was on
+  screen, the sum takes it off, as on the server (Р-32, review Р4-1). «Счета» are read as
+  the sheet opens, never with every opening of the record (Р1-2). **The price, named:** an account this phone
+  does not know reads «Без счёта» in the row until «Счета» answer, the record staying on it. Only for the account's own currency against the record's: a purchase in a third currency
+  is the summary's to cover in «Траты», a price named. **The price, named:** removing a trip dated before
   a check that came out even moves the balance with no reason the check can name, as a removed
   spending does.
 
