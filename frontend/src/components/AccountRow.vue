@@ -68,7 +68,7 @@ export default defineComponent({
   width: 100%;
   min-height: var(--touch-target-lg);
   padding: 0 var(--space-2) 0 var(--space-3);
-  border: var(--hairline) solid var(--border);
+  border: var(--hairline) solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--surface-2);
   color: var(--text);
@@ -130,8 +130,11 @@ export default defineComponent({
   @include visually-hidden;
 }
 
+/* No width of its own (`width: 0` beside `flex: 1`), as `SearchField`'s input: the name's whole line was
+   the row's least width, and a long one pushed the sheet past a phone of 320 instead of ending in «…». */
 .value {
   flex: 1;
+  width: 0;
   min-width: 0;
   overflow: hidden;
   font-size: var(--text-headline);
