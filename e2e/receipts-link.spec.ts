@@ -73,10 +73,13 @@ test('a receipt by its link: pasted, asked of the tax office, reviewed and recor
   }
   await expect(page).toHaveURL(/\/purchases\/[0-9a-f-]+$/, READ)
   await expect(page.getByRole('heading', { name: 'Saved 2 purchases' })).toBeVisible()
-  // at the premises the tax office named, in dinars, the weighed line by the kilogram
+  // at the premises the tax office named, in dinars, the weighed line by the kilogram — a row of the
+  // kit (MOL-206): the name, the quantity and the price per kilogram, the line as printed, the amount
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('ТЕСТ ПРОДАВНИЦА 1')
   await expect(
-    page.getByRole('button', { name: /^Banana 1\.482 kg BANANA KG RSD 296\.39/ }),
+    page.getByRole('button', {
+      name: /^Banana 1\.482 kg · RSD [\d.,]+ per kg BANANA KG RSD 296\.39$/,
+    }),
   ).toBeVisible()
 })
 
