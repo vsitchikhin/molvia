@@ -49,7 +49,7 @@ const FEEDBACK_IN_APP = `(SELECT max("created_at") FROM "feedback" WHERE "actor_
 
 function migration(tag: string, mutant: boolean): string {
   const file = readFileSync(`${MIGRATIONS}/${tag}.sql`, 'utf8')
-  if (!mutant) return file
+  if (!mutant || tag !== '0073_actor_last_seen') return file
   if (!file.includes(FEEDBACK_ALL)) throw new Error('0073 changed: the mutant has nothing to replace')
   return file.replace(FEEDBACK_ALL, FEEDBACK_IN_APP)
 }
@@ -76,6 +76,8 @@ interface Copy {
 let admin: Sql
 let original: Copy
 let mutant: Copy
+/** Every database made, so `afterAll` drops it even where `prepare` failed halfway. */
+const opened: { readonly name: string; readonly sql: Sql }[] = []
 
 async function prepare(name: string, mutated: boolean): Promise<Copy> {
   await admin.unsafe(`drop database if exists "${name}"`)
@@ -83,6 +85,7 @@ async function prepare(name: string, mutated: boolean): Promise<Copy> {
   const own = new URL(url.toString())
   own.pathname = `/${name}`
   const sql = postgres(own.toString(), { max: 1, onnotice: () => undefined })
+  opened.push({ name, sql })
 
   async function apply(entry: JournalEntry): Promise<void> {
     for (const statement of migration(entry.tag, mutated).split('--> statement-breakpoint')) {
@@ -189,7 +192,7 @@ beforeAll(async () => {
 }, 120_000)
 
 afterAll(async () => {
-  for (const copy of [original, mutant]) {
+  for (const copy of opened) {
     await copy.sql.end()
     await admin.unsafe(`drop database if exists "${copy.name}"`)
   }
