@@ -2,7 +2,13 @@ import { randomUUID } from 'node:crypto'
 import { and, asc, eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { ERROR, receiptRecordedCodec, tripHistoryCodec, tripViewCodec } from '@molvia/model'
+import {
+  ERROR,
+  moneyAccountsCodec,
+  receiptRecordedCodec,
+  tripHistoryCodec,
+  tripViewCodec,
+} from '@molvia/model'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import type { FastifyInstance } from 'fastify'
 import postgres from 'postgres'
@@ -12,6 +18,7 @@ import { createReceiptRepository } from '@/db/receipts-repository'
 import {
   expenses,
   items,
+  moneyAccounts,
   places,
   receiptDays,
   receiptLineImages,
@@ -1852,5 +1859,159 @@ describe('«Записать»', () => {
       const again = await record(me, second, { ...body, tripId: randomUUID() })
       expect(codeOf(again)).toBe(ERROR.RECEIPT_RECORDED_BEFORE)
     })
+  })
+})
+
+// MOL-312: the account the receipt was paid from, set with the trip by the rules of its own payment
+describe('the account of «Записать» (MOL-312)', () => {
+  const headers = (cookie: string) => ({ cookie, 'x-molvia-today': '2026-10-03' })
+
+  async function addAccount(actorId: string, currency: 'AMD' | 'RUB' = 'AMD'): Promise<string> {
+    const id = randomUUID()
+    const response = await app.inject({
+      method: 'POST',
+      url: '/money/accounts',
+      headers: headers(await signIn(db, actorId)),
+      payload: {
+        id,
+        name: `Счёт ${id.slice(0, 8)}`,
+        currency,
+        savings: false,
+        start: { amount: '100000', currency },
+        startOn: '2026-09-20',
+      },
+    })
+    expect(response.statusCode, response.body).toBe(201)
+    return id
+  }
+
+  async function overview(actorId: string) {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/money/accounts',
+      headers: headers(await signIn(db, actorId)),
+    })
+    expect(response.statusCode).toBe(200)
+    return moneyAccountsCodec.parse(response.json())
+  }
+
+  /** Every line left out: the trip's money is the printed total, 4 640 ֏. */
+  const bodyOf = (account?: Record<string, unknown>) => ({
+    tripId: randomUUID(),
+    place: { name: 'Ереван Сити', city: 'Гюмри' },
+    purchasedOn: '2026-09-26',
+    lines: LINES.map((_, position) => ({ position, skip: true })),
+    ...(account === undefined ? {} : { account }),
+  })
+
+  async function tripOf(id: string) {
+    const [trip] = await db.select().from(trips).where(eq(trips.id, id))
+    return trip
+  }
+
+  it('puts the trip on the account, which moves by the receipt’s money on its day', async () => {
+    const me = await insertActor(db)
+    const card = await addAccount(me)
+    const body = bodyOf({ accountId: card })
+    const response = await record(me, await parsedReceipt(me, LINES), body)
+    expect(response.statusCode, response.body).toBe(200)
+
+    const trip = await tripOf(body.tripId)
+    expect(trip).toMatchObject({ accountId: card, debitedMinor: null, debitedCurrency: null })
+    expect(trip?.accountSetAt).not.toBeNull()
+    const now = await overview(me)
+    expect(now.accounts.find((one) => one.id === card)?.balance).toEqual({
+      minor: 9_536_000n,
+      currency: 'AMD',
+    })
+    expect(now.unassigned).toBe(0)
+  })
+
+  it('takes «списано» from an account in another currency, exactly', async () => {
+    const me = await insertActor(db)
+    const roubles = await addAccount(me, 'RUB')
+    const body = bodyOf({ accountId: roubles, debited: { amount: '1100.50', currency: 'RUB' } })
+    expect((await record(me, await parsedReceipt(me, LINES), body)).statusCode).toBe(200)
+
+    expect(await tripOf(body.tripId)).toMatchObject({
+      accountId: roubles,
+      debitedMinor: 110_050n,
+      debitedCurrency: 'RUB',
+    })
+    const now = await overview(me)
+    expect(now.accounts.find((one) => one.id === roubles)?.balance).toEqual({
+      minor: 9_889_950n,
+      currency: 'RUB',
+    })
+  })
+
+  it('drops «списано» an account of the receipt’s own currency needs not', async () => {
+    const me = await insertActor(db)
+    const card = await addAccount(me)
+    const body = bodyOf({ accountId: card, debited: { amount: '4000', currency: 'AMD' } })
+    expect((await record(me, await parsedReceipt(me, LINES), body)).statusCode).toBe(200)
+    expect(await tripOf(body.tripId)).toMatchObject({ accountId: card, debitedMinor: null })
+  })
+
+  it('writes «без счёта», never a refusal, for an account that is not the one the phone saw', async () => {
+    const me = await insertActor(db)
+    const stranger = await insertActor(db)
+    const roubles = await addAccount(me, 'RUB')
+    const theirs = await addAccount(stranger)
+    const cases = [
+      // someone else's
+      { accountId: theirs },
+      // one deleted for good, gone from the table
+      { accountId: randomUUID() },
+      // «списано» in another currency than the account's: its currency changed on another phone
+      { accountId: roubles, debited: { amount: '4640', currency: 'AMD' } },
+    ]
+    for (const account of cases) {
+      const body = bodyOf(account)
+      const response = await record(me, await parsedReceipt(me, LINES, { receiptNo: null }), body)
+      expect(response.statusCode, response.body).toBe(200)
+      expect(await tripOf(body.tripId)).toMatchObject({ accountId: null, debitedMinor: null })
+    }
+  })
+
+  it('takes an account marked for deletion, as a queue written offline names it', async () => {
+    const me = await insertActor(db)
+    const card = await addAccount(me)
+    await db.update(moneyAccounts).set({ deletedAt: new Date() }).where(eq(moneyAccounts.id, card))
+    const body = bodyOf({ accountId: card })
+    expect((await record(me, await parsedReceipt(me, LINES), body)).statusCode).toBe(200)
+    expect((await tripOf(body.tripId))?.accountId).toBe(card)
+  })
+
+  it('writes no account for a body without one, as an earlier build sends it', async () => {
+    const me = await insertActor(db)
+    await addAccount(me)
+    const body = bodyOf()
+    expect((await record(me, await parsedReceipt(me, LINES), body)).statusCode).toBe(200)
+    const trip = await tripOf(body.tripId)
+    expect(trip).toMatchObject({ accountId: null, debitedMinor: null })
+    expect(trip?.accountSetAt).toBeNull()
+    expect((await overview(me)).unassigned).toBe(1)
+  })
+
+  it('leaves the account chosen later in «Траты» to a repeat of the record', async () => {
+    const me = await insertActor(db)
+    const card = await addAccount(me)
+    const cash = await addAccount(me)
+    const id = await parsedReceipt(me, LINES)
+    const body = bodyOf({ accountId: card })
+    expect((await record(me, id, body)).statusCode).toBe(200)
+
+    const paid = await app.inject({
+      method: 'PUT',
+      url: `/trips/${body.tripId}/payment`,
+      headers: headers(await signIn(db, me)),
+      payload: { accountId: cash },
+    })
+    expect(paid.statusCode, paid.body).toBe(200)
+    const again = await record(me, id, body)
+    expect(again.statusCode).toBe(200)
+    expect(receiptRecordedCodec.parse(again.json()).tripId).toBe(body.tripId)
+    expect((await tripOf(body.tripId))?.accountId).toBe(cash)
   })
 })

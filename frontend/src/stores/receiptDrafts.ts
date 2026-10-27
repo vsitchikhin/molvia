@@ -101,6 +101,41 @@ function recallShown(owner: string | null): Shown {
   }
 }
 
+/**
+ * The account a receipt is paid from as the person chose it on the review (MOL-312), and «Списано» as typed
+ * — `accountId: null` is «Без счёта» chosen. **Beside the drafts, never inside**, as `SHOWN_KEY`: a draft is
+ * read strictly by the build before, which would drop the whole receipt's edits for it.
+ */
+const PAYMENT_KEY = 'molvia.receipt-payment'
+
+export interface PaymentDraft {
+  readonly accountId: string | null
+  /** «Списано со счёта» as typed, the field's own text. */
+  readonly debited: string
+}
+
+const paymentCodec = z.strictObject({ accountId: z.uuid().nullable(), debited: z.string() })
+
+/** One broken entry is dropped alone, as a draft is: the others are somebody's choices (adversarial А6). */
+function recallPayments(owner: string | null): Record<string, PaymentDraft> {
+  if (!owner) return {}
+  const raw = read(`${PAYMENT_KEY}.${owner}`)
+  if (!raw) return {}
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return {}
+  }
+  if (!isRecord(parsed)) return {}
+  return Object.fromEntries(
+    Object.entries(parsed).flatMap(([id, value]) => {
+      const entry = paymentCodec.safeParse(value)
+      return entry.success ? [[id, entry.data]] : []
+    }),
+  )
+}
+
 function recall(owner: string | null): Record<string, ReceiptDraft> {
   if (!owner) return {}
   const raw = read(`${KEY}.${owner}`)
@@ -149,18 +184,31 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
   const actor = useActorStore()
   const drafts = ref<Record<string, ReceiptDraft>>(recall(actor.id))
   const shown = ref<Shown>(recallShown(actor.id))
+  const payments = ref<Record<string, PaymentDraft>>(recallPayments(actor.id))
 
   watch(
     () => actor.id,
     (id) => {
       drafts.value = recall(id)
       shown.value = recallShown(id)
+      payments.value = recallPayments(id)
     },
   )
   window.addEventListener('storage', (event) => {
     if (actor.id && event.key === `${KEY}.${actor.id}`) drafts.value = recall(actor.id)
     if (actor.id && event.key === `${SHOWN_KEY}.${actor.id}`) shown.value = recallShown(actor.id)
+    if (actor.id && event.key === `${PAYMENT_KEY}.${actor.id}`)
+      payments.value = recallPayments(actor.id)
   })
+
+  function keepPayments(
+    edit: (all: Record<string, PaymentDraft>) => Record<string, PaymentDraft>,
+  ): void {
+    const owner = actor.id
+    if (!owner) return
+    payments.value = edit(recallPayments(owner))
+    write(`${PAYMENT_KEY}.${owner}`, JSON.stringify(payments.value))
+  }
 
   function keepShown(edit: (all: Shown) => Shown): void {
     const owner = actor.id
@@ -228,8 +276,18 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
         return total ? { ...rest, total } : rest
       })
     },
+    /** The account chosen on the review (MOL-312); `null` — none chosen, the default stands. */
+    paymentOf: (receiptId: string): PaymentDraft | null => payments.value[receiptId] ?? null,
+    setPayment(receiptId: string, payment: PaymentDraft): void {
+      keepPayments((all) => ({ ...all, [receiptId]: payment }))
+    },
     forget(receiptId: string): void {
       keepShown((all) => Object.fromEntries(Object.entries(all).filter(([id]) => id !== receiptId)))
+      if (receiptId in recallPayments(actor.id)) {
+        keepPayments((all) =>
+          Object.fromEntries(Object.entries(all).filter(([id]) => id !== receiptId)),
+        )
+      }
       drafts.value = recall(actor.id)
       if (!(receiptId in drafts.value)) return
       drafts.value = Object.fromEntries(
@@ -239,6 +297,11 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
     },
     /** Lets go of the drafts of every receipt not named — recorded, removed, gone (Т-4). */
     keepOnly(receiptIds: ReadonlySet<string>): void {
+      if (Object.keys(recallPayments(actor.id)).some((id) => !receiptIds.has(id))) {
+        keepPayments((all) =>
+          Object.fromEntries(Object.entries(all).filter(([id]) => receiptIds.has(id))),
+        )
+      }
       if (Object.keys(recallShown(actor.id)).some((id) => !receiptIds.has(id))) {
         keepShown((all) =>
           Object.fromEntries(Object.entries(all).filter(([id]) => receiptIds.has(id))),

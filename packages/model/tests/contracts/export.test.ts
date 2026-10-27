@@ -232,6 +232,7 @@ const file: ExportFile = {
       cashback: money(740n, 'AMD'),
       redeemed: null,
       readPartly: false,
+      paidBy: 'card',
       balanced: true,
       city: 'Гюмри',
       recordedAt: at,
@@ -401,7 +402,7 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(22)
+    expect(wire.version).toBe(23)
     expect(wire.account.consentedAt).toBe('2026-09-20T10:00:00.000Z')
     expect(wire.account.analyticsOnAt).toBe('2026-09-20T10:00:00.000Z')
     expect(wire.receipts[0]?.lines[0]?.quantity).toEqual({ value: '2.000', unit: 'piece' })

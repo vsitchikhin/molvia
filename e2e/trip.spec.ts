@@ -525,6 +525,53 @@ test.describe('the newcomer`s «Что брать» (MOL-77, MOL-128)', () => {
   })
 })
 
+// MOL-312, В-3 «б»: finished is paid — the account is chosen in «Finish» and goes before the finish
+test('a record finished on an account moves that account, and nothing is left unassigned', async ({
+  page,
+}) => {
+  test.setTimeout(60_000)
+  const setting = await device(page)
+  const headers = await asBrowser(page)
+  const account = randomUUID()
+  const created = await page.request.post('/api/money/accounts', {
+    headers,
+    data: {
+      id: account,
+      name: 'Cash AMD',
+      currency: 'AMD',
+      savings: false,
+      start: { amount: '100000', currency: 'AMD' },
+      startOn: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(
+        new Date(Date.now() - 24 * 60 * 60 * 1000),
+      ),
+    },
+  })
+  expect(created.status(), await created.text()).toBe(201)
+  await startTrip(page, 'Ереван Сити')
+  await addItem(page, setting.word, '570')
+  await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+
+  await page.getByRole('button', { name: 'Finish', exact: true }).click()
+  await page.waitForTimeout(400)
+  // the one account of the record's currency stands in the sheet already
+  await expect(
+    sheet(page).getByRole('button', { name: /^Choose account:\s*Purchases account/ }),
+  ).toContainText('Cash AMD')
+  await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
+  await expect(page).toHaveURL(/\/purchases$/)
+
+  const accounts = async () =>
+    (await (await page.request.get('/api/money/accounts', { headers })).json()) as {
+      accounts: { id: string; balance: { amount: string } }[]
+      unassigned: number
+    }
+  // the queue sends the payment, then the finish
+  await expect
+    .poll(async () => (await accounts()).accounts.find((one) => one.id === account)?.balance.amount)
+    .toBe('99430.00')
+  expect((await accounts()).unassigned).toBe(0)
+})
+
 /**
  * «Сумма по чеку» (MOL-78): the receipt typed whole when not every price was — at «Закончить» and
  * any time after — and the record's money everywhere, the prices untouched.

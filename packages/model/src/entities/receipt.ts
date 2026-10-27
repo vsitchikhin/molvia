@@ -167,6 +167,13 @@ export const receiptViaSchema = z.enum(['qr', 'paste'])
 export type ReceiptVia = z.infer<typeof receiptViaSchema>
 
 /**
+ * How a receipt was paid, as its words of payment say (MOL-312): `cash` — «Առձեռն», «Կանխիկ»; `card` —
+ * «Անկանխիկ», a POS terminal. It suggests an account, never chooses one.
+ */
+export const receiptPaidBySchema = z.enum(['cash', 'card'])
+export type ReceiptPaidBy = z.infer<typeof receiptPaidBySchema>
+
+/**
  * The cities a receipt names, as a word of its head, of the countries read: a person in Tbilisi
  * records an Armenian receipt in Gyumri or Yerevan (MOL-109, Р-5).
  */

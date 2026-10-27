@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   RECEIPT_CASHBACK_HEADER,
+  RECEIPT_PAID_BY_HEADER,
   RECEIPT_PACK_HEADER,
   RECEIPT_REPAIRED_HEADER,
   RECEIPT_SPELLED_HEADER,
@@ -267,6 +268,31 @@ describe('the review of a receipt', () => {
     const asked = receiptDetailCodec.parse(response.json())
     expect([asked.cashback, asked.redeemed]).toEqual([amd(15.11), amd(100)])
     expect(asked.receipt.total).toEqual({ minor: 152_611n, currency: 'AMD' })
+  })
+
+  it('tells how the receipt was paid only to a phone that asks (MOL-312)', async () => {
+    const me = await insertActor(db)
+    const lines: Line[] = [{ printed: 'A', price: 531, sum: 531 }]
+    const card = await parsedReceipt(me, lines, { paidBy: 'card' })
+    // an installed app of an earlier build reads the detail strictly
+    expect((await review(me, card)).paidBy).toBeUndefined()
+    const asked = async (id: string) =>
+      receiptDetailCodec.parse(
+        (
+          await app.inject({
+            method: 'GET',
+            url: `/receipts/${id}`,
+            headers: {
+              cookie: await signIn(db, me),
+              'x-molvia-today': '2026-10-03',
+              [RECEIPT_PAID_BY_HEADER]: '1',
+            },
+          })
+        ).json(),
+      ).paidBy
+    expect(await asked(card)).toBe('card')
+    // a receipt that does not say, or one read before, says nothing
+    expect(await asked(await parsedReceipt(me, lines))).toBeNull()
   })
 
   it('tells a line the font’s swaps put right only to a phone that asks (MOL-290)', async () => {

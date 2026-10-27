@@ -395,11 +395,38 @@ describe('the queue', () => {
     expect(images.every((image) => image.confirmedAt === null)).toBe(true)
     expect(images.some((image) => /ՀՎՀՀ|Ընդամենը|Ֆիսկալ/.test(image.readText))).toBe(false)
     const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
-    expect([row?.readerVersion, row?.attempts, row?.layout]).toEqual([
+    expect([row?.readerVersion, row?.attempts, row?.layout, row?.paidBy]).toEqual([
       'tesseract 5.5.0 · test',
       1,
       'card',
+      // the fixture prints no payment: nothing said
+      null,
     ])
+  }, 15_000)
+
+  // MOL-312: how it was paid, by the words of the payment under the total, in either page mode
+  it('keeps how the receipt was paid, as the words under its total say', async () => {
+    const me = await owner()
+    const id = await queued(me)
+    const paid = (text: string) => `${text}\nՎճարված է PosTerminal: 8 676,41`
+    const texts: Record<number, string> = {
+      4: paid(am05.readings[0] ?? ''),
+      6: am05.readings[1] ?? '',
+    }
+    await readAll(
+      benchReader({
+        read(_photo, _languages, pageMode) {
+          const text = texts[pageMode] ?? ''
+          return Promise.resolve({
+            text,
+            rows: text.split('\n').map((row, i) => ({ text: row, box: [0, i * 40, 600, 30] })),
+            version: 'tesseract 5.5.0 · test',
+          })
+        },
+      }),
+    )
+    const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
+    expect([row?.status, row?.paidBy]).toEqual(['parsed', 'card'])
   }, 15_000)
 
   // MOL-126: what the lines are is found once, in the queue — by the catalogue's Armenian names and

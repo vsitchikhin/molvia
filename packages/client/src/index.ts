@@ -11,6 +11,7 @@ import {
   RECEIPT_REPAIRED_HEADER,
   RECEIPT_SPELLED_HEADER,
   RECEIPT_PACK_HEADER,
+  RECEIPT_PAID_BY_HEADER,
   loginStartedCodec,
   sessionsResponseCodec,
   loginPollCodec,
@@ -472,7 +473,8 @@ export interface MolviaClient {
    * read in part (`RECEIPT_READ_PARTLY_HEADER`, MOL-255), and what a card sent to the card
    * (`RECEIPT_CASHBACK_HEADER`, MOL-289), and which lines the font's swaps put right
    * (`RECEIPT_REPAIRED_HEADER`, MOL-290), and which new names spell a word in letters
-   * (`RECEIPT_SPELLED_HEADER`, MOL-293), and what one piece of a line holds (`RECEIPT_PACK_HEADER`, MOL-264).
+   * (`RECEIPT_SPELLED_HEADER`, MOL-293), and what one piece of a line holds (`RECEIPT_PACK_HEADER`, MOL-264),
+   * and how it was paid (`RECEIPT_PAID_BY_HEADER`, MOL-312).
    */
   receipt(id: string, options?: { readonly shown?: boolean }): Promise<ReceiptDetail>
   removeReceipt(id: string): Promise<void>
@@ -1027,6 +1029,7 @@ export function createClient(options: ClientOptions): MolviaClient {
           [RECEIPT_REPAIRED_HEADER]: '1',
           [RECEIPT_SPELLED_HEADER]: '1',
           [RECEIPT_PACK_HEADER]: '1',
+          [RECEIPT_PAID_BY_HEADER]: '1',
         }),
       }),
     receiptSettled: (id) => request(`/receipts/${segment(id)}/settled`, receiptSettledCodec),

@@ -29,6 +29,7 @@ import type {
   ReceiptVia,
   ReceiptHeard,
   ReceiptLayout,
+  ReceiptPaidBy,
   ReceiptLine,
   ReceiptParsedMatch,
   ReceiptPlace,
@@ -110,6 +111,8 @@ export interface ReceiptHead {
    */
   readonly cashbackMinor?: bigint | null
   readonly redeemedMinor?: bigint | null
+  /** How it was paid, as its words of payment say (MOL-312); a receipt by its link has none. */
+  readonly paidBy?: ReceiptPaidBy | null
   readonly balanced: boolean
   /** How a photo's lines were laid out; a receipt by its link has none. */
   readonly layout: ReceiptLayout | null
@@ -205,6 +208,8 @@ export interface StoredReceipt {
   readonly redeemed: Money | null
   /** Read in part, of the lines as read before the check (MOL-255, А6 «а»); `null` — read before it. */
   readonly readPartly: boolean | null
+  /** How it was paid, as its words say (MOL-312); `null` — it does not say, or read before it. */
+  readonly paidBy: ReceiptPaidBy | null
 }
 
 /**
@@ -559,6 +564,7 @@ function toStored(found: SummaryRow): StoredReceipt {
     cashback: cashOf(found.row.cashbackMinor, found.row.currency),
     redeemed: cashOf(found.row.redeemedMinor, found.row.currency),
     readPartly: found.row.readPartly,
+    paidBy: found.row.paidBy,
   }
 }
 
@@ -1283,6 +1289,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
                   readTotalMinor: head.readTotalMinor,
                   cashbackMinor: head.cashbackMinor ?? null,
                   redeemedMinor: head.redeemedMinor ?? null,
+                  paidBy: head.paidBy ?? null,
                   balanced: head.balanced,
                   city: head.city,
                   shopUnit: head.shopUnit ?? null,

@@ -7,6 +7,7 @@ import {
   REPAIR_SHIFTS_MAX,
   repairTries,
   modelHeadRows,
+  modelPaidBy,
   modelReceiptSchema,
   receiptTextOfModel,
   unparsedFigures,
@@ -844,5 +845,37 @@ describe('the answer’s schema', () => {
   it('takes no unit but a piece, a kilogram and a litre', () => {
     const odd = { ...answer(), lines: [{ ...line(), unit: 'g' }] }
     expect(modelReceiptSchema.safeParse(odd).success).toBe(false)
+  })
+})
+
+describe('how the model’s summary says the receipt was paid (MOL-312)', () => {
+  const paid = (...totals: [string, string][]) =>
+    modelPaidBy(
+      ARMENIAN_RECEIPTS,
+      answer({ totals: totals.map(([label, amount]) => ({ label, amount })) }),
+    )
+
+  it('reads the summary’s words beside their amounts, as Tesseract’s rows', () => {
+    expect(paid(['Ընդամենը', '1680.00'], ['Վճարված է Առծեռն', '5000.00'])).toBe('cash')
+    expect(paid(['Ընդամենը', '19098.00'], ['Վճարված է PosTerminal:', '19 098,00'])).toBe('card')
+    // the forms the bench's answers made of «Առձեռն»
+    for (const word of ['Առեն', 'Առնեռն', 'Առեղեն', 'Առճեռն', 'Առոեոն', 'Առժեն']) {
+      expect(paid([`Վճարված է ${word}`, '1000.00']), word).toBe('cash')
+    }
+  })
+
+  it('reads the year’s trade the model copied «Առաջին» as no payment (adversarial А1, А2)', () => {
+    const trade: [string, string] = ['Առաջին ամսվա սկզբից', '152889.00']
+    expect(paid(['Վճարված է PosTerminal', '22521.00'], trade)).toBe('card')
+    expect(paid(['Վճարված է:', '22521.00'], trade)).toBeNull()
+    expect(paid(['Առնեն ամբողջ ակզբից:', '152889.00'])).toBeNull()
+  })
+
+  it('reads no bonus spent as cash, nor a payment of an unknown way', () => {
+    // must not: the model copied «Կանխավճարի մարում» as «Կանխիկ վճարի մարում», and a delivery app
+    expect(paid(['Կանխիկ վճարի մարում', '700.00'])).toBeNull()
+    expect(paid(['Վճարված է Yandex', '8676.00'])).toBeNull()
+    expect(paid(['Վճարված է Առևտուր', '16539.00'])).toBeNull()
+    expect(paid(['Վճարված է Առձեռն', '0'], ['Վճարված է PosTerminal', '3741.00'])).toBe('card')
   })
 })

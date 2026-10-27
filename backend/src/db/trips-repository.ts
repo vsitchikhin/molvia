@@ -62,6 +62,9 @@ export interface RecordedTrip {
   readonly placeId: string
   readonly day: string
   readonly deviceAt: Date | null
+  /** The account it was paid from and «списано», as `paymentOf` settled them (MOL-312). */
+  readonly accountId: string | null
+  readonly debited: Money | null
 }
 
 export interface TripRepository {
@@ -100,7 +103,8 @@ export interface TripRepository {
    * A trip from a receipt (MOL-126): written finished, dated by the receipt's day for «Деньги» and the
    * accounts alike, at the rate of that day, with the receipt's sum whole (MOL-78). It is never the
    * open trip, so another one open does not stand in its way. A trip of this id already there is a
-   * 409: a receipt recorded again is answered by the receipt, before this is called.
+   * 409: a receipt recorded again is answered by the receipt, before this is called. Its account is
+   * written with it (MOL-312), new to every later check as `PUT /trips/:id/payment` makes it.
    */
   recordFinished(
     actorId: string,
@@ -413,6 +417,10 @@ export function createTripRepository(db: Conn): TripRepository {
               receiptCurrency: receipt?.currency ?? null,
               receiptSetAt: receipt === null ? null : sql`now()`,
               receiptFirstAt: receipt === null ? null : sql`now()`,
+              accountId: input.accountId,
+              debitedMinor: input.debited?.minor ?? null,
+              debitedCurrency: input.debited?.currency ?? null,
+              accountSetAt: input.accountId === null ? null : sql`now()`,
             })
             .onConflictDoNothing({ target: trips.id })
             .returning()

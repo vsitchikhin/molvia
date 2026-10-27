@@ -6,7 +6,14 @@ import { defineComponent, h } from 'vue'
 import { RouterView, createRouter, createWebHistory } from 'vue-router'
 import { ApiError } from '@molvia/client'
 import { ERROR, parseMoney, parseQuantity } from '@molvia/model'
-import type { ReceiptDetail, ReceiptRecordBody, ReceiptReviewLine } from '@molvia/model'
+import type {
+  Currency,
+  MoneyAccountView,
+  MoneyAccountsResponse,
+  ReceiptDetail,
+  ReceiptRecordBody,
+  ReceiptReviewLine,
+} from '@molvia/model'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import CaptureSheet from '@/components/CaptureSheet.vue'
@@ -25,6 +32,7 @@ const receipts = vi.fn<() => Promise<{ receipts: ReceiptDetail['receipt'][] }>>(
 const receiptSettled = vi.fn<(id: string) => Promise<{ tripId: string | null }>>()
 const keepOnly = vi.fn<(named: ReadonlySet<string>) => Promise<void>>()
 const shelfParts = vi.fn<(id: string) => Promise<Blob[]>>()
+const moneyAccounts = vi.fn<() => Promise<MoneyAccountsResponse>>()
 // Every other call of the API hangs: the screens behind this one load and never answer.
 vi.mock('@/api', () => ({
   api: new Proxy(
@@ -37,6 +45,7 @@ vi.mock('@/api', () => ({
           return (id: string, body: ReceiptRecordBody) => recordReceipt(id, body)
         if (name === 'receipts') return () => receipts()
         if (name === 'recentPlaces') return () => Promise.resolve([])
+        if (name === 'moneyAccounts') return () => moneyAccounts()
         return () => new Promise(() => undefined)
       },
     },
@@ -158,6 +167,9 @@ describe('ReceiptView (MOL-127)', () => {
     keepOnly.mockResolvedValue(undefined)
     shelfParts.mockReset()
     shelfParts.mockResolvedValue([])
+    // «Счета» never answer unless a test gives them: the review as before accounts
+    moneyAccounts.mockReset()
+    moneyAccounts.mockReturnValue(new Promise(() => undefined))
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
     clock = 0
     vi.spyOn(performance, 'now').mockImplementation(() => clock)
@@ -982,5 +994,184 @@ describe('ReceiptView of a receipt by its link (MOL-232)', () => {
     expect(view.text()).toContain(ru.receipt.failed.link.invalid_title)
     expect(view.findComponent(CaptureSheet).exists()).toBe(false)
     expect(view.text()).not.toContain(ru.receipt.capture.retake)
+  })
+})
+
+// MOL-312: the account a receipt was paid from, chosen on the review and recorded with «Записать»
+describe('ReceiptView — the account it was paid from (MOL-312)', () => {
+  let next = 0
+  function account(name: string, currency: Currency): MoneyAccountView {
+    next += 1
+    return {
+      id: `00000000-0000-4000-8000-${String(next).padStart(12, '0')}`,
+      name,
+      currency,
+      savings: false,
+      start: parseMoney('0', currency),
+      startOn: '2026-09-16',
+      balance: parseMoney('1000', currency),
+      approximate: false,
+      uncounted: 0,
+      inSpend: null,
+      rate: null,
+      lastCheckedOn: null,
+      hasOperations: false,
+      archivedAt: null,
+      revision: 1,
+    }
+  }
+  const cash = account('Наличные ֏', 'AMD')
+  const card = account('Карта ֏', 'AMD')
+  const roubles = account('Карта ₽', 'RUB')
+  const page = (accounts: MoneyAccountView[]): MoneyAccountsResponse => {
+    const zero = parseMoney('0', 'AMD')
+    return {
+      spendCurrency: 'AMD',
+      accounts,
+      totals: { total: zero, spendable: zero, savings: zero, uncounted: 0 },
+      incomeTotals: null,
+      unassigned: 0,
+      countedAt: new Date(),
+    }
+  }
+
+  beforeEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+    clock = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => clock)
+    receipt.mockReset()
+    receipt.mockResolvedValue(detail())
+    recordReceipt.mockReset()
+    recordReceipt.mockResolvedValue({ tripId: TRIP })
+    receipts.mockReset()
+    receipts.mockResolvedValue({ receipts: [] })
+    shelfParts.mockReset()
+    shelfParts.mockResolvedValue([])
+    moneyAccounts.mockReset()
+    moneyAccounts.mockResolvedValue(page([cash, card, roubles]))
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+  })
+
+  afterEach(() => {
+    while (mounted.length) mounted.pop()?.unmount()
+    vi.restoreAllMocks()
+    document.body.innerHTML = ''
+  })
+
+  const row = (view: VueWrapper) => view.find('.account .row')
+  /** The picker up — a sheet takes no tap before it has come up — and one of its accounts chosen. */
+  const choose = async (view: VueWrapper, name: string) => {
+    await row(view).trigger('click')
+    await flushPromises()
+    clock += 1000
+    const option = [...(sheet()?.querySelectorAll('[role="radio"]') ?? [])].find((one) =>
+      one.textContent.includes(name),
+    )
+    if (!(option instanceof HTMLElement)) throw new Error(`нет счёта «${name}»`)
+    option.click()
+    await flushPromises()
+  }
+  const recorded = async (view: VueWrapper) => {
+    await button(view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    return recordReceipt.mock.calls[0]?.[1]
+  }
+
+  it('draws no row with no account, and records no account', async () => {
+    moneyAccounts.mockResolvedValue(page([]))
+    const { view } = await render()
+    expect(row(view).exists()).toBe(false)
+    expect((await recorded(view))?.account).toBeUndefined()
+  })
+
+  it('starts on the first account of the receipt’s currency, and records the trip on it', async () => {
+    const { view } = await render()
+    expect(row(view).text()).toContain('Наличные ֏')
+    expect(view.find('.charged').exists()).toBe(false)
+    expect((await recorded(view))?.account).toEqual({ accountId: cash.id })
+    // the next receipt of drams starts on it
+    expect(JSON.parse(localStorage.getItem(`molvia.payment-accounts.${ME}`) ?? '{}')).toEqual({
+      AMD: { receipt: cash.id },
+    })
+  })
+
+  it('starts a receipt paid by card on the account the last one by card was recorded with', async () => {
+    localStorage.setItem(
+      `molvia.payment-accounts.${ME}`,
+      JSON.stringify({ AMD: { card: card.id, receipt: cash.id } }),
+    )
+    receipt.mockResolvedValue({ ...detail(), paidBy: 'card' })
+    const { view } = await render()
+    expect(row(view).text()).toContain('Карта ֏')
+    expect((await recorded(view))?.account).toEqual({ accountId: card.id })
+    expect(JSON.parse(localStorage.getItem(`molvia.payment-accounts.${ME}`) ?? '{}')).toEqual({
+      AMD: { card: card.id, receipt: card.id },
+    })
+  })
+
+  it('keeps a choice of another currency with «Списано» through a reload, and records both', async () => {
+    const { view } = await render()
+    await choose(view, 'Карта ₽')
+    expect(row(view).text()).toContain('Карта ₽')
+    await view.find('.charged input').setValue('1100,50')
+    // the review read again — the app closed and opened — keeps what was chosen and typed
+    while (mounted.length) mounted.pop()?.unmount()
+    const again = await render()
+    expect(row(again.view).text()).toContain('Карта ₽')
+    expect((again.view.find('.charged input').element as HTMLInputElement).value).toBe('1100,50')
+    expect((await recorded(again.view))?.account).toEqual({
+      accountId: roubles.id,
+      debited: parseMoney('1100.50', 'RUB'),
+    })
+  })
+
+  it('records «Без счёта» chosen with no account, and remembers no default of none', async () => {
+    const { view } = await render()
+    await choose(view, 'Без счёта')
+    expect(row(view).text()).toContain('Без счёта')
+    expect((await recorded(view))?.account).toBeUndefined()
+    expect(localStorage.getItem(`molvia.payment-accounts.${ME}`)).toBeNull()
+  })
+
+  it('keeps a choice that is the default too: the default moves, the choice does not (adversarial А5)', async () => {
+    const memory = `molvia.payment-accounts.${ME}`
+    localStorage.setItem(memory, JSON.stringify({ AMD: { receipt: card.id } }))
+    const { view } = await render()
+    expect(row(view).text()).toContain('Карта ֏')
+    await choose(view, 'Карта ֏')
+    // another receipt recorded in cash meanwhile moves the default
+    localStorage.setItem(memory, JSON.stringify({ AMD: { receipt: cash.id } }))
+    while (mounted.length) mounted.pop()?.unmount()
+    const again = await render()
+    expect(row(again.view).text()).toContain('Карта ֏')
+    expect((await recorded(again.view))?.account).toEqual({ accountId: card.id })
+  })
+
+  it('keeps a «Списано» of any length, and the other receipts’ choices with it (adversarial А6)', async () => {
+    const OTHER = 'cccccccc-0000-4000-8000-000000000099'
+    localStorage.setItem(
+      `molvia.receipt-payment.${ME}`,
+      JSON.stringify({ [OTHER]: { accountId: roubles.id, debited: '' } }),
+    )
+    const { view } = await render()
+    await choose(view, 'Карта ₽')
+    await view.find('.charged input').setValue('1 100,50 RUB списано, баланс 12 345,67 руб')
+    while (mounted.length) mounted.pop()?.unmount()
+    const again = await render()
+    expect(row(again.view).text()).toContain('Карта ₽')
+    expect(useReceiptDraftsStore().paymentOf(OTHER)).toEqual({ accountId: roubles.id, debited: '' })
+  })
+
+  it('records nothing while «Списано» is not money, and says so under the field', async () => {
+    localStorage.setItem(
+      `molvia.receipt-payment.${ME}`,
+      JSON.stringify({ [ID]: { accountId: roubles.id, debited: '0' } }),
+    )
+    const { view } = await render()
+    await button(view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    expect(recordReceipt).not.toHaveBeenCalled()
+    expect(view.find('.charged').text()).toContain(ru.spending.sheet.bad_amount)
   })
 })

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { tripPaymentBodySchema } from './money-account'
 import { deviceIdSchema, isoDate } from './trip'
 import {
   RECEIPT_PARTS_MAX,
@@ -7,6 +8,7 @@ import {
   receiptCountrySchema,
   receiptFailureSchema,
   receiptMatchSchema,
+  receiptPaidBySchema,
   receiptStatusSchema,
   receiptViaSchema,
 } from '#model/entities/receipt'
@@ -230,6 +232,12 @@ export const receiptDetailCodec = z.strictObject({
    */
   cashback: moneyCodec.nullable().optional(),
   redeemed: moneyCodec.nullable().optional(),
+  /**
+   * How the receipt was paid, as its words of payment say (MOL-312): cash or a card, only where one of
+   * them carries the sum — `null` when the receipt does not say, or says both. It suggests an account,
+   * never chooses one. Sent only to a phone that asked by `RECEIPT_PAID_BY_HEADER`, as `readTotal`.
+   */
+  paidBy: receiptPaidBySchema.nullable().optional(),
 })
 export type ReceiptDetail = z.output<typeof receiptDetailCodec>
 
@@ -294,6 +302,12 @@ export const receiptRecordBodySchema = z.strictObject({
    * person binds to the item recorded — by the rules of MOL-100. Absent — no question was asked.
    */
   barcodes: z.array(z.int().min(0)).max(500).optional(),
+  /**
+   * The account the receipt was paid from, and «списано» from it (MOL-312): the body of
+   * `PUT /trips/:id/payment`, set on the trip in the record's transaction by the same rules. Absent —
+   * a phone of an earlier build, or «без счёта» — the trip is on no account.
+   */
+  account: tripPaymentBodySchema.optional(),
 })
 export type ReceiptRecordBody = z.output<typeof receiptRecordBodySchema>
 
@@ -362,3 +376,6 @@ export const RECEIPT_SPELLED_HEADER = 'X-Molvia-Receipt-Spelled'
 
 /** A phone that knows a line's `pack` says so by this header (MOL-264), as `RECEIPT_CODES_HEADER`. */
 export const RECEIPT_PACK_HEADER = 'X-Molvia-Receipt-Pack'
+
+/** A phone that knows the detail's `paidBy` says so by this header (MOL-312), as `RECEIPT_CODES_HEADER`. */
+export const RECEIPT_PAID_BY_HEADER = 'X-Molvia-Receipt-Paid-By'

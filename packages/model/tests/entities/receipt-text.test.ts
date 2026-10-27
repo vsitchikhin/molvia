@@ -16,6 +16,7 @@ import {
   likeness,
   mergeParts,
   parseReceiptText,
+  receiptPaidBy,
   rowsOf,
 } from '#model/entities/receipt-text'
 import type { ReceiptText, TextRow } from '#model/entities/receipt-text'
@@ -2687,5 +2688,102 @@ describe('the parse reads the country’s card, never words of its own (MOL-247)
   it('puts back a letter read for a digit even where it is a class’s own sign', () => {
     const signs = { ...AM, digitLike: { ...AM.digitLike, '-': '1', '\\': '1', ']': '1', '^': '1' } }
     expect(card(signs).lines.map((line) => line.sumHundredths)).toEqual([15_000])
+  })
+})
+
+describe('how a receipt was paid (MOL-312)', () => {
+  // the forms are the bench's: «Ереван Сити», Dog City, KFC, a sole trader, a pharmacy — the rest made up
+  const paid = (...rows: string[]) => receiptPaidBy(AM, [rowsOf(rows.join('\n'), 0)])
+  const lines = ['1. Կաթ', '0401/1163909 1Հտ 1 000,00/0,00 1 000,00']
+
+  it('reads cash «in hand» and «Կանխիկ», and a card «Անկանխիկ» or a POS terminal', () => {
+    expect(paid(...lines, 'Ընդամենը: 1 000,00', 'Վճարված է Առձեռն: 5 000,00')).toBe('cash')
+    expect(paid(...lines, 'Ընդամենը 9450.00', 'Կանխիկ 9450.00')).toBe('cash')
+    expect(paid(...lines, 'Ընդամենը: 1 000,00', 'Վճարված է PosTerminal: 1 000,00')).toBe('card')
+    expect(paid(...lines, 'Ընդամենը 8510.00', 'Անկանխիկ(Այլ) 8510.00')).toBe('card')
+    expect(paid('Բաժին 1', '/ Շրջանառության հարկ/ 1700.00', 'Առձեռն՝ 1700.00')).toBe('cash')
+  })
+
+  it('reads «Առձեռն» as OCR leaves it, a whole word «Առ…ն»', () => {
+    for (const word of ['Առձեռն', 'Առձեդն', 'առձեռն', 'Առեղն']) {
+      expect(paid(...lines, 'Ընդամենը: 1 000,00', `Վճարված է ${word}: 1 000,00`), word).toBe('cash')
+    }
+    // must not: a word that is no payment, or one OCR left nothing of
+    for (const word of ['Առձերե', 'Ueto', 'Առևտուր', 'Առանցք', 'Yandex']) {
+      expect(paid(...lines, 'Ընդամենը: 1 000,00', `Վճարված է ${word}: 1 000,00`), word).toBeNull()
+    }
+  })
+
+  it('says nothing of a payment of both ways, or of neither', () => {
+    // a mixed payment: two ways with a sum
+    expect(
+      paid(...lines, 'Ընդամենը: 2 000,00', 'Առձեռն: 1 000,00', 'PosTerminal: 1 000,00'),
+    ).toBeNull()
+    expect(paid(...lines, 'Ընդամենը: 1 000,00')).toBeNull()
+  })
+
+  it('reads a way only beside a sum above nothing', () => {
+    // «Ереван Сити» prints the other way at 0
+    expect(
+      paid(...lines, 'Ընդամենը: 1 000,00', 'Վճարված է Առձեռն: 0,00', 'PosTerminal: 1 000,00'),
+    ).toBe('card')
+    expect(paid(...lines, 'Ընդամենը: 1 000,00', 'Վճարված է Առձեռն:')).toBeNull()
+  })
+
+  it('reads no bonus of the card, no promotion and no item as a payment', () => {
+    // must not: «Կանխավճարի մարում», the bonus spent; «միայն քարտապան», for the card's holders alone
+    expect(paid(...lines, 'Ընդամենը: 1 000,00', 'Կանխավճարի մարում: 1 000,00')).toBeNull()
+    expect(
+      paid(...lines, 'Ընդամենը: 1 000,00', 'Ակցիան գործում է միայն քարտապան 1 000,00'),
+    ).toBeNull()
+    // gloves above the total, «ձեռնոց», are an item, and the total's word starts the payment
+    expect(
+      paid(
+        '1. Աշխատանքային ձեռնոց Առձեռն',
+        '0401/1163909 1Հտ 500,00/0,00 500,00',
+        'Ընդամենը: 500,00',
+      ),
+    ).toBeNull()
+  })
+
+  it('reads a word of cash only as the last before its sum (adversarial А1–А3)', () => {
+    const total = 'Ընդամենը: 1 000,00'
+    const card = 'Վճարված է PosTerminal: 1 000,00'
+    // the year's trade as the model copied it, «Առաջին»; a prepayment's rest as «Կանխիկավճար»
+    for (const row of [
+      'Առաջին ամսվա սկզբից: 152 889,00',
+      'Կանխիկավճարի մնացորդ: 6 847,63',
+      'Կանխիկով մուծում 1 000,00',
+    ]) {
+      expect(paid(...lines, total, card, row), row).toBe('card')
+      // must not: alone, it names no way of payment — a card's receipt whose word was lost is no cash
+      expect(paid(...lines, total, 'Վճարված է: 1 000,00', row), row).toBeNull()
+    }
+  })
+
+  it('reads «Անկանխիկ» torn by OCR as a card, never as cash (adversarial А4)', () => {
+    expect(paid(...lines, 'Ընդամենը 8510.00', 'Վճարված Է Ան կանխիկ 8510.00')).toBe('card')
+  })
+
+  it('reads every reading, and two readings saying two ways say nothing', () => {
+    const cash = rowsOf(['Ընդամենը: 1 000,00', 'Առձեռն: 1 000,00'].join('\n'), 0)
+    const card = rowsOf(['Ընդամենը: 1 000,00', 'PosTerminal: 1 000,00'].join('\n'), 0)
+    const lost = rowsOf(['Ընդամենը: 1 000,00', 'Վճարված է Ueto 1 000,00'].join('\n'), 0)
+    expect(receiptPaidBy(AM, [lost, cash])).toBe('cash')
+    expect(receiptPaidBy(AM, [cash, card])).toBeNull()
+  })
+
+  it('reads the card’s words, never its own', () => {
+    const latin: PhotoReading = {
+      ...AM,
+      words: { ...AM.words, cash: ['CASH'], cashless: ['CARD'] },
+    }
+    const rows = (word: string) => [
+      rowsOf(['Ընդամենը: 1 000,00', `${word} 1 000,00`].join('\n'), 0),
+    ]
+    expect(receiptPaidBy(latin, rows('CASH'))).toBe('cash')
+    expect(receiptPaidBy(latin, rows('CARD'))).toBe('card')
+    // must not: Armenia's words are no longer the card's
+    expect(receiptPaidBy(latin, rows('Առձեռն:'))).toBeNull()
   })
 })

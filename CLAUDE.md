@@ -331,6 +331,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   operation of that day the server got after it (MOL-250). A trip is dated by the day it started.
 - **An account on an operation is optional**; one the owner has not got, or one that does not fit,
   is «без счёта», never a refusal.
+- **A receipt and a record by hand put their trip on an account at «Записать» and «Закончить»**
+  (MOL-312), each starting on the account last recorded the same way, per currency on the device.
 - **«Списано со счёта» moves the balance and nothing else**, counts only while it applies, and any
   change of a trip's money takes it off.
 - **A check looks for the reason before it offers to close the difference**; only a check that came
@@ -707,6 +709,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   lines, else the lines; the owner's lock first; the same trip again is the
   same answer, the same receipt recorded before a 409; a trip from a receipt is dated by its day on the
   accounts too.
+- **The trip of «Записать» is on the account the phone names** (MOL-312): the body of
+  `PUT /trips/:id/payment` by the same `paymentOf`, «без счёта» never a refusal; the choice a draft beside
+  the review's. **How a receipt was paid is a hint, never a choice**: one way's word with a sum, else
+  nothing (`paidByOf`), never read off a receipt by its link; the phone starts a receipt on the account
+  last recorded the same way (`rememberedAccount`), «Без счёта» never remembered.
 
 ### End-to-end — `.claude/rules/e2e.md`
 
