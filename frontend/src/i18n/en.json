@@ -1719,7 +1719,7 @@
       },
       "settings": {
         "term": "Your settings",
-        "text": "Country, city, currencies, and the day you changed the currency of conversion — and for “Count me in the statistics”: since when it is off, and when you last turned it back on."
+        "text": "Country, city, currencies, and the day you changed the currency of conversion — and for “Count me in the statistics”: since when it is off, and when you last turned it back on. And when you last opened the app: the two years of “Inactive account” are counted from that day."
       },
       "consent": {
         "term": "Consent to the terms",
