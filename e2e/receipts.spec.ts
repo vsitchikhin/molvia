@@ -1,7 +1,8 @@
 /// <reference lib="dom" />
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { signedIn } from './session'
+import { asBrowser, signedIn } from './session'
 
 // Receipts on the phone (MOL-127): taken in the browser, kept by the queue, read by the fake reader
 // (`bin/fake-receipt-reader.mjs` answers every photo with the bench's reading of am-05 — thirteen
@@ -124,6 +125,50 @@ test('a receipt from the photo to the purchases: read, reviewed, recorded under 
   await expect(
     page.locator('.recorded .list-row').filter({ hasText: 'from a receipt' }),
   ).toBeVisible(READ)
+})
+
+// MOL-312: the account a receipt was paid from, chosen on the review, is the trip's from «Записать» on —
+// its balance moves by the receipt on the receipt's day, and nothing waits in «Не попали в остатки»
+test('a receipt recorded on the account it was paid from moves that account, and nothing is left unassigned', async ({
+  page,
+}) => {
+  test.setTimeout(90_000)
+  await signedIn(page, '/purchases')
+  const headers = await asBrowser(page)
+  const account = randomUUID()
+  const created = await page.request.post('/api/money/accounts', {
+    headers,
+    data: {
+      id: account,
+      name: 'Card AMD',
+      currency: 'AMD',
+      savings: false,
+      start: { amount: '100000', currency: 'AMD' },
+      // before the fake reader's receipt of 1 October
+      startOn: '2026-09-20',
+    },
+  })
+  expect(created.status(), await created.text()).toBe(201)
+  await capture(page)
+
+  const ready = page.locator('.list-row').filter({ hasText: '13 items' })
+  await expect(ready).toBeVisible(READ)
+  await ready.click()
+  await expect(page.locator('.receipt-line')).toHaveCount(13)
+  // the one account of the receipt's currency stands there already
+  await expect(page.getByRole('button', { name: /^Choose account:\s*Account/ })).toContainText(
+    'Card AMD',
+  )
+  await saveAll(page)
+  await expect(page).toHaveURL(/\/purchases\/[0-9a-f-]+$/, READ)
+
+  const accounts = (await (await page.request.get('/api/money/accounts', { headers })).json()) as {
+    accounts: { id: string; balance: { amount: string } }[]
+    unassigned: number
+  }
+  // 100 000 less the receipt's 8 676,41
+  expect(accounts.accounts.find((one) => one.id === account)?.balance.amount).toBe('91323.59')
+  expect(accounts.unassigned).toBe(0)
 })
 
 // MOL-227: a sole trader prints no items — the receipt is its sum, recorded as one, with no «retake»
