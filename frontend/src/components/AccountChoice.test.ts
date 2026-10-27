@@ -416,6 +416,17 @@ describe('AccountPickerSheet', () => {
     expect(view.get('[aria-checked="true"] .balance').classes()).toContain('negative')
   })
 
+  // Muted under 4.5:1 on the tint (MOL-172): the chosen row's balance is ink, by the sheet's own choice.
+  it('only the chosen row’s balance is marked chosen, which the ink goes by', async () => {
+    const view = await mounted(
+      AccountPickerSheet,
+      { open: true, title: 'Account', accounts: [cash, card], currency: 'AMD', selected: card.id },
+      withAccounts([cash, card]),
+    )
+    expect(view.findAll('.balance').map((one) => one.classes('chosen'))).toEqual([false, true])
+    expect(view.get('[aria-checked="true"] .balance').classes()).toContain('chosen')
+  })
+
   it('a tap on a row picks it and closes the sheet', async () => {
     const view = await mounted(
       AccountPickerSheet,

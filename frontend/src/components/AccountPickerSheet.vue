@@ -17,7 +17,13 @@
                 @click="pick(account.id)"
               >
                 <template #tail>
-                  <span class="balance" :class="{ negative: account.balance.minor < 0n }">
+                  <span
+                    class="balance"
+                    :class="{
+                      negative: account.balance.minor < 0n,
+                      chosen: selected === account.id,
+                    }"
+                  >
                     {{ balanceOf(account) }}
                   </span>
                 </template>
@@ -152,8 +158,8 @@ export default defineComponent({
 }
 
 /* Muted text is under 4.5:1 on a tint (MOL-172): on the chosen row the balance is ink, as the kit
-   makes its meta. */
-.selected .balance:not(.negative) {
+   makes its meta. By the sheet's own choice, never the kit's class of the row, which is no contract. */
+.balance.chosen:not(.negative) {
   color: var(--text);
 }
 

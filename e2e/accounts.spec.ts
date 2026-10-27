@@ -513,6 +513,16 @@ test('выбор счёта: строки 64, у выбранной кольцо
       toCaption: Math.round(box(captions[1]).top - box(cards[0]).bottom),
       toNone: Math.round(box(cards[2]).top - box(cards[1]).bottom),
       toFootnote: Math.round(box(sheet.querySelector('.footnote')).top - box(cards[2]).bottom),
+      // On the tint muted is under 4.5:1 (MOL-172): the chosen balance is the title's ink, another's muted.
+      ink: [...sheet.querySelectorAll('[role="radio"]')]
+        .filter((row) => row.querySelector('.balance'))
+        .map((row) => {
+          const colour = (selector: string) => {
+            const one = row.querySelector(selector)
+            return one ? getComputedStyle(one).color : ''
+          }
+          return colour('.balance') === colour('.title')
+        }),
     }
   })
   expect(look).toEqual({
@@ -521,6 +531,7 @@ test('выбор счёта: строки 64, у выбранной кольцо
     toCaption: 24,
     toNone: 24,
     toFootnote: 8,
+    ink: [true, false],
   })
 })
 
