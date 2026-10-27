@@ -2,12 +2,14 @@ import { GrammyError, InputFile } from 'grammy'
 import type { Api } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
+import { RECEIPT_LINE_REASONS } from '@molvia/model'
 import type {
   CatalogueMergedNotice,
   FeedbackContinuedNotice,
   FeedbackNotice,
   ModelSpendNotice,
   OwnerNotice,
+  ReceiptPartialNotice,
 } from '@molvia/model'
 import { t } from './i18n'
 import { telegramFailure } from './assemble'
@@ -24,6 +26,9 @@ export function ownerText(notice: OwnerNotice): string {
   if (notice.kind === 'feedback_continued') return continuedText(notice)
   if (notice.kind === 'catalogue_merged') return mergedText(notice)
   if (notice.kind === 'model_spend') return spendText(notice)
+  if (notice.kind === 'receipt_partial') return partialText(notice)
+  if (notice.kind === 'receipt_partial_muted')
+    return t(undefined, 'owner.receipt.muted', { count: notice.count })
   if (notice.kind === 'failure_muted') {
     // Said only what is so (review №10, adversarial Г2): no «скрыто: 0», and `make failures` only for
     // the held ones — the unwritten are in no table.
@@ -115,6 +120,38 @@ function spendText(notice: ModelSpendNotice): string {
     spent: dollars(notice.spentMicroUsd),
     cap: dollars(notice.capMicroUsd),
   })
+}
+
+/**
+ * A receipt the model read not whole (MOL-309): which, and why by kind — the most frequent line reason first —
+ * and where its photo and the model's answer wait for the review. No name, no sum, no shop.
+ */
+function partialText(notice: ReceiptPartialNotice): string {
+  const reasons = RECEIPT_LINE_REASONS.flatMap((reason) => {
+    const count = notice.lineReasons[reason]
+    return count === undefined ? [] : [{ reason, count }]
+  })
+    .sort((a, b) => b.count - a.count)
+    .map(
+      ({ reason, count }) => `${t(undefined, `owner.receipt.line.${reason}`)} — ${String(count)}`,
+    )
+  return [
+    t(undefined, 'owner.receipt.partial', { receipt: notice.receipt, country: notice.country }),
+    t(undefined, 'owner.receipt.lines', {
+      lines: notice.lines,
+      shown: notice.shown,
+      empty: notice.lines - notice.shown,
+    }),
+    t(undefined, 'owner.receipt.reason', {
+      reason: t(undefined, `owner.receipt.why.${notice.reason}`),
+    }),
+    ...(reasons.length === 0
+      ? []
+      : [t(undefined, 'owner.receipt.lineReasons', { reasons: reasons.join(', ') })]),
+    ...(notice.keptUntil === undefined
+      ? []
+      : [t(undefined, 'owner.receipt.kept', { day: notice.keptUntil, receipt: notice.receipt })]),
+  ].join('\n')
 }
 
 function mergedText(notice: CatalogueMergedNotice): string {

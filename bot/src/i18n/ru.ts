@@ -231,6 +231,31 @@ export const ru = {
   'owner.model.stop':
     '🛑 Чеки моделью за {month}: потрачено ${spent}, чек не влез под потолок ${cap} и прочитан Tesseract. Дальше модель читает только то, что ещё влезает, остальное — Tesseract.',
   /**
+   * A receipt the model read not whole, told to the developer (MOL-309): which, by its id's first characters,
+   * and why by kind — no name, no sum, no shop. Russian always, as every notice to the owner.
+   */
+  'owner.receipt.partial': '🧾 Чек не целиком · {receipt} · модель · {country}',
+  'owner.receipt.lines': 'Строк {lines}: с цифрами {shown}, без цифр {empty}',
+  'owner.receipt.reason': 'Чек: {reason}',
+  'owner.receipt.lineReasons': 'Строки: {reasons}',
+  'owner.receipt.kept': 'Фото и ответ модели — до {day}: make receipt-miss ID={receipt}',
+  'owner.receipt.muted': '🔕 Скрыто сигналов о чеках не целиком: {count} — make receipt-reasons',
+  'owner.receipt.why.failed': 'не прочитано ни одной строки',
+  'owner.receipt.why.no_lines': 'строк нет',
+  'owner.receipt.why.no_total': 'итог не подтверждён двумя местами',
+  'owner.receipt.why.lines_lost': 'строки дают меньше итога',
+  'owner.receipt.why.line_doubted': 'строка под сомнением памяти',
+  'owner.receipt.why.line_not_as_printed': 'строка не как напечатана',
+  'owner.receipt.why.lines_over': 'строки дают больше итога',
+  'owner.receipt.line.doubted': 'сомнение памяти',
+  'owner.receipt.line.missing_figure': 'нет числа',
+  'owner.receipt.line.repaired_unproven': '5↔6 на нецелом чеке',
+  'owner.receipt.line.unsettled': 'не сходится арифметика',
+  'owner.receipt.line.bent': 'сошлась только подменой',
+  'owner.receipt.line.zero_not_gift': '0 — не подарок',
+  'owner.receipt.line.one_alike_unproven': '«1 × цена» на нецелом чеке',
+  'owner.receipt.line.price_dropped': 'цена убрана',
+  /**
    * «Написать разработчику» in the bot (MOL-148). The frame is what the person gets around the
    * owner's reply, in the language of their message (Р-12 of MOL-150); the rest answers a text
    * written as a reply to the bot, in the writer's language, under their message.
