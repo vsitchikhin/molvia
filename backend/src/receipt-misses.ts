@@ -28,25 +28,31 @@ const copyOf = (root: string | undefined, receipt: string): string =>
   join(root ?? tmpdir(), `receipt-miss-${receipt.slice(0, 8)}`)
 
 /**
- * Lets go of every copy under the root whose review the database no longer keeps: a review goes by itself — its 21
- * days, its person erased — and its copy must not outlive it (adversarial Б3). Only the root's own directories, by
- * their name: what is under a directory of another name — copies brought from production — is not this database's.
+ * Every copy under the root whose review the database does not keep — let go, or only named in a dry run: a review
+ * goes by itself — its 21 days, its person erased — and its copy must not outlive it (adversarial Б3). Only the root's
+ * own directories, by their name: what is under a directory of another name — copies brought from production — is not
+ * this database's. The root is this database's alone: a working copy's other database would judge copies it never
+ * wrote (round 4, В1б), so the make target gives each copy a root of its own.
  */
-async function sweep(root: string | undefined, kept: readonly string[]): Promise<number> {
+async function sweep(
+  root: string | undefined,
+  kept: readonly string[],
+  dryRun: boolean,
+): Promise<readonly string[]> {
   const at = root ?? tmpdir()
   const starts = new Set(kept.map((one) => one.slice(0, 8)))
   let entries: string[]
   try {
     entries = await readdir(at)
   } catch {
-    return 0
+    return []
   }
-  let swept = 0
-  for (const entry of entries) {
+  const swept: string[] = []
+  for (const entry of entries.sort()) {
     const start = /^receipt-miss-([\da-f]{8})$/.exec(entry)?.[1]
     if (start === undefined || starts.has(start)) continue
-    await rm(join(at, entry), { recursive: true, force: true })
-    swept += 1
+    if (!dryRun) await rm(join(at, entry), { recursive: true, force: true })
+    swept.push(entry)
   }
   return swept
 }
@@ -147,15 +153,20 @@ export async function receiptMisses(
       }
       const gone = await misses.forget(which, dryRun)
       for (const one of gone) write(`  ${one}`)
-      // the copies `show` wrote under its root go with what they were copied from (adversarial Б2); one written
-      // elsewhere by `--out` is the review's own to delete
-      if (!dryRun) {
-        for (const one of gone)
-          await rm(copyOf(flag('--root'), one), { recursive: true, force: true })
-        // and those of a review gone by itself — its days, its person erased — which no `forget` names
-        // (adversarial Б3)
-        const swept = await sweep(flag('--root'), await misses.keptIds())
-        if (swept > 0) write(`  copies of reviews gone by themselves let go: ${String(swept)}`)
+      // the copies `show` wrote under its root go with what they were copied from (adversarial Б2), and those of a
+      // review gone by itself — its days, its person erased — which no `forget` names (Б3); a dry run names them as
+      // the rows, since it is the one guard of a command that deletes (round 4, В1а). One written elsewhere by
+      // `--out` is the review's own to delete
+      const left = new Set(gone)
+      const kept = (await misses.keptIds()).filter((one) => !dryRun || !left.has(one))
+      const copies = await sweep(flag('--root'), kept, dryRun)
+      for (const one of copies) write(`  copy ${one}`)
+      if (copies.length > 0) {
+        write(
+          dryRun
+            ? `copies: ${String(copies.length)} would be deleted.`
+            : `copies deleted: ${String(copies.length)}.`,
+        )
       }
       write(
         dryRun

@@ -1418,8 +1418,13 @@ describe('a receipt read not whole: its reasons, its review and the developer to
           keepUntil: sql`clock_timestamp() - interval '1 day'`,
         })
         await repository.purgeStale()
+        // the dry run names what --yes deletes besides the rows, and deletes nothing (round 4, В1а)
+        const dry = await run(['forget', '--read-before', '2026-01-01', '--root', root])
+        expect(dry.lines).toContain(`  copy receipt-miss-${id.slice(0, 8)}`)
+        expect(dry.lines).toContain('copies: 1 would be deleted.')
+        expect(await readFile(join(copy, 'reading.json'), 'utf8')).toBeTruthy()
         const done = await run(['forget', '--read-before', '2026-01-01', '--root', root, '--yes'])
-        expect(done.lines).toContain('  copies of reviews gone by themselves let go: 1')
+        expect(done.lines).toContain('copies deleted: 1.')
         await expect(readFile(join(copy, 'reading.json'))).rejects.toThrow()
         expect(await readFile(join(brought, 'reading.json'), 'utf8')).toBe('{}')
       } finally {
@@ -1441,9 +1446,9 @@ describe('a receipt read not whole: its reasons, its review and the developer to
         expect((await readFile(join(copy, 'part-1.jpg'))).subarray(0, 2)).toEqual(
           Buffer.from([0xff, 0xd8]),
         )
-        expect((await run(['forget', id.slice(0, 8), '--root', root])).lines.at(-1)).toMatch(
-          /dry run: 1/,
-        )
+        const dry = await run(['forget', id.slice(0, 8), '--root', root])
+        expect(dry.lines.at(-1)).toMatch(/dry run: 1/)
+        expect(dry.lines).toContain(`  copy receipt-miss-${id.slice(0, 8)}`)
         expect(await db.select().from(receiptMisses)).toHaveLength(1)
         const done = await run(['forget', id.slice(0, 8), '--root', root, '--yes'])
         expect(done.lines.at(-1)).toBe('let go: 1.')
