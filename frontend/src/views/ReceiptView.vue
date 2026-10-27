@@ -177,9 +177,10 @@
             class="add-line"
             :icon="IconPlus"
             :title="t('receipt.added.add')"
-            :inactive="locked"
+            :meta="addedFull ? t('receipt.added.full', { max: RECEIPT_ADDED_MAX }) : ''"
+            :inactive="locked || addedFull"
             next
-            @click="!locked && openAdded(null)"
+            @click="!locked && !addedFull && openAdded(null)"
           />
         </AppCard>
         <ReceiptTotal
@@ -386,6 +387,7 @@ import IconReceiptCheck from '~icons/mdi/receipt-text-check-outline'
 import { ApiError } from '@molvia/client'
 import {
   ERROR,
+  RECEIPT_ADDED_MAX,
   formatMoney,
   linesTotalOf,
   parseMoney,
@@ -514,6 +516,8 @@ export default defineComponent({
     const canRetake = computed(() => country.value !== null && !byLink.value)
     /** The lines typed on the review (MOL-273): a receipt with no items takes purchases too. */
     const added = computed(() => drafts.addedOf(id.value))
+    // the server takes at most so many: one past it would refuse the whole «Записать» (self-review №4)
+    const addedFull = computed(() => added.value.length >= RECEIPT_ADDED_MAX)
     const noItems = computed(() =>
       detail.value
         ? added.value.length === 0 &&
@@ -1007,6 +1011,8 @@ export default defineComponent({
       openings,
       openLine,
       addedMounted,
+      addedFull,
+      RECEIPT_ADDED_MAX,
       addedOpen,
       openedAdded,
       openAdded,

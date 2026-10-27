@@ -127,30 +127,17 @@ import IconChevronRight from '~icons/mdi/chevron-right'
 import IconMagnify from '~icons/mdi/magnify'
 import {
   ERROR,
-  INVISIBLE,
   currencySign,
-  decimalFromMilli,
   drawsNothing,
   formatMoney,
   formatQuantity,
-  formatUnitPrice,
   lineProduct,
   newItemSchema,
-  parseMoney,
-  parseQuantity,
   pastedLine,
   priceInDoubt,
   receiptLineName,
-  unitPrice,
 } from '@molvia/model'
-import type {
-  BaseUnit,
-  Currency,
-  Money,
-  Quantity,
-  ReceiptCountry,
-  SettingsGeography,
-} from '@molvia/model'
+import type { BaseUnit, Currency, ReceiptCountry, SettingsGeography } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -158,15 +145,13 @@ import ItemPickSheet from '@/components/ItemPickSheet.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { formatRating, unitPriceText } from '@/components/adviceRow'
-import { receiptText } from '@/components/receipt'
 import { useCheaperHint } from '@/composables/useCheaperHint'
-import { shown } from '@/composables/useItemDetails'
+import { useLineFigures } from '@/composables/useLineFigures'
 import { calendarDay } from '@/days'
 import type { ReviewLine } from '@/receipts/review'
 import type { LineDraft, LineFigures } from '@/stores/receiptDrafts'
 
 const UNITS: readonly BaseUnit[] = ['kg', 'l', 'piece']
-const INVISIBLE_CHARACTERS = new RegExp(`[${INVISIBLE}]`, 'gu')
 /** As an item's own schema bounds its name. */
 const NAME_MAX = 200
 
@@ -211,79 +196,32 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const { t, locale } = useI18n()
-    const separator = locale.value === 'ru' ? ',' : '.'
     const start = props.line
     const item = ref<{ id: string | null; name: string }>({ id: start.itemId, name: start.name })
     const name = ref(start.itemId ? '' : start.name)
-    const quantity = ref(start.quantity ? shown(decimalFromMilli(start.quantity), separator) : '')
-    const unit = ref<BaseUnit>(start.quantity?.unit ?? 'piece')
-    const amount = ref(start.amount ? receiptText(start.amount, locale.value) : '')
+    const {
+      quantity,
+      unit,
+      amount,
+      quantityBad,
+      amountBad,
+      typedQuantity,
+      typedAmount,
+      parsedQuantity,
+      price,
+      perUnit,
+    } = useLineFigures(start, () => props.currency)
     const skip = ref(start.skip)
     const picking = ref(false)
-    const quantityBad = ref(false)
-    const amountBad = ref(false)
     const nameBad = ref(false)
     /** «проверьте» holds until the person settles the item one way or another. */
     const settled = ref(false)
 
     const units = computed(() => UNITS.map((value) => ({ value, label: t(`item.unit_${value}`) })))
 
-    // As the purchase's sheet reads a field (`useItemDetails`): what draws nothing is not input, and
-    // a space stays the domain's group separator (review 22).
-    const visible = (text: string) => text.replace(INVISIBLE_CHARACTERS, '').trim()
-    function typedQuantity(): Quantity | null | 'bad' {
-      const text = visible(quantity.value)
-      if (!text) return null
-      try {
-        return parseQuantity(text, unit.value)
-      } catch {
-        return 'bad'
-      }
-    }
-    function typedAmount(): Money | null | 'bad' {
-      const text = visible(amount.value)
-      if (!text) return null
-      try {
-        return parseMoney(text, props.currency)
-      } catch {
-        return 'bad'
-      }
-    }
-    watch(quantity, () => {
-      quantityBad.value = false
-    })
-    watch(amount, () => {
-      amountBad.value = false
-    })
     watch(name, () => {
       nameBad.value = false
     })
-    const parsedQuantity = computed(() => {
-      const value = typedQuantity()
-      return value === 'bad' ? null : value
-    })
-    const parsedAmount = computed(() => {
-      const value = typedAmount()
-      return value === 'bad' ? null : value
-    })
-    const price = computed(() => {
-      const money = parsedAmount.value
-      const many = parsedQuantity.value
-      if (!money || !many || many.milli <= 0n) return null
-      try {
-        return unitPrice(money, many)
-      } catch {
-        return null
-      }
-    })
-    const perUnit = computed(() =>
-      price.value
-        ? t('item.unit_price_value', {
-            amount: formatUnitPrice(price.value, locale.value),
-            unit: t(`item.unit_${price.value.unit}`),
-          })
-        : null,
-    )
 
     // «Тут дешевле» (MOL-92) asks about the item the line found, at the receipt's place and city.
     const hintItem = start.itemId

@@ -5,7 +5,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import { RouterView, createRouter, createWebHistory } from 'vue-router'
 import { ApiError } from '@molvia/client'
-import { ERROR, parseMoney, parseQuantity } from '@molvia/model'
+import { ERROR, RECEIPT_ADDED_MAX, parseMoney, parseQuantity } from '@molvia/model'
 import type {
   Currency,
   MoneyAccountView,
@@ -250,6 +250,60 @@ describe('ReceiptView (MOL-127)', () => {
       expect(useReceiptDraftsStore().addedOf(ID)).toEqual([])
       // a new line has nothing to take away
       expect(inSheet(ru.receipt.added.remove)).toBeUndefined()
+    })
+
+    // self-review №2: a receipt with no items takes purchases by a typed line, and becomes a receipt with lines
+    it('a receipt with no items and a typed line records the line, with no total required', async () => {
+      const one = detail()
+      receipt.mockResolvedValue({
+        ...one,
+        receipt: { ...one.receipt, lineCount: 0, total: null },
+        lines: [],
+      })
+      typed('100')
+      const { view } = await render()
+      expect(view.find('.no-items').exists()).toBe(false)
+      const record = button(view, 'Записать 1 покупку')
+      expect(record.attributes('aria-disabled')).not.toBe('true')
+      await record.trigger('click')
+      await flushPromises()
+      const body = recordReceipt.mock.calls[0]?.[1]
+      expect([body?.lines, body?.added?.length, body?.total]).toEqual([[], 1, undefined])
+    })
+
+    it('«Добавить строку» is not now while «Записать» waits: no sheet', async () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const first = await render()
+      await button(first.view, 'Записать 2 покупки').trigger('click')
+      await flushPromises()
+      while (mounted.length) mounted.pop()?.unmount()
+      const { view } = await render()
+      const add = button(view, ru.receipt.added.add)
+      expect(add.attributes('aria-disabled')).toBe('true')
+      await add.trigger('click')
+      await flushPromises()
+      expect(sheet()).toBeNull()
+    })
+
+    // self-review №4: one past the server's limit would refuse the whole «Записать»
+    it('«Добавить строку» is not now at the limit, and says why', async () => {
+      localStorage.setItem(
+        `molvia.receipt-added.${ME}`,
+        JSON.stringify({
+          [ID]: Array.from({ length: RECEIPT_ADDED_MAX }, (_, n) => ({
+            key: `eeeeeeee-0000-4000-8000-${String(n).padStart(12, '0')}`,
+            item: { name: `Строка ${String(n)}` },
+            figures: { quantity: null, amount: null },
+          })),
+        }),
+      )
+      const { view } = await render()
+      const add = button(view, ru.receipt.added.add)
+      expect(add.attributes('aria-disabled')).toBe('true')
+      expect(add.text()).toContain(`Больше ${String(RECEIPT_ADDED_MAX)} строк не дописать`)
+      await add.trigger('click')
+      await flushPromises()
+      expect(sheet()).toBeNull()
     })
 
     it('a typed line opens its own sheet, and «Убрать строку» takes it away', async () => {

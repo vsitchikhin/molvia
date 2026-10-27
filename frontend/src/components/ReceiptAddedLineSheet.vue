@@ -57,7 +57,7 @@
     </div>
 
     <template #footer>
-      <AppButton size="large" block @click="save">{{ t('receipt.place.done') }}</AppButton>
+      <AppButton size="large" block @click="save">{{ t('receipt.added.done') }}</AppButton>
       <AppButton v-if="line" variant="ghost" block @click="remove">{{
         t('receipt.added.remove')
       }}</AppButton>
@@ -68,33 +68,22 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, watch } from 'vue'
+import { computed, defineComponent, ref } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconChevronRight from '~icons/mdi/chevron-right'
-import {
-  ERROR,
-  INVISIBLE,
-  currencySign,
-  decimalFromMilli,
-  formatUnitPrice,
-  parseMoney,
-  parseQuantity,
-  unitPrice,
-} from '@molvia/model'
-import type { BaseUnit, Currency, Money, Quantity } from '@molvia/model'
+import { ERROR, currencySign } from '@molvia/model'
+import type { BaseUnit, Currency } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import ItemPickSheet from '@/components/ItemPickSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
-import { receiptText } from '@/components/receipt'
-import { shown } from '@/composables/useItemDetails'
+import { useLineFigures } from '@/composables/useLineFigures'
 import { newId } from '@/ids'
 import type { AddedLineDraft } from '@/stores/receiptDrafts'
 
 const UNITS: readonly BaseUnit[] = ['kg', 'l', 'piece']
-const INVISIBLE_CHARACTERS = new RegExp(`[${INVISIBLE}]`, 'gu')
 
 /**
  * «Новая строка» (MOL-273): a line the reader lost, typed on the review from the paper — the item, how
@@ -126,60 +115,12 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const { t, locale } = useI18n()
-    const separator = locale.value === 'ru' ? ',' : '.'
     const start = props.line
     const item = ref<AddedLineDraft['item'] | null>(start?.item ?? null)
-    const startQuantity = start?.figures.quantity ?? null
-    const quantity = ref(startQuantity ? shown(decimalFromMilli(startQuantity), separator) : '')
-    const unit = ref<BaseUnit>(startQuantity?.unit ?? 'piece')
-    const startAmount = start?.figures.amount ?? null
-    const amount = ref(startAmount ? receiptText(startAmount, locale.value) : '')
+    const { quantity, unit, amount, quantityBad, amountBad, typedQuantity, typedAmount, perUnit } =
+      useLineFigures(start?.figures ?? { quantity: null, amount: null }, () => props.currency)
     const picking = ref(false)
-    const quantityBad = ref(false)
-    const amountBad = ref(false)
     const itemMissing = ref(false)
-
-    // As the line's own sheet reads a field: what draws nothing is not input (review 22 of MOL-127).
-    const visible = (text: string) => text.replace(INVISIBLE_CHARACTERS, '').trim()
-    function typedQuantity(): Quantity | null | 'bad' {
-      const text = visible(quantity.value)
-      if (!text) return null
-      try {
-        return parseQuantity(text, unit.value)
-      } catch {
-        return 'bad'
-      }
-    }
-    function typedAmount(): Money | null | 'bad' {
-      const text = visible(amount.value)
-      if (!text) return null
-      try {
-        return parseMoney(text, props.currency)
-      } catch {
-        return 'bad'
-      }
-    }
-    watch(quantity, () => {
-      quantityBad.value = false
-    })
-    watch(amount, () => {
-      amountBad.value = false
-    })
-    const perUnit = computed(() => {
-      const money = typedAmount()
-      const many = typedQuantity()
-      if (money === null || money === 'bad' || many === null || many === 'bad') return null
-      if (many.milli <= 0n) return null
-      try {
-        const price = unitPrice(money, many)
-        return t('item.unit_price_value', {
-          amount: formatUnitPrice(price, locale.value),
-          unit: t(`item.unit_${price.unit}`),
-        })
-      } catch {
-        return null
-      }
-    })
 
     return {
       t,

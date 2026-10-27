@@ -2366,7 +2366,9 @@
       "meta": "It is not among the lines read — type it from the paper",
       "item_missing": "Pick an item — a line cannot be recorded without one",
       "figures_note": "May be left empty: only the item is required",
-      "remove": "Remove the line"
+      "remove": "Remove the line",
+      "done": "Done",
+      "full": "No more than {max} lines can be added"
     },
     "line": {
       "title": "Receipt line",
