@@ -37,14 +37,9 @@ interface FinishedTrip extends Omit<SelectedTrip, 'load'> {
   receiptOpen: Ref<boolean>
   receiptWaiting: ComputedRef<{ readonly receipt: Money | null } | null>
   receiptCurrent: ComputedRef<Money | null>
-  offerReceipt: ComputedRef<boolean>
+  receiptAction: ComputedRef<string | null>
   /** What a new sum starts in: the record's currency, as the purchase sheet takes it. */
   receiptCurrency: ComputedRef<Currency>
-  /**
-   * Whether the trip shown is the server's answer, which knows its receipt's sum — not one read back
-   * from the phone's shelf, here or by another window (MOL-78, reviews 4 and Е).
-   */
-  receiptKnown: ComputedRef<boolean>
   opened: Ref<OpenedPurchase | null>
   pending: ComputedRef<boolean>
   rejected: ComputedRef<boolean>
@@ -79,13 +74,16 @@ export function useFinishedTrip(): FinishedTrip {
     typeof route.params.tripId === 'string' ? route.params.tripId : null,
   )
   const { rows, waiting } = useTripRows(selected.id, selected.trip, () => t('trip.queued.unnamed'))
-  const { receiptOpen, receiptWaiting, receiptCurrent, offerReceipt } = useTripReceipt(
+  const actor = useActorStore()
+  const history = useTripHistoryStore()
+  // Whether the trip shown is the server's answer, which knows its receipt's sum — not one read back
+  // from the phone's shelf, here or by another window (MOL-78, reviews 4 and Е).
+  const { receiptOpen, receiptWaiting, receiptCurrent, receiptAction } = useTripReceipt(
     selected.id,
     selected.trip,
     rows,
+    () => history.answered(selected.trip.value),
   )
-  const actor = useActorStore()
-  const history = useTripHistoryStore()
   const receiptCurrency = computed<Currency>(
     () =>
       selected.trip.value?.currency ??
@@ -216,9 +214,8 @@ export function useFinishedTrip(): FinishedTrip {
     receiptOpen,
     receiptWaiting,
     receiptCurrent,
-    offerReceipt,
+    receiptAction,
     receiptCurrency,
-    receiptKnown: computed(() => history.answered(selected.trip.value)),
     opened,
     amend,
     pending,

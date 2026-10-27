@@ -387,8 +387,7 @@ The detail behind the frontend lines of `CLAUDE.md`.
   сохранилось ли» on top in the middle of «Ваши данные» (round 2, Б1, Б2). `kit-rows` holds a first, a middle
   and a last row, `advice.spec` the newcomer's row, `devices.spec` and `settings.spec` the two that are not
   rows. **The price, named** (self-review 7): a row built in place, not of the kit — «Написать разработчику»,
-  «Бот», «Устройства» and «Выйти» of «Настройки», «Сканировать штрихкод» of a record, `TripRow` —
-  keeps its ring cut at the card's edge, as on master, until its screen comes to the kit; the
+  «Бот», «Устройства» and «Выйти» of «Настройки» — keeps its ring cut at the card's edge, as on master, until its screen comes to the kit; the
   selector is not widened for them.
   **The icon of a status may take its ink** (`tone`, MOL-204, Ф-4): `warn-ink` for a receipt not accepted
   or not read, `good-ink` for one recorded — every other icon of a row is `text-muted`, since the accent
@@ -772,8 +771,14 @@ The detail behind the frontend lines of `CLAUDE.md`.
   line as the answer comes — taller, which MOL-138's hold allows. **And a month with no rate between
   the two currencies** — a new pair, a closed month with none frozen — has no «≈» (`spentApprox`)
   while the bars, which cannot know it before the answer, drew one: the page shrinks by that line
-  under the switcher, as for the empty month above (adversarial А4 of MOL-184). The total of 77 v2 2a (`TripTotal`) is no card until
-  MOL-206 makes it one, and the sums of an account and «Обмен» still stand at the body's
+  under the switcher, as for the empty month above (adversarial А4 of MOL-184). **The total of the record
+  typed by hand is a card of the part's shape** (`TripTotalCard`, MOL-206, 77 v2 2a): its caption, the figure
+  at `--leading-tight` and the line of its parts at `--leading-snug`, the part's own, so it is as tall as its
+  bars — `e2e/kit-rows` holds the pair at 390 and 320. **The price, named:** a line that wraps — «С ценой —
+  1 из 2» beside «≈» and the rate at 320, a caveat, a receipt's split — grows the card under the list, below
+  nothing that chooses; and so does a line the part has not got: money paid in another currency, on a line
+  of its own under the figure (adversarial А4), and the exact sum under the flipped estimate — the flip is the
+  phone's, so whoever turned it gets an answer a line taller than its bars at every opening (review 3, №4). The sums of an account and «Обмен» still stand at the body's
   leading, some 8 px taller than the part — their tasks set the part against their answer. **«Счета» stand
   at the part's leading** (MOL-193): the figure and the line under it as «Деньги», so the tiles start within
   4 px of where the plate stood; two lines each in two currencies, the card comes 30 px taller than the part at

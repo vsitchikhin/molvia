@@ -22,8 +22,13 @@
   "trip": {
     "title": "Entry",
     "add_item": "Add an item",
-    "add_price": "Add a price",
+    "add_short": "Item",
+    "add_lead": "Add an",
+    "scan_short": "Barcode",
+    "scan_lead": "Scan",
+    "unpriced": "no price",
     "total": "Total",
+    "total_line": "Priced — {priced} of {total} · unpriced — {unpriced}",
     "receipt": {
       "total": "Total by receipt",
       "add": "+ Receipt total",
@@ -53,6 +58,7 @@
     "finish_confirm": {
       "title": "Finish this entry?",
       "body": "The items stay recorded. Anything forgotten can be added later",
+      "body_receipt": "The receipt total {amount} stays in “Money”. Items can be added later",
       "ok": "Finish",
       "cancel": "Cancel"
     },
@@ -60,7 +66,8 @@
       "action": "Delete the entry",
       "sheet": {
         "title": "Delete this entry?",
-        "body": "The purchases and prices go, from “Money” and the accounts too. The ratings stay"
+        "body": "The purchases and prices go, from “Money” and the accounts too. The ratings stay",
+        "body_receipt": "The receipt total {amount} goes from “Money” and the accounts"
       },
       "empty": {
         "title": "Nothing in this entry",
@@ -79,16 +86,15 @@
     },
     "empty": {
       "title": "The entry has started",
-      "body": "Add the first item — the rest can be filled in later",
-      "action": "Find an item"
+      "body": "Add the first item — the rest can be filled in later"
     },
     "error": {
       "title": "The server did not answer",
-      "body": "Your items are still on the phone, nothing is lost"
+      "body": "Your items are still on the phone, nothing is lost",
+      "strip": "The server did not answer · your items are still on the phone"
     },
     "offline": {
-      "title": "No connection — no matter",
-      "body": "The items are saved on the phone and will be sent on their own. The entry goes on"
+      "strip": "Offline · items are kept on the phone and will be sent on their own"
     },
     "none": {
       "action": "Start the entry"

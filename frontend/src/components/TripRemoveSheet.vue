@@ -10,7 +10,15 @@
          there was a second `.meta` beside the screen's own. -->
     <template v-if="items > 0" #meta>{{ meta }}</template>
 
-    <p class="words">{{ t('trip.remove.sheet.body') }}</p>
+    <!-- A record whose only money is a receipt's sum names that sum: «покупки и цены» it has not got
+         (MOL-206, adversarial В1). -->
+    <p class="words">
+      {{
+        items === 0 && receipt
+          ? t('trip.remove.sheet.body_receipt', { amount: receipt })
+          : t('trip.remove.sheet.body')
+      }}
+    </p>
 
     <template #footer>
       <AppButton variant="danger-ghost" block @click="confirm">
@@ -45,6 +53,8 @@ export default defineComponent({
      */
     day: { type: Date as PropType<Date | null>, default: null },
     items: { type: Number, required: true },
+    /** The receipt's sum as printed, said where there are no purchases to name (MOL-206). */
+    receipt: { type: String as PropType<string | null>, default: null },
     onClosed: { type: Function as PropType<() => void>, default: undefined },
     /**
      * How many layers «Удалить» puts away: two on a finished trip's own screen — the sheet and the

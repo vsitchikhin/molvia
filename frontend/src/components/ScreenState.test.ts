@@ -162,11 +162,11 @@ describe('ScreenState', () => {
     const view = render({
       kind: 'offline',
       tone: 'good',
-      title: ru.trip.offline.title,
-      body: ru.trip.offline.body,
+      title: ru.spending.offline.title,
+      body: ru.spending.offline.body,
     })
-    expect(view.get('.title').text()).toBe(ru.trip.offline.title)
-    expect(view.get('.body').text()).toBe(ru.trip.offline.body)
+    expect(view.get('.title').text()).toBe(ru.spending.offline.title)
+    expect(view.get('.body').text()).toBe(ru.spending.offline.body)
   })
 
   // «Stale since yesterday» on the advice scaffold has a title only: its text names data

@@ -1,29 +1,27 @@
 <template>
-  <component
-    :is="open ? 'button' : 'div'"
+  <ListRow
     class="row"
     :class="{ waiting: row.mark !== null, gone: row.mark === 'removing' }"
-    :type="open ? 'button' : undefined"
-    @click="open && $emit('open', row)"
+    wrap
+    next
+    :inactive="!open"
+    @click="$emit('open', row)"
   >
-    <span class="what">
-      <span class="name">
-        {{ row.name }}
-        <span v-if="row.mark" class="mark">{{ t(`trip.queued.${row.mark}`) }}</span>
-      </span>
-      <span v-if="quantity" class="quantity">{{ quantity }}</span>
+    <template #title
+      ><span class="name">{{ row.name }}</span></template
+    >
+    <template v-if="meta" #meta
+      ><span class="quantity">{{ meta }}</span></template
+    >
+    <template v-if="row.mark || row.expense?.printed" #below>
+      <AppTag v-if="row.mark" tone="warn">{{ t(`trip.queued.${row.mark}`) }}</AppTag>
       <!-- A purchase from a receipt: the line as the till printed it, grey under it (MOL-127, 5o). -->
       <span v-if="row.expense?.printed" class="printed">{{ row.expense.printed }}</span>
-    </span>
-
-    <span class="price">
-      <template v-if="amount">
-        <span class="amount">{{ amount }}</span>
-        <span v-if="perUnit" class="per-unit">{{ perUnit }}</span>
-      </template>
-      <span v-else class="add-price">{{ t('trip.add_price') }}</span>
-    </span>
-  </component>
+    </template>
+    <template #tail
+      ><span class="amount">{{ amount ?? '—' }}</span></template
+    >
+  </ListRow>
 </template>
 
 <script lang="ts">
@@ -31,6 +29,8 @@ import { computed, defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatMoney, formatQuantity, formatUnitPrice } from '@molvia/model'
+import AppTag from '@/components/AppTag.vue'
+import ListRow from '@/components/ListRow.vue'
 import type { TripRowView } from './tripRow'
 
 /**
@@ -39,12 +39,15 @@ import type { TripRowView } from './tripRow'
  * shelf. The number is the server's for a row it has answered; for one still in the queue the
  * screen computes it with the domain's own `unitPrice`, as the sheet does.
  *
- * A price nobody entered is «Добавить цену» instead — the row is one tap from the same sheet.
- * There is no conversion here on purpose (handoff «Валюты»): eight rows × two numbers, half of
+ * A row of the kit (MOL-206, handoff 7a): the name, then the quantity and the price per unit in the
+ * meta, the amount in the tail and the chevron on every row. A price nobody entered
+ * is «без цены» under the name and «—» in the tail — the chevron says the row is one tap from the
+ * same sheet. There is no conversion here on purpose (handoff «Валюты»): eight rows × two numbers, half of
  * them estimates, is a screen nobody can read.
  */
 export default defineComponent({
   name: 'TripRow',
+  components: { AppTag, ListRow },
   props: {
     row: { type: Object as PropType<TripRowView>, required: true },
   },
@@ -57,7 +60,9 @@ export default defineComponent({
     /**
      * A row opens the sheet when there is a card to open it on — and not while it is being
      * removed: an amendment queued behind the removal would reach a row the server no longer has,
-     * and come back as «не принято» about a purchase the person threw away themselves.
+     * and come back as «не принято» about a purchase the person threw away themselves. Such a row is
+     * the kit's «not now» and keeps its chevron, so the amounts of a card end in one column, as an
+     * operation's do (MOL-176, adversarial А3); its tag says why.
      */
     const open = computed(() => props.row.entry !== null && props.row.mark !== 'removing')
 
@@ -85,36 +90,21 @@ export default defineComponent({
         : null
     })
 
-    return { t, open, quantity, amount, perUnit }
+    /** «0,9 л · 577,78 ֏ за л», or «без цены» beside the quantity of a purchase nobody priced yet. */
+    const meta = computed(() =>
+      [quantity.value, amount.value ? perUnit.value : t('trip.unpriced')]
+        .filter((part) => part !== null)
+        .join(' · '),
+    )
+
+    return { t, open, meta, amount }
   },
 })
 </script>
 
 <style scoped lang="scss">
-.row {
-  display: flex;
-  gap: var(--space-3);
-  align-items: flex-start;
-  width: 100%;
-  min-height: var(--touch-target);
-  margin: 0;
-  padding: var(--space-3) var(--space-4);
-  border: none;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-}
-
-button.row {
-  cursor: pointer;
-}
-
-/* Not the server's last word yet: the queue still holds something about this line. */
+/* Not the server's last word yet: the queue still holds something about this line. Its tag says what;
+   the fill and the bar at the side say it at a glance. */
 .waiting {
   background: var(--surface-2);
   box-shadow: inset 3px 0 0 var(--warn);
@@ -123,74 +113,23 @@ button.row {
 .gone .name,
 .gone .quantity,
 .gone .amount {
-  opacity: 0.5;
   text-decoration: line-through;
 }
 
-.what {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.name {
-  overflow-wrap: anywhere;
-  font-size: var(--text-headline);
-  font-weight: var(--weight-medium);
-}
-
-.mark {
-  display: inline-block;
-  margin-left: var(--space-2);
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-pill);
-  background: var(--warn-tint);
-  color: var(--warn-ink);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-medium);
-  white-space: nowrap;
-  vertical-align: middle;
-}
-
 .quantity,
-.per-unit {
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
+.amount {
+  font-variant-numeric: tabular-nums;
 }
 
 .printed {
   display: block;
   overflow: hidden;
+  margin-top: var(--space-1);
   color: var(--text-muted);
   font-family: var(--font-printed);
   font-size: var(--text-footnote);
   line-height: var(--leading-body);
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-.price {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  align-items: flex-end;
-  white-space: nowrap;
-}
-
-.amount,
-.per-unit {
-  font-variant-numeric: tabular-nums;
-}
-
-.amount {
-  font-size: var(--text-headline);
-  font-weight: var(--weight-medium);
-}
-
-.add-price {
-  color: var(--accent-ink);
-  font-size: var(--text-footnote);
-  font-weight: var(--weight-medium);
 }
 </style>

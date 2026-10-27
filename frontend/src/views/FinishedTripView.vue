@@ -90,8 +90,7 @@
         :pending="waiting"
         :local="trip === null"
         :receipt-waiting="receiptWaiting"
-        :offer-receipt="offerReceipt"
-        :receipt-known="receiptKnown"
+        :receipt-action="receiptAction"
         @receipt="receiptOpen = true"
     /></template>
     <ReceiptSheet
