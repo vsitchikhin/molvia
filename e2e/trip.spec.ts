@@ -103,7 +103,7 @@ async function toPurchases(page: Page): Promise<void> {
 
 async function addItem(page: Page, word: string, price: string): Promise<void> {
   // «+ Item» in the record's strip, the same with rows and without (MOL-206, Ф-22).
-  await page.getByRole('button', { name: 'Add an item', exact: true }).click()
+  await page.getByRole('button', { name: 'Add an Item', exact: true }).click()
   await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(word)
   await page.getByRole('option').first().click()
   await expect(sheet(page)).toContainText(word)
@@ -117,7 +117,7 @@ async function addItem(page: Page, word: string, price: string): Promise<void> {
 
 /** A purchase with no price: the item and how much, the price left for later (or never). */
 async function addUnpriced(page: Page, word: string): Promise<void> {
-  await page.getByRole('button', { name: 'Add an item', exact: true }).click()
+  await page.getByRole('button', { name: 'Add an Item', exact: true }).click()
   await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(word)
   await page.getByRole('option').first().click()
   await expect(sheet(page)).toContainText(word)
@@ -637,18 +637,19 @@ test.describe('the receipt total (MOL-78)', () => {
  * one over the other where they do not — «+ Позиция» under, nearer the thumb (owner's В-1 «в») — and
  * «Закончить» under the pair. Nothing of a button is cut or stands past the strip, in either language,
  * on the narrowest phone and the commonest; with a purchase and its total, the list ends over the strip
- * (review 2, №6). The buttons go by the names a screen reader says, the verb (№3).
+ * (review 2, №6). The buttons go by the names a screen reader says — a hidden lead and the word seen
+ * (review 2, №3; review 3, №3).
  */
 const STRIP_WORDS = {
   'en-US': {
-    scan: 'Scan a barcode',
-    add: 'Add an item',
+    scan: 'Scan Barcode',
+    add: 'Add an Item',
     finish: 'Finish',
     remove: 'Delete the entry',
   },
   'ru-RU': {
-    scan: 'Сканировать штрихкод',
-    add: 'Добавить позицию',
+    scan: 'Сканировать Штрихкод',
+    add: 'Новая Позиция',
     finish: 'Закончить',
     remove: 'Удалить запись',
   },
