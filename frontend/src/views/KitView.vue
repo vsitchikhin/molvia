@@ -513,6 +513,13 @@
         <MoneyMonthCard :month="moneyMonth" current="2026-09" />
         <SkeletonPart kind="figure" approx plate />
       </div>
+      <!-- The total of the record typed by hand and the same part (MOL-206): the card stands as tall as
+           its bars. Every row priced, so the line is one at 320 too; «С ценой — 1 из 2» beside the
+           rate wraps there, the answer's own price. -->
+      <div class="pair" data-part="trip-total">
+        <TripTotalCard :trip="kitTrip" />
+        <SkeletonPart kind="figure" />
+      </div>
       <SkeletonPart kind="figure" plate />
       <SkeletonPart kind="lines" :widths="[64, 78]" />
     </section>
@@ -604,8 +611,14 @@ import {
   formatMoney,
   money,
   COUNTRY_CITIES,
+  tripViewCodec,
 } from '@molvia/model'
-import type { AccountOperationView, MoneyMonthView, SpendingCategoryView } from '@molvia/model'
+import type {
+  AccountOperationView,
+  MoneyMonthView,
+  SpendingCategoryView,
+  TripView,
+} from '@molvia/model'
 import IconAlert from '~icons/mdi/alert-outline'
 import IconBarcode from '~icons/mdi/barcode-scan'
 import IconCart from '~icons/mdi/cart-outline'
@@ -645,6 +658,7 @@ import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
+import TripTotalCard from '@/components/TripTotalCard.vue'
 import { operationRowProps, shortDay } from '@/components/accounts'
 import { journalRowProps } from '@/components/spending'
 import type { JournalRow } from '@/components/spending'
@@ -680,6 +694,7 @@ export default defineComponent({
     IconShape,
     ListRow,
     MoneyMonthCard,
+    TripTotalCard,
     MonthSwitcher,
     NavRow,
     OperationRow,
@@ -706,6 +721,46 @@ export default defineComponent({
       }),
     )
     const [groceries, cafe, transport] = categories
+    // A record of handoff 7a as the server answers it, every row priced (MOL-206).
+    const kitTrip: TripView = tripViewCodec.parse({
+      id: '00000000-0000-4000-8000-000000000301',
+      startedAt: '2026-10-27T14:40:00.000Z',
+      finishedAt: null,
+      currency: 'AMD',
+      rate: {
+        base: 'RUB',
+        quote: 'AMD',
+        rate: '4.24',
+        source: 'official',
+        asOf: '2026-10-27T12:00:00.000Z',
+      },
+      rateProvider: 'cba',
+      rateJump: null,
+      rateStale: false,
+      place: { id: '00000000-0000-4000-8000-000000000302', kind: 'store', name: 'Рынок' },
+      expenses: [
+        {
+          id: '00000000-0000-4000-8000-000000000303',
+          createdAt: '2026-10-27T14:45:00.000Z',
+          item: {
+            id: '00000000-0000-4000-8000-000000000304',
+            kind: 'product',
+            name: 'Помидоры',
+            note: null,
+            defaultUnit: 'kg',
+            typicalQuantity: null,
+          },
+          quantity: null,
+          amount: { amount: '1000', currency: 'AMD' },
+          unitPrice: null,
+        },
+      ],
+      total: [{ amount: '1000', currency: 'AMD' }],
+      converted: { amount: '236', currency: 'RUB' },
+      receipt: null,
+      prices: [],
+      gap: null,
+    })
     // August of handoff MOL-157 v2 1b, as the server answers it: the card of a closed month.
     const moneyMonth: MoneyMonthView = {
       month: '2026-08',
@@ -987,6 +1042,7 @@ export default defineComponent({
       },
       units,
       moneyMonth,
+      kitTrip,
       chartMonth,
       chartSector,
       paceDays,

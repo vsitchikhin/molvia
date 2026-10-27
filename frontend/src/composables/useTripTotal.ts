@@ -31,10 +31,10 @@ export interface TripTotalInput {
   readonly local: boolean
   /** «Сумма по чеку» still in the queue: the sum typed, or `receipt: null` for one taken off. */
   readonly receiptWaiting: { readonly receipt: Money | null } | null
-  /** Whether «+ Сумма по чеку» is offered: a record with purchases (В-1). */
-  readonly offerReceipt: boolean
-  /** Whether the trip is the server's answer, which knows the receipt (review 4). */
-  readonly receiptKnown: boolean
+  /** Whether «+ Сумма по чеку» is offered: a record with purchases (В-1). Left out, not offered. */
+  readonly offerReceipt?: boolean
+  /** Whether the trip is the server's answer, which knows the receipt (review 4). Left out, it is. */
+  readonly receiptKnown?: boolean
 }
 
 /** One line of what the prices say beside the receipt's sum. */
@@ -51,6 +51,7 @@ export interface TripTotal {
   readonly estimate: ComputedRef<string | null>
   readonly rateLine: ComputedRef<string | null>
   readonly caveat: ComputedRef<string | null>
+  readonly priced: ComputedRef<string | null>
   readonly flippable: ComputedRef<boolean>
   readonly flipped: Ref<boolean>
   readonly flip: () => void
@@ -180,6 +181,20 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
     return lines.length > 0 ? lines.join(' · ') : null
   })
 
+  /**
+   * «С ценой — 1 из 2 · без цены — 1» (MOL-206, Ф-23): said only while some purchase the server
+   * holds has no price, so the total reads as the part it is; with a receipt's sum the split below
+   * says it instead. Rows of the server's answer, as the total is — never the queue's.
+   */
+  const priced = computed(() => {
+    const trip = props.trip
+    if (!trip || trip.receipt) return null
+    const all = trip.expenses.length
+    const withPrice = trip.expenses.filter((expense) => expense.amount !== null).length
+    if (withPrice === all) return null
+    return t('trip.total_line', { priced: withPrice, total: all, unpriced: all - withPrice })
+  })
+
   // Nothing to swap without a conversion: a lone total is not two numbers.
   const flippable = computed(() => converted.value !== null)
 
@@ -225,7 +240,7 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
   })
 
   const receiptAction = computed(() => {
-    if (!props.receiptKnown) return null
+    if (props.receiptKnown === false) return null
     if (props.trip?.receipt || props.receiptWaiting?.receipt) return t('trip.receipt.edit')
     return props.offerReceipt ? t('trip.receipt.add') : null
   })
@@ -236,6 +251,7 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
     estimate,
     rateLine,
     caveat,
+    priced,
     flippable,
     flipped,
     flip,

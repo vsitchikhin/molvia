@@ -5,6 +5,7 @@ import type { TripView } from '@molvia/model'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import TripTotal from '@/components/TripTotal.vue'
+import TripTotalCard from '@/components/TripTotalCard.vue'
 
 interface Wire {
   readonly amount: string
@@ -274,5 +275,106 @@ describe('TripTotal', () => {
       const off = render({ trip: partial(), receiptWaiting: { receipt: null } })
       expect(off.get('.waiting').text()).toBe(ru.trip.receipt.removing)
     })
+  })
+})
+
+// Итог ручной записи карточкой под списком (MOL-206, В-17 «а»): то же, что говорила полоса, одной
+// строкой частей, и переворот — нажатием на всю карточку.
+describe('TripTotalCard', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+  })
+
+  const amd = (amount: string): Wire => ({ amount, currency: 'AMD' })
+
+  function card(props: Record<string, unknown> = {}) {
+    return mount(TripTotalCard, {
+      props: { trip: trip(), ...props },
+      global: { plugins: [createAppI18n('ru')] },
+    })
+  }
+
+  const parts = (view: ReturnType<typeof card>) => view.findAll('.line .part').map(plain)
+
+  it('сумма крупно, а под ней одной строкой — ≈ в валюте дохода и курс с датой', () => {
+    const view = card()
+    expect(view.get('.caption').text()).toBe(ru.trip.total)
+    expect(plain(view.get('.sum'))).toBe('6 493,12 ֏')
+    expect(parts(view)).toEqual(['≈ 1 347 ₽', 'курс 4,82 ֏/₽ · 15 янв.'])
+  })
+
+  it('«С ценой — n из m · без цены — k» — только когда цена есть не у всех', () => {
+    const some = card({ trip: trip({ total: [amd('1000')], rows: [amd('1000'), null] }) })
+    expect(parts(some)[0]).toBe('С ценой — 1 из 2 · без цены — 1')
+
+    const all = card({ trip: trip({ total: [amd('1000')], rows: [amd('1000')] }) })
+    expect(parts(all).some((part) => part.startsWith('С ценой'))).toBe(false)
+  })
+
+  it('вся карточка — кнопка переворота: «≈» остаётся на пересчёте, точная сумма уходит в строку', async () => {
+    const view = card()
+    const face = view.get('button.face')
+    expect(face.attributes('aria-pressed')).toBe('false')
+    // Скрытое имя действия первым, а не aria-label: цифры и оговорки остаются слышны.
+    expect(face.attributes('aria-label')).toBeUndefined()
+    expect(face.get('.hidden').text()).toBe(ru.trip.flip)
+
+    await face.trigger('click')
+    expect(face.attributes('aria-pressed')).toBe('true')
+    expect(plain(view.get('.sum'))).toBe('≈ 1 347 ₽')
+    expect(view.get('.sum').classes()).toContain('guess')
+    expect(parts(view)).toEqual(['6 493,12 ֏', 'курс 4,82 ֏/₽ · 15 янв.'])
+
+    // Выбор общий с полосой записанных: одна память на телефон.
+    expect(plain(render().get('.sum'))).toBe('≈ 1 347 ₽')
+  })
+
+  it('без курса переворачивать нечего — карточка не кнопка', () => {
+    const view = card({ trip: trip({ rate: null, converted: null }) })
+    expect(view.find('button').exists()).toBe(false)
+    expect(view.text()).not.toContain('≈')
+  })
+
+  it('прочие валюты и оговорки остаются: итог не тише корзины', () => {
+    const view = card({
+      trip: trip({ total: [amd('6493.12'), { amount: '1500', currency: 'RUB' }] }),
+      pending: 2,
+    })
+    expect(parts(view)[0]).toBe('1 500 ₽')
+    expect(view.get('.note').text()).toBe('+ 2 позиции ещё не ушли · пересчёт только по AMD')
+  })
+
+  it('запись ещё не ушла — прочерк и почему', () => {
+    const view = card({ trip: null, local: true })
+    expect(view.get('.sum').text()).toBe('—')
+    expect(view.text()).toContain(ru.trip.caveat.local)
+  })
+
+  it('с суммой чека — «Итого по чеку» и разбивка сервера вместо счёта позиций', () => {
+    const view = card({
+      trip: trip({
+        total: [amd('12400')],
+        receipt: amd('12400'),
+        prices: [amd('8300')],
+        gap: { kind: 'unpriced', amount: amd('4100') },
+        converted: null,
+        rows: [amd('8300'), null],
+      }),
+    })
+    expect(view.get('.caption').text()).toBe(ru.trip.receipt.total)
+    expect(parts(view).some((part) => part.startsWith('С ценой'))).toBe(false)
+    expect(view.findAll('.split-line').map((line) => line.findAll('span').map(plain))).toEqual([
+      ['С ценой — 1 из 2', '8 300 ֏'],
+      ['Без цены — 1', '4 100 ֏'],
+    ])
+  })
+
+  it('в карточке нет «+ Сумма по чеку» — кнопка стоит под ней; сумма в очереди — строкой', () => {
+    const view = card({ receiptWaiting: { receipt: { minor: 1_240_000n, currency: 'AMD' } } })
+    expect(view.findAll('button')).toHaveLength(1)
+    expect(view.text()).not.toContain(ru.trip.receipt.add)
+    expect(plain(view.get('.sum'))).toBe('6 493,12 ֏')
+    expect(view.text().replaceAll('\u00a0', ' ')).toContain('Сумма по чеку 12 400 ֏ · отправляется')
   })
 })

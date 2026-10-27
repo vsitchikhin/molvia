@@ -24,6 +24,7 @@
     "add_item": "Add an item",
     "add_price": "Add a price",
     "total": "Total",
+    "total_line": "Priced — {priced} of {total} · unpriced — {unpriced}",
     "receipt": {
       "total": "Total by receipt",
       "add": "+ Receipt total",

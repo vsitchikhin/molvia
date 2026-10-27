@@ -431,3 +431,32 @@ for (const width of [390, 320])
     })
     expect(tops.bars).toBeCloseTo(tops.answer, 0)
   })
+
+// The total of the record typed by hand and the `figure` part (MOL-206, the debt of MOL-178): while the
+// total was a strip nothing held its height. A card now, the caption's line, the figure at
+// `--leading-tight` and the line of its parts stand where the part's bars stand, and the card is as tall
+// as the part, at both widths — a line wrapped at 320 is the answer's own price, not the kit's.
+for (const width of [390, 320])
+  test(`at ${String(width)} the record's total is as tall as its skeleton`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 720 })
+    await open(page, '/_kit')
+    const pair = page.locator('[data-part="trip-total"]')
+    await expect(pair.locator('.total .sum')).toBeVisible()
+    const sizes = await pair.evaluate((root) => {
+      const box = (selector: string) => {
+        const found = root.querySelector(selector)
+        if (!found) throw new Error(`no ${selector}`)
+        return found.getBoundingClientRect()
+      }
+      const answer = box('.total')
+      const bars = box('.sum-card')
+      return {
+        answer: answer.height,
+        bars: bars.height,
+        sumAnswer: box('.total .sum').top - answer.top,
+        sumBars: box('.sum-card .figure-line').top - bars.top,
+      }
+    })
+    expect(sizes.sumBars).toBeCloseTo(sizes.sumAnswer, 0)
+    expect(sizes.bars).toBeCloseTo(sizes.answer, 0)
+  })

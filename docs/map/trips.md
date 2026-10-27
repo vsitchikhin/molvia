@@ -73,6 +73,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 - `frontend/src/components/TripRemoveSheet.vue` — Sheet «Удалить запись?»: names the shop, the day and how many rows go.
 - `frontend/src/components/TripRow.vue` — One purchase line of a trip: item, quantity, price and price per unit, with its queue mark.
 - `frontend/src/components/TripTotal.vue` — «ИТОГО» of a finished record as a strip in `#docked`, what `useTripTotal` says; goes with MOL-207.
+- `frontend/src/components/TripTotalCard.vue` — The total of the record typed by hand as a card under its list (MOL-206, В-17 «а»): what `useTripTotal` says, one line of parts, the whole card the flip.
 - `frontend/src/components/TripUndoStrip.vue` — Strip «Запись удалена · Вернуть» on every screen a removed trip lands on, ten seconds from the removal.
 - `frontend/src/components/tripRow.ts` — Type of one trip line (`TripRowView`, `RowMark`) built by the screen and drawn by `TripRow`.
 
