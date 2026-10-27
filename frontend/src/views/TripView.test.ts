@@ -4,7 +4,14 @@ import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import { RouterView, createMemoryHistory, createRouter, createWebHistory } from 'vue-router'
 import { ApiError } from '@molvia/client'
-import { ERROR, ISSUE, parseMoney, parseQuantity, tripViewCodec } from '@molvia/model'
+import {
+  ERROR,
+  ISSUE,
+  moneyAccountsCodec,
+  parseMoney,
+  parseQuantity,
+  tripViewCodec,
+} from '@molvia/model'
 import type {
   CatalogueEntry,
   Currency,
@@ -1258,6 +1265,63 @@ describe('TripView', () => {
       await flushPromises()
       expect(first.queue.pending.map((write) => write.kind)).toEqual(['payment', 'finish'])
       expect(first.queue.pending[0]).toMatchObject({ body: { accountId: null } })
+    })
+
+    it('счёт, ждущий в очереди, — то, на чём открывается «Закончить», и его не вытесняет (Р2-2, А7)', async () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      currentTrip.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+      const { view, queue } = await render({ memory: trip(handoff()) })
+      // «Не попали» без связи: «Карта ₽» и «Списано» ждут в очереди
+      queue.enqueue({
+        kind: 'payment',
+        tripId: TRIP,
+        body: { accountId: roubles.id, debited: parseMoney('1100', 'RUB') },
+      })
+      await askFinish(view)
+      expect(row()?.textContent).toContain('Карта ₽')
+      inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      expect(queue.pending.filter((write) => write.kind === 'payment')).toEqual([
+        expect.objectContaining({
+          body: { accountId: roubles.id, debited: parseMoney('1100', 'RUB') },
+        }),
+      ])
+      expect(queue.pending.at(-1)?.kind).toBe('finish')
+      expect(memory()).toBeNull()
+    })
+
+    it('«не должно сработать»: поля «Списано» нет — тот же счёт ничего не шлёт (Р2-1, А8)', async () => {
+      // the record's own currency, «Списано» for a purchase in a third one: the field is not shown
+      currentTrip.mockResolvedValue({
+        ...trip(handoff()),
+        accountId: card.id,
+        debited: parseMoney('41000', 'AMD'),
+      })
+      const first = await render()
+      await askFinish(first.view)
+      expect(row()?.textContent).toContain('Карта ֏')
+      inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      expect(first.queue.pending.map((write) => write.kind)).toEqual(['finish'])
+    })
+
+    it('«не должно сработать»: счёта записи телефон не знает — «Закончить» его не трогает (А8)', async () => {
+      // an account this phone does not know — made on another phone, «Счета» not answering at the shelf
+      localStorage.setItem(
+        `molvia.accounts.${ME}`,
+        JSON.stringify({ overview: moneyAccountsCodec.encode(page([cash, card])) }),
+      )
+      moneyAccounts.mockReturnValue(new Promise(() => undefined))
+      currentTrip.mockResolvedValue({
+        ...trip(handoff()),
+        accountId: roubles.id,
+        debited: parseMoney('1100', 'RUB'),
+      })
+      const second = await render()
+      await askFinish(second.view)
+      inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      expect(second.queue.pending.map((write) => write.kind)).toEqual(['finish'])
     })
 
     it('«Счета» читаются при «Закончить», а не при каждом открытии записи (Р1-2)', async () => {

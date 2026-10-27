@@ -490,8 +490,18 @@ export default defineComponent({
       // the account the record is on already — set in «не попали» before «Закончить» — is where the sheet opens,
       // «Списано» with it: an amendment opens on what it was written with (review Р1-1); a record on none
       // starts on the one the last was finished with (MOL-312, Р-4)
+      // A payment still in the queue is the newest word of the record's account — chosen in «не попали» with no
+      // connection, or not landed yet — and a new one would take its place there (review Р2-2, adversarial А7).
       const own = trip.value
-      heldPayment = own?.accountId ? { accountId: own.accountId, debited: own.debited } : null
+      const waiting = queue.pending.findLast(
+        (write) => write.kind === 'payment' && write.tripId === tripId.value,
+      )
+      heldPayment =
+        waiting?.kind === 'payment'
+          ? { accountId: waiting.body.accountId, debited: waiting.body.debited ?? null }
+          : own?.accountId
+            ? { accountId: own.accountId, debited: own.debited }
+            : null
       byHand.value = heldPayment !== null
       if (heldPayment) accountId.value = heldPayment.accountId
       debited.value = heldPayment?.debited ? typedMoney(heldPayment.debited) : ''
@@ -510,7 +520,7 @@ export default defineComponent({
     const accounts = useAccountsStore()
     const accountId = ref<string | null>(null)
     /** The account and «Списано» the record was on when «Закончить» was asked: sent again, they move nothing. */
-    let heldPayment: { accountId: string; debited: Money | null } | null = null
+    let heldPayment: { accountId: string | null; debited: Money | null } | null = null
     const typedMoney = (value: Money) =>
       shown(decimalFromMinor(value), locale.value === 'ru' ? ',' : '.')
     /** Chosen in the picker: «Счета» answering late no longer move it. */
@@ -545,14 +555,15 @@ export default defineComponent({
      */
     function changedPayment(paid: TripPaymentBody | undefined): TripPaymentBody | undefined {
       const held = heldPayment
-      if (paid === undefined) return held ? { accountId: null } : undefined
-      if (
-        held?.accountId === paid.accountId &&
+      if (paid === undefined) return held?.accountId ? { accountId: null } : undefined
+      if (held?.accountId !== paid.accountId) return paid
+      // the same account with no field of «Списано» on screen — one of the record's currency, a third currency's
+      // purchase it covers, or an account this phone does not know: nothing typed, so nothing changed (Р2-1, А8)
+      if (!charged.value || !account.value) return undefined
+      const same =
         (paid.debited?.minor ?? null) === (held.debited?.minor ?? null) &&
         (paid.debited?.currency ?? null) === (held.debited?.currency ?? null)
-      )
-        return undefined
-      return paid
+      return same ? undefined : paid
     }
     /** The trip's payment: none for «Без счёта», which the record already is. */
     function paymentBody(): TripPaymentBody | 'bad' | undefined {
