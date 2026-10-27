@@ -690,6 +690,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       stopFailureCleanup = startLoginCleanup(
         async () => {
           const now = new Date()
+          // The phones' addresses an hour after their last failure (MOL-241) — first, since a
+          // database that is down would otherwise keep them for as long as it is.
+          failures.forget(now)
           await createFailureRepository(db).purgeStale(now)
           await createOwnerNoticeRepository(db).purgeStale(now)
           // The phone's notices held back, told once the hour has room (MOL-144, review №7).

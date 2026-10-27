@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { FailureCount, FailureOccurrence, FailureRepository } from '@/db/failures-repository'
 import { ERROR } from '@molvia/model'
 import type { OwnerNotice, PhoneFailure } from '@molvia/model'
@@ -499,5 +499,125 @@ describe('phoneRowBudget — новые строки телефона (ревь�
     const rows = phoneRowBudget(30, 10)
     for (let index = 0; index < 30; index += 1) rows.claim(now, `sender${String(index % 3)}`)
     expect(rows.claim(now, 'fresh')).toBe(false)
+  })
+})
+
+describe('forget — адрес телефона уходит из памяти через час после сбоя (MOL-241)', () => {
+  const HOUR = 60 * 60 * 1000
+  const t0 = new Date(Date.UTC(2026, 9, 27, 12, 0))
+  const later = (ms: number) => new Date(t0.getTime() + ms)
+  const notice: OwnerNotice = {
+    kind: 'failure',
+    source: 'phone',
+    errorName: 'E',
+    build: 'index-BTCsHrpw',
+    platform: 'ios 18 app',
+    fingerprint: 'abcdef',
+  }
+
+  /** The Maps a budget keeps inside itself, caught by their `set`, as adversarial А3 of MOL-97 did. */
+  function memory(): { readonly moments: (sender: string) => unknown } {
+    const spy = vi.spyOn(Map.prototype, 'set')
+    return {
+      moments: (sender) =>
+        (spy.mock.contexts as Map<unknown, unknown>[]).find((map) => map.has(sender))?.get(sender),
+    }
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  describe('phoneRowBudget', () => {
+    it('адрес через час и минуту ушёл', () => {
+      const kept = memory()
+      const rows = phoneRowBudget()
+      expect(rows.claim(t0, '203.0.113.7')).toBe(true)
+      rows.forget(later(HOUR + 60_000))
+      expect(kept.moments('203.0.113.7')).toBeUndefined()
+    })
+
+    it('граница: ровно через час ушёл, за миллисекунду до часа остался', () => {
+      const kept = memory()
+      const rows = phoneRowBudget()
+      rows.claim(t0, 'old')
+      rows.claim(later(1), 'young')
+      rows.forget(later(HOUR))
+      expect(kept.moments('old')).toBeUndefined()
+      expect(kept.moments('young')).toEqual([t0.getTime() + 1])
+    })
+
+    it('уборка не возвращает мест раньше часа: шестьдесят первая строка — всё ещё отказ', () => {
+      const rows = phoneRowBudget()
+      for (let index = 0; index < PHONE_ROWS_PER_SENDER; index += 1) rows.claim(t0, 'liar')
+      rows.forget(later(HOUR / 2))
+      expect(rows.claim(later(HOUR / 2), 'liar')).toBe(false)
+      expect(rows.claim(later(HOUR / 2), 'phone')).toBe(true)
+    })
+
+    it('известный отпечаток — место взято и возвращено — не оставляет адреса', () => {
+      const kept = memory()
+      const rows = phoneRowBudget()
+      rows.claim(t0, 'known')
+      rows.refund(t0, 'known')
+      expect(kept.moments('known')).toEqual([])
+      rows.forget(t0)
+      expect(kept.moments('known')).toBeUndefined()
+    })
+
+    it('запись, упавшая вместе с базой, не оставляет адреса после уборки', async () => {
+      const kept = memory()
+      const rows = phoneRowBudget()
+      const { summary, place, build } = phoneFailure(REPORT)
+      const broken = {
+        record: () => Promise.reject(new Error('connection refused')),
+      } as unknown as FailureRepository
+      await expect(
+        recordFailure(
+          { failures: broken, owner: null, phoneRows: rows },
+          occurrenceOf(summary, place, build),
+          1,
+          t0,
+          'one',
+        ),
+      ).rejects.toThrow('connection refused')
+      rows.forget(t0)
+      expect(kept.moments('one')).toBeUndefined()
+    })
+  })
+
+  describe('phoneNoticeBudget', () => {
+    it('адрес через час ушёл, адрес внутри часа остался', () => {
+      const kept = memory()
+      const notices = phoneNoticeBudget()
+      notices.take([notice], t0, 'old')
+      notices.take([notice], later(HOUR / 2), 'young')
+      notices.forget(later(HOUR))
+      expect(kept.moments('old')).toBeUndefined()
+      expect(kept.moments('young')).toEqual([t0.getTime() + HOUR / 2])
+    })
+
+    it('адрес без единого уведомления — владельца нет — уходит тоже', () => {
+      const kept = memory()
+      const notices = phoneNoticeBudget()
+      notices.take([], t0, 'silent')
+      expect(kept.moments('silent')).toEqual([])
+      notices.forget(t0)
+      expect(kept.moments('silent')).toBeUndefined()
+    })
+
+    it(`уборка не возвращает уведомлений раньше часа: четвёртое — скрыто`, () => {
+      const notices = phoneNoticeBudget()
+      for (let index = 0; index < PHONE_NOTICES_PER_SENDER; index += 1) {
+        notices.take([notice], t0, 'liar')
+      }
+      notices.forget(later(HOUR / 2))
+      expect(notices.take([notice], later(HOUR / 2), 'liar')).toEqual([])
+      expect(notices.held(later(HOUR / 2))).toEqual({
+        kind: 'failure_muted',
+        source: 'phone',
+        count: 1,
+      })
+    })
   })
 })

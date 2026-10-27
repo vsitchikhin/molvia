@@ -131,8 +131,8 @@ export interface FailureRecording {
 /**
  * «Сбой» — `times` occurrences of one fingerprint into the table, and what the owner should hear.
  * `sender` is whose report it was — the phone's network, the key of the limit — for the hour of its
- * notices, and nothing else: it is in no row and no notice. Answers whether the occurrence was
- * written: a phone's new fingerprint past the hour's new rows is not (review №6).
+ * notices and new rows, and nothing else: it is in no row and no notice. Answers whether the
+ * occurrence was written: a phone's new fingerprint past the hour's new rows is not (review №6).
  */
 export async function recordFailure(
   { failures, owner, phoneNotices, phoneRows }: FailureRecording,
@@ -209,6 +209,8 @@ export interface PhoneNoticeBudget {
   refund(told: number, at: Date, sender?: string): void
   /** A new fingerprint of the phone the hour's rows had no room for: not in the table at all. */
   unwritten(): void
+  /** Lets go of every sender with nothing in the hour before `at` (MOL-241). */
+  forget(at: Date): void
   /** How many were held back and how many not written, at most once an hour. */
   held(at: Date): OwnerNotice | null
 }
@@ -227,7 +229,8 @@ export interface PhoneNoticeBudget {
  * price, named:** seven networks — seven IPv4 addresses, seven `/48` — silence the names of the
  * phone's new failures for an hour; the table keeps them and the owner hears «скрыто M» every hour.
  * In the process's memory: a restart starts the hour over and forgets what was held — a rollout is a
- * restart.
+ * restart. A sender is let go an hour after its last notice by `forget`, which the minute timer calls
+ * before anything of the database (MOL-241).
  */
 export function phoneNoticeBudget(
   perHour = PHONE_NOTICES_PER_HOUR,
@@ -281,12 +284,15 @@ export function phoneNoticeBudget(
     unwritten() {
       lost += 1
     },
-    held(at) {
+    forget(at) {
       const now = at.getTime()
       told = recent(told, now)
       for (const [sender, moments] of bySender) {
         if (recent(moments, now).length === 0) bySender.delete(sender)
       }
+    },
+    held(at) {
+      const now = at.getTime()
       if (muted === 0 && lost === 0) return null
       if (lastHeld !== undefined && now - lastHeld < HOUR_MS) return null
       lastHeld = now
@@ -317,6 +323,8 @@ export interface PhoneRowBudget {
   claim(at: Date, sender?: string): boolean
   /** Gives back a place taken at `at` for a row that was there already. */
   refund(at: Date, sender?: string): void
+  /** Lets go of every sender with nothing in the hour before `at` (MOL-241). */
+  forget(at: Date): void
 }
 
 /**
@@ -330,7 +338,9 @@ export interface PhoneRowBudget {
  * seventeen networks fill the hour, some 720 000 rows in thirty days at most; and the sender is an
  * address, so one subscriber of a mobile operator sending sixty invented reports an hour takes the
  * new rows of every phone behind the same address (adversarial Г1) — telling phones apart would need
- * a mark of the device, which is tracking.
+ * a mark of the device, which is tracking. **A sender is let go an hour after its last failure** by
+ * `forget`, on the minute timer (MOL-241): `claim` is asked of every failure of a phone, a known one
+ * too, and before it every address that ever sent one stayed in memory until a restart.
  */
 export function phoneRowBudget(
   perHour = PHONE_ROWS_PER_HOUR,
@@ -361,6 +371,13 @@ export function phoneRowBudget(
       const now = at.getTime()
       added = without(added, now)
       if (sender !== undefined) bySender.set(sender, without(bySender.get(sender) ?? [], now))
+    },
+    forget(at) {
+      const now = at.getTime()
+      added = recent(added, now)
+      for (const [sender, moments] of bySender) {
+        if (recent(moments, now).length === 0) bySender.delete(sender)
+      }
     },
   }
 }

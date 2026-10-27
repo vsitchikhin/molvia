@@ -152,6 +152,11 @@ export interface ApiFailureReporter extends FailureReporter {
    * the next failure that would carry it may never come. Nothing where no owner is set.
    */
   tellHeld(at: Date): Promise<void>
+  /**
+   * Lets go of the phones' senders with nothing in the hour before `at` (MOL-241): the minute timer
+   * calls it first, so the memory waits neither for the database nor for an owner.
+   */
+  forget(at: Date): void
 }
 
 /**
@@ -189,6 +194,10 @@ export function apiFailureReporter(
       if (owner === null) return
       const held = phoneNotices.held(at)
       if (held !== null) await createOwnerNoticeRepository(db()).queue(held, at)
+    },
+    forget(at) {
+      phoneNotices.forget(at)
+      phoneRows.forget(at)
     },
   }
 }
