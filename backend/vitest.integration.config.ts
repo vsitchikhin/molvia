@@ -13,7 +13,7 @@ export default defineConfig({
     // can only be *executed* from here — they need `@/db/schema`, the fixtures and the
     // module alias — so the copy is the workflow, not sloppiness. `npm run test:attack`
     // runs them on purpose; nothing else picks them up.
-    exclude: [...configDefaults.exclude, '**/*.attack.*'],
+    exclude: [...configDefaults.exclude],
     environment: 'node',
     globalSetup: ['./tests/setup-db.ts'],
     // A database per worker, copied from the migrated one (MOL-164), so the files run in
