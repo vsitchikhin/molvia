@@ -275,7 +275,8 @@ signal is gone from both, and the button's word is one rule for the open record 
 only scrolled to — the owner's choice over a strip 24 px taller. An empty record is the quiet circle in a card with no
 buttons — the strip holds them — and no total, **unless a receipt's sum stays from purchases removed since**: that is
 the record's money, and the card and «Изменить» stand under the circle (adversarial А1) — nor do «Закончить» and
-«Удалить запись» call it empty: the one asks as of any record, the other asks first (adversarial Б1). **Every row has its chevron**,
+«Удалить запись» call it empty: the one asks as of any record, the other asks first (adversarial Б1), both naming
+the sum rather than purchases it has not got (adversarial В1). **Every row has its chevron**,
 a row that does not open — its removal queued, its card unread — being the kit's «not now», so the amounts end in one
 column (adversarial А3). **The connection is one `StatusStrip`** over the record the phone remembers — offline, or
 «Сервер не ответил» with «Повторить» — never a card: with no record the screen goes up, so there is always one
