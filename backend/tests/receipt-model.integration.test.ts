@@ -1,12 +1,17 @@
 import { randomUUID } from 'node:crypto'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { MODEL_CONSENT_EDITION, spendMonthOf } from '@molvia/model'
+import { MODEL_CONSENT_EDITION, REVIEW_CONSENT_EDITION, spendMonthOf } from '@molvia/model'
 import type { ModelReceipt } from '@molvia/model'
 import am05 from '@molvia/model/testing/receipt-text.am-05.json'
 import type { FastifyInstance } from 'fastify'
 import { createItemRepository } from '@/db/items-repository'
 import { createModelSpendRepository } from '@/db/model-spend-repository'
+import { createOwnerNoticeRepository } from '@/db/owner-notices-repository'
+import { createReceiptMissesRepository } from '@/db/receipt-misses-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
 import { createStoreMemoryRepository } from '@/db/store-memory-repository'
 import {
@@ -16,6 +21,10 @@ import {
   receiptDays,
   receiptLineImages,
   receiptLines,
+  receiptMissParts,
+  receiptMisses,
+  receiptParts,
+  receiptReasonDays,
   receipts,
   storeMemory as storeMemoryTable,
 } from '@/db/schema'
@@ -25,7 +34,13 @@ import type { ModelReading, ReceiptModel } from '@/receipts/model-reader'
 import type { ReaderReading, ReceiptReader } from '@/receipts/reader'
 import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
 import { RECEIPT_MODEL_WAIT_MS, readQueuedReceipts } from '@/usecases/read-receipts'
-import type { ReadReport } from '@/usecases/read-receipts'
+import type { ReadReceiptsDeps, ReadReport } from '@/usecases/read-receipts'
+import { receiptMisses as receiptMissesCommand } from '@/receipt-misses'
+import {
+  PHONE_NOTICES_PER_HOUR,
+  PHONE_NOTICES_PER_SENDER,
+  phoneNoticeBudget,
+} from '@/usecases/record-failure'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
@@ -198,7 +213,11 @@ const read = (cost = 2_180): Promise<ModelReading> =>
 async function readAll(
   reader: ReceiptReader,
   model: ReceiptModel | null,
-  { cap = CAP, now }: { cap?: number; now?: () => Date } = {},
+  {
+    cap = CAP,
+    now,
+    told,
+  }: { cap?: number; now?: () => Date; told?: ReadReceiptsDeps['told'] } = {},
 ): Promise<ReadReport[]> {
   const reports: ReadReport[] = []
   await readQueuedReceipts({
@@ -216,6 +235,7 @@ async function readAll(
     model: model === null ? null : { reader: model, spend, capMicroUsd: cap },
     storeMemory: memory,
     ...(now === undefined ? {} : { now }),
+    ...(told === undefined ? {} : { told }),
   })
   return reports
 }
@@ -965,4 +985,250 @@ describe('the measure of 0.2r by its reader (MOL-272, В-6 «а»)', () => {
     expect(row?.reshoot).toBe(1)
     expect(await db.select().from(receiptDays)).toEqual([])
   }, 30_000)
+})
+
+describe('a receipt read not whole: its reasons, its review and the developer told (MOL-309)', () => {
+  // a third line whose own arithmetic does not hold: 1 × 500 is no 600
+  const [milk, bread] = ANSWER.lines
+  const NOT_WHOLE: ModelReceipt = {
+    ...ANSWER,
+    lines: [
+      milk!,
+      bread!,
+      {
+        printed: 'Թեյ «Օրինակ»',
+        code: '0902',
+        article: '1100001',
+        quantity: '1',
+        unit: 'pcs',
+        unit_price: '500',
+        discount: null,
+        sum: '600',
+      },
+    ],
+    totals: [
+      { label: 'Ընդամենը', amount: '1627.10' },
+      { label: 'Վճարված է Առձեռն', amount: '1627.10' },
+    ],
+  }
+  const notWhole = () =>
+    Promise.resolve<ModelReading>({
+      kind: 'read',
+      answer: NOT_WHOLE,
+      costMicroUsd: 2_180,
+      tokens: TOKENS,
+    })
+  const told = () => ({
+    notices: createOwnerNoticeRepository(db),
+    budget: phoneNoticeBudget(PHONE_NOTICES_PER_HOUR, PHONE_NOTICES_PER_SENDER, (count) => ({
+      kind: 'receipt_partial_muted' as const,
+      count,
+    })),
+  })
+  const reasons = async () =>
+    (await db.select().from(receiptReasonDays))
+      .map((row) => `${row.reader} ${row.country} ${row.scope} ${row.reason} ${String(row.n)}`)
+      .sort()
+  const notices = async () =>
+    (await db.select({ payload: ownerNotices.payload }).from(ownerNotices)).map(
+      (row) => row.payload,
+    )
+
+  it('counts why, keeps the photo and the answer for the review, and tells the developer — no name, no sum', async () => {
+    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    const id = await queued(me)
+    await readAll(benchReader(), fakeModel(notWhole), { told: told() })
+    expect(await reasons()).toEqual([
+      'model AM line unsettled 1',
+      'model AM read lines 3',
+      'model AM read receipts 1',
+      'model AM receipt line_not_as_printed 1',
+    ])
+    const [kept] = await db.select().from(receiptMisses).where(eq(receiptMisses.receiptId, id))
+    expect(kept).toMatchObject({
+      readerVersion: 'claude-haiku-5-5@v5',
+      reasons: { receipt: 'line_not_as_printed', lines: [null, null, 'unsettled'] },
+      reading: NOT_WHOLE,
+    })
+    expect(await db.select().from(receiptMissParts)).toHaveLength(1)
+    const [notice] = await notices()
+    expect(notice).toMatchObject({
+      kind: 'receipt_partial',
+      receipt: id.slice(0, 8),
+      country: 'AM',
+      lines: 3,
+      shown: 2,
+      reason: 'line_not_as_printed',
+      lineReasons: { unsettled: 1 },
+    })
+    expect((notice as { keptUntil?: string }).keptUntil).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(JSON.stringify(notice)).not.toMatch(/Օրինակ|1627|600/)
+  }, 30_000)
+
+  it('keeps the review after «Записать» deletes the receipt’s own photo, until its days pass', async () => {
+    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    const id = await queued(me)
+    await readAll(benchReader(), fakeModel(notWhole))
+    const placeId = await insertPlace(db, { name: 'Օրինակ' })
+    const tripId = await insertTrip(db, { actorId: me.id, placeId })
+    await repository.markRecorded(id, {
+      tripId,
+      expenses: [],
+      confirmed: [],
+      priced: [],
+      edits: {
+        lines: 3,
+        edited: 0,
+        skipped: 0,
+        item: 0,
+        figures: 0,
+        totalCorrected: false,
+        added: 0,
+      },
+      source: 'photo',
+      codesWritten: 0,
+    })
+    await repository.purgeStale()
+    expect(await db.select().from(receiptParts)).toEqual([])
+    expect(await db.select().from(receiptMissParts)).toHaveLength(1)
+    await db.update(receiptMisses).set({
+      readAt: sql`clock_timestamp() - interval '22 days'`,
+      keepUntil: sql`clock_timestamp() - interval '1 day'`,
+    })
+    await repository.purgeStale()
+    expect(await db.select().from(receiptMisses)).toEqual([])
+    expect(await db.select().from(receiptMissParts)).toEqual([])
+  }, 30_000)
+
+  it('goes with its receipt: the person erased', async () => {
+    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    await queued(me)
+    await readAll(benchReader(), fakeModel(notWhole))
+    expect(await db.select().from(receiptMisses)).toHaveLength(1)
+    await db.execute(sql`delete from ${actors} where id = ${me.id}::uuid`)
+    expect(await db.select().from(receiptMisses)).toEqual([])
+    expect(await db.select().from(receiptMissParts)).toEqual([])
+    // the counts belong to nobody, and stay
+    expect(await reasons()).toContain('model AM read receipts 1')
+  }, 30_000)
+
+  it('keeps and tells nothing of a receipt read whole, and counts it', async () => {
+    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+      { told: told() },
+    )
+    expect(await reasons()).toEqual(['model AM read lines 2', 'model AM read receipts 1'])
+    expect(await db.select().from(receiptMisses)).toEqual([])
+    expect(await notices()).toEqual([])
+  }, 30_000)
+
+  it('keeps and tells a «переснимите» of the model: nothing read is the most to type', async () => {
+    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    const id = await queued(me)
+    const nothing = { ...ANSWER, lines: [], totals: [] }
+    await readAll(
+      benchReader(),
+      fakeModel(() =>
+        Promise.resolve({ kind: 'read', answer: nothing, costMicroUsd: 1_000, tokens: TOKENS }),
+      ),
+      { told: told() },
+    )
+    expect(await reasons()).toEqual(['model AM read receipts 1', 'model AM receipt failed 1'])
+    expect((await receiptOf(id))?.failure).toBe('reshoot')
+    expect(await db.select().from(receiptMisses)).toHaveLength(1)
+    expect(await notices()).toMatchObject([{ kind: 'receipt_partial', reason: 'failed', lines: 0 }])
+  }, 30_000)
+
+  it('counts Tesseract’s reasons, and neither keeps nor tells them (owner, В-4)', async () => {
+    const me = await person(null)
+    await queued(me)
+    await readAll(benchReader(), fakeModel(notWhole), { told: told() })
+    const counted = await reasons()
+    expect(counted).toContain('ocr AM read receipts 1')
+    expect(counted.some((row) => row.startsWith('model'))).toBe(false)
+    expect(await db.select().from(receiptMisses)).toEqual([])
+    expect(await notices()).toEqual([])
+  }, 30_000)
+
+  it('tells three of one person an hour, holds the rest and says how many once the hour is out', async () => {
+    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    for (let i = 0; i < 4; i += 1) await queued(me)
+    const channel = told()
+    const at = new Date('2026-10-27T10:00:00Z')
+    await readAll(benchReader(), fakeModel(notWhole), { told: channel, now: () => at })
+    expect((await notices()).map((one) => (one as { kind: string }).kind)).toEqual([
+      'receipt_partial',
+      'receipt_partial',
+      'receipt_partial',
+    ])
+    // every receipt is kept for the review all the same
+    expect(await db.select().from(receiptMisses)).toHaveLength(4)
+    const later = new Date(at.getTime() + 60 * 60 * 1000)
+    await readAll(benchReader(), fakeModel(notWhole), { told: channel, now: () => later })
+    expect((await notices()).at(-1)).toEqual({ kind: 'receipt_partial_muted', count: 1 })
+  }, 30_000)
+
+  it('tells of a receipt whose owner accepted no edition 4, and keeps nothing of it (MOL-309, В-3 «б»)', async () => {
+    const me = await person(LATER)
+    await queued(me)
+    await readAll(benchReader(), fakeModel(notWhole), { told: told() })
+    expect(await db.select().from(receiptMisses)).toEqual([])
+    const [notice] = await notices()
+    expect(notice).toMatchObject({ kind: 'receipt_partial', reason: 'line_not_as_printed' })
+    expect(notice).not.toHaveProperty('keptUntil')
+  }, 30_000)
+
+  it('tells nobody where nobody is there to tell, and keeps the review all the same', async () => {
+    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    await queued(me)
+    await readAll(benchReader(), fakeModel(notWhole))
+    expect(await notices()).toEqual([])
+    expect(await db.select().from(receiptMisses)).toHaveLength(1)
+  }, 30_000)
+
+  describe('make receipt-reasons, receipt-miss and receipt-miss-forget', () => {
+    const misses = createReceiptMissesRepository(db)
+    const run = async (argv: string[]) => {
+      const lines: string[] = []
+      const exit = await receiptMissesCommand(argv, misses, (line) => lines.push(line), new Date())
+      return { exit, lines }
+    }
+
+    it('reads the window’s reasons by reader and country, each share beside its n', async () => {
+      const me = await person(LATER, REVIEW_CONSENT_EDITION)
+      await queued(me)
+      await readAll(benchReader(), fakeModel(notWhole))
+      const today = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      const { exit, lines } = await run(['reasons', '--from', today])
+      expect(exit).toBe(0)
+      expect(lines.join('\n')).toMatch(/model AM[\s\S]*not whole\s+1\s+100\.0 %/)
+      expect(lines.join('\n')).toMatch(/unsettled\s+1\s+33\.3 %/)
+    }, 30_000)
+
+    it('shows one receipt with its photo written out, and lets it go only with --yes', async () => {
+      const me = await person(LATER, REVIEW_CONSENT_EDITION)
+      const id = await queued(me)
+      await readAll(benchReader(), fakeModel(notWhole))
+      const out = await mkdtemp(join(tmpdir(), 'receipt-miss-'))
+      try {
+        const shown = await run(['show', id.slice(0, 8), '--out', out])
+        expect(shown.exit).toBe(0)
+        expect(shown.lines).toContain('  line 3: unsettled')
+        expect(JSON.parse(await readFile(join(out, 'reading.json'), 'utf8'))).toEqual(NOT_WHOLE)
+        expect((await readFile(join(out, 'part-1.jpg'))).subarray(0, 2)).toEqual(
+          Buffer.from([0xff, 0xd8]),
+        )
+      } finally {
+        await rm(out, { recursive: true, force: true })
+      }
+      expect((await run(['forget', id.slice(0, 8)])).lines.at(-1)).toMatch(/dry run: 1/)
+      expect(await db.select().from(receiptMisses)).toHaveLength(1)
+      expect((await run(['forget', id.slice(0, 8), '--yes'])).lines.at(-1)).toBe('let go: 1.')
+      expect(await db.select().from(receiptMisses)).toEqual([])
+      expect((await run(['show', id.slice(0, 8)])).exit).toBe(3)
+    }, 30_000)
+  })
 })

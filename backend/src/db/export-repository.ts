@@ -86,7 +86,9 @@ export const EXPORT_COLUMNS: Readonly<
     | 'receipt_lines'
     | 'receipt_links'
     | 'receipt_parts'
-    | 'receipt_line_images',
+    | 'receipt_line_images'
+    | 'receipt_misses'
+    | 'receipt_miss_parts',
     { readonly exported: readonly string[]; readonly omitted?: Readonly<Record<string, string>> }
   >
 > = {
@@ -411,6 +413,29 @@ export const EXPORT_COLUMNS: Readonly<
       width: 'a measure of the photo that is not in the file',
       height: 'a measure of the photo that is not in the file',
       created_at: 'when a photo that is not in the file arrived',
+    },
+  },
+  // Taken by erasure with their receipt; never in the file — a developer's copy of a reading for the review
+  // (MOL-309), the photo's bytes among it, kept until the review takes it (21 days at most).
+  receipt_misses: {
+    exported: [],
+    omitted: {
+      receipt_id: 'the receipt it was read from, exported itself',
+      read_at: 'when the receipt was read, which the receipt in the file says',
+      keep_until: 'when the developer’s copy for the review goes (MOL-309): not the person’s data',
+      reader_version: 'the reader, which the receipt in the file says',
+      reasons:
+        'why the reader did not read it whole, for the developer’s review: what the lines in the file show',
+      reading: 'what the reader read, as it read it — the lines in the file are what came of it',
+    },
+  },
+  receipt_miss_parts: {
+    exported: [],
+    omitted: {
+      receipt_id: 'the receipt it is a photo of',
+      position: 'a part of a photo that is not in the file',
+      photo:
+        'the photo, copied for the developer’s review (MOL-309): never copied out, as the receipt’s own',
     },
   },
   receipt_line_images: {

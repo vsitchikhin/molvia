@@ -6,9 +6,11 @@ import {
   ERROR,
   MODEL_CONSENT_EDITION,
   RECEIPT_MODEL,
+  REVIEW_CONSENT_EDITION,
   placeSchema,
   RECEIPT_KEEP_DAYS,
   RECEIPT_LINK_WAIT_HOURS,
+  RECEIPT_MISS_KEEP_DAYS,
   RECEIPT_READ_ATTEMPTS,
   RECEIPT_TELL_AFTER_SECONDS,
   RECEIPT_TELL_WITHIN_HOURS,
@@ -31,7 +33,9 @@ import type {
   ReceiptLayout,
   ReceiptPaidBy,
   ReceiptLine,
+  ReceiptLineReason,
   ReceiptParsedMatch,
+  ReceiptReason,
   ReceiptPlace,
   ReceiptSummary,
   ReceiptCity,
@@ -50,7 +54,10 @@ import {
   receiptLinks,
   modelReceiptDays,
   receiptDays,
+  receiptMissParts,
+  receiptMisses,
   receiptParts,
+  receiptReasonDays,
   receipts,
   taxReceiptDays,
   trips,
@@ -76,6 +83,11 @@ export interface ClaimedReceipt {
    * as the claim reads it.
    */
   readonly byModel: boolean
+  /**
+   * Its photo and reading may be kept for the developer's review if it is read not whole (MOL-309): its owner
+   * accepted edition `REVIEW_CONSENT_EDITION`, which says so.
+   */
+  readonly reviewable: boolean
   /** When it was queued: the model away longer than its wait leaves it to Tesseract (Р-9). */
   readonly queuedAt: Date | null
 }
@@ -139,6 +151,24 @@ export interface LineImage {
   readonly readText: string
 }
 
+/**
+ * Why a reading was not whole (MOL-309): one reason of the receipt — `null`, proven whole — and one of each
+ * line in their order, `null` where it was shown as read. Counted in `receipt_reason_days`.
+ */
+export interface ReadReasons {
+  readonly receipt: ReceiptReason | null
+  readonly lines: readonly (ReceiptLineReason | null)[]
+}
+
+/**
+ * A receipt kept for the developer's review (MOL-309, В-3 «б»): what its reader read, as it read it, and
+ * its photo, part by part — copied now, since «Записать» deletes the receipt's own.
+ */
+export interface ReadMiss {
+  readonly reading: unknown
+  readonly parts: readonly { readonly position: number; readonly photo: Buffer }[]
+}
+
 /** How a reading ended: laid out into lines, or failed with what could be read of the head. */
 export type ReadOutcome =
   | {
@@ -165,6 +195,12 @@ export type ReadOutcome =
         readonly repaired: number
         readonly doubted: number
       }
+      /** Why it was not whole (MOL-309); none — a receipt by its link, which is not judged. */
+      readonly reasons?: ReadReasons
+      /** Kept for the developer's review (MOL-309); none — not kept. */
+      readonly miss?: ReadMiss
+      /** The developer is to hear of it (MOL-309, В-4 «б»): the model's, with something to type. */
+      readonly tell?: true
     }
   | {
       readonly kind: 'failed'
@@ -173,6 +209,10 @@ export type ReadOutcome =
       readonly head: ReceiptHead | null
       /** A receipt from the tax office whose journal holds no list: the office's answer, not ours (А7). */
       readonly journalEmpty?: boolean
+      /** Kept for the developer's review (MOL-309); none — not kept. */
+      readonly miss?: ReadMiss
+      /** The developer is to hear of it (MOL-309, В-4 «б»): the model read nothing. */
+      readonly tell?: true
     }
 
 /** A line as stored: as read, and what the parse found it to be (MOL-126). */
@@ -372,6 +412,89 @@ const tallyTax = (db: Conn, counts: TaxReceiptDayCounts, day: SQL, source: SQL =
 /** Today in Yerevan, by the database's clock: the day a reading ended on. */
 const today = (): SQL => yerevanDay(sql`clock_timestamp()`)
 
+/** What a reading adds to `receipt_reason_days` (MOL-309): the denominators, the receipt's reason, the lines'. */
+function reasonCounts(outcome: ReadOutcome): readonly {
+  readonly scope: 'read' | 'receipt' | 'line'
+  readonly reason: string
+  readonly n: number
+}[] {
+  if (outcome.kind === 'failed') {
+    return [
+      { scope: 'read', reason: 'receipts', n: 1 },
+      { scope: 'receipt', reason: 'failed', n: 1 },
+    ]
+  }
+  const { reasons } = outcome
+  // a receipt by its link is not judged
+  if (reasons === undefined) return []
+  const lines = new Map<string, number>()
+  for (const reason of reasons.lines) {
+    if (reason !== null) lines.set(reason, (lines.get(reason) ?? 0) + 1)
+  }
+  return [
+    { scope: 'read', reason: 'receipts', n: 1 },
+    { scope: 'read', reason: 'lines', n: reasons.lines.length },
+    ...(reasons.receipt === null
+      ? []
+      : [{ scope: 'receipt' as const, reason: reasons.receipt, n: 1 }]),
+    ...[...lines].map(([reason, n]) => ({ scope: 'line' as const, reason, n })),
+  ]
+}
+
+/**
+ * Adds a reading's reasons to its day, reader and country (MOL-309), in the transaction of the reading: what is
+ * rolled back is not counted.
+ */
+async function tallyReasons(
+  db: Conn,
+  readerVersion: string,
+  country: string,
+  outcome: ReadOutcome,
+) {
+  const counts = reasonCounts(outcome)
+  if (counts.length === 0) return
+  const reader = byModel(readerVersion) ? 'model' : 'ocr'
+  await db.execute(sql`
+    insert into ${receiptReasonDays} (day, reader, country, scope, reason, n)
+    values ${sql.join(
+      counts.map(
+        (one) => sql`(${today()}, ${reader}, ${country}, ${one.scope}, ${one.reason}, ${one.n})`,
+      ),
+      sql`, `,
+    )}
+    on conflict (day, reader, country, scope, reason)
+    do update set n = ${receiptReasonDays}.n + excluded.n`)
+}
+
+/**
+ * Keeps a receipt read not whole for the developer's review (MOL-309), whatever an earlier reading kept: its
+ * photo copied now — «Записать» deletes the receipt's own — what the reader read, and why, until the review
+ * lets it go or `RECEIPT_MISS_KEEP_DAYS` pass.
+ */
+async function keepMiss(db: Conn, id: string, readerVersion: string, outcome: ReadOutcome) {
+  await db.delete(receiptMisses).where(eq(receiptMisses.receiptId, id))
+  const { miss } = outcome
+  if (miss === undefined) return
+  await db.insert(receiptMisses).values({
+    receiptId: id,
+    readAt: sql`clock_timestamp()`,
+    keepUntil: sql`clock_timestamp() + make_interval(days => ${RECEIPT_MISS_KEEP_DAYS})`,
+    readerVersion,
+    reasons:
+      outcome.kind === 'parsed' && outcome.reasons !== undefined
+        ? outcome.reasons
+        : { receipt: 'failed', lines: [] },
+    reading: miss.reading,
+  })
+  if (miss.parts.length > 0) {
+    await db
+      .insert(receiptMissParts)
+      .values(
+        miss.parts.map((part) => ({ receiptId: id, position: part.position, photo: part.photo })),
+      )
+  }
+}
+
 export interface ReceiptRepository {
   /** «Отправить чек»: a new receipt, or the same one sent again; anything else under its id is a 409. */
   create(actorId: string, body: ReceiptBody): Promise<{ receipt: ReceiptSummary; created: boolean }>
@@ -442,7 +565,7 @@ export interface ReceiptRepository {
   /**
    * The minute timer's (П-8, В-3): a removal final after its ten minutes, a receipt not recorded
    * 28 days after it arrived, a recorded one's photo and its lines that are no purchase (MOL-240), a
-   * line cut out 28 days after it was confirmed.
+   * line cut out 28 days after it was confirmed, a receipt kept for the review past its days (MOL-309).
    */
   purgeStale(): Promise<void>
 
@@ -1169,6 +1292,8 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         .where(
           sql`${receiptLineImages.confirmedAt} <= clock_timestamp() - make_interval(days => ${RECEIPT_KEEP_DAYS})`,
         )
+      // a receipt kept for the review the review never took (MOL-309, Р-8)
+      await db.delete(receiptMisses).where(sql`${receiptMisses.keepUntil} <= clock_timestamp()`)
     },
 
     async requeueInterrupted() {
@@ -1230,6 +1355,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           .select({
             byModel: sql<boolean>`coalesce(${actors.receiptsModelUntil} > clock_timestamp()
               and ${actors.consentVersion} >= ${MODEL_CONSENT_EDITION}, false)`,
+            reviewable: sql<boolean>`coalesce(${actors.consentVersion} >= ${REVIEW_CONSENT_EDITION}, false)`,
           })
           .from(actors)
           .innerJoin(receipts, eq(receipts.actorId, actors.id))
@@ -1240,7 +1366,12 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           .where(eq(receiptParts.receiptId, next.id))
           .orderBy(asc(receiptParts.position))
         const row = theRow(claimed, 'receipts')
-        return { ...row, parts, byModel: owner?.byModel ?? false }
+        return {
+          ...row,
+          parts,
+          byModel: owner?.byModel ?? false,
+          reviewable: owner?.reviewable ?? false,
+        }
       })
     },
 
@@ -1301,7 +1432,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             nextAttemptAt: null,
           })
           .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
-          .returning({ id: receipts.id, source: receipts.source })
+          .returning({ id: receipts.id, source: receipts.source, country: receipts.country })
         if (done === undefined) return
         // read or failed, the link of a receipt by its QR code is no longer kept (MOL-232, Р-4)
         await tx.delete(receiptLinks).where(eq(receiptLinks.receiptId, id))
@@ -1311,6 +1442,11 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         // a reading is written whole: what an earlier one left goes first
         await tx.delete(receiptLines).where(eq(receiptLines.receiptId, id))
         await tx.delete(receiptLineImages).where(eq(receiptLineImages.receiptId, id))
+        // why it was not whole, of a reading of its photo by a reader we know (MOL-309)
+        if (!tax && outcome.readerVersion !== null) {
+          await tallyReasons(tx, outcome.readerVersion, done.country, outcome)
+          await keepMiss(tx, id, outcome.readerVersion, outcome)
+        }
         if (outcome.kind !== 'parsed') {
           if (tax) {
             const failed =
