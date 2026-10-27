@@ -321,9 +321,10 @@ the answer comes first and nothing changes; **late, it says in words that the pr
 (`trip.receipt.line_pending`, owner's В-3 «а» of the review): whole contrast and heard by a screen reader, faded in.
 Taken away at once it went and came back with every purchase sent (round 3, В1); dimmed by `--opacity-stale` it read
 2.1:1 for as long as the phone had no signal and said nothing to a screen reader (round 4, Г1, Г2) — that token stays
-the searches' alone. **The price, named:** for that one second a line offline still speaks of the list before, and
-the words in the place of the prices may change the card's height by a line of text — once, faded, since `AppReveal`
-moves blocks and the words stand in one line with «≈» and the rate. The receipt's sum above it stays the server's. **Its phrases wrap between their
+the searches' alone. **The price, named:** for that one second a line offline still speaks of the list before; and on a line slower
+than a second the card changes twice a purchase — to the words, then to the answer's figures — each faded in
+(`appear(0)` on every part of the receipt, keyed by its text, round 5, Д1), each maybe a line of text taller or shorter,
+since `AppReveal` moves blocks and the words stand in one line with «≈» and the rate. The receipt's sum above it stays the server's. **Its phrases wrap between their
 words** (review №1): whole, as the rate's parts are, «the receipt is ֏10,068 less than the prices» broke at any letter
 at 320; their sums come non-breaking from `formatMoney`, and what follows a dash — «— 12 из 14», «— 0 ֏» — with the
 dash, so a line never starts with it and a count is never cut (round 2, №3, П1); `e2e/kit-rows` holds both at 320 and
