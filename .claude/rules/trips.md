@@ -315,15 +315,20 @@ the receipt beside a purchase with none are «без цены — 0 ֏», never 
 currencies are a list by the locale's conjunction, «8 000 ֏ и 20 $», never «+», which reads as adding what the
 domain refuses to add (review №2, А3). **The line speaks only of the list the server counted** (adversarial А1): with
 a purchase removed or added on its way, the rows on screen are not the ones `prices` and `gap` measured, and the line
-says nothing of the prices until the answer — the receipt's sum above it stays. **Its phrases wrap between their
+says nothing of the prices until the answer — the receipt's sum above it stays. Judged by the rows, any of them being
+removed or waiting to be sent (`useTripReceipt.settled`), never by their counts: milk swapped for cheese keeps both
+(round 2, Б1). **Its phrases wrap between their
 words** (review №1): whole, as the rate's parts are, «the receipt is ֏10,068 less than the prices» broke at any letter
-at 320; their sums come non-breaking from `formatMoney`, and `e2e/kit-rows` holds both at 320 and 390 in ru and en. **Prices more than
+at 320; their sums come non-breaking from `formatMoney`, and what follows a dash — «— 12 из 14», «— 0 ֏» — with the
+dash, so a line never starts with it and a count is never cut (round 2, №3, П1); `e2e/kit-rows` holds both at 320 and
+390 in ru and en. **Prices more than
 the receipt are said as they are** (owner's В-1 «а»): «чек меньше цен», never «скидка» — the phone cannot tell a
 discount on the receipt from a price typed wrong. Under the card «+ Сумма по чеку», «Добавить позицию», «Удалить
 запись», no strip (В-2 «а»): a finished record is no record going on, and a purchase forgotten is rare. **A sum by
 the receipt is not empty there either** (adversarial А2, as Б1 of MOL-206): a receipt with no items (MOL-227) is
 asked about before it goes, the sheet naming its sum — read back from the shelf too, where the total of a record with
-no purchase is its receipt. Its header is
+no purchase is its receipt; one whose purchases are all being removed is asked about with no sum named, since its
+total read back so may be the prices or a receipt (round 2, Б2). Its header is
 the place, «город · день, время» under it by the moment and the day «Записаны» print — and while nothing of the record
 is known, «Покупки» with no line under it, never «Эта запись ещё не закончена» about the record the screen is for
 (Е-4). **The price, named:** a receipt whose time was not printed is dated by its record's moment, as in «Записаны»;
