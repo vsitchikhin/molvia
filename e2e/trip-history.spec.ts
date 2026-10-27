@@ -8,6 +8,7 @@ import { asBrowser, open, signedIn } from './session'
 interface WireTrip {
   id: string
   place: { name: string }
+  placeCity?: string
   expenses: { id: string; amount: { amount: string; currency: string } | null }[]
   finishedOnDeviceAt: string | null
 }
@@ -77,6 +78,11 @@ test('pages through all of «Записаны» and adds, amends and removes in 
     .filter({ has: page.locator('.title', { hasText: /^History shop 1$/ }) })
     .click()
   await expect(page).toHaveURL(new RegExp(`/purchases/${oldest}$`))
+  // Named by its place, its city and day under it — never «still open» about a finished one (Е-4).
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('History shop 1')
+  const city = (await read(page, oldest)).placeCity ?? ''
+  expect(city).not.toBe('')
+  await expect(page.locator('.subtitle')).toHaveText(new RegExp(`^${city} · `))
   await page.getByRole('button', { name: 'Add an item' }).click()
   await page.getByRole('combobox').fill(word)
   await page.getByRole('option').filter({ hasText: word }).first().click()
@@ -92,6 +98,10 @@ test('pages through all of «Записаны» and adds, amends and removes in 
   await sheet(page).getByLabel('Price as on the tag').fill('1300')
   await sheet(page).getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.locator('.row')).toContainText('֏1,300')
+  // One large figure, the card under the list, nothing in the strip at the bottom (Ф-23).
+  await expect(page.locator('.sum')).toHaveCount(1)
+  await expect(page.locator('.total .sum')).toHaveText(/֏/)
+  await expect(page.locator('.dock')).toHaveCount(0)
   expect(
     await page.locator('.row .name').evaluate((node) => node.scrollWidth <= node.clientWidth),
   ).toBe(true)
@@ -149,6 +159,10 @@ test('keeps an offline finish and its purchases across reload, then sends the or
   await page.reload()
   await recorded(page).filter({ hasText: 'Offline shop' }).click()
   await expect(page.locator('.row')).toHaveCount(1)
+  // The place it was finished at, and one strip of the connection over it (Е-4, MOL-181).
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Offline shop')
+  await expect(page.locator('.strip')).toHaveCount(1)
+  await expect(page.locator('.strip.offline')).toBeVisible()
   await page.unroute('**/api/**')
   await page.evaluate(() => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => true })
