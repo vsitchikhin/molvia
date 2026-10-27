@@ -122,7 +122,10 @@ The detail behind the trip lines of `CLAUDE.md`.
   answer in «Покупки» (adversarial round 3, Н4). **«Закончить» of a record by hand chooses the account too**
   (MOL-312, owner's В-3 «б», Р-2): finished is paid, so the row «Счёт покупок» and «Списано» stand in its sheet
   beside the receipt's sum, and the `payment` goes into the queue before the `finish`, as the sum does; «Без
-  счёта» sends none. Only for the account's own currency against the record's: a purchase in a third currency
+  счёта» sends none. **A record on an account already** — set in «не попали» while open — opens the sheet on it,
+  «Списано» typed in, and sends nothing unless changed (self-review Р1-1): sent again whole, a payment with no
+  «Списано» takes it off; «Без счёта» there takes the account off. «Счета» are read as the sheet opens, never with
+  every opening of the record (Р1-2). Only for the account's own currency against the record's: a purchase in a third currency
   is the summary's to cover in «Траты», a price named. **The price, named:** removing a trip dated before
   a check that came out even moves the balance with no reason the check can name, as a removed
   spending does.

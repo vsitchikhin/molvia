@@ -714,7 +714,10 @@ review's** (`molvia.receipt-payment`), never inside it — the build before read
 receipt's edits whole; «Без счёта» chosen is kept as a choice. A row only while some account lives; «Списано» under it
 for an account of another currency; not now while «Записать» waits. **The prices, named:** a server rolled back
 refuses a body with it and the queue of the build before drops it, as `edited` and `barcodes`; an account whose ten
-minutes of «Вернуть» run out in the very transaction is a 404, as `payTrip`'s is.
+minutes of «Вернуть» run out in the very transaction is a 404, as `payTrip`'s is; and with no «Счета» kept on the phone
+— the first launch, after «Выйти» — «Записать» pressed before they answer records the receipt on no account, the row not
+drawn yet (self-review Р1-3: held for the answer, a record at the shelf with no connection would wait for it). A choice
+is kept as chosen even where it was the default, which moves with the next receipt recorded (adversarial А5).
 
 **The same trip sent again is the same answer, another trip a 409** — the phone names the trip, as every
 write offline (MOL-24). **The same receipt recorded before is refused** (Т-11,
@@ -1393,18 +1396,23 @@ that line alone says nothing, the receipt's budget untouched (adversarial А5) �
 `cashless`). **One way only** (`paidByOf`): a word of one way beside a sum above nothing and no word of the other so —
 «Ереван Сити» prints the other way at 0; both with a sum, a mixed payment, or neither is nothing, since an account
 suggested wrong is one the person may not look at (MOL-255). **The closed list is the rule**: the model copies «Առձեռն»
-as «Առեն», «Առեղն», «Առնեռն» — so cash is a whole word «Առ…ն» of two to six letters — and once as «Առևտուր», trade,
-which is none; a word nobody listed («Վճարված է Yandex», a delivery app) is none; «Կանխավճարի մարում», the card's
-bonus spent, is no payment, though the model has copied it «Կանխիկ վճարի մարում»; «միայն քարտապան», a promotion for
-the card's holders, is no card. **Tesseract's rows count from the total down** (`receiptPaidBy`): above it «ձեռնոց»,
+as «Առեն», «Առեղն», «Առնեռն» — so cash is a whole word «Առ…ն» whose third letter is what they make of «ձ» (`ձծճեն`) —
+and once as «Առևտուր», trade, which is none; a word nobody listed («Վճարված է Yandex», a delivery app) is none;
+«Կանխավճարի մարում», the card's bonus spent, is no payment, though the model has copied it «Կանխիկ վճարի մարում»;
+«միայն քարտապան», a promotion for the card's holders, is no card. **A word of cash is the last word before its sum**
+(adversarial А1–А3): the model copies the month's trade «Առևտուր ամսվա սկզբից», always with a sum, as «Առաջին ամսվա
+սկզբից», and the prepayment's rest «Կանխավճարի մնացորդ» as «Կանխիկավճարի մնացորդ» — each a word of cash with words after
+it, read as cash it made a card's receipt of «Ереван Сити» mixed, and with the card's word lost, cash. «Անկանխիկ» torn by
+OCR, «Ան կանխիկ», is a card (А4). **Tesseract's rows count from the total down** (`receiptPaidBy`): above it «ձեռնոց»,
 gloves, is an item; a reading that lost the total's word says nothing. The model's summary is all summary
 (`modelPaidBy`). **Stored at reading** (`receipts.paid_by`, 0072), for either reader of a photo; **a receipt by its link
 has none** — the tax office's payments are never read (MOL-232, privacy). On the wire only to a phone that asks
 (`RECEIPT_PAID_BY_HEADER`): an installed app of an earlier build reads the detail strictly. In the copy (version 23).
 
 **On the bench** (`.scratch/tasks/status/MOL-312/bench.mts`, truth by the photos' words): the model's answers of v5, two
-runs, and am-44's eight — 105 right, 0 wrong, 10 none, five of them receipts that print no way; Tesseract's two page
-modes — 15 right, 0 wrong, 28 none, its readings of «Առձեռն» («Առձերե», «Ueto») unread.
+runs, and am-44's eight — 106 right, 0 wrong, 9 none, five of them receipts that print no way; Tesseract's two page
+modes — 15 right, 0 wrong, 28 none, its readings of «Առձեռն» («Առձերե», «Ueto») unread. Over every answer of the
+bench of MOL-272, 882 of them — 710 right, 0 wrong (the reviewer's probe).
 
 **How it is used** (В-1 «б», Р-1): the phone remembers the account last recorded per currency and way of payment
 (`stores/paymentAccounts`) — a receipt by card starts on the account of the last receipt by card, else of the last
