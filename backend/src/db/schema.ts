@@ -366,6 +366,14 @@ export const actors = pgTable(
      * would read as not having come back.
      */
     analyticsOnAt: timestamp('analytics_on_at', { withTimezone: true }),
+    /**
+     * When the person last opened the app (MOL-238): the clock of «two years of silence», after
+     * which MOL-239 erases the account (owner's В-2 of MOL-97). A session knows its own last use,
+     * but goes after 180 days unused, or at «Выйти» — and with it the only trace of the visit.
+     * Moved once a day by the first request through the guard and by every login, never by the bot
+     * (owner's В-1); not by `updated_at`'s trigger either, which marks a change, not a visit.
+     */
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Moved by a trigger, not by drizzle: `$onUpdate` lives in the query builder, so raw
     // SQL — the main instrument in this directory — would leave the column behind.
