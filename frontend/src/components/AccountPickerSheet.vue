@@ -3,47 +3,40 @@
     <template #title>{{ title }}</template>
     <template #meta>{{ t('accounts.picker.meta') }}</template>
 
-    <div class="groups" role="radiogroup" :aria-label="title">
-      <section v-for="section in sections" :key="section.key">
-        <SectionCaption as="h3" class="caption">{{ section.title }}</SectionCaption>
-        <ul class="card">
-          <li v-for="account in section.accounts" :key="account.id">
-            <button
-              type="button"
+    <div>
+      <div class="groups" role="radiogroup" :aria-label="title">
+        <section v-for="section in sections" :key="section.key">
+          <SectionCaption as="h3">{{ section.title }}</SectionCaption>
+          <AppCard as="ul" list>
+            <li v-for="account in section.accounts" :key="account.id">
+              <ListRow
+                role="radio"
+                :title="account.name"
+                :meta="subOf(account)"
+                :selected="selected === account.id"
+                @click="pick(account.id)"
+              >
+                <template #tail>
+                  <span class="balance" :class="{ negative: account.balance.minor < 0n }">
+                    {{ balanceOf(account) }}
+                  </span>
+                </template>
+              </ListRow>
+            </li>
+          </AppCard>
+        </section>
+        <AppCard v-if="allowNone" as="ul" list>
+          <li>
+            <ListRow
               role="radio"
-              class="option"
-              :aria-checked="selected === account.id ? 'true' : 'false'"
-              @click="pick(account.id)"
-            >
-              <span class="text">
-                <span class="name">{{ account.name }}</span>
-                <span class="sub">{{ subOf(account) }}</span>
-              </span>
-              <span class="balance" :class="{ negative: account.balance.minor < 0n }">
-                {{ balanceOf(account) }}
-              </span>
-              <IconCheck v-if="selected === account.id" class="check" aria-hidden="true" />
-            </button>
+              :title="t('accounts.picker.none')"
+              :meta="t('accounts.picker.none_hint')"
+              :selected="selected === null"
+              @click="pick(null)"
+            />
           </li>
-        </ul>
-      </section>
-      <ul v-if="allowNone" class="card">
-        <li>
-          <button
-            type="button"
-            role="radio"
-            class="option"
-            :aria-checked="selected === null ? 'true' : 'false'"
-            @click="pick(null)"
-          >
-            <span class="text">
-              <span class="name">{{ t('accounts.picker.none') }}</span>
-              <span class="sub">{{ t('accounts.picker.none_hint') }}</span>
-            </span>
-            <IconCheck v-if="selected === null" class="check" aria-hidden="true" />
-          </button>
-        </li>
-      </ul>
+        </AppCard>
+      </div>
       <p class="footnote">{{ footnote }}</p>
     </div>
   </BottomSheet>
@@ -53,10 +46,11 @@
 import { computed, defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import IconCheck from '~icons/mdi/check'
 import type { Currency, MoneyAccountView } from '@molvia/model'
+import AppCard from '@/components/AppCard.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { pickerGroups, signedAmount } from '@/components/accounts'
+import ListRow from '@/components/ListRow.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 
 /**
@@ -67,7 +61,7 @@ import SectionCaption from '@/components/SectionCaption.vue'
  */
 export default defineComponent({
   name: 'AccountPickerSheet',
-  components: { BottomSheet, IconCheck, SectionCaption },
+  components: { AppCard, BottomSheet, ListRow, SectionCaption },
   props: {
     open: { type: Boolean, required: true },
     title: { type: String, required: true },
@@ -139,99 +133,33 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* The groups 24 apart, a caption 8 over its card (its own margin), the footnote 8 under the last card
+   (handoff 116 v2/06, `picker-light.png`): one child of the sheet, whose own gap of 16 would part them. */
 .groups {
   display: grid;
-  gap: var(--space-2);
-}
-
-/* A caption and its card stand in a section of their own: in the groups' gap the 8 under it would be 16. */
-.caption {
+  gap: var(--space-6);
   margin-top: var(--space-2);
 }
 
-.card {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  border: var(--hairline) solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  list-style: none;
-
-  li + li {
-    border-top: var(--hairline) solid var(--border);
-  }
-}
-
-.option {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  min-height: 3.75rem;
-  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
-  border: 0;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-
-  &[aria-checked='true'] {
-    background: var(--accent-tint);
-
-    /* Muted text is under 4.5:1 on a tint (MOL-172): on the chosen row its lines are ink. */
-    .sub,
-    .balance:not(.negative) {
-      color: var(--text);
-    }
-  }
-
-  &:focus-visible {
-    @include focus-ring(-2px);
-  }
-}
-
-.text {
-  display: grid;
-  flex: 1;
-  min-width: 0;
-}
-
-.name {
-  overflow: hidden;
-  font-size: var(--text-headline);
-  font-weight: var(--weight-medium);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sub,
-.footnote {
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
-.footnote {
-  margin: var(--space-1) var(--space-1) 0;
-}
-
 .balance {
-  flex: none;
   color: var(--text-muted);
   font-size: var(--text-callout);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  font-weight: var(--weight-regular);
 
   &.negative {
     color: var(--bad-ink);
   }
 }
 
-.check {
-  @include icon;
+/* Muted text is under 4.5:1 on a tint (MOL-172): on the chosen row the balance is ink, as the kit
+   makes its meta. */
+.selected .balance:not(.negative) {
+  color: var(--text);
+}
 
-  font-size: var(--icon-md);
-  color: var(--accent-ink);
+.footnote {
+  margin: var(--space-2) var(--space-1) 0;
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
 }
 </style>
