@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -9,6 +9,7 @@ import {
   yerevanDate,
 } from '@molvia/model'
 import type { Money, RateProvider, TripView } from '@molvia/model'
+import { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import { calendarDay } from '@/days'
 import { read, writeEverywhere } from '@/stores/storage'
 
@@ -36,15 +37,12 @@ export interface TripTotalInput {
    * «С ценой — n из m» counts: the same count «Закончить» asks by (Р-5 of MOL-76, adversarial А2).
    * Left out, the line is not said.
    */
-  readonly rows?: { readonly kept: number; readonly unpriced: number } | null
-}
-
-/** One line of what the prices say beside the receipt's sum. */
-export interface SplitLine {
-  readonly key: string
-  readonly label: string
-  readonly amount: string | null
-  readonly warn: boolean
+  readonly rows?: {
+    readonly kept: number
+    readonly unpriced: number
+    /** None of them being removed or waiting to be sent: the list the server counted (MOL-207). */
+    readonly settled?: boolean
+  } | null
 }
 
 export interface TripTotal {
@@ -57,7 +55,9 @@ export interface TripTotal {
   readonly flippable: ComputedRef<boolean>
   readonly flipped: Ref<boolean>
   readonly flip: () => void
-  readonly split: ComputedRef<SplitLine[]>
+  readonly receiptParts: ComputedRef<string[]>
+  /** The receipt's line is the words of a recount: a write of the record late on its way. */
+  readonly receiptLate: Ref<boolean>
   readonly waiting: ComputedRef<string | null>
 }
 
@@ -79,10 +79,10 @@ export interface TripTotal {
  * **Only the trip's own currency is converted.** A purchase paid for in another is its own line
  * under the total: adding two currencies is refused by the domain and meaningless on a screen.
  *
- * **With a receipt's sum the big number is the receipt** (MOL-78, В-2): «Итого по чеку», and under
- * it what the prices say — how many purchases have one and what they came to, what the rest came
- * to, or by how much the prices miss the receipt. Those figures are the server's (`prices`, `gap`);
- * the phone only counts the rows with a price among the rows the server sent. A sum still in the
+ * **With a receipt's sum the big number is the receipt** (MOL-78, В-2): «Итого по чеку», and in the
+ * line under it what the prices say — what they came to and for how many purchases, what the rest came
+ * to, or by how much the prices miss the receipt (MOL-207). Those figures are the server's (`prices`,
+ * `gap`); the phone only counts the rows with a price among the rows the server sent. A sum still in the
  * queue is a line of its own, never the total (MOL-82's rule).
  */
 export function useTripTotal(props: TripTotalInput): TripTotal {
@@ -201,37 +201,92 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
   // Nothing to swap without a conversion: a lone total is not two numbers.
   const flippable = computed(() => converted.value !== null)
 
-  const split = computed(() => {
+  /** The rows on screen are not the list `prices` and `gap` were counted on: a write is on its way. */
+  const receiptStale = computed(() => {
     const trip = props.trip
-    if (!trip?.receipt) return []
+    const rows = props.rows
+    if (!trip?.receipt || !rows) return false
     const all = trip.expenses.length
     const priced = trip.expenses.filter((expense) => expense.amount !== null).length
-    const lines: SplitLine[] = []
-    if (priced > 0 && trip.prices.length > 0) {
-      lines.push({
-        key: 'priced',
-        label: t('trip.receipt.priced', { n: priced, total: all }),
-        amount: trip.prices.map((value) => money(value)).join(' · '),
-        warn: false,
-      })
-    }
+    return rows.settled === false || rows.kept !== all || rows.unpriced !== all - priced
+  })
+
+  /** A write still on its way past `STRIP_LATE_MS`: then the line says so in words. */
+  const receiptLate = ref(false)
+  let late: ReturnType<typeof setTimeout> | undefined
+  watch(
+    receiptStale,
+    (stale) => {
+      clearTimeout(late)
+      receiptLate.value = false
+      if (stale)
+        late = setTimeout(() => {
+          receiptLate.value = true
+        }, STRIP_LATE_MS)
+    },
+    { immediate: true },
+  )
+  onScopeDispose(() => {
+    clearTimeout(late)
+  })
+
+  /**
+   * «по ценам 10 070 ֏ · чек меньше цен на 200 ֏» — what the prices say beside the receipt's sum, as parts
+   * of the card's one line (MOL-207, Ф-23): every figure the server's (`prices`, `gap`), each with its
+   * words; the phone only counts the rows with a price among those the server sent. The column of
+   * «С ценой / Без цены / Цены больше чека» went with the strip.
+   *
+   * **Prices more than the receipt are said as they are** (owner's В-1 «а»): «чек меньше цен» — a
+   * discount on the receipt and a price typed wrong look alike to the phone, and «скидка» about a typo
+   * would be a figure made up. **Agreeing is said only where it was measured and nothing is left
+   * unpriced**: the prices in the receipt's own currency, one sum, and no gap — two currencies do not
+   * subtract (`receiptGap`); prices that meet the receipt beside a purchase with none leave it nothing,
+   * and that is said — «без цены — 0 ֏», never «сходится» (adversarial А4). **Two currencies are a list,
+   * never a sum** — «8 000 ֏ и 20 $» by the locale's own conjunction: a «+» read as adding what the domain
+   * refuses to add (review №2, А3).
+   *
+   * **Of the list the server counted** (adversarial А1): a purchase removed or added is on the screen
+   * and not in `prices` and `gap` until its answer, and «— 1 из 2 · без цены — 830 ֏» over a struck-out
+   * loaf spoke of a list no longer shown. While a row is being removed or waits to be sent — judged by
+   * the rows, not their counts: milk swapped for cheese keeps both (round 2, Б1) — the line stands as
+   * it is for `STRIP_LATE_MS`, as «обновляем» does (MOL-201): sent with a connection, the answer comes
+   * first and nothing changes. Late, the line says in words that the prices will be counted again —
+   * whole contrast, heard by a screen reader (owner's В-3 «а», round 4). Taken away at once it went and
+   * came back with every purchase sent (round 3, В1); dimmed it read 2.1:1 for as long as the phone had
+   * no signal, and said nothing to a screen reader (round 4, Г1, Г2). The receipt's sum above it is the
+   * server's and true.
+   *
+   * **A dash never starts a line, and «12 из 14» is never cut** (review round 2, №3, П1): what follows
+   * the dash of a part — the count, the sum — goes with it, no-break; the words before wrap.
+   */
+  const receiptParts = computed(() => {
+    const trip = props.trip
+    if (!trip?.receipt || trip.expenses.length === 0) return []
+    if (receiptLate.value) return [t('trip.receipt.line_pending')]
+    const all = trip.expenses.length
+    const priced = trip.expenses.filter((expense) => expense.amount !== null).length
+    if (trip.prices.length === 0) return [t('trip.receipt.line_none')]
+    const amount = new Intl.ListFormat(locale.value, { type: 'conjunction' }).format(
+      trip.prices.map((value) => money(value)),
+    )
+    const parts = [
+      priced < all
+        ? t('trip.receipt.line_prices_part', { amount, n: priced, total: all })
+        : t('trip.receipt.line_prices', { amount }),
+    ]
     const gap = trip.gap
-    if (gap?.kind === 'unpriced') {
-      lines.push({
-        key: 'unpriced',
-        label: t('trip.receipt.unpriced', { n: all - priced }),
-        amount: money(gap.amount),
-        warn: false,
-      })
-    } else if (gap) {
-      lines.push({
-        key: gap.kind,
-        label: t(`trip.receipt.${gap.kind}`, { amount: money(gap.amount) }),
-        amount: null,
-        warn: gap.kind === 'over',
-      })
-    }
-    return lines
+    const currency = trip.receipt.currency
+    if (gap) parts.push(t(`trip.receipt.line_${gap.kind}`, { amount: money(gap.amount) }))
+    else if (trip.prices.length === 1 && trip.prices[0]?.currency === currency)
+      parts.push(
+        priced < all
+          ? t('trip.receipt.line_unpriced', { amount: money({ minor: 0n, currency }) })
+          : t('trip.receipt.line_meets'),
+      )
+    return parts.map((part) => {
+      const dash = part.lastIndexOf(' — ')
+      return dash < 0 ? part : part.slice(0, dash) + part.slice(dash).replaceAll(' ', '\u00a0')
+    })
   })
 
   const waiting = computed(() => {
@@ -252,7 +307,8 @@ export function useTripTotal(props: TripTotalInput): TripTotal {
     flippable,
     flipped,
     flip,
-    split,
+    receiptParts,
+    receiptLate,
     waiting,
   }
 }

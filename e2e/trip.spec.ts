@@ -620,10 +620,9 @@ test.describe('the receipt total (MOL-78)', () => {
     await recorded(page, 'Ереван Сити').click()
     await expect(page.locator('.caption')).toHaveText('Total by receipt')
     await expect(page.locator('.sum')).toContainText('֏1,400')
-    await expect(page.locator('.split')).toContainText('With a price — 1 of 2')
-    await expect(page.locator('.split')).toContainText('֏570')
-    await expect(page.locator('.split')).toContainText('Without a price — 1')
-    await expect(page.locator('.split')).toContainText('֏830')
+    // What the prices say beside it — parts of the card's one line, every figure with its words (Ф-23).
+    await expect(page.locator('.total')).toContainText('by prices ֏570 — 1 of 2')
+    await expect(page.locator('.total')).toContainText('no price — ֏830')
     // The price of the milk stayed what it was: nothing is worked out of the sum.
     await expect(row(page).first()).toContainText('֏570')
 

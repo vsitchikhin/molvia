@@ -632,8 +632,13 @@ test('a record of «Покупки» removed from «Траты» does not grow b
   )
   await page.route('**/api/money/months/*', slow(1500))
   const fresh = reread(page)
+  // A record of a receipt's sum alone is asked about first, the sheet naming the sum (MOL-207, А2).
   await page.getByRole('button', { name: 'Удалить запись' }).click()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Траты')
+  await expect(sheet).toContainText('Сумма по чеку 5 000 ֏')
+  await pressInSheet(
+    () => sheet.getByRole('button', { name: 'Удалить запись' }).click({ timeout: 300 }),
+    () => expect(page.getByRole('heading', { level: 1 })).toHaveText('Траты', { timeout: 300 }),
+  )
   await fresh
   await settled(page)
 

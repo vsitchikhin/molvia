@@ -307,6 +307,43 @@ describe('скачок курса в походе (MOL-39, Р-19, Р-21)', () =>
     const week = { ...rate('4.82'), asOf: new Date('2026-08-31T20:00:00Z') }
     expect(isTripRateStale(tripSchema.parse({ ...trip, rate: week }))).toBe(false)
   })
+
+  // MOL-207, Е-14: the trip's own day judges, never the moment the server got it.
+  it('«устарел» судится по дню записи: чек, записанный через неделю, со своим курсом — не устарел', () => {
+    const ofDay = (asOf: string) => ({ ...rate('4.82'), asOf: new Date(`${asOf}T20:00:00Z`) })
+    const recorded = { ...trip, startedAt: new Date('2026-09-20T10:00:00Z') }
+    // the rate of the receipt's day — 2 September in Yerevan — recorded on the 20th
+    expect(
+      isTripRateStale(
+        tripSchema.parse({ ...recorded, startedOn: '2026-09-02', rate: ofDay('2026-09-01') }),
+      ),
+    ).toBe(false)
+    // a week before the day is fresh, eight days is not — the boundary of MOL-39
+    expect(
+      isTripRateStale(
+        tripSchema.parse({ ...recorded, startedOn: '2026-09-09', rate: ofDay('2026-09-01') }),
+      ),
+    ).toBe(false)
+    expect(
+      isTripRateStale(
+        tripSchema.parse({ ...recorded, startedOn: '2026-09-10', rate: ofDay('2026-09-01') }),
+      ),
+    ).toBe(true)
+  })
+
+  it('курс новее дня записи не устарел: «с тех пор» о дне после записи — неправда (Е-14)', () => {
+    // started offline on the 22nd, sent on the 25th: the rate is the day it arrived (Ж1)
+    const late = { ...rate('4.82'), asOf: new Date('2026-09-24T20:00:00Z') }
+    expect(
+      isTripRateStale(tripSchema.parse({ ...trip, startedOn: '2026-09-22', rate: late })),
+    ).toBe(false)
+    // and so with no day of its own: the server's moment backdated, as the seed of MOL-118 did
+    expect(
+      isTripRateStale(
+        tripSchema.parse({ ...trip, startedAt: new Date('2026-09-22T15:05:00Z'), rate: late }),
+      ),
+    ).toBe(false)
+  })
 })
 
 describe('tripMoney (MOL-78)', () => {

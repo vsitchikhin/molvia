@@ -26,6 +26,12 @@ export interface TripReceipt {
   /** Rows on screen, one being removed not among them — what both questions of a record count (Р-5). */
   readonly kept: ComputedRef<number>
   readonly unpriced: ComputedRef<number>
+  /**
+   * The rows on screen are the server's: none being removed or waiting to be sent (MOL-207, adversarial
+   * Б1). Its figures of the prices are of this list then, and of another while a write is on its way —
+   * a purchase swapped for another keeps both counts and changes the list.
+   */
+  readonly settled: ComputedRef<boolean>
 }
 
 export function useTripReceipt(
@@ -74,5 +80,8 @@ export function useTripReceipt(
     receiptAction,
     kept: computed(() => shown.value.length),
     unpriced,
+    settled: computed(() =>
+      rows.value.every((row) => row.mark !== 'removing' && row.mark !== 'waiting'),
+    ),
   }
 }

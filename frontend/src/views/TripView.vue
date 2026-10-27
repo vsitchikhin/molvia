@@ -70,7 +70,7 @@
           :pending="waiting"
           :local="local !== null"
           :receipt-waiting="receiptWaiting"
-          :rows="{ kept, unpriced }"
+          :rows="{ kept, unpriced, settled }"
         />
         <p v-if="rows.length > 0" class="footnote">{{ t('trip.footnote') }}</p>
         <AppButton
@@ -418,7 +418,7 @@ export default defineComponent({
     })
 
     const { rows, waiting } = useTripRows(tripId, trip, () => t('trip.queued.unnamed'))
-    const { receiptOpen, receiptWaiting, receiptCurrent, receiptAction, kept, unpriced } =
+    const { receiptOpen, receiptWaiting, receiptCurrent, receiptAction, kept, unpriced, settled } =
       useTripReceipt(tripId, trip, rows)
     const handoff = useSpendingHandoffStore()
     /** «Записать тратой в «Деньгах»» was chosen: the screen goes there once the record is away. */
@@ -746,6 +746,7 @@ export default defineComponent({
       receiptAction,
       kept,
       unpriced,
+      settled,
       tripId,
       currency,
       accounts,

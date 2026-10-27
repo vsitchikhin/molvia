@@ -1,13 +1,14 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import type { SelectedTrip } from './useSelectedTrip'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { z } from 'zod'
-import { currencySchema } from '@molvia/model'
+import { currencySchema, formatMoney } from '@molvia/model'
 import type { CatalogueEntry, Currency, Money, TripExpenseView } from '@molvia/model'
 import type { TripRowView } from '@/components/tripRow'
 import type { CodeHeld } from '@/stores/receiptQueue'
+import { dayOfAnyYear, timeOfDay } from '@/days'
 import { upTarget, useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
 import { useTripHistoryStore } from '@/stores/tripHistory'
@@ -26,7 +27,10 @@ interface OpenedPurchase {
 interface FinishedTrip extends Omit<SelectedTrip, 'load'> {
   t: ReturnType<typeof useI18n>['t']
   name: ComputedRef<string>
-  meta: ComputedRef<string>
+  /** «Гюмри · вчера, 18:40 · из чека»; none while nothing of the record is known (Е-4). */
+  meta: ComputedRef<string | null>
+  /** The failed reads in a row, for the strip to say its words again (MOL-181). */
+  attempt: Ref<number>
   /** The purchases just written from a receipt, said once on arrival (MOL-127, 5o). */
   recorded: Ref<number | null>
   codesHeld: Ref<CodeHeld[]>
@@ -38,13 +42,23 @@ interface FinishedTrip extends Omit<SelectedTrip, 'load'> {
   receiptWaiting: ComputedRef<{ readonly receipt: Money | null } | null>
   receiptCurrent: ComputedRef<Money | null>
   receiptAction: ComputedRef<string | null>
+  /**
+   * The rows on screen and those with no price, as the card's «С ценой» counts them (MOL-206) — none
+   * over a record read back from the phone's shelf, which keeps no receipt's sum yet: its total may be
+   * the receipt, and «С ценой — 1 из 2» beside it read as the prices (MOL-207).
+   */
+  priced: ComputedRef<{
+    readonly kept: number
+    readonly unpriced: number
+    readonly settled: boolean
+  } | null>
   /** What a new sum starts in: the record's currency, as the purchase sheet takes it. */
   receiptCurrency: ComputedRef<Currency>
   opened: Ref<OpenedPurchase | null>
   pending: ComputedRef<boolean>
   rejected: ComputedRef<boolean>
   removing: Ref<boolean>
-  removal: Ref<{ place: string; day: Date | null; items: number }>
+  removal: Ref<{ place: string; day: Date | null; items: number; receipt: string | null }>
   askRemove(): void
   confirmRemove(): void
   afterRemoveSheet(): void
@@ -78,11 +92,11 @@ export function useFinishedTrip(): FinishedTrip {
   const history = useTripHistoryStore()
   // Whether the trip shown is the server's answer, which knows its receipt's sum — not one read back
   // from the phone's shelf, here or by another window (MOL-78, reviews 4 and Е).
-  const { receiptOpen, receiptWaiting, receiptCurrent, receiptAction } = useTripReceipt(
-    selected.id,
-    selected.trip,
-    rows,
-    () => history.answered(selected.trip.value),
+  const answered = (): boolean => history.answered(selected.trip.value)
+  const { receiptOpen, receiptWaiting, receiptCurrent, receiptAction, kept, unpriced, settled } =
+    useTripReceipt(selected.id, selected.trip, rows, answered)
+  const priced = computed(() =>
+    answered() ? { kept: kept.value, unpriced: unpriced.value, settled: settled.value } : null,
   )
   const receiptCurrency = computed<Currency>(
     () =>
@@ -98,17 +112,27 @@ export function useFinishedTrip(): FinishedTrip {
       selected.trip.value?.finishedOnDeviceAt ??
       selected.trip.value?.finishedAt,
   )
+  /**
+   * «Гюмри · вчера, 18:40» (handoff 5q) — the place is the title. The moment and its day are the ones
+   * the record's row in «Записаны» says, one record one day on both screens; the city is the answer's
+   * (`placeCity`), and a record with none says the day alone. Nothing at all while no moment is known
+   * — never «Эта запись ещё не закончена» about a record the screen is for (Е-4).
+   */
   const meta = computed(() => {
-    const line = finished.value
-      ? t('trip.history.finished_at', {
-          when: new Intl.DateTimeFormat(locale.value, {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-          }).format(finished.value),
-        })
-      : t('trip.history.unfinished')
+    const at = finished.value
+    if (!at) return null
+    const city = selected.trip.value?.placeCity ?? selected.local.value?.view?.placeCity
+    const when = t('trip.history.when', {
+      day: dayOfAnyYear(at, locale.value),
+      time: timeOfDay(at, locale.value),
+    })
     // Recorded from a receipt (MOL-126): said beside the day, as «Записаны» says it (MOL-127).
-    return selected.trip.value?.receiptId ? `${line} · ${t('receipt.recorded.from_receipt')}` : line
+    const source = selected.trip.value?.receiptId ? t('receipt.recorded.from_receipt') : null
+    return [city, when, source].filter((part) => part).join(' · ')
+  })
+  const attempt = ref(0)
+  watch(selected.loading, (now, was) => {
+    if (was && !now && selected.trouble.value) attempt.value += 1
   })
   /**
    * «Записали N покупок» (handoff 05, 5o): the review hands the count over in the history's state
@@ -167,15 +191,18 @@ export function useFinishedTrip(): FinishedTrip {
   const pending = computed(() => queue.pending.some((w) => w.tripId === selected.id.value))
 
   const removing = ref(false)
-  const removal = ref<{ place: string; day: Date | null; items: number }>({
+  const removal = ref<{ place: string; day: Date | null; items: number; receipt: string | null }>({
     place: '',
     day: null,
     items: 0,
+    receipt: null,
   })
   /**
    * «Удалить поход» of a finished trip (MOL-76, В-1): the same as an open one's — an empty one goes
    * at once, one with purchases is asked about. Then back to where the person came from, the
-   * history, the home screen or «Деньги», where «Вернуть» stands.
+   * history, the home screen or «Деньги», where «Вернуть» stands. **A sum by the receipt is not empty**
+   * (adversarial А2 of MOL-207, as Б1 of MOL-206 on the open record): a receipt with no items (MOL-227)
+   * is a record of its sum alone, and the sheet asks, naming that sum, before it goes.
    */
   function drop(): void {
     const tripId = selected.id.value
@@ -183,12 +210,25 @@ export function useFinishedTrip(): FinishedTrip {
   }
   function askRemove(): void {
     const items = rows.value.filter((row) => row.mark !== 'removing').length
-    if (items === 0) {
+    // Read back from the phone's shelf the receipt is not kept, but a record the server holds with no
+    // purchase has no money but its receipt: its total is that sum. One whose purchases are only being
+    // removed has a total that may be their prices or a receipt — the shelf cannot say which, so it is
+    // asked about with no sum named (round 2, Б2); answered by the server, its receipt is known.
+    const held = selected.trip.value
+    const sum =
+      receiptCurrent.value ?? (held?.expenses.length === 0 ? (held.total[0] ?? null) : null)
+    const unknown = held !== null && !answered() && held.total.length > 0
+    if (items === 0 && !sum && !unknown) {
       drop()
       void goBack()
       return
     }
-    removal.value = { place: name.value, day: finished.value ?? null, items }
+    removal.value = {
+      place: name.value,
+      day: finished.value ?? null,
+      items,
+      receipt: items === 0 && sum ? formatMoney(sum, locale.value) : null,
+    }
     removing.value = true
   }
   /** The sheet puts itself and this screen away in one step back (`steps` 2). */
@@ -206,6 +246,7 @@ export function useFinishedTrip(): FinishedTrip {
     t,
     name,
     meta,
+    attempt,
     recorded,
     codesHeld,
     toVerdicts: () => void goTab('verdicts'),
@@ -215,6 +256,7 @@ export function useFinishedTrip(): FinishedTrip {
     receiptWaiting,
     receiptCurrent,
     receiptAction,
+    priced,
     receiptCurrency,
     opened,
     amend,
