@@ -128,7 +128,10 @@ The detail behind the trip lines of `CLAUDE.md`.
   it**: a `payment` still in the queue — chosen in «не попали» with no connection, or not landed yet — before the
   server's answer, since a new one would take its place there (review Р2-2, adversarial А7). **The same account
   with no field of «Списано» on screen sends nothing** — one of the record's currency, «Списано» for a purchase in
-  a third, or an account this phone does not know (Р2-1, А8): nothing typed, nothing changed. «Счета» are read as
+  a third, or an account this phone does not know (Р2-1, А8): nothing typed, nothing changed. **A sum typed in the same
+  sheet sends the payment again after it** (adversarial А9): the sum goes first and takes «Списано» off on the
+  server, so what the sheet showed beside it — the field as typed, or the record's own where none was on screen —
+  is put back by a `payment` behind the `receipt`. «Счета» are read as
   the sheet opens, never with every opening of the record (Р1-2). **The price, named:** an account this phone
   does not know reads «Без счёта» in the row until «Счета» answer, the record staying on it. Only for the account's own currency against the record's: a purchase in a third currency
   is the summary's to cover in «Траты», a price named. **The price, named:** removing a trip dated before
