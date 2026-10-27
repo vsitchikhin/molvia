@@ -270,6 +270,8 @@ describe('какие ключи приложение пишет на устро�
       // Очередь чеков и её отказы (MOL-127).
       'molvia.receipt-queue',
       'molvia.receipt-rejected',
+      // Чеки, снятые «Переснять», — их удаление оставляет разбор (MOL-309, В-6 «а»).
+      'molvia.receipt-retakes',
       // Какой товар показал просмотр при первой правке строки — мера 0.2 (MOL-222, В1).
       'molvia.receipt-shown',
       'molvia.receipts',

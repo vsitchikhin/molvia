@@ -235,6 +235,8 @@ export const ru = {
    * and why by kind — no name, no sum, no shop. Russian always, as every notice to the owner.
    */
   'owner.receipt.partial': '🧾 Чек не целиком · {receipt} · модель · {country}',
+  'owner.receipt.partialUnkept':
+    '🧾 Чек не целиком · модель · {country} · не хранится: редакция 4 не принята',
   'owner.receipt.lines': 'Строк {lines}: с цифрами {shown}, без цифр {empty}',
   'owner.receipt.reason': 'Чек: {reason}',
   'owner.receipt.lineReasons': 'Строки: {reasons}',

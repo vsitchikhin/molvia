@@ -261,6 +261,17 @@ const file: ExportFile = {
       ],
     },
   ],
+  receiptReviews: [
+    {
+      receipt: id(30),
+      receiptId: id(30),
+      readAt: at,
+      keepUntil: at,
+      retakenAt: at,
+      readerVersion: 'claude-haiku-5-5@v5',
+      reasons: { receipt: 'lines_lost', lines: [null, 'unsettled'] },
+    },
+  ],
   spendingCategories: [
     {
       id: id(14),

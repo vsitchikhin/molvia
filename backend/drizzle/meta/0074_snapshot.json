@@ -1,5 +1,5 @@
 {
-  "id": "1d981550-9e05-40ed-b83b-87255466a004",
+  "id": "77a16726-3ea0-4025-aa0c-a819682f77ff",
   "prevId": "bdee3b51-15a3-4b36-9d20-0c519554156b",
   "version": "7",
   "dialect": "postgresql",
@@ -5012,8 +5012,8 @@
       "name": "receipt_miss_parts",
       "schema": "",
       "columns": {
-        "receipt_id": {
-          "name": "receipt_id",
+        "receipt": {
+          "name": "receipt",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -5033,20 +5033,20 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "receipt_miss_parts_receipt_id_receipt_misses_receipt_id_fk": {
-          "name": "receipt_miss_parts_receipt_id_receipt_misses_receipt_id_fk",
+        "receipt_miss_parts_receipt_receipt_misses_receipt_fk": {
+          "name": "receipt_miss_parts_receipt_receipt_misses_receipt_fk",
           "tableFrom": "receipt_miss_parts",
           "tableTo": "receipt_misses",
-          "columnsFrom": ["receipt_id"],
-          "columnsTo": ["receipt_id"],
+          "columnsFrom": ["receipt"],
+          "columnsTo": ["receipt"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
-        "receipt_miss_parts_receipt_id_position_pk": {
-          "name": "receipt_miss_parts_receipt_id_position_pk",
-          "columns": ["receipt_id", "position"]
+        "receipt_miss_parts_receipt_position_pk": {
+          "name": "receipt_miss_parts_receipt_position_pk",
+          "columns": ["receipt", "position"]
         }
       },
       "uniqueConstraints": {},
@@ -5063,10 +5063,22 @@
       "name": "receipt_misses",
       "schema": "",
       "columns": {
+        "receipt": {
+          "name": "receipt",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
         "receipt_id": {
           "name": "receipt_id",
           "type": "uuid",
-          "primaryKey": true,
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
           "notNull": true
         },
         "read_at": {
@@ -5080,6 +5092,12 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
+        },
+        "retaken_at": {
+          "name": "retaken_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "reader_version": {
           "name": "reader_version",
@@ -5115,6 +5133,36 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "receipt_misses_receipt_id_idx": {
+          "name": "receipt_misses_receipt_id_idx",
+          "columns": [
+            {
+              "expression": "receipt_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "receipt_misses_actor_idx": {
+          "name": "receipt_misses_actor_idx",
+          "columns": [
+            {
+              "expression": "actor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -5123,6 +5171,15 @@
           "tableFrom": "receipt_misses",
           "tableTo": "receipts",
           "columnsFrom": ["receipt_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "receipt_misses_actor_id_actors_id_fk": {
+          "name": "receipt_misses_actor_id_actors_id_fk",
+          "tableFrom": "receipt_misses",
+          "tableTo": "actors",
+          "columnsFrom": ["actor_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
@@ -5135,6 +5192,10 @@
         "receipt_misses_kept_after_read": {
           "name": "receipt_misses_kept_after_read",
           "value": "\"receipt_misses\".\"keep_until\" > \"receipt_misses\".\"read_at\""
+        },
+        "receipt_misses_receipt_own": {
+          "name": "receipt_misses_receipt_own",
+          "value": "\"receipt_misses\".\"receipt_id\" is null or \"receipt_misses\".\"receipt_id\" = \"receipt_misses\".\"receipt\""
         }
       },
       "isRLSEnabled": false

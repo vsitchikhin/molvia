@@ -3073,20 +3073,29 @@ export const receiptReasonDays = pgTable(
 
 /**
  * A receipt read not whole, kept for the developer's review (MOL-309, owner's В-3 «б»): what its reader
- * read — the model's answer as it came, or Tesseract's rows of both page modes — and why each line was
- * not shown as read; its photo in `receipt_miss_parts`. **Kept after «Записать»**, which deletes the
- * receipt's own photo, until the fortnightly review (MOL-310) lets it go — `make receipt-miss-forget` —
- * or `keep_until` passes (`RECEIPT_MISS_KEEP_DAYS`). It goes with its receipt: removed, its trip gone for
- * good, the person erased. Never in the nightly copy, never in the log, never in the person's copy.
+ * read — the model's answer as it came — and why each line was not shown as read; its photo in
+ * `receipt_miss_parts`. **Kept after «Записать»**, which deletes the receipt's own photo, until the fortnightly
+ * review (MOL-310) lets it go — `make receipt-miss-forget` — or `keep_until` passes (`RECEIPT_MISS_KEEP_DAYS`).
+ *
+ * **Its key is the receipt's id as it was read** (`receipt`), never a key to it: «Переснять» removes the receipt it
+ * replaces, and the review of exactly such a receipt stays (owner's В-6 «а») — `retaken_at` marks it at the removal,
+ * and the purge lets go of the link (`receipt_id` to null) before the receipt goes. Any other removal takes it by
+ * the cascade of `receipt_id`: «Удалить чек», its trip gone for good, the 28 days of a receipt not recorded. **It goes
+ * with its person** (`actor_id`, `ACTOR_REFERENCES`), the retaken one too. Never in the nightly copy, never in the
+ * log; the person's copy says it is kept, until when and why — never the photo or the reading.
  */
 export const receiptMisses = pgTable(
   'receipt_misses',
   {
-    receiptId: uuid('receipt_id')
-      .primaryKey()
-      .references(() => receipts.id, { onDelete: 'cascade' }),
+    receipt: uuid('receipt').primaryKey(),
+    receiptId: uuid('receipt_id').references(() => receipts.id, { onDelete: 'cascade' }),
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id, { onDelete: 'cascade' }),
     readAt: timestamp('read_at', { withTimezone: true }).notNull(),
     keepUntil: timestamp('keep_until', { withTimezone: true }).notNull(),
+    /** «Переснять» removed its receipt (В-6 «а»): the review stays past it; «Вернуть» takes the mark back. */
+    retakenAt: timestamp('retaken_at', { withTimezone: true }),
     readerVersion: text('reader_version').notNull(),
     /** Why the receipt was not proven whole, and why each line was not shown as read, in their order. */
     reasons: jsonb('reasons')
@@ -3097,7 +3106,14 @@ export const receiptMisses = pgTable(
   },
   (table) => [
     index('receipt_misses_keep_until_idx').on(table.keepUntil),
+    index('receipt_misses_receipt_id_idx').on(table.receiptId),
+    index('receipt_misses_actor_idx').on(table.actorId),
     check('receipt_misses_kept_after_read', sql`${table.keepUntil} > ${table.readAt}`),
+    // linked, it is its own receipt's
+    check(
+      'receipt_misses_receipt_own',
+      sql`${table.receiptId} is null or ${table.receiptId} = ${table.receipt}`,
+    ),
   ],
 )
 
@@ -3105,14 +3121,14 @@ export const receiptMisses = pgTable(
 export const receiptMissParts = pgTable(
   'receipt_miss_parts',
   {
-    receiptId: uuid('receipt_id')
+    receipt: uuid('receipt')
       .notNull()
-      .references(() => receiptMisses.receiptId, { onDelete: 'cascade' }),
+      .references(() => receiptMisses.receipt, { onDelete: 'cascade' }),
     position: smallint('position').notNull(),
     photo: bytea('photo').notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.receiptId, table.position] }),
+    primaryKey({ columns: [table.receipt, table.position] }),
     check(
       'receipt_miss_parts_position_range',
       sql`${table.position} between 1 and ${sql.raw(String(RECEIPT_PARTS_MAX))}`,

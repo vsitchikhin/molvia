@@ -1199,7 +1199,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
             pack,
             paidBy,
           ),
-        remove: (actorId, id) => removeReceipt(receipts, actorId, id),
+        remove: (actorId, id, retake) => removeReceipt(receipts, actorId, id, retake),
         restore: (actorId, id) => restoreReceipt(receipts, actorId, id),
         record: (actor, id, body) => recordReceipt(transact, actor, id, body),
         settled: (actor, id) => receiptSettled(transact, actor, id),

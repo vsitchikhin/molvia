@@ -374,13 +374,17 @@ export async function receiptOfOwner(
   }
 }
 
-/** «Удалить чек»: a mark; the photo and the lines go when «Вернуть» is over (П-8). */
+/**
+ * «Удалить чек»: a mark; the photo and the lines go when «Вернуть» is over (П-8). `retake` — «Переснять» replaced it,
+ * and its review stays (MOL-309, owner's В-6 «а»).
+ */
 export function removeReceipt(
   receipts: ReceiptRepository,
   actorId: string,
   id: string,
+  retake = false,
 ): Promise<void> {
-  return receipts.remove(actorId, id)
+  return receipts.remove(actorId, id, { retake })
 }
 
 export async function restoreReceipt(

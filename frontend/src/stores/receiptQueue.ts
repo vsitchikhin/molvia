@@ -87,6 +87,30 @@ interface Kept {
 const QUEUE_KEY = 'molvia.receipt-queue'
 const REJECTED_KEY = 'molvia.receipt-rejected'
 const DELIVERED_KEY = 'molvia.receipt-delivered'
+/**
+ * The receipts «Переснять» removed (MOL-309, owner's В-6 «а»): their removal goes with `RECEIPT_RETAKE_HEADER`, and
+ * the review of one read not whole stays past it. **Beside the queue, never inside**: the build before reads a write
+ * strictly and would drop the removal for a field it does not know.
+ */
+const RETAKES_KEY = 'molvia.receipt-retakes'
+
+function recallRetakes(owner: string | null): string[] {
+  if (!owner) return []
+  const raw = read(`${RETAKES_KEY}.${owner}`)
+  if (!raw) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function keepRetakes(owner: string | null, edit: (ids: string[]) => string[]): void {
+  if (!owner) return
+  const next = edit(recallRetakes(owner))
+  write(`${RETAKES_KEY}.${owner}`, JSON.stringify(next))
+}
 /** As long as the server keeps a receipt not recorded (В-3): nothing to remember past it. */
 const DELIVERED_MS = 28 * 24 * 60 * 60 * 1000
 
@@ -392,9 +416,12 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
         await api.putReceiptPart(write.id, write.part, photo)
         return
       }
-      case 'remove':
-        await api.removeReceipt(write.id)
+      case 'remove': {
+        const retake = recallRetakes(actor.id).includes(write.id)
+        await api.removeReceipt(write.id, retake ? { retake } : undefined)
+        if (retake) keepRetakes(actor.id, (ids) => ids.filter((one) => one !== write.id))
         return
+      }
       case 'restore':
         await api.restoreReceipt(write.id)
         return
@@ -599,11 +626,14 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     const owner = actor.id
     if (!quiet) lastRemoved.value = { undo, stamp: Date.now(), left: 0, at: Date.now() }
     else if (owner && undo.local) void photoShelf(owner).drop(id)
+    // the server's removal of a receipt replaced says so: its review stays (MOL-309, В-6 «а»)
+    else keepRetakes(owner, (ids) => (ids.includes(id) ? ids : [...ids, id]))
     return undo
   }
 
   /** «Вернуть»: what was taken out put back; the waiting removal taken back, or a restore sent. */
   function restore(undo: ReceiptUndo): void {
+    keepRetakes(actor.id, (ids) => ids.filter((one) => one !== undo.id))
     change(() => {
       if (undo.local && undo.writes) {
         kept = [...kept, ...undo.writes.map((write) => ({ key: newKey(), write }))]

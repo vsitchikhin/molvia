@@ -431,10 +431,16 @@ function reasonCounts(outcome: ReadOutcome): readonly {
   for (const reason of reasons.lines) {
     if (reason !== null) lines.set(reason, (lines.get(reason) ?? 0) + 1)
   }
+  // a receipt with no item lines read is a sum (MOL-227), read whole: counted apart, never «not whole» (self-review №6)
+  const noItems = reasons.receipt === 'no_lines'
   return [
     { scope: 'read', reason: 'receipts', n: 1 },
     { scope: 'read', reason: 'lines', n: reasons.lines.length },
-    ...(reasons.receipt === null
+    ...(noItems ? [{ scope: 'read' as const, reason: 'no_items', n: 1 }] : []),
+    // the server's word «Прочитали не всё», beside the reason: lines lost may hide behind a line not as printed
+    // (self-review №5)
+    ...(outcome.partly ? [{ scope: 'read' as const, reason: 'partly', n: 1 }] : []),
+    ...(reasons.receipt === null || noItems
       ? []
       : [{ scope: 'receipt' as const, reason: reasons.receipt, n: 1 }]),
     ...[...lines].map(([reason, n]) => ({ scope: 'line' as const, reason, n })),
@@ -472,11 +478,13 @@ async function tallyReasons(
  * lets it go or `RECEIPT_MISS_KEEP_DAYS` pass.
  */
 async function keepMiss(db: Conn, id: string, readerVersion: string, outcome: ReadOutcome) {
-  await db.delete(receiptMisses).where(eq(receiptMisses.receiptId, id))
+  await db.delete(receiptMisses).where(eq(receiptMisses.receipt, id))
   const { miss } = outcome
   if (miss === undefined) return
   await db.insert(receiptMisses).values({
+    receipt: id,
     receiptId: id,
+    actorId: sql`(select ${receipts.actorId} from ${receipts} where ${receipts.id} = ${id})`,
     readAt: sql`clock_timestamp()`,
     keepUntil: sql`clock_timestamp() + make_interval(days => ${RECEIPT_MISS_KEEP_DAYS})`,
     readerVersion,
@@ -490,7 +498,7 @@ async function keepMiss(db: Conn, id: string, readerVersion: string, outcome: Re
     await db
       .insert(receiptMissParts)
       .values(
-        miss.parts.map((part) => ({ receiptId: id, position: part.position, photo: part.photo })),
+        miss.parts.map((part) => ({ receipt: id, position: part.position, photo: part.photo })),
       )
   }
 }
@@ -557,9 +565,9 @@ export interface ReceiptRepository {
   /**
    * «Удалить чек»: a mark. A receipt recorded as purchases still there is refused (409): the trip is
    * dated, named «из чека» and guarded against a second record by this row (MOL-126) — it goes with
-   * its trip.
+   * its trip. `retake` — «Переснять» removed it: its review stays past it (MOL-309, owner's В-6 «а»).
    */
-  remove(actorId: string, id: string): Promise<void>
+  remove(actorId: string, id: string, options?: { readonly retake?: boolean }): Promise<void>
   /** «Вернуть»: `false` for anything that is not the owner's receipt removed within the window. */
   restore(actorId: string, id: string): Promise<boolean>
   /**
@@ -604,9 +612,10 @@ export interface ReceiptRepository {
   askLater(id: string, minutes: number): Promise<'queued' | 'failed'>
   /**
    * The end of a reading. Written into a receipt removed meanwhile too — «Вернуть» brings it back
-   * read; nothing happens to one no longer `reading`, or no longer there after the final purge.
+   * read; nothing happens to one no longer `reading`, or no longer there after the final purge. Whether it was
+   * written: a receipt not written is no receipt to tell of (MOL-309, self-review №7).
    */
-  finish(id: string, outcome: ReadOutcome): Promise<void>
+  finish(id: string, outcome: ReadOutcome): Promise<boolean>
 }
 
 const undoFrom = () => sql`clock_timestamp() - make_interval(mins => ${RECEIPT_UNDO_MINUTES})`
@@ -1221,7 +1230,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
       return recordedTwinOf(db, actorId, tin, receiptNo, except)
     },
 
-    async remove(actorId, id) {
+    async remove(actorId, id, { retake = false } = {}) {
       const own = idOrNull(id)
       if (own === null) return
       await db.transaction(async (tx) => {
@@ -1244,6 +1253,11 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           .update(receipts)
           .set({ deletedAt: sql`clock_timestamp()` })
           .where(eq(receipts.id, own))
+        // «Переснять»: the review of the receipt it replaces stays (MOL-309, owner's В-6 «а»)
+        await tx
+          .update(receiptMisses)
+          .set({ retakenAt: retake ? sql`clock_timestamp()` : null })
+          .where(eq(receiptMisses.receiptId, own))
       })
     },
 
@@ -1262,10 +1276,24 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           ),
         )
         .returning({ id: receipts.id })
+      // brought back, it is no receipt replaced: its review goes with it again
+      if (restored.length > 0) {
+        await db
+          .update(receiptMisses)
+          .set({ retakenAt: null })
+          .where(eq(receiptMisses.receiptId, own))
+      }
       return restored.length > 0
     },
 
     async purgeStale() {
+      // a receipt «Переснять» replaced lets go of its review before it goes: the review stays (MOL-309, В-6 «а»)
+      await db
+        .update(receiptMisses)
+        .set({ receiptId: null })
+        .where(
+          sql`${receiptMisses.retakenAt} is not null and ${receiptMisses.receiptId} in (select ${receipts.id} from ${receipts} where ${receipts.deletedAt} <= ${undoFrom()})`,
+        )
       await db.delete(receipts).where(sql`${receipts.deletedAt} <= ${undoFrom()}`)
       // Not recorded in its days, by the server's clock: the phone's moment of the shot may lie.
       await db
@@ -1399,7 +1427,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     },
 
     async finish(id, outcome) {
-      await db.transaction(async (tx) => {
+      return db.transaction(async (tx) => {
         const head = outcome.head
         const [done] = await tx
           .update(receipts)
@@ -1433,7 +1461,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           })
           .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
           .returning({ id: receipts.id, source: receipts.source, country: receipts.country })
-        if (done === undefined) return
+        if (done === undefined) return false
         // read or failed, the link of a receipt by its QR code is no longer kept (MOL-232, Р-4)
         await tx.delete(receiptLinks).where(eq(receiptLinks.receiptId, id))
         // the measure of 0.2 is the reader's (MOL-222): a receipt from the tax office has nothing in it
@@ -1456,11 +1484,11 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
                   ? 'empty'
                   : 'unreadable'
             await tallyTax(tx, { [failed]: sql`1` }, today())
-            return
+            return true
           }
           const failed = outcome.failure === 'reshoot' ? 'reshoot' : 'unreadable'
           await tally(tx, { [failed]: sql`1` }, today(), sql``, outcome.readerVersion)
-          return
+          return true
         }
         if (outcome.lines.length > 0) {
           await tx.insert(receiptLines).values(
@@ -1511,6 +1539,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             today(),
           )
         } else await tally(tx, read, today(), sql``, outcome.readerVersion)
+        return true
       })
     },
 

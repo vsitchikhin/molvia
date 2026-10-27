@@ -386,6 +386,13 @@ export const RECEIPT_READ_TOTAL_HEADER = 'X-Molvia-Receipt-Read-Total'
 /** A phone that knows the detail's `readPartly` says so by this header (MOL-255), as `RECEIPT_CODES_HEADER`. */
 export const RECEIPT_READ_PARTLY_HEADER = 'X-Molvia-Receipt-Read-Partly'
 
+/**
+ * «Переснять» removes the receipt it replaces by this header on `DELETE /receipts/:id` (MOL-309, owner's В-6 «а»):
+ * the review of a receipt read not whole stays past it. A header, not the query: a server rolled back takes the
+ * removal all the same, and the review goes as it did.
+ */
+export const RECEIPT_RETAKE_HEADER = 'X-Molvia-Receipt-Retake'
+
 /** A phone that knows a line's `repaired` says so by this header (MOL-290), as `RECEIPT_CODES_HEADER`. */
 export const RECEIPT_REPAIRED_HEADER = 'X-Molvia-Receipt-Repaired'
 

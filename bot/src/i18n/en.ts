@@ -127,6 +127,8 @@ export const en: Dictionary = {
   'owner.model.stop':
     '🛑 Receipts by the model in {month}: ${spent} spent, a receipt did not fit under the ${cap} cap and was read by Tesseract. From now on the model reads only what still fits, Tesseract the rest.',
   'owner.receipt.partial': '🧾 A receipt not read whole · {receipt} · model · {country}',
+  'owner.receipt.partialUnkept':
+    '🧾 A receipt not read whole · model · {country} · not kept: edition 4 not accepted',
   'owner.receipt.lines': 'Lines {lines}: with figures {shown}, without {empty}',
   'owner.receipt.reason': 'Receipt: {reason}',
   'owner.receipt.lineReasons': 'Lines: {reasons}',

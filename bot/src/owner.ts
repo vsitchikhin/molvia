@@ -135,22 +135,31 @@ function partialText(notice: ReceiptPartialNotice): string {
     .map(
       ({ reason, count }) => `${t(undefined, `owner.receipt.line.${reason}`)} — ${String(count)}`,
     )
+  // a receipt not kept for the review is named by no id: nothing here would open it (self-review №3)
+  const { receipt } = notice
   return [
-    t(undefined, 'owner.receipt.partial', { receipt: notice.receipt, country: notice.country }),
+    receipt === undefined
+      ? t(undefined, 'owner.receipt.partialUnkept', { country: notice.country })
+      : t(undefined, 'owner.receipt.partial', { receipt, country: notice.country }),
     t(undefined, 'owner.receipt.lines', {
       lines: notice.lines,
       shown: notice.shown,
       empty: notice.lines - notice.shown,
     }),
-    t(undefined, 'owner.receipt.reason', {
-      reason: t(undefined, `owner.receipt.why.${notice.reason}`),
-    }),
+    // proven whole, a line emptied all the same: no reason of the receipt to give (adversarial А3)
+    ...(notice.reason === undefined
+      ? []
+      : [
+          t(undefined, 'owner.receipt.reason', {
+            reason: t(undefined, `owner.receipt.why.${notice.reason}`),
+          }),
+        ]),
     ...(reasons.length === 0
       ? []
       : [t(undefined, 'owner.receipt.lineReasons', { reasons: reasons.join(', ') })]),
-    ...(notice.keptUntil === undefined
+    ...(notice.keptUntil === undefined || receipt === undefined
       ? []
-      : [t(undefined, 'owner.receipt.kept', { day: notice.keptUntil, receipt: notice.receipt })]),
+      : [t(undefined, 'owner.receipt.kept', { day: notice.keptUntil, receipt })]),
   ].join('\n')
 }
 

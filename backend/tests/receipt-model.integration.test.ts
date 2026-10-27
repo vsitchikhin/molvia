@@ -1178,8 +1178,147 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     expect(await db.select().from(receiptMisses)).toEqual([])
     const [notice] = await notices()
     expect(notice).toMatchObject({ kind: 'receipt_partial', reason: 'line_not_as_printed' })
+    // nothing kept: no day, and no id that would name a receipt nothing here opens (self-review №3)
     expect(notice).not.toHaveProperty('keptUntil')
+    expect(notice).not.toHaveProperty('receipt')
   }, 30_000)
+
+  // adversarial А3: proven whole, a line «1 × 0 = 0» emptied all the same — no reason of the receipt to give
+  it('tells of a receipt proven whole with a line emptied, with no reason of the receipt', async () => {
+    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    await queued(me)
+    const free: ModelReceipt = {
+      ...ANSWER,
+      lines: [
+        ...ANSWER.lines,
+        {
+          printed: 'Տոպրակ',
+          code: '3923',
+          article: '1100002',
+          quantity: '1',
+          unit: 'pcs',
+          unit_price: '0',
+          discount: null,
+          sum: '0',
+        },
+      ],
+    }
+    await readAll(
+      benchReader(),
+      fakeModel(() =>
+        Promise.resolve({ kind: 'read', answer: free, costMicroUsd: 2_180, tokens: TOKENS }),
+      ),
+      { told: told() },
+    )
+    const [notice] = await notices()
+    expect(notice).toMatchObject({ kind: 'receipt_partial', lineReasons: { zero_not_gift: 1 } })
+    expect(notice).not.toHaveProperty('reason')
+  }, 30_000)
+
+  // self-review №5, №6: «Прочитали не всё» counted beside the reason, a receipt with no items apart from «not whole»
+  it('counts a line lost with «read in part», and a receipt with no items apart', async () => {
+    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    await queued(me)
+    const lost: ModelReceipt = {
+      ...ANSWER,
+      totals: [
+        { label: 'Ընդամենը', amount: '1317.10' },
+        { label: 'Վճարված է Առձեռն', amount: '1317.10' },
+      ],
+    }
+    await readAll(
+      benchReader(),
+      fakeModel(() =>
+        Promise.resolve({ kind: 'read', answer: lost, costMicroUsd: 2_180, tokens: TOKENS }),
+      ),
+    )
+    expect(await reasons()).toEqual([
+      'model AM read lines 2',
+      'model AM read partly 1',
+      'model AM read receipts 1',
+      'model AM receipt lines_lost 1',
+    ])
+    await db.delete(receiptReasonDays)
+    await queued(me)
+    const section = {
+      ...ANSWER,
+      lines: [],
+      totals: [
+        { label: 'Բաժին 1', amount: '1700.00' },
+        { label: 'Ընդամենը', amount: '1700.00' },
+      ],
+    }
+    await readAll(
+      benchReader(),
+      fakeModel(() =>
+        Promise.resolve({ kind: 'read', answer: section, costMicroUsd: 1_000, tokens: TOKENS }),
+      ),
+    )
+    expect(await reasons()).toEqual([
+      'model AM read lines 0',
+      'model AM read no_items 1',
+      'model AM read receipts 1',
+    ])
+  }, 30_000)
+
+  describe('«Переснять» leaves the review (owner’s В-6 «а»)', () => {
+    const removed = async (me: Person, id: string, retake: boolean) => {
+      const response = await app.inject({
+        method: 'DELETE',
+        url: `/receipts/${id}`,
+        headers: { cookie: me.cookie, ...(retake ? { 'x-molvia-receipt-retake': '1' } : {}) },
+      })
+      expect(response.statusCode).toBe(204)
+      // the ten minutes of «Вернуть» over
+      await db
+        .update(receipts)
+        .set({ deletedAt: sql`clock_timestamp() - interval '11 minutes'` })
+        .where(eq(receipts.id, id))
+      await repository.purgeStale()
+    }
+
+    it('keeps the review of a receipt «Переснять» replaced, past the receipt itself', async () => {
+      const me = await person(LATER, REVIEW_CONSENT_EDITION)
+      const id = await queued(me)
+      await readAll(benchReader(), fakeModel(notWhole))
+      await removed(me, id, true)
+      expect(await receiptOf(id)).toBeUndefined()
+      const [kept] = await db.select().from(receiptMisses)
+      expect(kept).toMatchObject({ receipt: id, receiptId: null })
+      expect(kept?.retakenAt).not.toBeNull()
+      expect(await db.select().from(receiptMissParts)).toHaveLength(1)
+      // and goes with the person all the same
+      await db.execute(sql`delete from ${actors} where id = ${me.id}::uuid`)
+      expect(await db.select().from(receiptMisses)).toEqual([])
+    }, 30_000)
+
+    it('lets the review go with a receipt removed by «Удалить чек»', async () => {
+      const me = await person(LATER, REVIEW_CONSENT_EDITION)
+      const id = await queued(me)
+      await readAll(benchReader(), fakeModel(notWhole))
+      await removed(me, id, false)
+      expect(await db.select().from(receiptMisses)).toEqual([])
+    }, 30_000)
+
+    it('takes the mark back with «Вернуть»: brought back, the review goes with its receipt again', async () => {
+      const me = await person(LATER, REVIEW_CONSENT_EDITION)
+      const id = await queued(me)
+      await readAll(benchReader(), fakeModel(notWhole))
+      await app.inject({
+        method: 'DELETE',
+        url: `/receipts/${id}`,
+        headers: { cookie: me.cookie, 'x-molvia-receipt-retake': '1' },
+      })
+      const back = await app.inject({
+        method: 'POST',
+        url: `/receipts/${id}/restore`,
+        headers: { cookie: me.cookie },
+      })
+      expect(back.statusCode).toBe(200)
+      const [kept] = await db.select().from(receiptMisses)
+      expect(kept).toMatchObject({ receiptId: id, retakenAt: null })
+    }, 30_000)
+  })
 
   it('tells nobody where nobody is there to tell, and keeps the review all the same', async () => {
     const me = await person(LATER, REVIEW_CONSENT_EDITION)
@@ -1196,6 +1335,33 @@ describe('a receipt read not whole: its reasons, its review and the developer to
       const exit = await receiptMissesCommand(argv, misses, (line) => lines.push(line), new Date())
       return { exit, lines }
     }
+
+    // self-review №9: one rule with `show` — a start naming more than one receipt lets none go
+    it('lets nothing go by a start of the id that names more than one receipt', async () => {
+      const me = await person(LATER, REVIEW_CONSENT_EDITION)
+      const reasons = { receipt: 'lines_lost', lines: [] }
+      const kept = (receipt: string) => ({
+        receipt,
+        actorId: me.id,
+        readAt: new Date(),
+        keepUntil: new Date(Date.now() + 60_000),
+        readerVersion: 'claude-haiku-5-5@v5',
+        reasons,
+        reading: {},
+      })
+      await db
+        .insert(receiptMisses)
+        .values([
+          kept('abcdef12-0000-4000-8000-000000000001'),
+          kept('abcdef12-0000-4000-8000-000000000002'),
+        ])
+      const { exit, lines } = await run(['forget', 'abcdef12', '--yes'])
+      expect(exit).toBe(2)
+      expect(lines.at(-1)).toMatch(/2 receipts start with abcdef12/)
+      expect(await db.select().from(receiptMisses)).toHaveLength(2)
+      expect((await run(['forget', 'abcdef12-0000-4000-8000-000000000001', '--yes'])).exit).toBe(0)
+      expect(await db.select().from(receiptMisses)).toHaveLength(1)
+    }, 30_000)
 
     it('reads the window’s reasons by reader and country, each share beside its n', async () => {
       const me = await person(LATER, REVIEW_CONSENT_EDITION)

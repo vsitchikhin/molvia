@@ -1,4 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describeFailure } from '@molvia/model'
 import type { ReasonCount, ReceiptMissesRepository } from '@/db/receipt-misses-repository'
@@ -68,9 +69,16 @@ export async function receiptMisses(
       }
       const [miss] = found
       if (miss === undefined) return 3
-      const out = flag('--out') ?? `receipt-miss-${miss.receiptId.slice(0, 8)}`
-      write(`receipt ${miss.receiptId}`)
+      // a person's photo and purchases: never into the working directory, which may be the repository's — public
+      // (self-review №1) — nor one the process may not write to, as the API's image (adversarial А5)
+      const out = flag('--out') ?? join(tmpdir(), `receipt-miss-${miss.receipt.slice(0, 8)}`)
+      write(`receipt ${miss.receipt}`)
       write(`  read ${miss.readAt.toISOString()} by ${miss.readerVersion}`)
+      if (miss.retakenAt !== null) {
+        write(
+          `  retaken ${miss.retakenAt.toISOString()}: the receipt was replaced, its review stays`,
+        )
+      }
       write(`  kept until ${miss.keepUntil.toISOString()}`)
       write(`  receipt: ${miss.reasons.receipt ?? 'whole'}`)
       miss.reasons.lines.forEach((reason, position) => {
@@ -95,10 +103,16 @@ export async function receiptMisses(
         write(RECEIPT_MISSES_USAGE)
         return 2
       }
-      const gone = await misses.forget(
-        id === undefined ? { readBefore: before ?? '' } : { id },
-        dryRun,
-      )
+      const which = id === undefined ? { readBefore: before ?? '' } : { id }
+      // one rule with `show`: a start that names more than one receipt lets none go (self-review №9)
+      if (id !== undefined) {
+        const matched = await misses.forget(which, true)
+        if (matched.length > 1) {
+          write(`${String(matched.length)} receipts start with ${id}: give more of the id`)
+          return 2
+        }
+      }
+      const gone = await misses.forget(which, dryRun)
       for (const one of gone) write(`  ${one}`)
       write(
         dryRun
@@ -136,6 +150,12 @@ export function reasonLines(counts: readonly ReasonCount[], from: string, to: st
     const notShown = sorted('line').reduce((all, one) => all + one.n, 0)
     lines.push('', block)
     lines.push(`  ${'receipts read'.padEnd(28)}${String(receipts)}`)
+    // a receipt with no items is a sum read whole (MOL-227), never «not whole»; «in part» is the server's own word,
+    // beside the reasons — lines lost may stand behind a line not as printed (self-review №5, №6)
+    lines.push(`  ${'  no items, a sum'.padEnd(28)}${String(read('no_items'))}`)
+    lines.push(
+      `  ${'  read in part'.padEnd(28)}${String(read('partly')).padEnd(8)}${share(read('partly'), receipts)}`,
+    )
     lines.push(
       `  ${'  not whole'.padEnd(28)}${String(notWhole).padEnd(8)}${share(notWhole, receipts)}`,
     )

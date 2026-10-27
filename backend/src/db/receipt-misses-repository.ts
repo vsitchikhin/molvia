@@ -14,7 +14,9 @@ export interface ReasonCount {
 
 /** A receipt kept for the review (MOL-309): what was read, why, and its photo. */
 export interface KeptMiss {
-  readonly receiptId: string
+  readonly receipt: string
+  /** «Переснять» replaced its receipt: the review stays past it (MOL-309, В-6 «а»). */
+  readonly retakenAt: Date | null
   readonly readAt: Date
   readonly keepUntil: Date
   readonly readerVersion: string
@@ -72,7 +74,7 @@ export function createReceiptMissesRepository(db: Conn): ReceiptMissesRepository
       const misses = await db
         .select()
         .from(receiptMisses)
-        .where(like(sql`${receiptMisses.receiptId}::text`, `${idStart.toLowerCase()}%`))
+        .where(like(sql`${receiptMisses.receipt}::text`, `${idStart.toLowerCase()}%`))
         .orderBy(asc(receiptMisses.readAt))
       if (misses.length === 0) return []
       const parts = await db
@@ -80,15 +82,21 @@ export function createReceiptMissesRepository(db: Conn): ReceiptMissesRepository
         .from(receiptMissParts)
         .where(
           inArray(
-            receiptMissParts.receiptId,
-            misses.map((miss) => miss.receiptId),
+            receiptMissParts.receipt,
+            misses.map((miss) => miss.receipt),
           ),
         )
         .orderBy(asc(receiptMissParts.position))
       return misses.map((miss) => ({
-        ...miss,
+        receipt: miss.receipt,
+        retakenAt: miss.retakenAt,
+        readAt: miss.readAt,
+        keepUntil: miss.keepUntil,
+        readerVersion: miss.readerVersion,
+        reasons: miss.reasons,
+        reading: miss.reading,
         parts: parts
-          .filter((part) => part.receiptId === miss.receiptId)
+          .filter((part) => part.receipt === miss.receipt)
           .map(({ position, photo }) => ({ position, photo })),
       }))
     },
@@ -100,11 +108,11 @@ export function createReceiptMissesRepository(db: Conn): ReceiptMissesRepository
             .delete(receiptMisses)
             .where(
               'id' in which
-                ? like(sql`${receiptMisses.receiptId}::text`, `${which.id.toLowerCase()}%`)
+                ? like(sql`${receiptMisses.receipt}::text`, `${which.id.toLowerCase()}%`)
                 : // the day in Yerevan, as every day of a receipt's
                   sql`${yerevanDay(receiptMisses.readAt)} < ${which.readBefore}::date`,
             )
-            .returning({ id: receiptMisses.receiptId })
+            .returning({ id: receiptMisses.receipt })
           const ids = gone.map((row) => row.id)
           if (dryRun) throw new DryRun(ids)
           return ids

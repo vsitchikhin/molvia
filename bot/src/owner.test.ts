@@ -787,6 +787,20 @@ describe('ownerText — чек, прочитанный моделью не це�
     )
   })
 
+  it('не хранится (редакция 4 не принята) — без id чека и без команды разбора', () => {
+    const unkept = { ...notice, receipt: undefined, keptUntil: undefined }
+    expect(ownerText(unkept).split('\n')[0]).toBe(
+      '🧾 Чек не целиком · модель · AM · не хранится: редакция 4 не принята',
+    )
+    expect(ownerText(unkept)).not.toContain('make receipt-miss')
+  })
+
+  it('чек доказан целым, а строка опустошена — без строки «Чек:» (адверсариальное А3)', () => {
+    expect(
+      ownerText({ ...notice, reason: undefined, lineReasons: { zero_not_gift: 1 } }),
+    ).not.toContain('Чек:')
+  })
+
   it('отложенные сверх предела — одним счётом', () => {
     expect(ownerText({ kind: 'receipt_partial_muted', count: 4 })).toBe(
       '🔕 Скрыто сигналов о чеках не целиком: 4 — make receipt-reasons',

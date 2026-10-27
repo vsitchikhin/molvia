@@ -49,8 +49,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // a receipt's `cashback` and `redeemed`, what a card sent to the card and the bonus it was paid with
 // (MOL-289), and a line's `repaired`, put right by the digits the till's font confuses (MOL-290). 22: a
 // category's `icon`, chosen for one's own (MOL-285). 23: a receipt's `paidBy`, cash or a card as its words
-// of payment say (MOL-312).
-export const EXPORT_VERSION = 23
+// of payment say (MOL-312). 24: `receiptReviews`, the receipts read not whole kept for the developer's review —
+// until when and why, never the photo or what was read (MOL-309).
+export const EXPORT_VERSION = 24
 
 const day = z.iso.date()
 
@@ -461,6 +462,24 @@ const addedBarcodeSchema = z.strictObject({
  * seller with this tax number is this item, at this shelf price. Shared — others read the item, never
  * who said it — and kept without its author after erasure.
  */
+/**
+ * A receipt read not whole, kept for the developer's review (MOL-309): which receipt — its id, and the link to it
+ * while it is there (none once «Переснять» replaced it) — when it was read and by what, until when it is kept, and
+ * why it was not whole. Never its photo or what the reader read: those are the reasons' own copy, not the person's.
+ */
+const receiptReviewSchema = z.strictObject({
+  receipt: z.uuid(),
+  receiptId: z.uuid().nullable(),
+  readAt: isoDate,
+  keepUntil: isoDate,
+  retakenAt: isoDate.nullable(),
+  readerVersion: z.string(),
+  reasons: z.strictObject({
+    receipt: z.string().nullable(),
+    lines: z.array(z.string().nullable()),
+  }),
+})
+
 const storeMemorySchema = z.strictObject({
   tin: z.string(),
   kind: z.string(),
@@ -543,6 +562,7 @@ export const exportContentCodec = z.strictObject({
   spendings: z.array(spendingSchema),
   transfers: z.array(transferSchema),
   receipts: z.array(receiptSchema),
+  receiptReviews: z.array(receiptReviewSchema),
   spendingCategories: z.array(spendingCategorySchema),
   monthRates: z.array(monthRateSchema),
   budgetPlans: z.array(budgetPlanSchema),

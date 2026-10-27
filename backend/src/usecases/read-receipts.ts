@@ -434,18 +434,21 @@ async function tell(
   const lines = outcome.kind === 'parsed' ? outcome.lines : []
   const notice: OwnerNotice = {
     kind: 'receipt_partial',
-    receipt: claimed.id.slice(0, 8),
     country: claimed.country,
     lines: lines.length,
     shown: lines.filter((line) => line.sum !== null).length,
-    reason:
-      reasons.receipt ?? (outcome.kind === 'parsed' && outcome.partly ? 'lines_lost' : 'failed'),
+    // proven whole, a line emptied all the same: no reason of the receipt to give (adversarial А3)
+    ...(reasons.receipt === null ? {} : { reason: reasons.receipt }),
     lineReasons,
-    // where it is kept: its owner accepted the edition that says so
+    // where it is kept — its owner accepted the edition that says so — named by its id; one not kept by none, since
+    // nothing here would open it (self-review №3); its day is Yerevan's, as `keep_until` is read (adversarial)
     ...(outcome.miss === undefined
       ? {}
       : {
-          keptUntil: new Date(at.getTime() + RECEIPT_MISS_KEEP_DAYS * 24 * 60 * 60 * 1000)
+          receipt: claimed.id.slice(0, 8),
+          keptUntil: new Date(
+            at.getTime() + RECEIPT_MISS_KEEP_DAYS * 24 * 60 * 60 * 1000 + 4 * 60 * 60 * 1000,
+          )
             .toISOString()
             .slice(0, 10),
         }),
@@ -666,16 +669,18 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
       if (!(error instanceof PhotoUnreadable)) deps.report({ kind: 'error', error })
       outcome = { kind: 'failed', failure: 'unreadable', readerVersion: null, head: null }
     }
+    let written: boolean
     try {
-      await deps.receipts.finish(claimed.id, outcome)
+      written = await deps.receipts.finish(claimed.id, outcome)
     } catch (error) {
       // a reading the schema let through and the table refused: failed now, not read a second time
       deps.report({ kind: 'error', error })
       outcome = { kind: 'failed', failure: 'unreadable', readerVersion: null, head: null }
-      await deps.receipts.finish(claimed.id, outcome)
+      written = await deps.receipts.finish(claimed.id, outcome)
     }
     read += 1
-    await tell(deps, claimed, outcome, now())
+    // a reading not written — the receipt gone or taken meanwhile — is nothing to tell of (self-review №7)
+    if (written) await tell(deps, claimed, outcome, now())
     deps.report({
       kind: 'read',
       status: outcome.kind,

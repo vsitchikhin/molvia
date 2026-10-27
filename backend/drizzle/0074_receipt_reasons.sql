@@ -1,19 +1,23 @@
 CREATE TABLE "receipt_miss_parts" (
-	"receipt_id" uuid NOT NULL,
+	"receipt" uuid NOT NULL,
 	"position" smallint NOT NULL,
 	"photo" "bytea" NOT NULL,
-	CONSTRAINT "receipt_miss_parts_receipt_id_position_pk" PRIMARY KEY("receipt_id","position"),
+	CONSTRAINT "receipt_miss_parts_receipt_position_pk" PRIMARY KEY("receipt","position"),
 	CONSTRAINT "receipt_miss_parts_position_range" CHECK ("receipt_miss_parts"."position" between 1 and 4)
 );
 --> statement-breakpoint
 CREATE TABLE "receipt_misses" (
-	"receipt_id" uuid PRIMARY KEY NOT NULL,
+	"receipt" uuid PRIMARY KEY NOT NULL,
+	"receipt_id" uuid,
+	"actor_id" uuid NOT NULL,
 	"read_at" timestamp with time zone NOT NULL,
 	"keep_until" timestamp with time zone NOT NULL,
+	"retaken_at" timestamp with time zone,
 	"reader_version" text NOT NULL,
 	"reasons" jsonb NOT NULL,
 	"reading" jsonb NOT NULL,
-	CONSTRAINT "receipt_misses_kept_after_read" CHECK ("receipt_misses"."keep_until" > "receipt_misses"."read_at")
+	CONSTRAINT "receipt_misses_kept_after_read" CHECK ("receipt_misses"."keep_until" > "receipt_misses"."read_at"),
+	CONSTRAINT "receipt_misses_receipt_own" CHECK ("receipt_misses"."receipt_id" is null or "receipt_misses"."receipt_id" = "receipt_misses"."receipt")
 );
 --> statement-breakpoint
 CREATE TABLE "receipt_reason_days" (
@@ -30,7 +34,10 @@ CREATE TABLE "receipt_reason_days" (
 );
 --> statement-breakpoint
 ALTER TABLE "owner_notices" DROP CONSTRAINT "owner_notices_kind_known";--> statement-breakpoint
-ALTER TABLE "receipt_miss_parts" ADD CONSTRAINT "receipt_miss_parts_receipt_id_receipt_misses_receipt_id_fk" FOREIGN KEY ("receipt_id") REFERENCES "public"."receipt_misses"("receipt_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "receipt_miss_parts" ADD CONSTRAINT "receipt_miss_parts_receipt_receipt_misses_receipt_fk" FOREIGN KEY ("receipt") REFERENCES "public"."receipt_misses"("receipt") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "receipt_misses" ADD CONSTRAINT "receipt_misses_receipt_id_receipts_id_fk" FOREIGN KEY ("receipt_id") REFERENCES "public"."receipts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "receipt_misses" ADD CONSTRAINT "receipt_misses_actor_id_actors_id_fk" FOREIGN KEY ("actor_id") REFERENCES "public"."actors"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "receipt_misses_keep_until_idx" ON "receipt_misses" USING btree ("keep_until");--> statement-breakpoint
+CREATE INDEX "receipt_misses_receipt_id_idx" ON "receipt_misses" USING btree ("receipt_id");--> statement-breakpoint
+CREATE INDEX "receipt_misses_actor_idx" ON "receipt_misses" USING btree ("actor_id");--> statement-breakpoint
 ALTER TABLE "owner_notices" ADD CONSTRAINT "owner_notices_kind_known" CHECK ("owner_notices"."kind" in ('failure', 'failure_count', 'failure_muted', 'feedback', 'feedback_continued', 'catalogue_merged', 'model_spend', 'receipt_partial', 'receipt_partial_muted'));
