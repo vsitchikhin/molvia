@@ -131,6 +131,7 @@ export const en: Dictionary = {
     '🧾 A receipt not read whole · model · {country} · not kept: edition 4 not accepted',
   'owner.receipt.lines': 'Lines {lines}: with figures {shown}, without {empty}',
   'owner.receipt.reason': 'Receipt: {reason}',
+  'owner.receipt.partly': 'Read in part: the lines come to less than the total',
   'owner.receipt.lineReasons': 'Lines: {reasons}',
   'owner.receipt.kept':
     'Photo and the model’s answer kept until {day}: make receipt-miss ID={receipt}',

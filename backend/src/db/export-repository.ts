@@ -1279,7 +1279,11 @@ export function createExportRepository(db: Db): ExportRepository {
             addedBarcodes: addedCodeRows,
             receiptReviews: reviewRows.map((row) => ({
               ...row,
-              reasons: { receipt: row.reasons.receipt, lines: [...row.reasons.lines] },
+              reasons: {
+                receipt: row.reasons.receipt,
+                lines: [...row.reasons.lines],
+                ...(row.reasons.partly === undefined ? {} : { partly: row.reasons.partly }),
+              },
             })),
             storeMemory: memoryRows.map((row) => ({
               tin: row.tin,

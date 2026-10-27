@@ -154,6 +154,8 @@ function partialText(notice: ReceiptPartialNotice): string {
             reason: t(undefined, `owner.receipt.why.${notice.reason}`),
           }),
         ]),
+    // lines lost may stand behind a line not as printed: the server's word says so (adversarial Б1)
+    ...(notice.partly === true ? [t(undefined, 'owner.receipt.partly')] : []),
     ...(reasons.length === 0
       ? []
       : [t(undefined, 'owner.receipt.lineReasons', { reasons: reasons.join(', ') })]),

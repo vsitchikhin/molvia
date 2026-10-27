@@ -801,6 +801,12 @@ describe('ownerText — чек, прочитанный моделью не це�
     ).not.toContain('Чек:')
   })
 
+  it('«Прочитали не всё» — своей строкой рядом с причиной чека (адверсариальное Б1)', () => {
+    expect(ownerText({ ...notice, reason: 'line_not_as_printed', partly: true })).toContain(
+      'Прочитали не всё: строки дают меньше итога',
+    )
+  })
+
   it('отложенные сверх предела — одним счётом', () => {
     expect(ownerText({ kind: 'receipt_partial_muted', count: 4 })).toBe(
       '🔕 Скрыто сигналов о чеках не целиком: 4 — make receipt-reasons',

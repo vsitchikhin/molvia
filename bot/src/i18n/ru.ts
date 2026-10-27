@@ -239,6 +239,7 @@ export const ru = {
     '🧾 Чек не целиком · модель · {country} · не хранится: редакция 4 не принята',
   'owner.receipt.lines': 'Строк {lines}: с цифрами {shown}, без цифр {empty}',
   'owner.receipt.reason': 'Чек: {reason}',
+  'owner.receipt.partly': 'Прочитали не всё: строки дают меньше итога',
   'owner.receipt.lineReasons': 'Строки: {reasons}',
   'owner.receipt.kept': 'Фото и ответ модели — до {day}: make receipt-miss ID={receipt}',
   'owner.receipt.muted': '🔕 Скрыто сигналов о чеках не целиком: {count} — make receipt-reasons',

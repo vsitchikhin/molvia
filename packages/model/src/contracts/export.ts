@@ -477,6 +477,8 @@ const receiptReviewSchema = z.strictObject({
   reasons: z.strictObject({
     receipt: z.string().nullable(),
     lines: z.array(z.string().nullable()),
+    /** «Прочитали не всё» beside the reasons (adversarial Б1). */
+    partly: z.boolean().optional(),
   }),
 })
 

@@ -1261,6 +1261,32 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     ])
   }, 30_000)
 
+  // adversarial Б1: a line lost beside a line not as printed is said by «Прочитали не всё», in the notice and the review
+  it('tells «Прочитали не всё» where a line lost stands behind a line not as printed', async () => {
+    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    const id = await queued(me)
+    const [milk, bread] = ANSWER.lines
+    const hidden: ModelReceipt = {
+      ...ANSWER,
+      lines: [milk!, { ...bread!, quantity: '2', unit_price: '145', discount: null, sum: '300' }],
+      totals: [
+        { label: 'Ընդամենը', amount: '1680.00' },
+        { label: 'Վճարված է Առձեռն', amount: '1680.00' },
+      ],
+    }
+    await readAll(
+      benchReader(),
+      fakeModel(() =>
+        Promise.resolve({ kind: 'read', answer: hidden, costMicroUsd: 2_180, tokens: TOKENS }),
+      ),
+      { told: told() },
+    )
+    const [notice] = await notices()
+    expect(notice).toMatchObject({ reason: 'line_not_as_printed', partly: true })
+    const [kept] = await db.select().from(receiptMisses).where(eq(receiptMisses.receipt, id))
+    expect(kept?.reasons).toMatchObject({ receipt: 'line_not_as_printed', partly: true })
+  }, 30_000)
+
   describe('«Переснять» leaves the review (owner’s В-6 «а»)', () => {
     const removed = async (me: Person, id: string, retake: boolean) => {
       const response = await app.inject({
@@ -1374,27 +1400,33 @@ describe('a receipt read not whole: its reasons, its review and the developer to
       expect(lines.join('\n')).toMatch(/unsettled\s+1\s+33\.3 %/)
     }, 30_000)
 
-    it('shows one receipt with its photo written out, and lets it go only with --yes', async () => {
+    it('shows one receipt with its photo written out, and lets it go only with --yes — its copy too', async () => {
       const me = await person(LATER, REVIEW_CONSENT_EDITION)
       const id = await queued(me)
       await readAll(benchReader(), fakeModel(notWhole))
-      const out = await mkdtemp(join(tmpdir(), 'receipt-miss-'))
+      const root = await mkdtemp(join(tmpdir(), 'receipt-misses-'))
+      const copy = join(root, `receipt-miss-${id.slice(0, 8)}`)
       try {
-        const shown = await run(['show', id.slice(0, 8), '--out', out])
+        const shown = await run(['show', id.slice(0, 8), '--root', root])
         expect(shown.exit).toBe(0)
         expect(shown.lines).toContain('  line 3: unsettled')
-        expect(JSON.parse(await readFile(join(out, 'reading.json'), 'utf8'))).toEqual(NOT_WHOLE)
-        expect((await readFile(join(out, 'part-1.jpg'))).subarray(0, 2)).toEqual(
+        expect(JSON.parse(await readFile(join(copy, 'reading.json'), 'utf8'))).toEqual(NOT_WHOLE)
+        expect((await readFile(join(copy, 'part-1.jpg'))).subarray(0, 2)).toEqual(
           Buffer.from([0xff, 0xd8]),
         )
+        expect((await run(['forget', id.slice(0, 8), '--root', root])).lines.at(-1)).toMatch(
+          /dry run: 1/,
+        )
+        expect(await db.select().from(receiptMisses)).toHaveLength(1)
+        const done = await run(['forget', id.slice(0, 8), '--root', root, '--yes'])
+        expect(done.lines.at(-1)).toBe('let go: 1.')
+        expect(await db.select().from(receiptMisses)).toEqual([])
+        // the copy `show` wrote goes with what it was copied from (adversarial Б2)
+        await expect(readFile(join(copy, 'reading.json'))).rejects.toThrow()
+        expect((await run(['show', id.slice(0, 8)])).exit).toBe(3)
       } finally {
-        await rm(out, { recursive: true, force: true })
+        await rm(root, { recursive: true, force: true })
       }
-      expect((await run(['forget', id.slice(0, 8)])).lines.at(-1)).toMatch(/dry run: 1/)
-      expect(await db.select().from(receiptMisses)).toHaveLength(1)
-      expect((await run(['forget', id.slice(0, 8), '--yes'])).lines.at(-1)).toBe('let go: 1.')
-      expect(await db.select().from(receiptMisses)).toEqual([])
-      expect((await run(['show', id.slice(0, 8)])).exit).toBe(3)
     }, 30_000)
   })
 })

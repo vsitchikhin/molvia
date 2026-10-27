@@ -1,5 +1,4 @@
 import {
-  RECEIPT_MISS_KEEP_DAYS,
   RECEIPT_MODEL_INPUT_MAX,
   RECEIPT_PAGE_MODES,
   AGGREGATE_MIN_CONTRIBUTIONS,
@@ -23,6 +22,7 @@ import {
   receiptLineOf,
   receiptLineCodec,
   spendMonthOf,
+  dayIn,
   explainedReading,
   worstCallMicroUsd,
 } from '@molvia/model'
@@ -420,6 +420,7 @@ async function tell(
   deps: ReadReceiptsDeps,
   claimed: ClaimedReceipt,
   outcome: ReadOutcome,
+  keptUntil: Date | null,
   at: Date,
 ): Promise<void> {
   const { told } = deps
@@ -440,18 +441,11 @@ async function tell(
     // proven whole, a line emptied all the same: no reason of the receipt to give (adversarial А3)
     ...(reasons.receipt === null ? {} : { reason: reasons.receipt }),
     lineReasons,
+    // «Прочитали не всё»: lines lost may stand behind a line not as printed (adversarial Б1)
+    ...(outcome.kind === 'parsed' && outcome.partly ? { partly: true } : {}),
     // where it is kept — its owner accepted the edition that says so — named by its id; one not kept by none, since
-    // nothing here would open it (self-review №3); its day is Yerevan's, as `keep_until` is read (adversarial)
-    ...(outcome.miss === undefined
-      ? {}
-      : {
-          receipt: claimed.id.slice(0, 8),
-          keptUntil: new Date(
-            at.getTime() + RECEIPT_MISS_KEEP_DAYS * 24 * 60 * 60 * 1000 + 4 * 60 * 60 * 1000,
-          )
-            .toISOString()
-            .slice(0, 10),
-        }),
+    // nothing here would open it (self-review №3); the day of `keep_until` as written, in Yerevan (№13)
+    ...(keptUntil === null ? {} : { receipt: claimed.id.slice(0, 8), keptUntil: dayIn(keptUntil) }),
   }
   const given = told.budget.ask([notice], at, claimed.actorId)
   try {
@@ -669,7 +663,7 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
       if (!(error instanceof PhotoUnreadable)) deps.report({ kind: 'error', error })
       outcome = { kind: 'failed', failure: 'unreadable', readerVersion: null, head: null }
     }
-    let written: boolean
+    let written: { readonly keptUntil: Date | null } | null
     try {
       written = await deps.receipts.finish(claimed.id, outcome)
     } catch (error) {
@@ -680,7 +674,7 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
     }
     read += 1
     // a reading not written — the receipt gone or taken meanwhile — is nothing to tell of (self-review №7)
-    if (written) await tell(deps, claimed, outcome, now())
+    if (written !== null) await tell(deps, claimed, outcome, written.keptUntil, now())
     deps.report({
       kind: 'read',
       status: outcome.kind,

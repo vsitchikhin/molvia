@@ -27,6 +27,11 @@ export const receiptPartialNoticeSchema = z.strictObject({
    * «1 × 0 = 0» that is no gift (adversarial А3).
    */
   reason: z.enum(RECEIPT_REASONS).optional(),
+  /**
+   * «Прочитали не всё»: the lines as read come to less than the total — lines lost may stand behind the receipt's
+   * reason, a line not as printed (adversarial Б1).
+   */
+  partly: z.literal(true).optional(),
   /** Why lines were not shown as read: each kind with how many. */
   lineReasons: z.partialRecord(z.enum(RECEIPT_LINE_REASONS), z.int().positive()),
   /** Until when its photo and what was read are kept for the review; none — not kept. */

@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describeFailure } from '@molvia/model'
@@ -6,8 +6,8 @@ import type { ReasonCount, ReceiptMissesRepository } from '@/db/receipt-misses-r
 
 export const RECEIPT_MISSES_USAGE = [
   'usage: receipt-misses reasons --from <YYYY-MM-DD> [--to <YYYY-MM-DD>]',
-  '       receipt-misses show <id start> [--out <directory>]',
-  '       receipt-misses forget (<id start> | --read-before <YYYY-MM-DD>) [--yes]',
+  '       receipt-misses show <id start> [--root <directory> | --out <directory>]',
+  '       receipt-misses forget (<id start> | --read-before <YYYY-MM-DD>) [--root <directory>] [--yes]',
 ].join('\n')
 
 /** 0 — done, 1 — the database or the disk failed, 2 — the command was wrong, 3 — nothing found. */
@@ -19,6 +19,13 @@ const ID_START = /^[\da-f]{8}[\da-f-]{0,28}$/i
 
 const share = (part: number, whole: number) =>
   whole === 0 ? '—' : `${(Math.floor((part * 1000) / whole) / 10).toFixed(1)} %`
+
+/**
+ * Where `show` copies a receipt kept for the review, and where `forget` lets the copy go: a directory of its own under
+ * the root — the system's temporary one by default — named by the id's start.
+ */
+const copyOf = (root: string | undefined, receipt: string): string =>
+  join(root ?? tmpdir(), `receipt-miss-${receipt.slice(0, 8)}`)
 
 /** Today in Yerevan, the day the window ends on by default. */
 const yerevanToday = (now: Date) =>
@@ -71,7 +78,7 @@ export async function receiptMisses(
       if (miss === undefined) return 3
       // a person's photo and purchases: never into the working directory, which may be the repository's — public
       // (self-review №1) — nor one the process may not write to, as the API's image (adversarial А5)
-      const out = flag('--out') ?? join(tmpdir(), `receipt-miss-${miss.receipt.slice(0, 8)}`)
+      const out = flag('--out') ?? copyOf(flag('--root'), miss.receipt)
       write(`receipt ${miss.receipt}`)
       write(`  read ${miss.readAt.toISOString()} by ${miss.readerVersion}`)
       if (miss.retakenAt !== null) {
@@ -81,6 +88,8 @@ export async function receiptMisses(
       }
       write(`  kept until ${miss.keepUntil.toISOString()}`)
       write(`  receipt: ${miss.reasons.receipt ?? 'whole'}`)
+      if (miss.reasons.partly === true)
+        write('  read in part: the lines come to less than the total')
       miss.reasons.lines.forEach((reason, position) => {
         write(`  line ${String(position + 1)}: ${reason ?? 'as read'}`)
       })
@@ -114,6 +123,12 @@ export async function receiptMisses(
       }
       const gone = await misses.forget(which, dryRun)
       for (const one of gone) write(`  ${one}`)
+      // the copies `show` wrote under its root go with what they were copied from (adversarial Б2); one written
+      // elsewhere by `--out` is the review's own to delete
+      if (!dryRun) {
+        for (const one of gone)
+          await rm(copyOf(flag('--root'), one), { recursive: true, force: true })
+      }
       write(
         dryRun
           ? `dry run: ${String(gone.length)} would be let go. Run again with --yes to let them go.`

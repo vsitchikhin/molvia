@@ -20,7 +20,11 @@ export interface KeptMiss {
   readonly readAt: Date
   readonly keepUntil: Date
   readonly readerVersion: string
-  readonly reasons: { readonly receipt: string | null; readonly lines: readonly (string | null)[] }
+  readonly reasons: {
+    readonly receipt: string | null
+    readonly lines: readonly (string | null)[]
+    readonly partly?: boolean
+  }
   readonly reading: unknown
   readonly parts: readonly { readonly position: number; readonly photo: Buffer }[]
 }

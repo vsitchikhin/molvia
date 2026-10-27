@@ -3099,7 +3099,12 @@ export const receiptMisses = pgTable(
     readerVersion: text('reader_version').notNull(),
     /** Why the receipt was not proven whole, and why each line was not shown as read, in their order. */
     reasons: jsonb('reasons')
-      .$type<{ readonly receipt: string | null; readonly lines: readonly (string | null)[] }>()
+      .$type<{
+        readonly receipt: string | null
+        readonly lines: readonly (string | null)[]
+        /** «Прочитали не всё», the server's word beside the reasons (adversarial Б1). */
+        readonly partly?: boolean
+      }>()
       .notNull(),
     /** What the reader read, as it read it. */
     reading: jsonb('reading').notNull(),
