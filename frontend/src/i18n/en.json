@@ -2357,10 +2357,8 @@
       "add": "Add a line",
       "title": "New line",
       "meta": "It is not among the lines read — type it from the paper",
-      "pick": "Pick an item",
       "item_missing": "Pick an item — a line cannot be recorded without one",
       "figures_note": "May be left empty: only the item is required",
-      "save": "Done",
       "remove": "Remove the line"
     },
     "line": {

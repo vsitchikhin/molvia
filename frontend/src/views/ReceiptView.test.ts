@@ -244,7 +244,7 @@ describe('ReceiptView (MOL-127)', () => {
       expect(sheet()?.textContent).not.toContain(ru.receipt.line.printed)
       // a sheet takes no tap before it is up (MOL-69)
       clock += 1000
-      inSheet(ru.receipt.added.save)?.click()
+      inSheet(ru.receipt.place.done)?.click()
       await flushPromises()
       expect(sheet()?.textContent).toContain(ru.receipt.added.item_missing)
       expect(useReceiptDraftsStore().addedOf(ID)).toEqual([])

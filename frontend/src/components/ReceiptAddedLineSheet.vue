@@ -15,7 +15,7 @@
           @click="picking = true"
         >
           <span v-if="item" class="product-name">{{ item.name }}</span>
-          <span v-else class="product-empty">{{ t('receipt.added.pick') }}</span>
+          <span v-else class="product-empty">{{ t('receipt.pick.title') }}</span>
           <span class="product-other"
             >{{ item ? t('receipt.line.product_other') : ''
             }}<IconChevronRight class="other-chevron" aria-hidden="true"
@@ -57,7 +57,7 @@
     </div>
 
     <template #footer>
-      <AppButton size="large" block @click="save">{{ t('receipt.added.save') }}</AppButton>
+      <AppButton size="large" block @click="save">{{ t('receipt.place.done') }}</AppButton>
       <AppButton v-if="line" variant="ghost" block @click="remove">{{
         t('receipt.added.remove')
       }}</AppButton>
