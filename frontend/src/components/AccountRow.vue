@@ -68,7 +68,7 @@ export default defineComponent({
   width: 100%;
   min-height: var(--touch-target-lg);
   padding: 0 var(--space-2) 0 var(--space-3);
-  border: var(--hairline) solid var(--border);
+  border: var(--hairline) solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--surface-2);
   color: var(--text);
