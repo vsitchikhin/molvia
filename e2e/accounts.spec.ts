@@ -656,3 +656,60 @@ test('the edit of an account keeps «Сохранить» pinned in sight over t
     )
     .toEqual({ pinned: true, save: true, name: true })
 })
+
+// MOL-197, адверсариальное ревью, раунд 2, Б1 — проба: ЗЕЛЁНАЯ = минус выбранной строки стоит в `bad-ink`, не в
+// `text`. Тесты PR этот цвет не видят: юнит смотрит класс, e2e выбора — два положительных остатка.
+test('MOL-197 Б1: минус выбранной строки — bad-ink, плюс соседней — muted', async ({ page }) => {
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  for (const [name, currency, amount] of [
+    ['Кредитка ֏', 'AMD', '-12000'],
+    ['Карта ₽', 'RUB', '1000'],
+  ] as const) {
+    const response = await page.request.post('/api/money/accounts', {
+      headers,
+      data: {
+        id: randomUUID(),
+        name,
+        currency,
+        savings: false,
+        start: { amount, currency },
+        startOn: yesterday(),
+      },
+    })
+    expect(response.status(), await response.text()).toBe(201)
+  }
+  await open(page, '/money')
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  await expect(topSheet(page)).toContainText('Новая трата')
+  await page.waitForTimeout(400)
+  await topSheet(page)
+    .getByRole('button', { name: /Выбрать счёт:/ })
+    .click()
+  const picker = topSheet(page)
+  await expect(picker.getByRole('radio', { name: /Кредитка ֏/ })).toBeChecked()
+  const look = await picker.evaluate((sheet) => {
+    const ink = (token: string) => {
+      const probe = document.createElement('span')
+      probe.style.color = `var(${token})`
+      sheet.append(probe)
+      const colour = getComputedStyle(probe).color
+      probe.remove()
+      return colour
+    }
+    const balance = (selector: string) => {
+      const one = sheet.querySelector(`${selector} .balance`)
+      return one ? getComputedStyle(one).color : ''
+    }
+    return {
+      chosenMinus: balance('[role="radio"][aria-checked="true"]'),
+      otherPlus: balance('[role="radio"][aria-checked="false"]'),
+      badInk: ink('--bad-ink'),
+      text: ink('--text'),
+      muted: ink('--text-muted'),
+    }
+  })
+  console.log(`MOL-197 Б1: ${JSON.stringify(look)}`)
+  expect.soft(look.chosenMinus, 'минус выбранной строки').toBe(look.badInk)
+  expect.soft(look.otherPlus, 'плюс невыбранной строки').toBe(look.muted)
+})
