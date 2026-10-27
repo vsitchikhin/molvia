@@ -132,7 +132,7 @@ receipt-miss: ## One receipt kept for the review, its photo written out: make re
 
 receipt-miss-forget: ## Let go what the review took: make receipt-miss-forget ID=<id start>|BEFORE=<day> [YES=1]
 	$(NEED_SCAFFOLD)
-	$(if $(filter command line,$(origin ID)),,unset ID;) $(if $(filter command line,$(origin BEFORE)),,unset BEFORE;) ./bin/receipt-misses.sh forget "$${ID:-$${BEFORE:-}}" $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),yes)
+	$(if $(filter command line,$(origin ID)),,unset ID;) $(if $(filter command line,$(origin BEFORE)),,unset BEFORE;) ./bin/receipt-misses.sh forget "$${ID:-}" "$${BEFORE:-}" $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),yes)
 
 failures: ## The latest failures of the API and the bot: make failures [LIMIT=20] (MOL-143)
 	$(NEED_SCAFFOLD)
