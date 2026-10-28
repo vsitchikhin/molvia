@@ -24,7 +24,7 @@ const REPORT: GatesReport = {
     withoutConsent: 6,
     optedOut: 2,
   },
-  erased: { count: 2, firstWeek: '2026-10-05', lastWeek: '2026-11-16' },
+  erased: { count: 2, silent: 1, firstWeek: '2026-10-05', lastWeek: '2026-11-16' },
   logins: {
     firstDay: '2026-10-05',
     lastDay: '2026-11-20',
@@ -371,6 +371,7 @@ describe('gates — чтение ворот вручную', () => {
       '     opted out of the statistics         2          in neither half',
       '',
       '     erased                              2          appeared the weeks of 2026-10-05 … 2026-11-16, in neither half',
+      '       of them silent                    1          two years without a visit',
       '',
       'login how many who began got in?                    second way in above 25 %',
       '     began                               41         days 2026-10-05 … 2026-11-20 in Yerevan',
@@ -473,11 +474,14 @@ describe('gates — чтение ворот вручную', () => {
   it('удалённые одной недели — «the week of», и нулём тоже печатаются', async () => {
     const { exit, lines } = run(['--from', '2026-10-05', '--to', '2026-10-07'], {
       ...REPORT,
-      erased: { count: 0, firstWeek: '2026-10-05', lastWeek: '2026-10-05' },
+      erased: { count: 0, silent: 0, firstWeek: '2026-10-05', lastWeek: '2026-10-05' },
     })
     await exit
     expect(lines).toContain(
       '     erased                              0          appeared the week of 2026-10-05, in neither half',
+    )
+    expect(lines).toContain(
+      '       of them silent                    0          two years without a visit',
     )
   })
 

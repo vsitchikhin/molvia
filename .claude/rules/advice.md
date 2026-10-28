@@ -192,7 +192,8 @@ fourth week is not over is waiting, with access or without — it can still be g
 access in week 4» is said only of a week that is over (adversarial А: judged by today's access, a
 newcomer read «no access» eighteen days early). Those waiting, those without access, those who
 objected to being counted (MOL-96, under each gate) and the erased of the weeks the window touches
-are each a line of their own, in neither fraction.
+are each a line of their own, in neither fraction — of the erased, those the two years of silence took
+(MOL-239, `erasures.silent`) a line under them: a person who left and one who stopped coming are not one signal.
 **The login's funnel is the third block** (MOL-68, rules in `auth.md`): the logins begun on the days
 the window touches — not the people who appeared, since those lost at the door never appear — with
 «began» (starts less a device's repeats), «got in» and «lost» beside their `n`, the line
