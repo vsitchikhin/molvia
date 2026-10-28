@@ -44,11 +44,6 @@ interface Kept {
   /** The trip's moment in «Записаны» from the server, or the last purchase written here into it. */
   readonly at: number
   readonly items: readonly CatalogueEntry[]
-  /**
-   * Written here as the trip going on, not finished yet (adversarial В2 of review 3): it will be
-   * finished after any trip finished already, so a finished one kept meanwhile does not stand over it.
-   */
-  readonly open?: boolean
 }
 
 interface Slot {
@@ -63,12 +58,7 @@ const slotSchema = z.object({
   trips: z.array(z.unknown()).catch([]),
   none: z.string().nullable().catch(null),
 })
-const keptSchema = z.object({
-  tripId: z.string(),
-  at: z.number(),
-  items: z.array(z.unknown()),
-  open: z.boolean().optional(),
-})
+const keptSchema = z.object({ tripId: z.string(), at: z.number(), items: z.array(z.unknown()) })
 
 /** Slot by slot and row by row, so one an older version wrote differently costs only itself. */
 function load(owner: string): Slot[] {
@@ -91,14 +81,7 @@ function load(owner: string): Slot[] {
         const item = catalogueEntryCodec.safeDecode(row as never)
         return item.success ? [item.data] : []
       })
-      return [
-        {
-          tripId: kept.data.tripId,
-          at: kept.data.at,
-          items,
-          ...(kept.data.open ? { open: true } : {}),
-        },
-      ]
+      return [{ tripId: kept.data.tripId, at: kept.data.at, items }]
     })
     return [{ slot: slot.data.slot, trips, none: slot.data.none }]
   })
@@ -219,6 +202,13 @@ export function rememberHereLast(
    * what another device added (adversarial В1 of review 3). `null` for a caller with no such word.
    */
   held: readonly CatalogueEntry[] | null = null,
+  /**
+   * The trip going on here now, when a finished one is asked about (adversarial В2 of review 3, Г2 of
+   * review 4): it will be finished after any trip finished already, so it stays the newest. Only that
+   * one — a trip removed here, or finished elsewhere, is no longer going on, and lifted it stood over
+   * the receipt for good.
+   */
+  going: string | null = null,
 ): void {
   const id = tripId.toLowerCase()
   const { previous } = answer
@@ -243,17 +233,17 @@ export function rememberHereLast(
           tripId: id,
           at: before?.getTime() ?? own?.at ?? Date.now(),
           items: items.slice(0, ITEMS_PER_TRIP),
-          ...(before === null ? { open: true } : {}),
         },
         ...trips.filter((trip) => trip.tripId !== id),
       ]
     }
-    // A finished trip kept at its own moment does not stand over a trip still going on here: that one
-    // is finished after it (adversarial В2 of review 3) — a receipt keeps the moment its paper names.
-    if (before !== null) {
+    // A finished trip kept at its own moment does not stand over the trip going on here: that one is
+    // finished after it (adversarial В2 of review 3) — a receipt keeps the moment its paper names.
+    const goingId = going?.toLowerCase()
+    if (before !== null && goingId !== undefined && goingId !== id) {
       const now = Date.now()
       trips = trips.map((trip) =>
-        trip.open === true && trip.tripId !== id && trip.at < now ? { ...trip, at: now } : trip,
+        trip.tripId === goingId && trip.at < now ? { ...trip, at: now } : trip,
       )
     }
     return {
@@ -291,7 +281,7 @@ export function rememberBoughtHere(
     return {
       ...slot,
       trips: [
-        { tripId: id, at: at.getTime(), items, ...(finishedAt === null ? { open: true } : {}) },
+        { tripId: id, at: at.getTime(), items },
         ...slot.trips.filter((trip) => trip.tripId !== id),
       ],
     }

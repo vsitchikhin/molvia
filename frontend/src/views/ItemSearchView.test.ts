@@ -2307,7 +2307,7 @@ describe('«What did you pick up?»', () => {
     // Adversarial Б2: the answer is the last time less what this trip holds (В-5 «а»); kept alone, it
     // stood for the whole of Monday, and the next trip with no signal lost the things taken both times.
     it('the trip asked about is remembered as it holds, so the next one with no signal finds it', async () => {
-      previousItems.mockResolvedValue({ ...lastTime, items: [eggs] })
+      previousItems.mockResolvedValue({ ...lastTime, items: [eggs], holds: [milk, bread] })
       onTrip(milk, bread)
       await render()
       await flushPromises()
@@ -2403,6 +2403,61 @@ describe('«What did you pick up?»', () => {
       expect(previousItems).toHaveBeenCalledWith(receipt)
       const next = 'cccccccc-0000-4000-8000-000000000003'
       expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([milk.name])
+    })
+
+    // Adversarial Г1 of review 4: the phone's copy of the trip still holds what another device took
+    // out; only the queue is added to what the server says the trip holds.
+    it('the trip is remembered without what the server no longer holds, however old the phone’s copy', async () => {
+      previousItems.mockResolvedValue({ ...lastTime, items: [eggs], holds: [marianna] })
+      onTrip(marianna, milk)
+      await render()
+      await flushPromises()
+
+      const next = 'cccccccc-0000-4000-8000-000000000003'
+      expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([marianna.name])
+    })
+
+    // Adversarial Г2 of review 4: a trip written here that goes on no more — removed, or finished on
+    // another phone — is not lifted over the receipt searched.
+    it('a finished record searched with no trip going on is the newest — a removed trip stays below', async () => {
+      vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-06T10:05:00Z') })
+      rememberBoughtHere(ACTOR, sas, TRIP, milk)
+      vi.useRealTimers()
+      const receipt = 'cccccccc-0000-4000-8000-000000000012'
+      tripRead.mockResolvedValue(
+        tripViewCodec.parse({
+          id: receipt,
+          startedAt: '2026-10-07T10:20:00.000Z',
+          finishedAt: '2026-10-07T12:00:00.000Z',
+          finishedOnDeviceAt: '2026-10-07T10:20:00.000Z',
+          currency: 'AMD',
+          rate: null,
+          rateProvider: null,
+          rateJump: null,
+          rateStale: false,
+          place: { id: 'aaaaaaaa-0000-4000-8000-000000000002', kind: 'store', name: sas.name },
+          placeCity: sas.city,
+          expenses: [
+            {
+              id: 'dddddddd-0000-4000-8000-000000000031',
+              createdAt: '2026-10-07T10:20:00.000Z',
+              item: marianna,
+              quantity: null,
+              amount: null,
+              unitPrice: null,
+            },
+          ],
+          total: [],
+          converted: null,
+        }),
+      )
+      previousItems.mockResolvedValue({ ...lastTime, items: [bread], holds: [marianna] })
+      await render(ref(true), `/purchases/${receipt}/add`)
+      await flushPromises()
+
+      expect(previousItems).toHaveBeenCalledWith(receipt)
+      const next = 'cccccccc-0000-4000-8000-000000000003'
+      expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([marianna.name])
     })
 
     describe('nothing remembered: the answer is waited for, a second at most (В-2)', () => {

@@ -524,7 +524,17 @@ export default defineComponent({
         (answer) => {
           if (asked !== hereAsked || !alive) return
           if (owner !== null && at.place !== null) {
-            rememberHereLast(owner, at.place, at.tripId, answer, at.before, heldWith(answer.holds))
+            rememberHereLast(
+              owner,
+              at.place,
+              at.tripId,
+              answer,
+              at.before,
+              heldWith(answer.holds),
+              // Asked about a finished record, the one going on here — removed or finished elsewhere
+              // it is none (Г2 of review 4).
+              selected.id.value === null ? null : current.tripId.value,
+            )
           }
           if (!hereLate.value) hereAnswer.value = answer.items
           hereLate.value = true
@@ -575,9 +585,9 @@ export default defineComponent({
       tripRows.value.flatMap((row) => (row.mark !== 'removing' && row.entry ? [row.entry] : [])),
     )
     /**
-     * What the trip holds for its memory (adversarial В1 of review 3): what the server says it holds —
-     * the screen's copy may miss what another device added — less what is being removed here, and what
-     * the queue still carries into it.
+     * What the trip holds for its memory: what the server says it holds (adversarial В1 of review 3) —
+     * less what is being removed here — and the purchases the queue still carries into it, never the
+     * phone's copy of the server's rows, which may keep what another device took out (Г1 of review 4).
      */
     function heldWith(holds: readonly CatalogueEntry[]): CatalogueEntry[] {
       const removing = new Set(
@@ -585,7 +595,10 @@ export default defineComponent({
           row.mark === 'removing' && row.entry ? [row.entry.id] : [],
         ),
       )
-      return [...holds.filter((item) => !removing.has(item.id)), ...held.value]
+      const queued = tripRows.value.flatMap((row) =>
+        row.expense === null && row.mark !== 'removing' && row.entry ? [row.entry] : [],
+      )
+      return [...holds.filter((item) => !removing.has(item.id)), ...queued]
     }
     /** What this trip holds already goes from the group (Р-17). */
     const hereLast = computed<CatalogueEntry[]>(() => {

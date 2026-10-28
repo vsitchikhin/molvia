@@ -340,9 +340,29 @@ describe('«Брали здесь в прошлый раз» on the device (MOL-
         { previous: { tripId: trip(0), at: monday }, items: [bread] },
         printed,
         [eggs],
+        trip(1),
       )
 
       expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Молоко'])
+    })
+
+    // Adversarial Г2 of review 4, self-review №4: a trip removed here, or finished on another phone, is
+    // no longer the one going on — lifted, it stood over the receipt for good.
+    it('«must not fire»: a trip written here and no longer going on is not lifted over the receipt', () => {
+      vi.useFakeTimers({ now: new Date('2026-10-06T10:05:00Z') })
+      rememberBoughtHere(ME, sas, trip(1), milk)
+      vi.setSystemTime(new Date('2026-10-07T12:00:00Z'))
+      rememberHereLast(
+        ME,
+        sas,
+        trip(2),
+        { previous: { tripId: trip(0), at: monday }, items: [bread] },
+        printed,
+        [eggs],
+        null,
+      )
+
+      expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Яйца'])
     })
 
     it('a trip finished here stands at its finish: finished before the receipt’s paper, the receipt is newer', () => {
@@ -373,6 +393,7 @@ describe('«Брали здесь в прошлый раз» on the device (MOL-
         { previous: { tripId: trip(0), at: monday }, items: [bread] },
         printed,
         [eggs],
+        trip(1),
       )
       rememberFinishedHere(ME, trip(1), new Date('2026-10-09T18:00:00Z'))
 
