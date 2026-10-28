@@ -647,7 +647,15 @@ The detail behind the frontend lines of `CLAUDE.md`.
   «Повторить» filled, «Сообщить о проблеме», an alert — not the quiet card. **While a version waits it
   offers «Обновить» there too, and the strip's row of the version steps aside for it**
   (`useStateStrip().offer`, self-review №1): holding no strip, it left the row standing, and the
-  screen offered «Обновить» twice. **Always on that screen,
+  screen offered «Обновить» twice. **Its buttons stand side by side where they fit** (adversarial А5): on
+  the owner's iPhone the keys leave 395 px of a window of 699, and one under the other «Взять из
+  недавних» stood 41 px under them — side by side it stands with «Повторить», as «Обновить» does with
+  «Повторить» while a version waits (А6, the order of 8c kept); e2e measures on that window, not on the
+  Pixel of the project, which left 140 px the phone has not got. **The price, named:** «Сообщить о
+  проблеме», last and quietest, stands under the keys there (435), and so does «Взять из недавних»
+  while a version waits; a phone narrower than the pair puts them one under the other again. **A
+  dimmed state says nothing** (`silent`, adversarial А3): an empty answer left while the next is on its
+  way is for the text before, and its words leave the region until it is the answer again. **Always on that screen,
   not «while the field holds the focus»**: a tap on the button takes the focus from the field first,
   and a button moving to the strip on `blur` would leave the finger before the `click`. **A focus the strip loses is brought
   back by the frame** (MOL-194, adversarial Б2, Б3): a render that swaps the strip's actions under

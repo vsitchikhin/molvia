@@ -333,6 +333,30 @@ describe('ScreenState', () => {
       view.unmount()
     })
 
+    // A dimmed answer is for the text before (the search's rule, MOL-208 adversarial А3): its words
+    // leave the region while the block stays, and come back with the answer.
+    it('takes its words back while silent, and says them again once it is not', async () => {
+      const silent = ref(false)
+      const view = onScreen(() => [
+        h(ScreenState, {
+          kind: 'empty',
+          icon: IconPlus,
+          title: 'Nothing found',
+          silent: silent.value,
+        } as never),
+      ])
+      await settle()
+      expect(view.region).toEqual(['Nothing found'])
+      silent.value = true
+      await settle()
+      expect(view.region).toEqual([])
+      expect(view.view.find('.state').exists()).toBe(true)
+      silent.value = false
+      await settle()
+      expect(view.region).toEqual(['Nothing found'])
+      view.view.unmount()
+    })
+
     // The region is hidden but read in browse mode: it must not keep a state that is gone (C3).
     it('takes its words back when it goes', async () => {
       const shown = ref(true)

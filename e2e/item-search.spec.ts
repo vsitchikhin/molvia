@@ -63,18 +63,20 @@ const OFFLINE_STRIP =
   'Offline · searching your recent items only. The full catalogue comes back with a connection'
 
 /**
- * The keys of an iPhone with the bar over them, as measured on the owner's (MOL-135): what a state of
- * this screen offers is tapped while the field holds them up, so it must stand above them. The window
- * of Chromium does not shrink, so this is the geometry alone — the strip at the bottom fails it.
+ * The owner's iPhone in Safari and its keys with the bar over them (MOL-135: `innerHeight` 699, 395 left
+ * over the keys): what a state of this screen offers is tapped while the field holds them up, so it must
+ * stand above them. Measured on that window, not the Pixel of the project — 839 tall, it left 140 px the
+ * phone has not got (adversarial А5). The window of Chromium does not shrink, so this is the geometry
+ * alone — the strip at the bottom fails it.
  */
-const KEYS = 304
+const OWNER_IPHONE = { width: 390, height: 699 }
+const OVER_THE_KEYS = OWNER_IPHONE.height - 304
 
-async function aboveTheKeys(page: Page, button: Locator): Promise<void> {
+async function aboveTheKeys(button: Locator): Promise<void> {
   await expect(button).toBeVisible()
   const box = await button.boundingBox()
-  const height = page.viewportSize()!.height
   expect(box!.y + box!.height, 'the button stands under the keys').toBeLessThanOrEqual(
-    height - KEYS,
+    OVER_THE_KEYS,
   )
 }
 
@@ -231,6 +233,7 @@ test.describe('nothing found', () => {
   test('offers «Suggest an item», and the item comes back the same when suggested twice', async ({
     page,
   }) => {
+    await page.setViewportSize(OWNER_IPHONE)
     await arrive(page)
     await page.goto('/purchases/manual/add')
     const word = nonsense()
@@ -246,7 +249,7 @@ test.describe('nothing found', () => {
       if (response.url().endsWith('/catalogue/items')) statuses.push(response.status())
     })
 
-    await aboveTheKeys(page, page.getByRole('button', { name: 'Suggest an item' }))
+    await aboveTheKeys(page.getByRole('button', { name: 'Suggest an item' }))
 
     for (const expected of [201, 200]) {
       await page.getByRole('button', { name: 'Suggest an item' }).click()
@@ -358,6 +361,7 @@ test.describe('without the server', () => {
   })
 
   test('an error offers «Try again» and the recent items', async ({ page }) => {
+    await page.setViewportSize(OWNER_IPHONE)
     await withKvirta(page, { recent: true })
     await page.route('**/api/catalogue/search**', (route) => route.abort())
 
@@ -368,14 +372,40 @@ test.describe('without the server', () => {
     ).toBeVisible()
     // It comes while the person types: the buttons stand under the words, above where the keys of a
     // phone would be, never in the strip at the bottom (owner's В-20 «а»).
-    await aboveTheKeys(page, page.getByRole('button', { name: 'Try again' }))
-    await aboveTheKeys(page, page.getByRole('button', { name: 'Pick from recent' }))
+    await aboveTheKeys(page.getByRole('button', { name: 'Try again' }))
+    await aboveTheKeys(page.getByRole('button', { name: 'Pick from recent' }))
     await page.getByRole('button', { name: 'Pick from recent' }).click()
     await expect(options(page)).toHaveText([new RegExp(KVIRTA_MILK.name)])
 
     await page.unroute('**/api/catalogue/search**')
     await page.getByRole('button', { name: 'Try again' }).click()
     await expect(options(page).first()).toContainText('Квирта')
+  })
+
+  // In the owner's language the words are longer, and the pair still stands above the keys side by side.
+  test.describe('in Russian', () => {
+    test.use({ locale: 'ru-RU' })
+
+    test('«Повторить» and «Взять из недавних» stand above the keys', async ({ page }) => {
+      await page.setViewportSize(OWNER_IPHONE)
+      const actor = await arrive(page)
+      const milk: unknown = await (await propose(page, KVIRTA_MILK)).json()
+      await page.evaluate(
+        ([key, cards]) => {
+          localStorage.setItem(key, cards)
+        },
+        [`molvia.recent.${actor}`, JSON.stringify([milk])] as const,
+      )
+      await page.goto('/purchases/manual/add')
+      await page.route('**/api/catalogue/search**', (route) => route.abort())
+      await page.getByRole('combobox').fill('квирта')
+
+      await expect(
+        page.getByRole('heading', { name: 'Сервер не ответил', exact: true }),
+      ).toBeVisible()
+      await aboveTheKeys(page.getByRole('button', { name: 'Повторить', exact: true }))
+      await aboveTheKeys(page.getByRole('button', { name: 'Взять из недавних', exact: true }))
+    })
   })
 
   test('the skeleton does not pulse for someone who asked for less motion', async ({ page }) => {

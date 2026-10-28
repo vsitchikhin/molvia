@@ -195,6 +195,11 @@ export default defineComponent({
     inline: { type: Boolean, default: false },
     /** The buttons under the words, never in the strip: a screen typed in (В-20). */
     flow: { type: Boolean, default: false },
+    /**
+     * Its words out of the live region while it stands: an answer dimmed while the next is on its way
+     * is for the text before, and is not read out (the search's rule, MOL-208 adversarial А3).
+     */
+    silent: { type: Boolean, default: false },
   },
   emits: ['retry'],
   setup(props) {
@@ -297,11 +302,11 @@ export default defineComponent({
     function speak(): void {
       withdraw?.()
       withdraw = undefined
-      if (alerts.value || !announce) return
+      if (alerts.value || !announce || props.silent) return
       withdraw = announce([props.title, props.body].filter(Boolean).join('. '), { held: true })
     }
     onMounted(speak)
-    watch(() => [props.title, props.body], speak)
+    watch(() => [props.title, props.body, props.silent], speak)
 
     onBeforeUnmount(() => {
       withdraw?.()
@@ -463,5 +468,17 @@ export default defineComponent({
 .inline .action,
 .flow .action {
   margin-top: 0;
+}
+
+/* Side by side where they fit, so the second still stands over the keys (adversarial А5 of MOL-208):
+   on the owner's iPhone the keys leave 395 px, and one under the other «Взять из недавних» stood 41 px
+   below them. Each as wide as its word or more; a row that runs out wraps, and a lone one takes it whole. */
+.flow .action {
+  flex-flow: row wrap;
+
+  > :deep(*) {
+    flex: 1 0 auto;
+    width: auto;
+  }
 }
 </style>
