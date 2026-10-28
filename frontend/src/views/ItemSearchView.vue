@@ -532,9 +532,9 @@ export default defineComponent({
               answer,
               at.before,
               heldWith(answer.holds, known),
-              // Asked about a finished record, the one going on here — removed or finished elsewhere
-              // it is none (Г2 of review 4).
-              selected.id.value === null ? null : current.tripId.value,
+              // The trip going on as the server knows it, never the phone's copy, which may still
+              // hold one removed or finished on another device (Г2, Д1, Е1 of reviews 4–6).
+              answer.open,
             )
           }
           if (!hereLate.value) hereAnswer.value = answer.items

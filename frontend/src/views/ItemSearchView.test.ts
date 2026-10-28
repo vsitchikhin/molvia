@@ -45,7 +45,7 @@ const addExpense = vi.fn<(tripId: string, body: AddExpenseBody) => Promise<unkno
 const currentTrip = vi.fn<() => Promise<unknown>>(() => Promise.resolve(null))
 /** «Брали здесь в прошлый раз» (MOL-209): no last time unless a test says so. */
 const previousItems = vi.fn<(tripId: string) => Promise<PreviousItemsResponse>>(() =>
-  Promise.resolve({ previous: null, items: [], holds: [] }),
+  Promise.resolve({ previous: null, items: [], holds: [], open: null }),
 )
 /** A finished record read for its search (MOL-208): never answered unless a test says so. */
 const tripRead = vi.fn<(id: string) => Promise<unknown>>(() => new Promise(() => undefined))
@@ -179,7 +179,7 @@ beforeEach(() => {
   tripRead.mockReset()
   tripRead.mockReturnValue(new Promise(() => undefined))
   previousItems.mockReset()
-  previousItems.mockResolvedValue({ previous: null, items: [], holds: [] })
+  previousItems.mockResolvedValue({ previous: null, items: [], holds: [], open: null })
   online(true)
 })
 
@@ -2152,6 +2152,7 @@ describe('«What did you pick up?»', () => {
       previous: { tripId: BEFORE, at: new Date('2026-10-01T10:00:00Z') },
       items: [bread, eggs, marianna],
       holds: [],
+      open: null,
     }
 
     /** An open trip at SAS, as the server answered it, with `bought` written into it. */
@@ -2396,7 +2397,12 @@ describe('«What did you pick up?»', () => {
           converted: null,
         }),
       )
-      previousItems.mockResolvedValue({ ...lastTime, items: [bread], holds: [marianna] })
+      previousItems.mockResolvedValue({
+        ...lastTime,
+        items: [bread],
+        holds: [marianna],
+        open: TRIP,
+      })
       await render(ref(true), `/purchases/${receipt}/add`)
       await flushPromises()
 
@@ -2419,6 +2425,54 @@ describe('«What did you pick up?»', () => {
 
     // Adversarial Г2 of review 4: a trip written here that goes on no more — removed, or finished on
     // another phone — is not lifted over the receipt searched.
+    // Adversarial Е1 of review 6: the phone's copy still says the trip goes on — removed on another
+    // device — and the server, asked, names none going on.
+    it('a trip the phone still thinks goes on, and the server does not, stays below the receipt', async () => {
+      vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-06T10:05:00Z') })
+      rememberBoughtHere(ACTOR, sas, TRIP, milk)
+      vi.useRealTimers()
+      onTrip(milk)
+      const receipt = 'cccccccc-0000-4000-8000-000000000012'
+      tripRead.mockResolvedValue(
+        tripViewCodec.parse({
+          id: receipt,
+          startedAt: '2026-10-07T10:20:00.000Z',
+          finishedAt: '2026-10-07T12:00:00.000Z',
+          finishedOnDeviceAt: '2026-10-07T10:20:00.000Z',
+          currency: 'AMD',
+          rate: null,
+          rateProvider: null,
+          rateJump: null,
+          rateStale: false,
+          place: { id: 'aaaaaaaa-0000-4000-8000-000000000002', kind: 'store', name: sas.name },
+          placeCity: sas.city,
+          expenses: [
+            {
+              id: 'dddddddd-0000-4000-8000-000000000031',
+              createdAt: '2026-10-07T10:20:00.000Z',
+              item: marianna,
+              quantity: null,
+              amount: null,
+              unitPrice: null,
+            },
+          ],
+          total: [],
+          converted: null,
+        }),
+      )
+      previousItems.mockResolvedValue({
+        ...lastTime,
+        items: [bread],
+        holds: [marianna],
+        open: null,
+      })
+      await render(ref(true), `/purchases/${receipt}/add`)
+      await flushPromises()
+
+      const next = 'cccccccc-0000-4000-8000-000000000003'
+      expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([marianna.name])
+    })
+
     it('a finished record searched with no trip going on is the newest — a removed trip stays below', async () => {
       vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-06T10:05:00Z') })
       rememberBoughtHere(ACTOR, sas, TRIP, milk)
