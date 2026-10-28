@@ -101,10 +101,13 @@ test('the ring of «Куда ушли» opens «Месяц» of the same month; 
   // The weight is held as itself: this test runs in Chromium alone, which in CI sets the text on whole
   // pixels — a chosen row at 700 measured 69 wide here, as at 600 (MOL-306). Both are read once the row
   // has settled: a weight that came by a transition after a pause was 600 still the moment after the tap
-  // (adversarial Р2-А4).
+  // (adversarial Р2-А4). An endless animation is not waited for: its end never comes (Р3-А1).
   await row.evaluate((node) =>
     Promise.allSettled(
-      node.getAnimations({ subtree: true }).map((animation) => animation.finished),
+      node
+        .getAnimations({ subtree: true })
+        .filter((animation) => Number(animation.effect?.getComputedTiming().endTime) !== Infinity)
+        .map((animation) => animation.finished),
     ),
   )
   await expect(name).toHaveCSS('font-weight', weight.name)
