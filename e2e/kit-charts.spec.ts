@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 // DOM for the code inside evaluate, which runs in the browser.
 import { expect, test } from '@playwright/test'
+import { facesIn } from './scroll'
 import { open } from './session'
 
 /**
@@ -16,14 +17,24 @@ import { open } from './session'
 test('a chosen legend row keeps its width, and its dot stands on a ring of the card', async ({
   page,
 }) => {
+  // MOL-306 probe: Dram — the face of ֏ — held until the first measure, as on a slow attempt; the
+  // second measure waits for it. The run is to fail with the numbers of the flake.
+  let release: (() => void) | undefined
+  const held = new Promise<void>((resolve) => (release = resolve))
+  await page.route('**/fonts/dram-*', async (route) => {
+    await held
+    await route.continue()
+  })
   await open(page, '/_kit')
   const where = page.getByRole('region', { name: 'Where it went' })
   const row = where.locator('.legend .row', { hasText: 'Cafés and restaurants' })
   const amount = row.locator('.amount')
   const unchosen = (await amount.boundingBox())?.width
+  release?.()
   await row.click()
   await expect(where.getByRole('radio', { name: /Cafés and restaurants/ })).toBeChecked()
   await expect(row).toHaveClass(/chosen/)
+  await facesIn(page)
   expect((await amount.boundingBox())?.width).toBe(unchosen)
 
   const ring = await row.locator('.dot').evaluate((dot) => {

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { actorCodec, settingsOf } from '@molvia/model'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
-import { standAt, toTheEnd, topOf } from './scroll'
+import { facesIn, standAt, toTheEnd, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 import { firstAttemptTrace } from './trace'
 
@@ -69,6 +69,14 @@ async function toCharts(page: Page): Promise<void> {
 test('the ring of «Куда ушли» opens «Месяц» of the same month; a sector is chosen and let go', async ({
   page,
 }) => {
+  // MOL-306 probe: Dram — the face of ֏ — held until the first measure, as on a slow attempt; the
+  // second measure waits for it. The run is to fail with the numbers of the flake.
+  let release: (() => void) | undefined
+  const held = new Promise<void>((resolve) => (release = resolve))
+  await page.route('**/fonts/dram-*', async (route) => {
+    await held
+    await route.continue()
+  })
   await seed(page)
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
   // The ring names this month's one category, and the card is one link (MOL-156).
@@ -86,10 +94,12 @@ test('the ring of «Куда ушли» opens «Месяц» of the same month; 
   // The amount's column is as wide as its figure (the name's takes what is left, whatever its weight).
   const amount = row.locator('.amount')
   const unchosen = (await amount.boundingBox())?.width
+  release?.()
   await row.click()
   await expect(where.getByRole('radio', { name: /Кафе и рестораны/ })).toBeChecked()
   // Chosen by a fill and a ring, at the weight of every row: the words do not grow (Ф-5, MOL-186).
   await expect(row).toHaveClass(/chosen/)
+  await facesIn(page)
   expect((await amount.boundingBox())?.width).toBe(unchosen)
   await expect(centre).toContainText('Кафе и рестораны')
   await expect(centre).toContainText('100')
