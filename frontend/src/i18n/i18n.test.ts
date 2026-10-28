@@ -114,7 +114,7 @@ describe('словарь: повторяющиеся тексты', () => {
     expect(duplicates(RU)).toEqual({
       // Один глагол у шторок, где закончено дело: баланс счёта, цифры штрихкода (MOL-98),
       // отправленное сообщение разработчику (MOL-147), место чека и края чека (MOL-222), дописанная строка
-      // чека (MOL-273).
+      // чека (MOL-273), дата, заметка и место траты (MOL-199).
       Готово: [
         'accounts.done',
         'feedback.done',
@@ -122,6 +122,7 @@ describe('словарь: повторяющиеся тексты', () => {
         'receipt.edges.done',
         'receipt.place.done',
         'scanner.done',
+        'spending.sheet.details_done',
       ],
       // Строка входа и заголовок шторки, которую она открывает, — одни слова (MOL-147): человек
       // видит, что попал туда, куда нажал. И у ссылки экрана ошибки так же.
@@ -348,6 +349,7 @@ describe('словарь: повторяющиеся тексты', () => {
         'receipt.edges.done',
         'receipt.place.done',
         'scanner.done',
+        'spending.sheet.details_done',
       ],
       'Write to the developer': ['feedback.title', 'settings.feedback.label'],
       'Report a problem': ['feedback.title_error', 'state.report'],

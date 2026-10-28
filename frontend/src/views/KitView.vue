@@ -385,6 +385,20 @@
           </li>
         </AppCard>
       </div>
+      <!-- The same entry among the fields of a form, and with an error behind it (MOL-199). -->
+      <NavRow
+        field
+        :icon="IconCalendar"
+        :label="t('spending.sheet.details_none')"
+        @click="sheetOpen = true"
+      />
+      <NavRow
+        field
+        invalid
+        :icon="IconCalendar"
+        :label="t('spending.sheet.details_title')"
+        @click="sheetOpen = true"
+      />
       <AppNote>{{ t('dev.kit.note_plain') }}</AppNote>
       <AppNote tone="warn" :icon="IconAlert">{{ t('dev.kit.note_warn') }}</AppNote>
       <div class="row">
@@ -661,6 +675,7 @@ import IconPlus from '~icons/mdi/plus'
 import IconRefresh from '~icons/mdi/refresh'
 import IconShape from '~icons/mdi/shape-outline'
 import IconWallet from '~icons/mdi/wallet-outline'
+import IconCalendar from '~icons/mdi/calendar-blank-outline'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
@@ -1146,6 +1161,7 @@ export default defineComponent({
       IconPhone,
       IconUpload,
       IconWallet,
+      IconCalendar,
       accounts: computed(() => [
         {
           id: 'card',

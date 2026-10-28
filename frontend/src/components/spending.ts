@@ -44,10 +44,12 @@ import {
   RATE_SCALE,
   currencySign,
   decimalFromRate,
+  drawsNothing,
   formatEstimate,
   formatMoney,
   formatRate,
   homeBankOf,
+  isRateDay,
   nextCategoryColour,
   TRIP_CATEGORY,
 } from '@molvia/model'
@@ -69,6 +71,7 @@ import type {
 } from '@/stores/spendingQueue'
 import { spendingOf } from '@/stores/spendingQueue'
 import type { SpendingPrefill } from '@/stores/spendingHandoff'
+import { dayWords } from '@/days'
 
 /**
  * What the screen of «Деньги» draws, put together from the server's month and the phone's queue
@@ -614,6 +617,30 @@ export function groceriesOf(categories: readonly SpendingCategoryView[]): string
     categories.find((category) => category.preset === TRIP_CATEGORY && !category.archived)?.id ??
     null
   )
+}
+
+/** A field behind «Дата, заметка, место» — the one its sheet opens on when it is wrong. */
+export type SpendingDetailsField = 'day' | 'note' | 'place'
+
+/**
+ * The entry «Дата, заметка, место» of the spending sheet says what is behind it in one line (MOL-199,
+ * Ф-17): «Сегодня · без заметки», «Вчера · Кофе с собой · «Кофеман»», «28 сент. · Кинза» — the day as a
+ * card heads it (`dayWords`), then the note and the place as typed, never quoted by the line. A day the
+ * picker cleared is no part; nothing typed besides it is `none`, «без заметки». «Nothing» is what draws
+ * nothing (`drawsNothing`, the one list `INVISIBLE`): a U+200B pasted in left «Сегодня · » with a dot
+ * hanging (adversarial А2).
+ */
+export function detailsLine(
+  fields: { readonly day: string; readonly note: string; readonly place: string },
+  locale: string,
+  today: string,
+  none: string,
+): string {
+  const day = isRateDay(fields.day) ? dayWords(fields.day, locale, today) : null
+  const typed = [fields.note, fields.place]
+    .filter((part) => !drawsNothing(part))
+    .map((part) => part.trim())
+  return [day, ...(typed.length > 0 ? typed : [none])].filter((part) => part !== null).join(' · ')
 }
 
 /**

@@ -5,6 +5,7 @@ import { fakeKeyboard } from './keyboard'
 import { facesIn, standAt, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 import { chooseCategory } from './category'
+import { fillDetails, openDetails } from './spending-details'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
@@ -39,7 +40,7 @@ async function writeSpending(
   await page.waitForTimeout(400)
   await sheet.getByLabel('Сумма').fill(amount)
   await chooseCategory(page, category)
-  if (note) await sheet.getByLabel(/Что это/).fill(note)
+  if (note) await fillDetails(page, { note })
   await sheet.getByRole('button', { name: 'Сохранить трату' }).click()
   await expect(sheet).toBeHidden()
 }
@@ -57,7 +58,7 @@ test('a spending lands in the month, and a removal comes back with «Верну�
   await expect(sheet).toContainText('Выберите категорию')
   await sheet.getByLabel('Сумма').fill('5000')
   await chooseCategory(page, 'Красота и гигиена')
-  await sheet.getByLabel(/Что это/).fill('Барбер')
+  await fillDetails(page, { note: 'Барбер' })
   await sheet.getByRole('button', { name: 'Сохранить трату' }).click()
   await expect(sheet).toBeHidden()
 
@@ -648,6 +649,99 @@ test('a category of one’s own is made from the sheet, and a preset’s name is
   await expect(page.getByRole('heading', { name: 'Убранные' })).toBeHidden()
 })
 
+// «Дата, заметка, место» is a sheet over the spending (MOL-199, Д-1): «‹» and no ×, one scrim, Esc takes
+// it alone; what is typed is in the line at once, and a wrong one is opened by «Сохранить трату».
+test('the day, the note and the place are behind one line, in a sheet over the spending', async ({
+  page,
+}) => {
+  await openMoney(page)
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  const sheet = page.locator('dialog[open]').first()
+  await expect(sheet).toContainText('Новая трата')
+  await page.waitForTimeout(400)
+  const line = sheet.getByRole('button', { name: /^Дата, заметка, место:/ })
+  await expect(line).toHaveAccessibleName('Дата, заметка, место: Сегодня · без заметки')
+  await expect(sheet.getByLabel(/Что это/)).toHaveCount(0)
+
+  const details = await openDetails(page)
+  await expect(page.locator('dialog[open]')).toHaveCount(2)
+  await expect(details.getByRole('button', { name: 'Назад' })).toBeVisible()
+  await expect(details.getByRole('button', { name: 'Закрыть' })).toHaveCount(0)
+  await details.getByLabel(/Что это/).fill('Обед')
+  await details.getByLabel(/Где/).fill('Кинза')
+  await expect(line).toHaveText('Сегодня · Обед · Кинза')
+  // Esc takes the details alone, and the focus goes back to the line it was opened from.
+  await page.keyboard.press('Escape')
+  await expect(page.locator('dialog[open]')).toHaveCount(1)
+  await expect(line).toBeFocused()
+  await expect(line).toHaveText('Сегодня · Обед · Кинза')
+
+  // A day the picker cleared: «Сохранить трату» opens the details on it, and the line is marked.
+  await sheet.getByLabel('Сумма').fill('2500')
+  await chooseCategory(page, 'Кафе и рестораны')
+  const again = await openDetails(page)
+  await again.getByLabel('Когда').fill('')
+  await again.getByRole('button', { name: 'Готово' }).click()
+  await expect(page.locator('dialog[open]')).toHaveCount(1)
+  await sheet.getByRole('button', { name: 'Сохранить трату' }).click()
+  const opened = page.locator('dialog[open]').last()
+  await expect(opened).toContainText('Выберите день не позже сегодняшнего')
+  await expect(opened.getByLabel('Когда')).toBeFocused()
+  await expect(line).toHaveAttribute('aria-invalid', 'true')
+})
+
+// The line is a row of the kit in the form too — the sheet's own `.field` stood it in a column 84 high
+// (adversarial А1) — and a long note ends in «…» inside it: without `width: 0` its whole line widened
+// the sheet past a phone, × off the screen (А3). At 320, where the fewest letters do it (self-review 3).
+test('the line of the day, the note and the place is one row, and a long one ends in «…» at 320', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 640 })
+  await openMoney(page)
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  const sheet = page.locator('dialog[open]').first()
+  await expect(sheet).toContainText('Новая трата')
+  await page.waitForTimeout(400)
+  const line = sheet.getByRole('button', { name: /^Дата, заметка, место:/ })
+  const shape = () =>
+    line.evaluate((row) => {
+      const rect = (selector: string): DOMRect => {
+        const found = row.querySelector(selector)
+        if (!found) throw new Error(`no ${selector} in the line`)
+        return found.getBoundingClientRect()
+      }
+      const dialog = row.closest('dialog')
+      const label = row.querySelector('.label')
+      if (!dialog || !label) throw new Error('the line is not in a sheet')
+      const own = row.getBoundingClientRect()
+      const [icon, text, chevron] = [rect('.icon'), rect('.label'), rect('.chevron')]
+      return {
+        height: own.height,
+        row: icon.right <= text.left && text.right <= chevron.left,
+        inside: chevron.right <= own.right && own.right <= dialog.getBoundingClientRect().right,
+        wider: dialog.scrollWidth - dialog.clientWidth,
+        cut: label.scrollWidth > label.clientWidth,
+      }
+    })
+  // Widths are measured once the faces have come (MOL-306). At 320 even «Сегодня · без заметки» needs
+  // 185 of the label's 166 and ends in «…» — the price, named in `money-spendings.md`; from 375 it fits.
+  await facesIn(page)
+  expect(await shape()).toMatchObject({ row: true, inside: true, wider: 0 })
+  expect((await shape()).height).toBeLessThan(60)
+
+  const note = 'Подарок коллеге на день рождения'
+  await fillDetails(page, { note, place: 'Торговый центр «Ташир»' })
+  expect(await shape()).toMatchObject({ row: true, inside: true, wider: 0, cut: true })
+  expect((await shape()).height).toBeLessThan(60)
+  await expect(line).toHaveAccessibleName(
+    `Дата, заметка, место: Сегодня · ${note} · Торговый центр «Ташир»`,
+  )
+  // × stays on the screen: the sheet is no wider than the window.
+  const close = sheet.getByRole('button', { name: 'Закрыть' })
+  const box = await close.boundingBox()
+  expect(box && box.x + box.width).toBeLessThanOrEqual(320)
+})
+
 test('a category is made from the strip of «Категории», removed quietly and brought back', async ({
   page,
 }) => {
@@ -1060,23 +1154,25 @@ test('the spending sheet stays in what is visible over the keyboard (MOL-135)', 
   })
 })
 
-// A field focused with the keys down is in sight at the bottom of the tall sheet; the keys come up,
-// the sheet is made lower from the top down, and the field is left under its edge — the sheet
-// scrolls to it, not the window. The browser's own focus has done its part before, so only the
-// sheet's scroll can pass this (review С-2).
+// A field focused with the keys down is in sight at the bottom of its sheet; the keys come up, the
+// sheet is made lower from the top down, and the field is left under its edge — the sheet scrolls to
+// it, not the window. The browser's own focus has done its part before, so only the sheet's scroll can
+// pass this (review С-2). Since MOL-199 the last field typed in is «Где» of «Дата, заметка, место»,
+// a sheet short enough that an iPhone SE's window, not a Pixel's, leaves it under the keys.
 test('the field typed in stays in sight as the keyboard makes the sheet lower (MOL-135)', async ({
   page,
 }) => {
   const keyboard = await fakeKeyboard(page)
+  await page.setViewportSize({ width: 375, height: 667 })
   await openMoney(page)
   await page.getByRole('button', { name: 'Добавить трату' }).click()
-  const sheet = page.locator('dialog[open]')
-  await expect(sheet).toContainText('Новая трата')
+  await expect(page.locator('dialog[open]')).toContainText('Новая трата')
   await page.waitForTimeout(400)
+  const sheet = await openDetails(page)
 
-  // Focused where a person left it: at the very bottom of the tall sheet, as a tap there leaves it.
+  // Focused where a person left it: at the very bottom of the sheet, as a tap there leaves it.
   // Not by `focus()` alone — Chromium would centre it, and the lower sheet would still show it.
-  const note = sheet.getByLabel(/Что это/)
+  const note = sheet.getByLabel(/Где/)
   await note.evaluate((field) => {
     field.focus({ preventScroll: true })
     const dialog = field.closest('dialog')
@@ -1323,7 +1419,7 @@ test('the sum being typed stands in sight over the keys of a turned phone (MOL-1
   await page.waitForTimeout(400)
   await sheet.getByLabel('Сумма').fill('5000')
   await chooseCategory(page, 'Красота и гигиена')
-  await sheet.getByLabel(/Что это/).fill('Барбер')
+  await fillDetails(page, { note: 'Барбер' })
   await sheet.getByRole('button', { name: 'Сохранить трату' }).click()
   await expect(sheet).toBeHidden()
   await openSpendings(page)

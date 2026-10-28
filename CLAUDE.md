@@ -301,6 +301,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The chips of a spending stand by frequency, taken when the sheet opens** (MOL-198): two rows and
   «Ещё…», the order the server's (`frequent`, 90 days), the chosen one first, never moved by a tap;
   `categoryOrder` stays every other order.
+- **The day, the note and the place are one line, «Дата, заметка, место ›»** (MOL-199): a sheet over the
+  spending whose fields are the spending's own; «Сохранить трату» opens it on the field it finds wrong
+  only when that is the first wrong one, and marks the line meanwhile.
 - **Removal is a mark, «Вернуть», final after ten minutes by the minute timer.**
 - **Every write of «Деньги» goes through its own queue** (`stores/spendingQueue`); a write a send
   has begun on is never folded into; a spending in the queue is a row, never a figure.
