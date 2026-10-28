@@ -144,4 +144,52 @@ describe('the sheet and the router', () => {
     await landsOn(router, '/verdicts')
     view.unmount()
   })
+
+  // MOL-198, owner's В-1 «а»: a new category made over «Ещё…» takes the list with it, and the sheets
+  // under them stand — `close(2)` left the screen and every sheet on it, a check under the spending too.
+  it('closeWith(1) steps off a sheet and the one under it, never a sheet lower or the screen', async () => {
+    const router = await fresh('/money')
+    await router.push('/money/accounts')
+    const open = [ref(true), ref(false), ref(false)]
+    const sheet = (at: number) =>
+      h(
+        BottomSheet,
+        {
+          open: open[at]?.value,
+          back: at > 0,
+          'onUpdate:open': (next: boolean) => {
+            const one = open[at]
+            if (one) one.value = next
+          },
+        },
+        { title: () => `Sheet ${String(at)}` },
+      )
+    const view = mount(
+      defineComponent(() => () => [h(RouterView), sheet(0), sheet(1), sheet(2)]),
+      {
+        attachTo: document.body,
+        global: { plugins: [router, createPinia(), createAppI18n('en')] },
+      },
+    )
+    // Each laid over the one before, as a person opens them: one entry each.
+    for (const [at, one] of open.entries()) {
+      one.value = true
+      await vi.waitFor(() => {
+        expect(document.querySelectorAll('dialog[open]')).toHaveLength(at + 1)
+        expect(router.options.history.state.sheet).toBe(true)
+      })
+    }
+    const go = vi.spyOn(router, 'go')
+    // The last of the page's: the screen under them has sheets of its own.
+    const top = view.findAllComponents(BottomSheet).at(-1)?.vm as unknown as {
+      closeWith: (below: number) => void
+    }
+    top.closeWith(1)
+    expect(go).toHaveBeenCalledExactlyOnceWith(-2)
+    await vi.waitFor(() => {
+      expect(open.map((one) => one.value)).toEqual([true, false, false])
+    })
+    expect(router.currentRoute.value.fullPath).toBe('/money/accounts')
+    view.unmount()
+  })
 })

@@ -191,6 +191,7 @@ function stackOf(router: Router): Holder[] {
 export function useSheetHistory(onLeft: () => void): {
   lay: (anchor?: SheetAnchor | null, from?: SheetOpener | null) => void
   leave: (steps?: number) => void
+  leaveWith: (below: number) => void
   laid: () => boolean
 } {
   const router = useRouter()
@@ -275,6 +276,20 @@ export function useSheetHistory(onLeft: () => void): {
     stepBack(router, screens > 0 ? stack.length + screens : over)
   }
 
+  /**
+   * Steps back off the entry and the entries of `below` sheets under it, never the screen: the list
+   * «Ещё…» goes with the new category made over it, and the spending stands (MOL-198, owner's В-1
+   * «а»). `leave(2)` would have left the screen and every sheet on it, a check under the spending too.
+   */
+  function leaveWith(below: number): void {
+    if (!holder) {
+      onLeft()
+      return
+    }
+    const at = stack.indexOf(holder)
+    stepBack(router, stack.length - at + Math.min(below, at))
+  }
+
   // Gone with its entry still laid and no move to tell of it — the screen was taken out of the
   // page some other way. The screen is still told the sheet is shut.
   onBeforeUnmount(() => {
@@ -283,7 +298,7 @@ export function useSheetHistory(onLeft: () => void): {
     onLeft()
   })
 
-  return { lay, leave, laid: () => holder !== undefined }
+  return { lay, leave, leaveWith, laid: () => holder !== undefined }
 }
 
 /**

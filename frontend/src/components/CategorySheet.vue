@@ -130,7 +130,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n()
     const queue = useSpendingQueueStore()
-    const sheet = ref<{ close: (steps?: number) => void } | null>(null)
+    const sheet = ref<{ closeWith: (below: number) => void } | null>(null)
     const name = ref('')
     const icon = ref<SpendingIcon>(DEFAULT_SPENDING_ICON)
     const colour = ref(0)
@@ -212,7 +212,7 @@ export default defineComponent({
         ...(colourChosen.value ? { colour: body.colour } : {}),
       })
       emit('created', id)
-      if (props.closes > 1) sheet.value?.close(props.closes)
+      if (props.closes > 1) sheet.value?.closeWith(props.closes - 1)
       else close()
     }
 
