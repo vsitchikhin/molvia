@@ -18,7 +18,8 @@ paths:
   - 'frontend/src/views/ItemSearchView*'
   - 'frontend/src/components/{CatalogueCombobox,ProposeItemSheet}*'
   - 'frontend/src/composables/useCatalogueSearch*'
-  - 'frontend/src/stores/{searchDraft,itemEntry,recentItems}*'
+  - 'frontend/src/stores/{searchDraft,itemEntry,recentItems,hereLast}*'
+  - 'backend/src/usecases/previous-items*.ts'
   - 'e2e/item-search.spec.ts'
   - 'packages/model/src/entities/twins.ts'
   - 'packages/model/src/contracts/merge.ts'
@@ -414,6 +415,52 @@ price of memory belonging to the query — one short word serving two items. 3 s
 picks measure it again (MOL-47). The corpus pins every answer whole — the shelf, those fifty
 words, Latin and Cyrillic brand spellings, Armenian labels — so a change of either threshold
 shows what it moves.
+
+## «Брали здесь в прошлый раз» on «Что взяли?» (MOL-209)
+
+Ф-24: the screen does not open empty. In a shop one knows a person takes what they took last time, and
+finds it without typing. «Часто берёте» is the person's last twenty items with no place; what was taken
+**here** only the server knows.
+
+- **The last time is the server's** (`GET /trips/:tripId/previous-items`): the person's last finished
+  trip at this trip's place before it, in the order of «Записаны» (`coalesce(finished_on_device_at,
+finished_at)`, then the id) — for the trip going on the last finished one, for a finished trip one
+  strictly before it. The place is the trip's, never the request's; a stranger's, a missing, a removed
+  trip and a malformed id are one `404`. **A trip with no purchase is no last time** (Р-1): a receipt
+  with no lines, every purchase removed — the one before it speaks. A removed trip does not count; a
+  trip from a receipt does. One name in two cities is two places (MOL-120). The items are catalogue
+  cards, each once, in the order first bought, at most `PREVIOUS_ITEMS_LIMIT` (20); the answer names
+  the trip and its moment for the phone's memory. It writes nothing.
+- **What is in this trip already is not shown** (owner's Р-17 of MOL-118): the trip's rows and the
+  purchases in the queue, by `useTripRows`, a row being removed given back — so **the phone cuts to
+  five** (`HERE_LAST_SHOWN`) after taking them out, never the server: cut to five there, three of them
+  recorded left two where ten were taken (Р-2). «Часто берёте» under it repeats none of what it shows.
+- **Only under an empty field**: typed, the recent items are narrowed alone, as with no signal (1j);
+  the answer to a code and the question «привязать?» show no groups. Both groups are one listbox of
+  `CatalogueCombobox` (`groups`), each `role="group"` named by its caption, the arrows one run through
+  them; the listbox is named by the field.
+- **The phone remembers it per place** (`stores/hereLast.ts`, `molvia.here-last.<owner>`, thirty
+  places): **by the city and the name as the places' index folds them, never the place's id** (Р-3) —
+  a trip started with no signal knows only what was typed at the door, and a shelf with no signal is
+  where the memory is read. A trip still in the queue is not asked about (Р-4). **It remembers the
+  server's answer and the purchases written here** (owner's В-1 «а»): the answer names the trip
+  _before_ the one asked about, so a memory of answers alone is a trip behind — Wednesday with a
+  signal remembers Monday, and Friday with none would show Monday. So an item that goes into a trip
+  makes that trip the place's newest; the newest kept trip but the one going on is the last time, and
+  for a finished trip only one before it. The server's answer about a trip takes the place of what the
+  phone wrote into it — it knows what was removed since. «None» is remembered for the trip it was said
+  of. **The prices, named:** a receipt recorded is not written here — its items reach the memory with
+  the next answer at that place; a purchase removed after it was written stays in the memory until
+  then; a merged place (MOL-106) started by its old spelling is looked up by the old key until the
+  server answers.
+- **With nothing remembered the answer is waited for, a second at most** (owner's В-2 «а»,
+  `STRIP_LATE_MS`): «Часто берёте» is on the phone and would stand at once, and the group coming in
+  over it would take its rows from under the finger (MOL-269). Under the hint there is nothing until
+  the answer, and then both groups come together; later than that, «Часто берёте» stands alone and the
+  answer is only remembered. With something remembered it stands at once and the answer takes its place
+  (Р-5) — they part only where a trip was finished or changed on another phone, a move named. A
+  failure, a `404`, no connection — the group is a help, never a state of the screen: what is
+  remembered stands, or nothing does.
 
 ## By meaning (MOL-105)
 

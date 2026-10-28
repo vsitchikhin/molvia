@@ -144,6 +144,12 @@ The detail behind the trip lines of `CLAUDE.md`.
   a check that came out even moves the balance with no reason the check can name, as a removed
   spending does.
 
+## «Брали здесь в прошлый раз» (MOL-209)
+
+**`GET /trips/:tripId/previous-items` and `TripRepository.previousPurchases` are read by «Что взяли?»**, and
+their rules — which trip is the last time, what the phone keeps and when it waits — are in `search.md`,
+««Брали здесь в прошлый раз» on «Что взяли?»». A removed trip filters its mark, as every reader does.
+
 ## «Сумма по чеку» — a trip's money whole (MOL-78)
 
 **The receipt's sum is a field of the trip, never a price** (owner's decisions В-1…В-4 of 30.09.2026).

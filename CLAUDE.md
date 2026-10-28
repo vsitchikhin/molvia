@@ -202,6 +202,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   `CATALOGUE_MERGE=report` until the owner says `on`** (В-3); `make unmerge ID=` takes a merge back,
   a chain from its end.
 
+- **«Брали здесь в прошлый раз» is the server's, the phone keeps it per place** (MOL-209): the last
+  finished trip with a purchase at the trip's place before it; what is in this trip already goes on the
+  phone, which shows five; remembered by city and name, the server's answer and the purchases written
+  here; with nothing remembered the answer is waited for a second, never pushed in over «Часто берёте».
+
 ### «Что брать» and verdicts — `.claude/rules/advice.md`
 
 - **«Не брать нигде» has no field for a price, a place or a threshold** — the answer is a
