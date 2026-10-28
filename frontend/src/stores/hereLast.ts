@@ -141,25 +141,35 @@ export function recallHereLast(
 
 /**
  * The server's answer for a trip at this place: its last time there, which takes the place of what
- * the device wrote into that same trip itself — the server knows what was removed since.
+ * the device wrote into that same trip itself — the server knows what was removed since. And every
+ * trip the device keeps between that last time and the one asked about goes (owner's В-3 «а»): the
+ * server saw it and did not count it — removed, or every purchase in it removed — and kept, it was
+ * the newest, the last time with no signal for good (adversarial А1). One not sent yet is not
+ * among them: the trip asked about was sent, and the queue sends in order (Р-4).
  */
 export function rememberHereLast(
   owner: string,
   place: HerePlace,
   tripId: string,
   answer: PreviousItemsResponse,
+  /** The finished trip's moment in «Записаны»: it looks only before itself. `null` — the one going on. */
+  before: Date | null = null,
 ): void {
   const id = tripId.toLowerCase()
   const { previous } = answer
+  const after = previous?.at.getTime() ?? -Infinity
+  const until = before?.getTime() ?? Infinity
+  const seen = (trip: Kept) => trip.tripId !== id && trip.at > after && trip.at < until
   put(owner, place, (slot) => {
-    if (previous === null) return { ...slot, none: id }
+    const trips = slot.trips.filter((trip) => !seen(trip))
+    if (previous === null) return { ...slot, none: id, trips }
     const named = previous.tripId.toLowerCase()
     return {
       ...slot,
       none: slot.none === id ? null : slot.none,
       trips: [
         { tripId: named, at: previous.at.getTime(), items: answer.items.slice(0, ITEMS_PER_TRIP) },
-        ...slot.trips.filter((trip) => trip.tripId !== named),
+        ...trips.filter((trip) => trip.tripId !== named),
       ],
     }
   })

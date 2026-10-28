@@ -123,6 +123,79 @@ describe('«Брали здесь в прошлый раз» on the device (MOL-
     expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Яйца'])
   })
 
+  // Owner's В-3 «а» of the review, adversarial А1: Monday the bread, Wednesday the milk written here
+  // and taken out again — an empty trip is no last time (Р-1) — Friday the server says Monday.
+  describe('a trip the server did not count goes with its answer', () => {
+    const monday = new Date('2026-10-05T11:00:00Z')
+    function wednesdayEmptied(): void {
+      vi.useFakeTimers({ now: new Date('2026-10-07T10:00:00Z') })
+      rememberHereLast(ME, sas, trip(1), {
+        previous: { tripId: trip(0), at: monday },
+        items: [bread],
+      })
+      rememberBoughtHere(ME, sas, trip(1), milk)
+      vi.setSystemTime(new Date('2026-10-09T10:00:00Z'))
+    }
+
+    it('the trip asked about, with no signal again, is the server’s last time', () => {
+      wednesdayEmptied()
+      rememberHereLast(ME, sas, trip(2), {
+        previous: { tripId: trip(0), at: monday },
+        items: [bread],
+      })
+
+      expect(names(recallHereLast(ME, sas, trip(2)))).toEqual(['Хлеб'])
+      expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Хлеб'])
+    })
+
+    it('«none» takes every trip before the one asked about — a removed trip was the only one', () => {
+      wednesdayEmptied()
+      rememberHereLast(ME, sas, trip(2), { previous: null, items: [] })
+
+      expect(recallHereLast(ME, sas, trip(2))).toEqual([])
+    })
+
+    it('«must not fire»: the trip asked about keeps what was written into it', () => {
+      wednesdayEmptied()
+      rememberBoughtHere(ME, sas, trip(2), eggs)
+      rememberHereLast(ME, sas, trip(2), {
+        previous: { tripId: trip(0), at: monday },
+        items: [bread],
+      })
+
+      expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Яйца'])
+    })
+
+    it('«must not fire»: a finished trip asked about takes nothing after itself', () => {
+      wednesdayEmptied()
+      // Wednesday's trip is after the finished Tuesday one asked about: not the server's to judge.
+      const tuesday = new Date('2026-10-06T12:00:00Z')
+      rememberHereLast(
+        ME,
+        sas,
+        trip(5),
+        { previous: { tripId: trip(0), at: monday }, items: [bread] },
+        tuesday,
+      )
+
+      expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Молоко'])
+      expect(names(recallHereLast(ME, sas, trip(5), tuesday))).toEqual(['Хлеб'])
+    })
+
+    it('boundary: a trip at the very moment the server named is not taken — only those after it', () => {
+      rememberHereLast(ME, sas, trip(8), {
+        previous: { tripId: trip(4), at: monday },
+        items: [eggs],
+      })
+      rememberHereLast(ME, sas, trip(2), {
+        previous: { tripId: trip(0), at: monday },
+        items: [bread],
+      })
+
+      expect(names(recallHereLast(ME, sas, trip(0)))).toEqual(['Яйца'])
+    })
+  })
+
   it('a finished trip looks only before itself', () => {
     rememberHereLast(ME, sas, trip(3), {
       previous: { tripId: trip(2), at: new Date('2026-10-07') },
