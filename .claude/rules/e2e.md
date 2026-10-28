@@ -237,6 +237,34 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   hides by chance. **The price, named:** a face first needed after the action — a glyph only the next
   answer brings — still moves what is measured after it; on «Год» every face is on the page before the
   choice, the other screens were not checked for it.
+- **A width is measured once the faces have come, too** (MOL-306): the chosen legend row of the kit
+  (`kit-charts.spec`) and its twin on «Месяц» (`money-charts.spec`) wait with `facesIn` before the first
+  measure. ֏ is Dram's own face, asked for only once the door lets the screen in — on the retry's trace a
+  second after the Latin faces, 0.35 s before the measure; on a slow attempt it came between the two
+  measures and widened «֏30,000» by 3/16 px on WebKit (run 40306940186, 66.203125 → 66.390625). Proved,
+  not supposed: held until the first measure, it gave exactly those numbers on every attempt (run
+  40646618731); in Chromium the same hold moved nothing. The width stays `toBe`.
+- **A weight is held as itself, never by a width alone** (MOL-306, review №4): Chromium in the CI image
+  sets text on whole pixels, so «֏30,000» measured 66 at 600 and at 700 (69 on «Месяц»), while WebKit
+  told them apart (66.390625 → 66.984375). A chosen row at 700 went green in every [phone] run — the twin
+  on «Месяц» runs in nothing else. Both tests now read the weight of the name and the sum before the
+  choice and hold it after with `toHaveCSS('font-weight', …)`; at 700 all three CI runs turn red, in the
+  CI image's browsers, not a Mac's, where the width alone had looked enough. Weight and width are read
+  once the row's animations have finished (`getAnimations({ subtree: true })`): a 700 that came by a
+  transition after a pause of `--dur` was still 600 the moment after the tap, and passed by chance
+  (adversarial Р2-А4); waited for, it is red every run. An endless animation is not waited for, as the
+  sheet's rise is not (MOL-69): the legend's dot does not breathe, but made to by `work-breath` in a
+  mutation it hung the wait until the test's timeout, with nothing in the message to say why (Р3-А1).
+  **The prices, named:** the other measures of a width taken right after `open()` were not checked for
+  the late face, nor any other `toBe` of a width in [phone] for what whole pixels hide; the next to fail
+  so is a task of its own. And the check is still a snapshot — «settled» is «the row's own finite
+  animations have ended», not «nothing more will change». Each of these, put in on purpose, passed or
+  hung it, and none is in the legend today: a 700 set by a timer 220 ms after the choice (Р3-А2); an
+  endless flicker of 600 and 700, not waited for and caught at 600 (Р4-А1); a finite animation longer
+  than the test, waited on into its timeout (Р4-А2); a transition of an ancestor — the `fieldset`
+  spreading its letters — which the row's `getAnimations` does not list (Р4-А3). The row is chosen
+  synchronously, sets no timer and has no animation of its own; a wait that answered all four would be
+  a mechanism of its own, and was not built for a flake.
 - **«A line gone under the category of «Год»» keeps its first attempt's trace in CI** (MOL-267,
   `firstAttemptTrace` of `e2e/trace.ts`), since its one failure was never explained (run 37911189456,
   09.10, `scrollY` 1151 → 1132 with the choice where it was). Late faces were not it: held a second with

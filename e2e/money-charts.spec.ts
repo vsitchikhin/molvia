@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { actorCodec, settingsOf } from '@molvia/model'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
-import { standAt, toTheEnd, topOf } from './scroll'
+import { facesIn, standAt, toTheEnd, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 import { firstAttemptTrace } from './trace'
 
@@ -85,11 +85,33 @@ test('the ring of «Куда ушли» opens «Месяц» of the same month; 
   const row = where.locator('.legend .row', { hasText: 'Кафе и рестораны' })
   // The amount's column is as wide as its figure (the name's takes what is left, whatever its weight).
   const amount = row.locator('.amount')
+  // Measured once the faces have come, as its twin in the kit: there Dram, the face of ֏, came between
+  // the two measures on WebKit and widened the sum by 3/16 px; held so here, Chromium moved nothing (MOL-306).
+  await facesIn(page)
   const unchosen = (await amount.boundingBox())?.width
+  const name = row.locator('.name')
+  const weight = {
+    name: await name.evaluate((node) => getComputedStyle(node).fontWeight),
+    amount: await amount.evaluate((node) => getComputedStyle(node).fontWeight),
+  }
   await row.click()
   await expect(where.getByRole('radio', { name: /Кафе и рестораны/ })).toBeChecked()
   // Chosen by a fill and a ring, at the weight of every row: the words do not grow (Ф-5, MOL-186).
   await expect(row).toHaveClass(/chosen/)
+  // The weight is held as itself: this test runs in Chromium alone, which in CI sets the text on whole
+  // pixels — a chosen row at 700 measured 69 wide here, as at 600 (MOL-306). Both are read once the row
+  // has settled: a weight that came by a transition after a pause was 600 still the moment after the tap
+  // (adversarial Р2-А4). An endless animation is not waited for: its end never comes (Р3-А1).
+  await row.evaluate((node) =>
+    Promise.allSettled(
+      node
+        .getAnimations({ subtree: true })
+        .filter((animation) => Number(animation.effect?.getComputedTiming().endTime) !== Infinity)
+        .map((animation) => animation.finished),
+    ),
+  )
+  await expect(name).toHaveCSS('font-weight', weight.name)
+  await expect(amount).toHaveCSS('font-weight', weight.amount)
   expect((await amount.boundingBox())?.width).toBe(unchosen)
   await expect(centre).toContainText('Кафе и рестораны')
   await expect(centre).toContainText('100')

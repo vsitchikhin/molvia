@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 // DOM for the code inside evaluate, which runs in the browser.
 import { expect, test } from '@playwright/test'
+import { facesIn } from './scroll'
 import { open } from './session'
 
 /**
@@ -20,10 +21,32 @@ test('a chosen legend row keeps its width, and its dot stands on a ring of the c
   const where = page.getByRole('region', { name: 'Where it went' })
   const row = where.locator('.legend .row', { hasText: 'Cafés and restaurants' })
   const amount = row.locator('.amount')
+  // ֏ is Dram's own face, asked for only once the door lets the screen in — a second after the Latin
+  // faces; come between the two measures, it widened the sum by 3/16 px on WebKit (MOL-306).
+  await facesIn(page)
   const unchosen = (await amount.boundingBox())?.width
+  const name = row.locator('.name')
+  const weight = {
+    name: await name.evaluate((node) => getComputedStyle(node).fontWeight),
+    amount: await amount.evaluate((node) => getComputedStyle(node).fontWeight),
+  }
   await row.click()
   await expect(where.getByRole('radio', { name: /Cafés and restaurants/ })).toBeChecked()
   await expect(row).toHaveClass(/chosen/)
+  // The weight is held as itself: Chromium in CI sets this text on whole pixels, and a chosen row at 700
+  // measured 66 wide as at 600 — only WebKit's width told them apart (MOL-306). Both are read once the
+  // row has settled: a weight that came by a transition after a pause was 600 still the moment after the
+  // tap (adversarial Р2-А4). An endless animation is not waited for: its end never comes (Р3-А1).
+  await row.evaluate((node) =>
+    Promise.allSettled(
+      node
+        .getAnimations({ subtree: true })
+        .filter((animation) => Number(animation.effect?.getComputedTiming().endTime) !== Infinity)
+        .map((animation) => animation.finished),
+    ),
+  )
+  await expect(name).toHaveCSS('font-weight', weight.name)
+  await expect(amount).toHaveCSS('font-weight', weight.amount)
   expect((await amount.boundingBox())?.width).toBe(unchosen)
 
   const ring = await row.locator('.dot').evaluate((dot) => {
