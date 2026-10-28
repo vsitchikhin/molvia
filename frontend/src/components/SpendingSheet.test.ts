@@ -543,7 +543,8 @@ describe('SpendingSheet: the chips by frequency, the chosen one first (MOL-198, 
       [en.spending.sheet.more]: 66,
     }
     let row = 358
-    let resized: (() => void) | null = null
+    // Set inside the observer the chips make: a plain `null` would be narrowed to nothing to call.
+    let resized = null as (() => void) | null
     vi.stubGlobal(
       'ResizeObserver',
       class {
