@@ -243,9 +243,15 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   second after the Latin faces, 0.35 s before the measure; on a slow attempt it came between the two
   measures and widened «֏30,000» by 3/16 px on WebKit (run 40306940186, 66.203125 → 66.390625). Proved,
   not supposed: held until the first measure, it gave exactly those numbers on every attempt (run
-  40646618731); in Chromium the same hold moved nothing. The check stays `toBe` — a chosen row at 700
-  turns both browsers red. **The price, named:** the other measures of a width taken right after
-  `open()` were not checked for it; the next to fail so is a task of its own.
+  40646618731); in Chromium the same hold moved nothing. The width stays `toBe`.
+- **A weight is held as itself, never by a width alone** (MOL-306, review №4): Chromium in the CI image
+  sets text on whole pixels, so «֏30,000» measured 66 at 600 and at 700 (69 on «Месяц»), while WebKit
+  told them apart (66.390625 → 66.984375). A chosen row at 700 went green in every [phone] run — the twin
+  on «Месяц» runs in nothing else. Both tests now read the weight of the name and the sum before the
+  choice and hold it after with `toHaveCSS('font-weight', …)`; at 700 all three CI runs turn red, in the
+  CI image's browsers, not a Mac's, where the width alone had looked enough. **The price, named:** the other measures
+  of a width taken right after `open()` were not checked for the late face, nor any other `toBe` of a
+  width in [phone] for what whole pixels hide; the next to fail so is a task of its own.
 - **«A line gone under the category of «Год»» keeps its first attempt's trace in CI** (MOL-267,
   `firstAttemptTrace` of `e2e/trace.ts`), since its one failure was never explained (run 37911189456,
   09.10, `scrollY` 1151 → 1132 with the choice where it was). Late faces were not it: held a second with
