@@ -231,6 +231,12 @@ export const previousItemsResponseSchema = z.strictObject({
    * — and so tells what `items` left out from what was removed since.
    */
   holds: z.array(catalogueEntryCodec),
+  /**
+   * The person's trip going on, as the server knows it, or `null` (adversarial Е1 of review 6): the
+   * phone keeps it the newest of a place, and its own copy may still hold one removed or finished on
+   * another device.
+   */
+  open: z.uuid().nullable(),
 })
 export type PreviousItemsResponse = z.output<typeof previousItemsResponseSchema>
 

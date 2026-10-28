@@ -793,6 +793,8 @@ describe('previousItems (MOL-209)', () => {
           calls.push(args)
           return Promise.resolve({ previous, itemIds: [bread.id, milk.id], heldIds: [milk.id] })
         },
+        // The trip going on, as the server knows it (adversarial Е1 of review 6).
+        latestUnfinishedFor: () => Promise.resolve(trip),
       },
       // In the order of ids, as the repository reads them — not the order bought.
       items: { byIds: () => Promise.resolve([milk, bread]) },
@@ -803,6 +805,7 @@ describe('previousItems (MOL-209)', () => {
     expect(answer.previous).toEqual(previous)
     expect(answer.items.map((entry) => entry.name)).toEqual(['Хлеб', 'Молоко «Ашхар»'])
     expect(answer.holds.map((entry) => entry.name)).toEqual(['Молоко «Ашхар»'])
+    expect(answer.open).toBe(trip.id)
     expect(Object.keys(answer.items[0] ?? {})).not.toContain('createdBy')
   })
 
@@ -810,6 +813,7 @@ describe('previousItems (MOL-209)', () => {
     const repositories = fakeRepositories({
       trips: {
         previousPurchases: () => Promise.resolve({ previous: null, itemIds: [], heldIds: [] }),
+        latestUnfinishedFor: () => Promise.resolve(null),
       },
       items: { byIds: () => Promise.resolve([]) },
     })
@@ -817,6 +821,7 @@ describe('previousItems (MOL-209)', () => {
       previous: null,
       items: [],
       holds: [],
+      open: null,
     })
   })
 

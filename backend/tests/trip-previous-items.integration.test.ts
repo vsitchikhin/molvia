@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { and, eq } from 'drizzle-orm'
 import { ERROR, previousItemsResponseSchema, toSearchKey } from '@molvia/model'
-import { expenses } from '@/db/schema'
+import { expenses, trips } from '@/db/schema'
 import { buildServer } from '@/server'
 import { PREVIOUS_ITEMS_LIMIT } from '@/usecases/previous-items'
 import { connectDrizzle } from './db'
@@ -226,6 +226,21 @@ describe('«Брали здесь в прошлый раз» (MOL-209)', () => {
     expect(answer.items.map((entry) => entry.id)).toEqual([eggs])
     expect(answer.holds.map((entry) => entry.id)).toEqual([bread, milk])
     expect(Object.keys(answer.holds[0] ?? {})).not.toContain('createdBy')
+    // The trip going on, as the server knows it (adversarial Е1 of review 6).
+    expect(answer.open).toBe(open)
+  })
+
+  it('names no trip going on once it is removed or finished — asked about a finished one', async () => {
+    const actor = await insertActor(db)
+    const cookie = await signIn(db, actor)
+    const place = await insertPlace(db, { name: `SAS ${randomUUID()}` })
+    const asked = await insertTrip(db, { actorId: actor, placeId: place, ...finished(3) })
+    await bought(asked, [await item('Сыр')])
+    const going = await insertTrip(db, { actorId: actor, placeId: place })
+    expect((await previousOf(cookie, asked)).open).toBe(going)
+
+    await db.update(trips).set({ deletedAt: new Date() }).where(eq(trips.id, going))
+    expect((await previousOf(cookie, asked)).open).toBeNull()
   })
 
   it('a stranger’s, a missing, a removed and a malformed trip are one 404', async () => {
@@ -253,7 +268,7 @@ describe('«Брали здесь в прошлый раз» (MOL-209)', () => {
     await bought(theirs, [await item('Чужое')])
     const open = await insertTrip(db, { actorId: actor, placeId: place })
 
-    expect(await previousOf(cookie, open)).toEqual({ previous: null, items: [], holds: [] })
+    expect(await previousOf(cookie, open)).toEqual({ previous: null, items: [], holds: [], open })
   })
 })
 

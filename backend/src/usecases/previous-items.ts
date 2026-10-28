@@ -39,5 +39,13 @@ export async function previousItems(
       if (!item) throw new Error(`previous trip: item ${id} was not read`)
       return catalogueEntryOf(item)
     })
-  return { previous: found.previous, items: cards(found.itemIds), holds: cards(found.heldIds) }
+  // The trip going on, as the server knows it — what the phone keeps the newest (adversarial Е1 of
+  // review 6): the phone's own copy may still hold one removed or finished on another device.
+  const open = await trips.latestUnfinishedFor(actorId)
+  return {
+    previous: found.previous,
+    items: cards(found.itemIds),
+    holds: cards(found.heldIds),
+    open: open?.id ?? null,
+  }
 }
