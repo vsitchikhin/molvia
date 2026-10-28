@@ -76,8 +76,10 @@ import type { ChipRows } from '@/components/spending'
  *
  * The order is the sheet's (`chipOrder`), by frequency, taken when it opens: a tap here moves no chip.
  * How many stand is the browser's measure of the chips at their widths, again when the field's width
- * changes or the fonts come; until there is one — a sheet still shut, a test with no layout — they all
- * stand, as before. Chosen is «here», the accent, not the category's colour — a fill and a ring, never
+ * changes or a face comes; until there is one — a sheet still shut, a test with no layout — they all
+ * stand, as before. **The chosen one never leaves the rows** (adversarial А1): a measure that would lay
+ * it past them — the phone turned, a name grown longer by an answer — stands it first, as the sheet
+ * does at its opening (owner's В-2 «а»); a chip chosen by a tap is in the rows already and moves none. Chosen is «here», the accent, not the category's colour — a fill and a ring, never
  * a weight: every chip is at 600, so the row does not reflow on a tap (Ф-5, MOL-174); its dot stands on
  * a ring of `surface`, where on the tint ten light categories fell under 3:1 (MOL-172 А2).
  */
@@ -100,7 +102,13 @@ export default defineComponent({
   setup(props) {
     const field = ref<HTMLElement | null>(null)
     const ruler = ref<HTMLElement | null>(null)
-    const rows = ref<ChipRows | null>(null)
+    // The order the rows stand in — the sheet's, or with the chosen one lifted first — and how many.
+    const laid = ref<{ order: string[]; rows: ChipRows } | null>(null)
+    const rows = computed(() => laid.value?.rows ?? null)
+    const shownIds = computed(() => {
+      const now = laid.value
+      return now ? now.order.slice(0, now.rows.first + now.rows.second) : null
+    })
 
     function measure(): void {
       const box = field.value
@@ -109,14 +117,33 @@ export default defineComponent({
       const width = box.getBoundingClientRect().width
       // A shut sheet lays nothing out: the last measure stands until it opens.
       if (width <= 0) return
-      const widths = [...chips.children].map((chip) => chip.getBoundingClientRect().width)
-      const more = widths.pop() ?? 0
+      const sizes = [...chips.children].map((chip) => chip.getBoundingClientRect().width)
+      const more = sizes.pop() ?? 0
       const gap = parseFloat(getComputedStyle(chips).columnGap) || 0
-      rows.value = chipsInTwoRows(widths, width, more, gap)
+      const widthOf = new Map(props.categories.map((category, at) => [category.id, sizes[at] ?? 0]))
+      const layOut = (order: string[]) =>
+        chipsInTwoRows(
+          order.map((id) => widthOf.get(id) ?? 0),
+          width,
+          more,
+          gap,
+        )
+      let order = props.categories.map((category) => category.id)
+      let laidOut = layOut(order)
+      const chosen = props.modelValue
+      if (chosen !== null && order.indexOf(chosen) >= laidOut.first + laidOut.second) {
+        order = [chosen, ...order.filter((id) => id !== chosen)]
+        laidOut = layOut(order)
+      }
+      laid.value = { order, rows: laidOut }
     }
 
     let observer: ResizeObserver | null = null
-    let gone = false
+    // A chip measured in a fallback face is narrower or wider than the one drawn a moment later — and a
+    // face may come after the sheet has opened, which changes no width of the field.
+    const faceCame = (): void => {
+      measure()
+    }
     onMounted(() => {
       if (typeof ResizeObserver !== 'undefined' && field.value) {
         observer = new ResizeObserver(() => {
@@ -124,17 +151,12 @@ export default defineComponent({
         })
         observer.observe(field.value)
       }
-      // A chip measured in a fallback face is narrower or wider than the one drawn a moment later.
-      if ('fonts' in document) {
-        void document.fonts.ready.then(() => {
-          if (!gone) measure()
-        })
-      }
+      if ('fonts' in document) document.fonts.addEventListener('loadingdone', faceCame)
       measure()
     })
     onBeforeUnmount(() => {
-      gone = true
       observer?.disconnect()
+      if ('fonts' in document) document.fonts.removeEventListener('loadingdone', faceCame)
     })
     watch(
       () => props.categories.map((category) => props.nameOf(category)).join('\n'),
@@ -143,13 +165,23 @@ export default defineComponent({
         measure()
       },
     )
+    // Chosen from outside the rows — the list, one just made — is laid in; one in the rows moves none.
+    watch(
+      () => props.modelValue,
+      (chosen) => {
+        if (chosen !== null && shownIds.value !== null && !shownIds.value.includes(chosen))
+          measure()
+      },
+    )
 
     const shownRows = computed(() => {
-      const laid = rows.value
-      if (!laid) return [props.categories]
+      const now = laid.value
+      if (!now) return [props.categories]
+      const byId = new Map(props.categories.map((category) => [category.id, category]))
+      const ordered = now.order.flatMap((id) => byId.get(id) ?? [])
       return [
-        props.categories.slice(0, laid.first),
-        props.categories.slice(laid.first, laid.first + laid.second),
+        ordered.slice(0, now.rows.first),
+        ordered.slice(now.rows.first, now.rows.first + now.rows.second),
       ]
     })
 

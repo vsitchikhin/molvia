@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import type { SpendingCategoryView } from '@molvia/model'
@@ -136,5 +136,110 @@ describe('CategoryChips — two rows and «Ещё…» (MOL-198, Ф-17)', () => 
       wrapper.findAll('input[type="radio"]').every((radio) => radio.attributes('aria-invalid')),
     ).toBe(true)
     expect(wrapper.get('button.more').attributes('aria-invalid')).toBeUndefined()
+  })
+})
+
+// Adversarial А1 of MOL-198: a chip chosen by a tap went out of the two rows at the next measure — the
+// phone turned, a name grown longer by an answer — and nothing on the sheet said what was chosen, while
+// «Сохранить трату» still saved it. The chosen one is lifted first there, as the sheet does at its opening.
+describe('CategoryChips — the chosen one never leaves the rows (adversarial А1)', () => {
+  let field = 358
+  let resized: (() => void) | null = null
+  const LONGER: Record<string, number> = { ...WIDTHS, 'Транспорт и такси': 175 }
+  const PETS = categories[3]?.id ?? ''
+  const TELECOM = categories[4]?.id ?? ''
+
+  function laidAt(): void {
+    field = 358
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          resized = callback
+        }
+        observe(): void {
+          // The test calls `resized` itself, as the browser would on a new width.
+        }
+        disconnect(): void {
+          resized = null
+        }
+      },
+    )
+    const style = window.getComputedStyle.bind(window)
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+      const computed = style(element, pseudo)
+      if (!(element instanceof HTMLElement && element.classList.contains('ruler'))) return computed
+      return new Proxy(computed, {
+        get: (target, key) => (key === 'columnGap' ? '8px' : Reflect.get(target, key)),
+      })
+    })
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const width = this.classList.contains('chips-field')
+        ? field
+        : (LONGER[this.textContent.trim()] ?? 0)
+      return { width, height: 44, top: 0, left: 0, right: width, bottom: 44, x: 0, y: 0 } as DOMRect
+    })
+  }
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    resized = null
+  })
+  const checked = () => document.querySelector<HTMLInputElement>('.chips input:checked')?.value
+
+  async function tappedPets() {
+    laidAt()
+    const wrapper = chips()
+    await nextTick()
+    await wrapper.find(`input[value="${PETS}"]`).setValue(true)
+    await wrapper.setProps({ modelValue: PETS })
+    // A tap moves nothing: «Животные» stays where it stood.
+    expect(rowsOf(wrapper)).toEqual([
+      ['Продукты', 'Кафе и рестораны'],
+      ['Транспорт', 'Животные', 'Ещё…'],
+    ])
+    return wrapper
+  }
+
+  it('the field narrowed to 288: the chosen one stands first, checked', async () => {
+    const wrapper = await tappedPets()
+    field = 288
+    resized?.()
+    await nextTick()
+    expect(rowsOf(wrapper)).toEqual([
+      ['Животные', 'Продукты'],
+      ['Кафе и рестораны', 'Ещё…'],
+    ])
+    expect(checked()).toBe(PETS)
+  })
+
+  it('a name before it grown longer by an answer: the chosen one stands first, checked', async () => {
+    const wrapper = await tappedPets()
+    await wrapper.setProps({
+      categories: categories.map((one) =>
+        one.name === 'Транспорт' ? { ...one, name: 'Транспорт и такси' } : one,
+      ),
+    })
+    // The ruler is drawn anew, then measured.
+    await flushPromises()
+    expect(rowsOf(wrapper)[0]?.[0]).toBe('Животные')
+    expect(checked()).toBe(PETS)
+  })
+
+  it('chosen from outside the rows, it is laid in first; chosen within them, nothing moves', async () => {
+    laidAt()
+    const wrapper = chips()
+    await nextTick()
+    await wrapper.setProps({ modelValue: categories[1]?.id ?? '' })
+    await nextTick()
+    expect(rowsOf(wrapper)).toEqual([
+      ['Продукты', 'Кафе и рестораны'],
+      ['Транспорт', 'Животные', 'Ещё…'],
+    ])
+    await wrapper.setProps({ modelValue: TELECOM })
+    await nextTick()
+    expect(rowsOf(wrapper)[0]?.[0]).toBe('Связь и интернет')
+    expect(checked()).toBe(TELECOM)
   })
 })
