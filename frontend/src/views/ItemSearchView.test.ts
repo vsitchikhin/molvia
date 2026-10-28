@@ -266,6 +266,7 @@ describe('«What did you pick up?»', () => {
 
     await field(view).setValue('молокоо')
 
+    // The whole region, so the words are said once: `ScreenState`'s alone, never the screen's beside them.
     await vi.waitFor(() => {
       expect(view.get('.live').text()).toBe(
         `${en.item.empty.title.replace('{query}', 'молокоо')}. ${en.item.empty.text}`,
