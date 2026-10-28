@@ -84,7 +84,7 @@ The log's writer, the cohort and both gate queries are pinned in `.claude/rules/
   counts from when the server received it.
 - **Both gates are read by `dist/gates.js`** (MOL-91), `make gates FROM=…` in a copy: `n` beside
   every share, the stop line printed and no verdict; gate 0.3 closes its window as 0.2 does; the
-  erased leave one number, by week of arrival, in `erasures`.
+  erased leave one number, by week of arrival, in `erasures` — the silent apart (MOL-239).
 - **The scanner's measure is `receipt_days`** (MOL-222): how readings ended, and at «Записать» the lines
   put right — the phone's word (`edited`), since only it knows what its review showed — a total put
   right as the receipt's own edit, the first record only, and the time from the server taking the
@@ -419,6 +419,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   erasure** — a test holds `ACTOR_REFERENCES` to every foreign key — **and the record of processing**
   (Confluence 12091393, MOL-97) in the same PR, as must a new recipient; nothing holds that one —
   **and a new recipient is a line of `PRIVACY_RECIPIENTS` and a new edition** (MOL-236).
+- **Two years of silence erase the account by the same function** (MOL-239): `last_seen_at` + 2 years; the bot
+  warns 30 and 7 days before, the API marking the step; no account goes sooner than a week after its last warning,
+  and unwarned only with the bot blocked; a mark holds only for the day it falls before; `erasures.silent` apart.
 - **The copy is what erasure takes** (`GET /actors/me/export`, MOL-93): a section per erased table,
   counted against a dry run, **and every column exported or left out with its reason**
   (`EXPORT_COLUMNS`); stored, never counted; the removed marked; no secret.

@@ -1,6 +1,9 @@
 ---
 paths:
-  - 'backend/src/db/{erasure-repository,export-repository,failure,schema}.ts'
+  - 'backend/src/db/{erasure-repository,export-repository,failure,schema,silence-repository}.ts'
+  - 'backend/src/usecases/silence.ts'
+  - 'packages/model/src/entities/silence.ts'
+  - 'backend/tests/silence.integration.test.ts'
   - 'backend/src/{forget,forget-cli,server,index}*.ts'
   - 'backend/src/usecases/{erase-me,export-mine,consent}.ts'
   - 'backend/src/routes/consent.ts'
@@ -158,6 +161,40 @@ The detail behind the privacy lines of `CLAUDE.md`.
   with the switch off and with no edition accepted, in the copy (version 24), gone with the row, a line
   of the record of processing; the page names it under «Ваши настройки», and says that after a long
   silence keeping the account takes a login, not only opening the app — both revisions.
+- **Two years of silence erase the account** (MOL-239, owner's В-2 of MOL-97; decisions of 28.10.2026 in
+  `.scratch/tasks/requirements/MOL-239.md`): `last_seen_at` plus two calendar years (`SILENCE_YEARS`, Postgres's
+  `make_interval`) is the day, and the page is the specification — «за 30 и за 7 дней бот предупредит… если бот
+  заблокирован, аккаунт удалится без предупреждения». **The bot warns 30 and 7 days before, the API decides and marks**
+  (`bot.md`); a late bot sends only the latest step, and the last comes a day after the first at the soonest. **The
+  first falls due a day before its thirty** (`SILENCE_FIRST_LEAD_DAYS`, adversarial А2): it waits for the person's day,
+  and any twenty-four hours hold one, so sent within them it leaves thirty days at least. **No account is erased
+  sooner than a week after its last warning** (Р-3, adversarial А3) — the warning named that day, and a block heard
+  after it does not bring the day forward; so a bot down for days moves the erasure, never the warning. **Without a last
+  warning of seven days only a blocked bot is erased** (`bot_blocked_at`), on the day — the one the first warning named,
+  if any; the page's one exception; an account the bot
+  can reach is never erased unwarned. **A bot once heard blocked is tried all the same** (adversarial А4): an unblock
+  from Telegram's list is never heard, and a block still there answers 403. **The mark is two columns of `actors`**
+  (`silence_warning`, `silence_warned_at`, both or neither), **holding only for the silence whose day it falls before by
+  at most 32 days** (adversarial А1, self-review №2): a login moves the day two years on and every mark before it falls
+  out of reach, whoever's clock wrote it — compared with the visit, the API's moment of a claim and the moment a
+  login's transaction began left a login begun before the claim older than the mark, and the old warning stood for the
+  new silence. Nothing of the login touches the mark, nor does the mark move `updated_at` (0075), as the visit does
+  not. **A country with no zone is read in Yerevan's** (`SILENCE_DEFAULT_ZONE`, self-review №4): never warned, its
+  people would never be erased either. In the
+  copy (version 26), gone with the row, a line of the record of processing. **Erasure is the one function** with
+  `silentAt` (Р-7): the rule (`silentErasable`) is judged again under the account's lock, the one a login takes, so a
+  login that came first leaves everything — the login requests too — and `found: false`. **The run is once a day and at
+  start** (the minute runner with a day's interval), each account in a transaction of its own, a failure
+  `job:silence-erasure` and the rest going on; run twice, it finds nobody. **Counted apart** (owner's В-1 «а»):
+  `erasures.silent`, by the same week of arrival — `make gates` prints «of them silent» under «erased», since a person
+  who left in disgust and one who stopped coming two years ago are not one signal. **The owner hears it in numbers**
+  (В-3 «а»): `owner_notices` of kind `silence`, a claim's warnings by step and a run's erasures with how many had the
+  bot blocked — the first sign of a clock gone wrong comes a month before any erasure. **The price, named:** a warning
+  lost on its way — a chat gone, the network — is not sent again, and the account goes a week after its mark; the
+  first candidates of production come no sooner than 26.09.2028 (the fill of 0073), so the path is held by tests alone
+  until then. `/privacy` names the warning among the bot's messages under «Telegram», the mark under «Ваши
+  настройки» and the count of the silent in «Удалить всё» — a revision of edition 4: the term and the warnings were
+  promised by edition 2.
 - **A person can object to being counted** (MOL-96): «Учитывать меня в статистике» in «Ваши
   данные» erases their event log at once, stops it, and takes them out of both gates — the reasons
   and the rules are in `advice.md`. The two moments it keeps are on `actors`, so erasure takes them

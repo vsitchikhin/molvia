@@ -51,8 +51,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // category's `icon`, chosen for one's own (MOL-285). 23: a receipt's `paidBy`, cash or a card as its words
 // of payment say (MOL-312). 24: the account's `lastSeenAt`, when the person last used the app or signed
 // in — the clock of the two years of silence (MOL-238). 25: `receiptReviews`, the receipts read not whole kept for the developer's review —
-// until when and why, never the photo or what was read (MOL-309).
-export const EXPORT_VERSION = 25
+// until when and why, never the photo or what was read (MOL-309). 26: the account's `silenceWarning` and
+// `silenceWarnedAt`, the last warning before an erasure for two years of silence and when (MOL-239).
+export const EXPORT_VERSION = 26
 
 const day = z.iso.date()
 
@@ -137,6 +138,8 @@ const accountSchema = z.strictObject({
   sharedUntil: isoDate.nullable(),
   receiptsModelUntil: isoDate.nullable(),
   lastSeenAt: isoDate,
+  silenceWarning: z.int().nullable(),
+  silenceWarnedAt: isoDate.nullable(),
   createdAt: isoDate,
   updatedAt: isoDate,
 })

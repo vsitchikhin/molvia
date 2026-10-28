@@ -68,7 +68,7 @@ describe('the gates reader', () => {
   it('counts the erased of the weeks the window touches, whole weeks in Yerevan', async () => {
     await db.insert(erasures).values([
       { appearedWeek: '2026-09-28', erased: 5 }, // the week before
-      { appearedWeek: '2026-10-05', erased: 2 },
+      { appearedWeek: '2026-10-05', erased: 2, silent: 1 },
       { appearedWeek: '2026-10-12', erased: 1 },
       { appearedWeek: '2026-10-19', erased: 7 }, // the week after
     ])
@@ -80,7 +80,12 @@ describe('the gates reader', () => {
       to: new Date('2026-10-19T00:00:00+04:00'),
     })
 
-    expect(report.erased).toEqual({ count: 3, firstWeek: '2026-10-05', lastWeek: '2026-10-12' })
+    expect(report.erased).toEqual({
+      count: 3,
+      silent: 1,
+      firstWeek: '2026-10-05',
+      lastWeek: '2026-10-12',
+    })
   })
 
   it('reads the login funnel of the days the window touches, whole days in Yerevan (MOL-68)', async () => {
