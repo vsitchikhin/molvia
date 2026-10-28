@@ -27,6 +27,7 @@ import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import { useReceiptQueueStore } from '@/stores/receiptQueue'
 
 const tripHistory = vi.fn<() => Promise<TripHistory>>()
 const pendingVerdicts = vi.fn<() => Promise<PendingVerdicts>>()
@@ -991,6 +992,50 @@ describe('PurchasesView (MOL-128)', () => {
         answerFirst({ trips: [answer], nextCursor: cursor })
         await pausesPass()
         expect(tripHistory).toHaveBeenCalledTimes(2)
+      })
+
+      it('чек записался, пока первая страница перечитывается, — её читают и для чека, затем следующую (Л1)', async () => {
+        shelve()
+        let answerFirst: (page: TripHistory) => void = () => undefined
+        tripHistory
+          .mockRejectedValueOnce(new Error('HTTP 500'))
+          .mockImplementationOnce(
+            () =>
+              new Promise<TripHistory>((resolve) => {
+                answerFirst = resolve
+              }),
+          )
+          .mockResolvedValueOnce({ trips: [answer], nextCursor: cursor })
+          .mockImplementationOnce(next)
+        const { view } = await render()
+        await flushPromises()
+        await more(view).trigger('click')
+        await flushPromises()
+        // The receipt queue's «Записать» lands meanwhile (MOL-127): «Записаны» is to be read again.
+        const receiptsQueue = useReceiptQueueStore()
+        receiptsQueue.recorded = [
+          ...receiptsQueue.recorded,
+          {
+            receiptId: 'cccccccc-0000-4000-8000-000000000001',
+            tripId: trip(0).id,
+            count: 1,
+            held: [],
+          },
+        ]
+        await flushPromises()
+        answerFirst({ trips: [answer], nextCursor: cursor })
+        await pausesPass()
+
+        // The tap's re-read, the receipt's, then the next page from the boundary that one left.
+        expect(tripHistory).toHaveBeenCalledTimes(4)
+        expect(rows(view).map((one) => one.text())).toEqual([
+          expect.stringContaining('Ереван Сити'),
+          expect.stringContaining('SAS'),
+        ])
+        expect(view.findAll('button').some((one) => one.text() === ru.trip.history.more)).toBe(
+          false,
+        )
+        expect(view.findAll('.strip')).toHaveLength(0)
       })
 
       it('«не должно сработать»: первая страница ответила — взятая «Показать ещё» её не перечитывает', async () => {

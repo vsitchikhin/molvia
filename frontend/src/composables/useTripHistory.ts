@@ -1,4 +1,4 @@
-import { computed, onScopeDispose, ref, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Money } from '@molvia/model'
@@ -68,6 +68,10 @@ export function useTripHistory(): TripHistoryScreen {
   const failures = ref(0)
   const moved = ref(false)
   let run = 0
+  /** The screen was taken away (И1). */
+  let gone = false
+  /** The read begun last, of either page — what «Показать ещё» waits for (Л1). */
+  let latest: Promise<void> = Promise.resolve()
   const rows = computed(() => {
     // A list moved under every read is the answer by its rows; a count the answer does not say is
     // unknown, never memory said as the answer (MOL-307, owner's В-2 «а»).
@@ -124,8 +128,15 @@ export function useTripHistory(): TripHistoryScreen {
       (a, b) => b.at.getTime() - a.at.getTime() || b.id.localeCompare(a.id),
     )
   })
+  /** Every read goes through here, so the one begun last is known. */
+  function load(more = false, tapped = more): Promise<void> {
+    const reading = ask(more, tapped)
+    latest = reading
+    return reading
+  }
+
   /** `tapped`: a first page read for «Показать ещё», whose button says it is at work meanwhile. */
-  async function load(more = false, tapped = more): Promise<void> {
+  async function ask(more: boolean, tapped: boolean): Promise<void> {
     if (!actor.id) return
     const token = ++run
     busy.value = true
@@ -173,11 +184,18 @@ export function useTripHistory(): TripHistoryScreen {
    */
   async function more(): Promise<void> {
     if (trouble.value !== null || moved.value) {
-      const reread = run + 1
+      const owner = actor.id
       await load(false, true)
-      // Nothing moved since: not the screen taken away (И1, round 8 of MOL-307, З1), not the owner
-      // changed, not another read begun — or the next page is asked for nobody, or for another list.
-      if (run !== reread) return
+      // A read of this very list begun meanwhile — a receipt recorded starts one as the re-read ends — is
+      // waited for, and the next page asked from the boundary it leaves (round 9 of MOL-307, Л1): stopped
+      // by it, the tap brought nothing. A screen taken away, or another owner, ends the tap here (И1, З1).
+      let seen: Promise<void>
+      do {
+        seen = latest
+        await seen
+        await nextTick()
+      } while (seen !== latest)
+      if (gone || owner !== actor.id) return
     }
     await load(true)
   }
@@ -210,6 +228,7 @@ export function useTripHistory(): TripHistoryScreen {
   // A screen taken away ends its asking: a retry asleep in its pause would otherwise wake and go
   // for the history again with nobody to show it to (round 3, И1).
   onScopeDispose(() => {
+    gone = true
     run += 1
   })
   return {

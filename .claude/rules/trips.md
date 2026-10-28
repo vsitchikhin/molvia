@@ -416,8 +416,9 @@ said as the answer nor a strip that blames the server — and they come back wit
 sent reads it in the store. So a first page in doubt — a strip over it, or a list moved under every read — is asked
 again by «Показать ещё» **before** the next page, and its own outcome decides the strip and the counts; then the next
 page is read from the boundary it now has — read after it, a first page whose boundary had moved since the shelf threw
-the tapped page away and put the button back (round 7, Ж1) — and only if nothing moved meanwhile: a screen taken
-away, another owner or another read ends it there, as И1 ends a retry (round 8, З1). One not in doubt is not asked. Kept by the screen instead, its state was always half kept — the strip and not `moved`, or not what the store had read. **A
+the tapped page away and put the button back (round 7, Ж1) — a read of the same list begun meanwhile (a receipt recorded) waited for, and the
+next page asked from the boundary it leaves (round 9, Л1); a screen taken away or another owner ends the tap there, as
+И1 ends a retry (round 8, З1). One not in doubt is not asked. Kept by the screen instead, its state was always half kept — the strip and not `moved`, or not what the store had read. **A
 purchase written into a recorded record moves its row on the shelf too** (`apply`, adversarial А1): only in place,
 where the first page holds it — a row the page has not got would move the boundary only `load()` reads. Left on
 screen alone, the first write of another window put the count before the purchase back as the server's answer,
