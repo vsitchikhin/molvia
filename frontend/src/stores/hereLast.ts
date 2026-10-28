@@ -44,6 +44,11 @@ interface Kept {
   /** The trip's moment in «Записаны» from the server, or the last purchase written here into it. */
   readonly at: number
   readonly items: readonly CatalogueEntry[]
+  /**
+   * Written here as the trip going on, not finished yet (adversarial В2 of review 3): it will be
+   * finished after any trip finished already, so a finished one kept meanwhile does not stand over it.
+   */
+  readonly open?: boolean
 }
 
 interface Slot {
@@ -58,7 +63,12 @@ const slotSchema = z.object({
   trips: z.array(z.unknown()).catch([]),
   none: z.string().nullable().catch(null),
 })
-const keptSchema = z.object({ tripId: z.string(), at: z.number(), items: z.array(z.unknown()) })
+const keptSchema = z.object({
+  tripId: z.string(),
+  at: z.number(),
+  items: z.array(z.unknown()),
+  open: z.boolean().optional(),
+})
 
 /** Slot by slot and row by row, so one an older version wrote differently costs only itself. */
 function load(owner: string): Slot[] {
@@ -81,7 +91,14 @@ function load(owner: string): Slot[] {
         const item = catalogueEntryCodec.safeDecode(row as never)
         return item.success ? [item.data] : []
       })
-      return [{ tripId: kept.data.tripId, at: kept.data.at, items }]
+      return [
+        {
+          tripId: kept.data.tripId,
+          at: kept.data.at,
+          items,
+          ...(kept.data.open ? { open: true } : {}),
+        },
+      ]
     })
     return [{ slot: slot.data.slot, trips, none: slot.data.none }]
   })
@@ -193,12 +210,13 @@ export function rememberHereLast(
   owner: string,
   place: HerePlace,
   tripId: string,
-  answer: PreviousItemsResponse,
+  answer: Pick<PreviousItemsResponse, 'previous' | 'items'>,
   /** The finished trip's moment in «Записаны»: it looks only before itself. `null` — the one going on. */
   before: Date | null = null,
   /**
-   * What the trip asked about holds, in its order, as the screen knows it — the server's rows and the
-   * queue's; `null` when it is not known.
+   * What the trip asked about holds, in its order: what the server says it holds (`holds` of the
+   * answer) and what the queue still carries into it — the screen's own copy of the trip may miss
+   * what another device added (adversarial В1 of review 3). `null` for a caller with no such word.
    */
   held: readonly CatalogueEntry[] | null = null,
 ): void {
@@ -225,9 +243,18 @@ export function rememberHereLast(
           tripId: id,
           at: before?.getTime() ?? own?.at ?? Date.now(),
           items: items.slice(0, ITEMS_PER_TRIP),
+          ...(before === null ? { open: true } : {}),
         },
         ...trips.filter((trip) => trip.tripId !== id),
       ]
+    }
+    // A finished trip kept at its own moment does not stand over a trip still going on here: that one
+    // is finished after it (adversarial В2 of review 3) — a receipt keeps the moment its paper names.
+    if (before !== null) {
+      const now = Date.now()
+      trips = trips.map((trip) =>
+        trip.open === true && trip.tripId !== id && trip.at < now ? { ...trip, at: now } : trip,
+      )
     }
     return {
       ...slot,
@@ -264,9 +291,33 @@ export function rememberBoughtHere(
     return {
       ...slot,
       trips: [
-        { tripId: id, at: at.getTime(), items },
+        { tripId: id, at: at.getTime(), items, ...(finishedAt === null ? { open: true } : {}) },
         ...slot.trips.filter((trip) => trip.tripId !== id),
       ],
     }
   })
+}
+
+/**
+ * «Закончить» on this phone (adversarial В2 of review 3): the trip is kept at the moment it was
+ * finished, as «Записаны» order it and the server names it, and is no longer the one going on.
+ * Wherever the device keeps it — a trip is at one place.
+ */
+export function rememberFinishedHere(owner: string, tripId: string, finishedAt: Date): void {
+  const id = tripId.toLowerCase()
+  const slots = load(owner)
+  if (!slots.some((slot) => slot.trips.some((trip) => trip.tripId === id))) return
+  save(
+    owner,
+    slots.map((slot) => ({
+      ...slot,
+      trips: slot.trips
+        .map((trip) =>
+          trip.tripId === id
+            ? { tripId: trip.tripId, at: finishedAt.getTime(), items: trip.items }
+            : trip,
+        )
+        .sort((a, b) => b.at - a.at),
+    })),
+  )
 }

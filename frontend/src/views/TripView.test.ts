@@ -48,7 +48,7 @@ vi.mock('@/api', () => ({
     receipts: () => Promise.resolve({ receipts: [] }),
     currentTrip: () => currentTrip(),
     // «Что взяли?», где оказываются «+ Позиция» и «Штрихкод», спрашивает прошлый раз места (MOL-209).
-    previousItems: () => Promise.resolve({ previous: null, items: [] }),
+    previousItems: () => Promise.resolve({ previous: null, items: [], holds: [] }),
     tripHistory: () => tripHistory(),
     pendingVerdicts: () => pendingVerdicts(),
     recentPlaces: () => recentPlaces(),

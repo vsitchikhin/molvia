@@ -524,7 +524,7 @@ export default defineComponent({
         (answer) => {
           if (asked !== hereAsked || !alive) return
           if (owner !== null && at.place !== null) {
-            rememberHereLast(owner, at.place, at.tripId, answer, at.before, held.value)
+            rememberHereLast(owner, at.place, at.tripId, answer, at.before, heldWith(answer.holds))
           }
           if (!hereLate.value) hereAnswer.value = answer.items
           hereLate.value = true
@@ -574,6 +574,19 @@ export default defineComponent({
     const held = computed<CatalogueEntry[]>(() =>
       tripRows.value.flatMap((row) => (row.mark !== 'removing' && row.entry ? [row.entry] : [])),
     )
+    /**
+     * What the trip holds for its memory (adversarial В1 of review 3): what the server says it holds —
+     * the screen's copy may miss what another device added — less what is being removed here, and what
+     * the queue still carries into it.
+     */
+    function heldWith(holds: readonly CatalogueEntry[]): CatalogueEntry[] {
+      const removing = new Set(
+        tripRows.value.flatMap((row) =>
+          row.mark === 'removing' && row.entry ? [row.entry.id] : [],
+        ),
+      )
+      return [...holds.filter((item) => !removing.has(item.id)), ...held.value]
+    }
     /** What this trip holds already goes from the group (Р-17). */
     const hereLast = computed<CatalogueEntry[]>(() => {
       const taken = new Set(held.value.map((item) => item.id))

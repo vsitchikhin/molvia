@@ -45,8 +45,10 @@ const addExpense = vi.fn<(tripId: string, body: AddExpenseBody) => Promise<unkno
 const currentTrip = vi.fn<() => Promise<unknown>>(() => Promise.resolve(null))
 /** «Брали здесь в прошлый раз» (MOL-209): no last time unless a test says so. */
 const previousItems = vi.fn<(tripId: string) => Promise<PreviousItemsResponse>>(() =>
-  Promise.resolve({ previous: null, items: [] }),
+  Promise.resolve({ previous: null, items: [], holds: [] }),
 )
+/** A finished record read for its search (MOL-208): never answered unless a test says so. */
+const tripRead = vi.fn<(id: string) => Promise<unknown>>(() => new Promise(() => undefined))
 const catalogueByBarcode = vi.fn<(code: string) => Promise<CatalogueEntry | null>>()
 const catalogueBarcodeHint =
   vi.fn<(code: string, locale: AppLocale) => Promise<BarcodeHint | null>>()
@@ -67,7 +69,7 @@ vi.mock('@/api', () => ({
     // «Тут дешевле» on the purchase sheet (MOL-92): never answered here.
     ownPrices: () => new Promise(() => undefined),
     // A finished record read for its search (MOL-208): never answered here.
-    trip: () => new Promise(() => undefined),
+    trip: (id: string) => tripRead(id),
   },
 }))
 
@@ -174,8 +176,10 @@ beforeEach(() => {
   catalogueByBarcode.mockReset()
   catalogueBarcodeHint.mockReset()
   catalogueBarcodeHint.mockResolvedValue(null)
+  tripRead.mockReset()
+  tripRead.mockReturnValue(new Promise(() => undefined))
   previousItems.mockReset()
-  previousItems.mockResolvedValue({ previous: null, items: [] })
+  previousItems.mockResolvedValue({ previous: null, items: [], holds: [] })
   online(true)
 })
 
@@ -2147,6 +2151,7 @@ describe('«What did you pick up?»', () => {
     const lastTime: PreviousItemsResponse = {
       previous: { tripId: BEFORE, at: new Date('2026-10-01T10:00:00Z') },
       items: [bread, eggs, marianna],
+      holds: [],
     }
 
     /** An open trip at SAS, as the server answered it, with `bought` written into it. */
@@ -2325,6 +2330,79 @@ describe('«What did you pick up?»', () => {
 
       expect(view.find('input[role="combobox"]').exists()).toBe(true)
       expect(groups(view)).toEqual([{ heading: en.item.group_recent, rows: [milk.name] }])
+    })
+
+    // Adversarial В1 of review 3: the phone's copy of the trip going on misses what another device
+    // added; the server says what the trip holds, and the memory goes by it.
+    it('the trip is remembered by what the server says it holds — another device’s purchases kept', async () => {
+      rememberHereLast(ACTOR, sas, 'cccccccc-0000-4000-8000-000000000009', {
+        previous: { tripId: BEFORE, at: new Date('2026-10-01T10:00:00Z') },
+        items: [milk, bread, eggs],
+      })
+      previousItems.mockResolvedValue({
+        ...lastTime,
+        items: [eggs],
+        holds: [marianna, milk, bread],
+      })
+      onTrip(marianna)
+      await render()
+      await flushPromises()
+
+      const next = 'cccccccc-0000-4000-8000-000000000003'
+      expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([
+        marianna.name,
+        milk.name,
+        bread.name,
+      ])
+      expect(recallHereLast(ACTOR, sas, TRIP)?.map((item) => item.name)).toEqual([
+        milk.name,
+        bread.name,
+        eggs.name,
+      ])
+    })
+
+    // Adversarial В2 of review 3: a receipt opened while a trip goes on here is kept at its paper's
+    // moment; the trip going on, finished later, stays the newest.
+    it('a finished record searched while another goes on leaves that one the newest', async () => {
+      vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-06T10:05:00Z') })
+      rememberBoughtHere(ACTOR, sas, TRIP, milk)
+      vi.useRealTimers()
+      onTrip(milk)
+      const receipt = 'cccccccc-0000-4000-8000-000000000012'
+      tripRead.mockResolvedValue(
+        tripViewCodec.parse({
+          id: receipt,
+          startedAt: '2026-10-07T10:20:00.000Z',
+          finishedAt: '2026-10-07T12:00:00.000Z',
+          finishedOnDeviceAt: '2026-10-07T10:20:00.000Z',
+          currency: 'AMD',
+          rate: null,
+          rateProvider: null,
+          rateJump: null,
+          rateStale: false,
+          place: { id: 'aaaaaaaa-0000-4000-8000-000000000002', kind: 'store', name: sas.name },
+          placeCity: sas.city,
+          expenses: [
+            {
+              id: 'dddddddd-0000-4000-8000-000000000031',
+              createdAt: '2026-10-07T10:20:00.000Z',
+              item: marianna,
+              quantity: null,
+              amount: null,
+              unitPrice: null,
+            },
+          ],
+          total: [],
+          converted: null,
+        }),
+      )
+      previousItems.mockResolvedValue({ ...lastTime, items: [bread], holds: [marianna] })
+      await render(ref(true), `/purchases/${receipt}/add`)
+      await flushPromises()
+
+      expect(previousItems).toHaveBeenCalledWith(receipt)
+      const next = 'cccccccc-0000-4000-8000-000000000003'
+      expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([milk.name])
     })
 
     describe('nothing remembered: the answer is waited for, a second at most (В-2)', () => {

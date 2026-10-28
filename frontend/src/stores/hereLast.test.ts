@@ -4,6 +4,7 @@ import {
   HERE_LAST_PLACES,
   recallHereLast,
   rememberBoughtHere,
+  rememberFinishedHere,
   rememberHereLast,
 } from '@/stores/hereLast'
 
@@ -319,6 +320,80 @@ describe('«Брали здесь в прошлый раз» on the device (MOL-
         previous: { tripId: trip(0), at: monday },
         items: [bread],
       })
+
+      expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Хлеб'])
+    })
+  })
+
+  describe('a finished trip asked about, beside the trip going on (adversarial В2, m5 of review 3)', () => {
+    const monday = new Date('2026-10-05T11:00:00Z')
+    const printed = new Date('2026-10-07T10:20:00Z')
+
+    it('the trip going on stays the newest: it is finished after any finished trip', () => {
+      vi.useFakeTimers({ now: new Date('2026-10-06T10:05:00Z') })
+      rememberBoughtHere(ME, sas, trip(1), milk)
+      vi.setSystemTime(new Date('2026-10-07T12:00:00Z'))
+      rememberHereLast(
+        ME,
+        sas,
+        trip(2),
+        { previous: { tripId: trip(0), at: monday }, items: [bread] },
+        printed,
+        [eggs],
+      )
+
+      expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Молоко'])
+    })
+
+    it('a trip finished here stands at its finish: finished before the receipt’s paper, the receipt is newer', () => {
+      vi.useFakeTimers({ now: new Date('2026-10-06T10:05:00Z') })
+      rememberBoughtHere(ME, sas, trip(1), milk)
+      rememberFinishedHere(ME, trip(1).toUpperCase(), new Date('2026-10-06T11:00:00Z'))
+      vi.setSystemTime(new Date('2026-10-10T12:00:00Z'))
+      rememberHereLast(
+        ME,
+        sas,
+        trip(2),
+        { previous: { tripId: trip(0), at: monday }, items: [bread] },
+        printed,
+        [eggs],
+      )
+
+      expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Яйца'])
+    })
+
+    it('finished after the receipt’s paper, the trip finished here stays the newest', () => {
+      vi.useFakeTimers({ now: new Date('2026-10-06T10:05:00Z') })
+      rememberBoughtHere(ME, sas, trip(1), milk)
+      vi.setSystemTime(new Date('2026-10-08T12:00:00Z'))
+      rememberHereLast(
+        ME,
+        sas,
+        trip(2),
+        { previous: { tripId: trip(0), at: monday }, items: [bread] },
+        printed,
+        [eggs],
+      )
+      rememberFinishedHere(ME, trip(1), new Date('2026-10-09T18:00:00Z'))
+
+      expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Молоко'])
+    })
+
+    it('a finished trip is kept at its own moment, not at the moment it was asked about', () => {
+      rememberHereLast(ME, sas, trip(9), {
+        previous: { tripId: trip(0), at: monday },
+        items: [bread],
+      })
+      vi.useFakeTimers({ now: new Date('2026-10-08T12:00:00Z') })
+      // A September receipt recorded and opened today: its last time is in August.
+      rememberHereLast(
+        ME,
+        sas,
+        trip(2),
+        { previous: { tripId: trip(4), at: new Date('2026-08-20T10:00:00Z') }, items: [eggs] },
+        new Date('2026-09-07T10:20:00Z'),
+        [milk],
+      )
 
       expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Хлеб'])
     })
