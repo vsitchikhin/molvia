@@ -97,6 +97,15 @@ describe('«Брали здесь в прошлый раз» on the device (MOL-
     expect(names(recallHereLast(ME, sas, trip(2)))).toEqual(['Хлеб'])
   })
 
+  it('an item added to a finished trip keeps that trip where it stood, not the newest', () => {
+    vi.useFakeTimers({ now: new Date('2026-10-07T10:00:00Z') })
+    rememberBoughtHere(ME, sas, trip(2), milk)
+    // Last week's record, a forgotten bread added to it today.
+    rememberBoughtHere(ME, sas, trip(1), bread, new Date('2026-10-01T10:00:00Z'))
+
+    expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Молоко'])
+  })
+
   it('a finished trip looks only before itself', () => {
     rememberHereLast(ME, sas, trip(3), {
       previous: { tripId: trip(2), at: new Date('2026-10-07') },

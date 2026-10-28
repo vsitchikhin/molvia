@@ -341,7 +341,7 @@ import { useSelectedTrip } from '@/composables/useSelectedTrip'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { ApiError } from '@molvia/client'
-import { ERROR, drawsNothing, pickLocale } from '@molvia/model'
+import { ERROR, drawsNothing, pickLocale, placeNameIdentity } from '@molvia/model'
 import type { AppLocale, BarcodeHint, CatalogueEntry } from '@molvia/model'
 import IconBarcode from '~icons/mdi/barcode-scan'
 import IconClose from '~icons/mdi/close'
@@ -525,13 +525,15 @@ export default defineComponent({
       )
     }
 
+    // The place as its memory is keyed (Р-3): a start that landed names the place in the server's
+    // spelling, which may differ from the one typed at the door by its case, and is the same place.
     watch(
-      () => [
-        here.value?.tripId,
-        here.value?.place?.city,
-        here.value?.place?.name,
-        here.value?.sent,
-      ],
+      () => {
+        const at = here.value
+        return at?.place
+          ? `${at.tripId}|${placeNameIdentity(at.place.city)}|${placeNameIdentity(at.place.name)}`
+          : (at?.tripId ?? null)
+      },
       () => {
         const at = here.value
         hereAnswer.value = null
@@ -545,6 +547,14 @@ export default defineComponent({
         askHere()
       },
       { immediate: true },
+    )
+    // The same trip, its start landed while the screen is open (Р-4): asked now, and nothing on the
+    // screen waits again — «Часто берёте» already stands, and an answer would only be remembered.
+    watch(
+      () => here.value?.sent,
+      (sent) => {
+        if (sent) askHere()
+      },
     )
     useReconnect(askHere)
 
@@ -1069,7 +1079,10 @@ export default defineComponent({
       // And into the place's memory as its newest trip (В-1 «а»): the next trip here with no signal
       // finds this one as the last time.
       const at = here.value
-      if (owner !== null && at?.place) rememberBoughtHere(owner, at.place, at.tripId, item)
+      // A purchase added to a finished trip keeps that trip where it stood in time, not the newest.
+      if (owner !== null && at?.place) {
+        rememberBoughtHere(owner, at.place, at.tripId, item, at.before ?? new Date())
+      }
     }
 
     /**

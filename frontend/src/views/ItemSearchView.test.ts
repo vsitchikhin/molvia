@@ -2275,6 +2275,30 @@ describe('«What did you pick up?»', () => {
       expect(groups(view)[0]).toEqual({ heading: en.item.group_here_last, rows: [eggs.name] })
     })
 
+    it('a start that lands while the screen is open asks, and takes nothing from under the finger', async () => {
+      previousItems.mockReturnValue(new Promise(() => undefined))
+      remembered(milk)
+      const queue = useTripQueueStore(pinia)
+      queue.enqueue({
+        kind: 'start',
+        tripId: TRIP,
+        // Typed at the door in another case than the server keeps it: the same place.
+        place: { kind: 'store', name: 'sas' },
+        context: { country: 'AM', city: sas.city, spendCurrency: 'AMD', incomeCurrency: 'RUB' },
+        startedAt: new Date('2026-10-05T08:00:00Z'),
+      })
+      const view = await render()
+      await flushPromises()
+      expect(groups(view)).toEqual([{ heading: en.item.group_recent, rows: [milk.name] }])
+
+      queue.pending = []
+      onTrip()
+      await nextTick()
+
+      expect(previousItems).toHaveBeenCalledWith(TRIP)
+      expect(groups(view)).toEqual([{ heading: en.item.group_recent, rows: [milk.name] }])
+    })
+
     describe('nothing remembered: the answer is waited for, a second at most (В-2)', () => {
       beforeEach(() => {
         vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })

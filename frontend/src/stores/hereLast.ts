@@ -175,6 +175,8 @@ export function rememberBoughtHere(
   place: HerePlace,
   tripId: string,
   item: CatalogueEntry,
+  /** When the trip stands in time: now for the one going on, its finish for a finished one. */
+  at: Date = new Date(),
 ): void {
   const id = tripId.toLowerCase()
   put(owner, place, (slot) => {
@@ -186,7 +188,7 @@ export function rememberBoughtHere(
     return {
       ...slot,
       trips: [
-        { tripId: id, at: Date.now(), items },
+        { tripId: id, at: at.getTime(), items },
         ...slot.trips.filter((trip) => trip.tripId !== id),
       ],
     }
