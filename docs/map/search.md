@@ -87,6 +87,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 ## frontend · stores
 
 - `frontend/src/stores/itemEntry.ts` — Store: the item picked on «Что взяли?», carried with its query and missed query to the purchase sheet.
+- `frontend/src/stores/hereLast.ts` — Memory of «Брали здесь в прошлый раз» per owner and place (city and name folded as the places' index): the server's last answer and the purchases written here, for no signal and the first frame (MOL-209).
 - `frontend/src/stores/recentItems.ts` — Store: the recent items per identity on the device, searched offline by the same key and synonym rules.
 - `frontend/src/stores/searchDraft.ts` — Store: the typed query and missed query of «Что взяли?», kept in session storage across a reload of this window.
 
