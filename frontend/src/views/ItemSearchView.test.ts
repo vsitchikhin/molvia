@@ -2372,5 +2372,26 @@ describe('«What did you pick up?»', () => {
       const next = 'cccccccc-0000-4000-8000-000000000003'
       expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([milk.name])
     }, 10_000)
+
+    // Adversarial А3: the groups depend on the record's rows, and a record read again — the queue's
+    // answer, a refresh — rebuilds them with the very same rows.
+    it('«must not fire»: the record read again with the same rows keeps the row the arrows stand on', async () => {
+      previousItems.mockResolvedValue(lastTime)
+      remembered(milk)
+      onTrip(marianna)
+      const view = await render()
+      await flushPromises()
+      await field(view).trigger('keydown', { key: 'ArrowDown' })
+      await field(view).trigger('keydown', { key: 'ArrowDown' })
+      const active = field(view).attributes('aria-activedescendant')
+      const shown = names(view)
+
+      onTrip(marianna)
+      await flushPromises()
+
+      expect(names(view)).toEqual(shown)
+      expect(active).toBeDefined()
+      expect(field(view).attributes('aria-activedescendant')).toBe(active)
+    })
   })
 })

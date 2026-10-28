@@ -99,11 +99,28 @@ describe('«Брали здесь в прошлый раз» on the device (MOL-
 
   it('an item added to a finished trip keeps that trip where it stood, not the newest', () => {
     vi.useFakeTimers({ now: new Date('2026-10-07T10:00:00Z') })
+    const finished = new Date('2026-10-01T10:00:00Z')
+    rememberHereLast(ME, sas, trip(2), {
+      previous: { tripId: trip(1), at: finished },
+      items: [eggs],
+    })
     rememberBoughtHere(ME, sas, trip(2), milk)
     // Last week's record, a forgotten bread added to it today.
-    rememberBoughtHere(ME, sas, trip(1), bread, new Date('2026-10-01T10:00:00Z'))
+    rememberBoughtHere(ME, sas, trip(1), bread, finished)
 
     expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Молоко'])
+    expect(names(recallHereLast(ME, sas, trip(2)))).toEqual(['Яйца', 'Хлеб'])
+  })
+
+  // Adversarial А1г: a receipt's trip is not in the memory; one item added to it is not all of it.
+  it('an item added to a finished trip the device does not hold is not written as that trip', () => {
+    rememberHereLast(ME, sas, trip(2), {
+      previous: { tripId: trip(0), at: new Date('2026-10-01T10:00:00Z') },
+      items: [eggs],
+    })
+    rememberBoughtHere(ME, sas, trip(1), bread, new Date('2026-10-05T10:00:00Z'))
+
+    expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Яйца'])
   })
 
   it('a finished trip looks only before itself', () => {

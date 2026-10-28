@@ -175,12 +175,16 @@ export function rememberBoughtHere(
   place: HerePlace,
   tripId: string,
   item: CatalogueEntry,
-  /** When the trip stands in time: now for the one going on, its finish for a finished one. */
-  at: Date = new Date(),
+  /** A finished trip's moment in «Записаны», which it keeps; `null` for the one going on — now. */
+  finishedAt: Date | null = null,
 ): void {
   const id = tripId.toLowerCase()
+  const at = finishedAt ?? new Date()
   put(owner, place, (slot) => {
     const own = slot.trips.find((trip) => trip.tripId === id)
+    // A finished trip the device does not hold — a receipt's, another phone's — it does not know
+    // whole: the one item added would stand for all of it (adversarial А1г). It stays out.
+    if (finishedAt !== null && !own) return slot
     // In the order first bought, as the server answers: a second milk leaves the milk where it was.
     const items = own?.items.some((kept) => kept.id === item.id)
       ? own.items

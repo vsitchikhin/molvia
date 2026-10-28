@@ -1081,7 +1081,7 @@ export default defineComponent({
       const at = here.value
       // A purchase added to a finished trip keeps that trip where it stood in time, not the newest.
       if (owner !== null && at?.place) {
-        rememberBoughtHere(owner, at.place, at.tripId, item, at.before ?? new Date())
+        rememberBoughtHere(owner, at.place, at.tripId, item, at.before)
       }
     }
 
