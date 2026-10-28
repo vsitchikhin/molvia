@@ -88,7 +88,7 @@ describe('отправка', () => {
   it('каждому — своё сообщение; 403 отмечает блок, остальные уходят', async () => {
     const { api, calls } = telegram([4242])
     const fake = client([notice(), notice({ telegramUserId: 5151, days: 7 })])
-    await warnSilent(asClient(fake), api, APP, () => Promise.resolve())
+    await warnSilent(asClient(fake), api, APP, () => Promise.resolve(true))
     expect(calls.map(({ payload }) => payload.chat_id)).toEqual([4242, 5151])
     expect(fake.switchReminders).toHaveBeenCalledWith(4242, 'blocked')
   })
@@ -98,7 +98,7 @@ describe('отправка', () => {
     const fake = client([])
     fake.claimSilenceNotices.mockImplementationOnce(() => Promise.reject(new Error('boom')))
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    await warnSilent(asClient(fake), api, APP, () => Promise.resolve())
+    await warnSilent(asClient(fake), api, APP, () => Promise.resolve(true))
     expect(calls).toEqual([])
     expect(error).toHaveBeenCalledWith('[molvia] silence claim: unexpected failure')
   })
