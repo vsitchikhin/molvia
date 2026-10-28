@@ -124,6 +124,7 @@
         :error="categoryBad ? t('spending.sheet.bad_category') : null"
         @update:model-value="categoryBad = false"
         @more="moreOpen = true"
+        @lift="lead = $event"
       />
 
       <AppField
@@ -442,7 +443,8 @@ export default defineComponent({
     })
     const byId = (id: string) => choice.value.find((category) => category.id === id)
     const listed = computed(() => order.value.flatMap((id) => byId(id) ?? []))
-    // The one place the chosen one is put first: the chips and the list «Ещё…» alike.
+    // The one place the chosen one is put first: the chips and the list «Ещё…» alike — the chips ask it
+    // of the sheet when a measure would lay the chosen one past their rows (`lift`, review 2, Р2-А1).
     const chips = computed(() => {
       const first = lead.value === null ? undefined : byId(lead.value)
       return first ? [first, ...listed.value.filter((one) => one !== first)] : listed.value
@@ -930,6 +932,7 @@ export default defineComponent({
       currency,
       categoryId,
       chips,
+      lead,
       moreOpen,
       pickCategory,
       day,

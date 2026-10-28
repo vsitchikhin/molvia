@@ -204,9 +204,13 @@ describe('CategoryChips — the chosen one never leaves the rows (adversarial А
 
   it('the field narrowed to 288: the chosen one stands first, checked', async () => {
     const wrapper = await tappedPets()
+    // A tap lifts nothing.
+    expect(wrapper.emitted('lift')).toBeUndefined()
     field = 288
     resized?.()
     await nextTick()
+    // The sheet is told, so its order — the list «More…» — takes it first too (review 2, Р2-А1).
+    expect(wrapper.emitted('lift')).toEqual([[PETS]])
     expect(rowsOf(wrapper)).toEqual([
       ['Животные', 'Продукты'],
       ['Кафе и рестораны', 'Ещё…'],

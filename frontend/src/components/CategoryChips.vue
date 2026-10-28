@@ -79,7 +79,8 @@ import type { ChipRows } from '@/components/spending'
  * changes or a face comes; until there is one — a sheet still shut, a test with no layout — they all
  * stand, as before. **The chosen one never leaves the rows** (adversarial А1): a measure that would lay
  * it past them — the phone turned, a name grown longer by an answer — stands it first, as the sheet
- * does at its opening (owner's В-2 «а»); a chip chosen by a tap is in the rows already and moves none. Chosen is «here», the accent, not the category's colour — a fill and a ring, never
+ * does at its opening (owner's В-2 «а»), and says so (`lift`), so the sheet's order — the list «Ещё…»
+ * too — takes it first as well; a chip chosen by a tap is in the rows already and moves none. Chosen is «here», the accent, not the category's colour — a fill and a ring, never
  * a weight: every chip is at 600, so the row does not reflow on a tap (Ф-5, MOL-174); its dot stands on
  * a ring of `surface`, where on the tint ten light categories fell under 3:1 (MOL-172 А2).
  */
@@ -98,8 +99,8 @@ export default defineComponent({
     moreLabel: { type: String, required: true },
     error: { type: String as PropType<string | null>, default: null },
   },
-  emits: ['update:modelValue', 'more'],
-  setup(props) {
+  emits: ['update:modelValue', 'more', 'lift'],
+  setup(props, { emit }) {
     const field = ref<HTMLElement | null>(null)
     const ruler = ref<HTMLElement | null>(null)
     // The order the rows stand in — the sheet's, or with the chosen one lifted first — and how many.
@@ -133,6 +134,9 @@ export default defineComponent({
       const chosen = props.modelValue
       if (chosen !== null && order.indexOf(chosen) >= laidOut.first + laidOut.second) {
         order = [chosen, ...order.filter((id) => id !== chosen)]
+        // The order is the sheet's: told, it stands the chosen one first for the list «Ещё…» too, and
+        // the order it sends back is this one (review 2, Р2-А1).
+        emit('lift', chosen)
         laidOut = layOut(order)
       }
       laid.value = { order, rows: laidOut }

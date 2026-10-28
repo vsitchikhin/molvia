@@ -532,6 +532,98 @@ describe('SpendingSheet: the chips by frequency, the chosen one first (MOL-198, 
     expect(chips()).toEqual([PETS, OTHER, CAFE, RENT])
   }, 15_000)
 
+  // Review 2, Р2-А1: a measure that would lay the chosen chip past the rows lifts it first, and the
+  // sheet's order — the list «More…» — takes it first too: one order for both.
+  it('a chosen chip lifted by a measure stands first in the list «More…» too', async () => {
+    const widths: Record<string, number> = {
+      [en.spending.category.other]: 80,
+      [en.spending.category.cafe]: 200,
+      [en.spending.category.rent]: 70,
+      [en.spending.category.pets]: 70,
+      [en.spending.sheet.more]: 66,
+    }
+    let row = 358
+    let resized: (() => void) | null = null
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        readonly callback: () => void
+        chips = false
+        constructor(callback: () => void) {
+          this.callback = callback
+        }
+        observe(target: Element): void {
+          if (!target.classList.contains('chips-field')) return
+          this.chips = true
+          resized = () => {
+            this.callback()
+          }
+        }
+        // The sheet measures its own height too: only the chips' observer lets the chips go.
+        disconnect(): void {
+          if (this.chips) resized = null
+        }
+      },
+    )
+    const style = window.getComputedStyle.bind(window)
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+      const computed = style(element, pseudo)
+      if (!(element instanceof HTMLElement && element.classList.contains('ruler'))) return computed
+      return new Proxy(computed, {
+        get: (target, key) => (key === 'columnGap' ? '8px' : Reflect.get(target, key)),
+      })
+    })
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const width = this.classList.contains('chips-field')
+        ? row
+        : this.parentElement?.classList.contains('ruler')
+          ? (widths[this.textContent.trim()] ?? 0)
+          : null
+      // The spy stands on HTMLElement; Element's own is the browser's.
+      if (width === null) return Element.prototype.getBoundingClientRect.call(this)
+      return { width, height: 44, top: 0, left: 0, right: width, bottom: 44, x: 0, y: 0 } as DOMRect
+    })
+    const shown = () =>
+      [...document.querySelectorAll('dialog[open] .chips .row input[type="radio"]')].map((radio) =>
+        radio.getAttribute('value'),
+      )
+    try {
+      moneyMonth.mockResolvedValue(frequentMonth())
+      const view = await render()
+      await view
+        .findAll('button')
+        .find((one) => one.text().trim() === en.spending.summary.add)
+        ?.trigger('click')
+      await risen()
+      expect(shown()).toEqual([OTHER, CAFE, RENT, PETS])
+      document
+        .querySelector<HTMLInputElement>(`dialog[open] .chips input[value="${PETS}"]`)
+        ?.click()
+      await flushPromises()
+      expect(shown()).toEqual([OTHER, CAFE, RENT, PETS])
+
+      // The phone turned: the field is 250, and «Pets» would stand past the rows.
+      row = 250
+      resized?.()
+      await flushPromises()
+      expect(shown()).toEqual([PETS, OTHER])
+      await pressUntil(en.spending.sheet.more, () => {
+        expect(document.querySelectorAll('dialog[open]')).toHaveLength(2)
+      })
+      const list = [...document.querySelectorAll('dialog[open] [role="radio"]')]
+      expect(list.map((one) => one.textContent.trim())).toEqual([
+        en.spending.category.pets,
+        en.spending.category.other,
+        en.spending.category.cafe,
+        en.spending.category.rent,
+      ])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  }, 15_000)
+
   // Р-4 and requirement 7 (self-review №1): an answer landing while the sheet is up moves no chip — a
   // new category goes to the end, one gone is taken out — and the next opening takes the new order.
   it('an answer while the sheet is up moves no chip; the next opening takes its order', async () => {
