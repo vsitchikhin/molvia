@@ -141,11 +141,20 @@ export function recallHereLast(
 
 /**
  * The server's answer for a trip at this place: its last time there, which takes the place of what
- * the device wrote into that same trip itself — the server knows what was removed since. And every
- * trip the device keeps between that last time and the one asked about goes (owner's В-3 «а»): the
- * server saw it and did not count it — removed, or every purchase in it removed — and kept, it was
- * the newest, the last time with no signal for good (adversarial А1). One not sent yet is not
- * among them: the trip asked about was sent, and the queue sends in order (Р-4).
+ * the device wrote into that same trip itself — the server knows what was removed since.
+ *
+ * **Asked about the trip going on, every trip the device keeps between that last time and now goes**
+ * (owner's В-3 «а»): the server saw it and did not count it — removed, or every purchase in it removed
+ * — and kept, it was the newest, the last time with no signal for good (adversarial А1). Only then:
+ * one trip is open at a time and the queue sends in order, so whatever lies between was finished on
+ * the server (Р-4). **Asked about a finished trip, nothing goes** (adversarial Б1): between its last
+ * time and its moment may lie this phone's trip still open — a receipt's moment is the till's, and
+ * its queue is not the trips' — which the server did not count for being open, not empty.
+ *
+ * **And the trip asked about is kept as this screen holds it** (`held`, adversarial Б2): the answer is
+ * its last time less what it holds (owner's В-5 «а»), so kept alone it stood for the whole of that last
+ * time, and the next trip with no signal saw it without the things taken both times. The trip asked
+ * about is newer, and the screen knows its rows — the server's and the queue's.
  */
 export function rememberHereLast(
   owner: string,
@@ -154,23 +163,38 @@ export function rememberHereLast(
   answer: PreviousItemsResponse,
   /** The finished trip's moment in «Записаны»: it looks only before itself. `null` — the one going on. */
   before: Date | null = null,
+  /** What the trip asked about holds, in its order — nothing written when the screen knows none. */
+  held: readonly CatalogueEntry[] = [],
 ): void {
   const id = tripId.toLowerCase()
   const { previous } = answer
   const after = previous?.at.getTime() ?? -Infinity
-  const until = before?.getTime() ?? Infinity
-  const seen = (trip: Kept) => trip.tripId !== id && trip.at > after && trip.at < until
+  const seen = (trip: Kept) => before === null && trip.tripId !== id && trip.at > after
   put(owner, place, (slot) => {
-    const trips = slot.trips.filter((trip) => !seen(trip))
-    if (previous === null) return { ...slot, none: id, trips }
-    const named = previous.tripId.toLowerCase()
-    return {
-      ...slot,
-      none: slot.none === id ? null : slot.none,
-      trips: [
+    let trips = slot.trips.filter((trip) => !seen(trip))
+    if (previous !== null) {
+      const named = previous.tripId.toLowerCase()
+      trips = [
         { tripId: named, at: previous.at.getTime(), items: answer.items.slice(0, ITEMS_PER_TRIP) },
         ...trips.filter((trip) => trip.tripId !== named),
-      ],
+      ]
+    }
+    if (held.length > 0) {
+      const own = trips.find((trip) => trip.tripId === id)
+      const items = held.filter((item, at) => held.findIndex((one) => one.id === item.id) === at)
+      trips = [
+        {
+          tripId: id,
+          at: before?.getTime() ?? own?.at ?? Date.now(),
+          items: items.slice(0, ITEMS_PER_TRIP),
+        },
+        ...trips.filter((trip) => trip.tripId !== id),
+      ]
+    }
+    return {
+      ...slot,
+      none: previous === null ? id : slot.none === id ? null : slot.none,
+      trips,
     }
   })
 }

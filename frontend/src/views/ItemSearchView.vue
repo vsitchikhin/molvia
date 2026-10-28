@@ -514,7 +514,7 @@ export default defineComponent({
         (answer) => {
           if (asked !== hereAsked || !alive) return
           if (owner !== null && at.place !== null) {
-            rememberHereLast(owner, at.place, at.tripId, answer, at.before)
+            rememberHereLast(owner, at.place, at.tripId, answer, at.before, held.value)
           }
           if (!hereLate.value) hereAnswer.value = answer.items
           hereLate.value = true
@@ -560,12 +560,13 @@ export default defineComponent({
     )
     useReconnect(askHere)
 
+    /** What this trip holds — on the server, or in the queue; a row being removed is given back. */
+    const held = computed<CatalogueEntry[]>(() =>
+      tripRows.value.flatMap((row) => (row.mark !== 'removing' && row.entry ? [row.entry] : [])),
+    )
+    /** What this trip holds already goes from the group (Р-17). */
     const hereLast = computed<CatalogueEntry[]>(() => {
-      const taken = new Set(
-        tripRows.value.flatMap((row) =>
-          row.mark !== 'removing' && row.entry ? [row.entry.id] : [],
-        ),
-      )
+      const taken = new Set(held.value.map((item) => item.id))
       return (hereAnswer.value ?? hereRemembered.value ?? [])
         .filter((item) => !taken.has(item.id))
         .slice(0, HERE_LAST_SHOWN)

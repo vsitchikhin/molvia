@@ -182,6 +182,27 @@ describe('«Брали здесь в прошлый раз» on the device (MOL-
       expect(names(recallHereLast(ME, sas, trip(5), tuesday))).toEqual(['Хлеб'])
     })
 
+    // Adversarial Б1: a receipt recorded at the till while a trip typed by hand is still open here —
+    // the server did not count that trip for being open, not for being empty.
+    it('«must not fire»: a finished trip asked about takes nothing before itself either', () => {
+      vi.useFakeTimers({ now: new Date('2026-10-06T10:00:00Z') })
+      rememberHereLast(ME, sas, trip(6), {
+        previous: { tripId: trip(0), at: monday },
+        items: [bread],
+      })
+      rememberBoughtHere(ME, sas, trip(6), milk)
+      const receipt = new Date('2026-10-07T12:00:00Z')
+      rememberHereLast(
+        ME,
+        sas,
+        trip(7),
+        { previous: { tripId: trip(0), at: monday }, items: [bread] },
+        receipt,
+      )
+
+      expect(names(recallHereLast(ME, sas, trip(8)))).toEqual(['Молоко'])
+    })
+
     it('boundary: a trip at the very moment the server named is not taken — only those after it', () => {
       rememberHereLast(ME, sas, trip(8), {
         previous: { tripId: trip(4), at: monday },
@@ -193,6 +214,55 @@ describe('«Брали здесь в прошлый раз» on the device (MOL-
       })
 
       expect(names(recallHereLast(ME, sas, trip(0)))).toEqual(['Яйца'])
+    })
+  })
+
+  describe('the trip asked about is kept as the screen holds it (adversarial Б2)', () => {
+    const monday = new Date('2026-10-05T11:00:00Z')
+
+    it('the next trip with no signal finds it whole, not the last time less what it holds', () => {
+      rememberHereLast(ME, sas, trip(1), {
+        previous: { tripId: trip(0), at: monday },
+        items: [milk, bread, eggs],
+      })
+      // Wednesday's receipt took the milk and the bread again: the answer is Monday less them.
+      const receipt = new Date('2026-10-07T12:00:00Z')
+      rememberHereLast(
+        ME,
+        sas,
+        trip(2),
+        { previous: { tripId: trip(0), at: monday }, items: [eggs] },
+        receipt,
+        [milk, bread, milk],
+      )
+
+      expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Молоко', 'Хлеб'])
+      expect(names(recallHereLast(ME, sas, trip(2), receipt))).toEqual(['Яйца'])
+    })
+
+    it('what the screen holds takes the place of what was written into it — a removal too', () => {
+      vi.useFakeTimers({ now: new Date('2026-10-07T10:00:00Z') })
+      rememberBoughtHere(ME, sas, trip(2), milk)
+      rememberBoughtHere(ME, sas, trip(2), eggs)
+      rememberHereLast(
+        ME,
+        sas,
+        trip(2),
+        { previous: { tripId: trip(0), at: monday }, items: [bread] },
+        null,
+        [milk],
+      )
+
+      expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Молоко'])
+    })
+
+    it('«must not fire»: a screen that knows none of the trip’s rows writes no trip', () => {
+      rememberHereLast(ME, sas, trip(2), {
+        previous: { tripId: trip(0), at: monday },
+        items: [bread],
+      })
+
+      expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Хлеб'])
     })
   })
 

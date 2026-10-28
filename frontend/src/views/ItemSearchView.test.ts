@@ -2299,6 +2299,21 @@ describe('«What did you pick up?»', () => {
       expect(groups(view)).toEqual([{ heading: en.item.group_recent, rows: [milk.name] }])
     })
 
+    // Adversarial Б2: the answer is the last time less what this trip holds (В-5 «а»); kept alone, it
+    // stood for the whole of Monday, and the next trip with no signal lost the things taken both times.
+    it('the trip asked about is remembered as it holds, so the next one with no signal finds it', async () => {
+      previousItems.mockResolvedValue({ ...lastTime, items: [eggs] })
+      onTrip(milk, bread)
+      await render()
+      await flushPromises()
+
+      const next = 'cccccccc-0000-4000-8000-000000000003'
+      expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([
+        milk.name,
+        bread.name,
+      ])
+    })
+
     describe('nothing remembered: the answer is waited for, a second at most (В-2)', () => {
       beforeEach(() => {
         vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
