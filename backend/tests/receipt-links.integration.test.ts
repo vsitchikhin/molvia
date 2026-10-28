@@ -693,6 +693,12 @@ describe('«Записать» a receipt by its link', () => {
     const me = await serb()
     const first = await parsedLink(me)
     await record(me, first, recordBody({ name: 'RODA MEGAMARKET 463', city: 'Белград' }))
+    // the memory holds the price: without it the hint is silent with or without the fix (review 1, №1)
+    const sugar = await db
+      .select()
+      .from(storeMemory)
+      .where(eq(storeMemory.key, toSearchKey('SECER KRISTAL 1KG SUNOKO KOM')))
+    expect(sugar).toMatchObject([{ tin: TIN, priceMinor: 9_499n, priceCurrency: 'RSD' }])
     // 94,99 → 91,99 is the swap 4↔1 of Armenia's tills; nobody read these figures
     const lines = [
       { name: 'SECER KRISTAL 1KG SUNOKO KOM (Е)', price: '91,99', quantity: '2', sum: '183,98' },
