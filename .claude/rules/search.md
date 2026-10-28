@@ -460,7 +460,8 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   receipt, at its paper's — lifts **the trip going on here now** (`useCurrentTrip`) to now, since it will be
   finished after (adversarial В2 of review 3; its moment held by a test, m5). Only that one: a trip removed
   here or finished on another phone goes on no more, and a mark kept in the memory lifted it over the
-  receipt for good (Г2 of review 4, self-review №4).
+  receipt for good (Г2 of review 4, self-review №4); **nor the one the answer named as the last time**,
+  whatever the phone's copy says — the server names finished trips only (Д1 of review 5).
   The newest kept trip but the one going
   on is the last time, and for a finished trip only one before it. The server's answer about a trip
   takes the place of what the phone wrote into it — it knows what was removed since — **and, asked
@@ -474,7 +475,9 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   kept as it holds** — what the answer says it holds on the server, less a row being removed here, and
   the purchases the queue still carries — never the phone's copy of the server's rows (adversarial Б2; В1
   of review 3: that copy missed another device's purchases and took them for removed; Г1 of review 4:
-  it kept what another device took out): the answer is
+  it kept what another device took out; the copy counts only for what changed while the answer was on
+  its way — a purchase that reached the server then is kept, one removed then is not brought back,
+  told by the server's rows the phone knew as the question left, Д2 of review 5): the answer is
   its last time less what it holds (В-5), so kept alone it stood for the whole of that last time, and
   the next trip with no signal lost the things taken both times. **Nor does the answer cut a last time the device holds whole**:
   what it leaves out is either in the trip asked about or removed since — told apart by what that trip
