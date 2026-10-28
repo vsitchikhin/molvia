@@ -8,6 +8,7 @@ import {
   chipOrder,
   chipsInTwoRows,
   dayTotalText,
+  detailsLine,
   journalOf,
   journalRowProps,
   mergePages,
@@ -358,6 +359,46 @@ describe('the chips of a spending (MOL-198, Ф-17)', () => {
 
   it('has nothing to lay out with no categories — «Ещё…» alone', () => {
     expect(chipsInTwoRows([], 288, more, 8)).toEqual({ first: 0, second: 0 })
+  })
+})
+
+describe('the line of «Дата, заметка, место» (MOL-199, Ф-17)', () => {
+  const today = '2026-09-30'
+  const line = (day: string, note = '', place = '', locale = 'ru') =>
+    detailsLine({ day, note, place }, locale, today, locale === 'ru' ? 'без заметки' : 'no note')
+
+  it('says the day as a card heads it, and «без заметки» when nothing else is typed', () => {
+    expect(line(today)).toBe('Сегодня · без заметки')
+    expect(line('2026-09-29')).toBe('Вчера · без заметки')
+    expect(line('2026-09-28')).toBe('28 сент. · без заметки')
+    expect(line('2026-09-28', '', '', 'en')).toBe('Sep 28 · no note')
+  })
+
+  it('puts the note and the place after it as typed, quoting nothing of its own', () => {
+    expect(line('2026-09-29', 'Кофе с собой', '«Кофеман»')).toBe('Вчера · Кофе с собой · «Кофеман»')
+    expect(line(today, 'Обед', 'Кинза')).toBe('Сегодня · Обед · Кинза')
+  })
+
+  // The place alone is what was typed besides the day: «без заметки» beside it would read as missing.
+  it('with the place alone, says the place and no «без заметки»', () => {
+    expect(line('2026-09-27', '', 'Ереван Сити')).toBe('27 сент. · Ереван Сити')
+    expect(line(today, 'Барбер')).toBe('Сегодня · Барбер')
+  })
+
+  it('takes nothing but spaces for nothing typed', () => {
+    expect(line(today, '   ', ' ')).toBe('Сегодня · без заметки')
+    expect(line(today, '  Обед ')).toBe('Сегодня · Обед')
+  })
+
+  // «Сбросить» of the iOS picker leaves the field empty; the check on «Сохранить» names it.
+  it('has no day part for a day the picker cleared, or one nobody can print', () => {
+    expect(line('')).toBe('без заметки')
+    expect(line('', 'Обед')).toBe('Обед')
+    expect(line('1999-12-31')).toBe('без заметки')
+  })
+
+  it('names a day ahead of the phone by its date, as a spending typed further east keeps it', () => {
+    expect(line('2026-10-01')).toBe('1 окт. · без заметки')
   })
 })
 
