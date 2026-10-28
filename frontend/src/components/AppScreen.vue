@@ -1,7 +1,7 @@
 <template>
   <div
     class="screen"
-    :class="{ collapsed, docked, tabbed, held: $slots.docked || updating || stateHeld }"
+    :class="{ collapsed, docked, tabbed, held: $slots.docked || banded || stateHeld }"
     :style="dockStyle"
   >
     <header ref="bar" class="bar">
@@ -57,7 +57,7 @@
       <!-- The room the strip below takes, and «Вернуть» over it, kept inside the scroll: the last
            row of a list has to be reachable, and both are over the page, not in it. -->
       <div
-        v-if="$slots.docked || updating || stateHeld || $slots.undo"
+        v-if="$slots.docked || banded || stateHeld || $slots.undo"
         class="dock-room"
         :style="{ height: room }"
         aria-hidden="true"
@@ -70,12 +70,8 @@
          An error of the whole screen takes it over (К-1, 8c): its «Повторить» stands where the
          screen's action stood, and the row steps aside while the error offers «Обновить» itself;
          a version that did not take keeps its words, which offer nothing twice. -->
-    <div v-if="$slots.docked || updating || stateHeld" ref="dock" class="dock">
-      <UpdateBand
-        v-if="updating && !offered"
-        class="update"
-        :class="{ over: $slots.docked || stateHeld }"
-      />
+    <div v-if="$slots.docked || banded || stateHeld" ref="dock" class="dock">
+      <UpdateBand v-if="banded" class="update" :class="{ over: $slots.docked || stateHeld }" />
       <div v-if="stateHeld" ref="stateTarget" class="state-actions"></div>
       <slot v-else name="docked" />
     </div>
@@ -263,10 +259,15 @@ export default defineComponent({
       },
       { flush: 'pre' },
     )
-    // The error offers «Обновить» itself while a version waits or is being let in.
+    // The error offers «Обновить» itself while a version waits or is being let in — from the strip
+    // it holds, or under its own words on a screen typed in (`flow`, MOL-208).
     const offered = computed(
-      () => strip.held.value && ['ready', 'applying'].includes(update.phase.value),
+      () =>
+        (strip.held.value || strip.offering.value) &&
+        ['ready', 'applying'].includes(update.phase.value),
     )
+    // The row of the version alone, stepped aside for the error's own «Обновить», leaves no strip.
+    const banded = computed(() => updating.value && !offered.value)
 
     const { goBack } = useNavigation()
 
@@ -291,7 +292,7 @@ export default defineComponent({
       tabbed,
       room,
       dockStyle,
-      updating,
+      banded,
       stateTarget,
       stateHeld: strip.held,
       offered,

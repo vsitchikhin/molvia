@@ -644,7 +644,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   come while the person types, and the strip at the bottom is under the keys on an iPhone — the
   button seen only once the keyboard is put away. There the state keeps its own height and its
   buttons right under the words, and takes no strip; an error stays the whole screen's — the circle,
-  «Повторить» filled, «Сообщить о проблеме», an alert — not the quiet card. **Always on that screen,
+  «Повторить» filled, «Сообщить о проблеме», an alert — not the quiet card. **While a version waits it
+  offers «Обновить» there too, and the strip's row of the version steps aside for it**
+  (`useStateStrip().offer`, self-review №1): holding no strip, it left the row standing, and the
+  screen offered «Обновить» twice. **Always on that screen,
   not «while the field holds the focus»**: a tap on the button takes the focus from the field first,
   and a button moving to the strip on `blur` would leave the finger before the `click`. **A focus the strip loses is brought
   back by the frame** (MOL-194, adversarial Б2, Б3): a render that swaps the strip's actions under

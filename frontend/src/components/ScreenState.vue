@@ -230,6 +230,14 @@ export default defineComponent({
         !props.inline,
     )
     const card = computed(() => props.kind === 'error' && (props.inline || second.value))
+    // In the flow the error offers «Обновить» under its words, where the keys leave it in sight, and
+    // the strip's row of the version steps aside for it — one «Обновить», as when the strip is held
+    // (8c, self-review №1).
+    watchEffect(() => {
+      if (!strip) return
+      if (props.kind === 'error' && props.flow && !card.value) strip.offer(me)
+      else strip.withdraw(me)
+    })
 
     // Moved between the strip and the block — the error turned a section's or the screen's where it
     // stands — the buttons are other nodes or the same ones moved, and either way the focus fell to
@@ -298,6 +306,7 @@ export default defineComponent({
     onBeforeUnmount(() => {
       withdraw?.()
       strip?.release(me)
+      strip?.withdraw(me)
       // The buttons may stand in the strip, out of the block: a focus on them goes with them too.
       const focused = document.activeElement
       if (root.value?.contains(focused) || actions.value?.contains(focused)) focusScreenTitle()

@@ -669,6 +669,63 @@ describe('AppScreen with an error of the whole screen', () => {
     expect(view.get('.content').find('.action').exists()).toBe(true)
   })
 
+  // A screen typed in (`flow`, MOL-208, В-20): the error's buttons stand under its words, over the
+  // keys, and it offers «Обновить» there — so the row of the version steps aside as for a held strip,
+  // and «Обновить» is one (8c, self-review №1).
+  describe('in the flow of a screen typed in', () => {
+    it('offers «Update» once, under the words, and leaves no strip of the version', async () => {
+      const { view } = await render('/', {
+        update: 'ready',
+        slots: { default: () => error({ flow: true }) },
+      })
+      await nextTick()
+      expect(view.find('.dock').exists()).toBe(false)
+      expect(view.find('.band').exists()).toBe(false)
+      expect(view.classes()).not.toContain('held')
+      const actions = view.get('.content .state .action')
+      expect(buttons(actions)).toEqual([en.update.apply, en.state.retry])
+      const all = view.findAll('button').map((button) => button.text())
+      expect(all.filter((text) => text === en.update.apply)).toHaveLength(1)
+    })
+
+    it('keeps what the screen pins, with no row of the version over it', async () => {
+      const { view } = await render('/', {
+        update: 'ready',
+        slots: {
+          default: () => error({ flow: true }),
+          docked: () => h('button', { class: 'own' }, 'Add a spending'),
+        },
+      })
+      await nextTick()
+      expect(buttons(view.get('.dock'))).toEqual(['Add a spending'])
+      expect(view.find('.band').exists()).toBe(false)
+    })
+
+    it('keeps the words of a version that did not take: the error offers nothing then', async () => {
+      const { view } = await render('/', {
+        update: 'failed',
+        slots: { default: () => error({ flow: true }) },
+      })
+      await nextTick()
+      expect(view.get('.dock .band').text()).toContain(en.update.failed.title)
+      expect(buttons(view.get('.content .state .action'))).toEqual([en.state.retry])
+    })
+
+    it('gives the row back when the error goes', async () => {
+      const shown = ref(true)
+      const { view } = await render('/', {
+        update: 'ready',
+        slots: { default: () => (shown.value ? error({ flow: true }) : h('p', 'rows')) },
+      })
+      await nextTick()
+      expect(view.find('.band').exists()).toBe(false)
+      shown.value = false
+      await nextTick()
+      await nextTick()
+      expect(view.get('.dock .band').text()).toContain(en.update.apply)
+    })
+  })
+
   // One error of the screen's own: a second while the first holds the strip is a section's quiet
   // card, so «Обновить» is one and the filled «Повторить» is one (8c, adversarial А4).
   it('draws a second error as a section’s while the first holds the strip', async () => {
