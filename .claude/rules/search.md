@@ -446,7 +446,7 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   server's answer and the purchases written here** (owner's В-1 «а»): the answer names the trip
   _before_ the one asked about, so a memory of answers alone is a trip behind — Wednesday with a
   signal remembers Monday, and Friday with none would show Monday. So an item that goes into a trip
-  makes that trip the place's newest; the newest kept trip but the one going on is the last time, and
+  makes that trip the place's newest — one added to a finished trip keeps it at its finish; the newest kept trip but the one going on is the last time, and
   for a finished trip only one before it. The server's answer about a trip takes the place of what the
   phone wrote into it — it knows what was removed since. «None» is remembered for the trip it was said
   of. **The prices, named:** a receipt recorded is not written here — its items reach the memory with
@@ -457,7 +457,9 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   `STRIP_LATE_MS`): «Часто берёте» is on the phone and would stand at once, and the group coming in
   over it would take its rows from under the finger (MOL-269). Under the hint there is nothing until
   the answer, and then both groups come together; later than that, «Часто берёте» stands alone and the
-  answer is only remembered. With something remembered it stands at once and the answer takes its place
+  answer is only remembered. A start that lands while the screen is open only asks — the same trip
+  and place, by the folded key, so «sas» typed at the door is the server's «SAS» — and waits for nothing
+  again. With something remembered it stands at once and the answer takes its place
   (Р-5) — they part only where a trip was finished or changed on another phone, a move named. A
   failure, a `404`, no connection — the group is a help, never a state of the screen: what is
   remembered stands, or nothing does.
