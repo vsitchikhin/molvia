@@ -1,9 +1,11 @@
 <template>
   <AppScreen :title="t('item.search_title')">
     <!-- The search of a finished record, while the record is read (Ф-13): the field as it will stand,
+         its hint — known before any answer, so its own words, still, at the height they will have —
          and the recent items under it where the phone has some — they come with the screen. -->
     <ScreenSkeleton v-if="selectedId && selectedLoading && !selectedAvailable">
       <SkeletonPart kind="field" />
+      <p class="ghost-hint">{{ t('item.search_hint') }}</p>
       <template v-if="recentCount > 0">
         <SkeletonPart kind="caption" :width="30" />
         <SkeletonPart kind="rows" :count="Math.min(recentCount, 3)" :narrow="false" next />
@@ -1080,6 +1082,15 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* The field's hint under the well of the skeleton, as `SearchField` sets it: the frame's 8 above it
+   stands for the hint's own padding. */
+.ghost-hint {
+  margin: 0;
+  padding: 0 var(--space-4);
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
+}
+
 /* Not `.skeleton`: a scoped class reaches the root of a child too, and that is ScreenSkeleton's. The card
    is the skeleton's own (MOL-178). */
 .loading {

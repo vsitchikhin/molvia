@@ -230,6 +230,8 @@ describe('«What did you pick up?»', () => {
       await vi.waitFor(() => {
         expect(view.find('.skeleton-field').exists()).toBe(true)
       })
+      // The field's hint stands under the well, or the rows came a line lower than their bars.
+      expect(view.get('.ghost-hint').text()).toBe(en.item.search_hint)
       expect(view.findAll('.skeleton-caption')).toHaveLength(1)
       expect(view.findAll('.skeleton-rows .item')).toHaveLength(2)
       expect(view.find('input[role="combobox"]').exists()).toBe(false)
