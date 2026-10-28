@@ -213,20 +213,35 @@
           <ScreenSkeleton :groups="[62, 62, 62]" />
         </div>
 
-        <div v-else-if="phase === 'empty'" class="not-found" :class="{ stale }">
-          <p class="not-found-text">{{ t('item.empty.body', { query: answered }) }}</p>
-          <AppButton @click="proposing = true">
-            <template #icon><IconPlus /></template>
-            {{ t('item.empty.action') }}
-          </AppButton>
-        </div>
+        <!-- Both come while the person types: their buttons stand under the words, not in the strip
+             at the bottom, which the keyboard covers on an iPhone (owner's В-20 «а»). -->
+        <ScreenState
+          v-else-if="phase === 'empty'"
+          kind="empty"
+          flow
+          class="answer"
+          :class="{ stale }"
+          :icon="IconMagnify"
+          :title="t('item.empty.title', { query: answered })"
+          :body="t('item.empty.text')"
+        >
+          <template #action>
+            <AppButton block @click="proposing = true">
+              <template #icon><IconPlus /></template>
+              {{ t('item.empty.action') }}
+            </AppButton>
+          </template>
+        </ScreenState>
 
+        <!-- Taken from the recent items, the error is a section's: the quiet card over them (1i). -->
         <ScreenState
           v-else-if="phase === 'error'"
           kind="error"
+          class="answer"
+          :flow="!fallback"
           :inline="fallback"
           :title="t('item.error.title')"
-          :body="t('item.error.body')"
+          :body="fallback ? t('item.error.fallback_note') : t('item.error.body')"
           @retry="retry"
         >
           <!-- Offered only when there is something to take: with no recent items the tap would
@@ -262,13 +277,14 @@
            of the quiet line: the answer flips near and far while a word is typed, and a block
            above would move every row under the finger as it came and went (owner's decision). -->
       <template v-else-if="phase === 'far' && barcode === 'idle' && !bind" #after>
-        <div class="not-found" :class="{ stale }">
-          <p class="not-found-text">{{ t('item.empty.body', { query: answered }) }}</p>
-          <AppButton @click="proposing = true">
+        <AppCard class="far" :class="{ stale }">
+          <p class="far-title">{{ t('item.empty.title', { query: answered }) }}</p>
+          <p class="far-text">{{ t('item.empty.text') }}</p>
+          <AppButton block @click="proposing = true">
             <template #icon><IconPlus /></template>
             {{ t('item.empty.action') }}
           </AppButton>
-        </div>
+        </AppCard>
       </template>
     </CatalogueCombobox>
 
@@ -317,8 +333,10 @@ import { ERROR, pickLocale } from '@molvia/model'
 import type { AppLocale, BarcodeHint, CatalogueEntry } from '@molvia/model'
 import IconBarcode from '~icons/mdi/barcode-scan'
 import IconClose from '~icons/mdi/close'
+import IconMagnify from '~icons/mdi/magnify'
 import IconPlus from '~icons/mdi/plus'
 import AppButton from '@/components/AppButton.vue'
+import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
 import CatalogueCombobox from '@/components/CatalogueCombobox.vue'
@@ -354,6 +372,7 @@ export default defineComponent({
   name: 'ItemSearchView',
   components: {
     AppButton,
+    AppCard,
     AppScreen,
     BarcodeScannerSheet,
     CatalogueCombobox,
@@ -711,9 +730,8 @@ export default defineComponent({
       return phase.value === 'far' ? t('item.group_similar') : t('item.group_found')
     })
 
-    // Read out once per answer, not on every letter: the answer is what changed. An empty answer
-    // too — the block that replaces the list is not a ScreenState and says nothing of itself, and
-    // after «found one» silence would read as nothing having happened (Р-10, A5).
+    // Read out once per answer, not on every letter: the answer is what changed. An empty answer is
+    // `ScreenState`'s, which says its own words — said here too, it was heard twice (Р-10, A5).
     // The words go with the answer they describe — a new answer, any other state, the screen
     // left: the region is read in browse mode, and «found one» over an error is a lie (B3).
     // A dimmed answer is not read out: it is for the text before, and the answer to what is typed
@@ -722,7 +740,7 @@ export default defineComponent({
     watch([phase, results, stale], ([next, found, dimmed]) => {
       withdraw?.()
       withdraw = undefined
-      if ((next !== 'ready' && next !== 'far' && next !== 'empty') || dimmed) return
+      if ((next !== 'ready' && next !== 'far') || dimmed) return
       // Under the answer to a code the rows are not shown, so an answer to the search that lands
       // then is not said either — «found two» over «Код … не знаком» (adversarial Б). Nor under
       // the question about a code (MOL-100).
@@ -732,9 +750,7 @@ export default defineComponent({
       withdraw = announce?.(
         next === 'ready'
           ? t('item.results_announced', { n: found.length }, found.length)
-          : next === 'far'
-            ? t('item.far_announced', { query: answered.value, n: found.length }, found.length)
-            : t('item.empty.body', { query: answered.value }),
+          : t('item.far_announced', { query: answered.value, n: found.length }, found.length),
       )
     })
 
@@ -1039,6 +1055,7 @@ export default defineComponent({
       barcode,
       barcodeCode: lookup.code,
       barcodeItem: lookup.item,
+      IconMagnify,
     }
   },
 })
@@ -1061,6 +1078,39 @@ export default defineComponent({
   border: var(--hairline) dashed var(--border-strong);
   border-radius: var(--radius-lg);
   text-align: center;
+}
+
+/* The search's own answer in place of the rows: as far below the field as a group's caption. */
+.answer {
+  margin-top: var(--space-6);
+}
+
+/* «Не нашли» under the rows of a far answer (1e): where the quiet «Нет нужного?» stands otherwise. */
+.far {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.far-title {
+  margin: 0;
+  font-size: var(--text-headline);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+.far-text {
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
+  line-height: var(--leading-body);
+}
+
+/* A previous answer left while the next is on its way (К-11). */
+.answer,
+.far {
   transition: opacity var(--dur-fast) var(--ease-out);
 
   &.stale {
@@ -1129,7 +1179,8 @@ export default defineComponent({
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .not-found {
+  .answer,
+  .far {
     transition: none;
   }
 }

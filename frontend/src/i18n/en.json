@@ -328,7 +328,8 @@
       "action": "To Purchases"
     },
     "empty": {
-      "body": "Nothing found for «{query}». We will add it to the catalogue — tell us what the price tag calls it",
+      "title": "Nothing found for “{query}”",
+      "text": "We’ll add it to the catalogue — type its name as the price tag has it",
       "action": "Suggest an item"
     },
     "not_listed": "Not here? Suggest an item",
@@ -351,8 +352,9 @@
     },
     "error": {
       "title": "The server did not answer",
-      "body": "Catalogue search lives on the server, there is no local copy",
-      "fallback": "Pick from recent"
+      "body": "The catalogue isn’t answering. Try again — or pick from your recent items",
+      "fallback": "Pick from recent",
+      "fallback_note": "For now — from your recent items"
     },
     "offline": {
       "title": "No connection",
