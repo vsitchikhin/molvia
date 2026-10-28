@@ -323,7 +323,7 @@ test.describe('nothing close found (MOL-46)', () => {
     await expect(options(page).first()).toContainText(name)
     // The list is named by its heading; the live region says «…with a similar spelling» too, and
     // `getByText` would hold only while `exact` happened to tell them apart (MOL-64).
-    await expect(page.getByRole('listbox', { name: 'Similar spelling' })).toBeVisible()
+    await expect(page.getByRole('group', { name: 'Similar spelling' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Suggest an item' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Not here? Suggest an item' })).toHaveCount(0)
 

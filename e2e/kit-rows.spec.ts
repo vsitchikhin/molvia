@@ -111,7 +111,7 @@ test('a chosen row the keyboard stands on takes its fill from its round layer al
   page,
 }) => {
   await open(page, '/_kit')
-  const active = page.getByRole('listbox', { name: 'Found' }).getByRole('option').first()
+  const active = page.getByRole('group', { name: 'Found' }).getByRole('option').first()
   await expect(active).toHaveClass(/\bactive\b/)
   const fills = await active.evaluate(async (row) => {
     const read = () => getComputedStyle(row).backgroundColor
@@ -150,7 +150,7 @@ test('the search field is one pill, and the active option keeps its weight and r
     expect(well.radius).toBeGreaterThanOrEqual(well.height / 2)
   }
 
-  const active = page.getByRole('listbox', { name: 'Found' }).getByRole('option').first()
+  const active = page.getByRole('group', { name: 'Found' }).getByRole('option').first()
   await expect(active).toHaveAttribute('aria-selected', 'true')
   const look = await active.evaluate((row) => {
     const title = getComputedStyle(row.querySelector('.title')!)
@@ -192,7 +192,7 @@ for (const width of [390, 320])
     await page.setViewportSize({ width, height: 720 })
     await open(page, '/_kit')
     const titles = await page
-      .getByRole('listbox', { name: 'Found' })
+      .getByRole('group', { name: 'Found' })
       .getByRole('option')
       .evaluateAll((rows) =>
         rows.map((row) => {

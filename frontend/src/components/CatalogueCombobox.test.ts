@@ -5,6 +5,7 @@ import { CATALOGUE_QUERY_MAX } from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
 import { createAppI18n } from '@/i18n'
 import CatalogueCombobox from '@/components/CatalogueCombobox.vue'
+import type { ComboboxGroup } from '@/components/CatalogueCombobox.vue'
 
 function entry(n: number, name: string, note: string | null = null): CatalogueEntry {
   return {
@@ -23,13 +24,26 @@ const condensed = entry(3, 'Молоко сгущённое')
 
 const mounted: VueWrapper[] = []
 
-function combobox(props: { items?: CatalogueEntry[]; stale?: boolean; modelValue?: string } = {}) {
+const bread = entry(4, 'Хлеб бородинский', 'нарезной, 400 г')
+const eggs = entry(5, 'Яйца С1')
+
+function found(items: CatalogueEntry[]): ComboboxGroup[] {
+  return [{ key: 'found', heading: 'Нашли', items }]
+}
+
+function combobox(
+  props: {
+    items?: CatalogueEntry[]
+    groups?: ComboboxGroup[]
+    stale?: boolean
+    modelValue?: string
+  } = {},
+) {
   const wrapper = mount(CatalogueCombobox, {
     attachTo: document.body,
     props: {
       modelValue: props.modelValue ?? 'молок',
-      items: props.items ?? [milk, marianna, condensed],
-      heading: 'Нашли',
+      groups: props.groups ?? found(props.items ?? [milk, marianna, condensed]),
       label: 'Что взяли?',
       placeholder: 'Молоко, matsun, сыр…',
       hint: 'Можно с опечатками и латиницей',
@@ -79,19 +93,87 @@ afterEach(() => {
 })
 
 describe('the catalogue combobox', () => {
-  it('is a combobox controlling a listbox named by its heading', () => {
+  it('is a combobox controlling a listbox, its group named by its heading', () => {
     const wrapper = combobox()
     const input = field(wrapper)
     const list = wrapper.get('[role="listbox"]')
+    const group = list.get('[role="group"]')
 
     expect(input.attributes('role')).toBe('combobox')
     expect(input.attributes('aria-expanded')).toBe('true')
     expect(input.attributes('aria-controls')).toBe(list.attributes('id'))
     expect(input.attributes('aria-label')).toBe('Что взяли?')
-    expect(wrapper.get(`#${CSS.escape(list.attributes('aria-labelledby') ?? '')}`).text()).toBe(
+    expect(list.attributes('aria-label')).toBe('Что взяли?')
+    expect(wrapper.get(`#${CSS.escape(group.attributes('aria-labelledby') ?? '')}`).text()).toBe(
       'Нашли',
     )
-    expect(wrapper.findAll('[role="option"]')).toHaveLength(3)
+    expect(group.findAll('[role="option"]')).toHaveLength(3)
+    // Nothing between the group and its options owns them in their place.
+    expect(group.get('ul').attributes('role')).toBe('none')
+  })
+
+  describe('groups (MOL-209)', () => {
+    const hereLast: ComboboxGroup = {
+      key: 'here-last',
+      heading: 'Брали здесь в прошлый раз',
+      items: [bread, eggs],
+    }
+    const recent: ComboboxGroup = { key: 'recent', heading: 'Часто берёте', items: [milk] }
+    const groups = [hereLast, recent]
+
+    it('draws each group under its caption, in one listbox, in the order given', () => {
+      const wrapper = combobox({ groups, modelValue: '' })
+      const named = wrapper.findAll('[role="group"]').map((group) => ({
+        heading: wrapper.get(`#${CSS.escape(group.attributes('aria-labelledby') ?? '')}`).text(),
+        rows: group.findAll('[role="option"] .title').map((row) => row.text()),
+      }))
+
+      expect(wrapper.findAll('[role="listbox"]')).toHaveLength(1)
+      expect(named).toEqual([
+        { heading: 'Брали здесь в прошлый раз', rows: ['Хлеб бородинский', 'Яйца С1'] },
+        { heading: 'Часто берёте', rows: ['Молоко «Ашхар»'] },
+      ])
+      const ids = wrapper.findAll('[role="option"]').map((row) => row.attributes('id'))
+      expect(new Set(ids).size).toBe(3)
+    })
+
+    it('draws no caption for a group with nothing in it', () => {
+      const wrapper = combobox({ groups: [{ ...hereLast, items: [] }, recent] })
+
+      expect(wrapper.findAll('[role="group"]')).toHaveLength(1)
+      expect(wrapper.text()).not.toContain('Брали здесь в прошлый раз')
+    })
+
+    it('is collapsed when no group has a row', () => {
+      const wrapper = combobox({ groups: groups.map((group) => ({ ...group, items: [] })) })
+
+      expect(field(wrapper).attributes('aria-expanded')).toBe('false')
+      expect(wrapper.find('[role="listbox"]').exists()).toBe(false)
+    })
+
+    it('walks the arrows through every group as one run, wrapping at both ends', async () => {
+      const wrapper = combobox({ groups })
+      const seen: (string | undefined)[] = []
+      for (let i = 0; i < 4; i += 1) {
+        await press(wrapper, 'ArrowDown')
+        seen.push(activeName(wrapper))
+      }
+      expect(seen).toEqual(['Хлеб бородинский', 'Яйца С1', 'Молоко «Ашхар»', 'Хлеб бородинский'])
+
+      await press(wrapper, 'ArrowUp')
+      expect(activeName(wrapper)).toBe('Молоко «Ашхар»')
+    })
+
+    it('takes the active row of the second group on Enter, and brings it into view', async () => {
+      const wrapper = combobox({ groups })
+      await press(wrapper, 'ArrowUp')
+      await wrapper.vm.$nextTick()
+      const row = wrapper.findAll('[role="option"]')[2]?.element
+
+      expect(scrolled.mock.contexts.at(-1)).toBe(row)
+      await press(wrapper, 'Enter')
+      expect(wrapper.emitted('pick')).toEqual([[milk]])
+    })
   })
 
   it('is collapsed, with nothing to control, when there are no rows', () => {
@@ -261,7 +343,7 @@ describe('the catalogue combobox', () => {
     it('forgets the active row when a new answer arrives — it belonged to the old question', async () => {
       const wrapper = combobox()
       await press(wrapper, 'ArrowDown')
-      await wrapper.setProps({ items: [marianna, condensed] })
+      await wrapper.setProps({ groups: found([marianna, condensed]) })
 
       expect(field(wrapper).attributes('aria-activedescendant')).toBeUndefined()
       await press(wrapper, 'Enter')

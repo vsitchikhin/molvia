@@ -22,35 +22,46 @@
 
     <slot name="before" />
 
-    <template v-if="expanded">
-      <SectionCaption :id="`${id}-heading`" as="p" class="heading">{{ heading }}</SectionCaption>
-      <AppCard
-        :id="`${id}-list`"
-        ref="list"
-        as="ul"
-        list
-        class="options"
-        :class="{ stale }"
-        role="listbox"
-        :aria-labelledby="`${id}-heading`"
-        :aria-busy="stale ? 'true' : undefined"
+    <!-- One listbox whatever the groups (MOL-209): the arrows walk every row of them as one run, and
+         `aria-activedescendant` knows no edge of a group. A group is named by its caption. -->
+    <div
+      v-if="expanded"
+      :id="`${id}-list`"
+      class="groups"
+      :class="{ stale }"
+      role="listbox"
+      :aria-label="label"
+      :aria-busy="stale ? 'true' : undefined"
+    >
+      <div
+        v-for="group in shown"
+        :key="group.key"
+        class="group"
+        role="group"
+        :aria-labelledby="`${id}-${group.key}-heading`"
       >
-        <ListRow
-          v-for="(item, index) in items"
-          :id="optionId(index)"
-          :key="item.id"
-          as="li"
-          class="row"
-          role="option"
-          :title="item.name"
-          :meta="item.note ?? ''"
-          :active="index === active"
-          wrap
-          next
-          @click="choose(item)"
-        />
-      </AppCard>
-    </template>
+        <SectionCaption :id="`${id}-${group.key}-heading`" as="p" class="heading">
+          {{ group.heading }}
+        </SectionCaption>
+        <!-- `none`: a list between the group and its options would break what owns them. -->
+        <AppCard as="ul" list class="options" role="none">
+          <ListRow
+            v-for="(item, index) in group.items"
+            :id="optionId(group.from + index)"
+            :key="item.id"
+            as="li"
+            class="row"
+            role="option"
+            :title="item.name"
+            :meta="item.note ?? ''"
+            :active="group.from + index === active"
+            wrap
+            next
+            @click="choose(item)"
+          />
+        </AppCard>
+      </div>
+    </div>
 
     <slot name="after" />
   </div>
@@ -81,20 +92,29 @@ import SectionCaption from '@/components/SectionCaption.vue'
  * one (В-7). The list is in the page's flow and the page scrolls, never the list (MOL-17), so
  * the active row is brought into view by the page, to the nearest edge rather than the centre.
  *
- * Only what the server sent, in its order: nothing is filtered or sorted here.
+ * Only what the screen gives, in its order: nothing is filtered or sorted here. The rows come in
+ * groups, each under its caption, all of them one listbox (MOL-209): a group with no rows is not
+ * drawn, and with no rows at all there is no list.
  *
  * The field is the kit's `SearchField`, given the combobox's role, `aria-*` and keys; a row is a
  * `ListRow` option, the one the arrows stand on filled and its weight unchanged (MOL-177, К-4).
  */
+/** A run of rows under one caption: «Брали здесь в прошлый раз», «Часто берёте», «Нашли». */
+export interface ComboboxGroup {
+  /** Stable across answers and unique in the list: it names the caption the group is read by. */
+  readonly key: string
+  readonly heading: string
+  readonly items: readonly CatalogueEntry[]
+}
+
 export default defineComponent({
   name: 'CatalogueCombobox',
   components: { AppCard, ListRow, SearchField, SectionCaption },
   props: {
     modelValue: { type: String, required: true },
-    items: { type: Array as PropType<CatalogueEntry[]>, required: true },
-    /** «Часто берёте» or «Нашли» — what the list is, read out as its name. */
-    heading: { type: String, required: true },
-    /** The field's name for a screen reader: the screen's title, which is the question. */
+    /** «Брали здесь в прошлый раз» and «Часто берёте», or «Нашли» — each read out as its name. */
+    groups: { type: Array as PropType<readonly ComboboxGroup[]>, required: true },
+    /** The field's name for a screen reader, and the list's: the screen's title, the question. */
     label: { type: String, required: true },
     placeholder: { type: String, required: true },
     hint: { type: String, required: true },
@@ -110,10 +130,21 @@ export default defineComponent({
   setup(props, { emit, expose }) {
     const id = useId()
     const field = ref<{ focus: (options?: FocusOptions) => void; blur: () => void } | null>(null)
-    const list = ref<{ $el: HTMLElement } | null>(null)
     const active = ref(-1)
 
-    const expanded = computed(() => props.items.length > 0)
+    // Each group knows where its rows start in the one run the arrows walk.
+    const shown = computed(() => {
+      let from = 0
+      return props.groups
+        .filter((group) => group.items.length > 0)
+        .map((group) => {
+          const at = from
+          from += group.items.length
+          return { ...group, from: at }
+        })
+    })
+    const rows = computed(() => shown.value.flatMap((group) => group.items))
+    const expanded = computed(() => rows.value.length > 0)
 
     function optionId(index: number): string {
       return `${id}-option-${String(index)}`
@@ -121,16 +152,17 @@ export default defineComponent({
 
     // A new list is a new question: the row made active in the old one means nothing in it.
     watch(
-      () => props.items,
+      () => props.groups,
       () => {
         active.value = -1
       },
     )
 
+    // By the row's id, not its place among the list's children: the rows are in groups now.
     watch(active, async (index) => {
       if (index < 0) return
       await nextTick()
-      list.value?.$el.children[index]?.scrollIntoView({ block: 'nearest' })
+      document.getElementById(optionId(index))?.scrollIntoView({ block: 'nearest' })
     })
 
     function choose(entry: CatalogueEntry): void {
@@ -140,7 +172,7 @@ export default defineComponent({
     function onKeydown(event: KeyboardEvent): void {
       // A key that finishes a word in an input method belongs to that word, not to the list.
       if (event.isComposing) return
-      const last = props.items.length - 1
+      const last = rows.value.length - 1
 
       switch (event.key) {
         case 'ArrowDown':
@@ -163,7 +195,7 @@ export default defineComponent({
           return
         case 'Enter': {
           event.preventDefault()
-          const entry = props.items[active.value]
+          const entry = rows.value[active.value]
           if (entry) choose(entry)
           else field.value?.blur()
           return
@@ -188,8 +220,8 @@ export default defineComponent({
       focus,
       id,
       field,
-      list,
       active,
+      shown,
       expanded,
       optionId,
       choose,
@@ -205,7 +237,7 @@ export default defineComponent({
   margin-top: var(--space-6);
 }
 
-.options {
+.groups {
   transition: opacity var(--dur-fast) var(--ease-out);
 
   &.stale {
@@ -220,7 +252,7 @@ export default defineComponent({
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .options {
+  .groups {
     transition: none;
   }
 }

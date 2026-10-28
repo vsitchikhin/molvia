@@ -35,8 +35,7 @@
       v-if="!selectedId || selectedAvailable"
       ref="combobox"
       v-model="query"
-      :items="rows"
-      :heading="heading"
+      :groups="groups"
       :stale="stale"
       :readonly="bind?.phase === 'sending'"
       :label="t('item.search_title')"
@@ -353,6 +352,7 @@ import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
 import CatalogueCombobox from '@/components/CatalogueCombobox.vue'
+import type { ComboboxGroup } from '@/components/CatalogueCombobox.vue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ProposeItemSheet from '@/components/ProposeItemSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
@@ -751,9 +751,12 @@ export default defineComponent({
       return hasRecent.value ? t('item.error.body') : t('item.error.body_alone')
     })
 
-    const heading = computed(() => {
-      if (showsRecent.value) return t('item.group_recent')
-      return phase.value === 'far' ? t('item.group_similar') : t('item.group_found')
+    const groups = computed<ComboboxGroup[]>(() => {
+      if (showsRecent.value)
+        return [{ key: 'recent', heading: t('item.group_recent'), items: rows.value }]
+      return phase.value === 'far'
+        ? [{ key: 'similar', heading: t('item.group_similar'), items: rows.value }]
+        : [{ key: 'found', heading: t('item.group_found'), items: rows.value }]
     })
 
     // Read out once per answer, not on every letter: the answer is what changed. An empty answer is
@@ -1046,7 +1049,7 @@ export default defineComponent({
       hasRecent,
       errorBody,
       rows,
-      heading,
+      groups,
       pick,
       picked,
       opened,
