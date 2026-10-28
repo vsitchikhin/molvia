@@ -38,11 +38,26 @@
           <p class="note">{{ t('accounts.trip_hint') }}</p>
         </div>
       </AppReveal>
-      <p v-if="items === 'loading'" class="note">{{ t('state.loading') }}</p>
+      <!-- The answer's shape (Ф-13): four rows «name · sum» in the card of the items. -->
+      <ScreenSkeleton v-if="items === 'loading'">
+        <ul class="items">
+          <li v-for="n in 4" :key="n" class="item ghost-item">
+            <span class="ghost-line"><span class="ghost-bar ghost-name"></span></span>
+            <span class="ghost-line"><span class="ghost-bar ghost-amount"></span></span>
+          </li>
+        </ul>
+      </ScreenSkeleton>
       <p v-else-if="items === 'offline'" class="note">
         {{ t('spending.sheet.trip_items_offline') }}
       </p>
-      <p v-else-if="items === 'error'" class="note">{{ t('spending.sheet.trip_items_error') }}</p>
+      <!-- A section's error is the kit's quiet card (MOL-180, owner's В-1 «а» of MOL-199). -->
+      <ScreenState
+        v-else-if="items === 'error'"
+        kind="error"
+        inline
+        :title="t('spending.sheet.trip_items_error')"
+        @retry="retryItems"
+      />
       <ul v-else class="items">
         <li v-for="item in items" :key="item.id" class="item">
           <span class="item-name">
@@ -248,6 +263,8 @@ import CategoryChips from '@/components/CategoryChips.vue'
 import CategoryPickerSheet from '@/components/CategoryPickerSheet.vue'
 import ChargedField from '@/components/ChargedField.vue'
 import NavRow from '@/components/NavRow.vue'
+import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import ScreenState from '@/components/ScreenState.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import SpendingDetailsSheet from '@/components/SpendingDetailsSheet.vue'
@@ -309,6 +326,8 @@ export default defineComponent({
     IconDelete,
     IconInfo,
     NavRow,
+    ScreenSkeleton,
+    ScreenState,
     SegmentedControl,
     SpendingDetailsSheet,
     StatusStrip,
@@ -592,6 +611,11 @@ export default defineComponent({
         const answered = error instanceof ApiError && error.answered
         items.value = !answered && !navigator.onLine ? 'offline' : 'error'
       }
+    }
+
+    /** «Повторить» of the items (Ф-15): the trip read again — the same read the opening made. */
+    function retryItems(): void {
+      if (props.target.kind === 'trip') void loadTrip(props.target.row)
     }
 
     const title = computed(() => {
@@ -1007,6 +1031,7 @@ export default defineComponent({
       toTrip,
       openTrip,
       afterClose,
+      retryItems,
     }
   },
 })
@@ -1231,6 +1256,45 @@ export default defineComponent({
 
   & + & {
     border-top: var(--hairline) solid var(--border);
+  }
+}
+
+/* A row of bars stands as tall as a row of the answer: each bar in the middle of a line of the words it
+   stands for, at their size and leading (MOL-178). */
+.ghost-item {
+  align-items: center;
+}
+
+.ghost-line {
+  display: flex;
+  align-items: center;
+  height: calc(1em * var(--leading-body));
+}
+
+.ghost-bar {
+  @include skeleton-bar;
+
+  height: var(--skeleton-line);
+}
+
+/* The uneven cycle of a list's bars (MOL-178), so four rows do not read as one block. */
+.ghost-name {
+  width: 9rem;
+
+  .ghost-item:nth-child(2) & {
+    width: 11rem;
+  }
+
+  .ghost-item:nth-child(3) & {
+    width: 7rem;
+  }
+}
+
+.ghost-amount {
+  width: 3.5rem;
+
+  .ghost-item:nth-child(even) & {
+    width: 2.75rem;
   }
 }
 

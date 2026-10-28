@@ -8,7 +8,8 @@ import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { parseMoney } from '@molvia/model'
+import { ApiError } from '@molvia/client'
+import { ERROR, parseMoney } from '@molvia/model'
 import type { JournalKey, MoneyMonthView, SpendingBody } from '@molvia/model'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
@@ -23,8 +24,10 @@ import SpendingSheet from '@/components/SpendingSheet.vue'
 const moneyMonth = vi.fn<(month: string, cursor?: JournalKey) => Promise<MoneyMonthView>>()
 const recordSpending = vi.fn<(body: SpendingBody) => Promise<unknown>>()
 const amendSpending = vi.fn<(id: string, body: unknown) => Promise<unknown>>()
+const trip = vi.fn<(id: string) => Promise<unknown>>()
 vi.mock('@/api', () => ({
   api: {
+    trip: (id: string) => trip(id),
     moneyMonth: (month: string, cursor?: JournalKey) => moneyMonth(month, cursor),
     recordSpending: (body: SpendingBody) => recordSpending(body),
     amendSpending: (id: string, body: unknown) => amendSpending(id, body),
@@ -218,7 +221,7 @@ beforeEach(() => {
   vi.restoreAllMocks()
   localStorage.clear()
   sessionStorage.clear()
-  for (const mock of [moneyMonth, recordSpending, amendSpending]) mock.mockReset()
+  for (const mock of [moneyMonth, recordSpending, amendSpending, trip]) mock.mockReset()
   recordSpending.mockResolvedValue(undefined)
   amendSpending.mockResolvedValue(undefined)
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
@@ -811,5 +814,93 @@ describe('SpendingSheet: «Дата, заметка, место» behind one lin
     expect(document.activeElement).toBe(dialog.querySelector('input[inputmode="decimal"]'))
     // Still marked: what is wrong behind the line shows before it is opened.
     expect(detailsRow().getAttribute('aria-invalid')).toBe('true')
+  })
+})
+
+describe('SpendingSheet: the items of a trip’s summary (MOL-199, Ф-13, Ф-15)', () => {
+  const TRIP = 'bbbbbbbb-0000-4000-8000-000000000001'
+  const answer = {
+    id: TRIP,
+    accountId: null,
+    debited: null,
+    currency: 'AMD',
+    expenses: [
+      { id: 'e1', item: { name: 'Milk' }, quantity: null, amount: amd('600') },
+      { id: 'e2', item: { name: 'Bread' }, quantity: null, amount: amd('250') },
+    ],
+  }
+
+  async function summary(): Promise<VueWrapper> {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const actor = useActorStore()
+    actor.id = ACTOR
+    actor.state = 'ready'
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/money/spendings')
+    const view = mount(SpendingSheet, {
+      attachTo: document.body,
+      props: {
+        open: true,
+        target: {
+          kind: 'trip',
+          day: '2026-09-25',
+          row: {
+            kind: 'trip',
+            key: TRIP,
+            tripId: TRIP,
+            placeName: 'SAS',
+            items: 2,
+            amount: amd('850'),
+            counted: null,
+          },
+        },
+        categories: [],
+        nameOf: () => 'Groceries',
+        spendCurrency: 'AMD',
+      },
+      global: { plugins: [pinia, router, createAppI18n('en')] },
+    })
+    views.push(view)
+    // The sheet takes no tap until it has come up (MOL-69).
+    await risen()
+    return view
+  }
+
+  it('while they load, four rows of bars stand in the card of the items, hidden from a reader', async () => {
+    trip.mockReturnValue(new Promise(() => undefined))
+    const view = await summary()
+    const bars = view.get('.skeleton .items')
+    expect(bars.findAll('.ghost-item')).toHaveLength(4)
+    expect(bars.element.closest('[aria-hidden="true"]')).not.toBeNull()
+    expect(view.text()).not.toContain(en.spending.sheet.trip_items_error)
+  })
+
+  it('failed, the quiet card says so, and «Try again» reads the trip again', async () => {
+    trip.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL)).mockResolvedValue(answer)
+    const view = await summary()
+    const state = view.get('.state')
+    expect(state.text()).toContain(en.spending.sheet.trip_items_error)
+    expect(view.find('.items').exists()).toBe(false)
+    const retry = view.findAll('.state button').find((one) => one.text() === en.state.retry)
+    if (!retry) throw new Error('no «Try again»')
+    await retry.trigger('click')
+    await flushPromises()
+    expect(trip).toHaveBeenCalledTimes(2)
+    expect(trip).toHaveBeenLastCalledWith(TRIP)
+    expect(view.find('.state').exists()).toBe(false)
+    expect(view.findAll('.items .item').map((one) => one.text())).toEqual([
+      expect.stringContaining('Milk'),
+      expect.stringContaining('Bread'),
+    ])
+  })
+
+  // Offline is no error: the screen's strip under the sheet says it, and there is nothing to retry.
+  it('must not fire: offline, no red card and no «Try again», the line of the code', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    trip.mockRejectedValue(new TypeError('Failed to fetch'))
+    const view = await summary()
+    expect(view.text()).toContain(en.spending.sheet.trip_items_offline)
+    expect(view.find('.state').exists()).toBe(false)
   })
 })
