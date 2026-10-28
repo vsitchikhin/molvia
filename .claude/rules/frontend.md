@@ -403,7 +403,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   its sides are 8 and it stands 8 into the row's padding at the right, so beside a circle of 40 a word of
   a name fits at 320 under the widest word of the tail (adversarial А2: «Развлечения» broke in its middle
   at 16; Б1: under «Вернуть» with the sides alone). `NavRow` without `to` is a button that opens a sheet and says so
-  (`aria-haspopup="dialog"`). **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
+  (`aria-haspopup="dialog"`). **Among the fields of a form it is drawn as one** (`field`, MOL-199):
+  the well of `AccountRow` — `--surface-2`, a `border-strong` edge, the tint under the pointer — since a
+  list's row, with no fill and no edge, read in a form as plain text; `invalid` marks a field behind it
+  that holds an error (a `--bad` edge, `aria-invalid`). **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
   handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
   its tint, in the strip's shape and never a live region; a tag a pill of 13/600, plain, warn or bad
   — rows had drawn them at 11/700, 11/600 and 13/600. Screens move onto them in their own tasks.
