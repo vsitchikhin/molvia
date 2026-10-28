@@ -127,13 +127,20 @@ export function recallHereLast(
   place: HerePlace,
   tripId: string,
   before: Date | null = null,
+  /**
+   * The trip going on here, which is never anybody's last time: the server names finished trips only
+   * (adversarial Ж1 of review 7) — a receipt opened with no signal showed the trip still open.
+   */
+  going: string | null = null,
 ): readonly CatalogueEntry[] | null {
   if (owner === null) return null
   const id = tripId.toLowerCase()
+  const open = going?.toLowerCase()
   const slot = load(owner).find((kept) => kept.slot === slotOf(place))
   if (!slot) return null
   const last = slot.trips.find(
-    (trip) => trip.tripId !== id && (before === null || trip.at < before.getTime()),
+    (trip) =>
+      trip.tripId !== id && trip.tripId !== open && (before === null || trip.at < before.getTime()),
   )
   if (last) return last.items
   return slot.none === id ? [] : null

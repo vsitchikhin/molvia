@@ -439,6 +439,23 @@ describe('«Брали здесь в прошлый раз» on the device (MOL-
     })
   })
 
+  // Adversarial Ж1 of review 7: the trip going on is never anybody's last time.
+  it('the trip going on here is not the last time of a receipt read with no signal', () => {
+    rememberHereLast(ME, sas, trip(1), {
+      previous: { tripId: trip(0), at: new Date('2026-10-05T11:00:00Z') },
+      items: [bread],
+    })
+    vi.useFakeTimers({ now: new Date('2026-10-06T10:05:00Z') })
+    rememberBoughtHere(ME, sas, trip(1), milk)
+    const printed = new Date('2026-10-07T10:20:00Z')
+
+    expect(names(recallHereLast(ME, sas, trip(2), printed, trip(1).toUpperCase()))).toEqual([
+      'Хлеб',
+    ])
+    // «Must not fire»: with nothing going on, it is the last time.
+    expect(names(recallHereLast(ME, sas, trip(2), printed))).toEqual(['Молоко'])
+  })
+
   it('a finished trip looks only before itself', () => {
     rememberHereLast(ME, sas, trip(3), {
       previous: { tripId: trip(2), at: new Date('2026-10-07') },

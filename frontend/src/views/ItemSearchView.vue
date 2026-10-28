@@ -561,7 +561,11 @@ export default defineComponent({
         const at = here.value
         hereAnswer.value = null
         hereRemembered.value =
-          at?.place != null ? recallHereLast(owner, at.place, at.tripId, at.before) : null
+          at?.place != null
+            ? // The trip going on is nobody's last time (Ж1 of review 7); with no signal the phone's
+              // copy is all there is to tell it by.
+              recallHereLast(owner, at.place, at.tripId, at.before, current.tripId.value)
+            : null
         hereLate.value = false
         clearTimeout(hereTimer)
         hereTimer = setTimeout(() => {

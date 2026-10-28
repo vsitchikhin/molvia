@@ -2425,6 +2425,44 @@ describe('«What did you pick up?»', () => {
 
     // Adversarial Г2 of review 4: a trip written here that goes on no more — removed, or finished on
     // another phone — is not lifted over the receipt searched.
+    // Adversarial Ж1 of review 7: a receipt opened with no signal while a trip goes on here — that
+    // trip is nobody's last time; the server would name the one before.
+    it('a receipt opened with no signal does not name the trip going on as its last time', async () => {
+      rememberHereLast(ACTOR, sas, TRIP, {
+        previous: { tripId: BEFORE, at: new Date('2026-10-05T11:00:00Z') },
+        items: [bread],
+      })
+      vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-06T10:05:00Z') })
+      rememberBoughtHere(ACTOR, sas, TRIP, milk)
+      vi.useRealTimers()
+      onTrip(milk)
+      const receipt = 'cccccccc-0000-4000-8000-000000000012'
+      tripRead.mockResolvedValue(
+        tripViewCodec.parse({
+          id: receipt,
+          startedAt: '2026-10-07T10:20:00.000Z',
+          finishedAt: '2026-10-07T12:00:00.000Z',
+          finishedOnDeviceAt: '2026-10-07T10:20:00.000Z',
+          currency: 'AMD',
+          rate: null,
+          rateProvider: null,
+          rateJump: null,
+          rateStale: false,
+          place: { id: 'aaaaaaaa-0000-4000-8000-000000000002', kind: 'store', name: sas.name },
+          placeCity: sas.city,
+          expenses: [],
+          total: [],
+          converted: null,
+        }),
+      )
+      online(false)
+      const view = await render(ref(true), `/purchases/${receipt}/add`)
+      await flushPromises()
+
+      expect(previousItems).not.toHaveBeenCalled()
+      expect(groups(view)[0]).toEqual({ heading: en.item.group_here_last, rows: [bread.name] })
+    })
+
     // Adversarial Е1 of review 6: the phone's copy still says the trip goes on — removed on another
     // device — and the server, asked, names none going on.
     it('a trip the phone still thinks goes on, and the server does not, stays below the receipt', async () => {
