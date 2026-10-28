@@ -409,7 +409,8 @@ way. **«Row for row» is by the rows, not their counts** (owner's В-2 «а»):
 list's answer and by a write's, the phone cannot tell which is newer, and compared whole a shelf ahead of the
 answer — another window's queue sending one purchase a time — drew «Сервер не ответил» over a server that answered
 every time (adversarial А3, Б2). **So while the list moves under every read, a count and a sum the last answer does
-not say are unknown** (`unconfirmed`): the row reads where and when, as before the cache kept them — neither memory
+not say are unknown** (`unconfirmed`, read after every answer, one thrown away included — it lands after the
+write that threw it away has redrawn the page, round 3 В1): the row reads where and when, as before the cache kept them — neither memory
 said as the answer nor a strip that blames the server — and they come back with the first answer taken. **A
 purchase written into a recorded record moves its row on the shelf too** (`apply`, adversarial А1): only in place,
 where the first page holds it — a row the page has not got would move the boundary only `load()` reads. Left on

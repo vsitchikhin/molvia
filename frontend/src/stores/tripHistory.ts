@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, toRaw, watch } from 'vue'
+import { ref, shallowRef, toRaw, watch } from 'vue'
 import { z } from 'zod'
 import {
   currencySchema,
@@ -217,8 +217,13 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   // What «Показать ещё» brought, and the cursor standing after it. Only the first page is
   // remembered on the phone; these live for as long as the screen does.
   let deeper: TripHistoryEntry[] = []
-  /** The first page the server gave last, taken or not (adversarial В1). */
-  let lastAnswer: TripHistory | null = null
+  /**
+   * The first page the server gave last, taken or not (adversarial В1). Reactive, unlike the rest of
+   * the bookkeeping: an answer thrown away lands after the write that threw it away has redrawn the
+   * page, and `unconfirmed` read in a render must follow it (round 3 of MOL-307, В1) — `firstPage`
+   * never moves without `page`.
+   */
+  const lastAnswer = shallowRef<TripHistory | null>(null)
   let deepCursor: TripHistory['nextCursor'] = null
   let generation = 0
   let selection = 0
@@ -454,7 +459,8 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
    * no memory (adversarial А4, В1); a page put back from before it is (Б4).
    */
   function showsAnswer(): boolean {
-    return lastAnswer !== null && asShelvedPage(firstPage) === asShelvedPage(lastAnswer)
+    const answer = lastAnswer.value
+    return answer !== null && asShelvedPage(firstPage) === asShelvedPage(answer)
   }
 
   /**
@@ -463,7 +469,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
    * the answer or newer, and «unknown» is neither wrong nor the strip's «не ответил».
    */
   function unconfirmed(): Set<string> {
-    const said = new Map((lastAnswer?.trips ?? []).map((row) => [row.id, countOf(row)]))
+    const said = new Map((lastAnswer.value?.trips ?? []).map((row) => [row.id, countOf(row)]))
     return new Set(
       firstPage.trips.filter((row) => said.get(row.id) !== countOf(row)).map((row) => row.id),
     )
@@ -481,7 +487,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     const cursor = more ? page.value.nextCursor : null
     if (more && !cursor) return true
     const answer = await api.tripHistory(cursor ?? undefined)
-    if (!more && owner === actor.id) lastAnswer = answer
+    if (!more && owner === actor.id) lastAnswer.value = answer
     // A next page cannot be cancelled by a change somewhere else: it lies deeper than anything
     // held, and it is merged by id. Under the shared guard a correction sent to a trip finished
     // last week threw it away, and «Показать ещё» did nothing at all (В5).

@@ -1,4 +1,4 @@
-import { nextTick } from 'vue'
+import { computed, nextTick } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { tripHistoryCodec, tripViewCodec } from '@molvia/model'
@@ -268,6 +268,29 @@ describe('whether the server has answered an empty history (MOL-77)', () => {
     expect(store.page.trips[0]).toMatchObject({ id: A, itemCount: 3 })
     expect(store.page.trips[0]?.total?.[0]?.minor).toBe(150_000n)
     expect(restart().page.trips[0]).toMatchObject({ id: A, itemCount: 3 })
+  })
+
+  it('a render takes the unconfirmed counts by an answer thrown away after it (round 3 of MOL-307, В1)', async () => {
+    const store = useTripHistoryStore()
+    const counted = (n: number) => ({
+      ...entry(A),
+      itemCount: n,
+      total: [{ minor: BigInt(n) * 50_000n, currency: 'AMD' as const }],
+    })
+    tripHistory.mockResolvedValueOnce({ trips: [counted(4)], nextCursor: null })
+    await store.load()
+    // What a screen computes its rows by.
+    const shown = computed(() => (store.page.trips.length, store.unconfirmed()))
+    // Another window writes the shelf, and the page is drawn again before the answer comes — the
+    // server read the list after that window's next purchase.
+    tripHistory.mockImplementationOnce(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-history.${OWNER}` }))
+      expect(shown.value).toEqual(new Set())
+      return Promise.resolve({ trips: [counted(5)], nextCursor: null })
+    })
+    expect(await store.load()).toBe(false)
+    expect(store.unconfirmed()).toEqual(new Set([A]))
+    expect(shown.value).toEqual(new Set([A]))
   })
 
   it('a row another window of this build moved is the answer, while it moves the list under every read (adversarial А3 of MOL-307)', async () => {
