@@ -4,7 +4,7 @@
     :ref="setRoot"
     :as="card ? 'section' : undefined"
     class="state"
-    :class="[toneClass, { inline, card }]"
+    :class="[toneClass, { inline, flow, card }]"
   >
     <span v-if="glyph" class="circle" aria-hidden="true">
       <component :is="glyph" class="glyph" />
@@ -177,6 +177,11 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
  * around it is the card's, not this block's. An `inline` error is that card itself, the quiet one
  * (К-13, 77 v2 2c): «Повторить» a ghost the width of its word, and no «Обновить», which the strip's
  * own row already offers while the screen works.
+ *
+ * `flow` is for a screen whose field holds the keyboard — «Что взяли?» (owner's В-20 «а»): its states
+ * come while the person types, and the strip at the bottom is under the keys on an iPhone. The block
+ * keeps its own height and its buttons right under the words, and takes no strip; an error stays the
+ * whole screen's — its circle, «Повторить» filled, «Сообщить о проблеме», an alert — not the quiet card.
  */
 export default defineComponent({
   name: 'ScreenState',
@@ -188,6 +193,8 @@ export default defineComponent({
     title: { type: String, required: true },
     body: { type: String, default: undefined },
     inline: { type: Boolean, default: false },
+    /** The buttons under the words, never in the strip: a screen typed in (В-20). */
+    flow: { type: Boolean, default: false },
   },
   emits: ['retry'],
   setup(props) {
@@ -208,7 +215,7 @@ export default defineComponent({
     const me = Symbol('screen-state')
     watchEffect(() => {
       if (!strip) return
-      if (props.kind === 'error' && !props.inline) strip.claim(me)
+      if (props.kind === 'error' && !props.inline && !props.flow) strip.claim(me)
       else strip.release(me)
     })
     const dockTarget = computed(() => (strip?.owner.value === me ? strip.target.value : null))
@@ -359,7 +366,8 @@ export default defineComponent({
   flex-direction: column;
 }
 
-.inline {
+.inline,
+.flow {
   flex: none;
 }
 
@@ -443,7 +451,8 @@ export default defineComponent({
   padding-top: 0;
 }
 
-.inline .action {
+.inline .action,
+.flow .action {
   margin-top: 0;
 }
 </style>

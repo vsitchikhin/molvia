@@ -612,7 +612,7 @@ describe('ScreenState', () => {
 
   // A strip of the screen around, as `AppScreen` gives one (MOL-180, К-1).
   describe('the strip of the screen around', () => {
-    function inside(options: { sheet?: boolean; target?: boolean } = {}) {
+    function inside(options: { sheet?: boolean; target?: boolean; flow?: boolean } = {}) {
       let strip: StateStrip | undefined
       const target = shallowRef<HTMLElement | null>(null)
       const Sheet = defineComponent({
@@ -626,7 +626,11 @@ describe('ScreenState', () => {
           setup: () => {
             strip = provideStateStrip(options.target ? target : undefined)
             return () => {
-              const state = h(ScreenState, { kind: 'error', title: 'Broke' } as never)
+              const state = h(ScreenState, {
+                kind: 'error',
+                title: 'Broke',
+                flow: options.flow,
+              } as never)
               return h('div', [
                 options.sheet ? h(Sheet, () => state) : state,
                 h('div', { class: 'strip', ref: (el) => (target.value = el as HTMLElement) }),
@@ -666,10 +670,51 @@ describe('ScreenState', () => {
       expect(view.get('.sheet').find('.action').text()).toBe(en.state.retry)
       expect(view.get('.strip').find('.action').exists()).toBe(false)
     })
+
+    it('must not take it in the flow of a screen typed in (В-20)', async () => {
+      const { view, held } = inside({ target: true, flow: true })
+      await nextTick()
+      expect(held()).toBe(false)
+      expect(view.get('.state').find('.action').text()).toBe(en.state.retry)
+      expect(view.get('.strip').find('.action').exists()).toBe(false)
+    })
   })
 
   it('takes the free height unless it is asked to stay inline', () => {
     expect(render({ kind: 'error' }).classes()).not.toContain('inline')
     expect(render({ kind: 'error', inline: true }).classes()).toContain('inline')
+  })
+
+  // A screen typed in (В-20): the strip is under the keys on an iPhone, so the buttons stand under the
+  // words — and the error is still the screen's, not a section's quiet card.
+  describe('in the flow of a screen typed in', () => {
+    afterEach(() => {
+      document.body.innerHTML = ''
+    })
+
+    it('keeps its own height, its buttons right under the words', () => {
+      const view = render({ kind: 'error', flow: true })
+      expect(view.classes()).toContain('flow')
+      expect(view.find('.message + .action').exists()).toBe(true)
+    })
+
+    it('stays the whole screen’s error: «Повторить» filled and wide, an alert', async () => {
+      const view = render({ kind: 'error', flow: true })
+      expect(view.classes()).not.toContain('card')
+      const retry = view.get('.action button')
+      expect(retry.classes()).toEqual(expect.arrayContaining(['primary', 'block']))
+      expect(view.get('.message').attributes('role')).toBe('alert')
+      await retry.trigger('click')
+      expect(view.emitted('retry')).toHaveLength(1)
+    })
+
+    it('keeps an empty state’s action under the words too', () => {
+      const view = render(
+        { kind: 'empty', icon: IconPlus, flow: true },
+        { action: () => h('button', { class: 'own' }, 'Suggest') },
+      )
+      expect(view.classes()).toContain('flow')
+      expect(view.find('.message + .action .own').exists()).toBe(true)
+    })
   })
 })

@@ -639,7 +639,14 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the strip is up (adversarial А1): taken, the strip took the sheet and what was typed in it. A
   second full error while the first holds the strip is drawn as the quiet card (А4); the same error
   turning a section's where it stands gives its focus back to «Повторить» (А2); and the error says
-  the version out loud in the row's place (`useUpdateAnnouncement`, А3). **A focus the strip loses is brought
+  the version out loud in the row's place (`useUpdateAnnouncement`, А3). **One exception, a screen
+  typed in** (`flow`, MOL-208, owner's В-20 «а»): on «Что взяли?» «не нашли» and «сервер не ответил»
+  come while the person types, and the strip at the bottom is under the keys on an iPhone — the
+  button seen only once the keyboard is put away. There the state keeps its own height and its
+  buttons right under the words, and takes no strip; an error stays the whole screen's — the circle,
+  «Повторить» filled, «Сообщить о проблеме», an alert — not the quiet card. **Always on that screen,
+  not «while the field holds the focus»**: a tap on the button takes the focus from the field first,
+  and a button moving to the strip on `blur` would leave the finger before the `click`. **A focus the strip loses is brought
   back by the frame** (MOL-194, adversarial Б2, Б3): a render that swaps the strip's actions under
   the focus — an account put away or deleted on another phone — left it on the body; it goes to the
   screen's first button in the strip, where the one it stood on was, or to the title where the strip

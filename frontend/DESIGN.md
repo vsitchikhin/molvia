@@ -409,7 +409,7 @@ inner container — a sheet is the only exception.
 - **Docked action:** a screen's main action is a full-width bar (`#docked`) above the tab bar — on «Покупки» and on every screen of «Деньги»; no action floats. Nothing scrolls under it unseen: the list ends above it. The bar keeps its own margins — 12 over, 16 at the sides, 12 under (over the home indicator on a nested screen) — and stands its actions in one column 8 apart: a main action, a ghost under it.
 - **"Вернуть":** one place on every screen — 8 over the docked bar, or over the tab bar where there is none; 16 from the edges, over the list, `surface` with the raised shadow, min 56: the words 15 · a 28 ring of `graphic` with the seconds · tinted "Вернуть". The bar under it stays whole, and the list ends over it. In a sheet it stands in the footer, over the main action.
 - **Above the control, nothing of the answer:** a strip, a refusal, a note go under the switch (month, period) that chooses the answer, never above it.
-- **Thumb zone:** a state's own action is pushed to the bottom of the free height, an error's stands in the strip; one primary per screen.
+- **Thumb zone:** a state's own action is pushed to the bottom of the free height, an error's stands in the strip; one primary per screen. A screen typed in («Что взяли?») is the exception: the keyboard covers the bottom, so a state's buttons stand right under its words.
 
 ## Elevation & Depth
 
