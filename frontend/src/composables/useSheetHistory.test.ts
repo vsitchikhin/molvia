@@ -155,7 +155,7 @@ describe('the sheet and the router', () => {
       h(
         BottomSheet,
         {
-          open: open[at]?.value,
+          open: open[at]?.value ?? false,
           back: at > 0,
           'onUpdate:open': (next: boolean) => {
             const one = open[at]
