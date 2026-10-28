@@ -149,20 +149,69 @@ async function pressUntil(text: string, happened: () => void): Promise<void> {
   })
 }
 
-/** Opens the one row, types a new note — the smallest amendment there is. */
+/** The sheet on top: «Дата, заметка, место» over the spending, once it is open. */
+function topSheet(): HTMLDialogElement {
+  const open = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')]
+  const top = open.at(-1)
+  if (!top) throw new Error('no sheet')
+  return top
+}
+
+/** The line «Дата, заметка, место» of the spending sheet (MOL-199). */
+function detailsRow(): HTMLButtonElement {
+  const row = document.querySelector<HTMLButtonElement>('dialog[open] .nav-row.field')
+  if (!row) throw new Error('no line of the day, the note and the place')
+  return row
+}
+
+/** Opens «Дата, заметка, место» from its line, as a tap does. */
+async function openDetails(): Promise<HTMLDialogElement> {
+  detailsRow().click()
+  await risen()
+  const top = topSheet()
+  expect(top.textContent).toContain(en.spending.sheet.details_title)
+  return top
+}
+
+function textField(placeholder: string): HTMLInputElement {
+  const found = document.querySelector<HTMLInputElement>(
+    `dialog[open] input[placeholder="${placeholder}"]`,
+  )
+  if (!found) throw new Error(`no field «${placeholder}»`)
+  return found
+}
+
+async function typeInto(field: HTMLInputElement, value: string): Promise<void> {
+  field.value = value
+  field.dispatchEvent(new Event('input'))
+  await flushPromises()
+}
+
+/** Opens the one row, types a new note — the smallest amendment there is; the details stay open. */
 async function amendNote(view: VueWrapper): Promise<HTMLDialogElement> {
   await view.find('.list-row').trigger('click')
   await risen()
   const dialog = document.querySelector<HTMLDialogElement>('dialog[open]')
   if (!dialog) throw new Error('no sheet')
-  const note = dialog.querySelector<HTMLInputElement>(
-    `input[placeholder="${en.spending.sheet.note_placeholder}"]`,
+  await openDetails()
+  await typeInto(
+    textField(en.spending.sheet.note_placeholder),
+    'Reconciliation: coins in the other jacket',
   )
-  if (!note) throw new Error('no note field')
-  note.value = 'Reconciliation: coins in the other jacket'
-  note.dispatchEvent(new Event('input'))
-  await flushPromises()
   return dialog
+}
+
+/**
+ * «Готово»: back to the spending, with nothing but it open. A memory history sends no popstate, so the
+ * step off the details is told it landed — else it stands in flight for a second, and the spending's
+ * own close is dropped as a second step.
+ */
+async function detailsDone(): Promise<void> {
+  await pressUntil(en.spending.sheet.details_done, () => {
+    expect(document.querySelectorAll('dialog[open]')).toHaveLength(1)
+  })
+  window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+  await risen()
 }
 
 beforeEach(() => {
@@ -200,6 +249,7 @@ describe('SpendingSheet: the phone’s day (MOL-121)', () => {
       .find((one) => one.text().trim() === en.spending.summary.add)
       ?.trigger('click')
     await risen()
+    await openDetails()
     expect(dayField().value).toBe('2026-09-28')
     expect(dayField().max).toBe('2026-09-28')
   }, 15_000)
@@ -217,15 +267,23 @@ describe('SpendingSheet: the phone’s day (MOL-121)', () => {
     if (!amount) throw new Error('no amount field')
     amount.value = '1000'
     amount.dispatchEvent(new Event('input'))
+    dialog?.querySelector<HTMLInputElement>('.chips-field input')?.click()
+    await flushPromises()
+    await openDetails()
     dayField().value = '2026-09-29'
     dayField().dispatchEvent(new Event('input'))
     dayField().dispatchEvent(new Event('change'))
     await flushPromises()
+    await detailsDone()
+    // The first field wrong is behind the line: «Сохранить» opens it on that field (MOL-199).
     await pressUntil(en.spending.sheet.save, () => {
-      expect(dialog?.textContent).toContain(en.spending.sheet.bad_day)
+      expect(topSheet().textContent).toContain(en.spending.sheet.bad_day)
     })
+    await flushPromises()
+    expect(document.activeElement).toBe(dayField())
+    expect(detailsRow().getAttribute('aria-invalid')).toBe('true')
     expect(recordSpending).not.toHaveBeenCalled()
-  })
+  }, 25_000)
 
   // The correction of a check is dated by the day of the check, and a spending typed further east
   // by a day this phone has not reached; its note must still be amendable here (adversarial Л).
@@ -234,6 +292,7 @@ describe('SpendingSheet: the phone’s day (MOL-121)', () => {
     const view = await render(undefined, '/money/spendings')
     await amendNote(view)
     expect(dayField().max).toBe('2026-09-29')
+    await detailsDone()
     await pressUntil(en.spending.sheet.save, () => {
       expect(amendSpending).toHaveBeenCalled()
     })
@@ -273,11 +332,10 @@ describe('SpendingSheet: a record with no purchases handed over (MOL-78, В-1)',
     await risen()
     const dialog = document.querySelector<HTMLDialogElement>('dialog[open]')
     expect(dialog).not.toBeNull()
+    expect(detailsRow().textContent.trim()).toBe('Yesterday · Ереван Сити')
+    await openDetails()
     expect(dayField().value).toBe('2026-09-27')
-    const place = dialog?.querySelector<HTMLInputElement>(
-      `input[placeholder="${en.spending.sheet.place_placeholder}"]`,
-    )
-    expect(place?.value).toBe('Ереван Сити')
+    expect(textField(en.spending.sheet.place_placeholder).value).toBe('Ереван Сити')
     const chosen = dialog?.querySelector<HTMLInputElement>('.chips-field input:checked')
     expect(chosen?.value ?? chosen?.id ?? '').not.toBe('')
     expect(chosen?.closest('label')?.textContent).toContain(en.spending.category.groceries)
@@ -374,6 +432,7 @@ describe('SpendingSheet: the «≈» of a spending written is its own day’s (M
   it('must not fire: a day moved is another fact — counted as one typed anew', async () => {
     moneyMonth.mockResolvedValue(inRoubles(kept))
     const dialog = await opened(await render(undefined, '/money/spendings'))
+    await openDetails()
     dayField().value = '2026-09-21'
     dayField().dispatchEvent(new Event('input'))
     dayField().dispatchEvent(new Event('change'))
@@ -679,4 +738,78 @@ describe('SpendingSheet: the chips by frequency, the chosen one first (MOL-198, 
     await risen()
     expect(chips()).toEqual([TAXI, CAFE, RENT])
   }, 15_000)
+})
+
+describe('SpendingSheet: «Дата, заметка, место» behind one line (MOL-199, Ф-17)', () => {
+  async function newSpending(): Promise<HTMLDialogElement> {
+    moneyMonth.mockResolvedValue(month('2026-09-28'))
+    const view = await render()
+    await view
+      .findAll('button')
+      .find((one) => one.text().trim() === en.spending.summary.add)
+      ?.trigger('click')
+    await risen()
+    const dialog = document.querySelector<HTMLDialogElement>('dialog[open]')
+    if (!dialog) throw new Error('no sheet')
+    return dialog
+  }
+
+  it('says the day and «no note» in the form, the whole of it to a screen reader, and no field', async () => {
+    const dialog = await newSpending()
+    expect(detailsRow().textContent.trim()).toBe('Today · no note')
+    expect(detailsRow().getAttribute('aria-label')).toBe('Date, note, place: Today · no note')
+    expect(detailsRow().getAttribute('aria-haspopup')).toBe('dialog')
+    expect(dialog.querySelector('input[type="date"]')).toBeNull()
+    expect(
+      dialog.querySelector(`input[placeholder="${en.spending.sheet.note_placeholder}"]`),
+    ).toBeNull()
+  })
+
+  it('what is typed behind it is in the line at once, and «Done» keeps it', async () => {
+    await newSpending()
+    await openDetails()
+    await typeInto(textField(en.spending.sheet.note_placeholder), 'Lunch')
+    await typeInto(textField(en.spending.sheet.place_placeholder), 'Kinza')
+    expect(detailsRow().textContent.trim()).toBe('Today · Lunch · Kinza')
+    await detailsDone()
+    expect(detailsRow().textContent.trim()).toBe('Today · Lunch · Kinza')
+  })
+
+  it('«Save» with a note that cannot be saved opens the details on the note, and the line says so', async () => {
+    const dialog = await newSpending()
+    const amount = dialog.querySelector<HTMLInputElement>('input[inputmode="decimal"]')
+    if (!amount) throw new Error('no amount field')
+    await typeInto(amount, '1000')
+    dialog.querySelector<HTMLInputElement>('.chips-field input')?.click()
+    await flushPromises()
+    await openDetails()
+    // A bell: a character that draws nothing, which the server refuses.
+    await typeInto(textField(en.spending.sheet.note_placeholder), `Lunch${String.fromCharCode(7)}`)
+    await detailsDone()
+    await pressUntil(en.spending.sheet.save, () => {
+      expect(topSheet().textContent).toContain(en.spending.sheet.bad_text)
+    })
+    await flushPromises()
+    expect(document.activeElement).toBe(textField(en.spending.sheet.note_placeholder))
+    expect(detailsRow().getAttribute('aria-invalid')).toBe('true')
+    expect(recordSpending).not.toHaveBeenCalled()
+    // Put right, the mark goes with the error.
+    await typeInto(textField(en.spending.sheet.note_placeholder), 'Lunch')
+    expect(detailsRow().getAttribute('aria-invalid')).toBeNull()
+  })
+
+  it('must not fire: a wrong sum before it takes the focus, and the details stay shut', async () => {
+    const dialog = await newSpending()
+    await openDetails()
+    await typeInto(textField(en.spending.sheet.note_placeholder), `Lunch${String.fromCharCode(7)}`)
+    await detailsDone()
+    await pressUntil(en.spending.sheet.save, () => {
+      expect(dialog.textContent).toContain(en.spending.sheet.bad_amount)
+    })
+    await flushPromises()
+    expect(document.querySelectorAll('dialog[open]')).toHaveLength(1)
+    expect(document.activeElement).toBe(dialog.querySelector('input[inputmode="decimal"]'))
+    // Still marked: what is wrong behind the line shows before it is opened.
+    expect(detailsRow().getAttribute('aria-invalid')).toBe('true')
+  })
 })

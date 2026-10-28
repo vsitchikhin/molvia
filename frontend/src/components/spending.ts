@@ -618,6 +618,9 @@ export function groceriesOf(categories: readonly SpendingCategoryView[]): string
   )
 }
 
+/** A field behind «Дата, заметка, место» — the one its sheet opens on when it is wrong. */
+export type SpendingDetailsField = 'day' | 'note' | 'place'
+
 /**
  * The entry «Дата, заметка, место» of the spending sheet says what is behind it in one line (MOL-199,
  * Ф-17): «Сегодня · без заметки», «Вчера · Кофе с собой · «Кофеман»», «28 сент. · Кинза» — the day as a

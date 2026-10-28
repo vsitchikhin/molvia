@@ -477,18 +477,31 @@ describe('MoneySpendingsView: the journal of the month (MOL-159)', () => {
     await risen()
     const dialog = document.querySelector('dialog[open]')
     const amount = dialog?.querySelector<HTMLInputElement>('input[inputmode=decimal]')
-    const date = dialog?.querySelector<HTMLInputElement>('input[type=date]')
-    if (!amount || !date) throw new Error('no fields')
+    if (!amount) throw new Error('no amount')
     amount.value = '700'
     amount.dispatchEvent(new Event('input'))
+    dialog?.querySelector<HTMLInputElement>(`input[value="${BEAUTY}"]`)?.click()
+    // The day is behind «Дата, заметка, место» (MOL-199).
+    dialog?.querySelector<HTMLButtonElement>('.nav-row.field')?.click()
+    await risen()
+    const date = document.querySelector<HTMLInputElement>('dialog[open] input[type=date]')
+    if (!date) throw new Error('no date')
     date.value = '2026-08-30'
     date.dispatchEvent(new Event('input'))
-    dialog?.querySelector<HTMLInputElement>(`input[value="${BEAUTY}"]`)?.click()
     await flushPromises()
-    await pressUntil(en.spending.sheet.save, () => {
+    sheetButton(en.spending.sheet.details_done).click()
+    // A memory history sends no popstate: the step off the details lands by its guard, a second
+    // later, unless it is told — and the sheet under it closes through the history after it.
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    await risen()
+    expect(document.querySelectorAll('dialog[open]')).toHaveLength(1)
+    clock += 1000
+    sheetButton(en.spending.sheet.save).click()
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    await vi.waitFor(() => {
       expect(router.currentRoute.value.query.month).toBe('2026-08')
     })
-  })
+  }, 25_000)
 
   it('«‹ Деньги» leads back to the summary', async () => {
     moneyMonth.mockResolvedValue(month())

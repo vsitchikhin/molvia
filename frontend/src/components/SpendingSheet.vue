@@ -127,41 +127,16 @@
         @lift="lead = $event"
       />
 
-      <AppField
-        v-model="day"
-        :label="t('spending.sheet.date')"
-        kind="date"
-        min="2000-01-02"
-        :max="latest"
-        :display="dayWords"
-        :error-text="dayBad ? t('spending.sheet.bad_day') : null"
-        @update:model-value="dayBad = false"
+      <!-- The day, the note and the place behind one line (MOL-199, Ф-17): almost never changed, they
+           took three fields under the chips and pushed the form off the screen. -->
+      <NavRow
+        field
+        :icon="IconCalendar"
+        :label="details"
+        :aria-label="t('spending.sheet.details_label', { value: details })"
+        :invalid="dayBad || noteBad || placeBad"
+        @click="openDetails(null)"
       />
-
-      <AppField
-        v-model="note"
-        :label="t('spending.sheet.note')"
-        :placeholder="t('spending.sheet.note_placeholder')"
-        :maxlength="textMax"
-        :error-text="noteBad ? t('spending.sheet.bad_text') : null"
-        enterkeyhint="next"
-      >
-        <template #label-extra>
-          <span class="optional">{{ t('spending.sheet.optional') }}</span>
-        </template>
-      </AppField>
-      <AppField
-        v-model="place"
-        :label="t('spending.sheet.place')"
-        :placeholder="t('spending.sheet.place_placeholder')"
-        :maxlength="textMax"
-        :error-text="placeBad ? t('spending.sheet.bad_text') : null"
-        enterkeyhint="done"
-      >
-        <template #label-extra>
-          <span class="optional">{{ t('spending.sheet.optional') }}</span>
-        </template>
-      </AppField>
 
       <!-- Last in the form and never in the footer: a second action must not argue with
            «Сохранить» under the thumb (handoff 02). Nothing typed goes to the trip — there a
@@ -217,6 +192,21 @@
     @pick="pickCategory"
     @add="$emit('add-category')"
   />
+  <SpendingDetailsSheet
+    v-model:open="detailsOpen"
+    v-model:day="day"
+    v-model:note="note"
+    v-model:place="place"
+    :latest="latest"
+    :display="dayWords"
+    :day-bad="dayBad"
+    :note-bad="noteBad"
+    :place-bad="placeBad"
+    :focus="detailsFocus"
+    @update:day="dayBad = false"
+    @update:note="noteBad = false"
+    @update:place="placeBad = false"
+  />
 </template>
 
 <script lang="ts">
@@ -225,6 +215,7 @@ import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconAlert from '~icons/mdi/alert-circle-outline'
+import IconCalendar from '~icons/mdi/calendar-blank-outline'
 import IconCart from '~icons/mdi/cart-outline'
 import IconCheck from '~icons/mdi/check'
 import IconDelete from '~icons/mdi/trash-can-outline'
@@ -232,7 +223,6 @@ import IconInfo from '~icons/mdi/information-outline'
 import { ApiError } from '@molvia/client'
 import {
   ERROR,
-  SPENDING_TEXT_MAX,
   convertAcross,
   currencySchema,
   currencySign,
@@ -251,16 +241,29 @@ import { api } from '@/api'
 import AccountPickerSheet from '@/components/AccountPickerSheet.vue'
 import AccountRow from '@/components/AccountRow.vue'
 import AppButton from '@/components/AppButton.vue'
-import AppField from '@/components/AppField.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import CategoryChips from '@/components/CategoryChips.vue'
 import CategoryPickerSheet from '@/components/CategoryPickerSheet.vue'
 import ChargedField from '@/components/ChargedField.vue'
+import NavRow from '@/components/NavRow.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import SpendingDetailsSheet from '@/components/SpendingDetailsSheet.vue'
 import { defaultAccount, pageOrder } from '@/components/accounts'
-import { bankWords, categoryColour, chipOrder, groceriesOf, rateWords } from '@/components/spending'
-import type { JournalRow, Removed, SpendingTarget } from '@/components/spending'
+import {
+  bankWords,
+  categoryColour,
+  chipOrder,
+  detailsLine,
+  groceriesOf,
+  rateWords,
+} from '@/components/spending'
+import type {
+  JournalRow,
+  Removed,
+  SpendingDetailsField,
+  SpendingTarget,
+} from '@/components/spending'
 import { shown } from '@/composables/useItemDetails'
 import { calendarDay, localDay, shiftDay } from '@/days'
 import { afterStep, useNavigation } from '@/navigation'
@@ -293,7 +296,6 @@ export default defineComponent({
     AccountPickerSheet,
     AccountRow,
     AppButton,
-    AppField,
     AppReveal,
     BottomSheet,
     CategoryChips,
@@ -304,7 +306,9 @@ export default defineComponent({
     IconCheck,
     IconDelete,
     IconInfo,
+    NavRow,
     SegmentedControl,
+    SpendingDetailsSheet,
   },
   props: {
     open: { type: Boolean, required: true },
@@ -363,6 +367,9 @@ export default defineComponent({
     const dayBad = ref(false)
     const placeBad = ref(false)
     const amountInput = ref<HTMLInputElement | null>(null)
+    const detailsOpen = ref(false)
+    /** The field «Дата, заметка, место» opens on: the first wrong one, none for a tap on its line. */
+    const detailsFocus = ref<SpendingDetailsField | null>(null)
     const items = ref<TripItem[] | 'loading' | 'offline' | 'error'>('loading')
     let after: (() => void) | null = null
 
@@ -497,6 +504,7 @@ export default defineComponent({
         order.value = chipOrder(choice.value, props.frequent).map((category) => category.id)
         lead.value = categoryId.value
         moreOpen.value = false
+        detailsOpen.value = false
         amountBad.value = false
         categoryBad.value = false
         noteBad.value = false
@@ -626,6 +634,20 @@ export default defineComponent({
 
     /** A day the server takes: a calendar day from 2000 on, and not after `latest`. */
     const dayGood = computed(() => isRateDay(day.value) && day.value <= latest.value)
+
+    const details = computed(() =>
+      detailsLine(
+        { day: day.value, note: note.value, place: place.value },
+        locale.value,
+        today.value,
+        t('spending.sheet.details_none'),
+      ),
+    )
+
+    function openDetails(focus: SpendingDetailsField | null): void {
+      detailsFocus.value = focus
+      detailsOpen.value = true
+    }
 
     // A cleared field — «Сбросить» of the iOS picker — is no day to name, and a date nobody can
     // print must not take the sheet down with it (adversarial Д2).
@@ -788,8 +810,6 @@ export default defineComponent({
       return t('spending.sheet.refused', { reason })
     })
 
-    const textMax = SPENDING_TEXT_MAX
-
     function text(value: string): { value?: string; bad: boolean } {
       if (!value.trim()) return { bad: false }
       const checked = spendingTextSchema.safeParse(value)
@@ -819,12 +839,13 @@ export default defineComponent({
         charge === 'bad'
       ) {
         await nextTick()
-        // The first field that is wrong gets the focus (handoff 02).
+        // The first field that is wrong gets the focus (handoff 02), in the order of the form: the sum,
+        // «списано», a chip — and only then the fields behind «Дата, заметка, место», whose sheet opens
+        // on the wrong one (MOL-199). Opened over an error above it, it would hide the error.
         if (!value) amountInput.value?.focus()
-        else
-          document
-            .querySelector<HTMLInputElement>('.chips-field input, .form [aria-invalid="true"]')
-            ?.focus()
+        else if (charge === 'bad' || !chosen)
+          document.querySelector<HTMLInputElement>('.form [aria-invalid="true"]')?.focus()
+        else openDetails(dayBad.value ? 'day' : typedNote.bad ? 'note' : 'place')
         return
       }
       const fields: SpendingFields = {
@@ -935,6 +956,11 @@ export default defineComponent({
       lead,
       moreOpen,
       pickCategory,
+      details,
+      detailsOpen,
+      detailsFocus,
+      openDetails,
+      IconCalendar,
       day,
       today,
       latest,
@@ -972,7 +998,6 @@ export default defineComponent({
       saveTripCharge,
       refusal,
       refusalText,
-      textMax,
       submit,
       remove,
       dismiss,
@@ -1075,12 +1100,6 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-footnote);
   font-variant-numeric: tabular-nums;
-}
-
-.optional {
-  margin-left: var(--space-1);
-  color: var(--text-muted);
-  font-weight: var(--weight-regular);
 }
 
 .strip {
