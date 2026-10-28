@@ -8,13 +8,13 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `packages/model/src/contracts/money.ts` — Wire schemas of the «Деньги» month: the month address, journal page cursor, the month view, the salary-shift setting.
 - `packages/model/src/contracts/money-budget.ts` — Wire schemas of «Бюджет» (MOL-117): a plan as a sum or a percent, the body of `PUT /budget/plans`, the month's budget answer.
 - `packages/model/src/contracts/money-charts.ts` — Wire schemas of «Графики», every height the server counted: the month's charts of MOL-158 and the year's of MOL-160 (`yearSchema`), the sector of a ring shared.
-- `packages/model/src/contracts/spending.ts` — Wire schemas of spendings and categories: body and amendment, a spending's view, a category's body and view, the categories answer.
+- `packages/model/src/contracts/spending.ts` — Wire schemas of spendings and categories: body and amendment, a spending's view, a category's body and view, the categories answer with the chips' frequent ones (`frequent`, MOL-198).
 - `packages/model/src/entities/money-budget.ts` — The budget of a month (MOL-117): which plan holds from which month, a share of «Пришло» by the month's rate, rows against `byCategory`, «Без плана», the total, the savings target.
 - `packages/model/src/entities/money-month.ts` — The month of «Деньги» counted whole: months and budget month, journal entries and order, «Пришло», «Остаток», `percentChange`, `shareOf`.
 - `packages/model/src/entities/money-charts.ts` — What every chart shares: levels, the ring's sectors (`donutSlices`), months of a period, means and changes, and the exchanges by exchanger of «Обмен денег».
 - `packages/model/src/entities/money-chart-month.ts` — «Графики → Месяц» from counted months: the usual month of up to twelve closed ones from three, against the usual by category, the pace by day, the ring with «Остальные» named; the day of comparison (`comparedDay`) and the month before to it (`previousToDay`) of «Деньги» too.
 - `packages/model/src/entities/money-chart-year.ts` — «Графики → Год» from counted months: twelve months with what each is to the bars, the year's ring by each month's rate, the usual month of «Месяц» as its dashed line, «Разница» of the year, categories by month.
-- `packages/model/src/entities/spending-category.ts` — Spending category entity: the thirteen presets and their order, the trip's category, name limit, palette colour, the icons one's own may take (MOL-285), chip order.
+- `packages/model/src/entities/spending-category.ts` — Spending category entity: the thirteen presets and their order, the trip's category, name limit, palette colour, the icons one's own may take (MOL-285), the order of the list (`categoryOrder`), the chips' frequent ones over 90 days (`frequentCategories`, MOL-198).
 - `packages/model/src/entities/spending.ts` — Spending entity: money spent outside a trip, its text limits, undo window and its amount in the spending currency.
 
 ## backend · routes
@@ -29,13 +29,13 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `backend/src/usecases/money-chart-year.ts` — Use case: `GET /money/years/:year/charts` — every month of the calendar year counted and frozen as «Деньги» count it, the usual's months before the year with no rate. Tests: `backend/tests/money-chart-year.integration.test.ts`.
 - `backend/src/usecases/money.test.ts` — Use-case test: day rates, a spending's rate snapshot on record and amend, and month freezing hold on fake repositories.
 - `backend/src/usecases/today.ts` — `todayOf`: «today» of money for a request — the phone's day it named (`TODAY_HEADER`, MOL-121), or Yerevan's. Tests: `backend/tests/money-accounts.integration.test.ts`.
-- `backend/src/usecases/spendings.ts` — Use cases of spendings and categories: record, amend, remove, restore a spending; list, add, amend and archive a category.
+- `backend/src/usecases/spendings.ts` — Use cases of spendings and categories: record, amend, remove, restore a spending; list (with the chips' frequent ones, MOL-198), add, amend and archive a category.
 
 ## backend · db
 
 - `backend/src/db/budget-plans-repository.ts` — Repository of «Бюджет» (MOL-117): the owner's plans read whole, a plan written from a month on under the owner's lock, replacing the later ones of its category.
 - `backend/src/db/money-repository.ts` — Repository of what «Деньги» reads beside spendings: a month's finished trips as journal lines and the frozen rate of a closed month.
-- `backend/src/db/spending-categories-repository.ts` — Repository of the owner's categories: presets given on first read, one's own named by the device with an icon and a colour, amended, archive and restore.
+- `backend/src/db/spending-categories-repository.ts` — Repository of the owner's categories: presets given on first read, one's own named by the device with an icon and a colour, amended, archive and restore; how many live spendings each has in the window of the chips (`uses`, MOL-198).
 - `backend/src/db/spendings-repository.ts` — Repository of spendings outside trips: add with repeat/conflict, amend by revision, mark-remove, restore and final erase.
 
 ## backend · tests
@@ -68,17 +68,18 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `frontend/src/components/ChartsMonth.vue` — «Графики → Месяц»: the month's answer in four states and its three cards; the sector and the day chosen on the screen, not in the address.
 - `frontend/src/components/ChartsSkeleton.vue` — Loading of «Графики» in the shape of the answer: the ring's card, then the lines of «Против обычного» or the twelve bars of «Год».
 - `frontend/src/components/ChartsYear.vue` — «Графики → Год» (MOL-160): «‹ 2026 ›», the year's ring, twelve months against the usual, in and out with the year's «Разница», a category by month chosen by a sector of the ring too.
-- `frontend/src/components/CategoryChips.vue` — Category chips of a spending: a radio group in fixed order, nothing preselected, the last chip «+ Своя».
-- `frontend/src/components/CategorySheet.vue` — «Новая категория» over the spending sheet or from «Категории», and one's own amended (MOL-285): a name, an icon of the set, a colour of the palette, through the queue; a preset's name refused; «Убрать категорию» in the footer of one's own.
+- `frontend/src/components/CategoryChips.vue` — Category chips of a spending (MOL-198): two rows by the browser's measure of the chips, «Ещё…» last in the second, the radios only of the chips shown, nothing preselected.
+- `frontend/src/components/CategoryPickerSheet.vue` — «Категория» over the spending sheet (MOL-198): every category in the chips' order on `ListRow` with its dot, a tap chooses and goes back, «+ Своя» last.
+- `frontend/src/components/CategorySheet.vue` — «Новая категория» over the spending sheet — from «Ещё…», taking the list with it when made (`closes`, MOL-198) — or from «Категории», and one's own amended (MOL-285): a name, an icon of the set, a colour of the palette, through the queue; a preset's name refused; «Убрать категорию» in the footer of one's own.
 - `frontend/src/components/ExchangeLosses.vue` — «Обмены против рынка» card on top of «Обмен денег» (MOL-152, MOL-159): exchangers worst first, a bar from the centre line, no «≈ ₽».
 - `frontend/src/components/MoneyAccountsNow.vue` — «На счетах сейчас» over the switcher of «Деньги» (MOL-183): the live accounts now in the income currency, «можно тратить», the count, the one way into «Счета».
 - `frontend/src/components/MoneyEntries.vue` — The ways out of «Деньги», rows of `NavRow`: «Траты» and «Бюджет» of the month, «Счета» only without «На счетах сейчас», «Обмен денег», «Доходы», «Категории», each with one figure or none until known.
 - `frontend/src/components/MoneyMonthCard.vue` — The card of the month on «Деньги» (MOL-183): spent and the comparison — to the same day for the running month, whole for a closed one — «≈», «Пришло», a closed month's «На счетах 31 авг.», the rate.
 - `frontend/src/components/MonthSwitcher.vue` — «‹ Сентябрь 2026 ›» month switcher of «Деньги», or «‹ 2026 ›» of «Графики → Год»: no future, no swipe; the month with no lower bound, the year back to the first with data (MOL-160).
 - `frontend/src/components/SalaryShiftGroup.vue` — Settings group «Зарплата с … числа — в следующий месяц»: a switch and a day select, saved on the tap; neither while a change is unsure, the quiet line in their place (MOL-96).
-- `frontend/src/components/SpendingSheet.vue` — Spending sheet: «Новая трата», amending one's own, or reading a trip's line; writes go to the queue and it closes at once.
+- `frontend/src/components/SpendingSheet.vue` — Spending sheet: «Новая трата», amending one's own, or reading a trip's line; writes go to the queue and it closes at once; the chips' order taken at its opening, the chosen one first (MOL-198).
 - `frontend/src/components/charts.ts` — Words of «Графики»: the month long, in three letters and by name, «после октября», a span of months, the closed ones named, a signed percent, «−8 % к августу».
-- `frontend/src/components/spending.ts` — Helpers of «Деньги» drawing: category icon (one's own by its key, `OWN_ICONS`) and colour, rate words, journal rows from the month and the queue, page merge, a day's sum with what had no rate (`dayTotalText`), a figure of «Бюджет» (`budgetAmount`) and money whole units would print as a nought (`roundsToNought`).
+- `frontend/src/components/spending.ts` — Helpers of «Деньги» drawing: category icon (one's own by its key, `OWN_ICONS`) and colour, the chips' order and their two rows (`chipOrder`, `chipsInTwoRows`, MOL-198), rate words, journal rows from the month and the queue, page merge, a day's sum with what had no rate (`dayTotalText`), a figure of «Бюджет» (`budgetAmount`) and money whole units would print as a nought (`roundsToNought`).
 
 ## frontend · composables
 

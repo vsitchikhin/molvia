@@ -98,8 +98,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   read is in the other readers of the file — `bin/design-md.mjs` and both plugins
   (`withoutComments`, `roleMixins`). The dot of a category on the chosen chip is under 3:1 on
   `--accent-tint` for ten light and three dark categories (А2; six and one before the palette of
-  MOL-218) — not held: the tint cannot be made lighter without meeting `bad-tint`, the categories
-  cannot all be darkened and stay 0.07 apart, and the chip's form is MOL-198's.
+  MOL-218): the tint cannot be made lighter without meeting `bad-tint`, and the categories cannot all be
+  darkened and stay 0.07 apart, so **the chip's form holds it** (MOL-198): the dot stands on a 2 ring of
+  `surface`, as the legend's of «Графики» does (MOL-186), and on `surface` every category holds 3:1 —
+  which this test already checks. A chosen `ListRow` with a dot does the same.
 - **Any two categories stand 0.07 apart, and a category keeps its hue in both schemes** (MOL-218,
   the same test). **Every pair, not a list** (owner's В-1): the ring orders its sectors by sum, not
   by category, so its neighbours change from month to month; every account has all thirteen presets;
