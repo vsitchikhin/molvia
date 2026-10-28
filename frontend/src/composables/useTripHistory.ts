@@ -172,9 +172,14 @@ export function useTripHistory(): TripHistoryScreen {
    * whose boundary had moved since the shelf threw the tapped page away and put the button back (Ж1).
    */
   async function more(): Promise<void> {
-    const owner = actor.id
-    if (trouble.value !== null || moved.value) await load(false, true)
-    if (owner === actor.id) await load(true)
+    if (trouble.value !== null || moved.value) {
+      const reread = run + 1
+      await load(false, true)
+      // Nothing moved since: not the screen taken away (И1, round 8 of MOL-307, З1), not the owner
+      // changed, not another read begun — or the next page is asked for nobody, or for another list.
+      if (run !== reread) return
+    }
+    await load(true)
   }
   watch(
     () => actor.id,

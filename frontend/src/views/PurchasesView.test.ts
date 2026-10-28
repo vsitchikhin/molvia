@@ -972,6 +972,27 @@ describe('PurchasesView (MOL-128)', () => {
         expect(view.findAll('.strip')).toHaveLength(0)
       })
 
+      it('с экрана ушли, пока первая страница перечитывается, — следующую не спрашивают (З1, И1)', async () => {
+        shelve()
+        let answerFirst: (page: TripHistory) => void = () => undefined
+        tripHistory.mockRejectedValueOnce(new Error('HTTP 500')).mockImplementationOnce(
+          () =>
+            new Promise<TripHistory>((resolve) => {
+              answerFirst = resolve
+            }),
+        )
+        const { view } = await render()
+        await flushPromises()
+        await more(view).trigger('click')
+        await flushPromises()
+        expect(tripHistory).toHaveBeenCalledTimes(2)
+
+        view.unmount()
+        answerFirst({ trips: [answer], nextCursor: cursor })
+        await pausesPass()
+        expect(tripHistory).toHaveBeenCalledTimes(2)
+      })
+
       it('«не должно сработать»: первая страница ответила — взятая «Показать ещё» её не перечитывает', async () => {
         tripHistory
           .mockResolvedValueOnce({ trips: [answer], nextCursor: cursor })
