@@ -237,6 +237,15 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   hides by chance. **The price, named:** a face first needed after the action — a glyph only the next
   answer brings — still moves what is measured after it; on «Год» every face is on the page before the
   choice, the other screens were not checked for it.
+- **A width is measured once the faces have come, too** (MOL-306): the chosen legend row of the kit
+  (`kit-charts.spec`) and its twin on «Месяц» (`money-charts.spec`) wait with `facesIn` before the first
+  measure. ֏ is Dram's own face, asked for only once the door lets the screen in — on the retry's trace a
+  second after the Latin faces, 0.35 s before the measure; on a slow attempt it came between the two
+  measures and widened «֏30,000» by 3/16 px on WebKit (run 40306940186, 66.203125 → 66.390625). Proved,
+  not supposed: held until the first measure, it gave exactly those numbers on every attempt (run
+  40646618731); in Chromium the same hold moved nothing. The check stays `toBe` — a chosen row at 700
+  turns both browsers red. **The price, named:** the other measures of a width taken right after
+  `open()` were not checked for it; the next to fail so is a task of its own.
 - **«A line gone under the category of «Год»» keeps its first attempt's trace in CI** (MOL-267,
   `firstAttemptTrace` of `e2e/trace.ts`), since its one failure was never explained (run 37911189456,
   09.10, `scrollY` 1151 → 1132 with the choice where it was). Late faces were not it: held a second with
