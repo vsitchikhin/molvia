@@ -76,7 +76,7 @@ let clock = 0
 const mounted: VueWrapper[] = []
 const sheet = () => document.body.querySelector('dialog[open]')
 
-async function render(line = chocolate()) {
+async function render(line = chocolate(), over: Record<string, unknown> = {}) {
   const pinia = createPinia()
   setActivePinia(pinia)
   // The sheet lays an entry in the history: it needs the router, as on a screen.
@@ -95,6 +95,7 @@ async function render(line = chocolate()) {
       country: 'AM',
       digits: 0,
       onSaved: (draft: LineDraft) => saved.push(draft),
+      ...over,
     },
     global: { plugins: [router, pinia, createAppI18n('ru')] },
     attachTo: document.body,
@@ -144,6 +145,47 @@ describe('ReceiptLineSheet (MOL-127)', () => {
     // a price read far off the remembered one changed on the shelf: nothing is said
     await render({ ...base, line: { ...base.line, rememberedPrice: amd('2000') } })
     expect(sheet()?.textContent).not.toContain('В прошлый раз здесь было')
+  })
+
+  it('doubts no digit of a receipt the tax office gave, and still names the memory on a line with no price (MOL-270)', async () => {
+    const rsd = (value: string) => parseMoney(value, 'RSD')
+    const base = chocolate()
+    const serbian = { country: 'RS', currency: 'RSD', lang: 'sr', digits: 2 }
+    // 91,99 against 94,99 is one Armenian swap, 4↔1: a price that changed, never a misread
+    await render(
+      {
+        ...base,
+        mismatch: false,
+        line: {
+          ...base.line,
+          quantity: parseQuantity('1', 'piece'),
+          price: rsd('91.99'),
+          sum: rsd('91.99'),
+          amount: rsd('91.99'),
+          rememberedPrice: rsd('94.99'),
+        },
+        quantity: parseQuantity('1', 'piece'),
+        amount: rsd('91.99'),
+      },
+      serbian,
+    )
+    expect(sheet()?.textContent).not.toContain('В прошлый раз здесь было')
+    while (mounted.length) mounted.pop()?.unmount()
+    await render(
+      {
+        ...base,
+        mismatch: false,
+        line: {
+          ...base.line,
+          price: null,
+          sum: null,
+          settled: false,
+          rememberedPrice: rsd('94.99'),
+        },
+      },
+      serbian,
+    )
+    expect(sheet()?.textContent).toContain('В прошлый раз здесь было')
   })
 
   it('«Сохранить» with nothing changed writes no draft: «≠» and «проверьте» stay (review 16)', async () => {
