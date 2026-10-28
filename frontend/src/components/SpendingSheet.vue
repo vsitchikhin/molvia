@@ -57,8 +57,9 @@
     </div>
 
     <form v-else class="form" novalidate @submit.prevent="submit">
-      <p v-if="!online" class="strip offline">{{ t('spending.sheet.offline') }}</p>
-      <p v-if="refusalText" class="strip refused" role="alert">{{ refusalText }}</p>
+      <!-- The kit's strip, in the sheet's words (Ф-14, MOL-181): never red, and «Сохранить трату» works. -->
+      <StatusStrip v-if="!online" kind="offline" :text="t('spending.sheet.offline')" />
+      <p v-if="refusalText" class="refused" role="alert">{{ refusalText }}</p>
 
       <div class="field">
         <label :for="amountId" class="label">{{ t('spending.sheet.amount') }}</label>
@@ -97,7 +98,7 @@
 
       <!-- Where the money came from, beside the sum it is about (handoff 06). No account at all —
            no row: the sheet is as it was before accounts. -->
-      <template v-if="showsAccounts">
+      <div v-if="showsAccounts" class="field">
         <AccountRow
           :label="t('accounts.picker.row_spending')"
           :account="account"
@@ -113,7 +114,7 @@
             @update:model-value="debitedBad = false"
           />
         </AppReveal>
-      </template>
+      </div>
 
       <CategoryChips
         v-model="categoryId"
@@ -248,6 +249,7 @@ import CategoryPickerSheet from '@/components/CategoryPickerSheet.vue'
 import ChargedField from '@/components/ChargedField.vue'
 import NavRow from '@/components/NavRow.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import SpendingDetailsSheet from '@/components/SpendingDetailsSheet.vue'
 import { defaultAccount, pageOrder } from '@/components/accounts'
 import {
@@ -309,6 +311,7 @@ export default defineComponent({
     NavRow,
     SegmentedControl,
     SpendingDetailsSheet,
+    StatusStrip,
   },
   props: {
     open: { type: Boolean, required: true },
@@ -1016,12 +1019,13 @@ export default defineComponent({
   gap: var(--space-2);
 }
 
+/* 24 between the groups, 8 within one — a label, its field, its error or hint (Ф-10). A column, not a
+   grid: a block of it grows and goes by `AppReveal`, which takes a flex column's gap back with the
+   block — a grid's stays and jumped (MOL-151, adversarial Б2). */
 .form {
-  /* A column, not a grid: a block of it grows and goes by `AppReveal`, which takes a flex
-     column's gap back with the block — a grid's stays and jumped (MOL-151, adversarial Б2). */
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-6);
   padding: var(--space-4);
 }
 
@@ -1102,23 +1106,15 @@ export default defineComponent({
   font-variant-numeric: tabular-nums;
 }
 
-.strip {
+.refused {
   @include appear;
 
   margin: 0;
   padding: var(--space-3);
   border-radius: var(--radius);
+  background: var(--bad-tint);
+  color: var(--bad-ink);
   font-size: var(--text-footnote);
-
-  &.offline {
-    background: var(--warn-tint);
-    color: var(--warn-ink);
-  }
-
-  &.refused {
-    background: var(--bad-tint);
-    color: var(--bad-ink);
-  }
 }
 
 .shop {
@@ -1140,6 +1136,7 @@ export default defineComponent({
   }
 }
 
+/* Quiet (Ф-4): the whole card is pressed, and the accent is «Покупки ›» alone. */
 .shop-icon {
   display: grid;
   flex: none;
@@ -1147,8 +1144,8 @@ export default defineComponent({
   width: 2.25rem;
   height: 2.25rem;
   border-radius: var(--radius-pill);
-  background: var(--accent-tint);
-  color: var(--accent-ink);
+  background: var(--surface-2);
+  color: var(--text-muted);
 
   svg {
     @include icon;
