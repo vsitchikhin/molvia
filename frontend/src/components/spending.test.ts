@@ -390,6 +390,15 @@ describe('the line of «Дата, заметка, место» (MOL-199, Ф-17)'
     expect(line(today, '  Обед ')).toBe('Сегодня · Обед')
   })
 
+  // What draws nothing is the model's one list (`INVISIBLE`), not JavaScript's trim (adversarial А2).
+  it('takes what draws nothing for nothing typed — a zero-width space, a word joiner, a blank Braille cell', () => {
+    for (const code of [0x200b, 0x2060, 0x2800]) {
+      const invisible = String.fromCharCode(code)
+      expect(line(today, invisible)).toBe('Сегодня · без заметки')
+      expect(line(today, 'Обед', ` ${invisible} `)).toBe('Сегодня · Обед')
+    }
+  })
+
   // «Сбросить» of the iOS picker leaves the field empty; the check on «Сохранить» names it.
   it('has no day part for a day the picker cleared, or one nobody can print', () => {
     expect(line('')).toBe('без заметки')

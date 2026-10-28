@@ -44,6 +44,7 @@ import {
   RATE_SCALE,
   currencySign,
   decimalFromRate,
+  drawsNothing,
   formatEstimate,
   formatMoney,
   formatRate,
@@ -625,7 +626,9 @@ export type SpendingDetailsField = 'day' | 'note' | 'place'
  * The entry «Дата, заметка, место» of the spending sheet says what is behind it in one line (MOL-199,
  * Ф-17): «Сегодня · без заметки», «Вчера · Кофе с собой · «Кофеман»», «28 сент. · Кинза» — the day as a
  * card heads it (`dayWords`), then the note and the place as typed, never quoted by the line. A day the
- * picker cleared is no part; nothing typed besides it is `none`, «без заметки».
+ * picker cleared is no part; nothing typed besides it is `none`, «без заметки». «Nothing» is what draws
+ * nothing (`drawsNothing`, the one list `INVISIBLE`): a U+200B pasted in left «Сегодня · » with a dot
+ * hanging (adversarial А2).
  */
 export function detailsLine(
   fields: { readonly day: string; readonly note: string; readonly place: string },
@@ -634,7 +637,9 @@ export function detailsLine(
   none: string,
 ): string {
   const day = isRateDay(fields.day) ? dayWords(fields.day, locale, today) : null
-  const typed = [fields.note.trim(), fields.place.trim()].filter((part) => part !== '')
+  const typed = [fields.note, fields.place]
+    .filter((part) => !drawsNothing(part))
+    .map((part) => part.trim())
   return [day, ...(typed.length > 0 ? typed : [none])].filter((part) => part !== null).join(' · ')
 }
 
