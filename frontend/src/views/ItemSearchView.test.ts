@@ -346,6 +346,31 @@ describe('«What did you pick up?»', () => {
     expect(names(view)).toEqual([marianna.name])
   }, 25_000)
 
+  // A dimmed answer is for the text before, and the region says nothing of it (adversarial А3): the
+  // empty one too, now that it speaks for itself — and it speaks again once it is the answer once more.
+  it('takes «Nothing found» out of the region while the next search is out', async () => {
+    let second!: (entries: CatalogueEntry[]) => void
+    searchCatalogue
+      .mockResolvedValueOnce([])
+      .mockReturnValueOnce(new Promise((resolve) => (second = resolve)))
+    const view = await render()
+    await field(view).setValue('кефр')
+    await vi.waitFor(() => {
+      expect(view.get('.live').text()).toContain('Nothing found for «кефр»')
+    })
+
+    await field(view).setValue('кефри')
+    await vi.waitFor(() => {
+      expect(view.find('.state.stale').exists()).toBe(true)
+    })
+    expect(view.get('.live').text()).toBe('')
+
+    second([])
+    await vi.waitFor(() => {
+      expect(view.get('.live').text()).toContain('Nothing found for «кефри»')
+    })
+  }, 15_000)
+
   it('names the query nothing was found for', async () => {
     searchCatalogue.mockResolvedValue([])
     const view = await render()
@@ -621,6 +646,21 @@ describe('«What did you pick up?»', () => {
 
       expect(view.text()).not.toContain(en.item.error.fallback)
       expect(view.text()).toContain(en.state.retry)
+      // Nor in words: a newcomer's first search is not told to take what it has none of (adversarial А2).
+      expect(view.get('.state .body').text()).toBe(en.item.error.body_alone)
+    }, 10_000)
+
+    it('says nothing of the recent items when none of them is what was typed (adversarial А2)', async () => {
+      remembered(bread)
+      searchCatalogue.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 500'))
+      const view = await render()
+      await field(view).setValue('молок')
+      await vi.waitFor(() => {
+        expect(view.text()).toContain(en.item.error.title)
+      })
+
+      expect(view.text()).not.toContain(en.item.error.fallback)
+      expect(view.get('.state .body').text()).toBe(en.item.error.body_alone)
     }, 10_000)
 
     it('keeps the recent items taken when the app is looked at again and the server is still down', async () => {

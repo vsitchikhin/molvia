@@ -232,6 +232,7 @@
           flow
           class="answer"
           :class="{ stale }"
+          :silent="stale"
           :icon="IconMagnify"
           :title="t('item.empty.title', { query: answered })"
           :body="t('item.empty.text')"
@@ -252,7 +253,7 @@
           :flow="!fallback"
           :inline="fallback"
           :title="t('item.error.title')"
-          :body="fallback ? t('item.error.fallback_note') : t('item.error.body')"
+          :body="errorBody"
           @retry="retry"
         >
           <!-- Offered only when there is something to take: with no recent items the tap would
@@ -743,6 +744,13 @@ export default defineComponent({
     // they are narrowed by the query, and a button leading to none of them is a dead end (B2).
     const hasRecent = computed(() => recent.filter(query.value).length > 0)
 
+    // The words say what the buttons offer: «возьмите из недавних» only beside «Взять из недавних» —
+    // a newcomer's first search, failing, was told of items it had none of (adversarial А2).
+    const errorBody = computed(() => {
+      if (fallback.value) return t('item.error.fallback_note')
+      return hasRecent.value ? t('item.error.body') : t('item.error.body_alone')
+    })
+
     const heading = computed(() => {
       if (showsRecent.value) return t('item.group_recent')
       return phase.value === 'far' ? t('item.group_similar') : t('item.group_found')
@@ -1036,6 +1044,7 @@ export default defineComponent({
       retry,
       fallback,
       hasRecent,
+      errorBody,
       rows,
       heading,
       pick,

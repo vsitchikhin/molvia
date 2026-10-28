@@ -352,6 +352,7 @@
     "error": {
       "title": "The server did not answer",
       "body": "The catalogue isn’t answering. Try again — or pick from your recent items",
+      "body_alone": "The catalogue isn’t answering — try again in a moment",
       "fallback": "Pick from recent",
       "fallback_note": "For now — from your recent items"
     },
