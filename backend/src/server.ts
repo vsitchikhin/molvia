@@ -64,6 +64,7 @@ import { ownPrices } from '@/usecases/own-prices'
 import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
+import { SILENCE_ERASE_EVERY_MS, claimSilenceNotices, eraseSilent } from '@/usecases/silence'
 import { exportMine } from '@/usecases/export-mine'
 import { heavyFeedbackLimit, sendFeedback } from '@/usecases/send-feedback'
 import { feedbackFromBot } from '@/usecases/feedback-from-bot'
@@ -203,6 +204,7 @@ import type { Embedder, EmbeddingLog } from '@/embeddings/embedder'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { createSessionRepository } from '@/db/sessions-repository'
 import { createErasureRepository } from '@/db/erasure-repository'
+import { createSilenceRepository } from '@/db/silence-repository'
 import { createExportRepository } from '@/db/export-repository'
 import { createFeedbackRepository } from '@/db/feedback-repository'
 import { createReminderRepository } from '@/db/reminders-repository'
@@ -635,6 +637,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     // The route's minute of the phone's reports (MOL-144), let go by the timer below too (MOL-241).
     const phoneLimit = phoneReportLimit()
     let stopMergeTwins: (() => Promise<void>) | undefined
+    let stopSilence: (() => Promise<void>) | undefined
     const embedder = options.embedder?.(instance.log) ?? NO_EMBEDDER
     let itemEmbedding: ReturnType<typeof startItemEmbedding> | undefined
     instance.addHook('onReady', (ready) => {
@@ -772,6 +775,28 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           },
         )
       }
+      // Two years of silence (MOL-239, Р-8): once a day, and at once on start — run twice, it finds
+      // nobody the second time. Each account in a transaction of its own; one that fails is reported.
+      const silenceFailed = (error: unknown): void => {
+        failures.report(error, job('silence-erasure'), 'silent account erasure failed')
+      }
+      stopSilence = startLoginCleanup(
+        async () => {
+          const { erased } = await eraseSilent(
+            {
+              silence: createSilenceRepository(db),
+              erasure: createErasureRepository(db),
+              notices: createOwnerNoticeRepository(db),
+              owner: owner !== null,
+              failed: silenceFailed,
+            },
+            new Date(),
+          )
+          if (erased > 0) instance.log.info({ erased }, 'silent accounts erased')
+        },
+        silenceFailed,
+        SILENCE_ERASE_EVERY_MS,
+      )
       // Receipts (MOL-125): a removal final after its ten minutes, a receipt not recorded after its
       // 28 days, a line cut out for training 28 days after it was confirmed.
       stopReceiptCleanup = startLoginCleanup(
@@ -956,6 +981,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopFailureCleanup?.()
       await stopSenderForget?.()
       await stopMergeTwins?.()
+      await stopSilence?.()
       await itemEmbedding?.stop()
       await stopReceiptCleanup?.()
       await receiptQueue?.stop()
@@ -1036,6 +1062,23 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       replyDelivered: (body) => messages.markDelivered(body),
       feedbackPicture: (number, position) => messages.picture(number, position),
       claimBroadcast: () => claimBroadcast(createBroadcastRepository(db), owner),
+      // Two years of silence (MOL-239): the warnings due, marked as handed on the way.
+      claimSilenceNotices: () =>
+        claimSilenceNotices(
+          {
+            silence: createSilenceRepository(db),
+            notices: createOwnerNoticeRepository(db),
+            owner: owner !== null,
+            failed: (error) => {
+              failures.report(
+                error,
+                { source: 'api', route: 'POST /internal/silence/claim' },
+                'silence notice to the owner not queued',
+              )
+            },
+          },
+          new Date(),
+        ),
       broadcastDone: (body) => broadcastDone(createBroadcastRepository(db), body),
     })
 

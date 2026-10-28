@@ -157,6 +157,7 @@ function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
     row('opted out of the statistics', [String(products.optedOut), 'in neither half']),
     '',
     row('erased', [String(report.erased.count), erasedWeeks(report.erased)]),
+    row('  of them silent', [String(report.erased.silent), 'two years without a visit']),
     '',
     ...loginLines(report.logins),
     '',

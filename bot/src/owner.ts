@@ -29,6 +29,18 @@ export function ownerText(notice: OwnerNotice): string {
   if (notice.kind === 'receipt_partial') return partialText(notice)
   if (notice.kind === 'receipt_partial_muted')
     return t(undefined, 'owner.receipt.muted', { count: notice.count })
+  if (notice.kind === 'silence') {
+    // a claim warns, the day's run erases: each notice says the half it has (MOL-239)
+    return notice.erased > 0
+      ? t(undefined, 'owner.silence.erased', {
+          erased: notice.erased,
+          blocked: notice.erasedBlocked,
+        })
+      : t(undefined, 'owner.silence.warned', {
+          warned30: notice.warned30,
+          warned7: notice.warned7,
+        })
+  }
   if (notice.kind === 'failure_muted') {
     // Said only what is so (review №10, adversarial Г2): no «скрыто: 0», and `make failures` only for
     // the held ones — the unwritten are in no table.

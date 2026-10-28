@@ -99,6 +99,12 @@ export const en: Dictionary = {
   'receipt.items.one': '{n} item',
   'receipt.items.few': '{n} items',
   'receipt.items.many': '{n} items',
+  'silence.warn':
+    "You haven't opened Molvia for almost two years. On {date} — in {days} — your account and all your data will be deleted, just as by «Delete my data».\n\nTo keep them, open the app and sign in. You can take a copy first: «Download my data» in the settings.",
+  'silence.days.one': '{n} day',
+  'silence.days.few': '{n} days',
+  'silence.days.many': '{n} days',
+  'silence.open': 'Open Molvia',
   'owner.failure.new': '🔴 New failure · {source}',
   'owner.failure.again': '🟠 {count} times in this build already · {source}',
   'owner.failure.what': '{kind} · {place}',
@@ -136,6 +142,10 @@ export const en: Dictionary = {
   'owner.receipt.kept':
     'Photo and the model’s answer kept until {day}: make receipt-miss ID={receipt}',
   'owner.receipt.muted': '🔕 Receipts not read whole held back: {count} — make receipt-reasons',
+  'owner.silence.warned':
+    '🗓 Silence: warnings handed to the bot, 30 days before — {warned30}, 7 days before — {warned7}',
+  'owner.silence.erased':
+    '🗓 Silence: accounts erased — {erased}, of them with the bot blocked — {blocked}',
   'owner.receipt.why.failed': 'not one line read',
   'owner.receipt.why.no_lines': 'no lines',
   'owner.receipt.why.no_total': 'no total two places vouch for',
