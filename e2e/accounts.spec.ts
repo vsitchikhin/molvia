@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import { fakeKeyboard } from './keyboard'
 import { asBrowser, open, signedIn } from './session'
+import { chooseCategory } from './category'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
@@ -60,7 +61,7 @@ async function writeSpending(page: Page, amount: string, note: string): Promise<
   await expect(sheet).toContainText('Новая трата')
   await page.waitForTimeout(400)
   await sheet.getByLabel('Сумма').fill(amount)
-  await sheet.getByRole('radio', { name: 'Кафе и рестораны' }).check()
+  await chooseCategory(page, 'Кафе и рестораны')
   await sheet.getByLabel(/Что это/).fill(note)
 }
 
@@ -135,6 +136,99 @@ test('счёт, трата с него, «без счёта» в сверке �
   await expect(check).toContainText('Сходится с приложением')
   await check.getByRole('button', { name: 'Готово' }).click()
   await expect(page.getByText(/сверено/)).toBeVisible()
+})
+
+// С-16 of MOL-118: «+ Своя» is the last row of «Ещё…» since MOL-198, so from a check a new category
+// is the fourth sheet — Сверка → Трата → Категория → Новая. Each over the one under it has «‹» and no
+// ×, one scrim, and Esc and «back» take one at a time; made, it takes the list with it (owner's В-1
+// «а») and stands first and chosen in the spending, the check still under it.
+test('четыре шторки от сверки: Esc и «назад» снимают по одной, созданная категория — в трате', async ({
+  page,
+}) => {
+  await openMoney(page)
+  await openAccounts(page)
+  await page.getByRole('button', { name: 'Добавить счёт' }).click()
+  await addAccount(page, 'Наличные ֏', '10000')
+  const account = page.getByRole('link', { name: /Наличные ֏/ })
+  await backToMoney(page)
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  await writeSpending(page, '1000', 'Такси')
+  await topSheet(page)
+    .getByRole('button', { name: /Выбрать счёт:/ })
+    .click()
+  await page.waitForTimeout(400)
+  await topSheet(page)
+    .getByRole('radio', { name: /Без счёта/ })
+    .click()
+  await topSheet(page).getByRole('button', { name: 'Сохранить трату' }).click()
+  await expect(topSheet(page)).toBeHidden()
+
+  await openAccounts(page)
+  await account.click()
+  await page.getByRole('button', { name: 'Сверить с фактом' }).click()
+  const check = topSheet(page)
+  await page.waitForTimeout(400)
+  await check.getByLabel('Сколько на счёте сейчас?').fill('9000')
+  await check.getByRole('button', { name: 'Сверить', exact: true }).click()
+  await check.getByRole('button', { name: /Трата 1\s000\s֏ без счёта/ }).click()
+  const spending = topSheet(page)
+  await expect(spending).toContainText('Трата')
+  await page.waitForTimeout(400)
+
+  const open = page.locator('dialog[open]')
+  const more = async () => {
+    await spending.getByRole('button', { name: 'Ещё…' }).click()
+    await expect(open).toHaveCount(3)
+    await expect(topSheet(page)).toContainText('Категория')
+    await page.waitForTimeout(400)
+  }
+  const own = async () => {
+    await topSheet(page).getByRole('button', { name: 'Своя' }).click()
+    await expect(open).toHaveCount(4)
+    await expect(topSheet(page)).toContainText('Новая категория')
+    await page.waitForTimeout(400)
+  }
+
+  await more()
+  await own()
+  // Every sheet over another: «‹», no ×, and only the lowest draws the scrim.
+  for (const sheet of await open.all()) {
+    const over = await sheet.evaluate((dialog) => dialog.classList.contains('over'))
+    await expect(sheet.getByRole('button', { name: 'Закрыть', exact: true })).toHaveCount(
+      over ? 0 : 1,
+    )
+    if (over)
+      expect(
+        await sheet.evaluate((dialog) => getComputedStyle(dialog, '::backdrop').backgroundColor),
+      ).toBe('rgba(0, 0, 0, 0)')
+  }
+
+  // Esc takes the new one alone, «back» the list alone: the spending and the check stay.
+  await page.keyboard.press('Escape')
+  await expect(open).toHaveCount(3)
+  await expect(topSheet(page)).toContainText('Категория')
+  await page.goBack()
+  await expect(open).toHaveCount(2)
+  await expect(topSheet(page)).toContainText('Трата')
+
+  // Made, it takes «Ещё…» with it: back on the spending, chosen and first among the chips.
+  await page.waitForTimeout(400)
+  await more()
+  await own()
+  await topSheet(page).getByLabel('Название').fill('Метро')
+  await topSheet(page).getByRole('button', { name: 'Добавить' }).click()
+  await expect(open).toHaveCount(2)
+  await expect(topSheet(page)).toContainText('Трата')
+  const chips = spending.locator('.chips').getByRole('radio')
+  await expect(chips.first()).toHaveAccessibleName('Метро')
+  await expect(chips.first()).toBeChecked()
+  // The focus goes back to «Ещё…», the list's opener (review 1, №7).
+  await expect(spending.getByRole('button', { name: 'Ещё…' })).toBeFocused()
+
+  // One more Esc is the spending's: the check is the one left.
+  await page.keyboard.press('Escape')
+  await expect(open).toHaveCount(1)
+  await expect(check).toContainText(/Разница/)
 })
 
 test('разницу, которой нет причины, закрывает «Прочее · сверка» — и сверка сходится', async ({

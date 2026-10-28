@@ -828,6 +828,8 @@
       "conversion_counted": "≈ {amount} по курсу дня траты",
       "category": "Категория",
       "add_category": "Своя",
+      "more": "Ещё…",
+      "more_title": "Категория",
       "date": "Когда",
       "date_today": "Сегодня, {date}",
       "date_yesterday": "Вчера, {date}",

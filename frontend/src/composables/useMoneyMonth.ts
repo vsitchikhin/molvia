@@ -36,6 +36,8 @@ export interface MoneyMonth {
    * landed before is in it (MOL-285). None for the categories recalled from another month kept.
    */
   readonly categoriesAskedAt: ComputedRef<Date | null>
+  /** The ids the chips of a spending stand first by (MOL-198), of the same answer as the categories. */
+  readonly knownFrequent: ComputedRef<MoneyMonthView['frequent']>
   /**
    * «Мой курс на сегодня» — the running month's rate, from its answer kept on the phone when another
    * month is on screen (review С-5): a spending is written today whatever month is looked at.
@@ -94,13 +96,21 @@ function recall(owner: string, month: string): Remembered | null {
     : { answer: answer.data, fetchedAt }
 }
 
-/** The categories of the newest month kept for the owner — any month names all of them. */
-export function recallCategories(owner: string): MoneyMonthView['categories'] {
-  const newest = Object.keys(recallAll(owner))
+function newestKept(owner: string): Remembered | undefined {
+  return Object.keys(recallAll(owner))
     .map((month) => recall(owner, month))
     .filter((one): one is Remembered => one !== null)
     .sort((a, b) => b.fetchedAt.getTime() - a.fetchedAt.getTime())[0]
-  return newest?.answer.categories ?? []
+}
+
+/** The categories of the newest month kept for the owner — any month names all of them. */
+export function recallCategories(owner: string): MoneyMonthView['categories'] {
+  return newestKept(owner)?.answer.categories ?? []
+}
+
+/** The chips' frequent ones of the newest month kept for the owner (MOL-198), as its categories. */
+export function recallFrequent(owner: string): MoneyMonthView['frequent'] {
+  return newestKept(owner)?.answer.frequent ?? []
 }
 
 /** The rate of the running month as last answered — only a month read while it was running. */
@@ -165,6 +175,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
 
   /** The categories of any month the phone keeps: they are the owner's, not a month's. */
   const kept = ref<MoneyMonthView['categories']>([])
+  const keptFrequent = ref<MoneyMonthView['frequent']>([])
   /** Today's rate as the running month last answered it, for a sheet opened on another month. */
   const keptRate = ref<MoneyMonthView['rate']>(null)
 
@@ -172,6 +183,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
     const id = actor.id
     shown.value = id ? recall(id, selected.value) : null
     kept.value = id ? recallCategories(id) : []
+    keptFrequent.value = id ? recallFrequent(id) : []
     keptRate.value = id ? recallTodayRate(id) : null
     // A page asked for on another month is not this month's to fetch (review У-3).
     moreAfterRead = false
@@ -195,6 +207,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
     // is taken from the phone, not left as read at the opening (А7).
     if (!remember(id, first, firstAt, askedAt)) {
       kept.value = recallCategories(id)
+      keptFrequent.value = recallFrequent(id)
       keptRate.value = recallTodayRate(id)
       return
     }
@@ -203,6 +216,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
     // into until it was read itself (MOL-183, e2e «a summary that did not load»). Today's rate
     // likewise, from the running month's answer: a spending is written today (MOL-262, А1).
     kept.value = first.categories
+    keptFrequent.value = first.frequent
     if (first.rateKind === 'live') keptRate.value = first.rate
   }
 
@@ -223,6 +237,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
       if (actor.id !== id || selected.value !== month || mine !== latest) return
       shown.value = { answer, fetchedAt: firstAt, askedAt }
       kept.value = answer.categories
+      keptFrequent.value = answer.frequent
       if (answer.rateKind === 'live') keptRate.value = answer.rate
       failure.value = null
       confirmed.value = true
@@ -337,6 +352,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
     askedAt: computed(() => shown.value?.askedAt ?? shown.value?.fetchedAt ?? null),
     knownCategories: computed(() => shown.value?.answer.categories ?? kept.value),
     categoriesAskedAt: computed(() => shown.value?.askedAt ?? null),
+    knownFrequent: computed(() => shown.value?.answer.frequent ?? keptFrequent.value),
     todayRate: computed(() =>
       shown.value?.answer.rateKind === 'live' ? shown.value.answer.rate : keptRate.value,
     ),

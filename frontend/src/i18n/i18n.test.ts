@@ -159,8 +159,13 @@ describe('словарь: повторяющиеся тексты', () => {
         'trip.receipt.sheet.save',
       ],
       // Поле категории в шторке траты и заголовок шторки своей категории (MOL-285) — одно слово о
-      // разном: поле выбирает, шторка правит.
-      Категория: ['spending.new_category.edit_title', 'spending.sheet.category'],
+      // разном: поле выбирает, шторка правит. И заголовок списка «Ещё…» (MOL-198, хендофф 72 v2):
+      // он продолжает то же поле, слово то же нарочно — разойдутся, только если разойдётся поле.
+      Категория: [
+        'spending.new_category.edit_title',
+        'spending.sheet.category',
+        'spending.sheet.more_title',
+      ],
       // Два поиска, одни слова пустого ответа: «Что брать» (MOL-201) и «Что взяли?» (MOL-208, Ф-16).
       'Не нашли «{query}»': ['advice.search.empty.title', 'item.empty.title'],
       // Цена Р-2: одно состояние, написанное для трёх экранов, и у просмотра чека своё (MOL-127).
@@ -418,7 +423,11 @@ describe('словарь: повторяющиеся тексты', () => {
         'transfer.save',
         'trip.receipt.sheet.save',
       ],
-      Category: ['spending.new_category.edit_title', 'spending.sheet.category'],
+      Category: [
+        'spending.new_category.edit_title',
+        'spending.sheet.category',
+        'spending.sheet.more_title',
+      ],
       'No connection': [
         'bot.offline.title',
         'consent.lost.title',

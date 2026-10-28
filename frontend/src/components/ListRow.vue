@@ -11,6 +11,7 @@
       inactive,
       selected,
       active,
+      dotted: dot !== '',
       [`tone-${tone}`]: tone !== '',
     }"
     :type="tag === 'button' ? 'button' : undefined"
@@ -31,6 +32,7 @@
       ><component :is="icon" class="icon"
     /></span>
     <component :is="icon" v-else-if="icon" class="icon" aria-hidden="true" />
+    <span v-else-if="dot" class="dot" :style="{ background: dot }" aria-hidden="true"></span>
     <span class="words">
       <span class="title"
         ><slot name="title">{{ title }}</slot></span
@@ -80,6 +82,9 @@ const SELECTED = new Set([
  *   icon     — a component, drawn here at its step, so no screen can draw it at another;
  *   tint     — the icon stands in a circle of 40 (MOL-176): a colour — a category's, on its
  *              `cat-tint-share` — or `muted`, `surface-2` under `text-muted`, for what has no colour;
+ *   dot      — a category's colour as a dot of 12 in place of an icon, and the row 52 (MOL-198, В-3
+ *              «а»): the whole list of a spending's chips, a choice of one line with no meta. Chosen,
+ *              the dot stands on a ring of `surface`: on the tint ten light categories fell under 3:1;
  *   wrap     — the title breaks onto lines instead of ending in «…»;
  *   whole    — the meta stands whole, in as many lines as it takes: an explanation cut at two lines
  *              explains nothing — the newcomer's steps on a phone of 320 (MOL-203). A list of rows
@@ -122,6 +127,7 @@ export default defineComponent({
     meta: { type: String, default: '' },
     icon: { type: [Object, Function] as PropType<Component>, default: undefined },
     tint: { type: String, default: '' },
+    dot: { type: String, default: '' },
     wrap: { type: Boolean, default: false },
     whole: { type: Boolean, default: false },
     next: { type: Boolean, default: false },
@@ -254,6 +260,22 @@ export default defineComponent({
   &.muted {
     background: var(--surface-2);
     color: var(--text-muted);
+  }
+}
+
+.dotted {
+  min-height: var(--touch-target-lg);
+}
+
+.dot {
+  flex: none;
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: var(--radius-pill);
+
+  /* On the tint a dot of ten light categories stood under 3:1; on `surface` each holds it (MOL-172 А2). */
+  .selected & {
+    box-shadow: 0 0 0 2px var(--surface);
   }
 }
 

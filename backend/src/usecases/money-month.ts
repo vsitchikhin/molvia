@@ -4,6 +4,7 @@ import {
   budgetMonthOf,
   convertAcross,
   convertSigned,
+  frequentCategories,
   lastDayOf,
   monthBudget,
   monthOf,
@@ -294,10 +295,11 @@ export async function moneyMonthOf(
   now: Date = new Date(),
 ): Promise<MoneyMonthView> {
   const today = todayOf(owner, now)
-  const [rates, categories, salaryShiftDay] = await Promise.all([
+  const [rates, categories, salaryShiftDay, uses] = await Promise.all([
     dayRates(repositories, owner),
     repositories.spendingCategories.list(owner.id),
     repositories.money.salaryShift(owner.id),
+    repositories.spendingCategories.uses(owner.id, today),
   ])
   let frozen: Awaited<ReturnType<typeof monthRate>>
   try {
@@ -328,7 +330,15 @@ export async function moneyMonthOf(
   const budget = planned && budgetFigure(monthBudget(counted, planned, categories))
   // «−10 % к тому же дню августа» (MOL-183): the running month against August to the same day.
   const toDay = previousToDay(counted, before, today)
-  return moneyMonthViewOf(counted, previousSpent, categories, cursor, budget, toDay)
+  return moneyMonthViewOf(
+    counted,
+    previousSpent,
+    categories,
+    cursor,
+    budget,
+    toDay,
+    frequentCategories(categories, uses),
+  )
 }
 
 /** `GET /actors/me/salary-shift` (MOL-134, В-3): from which day a salary counts in the next month. */

@@ -464,7 +464,8 @@ height on it.
 ### Selection
 
 One grammar: the selected thing gets a fill or a form, not only a hue. A selected segment is filled
-`accent-solid` with `on-accent`. A selected chip has the `accent-tint` fill and an `accent` ring. A
+`accent-solid` with `on-accent`. A selected chip has the `accent-tint` fill and an `accent` ring, its
+category's dot on a 2 `surface` ring — on the tint a dot falls under 3:1. A
 switch that is on carries a ✓ on its knob. Weights do not change on selection — every segment and
 every chip is 600 — so the row never reflows under the thumb. The one exception is the tab bar,
 whose columns are fixed: the active tab has a filled MDI icon and, with it, a 700 label; inactive
@@ -474,7 +475,7 @@ tabs are outlined, 600.
 
 - **Card:** `surface`, radius 20, 16 padding, `border` hairline, rest shadow.
 - **List card:** the same with no padding; rows divided by a hairline; focus drawn inside the row.
-- **ListRow:** icon 24, or in a circle of 40 (`row-circle`) in a category's colour or `surface-2` · title 17/600 (an ellipsis, or wrapped) · meta 13 in two lines at most, or whole where it explains — a step of the newcomer's cycle · tail (an amount, or a 44 button on a row that is no control — sides of 8, standing over the row's padding by 4 above and below and by 8 at the right, so the row stays 64 and a name has room at 320) · a 20 chevron; 64 high. Destructive: title and icon `bad-ink`. Inactive: `text-muted`, still focusable, the meta says why. Selected: the `accent-tint` fill and a 2 `accent` ring on a layer rounded as the card — the row and the hairline above it stay square — and a ✓ in place of the chevron; its keyboard focus stands inside the ring, the fill between them. Active under the keyboard (a list a field owns): the fill without the ring, no hover. On the fill of a selected or an active row the meta is `text`, never `text-muted`. Hover `surface-2`.
+- **ListRow:** icon 24, or in a circle of 40 (`row-circle`) in a category's colour or `surface-2` · title 17/600 (an ellipsis, or wrapped) · meta 13 in two lines at most, or whole where it explains — a step of the newcomer's cycle · tail (an amount, or a 44 button on a row that is no control — sides of 8, standing over the row's padding by 4 above and below and by 8 at the right, so the row stays 64 and a name has room at 320) · a 20 chevron; 64 high. A category's dot of 12 in place of the icon makes a row of one line 52 — the list «Ещё…» of a spending's chips; chosen, the dot stands on a 2 `surface` ring. Destructive: title and icon `bad-ink`. Inactive: `text-muted`, still focusable, the meta says why. Selected: the `accent-tint` fill and a 2 `accent` ring on a layer rounded as the card — the row and the hairline above it stay square — and a ✓ in place of the chevron; its keyboard focus stands inside the ring, the fill between them. Active under the keyboard (a list a field owns): the fill without the ring, no hover. On the fill of a selected or an active row the meta is `text`, never `text-muted`. Hover `surface-2`.
 - **The Chevron Goes On Rule.** A chevron means the row opens something to go on with — a screen, a sheet with fields, or a fork whose every way goes on to them. A row that acts at once or asks to confirm has none, and one card never mixes the two (the owner's В-14).
 - **SectionCaption:** caps 11/700, `text-muted`, 4 from the left, 8 above its card; a mark before the words (the verdict's dot, 24) and a tail on the right (a month's sum, 13/600). Inside a card, as the card's own title, it has no 4 and no 8. Caps are drawn nowhere else.
 - **NavRow:** "icon · label · value · ›", 52 — the entry into a nested screen, or a button opening a sheet. The chevron always.

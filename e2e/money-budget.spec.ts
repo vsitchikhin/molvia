@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { asBrowser, goOffline, signedIn } from './session'
+import { chooseCategory } from './category'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
@@ -49,7 +50,7 @@ test('a plan from this month on: «осталось» on the screen and on «Д�
   await expect(sheet).toContainText('Новая трата')
   await page.waitForTimeout(400)
   await sheet.getByLabel('Сумма').fill('100000')
-  await sheet.getByRole('radio', { name: 'Аренда жилья' }).check()
+  await chooseCategory(page, 'Аренда жилья')
   await sheet.getByRole('button', { name: 'Сохранить трату' }).click()
   await expect(sheet).toBeHidden()
   await expect(page.getByRole('link', { name: /^Бюджет, осталось 150\s000\s֏$/ })).toBeVisible()

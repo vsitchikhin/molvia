@@ -4,8 +4,9 @@ import { visibleLine } from '#model/support/text'
 /**
  * The categories every account starts with (MOL-73, В-3), in the order the chips stand in: the
  * handoff's ten and the three the owner's sheet had besides — «Дом и быт», «Животные», «Документы».
- * A key rather than a name, so the screen can say it in any language; the order is fixed and never
- * by frequency — a chip must not move from under the finger.
+ * A key rather than a name, so the screen can say it in any language. Their order is the order of
+ * everything but the choice: the budget, the charts, «Категории» (`categoryOrder`). The chips of a
+ * spending stand by frequency (`frequentCategories`, MOL-198).
  */
 export const SPENDING_PRESETS = [
   'groceries',
@@ -123,6 +124,30 @@ export function categoryOrder(categories: readonly SpendingCategory[]): Spending
       a.createdAt.getTime() - b.createdAt.getTime() ||
       (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   )
+}
+
+/**
+ * How far back the chips of a spending count a category's use (MOL-198, owner's Р-16 of MOL-118): 90
+ * calendar days, today among them.
+ */
+export const CATEGORY_FREQUENCY_DAYS = 90
+
+/**
+ * The live categories a person chose in the window, the most used first (MOL-198, Ф-17): 21 chips in
+ * six rows pushed the sheet's form off the screen, and two rows of the frequent ones keep «Сохранить
+ * трату» under the thumb. A tie, and every category not used at all, stands in `categoryOrder` — the
+ * presets as listed, a newcomer's whole order. The chips take this order when the sheet opens and
+ * keep it while it is up: a chip does not move from under the finger (MOL-82, by its sense).
+ */
+export function frequentCategories(
+  categories: readonly SpendingCategory[],
+  uses: ReadonlyMap<string, number>,
+): string[] {
+  const used = (category: SpendingCategory) => uses.get(category.id) ?? 0
+  return categoryOrder(categories)
+    .filter((category) => category.archivedAt === null && used(category) > 0)
+    .sort((a, b) => used(b) - used(a))
+    .map((category) => category.id)
 }
 
 /** The colour a new category of one's own takes: the palette by turn, by how many there already are. */

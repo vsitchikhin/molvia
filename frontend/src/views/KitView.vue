@@ -91,10 +91,18 @@
       <MonthSwitcher :month="month" current="2026-10" @change="month = $event" />
       <CategoryChips
         v-model="category"
-        :categories="categories"
+        :categories="chipCategories"
         :name-of="categoryName"
         :legend="t('spending.sheet.category')"
-        :add-label="t('spending.sheet.add_category')"
+        :more-label="t('spending.sheet.more')"
+        @more="moreOpen = true"
+      />
+      <CategoryPickerSheet
+        v-model:open="moreOpen"
+        :categories="chipCategories"
+        :name-of="categoryName"
+        :selected="category"
+        @pick="category = $event"
       />
     </section>
 
@@ -629,6 +637,7 @@ import {
   formatMoney,
   money,
   COUNTRY_CITIES,
+  SPENDING_PRESETS,
   tripViewCodec,
 } from '@molvia/model'
 import type {
@@ -662,6 +671,7 @@ import AppTag from '@/components/AppTag.vue'
 import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import CategoryChips from '@/components/CategoryChips.vue'
+import CategoryPickerSheet from '@/components/CategoryPickerSheet.vue'
 import DonutChart from '@/components/DonutChart.vue'
 import type { DonutData } from '@/components/DonutChart.vue'
 import ListRow from '@/components/ListRow.vue'
@@ -704,6 +714,7 @@ export default defineComponent({
     BarcodeScannerSheet,
     BottomSheet,
     CategoryChips,
+    CategoryPickerSheet,
     DonutChart,
     IconBarcode,
     IconClose,
@@ -739,6 +750,20 @@ export default defineComponent({
       }),
     )
     const [groceries, cafe, transport] = categories
+    // Every preset, so the chips stand in two rows and «Ещё…» has a list to open (MOL-198).
+    const chipCategories: SpendingCategoryView[] = [
+      ...categories,
+      ...SPENDING_PRESETS.filter(
+        (preset) => !['groceries', 'cafe', 'transport'].includes(preset),
+      ).map((preset, index) => ({
+        id: `00000000-0000-4000-8000-0000000002${String(index).padStart(2, '0')}`,
+        preset,
+        name: null,
+        colour: null,
+        icon: null,
+        archived: false,
+      })),
+    ]
     // A record of handoff 7a as the server answers it, every row priced (MOL-206).
     const kitTrip: TripView = tripViewCodec.parse({
       id: '00000000-0000-4000-8000-000000000301',
@@ -845,6 +870,7 @@ export default defineComponent({
       cursor: null,
       remaining: 0,
       remainingFrom: null,
+      frequent: [],
       remainingTo: null,
     }
     /** A month of «Графики» (MOL-186): two categories and «Остальные», a sector to choose. */
@@ -1171,6 +1197,8 @@ export default defineComponent({
             .sort((one, other) => one.title.length - other.title.length)[0],
       ),
       category: ref<string | null>('00000000-0000-4000-8000-000000000101'),
+      chipCategories,
+      moreOpen: ref(false),
       sheetOpen: ref(false),
       longOpen: ref(false),
       longNote: ref(''),
