@@ -1038,6 +1038,79 @@ describe('PurchasesView (MOL-128)', () => {
         expect(view.findAll('.strip')).toHaveLength(0)
       })
 
+      it('перечитывание упало, чтение для чека ответило — полосы нет, кнопка за работой всё нажатие (№6, М1)', async () => {
+        shelve()
+        const held: { resolve: (page: TripHistory) => void; reject: (error: Error) => void }[] = []
+        const hold = () =>
+          new Promise<TripHistory>((resolve, reject) => {
+            held.push({ resolve, reject })
+          })
+        tripHistory
+          .mockRejectedValueOnce(new Error('HTTP 500'))
+          .mockImplementationOnce(hold)
+          .mockImplementationOnce(hold)
+          .mockImplementationOnce(next)
+        const { view } = await render()
+        await flushPromises()
+        const button = () => view.get('.more')
+        await button().trigger('click')
+        await flushPromises()
+        expect(button().attributes('aria-busy')).toBe('true')
+        const receiptsQueue = useReceiptQueueStore()
+        receiptsQueue.recorded = [
+          ...receiptsQueue.recorded,
+          {
+            receiptId: 'cccccccc-0000-4000-8000-000000000001',
+            tripId: trip(0).id,
+            count: 1,
+            held: [],
+          },
+        ]
+        await flushPromises()
+        // The tap's re-read fails; the receipt's read is in the air — and the tap waits for it, at work.
+        held[0]?.reject(new Error('HTTP 500'))
+        await flushPromises()
+        expect(tripHistory).toHaveBeenCalledTimes(3)
+        expect(button().attributes('aria-busy')).toBe('true')
+        expect(button().text()).toContain(ru.trip.history.loading)
+
+        held[1]?.resolve({ trips: [answer], nextCursor: cursor })
+        await pausesPass()
+        // The receipt's read answered the first page: its outcome decides the strip — none.
+        expect(tripHistory).toHaveBeenCalledTimes(4)
+        expect(view.findAll('.strip')).toHaveLength(0)
+        expect(rows(view).map((one) => one.text())).toEqual([
+          expect.stringContaining('3 позиции'),
+          expect.stringContaining('SAS'),
+        ])
+      })
+
+      it('владелец сменился, пока первая страница перечитывается, — следующую не спрашивают (З1, №6)', async () => {
+        shelve()
+        let answerFirst: (page: TripHistory) => void = () => undefined
+        tripHistory
+          .mockRejectedValueOnce(new Error('HTTP 500'))
+          .mockImplementationOnce(
+            () =>
+              new Promise<TripHistory>((resolve) => {
+                answerFirst = resolve
+              }),
+          )
+          // the new owner's first page, with more past it
+          .mockResolvedValue({ trips: [trip(5, 'Гая')], nextCursor: cursor })
+        const { view } = await render()
+        await flushPromises()
+        await more(view).trigger('click')
+        await flushPromises()
+
+        useActorStore().id = 'dddddddd-0000-4000-8000-000000000009'
+        await flushPromises()
+        answerFirst({ trips: [answer], nextCursor: cursor })
+        await pausesPass()
+        // The tap's re-read and the new owner's first page — no next page of either list.
+        expect(tripHistory).toHaveBeenCalledTimes(3)
+      })
+
       it('«не должно сработать»: первая страница ответила — взятая «Показать ещё» её не перечитывает', async () => {
         tripHistory
           .mockResolvedValueOnce({ trips: [answer], nextCursor: cursor })

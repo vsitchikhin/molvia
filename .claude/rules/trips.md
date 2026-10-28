@@ -418,7 +418,8 @@ again by «Показать ещё» **before** the next page, and its own outco
 page is read from the boundary it now has — read after it, a first page whose boundary had moved since the shelf threw
 the tapped page away and put the button back (round 7, Ж1) — a read of the same list begun meanwhile (a receipt recorded) waited for, and the
 next page asked from the boundary it leaves (round 9, Л1); a screen taken away or another owner ends the tap there, as
-И1 ends a retry (round 8, З1). One not in doubt is not asked. Kept by the screen instead, its state was always half kept — the strip and not `moved`, or not what the store had read. **A
+И1 ends a retry (round 8, З1). The button says «Загружаем…» for the whole of the tap, whichever read is in the air
+— never «not now» between them (round 10, М1). One not in doubt is not asked. Kept by the screen instead, its state was always half kept — the strip and not `moved`, or not what the store had read. **A
 purchase written into a recorded record moves its row on the shelf too** (`apply`, adversarial А1): only in place,
 where the first page holds it — a row the page has not got would move the boundary only `load()` reads. Left on
 screen alone, the first write of another window put the count before the purchase back as the server's answer,

@@ -129,18 +129,16 @@ export function useTripHistory(): TripHistoryScreen {
     )
   })
   /** Every read goes through here, so the one begun last is known. */
-  function load(more = false, tapped = more): Promise<void> {
-    const reading = ask(more, tapped)
+  function load(more = false): Promise<void> {
+    const reading = ask(more)
     latest = reading
     return reading
   }
 
-  /** `tapped`: a first page read for «Показать ещё», whose button says it is at work meanwhile. */
-  async function ask(more: boolean, tapped: boolean): Promise<void> {
+  async function ask(more: boolean): Promise<void> {
     if (!actor.id) return
     const token = ++run
     busy.value = true
-    loadingMore.value = tapped
     history.stale = true
     try {
       // An answer the list moved under is asked for again (adversarial А), after a pause that
@@ -169,10 +167,7 @@ export function useTripHistory(): TripHistoryScreen {
         failures.value += 1
       }
     } finally {
-      if (token === run) {
-        busy.value = false
-        loadingMore.value = false
-      }
+      if (token === run) busy.value = false
     }
   }
   /**
@@ -183,9 +178,20 @@ export function useTripHistory(): TripHistoryScreen {
    * whose boundary had moved since the shelf threw the tapped page away and put the button back (Ж1).
    */
   async function more(): Promise<void> {
+    // The tap is at work for the whole of it, whichever read is in the air — the re-read, another one it
+    // waits for, the next page: its button says «Загружаем…» throughout, never «not now» between them
+    // (round 10 of MOL-307, М1).
+    loadingMore.value = true
+    try {
+      await tap()
+    } finally {
+      loadingMore.value = false
+    }
+  }
+  async function tap(): Promise<void> {
     if (trouble.value !== null || moved.value) {
       const owner = actor.id
-      await load(false, true)
+      await load()
       // A read of this very list begun meanwhile — a receipt recorded starts one as the re-read ends — is
       // waited for, and the next page asked from the boundary it leaves (round 9 of MOL-307, Л1): stopped
       // by it, the tap brought nothing. A screen taken away, or another owner, ends the tap here (И1, З1).
