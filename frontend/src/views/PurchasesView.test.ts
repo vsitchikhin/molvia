@@ -8,6 +8,7 @@ import {
   currentTripResponseSchema,
   parseMoney,
   receiptsResponseCodec,
+  tripHistoryEntryCodec,
   tripViewCodec,
 } from '@molvia/model'
 import type {
@@ -166,13 +167,8 @@ function remember(trips: TripHistoryEntry[] = []) {
     `molvia.trip-history.${ME}`,
     JSON.stringify({
       page: {
-        trips: trips.map((row) => ({
-          id: row.id,
-          place: row.place,
-          startedAt: row.startedAt.toISOString(),
-          finishedAt: row.finishedAt.toISOString(),
-          finishedOnDeviceAt: null,
-        })),
+        // As a window of this build shelves them: whole, the count and the sum too (MOL-307).
+        trips: trips.map((row) => tripHistoryEntryCodec.encode(row)),
         nextCursor: null,
       },
       selected: null,
@@ -771,7 +767,7 @@ describe('PurchasesView (MOL-128)', () => {
     it('соседнее окно ответило до вопроса и шлёт очередь — на экране его ответ, тот же, что у сервера: полосы нет (адверсариальное В1, А4)', async () => {
       const before = new Date(NOW.getTime() - 5000)
       // One answer, the same every time it is asked: `trip` reads the clock. With its count and sum,
-      // which the shelf does not keep: the copy is the answer all the same (adversarial Г1, the price).
+      // which the shelf keeps: the copy is the answer, and says them (adversarial Г1, MOL-307).
       const answer = [
         { ...trip(1), itemCount: 12, total: [{ minor: 987000n, currency: 'AMD' as const }] },
         trip(5, 'SAS'),
@@ -793,6 +789,8 @@ describe('PurchasesView (MOL-128)', () => {
 
         expect(tripHistory).toHaveBeenCalledTimes(4)
         expect(rows(view)).toHaveLength(2)
+        expect(rows(view)[0]?.text()).toContain('12 позиций')
+        expect(rows(view)[0]?.text()).toMatch(/9\s870/)
         expect(view.findAll('.strip')).toHaveLength(0)
         expect(view.find('.state').exists()).toBe(false)
       }

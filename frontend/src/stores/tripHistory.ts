@@ -33,19 +33,22 @@ const cacheCodec = z.strictObject({
   local: z.array(localCodec),
 })
 /**
- * Fields of a trip this cache does not keep yet (MOL-115, review Р-1, adversarial Д9): a window
- * still on the previous build reads the cache with a strict codec, took a cache holding them for
- * no cache at all, and wrote its own over a finish made with no signal. Left out on the way in and
- * filled with what their absence means on the way out; they go in with the next release, once no
- * build without them is left.
+ * Fields of a trip this cache does not keep (MOL-115, review Р-1, adversarial Д9): a window on the
+ * build before MOL-115 read the cache with a strict codec, took a cache holding them for no cache at
+ * all, and wrote its own over a finish made with no signal. Left out on the way in and filled with
+ * what their absence means on the way out. No such build is left, yet they do not go in by taking
+ * this away (MOL-307, owner's В-1 «а»): their absence is a value, not «unknown» — no `receipt` reads
+ * «no receipt» — so a copy shelved without them reads as one with no receipt, goes back on the shelf
+ * with an explicit `null` at the next write, and is then the same as a true one. The screen trusts
+ * no trip read back from the shelf for that reason (`answered`).
  */
 const NOT_CACHED_YET = new Set(['accountId', 'debited', 'receipt', 'prices', 'gap'])
 const TRIP_KEYS = new Set(Object.keys(tripViewCodec.def.shape))
 /**
- * The same for a row of the history page (MOL-128): «12 позиций · 9 870 ֏» is not kept yet, for
- * the same reason, and a row read back from the phone says only where and when.
+ * The keys of a row of the history page a build reads back. «12 позиций · 9 870 ֏» is kept (MOL-307):
+ * every build since MOL-128 drops a key it does not know here and knows these two, and their absence —
+ * a shelf of a build before this one — is `null`, unknown, never «0 позиций».
  */
-const ENTRY_NOT_CACHED_YET = new Set(['itemCount', 'total'])
 const ENTRY_KEYS = new Set(Object.keys(tripHistoryEntryCodec.def.shape))
 
 /** A trip view on the shelf, with only the keys `keep` says — and never anything but a record. */
@@ -98,25 +101,22 @@ function toShelf(cache: z.output<typeof cacheCodec>): string {
     everyView(
       cacheCodec.encode(cache),
       (key) => !NOT_CACHED_YET.has(key),
-      (key) => !ENTRY_NOT_CACHED_YET.has(key),
-    ),
-  )
-}
-
-/** A first page as the shelf keeps it: what tells a page shown from the server's answer (В1). */
-function asShelvedPage(page: TripHistory): string {
-  return JSON.stringify(
-    everyView(
-      { page: tripHistoryCodec.encode(page) },
       () => true,
-      (key) => !ENTRY_NOT_CACHED_YET.has(key),
     ),
   )
 }
 
 /**
+ * A first page as the shelf keeps it, whole: what tells a page shown from the server's answer (В1) —
+ * a row with another count is another page (MOL-307).
+ */
+function asShelvedPage(page: TripHistory): string {
+  return JSON.stringify(tripHistoryCodec.encode(page))
+}
+
+/**
  * A trip as the shelf keeps it: what two copies are compared by when another window writes the
- * shelf. The fields the shelf does not keep yet are left out, so an answer and its own shelf copy
+ * shelf. The fields the shelf does not keep are left out, so an answer and its own shelf copy
  * say the same (MOL-78, review Е2).
  */
 function asShelved(trip: TripView): string {
@@ -172,7 +172,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   const selected = ref<TripView | null>(null)
   /**
    * The trips as the server answered them, as against those read back from the shelf (MOL-78,
-   * review Е): the shelf does not keep `receipt`, `prices` and `gap` yet, so only an answer knows
+   * review Е): the shelf does not keep `receipt`, `prices` and `gap`, so only an answer knows
    * whether a finished record has a receipt's sum — and another window writing the shelf puts a
    * read-back trip in `selected` with no request of this window's own.
    */
@@ -269,7 +269,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
       asShelved(selected.value) === asShelved(viewing)
     ) {
       // The same trip, and the shelf says nothing the answer on screen does not: the answer stays,
-      // with the receipt's sum the shelf does not keep yet (MOL-78, review Е2). A copy that says
+      // with the receipt's sum the shelf does not keep (MOL-78, review Е2). A copy that says
       // more — another purchase, another total — is fresher, and taken as it is. The server is not
       // asked again from here: two windows on one trip would ask each other in a circle.
       selected.value = viewing
