@@ -472,13 +472,26 @@ export default defineComponent({
 
 /* Side by side where they fit, so the second still stands over the keys (adversarial А5 of MOL-208):
    on the owner's iPhone the keys leave 395 px, and one under the other «Взять из недавних» stood 41 px
-   below them. Each as wide as its word or more; a row that runs out wraps, and a lone one takes it whole. */
+   below them. Each as wide as its word or more; a row that runs out wraps, and a lone one takes it whole —
+   and shrinks, its words wrapping inside it, where a large text makes a word wider than the column
+   (self-review №7: with no shrink «Сообщить о проблеме» stood past a screen of 320 at text ×1.5). */
 .flow .action {
   flex-flow: row wrap;
+  container-type: inline-size;
 
   > :deep(*) {
-    flex: 1 0 auto;
+    flex: 1 1 auto;
     width: auto;
+  }
+}
+
+/* Narrower than a pair with its sides — every iPhone of 375 in Russian, where «Повторить · Взять из
+   недавних» needs some 346 px (adversarial А8) — the buttons keep 8 at their sides, not 16: the pair needs
+   some 314 and stays side by side on 375 and 360. Not a basis of 0: a button shrinks below its word, and
+   all three stood in one row with their words past the screen. */
+@container (width < 22rem) {
+  .flow .action > :deep(*) {
+    padding-inline: var(--space-2);
   }
 }
 </style>

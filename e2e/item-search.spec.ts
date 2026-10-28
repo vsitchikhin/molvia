@@ -386,8 +386,9 @@ test.describe('without the server', () => {
   test.describe('in Russian', () => {
     test.use({ locale: 'ru-RU' })
 
-    test('«Повторить» and «Взять из недавних» stand above the keys', async ({ page }) => {
-      await page.setViewportSize(OWNER_IPHONE)
+    /** The error with a recent item to take, on a window of the given width. */
+    async function errorInRussian(page: Page, width: number): Promise<void> {
+      await page.setViewportSize({ width, height: OWNER_IPHONE.height })
       const actor = await arrive(page)
       const milk: unknown = await (await propose(page, KVIRTA_MILK)).json()
       await page.evaluate(
@@ -399,12 +400,47 @@ test.describe('without the server', () => {
       await page.goto('/purchases/manual/add')
       await page.route('**/api/catalogue/search**', (route) => route.abort())
       await page.getByRole('combobox').fill('квирта')
-
       await expect(
         page.getByRole('heading', { name: 'Сервер не ответил', exact: true }),
       ).toBeVisible()
-      await aboveTheKeys(page.getByRole('button', { name: 'Повторить', exact: true }))
-      await aboveTheKeys(page.getByRole('button', { name: 'Взять из недавних', exact: true }))
+    }
+
+    const retry = (page: Page) => page.getByRole('button', { name: 'Повторить', exact: true })
+    const recent = (page: Page) =>
+      page.getByRole('button', { name: 'Взять из недавних', exact: true })
+
+    test('«Повторить» and «Взять из недавних» stand above the keys', async ({ page }) => {
+      await errorInRussian(page, OWNER_IPHONE.width)
+      await aboveTheKeys(retry(page))
+      await aboveTheKeys(recent(page))
+    })
+
+    // Every iPhone of 375 and a phone of 360: the pair stays side by side — one under the other it went
+    // 52 px lower, under the keys (adversarial А8). A phone of 320 has them one under the other, a price.
+    for (const width of [375, 360]) {
+      test(`the pair stays side by side at ${String(width)}`, async ({ page }) => {
+        await errorInRussian(page, width)
+        const [a, b] = [await retry(page).boundingBox(), await recent(page).boundingBox()]
+        expect(Math.abs(b!.y + b!.height / 2 - (a!.y + a!.height / 2))).toBeLessThan(1)
+        expect(b!.x).toBeGreaterThan(a!.x + a!.width)
+        expect(b!.x + b!.width).toBeLessThanOrEqual(width - 16)
+      })
+    }
+
+    // Android's text scale grows the words, not the window: a button wider than the column shrinks and
+    // wraps its words, and nothing stands past the screen (self-review №7).
+    test('nothing stands past a screen of 320 with the text at 150 %', async ({ page }) => {
+      await errorInRussian(page, 320)
+      await page.evaluate(() => {
+        document.documentElement.style.fontSize = '150%'
+      })
+      await expect(retry(page)).toBeVisible()
+      const wide = await page.evaluate(() => document.documentElement.scrollWidth)
+      expect(wide).toBeLessThanOrEqual(320)
+      for (const button of await page.locator('.state .action button').all()) {
+        const box = await button.boundingBox()
+        expect(box!.x + box!.width).toBeLessThanOrEqual(320 - 16 + 0.5)
+      }
     })
   })
 

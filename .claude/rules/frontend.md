@@ -653,7 +653,12 @@ The detail behind the frontend lines of `CLAUDE.md`.
   «Повторить» while a version waits (А6, the order of 8c kept); e2e measures on that window, not on the
   Pixel of the project, which left 140 px the phone has not got. **The price, named:** «Сообщить о
   проблеме», last and quietest, stands under the keys there (435), and so does «Взять из недавних»
-  while a version waits; a phone narrower than the pair puts them one under the other again. **A focus
+  while a version waits. **Narrower than 22rem the buttons keep 8 at their sides, not 16** (adversarial
+  А8): the Russian pair needed some 346 px and went one under the other on every iPhone of 375; with
+  8 it needs some 314 and stands side by side from a phone of 360 — a phone of 320 has them one under
+  the other, a price, and in English the error's words take a line more below some 386, which lowers
+  the block by 39. **They shrink, never stand past the column** (`flex: 1 1 auto`, self-review №7):
+  with Android's text at 150 % a button wider than the column wraps its words inside it. **A focus
   on the row's «Обновить» goes to the error's «Обновить»** when the row steps aside for it (adversarial
   А7, Ж of MOL-132 below) — a tick later, since the error's buttons come by a deferred `Teleport`. **A
   dimmed state says nothing** (`silent`, adversarial А3): an empty answer left while the next is on its
