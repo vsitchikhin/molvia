@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import { telegramUserIdSchema } from '@molvia/model'
 import type { TelegramUserId } from '@molvia/model'
 import { cursorAtOrBelow } from './broadcasts-repository'
+import { silentErasable } from './silence-repository'
 import type { Db } from './index'
 import { lockTelegramAccount } from './telegram-lock'
 import { yerevanWeek } from './yerevan-week'
@@ -89,7 +90,16 @@ export interface ErasureRepository {
    */
   erase(
     telegramUserId: TelegramUserId,
-    options: { readonly dryRun: boolean },
+    options: {
+      readonly dryRun: boolean
+      /**
+       * Erasure for two years of silence (MOL-239): only if the account is still due at this moment,
+       * judged under its locks (Р-7) — a login takes the account's lock too, so one that came first has
+       * moved the visit, and nothing is erased: `found: false`, not even the login requests. Counted in
+       * `erasures.silent`.
+       */
+      readonly silentAt?: Date
+    },
   ): Promise<ErasureReport>
 }
 
@@ -99,9 +109,47 @@ class DryRun extends Error {
   }
 }
 
+/** Every table at nought: the start of a count, and the whole report of an erasure that did not happen. */
+function noneErased(): Record<ErasedTable, number> {
+  return {
+    sessions: 0,
+    search_picks: 0,
+    rating_reminders: 0,
+    verdicts: 0,
+    events: 0,
+    feedback: 0,
+    expenses: 0,
+    trips: 0,
+    exchanges: 0,
+    incomes: 0,
+    spendings: 0,
+    account_transfers: 0,
+    receipts: 0,
+    budget_plans: 0,
+    spending_categories: 0,
+    money_month_rates: 0,
+    money_account_checks: 0,
+    money_accounts: 0,
+    login_requests: 0,
+    actors: 0,
+  }
+}
+
+/** The report of nobody erased: no owner, or one whose silence a login ended (MOL-239). */
+function nobody(): ErasureReport {
+  return {
+    found: false,
+    erased: noneErased(),
+    itemsReleased: 0,
+    barcodesReleased: 0,
+    memoryReleased: 0,
+    counted: false,
+  }
+}
+
 export function createErasureRepository(db: Db): ErasureRepository {
   return {
-    async erase(telegramUserId, { dryRun }) {
+    async erase(telegramUserId, { dryRun, silentAt }) {
       // Checked here and not only by the callers: the id is interpolated into a DELETE, and a
       // value no owner could have must never reach one.
       const id = telegramUserIdSchema.parse(telegramUserId)
@@ -131,33 +179,13 @@ export function createErasureRepository(db: Db): ErasureRepository {
           )
           // The owner's row: a concurrent write by the same person waits and then fails on its
           // foreign key, rather than land a row beside an owner that is going away.
-          const owner = await tx.execute<{ id: string }>(
-            sql`select id from actors where telegram_user_id = ${id} for update`,
-          )
+          const owner = await tx.execute<{ id: string; silent: boolean }>(sql`
+            select id, ${silentAt === undefined ? sql`false` : silentErasable('actors', silentAt)} as silent
+            from actors where telegram_user_id = ${id} for update`)
           const actorId = owner[0]?.id ?? null
+          if (silentAt !== undefined && owner[0]?.silent !== true) return nobody()
 
-          const erased: Record<ErasedTable, number> = {
-            sessions: 0,
-            search_picks: 0,
-            rating_reminders: 0,
-            verdicts: 0,
-            events: 0,
-            feedback: 0,
-            expenses: 0,
-            trips: 0,
-            exchanges: 0,
-            incomes: 0,
-            spendings: 0,
-            account_transfers: 0,
-            receipts: 0,
-            budget_plans: 0,
-            spending_categories: 0,
-            money_month_rates: 0,
-            money_account_checks: 0,
-            money_accounts: 0,
-            login_requests: 0,
-            actors: 0,
-          }
+          const erased = noneErased()
           let itemsReleased = 0
           let barcodesReleased = 0
           let memoryReleased = 0
@@ -266,10 +294,11 @@ export function createErasureRepository(db: Db): ErasureRepository {
             // from goes: without it the gates lose the person with no trace.
             counted =
               (await count(sql`
-                insert into erasures (appeared_week, erased)
-                select ${yerevanWeek(sql`created_at`)}, 1
+                insert into erasures (appeared_week, erased, silent)
+                select ${yerevanWeek(sql`created_at`)}, 1, ${silentAt === undefined ? 0 : 1}
                 from actors where id = ${actorId}
-                on conflict (appeared_week) do update set erased = erasures.erased + 1
+                on conflict (appeared_week) do update set erased = erasures.erased + 1,
+                  silent = erasures.silent + excluded.silent
                 returning 1`)) > 0
             // The broadcasts whose cursor may come to this person, locked before the person goes
             // (MOL-237, adversarial А2): a word of the bot in flight then either lands first and is

@@ -189,6 +189,17 @@ export const ru = {
   'receipt.items.few': '{n} позиции',
   'receipt.items.many': '{n} позиций',
   /**
+   * The warning before an account is erased for two years of silence (MOL-239): Russian, then English in
+   * the same message (owner's В-2 «а»), since nobody's language is kept. «и войдите»: after 180 days the
+   * session is gone, and only a login marks the visit (MOL-238). The date is the day it goes, the person's.
+   */
+  'silence.warn':
+    'Вы не открывали Molvia почти два года. {date} — через {days} — аккаунт и все ваши данные удалятся, так же как по «Удалить мои данные».\n\nЧтобы их оставить, откройте приложение и войдите. Копию можно взять до этого: «Скачать мои данные» в настройках.',
+  'silence.days.one': '{n} день',
+  'silence.days.few': '{n} дня',
+  'silence.days.many': '{n} дней',
+  'silence.open': 'Открыть Molvia',
+  /**
    * A failure, told to the owner (MOL-143): the first time in a build, then at 10, 100 and 1000
    * there. Russian always — the owner's language is not kept. The kind and the place are the
    * table's own words, a class name and a route's template, and are printed as they are.
@@ -243,6 +254,10 @@ export const ru = {
   'owner.receipt.lineReasons': 'Строки: {reasons}',
   'owner.receipt.kept': 'Фото и ответ модели — до {day}: make receipt-miss ID={receipt}',
   'owner.receipt.muted': '🔕 Скрыто сигналов о чеках не целиком: {count} — make receipt-reasons',
+  /** Two years of silence (MOL-239, В-3 «а»): numbers only, no one named. */
+  'owner.silence.warned': '🗓 Тишина: предупреждены за 30 дней — {warned30}, за 7 — {warned7}',
+  'owner.silence.erased':
+    '🗓 Тишина: стёрто аккаунтов — {erased}, из них без предупреждения (бот заблокирован) — {blocked}',
   'owner.receipt.why.failed': 'не прочитано ни одной строки',
   'owner.receipt.why.no_lines': 'строк нет',
   'owner.receipt.why.no_total': 'итог не подтверждён двумя местами',
