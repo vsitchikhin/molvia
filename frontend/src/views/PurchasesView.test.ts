@@ -831,6 +831,47 @@ describe('PurchasesView (MOL-128)', () => {
       }
     })
 
+    it('«Показать ещё» после такой лесенки — число первой страницы, которого ответ не сказал, остаётся неизвестным (MOL-307, Г1)', async () => {
+      const before = new Date(NOW.getTime() - 5000)
+      const row = trip(1)
+      const deeper = trip(7, 'SAS')
+      const cursor = { at: '2026-09-01T00:00:00.123456Z', id: deeper.id }
+      // The other window's page, from before a purchase another device sent; the server says 3.
+      const theirs = { ...row, itemCount: 2, total: [parseMoney('1000', 'AMD')] }
+      const answer = { ...row, itemCount: 3, total: [parseMoney('1500', 'AMD')] }
+      let asked = 0
+      tripHistory.mockImplementation(() => {
+        asked += 1
+        if (asked > 4) return Promise.resolve({ trips: [deeper], nextCursor: null })
+        localStorage.setItem(`molvia.trip-history-at.${ME}`, before.toISOString())
+        localStorage.setItem(
+          key,
+          JSON.stringify({
+            page: { trips: [tripHistoryEntryCodec.encode(theirs)], nextCursor: cursor },
+            selected: null,
+            local: [],
+          }),
+        )
+        window.dispatchEvent(new StorageEvent('storage', { key }))
+        return Promise.resolve({ trips: [answer], nextCursor: cursor })
+      })
+      const { view } = await render()
+      await pausesPass()
+      expect(tripHistory).toHaveBeenCalledTimes(4)
+      expect(rows(view)[0]?.text()).not.toContain('позиц')
+
+      const more = view.findAll('button').find((button) => button.text() === ru.trip.history.more)
+      if (!more) throw new Error('нет «Показать ещё»')
+      await more.trigger('click')
+      await flushPromises()
+
+      expect(tripHistory).toHaveBeenCalledTimes(5)
+      expect(rows(view)).toHaveLength(2)
+      expect(rows(view)[0]?.text()).not.toContain('позиц')
+      expect(rows(view)[0]?.text()).not.toContain('֏')
+      expect(view.findAll('.strip')).toHaveLength(0)
+    })
+
     it('другое окно кладёт назад свою старую страницу — полоса со временем той страницы (адверсариальное Б4)', async () => {
       const old = new Date(NOW.getTime() - 3 * 86_400_000)
       // An `apply` of a window sending its queue: the page it read three days ago, with that moment.

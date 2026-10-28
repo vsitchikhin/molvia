@@ -142,7 +142,9 @@ export function useTripHistory(): TripHistoryScreen {
       }
       if (token === run) {
         trouble.value = taken ? null : 'error'
-        moved.value = !taken && history.showsAnswer()
+        // A next page taken says nothing of the first: the counts a moved list left unknown stay so until
+        // the first page is answered (round 4 of MOL-307, Г1).
+        if (!more || !taken) moved.value = !taken && history.showsAnswer()
       }
       if (token === run && !taken) failures.value += 1
     } catch (error) {

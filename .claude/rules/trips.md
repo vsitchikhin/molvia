@@ -411,7 +411,7 @@ answer — another window's queue sending one purchase a time — drew «Сер�
 every time (adversarial А3, Б2). **So while the list moves under every read, a count and a sum the last answer does
 not say are unknown** (`unconfirmed`, read after every answer, one thrown away included — it lands after the
 write that threw it away has redrawn the page, round 3 В1): the row reads where and when, as before the cache kept them — neither memory
-said as the answer nor a strip that blames the server — and they come back with the first answer taken. **A
+said as the answer nor a strip that blames the server — and they come back with the first page answered and taken — a next page taken says nothing of it (round 4, Г1). **A
 purchase written into a recorded record moves its row on the shelf too** (`apply`, adversarial А1): only in place,
 where the first page holds it — a row the page has not got would move the boundary only `load()` reads. Left on
 screen alone, the first write of another window put the count before the purchase back as the server's answer,
