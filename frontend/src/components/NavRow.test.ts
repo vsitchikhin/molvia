@@ -52,4 +52,17 @@ describe('NavRow', () => {
         .exists(),
     ).toBe(false)
   })
+
+  // «Сегодня · без заметки ›» among the fields of a sheet (MOL-199, Ф-3): a field's well, not a list row.
+  it('in a form, is drawn as a field and says when what is behind it is wrong', () => {
+    const plain = mount(NavRow, { props: { label: 'Сегодня · без заметки' } })
+    expect(plain.classes()).not.toContain('field')
+    expect(plain.attributes('aria-invalid')).toBeUndefined()
+    const field = mount(NavRow, { props: { label: 'Сегодня · без заметки', field: true } })
+    expect(field.classes()).toContain('field')
+    expect(field.attributes('aria-invalid')).toBeUndefined()
+    const wrong = mount(NavRow, { props: { label: 'Сегодня · Обед', field: true, invalid: true } })
+    expect(wrong.classes()).toContain('invalid')
+    expect(wrong.attributes('aria-invalid')).toBe('true')
+  })
 })

@@ -2,9 +2,11 @@
   <component
     :is="link ? 'a' : 'button'"
     class="nav-row"
+    :class="{ field, invalid }"
     :type="link ? undefined : 'button'"
     :href="link?.href.value"
     :aria-haspopup="link ? undefined : 'dialog'"
+    :aria-invalid="invalid ? 'true' : undefined"
     @click="click"
   >
     <component :is="icon" v-if="icon" class="icon" aria-hidden="true" />
@@ -26,6 +28,10 @@ import IconChevronRight from '~icons/mdi/chevron-right'
  * is a link to a screen; without, a button that opens a sheet with fields — `aria-haspopup="dialog"`
  * says so before the press. The chevron is always there: an entry always goes on (В-14 «а»), and a
  * row that acts at once or asks to confirm is a `ListRow` with no chevron.
+ *
+ * `field` is the same entry standing in a form among its fields — «Сегодня · без заметки ›» under the
+ * chips (MOL-199, Ф-3): the well of a field, as «Счёт ›» above it, not a row of a list card, which in a
+ * form read as plain text. `invalid` marks a field behind it that holds an error.
  */
 export default defineComponent({
   name: 'NavRow',
@@ -35,6 +41,8 @@ export default defineComponent({
     label: { type: String, required: true },
     value: { type: String, default: '' },
     icon: { type: [Object, Function] as PropType<Component>, default: undefined },
+    field: { type: Boolean, default: false },
+    invalid: { type: Boolean, default: false },
   },
   emits: { click: (event: MouseEvent) => event instanceof MouseEvent },
   setup(props, { emit }) {
@@ -84,6 +92,33 @@ export default defineComponent({
 @media (hover: hover) {
   .nav-row:hover {
     background: var(--surface-2);
+  }
+}
+
+/* A field's well, as `AccountRow`: under the pointer the tint, where muted text is under 4.5:1 (MOL-172). */
+.field {
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border: var(--hairline) solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+
+  @media (hover: hover) {
+    &:hover {
+      background: var(--accent-tint);
+
+      .value {
+        color: var(--text);
+      }
+    }
+  }
+
+  &:focus-visible {
+    @include focus-ring(2px);
+  }
+
+  &.invalid {
+    border-color: var(--bad);
+    box-shadow: inset 0 0 0 var(--hairline) var(--bad);
   }
 }
 
