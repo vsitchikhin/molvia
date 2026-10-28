@@ -388,11 +388,14 @@ pharmacies print three decimals beside its shops' two — **and a card may name 
 or with one it does not read (`RangeError` in `lexiconOf`, adversarial А3) — a card of three decimals read as
 two would be every sum wrong, and only a refusal makes the field more than a declaration.
 
-**The price, as before:** `priceInDoubt` asks the receipt's country (`receiptCard`), and a card read off no photo
-— Serbia's, from the tax office — keeps the Armenian swaps it was checked by before the card (`ARMENIAN_RECEIPTS`).
-A price of such a receipt one «confused» digit off the memory's is still flagged, though nobody read it and the
-change of price is likely real: doubting none of its digits is a change of behaviour the owner had not decided,
-so it is MOL-270's, not the card's (self-review № 3).
+**A card read off no photo doubts no digit** (MOL-270, owner's В-1 «а», 28.10.2026): `priceInDoubt` asks the
+receipt's card (`receiptCard`), and one with no `photo` — Serbia's, from the tax office — is `false`, the server's
+`rememberedPrice` and the line's sheet alike. Nobody read its figures, so a price one «confused» digit off the
+memory's is a price changed: the card kept the Armenian swaps for it (MOL-247, self-review № 3), and «В прошлый раз
+здесь было 94,99 — проверьте цифры» over a sugar the tax office gave at 91,99 asked the person to put the old price
+back. The card decides, not the country: a country read by photo comes with its own swaps. A line with no price
+still shows the memory (MOL-291), which asks no doubt. **The price, named:** a price of such a receipt changed by
+one such digit is told nowhere, as any other change of a price is not.
 
 ## What a line is (MOL-126)
 

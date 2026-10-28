@@ -259,12 +259,13 @@ describe('a price in doubt by the memory (В-1)', () => {
     expect(priceInDoubt('AM', amd(50), rub(60))).toBe(false)
   })
 
-  it('doubts a receipt the tax office gave by the Armenian swaps, as before the card (MOL-270)', () => {
+  it('doubts no digit of a receipt the tax office gave: nobody read it (MOL-270, owner’s В-1 «а»)', () => {
     const rsd = (major: number): Money => ({
       minor: BigInt(Math.round(major * 100)),
       currency: 'RSD',
     })
-    expect(priceInDoubt('RS', rsd(60), rsd(50))).toBe(true)
+    expect(priceInDoubt('RS', rsd(60), rsd(50))).toBe(false)
+    expect(priceInDoubt('RS', rsd(91.99), rsd(94.99))).toBe(false)
     expect(priceInDoubt('RS', rsd(70), rsd(50))).toBe(false)
   })
 })
