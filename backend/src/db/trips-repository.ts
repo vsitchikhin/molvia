@@ -190,6 +190,26 @@ export interface TripRepository {
   ): Promise<Trip | null>
   /** The minute timer: removals past their ten minutes deleted, their purchases by cascade. */
   purgeStale(): Promise<void>
+  /**
+   * «Брали здесь в прошлый раз» (MOL-209): the person's last finished trip at this trip's place
+   * before it, in the order of «Записаны», and its items not in this trip already. `null` when the trip is not the owner's
+   * — a stranger's, a missing one, one removed — as `byId` answers.
+   */
+  previousPurchases(id: string, actorId: string, limit: number): Promise<PreviousPurchases | null>
+}
+
+/** What «Брали здесь в прошлый раз» is built from (MOL-209). */
+export interface PreviousPurchases {
+  /** The previous trip and its moment in «Записаны», or `null` — none, and then no items. */
+  readonly previous: { readonly tripId: string; readonly at: Date } | null
+  /** Its items, each once, in the order they were first bought in it, but those the trip asked about holds. */
+  readonly itemIds: readonly string[]
+  /**
+   * What the trip asked about holds, each once, in the order first bought (adversarial В1 of review
+   * 3): the phone keeps that trip by it, and tells what the answer took out from what was removed —
+   * its own copy of the trip may not know what another device added.
+   */
+  readonly heldIds: readonly string[]
 }
 
 type TripRow = typeof trips.$inferSelect
@@ -651,6 +671,69 @@ export function createTripRepository(db: Conn): TripRepository {
           return toTrip(theRow(row, 'trips'))
         }),
       )
+    },
+
+    async previousPurchases(id, actorId, limit) {
+      if (idOrNull(id) === null || idOrNull(actorId) === null) return null
+
+      const [self] = await db
+        .select({ placeId: trips.placeId, finishedAt: trips.finishedAt })
+        .from(trips)
+        .where(ownedBy(id, actorId))
+        .limit(1)
+      if (!self) return null
+
+      const held = await db
+        .select({ itemId: expenses.itemId })
+        .from(expenses)
+        .where(eq(expenses.tripId, id))
+        .groupBy(expenses.itemId)
+        .orderBy(sql`min(${expenses.createdAt})`, expenses.itemId)
+        .limit(rowLimit(limit))
+      const heldIds = held.map((row) => row.itemId)
+
+      // The order of «Записаны» (`history`): the moment the phone named, else the server's. A
+      // finished trip looks before itself in that order, by the row itself rather than a moment
+      // handed back through JS, which keeps milliseconds of a column that holds microseconds.
+      const time = sql`coalesce(${trips.finishedOnDeviceAt}, ${trips.finishedAt})`
+      const [previous] = await db
+        .select({ tripId: trips.id, at: sql<Date>`${time}`.mapWith(trips.finishedAt) })
+        .from(trips)
+        .where(
+          and(
+            eq(trips.actorId, actorId),
+            eq(trips.placeId, self.placeId),
+            isNotNull(trips.finishedAt),
+            isNull(trips.deletedAt),
+            sql`${trips.id} <> ${id}`,
+            // A trip with nothing in it says nothing of what was taken there (Р-1): a receipt with
+            // no lines (MOL-227), every purchase removed — the one before it speaks instead.
+            sql`exists (select 1 from ${expenses} e where e.trip_id = ${trips.id})`,
+            self.finishedAt
+              ? sql`(${time}, ${trips.id}) < (select coalesce(s.finished_on_device_at, s.finished_at), s.id from ${trips} s where s.id = ${id})`
+              : undefined,
+          ),
+        )
+        .orderBy(sql`${time} desc`, desc(trips.id))
+        .limit(1)
+      if (!previous) return { previous: null, itemIds: [], heldIds }
+
+      // What this trip holds already goes before the limit, not after it (owner's В-5 «а»): cut first,
+      // eighteen of twenty taken again left two where seven were still to take (adversarial А4). The
+      // phone still takes out what it alone knows — the queue (Р-17).
+      const rows = await db
+        .select({ itemId: expenses.itemId })
+        .from(expenses)
+        .where(
+          and(
+            eq(expenses.tripId, previous.tripId),
+            sql`not exists (select 1 from ${expenses} h where h.trip_id = ${id} and h.item_id = ${expenses.itemId})`,
+          ),
+        )
+        .groupBy(expenses.itemId)
+        .orderBy(sql`min(${expenses.createdAt})`, expenses.itemId)
+        .limit(rowLimit(limit))
+      return { previous, itemIds: rows.map((row) => row.itemId), heldIds }
     },
 
     async purgeStale() {

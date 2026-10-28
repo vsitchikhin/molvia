@@ -15,6 +15,7 @@ import type {
   BarcodeHint,
   CatalogueEntry,
   CatalogueSearchResponse,
+  PreviousItemsResponse,
   ProposedItem,
 } from '@molvia/model'
 import en from '@/i18n/en.json'
@@ -25,6 +26,8 @@ import { useItemEntryStore } from '@/stores/itemEntry'
 import { useRecentItemsStore } from '@/stores/recentItems'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import { recallHereLast, rememberBoughtHere, rememberHereLast } from '@/stores/hereLast'
+import { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import ItemSearchView from '@/views/ItemSearchView.vue'
 import { holdsTyping } from '@/pwaUpdate'
 
@@ -40,6 +43,12 @@ const attachBarcode = vi.fn<(itemId: string, code: string) => Promise<CatalogueW
 const detachBarcode = vi.fn<(itemId: string, code: string) => Promise<void>>()
 const addExpense = vi.fn<(tripId: string, body: AddExpenseBody) => Promise<unknown>>()
 const currentTrip = vi.fn<() => Promise<unknown>>(() => Promise.resolve(null))
+/** «Брали здесь в прошлый раз» (MOL-209): no last time unless a test says so. */
+const previousItems = vi.fn<(tripId: string) => Promise<PreviousItemsResponse>>(() =>
+  Promise.resolve({ previous: null, items: [], holds: [], open: null }),
+)
+/** A finished record read for its search (MOL-208): never answered unless a test says so. */
+const tripRead = vi.fn<(id: string) => Promise<unknown>>(() => new Promise(() => undefined))
 const catalogueByBarcode = vi.fn<(code: string) => Promise<CatalogueEntry | null>>()
 const catalogueBarcodeHint =
   vi.fn<(code: string, locale: AppLocale) => Promise<BarcodeHint | null>>()
@@ -56,10 +65,11 @@ vi.mock('@/api', () => ({
     detachBarcode: (itemId: string, code: string) => detachBarcode(itemId, code),
     addExpense: (tripId: string, body: AddExpenseBody) => addExpense(tripId, body),
     currentTrip: () => currentTrip(),
+    previousItems: (tripId: string) => previousItems(tripId),
     // «Тут дешевле» on the purchase sheet (MOL-92): never answered here.
     ownPrices: () => new Promise(() => undefined),
     // A finished record read for its search (MOL-208): never answered here.
-    trip: () => new Promise(() => undefined),
+    trip: (id: string) => tripRead(id),
   },
 }))
 
@@ -166,6 +176,10 @@ beforeEach(() => {
   catalogueByBarcode.mockReset()
   catalogueBarcodeHint.mockReset()
   catalogueBarcodeHint.mockResolvedValue(null)
+  tripRead.mockReset()
+  tripRead.mockReturnValue(new Promise(() => undefined))
+  previousItems.mockReset()
+  previousItems.mockResolvedValue({ previous: null, items: [], holds: [], open: null })
   online(true)
 })
 
@@ -2127,5 +2141,613 @@ describe('«What did you pick up?»', () => {
       expect(useTripQueueStore(pinia).pending).toEqual([])
       expect(useRecentItemsStore(pinia).items).toEqual([bread])
     }, 10_000)
+  })
+
+  describe('«Брали здесь в прошлый раз» (MOL-209)', () => {
+    const TRIP = 'cccccccc-0000-4000-8000-000000000002'
+    const BEFORE = 'cccccccc-0000-4000-8000-000000000001'
+    const sas = { city: 'Гюмри', name: 'SAS' }
+    const eggs = entry(4, 'Яйца С1', '10 шт')
+    const lastTime: PreviousItemsResponse = {
+      previous: { tripId: BEFORE, at: new Date('2026-10-01T10:00:00Z') },
+      items: [bread, eggs, marianna],
+      holds: [],
+      open: null,
+    }
+
+    /** An open trip at SAS, as the server answered it, with `bought` written into it. */
+    function onTrip(...bought: CatalogueEntry[]): void {
+      const trip = tripViewCodec.parse({
+        id: TRIP,
+        startedAt: '2026-10-05T08:00:00.000Z',
+        finishedAt: null,
+        currency: 'AMD',
+        rate: null,
+        rateProvider: null,
+        rateJump: null,
+        rateStale: false,
+        place: { id: 'aaaaaaaa-0000-4000-8000-000000000002', kind: 'store', name: sas.name },
+        placeCity: sas.city,
+        expenses: bought.map((item, n) => ({
+          id: `dddddddd-0000-4000-8000-${String(n + 1).padStart(12, '0')}`,
+          createdAt: '2026-10-05T08:01:00.000Z',
+          item,
+          quantity: null,
+          amount: null,
+          unitPrice: null,
+        })),
+        total: [],
+        converted: null,
+      })
+      useTripStore(pinia).apply(trip)
+      currentTrip.mockResolvedValue(trip)
+    }
+
+    function groups(view: VueWrapper): { heading: string; rows: string[] }[] {
+      return view.findAll('[role="group"]').map((group) => ({
+        heading: view.get(`#${CSS.escape(group.attributes('aria-labelledby') ?? '')}`).text(),
+        rows: group.findAll('[role="option"] .title').map((row) => row.text()),
+      }))
+    }
+
+    it('1a: the place’s last time first, without what is in this trip, and «Часто берёте» without it', async () => {
+      previousItems.mockResolvedValue(lastTime)
+      remembered(milk, eggs)
+      onTrip(marianna)
+      const view = await render()
+      await flushPromises()
+
+      expect(previousItems).toHaveBeenCalledWith(TRIP)
+      expect(groups(view)).toEqual([
+        { heading: en.item.group_here_last, rows: [bread.name, eggs.name] },
+        { heading: en.item.group_recent, rows: [milk.name] },
+      ])
+      expect(view.findAll('[role="listbox"]')).toHaveLength(1)
+    })
+
+    it('shows five at most, counted after what is in this trip goes', async () => {
+      const many = Array.from({ length: 8 }, (_, n) => entry(10 + n, `Позиция ${String(n)}`))
+      previousItems.mockResolvedValue({ ...lastTime, items: many })
+      onTrip(many[0] ?? milk, many[2] ?? milk)
+      const view = await render()
+      await flushPromises()
+
+      expect(groups(view)[0]?.rows).toEqual([
+        'Позиция 1',
+        'Позиция 3',
+        'Позиция 4',
+        'Позиция 5',
+        'Позиция 6',
+      ])
+    })
+
+    it('1b: no last time here — «Часто берёте» alone', async () => {
+      remembered(milk)
+      onTrip()
+      const view = await render()
+      await flushPromises()
+
+      expect(groups(view)).toEqual([{ heading: en.item.group_recent, rows: [milk.name] }])
+    })
+
+    it('nothing at all — only the field and its hint', async () => {
+      onTrip()
+      const view = await render()
+      await flushPromises()
+
+      expect(view.find('[role="listbox"]').exists()).toBe(false)
+    })
+
+    it('typed, only the recent items are narrowed — the group is the empty field’s', async () => {
+      previousItems.mockResolvedValue(lastTime)
+      remembered(eggs)
+      onTrip()
+      online(false)
+      const view = await render()
+      await field(view).setValue('яйц')
+
+      expect(groups(view)).toEqual([{ heading: en.item.group_recent, rows: [eggs.name] }])
+    })
+
+    it('with no signal, from what the device remembers of the place, asking nothing', async () => {
+      rememberHereLast(ACTOR, sas, TRIP, lastTime)
+      remembered(milk)
+      onTrip()
+      online(false)
+      const view = await render()
+      await flushPromises()
+
+      expect(previousItems).not.toHaveBeenCalled()
+      expect(groups(view)).toEqual([
+        { heading: en.item.group_here_last, rows: [bread.name, eggs.name, marianna.name] },
+        { heading: en.item.group_recent, rows: [milk.name] },
+      ])
+    })
+
+    it('a trip still in the queue is not asked about; its place is remembered by city and name', async () => {
+      rememberHereLast(ACTOR, sas, BEFORE, { previous: null, items: [] })
+      rememberBoughtHere(ACTOR, sas, BEFORE, eggs)
+      useTripQueueStore(pinia).enqueue({
+        kind: 'start',
+        tripId: TRIP,
+        place: { kind: 'store', name: sas.name },
+        context: { country: 'AM', city: sas.city, spendCurrency: 'AMD', incomeCurrency: 'RUB' },
+        startedAt: new Date('2026-10-05T08:00:00Z'),
+      })
+      const view = await render()
+      await flushPromises()
+
+      expect(previousItems).not.toHaveBeenCalled()
+      expect(groups(view)[0]).toEqual({ heading: en.item.group_here_last, rows: [eggs.name] })
+    })
+
+    it('a start that lands while the screen is open asks, and takes nothing from under the finger', async () => {
+      previousItems.mockReturnValue(new Promise(() => undefined))
+      remembered(milk)
+      const queue = useTripQueueStore(pinia)
+      queue.enqueue({
+        kind: 'start',
+        tripId: TRIP,
+        // Typed at the door in another case than the server keeps it: the same place.
+        place: { kind: 'store', name: 'sas' },
+        context: { country: 'AM', city: sas.city, spendCurrency: 'AMD', incomeCurrency: 'RUB' },
+        startedAt: new Date('2026-10-05T08:00:00Z'),
+      })
+      const view = await render()
+      await flushPromises()
+      expect(groups(view)).toEqual([{ heading: en.item.group_recent, rows: [milk.name] }])
+
+      queue.pending = []
+      onTrip()
+      await nextTick()
+
+      expect(previousItems).toHaveBeenCalledWith(TRIP)
+      expect(groups(view)).toEqual([{ heading: en.item.group_recent, rows: [milk.name] }])
+    })
+
+    // Adversarial Б2: the answer is the last time less what this trip holds (В-5 «а»); kept alone, it
+    // stood for the whole of Monday, and the next trip with no signal lost the things taken both times.
+    it('the trip asked about is remembered as it holds, so the next one with no signal finds it', async () => {
+      previousItems.mockResolvedValue({ ...lastTime, items: [eggs], holds: [milk, bread] })
+      onTrip(milk, bread)
+      await render()
+      await flushPromises()
+
+      const next = 'cccccccc-0000-4000-8000-000000000003'
+      expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([
+        milk.name,
+        bread.name,
+      ])
+    })
+
+    it('a request that throws before it leaves takes nothing of the screen — «Часто берёте» stands', async () => {
+      previousItems.mockImplementation(() => {
+        throw new TypeError('the address could not be built')
+      })
+      remembered(milk)
+      onTrip()
+      const view = await render()
+      await flushPromises()
+
+      expect(view.find('input[role="combobox"]').exists()).toBe(true)
+      expect(groups(view)).toEqual([{ heading: en.item.group_recent, rows: [milk.name] }])
+    })
+
+    // Adversarial В1 of review 3: the phone's copy of the trip going on misses what another device
+    // added; the server says what the trip holds, and the memory goes by it.
+    it('the trip is remembered by what the server says it holds — another device’s purchases kept', async () => {
+      rememberHereLast(ACTOR, sas, 'cccccccc-0000-4000-8000-000000000009', {
+        previous: { tripId: BEFORE, at: new Date('2026-10-01T10:00:00Z') },
+        items: [milk, bread, eggs],
+      })
+      previousItems.mockResolvedValue({
+        ...lastTime,
+        items: [eggs],
+        holds: [marianna, milk, bread],
+      })
+      onTrip(marianna)
+      await render()
+      await flushPromises()
+
+      const next = 'cccccccc-0000-4000-8000-000000000003'
+      expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([
+        marianna.name,
+        milk.name,
+        bread.name,
+      ])
+      expect(recallHereLast(ACTOR, sas, TRIP)?.map((item) => item.name)).toEqual([
+        milk.name,
+        bread.name,
+        eggs.name,
+      ])
+    })
+
+    // Adversarial В2 of review 3: a receipt opened while a trip goes on here is kept at its paper's
+    // moment; the trip going on, finished later, stays the newest.
+    it('a finished record searched while another goes on leaves that one the newest', async () => {
+      vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-06T10:05:00Z') })
+      rememberBoughtHere(ACTOR, sas, TRIP, milk)
+      vi.useRealTimers()
+      onTrip(milk)
+      const receipt = 'cccccccc-0000-4000-8000-000000000012'
+      tripRead.mockResolvedValue(
+        tripViewCodec.parse({
+          id: receipt,
+          startedAt: '2026-10-07T10:20:00.000Z',
+          finishedAt: '2026-10-07T12:00:00.000Z',
+          finishedOnDeviceAt: '2026-10-07T10:20:00.000Z',
+          currency: 'AMD',
+          rate: null,
+          rateProvider: null,
+          rateJump: null,
+          rateStale: false,
+          place: { id: 'aaaaaaaa-0000-4000-8000-000000000002', kind: 'store', name: sas.name },
+          placeCity: sas.city,
+          expenses: [
+            {
+              id: 'dddddddd-0000-4000-8000-000000000031',
+              createdAt: '2026-10-07T10:20:00.000Z',
+              item: marianna,
+              quantity: null,
+              amount: null,
+              unitPrice: null,
+            },
+          ],
+          total: [],
+          converted: null,
+        }),
+      )
+      previousItems.mockResolvedValue({
+        ...lastTime,
+        items: [bread],
+        holds: [marianna],
+        open: TRIP,
+      })
+      await render(ref(true), `/purchases/${receipt}/add`)
+      await flushPromises()
+
+      expect(previousItems).toHaveBeenCalledWith(receipt)
+      const next = 'cccccccc-0000-4000-8000-000000000003'
+      expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([milk.name])
+    })
+
+    // Adversarial Г1 of review 4: the phone's copy of the trip still holds what another device took
+    // out; only the queue is added to what the server says the trip holds.
+    it('the trip is remembered without what the server no longer holds, however old the phone’s copy', async () => {
+      previousItems.mockResolvedValue({ ...lastTime, items: [eggs], holds: [marianna] })
+      onTrip(marianna, milk)
+      await render()
+      await flushPromises()
+
+      const next = 'cccccccc-0000-4000-8000-000000000003'
+      expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([marianna.name])
+    })
+
+    // Adversarial Г2 of review 4: a trip written here that goes on no more — removed, or finished on
+    // another phone — is not lifted over the receipt searched.
+    // Adversarial Ж1 of review 7: a receipt opened with no signal while a trip goes on here — that
+    // trip is nobody's last time; the server would name the one before.
+    it('a receipt opened with no signal does not name the trip going on as its last time', async () => {
+      rememberHereLast(ACTOR, sas, TRIP, {
+        previous: { tripId: BEFORE, at: new Date('2026-10-05T11:00:00Z') },
+        items: [bread],
+      })
+      vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-06T10:05:00Z') })
+      rememberBoughtHere(ACTOR, sas, TRIP, milk)
+      vi.useRealTimers()
+      onTrip(milk)
+      const receipt = 'cccccccc-0000-4000-8000-000000000012'
+      tripRead.mockResolvedValue(
+        tripViewCodec.parse({
+          id: receipt,
+          startedAt: '2026-10-07T10:20:00.000Z',
+          finishedAt: '2026-10-07T12:00:00.000Z',
+          finishedOnDeviceAt: '2026-10-07T10:20:00.000Z',
+          currency: 'AMD',
+          rate: null,
+          rateProvider: null,
+          rateJump: null,
+          rateStale: false,
+          place: { id: 'aaaaaaaa-0000-4000-8000-000000000002', kind: 'store', name: sas.name },
+          placeCity: sas.city,
+          expenses: [],
+          total: [],
+          converted: null,
+        }),
+      )
+      online(false)
+      const view = await render(ref(true), `/purchases/${receipt}/add`)
+      await flushPromises()
+
+      expect(previousItems).not.toHaveBeenCalled()
+      expect(groups(view)[0]).toEqual({ heading: en.item.group_here_last, rows: [bread.name] })
+    })
+
+    // Adversarial Е1 of review 6: the phone's copy still says the trip goes on — removed on another
+    // device — and the server, asked, names none going on.
+    it('a trip the phone still thinks goes on, and the server does not, stays below the receipt', async () => {
+      vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-06T10:05:00Z') })
+      rememberBoughtHere(ACTOR, sas, TRIP, milk)
+      vi.useRealTimers()
+      onTrip(milk)
+      const receipt = 'cccccccc-0000-4000-8000-000000000012'
+      tripRead.mockResolvedValue(
+        tripViewCodec.parse({
+          id: receipt,
+          startedAt: '2026-10-07T10:20:00.000Z',
+          finishedAt: '2026-10-07T12:00:00.000Z',
+          finishedOnDeviceAt: '2026-10-07T10:20:00.000Z',
+          currency: 'AMD',
+          rate: null,
+          rateProvider: null,
+          rateJump: null,
+          rateStale: false,
+          place: { id: 'aaaaaaaa-0000-4000-8000-000000000002', kind: 'store', name: sas.name },
+          placeCity: sas.city,
+          expenses: [
+            {
+              id: 'dddddddd-0000-4000-8000-000000000031',
+              createdAt: '2026-10-07T10:20:00.000Z',
+              item: marianna,
+              quantity: null,
+              amount: null,
+              unitPrice: null,
+            },
+          ],
+          total: [],
+          converted: null,
+        }),
+      )
+      previousItems.mockResolvedValue({
+        ...lastTime,
+        items: [bread],
+        holds: [marianna],
+        open: null,
+      })
+      await render(ref(true), `/purchases/${receipt}/add`)
+      await flushPromises()
+
+      const next = 'cccccccc-0000-4000-8000-000000000003'
+      expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([marianna.name])
+    })
+
+    it('a finished record searched with no trip going on is the newest — a removed trip stays below', async () => {
+      vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-06T10:05:00Z') })
+      rememberBoughtHere(ACTOR, sas, TRIP, milk)
+      vi.useRealTimers()
+      const receipt = 'cccccccc-0000-4000-8000-000000000012'
+      tripRead.mockResolvedValue(
+        tripViewCodec.parse({
+          id: receipt,
+          startedAt: '2026-10-07T10:20:00.000Z',
+          finishedAt: '2026-10-07T12:00:00.000Z',
+          finishedOnDeviceAt: '2026-10-07T10:20:00.000Z',
+          currency: 'AMD',
+          rate: null,
+          rateProvider: null,
+          rateJump: null,
+          rateStale: false,
+          place: { id: 'aaaaaaaa-0000-4000-8000-000000000002', kind: 'store', name: sas.name },
+          placeCity: sas.city,
+          expenses: [
+            {
+              id: 'dddddddd-0000-4000-8000-000000000031',
+              createdAt: '2026-10-07T10:20:00.000Z',
+              item: marianna,
+              quantity: null,
+              amount: null,
+              unitPrice: null,
+            },
+          ],
+          total: [],
+          converted: null,
+        }),
+      )
+      previousItems.mockResolvedValue({ ...lastTime, items: [bread], holds: [marianna] })
+      await render(ref(true), `/purchases/${receipt}/add`)
+      await flushPromises()
+
+      expect(previousItems).toHaveBeenCalledWith(receipt)
+      const next = 'cccccccc-0000-4000-8000-000000000003'
+      expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([marianna.name])
+    })
+
+    // Adversarial Д2 of review 5, and its mirror: what changed while the answer was on its way — a
+    // purchase that reached the server, one removed there — is in neither `holds` nor the queue as it is.
+    describe('what changed while the answer was on its way', () => {
+      function trip(...bought: CatalogueEntry[]) {
+        return tripViewCodec.parse({
+          id: TRIP,
+          startedAt: '2026-10-05T08:00:00.000Z',
+          finishedAt: null,
+          currency: 'AMD',
+          rate: null,
+          rateProvider: null,
+          rateJump: null,
+          rateStale: false,
+          place: { id: 'aaaaaaaa-0000-4000-8000-000000000002', kind: 'store', name: sas.name },
+          placeCity: sas.city,
+          expenses: bought.map((item) => ({
+            id: `dddddddd-0000-4000-8000-${item.id.slice(-12)}`,
+            createdAt: '2026-10-05T08:01:00.000Z',
+            item,
+            quantity: null,
+            amount: null,
+            unitPrice: null,
+          })),
+          total: [],
+          converted: null,
+        })
+      }
+
+      async function slowly(
+        before: CatalogueEntry[],
+        after: CatalogueEntry[],
+        holds: CatalogueEntry[],
+      ): Promise<void> {
+        useTripStore(pinia).apply(trip(...before))
+        let answer: (value: PreviousItemsResponse) => void = () => undefined
+        previousItems.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+        await render()
+        await flushPromises()
+        useTripStore(pinia).apply(trip(...after))
+        answer({ ...lastTime, items: [eggs], holds })
+        await flushPromises()
+      }
+
+      const next = 'cccccccc-0000-4000-8000-000000000003'
+
+      it('a purchase that reached the server meanwhile is kept', async () => {
+        await slowly([marianna], [marianna, milk], [marianna])
+        expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([
+          marianna.name,
+          milk.name,
+        ])
+      })
+
+      it('a purchase removed there meanwhile is not brought back by the answer', async () => {
+        await slowly([marianna, milk], [marianna], [marianna, milk])
+        expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([marianna.name])
+      })
+
+      it('«must not fire»: a row the copy held before the question is not added past the server', async () => {
+        await slowly([marianna, milk], [marianna, milk], [marianna])
+        expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([marianna.name])
+      })
+    })
+
+    describe('nothing remembered: the answer is waited for, a second at most (В-2)', () => {
+      beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      })
+      afterEach(() => {
+        vi.useRealTimers()
+      })
+
+      it('nothing under the field while it is on its way, both groups at once when it comes', async () => {
+        let answer: (value: PreviousItemsResponse) => void = () => undefined
+        previousItems.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+        remembered(milk)
+        onTrip()
+        const view = await render()
+
+        expect(view.find('[role="listbox"]').exists()).toBe(false)
+        answer(lastTime)
+        await flushPromises()
+        expect(groups(view).map((group) => group.heading)).toEqual([
+          en.item.group_here_last,
+          en.item.group_recent,
+        ])
+      })
+
+      it('late, «Часто берёте» stands alone and the answer is only remembered — nothing moves', async () => {
+        let answer: (value: PreviousItemsResponse) => void = () => undefined
+        previousItems.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+        remembered(milk)
+        onTrip()
+        const view = await render()
+
+        await vi.advanceTimersByTimeAsync(STRIP_LATE_MS)
+        expect(groups(view)).toEqual([{ heading: en.item.group_recent, rows: [milk.name] }])
+        answer(lastTime)
+        await flushPromises()
+        expect(groups(view)).toEqual([{ heading: en.item.group_recent, rows: [milk.name] }])
+        expect(recallHereLast(ACTOR, sas, TRIP)?.map((item) => item.name)).toEqual([
+          bread.name,
+          eggs.name,
+          marianna.name,
+        ])
+      })
+
+      // Owner's В-4 «а» of the review: remembered or not, with a signal the same second's wait.
+      it('remembered, the answer is still waited for, and in time it stands instead', async () => {
+        rememberHereLast(ACTOR, sas, TRIP, { ...lastTime, items: [eggs] })
+        let answer: (value: PreviousItemsResponse) => void = () => undefined
+        previousItems.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+        remembered(milk)
+        onTrip()
+        const view = await render()
+
+        expect(view.find('[role="listbox"]').exists()).toBe(false)
+        answer(lastTime)
+        await flushPromises()
+        expect(groups(view)).toEqual([
+          { heading: en.item.group_here_last, rows: [bread.name, eggs.name, marianna.name] },
+          { heading: en.item.group_recent, rows: [milk.name] },
+        ])
+      })
+
+      // Adversarial А2: Monday by hand, Wednesday a receipt on this phone — which the memory does not
+      // learn — and on Friday the memory is Monday's and the answer Wednesday's.
+      it('remembered and late, the memory stands and nothing moves under the finger', async () => {
+        rememberHereLast(ACTOR, sas, TRIP, { ...lastTime, items: [eggs] })
+        let answer: (value: PreviousItemsResponse) => void = () => undefined
+        previousItems.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+        remembered(milk)
+        onTrip()
+        const view = await render()
+
+        await vi.advanceTimersByTimeAsync(STRIP_LATE_MS)
+        const shown = [
+          { heading: en.item.group_here_last, rows: [eggs.name] },
+          { heading: en.item.group_recent, rows: [milk.name] },
+        ]
+        expect(groups(view)).toEqual(shown)
+        answer(lastTime)
+        await flushPromises()
+        expect(groups(view)).toEqual(shown)
+        expect(recallHereLast(ACTOR, sas, TRIP)?.map((item) => item.name)).toEqual([
+          bread.name,
+          eggs.name,
+          marianna.name,
+        ])
+      })
+
+      it('«must not fire»: with no signal the memory stands at once, waiting for nothing', async () => {
+        rememberHereLast(ACTOR, sas, TRIP, { ...lastTime, items: [eggs] })
+        online(false)
+        onTrip()
+        const view = await render()
+
+        expect(groups(view)[0]?.rows).toEqual([eggs.name])
+      })
+    })
+
+    it('an item that went into the trip is the place’s newest last time for the next trip (В-1)', async () => {
+      addExpense.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+      remembered(milk)
+      onTrip()
+      const view = await render()
+      await flushPromises()
+      await view.get('[role="option"]').trigger('click')
+      vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      const add = view.findAll('dialog[open] button').find((b) => b.text() === en.item.save)
+      await add?.trigger('click')
+
+      const next = 'cccccccc-0000-4000-8000-000000000003'
+      expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([milk.name])
+    }, 10_000)
+
+    // Adversarial А3: the groups depend on the record's rows, and a record read again — the queue's
+    // answer, a refresh — rebuilds them with the very same rows.
+    it('«must not fire»: the record read again with the same rows keeps the row the arrows stand on', async () => {
+      previousItems.mockResolvedValue(lastTime)
+      remembered(milk)
+      onTrip(marianna)
+      const view = await render()
+      await flushPromises()
+      await field(view).trigger('keydown', { key: 'ArrowDown' })
+      await field(view).trigger('keydown', { key: 'ArrowDown' })
+      const active = field(view).attributes('aria-activedescendant')
+      const shown = names(view)
+
+      onTrip(marianna)
+      await flushPromises()
+
+      expect(names(view)).toEqual(shown)
+      expect(active).toBeDefined()
+      expect(field(view).attributes('aria-activedescendant')).toBe(active)
+    })
   })
 })

@@ -35,8 +35,7 @@
       v-if="!selectedId || selectedAvailable"
       ref="combobox"
       v-model="query"
-      :items="rows"
-      :heading="heading"
+      :groups="groups"
       :stale="stale"
       :readonly="bind?.phase === 'sending'"
       :label="t('item.search_title')"
@@ -342,8 +341,8 @@ import { useSelectedTrip } from '@/composables/useSelectedTrip'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { ApiError } from '@molvia/client'
-import { ERROR, pickLocale } from '@molvia/model'
-import type { AppLocale, BarcodeHint, CatalogueEntry } from '@molvia/model'
+import { ERROR, drawsNothing, pickLocale, placeNameIdentity } from '@molvia/model'
+import type { AppLocale, BarcodeHint, CatalogueEntry, PreviousItemsResponse } from '@molvia/model'
 import IconBarcode from '~icons/mdi/barcode-scan'
 import IconClose from '~icons/mdi/close'
 import IconMagnify from '~icons/mdi/magnify'
@@ -353,18 +352,30 @@ import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
 import CatalogueCombobox from '@/components/CatalogueCombobox.vue'
+import type { ComboboxGroup } from '@/components/CatalogueCombobox.vue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ProposeItemSheet from '@/components/ProposeItemSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SkeletonPart from '@/components/SkeletonPart.vue'
-import StatusStrip from '@/components/StatusStrip.vue'
+import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import { api } from '@/api'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { packageSize, useBarcodeHint } from '@/composables/useBarcodeHint'
 import { useBarcodeLookup } from '@/composables/useBarcodeLookup'
 import { useCatalogueSearch } from '@/composables/useCatalogueSearch'
+import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useOnline } from '@/composables/useOnline'
+import { useReconnect } from '@/composables/useReconnect'
+import { useTripRows } from '@/composables/useTripRows'
+import { useActorStore } from '@/stores/actor'
+import {
+  HERE_LAST_SHOWN,
+  recallHereLast,
+  rememberBoughtHere,
+  rememberHereLast,
+} from '@/stores/hereLast'
+import type { HerePlace } from '@/stores/hereLast'
 import { currentIdentity } from '@/stores/identity'
 import { useItemEntryStore } from '@/stores/itemEntry'
 import { useRecentItemsStore } from '@/stores/recentItems'
@@ -425,6 +436,218 @@ export default defineComponent({
     const recent = useRecentItemsStore()
     const entry = useItemEntryStore()
     const announce = useAnnouncer()
+
+    /**
+     * «Брали здесь в прошлый раз» (MOL-209, Ф-24): the trip the search writes into and its place —
+     * the finished one the address names, else the one going on, sent or still in the queue. The
+     * place is its city and name, which a trip started with no signal knows too (Р-3).
+     */
+    const current = useCurrentTrip()
+    const actor = useActorStore()
+    const here = computed<{
+      readonly tripId: string
+      readonly place: HerePlace | null
+      /** The server may know the trip: one still in the queue is not asked about (Р-4). */
+      readonly sent: boolean
+      /** A finished trip looks only before itself. */
+      readonly before: Date | null
+    } | null>(() => {
+      if (selected.id.value !== null) {
+        const trip = selected.trip.value
+        if (!trip) return null
+        return {
+          tripId: trip.id,
+          place:
+            trip.placeCity === undefined ? null : { city: trip.placeCity, name: trip.place.name },
+          sent: true,
+          before: trip.finishedOnDeviceAt ?? trip.finishedAt,
+        }
+      }
+      const local = current.local.value
+      if (local) {
+        const city = local.context?.city ?? actor.settings?.city
+        return {
+          tripId: local.id,
+          place: city === undefined ? null : { city, name: local.placeName },
+          sent: false,
+          before: null,
+        }
+      }
+      const trip = current.trip.value
+      if (!trip) return null
+      return {
+        tripId: trip.id,
+        place:
+          trip.placeCity === undefined ? null : { city: trip.placeCity, name: trip.place.name },
+        sent: true,
+        before: null,
+      }
+    })
+    /** What is in this trip already — on the server, or in the queue — goes from the group (Р-17). */
+    const { rows: tripRows } = useTripRows(
+      computed(() => here.value?.tripId ?? null),
+      computed(() => (selected.id.value !== null ? selected.trip.value : current.trip.value)),
+      () => '',
+    )
+    /** The server's answer on this screen, and what the device remembered before it. */
+    const hereAnswer = ref<readonly CatalogueEntry[] | null>(null)
+    const hereRemembered = ref<readonly CatalogueEntry[] | null>(null)
+    /**
+     * With a connection the screen waits for the answer, at most `STRIP_LATE_MS`, before what the
+     * device remembers — or «Часто берёте» alone — stands (В-2 «а»; owner's В-4 «а» of the review:
+     * remembered or not): the group coming in over it would take its rows from under the finger
+     * (MOL-269), and the memory parts from the answer after every receipt recorded on this phone.
+     * An answer later than that is only remembered, for next time.
+     */
+    const hereLate = ref(false)
+    let hereAsked = 0
+    let hereTimer: ReturnType<typeof setTimeout> | undefined
+
+    function askHere(): void {
+      const at = here.value
+      if (!at?.sent || hereAnswer.value !== null || !navigator.onLine) {
+        hereLate.value = true
+        return
+      }
+      const asked = ++hereAsked
+      const known = serverRows()
+      // A throw before the request leaves the screen as it is too: the client builds the address
+      // synchronously, and a throw in the screen's setup took the whole screen down (adversarial Т1,
+      // the question it left).
+      let request: Promise<PreviousItemsResponse>
+      try {
+        request = api.previousItems(at.tripId)
+      } catch {
+        hereLate.value = true
+        return
+      }
+      request.then(
+        (answer) => {
+          if (asked !== hereAsked || !alive) return
+          if (owner !== null && at.place !== null) {
+            rememberHereLast(
+              owner,
+              at.place,
+              at.tripId,
+              answer,
+              at.before,
+              heldWith(answer.holds, known),
+              // The trip going on as the server knows it, never the phone's copy, which may still
+              // hold one removed or finished on another device (Г2, Д1, Е1 of reviews 4–6).
+              answer.open,
+            )
+          }
+          if (!hereLate.value) hereAnswer.value = answer.items
+          hereLate.value = true
+        },
+        // A trip the server does not know yet, no connection, a server that failed: the group is a
+        // help, never a state of the screen — what the device remembers stands, or nothing does.
+        () => {
+          if (asked === hereAsked) hereLate.value = true
+        },
+      )
+    }
+
+    // The place as its memory is keyed (Р-3): a start that landed names the place in the server's
+    // spelling, which may differ from the one typed at the door by its case, and is the same place.
+    watch(
+      () => {
+        const at = here.value
+        return at?.place
+          ? `${at.tripId}|${placeNameIdentity(at.place.city)}|${placeNameIdentity(at.place.name)}`
+          : (at?.tripId ?? null)
+      },
+      () => {
+        const at = here.value
+        hereAnswer.value = null
+        hereRemembered.value =
+          at?.place != null
+            ? // The trip going on is nobody's last time (Ж1 of review 7); with no signal the phone's
+              // copy is all there is to tell it by.
+              recallHereLast(owner, at.place, at.tripId, at.before, current.tripId.value)
+            : null
+        hereLate.value = false
+        clearTimeout(hereTimer)
+        hereTimer = setTimeout(() => {
+          hereLate.value = true
+        }, STRIP_LATE_MS)
+        askHere()
+      },
+      { immediate: true },
+    )
+    // The same trip, its start landed while the screen is open (Р-4): asked now, and nothing on the
+    // screen waits again — «Часто берёте» already stands, and an answer would only be remembered.
+    watch(
+      () => here.value?.sent,
+      (sent) => {
+        if (sent) askHere()
+      },
+    )
+    useReconnect(askHere)
+
+    /** What this trip holds — on the server, or in the queue; a row being removed is given back. */
+    const held = computed<CatalogueEntry[]>(() =>
+      tripRows.value.flatMap((row) => (row.mark !== 'removing' && row.entry ? [row.entry] : [])),
+    )
+    /** The server's rows of this trip the phone knows now: purchase → item. */
+    function serverRows(): Map<string, string> {
+      return new Map(
+        tripRows.value.flatMap((row) =>
+          row.expense !== null && row.entry ? [[row.expense.id, row.entry.id] as const] : [],
+        ),
+      )
+    }
+
+    /**
+     * What the trip holds for its memory: what the server says it holds (adversarial В1 of review 3) —
+     * less what is being removed here — and the purchases the queue still carries into it, never the
+     * phone's copy of the server's rows, which may keep what another device took out (Г1 of review 4).
+     * **The copy counts only for what changed while the answer was on its way** (Д2 of review 5): a
+     * purchase that reached the server meanwhile is in neither `holds` nor the queue, and one removed
+     * meanwhile is still in `holds` — told by the server's rows known as the question left (`known`).
+     */
+    function heldWith(
+      holds: readonly CatalogueEntry[],
+      known: ReadonlyMap<string, string>,
+    ): CatalogueEntry[] {
+      const rows = tripRows.value
+      const removing = new Set(
+        rows.flatMap((row) => (row.mark === 'removing' && row.entry ? [row.entry.id] : [])),
+      )
+      const present = new Set(
+        rows.flatMap((row) => (row.mark !== 'removing' && row.entry ? [row.entry.id] : [])),
+      )
+      const now = new Set(rows.flatMap((row) => (row.expense === null ? [] : [row.expense.id])))
+      const gone = new Set(
+        [...known].flatMap(([expense, item]) =>
+          now.has(expense) || present.has(item) ? [] : [item],
+        ),
+      )
+      const landed = rows.flatMap((row) =>
+        row.expense !== null && !known.has(row.expense.id) && row.mark !== 'removing' && row.entry
+          ? [row.entry]
+          : [],
+      )
+      const queued = rows.flatMap((row) =>
+        row.expense === null && row.mark !== 'removing' && row.entry ? [row.entry] : [],
+      )
+      return [
+        ...holds.filter((item) => !removing.has(item.id) && !gone.has(item.id)),
+        ...landed,
+        ...queued,
+      ]
+    }
+    /** What this trip holds already goes from the group (Р-17). */
+    const hereLast = computed<CatalogueEntry[]>(() => {
+      const taken = new Set(held.value.map((item) => item.id))
+      return (hereAnswer.value ?? hereRemembered.value ?? [])
+        .filter((item) => !taken.has(item.id))
+        .slice(0, HERE_LAST_SHOWN)
+    })
+    /** The answer still on its way, for a second at most (В-2, В-4 of the review). */
+    const hereWaiting = computed(
+      () => here.value?.sent === true && hereAnswer.value === null && !hereLate.value,
+    )
 
     /** «Взять из недавних» under an error — asked for, not shown by default. */
     const fallback = ref(false)
@@ -751,9 +974,26 @@ export default defineComponent({
       return hasRecent.value ? t('item.error.body') : t('item.error.body_alone')
     })
 
-    const heading = computed(() => {
-      if (showsRecent.value) return t('item.group_recent')
-      return phase.value === 'far' ? t('item.group_similar') : t('item.group_found')
+    const groups = computed<ComboboxGroup[]>(() => {
+      // Under an empty field the place's last time comes first, and «Часто берёте» does not repeat
+      // it (Ф-24); typed, only the recent items are narrowed, as with no signal (1j).
+      if (showsRecent.value && drawsNothing(query.value)) {
+        if (hereWaiting.value) return []
+        const first = new Set(hereLast.value.map((item) => item.id))
+        return [
+          { key: 'here-last', heading: t('item.group_here_last'), items: hereLast.value },
+          {
+            key: 'recent',
+            heading: t('item.group_recent'),
+            items: rows.value.filter((item) => !first.has(item.id)),
+          },
+        ]
+      }
+      if (showsRecent.value)
+        return [{ key: 'recent', heading: t('item.group_recent'), items: rows.value }]
+      return phase.value === 'far'
+        ? [{ key: 'similar', heading: t('item.group_similar'), items: rows.value }]
+        : [{ key: 'found', heading: t('item.group_found'), items: rows.value }]
     })
 
     // Read out once per answer, not on every letter: the answer is what changed. An empty answer is
@@ -908,6 +1148,13 @@ export default defineComponent({
     function added(item: CatalogueEntry): void {
       const code = pickedByCode.value
       recent.remember(item, code?.itemId === item.id ? code.code : undefined)
+      // And into the place's memory as its newest trip (В-1 «а»): the next trip here with no signal
+      // finds this one as the last time.
+      const at = here.value
+      // A purchase added to a finished trip keeps that trip where it stood in time, not the newest.
+      if (owner !== null && at?.place) {
+        rememberBoughtHere(owner, at.place, at.tripId, item, at.before)
+      }
     }
 
     /**
@@ -1021,6 +1268,7 @@ export default defineComponent({
     })
     onUnmounted(() => {
       alive = false
+      clearTimeout(hereTimer)
       withdraw?.()
       withdrawCode?.()
       withdrawBind?.()
@@ -1046,7 +1294,7 @@ export default defineComponent({
       hasRecent,
       errorBody,
       rows,
-      heading,
+      groups,
       pick,
       picked,
       opened,

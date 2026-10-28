@@ -6,7 +6,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 ## packages/model
 
 - `packages/model/src/contracts/settings.ts` — Contract of the four settings (country, city, two currencies): `SETTINGS_COUNTRIES` and `COUNTRY_CITIES` (Armenia, Georgia, Serbia, MOL-109), `settingsCityOf` (the settings' city a stored spelling folds to, MOL-120), `geographyAllowed`, `firstGeography` (a newcomer's by the phone's zone), the update body with its base.
-- `packages/model/src/contracts/trip.ts` — Wire contract of trips: start/add/finish/restore/rate-choice bodies, `deviceIdSchema`, trip view and history codecs (a history row with `itemCount` and `total`, MOL-128), recent places.
+- `packages/model/src/contracts/trip.ts` — Wire contract of trips: start/add/finish/restore/rate-choice bodies, `deviceIdSchema`, trip view and history codecs (a history row with `itemCount` and `total`, MOL-128), recent places, the previous trip's items (MOL-209).
 - `packages/model/src/entities/expense.ts` — Entity of a trip purchase: item required, quantity and amount optional; the new-row and patch schemas.
 - `packages/model/src/entities/place.ts` — Entity of a place (shop or venue) with its country and city; the schema a new place is named by.
 - `packages/model/src/entities/trip.ts` — Entity of a trip: rate snapshot and rate choice, `TRIP_UNDO_MINUTES`, the effective rate, staleness, totals and conversion.
@@ -17,12 +17,13 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 
 - `backend/src/routes/places.ts` — Route `GET /places/recent`: the person's recent shops, optionally filtered by country and city.
 - `backend/src/routes/settings.ts` — Route `PUT /actors/me/settings`: saves the four settings and answers with the actor.
-- `backend/src/routes/trips.ts` — Routes of `/trips`: start, current, history, one trip, purchases, finish, remove, «Вернуть», rate choice, receipt's sum.
+- `backend/src/routes/trips.ts` — Routes of `/trips`: start, current, history, one trip, «брали здесь в прошлый раз», purchases, finish, remove, «Вернуть», rate choice, receipt's sum.
 
 ## backend · usecases
 
 - `backend/src/usecases/choose-trip-rate.ts` — Use case «По какому курсу считать» after a jump: the new rate, the previous one, or the person's own.
 - `backend/src/usecases/current-trip.ts` — Use case: the unfinished trip the record typed by hand opens on (or null), and one trip selected by id.
+- `backend/src/usecases/previous-items.ts` — Use case «Брали здесь в прошлый раз» (MOL-209): the items of the person's last finished trip at the trip's place before it, as catalogue cards, `PREVIOUS_ITEMS_LIMIT`; a trip not the owner's is not found.
 - `backend/src/usecases/recent-places.ts` — Use case: the last few places «Где вы?» offers to tap (`RECENT_PLACES`).
 - `backend/src/usecases/remove-trip.ts` — Use cases «Удалить запись» (marks the trip) and «Вернуть» (back, optionally finished). Tests: `backend/tests/trip-removal.integration.test.ts`.
 - `backend/src/usecases/save-settings.ts` — Use case: saves the settings form against its base, and lets frozen months go when a currency changes.
@@ -36,7 +37,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 - `backend/src/db/places-repository.ts` — Repository of places: `ensure` one shop per name, reads by id, and the person's recent places.
 - `backend/src/db/settings-repository.ts` — Repository of the settings: one conditional `UPDATE` of the actor row against the form's base. Tests: `backend/tests/settings.integration.test.ts`.
 - `backend/src/db/trip-money.ts` — A trip's money in SQL (MOL-78): the receipt's sum, else the priced purchases per currency — the one fragment «Записаны», the month and the accounts read. Tests: `backend/tests/trip-receipt.integration.test.ts`.
-- `backend/src/db/trips-repository.ts` — Repository of trips: start, lock, current, history page with each row's count and sums, finish, rate choice, receipt's sum, mark, restore, purge. Tests: `backend/tests/trip-rules.integration.test.ts`.
+- `backend/src/db/trips-repository.ts` — Repository of trips: start, lock, current, history page with each row's count and sums, finish, rate choice, receipt's sum, mark, restore, purge, and the previous trip at a place with its items (MOL-209). Tests: `backend/tests/trip-rules.integration.test.ts`.
 
 ## backend · tests
 
@@ -44,6 +45,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 - `backend/tests/place-identity.integration.test.ts` — Integration test: `placeNameIdentity` agrees with the database's place index across a corpus of spellings.
 - `backend/tests/settings.integration.test.ts` — Integration test: settings saved without overwriting another device, and a queued trip keeps the geography it started with.
 - `backend/tests/trip-history.integration.test.ts` — Integration test: history of finished trips is private, ordered by the device's finish time, paged by its cursor, each row counted and summed per currency.
+- `backend/tests/trip-previous-items.integration.test.ts` — Integration test of «Брали здесь в прошлый раз» through HTTP: the owner's trip only, the trip itself, open, removed and empty trips not counted, a finished trip looks before itself, one name in two cities, removed purchases, the limit.
 - `backend/tests/trip-receipt.integration.test.ts` — Integration test: «Сумма по чеку» through HTTP, and every reader of a trip's money — the trip, «Записаны», the month, the accounts, the hint of an exchange — saying one thing.
 - `backend/tests/trip-removal.integration.test.ts` — Integration test: a removed trip is hidden from every reader, «Вернуть» works for ten minutes, the timer purges after.
 - `backend/tests/trip-rules.integration.test.ts` — Integration test of the repositories: one open trip per person, device ids as repeats, races, finish, one transaction.

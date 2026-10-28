@@ -45,6 +45,7 @@ import type { Loose } from '@/stores/queueing'
 import { read, writeEverywhere } from '@/stores/storage'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripStore } from '@/stores/trip'
+import { rememberFinishedHere } from '@/stores/hereLast'
 import { rememberRecordCity } from '@/stores/ownPrices'
 
 /**
@@ -1258,6 +1259,9 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       }
     }
     if (entry.kind === 'finish') {
+      // «Брали здесь в прошлый раз» with no signal: the trip stands at its finish, as «Записаны» order
+      // it, no longer the one going on (MOL-209, adversarial В2).
+      if (id) rememberFinishedHere(id, entry.tripId, entry.finishedOnDeviceAt ?? new Date())
       const earlier = kept.find((item) => sameWrite(item.write, entry))?.write
       if (earlier?.kind === 'finish' && earlier.finishedOnDeviceAt) {
         entry = { ...entry, finishedOnDeviceAt: earlier.finishedOnDeviceAt }
