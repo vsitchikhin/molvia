@@ -672,7 +672,10 @@ test.describe('the receipt total (MOL-78)', () => {
 
     await expect(page).toHaveURL(/\/money/)
     await expect(sheet(page)).toContainText('New spending')
-    await expect(sheet(page).getByLabel('Where')).toHaveValue('Рынок')
+    // The shop is behind «Date, note, place», and its line says it (MOL-199).
+    await expect(
+      sheet(page).getByRole('button', { name: /^Date, note, place: .+ · Рынок$/ }),
+    ).toBeVisible()
     await expect(sheet(page).getByRole('radio', { name: 'Groceries' })).toBeChecked()
     await expect.poll(setting.current).toBeNull()
   })
