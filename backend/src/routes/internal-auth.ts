@@ -10,6 +10,7 @@ import {
   dueBroadcastSchema,
   dueReceiptNoticesSchema,
   dueRemindersSchema,
+  dueSilenceNoticesSchema,
   eraseMeSchema,
   feedbackFromBotAnswerSchema,
   feedbackFromBotSchema,
@@ -27,6 +28,7 @@ import type {
   DueBroadcast,
   DueReceiptNotices,
   DueReminders,
+  DueSilenceNotices,
   FeedbackFromBot,
   FeedbackFromBotAnswer,
   FeedbackPicture,
@@ -68,6 +70,7 @@ export function internalAuthRoutes(
     feedbackPicture(number: number, position: number): Promise<FeedbackPicture | null>
     claimBroadcast(): Promise<DueBroadcast>
     broadcastDone(body: BroadcastDone): Promise<void>
+    claimSilenceNotices(): Promise<DueSilenceNotices>
   },
 ): void {
   const digest = (value: string): Buffer => createHash('sha256').update(value).digest()
@@ -188,6 +191,11 @@ export function internalAuthRoutes(
     )
     // The message to people about a leak (MOL-237): a batch at a time, the API deciding who; the
     // bot's word on a batch is what moves it on, so a batch never reported goes out again.
+    // Two years of silence (MOL-239): the warnings due, marked as handed on the way, as the reminders'.
+    scope.post('/internal/silence/claim', { onRequest: refuseAnyBody }, async (request) => {
+      parseQuery(z.strictObject({}), request.query)
+      return dueSilenceNoticesSchema.parse(await api.claimSilenceNotices())
+    })
     scope.post('/internal/broadcasts/claim', { onRequest: refuseAnyBody }, async (request) => {
       parseQuery(z.strictObject({}), request.query)
       return dueBroadcastSchema.parse(await api.claimBroadcast())

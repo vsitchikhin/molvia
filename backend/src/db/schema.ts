@@ -61,6 +61,7 @@ import {
   rateProviderSchema,
   ratePreferenceSchema,
   SALARY_SHIFT_DAY_MAX,
+  SILENCE_WARN_DAYS,
   RECEIPT_CITIES,
   RECEIPT_LAYOUTS,
   rateSourceSchema,
@@ -88,6 +89,7 @@ import type {
   FeedbackDelivery,
   FeedbackKind,
   RemindersOff,
+  SilenceStep,
   ExchangeChannel,
   IncomeSource,
   ItemKind,
@@ -375,6 +377,14 @@ export const actors = pgTable(
      * `updated_at`'s trigger either, which marks a change, not a visit.
      */
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * The last warning the bot was handed before the account is erased for its silence (MOL-239): 30 or
+     * 7 days before, and when. **It holds only while newer than `last_seen_at`**: a login after it moves
+     * the visit, and the warning is of a silence that ended — so nothing of the login touches it. Both or
+     * neither; not a change of the row either, as the visit is not (0075).
+     */
+    silenceWarning: smallint('silence_warning').$type<SilenceStep>(),
+    silenceWarnedAt: timestamp('silence_warned_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Moved by a trigger, not by drizzle: `$onUpdate` lives in the query builder, so raw
     // SQL — the main instrument in this directory — would leave the column behind.
@@ -406,6 +416,16 @@ export const actors = pgTable(
       sql`(${table.consentVersion} is null) = (${table.consentedAt} is null)`,
     ),
     check('actors_consent_version_positive', sql`${table.consentVersion} >= 1`),
+    check(
+      'actors_silence_warning_whole',
+      sql`(${table.silenceWarning} is null) = (${table.silenceWarnedAt} is null)`,
+    ),
+    check(
+      'actors_silence_warning_known',
+      sql`${table.silenceWarning} in (${sql.raw(SILENCE_WARN_DAYS.join(', '))})`,
+    ),
+    // The bot asks every minute whose silence is near (MOL-239).
+    index('actors_last_seen_at').on(table.lastSeenAt),
   ],
 )
 
@@ -2042,9 +2062,15 @@ export const erasures = pgTable(
   {
     appearedWeek: date('appeared_week').primaryKey(),
     erased: integer('erased').notNull(),
+    /**
+     * Of them, erased for two years of silence (MOL-239, owner's В-1 «а»): a person who left in disgust
+     * and one who simply stopped coming two years ago are not one signal.
+     */
+    silent: integer('silent').notNull().default(0),
   },
   (table) => [
     check('erasures_erased_positive', sql`${table.erased} > 0`),
+    check('erasures_silent_within', sql`${table.silent} between 0 and ${table.erased}`),
     check('erasures_week_monday', sql`extract(isodow from ${table.appearedWeek}) = 1`),
   ],
 )

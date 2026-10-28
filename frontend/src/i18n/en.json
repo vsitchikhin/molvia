@@ -1731,7 +1731,7 @@
       },
       "settings": {
         "term": "Your settings",
-        "text": "Country, city, currencies, and the day you changed the currency of conversion — and for “Count me in the statistics”: since when it is off, and when you last turned it back on. And when you last used the app or signed in to it: the two years of “An inactive account” are counted from that day."
+        "text": "Country, city, currencies, and the day you changed the currency of conversion — and for “Count me in the statistics”: since when it is off, and when you last turned it back on. And when you last used the app or signed in to it: the two years of “An inactive account” are counted from that day. And when the bot last warned you that the account is about to be deleted — 30 or 7 days before: so that it does not warn twice."
       },
       "consent": {
         "term": "Consent to the terms",
@@ -1754,7 +1754,7 @@
       },
       "telegram": {
         "term": "Telegram",
-        "text": "The bot’s messages to you — sign-in, reminders, “receipt read”, the developer’s replies, a notice of a data breach — and your messages to the developer with their screenshots. Telegram is a company abroad; this has to go to it because Molvia’s sign-in and bot work through Telegram — a channel you chose yourself by signing in."
+        "text": "The bot’s messages to you — sign-in, reminders, “receipt read”, the developer’s replies, a notice of a data breach, a warning before an inactive account is deleted — and your messages to the developer with their screenshots. Telegram is a company abroad; this has to go to it because Molvia’s sign-in and bot work through Telegram — a channel you chose yourself by signing in."
       },
       "contabo": {
         "term": "Contabo, Germany",
@@ -1811,7 +1811,7 @@
     },
     "erase": {
       "title": "Delete everything",
-      "text": "In Settings, «Delete my data», or send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they, the items you added to the shared catalogue, the barcodes you linked and the shops’ memory — which item stands behind a receipt line and the shelf price — stay, without your name. Deleting from Settings also erases the copies on the phone you deleted from; on other devices, and after /delete, they may remain: to remove them, delete the app there or clear the site's data — or sign out there in Settings beforehand. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who came in the same week as you deleted their data. It is there so that whether Molvia gets used is counted honestly."
+      "text": "In Settings, «Delete my data», or send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they, the items you added to the shared catalogue, the barcodes you linked and the shops’ memory — which item stands behind a receipt line and the shelf price — stay, without your name. Deleting from Settings also erases the copies on the phone you deleted from; on other devices, and after /delete, they may remain: to remove them, delete the app there or clear the site's data — or sign out there in Settings beforehand. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who came in the same week as you deleted their data, and how many of those accounts were deleted by themselves, after two years without a visit. It is there so that whether Molvia gets used is counted honestly."
     },
     "inactive": {
       "title": "An inactive account",

@@ -7,6 +7,7 @@ import {
   broadcastDoneSchema,
   confirmLoginSchema,
   dueBroadcastSchema,
+  dueSilenceNoticesSchema,
   dueReceiptNoticesSchema,
   dueRemindersSchema,
   eraseMeSchema,
@@ -26,6 +27,7 @@ import type {
   BotFailure,
   BroadcastDone,
   DueBroadcast,
+  DueSilenceNotices,
   DueReceiptNotices,
   DueReminders,
   FeedbackFromBot,
@@ -99,6 +101,11 @@ export interface MolviaBotClient {
   claimBroadcast(): Promise<DueBroadcast>
   /** The bot went through a batch up to `through`, with these outcomes. Repeats change nothing. */
   broadcastDone(report: BroadcastDone): Promise<void>
+  /**
+   * The warnings before an account is erased for its silence (MOL-239), already marked as handed: a
+   * warning lost on the way is not handed again.
+   */
+  claimSilenceNotices(): Promise<DueSilenceNotices>
 }
 
 /** An internal client has no session and cannot attach its secret to an arbitrary API path. */
@@ -203,6 +210,8 @@ export function createBotClient({ secret, ...options }: BotClientOptions): Molvi
       }),
     claimBroadcast: async () =>
       request('/internal/broadcasts/claim', dueBroadcastSchema, { method: 'POST' }),
+    claimSilenceNotices: async () =>
+      request('/internal/silence/claim', dueSilenceNoticesSchema, { method: 'POST' }),
     broadcastDone: async (report) => {
       const body = broadcastDoneSchema.safeParse(report)
       if (!body.success) throw new ApiError(ISSUE.BODY_INVALID, 'report')

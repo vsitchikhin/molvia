@@ -37,6 +37,8 @@ export interface GatesReport {
  */
 export interface ErasedInWindow {
   readonly count: number
+  /** Of them, erased for two years of silence (MOL-239, В-1 «а»), not by their own hand. */
+  readonly silent: number
   readonly firstWeek: string
   readonly lastWeek: string
 }
@@ -175,7 +177,12 @@ export function createGatesReader(db: Db): GatesReader {
 async function erasedIn(tx: Conn, from: Date, to: Date): Promise<ErasedInWindow> {
   // The week as `erase` writes it. The last week is the one holding the window's last
   // millisecond, `to` being open.
-  const [row] = await tx.execute<{ count: number; first_week: string; last_week: string }>(sql`
+  const [row] = await tx.execute<{
+    count: number
+    silent: number
+    first_week: string
+    last_week: string
+  }>(sql`
     with bounds as (
       select
         ${yerevanWeek(sql`${from.toISOString()}::timestamptz`)} as first_week,
@@ -183,6 +190,7 @@ async function erasedIn(tx: Conn, from: Date, to: Date): Promise<ErasedInWindow>
     )
     select
       coalesce(sum(e.erased), 0)::int as count,
+      coalesce(sum(e.silent), 0)::int as silent,
       to_char(b.first_week, 'YYYY-MM-DD') as first_week,
       to_char(b.last_week, 'YYYY-MM-DD') as last_week
     from bounds b
@@ -191,6 +199,7 @@ async function erasedIn(tx: Conn, from: Date, to: Date): Promise<ErasedInWindow>
   `)
   return {
     count: row?.count ?? 0,
+    silent: row?.silent ?? 0,
     firstWeek: row?.first_week ?? '',
     lastWeek: row?.last_week ?? '',
   }
