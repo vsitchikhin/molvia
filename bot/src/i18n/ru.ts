@@ -254,8 +254,12 @@ export const ru = {
   'owner.receipt.lineReasons': 'Строки: {reasons}',
   'owner.receipt.kept': 'Фото и ответ модели — до {day}: make receipt-miss ID={receipt}',
   'owner.receipt.muted': '🔕 Скрыто сигналов о чеках не целиком: {count} — make receipt-reasons',
-  /** Two years of silence (MOL-239, В-3 «а»): numbers only, no one named. */
-  'owner.silence.warned': '🗓 Тишина: предупреждены за 30 дней — {warned30}, за 7 — {warned7}',
+  /**
+   * Two years of silence (MOL-239, В-3 «а»): numbers only, no one named. Handed, not delivered: a blocked bot
+   * is tried too (adversarial А4), and Telegram may refuse it.
+   */
+  'owner.silence.warned':
+    '🗓 Тишина: отдано боту предупреждений за 30 дней — {warned30}, за 7 — {warned7}',
   'owner.silence.erased':
     '🗓 Тишина: стёрто аккаунтов — {erased}, из них с заблокированным ботом — {blocked}',
   'owner.receipt.why.failed': 'не прочитано ни одной строки',

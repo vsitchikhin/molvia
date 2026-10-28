@@ -169,8 +169,9 @@ The detail behind the privacy lines of `CLAUDE.md`.
   first falls due a day before its thirty** (`SILENCE_FIRST_LEAD_DAYS`, adversarial А2): it waits for the person's day,
   and any twenty-four hours hold one, so sent within them it leaves thirty days at least. **No account is erased
   sooner than a week after its last warning** (Р-3, adversarial А3) — the warning named that day, and a block heard
-  after it does not bring the day forward; so a bot down for days moves the erasure, never the warning. **With no last
-  warning only a blocked bot is erased** (`bot_blocked_at`), on the day — the page's one exception; an account the bot
+  after it does not bring the day forward; so a bot down for days moves the erasure, never the warning. **Without a last
+  warning of seven days only a blocked bot is erased** (`bot_blocked_at`), on the day — the one the first warning named,
+  if any; the page's one exception; an account the bot
   can reach is never erased unwarned. **A bot once heard blocked is tried all the same** (adversarial А4): an unblock
   from Telegram's list is never heard, and a block still there answers 403. **The mark is two columns of `actors`**
   (`silence_warning`, `silence_warned_at`, both or neither), **holding only for the silence whose day it falls before by

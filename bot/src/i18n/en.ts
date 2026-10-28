@@ -143,7 +143,7 @@ export const en: Dictionary = {
     'Photo and the model’s answer kept until {day}: make receipt-miss ID={receipt}',
   'owner.receipt.muted': '🔕 Receipts not read whole held back: {count} — make receipt-reasons',
   'owner.silence.warned':
-    '🗓 Silence: warned 30 days before — {warned30}, 7 days before — {warned7}',
+    '🗓 Silence: warnings handed to the bot, 30 days before — {warned30}, 7 days before — {warned7}',
   'owner.silence.erased':
     '🗓 Silence: accounts erased — {erased}, of them with the bot blocked — {blocked}',
   'owner.receipt.why.failed': 'not one line read',
