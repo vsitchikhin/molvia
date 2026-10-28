@@ -433,7 +433,7 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   then at most `PREVIOUS_ITEMS_LIMIT` (20)** (owner's В-5 «а» of review 1): cut first, a receipt of 25
   lines taken again in its order left two of the seven still to take at 18, none at 20 (adversarial
   А4). The answer names the trip and its moment for the phone's memory, **and what the trip asked
-  about holds** (`holds`, adversarial В1 of review 3) — the phone's own copy of a trip going on may miss
+  about holds** (`holds`, adversarial В1 of review 3), **and the trip going on** (`open`, Е1 of review 6) — the phone's own copy of a trip going on may miss
   what another device added. It writes nothing.
 - **What is in this trip already is not shown** (owner's Р-17 of MOL-118): the trip's rows and the
   purchases in the queue, by `useTripRows`, a row being removed given back — so **the phone cuts to
@@ -457,11 +457,13 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   where the memory holds that trip** (Р-10 of review 1): a receipt's, another phone's, is not known
   whole, and its one item stood for all of it (adversarial А1г). **«Закончить» puts a trip at its
   finish** (`rememberFinishedHere`, from the trip queue), and a finished trip kept at its own moment — a
-  receipt, at its paper's — lifts **the trip going on here now** (`useCurrentTrip`) to now, since it will be
-  finished after (adversarial В2 of review 3; its moment held by a test, m5). Only that one: a trip removed
-  here or finished on another phone goes on no more, and a mark kept in the memory lifted it over the
-  receipt for good (Г2 of review 4, self-review №4); **nor the one the answer named as the last time**,
-  whatever the phone's copy says — the server names finished trips only (Д1 of review 5).
+  receipt, at its paper's — lifts **the trip going on, as the
+  answer names it** (`open`, the person's latest unfinished trip on the server) to now, since it will be
+  finished after (adversarial В2 of review 3; its moment held by a test, m5). Only that one, and never by the
+  phone's copy: a mark kept in the memory lifted a trip removed or finished elsewhere over the receipt
+  for good (Г2 of review 4, self-review №4), and the copy still held one removed or finished on another
+  device (Д1, Е1 of reviews 5–6). A trip the server does not hold yet — its start still queued — takes
+  its place by «Закончить» on this phone.
   The newest kept trip but the one going
   on is the last time, and for a finished trip only one before it. The server's answer about a trip
   takes the place of what the phone wrote into it — it knows what was removed since — **and, asked
