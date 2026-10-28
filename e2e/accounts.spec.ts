@@ -4,6 +4,7 @@ import type { Locator, Page } from '@playwright/test'
 import { fakeKeyboard } from './keyboard'
 import { asBrowser, open, signedIn } from './session'
 import { chooseCategory } from './category'
+import { fillDetails } from './spending-details'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
@@ -62,7 +63,7 @@ async function writeSpending(page: Page, amount: string, note: string): Promise<
   await page.waitForTimeout(400)
   await sheet.getByLabel('Сумма').fill(amount)
   await chooseCategory(page, 'Кафе и рестораны')
-  await sheet.getByLabel(/Что это/).fill(note)
+  await fillDetails(page, { note })
 }
 
 test('счёт, трата с него, «без счёта» в сверке — и сверка сходится, когда счёт выбран', async ({

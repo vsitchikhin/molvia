@@ -2,9 +2,11 @@
   <component
     :is="link ? 'a' : 'button'"
     class="nav-row"
+    :class="{ 'nav-field': field, 'nav-invalid': invalid }"
     :type="link ? undefined : 'button'"
     :href="link?.href.value"
     :aria-haspopup="link ? undefined : 'dialog'"
+    :aria-invalid="invalid ? 'true' : undefined"
     @click="click"
   >
     <component :is="icon" v-if="icon" class="icon" aria-hidden="true" />
@@ -26,6 +28,12 @@ import IconChevronRight from '~icons/mdi/chevron-right'
  * is a link to a screen; without, a button that opens a sheet with fields — `aria-haspopup="dialog"`
  * says so before the press. The chevron is always there: an entry always goes on (В-14 «а»), and a
  * row that acts at once or asks to confirm is a `ListRow` with no chevron.
+ *
+ * `field` is the same entry standing in a form among its fields — «Сегодня · без заметки ›» under the
+ * chips (MOL-199, Ф-3): the well of a field, as «Счёт ›» above it, not a row of a list card, which in a
+ * form read as plain text. `invalid` marks a field behind it that holds an error. Their classes are the
+ * kit's own words: a root carries the scope of the screen it stands in, and the spending sheet's own
+ * `.field` — its column of a label and a field — stood the row in a column (adversarial А1 of MOL-199).
  */
 export default defineComponent({
   name: 'NavRow',
@@ -35,6 +43,8 @@ export default defineComponent({
     label: { type: String, required: true },
     value: { type: String, default: '' },
     icon: { type: [Object, Function] as PropType<Component>, default: undefined },
+    field: { type: Boolean, default: false },
+    invalid: { type: Boolean, default: false },
   },
   emits: { click: (event: MouseEvent) => event instanceof MouseEvent },
   setup(props, { emit }) {
@@ -87,6 +97,33 @@ export default defineComponent({
   }
 }
 
+/* A field's well, as `AccountRow`: under the pointer the tint, where muted text is under 4.5:1 (MOL-172). */
+.nav-field {
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border: var(--hairline) solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+
+  @media (hover: hover) {
+    &:hover {
+      background: var(--accent-tint);
+
+      .value {
+        color: var(--text);
+      }
+    }
+  }
+
+  &:focus-visible {
+    @include focus-ring(2px);
+  }
+
+  &.nav-invalid {
+    border-color: var(--bad);
+    box-shadow: inset 0 0 0 var(--hairline) var(--bad);
+  }
+}
+
 .icon {
   @include icon;
 
@@ -94,8 +131,12 @@ export default defineComponent({
   color: var(--text-muted);
 }
 
+/* No width of its own (`width: 0` beside `flex: 1`), as `AccountRow`'s value: `min-width: 0` lets it
+   shrink, but its whole line still counted in the sheet's least width, and a note of 32 letters made
+   the spending sheet wider than the phone (adversarial А3 of MOL-199). */
 .label {
   flex: 1;
+  width: 0;
   min-width: 0;
   overflow: hidden;
   font-weight: var(--weight-medium);

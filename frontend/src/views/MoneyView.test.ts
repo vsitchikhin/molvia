@@ -632,14 +632,18 @@ describe('MoneyView: what the review found (MOL-82)', () => {
     amount.value = '500'
     amount.dispatchEvent(new Event('input'))
     dialog?.querySelector<HTMLInputElement>(`input[value="${BEAUTY}"]`)?.click()
+    // The day is behind «Дата, заметка, место» (MOL-199), and its error is said there.
+    dialog?.querySelector<HTMLButtonElement>('.nav-row.nav-field')?.click()
+    await risen()
+    const open = () => [...document.querySelectorAll('dialog[open]')].map((one) => one.textContent)
     for (const day of ['', '1999-12-31']) {
-      const date = dialog?.querySelector<HTMLInputElement>('input[type=date]')
+      const date = document.querySelector<HTMLInputElement>('dialog[open] input[type=date]')
       if (!date) throw new Error('no date')
       date.value = day
       date.dispatchEvent(new Event('input'))
       await flushPromises()
       await pressUntil(en.spending.sheet.save, () => {
-        expect(dialog?.textContent).toContain(en.spending.sheet.bad_day)
+        expect(open().join(' ')).toContain(en.spending.sheet.bad_day)
       })
     }
     expect(useSpendingQueueStore().pending).toEqual([])

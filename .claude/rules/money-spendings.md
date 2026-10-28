@@ -556,6 +556,42 @@ nothing up.
   «Сохранить» with nothing changed writes nothing; **a name kept as it was is not checked again**
   (adversarial А2): the server has it, and a preset's name in the language of this screen refused a
   new icon to one made on a screen in another.
+- **The day, the note and the place are behind one line, «Дата, заметка, место»** (MOL-199, Ф-17 of
+  MOL-118): almost never changed — the day is today, the two others optional — they took three fields
+  under the chips and pushed the form off the screen. The line is the kit's `NavRow` drawn as a field
+  (`field`, the well of «Счёт ›» over it) and says what is behind it: the day as a card heads it
+  (`dayWords` — «Сегодня», «Вчера», «28 сент.»), the note and the place as typed, never quoted, or «без
+  заметки» (`detailsLine`); its name is the whole line. «Nothing typed» is what draws nothing
+  (`drawsNothing`, the one list `INVISIBLE`): by JavaScript's trim a pasted U+200B left «Сегодня · » with
+  a dot hanging (adversarial А2) — **and so it is for «Сохранить трату»**, which saves such a note as none:
+  refused there by the same trim, the line said «без заметки» and the sheet «нельзя сохранить» of one
+  empty field (self-review 6). **The fields are the spending sheet's own**
+  (`SpendingDetailsSheet` shows them): «‹», Esc, «back», a pull down and «Готово» all keep what was
+  typed — there was no undo with them in the form either — and nothing is checked there. **«Сохранить
+  трату» opens it on the field it finds wrong, only when that is the first one wrong** in the order of
+  the form — the sum, «списано», a chip, then the day, the note, the place: opened over an error above
+  it, it would hide that error. **While a field behind it is wrong the line is marked** (`invalid`, a
+  `--bad` edge and `aria-invalid`, as «Счёт ›» with an account refused): gone back with «‹», the error was
+  nowhere on the sheet, and «Сохранить» seemed to open the details by itself. **The prices, named:** a
+  day of another year is «28 сент.» with no year, as `dayWords` says it everywhere — the field behind
+  says it whole; the focus put on a field as the details open raises no keyboard on iOS, which takes a
+  tap — the field is focused and its error said; and Enter there does nothing, as in the form before:
+  «Готово» is in the footer, out of the fields' way; at 320 the line is cut by «…» even as «Сегодня · без
+  заметки» (185 px of words in a label of 166) — from 375 it fits, and its name is whole; and the sheet
+  over the spending runs in Chromium alone — WebKit keeps no `Secure` cookie on the loopback and opens
+  no «Деньги» (`e2e.md`): «‹», Esc and the focus given back are `BottomSheet`'s, held on WebKit by
+  `sheet.spec` on the kit.
+- **The summary of a trip's spending loads its items as their shape** (MOL-199, Ф-13, Ф-15): four rows
+  «name · sum» of bars in the card of the items, through `ScreenSkeleton` — 1.35:1 on `--surface-2` in
+  the light scheme, 1.39 in the dark, over the 1.31 of the ground under a caption — and failed, the kit's
+  quiet card with «Повторить», which reads the trip again (MOL-180, owner's В-1 «а»: the handoff's line
+  inside the card of the items would have been a second look of a section's error). Offline is the line
+  of the code: the screen's strip under the sheet says it, and there is nothing to retry. **Only the
+  latest read is laid** (`reading`, self-review 1): «Повторить» over a server that hangs, the sheet opened
+  again and read, and the first read's refusal came last over the items. **The price, named**
+  (self-review 2): the quiet card goes with the focus on its «Повторить», and the kit gives it to the
+  screen's title, which is inert under the sheet — the focus falls to the page, as a `StatusStrip`'s does
+  in a sheet (`frontend.md`); the kit's task of the focus in a sheet is MOL-317.
 - **«Категории» stands in three groups** (owner's В-2 «а» of MOL-285): «Готовые» with a quiet
   «Убрать» in the tail, «Свои» — rows that open their sheet, with the chevron and no button, since a
   card never mixes the two (MOL-175, В-14) — and «Убранные» with «Вернуть»; each only when it has a

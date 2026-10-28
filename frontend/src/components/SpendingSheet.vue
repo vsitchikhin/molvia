@@ -38,11 +38,26 @@
           <p class="note">{{ t('accounts.trip_hint') }}</p>
         </div>
       </AppReveal>
-      <p v-if="items === 'loading'" class="note">{{ t('state.loading') }}</p>
+      <!-- The answer's shape (Ф-13): four rows «name · sum» in the card of the items. -->
+      <ScreenSkeleton v-if="items === 'loading'">
+        <ul class="items">
+          <li v-for="n in 4" :key="n" class="item ghost-item">
+            <span class="ghost-line"><span class="ghost-bar ghost-name"></span></span>
+            <span class="ghost-line"><span class="ghost-bar ghost-amount"></span></span>
+          </li>
+        </ul>
+      </ScreenSkeleton>
       <p v-else-if="items === 'offline'" class="note">
         {{ t('spending.sheet.trip_items_offline') }}
       </p>
-      <p v-else-if="items === 'error'" class="note">{{ t('spending.sheet.trip_items_error') }}</p>
+      <!-- A section's error is the kit's quiet card (MOL-180, owner's В-1 «а» of MOL-199). -->
+      <ScreenState
+        v-else-if="items === 'error'"
+        kind="error"
+        inline
+        :title="t('spending.sheet.trip_items_error')"
+        @retry="retryItems"
+      />
       <ul v-else class="items">
         <li v-for="item in items" :key="item.id" class="item">
           <span class="item-name">
@@ -57,8 +72,9 @@
     </div>
 
     <form v-else class="form" novalidate @submit.prevent="submit">
-      <p v-if="!online" class="strip offline">{{ t('spending.sheet.offline') }}</p>
-      <p v-if="refusalText" class="strip refused" role="alert">{{ refusalText }}</p>
+      <!-- The kit's strip, in the sheet's words (Ф-14, MOL-181): never red, and «Сохранить трату» works. -->
+      <StatusStrip v-if="!online" kind="offline" :text="t('spending.sheet.offline')" />
+      <p v-if="refusalText" class="refused" role="alert">{{ refusalText }}</p>
 
       <div class="field">
         <label :for="amountId" class="label">{{ t('spending.sheet.amount') }}</label>
@@ -97,7 +113,7 @@
 
       <!-- Where the money came from, beside the sum it is about (handoff 06). No account at all —
            no row: the sheet is as it was before accounts. -->
-      <template v-if="showsAccounts">
+      <div v-if="showsAccounts" class="field">
         <AccountRow
           :label="t('accounts.picker.row_spending')"
           :account="account"
@@ -113,7 +129,7 @@
             @update:model-value="debitedBad = false"
           />
         </AppReveal>
-      </template>
+      </div>
 
       <CategoryChips
         v-model="categoryId"
@@ -127,41 +143,16 @@
         @lift="lead = $event"
       />
 
-      <AppField
-        v-model="day"
-        :label="t('spending.sheet.date')"
-        kind="date"
-        min="2000-01-02"
-        :max="latest"
-        :display="dayWords"
-        :error-text="dayBad ? t('spending.sheet.bad_day') : null"
-        @update:model-value="dayBad = false"
+      <!-- The day, the note and the place behind one line (MOL-199, Ф-17): almost never changed, they
+           took three fields under the chips and pushed the form off the screen. -->
+      <NavRow
+        field
+        :icon="IconCalendar"
+        :label="details"
+        :aria-label="t('spending.sheet.details_label', { value: details })"
+        :invalid="dayBad || noteBad || placeBad"
+        @click="openDetails(null)"
       />
-
-      <AppField
-        v-model="note"
-        :label="t('spending.sheet.note')"
-        :placeholder="t('spending.sheet.note_placeholder')"
-        :maxlength="textMax"
-        :error-text="noteBad ? t('spending.sheet.bad_text') : null"
-        enterkeyhint="next"
-      >
-        <template #label-extra>
-          <span class="optional">{{ t('spending.sheet.optional') }}</span>
-        </template>
-      </AppField>
-      <AppField
-        v-model="place"
-        :label="t('spending.sheet.place')"
-        :placeholder="t('spending.sheet.place_placeholder')"
-        :maxlength="textMax"
-        :error-text="placeBad ? t('spending.sheet.bad_text') : null"
-        enterkeyhint="done"
-      >
-        <template #label-extra>
-          <span class="optional">{{ t('spending.sheet.optional') }}</span>
-        </template>
-      </AppField>
 
       <!-- Last in the form and never in the footer: a second action must not argue with
            «Сохранить» under the thumb (handoff 02). Nothing typed goes to the trip — there a
@@ -217,6 +208,21 @@
     @pick="pickCategory"
     @add="$emit('add-category')"
   />
+  <SpendingDetailsSheet
+    v-model:open="detailsOpen"
+    v-model:day="day"
+    v-model:note="note"
+    v-model:place="place"
+    :latest="latest"
+    :display="dayWords"
+    :day-bad="dayBad"
+    :note-bad="noteBad"
+    :place-bad="placeBad"
+    :focus="detailsFocus"
+    @update:day="dayBad = false"
+    @update:note="noteBad = false"
+    @update:place="placeBad = false"
+  />
 </template>
 
 <script lang="ts">
@@ -225,6 +231,7 @@ import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconAlert from '~icons/mdi/alert-circle-outline'
+import IconCalendar from '~icons/mdi/calendar-blank-outline'
 import IconCart from '~icons/mdi/cart-outline'
 import IconCheck from '~icons/mdi/check'
 import IconDelete from '~icons/mdi/trash-can-outline'
@@ -232,11 +239,11 @@ import IconInfo from '~icons/mdi/information-outline'
 import { ApiError } from '@molvia/client'
 import {
   ERROR,
-  SPENDING_TEXT_MAX,
   convertAcross,
   currencySchema,
   currencySign,
   decimalFromMinor,
+  drawsNothing,
   formatEstimate,
   formatMoney,
   formatQuantity,
@@ -251,16 +258,32 @@ import { api } from '@/api'
 import AccountPickerSheet from '@/components/AccountPickerSheet.vue'
 import AccountRow from '@/components/AccountRow.vue'
 import AppButton from '@/components/AppButton.vue'
-import AppField from '@/components/AppField.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import CategoryChips from '@/components/CategoryChips.vue'
 import CategoryPickerSheet from '@/components/CategoryPickerSheet.vue'
 import ChargedField from '@/components/ChargedField.vue'
+import NavRow from '@/components/NavRow.vue'
+import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import ScreenState from '@/components/ScreenState.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
+import SpendingDetailsSheet from '@/components/SpendingDetailsSheet.vue'
 import { defaultAccount, pageOrder } from '@/components/accounts'
-import { bankWords, categoryColour, chipOrder, groceriesOf, rateWords } from '@/components/spending'
-import type { JournalRow, Removed, SpendingTarget } from '@/components/spending'
+import {
+  bankWords,
+  categoryColour,
+  chipOrder,
+  detailsLine,
+  groceriesOf,
+  rateWords,
+} from '@/components/spending'
+import type {
+  JournalRow,
+  Removed,
+  SpendingDetailsField,
+  SpendingTarget,
+} from '@/components/spending'
 import { shown } from '@/composables/useItemDetails'
 import { calendarDay, localDay, shiftDay } from '@/days'
 import { afterStep, useNavigation } from '@/navigation'
@@ -293,7 +316,6 @@ export default defineComponent({
     AccountPickerSheet,
     AccountRow,
     AppButton,
-    AppField,
     AppReveal,
     BottomSheet,
     CategoryChips,
@@ -304,7 +326,12 @@ export default defineComponent({
     IconCheck,
     IconDelete,
     IconInfo,
+    NavRow,
+    ScreenSkeleton,
+    ScreenState,
     SegmentedControl,
+    SpendingDetailsSheet,
+    StatusStrip,
   },
   props: {
     open: { type: Boolean, required: true },
@@ -363,7 +390,12 @@ export default defineComponent({
     const dayBad = ref(false)
     const placeBad = ref(false)
     const amountInput = ref<HTMLInputElement | null>(null)
+    const detailsOpen = ref(false)
+    /** The field «Дата, заметка, место» opens on: the first wrong one, none for a tap on its line. */
+    const detailsFocus = ref<SpendingDetailsField | null>(null)
     const items = ref<TripItem[] | 'loading' | 'offline' | 'error'>('loading')
+    /** Which read of the items is the latest: an answer of an earlier one changes nothing. */
+    let reading = 0
     let after: (() => void) | null = null
 
     // The account (MOL-123, handoff 06): the screen puts the default in, the server never guesses.
@@ -497,6 +529,7 @@ export default defineComponent({
         order.value = chipOrder(choice.value, props.frequent).map((category) => category.id)
         lead.value = categoryId.value
         moreOpen.value = false
+        detailsOpen.value = false
         amountBad.value = false
         categoryBad.value = false
         noteBad.value = false
@@ -560,10 +593,14 @@ export default defineComponent({
     )
 
     async function loadTrip(row: TripRow): Promise<void> {
+      const mine = ++reading
       items.value = 'loading'
       try {
         const trip = await api.trip(row.tripId)
-        // Another trip opened meanwhile: this answer is not its account (review 8).
+        // Another trip opened meanwhile: this answer is not its account (review 8). Nor is a read the
+        // sheet made before the one in hand — the same trip opened again, or «Повторить» over a server
+        // that hung: its answer would put back what the later one replaced (self-review 1 of MOL-199).
+        if (mine !== reading) return
         if (props.target.kind !== 'trip' || props.target.row.tripId !== row.tripId) return
         tripView.value = trip
         accountId.value = trip.accountId
@@ -578,9 +615,15 @@ export default defineComponent({
           }))
       } catch (error) {
         reportFailure(error, 'screen')
+        if (mine !== reading) return
         const answered = error instanceof ApiError && error.answered
         items.value = !answered && !navigator.onLine ? 'offline' : 'error'
       }
+    }
+
+    /** «Повторить» of the items (Ф-15): the trip read again — the same read the opening made. */
+    function retryItems(): void {
+      if (props.target.kind === 'trip') void loadTrip(props.target.row)
     }
 
     const title = computed(() => {
@@ -626,6 +669,20 @@ export default defineComponent({
 
     /** A day the server takes: a calendar day from 2000 on, and not after `latest`. */
     const dayGood = computed(() => isRateDay(day.value) && day.value <= latest.value)
+
+    const details = computed(() =>
+      detailsLine(
+        { day: day.value, note: note.value, place: place.value },
+        locale.value,
+        today.value,
+        t('spending.sheet.details_none'),
+      ),
+    )
+
+    function openDetails(focus: SpendingDetailsField | null): void {
+      detailsFocus.value = focus
+      detailsOpen.value = true
+    }
 
     // A cleared field — «Сбросить» of the iOS picker — is no day to name, and a date nobody can
     // print must not take the sheet down with it (adversarial Д2).
@@ -788,10 +845,10 @@ export default defineComponent({
       return t('spending.sheet.refused', { reason })
     })
 
-    const textMax = SPENDING_TEXT_MAX
-
+    // Nothing typed is what draws nothing — the measure of the line «Дата, заметка, место» too: a pasted
+    // U+200B read «без заметки» there and was refused here (self-review 6 of MOL-199).
     function text(value: string): { value?: string; bad: boolean } {
-      if (!value.trim()) return { bad: false }
+      if (drawsNothing(value)) return { bad: false }
       const checked = spendingTextSchema.safeParse(value)
       return checked.success ? { value: checked.data, bad: false } : { bad: true }
     }
@@ -819,12 +876,13 @@ export default defineComponent({
         charge === 'bad'
       ) {
         await nextTick()
-        // The first field that is wrong gets the focus (handoff 02).
+        // The first field that is wrong gets the focus (handoff 02), in the order of the form: the sum,
+        // «списано», a chip — and only then the fields behind «Дата, заметка, место», whose sheet opens
+        // on the wrong one (MOL-199). Opened over an error above it, it would hide the error.
         if (!value) amountInput.value?.focus()
-        else
-          document
-            .querySelector<HTMLInputElement>('.chips-field input, .form [aria-invalid="true"]')
-            ?.focus()
+        else if (charge === 'bad' || !chosen)
+          document.querySelector<HTMLInputElement>('.form [aria-invalid="true"]')?.focus()
+        else openDetails(dayBad.value ? 'day' : typedNote.bad ? 'note' : 'place')
         return
       }
       const fields: SpendingFields = {
@@ -935,6 +993,11 @@ export default defineComponent({
       lead,
       moreOpen,
       pickCategory,
+      details,
+      detailsOpen,
+      detailsFocus,
+      openDetails,
+      IconCalendar,
       day,
       today,
       latest,
@@ -972,13 +1035,13 @@ export default defineComponent({
       saveTripCharge,
       refusal,
       refusalText,
-      textMax,
       submit,
       remove,
       dismiss,
       toTrip,
       openTrip,
       afterClose,
+      retryItems,
     }
   },
 })
@@ -991,12 +1054,13 @@ export default defineComponent({
   gap: var(--space-2);
 }
 
+/* 24 between the groups, 8 within one — a label, its field, its error or hint (Ф-10). A column, not a
+   grid: a block of it grows and goes by `AppReveal`, which takes a flex column's gap back with the
+   block — a grid's stays and jumped (MOL-151, adversarial Б2). */
 .form {
-  /* A column, not a grid: a block of it grows and goes by `AppReveal`, which takes a flex
-     column's gap back with the block — a grid's stays and jumped (MOL-151, adversarial Б2). */
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-6);
   padding: var(--space-4);
 }
 
@@ -1077,29 +1141,15 @@ export default defineComponent({
   font-variant-numeric: tabular-nums;
 }
 
-.optional {
-  margin-left: var(--space-1);
-  color: var(--text-muted);
-  font-weight: var(--weight-regular);
-}
-
-.strip {
+.refused {
   @include appear;
 
   margin: 0;
   padding: var(--space-3);
   border-radius: var(--radius);
+  background: var(--bad-tint);
+  color: var(--bad-ink);
   font-size: var(--text-footnote);
-
-  &.offline {
-    background: var(--warn-tint);
-    color: var(--warn-ink);
-  }
-
-  &.refused {
-    background: var(--bad-tint);
-    color: var(--bad-ink);
-  }
 }
 
 .shop {
@@ -1121,6 +1171,7 @@ export default defineComponent({
   }
 }
 
+/* Quiet (Ф-4): the whole card is pressed, and the accent is «Покупки ›» alone. */
 .shop-icon {
   display: grid;
   flex: none;
@@ -1128,8 +1179,8 @@ export default defineComponent({
   width: 2.25rem;
   height: 2.25rem;
   border-radius: var(--radius-pill);
-  background: var(--accent-tint);
-  color: var(--accent-ink);
+  background: var(--surface-2);
+  color: var(--text-muted);
 
   svg {
     @include icon;
@@ -1215,6 +1266,45 @@ export default defineComponent({
 
   & + & {
     border-top: var(--hairline) solid var(--border);
+  }
+}
+
+/* A row of bars stands as tall as a row of the answer: each bar in the middle of a line of the words it
+   stands for, at their size and leading (MOL-178). */
+.ghost-item {
+  align-items: center;
+}
+
+.ghost-line {
+  display: flex;
+  align-items: center;
+  height: calc(1em * var(--leading-body));
+}
+
+.ghost-bar {
+  @include skeleton-bar;
+
+  height: var(--skeleton-line);
+}
+
+/* The uneven cycle of a list's bars (MOL-178), so four rows do not read as one block. */
+.ghost-name {
+  width: 9rem;
+
+  .ghost-item:nth-child(2) & {
+    width: 11rem;
+  }
+
+  .ghost-item:nth-child(3) & {
+    width: 7rem;
+  }
+}
+
+.ghost-amount {
+  width: 3.5rem;
+
+  .ghost-item:nth-child(even) & {
+    width: 2.75rem;
   }
 }
 
