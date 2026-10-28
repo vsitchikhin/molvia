@@ -216,6 +216,18 @@ export const recentPlacesResponseSchema = z.strictObject({
 export type RecentPlacesResponse = z.infer<typeof recentPlacesResponseSchema>
 
 /**
+ * «Брали здесь в прошлый раз» (MOL-209): the items of the person's last finished trip at the
+ * trip's place before it, each once, in the order they were first bought there. `previous` names
+ * that trip and its moment in «Записаны», so the phone can tell it from the trips it remembers
+ * by itself (В-1); `null` — no such trip, and then no items.
+ */
+export const previousItemsResponseSchema = z.strictObject({
+  previous: z.strictObject({ tripId: z.uuid(), at: isoDate }).nullable(),
+  items: z.array(catalogueEntryCodec),
+})
+export type PreviousItemsResponse = z.output<typeof previousItemsResponseSchema>
+
+/**
  * The total converted for display, or nothing. An estimate, never a fact — so one that does not
  * fit is shown as none rather than refusing the purchase the trip is being written with: the
  * answer is built inside the writer's transaction, and a throw here would undo the expense

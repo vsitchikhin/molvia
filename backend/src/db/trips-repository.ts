@@ -190,6 +190,20 @@ export interface TripRepository {
   ): Promise<Trip | null>
   /** The minute timer: removals past their ten minutes deleted, their purchases by cascade. */
   purgeStale(): Promise<void>
+  /**
+   * «Брали здесь в прошлый раз» (MOL-209): the person's last finished trip at this trip's place
+   * before it, in the order of «Записаны», and its items. `null` when the trip is not the owner's
+   * — a stranger's, a missing one, one removed — as `byId` answers.
+   */
+  previousPurchases(id: string, actorId: string, limit: number): Promise<PreviousPurchases | null>
+}
+
+/** What «Брали здесь в прошлый раз» is built from (MOL-209). */
+export interface PreviousPurchases {
+  /** The previous trip and its moment in «Записаны», or `null` — none, and then no items. */
+  readonly previous: { readonly tripId: string; readonly at: Date } | null
+  /** Its items, each once, in the order they were first bought in it. */
+  readonly itemIds: readonly string[]
 }
 
 type TripRow = typeof trips.$inferSelect
@@ -651,6 +665,52 @@ export function createTripRepository(db: Conn): TripRepository {
           return toTrip(theRow(row, 'trips'))
         }),
       )
+    },
+
+    async previousPurchases(id, actorId, limit) {
+      if (idOrNull(id) === null || idOrNull(actorId) === null) return null
+
+      const [self] = await db
+        .select({ placeId: trips.placeId, finishedAt: trips.finishedAt })
+        .from(trips)
+        .where(ownedBy(id, actorId))
+        .limit(1)
+      if (!self) return null
+
+      // The order of «Записаны» (`history`): the moment the phone named, else the server's. A
+      // finished trip looks before itself in that order, by the row itself rather than a moment
+      // handed back through JS, which keeps milliseconds of a column that holds microseconds.
+      const time = sql`coalesce(${trips.finishedOnDeviceAt}, ${trips.finishedAt})`
+      const [previous] = await db
+        .select({ tripId: trips.id, at: sql<Date>`${time}`.mapWith(trips.finishedAt) })
+        .from(trips)
+        .where(
+          and(
+            eq(trips.actorId, actorId),
+            eq(trips.placeId, self.placeId),
+            isNotNull(trips.finishedAt),
+            isNull(trips.deletedAt),
+            sql`${trips.id} <> ${id}`,
+            // A trip with nothing in it says nothing of what was taken there (Р-1): a receipt with
+            // no lines (MOL-227), every purchase removed — the one before it speaks instead.
+            sql`exists (select 1 from ${expenses} e where e.trip_id = ${trips.id})`,
+            self.finishedAt
+              ? sql`(${time}, ${trips.id}) < (select coalesce(s.finished_on_device_at, s.finished_at), s.id from ${trips} s where s.id = ${id})`
+              : undefined,
+          ),
+        )
+        .orderBy(sql`${time} desc`, desc(trips.id))
+        .limit(1)
+      if (!previous) return { previous: null, itemIds: [] }
+
+      const rows = await db
+        .select({ itemId: expenses.itemId })
+        .from(expenses)
+        .where(eq(expenses.tripId, previous.tripId))
+        .groupBy(expenses.itemId)
+        .orderBy(sql`min(${expenses.createdAt})`, expenses.itemId)
+        .limit(rowLimit(limit))
+      return { previous, itemIds: rows.map((row) => row.itemId) }
     },
 
     async purgeStale() {

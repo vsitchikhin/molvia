@@ -69,6 +69,7 @@ import { heavyFeedbackLimit, sendFeedback } from '@/usecases/send-feedback'
 import { feedbackFromBot } from '@/usecases/feedback-from-bot'
 import { completeLogin } from '@/usecases/complete-login'
 import { currentTrip, selectedTrip } from '@/usecases/current-trip'
+import { previousItems } from '@/usecases/previous-items'
 import { proposeItem } from '@/usecases/propose-item'
 import { embedMissing, startItemEmbedding } from '@/usecases/embed-items'
 import { mergeTick } from '@/usecases/merge-twins'
@@ -1132,6 +1133,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         start: (actor, body) => startTrip(transact, actor, body),
         current: (actorId) => currentTrip(tripData, actorId),
         selected: (actorId, id) => selectedTrip(tripData, actorId, id),
+        previousItems: (actorId, id) => previousItems(tripData, actorId, id),
         history: (actorId, cursor) => tripData.trips.history(actorId, cursor),
         add: (actorId, tripId, body) => addExpense(transact, actorId, tripId, body),
         update: (actorId, tripId, expenseId, patch) =>

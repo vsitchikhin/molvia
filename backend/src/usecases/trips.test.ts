@@ -30,6 +30,7 @@ import type { SearchPickRepository } from '@/db/search-picks-repository'
 import type { TripRepository, TripSnapshot } from '@/db/trips-repository'
 import type { Transact, TripRepositories } from '@/db/unit-of-work'
 import { currentTrip } from './current-trip'
+import { PREVIOUS_ITEMS_LIMIT, previousItems } from './previous-items'
 import { RECENT_PLACES, recentPlaces } from './recent-places'
 import { startTrip } from './start-trip'
 import { addExpense, finishTrip, removeExpense, setReceipt, updateExpense } from './trip-expenses'
@@ -135,6 +136,7 @@ function fakeRepositories(
       remove: unexpected('trips.remove'),
       restore: unexpected('trips.restore'),
       purgeStale: unexpected('trips.purgeStale'),
+      previousPurchases: unexpected('trips.previousPurchases'),
       ...overrides.trips,
     },
     expenses: {
@@ -773,6 +775,64 @@ describe('recentPlaces', () => {
 
     expect(await recentPlaces(places, ACTOR)).toEqual([place])
     expect(calls).toEqual([[ACTOR, RECENT_PLACES, undefined]])
+  })
+})
+
+describe('previousItems (MOL-209)', () => {
+  it('asks for the owner’s trip with the limit, and answers the items as cards in its order', async () => {
+    const bread = itemSchema.parse({
+      ...milk,
+      id: 'aa11aa22-bb33-4c44-8d55-ee6677889900',
+      name: 'Хлеб',
+    })
+    const calls: unknown[][] = []
+    const previous = { tripId: 'ee11ee22-ff33-4a44-8b55-cc6677889900', at: new Date('2026-10-01') }
+    const repositories = fakeRepositories({
+      trips: {
+        previousPurchases: (...args) => {
+          calls.push(args)
+          return Promise.resolve({ previous, itemIds: [bread.id, milk.id] })
+        },
+      },
+      // In the order of ids, as the repository reads them — not the order bought.
+      items: { byIds: () => Promise.resolve([milk, bread]) },
+    })
+
+    const answer = await previousItems(repositories, ACTOR, TRIP)
+    expect(calls).toEqual([[TRIP, ACTOR, PREVIOUS_ITEMS_LIMIT]])
+    expect(answer.previous).toEqual(previous)
+    expect(answer.items.map((entry) => entry.name)).toEqual(['Хлеб', 'Молоко «Ашхар»'])
+    expect(Object.keys(answer.items[0] ?? {})).not.toContain('createdBy')
+  })
+
+  it('no previous trip is an answer with nothing in it', async () => {
+    const repositories = fakeRepositories({
+      trips: { previousPurchases: () => Promise.resolve({ previous: null, itemIds: [] }) },
+      items: { byIds: () => Promise.resolve([]) },
+    })
+    expect(await previousItems(repositories, ACTOR, TRIP)).toEqual({ previous: null, items: [] })
+  })
+
+  it('a trip not the owner’s is not found', async () => {
+    const repositories = fakeRepositories({
+      trips: { previousPurchases: () => Promise.resolve(null) },
+    })
+    await expect(previousItems(repositories, ACTOR, TRIP)).rejects.toMatchObject({
+      code: ERROR.NOT_FOUND,
+    })
+  })
+
+  it('an item the read did not bring back is a defect, never a «not found»', async () => {
+    const repositories = fakeRepositories({
+      trips: {
+        previousPurchases: () =>
+          Promise.resolve({ previous: { tripId: TRIP, at: new Date() }, itemIds: [milk.id] }),
+      },
+      items: { byIds: () => Promise.resolve([]) },
+    })
+    const failure = await previousItems(repositories, ACTOR, TRIP).catch((error: unknown) => error)
+    expect(failure).toBeInstanceOf(Error)
+    expect(failure).not.toHaveProperty('code')
   })
 })
 
