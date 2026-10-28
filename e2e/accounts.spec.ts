@@ -222,6 +222,8 @@ test('четыре шторки от сверки: Esc и «назад» сни�
   const chips = spending.locator('.chips').getByRole('radio')
   await expect(chips.first()).toHaveAccessibleName('Метро')
   await expect(chips.first()).toBeChecked()
+  // The focus goes back to «Ещё…», the list's opener (review 1, №7).
+  await expect(spending.getByRole('button', { name: 'Ещё…' })).toBeFocused()
 
   // One more Esc is the spending's: the check is the one left.
   await page.keyboard.press('Escape')
