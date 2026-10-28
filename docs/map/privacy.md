@@ -6,6 +6,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 ## packages/model
 
 - `packages/model/src/contracts/export.ts` — Contract of «Скачать мои данные» (MOL-93): the file whole — header, version and a section for everything erasure removes — with money, quantity and rates as decimal strings and no enum or band a stored row may predate.
+- `packages/model/src/entities/silence.ts` — Two years of silence (MOL-239): the years, the warnings 30 and 7 days before, a day between them, a week after the last; the countries whose day it is, and the day and the days left in a zone.
 - `packages/model/src/contracts/consent.ts` — Contract of the consent to the terms and the privacy page (MOL-95): `POLICY_VERSION`, raised by hand for a change that matters; the edition a person accepted, the body that accepts one, and `consentNeeded` — whether this build asks.
 
 ## backend · usecases
@@ -21,6 +22,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 ## backend · db
 
 - `backend/src/db/erasure-repository.ts` — Repository of erasure: everything about one Telegram id in one transaction, a dry run rolled back; `ACTOR_REFERENCES` names every key to `actors`. Tests: `backend/tests/erasure.integration.test.ts`.
+- `backend/src/db/silence-repository.ts` — Repository of two years of silence (MOL-239): the warning due by `last_seen_at` and the last one given, marked as handed in the same statement; who is due for erasure — the bot blocked, or the last warning a week old; `silentErasable`, the one rule erasure reads again under its locks.
 - `backend/src/db/export-repository.ts` — Repository of «Скачать мои данные» (MOL-93): everything of one owner as one read-only snapshot; `EXPORT_SECTION_OF` ties each erased table to its section, `EXPORT_COLUMNS` names every column as exported or left out and why. Tests: `backend/tests/export.integration.test.ts`.
 - `backend/src/db/failure.ts` — Postgres failures: foreign-key and unique violations turned into domain errors; `describeMigrationFailure`, a failed migration by its kind (`describeFailure` of the model, MOL-143) adds the statement that failed, DDL from our files, or the migrator's own words about a file of ours (MOL-153). Tests: `backend/tests/migration-log.integration.test.ts`.
 
@@ -40,6 +42,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 - `backend/tests/forget-bundle.integration.test.ts` — Integration test: the bundled `dist/forget.js` runs from the bundle alone, and `make forget` erases only with `YES=1` on the command line.
 - `backend/tests/life.ts` — Test support: `aLife`, a person touching every table erasure removes — the one life both the erasure and the export tests read.
 - `backend/tests/migration-log.integration.test.ts` — Integration test: a migration failing through drizzle's own migrator on a cast of a person's text is logged by its kind and statement, without the value Postgres puts into the message; a file the journal names and the folder lacks is named; a connection cut mid-migration still ends in that line; `make migrate` prints a failure the same way.
+- `backend/tests/silence.integration.test.ts` — Integration test of two years of silence (MOL-239): the first warning thirty days before and once, the last alone for a late bot and a day after the first, nothing to a blocked bot or a country at night, a login putting a warning out, two claims at once; erasure a week after the last warning, the blocked at the day, `erasures.silent`, a login under the lock winning; the day's run and the owner's numbers.
 - `backend/tests/request-log.integration.test.ts` — Integration test: a request is logged as method and path without the search query; an unknown address is neither logged with its query nor echoed.
 
 ## frontend · views

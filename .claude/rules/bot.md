@@ -12,14 +12,15 @@ paths:
   - 'bin/notify.sh'
   - 'backend/tests/reminders*.ts'
   - 'packages/model/src/{entities,contracts}/reminder.ts'
-  - 'packages/model/src/contracts/{receipt-notice,broadcast}.ts'
+  - 'packages/model/src/contracts/{receipt-notice,broadcast,silence}.ts'
+  - 'backend/src/usecases/silence.ts'
   - 'backend/tests/receipt-notices*'
   - 'frontend/src/views/BotView*'
   - 'frontend/src/components/BotSwitchRow*'
   - 'frontend/src/composables/{useReminders,useReceiptNotices}*'
 ---
 
-# The bot, and what it is allowed to know (MOL-55, MOL-58, MOL-101, MOL-129, MOL-237)
+# The bot, and what it is allowed to know (MOL-55, MOL-58, MOL-101, MOL-129, MOL-237, MOL-239)
 
 The bot did two things in 0.1, and 0.2 gives it a third — the rating reminder, below. It is the
 second half of the login: the one place a person is shown **which device** they are letting in and
@@ -598,3 +599,27 @@ plan in `.scratch/tasks/plans/MOL-237.md`.
   `make notify` and the bot print is the text and counts, never anyone.
 - **The privacy page names it** among the bot's messages under «Telegram» — a revision of edition 2,
   since «Если данные утекут» already promised it.
+
+## The warning before an erasure for silence (MOL-239)
+
+The account silent two years is erased (`privacy.md`), and the page promises the bot warns 30 and 7 days before.
+Owner's decisions of 28.10.2026 in `.scratch/tasks/requirements/MOL-239.md`.
+
+- **The API decides and marks as it hands out, the bot only sends** — the reminders' rule (Р-1, Р-2 of MOL-101).
+  `POST /internal/silence/claim`, every minute: the warnings due, marked on `actors` (`silence_warning`,
+  `silence_warned_at`) in the same statement under `for update skip locked`, so two claims never share a person. At
+  most once: a bot that dies after the claim loses that message, and the account goes a week after the mark.
+- **Only in the person's day** (Р-5): 10:00 to 20:00 by `timeZoneOf` of their country (`silenceSendCountries`);
+  outside every country's day the claim asks the database nothing. A step is due until sent, so it comes the next day.
+- **Never to a blocked bot** (`bot_blocked_at`), whatever else is off: the reminders off, no edition accepted, the
+  statistics off are no reason to stay silent — it is a duty, as the message about a leak is (Р-9).
+- **Russian, then English, in one message** (owner's В-2 «а»): nobody's language is kept, and a warning not understood
+  is data lost. Keys of the dictionary (`silence.warn`, `silence.days.*`), the date and the count by each language's own
+  rules. **«откройте приложение и войдите»**: after 180 days the session is gone, the app opens on the door, and only a
+  login marks the visit (MOL-238) — the bot is no visit, and has no button to keep the account (Р-12). The day and the
+  days left are the API's, in the person's zone: for the last warning, the day a week after it at the soonest.
+- **One URL button to the app**, a line of text on `http://`; sent through `deliver` — a 429 waited out once, a 403
+  marking the block by MOL-103's path, after which the account goes on its day unwarned.
+- **The owner hears how many** (В-3 «а»): the claim queues `silence` with the warnings by step, the day's run with the
+  accounts erased and how many of them had the bot blocked (`owner.silence.*`). A notice that fails to queue is reported
+  and the warnings still go — marked already, lost there they would be lost for good.
