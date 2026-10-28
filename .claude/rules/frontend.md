@@ -641,7 +641,37 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the strip is up (adversarial А1): taken, the strip took the sheet and what was typed in it. A
   second full error while the first holds the strip is drawn as the quiet card (А4); the same error
   turning a section's where it stands gives its focus back to «Повторить» (А2); and the error says
-  the version out loud in the row's place (`useUpdateAnnouncement`, А3). **A focus the strip loses is brought
+  the version out loud in the row's place (`useUpdateAnnouncement`, А3). **One exception, a screen
+  typed in** (`flow`, MOL-208, owner's В-20 «а»): on «Что взяли?» «не нашли» and «сервер не ответил»
+  come while the person types, and the strip at the bottom is under the keys on an iPhone — the
+  button seen only once the keyboard is put away. There the state keeps its own height and its
+  buttons right under the words, and takes no strip; an error stays the whole screen's — the circle,
+  «Повторить» filled, «Сообщить о проблеме», an alert — not the quiet card. **While a version waits it
+  offers «Обновить» there too, and the strip's row of the version steps aside for it**
+  (`useStateStrip().offer`, self-review №1): holding no strip, it left the row standing, and the
+  screen offered «Обновить» twice. **Its buttons stand side by side where they fit** (adversarial А5): on
+  the owner's iPhone the keys leave 395 px of a window of 699, and one under the other «Взять из
+  недавних» stood 41 px under them — side by side it stands with «Повторить», as «Обновить» does with
+  «Повторить» while a version waits (А6, the order of 8c kept); e2e measures on that window, not on the
+  Pixel of the project, which left 140 px the phone has not got. **The price, named:** «Сообщить о
+  проблеме», last and quietest, stands under the keys there (435), and so does «Взять из недавних»
+  while a version waits. **Narrower than 22rem the buttons keep 8 at their sides, not 16** (adversarial
+  А8): the Russian pair needed some 346 px and went one under the other on every iPhone of 375; with
+  8 it needs some 314 and stands side by side from a phone of 360 — a phone of 320 has them one under
+  the other, a price, and in English the error's words take a line more below some 386, which lowers
+  the block by 39. **They shrink, never stand past the column** (`flex: 1 1 auto`, self-review №7):
+  with Android's text at 150 % a button wider than the column wraps its words inside it. As wide as its
+  word, a button there is no block, so «Обновить» holds «Обновляем…» in its cell (MOL-225 above): a block
+  one swapped the word, grew by 14 px and moved «Повторить» beside it (adversarial А10). **The price,
+  named** (А11): as wide as «Обновляем…» at rest too, it stands 13 px wider, and below some 335 px in
+  Russian «Повторить» goes a row under it while a version waits — a narrow Android, no iPhone of the
+  floor. **A focus
+  on the row's «Обновить» goes to the error's «Обновить»** when the row steps aside for it (adversarial
+  А7, Ж of MOL-132 below) — a tick later, since the error's buttons come by a deferred `Teleport`. **A
+  dimmed state says nothing** (`silent`, adversarial А3): an empty answer left while the next is on its
+  way is for the text before, and its words leave the region until it is the answer again. **Always on that screen,
+  not «while the field holds the focus»**: a tap on the button takes the focus from the field first,
+  and a button moving to the strip on `blur` would leave the finger before the `click`. **A focus the strip loses is brought
   back by the frame** (MOL-194, adversarial Б2, Б3): a render that swaps the strip's actions under
   the focus — an account put away or deleted on another phone — left it on the body; it goes to the
   screen's first button in the strip, where the one it stood on was, or to the title where the strip

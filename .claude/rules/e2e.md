@@ -285,7 +285,7 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**
   (MOL-64). The app has one polite region, in `App.vue` above the router, and **eight things write
   to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the
-  count of an answer, and an empty answer's own words), `ItemDetailsSheet` (the price per unit, with
+  count of an answer, and a far answer's «не нашли»), `ItemDetailsSheet` (the price per unit, with
   «Тут дешевле», MOL-92), `VerdictCard` («Pick a rating»), `useSettings` (the form's notice),
   `YourDataGroup` («Файл готов», MOL-93) and `LoginView` («Ваши данные удалены», MOL-94). Whatever any of them
   says is on the screen twice, so a plain `getByText` matches two nodes and playwright's strict
@@ -294,7 +294,7 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   `.first()`; the region is not the place to fix it either, since the whole announcement is
   MOL-19's decision — a screen reader hears the state whole. **The heading when the block has
   one** (`getByRole('heading', { name: … })`), **the block's own container when it has none** —
-  the search's `.not-found-text`, the settings' `.dock`. Three things are easy to get wrong.
+  the far answer's `.far-title`, the settings' `.dock`. Three things are easy to get wrong.
   **A heading needs its name where the level is shared:** `{ level: 2 }` alone is not outside
   anything, because a state's `h2` is the level of a card's and a sheet's too, and an inline
   notice puts two of them on one screen (MOL-64, Н3). The `h1` is the exception rather than a

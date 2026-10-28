@@ -72,6 +72,14 @@ describe('routes', () => {
     expect(route.meta.tab).toBeUndefined()
   })
 
+  // The chevron of «Что взяли?» reads its parent's name: one word from the open record and the
+  // finished one, which are both a record named by its place (MOL-208, Е-13).
+  it('names both records the search opens from alike', async () => {
+    const open = await resolveAt('/purchases/manual')
+    const finished = await resolveAt('/purchases/aaaaaaaa-0000-4000-8000-000000000012')
+    expect(finished.meta.titleKey).toBe(open.meta.titleKey)
+  })
+
   // «Что брать» became home and «Поход» became «Покупки» (MOL-128): a bookmark or the history of
   // an installed app still arrives, and the old address is not left in the history of its own.
   it.each([
