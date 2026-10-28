@@ -21,7 +21,8 @@ export interface OwnCategories {
  * The owner's categories away from the month (MOL-123): the journal of an account, «не попали» and
  * the check name and draw a spending by its category, and a spending opened there is amended in the
  * sheet of «Деньги». They are the owner's, not a month's: any month kept on the phone names them,
- * and the server's list is asked once the screen is up — with the ones waiting in the queue on top.
+ * and the server's list is asked once the screen is up, and again whenever a write of the queue lands
+ * — with the ones waiting in the queue on top.
  */
 export function useOwnCategories(): OwnCategories {
   const { t } = useI18n()
@@ -47,6 +48,12 @@ export function useOwnCategories(): OwnCategories {
     }
   }
   onMounted(() => void load())
+  // A spending landed moves the chips' frequency, as «Деньги» read their month again on it (MOL-198,
+  // adversarial А3): the next sheet on an account's screen stands its chips by the order after it.
+  watch(
+    () => queue.landed,
+    () => void load(),
+  )
   watch(
     () => actor.id,
     (id) => {
