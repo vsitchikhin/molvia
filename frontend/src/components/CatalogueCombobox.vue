@@ -150,13 +150,12 @@ export default defineComponent({
       return `${id}-option-${String(index)}`
     }
 
-    // A new list is a new question: the row made active in the old one means nothing in it.
-    watch(
-      () => props.groups,
-      () => {
-        active.value = -1
-      },
-    )
+    // A new list is a new question: the row made active in the old one means nothing in it. Told by
+    // its rows and the query, never by the array: the screen builds its groups anew whenever the
+    // record it writes into is read again, with the very same rows (MOL-209, adversarial А3).
+    watch([() => rows.value.map((row) => row.id).join(), () => props.modelValue], () => {
+      active.value = -1
+    })
 
     // By the row's id, not its place among the list's children: the rows are in groups now.
     watch(active, async (index) => {

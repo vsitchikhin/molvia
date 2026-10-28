@@ -349,6 +349,28 @@ describe('the catalogue combobox', () => {
       await press(wrapper, 'Enter')
       expect(wrapper.emitted('pick')).toBeUndefined()
     })
+
+    it('forgets it when the query changes, even with the same rows', async () => {
+      const wrapper = combobox()
+      await press(wrapper, 'ArrowDown')
+      await wrapper.setProps({ modelValue: 'молоко' })
+
+      expect(field(wrapper).attributes('aria-activedescendant')).toBeUndefined()
+    })
+
+    // MOL-209, adversarial А3: the screen builds its groups anew whenever the record is read again.
+    it('«must not fire»: the same rows given anew keep the active row', async () => {
+      const wrapper = combobox()
+      await press(wrapper, 'ArrowDown')
+      await press(wrapper, 'ArrowDown')
+      await wrapper.setProps({ groups: found([milk, marianna, condensed]) })
+
+      expect(field(wrapper).attributes('aria-activedescendant')).toBe(
+        wrapper.findAll('[role="option"]')[1]?.attributes('id'),
+      )
+      await press(wrapper, 'Enter')
+      expect(wrapper.emitted('pick')).toEqual([[marianna]])
+    })
   })
 
   it('takes a row on a tap', async () => {
