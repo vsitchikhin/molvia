@@ -633,7 +633,7 @@ describe('MoneyView: what the review found (MOL-82)', () => {
     amount.dispatchEvent(new Event('input'))
     dialog?.querySelector<HTMLInputElement>(`input[value="${BEAUTY}"]`)?.click()
     // The day is behind «Дата, заметка, место» (MOL-199), and its error is said there.
-    dialog?.querySelector<HTMLButtonElement>('.nav-row.field')?.click()
+    dialog?.querySelector<HTMLButtonElement>('.nav-row.nav-field')?.click()
     await risen()
     const open = () => [...document.querySelectorAll('dialog[open]')].map((one) => one.textContent)
     for (const day of ['', '1999-12-31']) {

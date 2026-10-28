@@ -482,7 +482,7 @@ describe('MoneySpendingsView: the journal of the month (MOL-159)', () => {
     amount.dispatchEvent(new Event('input'))
     dialog?.querySelector<HTMLInputElement>(`input[value="${BEAUTY}"]`)?.click()
     // The day is behind «Дата, заметка, место» (MOL-199).
-    dialog?.querySelector<HTMLButtonElement>('.nav-row.field')?.click()
+    dialog?.querySelector<HTMLButtonElement>('.nav-row.nav-field')?.click()
     await risen()
     const date = document.querySelector<HTMLInputElement>('dialog[open] input[type=date]')
     if (!date) throw new Error('no date')

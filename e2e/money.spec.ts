@@ -690,6 +690,58 @@ test('the day, the note and the place are behind one line, in a sheet over the s
   await expect(line).toHaveAttribute('aria-invalid', 'true')
 })
 
+// The line is a row of the kit in the form too — the sheet's own `.field` stood it in a column 84 high
+// (adversarial А1) — and a long note ends in «…» inside it: without `width: 0` its whole line widened
+// the sheet past a phone, × off the screen (А3). At 320, where the fewest letters do it (self-review 3).
+test('the line of the day, the note and the place is one row, and a long one ends in «…» at 320', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 640 })
+  await openMoney(page)
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  const sheet = page.locator('dialog[open]').first()
+  await expect(sheet).toContainText('Новая трата')
+  await page.waitForTimeout(400)
+  const line = sheet.getByRole('button', { name: /^Дата, заметка, место:/ })
+  const shape = () =>
+    line.evaluate((row) => {
+      const rect = (selector: string): DOMRect => {
+        const found = row.querySelector(selector)
+        if (!found) throw new Error(`no ${selector} in the line`)
+        return found.getBoundingClientRect()
+      }
+      const dialog = row.closest('dialog')
+      const label = row.querySelector('.label')
+      if (!dialog || !label) throw new Error('the line is not in a sheet')
+      const own = row.getBoundingClientRect()
+      const [icon, text, chevron] = [rect('.icon'), rect('.label'), rect('.chevron')]
+      return {
+        height: own.height,
+        row: icon.right <= text.left && text.right <= chevron.left,
+        inside: chevron.right <= own.right && own.right <= dialog.getBoundingClientRect().right,
+        wider: dialog.scrollWidth - dialog.clientWidth,
+        cut: label.scrollWidth > label.clientWidth,
+      }
+    })
+  // Widths are measured once the faces have come (MOL-306). At 320 even «Сегодня · без заметки» needs
+  // 185 of the label's 166 and ends in «…» — the price, named in `money-spendings.md`; from 375 it fits.
+  await facesIn(page)
+  expect(await shape()).toMatchObject({ row: true, inside: true, wider: 0 })
+  expect((await shape()).height).toBeLessThan(60)
+
+  const note = 'Подарок коллеге на день рождения'
+  await fillDetails(page, { note, place: 'Торговый центр «Ташир»' })
+  expect(await shape()).toMatchObject({ row: true, inside: true, wider: 0, cut: true })
+  expect((await shape()).height).toBeLessThan(60)
+  await expect(line).toHaveAccessibleName(
+    `Дата, заметка, место: Сегодня · ${note} · Торговый центр «Ташир»`,
+  )
+  // × stays on the screen: the sheet is no wider than the window.
+  const close = sheet.getByRole('button', { name: 'Закрыть' })
+  const box = await close.boundingBox()
+  expect(box && box.x + box.width).toBeLessThanOrEqual(320)
+})
+
 test('a category is made from the strip of «Категории», removed quietly and brought back', async ({
   page,
 }) => {
