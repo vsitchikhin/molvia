@@ -465,7 +465,10 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   device (Д1, Е1 of reviews 5–6). A trip the server does not hold yet — its start still queued — takes
   its place by «Закончить» on this phone.
   The newest kept trip but the one going
-  on is the last time, and for a finished trip only one before it. The server's answer about a trip
+  on is the last time, and for a finished trip only one before it. **Nor the trip going on here, ever** (adversarial Ж1 of review 7): the server names
+  finished trips only, and a receipt read with no signal showed the trip still open; with no signal the
+  phone's copy is all there is to tell it by — **the price:** a trip finished on another device before
+  the receipt, the copy not told yet, is left out where the server would name it. The server's answer about a trip
   takes the place of what the phone wrote into it — it knows what was removed since — **and, asked
   about the trip going on, takes every trip kept between its last time and now** (owner's В-3 «а» of
   review 1): the server saw them and did not count them — removed, emptied — and kept, the newest stood
