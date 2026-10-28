@@ -432,7 +432,9 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   cards, each once, in the order first bought, **less what the trip asked about holds on the server,
   then at most `PREVIOUS_ITEMS_LIMIT` (20)** (owner's В-5 «а» of review 1): cut first, a receipt of 25
   lines taken again in its order left two of the seven still to take at 18, none at 20 (adversarial
-  А4). The answer names the trip and its moment for the phone's memory. It writes nothing.
+  А4). The answer names the trip and its moment for the phone's memory, **and what the trip asked
+  about holds** (`holds`, adversarial В1 of review 3) — the phone's own copy of a trip going on may miss
+  what another device added. It writes nothing.
 - **What is in this trip already is not shown** (owner's Р-17 of MOL-118): the trip's rows and the
   purchases in the queue, by `useTripRows`, a row being removed given back — so **the phone cuts to
   five** (`HERE_LAST_SHOWN`) after taking them out, never the server: cut to five there, three of them
@@ -453,7 +455,11 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   signal remembers Monday, and Friday with none would show Monday. So an item that goes into a trip
   makes that trip the place's newest — one added to a finished trip keeps it at its finish, **and only
   where the memory holds that trip** (Р-10 of review 1): a receipt's, another phone's, is not known
-  whole, and its one item stood for all of it (adversarial А1г). The newest kept trip but the one going
+  whole, and its one item stood for all of it (adversarial А1г). **A trip written here as the one going
+  on is marked open; «Закончить» puts it at its finish** (`rememberFinishedHere`, from the trip queue),
+  and a finished trip kept meanwhile at its own moment — a receipt, at its paper's — lifts an open one
+  to now, since it will be finished after (adversarial В2 of review 3; its moment held by a test, m5).
+  The newest kept trip but the one going
   on is the last time, and for a finished trip only one before it. The server's answer about a trip
   takes the place of what the phone wrote into it — it knows what was removed since — **and, asked
   about the trip going on, takes every trip kept between its last time and now** (owner's В-3 «а» of
@@ -463,11 +469,13 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   **Asked about a finished trip, it takes nothing** (adversarial Б1 of review 2): between its last time
   and its moment may lie this phone's trip still open — a receipt's moment is the till's, its queue not
   the trips' — which the server did not count for being open, not empty. **And the trip asked about is
-  kept as the screen holds it** — its rows, the server's and the queue's (adversarial Б2): the answer is
+  kept as it holds** — what the answer says it holds on the server, less a row being removed here, and
+  what the queue still carries (adversarial Б2; В1 of review 3: the screen's copy alone missed another
+  device's purchases, and took them for removed): the answer is
   its last time less what it holds (В-5), so kept alone it stood for the whole of that last time, and
   the next trip with no signal lost the things taken both times. **Nor does the answer cut a last time the device holds whole**:
-  what it leaves out is either in the trip asked about or removed since — told apart by the screen's
-  rows, kept where they are not known (a trip filled on another device). «None» is remembered for the trip it was said of, and takes every kept trip before it. **The
+  what it leaves out is either in the trip asked about or removed since — told apart by what that trip
+  holds; a caller with no word of it (`held = null`, none on the screen) keeps it. «None» is remembered for the trip it was said of, and takes every kept trip before it. **The
   prices, named:** a receipt recorded is not written here — its items reach the memory with the next
   answer at that place; a purchase removed after it was written stays in the memory until then; the
   answer kept is the last time less what the trip asked about held (В-5), so a purchase taken out of

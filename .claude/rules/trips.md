@@ -148,7 +148,9 @@ The detail behind the trip lines of `CLAUDE.md`.
 
 **`GET /trips/:tripId/previous-items` and `TripRepository.previousPurchases` are read by «Что взяли?»**, and
 their rules — which trip is the last time, what the phone keeps and when it waits — are in `search.md`,
-««Брали здесь в прошлый раз» on «Что взяли?»». A removed trip filters its mark, as every reader does.
+««Брали здесь в прошлый раз» on «Что взяли?»». A removed trip filters its mark, as every reader does. **The queue's
+«Закончить» puts the trip at its finish in that memory** (`rememberFinishedHere`, adversarial В2 of
+review 3), as the start keeps the record's city for «Тут дешевле».
 
 ## «Сумма по чеку» — a trip's money whole (MOL-78)
 
