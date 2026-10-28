@@ -252,9 +252,14 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   CI image's browsers, not a Mac's, where the width alone had looked enough. Weight and width are read
   once the row's animations have finished (`getAnimations({ subtree: true })`): a 700 that came by a
   transition after a pause of `--dur` was still 600 the moment after the tap, and passed by chance
-  (adversarial Р2-А4); waited for, it is red every run. **The price, named:** the other measures
+  (adversarial Р2-А4); waited for, it is red every run. An endless animation is not waited for, as the
+  sheet's rise is not (MOL-69): a chosen dot breathing by `work-breath` hung the wait until the test's
+  timeout, with nothing in the message to say why (Р3-А1). **The prices, named:** the other measures
   of a width taken right after `open()` were not checked for the late face, nor any other `toBe` of a
-  width in [phone] for what whole pixels hide; the next to fail so is a task of its own.
+  width in [phone] for what whole pixels hide; the next to fail so is a task of its own. And the check
+  is still a snapshot — «settled» is «no animation left», not «nothing more will change»: a 700 set by a
+  timer 220 ms after the choice, with no animation, passed every [phone] run (Р3-А2); the row is chosen
+  synchronously and sets no timer.
 - **«A line gone under the category of «Год»» keeps its first attempt's trace in CI** (MOL-267,
   `firstAttemptTrace` of `e2e/trace.ts`), since its one failure was never explained (run 37911189456,
   09.10, `scrollY` 1151 → 1132 with the choice where it was). Late faces were not it: held a second with
