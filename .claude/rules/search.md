@@ -465,7 +465,9 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   the trips' — which the server did not count for being open, not empty. **And the trip asked about is
   kept as the screen holds it** — its rows, the server's and the queue's (adversarial Б2): the answer is
   its last time less what it holds (В-5), so kept alone it stood for the whole of that last time, and
-  the next trip with no signal lost the things taken both times. «None» is remembered for the trip it was said of, and takes every kept trip before it. **The
+  the next trip with no signal lost the things taken both times. **Nor does the answer cut a last time the device holds whole**:
+  what it leaves out is either in the trip asked about or removed since — told apart by the screen's
+  rows, kept where they are not known (a trip filled on another device). «None» is remembered for the trip it was said of, and takes every kept trip before it. **The
   prices, named:** a receipt recorded is not written here — its items reach the memory with the next
   answer at that place; a purchase removed after it was written stays in the memory until then; the
   answer kept is the last time less what the trip asked about held (В-5), so a purchase taken out of

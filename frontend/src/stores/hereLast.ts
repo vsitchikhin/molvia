@@ -140,6 +140,39 @@ export function recallHereLast(
 }
 
 /**
+ * The last time as the device keeps it, after an answer about another trip (adversarial Б2 of
+ * review 2). The answer is that last time less what the trip asked about holds (owner's В-5 «а»), so
+ * what it leaves out of a last time the device holds is either in that trip or removed since: known
+ * by `held` where the screen knows the trip's rows, kept where it does not — written over, the
+ * things taken both times went from the next trip's group with no signal. In the order of both.
+ */
+function lastTimeOf(
+  kept: readonly CatalogueEntry[],
+  answered: readonly CatalogueEntry[],
+  held: readonly CatalogueEntry[] | null,
+): CatalogueEntry[] {
+  const inAnswer = new Set(answered.map((item) => item.id))
+  const inTrip = held === null ? null : new Set(held.map((item) => item.id))
+  const out: CatalogueEntry[] = []
+  let next = 0
+  for (const item of kept) {
+    if (inAnswer.has(item.id)) {
+      // The answer's own order up to this item, so what the device did not hold stands in its place.
+      while (next < answered.length) {
+        const one = answered[next++]
+        if (one === undefined) break
+        if (!out.some((taken) => taken.id === one.id)) out.push(one)
+        if (one.id === item.id) break
+      }
+    } else if (inTrip === null || inTrip.has(item.id)) out.push(item)
+  }
+  for (const one of answered.slice(next)) {
+    if (!out.some((taken) => taken.id === one.id)) out.push(one)
+  }
+  return out
+}
+
+/**
  * The server's answer for a trip at this place: its last time there, which takes the place of what
  * the device wrote into that same trip itself — the server knows what was removed since.
  *
@@ -163,8 +196,11 @@ export function rememberHereLast(
   answer: PreviousItemsResponse,
   /** The finished trip's moment in «Записаны»: it looks only before itself. `null` — the one going on. */
   before: Date | null = null,
-  /** What the trip asked about holds, in its order — nothing written when the screen knows none. */
-  held: readonly CatalogueEntry[] = [],
+  /**
+   * What the trip asked about holds, in its order, as the screen knows it — the server's rows and the
+   * queue's; `null` when it is not known.
+   */
+  held: readonly CatalogueEntry[] | null = null,
 ): void {
   const id = tripId.toLowerCase()
   const { previous } = answer
@@ -174,12 +210,14 @@ export function rememberHereLast(
     let trips = slot.trips.filter((trip) => !seen(trip))
     if (previous !== null) {
       const named = previous.tripId.toLowerCase()
+      const kept = trips.find((trip) => trip.tripId === named)
+      const items = lastTimeOf(kept?.items ?? [], answer.items, held)
       trips = [
-        { tripId: named, at: previous.at.getTime(), items: answer.items.slice(0, ITEMS_PER_TRIP) },
+        { tripId: named, at: previous.at.getTime(), items: items.slice(0, ITEMS_PER_TRIP) },
         ...trips.filter((trip) => trip.tripId !== named),
       ]
     }
-    if (held.length > 0) {
+    if (held !== null && held.length > 0) {
       const own = trips.find((trip) => trip.tripId === id)
       const items = held.filter((item, at) => held.findIndex((one) => one.id === item.id) === at)
       trips = [

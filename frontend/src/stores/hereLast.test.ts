@@ -89,11 +89,16 @@ describe('«Брали здесь в прошлый раз» on the device (MOL-
     vi.useFakeTimers({ now: new Date('2026-10-05T10:00:00Z') })
     rememberBoughtHere(ME, sas, trip(1), bread)
     rememberBoughtHere(ME, sas, trip(1), eggs)
-    // The eggs were removed afterwards, on another phone.
-    rememberHereLast(ME, sas, trip(2), {
-      previous: { tripId: trip(1), at: new Date('2026-10-05T11:00:00Z') },
-      items: [bread],
-    })
+    // The eggs were removed afterwards, on another phone; the trip asked about holds nothing, and the
+    // screen knows it — so the eggs are not in it, and gone.
+    rememberHereLast(
+      ME,
+      sas,
+      trip(2),
+      { previous: { tripId: trip(1), at: new Date('2026-10-05T11:00:00Z') }, items: [bread] },
+      null,
+      [],
+    )
     expect(names(recallHereLast(ME, sas, trip(2)))).toEqual(['Хлеб'])
   })
 
@@ -237,7 +242,60 @@ describe('«Брали здесь в прошлый раз» on the device (MOL-
       )
 
       expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Молоко', 'Хлеб'])
-      expect(names(recallHereLast(ME, sas, trip(2), receipt))).toEqual(['Яйца'])
+      // Monday stays whole: what the answer left out is in the receipt. Its own the screen takes out.
+      expect(names(recallHereLast(ME, sas, trip(2), receipt))).toEqual(['Молоко', 'Хлеб', 'Яйца'])
+    })
+
+    it('a last time held whole is not cut by an answer about another trip — the trip’s rows unknown', () => {
+      rememberHereLast(ME, sas, trip(1), {
+        previous: { tripId: trip(0), at: monday },
+        items: [milk, bread, eggs],
+      })
+      // A trip filled on another device: the answer is Monday less what it holds, the rows not known.
+      rememberHereLast(ME, sas, trip(2), {
+        previous: { tripId: trip(0), at: monday },
+        items: [eggs],
+      })
+
+      expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Молоко', 'Хлеб', 'Яйца'])
+    })
+
+    it('what the answer leaves out and the trip does not hold is gone — removed since', () => {
+      rememberHereLast(ME, sas, trip(1), {
+        previous: { tripId: trip(0), at: monday },
+        items: [milk, bread, eggs],
+      })
+      // The trip asked about holds the milk; the bread was taken out of Monday since.
+      rememberHereLast(
+        ME,
+        sas,
+        trip(2),
+        { previous: { tripId: trip(0), at: monday }, items: [eggs] },
+        new Date('2026-10-07T12:00:00Z'),
+        [milk],
+      )
+
+      expect(names(recallHereLast(ME, sas, trip(2), new Date('2026-10-07T12:00:00Z')))).toEqual([
+        'Молоко',
+        'Яйца',
+      ])
+    })
+
+    it('what the device did not hold of the last time stands in the answer’s order', () => {
+      rememberHereLast(ME, sas, trip(1), {
+        previous: { tripId: trip(0), at: monday },
+        items: [bread],
+      })
+      rememberHereLast(
+        ME,
+        sas,
+        trip(2),
+        { previous: { tripId: trip(0), at: monday }, items: [milk, bread, eggs] },
+        null,
+        [],
+      )
+
+      expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Молоко', 'Хлеб', 'Яйца'])
     })
 
     it('what the screen holds takes the place of what was written into it — a removal too', () => {
