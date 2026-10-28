@@ -34,7 +34,14 @@ test('a chosen legend row keeps its width, and its dot stands on a ring of the c
   await expect(where.getByRole('radio', { name: /Cafés and restaurants/ })).toBeChecked()
   await expect(row).toHaveClass(/chosen/)
   // The weight is held as itself: Chromium in CI sets this text on whole pixels, and a chosen row at 700
-  // measured 66 wide as at 600 — only WebKit's width told them apart (MOL-306).
+  // measured 66 wide as at 600 — only WebKit's width told them apart (MOL-306). Both are read once the
+  // row has settled: a weight that came by a transition after a pause was 600 still the moment after the
+  // tap (adversarial Р2-А4).
+  await row.evaluate((node) =>
+    Promise.allSettled(
+      node.getAnimations({ subtree: true }).map((animation) => animation.finished),
+    ),
+  )
   await expect(name).toHaveCSS('font-weight', weight.name)
   await expect(amount).toHaveCSS('font-weight', weight.amount)
   expect((await amount.boundingBox())?.width).toBe(unchosen)
