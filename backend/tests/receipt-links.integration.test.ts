@@ -689,6 +689,32 @@ describe('«Записать» a receipt by its link', () => {
     ])
   }, 10_000)
 
+  it('doubts no digit the tax office gave: a price one Armenian swap off the memory’s is a price changed (MOL-270)', async () => {
+    const me = await serb()
+    const first = await parsedLink(me)
+    await record(me, first, recordBody({ name: 'RODA MEGAMARKET 463', city: 'Белград' }))
+    // the memory holds the price: without it the hint is silent with or without the fix (review 1, №1)
+    const sugar = await db
+      .select()
+      .from(storeMemory)
+      .where(eq(storeMemory.key, toSearchKey('SECER KRISTAL 1KG SUNOKO KOM')))
+    expect(sugar).toMatchObject([{ tin: TIN, priceMinor: 9_499n, priceCurrency: 'RSD' }])
+    // 94,99 → 91,99 is the swap 4↔1 of Armenia's tills; nobody read these figures
+    const lines = [
+      { name: 'SECER KRISTAL 1KG SUNOKO KOM (Е)', price: '91,99', quantity: '2', sum: '183,98' },
+      { name: 'BANANA KG (Е)', price: '199,99', quantity: '1,482', sum: '296,39' },
+    ]
+    const second = await parsedLink(
+      me,
+      found({ journal: madeUpJournal(lines, '480,37') }),
+      link({ totalHundredths: 48_037 }),
+    )
+    const detail = receiptDetailCodec.parse((await get(me, `/receipts/${second}`)).json())
+    expect(detail.lines[0]).toMatchObject({ match: 'memory', itemName: 'Сахар' })
+    expect(detail.lines[0]?.price).toEqual({ minor: 9_199n, currency: 'RSD' })
+    expect(detail.lines.map((line) => line.rememberedPrice)).toEqual([null, null])
+  }, 10_000)
+
   it('refuses the same receipt recorded before, by the seller’s tax number and the number', async () => {
     const me = await serb()
     // one receipt's link sent twice as two receipts — from two phones, or pasted again
