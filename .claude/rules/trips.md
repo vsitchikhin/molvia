@@ -211,8 +211,9 @@ another currency than the receipt's is «списано со счёта», not a
   on screen — the fields the shelf does not keep left out — leaves the answer there with its sum; a
   copy that says more (another purchase, another total) is fresher and taken as it is. The server is
   not asked from the listener: two windows on one trip would ask each other in a circle; coming back
-  into view asks anyway. Offered again once the server answers; the fields go into the cache with the
-  next release.
+  into view asks anyway. Offered again once the server answers. The fields do not go into the cache by
+  simply keeping them (MOL-307, owner's В-1 «а»): a copy shelved without them reads as «no receipt», goes
+  back with an explicit `null`, and is then the same as a true one.
 - **«Закончить» asks «Сколько вышло по чеку?» only while some purchase has no price and no sum is
   there yet** (В-4): with every price in, the total is already known. Empty is fine; a sum that is
   not money is said at the field and nothing is sent. «Закончить и начать новую» asks nothing — the
@@ -265,9 +266,17 @@ receipts epic: at the shelf a person reads, at home they write). The word «по
 dictionary: open — «запись», finished — «покупки»; the code keeps its `trip*` names. «Покупки»
 (`/purchases`) is one list by what asks to be done: the record still being written first, then
 «N покупок ждут оценки», then «Записаны» — each row with the server's count and sums (`itemCount`,
-`total` of the history, В-4), `null` from an older server and from the phone's cache, which keeps
-neither yet: a window on the previous build reads the cache with a strict codec (`ENTRY_NOT_CACHED_YET`,
-as `NOT_CACHED_YET` for a trip view). **The record typed by hand is a screen under it**
+`total` of the history, В-4), `null` from an older server. **The phone's cache keeps both** (MOL-307):
+every build since MOL-128 reads them and drops a key of a row it does not know, so the strict codec of
+the build before it — the reason they were left out — is gone; a cache of a build before MOL-307 has
+neither, and its rows are `null`, unknown, never «0 позиций». **A sum is a value, and a value of a row
+this build cannot read is dropped where the field may be absent** (adversarial А2): a currency of a later
+build — a rollback past a new country — is a sum not known, never the whole cache, which the next write of
+the window put over a finish made with no signal. Backwards the same holds by the argument of the builds:
+one before MOL-110 (05.10) knows no lari, one before MOL-230 (06.10) no dinar, and none of them is left. **A trip view's fields stay out**
+(`NOT_CACHED_YET`, owner's В-1 «а»): there no `receipt` reads «no receipt», so a copy shelved without
+them goes back with an explicit `null` and is then the same as a true one — the screen trusts no trip
+read back (`tripHistory.answered`). **The record typed by hand is a screen under it**
 (`/purchases/manual`, the old `TripView`), named by its place, and **with no record open it goes
 up to «Покупки»** — finished here or on another device, removed, or reached by an old address —
 never under an open sheet. «Записать покупки» (`ManualEntryButton`) stands in the strip of
@@ -402,10 +411,31 @@ and no strip, are their own quiet card**, «Чеки не загрузились
 or under its skeleton, is untrue (А2). A read answered every time under a list another window kept moving failed
 nothing it shows when the page shown is the server's last answer, row for row as the shelf keeps them, and draws
 no strip (А4, В1) — whatever moment came with it, none included; a page put back that is not the answer is
-memory, and the strip names its moment (Б4). **The price, named:** the rows are then the shelf's copy, with no
-count and no sum — as after any write of another window to a list answered (Г1, MOL-307); the discarded answer's
-own are not taken, since the other window may have sent a purchase while it was on its way. The kind is the worse of the two reads; **the time is the older of
-the reads that failed and drew a row** — nothing on screen is newer than that. The strip says its words again
+memory, and the strip names its moment (Б4). The rows are then the shelf's copy, with its count and sum (Г1,
+MOL-307) — never the discarded answer's own, since the other window may have sent a purchase while it was on its
+way. **«Row for row» is by the rows, not their counts** (owner's В-2 «а»): a count on the shelf is moved by the
+list's answer and by a write's, the phone cannot tell which is newer, and compared whole a shelf ahead of the
+answer — another window's queue sending one purchase a time — drew «Сервер не ответил» over a server that answered
+every time (adversarial А3, Б2). **So while the list moves under every read, a count and a sum the last answer does
+not say are unknown** (`unconfirmed`, read after every answer, one thrown away included — it lands after the
+write that threw it away has redrawn the page, round 3 В1): the row reads where and when, as before the cache kept them — neither memory
+said as the answer nor a strip that blames the server — and they come back with the first page answered and taken. **A next page taken says nothing of the first** (rounds
+4–6: Г1, Д1, Е1): neither that it was answered nor that it was not, and the screen is not its only reader — a finish
+sent reads it in the store. So a first page in doubt — a strip over it, or a list moved under every read — is asked
+again by «Показать ещё» **before** the next page, and its own outcome decides the strip and the counts; then the next
+page is read from the boundary it now has — read after it, a first page whose boundary had moved since the shelf threw
+the tapped page away and put the button back (round 7, Ж1) — a read of the same list begun meanwhile (a receipt recorded) waited for, and the
+next page asked from the boundary it leaves (round 9, Л1); a screen taken away or another owner ends the tap there, as
+И1 ends a retry (round 8, З1). The button says «Загружаем…» for the whole of the tap, whichever read is in the air
+— never «not now» between them (round 10, М1). One not in doubt is not asked. Kept by the screen instead, its state was always half kept — the strip and not `moved`, or not what the store had read. **A
+purchase written into a recorded record moves its row on the shelf too** (`apply`, adversarial А1): only in place,
+where the first page holds it — a row the page has not got would move the boundary only `load()` reads. Left on
+screen alone, the first write of another window put the count before the purchase back as the server's answer,
+online and with no strip. **The prices, named** (MOL-307): while a window of the build before is open, a page it
+writes has no count and no sum; and while another window's queue moves the list, a moved row loses its count and
+sum for those seconds. The kind is the worse of the two reads; **the time is the older of
+the reads that failed and drew a row** — nothing on screen is newer than that, but for a row a write moved since
+(MOL-307): the moment then understates what is shown, never overstates it. The strip says its words again
 for a try of the person's that failed, never for the receipts' own poll every five seconds (А1). **The moment of
 the history's answer is a key of its own** (`molvia.trip-history-at`), for the reason the «empty» flag is: a
 field of the strict cache would be no cache to a window on the previous build, which would write its own over a

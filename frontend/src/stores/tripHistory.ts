@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, toRaw, watch } from 'vue'
+import { ref, shallowRef, toRaw, watch } from 'vue'
 import { z } from 'zod'
 import {
   currencySchema,
@@ -33,25 +33,40 @@ const cacheCodec = z.strictObject({
   local: z.array(localCodec),
 })
 /**
- * Fields of a trip this cache does not keep yet (MOL-115, review Р-1, adversarial Д9): a window
- * still on the previous build reads the cache with a strict codec, took a cache holding them for
- * no cache at all, and wrote its own over a finish made with no signal. Left out on the way in and
- * filled with what their absence means on the way out; they go in with the next release, once no
- * build without them is left.
+ * Fields of a trip this cache does not keep (MOL-115, review Р-1, adversarial Д9): a window on the
+ * build before MOL-115 read the cache with a strict codec, took a cache holding them for no cache at
+ * all, and wrote its own over a finish made with no signal. Left out on the way in and filled with
+ * what their absence means on the way out. No such build is left, yet they do not go in by taking
+ * this away (MOL-307, owner's В-1 «а»): their absence is a value, not «unknown» — no `receipt` reads
+ * «no receipt» — so a copy shelved without them reads as one with no receipt, goes back on the shelf
+ * with an explicit `null` at the next write, and is then the same as a true one. The screen trusts
+ * no trip read back from the shelf for that reason (`answered`).
  */
 const NOT_CACHED_YET = new Set(['accountId', 'debited', 'receipt', 'prices', 'gap'])
 const TRIP_KEYS = new Set(Object.keys(tripViewCodec.def.shape))
 /**
- * The same for a row of the history page (MOL-128): «12 позиций · 9 870 ֏» is not kept yet, for
- * the same reason, and a row read back from the phone says only where and when.
+ * The fields of a row of the history page a build reads back. «12 позиций · 9 870 ֏» is kept (MOL-307):
+ * every build since MOL-128 drops a key it does not know here and knows these two, and their absence —
+ * a shelf of a build before this one — is `null`, unknown, never «0 позиций».
  */
-const ENTRY_NOT_CACHED_YET = new Set(['itemCount', 'total'])
-const ENTRY_KEYS = new Set(Object.keys(tripHistoryEntryCodec.def.shape))
+const ENTRY_FIELDS: Record<string, z.ZodType> = tripHistoryEntryCodec.def.shape
 
-/** A trip view on the shelf, with only the keys `keep` says — and never anything but a record. */
-function shelved(view: unknown, keep: (key: string) => boolean): unknown {
+/**
+ * Whether a row's field is read back. A key this build does not know is dropped; so is a value it
+ * cannot read where the field may be absent (adversarial А2 of MOL-307): a sum in a currency of a later
+ * build is a sum not known, and failing it failed the whole cache — and the next write of this window put
+ * its own over a finish made with no signal.
+ */
+function readable(key: string, value: unknown): boolean {
+  const field = ENTRY_FIELDS[key]
+  if (!field) return false
+  return field.safeParse(value).success || !field.safeParse(undefined).success
+}
+
+/** A trip view on the shelf, with only the fields `keep` says — and never anything but a record. */
+function shelved(view: unknown, keep: (key: string, value: unknown) => boolean): unknown {
   if (typeof view !== 'object' || view === null || Array.isArray(view)) return view
-  return Object.fromEntries(Object.entries(view).filter(([key]) => keep(key)))
+  return Object.fromEntries(Object.entries(view).filter(([key, value]) => keep(key, value)))
 }
 
 /**
@@ -61,7 +76,7 @@ function shelved(view: unknown, keep: (key: string) => boolean): unknown {
 function everyView(
   held: unknown,
   keep: (key: string) => boolean,
-  keepEntry: (key: string) => boolean,
+  keepEntry: (key: string, value: unknown) => boolean,
 ): unknown {
   if (typeof held !== 'object' || held === null) return held
   const cache = held as { page?: unknown; selected?: unknown; local?: unknown }
@@ -85,11 +100,7 @@ function everyView(
 
 /** Read by both builds: a field of a later one is dropped rather than failing the whole cache. */
 function fromShelf(raw: string): unknown {
-  return everyView(
-    JSON.parse(raw),
-    (key) => TRIP_KEYS.has(key),
-    (key) => ENTRY_KEYS.has(key),
-  )
+  return everyView(JSON.parse(raw), (key) => TRIP_KEYS.has(key), readable)
 }
 
 /** Written as the previous build reads it. */
@@ -98,25 +109,41 @@ function toShelf(cache: z.output<typeof cacheCodec>): string {
     everyView(
       cacheCodec.encode(cache),
       (key) => !NOT_CACHED_YET.has(key),
-      (key) => !ENTRY_NOT_CACHED_YET.has(key),
-    ),
-  )
-}
-
-/** A first page as the shelf keeps it: what tells a page shown from the server's answer (В1). */
-function asShelvedPage(page: TripHistory): string {
-  return JSON.stringify(
-    everyView(
-      { page: tripHistoryCodec.encode(page) },
       () => true,
-      (key) => !ENTRY_NOT_CACHED_YET.has(key),
     ),
   )
 }
 
 /**
+ * A first page by its rows, not their counts: what tells a page shown from the server's answer (В1).
+ * A count on the shelf is moved by the list's answer and by a write's (`apply`), and which of them is
+ * newer the phone cannot tell — compared whole, a shelf ahead of the answer read as memory and drew
+ * «Сервер не ответил» over a server that answered every time (adversarial Б2 of MOL-307, owner's В-2
+ * «а»). The counts the answer does not confirm are `unconfirmed` instead.
+ */
+function asShelvedPage(page: TripHistory): string {
+  return JSON.stringify(
+    everyView(
+      { page: tripHistoryCodec.encode(page) },
+      () => true,
+      (key) => key !== 'itemCount' && key !== 'total',
+    ),
+  )
+}
+
+/** A row's count and sum, as compared with the answer's. */
+function countOf(row: TripHistoryEntry): string {
+  return JSON.stringify(tripHistoryEntryCodec.encode(row), [
+    'itemCount',
+    'total',
+    'amount',
+    'currency',
+  ])
+}
+
+/**
  * A trip as the shelf keeps it: what two copies are compared by when another window writes the
- * shelf. The fields the shelf does not keep yet are left out, so an answer and its own shelf copy
+ * shelf. The fields the shelf does not keep are left out, so an answer and its own shelf copy
  * say the same (MOL-78, review Е2).
  */
 function asShelved(trip: TripView): string {
@@ -172,7 +199,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   const selected = ref<TripView | null>(null)
   /**
    * The trips as the server answered them, as against those read back from the shelf (MOL-78,
-   * review Е): the shelf does not keep `receipt`, `prices` and `gap` yet, so only an answer knows
+   * review Е): the shelf does not keep `receipt`, `prices` and `gap`, so only an answer knows
    * whether a finished record has a receipt's sum — and another window writing the shelf puts a
    * read-back trip in `selected` with no request of this window's own.
    */
@@ -190,8 +217,13 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   // What «Показать ещё» brought, and the cursor standing after it. Only the first page is
   // remembered on the phone; these live for as long as the screen does.
   let deeper: TripHistoryEntry[] = []
-  /** The first page the server gave last, taken or not (adversarial В1). */
-  let lastAnswer: TripHistory | null = null
+  /**
+   * The first page the server gave last, taken or not (adversarial В1). Reactive, unlike the rest of
+   * the bookkeeping: an answer thrown away lands after the write that threw it away has redrawn the
+   * page, and `unconfirmed` read in a render must follow it (round 3 of MOL-307, В1) — `firstPage`
+   * never moves without `page`.
+   */
+  const lastAnswer = shallowRef<TripHistory | null>(null)
   let deepCursor: TripHistory['nextCursor'] = null
   let generation = 0
   let selection = 0
@@ -269,7 +301,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
       asShelved(selected.value) === asShelved(viewing)
     ) {
       // The same trip, and the shelf says nothing the answer on screen does not: the answer stays,
-      // with the receipt's sum the shelf does not keep yet (MOL-78, review Е2). A copy that says
+      // with the receipt's sum the shelf does not keep (MOL-78, review Е2). A copy that says
       // more — another purchase, another total — is fresher, and taken as it is. The server is not
       // asked again from here: two windows on one trip would ask each other in a circle.
       selected.value = viewing
@@ -378,6 +410,14 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
       }
       // Kept in place rather than dropped: a row of a page already loaded stays on that page.
       deeper = deeper.map((held) => (held.id === row.id ? row : held))
+      // And on the shelf, where the first page holds it (adversarial А1 of MOL-307): the shelf keeps the
+      // row's count, and the first write of another window put the count before this purchase back on
+      // screen, as the server's answer. Only in place — a row the page does not hold would move its
+      // boundary, which only `load()` reads.
+      firstPage = {
+        ...firstPage,
+        trips: firstPage.trips.map((held) => (held.id === row.id ? row : held)),
+      }
       moved = true
     }
     if (moved) generation += 1
@@ -419,7 +459,20 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
    * no memory (adversarial А4, В1); a page put back from before it is (Б4).
    */
   function showsAnswer(): boolean {
-    return lastAnswer !== null && asShelvedPage(firstPage) === asShelvedPage(lastAnswer)
+    const answer = lastAnswer.value
+    return answer !== null && asShelvedPage(firstPage) === asShelvedPage(answer)
+  }
+
+  /**
+   * The rows of the first page whose count and sum the server's last answer does not say (owner's
+   * В-2 «а» of MOL-307): on a page another window kept moving under every read they may be older than
+   * the answer or newer, and «unknown» is neither wrong nor the strip's «не ответил».
+   */
+  function unconfirmed(): Set<string> {
+    const said = new Map((lastAnswer.value?.trips ?? []).map((row) => [row.id, countOf(row)]))
+    return new Set(
+      firstPage.trips.filter((row) => said.get(row.id) !== countOf(row)).map((row) => row.id),
+    )
   }
 
   /**
@@ -434,7 +487,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     const cursor = more ? page.value.nextCursor : null
     if (more && !cursor) return true
     const answer = await api.tripHistory(cursor ?? undefined)
-    if (!more && owner === actor.id) lastAnswer = answer
+    if (!more && owner === actor.id) lastAnswer.value = answer
     // A next page cannot be cancelled by a change somewhere else: it lies deeper than anything
     // held, and it is merged by id. Under the shared guard a correction sent to a trip finished
     // last week threw it away, and «Показать ещё» did nothing at all (В5).
@@ -532,6 +585,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     drop,
     load,
     showsAnswer,
+    unconfirmed,
     known,
     answered,
     open,

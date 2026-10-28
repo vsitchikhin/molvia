@@ -8,6 +8,7 @@ import {
   currentTripResponseSchema,
   parseMoney,
   receiptsResponseCodec,
+  tripHistoryEntryCodec,
   tripViewCodec,
 } from '@molvia/model'
 import type {
@@ -26,6 +27,7 @@ import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import { useReceiptQueueStore } from '@/stores/receiptQueue'
 
 const tripHistory = vi.fn<() => Promise<TripHistory>>()
 const pendingVerdicts = vi.fn<() => Promise<PendingVerdicts>>()
@@ -166,13 +168,8 @@ function remember(trips: TripHistoryEntry[] = []) {
     `molvia.trip-history.${ME}`,
     JSON.stringify({
       page: {
-        trips: trips.map((row) => ({
-          id: row.id,
-          place: row.place,
-          startedAt: row.startedAt.toISOString(),
-          finishedAt: row.finishedAt.toISOString(),
-          finishedOnDeviceAt: null,
-        })),
+        // As a window of this build shelves them: whole, the count and the sum too (MOL-307).
+        trips: trips.map((row) => tripHistoryEntryCodec.encode(row)),
         nextCursor: null,
       },
       selected: null,
@@ -771,7 +768,7 @@ describe('PurchasesView (MOL-128)', () => {
     it('соседнее окно ответило до вопроса и шлёт очередь — на экране его ответ, тот же, что у сервера: полосы нет (адверсариальное В1, А4)', async () => {
       const before = new Date(NOW.getTime() - 5000)
       // One answer, the same every time it is asked: `trip` reads the clock. With its count and sum,
-      // which the shelf does not keep: the copy is the answer all the same (adversarial Г1, the price).
+      // which the shelf keeps: the copy is the answer, and says them (adversarial Г1, MOL-307).
       const answer = [
         { ...trip(1), itemCount: 12, total: [{ minor: 987000n, currency: 'AMD' as const }] },
         trip(5, 'SAS'),
@@ -793,9 +790,355 @@ describe('PurchasesView (MOL-128)', () => {
 
         expect(tripHistory).toHaveBeenCalledTimes(4)
         expect(rows(view)).toHaveLength(2)
+        expect(rows(view)[0]?.text()).toContain('12 позиций')
+        expect(rows(view)[0]?.text()).toMatch(/9\s870/)
         expect(view.findAll('.strip')).toHaveLength(0)
         expect(view.find('.state').exists()).toBe(false)
       }
+    })
+
+    it('соседнее окно двигает число строки под каждым чтением — полосы нет, число и сумма, которых ответ не сказал, неизвестны (MOL-307, Б2, В-2 «а»)', async () => {
+      const before = new Date(NOW.getTime() - 5000)
+      const counted = (n: number) => ({
+        ...trip(1),
+        itemCount: n,
+        total: [parseMoney(String(n * 500), 'AMD')],
+      })
+      // Ahead of the answer — the other window's queue sends one purchase a time, and the server read
+      // the list just before each — and behind it — its page kept from before a purchase another
+      // device sent.
+      for (const ahead of [1, -1]) {
+        while (mounted.length) mounted.pop()?.unmount()
+        localStorage.clear()
+        tripHistory.mockReset()
+        let sent = 2
+        tripHistory.mockImplementation(() => {
+          const answered = counted(sent)
+          sent += 1
+          localStorage.setItem(`molvia.trip-history-at.${ME}`, before.toISOString())
+          remember([counted(sent - 1 + ahead)])
+          window.dispatchEvent(new StorageEvent('storage', { key }))
+          return Promise.resolve({ trips: [answered], nextCursor: null })
+        })
+        const { view } = await render()
+        await pausesPass()
+
+        // Asked four times and answered every time: nothing on screen says it did not.
+        expect(tripHistory).toHaveBeenCalledTimes(4)
+        expect(rows(view)).toHaveLength(1)
+        expect(view.findAll('.strip')).toHaveLength(0)
+        expect(rows(view)[0]?.text()).not.toContain('позиц')
+        expect(rows(view)[0]?.text()).not.toContain('֏')
+      }
+    })
+
+    describe('«Показать ещё» о первой странице ничего не говорит — под сомнением она прочитана заново, до следующей (MOL-307, Г1, Д1, Е1, Ж1, №4)', () => {
+      const row = trip(1)
+      const deeper = trip(7, 'SAS')
+      const cursor = { at: '2026-09-01T00:00:00.123456Z', id: deeper.id }
+      // A page from before a purchase another device sent; the server says 3.
+      const theirs = { ...row, itemCount: 2, total: [parseMoney('1000', 'AMD')] }
+      const answer = { ...row, itemCount: 3, total: [parseMoney('1500', 'AMD')] }
+      const shelve = () => {
+        localStorage.setItem(
+          `molvia.trip-history-at.${ME}`,
+          new Date(NOW.getTime() - 3 * 86_400_000).toISOString(),
+        )
+        localStorage.setItem(
+          key,
+          JSON.stringify({
+            page: { trips: [tripHistoryEntryCodec.encode(theirs)], nextCursor: cursor },
+            selected: null,
+            local: [],
+          }),
+        )
+      }
+      /** Every answer of a ladder lands after another window wrote its page. */
+      const moving = () => {
+        shelve()
+        window.dispatchEvent(new StorageEvent('storage', { key }))
+        return Promise.resolve({ trips: [answer], nextCursor: cursor })
+      }
+      const next = () => Promise.resolve({ trips: [deeper], nextCursor: null })
+      const more = (view: VueWrapper) => {
+        const found = view
+          .findAll('button')
+          .find((button) => button.text() === ru.trip.history.more)
+        if (!found) throw new Error('нет «Показать ещё»')
+        return found
+      }
+      const tap = async (view: VueWrapper) => {
+        await more(view).trigger('click')
+        await pausesPass()
+      }
+
+      it('после лесенки, под которой список всё ещё двигают, — число неизвестно, полосы нет (Г1)', async () => {
+        let asked = 0
+        tripHistory.mockImplementation(() => {
+          asked += 1
+          return asked === 9 ? next() : moving()
+        })
+        const { view } = await render()
+        await pausesPass()
+        expect(rows(view)[0]?.text()).not.toContain('позиц')
+
+        await tap(view)
+        // The first page asked again — and moved again under every read — then the next one.
+        expect(tripHistory).toHaveBeenCalledTimes(9)
+        expect(rows(view)).toHaveLength(2)
+        expect(rows(view)[0]?.text()).not.toContain('позиц')
+        expect(rows(view)[0]?.text()).not.toContain('֏')
+        expect(view.findAll('.strip')).toHaveLength(0)
+      })
+
+      it('после ошибки первой страницы: она снова не ответила — полоса над памятью остаётся (Д1)', async () => {
+        shelve()
+        tripHistory
+          .mockRejectedValueOnce(new Error('HTTP 500'))
+          .mockRejectedValueOnce(new Error('HTTP 500'))
+          .mockImplementationOnce(next)
+        const { view } = await render()
+        await flushPromises()
+        expect(view.findAll('.strip')).toHaveLength(1)
+
+        await tap(view)
+        expect(tripHistory).toHaveBeenCalledTimes(3)
+        expect(rows(view)).toHaveLength(2)
+        expect(view.findAll('.strip')).toHaveLength(1)
+        expect(view.get('.strip').text()).toContain('покупки на')
+        expect(rows(view)[0]?.text()).toContain('2 позиции')
+      })
+
+      it('после ошибки первой страницы: теперь она ответила — полосы нет, число сервера (Д1, Е1)', async () => {
+        shelve()
+        tripHistory
+          .mockRejectedValueOnce(new Error('HTTP 500'))
+          .mockResolvedValueOnce({ trips: [answer], nextCursor: cursor })
+          .mockImplementationOnce(next)
+        const { view } = await render()
+        await flushPromises()
+
+        await tap(view)
+        expect(tripHistory).toHaveBeenCalledTimes(3)
+        expect(rows(view)).toHaveLength(2)
+        expect(view.findAll('.strip')).toHaveLength(0)
+        expect(rows(view)[0]?.text()).toContain('3 позиции')
+      })
+
+      it('лесенка, упавшая «Показать ещё», затем взятая — первая страница прочитана, полосы нет (№4)', async () => {
+        let asked = 0
+        tripHistory.mockImplementation(() => {
+          asked += 1
+          // a ladder; the tap: the first page, moved again, then the next one fails; the second tap: the
+          // first page, answered, then the next one
+          if (asked <= 8) return moving()
+          if (asked === 9) return Promise.reject(new Error('HTTP 500'))
+          if (asked === 10) return Promise.resolve({ trips: [answer], nextCursor: cursor })
+          return next()
+        })
+        const { view } = await render()
+        await pausesPass()
+        await tap(view)
+        expect(view.findAll('.strip')).toHaveLength(1)
+
+        await tap(view)
+        expect(tripHistory).toHaveBeenCalledTimes(11)
+        expect(rows(view)).toHaveLength(2)
+        expect(view.findAll('.strip')).toHaveLength(0)
+        expect(rows(view)[0]?.text()).toContain('3 позиции')
+      })
+
+      it('граница первой страницы сдвинулась, пока лежала полка, — страница нажатия читается от новой и остаётся (Ж1)', async () => {
+        shelve()
+        // Another device finished a record since: the first page now ends one row higher.
+        const gaya = trip(0, 'Гая')
+        const between = { at: '2026-09-20T00:00:00.123456Z', id: row.id }
+        tripHistory
+          .mockRejectedValueOnce(new Error('HTTP 500'))
+          .mockResolvedValueOnce({ trips: [gaya, answer], nextCursor: between })
+          .mockImplementationOnce(next)
+        const { view } = await render()
+        await flushPromises()
+
+        await tap(view)
+        expect(tripHistory).toHaveBeenCalledTimes(3)
+        expect(rows(view).map((one) => one.text())).toEqual([
+          expect.stringContaining('Гая'),
+          expect.stringContaining('Ереван Сити'),
+          expect.stringContaining('SAS'),
+        ])
+        expect(view.findAll('button').some((one) => one.text() === ru.trip.history.more)).toBe(
+          false,
+        )
+        expect(view.findAll('.strip')).toHaveLength(0)
+      })
+
+      it('с экрана ушли, пока первая страница перечитывается, — следующую не спрашивают (З1, И1)', async () => {
+        shelve()
+        let answerFirst: (page: TripHistory) => void = () => undefined
+        tripHistory.mockRejectedValueOnce(new Error('HTTP 500')).mockImplementationOnce(
+          () =>
+            new Promise<TripHistory>((resolve) => {
+              answerFirst = resolve
+            }),
+        )
+        const { view } = await render()
+        await flushPromises()
+        await more(view).trigger('click')
+        await flushPromises()
+        expect(tripHistory).toHaveBeenCalledTimes(2)
+
+        view.unmount()
+        answerFirst({ trips: [answer], nextCursor: cursor })
+        await pausesPass()
+        expect(tripHistory).toHaveBeenCalledTimes(2)
+      })
+
+      it('чек записался, пока первая страница перечитывается, — её читают и для чека, затем следующую (Л1)', async () => {
+        shelve()
+        let answerFirst: (page: TripHistory) => void = () => undefined
+        tripHistory
+          .mockRejectedValueOnce(new Error('HTTP 500'))
+          .mockImplementationOnce(
+            () =>
+              new Promise<TripHistory>((resolve) => {
+                answerFirst = resolve
+              }),
+          )
+          .mockResolvedValueOnce({ trips: [answer], nextCursor: cursor })
+          .mockImplementationOnce(next)
+        const { view } = await render()
+        await flushPromises()
+        await more(view).trigger('click')
+        await flushPromises()
+        // The receipt queue's «Записать» lands meanwhile (MOL-127): «Записаны» is to be read again.
+        const receiptsQueue = useReceiptQueueStore()
+        receiptsQueue.recorded = [
+          ...receiptsQueue.recorded,
+          {
+            receiptId: 'cccccccc-0000-4000-8000-000000000001',
+            tripId: trip(0).id,
+            count: 1,
+            held: [],
+          },
+        ]
+        await flushPromises()
+        answerFirst({ trips: [answer], nextCursor: cursor })
+        await pausesPass()
+
+        // The tap's re-read, the receipt's, then the next page from the boundary that one left.
+        expect(tripHistory).toHaveBeenCalledTimes(4)
+        expect(rows(view).map((one) => one.text())).toEqual([
+          expect.stringContaining('Ереван Сити'),
+          expect.stringContaining('SAS'),
+        ])
+        expect(view.findAll('button').some((one) => one.text() === ru.trip.history.more)).toBe(
+          false,
+        )
+        expect(view.findAll('.strip')).toHaveLength(0)
+      })
+
+      it('перечитывание упало, чтение для чека ответило — полосы нет, кнопка за работой всё нажатие (№6, М1)', async () => {
+        shelve()
+        const held: { resolve: (page: TripHistory) => void; reject: (error: Error) => void }[] = []
+        const hold = () =>
+          new Promise<TripHistory>((resolve, reject) => {
+            held.push({ resolve, reject })
+          })
+        tripHistory
+          .mockRejectedValueOnce(new Error('HTTP 500'))
+          .mockImplementationOnce(hold)
+          .mockImplementationOnce(hold)
+          .mockImplementationOnce(next)
+        const { view } = await render()
+        await flushPromises()
+        const button = () => view.get('.more')
+        await button().trigger('click')
+        await flushPromises()
+        expect(button().attributes('aria-busy')).toBe('true')
+        const receiptsQueue = useReceiptQueueStore()
+        receiptsQueue.recorded = [
+          ...receiptsQueue.recorded,
+          {
+            receiptId: 'cccccccc-0000-4000-8000-000000000001',
+            tripId: trip(0).id,
+            count: 1,
+            held: [],
+          },
+        ]
+        await flushPromises()
+        // The tap's re-read fails; the receipt's read is in the air — and the tap waits for it, at work.
+        held[0]?.reject(new Error('HTTP 500'))
+        await flushPromises()
+        expect(tripHistory).toHaveBeenCalledTimes(3)
+        expect(button().attributes('aria-busy')).toBe('true')
+        expect(button().text()).toContain(ru.trip.history.loading)
+
+        held[1]?.resolve({ trips: [answer], nextCursor: cursor })
+        await pausesPass()
+        // The receipt's read answered the first page: its outcome decides the strip — none.
+        expect(tripHistory).toHaveBeenCalledTimes(4)
+        expect(view.findAll('.strip')).toHaveLength(0)
+        expect(rows(view).map((one) => one.text())).toEqual([
+          expect.stringContaining('3 позиции'),
+          expect.stringContaining('SAS'),
+        ])
+      })
+
+      it('владелец сменился, пока первая страница перечитывается, — следующую не спрашивают (З1, №6)', async () => {
+        shelve()
+        let answerFirst: (page: TripHistory) => void = () => undefined
+        tripHistory
+          .mockRejectedValueOnce(new Error('HTTP 500'))
+          .mockImplementationOnce(
+            () =>
+              new Promise<TripHistory>((resolve) => {
+                answerFirst = resolve
+              }),
+          )
+          // the new owner's first page, with more past it
+          .mockResolvedValue({ trips: [trip(5, 'Гая')], nextCursor: cursor })
+        const { view } = await render()
+        await flushPromises()
+        await more(view).trigger('click')
+        await flushPromises()
+
+        useActorStore().id = 'dddddddd-0000-4000-8000-000000000009'
+        await flushPromises()
+        answerFirst({ trips: [answer], nextCursor: cursor })
+        await pausesPass()
+        // The tap's re-read and the new owner's first page — no next page of either list.
+        expect(tripHistory).toHaveBeenCalledTimes(3)
+      })
+
+      it('«не должно сработать»: первая страница ответила — взятая «Показать ещё» её не перечитывает', async () => {
+        tripHistory
+          .mockResolvedValueOnce({ trips: [answer], nextCursor: cursor })
+          .mockImplementationOnce(next)
+        const { view } = await render()
+        await flushPromises()
+
+        await tap(view)
+        expect(tripHistory).toHaveBeenCalledTimes(2)
+        expect(rows(view)).toHaveLength(2)
+        expect(rows(view)[0]?.text()).toContain('3 позиции')
+      })
+
+      it('полосу неудачной «Показать ещё» снимает следующая удачная', async () => {
+        tripHistory
+          .mockResolvedValueOnce({ trips: [answer], nextCursor: cursor })
+          .mockRejectedValueOnce(new Error('HTTP 500'))
+          .mockResolvedValueOnce({ trips: [answer], nextCursor: cursor })
+          .mockImplementationOnce(next)
+        const { view } = await render()
+        await flushPromises()
+        await tap(view)
+        expect(view.findAll('.strip')).toHaveLength(1)
+
+        await tap(view)
+        expect(rows(view)).toHaveLength(2)
+        expect(view.findAll('.strip')).toHaveLength(0)
+      })
     })
 
     it('другое окно кладёт назад свою старую страницу — полоса со временем той страницы (адверсариальное Б4)', async () => {

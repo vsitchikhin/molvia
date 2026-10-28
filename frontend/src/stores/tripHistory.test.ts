@@ -1,7 +1,7 @@
-import { nextTick } from 'vue'
+import { computed, nextTick } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { tripViewCodec } from '@molvia/model'
+import { tripHistoryCodec, tripViewCodec } from '@molvia/model'
 import type { TripHistory, TripHistoryEntry, TripView } from '@molvia/model'
 import { useTripHistoryStore } from './tripHistory'
 import { useTripStore } from './trip'
@@ -44,6 +44,28 @@ function view(id: string, finished = true): TripView {
     expenses: [],
     total: [],
     converted: null,
+  })
+}
+/** The finished record `id` as the server answers a write into it: `bought` purchases of 500 ֏. */
+function written(id: string, bought: number): TripView {
+  return tripViewCodec.parse({
+    ...tripViewCodec.encode(view(id)),
+    expenses: Array.from({ length: bought }, (_, n) => ({
+      id: `eeeeeeee-0000-4000-8000-00000000000${String(n)}`,
+      createdAt: '2026-09-01T10:10:00Z',
+      item: {
+        id: `dddddddd-0000-4000-8000-00000000000${String(n)}`,
+        kind: 'product',
+        name: `Товар ${String(n)}`,
+        note: null,
+        defaultUnit: 'piece',
+        typicalQuantity: null,
+      },
+      quantity: null,
+      amount: { amount: '500.00', currency: 'AMD' },
+      unitPrice: null,
+    })),
+    total: [{ amount: `${String(bought * 500)}.00`, currency: 'AMD' }],
   })
 }
 function restart() {
@@ -148,28 +170,161 @@ describe('whether the server has answered an empty history (MOL-77)', () => {
     expect(restart().local.map(({ id }) => id)).toEqual([A])
   })
 
-  it('keeps no count or total of a row the previous build cannot read, and reads a row of a later one (MOL-128)', async () => {
+  it('keeps the count and the total of a row, read by every build since MOL-128, and reads a row of a later one (MOL-307)', async () => {
     const store = useTripHistoryStore()
+    const total = [
+      { minor: 410_000n, currency: 'AMD' as const },
+      { minor: 1_250n, currency: 'USD' as const },
+    ]
     tripHistory.mockResolvedValueOnce({
-      trips: [{ ...entry(A), itemCount: 3, total: [{ minor: 410_000n, currency: 'AMD' }] }],
+      trips: [{ ...entry(A), itemCount: 3, total }],
       nextCursor: null,
     })
     await store.load()
 
-    expect(store.page.trips[0]).toMatchObject({ itemCount: 3 })
     const cached = JSON.parse(localStorage.getItem(`molvia.trip-history.${OWNER}`) ?? '{}') as {
       page: { trips: Record<string, unknown>[] }
     }
-    expect(Object.keys(cached.page.trips[0] ?? {})).not.toEqual(
-      expect.arrayContaining([expect.stringMatching(/^(itemCount|total)$/)]),
-    )
-    // Read back, they are unknown — not «0 позиций».
-    expect(restart().page.trips[0]).toMatchObject({ id: A, itemCount: null, total: null })
+    // The page as the shelf keeps it is the contract's own, strict: a window of any build since
+    // MOL-128 reads both fields, and drops none of the cache for them.
+    expect(tripHistoryCodec.parse(cached.page).trips[0]).toMatchObject({ itemCount: 3, total })
+    expect(restart().page.trips[0]).toMatchObject({ id: A, itemCount: 3, total })
 
     const [row] = cached.page.trips
     if (row) row.fromLaterBuild = true
     localStorage.setItem(`molvia.trip-history.${OWNER}`, JSON.stringify(cached))
     expect(restart().page.trips.map(({ id }) => id)).toEqual([A])
+  })
+
+  it('a row the build before shelved without them is unknown — not «0 позиций», after a write too (MOL-307)', async () => {
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({ trips: [entry(A)], nextCursor: null })
+    await store.load()
+    const cached = JSON.parse(localStorage.getItem(`molvia.trip-history.${OWNER}`) ?? '{}') as {
+      page: { trips: Record<string, unknown>[] }
+    }
+    for (const row of cached.page.trips) {
+      delete row.itemCount
+      delete row.total
+    }
+    localStorage.setItem(`molvia.trip-history.${OWNER}`, JSON.stringify(cached))
+    const again = restart()
+    expect(again.page.trips[0]).toMatchObject({ id: A, itemCount: null, total: null })
+    // Written back by this build, unknown stays unknown.
+    again.apply(view(B, false))
+    expect(restart().page.trips[0]).toMatchObject({ id: A, itemCount: null, total: null })
+  })
+
+  it('a sum in a currency this build does not know is a sum not known, never the whole cache (adversarial А2 of MOL-307)', async () => {
+    const store = useTripHistoryStore()
+    // A record finished on this phone with no signal: its snapshot waits on the shelf.
+    store.capture(
+      C,
+      'SAS',
+      new Date('2026-09-02T10:00:00Z'),
+      new Date('2026-09-02T11:00:00Z'),
+      'AMD',
+      null,
+    )
+    tripHistory.mockResolvedValueOnce({
+      trips: [{ ...entry(A), itemCount: 1, total: [{ minor: 500n, currency: 'GEL' }] }],
+      nextCursor: null,
+    })
+    await store.load()
+    // The shelf as a later build writes it: a currency of a country this build has not got.
+    const cached = JSON.parse(localStorage.getItem(`molvia.trip-history.${OWNER}`) ?? '{}') as {
+      page: { trips: { total: { currency: string }[] }[] }
+    }
+    for (const row of cached.page.trips) for (const sum of row.total) sum.currency = 'KZT'
+    localStorage.setItem(`molvia.trip-history.${OWNER}`, JSON.stringify(cached))
+
+    const again = restart()
+    expect(again.page.trips[0]).toMatchObject({ id: A, itemCount: 1, total: null })
+    expect(again.local.map(({ id }) => id)).toEqual([C])
+    // Its next write keeps the finish made with no signal.
+    again.capture(
+      B,
+      'Гая 5',
+      new Date('2026-09-03T10:00:00Z'),
+      new Date('2026-09-03T11:00:00Z'),
+      'AMD',
+      null,
+    )
+    expect(restart().local.map(({ id }) => id)).toEqual([C, B])
+  })
+
+  it('a purchase written into a recorded record moves its row on the shelf too (adversarial А1 of MOL-307)', async () => {
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({
+      trips: [{ ...entry(A), itemCount: 2, total: [{ minor: 100_000n, currency: 'AMD' }] }],
+      nextCursor: null,
+    })
+    await store.load()
+    // The queue's answer to a purchase written into the finished record.
+    store.apply(written(A, 3))
+    expect(store.page.trips[0]).toMatchObject({ id: A, itemCount: 3 })
+    // Another window writes the shelf — what is on it, as its own `persist` would.
+    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-history.${OWNER}` }))
+    expect(store.page.trips[0]).toMatchObject({ id: A, itemCount: 3 })
+    expect(store.page.trips[0]?.total?.[0]?.minor).toBe(150_000n)
+    expect(restart().page.trips[0]).toMatchObject({ id: A, itemCount: 3 })
+  })
+
+  it('a render takes the unconfirmed counts by an answer thrown away after it (round 3 of MOL-307, В1)', async () => {
+    const store = useTripHistoryStore()
+    const counted = (n: number) => ({
+      ...entry(A),
+      itemCount: n,
+      total: [{ minor: BigInt(n) * 50_000n, currency: 'AMD' as const }],
+    })
+    tripHistory.mockResolvedValueOnce({ trips: [counted(4)], nextCursor: null })
+    await store.load()
+    // What a screen computes its rows by.
+    const shown = computed(() => (store.page.trips.length, store.unconfirmed()))
+    // Another window writes the shelf, and the page is drawn again before the answer comes — the
+    // server read the list after that window's next purchase.
+    tripHistory.mockImplementationOnce(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-history.${OWNER}` }))
+      expect(shown.value).toEqual(new Set())
+      return Promise.resolve({ trips: [counted(5)], nextCursor: null })
+    })
+    expect(await store.load()).toBe(false)
+    expect(store.unconfirmed()).toEqual(new Set([A]))
+    expect(shown.value).toEqual(new Set([A]))
+  })
+
+  it('a row another window of this build moved is the answer, while it moves the list under every read (adversarial А3 of MOL-307)', async () => {
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({
+      trips: [{ ...entry(A), itemCount: 2, total: [{ minor: 100_000n, currency: 'AMD' }] }],
+      nextCursor: null,
+    })
+    await store.load()
+    const theirs = useTripHistoryStore(createPinia())
+    // The other window sends a purchase into the recorded record while this one reads the list: its
+    // answer goes on the shelf, and the server has it.
+    tripHistory.mockImplementationOnce(() => {
+      theirs.apply(written(A, 3))
+      window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-history.${OWNER}` }))
+      return Promise.resolve({
+        trips: [{ ...entry(A), itemCount: 3, total: [{ minor: 150_000n, currency: 'AMD' }] }],
+        nextCursor: null,
+      })
+    })
+    // Discarded — the list moved under it — and still the page shown is the server's.
+    expect(await store.load()).toBe(false)
+    expect(store.page.trips[0]).toMatchObject({ id: A, itemCount: 3 })
+    expect(store.showsAnswer()).toBe(true)
+  })
+
+  it('a record with no purchases keeps «0» and no sum on the shelf, not «unknown» (MOL-307)', async () => {
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({
+      trips: [{ ...entry(A), itemCount: 0, total: [] }],
+      nextCursor: null,
+    })
+    await store.load()
+    expect(restart().page.trips[0]).toMatchObject({ id: A, itemCount: 0, total: [] })
   })
 
   it('another owner’s answer is not this owner’s', async () => {
@@ -307,7 +462,7 @@ describe('when the server answered the first page (MOL-204)', () => {
     expect(store.showsAnswer()).toBe(false)
   })
 
-  it('an answer with counts and sums is the same page as its shelf copy, which keeps neither (adversarial В1)', async () => {
+  it('a row read back from the shelf another window wrote keeps its count and sum, and is the answer (Г1 of MOL-204, MOL-307)', async () => {
     const store = useTripHistoryStore()
     const counted = {
       ...entry(A),
@@ -316,10 +471,48 @@ describe('when the server answered the first page (MOL-204)', () => {
     }
     tripHistory.mockResolvedValueOnce({ trips: [counted], nextCursor: null })
     await store.load()
-    // Another window wrote this very answer: the page is read back from the shelf, with no counts.
+    // Another window wrote this very answer: the page is read back from the shelf.
     window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-history.${OWNER}` }))
+    expect(store.page.trips[0]).toMatchObject({ itemCount: 3, total: counted.total })
+    expect(store.showsAnswer()).toBe(true)
+  })
+
+  it('a shelf with another count, or none, is the answer by its rows, and its counts are unconfirmed (MOL-307, В-2 «а»)', async () => {
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({
+      trips: [{ ...entry(A), itemCount: 3, total: [{ minor: 120000n, currency: 'AMD' }] }],
+      nextCursor: null,
+    })
+    await store.load()
+    const shelf = (change: (row: Record<string, unknown>) => void) => {
+      const cached = JSON.parse(localStorage.getItem(`molvia.trip-history.${OWNER}`) ?? '{}') as {
+        page: { trips: Record<string, unknown>[] }
+      }
+      for (const row of cached.page.trips) change(row)
+      localStorage.setItem(`molvia.trip-history.${OWNER}`, JSON.stringify(cached))
+      window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-history.${OWNER}` }))
+    }
+    expect(store.unconfirmed()).toEqual(new Set())
+    // A window that sent a purchase meanwhile wrote its newer page — or one older than the answer:
+    // which, the phone cannot tell.
+    shelf((row) => (row.itemCount = 4))
+    expect(store.page.trips[0]?.itemCount).toBe(4)
+    expect(store.showsAnswer()).toBe(true)
+    expect(store.unconfirmed()).toEqual(new Set([A]))
+    // A sum alone the answer does not say.
+    shelf((row) => {
+      row.itemCount = 3
+      row.total = [{ amount: '1300.00', currency: 'AMD' }]
+    })
+    expect(store.unconfirmed()).toEqual(new Set([A]))
+    // A window of the build before wrote the same page without the counts.
+    shelf((row) => {
+      delete row.itemCount
+      delete row.total
+    })
     expect(store.page.trips[0]?.itemCount).toBeNull()
     expect(store.showsAnswer()).toBe(true)
+    expect(store.unconfirmed()).toEqual(new Set([A]))
   })
 
   it('another owner’s moment is not this owner’s', () => {
