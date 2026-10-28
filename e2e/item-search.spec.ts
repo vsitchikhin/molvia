@@ -2,7 +2,7 @@
 // DOM for the code inside page.evaluate, which runs in the browser.
 import { expect, test } from '@playwright/test'
 import { asBrowser, signedIn } from './session'
-import type { APIResponse, Page } from '@playwright/test'
+import type { APIResponse, Locator, Page } from '@playwright/test'
 
 /**
  * «What did you pick up?» against the real API and the real catalogue search: transliteration and
@@ -58,6 +58,25 @@ const KVIRTA_MILK = {
   note: 'пастеризованное, 3,2%',
 } as const
 const KVIRTA_KEFIR = { name: 'Кефир «Квирта»', defaultUnit: 'l' } as const
+
+const OFFLINE_STRIP =
+  'Offline · searching your recent items only. The full catalogue comes back with a connection'
+
+/**
+ * The keys of an iPhone with the bar over them, as measured on the owner's (MOL-135): what a state of
+ * this screen offers is tapped while the field holds them up, so it must stand above them. The window
+ * of Chromium does not shrink, so this is the geometry alone — the strip at the bottom fails it.
+ */
+const KEYS = 304
+
+async function aboveTheKeys(page: Page, button: Locator): Promise<void> {
+  await expect(button).toBeVisible()
+  const box = await button.boundingBox()
+  const height = page.viewportSize()!.height
+  expect(box!.y + box!.height, 'the button stands under the keys').toBeLessThanOrEqual(
+    height - KEYS,
+  )
+}
 
 /**
  * Two items in the catalogue and the search open. `recent` — the milk is among the items this
@@ -217,13 +236,17 @@ test.describe('nothing found', () => {
     const word = nonsense()
 
     await field(page).fill(word)
-    // The block on the screen, not the live region, which says the same words (Р-10).
-    await expect(page.locator('.not-found-text')).toContainText(`Nothing found for «${word}»`)
+    // The heading of the state, not the live region, which says the same words (MOL-64).
+    await expect(
+      page.getByRole('heading', { name: `Nothing found for «${word}»`, exact: true }),
+    ).toBeVisible()
 
     const statuses: number[] = []
     page.on('response', (response) => {
       if (response.url().endsWith('/catalogue/items')) statuses.push(response.status())
     })
+
+    await aboveTheKeys(page, page.getByRole('button', { name: 'Suggest an item' }))
 
     for (const expected of [201, 200]) {
       await page.getByRole('button', { name: 'Suggest an item' }).click()
@@ -279,8 +302,8 @@ test.describe('nothing close found (MOL-46)', () => {
 
     await field(page).fill(typo)
 
-    // The block on the screen, not the live region, which says the same words (Р-10).
-    await expect(page.locator('.not-found-text')).toContainText(`Nothing found for «${typo}»`)
+    // The card's own words, not the live region, which says the same (MOL-64).
+    await expect(page.locator('.far-title')).toHaveText(`Nothing found for «${typo}»`)
     await expect(options(page).first()).toContainText(name)
     // The list is named by its heading; the live region says «…with a similar spelling» too, and
     // `getByText` would hold only while `exact` happened to tell them apart (MOL-64).
@@ -291,7 +314,7 @@ test.describe('nothing close found (MOL-46)', () => {
     // The word itself is a find: everything goes back to how a find looks.
     await field(page).fill(name)
     await expect(options(page).first()).toContainText(name)
-    await expect(page.locator('.not-found')).toHaveCount(0)
+    await expect(page.locator('.far')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Not here? Suggest an item' })).toBeVisible()
   })
 })
@@ -309,8 +332,13 @@ test.describe('without the server', () => {
     await context.setOffline(true)
     await field(page).fill('квирт')
 
-    await expect(page.getByRole('heading', { name: 'No connection', exact: true })).toBeVisible()
-    await expect(page.locator('.tone-bad')).toHaveCount(0)
+    // One strip under the field (Ф-14): its own words, not the live region's copy of them.
+    const strip = page.locator('.strip.offline')
+    await expect(strip).toHaveText(OFFLINE_STRIP)
+    await expect(page.locator('.tone-bad, .strip.unanswered')).toHaveCount(0)
+    const fieldBox = await field(page).boundingBox()
+    const stripBox = await strip.boundingBox()
+    expect(stripBox!.y).toBeGreaterThan(fieldBox!.y + fieldBox!.height)
     await expect(options(page)).toHaveText([new RegExp(KVIRTA_MILK.name)])
 
     await field(page).fill('кефир')
@@ -326,6 +354,7 @@ test.describe('without the server', () => {
     // что поиск сам ушёл на сервер, когда связь вернулась, — не порядок выдачи.
     await expect(options(page).filter({ hasText: KVIRTA_KEFIR.name })).toHaveCount(1)
     expect(searches.length).toBeGreaterThan(0)
+    await expect(strip).toHaveCount(0)
   })
 
   test('an error offers «Try again» and the recent items', async ({ page }) => {
@@ -337,6 +366,10 @@ test.describe('without the server', () => {
     await expect(
       page.getByRole('heading', { name: 'The server did not answer', exact: true }),
     ).toBeVisible()
+    // It comes while the person types: the buttons stand under the words, above where the keys of a
+    // phone would be, never in the strip at the bottom (owner's В-20 «а»).
+    await aboveTheKeys(page, page.getByRole('button', { name: 'Try again' }))
+    await aboveTheKeys(page, page.getByRole('button', { name: 'Pick from recent' }))
     await page.getByRole('button', { name: 'Pick from recent' }).click()
     await expect(options(page)).toHaveText([new RegExp(KVIRTA_MILK.name)])
 

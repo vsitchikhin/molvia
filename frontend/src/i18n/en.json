@@ -327,7 +327,7 @@
       "action": "To Purchases"
     },
     "empty": {
-      "title": "Nothing found for “{query}”",
+      "title": "Nothing found for «{query}»",
       "text": "We’ll add it to the catalogue — type its name as the price tag has it",
       "action": "Suggest an item"
     },
