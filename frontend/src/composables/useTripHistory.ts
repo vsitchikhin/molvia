@@ -68,6 +68,13 @@ export function useTripHistory(): TripHistoryScreen {
   const failures = ref(0)
   const moved = ref(false)
   let run = 0
+  /**
+   * What became of the last read of the first page. A next page taken says nothing of the first (round 4
+   * of MOL-307, Г1): a first page the server did not answer stays memory under its strip, and the strip
+   * goes only with the first page answered — taken, a next page put the shelf's counts of days ago on
+   * screen as the answer (round 5, Д1). A failed next page's own trouble a next page taken does clear.
+   */
+  let firstTrouble: 'error' | 'offline' | null = null
   const rows = computed(() => {
     // A list moved under every read is the answer by its rows; a count the answer does not say is
     // unknown, never memory said as the answer (MOL-307, owner's В-2 «а»).
@@ -140,17 +147,20 @@ export function useTripHistory(): TripHistoryScreen {
         await new Promise((resolve) => setTimeout(resolve, RETRY_PAUSE_MS * 2 ** (again - 1)))
         if (token === run) taken = await history.load(more)
       }
-      if (token === run) {
+      if (token === run && more && taken) {
+        // The counts a moved list left unknown, and the first page's own trouble, stay (Г1, Д1).
+        trouble.value = firstTrouble
+      } else if (token === run) {
         trouble.value = taken ? null : 'error'
-        // A next page taken says nothing of the first: the counts a moved list left unknown stay so until
-        // the first page is answered (round 4 of MOL-307, Г1).
-        if (!more || !taken) moved.value = !taken && history.showsAnswer()
+        moved.value = !taken && history.showsAnswer()
+        if (!more) firstTrouble = trouble.value
       }
       if (token === run && !taken) failures.value += 1
     } catch (error) {
       reportFailure(error, 'screen')
       if (token === run) {
         trouble.value = navigator.onLine ? 'error' : 'offline'
+        if (!more) firstTrouble = trouble.value
         moved.value = false
         failures.value += 1
       }

@@ -872,6 +872,78 @@ describe('PurchasesView (MOL-128)', () => {
       expect(view.findAll('.strip')).toHaveLength(0)
     })
 
+    it('«Показать ещё» после ошибки первой страницы — полоса остаётся: первую страницу сервер так и не прочёл (MOL-307, Д1)', async () => {
+      const row = trip(1)
+      const deeper = trip(7, 'SAS')
+      const cursor = { at: '2026-09-01T00:00:00.123456Z', id: deeper.id }
+      // The shelf of three days ago; since then another device added a purchase to record 1.
+      localStorage.setItem(
+        `molvia.trip-history-at.${ME}`,
+        new Date(NOW.getTime() - 3 * 86_400_000).toISOString(),
+      )
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          page: {
+            trips: [
+              tripHistoryEntryCodec.encode({
+                ...row,
+                itemCount: 2,
+                total: [parseMoney('1000', 'AMD')],
+              }),
+            ],
+            nextCursor: cursor,
+          },
+          selected: null,
+          local: [],
+        }),
+      )
+      tripHistory
+        .mockRejectedValueOnce(new Error('HTTP 500'))
+        .mockResolvedValueOnce({ trips: [deeper], nextCursor: null })
+      const { view } = await render()
+      await flushPromises()
+      expect(view.findAll('.strip')).toHaveLength(1)
+
+      const more = view.findAll('button').find((button) => button.text() === ru.trip.history.more)
+      if (!more) throw new Error('нет «Показать ещё»')
+      await more.trigger('click')
+      await flushPromises()
+
+      expect(tripHistory).toHaveBeenCalledTimes(2)
+      expect(rows(view)).toHaveLength(2)
+      // The memory stays memory, under the strip with its moment.
+      expect(view.findAll('.strip')).toHaveLength(1)
+      expect(view.get('.strip').text()).toContain('покупки на')
+    })
+
+    it('«не должно сработать»: полосу неудачной «Показать ещё» снимает следующая удачная (MOL-307, Д1)', async () => {
+      const deeper = trip(7, 'SAS')
+      const cursor = { at: '2026-09-01T00:00:00.123456Z', id: deeper.id }
+      tripHistory
+        .mockResolvedValueOnce({ trips: [trip(1)], nextCursor: cursor })
+        .mockRejectedValueOnce(new Error('HTTP 500'))
+        .mockResolvedValueOnce({ trips: [deeper], nextCursor: null })
+      const { view } = await render()
+      await flushPromises()
+      const more = () => {
+        const found = view
+          .findAll('button')
+          .find((button) => button.text() === ru.trip.history.more)
+        if (!found) throw new Error('нет «Показать ещё»')
+        return found
+      }
+      await more().trigger('click')
+      await flushPromises()
+      expect(view.findAll('.strip')).toHaveLength(1)
+
+      await more().trigger('click')
+      await flushPromises()
+      expect(tripHistory).toHaveBeenCalledTimes(3)
+      expect(rows(view)).toHaveLength(2)
+      expect(view.findAll('.strip')).toHaveLength(0)
+    })
+
     it('другое окно кладёт назад свою старую страницу — полоса со временем той страницы (адверсариальное Б4)', async () => {
       const old = new Date(NOW.getTime() - 3 * 86_400_000)
       // An `apply` of a window sending its queue: the page it read three days ago, with that moment.
