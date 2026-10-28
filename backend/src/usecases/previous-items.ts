@@ -6,7 +6,8 @@ import type { TripRepositories } from '@/db/unit-of-work'
  * How many items «Брали здесь в прошлый раз» is answered with — as many as the search and the
  * recent items (`SEARCH_LIMIT`, `RECENT_LIMIT`). The phone shows five, but only after taking out
  * what is already in this trip (Р-17), which only the phone knows whole: cut to five here, three of
- * them recorded left two, where ten were taken last time (MOL-209, Р-2).
+ * them recorded left two, where ten were taken last time (MOL-209, Р-2). Counted after what this
+ * trip holds on the server is taken out (В-5 «а»): the same arithmetic on a big receipt.
  */
 export const PREVIOUS_ITEMS_LIMIT = 20
 

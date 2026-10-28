@@ -167,6 +167,46 @@ describe('«Брали здесь в прошлый раз» (MOL-209)', () => {
     10_000,
   )
 
+  // Owner's В-5 «а» of the review, adversarial А4: a receipt of 25 lines last time, the same taken
+  // again in its order — cut before, 18 taken left the phone 2 of the 7 still to take, 20 none.
+  it.each([18, PREVIOUS_ITEMS_LIMIT, 25])(
+    'what this trip holds goes before the limit: %i of 25 taken again leaves the rest',
+    async (taken) => {
+      const actor = await insertActor(db)
+      const cookie = await signIn(db, actor)
+      const place = await insertPlace(db, { name: `SAS ${randomUUID()}` })
+      const ids: string[] = []
+      for (let i = 0; i < 25; i += 1) ids.push(await item(`Позиция ${String(i)}`))
+      const last = await insertTrip(db, { actorId: actor, placeId: place, ...finished(1) })
+      await bought(last, ids)
+      const open = await insertTrip(db, { actorId: actor, placeId: place })
+      await bought(open, ids.slice(0, taken), Date.UTC(2026, 9, 10))
+
+      const answer = await previousOf(cookie, open)
+      expect(answer.previous?.tripId).toBe(last)
+      expect(answer.items.map((entry) => entry.id)).toEqual(ids.slice(taken))
+    },
+    10_000,
+  )
+
+  it('a finished trip asked about has what it holds taken out too, and another trip’s is not', async () => {
+    const actor = await insertActor(db)
+    const cookie = await signIn(db, actor)
+    const place = await insertPlace(db, { name: `SAS ${randomUUID()}` })
+    const [milk, bread, eggs] = [await item('Молоко'), await item('Хлеб'), await item('Яйца')]
+    const last = await insertTrip(db, { actorId: actor, placeId: place, ...finished(1) })
+    await bought(last, [milk, bread, eggs])
+    const asked = await insertTrip(db, { actorId: actor, placeId: place, ...finished(3) })
+    await bought(asked, [bread], Date.UTC(2026, 9, 3))
+    // «Must not fire»: the trip going on holds the eggs, and the finished one is asked about.
+    const open = await insertTrip(db, { actorId: actor, placeId: place })
+    await bought(open, [eggs], Date.UTC(2026, 9, 10))
+
+    const answer = await previousOf(cookie, asked)
+    expect(answer.previous?.tripId).toBe(last)
+    expect(answer.items.map((entry) => entry.id)).toEqual([milk, eggs])
+  })
+
   it('a stranger’s, a missing, a removed and a malformed trip are one 404', async () => {
     const actor = await insertActor(db)
     const other = await insertActor(db)

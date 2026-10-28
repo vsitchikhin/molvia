@@ -217,7 +217,8 @@ export type RecentPlacesResponse = z.infer<typeof recentPlacesResponseSchema>
 
 /**
  * «Брали здесь в прошлый раз» (MOL-209): the items of the person's last finished trip at the
- * trip's place before it, each once, in the order they were first bought there. `previous` names
+ * trip's place before it, each once, in the order they were first bought there, but none the trip
+ * asked about holds already (MOL-209, В-5 «а») — so they are not the whole of it. `previous` names
  * that trip and its moment in «Записаны», so the phone can tell it from the trips it remembers
  * by itself (В-1); `null` — no such trip, and then no items.
  */
