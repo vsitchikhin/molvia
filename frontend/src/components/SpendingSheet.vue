@@ -393,6 +393,8 @@ export default defineComponent({
     /** The field «Дата, заметка, место» opens on: the first wrong one, none for a tap on its line. */
     const detailsFocus = ref<SpendingDetailsField | null>(null)
     const items = ref<TripItem[] | 'loading' | 'offline' | 'error'>('loading')
+    /** Which read of the items is the latest: an answer of an earlier one changes nothing. */
+    let reading = 0
     let after: (() => void) | null = null
 
     // The account (MOL-123, handoff 06): the screen puts the default in, the server never guesses.
@@ -590,10 +592,14 @@ export default defineComponent({
     )
 
     async function loadTrip(row: TripRow): Promise<void> {
+      const mine = ++reading
       items.value = 'loading'
       try {
         const trip = await api.trip(row.tripId)
-        // Another trip opened meanwhile: this answer is not its account (review 8).
+        // Another trip opened meanwhile: this answer is not its account (review 8). Nor is a read the
+        // sheet made before the one in hand — the same trip opened again, or «Повторить» over a server
+        // that hung: its answer would put back what the later one replaced (self-review 1 of MOL-199).
+        if (mine !== reading) return
         if (props.target.kind !== 'trip' || props.target.row.tripId !== row.tripId) return
         tripView.value = trip
         accountId.value = trip.accountId
@@ -608,6 +614,7 @@ export default defineComponent({
           }))
       } catch (error) {
         reportFailure(error, 'screen')
+        if (mine !== reading) return
         const answered = error instanceof ApiError && error.answered
         items.value = !answered && !navigator.onLine ? 'offline' : 'error'
       }

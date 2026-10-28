@@ -162,7 +162,7 @@ function topSheet(): HTMLDialogElement {
 
 /** The line «Дата, заметка, место» of the spending sheet (MOL-199). */
 function detailsRow(): HTMLButtonElement {
-  const row = document.querySelector<HTMLButtonElement>('dialog[open] .nav-row.field')
+  const row = document.querySelector<HTMLButtonElement>('dialog[open] .nav-row.nav-field')
   if (!row) throw new Error('no line of the day, the note and the place')
   return row
 }
@@ -801,6 +801,25 @@ describe('SpendingSheet: «Дата, заметка, место» behind one lin
     expect(detailsRow().getAttribute('aria-invalid')).toBeNull()
   })
 
+  // Р-4: opened over «Выберите категорию», the details would hide the error above them (self-review 4).
+  it('must not fire: a category not chosen takes the focus before a wrong note, the details shut', async () => {
+    const dialog = await newSpending()
+    const amount = dialog.querySelector<HTMLInputElement>('input[inputmode="decimal"]')
+    if (!amount) throw new Error('no amount field')
+    await typeInto(amount, '1000')
+    await openDetails()
+    await typeInto(textField(en.spending.sheet.note_placeholder), `Lunch${String.fromCharCode(7)}`)
+    await detailsDone()
+    await pressUntil(en.spending.sheet.save, () => {
+      expect(dialog.textContent).toContain(en.spending.sheet.bad_category)
+    })
+    await flushPromises()
+    expect(document.querySelectorAll('dialog[open]')).toHaveLength(1)
+    expect(document.activeElement).toBe(dialog.querySelector('.chips-field input'))
+    expect(detailsRow().getAttribute('aria-invalid')).toBe('true')
+    expect(recordSpending).not.toHaveBeenCalled()
+  })
+
   it('must not fire: a wrong sum before it takes the focus, and the details stay shut', async () => {
     const dialog = await newSpending()
     await openDetails()
@@ -893,6 +912,35 @@ describe('SpendingSheet: the items of a trip’s summary (MOL-199, Ф-13, Ф-15)
       expect.stringContaining('Milk'),
       expect.stringContaining('Bread'),
     ])
+  })
+
+  // «Повторить» over a server that hangs, the sheet closed and opened again and read: the first read's
+  // refusal, come last, must not stand over the items the later one put there (self-review 1).
+  it('must not fire: a read that answers after a later one changes nothing', async () => {
+    let refuse: (error: unknown) => void = () => undefined
+    trip
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+      .mockReturnValueOnce(
+        new Promise((_resolve, reject) => {
+          refuse = reject
+        }),
+      )
+      .mockResolvedValue(answer)
+    const view = await summary()
+    const retry = view.findAll('.state button').find((one) => one.text() === en.state.retry)
+    if (!retry) throw new Error('no «Try again»')
+    await retry.trigger('click')
+    await flushPromises()
+    expect(view.find('.skeleton').exists()).toBe(true)
+    await view.setProps({ open: false })
+    await view.setProps({ open: true })
+    await flushPromises()
+    expect(view.findAll('.items .item')).toHaveLength(2)
+    refuse(new ApiError(ERROR.INTERNAL))
+    await flushPromises()
+    expect(trip).toHaveBeenCalledTimes(3)
+    expect(view.find('.state').exists()).toBe(false)
+    expect(view.findAll('.items .item')).toHaveLength(2)
   })
 
   // Offline is no error: the screen's strip under the sheet says it, and there is nothing to retry.
