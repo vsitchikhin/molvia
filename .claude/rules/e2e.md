@@ -249,7 +249,10 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   told them apart (66.390625 → 66.984375). A chosen row at 700 went green in every [phone] run — the twin
   on «Месяц» runs in nothing else. Both tests now read the weight of the name and the sum before the
   choice and hold it after with `toHaveCSS('font-weight', …)`; at 700 all three CI runs turn red, in the
-  CI image's browsers, not a Mac's, where the width alone had looked enough. **The price, named:** the other measures
+  CI image's browsers, not a Mac's, where the width alone had looked enough. Weight and width are read
+  once the row's animations have finished (`getAnimations({ subtree: true })`): a 700 that came by a
+  transition after a pause of `--dur` was still 600 the moment after the tap, and passed by chance
+  (adversarial Р2-А4); waited for, it is red every run. **The price, named:** the other measures
   of a width taken right after `open()` were not checked for the late face, nor any other `toBe` of a
   width in [phone] for what whole pixels hide; the next to fail so is a task of its own.
 - **«A line gone under the category of «Год»» keeps its first attempt's trace in CI** (MOL-267,
