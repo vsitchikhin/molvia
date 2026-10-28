@@ -653,7 +653,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   «Повторить» while a version waits (А6, the order of 8c kept); e2e measures on that window, not on the
   Pixel of the project, which left 140 px the phone has not got. **The price, named:** «Сообщить о
   проблеме», last and quietest, stands under the keys there (435), and so does «Взять из недавних»
-  while a version waits; a phone narrower than the pair puts them one under the other again. **A
+  while a version waits; a phone narrower than the pair puts them one under the other again. **A focus
+  on the row's «Обновить» goes to the error's «Обновить»** when the row steps aside for it (adversarial
+  А7, Ж of MOL-132 below) — a tick later, since the error's buttons come by a deferred `Teleport`. **A
   dimmed state says nothing** (`silent`, adversarial А3): an empty answer left while the next is on its
   way is for the text before, and its words leave the region until it is the answer again. **Always on that screen,
   not «while the field holds the focus»**: a tap on the button takes the focus from the field first,

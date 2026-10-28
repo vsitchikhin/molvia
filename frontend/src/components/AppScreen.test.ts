@@ -1,4 +1,4 @@
-import { enableAutoUnmount, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -709,6 +709,41 @@ describe('AppScreen with an error of the whole screen', () => {
       await nextTick()
       expect(view.get('.dock .band').text()).toContain(en.update.failed.title)
       expect(buttons(view.get('.content .state .action'))).toEqual([en.state.retry])
+    })
+
+    // A focus on the row's «Обновить» meant the reload: the row goes with the error that came, and the
+    // focus goes to the «Обновить» the error offers in its place (Ж of MOL-132, adversarial А7).
+    it('hands a focus on the row’s «Update» to the error’s own', async () => {
+      const shown = ref(false)
+      const view = mount(
+        defineComponent({
+          setup: () => () =>
+            h(
+              AppScreen,
+              { title: 'Search' },
+              { default: () => (shown.value ? error({ flow: true }) : h('p', 'rows')) },
+            ),
+        }),
+        {
+          attachTo: document.body,
+          global: {
+            plugins: [await routed('/'), createPinia(), createAppI18n('en')],
+            provide: { [pwaUpdateKey as symbol]: waiting('ready') },
+          },
+        },
+      )
+      await nextTick()
+      const row = view.get<HTMLButtonElement>('.dock .band .reload')
+      row.element.focus()
+      expect(document.activeElement).toBe(row.element)
+
+      shown.value = true
+      await flushPromises()
+      await nextTick()
+
+      expect(view.find('.dock').exists()).toBe(false)
+      expect(document.activeElement).toBe(view.get('.content .state .reload').element)
+      view.unmount()
     })
 
     it('gives the row back when the error goes', async () => {

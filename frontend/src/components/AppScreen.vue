@@ -52,7 +52,7 @@
       <IdentityNotice />
     </div>
 
-    <div class="content">
+    <div ref="content" class="content">
       <slot />
       <!-- The room the strip below takes, and «Вернуть» over it, kept inside the scroll: the last
            row of a list has to be reachable, and both are over the page, not in it. -->
@@ -135,6 +135,7 @@ export default defineComponent({
 
     const bar = ref<HTMLElement | null>(null)
     const dock = ref<HTMLElement | null>(null)
+    const content = ref<HTMLElement | null>(null)
     const sentinel = ref<HTMLElement | null>(null)
 
     // Named by where it leads (`backTarget`): a screen opened from further up than its parent goes
@@ -191,6 +192,18 @@ export default defineComponent({
       if (focused !== null && focused !== document.body) return
       const next = nextAction(dock.value, onReload)
       if (next) next.focus()
+      else if (onReload && strip.offering.value) void nextTick(toOfferedReload)
+      else focusScreenTitle()
+    }
+    // A screen typed in: the error that came offers «Обновить» under its words, and the row of the
+    // version went for it — a focus that stood on the row's «Обновить» goes to that one, as it would to
+    // the one in the strip (Ж of MOL-132; adversarial А7 of MOL-208). A tick later: the error's buttons
+    // are drawn by a deferred `Teleport`, after the render that took the row away.
+    function toOfferedReload(): void {
+      const focused = document.activeElement
+      if (focused !== null && focused !== document.body) return
+      const reload = content.value?.querySelector<HTMLElement>('.reload')
+      if (reload) reload.focus()
       else focusScreenTitle()
     }
     onUpdated(() => {
@@ -275,6 +288,7 @@ export default defineComponent({
       t,
       bar,
       dock,
+      content,
       undo,
       sentinel,
       collapsed,
