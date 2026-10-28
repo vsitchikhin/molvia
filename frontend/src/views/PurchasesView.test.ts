@@ -831,7 +831,7 @@ describe('PurchasesView (MOL-128)', () => {
       }
     })
 
-    describe('«Показать ещё» о первой странице ничего не говорит — под сомнением она прочитана заново (MOL-307, Г1, Д1, Е1, №4)', () => {
+    describe('«Показать ещё» о первой странице ничего не говорит — под сомнением она прочитана заново, до следующей (MOL-307, Г1, Д1, Е1, Ж1, №4)', () => {
       const row = trip(1)
       const deeper = trip(7, 'SAS')
       const cursor = { at: '2026-09-01T00:00:00.123456Z', id: deeper.id }
@@ -875,14 +875,14 @@ describe('PurchasesView (MOL-128)', () => {
         let asked = 0
         tripHistory.mockImplementation(() => {
           asked += 1
-          return asked === 5 ? next() : moving()
+          return asked === 9 ? next() : moving()
         })
         const { view } = await render()
         await pausesPass()
         expect(rows(view)[0]?.text()).not.toContain('позиц')
 
         await tap(view)
-        // The next page, then the first asked again — and moved again under every read.
+        // The first page asked again — and moved again under every read — then the next one.
         expect(tripHistory).toHaveBeenCalledTimes(9)
         expect(rows(view)).toHaveLength(2)
         expect(rows(view)[0]?.text()).not.toContain('позиц')
@@ -894,8 +894,8 @@ describe('PurchasesView (MOL-128)', () => {
         shelve()
         tripHistory
           .mockRejectedValueOnce(new Error('HTTP 500'))
-          .mockImplementationOnce(next)
           .mockRejectedValueOnce(new Error('HTTP 500'))
+          .mockImplementationOnce(next)
         const { view } = await render()
         await flushPromises()
         expect(view.findAll('.strip')).toHaveLength(1)
@@ -912,8 +912,8 @@ describe('PurchasesView (MOL-128)', () => {
         shelve()
         tripHistory
           .mockRejectedValueOnce(new Error('HTTP 500'))
-          .mockImplementationOnce(next)
           .mockResolvedValueOnce({ trips: [answer], nextCursor: cursor })
+          .mockImplementationOnce(next)
         const { view } = await render()
         await flushPromises()
 
@@ -928,10 +928,12 @@ describe('PurchasesView (MOL-128)', () => {
         let asked = 0
         tripHistory.mockImplementation(() => {
           asked += 1
-          if (asked <= 4) return moving()
-          if (asked === 5) return Promise.reject(new Error('HTTP 500'))
-          if (asked === 6) return next()
-          return Promise.resolve({ trips: [answer], nextCursor: cursor })
+          // a ladder; the tap: the first page, moved again, then the next one fails; the second tap: the
+          // first page, answered, then the next one
+          if (asked <= 8) return moving()
+          if (asked === 9) return Promise.reject(new Error('HTTP 500'))
+          if (asked === 10) return Promise.resolve({ trips: [answer], nextCursor: cursor })
+          return next()
         })
         const { view } = await render()
         await pausesPass()
@@ -939,10 +941,35 @@ describe('PurchasesView (MOL-128)', () => {
         expect(view.findAll('.strip')).toHaveLength(1)
 
         await tap(view)
-        expect(tripHistory).toHaveBeenCalledTimes(7)
+        expect(tripHistory).toHaveBeenCalledTimes(11)
         expect(rows(view)).toHaveLength(2)
         expect(view.findAll('.strip')).toHaveLength(0)
         expect(rows(view)[0]?.text()).toContain('3 позиции')
+      })
+
+      it('граница первой страницы сдвинулась, пока лежала полка, — страница нажатия читается от новой и остаётся (Ж1)', async () => {
+        shelve()
+        // Another device finished a record since: the first page now ends one row higher.
+        const gaya = trip(0, 'Гая')
+        const between = { at: '2026-09-20T00:00:00.123456Z', id: row.id }
+        tripHistory
+          .mockRejectedValueOnce(new Error('HTTP 500'))
+          .mockResolvedValueOnce({ trips: [gaya, answer], nextCursor: between })
+          .mockImplementationOnce(next)
+        const { view } = await render()
+        await flushPromises()
+
+        await tap(view)
+        expect(tripHistory).toHaveBeenCalledTimes(3)
+        expect(rows(view).map((one) => one.text())).toEqual([
+          expect.stringContaining('Гая'),
+          expect.stringContaining('Ереван Сити'),
+          expect.stringContaining('SAS'),
+        ])
+        expect(view.findAll('button').some((one) => one.text() === ru.trip.history.more)).toBe(
+          false,
+        )
+        expect(view.findAll('.strip')).toHaveLength(0)
       })
 
       it('«не должно сработать»: первая страница ответила — взятая «Показать ещё» её не перечитывает', async () => {
@@ -962,8 +989,8 @@ describe('PurchasesView (MOL-128)', () => {
         tripHistory
           .mockResolvedValueOnce({ trips: [answer], nextCursor: cursor })
           .mockRejectedValueOnce(new Error('HTTP 500'))
-          .mockImplementationOnce(next)
           .mockResolvedValueOnce({ trips: [answer], nextCursor: cursor })
+          .mockImplementationOnce(next)
         const { view } = await render()
         await flushPromises()
         await tap(view)

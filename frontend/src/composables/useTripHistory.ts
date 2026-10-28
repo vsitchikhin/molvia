@@ -124,11 +124,12 @@ export function useTripHistory(): TripHistoryScreen {
       (a, b) => b.at.getTime() - a.at.getTime() || b.id.localeCompare(a.id),
     )
   })
-  async function load(more = false): Promise<void> {
+  /** `tapped`: a first page read for «Показать ещё», whose button says it is at work meanwhile. */
+  async function load(more = false, tapped = more): Promise<void> {
     if (!actor.id) return
     const token = ++run
     busy.value = true
-    loadingMore.value = more
+    loadingMore.value = tapped
     history.stale = true
     try {
       // An answer the list moved under is asked for again (adversarial А), after a pause that
@@ -142,10 +143,8 @@ export function useTripHistory(): TripHistoryScreen {
       }
       if (token === run && more && taken) {
         // A next page taken says nothing of the first (MOL-307, rounds 4–6: Г1, Д1, Е1): neither that it
-        // was answered nor that it was not, and the screen is not the only one that reads it — a finish
-        // sent reads it in the store. So the first page in doubt — a strip over it, or a list moved under
-        // every read — is asked again, and its own outcome decides; until then everything stays.
-        if (trouble.value !== null || moved.value) void load()
+        // was answered nor that it was not. The first page in doubt is read before it (`more`), and the
+        // strip and the counts stay its own outcome's.
       } else if (token === run) {
         trouble.value = taken ? null : 'error'
         moved.value = !taken && history.showsAnswer()
@@ -164,6 +163,18 @@ export function useTripHistory(): TripHistoryScreen {
         loadingMore.value = false
       }
     }
+  }
+  /**
+   * «Показать ещё». A next page says nothing of the first, and the screen is not the first page's only
+   * reader — a finish sent reads it in the store (MOL-307, Е1). So a first page in doubt — a strip over
+   * it, or a list moved under every read — is read again first, and its own outcome decides the strip and
+   * the counts; then the next page, from the boundary it now has. Read after the next one, a first page
+   * whose boundary had moved since the shelf threw the tapped page away and put the button back (Ж1).
+   */
+  async function more(): Promise<void> {
+    const owner = actor.id
+    if (trouble.value !== null || moved.value) await load(false, true)
+    if (owner === actor.id) await load(true)
   }
   watch(
     () => actor.id,
@@ -206,7 +217,7 @@ export function useTripHistory(): TripHistoryScreen {
     failures,
     moved,
     load: () => void load(),
-    more: () => void load(true),
+    more: () => void more(),
     open: (tripId: string) => void router.push({ name: 'purchase', params: { tripId } }),
   }
 }
