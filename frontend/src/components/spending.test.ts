@@ -324,21 +324,6 @@ describe('the chips of a spending (MOL-198, Ф-17)', () => {
     expect(ids(chipOrder(list, []))).toEqual(['groceries', 'cafe', 'rent', 'telecom'])
   })
 
-  it('stands the chosen one first, wherever frequency put it (owner’s В-2 «а»)', () => {
-    expect(ids(chipOrder(list, [cafe.id], rent.id))).toEqual([
-      'rent',
-      'cafe',
-      'groceries',
-      'telecom',
-    ])
-    expect(ids(chipOrder(list, [cafe.id], cafe.id))).toEqual([
-      'cafe',
-      'groceries',
-      'rent',
-      'telecom',
-    ])
-  })
-
   // Chips as Onest 15/600 draws them with a dot of 10 and paddings of 12 and 16: «Продукты»,
   // «Кафе и рестораны», «Транспорт», «Животные», «Связь и интернет», «Дом и быт»; «Ещё…» of 66.
   const widths = [115, 170, 120, 115, 168, 110]

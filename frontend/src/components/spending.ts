@@ -171,18 +171,15 @@ export function categoryColour(category: SpendingCategoryView): string {
 }
 
 /**
- * The categories of a spending's chips in the order they stand (MOL-198, Ф-17): the frequent ones the
- * server named, then the rest as the list has them — a newcomer's, the presets as listed. `chosen`
- * stands first (owner's В-2 «а»: «выбранная категория всегда должна вставать первой»), as the sheet
- * puts it there at its opening, on a return from «Ещё…» and on a new one — never on a tap of a chip.
+ * The categories of a spending's chips by frequency (MOL-198, Ф-17): the frequent ones the server named,
+ * then the rest as the list has them — a newcomer's, the presets as listed. The chosen one first is the
+ * sheet's (`SpendingSheet`, owner's В-2 «а»), since only the sheet knows when the chips may move.
  */
 export function chipOrder(
   categories: readonly SpendingCategoryView[],
   frequent: readonly string[],
-  chosen: string | null = null,
 ): SpendingCategoryView[] {
   const rank = (id: string) => {
-    if (id === chosen) return -1
     const at = frequent.indexOf(id)
     return at === -1 ? frequent.length : at
   }

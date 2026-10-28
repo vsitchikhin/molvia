@@ -210,7 +210,7 @@
   />
   <CategoryPickerSheet
     v-model:open="moreOpen"
-    :categories="listed"
+    :categories="chips"
     :name-of="nameOf"
     :selected="categoryId"
     @pick="pickCategory"
@@ -426,10 +426,15 @@ export default defineComponent({
     // The order of the chips, taken when the sheet opens (MOL-198): an answer landing while it is up
     // moves none of them — one that comes after is put at the end, one gone is taken out.
     const order = ref(chipOrder(choice.value, props.frequent).map((category) => category.id))
-    // The chosen one standing first: put there at the opening, on a return from «Ещё…» and for one
-    // just made — never by a tap on a chip, which would move the chips under the finger (В-2 «а»).
+    // The chosen one standing first: put there at the opening, on a return from «Ещё…» — by a choice
+    // there, by «‹», Esc or «back» alike (adversarial А4) — and for one just made, never by a tap on a
+    // chip, which would move the chips under the finger (В-2 «а»). The list «Ещё…» stands in the order
+    // of the chips, the chosen one first there too (adversarial А2).
     const lead = ref<string | null>(null)
     const moreOpen = ref(false)
+    watch(moreOpen, (open, was) => {
+      if (was && !open) lead.value = categoryId.value
+    })
     watch(choice, (live) => {
       const ids = chipOrder(live, props.frequent).map((category) => category.id)
       const kept = order.value.filter((id) => ids.includes(id))
@@ -437,6 +442,7 @@ export default defineComponent({
     })
     const byId = (id: string) => choice.value.find((category) => category.id === id)
     const listed = computed(() => order.value.flatMap((id) => byId(id) ?? []))
+    // The one place the chosen one is put first: the chips and the list «Ещё…» alike.
     const chips = computed(() => {
       const first = lead.value === null ? undefined : byId(lead.value)
       return first ? [first, ...listed.value.filter((one) => one !== first)] : listed.value
@@ -924,7 +930,6 @@ export default defineComponent({
       currency,
       categoryId,
       chips,
-      listed,
       moreOpen,
       pickCategory,
       day,
