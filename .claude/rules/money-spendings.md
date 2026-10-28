@@ -460,22 +460,25 @@ nothing up.
   the opening, on the way back from «Ещё…» — by a choice there, by «‹», Esc or «back» alike
   (adversarial А4) — and for one just made — never on a tap of a chip, which is the finger's place; the
   one chosen before goes back to its place by frequency. One place does it, the sheet (`chips`), for the
-  chips and the list alike. **How many stand is the browser's measure** (`chipsInTwoRows`): each chip at
+  chips and the list alike — and the chips ask it of the sheet when a measure lifts the chosen one
+  (`lift`, below; review 2, Р2-А1): lifted in the rows alone, the list «Ещё…» stood it last. **How many stand is the browser's measure** (`chipsInTwoRows`): each chip at
   its width in an unseen ruler, again when the field's width changes and whenever a face comes, while the
   chips are there (`loadingdone`) — a face may come after the sheet has opened, and changes no width of
   the field; a row takes the next chip while it fits whole, the second keeping room for «Ещё…», the first
   chip always — a name wider than the row cut by its «…». Until there is a measure — a sheet still shut
   — every chip stands, as before. **The chosen one never leaves the rows** (adversarial А1): a measure
   that would lay it past them — the phone turned, a name before it grown longer by an answer — stands it
-  first, and one chosen from outside them is laid in; tapped in the rows, it is there already and moves
-  nothing. Lost from the rows, nothing on the sheet said what was chosen, and «Сохранить трату» saved it.
+  first and tells the sheet (`lift`), and one chosen from outside them is laid in; tapped in the rows,
+  it is there already and moves nothing. Lost from the rows, nothing on the sheet said what was chosen, and «Сохранить трату» saved it.
   Only the chips shown are radios: the arrows walk them, the rest are in the list. **«Ещё…» opens
   «Категория»** (`CategoryPickerSheet`), every category in the order of the chips, the chosen one first
   there too (adversarial А2), on `ListRow` with its dot (owner's В-3 «а»: 52, the handoff's — the list
   is the chips' own), a tap chooses and goes back. **The frequency is read again whenever a write of
   the queue lands** — by the month on «Деньги» and «Траты», by `/spending-categories` on an account's
   screen, its check and «не попали» (`useOwnCategories`, adversarial А3): read once when the screen came
-  up, a spending written there left the next sheet on the order from before it. **The prices, named:**
+  up, a spending written there left the next sheet on the order from before it. Reads that answer out
+  of turn — the queue sending several after the connection came back — never lay an answer over one that
+  set out later (review 2, Р2-А2), as a month is never kept over one (MOL-262, А6). **The prices, named:**
   a person's chips change between openings; an installed phone of the version before fails the new
   field and is offered «Обновить»; a month kept before it reads as a newcomer's; every instance of the
   categories on an account's screen asks again on each write landed — a small read each.
