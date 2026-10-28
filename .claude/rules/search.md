@@ -429,12 +429,17 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   trip and a malformed id are one `404`. **A trip with no purchase is no last time** (Р-1): a receipt
   with no lines, every purchase removed — the one before it speaks. A removed trip does not count; a
   trip from a receipt does. One name in two cities is two places (MOL-120). The items are catalogue
-  cards, each once, in the order first bought, at most `PREVIOUS_ITEMS_LIMIT` (20); the answer names
-  the trip and its moment for the phone's memory. It writes nothing.
+  cards, each once, in the order first bought, **less what the trip asked about holds on the server,
+  then at most `PREVIOUS_ITEMS_LIMIT` (20)** (owner's В-5 «а» of review 1): cut first, a receipt of 25
+  lines taken again in its order left two of the seven still to take at 18, none at 20 (adversarial
+  А4). The answer names the trip and its moment for the phone's memory. It writes nothing.
 - **What is in this trip already is not shown** (owner's Р-17 of MOL-118): the trip's rows and the
   purchases in the queue, by `useTripRows`, a row being removed given back — so **the phone cuts to
   five** (`HERE_LAST_SHOWN`) after taking them out, never the server: cut to five there, three of them
-  recorded left two where ten were taken (Р-2). «Часто берёте» under it repeats none of what it shows.
+  recorded left two where ten were taken (Р-2). The server has taken out what it holds of this trip
+  already; the queue only the phone knows. «Часто берёте» under it repeats none of what it shows. The
+  arrows keep the row they stand on while the rows and the query are the same: the groups are built
+  anew whenever the record is read again (adversarial А3).
 - **Only under an empty field**: typed, the recent items are narrowed alone, as with no signal (1j);
   the answer to a code and the question «привязать?» show no groups. Both groups are one listbox of
   `CatalogueCombobox` (`groups`), each `role="group"` named by its caption, the arrows one run through
@@ -446,23 +451,33 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   server's answer and the purchases written here** (owner's В-1 «а»): the answer names the trip
   _before_ the one asked about, so a memory of answers alone is a trip behind — Wednesday with a
   signal remembers Monday, and Friday with none would show Monday. So an item that goes into a trip
-  makes that trip the place's newest — one added to a finished trip keeps it at its finish; the newest kept trip but the one going on is the last time, and
-  for a finished trip only one before it. The server's answer about a trip takes the place of what the
-  phone wrote into it — it knows what was removed since. «None» is remembered for the trip it was said
-  of. **The prices, named:** a receipt recorded is not written here — its items reach the memory with
-  the next answer at that place; a purchase removed after it was written stays in the memory until
-  then; a merged place (MOL-106) started by its old spelling is looked up by the old key until the
-  server answers.
-- **With nothing remembered the answer is waited for, a second at most** (owner's В-2 «а»,
-  `STRIP_LATE_MS`): «Часто берёте» is on the phone and would stand at once, and the group coming in
-  over it would take its rows from under the finger (MOL-269). Under the hint there is nothing until
-  the answer, and then both groups come together; later than that, «Часто берёте» stands alone and the
-  answer is only remembered. A start that lands while the screen is open only asks — the same trip
-  and place, by the folded key, so «sas» typed at the door is the server's «SAS» — and waits for nothing
-  again. With something remembered it stands at once and the answer takes its place
-  (Р-5) — they part only where a trip was finished or changed on another phone, a move named. A
-  failure, a `404`, no connection — the group is a help, never a state of the screen: what is
-  remembered stands, or nothing does.
+  makes that trip the place's newest — one added to a finished trip keeps it at its finish, **and only
+  where the memory holds that trip** (Р-10 of review 1): a receipt's, another phone's, is not known
+  whole, and its one item stood for all of it (adversarial А1г). The newest kept trip but the one going
+  on is the last time, and for a finished trip only one before it. The server's answer about a trip
+  takes the place of what the phone wrote into it — it knows what was removed since — **and takes
+  every trip kept between its last time and the one asked about** (owner's В-3 «а» of review 1; for a
+  finished trip, before it only): the server saw them and did not count them — removed, emptied — and
+  kept, the newest stood as the last time with no signal for good (adversarial А1, self-review №2). A
+  trip not sent yet is not among them: the one asked about was sent, and the queue sends in order
+  (Р-4). «None» is remembered for the trip it was said of, and takes every kept trip before it. **The
+  prices, named:** a receipt recorded is not written here — its items reach the memory with the next
+  answer at that place; a purchase removed after it was written stays in the memory until then; the
+  answer kept is the last time less what the trip asked about held (В-5), so a purchase taken out of
+  that trip later comes back to the group with no signal only with the next answer; a merged place
+  (MOL-106) started by its old spelling is looked up by the old key until the server answers.
+- **With a connection the answer is waited for, a second at most, remembered or not** (owner's В-2 «а»,
+  `STRIP_LATE_MS`; В-4 «а» of review 1): «Часто берёте» is on the phone and would stand at once, and the
+  group coming in over it would take its rows from under the finger (MOL-269). Under the hint there is
+  nothing until the answer, and then both groups come together; later than that, what is remembered —
+  or «Часто берёте» alone — stands, and the answer is only remembered. **The memory does not stand
+  first to be replaced** (Р-5 withdrawn): it parts from the answer after every receipt recorded on this
+  phone, and the answer coming in late moved «Часто берёте» from under the finger (adversarial А2). With
+  no connection, or for a trip still in the queue, the memory stands at once. A start that lands while
+  the screen is open only asks — the same trip and place, by the folded key, so «sas» typed at the door
+  is the server's «SAS» — and waits for nothing again. A failure, a `404` — the group is a help, never a
+  state of the screen: what is remembered stands, or nothing does. **The price, named:** with a
+  connection and a memory the groups stand up to a second later than they could.
 
 ## By meaning (MOL-105)
 
