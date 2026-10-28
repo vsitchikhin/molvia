@@ -411,8 +411,11 @@ answer — another window's queue sending one purchase a time — drew «Сер�
 every time (adversarial А3, Б2). **So while the list moves under every read, a count and a sum the last answer does
 not say are unknown** (`unconfirmed`, read after every answer, one thrown away included — it lands after the
 write that threw it away has redrawn the page, round 3 В1): the row reads where and when, as before the cache kept them — neither memory
-said as the answer nor a strip that blames the server — and they come back with the first page answered and taken — a next page taken says nothing of it (round 4, Г1), nor takes away the strip over a first page the server did
-not answer (round 5, Д1); a failed next page's own strip it does. **A
+said as the answer nor a strip that blames the server — and they come back with the first page answered and taken. **A next page taken says nothing of the first** (rounds
+4–6: Г1, Д1, Е1): neither that it was answered nor that it was not, and the screen is not its only reader — a finish
+sent reads it in the store. So a first page in doubt — a strip over it, or a list moved under every read — is asked
+again after «Показать ещё», and its own outcome decides the strip and the counts; one not in doubt is not asked. Kept
+by the screen instead, its state was always half kept — the strip and not `moved`, or not what the store had read. **A
 purchase written into a recorded record moves its row on the shelf too** (`apply`, adversarial А1): only in place,
 where the first page holds it — a row the page has not got would move the boundary only `load()` reads. Left on
 screen alone, the first write of another window put the count before the purchase back as the server's answer,

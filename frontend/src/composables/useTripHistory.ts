@@ -68,13 +68,6 @@ export function useTripHistory(): TripHistoryScreen {
   const failures = ref(0)
   const moved = ref(false)
   let run = 0
-  /**
-   * What became of the last read of the first page. A next page taken says nothing of the first (round 4
-   * of MOL-307, Г1): a first page the server did not answer stays memory under its strip, and the strip
-   * goes only with the first page answered — taken, a next page put the shelf's counts of days ago on
-   * screen as the answer (round 5, Д1). A failed next page's own trouble a next page taken does clear.
-   */
-  let firstTrouble: 'error' | 'offline' | null = null
   const rows = computed(() => {
     // A list moved under every read is the answer by its rows; a count the answer does not say is
     // unknown, never memory said as the answer (MOL-307, owner's В-2 «а»).
@@ -148,19 +141,20 @@ export function useTripHistory(): TripHistoryScreen {
         if (token === run) taken = await history.load(more)
       }
       if (token === run && more && taken) {
-        // The counts a moved list left unknown, and the first page's own trouble, stay (Г1, Д1).
-        trouble.value = firstTrouble
+        // A next page taken says nothing of the first (MOL-307, rounds 4–6: Г1, Д1, Е1): neither that it
+        // was answered nor that it was not, and the screen is not the only one that reads it — a finish
+        // sent reads it in the store. So the first page in doubt — a strip over it, or a list moved under
+        // every read — is asked again, and its own outcome decides; until then everything stays.
+        if (trouble.value !== null || moved.value) void load()
       } else if (token === run) {
         trouble.value = taken ? null : 'error'
         moved.value = !taken && history.showsAnswer()
-        if (!more) firstTrouble = trouble.value
       }
       if (token === run && !taken) failures.value += 1
     } catch (error) {
       reportFailure(error, 'screen')
       if (token === run) {
         trouble.value = navigator.onLine ? 'error' : 'offline'
-        if (!more) firstTrouble = trouble.value
         moved.value = false
         failures.value += 1
       }
