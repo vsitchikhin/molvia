@@ -73,11 +73,11 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 
 ## frontend · views
 
-- `frontend/src/views/ItemSearchView.vue` — «Что взяли?» screen: catalogue lookup for a trip, «Часто берёте» under an empty field, «Предложить товар» on a miss; its states under the field — empty and error with their buttons under the words (`ScreenState flow`, MOL-208), offline a `StatusStrip`.
+- `frontend/src/views/ItemSearchView.vue` — «Что взяли?» screen: catalogue lookup for a trip, «Брали здесь в прошлый раз» and «Часто берёте» under an empty field (MOL-209), «Предложить товар» on a miss; its states under the field — empty and error with their buttons under the words (`ScreenState flow`, MOL-208), offline a `StatusStrip`.
 
 ## frontend · components
 
-- `frontend/src/components/CatalogueCombobox.vue` — The field and result list of «Что взяли?»: an ARIA combobox on the kit's `SearchField`, rows `ListRow` options only as the server sent them.
+- `frontend/src/components/CatalogueCombobox.vue` — The field and result list of «Что взяли?»: an ARIA combobox on the kit's `SearchField`, its rows `ListRow` options in groups under their captions, one listbox the arrows walk as one run (MOL-209), only as the screen gives them.
 - `frontend/src/components/ProposeItemSheet.vue` — «Предложить товар» sheet: name from the query, unit and note, waits for a connection, «already there» is a pick.
 
 ## frontend · composables
@@ -87,6 +87,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 ## frontend · stores
 
 - `frontend/src/stores/itemEntry.ts` — Store: the item picked on «Что взяли?», carried with its query and missed query to the purchase sheet.
+- `frontend/src/stores/hereLast.ts` — Memory of «Брали здесь в прошлый раз» per owner and place (city and name folded as the places' index): the server's last answer and the purchases written here, for no signal and the first frame (MOL-209).
 - `frontend/src/stores/recentItems.ts` — Store: the recent items per identity on the device, searched offline by the same key and synonym rules.
 - `frontend/src/stores/searchDraft.ts` — Store: the typed query and missed query of «Что взяли?», kept in session storage across a reload of this window.
 

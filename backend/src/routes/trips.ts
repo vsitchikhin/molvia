@@ -6,6 +6,7 @@ import {
   currentTripResponseSchema,
   expensePatchSchema,
   finishTripBodySchema,
+  previousItemsResponseSchema,
   tripHistoryCodec,
   tripHistoryQuerySchema,
   rateChoiceBodySchema,
@@ -21,6 +22,7 @@ import type {
   ExpensePatch,
   RateChoiceBody,
   Money,
+  PreviousItemsResponse,
   RestoreTripBody,
   StartTripBody,
   TripView,
@@ -34,6 +36,7 @@ export interface TripsApi {
   start(actor: Asking, body: StartTripBody): Promise<{ trip: TripView; created: boolean }>
   current(actorId: string): Promise<TripView | null>
   selected(actorId: string, id: string): Promise<TripView>
+  previousItems(actorId: string, id: string): Promise<PreviousItemsResponse>
   history(actorId: string, cursor?: TripHistoryCursor): Promise<TripHistory>
   add(
     actorId: string,
@@ -116,6 +119,24 @@ export function tripRoutes(app: FastifyInstance, api: TripsApi): void {
     { exposeHeadRoute: false },
     async (request, reply) =>
       answer(reply, await api.selected(request.actorId, resourceId(request.params.tripId))),
+  )
+
+  /**
+   * «Брали здесь в прошлый раз» (MOL-209): the place is the trip's, the trip the session's — a
+   * stranger's answers as a missing one does. Private as every trip route: `no-store`.
+   */
+  app.get<{ Params: TripParams }>(
+    '/trips/:tripId/previous-items',
+    { exposeHeadRoute: false },
+    async (request, reply) =>
+      reply
+        .header('cache-control', 'no-store')
+        .send(
+          z.encode(
+            previousItemsResponseSchema,
+            await api.previousItems(request.actorId, resourceId(request.params.tripId)),
+          ),
+        ),
   )
 
   /**

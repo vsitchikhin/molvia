@@ -32,6 +32,7 @@ import {
   catalogueBarcodeHintResponseSchema,
   catalogueBarcodeResponseSchema,
   currentTripResponseSchema,
+  previousItemsResponseSchema,
   exchangeAmendBodySchema,
   exchangeBodySchema,
   exchangesResponseCodec,
@@ -180,6 +181,7 @@ import type {
   StartTripBody,
   TripPlace,
   TripView,
+  PreviousItemsResponse,
   VerdictAmendment,
   VerdictCard,
   FinishTripBody,
@@ -321,6 +323,8 @@ export interface MolviaClient {
   /** The trip the screen opens on, or null — «Новый поход». */
   currentTrip(): Promise<TripView | null>
   trip(id: string): Promise<TripView>
+  /** «Брали здесь в прошлый раз» (MOL-209): a trip the server does not know is `error.not_found`. */
+  previousItems(tripId: string): Promise<PreviousItemsResponse>
   tripHistory(cursor?: TripHistoryCursor): Promise<TripHistory>
   /** «Добавить в поход». The same identifier again is one purchase, and `created` is `false`. */
   addExpense(tripId: string, body: AddExpenseBody): Promise<{ trip: TripView; created: boolean }>
@@ -807,6 +811,8 @@ export function createClient(options: ClientOptions): MolviaClient {
 
     currentTrip: async () => (await request('/trips/current', currentTripResponseSchema)).trip,
     trip: (id) => request(`/trips/${segment(id.toLowerCase())}`, tripViewCodec),
+    previousItems: (tripId) =>
+      request(`/trips/${segment(tripId)}/previous-items`, previousItemsResponseSchema),
     tripHistory: (cursor) =>
       request(
         cursor

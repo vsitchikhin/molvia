@@ -18,7 +18,8 @@ paths:
   - 'frontend/src/views/ItemSearchView*'
   - 'frontend/src/components/{CatalogueCombobox,ProposeItemSheet}*'
   - 'frontend/src/composables/useCatalogueSearch*'
-  - 'frontend/src/stores/{searchDraft,itemEntry,recentItems}*'
+  - 'frontend/src/stores/{searchDraft,itemEntry,recentItems,hereLast}*'
+  - 'backend/src/usecases/previous-items*.ts'
   - 'e2e/item-search.spec.ts'
   - 'packages/model/src/entities/twins.ts'
   - 'packages/model/src/contracts/merge.ts'
@@ -414,6 +415,96 @@ price of memory belonging to the query — one short word serving two items. 3 s
 picks measure it again (MOL-47). The corpus pins every answer whole — the shelf, those fifty
 words, Latin and Cyrillic brand spellings, Armenian labels — so a change of either threshold
 shows what it moves.
+
+## «Брали здесь в прошлый раз» on «Что взяли?» (MOL-209)
+
+Ф-24: the screen does not open empty. In a shop one knows a person takes what they took last time, and
+finds it without typing. «Часто берёте» is the person's last twenty items with no place; what was taken
+**here** only the server knows.
+
+- **The last time is the server's** (`GET /trips/:tripId/previous-items`): the person's last finished
+  trip at this trip's place before it, in the order of «Записаны» (`coalesce(finished_on_device_at,
+finished_at)`, then the id) — for the trip going on the last finished one, for a finished trip one
+  strictly before it. The place is the trip's, never the request's; a stranger's, a missing, a removed
+  trip and a malformed id are one `404`. **A trip with no purchase is no last time** (Р-1): a receipt
+  with no lines, every purchase removed — the one before it speaks. A removed trip does not count; a
+  trip from a receipt does. One name in two cities is two places (MOL-120). The items are catalogue
+  cards, each once, in the order first bought, **less what the trip asked about holds on the server,
+  then at most `PREVIOUS_ITEMS_LIMIT` (20)** (owner's В-5 «а» of review 1): cut first, a receipt of 25
+  lines taken again in its order left two of the seven still to take at 18, none at 20 (adversarial
+  А4). The answer names the trip and its moment for the phone's memory, **and what the trip asked
+  about holds** (`holds`, adversarial В1 of review 3), **and the trip going on** (`open`, Е1 of review 6) — the phone's own copy of a trip going on may miss
+  what another device added. It writes nothing.
+- **What is in this trip already is not shown** (owner's Р-17 of MOL-118): the trip's rows and the
+  purchases in the queue, by `useTripRows`, a row being removed given back — so **the phone cuts to
+  five** (`HERE_LAST_SHOWN`) after taking them out, never the server: cut to five there, three of them
+  recorded left two where ten were taken (Р-2). The server has taken out what it holds of this trip
+  already; the queue only the phone knows. «Часто берёте» under it repeats none of what it shows. The
+  arrows keep the row they stand on while the rows and the query are the same: the groups are built
+  anew whenever the record is read again (adversarial А3).
+- **Only under an empty field**: typed, the recent items are narrowed alone, as with no signal (1j);
+  the answer to a code and the question «привязать?» show no groups. Both groups are one listbox of
+  `CatalogueCombobox` (`groups`), each `role="group"` named by its caption, the arrows one run through
+  them; the listbox is named by the field.
+- **The phone remembers it per place** (`stores/hereLast.ts`, `molvia.here-last.<owner>`, thirty
+  places): **by the city and the name as the places' index folds them, never the place's id** (Р-3) —
+  a trip started with no signal knows only what was typed at the door, and a shelf with no signal is
+  where the memory is read. A trip still in the queue is not asked about (Р-4). **It remembers the
+  server's answer and the purchases written here** (owner's В-1 «а»): the answer names the trip
+  _before_ the one asked about, so a memory of answers alone is a trip behind — Wednesday with a
+  signal remembers Monday, and Friday with none would show Monday. So an item that goes into a trip
+  makes that trip the place's newest — one added to a finished trip keeps it at its finish, **and only
+  where the memory holds that trip** (Р-10 of review 1): a receipt's, another phone's, is not known
+  whole, and its one item stood for all of it (adversarial А1г). **«Закончить» puts a trip at its
+  finish** (`rememberFinishedHere`, from the trip queue), and a finished trip kept at its own moment — a
+  receipt, at its paper's — lifts **the trip going on, as the
+  answer names it** (`open`, the person's latest unfinished trip on the server) to now, since it will be
+  finished after (adversarial В2 of review 3; its moment held by a test, m5). Only that one, and never by the
+  phone's copy: a mark kept in the memory lifted a trip removed or finished elsewhere over the receipt
+  for good (Г2 of review 4, self-review №4), and the copy still held one removed or finished on another
+  device (Д1, Е1 of reviews 5–6). A trip the server does not hold yet — its start still queued — takes
+  its place by «Закончить» on this phone.
+  The newest kept trip but the one going
+  on is the last time, and for a finished trip only one before it. **Nor the trip going on here, ever** (adversarial Ж1 of review 7): the server names
+  finished trips only, and a receipt read with no signal showed the trip still open; with no signal the
+  phone's copy is all there is to tell it by — **the price:** a trip finished on another device before
+  the receipt, the copy not told yet, is left out where the server would name it. The server's answer about a trip
+  takes the place of what the phone wrote into it — it knows what was removed since — **and, asked
+  about the trip going on, takes every trip kept between its last time and now** (owner's В-3 «а» of
+  review 1): the server saw them and did not count them — removed, emptied — and kept, the newest stood
+  as the last time with no signal for good (adversarial А1, self-review №2). Only then: one trip is open
+  at a time and the queue sends in order, so whatever lies between was finished on the server (Р-4).
+  **Asked about a finished trip, it takes nothing** (adversarial Б1 of review 2): between its last time
+  and its moment may lie this phone's trip still open — a receipt's moment is the till's, its queue not
+  the trips' — which the server did not count for being open, not empty. **And the trip asked about is
+  kept as it holds** — what the answer says it holds on the server, less a row being removed here, and
+  the purchases the queue still carries — never the phone's copy of the server's rows (adversarial Б2; В1
+  of review 3: that copy missed another device's purchases and took them for removed; Г1 of review 4:
+  it kept what another device took out; the copy counts only for what changed while the answer was on
+  its way — a purchase that reached the server then is kept, one removed then is not brought back,
+  told by the server's rows the phone knew as the question left, Д2 of review 5): the answer is
+  its last time less what it holds (В-5), so kept alone it stood for the whole of that last time, and
+  the next trip with no signal lost the things taken both times. **Nor does the answer cut a last time the device holds whole**:
+  what it leaves out is either in the trip asked about or removed since — told apart by what that trip
+  holds; a caller with no word of it (`held = null`, none on the screen) keeps it. «None» is remembered for the trip it was said of, and takes every kept trip before it. **The
+  prices, named:** a receipt recorded is not written here — its items reach the memory with the next
+  answer at that place; a purchase removed after it was written stays in the memory until then; the
+  answer kept is the last time less what the trip asked about held (В-5), so a purchase taken out of
+  that trip later comes back to the group with no signal only with the next answer; a removed or emptied trip kept between
+  a finished trip and its last time stays until the next answer about a trip going on there; a merged place
+  (MOL-106) started by its old spelling is looked up by the old key until the server answers.
+- **With a connection the answer is waited for, a second at most, remembered or not** (owner's В-2 «а»,
+  `STRIP_LATE_MS`; В-4 «а» of review 1): «Часто берёте» is on the phone and would stand at once, and the
+  group coming in over it would take its rows from under the finger (MOL-269). Under the hint there is
+  nothing until the answer, and then both groups come together; later than that, what is remembered —
+  or «Часто берёте» alone — stands, and the answer is only remembered. **The memory does not stand
+  first to be replaced** (Р-5 withdrawn): it parts from the answer after every receipt recorded on this
+  phone, and the answer coming in late moved «Часто берёте» from under the finger (adversarial А2). With
+  no connection, or for a trip still in the queue, the memory stands at once. A start that lands while
+  the screen is open only asks — the same trip and place, by the folded key, so «sas» typed at the door
+  is the server's «SAS» — and waits for nothing again. A failure, a `404` — the group is a help, never a
+  state of the screen: what is remembered stands, or nothing does. **The price, named:** with a
+  connection and a memory the groups stand up to a second later than they could.
 
 ## By meaning (MOL-105)
 

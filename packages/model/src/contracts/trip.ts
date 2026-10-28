@@ -216,6 +216,31 @@ export const recentPlacesResponseSchema = z.strictObject({
 export type RecentPlacesResponse = z.infer<typeof recentPlacesResponseSchema>
 
 /**
+ * «Брали здесь в прошлый раз» (MOL-209): the items of the person's last finished trip at the
+ * trip's place before it, each once, in the order they were first bought there, but none the trip
+ * asked about holds already (MOL-209, В-5 «а») — so they are not the whole of it. `previous` names
+ * that trip and its moment in «Записаны», so the phone can tell it from the trips it remembers
+ * by itself (В-1); `null` — no such trip, and then no items.
+ */
+export const previousItemsResponseSchema = z.strictObject({
+  previous: z.strictObject({ tripId: z.uuid(), at: isoDate }).nullable(),
+  items: z.array(catalogueEntryCodec),
+  /**
+   * What the trip asked about holds on the server, each once, in the order first bought (adversarial
+   * В1 of review 3): the phone keeps that trip by it — its own copy may miss what another device added
+   * — and so tells what `items` left out from what was removed since.
+   */
+  holds: z.array(catalogueEntryCodec),
+  /**
+   * The person's trip going on, as the server knows it, or `null` (adversarial Е1 of review 6): the
+   * phone keeps it the newest of a place, and its own copy may still hold one removed or finished on
+   * another device.
+   */
+  open: z.uuid().nullable(),
+})
+export type PreviousItemsResponse = z.output<typeof previousItemsResponseSchema>
+
+/**
  * The total converted for display, or nothing. An estimate, never a fact — so one that does not
  * fit is shown as none rather than refusing the purchase the trip is being written with: the
  * answer is built inside the writer's transaction, and a throw here would undo the expense

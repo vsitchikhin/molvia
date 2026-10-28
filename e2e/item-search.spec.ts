@@ -1,7 +1,9 @@
 /// <reference lib="dom" />
 // DOM for the code inside page.evaluate, which runs in the browser.
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import { asBrowser, signedIn } from './session'
+import { actorCodec, settingsOf } from '@molvia/model'
+import { asBrowser, open, signedIn } from './session'
 import type { APIResponse, Locator, Page } from '@playwright/test'
 
 /**
@@ -323,7 +325,7 @@ test.describe('nothing close found (MOL-46)', () => {
     await expect(options(page).first()).toContainText(name)
     // The list is named by its heading; the live region says «…with a similar spelling» too, and
     // `getByText` would hold only while `exact` happened to tell them apart (MOL-64).
-    await expect(page.getByRole('listbox', { name: 'Similar spelling' })).toBeVisible()
+    await expect(page.getByRole('group', { name: 'Similar spelling' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Suggest an item' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Not here? Suggest an item' })).toHaveCount(0)
 
@@ -480,5 +482,89 @@ test.describe('without the server', () => {
     const bar = page.locator('.loading .bar').first()
     await expect(bar).toBeVisible()
     expect(await bar.evaluate((node) => getComputedStyle(node).animationName)).toBe('none')
+  })
+})
+
+test.describe('«Bought here last time» (MOL-209)', () => {
+  /** A record at `place` with `items` in it, through the API as the queue sends it. */
+  async function record(page: Page, place: string, itemIds: readonly string[]): Promise<string> {
+    const headers = await asBrowser(page)
+    const context = settingsOf(
+      actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
+    )
+    const id = randomUUID()
+    const started = await page.request.post('/api/trips', {
+      headers,
+      data: { context, id, place: { name: place, kind: 'store' } },
+    })
+    expect(started.status()).toBe(201)
+    for (const itemId of itemIds) {
+      const added = await page.request.post(`/api/trips/${id}/expenses`, {
+        headers,
+        data: { id: randomUUID(), itemId },
+      })
+      expect(added.status()).toBe(201)
+    }
+    return id
+  }
+
+  async function finish(page: Page, id: string): Promise<void> {
+    const finished = await page.request.post(`/api/trips/${id}/finish`, {
+      headers: await asBrowser(page),
+      data: {},
+    })
+    expect(finished.status()).toBe(204)
+  }
+
+  async function item(page: Page, name: string): Promise<string> {
+    const response = await propose(page, { name, defaultUnit: 'piece' })
+    return ((await response.json()) as { id: string }).id
+  }
+
+  const group = (page: Page, name: string) => page.getByRole('group', { name, exact: true })
+
+  /** «+ Позиция» on the record, as a person gets to the search; the answer of the group waited for. */
+  async function search(page: Page): Promise<void> {
+    await open(page, '/purchases/manual')
+    const answered = page.waitForResponse((response) => response.url().endsWith('/previous-items'))
+    await page.getByRole('button', { name: 'Add an Item', exact: true }).click()
+    expect((await answered).status()).toBe(200)
+  }
+
+  test('the last record at the place stands first, without what this one already holds', async ({
+    page,
+  }) => {
+    await arrive(page)
+    const word = nonsense()
+    const shop = `Магазин ${word}`
+    const bread = `Хлеб ${word}`
+    const milk = `Молоко ${word}`
+    const [breadId, milkId] = [await item(page, bread), await item(page, milk)]
+
+    await finish(page, await record(page, shop, [milkId, breadId]))
+    // The next record at the same shop, the milk already in it.
+    await record(page, shop, [milkId])
+    await search(page)
+
+    const here = group(page, 'Bought here last time')
+    await expect(here.getByRole('option')).toHaveText([new RegExp(bread)])
+    await expect(page.getByRole('option', { name: new RegExp(milk) })).toHaveCount(0)
+
+    // Typed, the group is the empty field's no more: the search answers.
+    await field(page).fill(bread)
+    await expect(group(page, 'Found').getByRole('option').first()).toContainText(bread)
+    await expect(here).toHaveCount(0)
+  })
+
+  test('another shop has its own last time — none here', async ({ page }) => {
+    await arrive(page)
+    const word = nonsense()
+    const cheese = await item(page, `Сыр ${word}`)
+    await finish(page, await record(page, `Магазин ${word}`, [cheese]))
+    await record(page, `Другой ${word}`, [])
+    await search(page)
+
+    await expect(field(page)).toBeVisible()
+    await expect(group(page, 'Bought here last time')).toHaveCount(0)
   })
 })
