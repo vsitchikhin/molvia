@@ -1,5 +1,5 @@
 <template>
-  <BottomSheet :open="open" :back="over" @update:open="$emit('update:open', $event)">
+  <BottomSheet ref="sheet" :open="open" :back="over" @update:open="$emit('update:open', $event)">
     <template #title>{{
       category ? t('spending.new_category.edit_title') : t('spending.new_category.title')
     }}</template>
@@ -117,6 +117,11 @@ export default defineComponent({
     category: { type: Object as PropType<SpendingCategoryView | null>, default: null },
     /** Opened over the sheet of a spending: «‹» back to it, no × (MOL-123, В-4). */
     over: { type: Boolean, default: false },
+    /**
+     * How many sheets a new one closes on «Добавить»: opened from the list «Ещё…» of a spending, the
+     * list goes with it and the spending stands with its new category chosen (MOL-198, owner's В-1 «а»).
+     */
+    closes: { type: Number, default: 1 },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
@@ -125,6 +130,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n()
     const queue = useSpendingQueueStore()
+    const sheet = ref<{ close: (steps?: number) => void } | null>(null)
     const name = ref('')
     const icon = ref<SpendingIcon>(DEFAULT_SPENDING_ICON)
     const colour = ref(0)
@@ -206,7 +212,8 @@ export default defineComponent({
         ...(colourChosen.value ? { colour: body.colour } : {}),
       })
       emit('created', id)
-      close()
+      if (props.closes > 1) sheet.value?.close(props.closes)
+      else close()
     }
 
     function choose(n: number): void {
@@ -226,6 +233,7 @@ export default defineComponent({
 
     return {
       t,
+      sheet,
       name,
       icon,
       colour,

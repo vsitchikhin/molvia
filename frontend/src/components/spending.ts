@@ -171,6 +171,65 @@ export function categoryColour(category: SpendingCategoryView): string {
 }
 
 /**
+ * The categories of a spending's chips in the order they stand (MOL-198, Ф-17): the frequent ones the
+ * server named, then the rest as the list has them — a newcomer's, the presets as listed. `chosen`
+ * stands first (owner's В-2 «а»: «выбранная категория всегда должна вставать первой»), as the sheet
+ * puts it there at its opening, on a return from «Ещё…» and on a new one — never on a tap of a chip.
+ */
+export function chipOrder(
+  categories: readonly SpendingCategoryView[],
+  frequent: readonly string[],
+  chosen: string | null = null,
+): SpendingCategoryView[] {
+  const rank = (id: string) => {
+    if (id === chosen) return -1
+    const at = frequent.indexOf(id)
+    return at === -1 ? frequent.length : at
+  }
+  // A stable sort: the rest keep the list's order.
+  return [...categories].sort((a, b) => rank(a.id) - rank(b.id))
+}
+
+/** How many chips stand in the first row and in the second, «Ещё…» last in it (MOL-198, Ф-17). */
+export interface ChipRows {
+  readonly first: number
+  readonly second: number
+}
+
+/**
+ * The chips laid out in two rows by their widths as the browser measured them (MOL-198, Ф-17): a row
+ * takes the next chip while it fits whole, the second keeping room for «Ещё…», and stops at the first
+ * that does not — the order is never skipped through. The first chip always stands, cut by its own «…»
+ * when its name is wider than the row: a category of forty letters at 320.
+ */
+export function chipsInTwoRows(
+  widths: readonly number[],
+  row: number,
+  more: number,
+  gap: number,
+): ChipRows {
+  let at = 0
+  let taken = 0
+  while (at < widths.length) {
+    const next = taken === 0 ? 0 : taken + gap
+    const width = widths[at] ?? 0
+    if (taken > 0 && next + width > row) break
+    taken = next + width
+    at++
+  }
+  const first = at
+  const room = row - gap - more
+  taken = 0
+  while (at < widths.length) {
+    const next = taken === 0 ? 0 : taken + gap
+    if (next + (widths[at] ?? 0) > room) break
+    taken = next + (widths[at] ?? 0)
+    at++
+  }
+  return { first, second: at - first }
+}
+
+/**
  * The person's categories as the phone knows them now: the server's list, then what waits in the
  * queue — a category made with no signal, an amendment (MOL-285), and a removal or a return not yet
  * sent (В-4). One's own made on the phone stands after the others, as the server will put it.

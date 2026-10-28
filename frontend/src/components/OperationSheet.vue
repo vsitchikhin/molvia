@@ -6,6 +6,7 @@
         :back="back"
         :target="target"
         :categories="categories"
+        :frequent="frequent"
         :name-of="nameOf"
         :spend-currency="spendCurrency"
         :online="online"
@@ -19,6 +20,7 @@
       <CategorySheet
         v-model:open="newCategoryOpen"
         over
+        :closes="2"
         :categories="categories"
         @created="made = $event"
       />
@@ -101,7 +103,7 @@ export default defineComponent({
     const { t } = useI18n()
     const actor = useActorStore()
     const announce = useAnnouncer()
-    const { categories, nameOf } = useOwnCategories()
+    const { categories, frequent, nameOf } = useOwnCategories()
     const spendCurrency = computed<Currency>(() => actor.settings?.spendCurrency ?? 'AMD')
     const newCategoryOpen = ref(false)
     const made = ref<string | null>(null)
@@ -179,6 +181,7 @@ export default defineComponent({
 
     return {
       categories,
+      frequent,
       nameOf,
       spendCurrency,
       newCategoryOpen,

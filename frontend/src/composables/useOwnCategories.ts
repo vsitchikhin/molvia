@@ -4,12 +4,14 @@ import { useI18n } from 'vue-i18n'
 import type { SpendingCategoryView } from '@molvia/model'
 import { api } from '@/api'
 import { categoriesWith } from '@/components/spending'
-import { recallCategories } from '@/composables/useMoneyMonth'
+import { recallCategories, recallFrequent } from '@/composables/useMoneyMonth'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 
 export interface OwnCategories {
   readonly categories: ComputedRef<SpendingCategoryView[]>
+  /** The ids the chips of a spending stand first by (MOL-198), of the same answer. */
+  readonly frequent: ComputedRef<readonly string[]>
   readonly nameOf: (category: SpendingCategoryView) => string
   /** The category's name by its id, «Прочее» when the phone does not know it. */
   readonly nameById: (id: string | null) => string
@@ -26,6 +28,7 @@ export function useOwnCategories(): OwnCategories {
   const actor = useActorStore()
   const queue = useSpendingQueueStore()
   const server = ref<SpendingCategoryView[]>(actor.id ? recallCategories(actor.id) : [])
+  const serverFrequent = ref<readonly string[]>(actor.id ? recallFrequent(actor.id) : [])
   // When the list was asked for; none for one recalled from a month kept on the phone.
   const askedAt = ref<Date | null>(null)
 
@@ -34,9 +37,10 @@ export function useOwnCategories(): OwnCategories {
     if (!owner) return
     const asked = new Date()
     try {
-      const { categories } = await api.spendingCategories()
+      const { categories, frequent } = await api.spendingCategories()
       if (actor.id !== owner) return
       server.value = categories
+      serverFrequent.value = frequent
       askedAt.value = asked
     } catch {
       // Whatever the phone remembers stands; a name unknown reads «Прочее».
@@ -47,6 +51,7 @@ export function useOwnCategories(): OwnCategories {
     () => actor.id,
     (id) => {
       server.value = id ? recallCategories(id) : []
+      serverFrequent.value = id ? recallFrequent(id) : []
       askedAt.value = null
       void load()
     },
@@ -62,5 +67,5 @@ export function useOwnCategories(): OwnCategories {
     const found = categories.value.find((category) => category.id === id)
     return found ? nameOf(found) : t('spending.category.other')
   }
-  return { categories, nameOf, nameById }
+  return { categories, frequent: computed(() => serverFrequent.value), nameOf, nameById }
 }

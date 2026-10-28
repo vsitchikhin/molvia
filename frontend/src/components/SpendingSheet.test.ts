@@ -404,3 +404,85 @@ describe('SpendingSheet: the «≈» of a spending written is its own day’s (M
     expect(conversion(dialog)).toBe(en.spending.sheet.conversion_later)
   })
 })
+
+describe('SpendingSheet: the chips by frequency, the chosen one first (MOL-198, В-2 «а»)', () => {
+  const CAFE = 'c0000000-0000-4000-8000-000000000001'
+  const RENT = 'c0000000-0000-4000-8000-000000000002'
+  const PETS = 'c0000000-0000-4000-8000-000000000003'
+  const preset = (id: string, key: 'cafe' | 'rent' | 'pets') =>
+    ({ id, preset: key, name: null, colour: null, icon: null, archived: false }) as const
+
+  /** Five categories, «Кафе» and «Прочее» frequent, the one spending of the journal in «Аренда». */
+  function frequentMonth(): MoneyMonthView {
+    const base = month('2026-09-28')
+    const [day] = base.days
+    const [entry] = day?.entries ?? []
+    if (!day || entry?.kind !== 'manual') throw new Error('no row')
+    return {
+      ...base,
+      categories: [
+        preset(CAFE, 'cafe'),
+        preset(RENT, 'rent'),
+        preset(PETS, 'pets'),
+        ...base.categories,
+      ],
+      frequent: [OTHER, CAFE],
+      days: [
+        { ...day, entries: [{ ...entry, spending: { ...entry.spending, categoryId: RENT } }] },
+      ],
+    }
+  }
+  /** The chips as they stand — every one, since nothing is laid out here. */
+  const chips = () =>
+    [...document.querySelectorAll('dialog[open] .chips label.chip input')].map((radio) =>
+      radio.getAttribute('value'),
+    )
+
+  it('a new spending stands the frequent ones first, the rest in the list’s order, none chosen', async () => {
+    moneyMonth.mockResolvedValue(frequentMonth())
+    const view = await render()
+    await view
+      .findAll('button')
+      .find((one) => one.text().trim() === en.spending.summary.add)
+      ?.trigger('click')
+    await risen()
+    expect(chips()).toEqual([OTHER, CAFE, RENT, PETS])
+    expect(document.querySelector('dialog[open] .chips input:checked')).toBeNull()
+  }, 15_000)
+
+  it('an amendment stands its own category first; a tap on another moves no chip', async () => {
+    moneyMonth.mockResolvedValue(frequentMonth())
+    const view = await render(undefined, '/money/spendings')
+    await view.find('.list-row').trigger('click')
+    await risen()
+    expect(chips()).toEqual([RENT, OTHER, CAFE, PETS])
+    const cafe = document.querySelector<HTMLInputElement>(
+      `dialog[open] .chips input[value="${CAFE}"]`,
+    )
+    cafe?.click()
+    await flushPromises()
+    expect(cafe?.checked).toBe(true)
+    expect(chips()).toEqual([RENT, OTHER, CAFE, PETS])
+  }, 15_000)
+
+  it('one chosen in «More…» stands first on the way back', async () => {
+    moneyMonth.mockResolvedValue(frequentMonth())
+    const view = await render(undefined, '/money/spendings')
+    await view.find('.list-row').trigger('click')
+    await risen()
+    await pressUntil(en.spending.sheet.more, () => {
+      expect(document.querySelectorAll('dialog[open]')).toHaveLength(2)
+    })
+    await risen()
+    const pets = [...document.querySelectorAll<HTMLElement>('dialog[open] [role="radio"]')].find(
+      (row) => row.textContent.trim() === en.spending.category.pets,
+    )
+    pets?.click()
+    await flushPromises()
+    // One chosen stands first; the one chosen before goes back to its place by frequency.
+    expect(chips()).toEqual([PETS, OTHER, CAFE, RENT])
+    expect(document.querySelector('dialog[open] .chips input:checked')?.getAttribute('value')).toBe(
+      PETS,
+    )
+  }, 15_000)
+})

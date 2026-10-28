@@ -182,6 +182,7 @@
       v-model:open="sheetOpen"
       :target="target"
       :categories="categories"
+      :frequent="frequent"
       :name-of="nameOf"
       :spend-currency="spendCurrency"
       :rate="liveRate"
@@ -193,6 +194,7 @@
     <CategorySheet
       v-model:open="newCategoryOpen"
       over
+      :closes="2"
       :categories="categories"
       @created="made = $event"
     />
