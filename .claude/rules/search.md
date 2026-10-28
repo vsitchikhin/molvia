@@ -455,16 +455,22 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   where the memory holds that trip** (Р-10 of review 1): a receipt's, another phone's, is not known
   whole, and its one item stood for all of it (adversarial А1г). The newest kept trip but the one going
   on is the last time, and for a finished trip only one before it. The server's answer about a trip
-  takes the place of what the phone wrote into it — it knows what was removed since — **and takes
-  every trip kept between its last time and the one asked about** (owner's В-3 «а» of review 1; for a
-  finished trip, before it only): the server saw them and did not count them — removed, emptied — and
-  kept, the newest stood as the last time with no signal for good (adversarial А1, self-review №2). A
-  trip not sent yet is not among them: the one asked about was sent, and the queue sends in order
-  (Р-4). «None» is remembered for the trip it was said of, and takes every kept trip before it. **The
+  takes the place of what the phone wrote into it — it knows what was removed since — **and, asked
+  about the trip going on, takes every trip kept between its last time and now** (owner's В-3 «а» of
+  review 1): the server saw them and did not count them — removed, emptied — and kept, the newest stood
+  as the last time with no signal for good (adversarial А1, self-review №2). Only then: one trip is open
+  at a time and the queue sends in order, so whatever lies between was finished on the server (Р-4).
+  **Asked about a finished trip, it takes nothing** (adversarial Б1 of review 2): between its last time
+  and its moment may lie this phone's trip still open — a receipt's moment is the till's, its queue not
+  the trips' — which the server did not count for being open, not empty. **And the trip asked about is
+  kept as the screen holds it** — its rows, the server's and the queue's (adversarial Б2): the answer is
+  its last time less what it holds (В-5), so kept alone it stood for the whole of that last time, and
+  the next trip with no signal lost the things taken both times. «None» is remembered for the trip it was said of, and takes every kept trip before it. **The
   prices, named:** a receipt recorded is not written here — its items reach the memory with the next
   answer at that place; a purchase removed after it was written stays in the memory until then; the
   answer kept is the last time less what the trip asked about held (В-5), so a purchase taken out of
-  that trip later comes back to the group with no signal only with the next answer; a merged place
+  that trip later comes back to the group with no signal only with the next answer; a removed or emptied trip kept between
+  a finished trip and its last time stays until the next answer about a trip going on there; a merged place
   (MOL-106) started by its old spelling is looked up by the old key until the server answers.
 - **With a connection the answer is waited for, a second at most, remembered or not** (owner's В-2 «а»,
   `STRIP_LATE_MS`; В-4 «а» of review 1): «Часто берёте» is on the phone and would stand at once, and the
