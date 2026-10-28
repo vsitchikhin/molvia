@@ -1,9 +1,14 @@
 <template>
   <AppScreen :title="t('item.search_title')">
-    <ScreenSkeleton
-      v-if="selectedId && selectedLoading && !selectedAvailable"
-      :groups="[72, 54, 84]"
-    />
+    <!-- The search of a finished record, while the record is read (Ф-13): the field as it will stand,
+         and the recent items under it where the phone has some — they come with the screen. -->
+    <ScreenSkeleton v-if="selectedId && selectedLoading && !selectedAvailable">
+      <SkeletonPart kind="field" />
+      <template v-if="recentCount > 0">
+        <SkeletonPart kind="caption" :width="30" />
+        <SkeletonPart kind="rows" :count="Math.min(recentCount, 3)" :narrow="false" next />
+      </template>
+    </ScreenSkeleton>
     <ScreenState
       v-else-if="selectedId && selectedMissing"
       kind="attention"
@@ -209,8 +214,12 @@
           :body="t('item.barcode.offline_body')"
         />
 
+        <!-- The answer's shape (1g): its caption and three rows of 64. -->
         <div v-else-if="phase === 'loading'" class="loading">
-          <ScreenSkeleton :groups="[62, 62, 62]" />
+          <ScreenSkeleton>
+            <SkeletonPart kind="caption" :width="20" />
+            <SkeletonPart kind="rows" :count="3" :narrow="false" next />
+          </ScreenSkeleton>
         </div>
 
         <!-- Both come while the person types: their buttons stand under the words, not in the strip
@@ -345,6 +354,7 @@ import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ProposeItemSheet from '@/components/ProposeItemSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { api } from '@/api'
 import { useAnnouncer } from '@/composables/useAnnouncer'
@@ -386,6 +396,7 @@ export default defineComponent({
     ProposeItemSheet,
     ScreenSkeleton,
     ScreenState,
+    SkeletonPart,
     StatusStrip,
   },
   setup() {
@@ -1062,6 +1073,7 @@ export default defineComponent({
       barcodeItem: lookup.item,
       IconMagnify,
       online,
+      recentCount: computed(() => recent.items.length),
     }
   },
 })

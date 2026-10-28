@@ -58,6 +58,8 @@ vi.mock('@/api', () => ({
     currentTrip: () => currentTrip(),
     // «Тут дешевле» on the purchase sheet (MOL-92): never answered here.
     ownPrices: () => new Promise(() => undefined),
+    // A finished record read for its search (MOL-208): never answered here.
+    trip: () => new Promise(() => undefined),
   },
 }))
 
@@ -111,9 +113,9 @@ function remembered(...items: CatalogueEntry[]): void {
  * The screen under the app's own live region, so what it reads out can be heard. `shown` takes the
  * screen away while the region stays — what leaving it does.
  */
-async function render(shown = ref(true)) {
+async function render(shown = ref(true), path = '/trip/add') {
   const router = createRouter({ history: createMemoryHistory(), routes })
-  await router.push('/trip/add')
+  await router.push(path)
   const wrapper = mount(
     defineComponent({
       setup() {
@@ -200,7 +202,9 @@ describe('«What did you pick up?»', () => {
     const view = await render()
 
     await field(view).setValue('молок')
-    expect(view.find('.loading .bars').exists()).toBe(true)
+    // The answer's shape (1g, Ф-13): a caption and a card of three rows, not paragraphs.
+    expect(view.findAll('.loading .skeleton-caption')).toHaveLength(1)
+    expect(view.findAll('.loading .skeleton-rows .item')).toHaveLength(3)
 
     await vi.waitFor(() => {
       expect(searchCatalogue).toHaveBeenCalledWith('молок')
@@ -213,6 +217,33 @@ describe('«What did you pick up?»', () => {
     expect(view.text()).not.toContain(en.item.group_recent)
     expect(view.find('.loading').exists()).toBe(false)
   }, 10_000)
+
+  // The search of a finished record while the record is read (Ф-13): the field and the recent items
+  // under it, as they will stand — not paragraphs in a card.
+  describe('while the finished record is read', () => {
+    const finished = '/purchases/aaaaaaaa-0000-4000-8000-000000000012/add'
+
+    it('draws the field and the rows of the recent items it has', async () => {
+      remembered(bread, milk)
+      const view = await render(ref(true), finished)
+
+      await vi.waitFor(() => {
+        expect(view.find('.skeleton-field').exists()).toBe(true)
+      })
+      expect(view.findAll('.skeleton-caption')).toHaveLength(1)
+      expect(view.findAll('.skeleton-rows .item')).toHaveLength(2)
+      expect(view.find('input[role="combobox"]').exists()).toBe(false)
+    })
+
+    it('draws the field alone with no recent items', async () => {
+      const view = await render(ref(true), finished)
+
+      await vi.waitFor(() => {
+        expect(view.find('.skeleton-field').exists()).toBe(true)
+      })
+      expect(view.find('.skeleton-rows').exists()).toBe(false)
+    })
+  })
 
   it('reads the count out once the answer is in', async () => {
     searchCatalogue.mockResolvedValue([milk, marianna])
