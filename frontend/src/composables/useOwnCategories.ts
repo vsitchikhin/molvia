@@ -33,13 +33,19 @@ export function useOwnCategories(): OwnCategories {
   // When the list was asked for; none for one recalled from a month kept on the phone.
   const askedAt = ref<Date | null>(null)
 
+  // Reads go out on every write landed, and may answer out of turn: an answer is never laid over one
+  // that set out later (review 2, Р2-А2) — as a month of «Деньги» is never kept over one (MOL-262, А6).
+  let sent = 0
+  let laid = 0
   async function load(): Promise<void> {
     const owner = actor.id
     if (!owner) return
     const asked = new Date()
+    const mine = ++sent
     try {
       const { categories, frequent } = await api.spendingCategories()
-      if (actor.id !== owner) return
+      if (actor.id !== owner || mine < laid) return
+      laid = mine
       server.value = categories
       serverFrequent.value = frequent
       askedAt.value = asked

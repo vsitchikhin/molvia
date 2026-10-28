@@ -73,6 +73,33 @@ describe('useOwnCategories', () => {
     view.unmount()
   })
 
+  // Review 2, Р2-А2: two spendings landed one after the other, two reads in the air, the later one
+  // answering first — the earlier answer, come last, is not laid over it.
+  it('an answer that set out earlier is not laid over one that set out later', async () => {
+    let first: (answer: SpendingCategoriesResponse) => void = () => undefined
+    spendingCategories.mockResolvedValueOnce({ categories: CATEGORIES, frequent: [GROCERIES] })
+    spendingCategories.mockReturnValueOnce(
+      new Promise((resolve) => {
+        first = resolve
+      }),
+    )
+    spendingCategories.mockResolvedValueOnce({
+      categories: CATEGORIES,
+      frequent: [DOCUMENTS, GROCERIES],
+    })
+    const { view, frequent, queue } = host()
+    await flushPromises()
+    queue.landed += 1
+    await flushPromises()
+    queue.landed += 1
+    await flushPromises()
+    expect(frequent()).toEqual([DOCUMENTS, GROCERIES])
+    first({ categories: CATEGORIES, frequent: [GROCERIES, DOCUMENTS] })
+    await flushPromises()
+    expect(frequent()).toEqual([DOCUMENTS, GROCERIES])
+    view.unmount()
+  })
+
   it('must not fire: nothing landed, nothing asked again', async () => {
     spendingCategories.mockResolvedValue({ categories: CATEGORIES, frequent: [GROCERIES] })
     const { view } = host()
