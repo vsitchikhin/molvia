@@ -563,7 +563,9 @@ nothing up.
   (`dayWords` — «Сегодня», «Вчера», «28 сент.»), the note and the place as typed, never quoted, or «без
   заметки» (`detailsLine`); its name is the whole line. «Nothing typed» is what draws nothing
   (`drawsNothing`, the one list `INVISIBLE`): by JavaScript's trim a pasted U+200B left «Сегодня · » with
-  a dot hanging (adversarial А2). **The fields are the spending sheet's own**
+  a dot hanging (adversarial А2) — **and so it is for «Сохранить трату»**, which saves such a note as none:
+  refused there by the same trim, the line said «без заметки» and the sheet «нельзя сохранить» of one
+  empty field (self-review 6). **The fields are the spending sheet's own**
   (`SpendingDetailsSheet` shows them): «‹», Esc, «back», a pull down and «Готово» all keep what was
   typed — there was no undo with them in the form either — and nothing is checked there. **«Сохранить
   трату» opens it on the field it finds wrong, only when that is the first one wrong** in the order of

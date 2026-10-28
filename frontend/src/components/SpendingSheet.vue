@@ -243,6 +243,7 @@ import {
   currencySchema,
   currencySign,
   decimalFromMinor,
+  drawsNothing,
   formatEstimate,
   formatMoney,
   formatQuantity,
@@ -844,8 +845,10 @@ export default defineComponent({
       return t('spending.sheet.refused', { reason })
     })
 
+    // Nothing typed is what draws nothing — the measure of the line «Дата, заметка, место» too: a pasted
+    // U+200B read «без заметки» there and was refused here (self-review 6 of MOL-199).
     function text(value: string): { value?: string; bad: boolean } {
-      if (!value.trim()) return { bad: false }
+      if (drawsNothing(value)) return { bad: false }
       const checked = spendingTextSchema.safeParse(value)
       return checked.success ? { value: checked.data, bad: false } : { bad: true }
     }

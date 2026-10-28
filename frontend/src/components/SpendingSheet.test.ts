@@ -820,6 +820,26 @@ describe('SpendingSheet: «Дата, заметка, место» behind one lin
     expect(recordSpending).not.toHaveBeenCalled()
   })
 
+  // The line and «Сохранить трату» say one thing of what draws nothing (self-review 6): no note.
+  it('a note that draws nothing is no note: the line says so, and the spending is saved without one', async () => {
+    const dialog = await newSpending()
+    const amount = dialog.querySelector<HTMLInputElement>('input[inputmode="decimal"]')
+    if (!amount) throw new Error('no amount field')
+    await typeInto(amount, '1000')
+    dialog.querySelector<HTMLInputElement>('.chips-field input')?.click()
+    await flushPromises()
+    await openDetails()
+    // A zero-width space pasted from a chat.
+    await typeInto(textField(en.spending.sheet.note_placeholder), String.fromCharCode(0x200b))
+    await detailsDone()
+    expect(detailsRow().textContent.trim()).toBe('Today · no note')
+    await pressUntil(en.spending.sheet.save, () => {
+      expect(recordSpending).toHaveBeenCalled()
+    })
+    expect(recordSpending.mock.calls[0]?.[0]).not.toHaveProperty('note')
+    expect(document.querySelectorAll('dialog[open]').length).toBeLessThanOrEqual(1)
+  })
+
   it('must not fire: a wrong sum before it takes the focus, and the details stay shut', async () => {
     const dialog = await newSpending()
     await openDetails()
