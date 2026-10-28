@@ -2342,18 +2342,57 @@ describe('«What did you pick up?»', () => {
         ])
       })
 
-      it('remembered, the memory stands at once and the answer takes its place', async () => {
+      // Owner's В-4 «а» of the review: remembered or not, with a signal the same second's wait.
+      it('remembered, the answer is still waited for, and in time it stands instead', async () => {
         rememberHereLast(ACTOR, sas, TRIP, { ...lastTime, items: [eggs] })
         let answer: (value: PreviousItemsResponse) => void = () => undefined
         previousItems.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+        remembered(milk)
+        onTrip()
+        const view = await render()
+
+        expect(view.find('[role="listbox"]').exists()).toBe(false)
+        answer(lastTime)
+        await flushPromises()
+        expect(groups(view)).toEqual([
+          { heading: en.item.group_here_last, rows: [bread.name, eggs.name, marianna.name] },
+          { heading: en.item.group_recent, rows: [milk.name] },
+        ])
+      })
+
+      // Adversarial А2: Monday by hand, Wednesday a receipt on this phone — which the memory does not
+      // learn — and on Friday the memory is Monday's and the answer Wednesday's.
+      it('remembered and late, the memory stands and nothing moves under the finger', async () => {
+        rememberHereLast(ACTOR, sas, TRIP, { ...lastTime, items: [eggs] })
+        let answer: (value: PreviousItemsResponse) => void = () => undefined
+        previousItems.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+        remembered(milk)
+        onTrip()
+        const view = await render()
+
+        await vi.advanceTimersByTimeAsync(STRIP_LATE_MS)
+        const shown = [
+          { heading: en.item.group_here_last, rows: [eggs.name] },
+          { heading: en.item.group_recent, rows: [milk.name] },
+        ]
+        expect(groups(view)).toEqual(shown)
+        answer(lastTime)
+        await flushPromises()
+        expect(groups(view)).toEqual(shown)
+        expect(recallHereLast(ACTOR, sas, TRIP)?.map((item) => item.name)).toEqual([
+          bread.name,
+          eggs.name,
+          marianna.name,
+        ])
+      })
+
+      it('«must not fire»: with no signal the memory stands at once, waiting for nothing', async () => {
+        rememberHereLast(ACTOR, sas, TRIP, { ...lastTime, items: [eggs] })
+        online(false)
         onTrip()
         const view = await render()
 
         expect(groups(view)[0]?.rows).toEqual([eggs.name])
-        await vi.advanceTimersByTimeAsync(STRIP_LATE_MS)
-        answer(lastTime)
-        await flushPromises()
-        expect(groups(view)[0]?.rows).toEqual([bread.name, eggs.name, marianna.name])
       })
     })
 

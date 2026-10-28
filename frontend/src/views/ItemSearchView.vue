@@ -493,9 +493,11 @@ export default defineComponent({
     const hereAnswer = ref<readonly CatalogueEntry[] | null>(null)
     const hereRemembered = ref<readonly CatalogueEntry[] | null>(null)
     /**
-     * With nothing remembered the screen waits for the answer, at most `STRIP_LATE_MS`, before
-     * «Часто берёте» stands alone (В-2 «а»): the group coming in over it would take its rows from
-     * under the finger (MOL-269). An answer later than that is only remembered, for next time.
+     * With a connection the screen waits for the answer, at most `STRIP_LATE_MS`, before what the
+     * device remembers — or «Часто берёте» alone — stands (В-2 «а»; owner's В-4 «а» of the review:
+     * remembered or not): the group coming in over it would take its rows from under the finger
+     * (MOL-269), and the memory parts from the answer after every receipt recorded on this phone.
+     * An answer later than that is only remembered, for next time.
      */
     const hereLate = ref(false)
     let hereAsked = 0
@@ -512,9 +514,9 @@ export default defineComponent({
         (answer) => {
           if (asked !== hereAsked || !alive) return
           if (owner !== null && at.place !== null) {
-            rememberHereLast(owner, at.place, at.tripId, answer)
+            rememberHereLast(owner, at.place, at.tripId, answer, at.before)
           }
-          if (!hereLate.value || hereRemembered.value !== null) hereAnswer.value = answer.items
+          if (!hereLate.value) hereAnswer.value = answer.items
           hereLate.value = true
         },
         // A trip the server does not know yet, no connection, a server that failed: the group is a
@@ -568,13 +570,9 @@ export default defineComponent({
         .filter((item) => !taken.has(item.id))
         .slice(0, HERE_LAST_SHOWN)
     })
-    /** Nothing remembered and the answer still on its way, for a second at most (В-2). */
+    /** The answer still on its way, for a second at most (В-2, В-4 of the review). */
     const hereWaiting = computed(
-      () =>
-        here.value?.sent === true &&
-        hereAnswer.value === null &&
-        hereRemembered.value === null &&
-        !hereLate.value,
+      () => here.value?.sent === true && hereAnswer.value === null && !hereLate.value,
     )
 
     /** «Взять из недавних» under an error — asked for, not shown by default. */
