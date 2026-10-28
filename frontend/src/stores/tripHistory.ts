@@ -45,16 +45,28 @@ const cacheCodec = z.strictObject({
 const NOT_CACHED_YET = new Set(['accountId', 'debited', 'receipt', 'prices', 'gap'])
 const TRIP_KEYS = new Set(Object.keys(tripViewCodec.def.shape))
 /**
- * The keys of a row of the history page a build reads back. «12 позиций · 9 870 ֏» is kept (MOL-307):
+ * The fields of a row of the history page a build reads back. «12 позиций · 9 870 ֏» is kept (MOL-307):
  * every build since MOL-128 drops a key it does not know here and knows these two, and their absence —
  * a shelf of a build before this one — is `null`, unknown, never «0 позиций».
  */
-const ENTRY_KEYS = new Set(Object.keys(tripHistoryEntryCodec.def.shape))
+const ENTRY_FIELDS: Record<string, z.ZodType> = tripHistoryEntryCodec.def.shape
 
-/** A trip view on the shelf, with only the keys `keep` says — and never anything but a record. */
-function shelved(view: unknown, keep: (key: string) => boolean): unknown {
+/**
+ * Whether a row's field is read back. A key this build does not know is dropped; so is a value it
+ * cannot read where the field may be absent (adversarial А2 of MOL-307): a sum in a currency of a later
+ * build is a sum not known, and failing it failed the whole cache — and the next write of this window put
+ * its own over a finish made with no signal.
+ */
+function readable(key: string, value: unknown): boolean {
+  const field = ENTRY_FIELDS[key]
+  if (!field) return false
+  return field.safeParse(value).success || !field.safeParse(undefined).success
+}
+
+/** A trip view on the shelf, with only the fields `keep` says — and never anything but a record. */
+function shelved(view: unknown, keep: (key: string, value: unknown) => boolean): unknown {
   if (typeof view !== 'object' || view === null || Array.isArray(view)) return view
-  return Object.fromEntries(Object.entries(view).filter(([key]) => keep(key)))
+  return Object.fromEntries(Object.entries(view).filter(([key, value]) => keep(key, value)))
 }
 
 /**
@@ -64,7 +76,7 @@ function shelved(view: unknown, keep: (key: string) => boolean): unknown {
 function everyView(
   held: unknown,
   keep: (key: string) => boolean,
-  keepEntry: (key: string) => boolean,
+  keepEntry: (key: string, value: unknown) => boolean,
 ): unknown {
   if (typeof held !== 'object' || held === null) return held
   const cache = held as { page?: unknown; selected?: unknown; local?: unknown }
@@ -88,11 +100,7 @@ function everyView(
 
 /** Read by both builds: a field of a later one is dropped rather than failing the whole cache. */
 function fromShelf(raw: string): unknown {
-  return everyView(
-    JSON.parse(raw),
-    (key) => TRIP_KEYS.has(key),
-    (key) => ENTRY_KEYS.has(key),
-  )
+  return everyView(JSON.parse(raw), (key) => TRIP_KEYS.has(key), readable)
 }
 
 /** Written as the previous build reads it. */
@@ -378,6 +386,14 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
       }
       // Kept in place rather than dropped: a row of a page already loaded stays on that page.
       deeper = deeper.map((held) => (held.id === row.id ? row : held))
+      // And on the shelf, where the first page holds it (adversarial А1 of MOL-307): the shelf keeps the
+      // row's count, and the first write of another window put the count before this purchase back on
+      // screen, as the server's answer. Only in place — a row the page does not hold would move its
+      // boundary, which only `load()` reads.
+      firstPage = {
+        ...firstPage,
+        trips: firstPage.trips.map((held) => (held.id === row.id ? row : held)),
+      }
       moved = true
     }
     if (moved) generation += 1
