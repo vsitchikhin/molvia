@@ -791,7 +791,7 @@ describe('previousItems (MOL-209)', () => {
       trips: {
         previousPurchases: (...args) => {
           calls.push(args)
-          return Promise.resolve({ previous, itemIds: [bread.id, milk.id] })
+          return Promise.resolve({ previous, itemIds: [bread.id, milk.id], heldIds: [milk.id] })
         },
       },
       // In the order of ids, as the repository reads them — not the order bought.
@@ -802,15 +802,22 @@ describe('previousItems (MOL-209)', () => {
     expect(calls).toEqual([[TRIP, ACTOR, PREVIOUS_ITEMS_LIMIT]])
     expect(answer.previous).toEqual(previous)
     expect(answer.items.map((entry) => entry.name)).toEqual(['Хлеб', 'Молоко «Ашхар»'])
+    expect(answer.holds.map((entry) => entry.name)).toEqual(['Молоко «Ашхар»'])
     expect(Object.keys(answer.items[0] ?? {})).not.toContain('createdBy')
   })
 
   it('no previous trip is an answer with nothing in it', async () => {
     const repositories = fakeRepositories({
-      trips: { previousPurchases: () => Promise.resolve({ previous: null, itemIds: [] }) },
+      trips: {
+        previousPurchases: () => Promise.resolve({ previous: null, itemIds: [], heldIds: [] }),
+      },
       items: { byIds: () => Promise.resolve([]) },
     })
-    expect(await previousItems(repositories, ACTOR, TRIP)).toEqual({ previous: null, items: [] })
+    expect(await previousItems(repositories, ACTOR, TRIP)).toEqual({
+      previous: null,
+      items: [],
+      holds: [],
+    })
   })
 
   it('a trip not the owner’s is not found', async () => {
@@ -826,7 +833,11 @@ describe('previousItems (MOL-209)', () => {
     const repositories = fakeRepositories({
       trips: {
         previousPurchases: () =>
-          Promise.resolve({ previous: { tripId: TRIP, at: new Date() }, itemIds: [milk.id] }),
+          Promise.resolve({
+            previous: { tripId: TRIP, at: new Date() },
+            itemIds: [milk.id],
+            heldIds: [],
+          }),
       },
       items: { byIds: () => Promise.resolve([]) },
     })

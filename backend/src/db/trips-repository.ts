@@ -204,6 +204,12 @@ export interface PreviousPurchases {
   readonly previous: { readonly tripId: string; readonly at: Date } | null
   /** Its items, each once, in the order they were first bought in it, but those the trip asked about holds. */
   readonly itemIds: readonly string[]
+  /**
+   * What the trip asked about holds, each once, in the order first bought (adversarial В1 of review
+   * 3): the phone keeps that trip by it, and tells what the answer took out from what was removed —
+   * its own copy of the trip may not know what another device added.
+   */
+  readonly heldIds: readonly string[]
 }
 
 type TripRow = typeof trips.$inferSelect
@@ -677,6 +683,15 @@ export function createTripRepository(db: Conn): TripRepository {
         .limit(1)
       if (!self) return null
 
+      const held = await db
+        .select({ itemId: expenses.itemId })
+        .from(expenses)
+        .where(eq(expenses.tripId, id))
+        .groupBy(expenses.itemId)
+        .orderBy(sql`min(${expenses.createdAt})`, expenses.itemId)
+        .limit(rowLimit(limit))
+      const heldIds = held.map((row) => row.itemId)
+
       // The order of «Записаны» (`history`): the moment the phone named, else the server's. A
       // finished trip looks before itself in that order, by the row itself rather than a moment
       // handed back through JS, which keeps milliseconds of a column that holds microseconds.
@@ -701,7 +716,7 @@ export function createTripRepository(db: Conn): TripRepository {
         )
         .orderBy(sql`${time} desc`, desc(trips.id))
         .limit(1)
-      if (!previous) return { previous: null, itemIds: [] }
+      if (!previous) return { previous: null, itemIds: [], heldIds }
 
       // What this trip holds already goes before the limit, not after it (owner's В-5 «а»): cut first,
       // eighteen of twenty taken again left two where seven were still to take (adversarial А4). The
@@ -718,7 +733,7 @@ export function createTripRepository(db: Conn): TripRepository {
         .groupBy(expenses.itemId)
         .orderBy(sql`min(${expenses.createdAt})`, expenses.itemId)
         .limit(rowLimit(limit))
-      return { previous, itemIds: rows.map((row) => row.itemId) }
+      return { previous, itemIds: rows.map((row) => row.itemId), heldIds }
     },
 
     async purgeStale() {

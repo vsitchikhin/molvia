@@ -26,14 +26,18 @@ export async function previousItems(
   const found = await trips.previousPurchases(tripId, actorId, PREVIOUS_ITEMS_LIMIT)
   if (!found) throw new DomainError(ERROR.NOT_FOUND)
 
-  const byId = new Map((await items.byIds(found.itemIds)).map((item) => [item.id, item]))
-  return {
-    previous: found.previous,
-    items: found.itemIds.map((id) => {
+  const byId = new Map(
+    (await items.byIds([...new Set([...found.itemIds, ...found.heldIds])])).map((item) => [
+      item.id,
+      item,
+    ]),
+  )
+  const cards = (ids: readonly string[]) =>
+    ids.map((id) => {
       const item = byId.get(id)
       // The foreign key holds it: missing is a defect, a 500 with a line, never a «not found».
       if (!item) throw new Error(`previous trip: item ${id} was not read`)
       return catalogueEntryOf(item)
-    }),
-  }
+    })
+  return { previous: found.previous, items: cards(found.itemIds), holds: cards(found.heldIds) }
 }

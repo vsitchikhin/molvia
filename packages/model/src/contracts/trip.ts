@@ -225,6 +225,12 @@ export type RecentPlacesResponse = z.infer<typeof recentPlacesResponseSchema>
 export const previousItemsResponseSchema = z.strictObject({
   previous: z.strictObject({ tripId: z.uuid(), at: isoDate }).nullable(),
   items: z.array(catalogueEntryCodec),
+  /**
+   * What the trip asked about holds on the server, each once, in the order first bought (adversarial
+   * В1 of review 3): the phone keeps that trip by it — its own copy may miss what another device added
+   * — and so tells what `items` left out from what was removed since.
+   */
+  holds: z.array(catalogueEntryCodec),
 })
 export type PreviousItemsResponse = z.output<typeof previousItemsResponseSchema>
 

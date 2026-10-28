@@ -128,7 +128,7 @@ describe('«Брали здесь в прошлый раз» (MOL-209)', () => {
 
     expect((await previousOf(cookie, latest)).previous?.tripId).toBe(middle)
     expect((await previousOf(cookie, middle)).previous?.tripId).toBe(delayed)
-    expect(await previousOf(cookie, delayed)).toEqual({ previous: null, items: [] })
+    expect(await previousOf(cookie, delayed)).toMatchObject({ previous: null, items: [] })
   })
 
   it('a removed purchase is gone from the answer', async () => {
@@ -207,6 +207,27 @@ describe('«Брали здесь в прошлый раз» (MOL-209)', () => {
     expect(answer.items.map((entry) => entry.id)).toEqual([milk, eggs])
   })
 
+  // Adversarial В1 of review 3: the phone keeps the trip asked about by what the server says it holds
+  // — its own copy may miss what another device added.
+  it('names what the trip asked about holds, each once, in the order first bought — with no last time too', async () => {
+    const actor = await insertActor(db)
+    const cookie = await signIn(db, actor)
+    const place = await insertPlace(db, { name: `SAS ${randomUUID()}` })
+    const [milk, bread, eggs] = [await item('Молоко'), await item('Хлеб'), await item('Яйца')]
+    const open = await insertTrip(db, { actorId: actor, placeId: place })
+    await bought(open, [bread, milk, bread])
+
+    expect(await previousOf(cookie, open)).toMatchObject({ previous: null, items: [] })
+    expect((await previousOf(cookie, open)).holds.map((entry) => entry.id)).toEqual([bread, milk])
+
+    const last = await insertTrip(db, { actorId: actor, placeId: place, ...finished(1) })
+    await bought(last, [milk, eggs])
+    const answer = await previousOf(cookie, open)
+    expect(answer.items.map((entry) => entry.id)).toEqual([eggs])
+    expect(answer.holds.map((entry) => entry.id)).toEqual([bread, milk])
+    expect(Object.keys(answer.holds[0] ?? {})).not.toContain('createdBy')
+  })
+
   it('a stranger’s, a missing, a removed and a malformed trip are one 404', async () => {
     const actor = await insertActor(db)
     const other = await insertActor(db)
@@ -232,7 +253,7 @@ describe('«Брали здесь в прошлый раз» (MOL-209)', () => {
     await bought(theirs, [await item('Чужое')])
     const open = await insertTrip(db, { actorId: actor, placeId: place })
 
-    expect(await previousOf(cookie, open)).toEqual({ previous: null, items: [] })
+    expect(await previousOf(cookie, open)).toEqual({ previous: null, items: [], holds: [] })
   })
 })
 
