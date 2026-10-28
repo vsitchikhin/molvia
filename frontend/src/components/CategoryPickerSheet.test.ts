@@ -59,7 +59,7 @@ async function render(selected: string | null): Promise<VueWrapper> {
 const radios = () => [...document.querySelectorAll('dialog[open] [role="radio"]')]
 
 describe('CategoryPickerSheet — «Ещё…» (MOL-198)', () => {
-  it('lists every category in the order given, the chosen one checked, «Own» last', async () => {
+  it('lists every category in the order given, the chosen one checked, «Own» under the group', async () => {
     await render(RENT)
     const dialog = document.querySelector('dialog[open]')
     const title = document.getElementById(dialog?.getAttribute('aria-labelledby') ?? '')
@@ -76,6 +76,10 @@ describe('CategoryPickerSheet — «Ещё…» (MOL-198)', () => {
     ])
     const rows = [...document.querySelectorAll('dialog[open] li')]
     expect(rows.at(-1)?.textContent.trim()).toBe(en.spending.sheet.add_category)
+    // «Own» is no choice: out of the group of radios (self-review №5).
+    const group = document.querySelector('dialog[open] [role="radiogroup"]')
+    expect(group?.querySelectorAll('[role="radio"]')).toHaveLength(3)
+    expect(group?.textContent).not.toContain(en.spending.sheet.add_category)
     // A dot of its colour on every row, never an icon: the list is the chips' (owner's В-3 «а»).
     expect(document.querySelectorAll('dialog[open] [role="radio"] .dot')).toHaveLength(3)
   })

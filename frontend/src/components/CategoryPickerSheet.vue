@@ -2,17 +2,23 @@
   <BottomSheet :open="open" back @update:open="$emit('update:open', $event)">
     <template #title>{{ t('spending.sheet.more_title') }}</template>
 
-    <div class="list" role="radiogroup" :aria-label="t('spending.sheet.more_title')">
+    <div class="list">
+      <div role="radiogroup" :aria-label="t('spending.sheet.more_title')">
+        <AppCard as="ul" list>
+          <li v-for="category in categories" :key="category.id">
+            <ListRow
+              role="radio"
+              :title="nameOf(category)"
+              :dot="colourOf(category)"
+              :selected="selected === category.id"
+              @click="pick(category.id)"
+            />
+          </li>
+        </AppCard>
+      </div>
+      <!-- A card of its own, out of the group: a button among the radios was read as one of the
+           choices (self-review №5); «Без счёта» of the account's choice stands so too. -->
       <AppCard as="ul" list>
-        <li v-for="category in categories" :key="category.id">
-          <ListRow
-            role="radio"
-            :title="nameOf(category)"
-            :dot="colourOf(category)"
-            :selected="selected === category.id"
-            @click="pick(category.id)"
-          />
-        </li>
         <li>
           <ListRow aria-haspopup="dialog" @click="$emit('add')">
             <template #title>
@@ -44,8 +50,8 @@ import { categoryColour } from '@/components/spending'
  * «Категория» — every category a spending may take, over its sheet (MOL-198, handoff 72 v2, «Ещё…»):
  * the chips hold two rows of the frequent ones, this list holds all, in the same order. A row is the
  * kit's, its dot the category's colour (owner's В-3 «а»); a choice closes the list — there is nothing
- * to confirm. The last row makes one's own (В-1 of MOL-82): «Новая категория» over this list, and
- * made, it is chosen and both go (owner's В-1 «а»).
+ * to confirm. Under the list, in a card of its own, «+ Своя» makes one's own (В-1 of MOL-82): «Новая
+ * категория» over this list, and made, it is chosen and both go (owner's В-1 «а»).
  */
 export default defineComponent({
   name: 'CategoryPickerSheet',
@@ -78,6 +84,8 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .list {
+  display: grid;
+  gap: var(--space-2);
   margin-top: var(--space-2);
 }
 
