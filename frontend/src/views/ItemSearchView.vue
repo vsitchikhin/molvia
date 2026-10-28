@@ -253,13 +253,14 @@
           </template>
         </ScreenState>
 
-        <ScreenState
-          v-else-if="phase === 'offline'"
+        <!-- Under the field, never over it: nothing of the answer stands above the control that chooses
+             it (MOL-138, В-2) — and with nothing typed too, as 1j draws it: typing offline searches the
+             recent items at once, with no failure to wait for (`useCatalogueSearch`). -->
+        <StatusStrip
+          v-else-if="phase === 'offline' || (phase === 'idle' && !online)"
           kind="offline"
-          tone="warn"
-          inline
-          :title="t('item.offline.title')"
-          :body="t('item.offline.body')"
+          class="connection"
+          :text="t('item.offline.strip')"
         />
       </template>
 
@@ -344,11 +345,13 @@ import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ProposeItemSheet from '@/components/ProposeItemSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { api } from '@/api'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { packageSize, useBarcodeHint } from '@/composables/useBarcodeHint'
 import { useBarcodeLookup } from '@/composables/useBarcodeLookup'
 import { useCatalogueSearch } from '@/composables/useCatalogueSearch'
+import { useOnline } from '@/composables/useOnline'
 import { currentIdentity } from '@/stores/identity'
 import { useItemEntryStore } from '@/stores/itemEntry'
 import { useRecentItemsStore } from '@/stores/recentItems'
@@ -383,6 +386,7 @@ export default defineComponent({
     ProposeItemSheet,
     ScreenSkeleton,
     ScreenState,
+    StatusStrip,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -394,6 +398,7 @@ export default defineComponent({
     )
     const query = ref('')
     const { phase, results, stale, answered, missed, takeMissed, retry } = useCatalogueSearch(query)
+    const online = useOnline()
 
     // What was typed comes back after a reload — a new version of the app lands while the phone
     // is away mid-search — and is put away with the screen, as it always was (MOL-46).
@@ -1056,6 +1061,7 @@ export default defineComponent({
       barcodeCode: lookup.code,
       barcodeItem: lookup.item,
       IconMagnify,
+      online,
     }
   },
 })
@@ -1078,6 +1084,11 @@ export default defineComponent({
   border: var(--hairline) dashed var(--border-strong);
   border-radius: var(--radius-lg);
   text-align: center;
+}
+
+/* The connection under the field and its hint (Ф-14, С-2). */
+.connection {
+  margin-top: var(--space-2);
 }
 
 /* The search's own answer in place of the rows: as far below the field as a group's caption. */

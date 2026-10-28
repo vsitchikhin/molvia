@@ -612,7 +612,12 @@ describe('«What did you pick up?»', () => {
   })
 
   describe('offline', () => {
-    it('says so in warning, not in red, and searches the recent items as typed', async () => {
+    // One strip under the field (Ф-14, С-2): never a block of its own over the rows, never red.
+    function strip(view: VueWrapper) {
+      return view.findAll('.strip')
+    }
+
+    it('says so in one strip under the field, not in red, and searches the recent items as typed', async () => {
       remembered(bread, milk, marianna)
       online(false)
       const view = await render()
@@ -620,14 +625,49 @@ describe('«What did you pick up?»', () => {
       await field(view).setValue('молоко')
 
       await vi.waitFor(() => {
-        expect(view.text()).toContain(en.item.offline.title)
+        expect(strip(view)).toHaveLength(1)
       })
-      expect(view.find('.tone-bad').exists()).toBe(false)
+      expect(strip(view)[0]?.text()).toBe(en.item.offline.strip)
+      expect(strip(view)[0]?.classes()).toContain('offline')
+      expect(view.find('.state').exists()).toBe(false)
       expect(names(view)).toEqual([milk.name, marianna.name])
       expect(searchCatalogue).not.toHaveBeenCalled()
     })
 
-    it('shows nothing under the notice when no recent item matches', async () => {
+    // Nothing above the control that chooses the answer (MOL-138, В-2): the strip comes and goes with
+    // the connection, and over the field it would move the field under the thumb.
+    it('stands under the field, never above it', async () => {
+      remembered(milk)
+      online(false)
+      const view = await render()
+      await field(view).setValue('молоко')
+      await vi.waitFor(() => {
+        expect(strip(view)).toHaveLength(1)
+      })
+
+      const html = view.html()
+      expect(html.indexOf('class="strip')).toBeGreaterThan(html.indexOf('<input'))
+      expect(html.indexOf('class="strip')).toBeLessThan(html.indexOf('role="listbox"'))
+    })
+
+    // As 1j draws it: typing offline searches the recent items at once, so the screen says it before.
+    it('says so with nothing typed too, over the recent items', async () => {
+      remembered(bread, milk)
+      online(false)
+      const view = await render()
+
+      expect(strip(view)).toHaveLength(1)
+      expect(names(view)).toEqual([bread.name, milk.name])
+    })
+
+    it('says nothing of the connection with nothing typed while online', async () => {
+      remembered(bread)
+      const view = await render()
+
+      expect(strip(view)).toHaveLength(0)
+    })
+
+    it('shows nothing under the strip when no recent item matches', async () => {
       remembered(bread)
       online(false)
       const view = await render()
@@ -635,7 +675,7 @@ describe('«What did you pick up?»', () => {
       await field(view).setValue('молоко')
 
       await vi.waitFor(() => {
-        expect(view.text()).toContain(en.item.offline.title)
+        expect(strip(view)).toHaveLength(1)
       })
       expect(view.find('[role="listbox"]').exists()).toBe(false)
     })

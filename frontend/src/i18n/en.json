@@ -358,7 +358,8 @@
     },
     "offline": {
       "title": "No connection",
-      "body": "Searching your recent items only. The full catalogue is back once you are online"
+      "body": "Searching your recent items only. The full catalogue is back once you are online",
+      "strip": "Offline · searching your recent items only. The full catalogue comes back with a connection"
     },
     "barcode": {
       "scan": "Scan a barcode",
