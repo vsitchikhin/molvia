@@ -29,10 +29,13 @@
       <div ref="actions" class="action" :class="{ docked: dockTarget }">
         <!-- A version waits: the error may well be the old code reading the new server's answer,
              and the reload loses nothing (MOL-132, В-2). -->
+        <!-- In the flow a button is as wide as its word, not its place: not a block there, so it holds
+             «Обновить» and «Обновляем…» in one cell and «Повторить» beside it stays put (MOL-225,
+             adversarial А10 of MOL-208). -->
         <AppButton
           v-if="kind === 'error' && updating && !card"
           class="reload"
-          block
+          :block="!flow"
           :size="dockTarget ? 'large' : 'regular'"
           :busy="applying"
           :busy-label="t('update.applying')"

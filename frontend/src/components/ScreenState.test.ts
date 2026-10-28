@@ -442,6 +442,16 @@ describe('ScreenState', () => {
       },
     )
 
+    // In the flow the buttons are as wide as their words: a block one swapped its word for «Обновляем…»
+    // and grew by 14 px, moving «Повторить» beside it (adversarial А10 of MOL-208). Not a block, it holds
+    // both words in one cell from the start.
+    it('holds both of its words in one cell in the flow', () => {
+      const { view } = waiting('ready', { kind: 'error', flow: true })
+      const button = view.get('.action .reload')
+      expect(button.classes()).not.toContain('block')
+      expect(button.find('.words [data-word]').attributes('data-word')).toBe('Обновляем…')
+    })
+
     it('must not offer it anywhere but an error', () => {
       const { view } = waiting('ready', { kind: 'offline', tone: 'warn' })
       expect(view.find('.action').exists()).toBe(false)

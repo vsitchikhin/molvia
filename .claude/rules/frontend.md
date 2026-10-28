@@ -660,7 +660,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   8 it needs some 314 and stands side by side from a phone of 360 — a phone of 320 has them one under
   the other, a price, and in English the error's words take a line more below some 386, which lowers
   the block by 39. **They shrink, never stand past the column** (`flex: 1 1 auto`, self-review №7):
-  with Android's text at 150 % a button wider than the column wraps its words inside it. **A focus
+  with Android's text at 150 % a button wider than the column wraps its words inside it. As wide as its
+  word, a button there is no block, so «Обновить» holds «Обновляем…» in its cell (MOL-225 above): a block
+  one swapped the word, grew by 14 px and moved «Повторить» beside it (adversarial А10). **A focus
   on the row's «Обновить» goes to the error's «Обновить»** when the row steps aside for it (adversarial
   А7, Ж of MOL-132 below) — a tick later, since the error's buttons come by a deferred `Teleport`. **A
   dimmed state says nothing** (`silent`, adversarial А3): an empty answer left while the next is on its
