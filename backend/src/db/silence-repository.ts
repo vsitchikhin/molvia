@@ -1,6 +1,8 @@
 import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import {
+  COUNTRY_TIME_ZONES,
+  SILENCE_FIRST_LEAD_DAYS,
   SILENCE_LAST_WARNING_DAYS,
   SILENCE_STEP_GAP_HOURS,
   SILENCE_WARN_DAYS,
@@ -28,9 +30,19 @@ const at = (now: Date): SQL => sql`${now.toISOString()}::timestamptz`
 const deadline = (a: string): SQL =>
   sql`(${sql.raw(a)}.last_seen_at + make_interval(years => ${SILENCE_YEARS}))`
 
-/** Its warning is of this silence: given after the last visit, never one a login has since ended. */
+/** The first warning falls due this long before the day (`SILENCE_FIRST_LEAD_DAYS`, adversarial А2). */
+const FIRST_OPENS_DAYS = FIRST_STEP + SILENCE_FIRST_LEAD_DAYS
+
+/**
+ * Its warning is of this silence: given no sooner than the first could fall due before this very day,
+ * a day of margin for the API's clock (adversarial А1, self-review №2). Not «given after the last visit»:
+ * the mark is the API's moment and the visit the database's moment a login's transaction began, so a
+ * login begun before a claim and ended after it left the visit older than the mark — the old warning
+ * stood for the new silence, and two years on the account went with not one message. A login moves the
+ * day two years on, and every mark before it falls out of reach, whoever's clock wrote it.
+ */
 const warnedNow = (a: string): SQL =>
-  sql`coalesce(${sql.raw(a)}.silence_warned_at > ${sql.raw(a)}.last_seen_at, false)`
+  sql`coalesce(${sql.raw(a)}.silence_warned_at >= ${deadline(a)} - make_interval(days => ${FIRST_OPENS_DAYS + 1}), false)`
 
 /**
  * Close enough to be asked about at all — said of `last_seen_at` alone, so the index can answer it; the
@@ -41,7 +53,7 @@ const silentSince = (a: string, now: Date, days: number): SQL =>
   sql`${sql.raw(a)}.last_seen_at <= ${at(now)} - make_interval(years => ${SILENCE_YEARS}) + make_interval(days => ${days + 1})`
 
 /**
- * The warning due now, or none: the first when thirty days are left, the last when seven are — and a
+ * The warning due now, or none: the first from thirty-one days before (А2), the last from seven — and a
  * bot late past both sends the last alone (Р-4). The last comes a day after the first at the soonest,
  * so a first sent late is never followed by the other at once.
  */
@@ -54,20 +66,23 @@ const dueStep = (a: string, now: Date): SQL => {
       when ${at(now)} >= greatest(${t} - make_interval(days => ${LAST_STEP}),
         ${warnedAt} + make_interval(hours => ${SILENCE_STEP_GAP_HOURS})) then ${LAST} end
     when ${at(now)} >= ${t} - make_interval(days => ${LAST_STEP}) then ${LAST}
-    when ${at(now)} >= ${t} - make_interval(days => ${FIRST_STEP}) then ${FIRST}
+    when ${at(now)} >= ${t} - make_interval(days => ${FIRST_OPENS_DAYS}) then ${FIRST}
   end`
 }
 
 /**
- * Whether the account is to be erased now (Р-3): its two years are over, and either the bot is blocked
- * — there is nothing to warn by, the page's one exception — or the last warning was handed a week ago
- * at least. An account the bot can reach is never erased unwarned: a bot down for days moves the day.
+ * Whether the account is to be erased now (Р-3): its two years are over, and never sooner than a week
+ * after its last warning, which named that day — a block heard after it does not bring the day forward
+ * (adversarial А3). With no last warning, only where the bot is blocked: there is nothing to warn by,
+ * the page's one exception. An account the bot can reach is never erased unwarned: a bot down for days
+ * moves the day.
  */
 export function silentErasable(a: string, now: Date): SQL {
-  return sql`(${at(now)} >= ${deadline(a)} and (
-    ${sql.raw(a)}.bot_blocked_at is not null
-    or (${warnedNow(a)} and ${sql.raw(a)}.silence_warning = ${LAST}
-      and ${at(now)} >= ${sql.raw(a)}.silence_warned_at + make_interval(days => ${SILENCE_LAST_WARNING_DAYS}))))`
+  return sql`(${at(now)} >= ${deadline(a)} and case
+    when ${warnedNow(a)} and ${sql.raw(a)}.silence_warning = ${LAST}
+      then ${at(now)} >= ${sql.raw(a)}.silence_warned_at + make_interval(days => ${SILENCE_LAST_WARNING_DAYS})
+    else ${sql.raw(a)}.bot_blocked_at is not null
+  end)`
 }
 
 /** A warning handed out: whose chat, which, and when the account goes — its zone is the caller's. */
@@ -84,27 +99,49 @@ export interface SilenceDue {
   readonly blocked: boolean
 }
 
+/** Whose day it is (`silenceSendDay`): the countries in their hours, and a country with no zone. */
+export interface SilenceSendDay {
+  readonly countries: readonly string[]
+  readonly elsewhere: boolean
+}
+
 export interface SilenceRepository {
   /**
-   * The warnings due now for people of `countries` — the ones whose day it is — the bot not blocked,
-   * marked as handed in the same statement: two claims at once take different rows (`skip locked`), and
-   * a bot that dies before sending loses the message rather than sends it twice (MOL-101 Р-2). The
-   * day a warning names is the account's erasure as it stands: for the last one, a week after it at
-   * the soonest (Р-3).
+   * The warnings due now for people whose day it is, marked as handed in the same statement: two claims
+   * at once take different rows (`skip locked`), and a bot that dies before sending loses the message
+   * rather than sends it twice (MOL-101 Р-2). **A bot once heard blocked is tried too** (adversarial
+   * А4): an unblock from Telegram's list is never heard, and a block still there answers 403, which
+   * `deliver` marks again. The day a warning names is the account's erasure as it stands: for the last
+   * one, a week after it at the soonest (Р-3).
    */
-  claimWarnings(
-    countries: readonly string[],
-    now: Date,
-    limit: number,
-  ): Promise<readonly SilenceWarned[]>
+  claimWarnings(day: SilenceSendDay, now: Date, limit: number): Promise<readonly SilenceWarned[]>
   /** The accounts to erase now, the longest silent first. */
   due(now: Date, limit: number): Promise<readonly SilenceDue[]>
 }
 
 export function createSilenceRepository(db: Conn): SilenceRepository {
   return {
-    async claimWarnings(countries, now, limit) {
-      if (countries.length === 0) return []
+    async claimWarnings({ countries, elsewhere }, now, limit) {
+      const whose = [
+        ...(countries.length === 0
+          ? []
+          : [
+              sql`c.country in (${sql.join(
+                countries.map((country) => sql`${country}`),
+                sql`, `,
+              )})`,
+            ]),
+        // a country with no zone is read in the default one (self-review №4)
+        ...(elsewhere
+          ? [
+              sql`c.country not in (${sql.join(
+                Object.keys(COUNTRY_TIME_ZONES).map((country) => sql`${country}`),
+                sql`, `,
+              )})`,
+            ]
+          : []),
+      ]
+      if (whose.length === 0) return []
       const rows = await db.execute<{
         telegram_user_id: number
         country: string
@@ -116,11 +153,7 @@ export function createSilenceRepository(db: Conn): SilenceRepository {
           select d.id, d.step from (
             select c.id, c.last_seen_at, ${dueStep('c', now)} as step
             from actors c
-            where ${silentSince('c', now, FIRST_STEP)} and c.bot_blocked_at is null
-              and c.country in (${sql.join(
-                countries.map((country) => sql`${country}`),
-                sql`, `,
-              )})
+            where ${silentSince('c', now, FIRST_OPENS_DAYS)} and (${sql.join(whose, sql` or `)})
             for update of c skip locked
           ) d
           where d.step is not null

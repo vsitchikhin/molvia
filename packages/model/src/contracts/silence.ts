@@ -9,7 +9,7 @@ import { telegramUserIdSchema } from '#model/entities/actor'
 export const silenceNoticeSchema = z.strictObject({
   telegramUserId: telegramUserIdSchema,
   day: z.iso.date(),
-  days: z.int().min(1).max(31),
+  days: z.int().min(1).max(32),
 })
 export type SilenceNotice = z.infer<typeof silenceNoticeSchema>
 
@@ -32,7 +32,10 @@ export const silenceNoticeToOwnerSchema = z.strictObject({
   warned30: z.int().nonnegative(),
   warned7: z.int().nonnegative(),
   erased: z.int().nonnegative(),
-  /** Of them, erased with no warning: the bot was blocked (the page's one exception). */
+  /**
+   * Of them, with the bot blocked: warned, if at all, by a message Telegram refused (the page's one
+   * exception — adversarial А4 tries them all the same).
+   */
   erasedBlocked: z.int().nonnegative(),
 })
 export type SilenceNoticeToOwner = z.infer<typeof silenceNoticeToOwnerSchema>

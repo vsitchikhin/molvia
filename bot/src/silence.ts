@@ -44,15 +44,16 @@ export function silenceText(notice: SilenceNotice): string {
 }
 
 /**
- * The message: the words and a URL button to the app, where the door asks to sign in. **Telegram
- * refuses an inline button to an `http://` address**, which a copy in development has, so there the
- * link goes as a line of text, as «чек разобран» does.
+ * The message: the words and a URL button to the app, where the door asks to sign in — named in both
+ * languages, as the words are (self-review №3). **Telegram refuses an inline button to an `http://`
+ * address**, which a copy in development has, so there the link goes as a line of text, as «чек
+ * разобран» does.
  */
 export function silenceMessage(
   notice: SilenceNotice,
   appUrl: string,
 ): { readonly text: string; readonly keyboard?: InlineKeyboard } {
-  const label = t('ru', 'silence.open')
+  const label = `${t('ru', 'silence.open')} · ${t('en', 'silence.open')}`
   const url = `${appUrl.replace(/\/+$/, '')}/`
   const text = silenceText(notice)
   return url.startsWith('https://')

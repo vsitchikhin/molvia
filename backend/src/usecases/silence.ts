@@ -1,8 +1,8 @@
 import {
   SILENCE_NOTICES_PER_CLAIM,
   silenceCountdown,
-  silenceSendCountries,
-  timeZoneOf,
+  silenceSendDay,
+  silenceZoneOf,
 } from '@molvia/model'
 import type { DueSilenceNotices, SilenceNoticeToOwner } from '@molvia/model'
 import type { ErasureRepository } from '@/db/erasure-repository'
@@ -33,9 +33,9 @@ export async function claimSilenceNotices(
   },
   now: Date,
 ): Promise<DueSilenceNotices> {
-  const countries = silenceSendCountries(now)
-  if (countries.length === 0) return { notices: [] }
-  const warned = await deps.silence.claimWarnings(countries, now, SILENCE_NOTICES_PER_CLAIM)
+  const day = silenceSendDay(now)
+  if (day.countries.length === 0 && !day.elsewhere) return { notices: [] }
+  const warned = await deps.silence.claimWarnings(day, now, SILENCE_NOTICES_PER_CLAIM)
   if (warned.length === 0) return { notices: [] }
   if (deps.owner) {
     await tell(deps, now, {
@@ -49,8 +49,7 @@ export async function claimSilenceNotices(
   return {
     notices: warned.map(({ telegramUserId, country, eraseAt }) => ({
       telegramUserId,
-      // every country a warning is claimed for has a zone: it was chosen by its day
-      ...silenceCountdown(eraseAt, now, timeZoneOf(country) ?? 'UTC'),
+      ...silenceCountdown(eraseAt, now, silenceZoneOf(country)),
     })),
   }
 }

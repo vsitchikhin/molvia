@@ -257,7 +257,7 @@ export const ru = {
   /** Two years of silence (MOL-239, В-3 «а»): numbers only, no one named. */
   'owner.silence.warned': '🗓 Тишина: предупреждены за 30 дней — {warned30}, за 7 — {warned7}',
   'owner.silence.erased':
-    '🗓 Тишина: стёрто аккаунтов — {erased}, из них без предупреждения (бот заблокирован) — {blocked}',
+    '🗓 Тишина: стёрто аккаунтов — {erased}, из них с заблокированным ботом — {blocked}',
   'owner.receipt.why.failed': 'не прочитано ни одной строки',
   'owner.receipt.why.no_lines': 'строк нет',
   'owner.receipt.why.no_total': 'итог не подтверждён двумя местами',

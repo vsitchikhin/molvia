@@ -29,7 +29,7 @@ afterAll(async () => {
 const DAY = 24 * 3_600_000
 /** Полдень в Ереване и Тбилиси, десять утра в Белграде (летнее время): день у всех трёх стран. */
 const NOW = new Date('2027-09-26T08:00:00.000Z')
-const DAYTIME = ['AM', 'GE', 'RS']
+const DAYTIME = { countries: ['AM', 'GE', 'RS'], elsewhere: true }
 
 /** Последний визит такой, что до стирания `days` суток от `NOW` (годы календарные, без 29 февраля). */
 function silentFor(days: number): Date {
@@ -60,9 +60,9 @@ async function telegramOf(actorId: string): Promise<number> {
 }
 
 describe('предупреждения', () => {
-  it('за 31 день — ничего, за 30 — первое, отмеченное и отданное один раз', async () => {
-    const early = await insertActor(db, { lastSeenAt: silentFor(31) })
-    const due = await insertActor(db, { lastSeenAt: silentFor(30) })
+  it('за 32 дня — ничего, за 31 — первое, отмеченное и отданное один раз (А2)', async () => {
+    const early = await insertActor(db, { lastSeenAt: silentFor(32) })
+    const due = await insertActor(db, { lastSeenAt: silentFor(31) })
     const updatedAt = (await rowOf(due))?.updatedAt
 
     const warned = await silence.claimWarnings(DAYTIME, NOW, 50)
@@ -71,7 +71,7 @@ describe('предупреждения', () => {
         telegramUserId: await telegramOf(due),
         country: 'AM',
         step: 30,
-        eraseAt: new Date(NOW.getTime() + 30 * DAY),
+        eraseAt: new Date(NOW.getTime() + 31 * DAY),
       },
     ])
     expect(await rowOf(due)).toEqual({ warning: 30, warnedAt: NOW, updatedAt })
@@ -101,11 +101,58 @@ describe('предупреждения', () => {
     expect(await silence.claimWarnings(DAYTIME, later, 50)).toEqual([])
   })
 
-  it('заблокировавшему бота и человеку страны не в её день — ничего', async () => {
-    await insertActor(db, { lastSeenAt: silentFor(10), botBlockedAt: silentFor(400) })
+  it('человеку страны не в её день — ничего', async () => {
     await insertActor(db, { lastSeenAt: silentFor(10), country: 'RS', city: 'Белград' })
-    expect(await silence.claimWarnings(['AM', 'GE'], NOW, 50)).toEqual([])
-    expect(await silence.claimWarnings([], NOW, 50)).toEqual([])
+    expect(
+      await silence.claimWarnings({ countries: ['AM', 'GE'], elsewhere: true }, NOW, 50),
+    ).toEqual([])
+    expect(await silence.claimWarnings({ countries: [], elsewhere: false }, NOW, 50)).toEqual([])
+  })
+
+  it('бота, однажды услышанного заблокированным, всё равно пробуем (А4)', async () => {
+    const blocked = await insertActor(db, {
+      lastSeenAt: silentFor(20),
+      botBlockedAt: new Date('2026-01-10T10:00:00.000Z'),
+    })
+    expect(await silence.claimWarnings(DAYTIME, NOW, 50)).toMatchObject([
+      { telegramUserId: await telegramOf(blocked), step: 30 },
+    ])
+  })
+
+  it('страна без пояса — в день Еревана, а не никогда (селфревью №4)', async () => {
+    const nowhere = await insertActor(db, {
+      lastSeenAt: silentFor(20),
+      country: 'XX',
+      city: 'Нигде',
+    })
+    expect(await silence.claimWarnings({ countries: ['AM'], elsewhere: false }, NOW, 50)).toEqual(
+      [],
+    )
+    expect(await silence.claimWarnings({ countries: [], elsewhere: true }, NOW, 50)).toMatchObject([
+      { telegramUserId: await telegramOf(nowhere), country: 'XX', step: 30 },
+    ])
+  })
+
+  it('отметка, поставленная после начала входа, новую тишину не держит (А1)', async () => {
+    // вход начался в NOW, claim успел поставить шаг 7 до его коммита, вход записал визит — NOW
+    const login = NOW
+    const actorId = await insertActor(db, { lastSeenAt: login })
+    await db
+      .update(actors)
+      .set({ silenceWarning: 7, silenceWarnedAt: new Date(login.getTime() + 1_000) })
+      .where(eq(actors.id, actorId))
+    const deadline = new Date(login)
+    deadline.setUTCFullYear(deadline.getUTCFullYear() + 2)
+
+    // старая отметка не делает его предупреждённым: без новых он не стирается
+    expect(await silence.due(new Date(deadline.getTime() + DAY), 50)).toEqual([])
+    // и «за 30 дней» новой тишины уходит
+    const [first] = await silence.claimWarnings(
+      DAYTIME,
+      new Date(deadline.getTime() - 31 * DAY),
+      50,
+    )
+    expect(first?.step).toBe(30)
   })
 
   it('вход после предупреждения гасит его: тишина считается заново', async () => {
@@ -120,7 +167,7 @@ describe('предупреждения', () => {
     // за 30 дней до двух лет от входа — снова первое предупреждение
     const again = new Date(login)
     again.setUTCFullYear(again.getUTCFullYear() + 2)
-    const [warned] = await silence.claimWarnings(DAYTIME, new Date(again.getTime() - 30 * DAY), 50)
+    const [warned] = await silence.claimWarnings(DAYTIME, new Date(again.getTime() - 31 * DAY), 50)
     expect(warned?.step).toBe(30)
   })
 
@@ -155,6 +202,17 @@ describe('стирание', () => {
       .set({ silenceWarning: 30, silenceWarnedAt: new Date(NOW.getTime() - 35 * DAY) })
       .where(eq(actors.id, actorId))
     expect(await silence.due(NOW, 50)).toEqual([])
+  })
+
+  it('блок после опоздавшего «через 7 дней» не приближает названный день (А3)', async () => {
+    const actorId = await insertActor(db, { lastSeenAt: silentFor(3) })
+    const [warned] = await silence.claimWarnings(DAYTIME, NOW, 50)
+    expect(warned?.eraseAt).toEqual(new Date(NOW.getTime() + 7 * DAY))
+    await db.update(actors).set({ botBlockedAt: NOW }).where(eq(actors.id, actorId))
+    expect(await silence.due(new Date(NOW.getTime() + 3 * DAY), 50)).toEqual([])
+    expect(await silence.due(new Date(NOW.getTime() + 7 * DAY), 50)).toEqual([
+      { telegramUserId: await telegramOf(actorId), blocked: true },
+    ])
   })
 
   it('заблокировавшего — ровно в срок, без предупреждения', async () => {
@@ -232,7 +290,7 @@ describe('сценарии', () => {
   })
 
   it('claim называет день стирания и число дней в поясе человека, владельцу — сколько', async () => {
-    const actorId = await insertActor(db, { lastSeenAt: silentFor(30) })
+    const actorId = await insertActor(db, { lastSeenAt: silentFor(31) })
     const deps = {
       silence,
       notices: createOwnerNoticeRepository(db),
@@ -240,11 +298,32 @@ describe('сценарии', () => {
       failed: () => undefined,
     }
     expect(await claimSilenceNotices(deps, NOW)).toEqual({
-      notices: [{ telegramUserId: await telegramOf(actorId), day: '2027-10-26', days: 30 }],
+      notices: [{ telegramUserId: await telegramOf(actorId), day: '2027-10-27', days: 31 }],
     })
     expect(await db.select({ payload: ownerNotices.payload }).from(ownerNotices)).toEqual([
       { payload: { kind: 'silence', warned30: 1, warned7: 0, erased: 0, erasedBlocked: 0 } },
     ])
+  })
+
+  it('срок в 21:00 по Еревану: первое уходит наутро и всё равно за 30 дней (А2)', async () => {
+    // срок — 26.10.2027 в 21:00 по Еревану
+    const deadline = new Date('2027-10-26T17:00:00.000Z')
+    const seen = new Date(deadline)
+    seen.setUTCFullYear(seen.getUTCFullYear() - 2)
+    const actorId = await insertActor(db, { lastSeenAt: seen })
+    const deps = {
+      silence,
+      notices: createOwnerNoticeRepository(db),
+      owner: false,
+      failed: () => undefined,
+    }
+    // за 31 сутки — 21:00, окно закрыто; наутро, в 10:00, ещё 30 дней
+    expect(await claimSilenceNotices(deps, new Date('2027-09-25T17:00:00.000Z'))).toEqual({
+      notices: [],
+    })
+    expect(await claimSilenceNotices(deps, new Date('2027-09-26T06:00:00.000Z'))).toEqual({
+      notices: [{ telegramUserId: await telegramOf(actorId), day: '2027-10-26', days: 30 }],
+    })
   })
 
   it('ночью во всех трёх странах claim не трогает никого', async () => {

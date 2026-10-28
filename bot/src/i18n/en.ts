@@ -145,7 +145,7 @@ export const en: Dictionary = {
   'owner.silence.warned':
     '🗓 Silence: warned 30 days before — {warned30}, 7 days before — {warned7}',
   'owner.silence.erased':
-    '🗓 Silence: accounts erased — {erased}, of them unwarned (bot blocked) — {blocked}',
+    '🗓 Silence: accounts erased — {erased}, of them with the bot blocked — {blocked}',
   'owner.receipt.why.failed': 'not one line read',
   'owner.receipt.why.no_lines': 'no lines',
   'owner.receipt.why.no_total': 'no total two places vouch for',

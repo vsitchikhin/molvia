@@ -75,12 +75,16 @@ describe('предупреждение о стирании (MOL-239)', () => {
     expect(say(21)).toContain('через 21 день')
   })
 
-  it('кнопка ведёт в приложение; на http:// — ссылка строкой', () => {
+  it('кнопка ведёт в приложение, подпись на обоих языках; на http:// — ссылка строкой', () => {
     const https = silenceMessage(notice(), `${APP}/`)
-    expect(https.keyboard?.inline_keyboard).toEqual([[{ text: 'Открыть Molvia', url: `${APP}/` }]])
+    expect(https.keyboard?.inline_keyboard).toEqual([
+      [{ text: 'Открыть Molvia · Open Molvia', url: `${APP}/` }],
+    ])
     const http = silenceMessage(notice(), 'http://127.0.0.1:5300')
     expect(http.keyboard).toBeUndefined()
-    expect(http.text.endsWith('\n\nОткрыть Molvia: http://127.0.0.1:5300/')).toBe(true)
+    expect(http.text.endsWith('\n\nОткрыть Molvia · Open Molvia: http://127.0.0.1:5300/')).toBe(
+      true,
+    )
   })
 })
 
