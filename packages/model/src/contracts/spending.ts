@@ -138,8 +138,16 @@ export function spendingCategoryViewOf(category: SpendingCategory): SpendingCate
   }
 }
 
-/** The person's categories in the order of the chips, the removed ones included and marked. */
+/**
+ * The ids the chips of a spending stand first by (MOL-198): `frequentCategories`, the rest after them
+ * in the list's order. A default, so an answer the phone kept from before it still reads — as a
+ * newcomer's, the presets as listed.
+ */
+export const frequentCategoriesCodec = z.array(z.uuid()).default([])
+
+/** The person's categories in the order of the list, the removed ones included and marked. */
 export const spendingCategoriesResponseCodec = z.strictObject({
   categories: z.array(spendingCategoryViewCodec),
+  frequent: frequentCategoriesCodec,
 })
 export type SpendingCategoriesResponse = z.output<typeof spendingCategoriesResponseCodec>

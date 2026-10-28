@@ -20,6 +20,7 @@ import {
   SPENDING_ICONS,
   SPENDING_PRESETS,
   categoryOrder,
+  frequentCategories,
   nextCategoryColour,
   spendingCategorySchema,
 } from '#model/entities/spending-category'
@@ -806,6 +807,52 @@ describe('categories', () => {
     expect(new Set(SPENDING_ICONS).size).toBe(SPENDING_ICONS.length)
     expect(SPENDING_ICONS).toEqual(expect.arrayContaining([...SPENDING_PRESETS]))
     expect(SPENDING_ICONS).toHaveLength(24 + SPENDING_PRESETS.length)
+  })
+})
+
+describe('the chips of a spending by frequency (MOL-198)', () => {
+  const own = (name: string, archived = false): SpendingCategory => ({
+    id: nextId(),
+    actorId: OWNER,
+    preset: null,
+    name,
+    colour: 0,
+    icon: 'tag',
+    archivedAt: archived ? new Date('2026-10-01T00:00:00Z') : null,
+    createdAt: new Date('2026-09-02T00:00:00Z'),
+  })
+  const preset = (key: (typeof SPENDING_PRESETS)[number]) =>
+    presets.find((category) => category.preset === key)?.id ?? ''
+
+  it('stands the most used first, a tie in the order of the presets', () => {
+    const uses = new Map([
+      [preset('transport'), 9],
+      [preset('cafe'), 14],
+      [preset('groceries'), 9],
+      [preset('telecom'), 1],
+    ])
+    expect(frequentCategories([...presets].reverse(), uses)).toEqual([
+      preset('cafe'),
+      preset('groceries'),
+      preset('transport'),
+      preset('telecom'),
+    ])
+  })
+
+  it("names only what was used — a newcomer's is empty, the presets' order stands", () => {
+    expect(frequentCategories(presets, new Map())).toEqual([])
+    expect(frequentCategories(presets, new Map([[preset('cafe'), 0]]))).toEqual([])
+  })
+
+  it("leaves a removed one out, and ties one's own after the presets, as made", () => {
+    const taxi = own('Такси')
+    const metro = own('Метро', true)
+    const uses = new Map([
+      [taxi.id, 2],
+      [metro.id, 5],
+      [preset('other'), 2],
+    ])
+    expect(frequentCategories([taxi, metro, ...presets], uses)).toEqual([preset('other'), taxi.id])
   })
 })
 

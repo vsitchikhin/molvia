@@ -4,6 +4,7 @@ import type { Locator, Page } from '@playwright/test'
 import { fakeKeyboard } from './keyboard'
 import { facesIn, standAt, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
+import { chooseCategory } from './category'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
@@ -37,7 +38,7 @@ async function writeSpending(
   // The sheet takes no tap while it rises.
   await page.waitForTimeout(400)
   await sheet.getByLabel('Сумма').fill(amount)
-  await sheet.getByRole('radio', { name: category }).check()
+  await chooseCategory(page, category)
   if (note) await sheet.getByLabel(/Что это/).fill(note)
   await sheet.getByRole('button', { name: 'Сохранить трату' }).click()
   await expect(sheet).toBeHidden()
@@ -55,7 +56,7 @@ test('a spending lands in the month, and a removal comes back with «Верну�
   await expect(sheet).toContainText('Введите сумму больше нуля')
   await expect(sheet).toContainText('Выберите категорию')
   await sheet.getByLabel('Сумма').fill('5000')
-  await sheet.getByRole('radio', { name: 'Красота и гигиена' }).check()
+  await chooseCategory(page, 'Красота и гигиена')
   await sheet.getByLabel(/Что это/).fill('Барбер')
   await sheet.getByRole('button', { name: 'Сохранить трату' }).click()
   await expect(sheet).toBeHidden()
@@ -561,6 +562,50 @@ test('the session over under a changed month: the login stands from the top', as
   ).toBe('')
 })
 
+// MOL-198, Ф-17: two rows of chips, «Ещё…» last in the second, and «Сохранить трату» in sight without a
+// scroll — 21 chips in six rows pushed it off the screen. The order is the person's, by frequency: a
+// spending in a category the rows did not hold stands it first at the next opening.
+test('the chips stand in two rows by frequency, «Ещё…» last, «Сохранить трату» in sight', async ({
+  page,
+}) => {
+  await openMoney(page)
+  const sheet = page.locator('dialog[open]').first()
+  const rows = sheet.locator('.chips .row')
+  const opened = async () => {
+    await page.getByRole('button', { name: 'Добавить трату' }).click()
+    await expect(sheet).toContainText('Новая трата')
+    await page.waitForTimeout(400)
+  }
+  const twoRows = async () => {
+    await expect(rows).toHaveCount(2)
+    // Each row on one line, as tall as a chip.
+    for (const row of await rows.all()) expect((await row.boundingBox())?.height).toBe(44)
+    await expect(rows.last().locator('> *').last()).toHaveText('Ещё…')
+    await expect(sheet.getByRole('button', { name: 'Ещё…' })).toHaveAttribute(
+      'aria-haspopup',
+      'dialog',
+    )
+    await expect(sheet.getByRole('button', { name: 'Сохранить трату' })).toBeInViewport()
+  }
+
+  await opened()
+  await twoRows()
+  // A newcomer's are the presets as listed: «Документы» is in «Ещё…», not in the rows.
+  await expect(rows.first().getByRole('radio').first()).toHaveAccessibleName('Продукты')
+  await expect(sheet.locator('.chips').getByRole('radio', { name: 'Документы' })).toHaveCount(0)
+  await sheet.getByLabel('Сумма').fill('3000')
+  await chooseCategory(page, 'Документы')
+  await sheet.getByRole('button', { name: 'Сохранить трату' }).click()
+  await expect(sheet).toBeHidden()
+  // The month read again with the spending in it names «Документы» frequent.
+  await expect(page.getByRole('link', { name: 'Траты, 1' })).toBeVisible()
+
+  await page.setViewportSize({ width: 320, height: 640 })
+  await opened()
+  await twoRows()
+  await expect(rows.first().getByRole('radio').first()).toHaveAccessibleName('Документы')
+})
+
 test('a category of one’s own is made from the sheet, and a preset’s name is refused', async ({
   page,
 }) => {
@@ -569,7 +614,12 @@ test('a category of one’s own is made from the sheet, and a preset’s name is
   const sheet = page.locator('dialog[open]')
   await page.waitForTimeout(400)
   await sheet.getByLabel('Сумма').fill('2000')
-  await sheet.getByRole('button', { name: 'Своя' }).click()
+  // «+ Своя» is the last row of «Ещё…», and a new one is a third sheet over it (MOL-198, С-16).
+  await sheet.getByRole('button', { name: 'Ещё…' }).click()
+  const list = page.locator('dialog[open]').last()
+  await expect(list).toContainText('Категория')
+  await page.waitForTimeout(400)
+  await list.getByRole('button', { name: 'Своя' }).click()
 
   const named = page.locator('dialog[open]').last()
   await expect(named).toContainText('Новая категория')
@@ -580,7 +630,10 @@ test('a category of one’s own is made from the sheet, and a preset’s name is
   await named.getByLabel('Название').fill('Такси')
   await named.getByRole('button', { name: 'Добавить' }).click()
 
-  // Chosen as soon as it exists (В-1).
+  // Chosen as soon as it exists (В-1), the list gone with its sheet and the new one first (owner's
+  // В-1 «а», В-2 «а» of MOL-198).
+  await expect(page.locator('dialog[open]')).toHaveCount(1)
+  await expect(sheet.locator('.chips').getByRole('radio').first()).toHaveAccessibleName('Такси')
   await expect(sheet.getByRole('radio', { name: 'Такси' })).toBeChecked()
   await sheet.getByRole('button', { name: 'Сохранить трату' }).click()
   await expect(sheet).toBeHidden()
@@ -1269,7 +1322,7 @@ test('the sum being typed stands in sight over the keys of a turned phone (MOL-1
   await expect(sheet).toContainText('Новая трата')
   await page.waitForTimeout(400)
   await sheet.getByLabel('Сумма').fill('5000')
-  await sheet.getByRole('radio', { name: 'Красота и гигиена' }).check()
+  await chooseCategory(page, 'Красота и гигиена')
   await sheet.getByLabel(/Что это/).fill('Барбер')
   await sheet.getByRole('button', { name: 'Сохранить трату' }).click()
   await expect(sheet).toBeHidden()

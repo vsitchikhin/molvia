@@ -325,6 +325,12 @@ export default defineComponent({
       history.leave(steps)
     }
 
+    /** Closes the sheet and `below` sheets under it, the screen staying (MOL-198). */
+    function closeWith(below: number): void {
+      closing = history.laid()
+      history.leaveWith(below)
+    }
+
     function pressed(event: PointerEvent): void {
       downOnScrim = event.target === dialog.value
       touchedAt = event.timeStamp
@@ -416,7 +422,7 @@ export default defineComponent({
       if (props.open) show()
     })
 
-    expose({ close })
+    expose({ close, closeWith })
     return {
       t,
       announcements,

@@ -1,5 +1,6 @@
 import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm'
 import {
+  CATEGORY_FREQUENCY_DAYS,
   DEFAULT_SPENDING_ICON,
   DomainError,
   ERROR,
@@ -12,7 +13,7 @@ import type { SpendingCategory, SpendingCategoryAmend, SpendingCategoryBody } fr
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull } from './rows'
-import { spendingCategories } from './schema'
+import { spendingCategories, spendings } from './schema'
 
 /**
  * The owner's spending categories (MOL-73, В-3). Every account is given the presets the first time
@@ -45,6 +46,13 @@ export interface SpendingCategoryRepository {
 
   /** Brings a removed category back into the choice; false when there is no such category of theirs. */
   restore(actorId: string, id: string): Promise<boolean>
+
+  /**
+   * How many live spendings of the owner each category has in the `CATEGORY_FREQUENCY_DAYS` up to
+   * `today`, and any dated later (MOL-198) — the person's choices. A transfer's fee is not one: the
+   * transfer puts it in «Прочее» (MOL-253).
+   */
+  uses(actorId: string, today: string): Promise<ReadonlyMap<string, number>>
 }
 
 type Row = typeof spendingCategories.$inferSelect
@@ -103,6 +111,22 @@ export function createSpendingCategoryRepository(db: Conn): SpendingCategoryRepo
 
   return {
     list: given,
+
+    async uses(actorId, today) {
+      const rows = await db
+        .select({ categoryId: spendings.categoryId, count: sql<number>`count(*)::int` })
+        .from(spendings)
+        .where(
+          and(
+            eq(spendings.actorId, actorId),
+            sql`${spendings.spentOn} > ${today}::date - ${CATEGORY_FREQUENCY_DAYS}::int`,
+            isNull(spendings.deletedAt),
+            isNull(spendings.transferId),
+          ),
+        )
+        .groupBy(spendings.categoryId)
+      return new Map(rows.map((row) => [row.categoryId, row.count]))
+    },
 
     async add(actorId, input) {
       await given(actorId)

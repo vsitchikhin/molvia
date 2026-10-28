@@ -316,6 +316,84 @@ describe('своя категория: иконка и цвет (MOL-285)', () =
   })
 })
 
+describe('чипы траты по частоте (MOL-198)', () => {
+  async function addAccount(me: Owner, name: string): Promise<string> {
+    const id = randomUUID()
+    const response = await call(me, 'POST', '/money/accounts', {
+      id,
+      name,
+      currency: 'USD',
+      savings: false,
+      start: { amount: '1000', currency: 'USD' },
+      startOn: daysAgo(5),
+    })
+    expect(response.statusCode, response.body).toBe(201)
+    return id
+  }
+
+  it('у новичка частых нет — порядок пресетов; список и месяц говорят одно', async () => {
+    const me = await owner()
+    expect((await categories(me)).frequent).toEqual([])
+    expect((await month(me, today.slice(0, 7))).frequent).toEqual([])
+  }, 10_000)
+
+  it('90 дней с сегодняшним и будущие: больше трат — раньше, ничья — по пресетам; удалённая не в счёт', async () => {
+    const me = await owner()
+    const [cafe, groceries, transport] = await Promise.all([
+      presetId(me, 'cafe'),
+      presetId(me, 'groceries'),
+      presetId(me, 'transport'),
+    ])
+    const at = (categoryId: string, spentOn: string) => spend(me, { categoryId, spentOn })
+    for (const written of [
+      await at(cafe, daysAgo(89)),
+      await at(cafe, today),
+      await at(cafe, latestDay(new Date())),
+      await at(groceries, today),
+      await at(groceries, daysAgo(90)),
+      await at(groceries, daysAgo(120)),
+      await at(transport, today),
+    ])
+      expect(written.statusCode, written.body).toBe(201)
+    const removed = await at(transport, today)
+    expect(
+      (await call(me, 'DELETE', `/spendings/${removed.json<{ id: string }>().id}`)).statusCode,
+    ).toBe(204)
+
+    const expected = [cafe, groceries, transport]
+    expect((await categories(me)).frequent).toEqual(expected)
+    expect((await month(me, today.slice(0, 7))).frequent).toEqual(expected)
+    // Another month's answer names them too: the categories are the owner's, not a month's.
+    expect((await month(me, previousMonth(today.slice(0, 7)))).frequent).toEqual(expected)
+  }, 15_000)
+
+  it('комиссию перевода ставит перевод, а не человек; чужие траты и убранная категория не в счёт', async () => {
+    const me = await owner()
+    const card = await addAccount(me, 'Карта')
+    const dollars = await addAccount(me, 'Доллары')
+    const fee = await call(me, 'POST', '/transfers', {
+      id: randomUUID(),
+      fromAccountId: card,
+      toAccountId: dollars,
+      amount: { amount: '200', currency: 'USD' },
+      fee: { amount: '2', currency: 'USD' },
+      transferredOn: today,
+    })
+    expect(fee.statusCode, fee.body).toBe(201)
+    expect((await categories(me)).frequent).toEqual([])
+
+    const pets = await presetId(me, 'pets')
+    expect((await spend(me, { categoryId: pets })).statusCode).toBe(201)
+    expect((await call(me, 'DELETE', `/spending-categories/${pets}`)).statusCode).toBe(200)
+    const stranger = await owner()
+    expect(
+      (await spend(stranger, { categoryId: await presetId(stranger, 'cafe') })).statusCode,
+    ).toBe(201)
+    expect((await categories(me)).frequent).toEqual([])
+    expect((await categories(stranger)).frequent).toEqual([await presetId(stranger, 'cafe')])
+  }, 15_000)
+})
+
 describe('трата вне похода (MOL-73)', () => {
   it('201 и одна строка; повтор из очереди — 200 и всё ещё одна; другое под тем же id — 409', async () => {
     const me = await owner()

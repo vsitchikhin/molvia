@@ -82,6 +82,7 @@ function page(days: [string, ReturnType<typeof entry>[]][], cursor: JournalKey |
     cursor,
     remaining: cursor ? 1 : 0,
     remainingFrom: null,
+    frequent: [],
     remainingTo: null,
   } satisfies MoneyMonthView
 }

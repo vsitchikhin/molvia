@@ -18,6 +18,7 @@ import { useSpendingHandoffStore } from '@/stores/spendingHandoff'
 import type { SpendingPrefill } from '@/stores/spendingHandoff'
 import MoneySpendingsView from '@/views/MoneySpendingsView.vue'
 import MoneyView from '@/views/MoneyView.vue'
+import SpendingSheet from '@/components/SpendingSheet.vue'
 
 const moneyMonth = vi.fn<(month: string, cursor?: JournalKey) => Promise<MoneyMonthView>>()
 const recordSpending = vi.fn<(body: SpendingBody) => Promise<unknown>>()
@@ -104,6 +105,7 @@ function month(spentOn: string): MoneyMonthView {
     cursor: null,
     remaining: 0,
     remainingFrom: null,
+    frequent: [],
     remainingTo: null,
   }
 }
@@ -402,4 +404,279 @@ describe('SpendingSheet: the «≈» of a spending written is its own day’s (M
     const dialog = await opened(await render(undefined, '/money/spendings'))
     expect(conversion(dialog)).toBe(en.spending.sheet.conversion_later)
   })
+})
+
+describe('SpendingSheet: the chips by frequency, the chosen one first (MOL-198, В-2 «а»)', () => {
+  const CAFE = 'c0000000-0000-4000-8000-000000000001'
+  const RENT = 'c0000000-0000-4000-8000-000000000002'
+  const PETS = 'c0000000-0000-4000-8000-000000000003'
+  const preset = (id: string, key: 'cafe' | 'rent' | 'pets') =>
+    ({ id, preset: key, name: null, colour: null, icon: null, archived: false }) as const
+
+  /** Five categories, «Кафе» and «Прочее» frequent, the one spending of the journal in «Аренда». */
+  function frequentMonth(): MoneyMonthView {
+    const base = month('2026-09-28')
+    const [day] = base.days
+    const [entry] = day?.entries ?? []
+    if (!day || entry?.kind !== 'manual') throw new Error('no row')
+    return {
+      ...base,
+      categories: [
+        preset(CAFE, 'cafe'),
+        preset(RENT, 'rent'),
+        preset(PETS, 'pets'),
+        ...base.categories,
+      ],
+      frequent: [OTHER, CAFE],
+      days: [
+        { ...day, entries: [{ ...entry, spending: { ...entry.spending, categoryId: RENT } }] },
+      ],
+    }
+  }
+  /** The chips as they stand — every one, since nothing is laid out here. */
+  const chips = () =>
+    [...document.querySelectorAll('dialog[open] .chips label.chip input')].map((radio) =>
+      radio.getAttribute('value'),
+    )
+
+  it('a new spending stands the frequent ones first, the rest in the list’s order, none chosen', async () => {
+    moneyMonth.mockResolvedValue(frequentMonth())
+    const view = await render()
+    await view
+      .findAll('button')
+      .find((one) => one.text().trim() === en.spending.summary.add)
+      ?.trigger('click')
+    await risen()
+    expect(chips()).toEqual([OTHER, CAFE, RENT, PETS])
+    expect(document.querySelector('dialog[open] .chips input:checked')).toBeNull()
+  }, 15_000)
+
+  it('an amendment stands its own category first; a tap on another moves no chip', async () => {
+    moneyMonth.mockResolvedValue(frequentMonth())
+    const view = await render(undefined, '/money/spendings')
+    await view.find('.list-row').trigger('click')
+    await risen()
+    expect(chips()).toEqual([RENT, OTHER, CAFE, PETS])
+    const cafe = document.querySelector<HTMLInputElement>(
+      `dialog[open] .chips input[value="${CAFE}"]`,
+    )
+    cafe?.click()
+    await flushPromises()
+    expect(cafe?.checked).toBe(true)
+    expect(chips()).toEqual([RENT, OTHER, CAFE, PETS])
+  }, 15_000)
+
+  it('one chosen in «More…» stands first on the way back', async () => {
+    moneyMonth.mockResolvedValue(frequentMonth())
+    const view = await render(undefined, '/money/spendings')
+    await view.find('.list-row').trigger('click')
+    await risen()
+    await pressUntil(en.spending.sheet.more, () => {
+      expect(document.querySelectorAll('dialog[open]')).toHaveLength(2)
+    })
+    await risen()
+    const pets = [...document.querySelectorAll<HTMLElement>('dialog[open] [role="radio"]')].find(
+      (row) => row.textContent.trim() === en.spending.category.pets,
+    )
+    pets?.click()
+    await flushPromises()
+    // One chosen stands first; the one chosen before goes back to its place by frequency.
+    expect(chips()).toEqual([PETS, OTHER, CAFE, RENT])
+    expect(document.querySelector('dialog[open] .chips input:checked')?.getAttribute('value')).toBe(
+      PETS,
+    )
+  }, 15_000)
+
+  // Adversarial А2: the list stands in the order of the chips — the chosen one first there too.
+  it('the list «More…» stands in the order of the chips', async () => {
+    moneyMonth.mockResolvedValue(frequentMonth())
+    const view = await render(undefined, '/money/spendings')
+    await view.find('.list-row').trigger('click')
+    await risen()
+    expect(chips()).toEqual([RENT, OTHER, CAFE, PETS])
+    await pressUntil(en.spending.sheet.more, () => {
+      expect(document.querySelectorAll('dialog[open]')).toHaveLength(2)
+    })
+    const rows = [...document.querySelectorAll('dialog[open] [role="radio"]')]
+    expect(rows.map((row) => row.textContent.trim())).toEqual([
+      en.spending.category.rent,
+      en.spending.category.other,
+      en.spending.category.cafe,
+      en.spending.category.pets,
+    ])
+  }, 15_000)
+
+  // Adversarial А4: a return from «More…» by «‹», a choice there or not, stands the chosen one first.
+  it('a chip tapped, «More…» and «‹»: the chosen one stands first on the way back', async () => {
+    moneyMonth.mockResolvedValue(frequentMonth())
+    const view = await render()
+    await view
+      .findAll('button')
+      .find((one) => one.text().trim() === en.spending.summary.add)
+      ?.trigger('click')
+    await risen()
+    document.querySelector<HTMLInputElement>(`dialog[open] .chips input[value="${PETS}"]`)?.click()
+    await flushPromises()
+    // A tap moves no chip.
+    expect(chips()).toEqual([OTHER, CAFE, RENT, PETS])
+    await pressUntil(en.spending.sheet.more, () => {
+      expect(document.querySelectorAll('dialog[open]')).toHaveLength(2)
+    })
+    await risen()
+    const list = [...document.querySelectorAll('dialog[open]')].at(-1)
+    list?.querySelector<HTMLButtonElement>(`button[aria-label="${en.nav.back_label}"]`)?.click()
+    // A memory history sends no `popstate`: the step lands as the browser's would.
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    await flushPromises()
+    expect(document.querySelectorAll('dialog[open]')).toHaveLength(1)
+    expect(chips()).toEqual([PETS, OTHER, CAFE, RENT])
+  }, 15_000)
+
+  // Review 2, Р2-А1: a measure that would lay the chosen chip past the rows lifts it first, and the
+  // sheet's order — the list «More…» — takes it first too: one order for both.
+  it('a chosen chip lifted by a measure stands first in the list «More…» too', async () => {
+    const widths: Record<string, number> = {
+      [en.spending.category.other]: 80,
+      [en.spending.category.cafe]: 200,
+      [en.spending.category.rent]: 70,
+      [en.spending.category.pets]: 70,
+      [en.spending.sheet.more]: 66,
+    }
+    let row = 358
+    // Set inside the observer the chips make: a plain `null` would be narrowed to nothing to call.
+    let resized = null as (() => void) | null
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        readonly callback: () => void
+        chips = false
+        constructor(callback: () => void) {
+          this.callback = callback
+        }
+        observe(target: Element): void {
+          if (!target.classList.contains('chips-field')) return
+          this.chips = true
+          resized = () => {
+            this.callback()
+          }
+        }
+        // The sheet measures its own height too: only the chips' observer lets the chips go.
+        disconnect(): void {
+          if (this.chips) resized = null
+        }
+      },
+    )
+    const style = window.getComputedStyle.bind(window)
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+      const computed = style(element, pseudo)
+      if (!(element instanceof HTMLElement && element.classList.contains('ruler'))) return computed
+      return new Proxy(computed, {
+        get: (target, key) => (key === 'columnGap' ? '8px' : Reflect.get(target, key)),
+      })
+    })
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const width = this.classList.contains('chips-field')
+        ? row
+        : this.parentElement?.classList.contains('ruler')
+          ? (widths[this.textContent.trim()] ?? 0)
+          : null
+      // The spy stands on HTMLElement; Element's own is the browser's.
+      if (width === null) return Element.prototype.getBoundingClientRect.call(this)
+      return { width, height: 44, top: 0, left: 0, right: width, bottom: 44, x: 0, y: 0 } as DOMRect
+    })
+    const shown = () =>
+      [...document.querySelectorAll('dialog[open] .chips .row input[type="radio"]')].map((radio) =>
+        radio.getAttribute('value'),
+      )
+    try {
+      moneyMonth.mockResolvedValue(frequentMonth())
+      const view = await render()
+      await view
+        .findAll('button')
+        .find((one) => one.text().trim() === en.spending.summary.add)
+        ?.trigger('click')
+      await risen()
+      expect(shown()).toEqual([OTHER, CAFE, RENT, PETS])
+      document
+        .querySelector<HTMLInputElement>(`dialog[open] .chips input[value="${PETS}"]`)
+        ?.click()
+      await flushPromises()
+      expect(shown()).toEqual([OTHER, CAFE, RENT, PETS])
+
+      // The phone turned: the field is 250, and «Pets» would stand past the rows.
+      row = 250
+      resized?.()
+      await flushPromises()
+      expect(shown()).toEqual([PETS, OTHER])
+      await pressUntil(en.spending.sheet.more, () => {
+        expect(document.querySelectorAll('dialog[open]')).toHaveLength(2)
+      })
+      const list = [...document.querySelectorAll('dialog[open] [role="radio"]')]
+      expect(list.map((one) => one.textContent.trim())).toEqual([
+        en.spending.category.pets,
+        en.spending.category.other,
+        en.spending.category.cafe,
+        en.spending.category.rent,
+      ])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  }, 15_000)
+
+  // Р-4 and requirement 7 (self-review №1): an answer landing while the sheet is up moves no chip — a
+  // new category goes to the end, one gone is taken out — and the next opening takes the new order.
+  it('an answer while the sheet is up moves no chip; the next opening takes its order', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const actor = useActorStore()
+    actor.id = ACTOR
+    actor.state = 'ready'
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/money')
+    const preset = (id: string, key: 'cafe' | 'rent' | 'pets' | 'other') =>
+      ({ id, preset: key, name: null, colour: null, icon: null, archived: false }) as const
+    const TAXI = 'c0000000-0000-4000-8000-000000000009'
+    const taxi = {
+      id: TAXI,
+      preset: null,
+      name: 'Taxi',
+      colour: 1,
+      icon: 'taxi',
+      archived: false,
+    } as const
+    const props = {
+      open: false,
+      target: { kind: 'add' } as const,
+      categories: [preset(CAFE, 'cafe'), preset(RENT, 'rent'), preset(PETS, 'pets')],
+      frequent: [RENT],
+      nameOf: (one: { preset: string | null; name: string | null }) => one.name ?? one.preset ?? '',
+      spendCurrency: 'AMD' as const,
+    }
+    const sheet = mount(SpendingSheet, {
+      props,
+      attachTo: document.body,
+      global: { plugins: [pinia, router, createAppI18n('en')] },
+    })
+    views.push(sheet)
+    await sheet.setProps({ open: true })
+    await risen()
+    expect(chips()).toEqual([RENT, CAFE, PETS])
+
+    // «Животные» gone, «Taxi» new and the most frequent, «Кафе» now before «Аренда».
+    await sheet.setProps({
+      categories: [preset(CAFE, 'cafe'), preset(RENT, 'rent'), taxi],
+      frequent: [TAXI, CAFE, RENT],
+    })
+    await flushPromises()
+    expect(chips()).toEqual([RENT, CAFE, TAXI])
+
+    await sheet.setProps({ open: false })
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    await flushPromises()
+    await sheet.setProps({ open: true })
+    await risen()
+    expect(chips()).toEqual([TAXI, CAFE, RENT])
+  }, 15_000)
 })

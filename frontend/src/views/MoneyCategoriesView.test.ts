@@ -155,7 +155,7 @@ afterEach(() => {
 
 describe('MoneyCategoriesView: «Добавить категорию» in the strip (MOL-191, Ф-28)', () => {
   it('stands in the strip, and the list has no button of its own over it', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
     expect(strip(view)).toEqual([en.spending.categories.add])
     expect(view.find('.content').text()).not.toContain(en.spending.categories.add)
@@ -168,13 +168,13 @@ describe('MoneyCategoriesView: «Добавить категорию» in the st
     expect(view.find('.skeleton').exists()).toBe(true)
     expect(view.find('.screen > .dock').exists()).toBe(false)
 
-    answer({ categories: LIST })
+    answer({ categories: LIST, frequent: [] })
     await flushPromises()
     expect(strip(view)).toEqual([en.spending.categories.add])
   })
 
   it('one’s own name is refused in the sheet, never sent: the sheet opens over the list', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
     await addThroughSheet(view, 'Armenian lessons')
     expect(document.querySelector('dialog[open]')?.textContent).toContain(
@@ -199,7 +199,7 @@ describe('MoneyCategoriesView: «Добавить категорию» in the st
     expect(strip(view)).toContain(en.state.retry)
     expect(addButton(view)).toBeUndefined()
 
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     await view
       .findAll('.screen > .dock button')
       .find((button) => button.text() === en.state.retry)
@@ -209,7 +209,7 @@ describe('MoneyCategoriesView: «Добавить категорию» in the st
   })
 
   it('offline over a list shown, a category is made through the queue and waits', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
     online(false)
     window.dispatchEvent(new Event('offline'))
@@ -227,7 +227,7 @@ describe('MoneyCategoriesView: «Добавить категорию» in the st
 
 describe('MoneyCategoriesView: «Убрать» is quiet (MOL-191, Ф-34)', () => {
   it('«Remove» is a ghost, never the red one; «Bring back» stands on the removed', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
     const remove = view
       .findAll('button')
@@ -247,7 +247,7 @@ describe('MoneyCategoriesView: «Убрать» is quiet (MOL-191, Ф-34)', () =
 
 describe('MoneyCategoriesView: a row is the kit’s ListRow (MOL-191, MOL-175)', () => {
   it('a preset and a removed one are rows with «Remove» or «Bring back» in the tail; one’s own opens', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
     const rows = view.findAllComponents(ListRow)
     expect(rows).toHaveLength(4)
@@ -269,7 +269,7 @@ describe('MoneyCategoriesView: a row is the kit’s ListRow (MOL-191, MOL-175)',
   })
 
   it('three groups: the presets, one’s own, the removed — each only when it has a row (MOL-285)', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
     expect(view.findAll('.section-caption').map((caption) => caption.text())).toEqual([
       en.spending.categories.presets,
@@ -280,7 +280,10 @@ describe('MoneyCategoriesView: a row is the kit’s ListRow (MOL-191, MOL-175)',
     expect(groups[1]?.text()).toContain('Armenian lessons')
     expect(groups[0]?.text()).not.toContain('Armenian lessons')
 
-    spendingCategories.mockResolvedValue({ categories: [preset(GROCERIES, 'groceries')] })
+    spendingCategories.mockResolvedValue({
+      categories: [preset(GROCERIES, 'groceries')],
+      frequent: [],
+    })
     const presetsOnly = await render()
     expect(presetsOnly.findAll('.section-caption').map((caption) => caption.text())).toEqual([
       en.spending.categories.presets,
@@ -288,7 +291,7 @@ describe('MoneyCategoriesView: a row is the kit’s ListRow (MOL-191, MOL-175)',
   })
 
   it('«Sending…» is a tag on the category that waits, and on no other row', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
     online(false)
     await addThroughSheet(view, 'Gifts')
@@ -302,7 +305,7 @@ describe('MoneyCategoriesView: a row is the kit’s ListRow (MOL-191, MOL-175)',
 
   it('a long name of one’s own is the row’s whole title, and the row wraps it', async () => {
     const long = 'Lessons of Armenian with a teacher at home'.slice(0, 40)
-    spendingCategories.mockResolvedValue({ categories: [own(OWN, long)] })
+    spendingCategories.mockResolvedValue({ categories: [own(OWN, long)], frequent: [] })
     const view = await render()
     const row = view.getComponent(ListRow)
     expect(row.find('.title').text()).toBe(long)
@@ -310,16 +313,19 @@ describe('MoneyCategoriesView: a row is the kit’s ListRow (MOL-191, MOL-175)',
   })
 
   it('no removed category, no group; the last brought back takes the group away', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST.filter((one) => !one.archived) })
+    spendingCategories.mockResolvedValue({
+      categories: LIST.filter((one) => !one.archived),
+      frequent: [],
+    })
     const none = await render()
     expect(none.text()).not.toContain(en.spending.categories.archived)
 
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const one = await render()
     expect(one.text()).toContain(en.spending.categories.archived)
     const restored = LIST.map((category) => ({ ...category, archived: false }))
-    restoreSpendingCategory.mockResolvedValue({ categories: restored })
-    spendingCategories.mockResolvedValue({ categories: restored })
+    restoreSpendingCategory.mockResolvedValue({ categories: restored, frequent: [] })
+    spendingCategories.mockResolvedValue({ categories: restored, frequent: [] })
     await one
       .findAll('button')
       .find((button) => button.text() === en.spending.restore)
@@ -330,7 +336,7 @@ describe('MoneyCategoriesView: a row is the kit’s ListRow (MOL-191, MOL-175)',
   })
 
   it('a refused category stands over the lists; a refused spending is not this screen’s', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
     const queue = useSpendingQueueStore()
     queue.rejected = [
@@ -390,7 +396,7 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
   }
 
   it('a new one starts on the tag and the palette’s next; chosen, it is made with them', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
     online(false)
     await addButton(view)?.trigger('click')
@@ -410,7 +416,7 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
   })
 
   it('a preset’s icon is in the choice, under the preset’s name (В-3 «б»)', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
     await addButton(view)?.trigger('click')
     await risen()
@@ -419,7 +425,10 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
 
   it('one’s own opens its sheet as it is; saved, the amendment goes through the queue', async () => {
     const mine = { ...own(OWN, 'Armenian lessons'), icon: 'study' as const, colour: 2 }
-    spendingCategories.mockResolvedValue({ categories: [preset(GROCERIES, 'groceries'), mine] })
+    spendingCategories.mockResolvedValue({
+      categories: [preset(GROCERIES, 'groceries'), mine],
+      frequent: [],
+    })
     const view = await render()
     online(false)
     await view.findAll('button.list-row').at(0)?.trigger('click')
@@ -449,7 +458,7 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
   })
 
   it('must not fire: saved as it was, nothing is written', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
     await view.findAll('button.list-row').at(0)?.trigger('click')
     await risen()
@@ -462,7 +471,7 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
 
   it('renamed to another of one’s own or to a preset, it is refused in the sheet; its own name is not', async () => {
     const second = own('ffffffff-0000-4000-8000-000000000021', 'Taxi')
-    spendingCategories.mockResolvedValue({ categories: [...LIST, second] })
+    spendingCategories.mockResolvedValue({ categories: [...LIST, second], frequent: [] })
     const view = await render()
     online(false)
     await view.findAll('button.list-row').at(0)?.trigger('click')
@@ -485,7 +494,7 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
   })
 
   it('«Take out the category» is quiet, in the sheet, and puts it among the removed', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
     online(false)
     await view.findAll('button.list-row').at(0)?.trigger('click')
@@ -500,7 +509,7 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
   })
 
   it('a new one left on the tag and the next colour is sent as an earlier build sends it (А3)', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
     online(false)
     await addButton(view)?.trigger('click')
@@ -511,7 +520,7 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
   })
 
   it('a colour pressed goes in the body even when it is the phone’s next — the server’s may differ (№6, Б1)', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
     online(false)
     await addButton(view)?.trigger('click')
@@ -525,7 +534,7 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
   })
 
   it('a colour pressed away and back is the person’s too (Б1)', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
     online(false)
     await addButton(view)?.trigger('click')
@@ -541,9 +550,12 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
   // Review №7: the screen hands its list's moment to `categoriesWith`.
   it('an amendment that landed gives way to the list read after it — another phone’s name shows', async () => {
     const mine = own(OWN, 'Armenian lessons')
-    spendingCategories.mockResolvedValueOnce({ categories: [mine] })
-    spendingCategories.mockResolvedValue({ categories: [{ ...mine, name: 'Armenian at school' }] })
-    amendSpendingCategory.mockResolvedValue({ categories: [] })
+    spendingCategories.mockResolvedValueOnce({ categories: [mine], frequent: [] })
+    spendingCategories.mockResolvedValue({
+      categories: [{ ...mine, name: 'Armenian at school' }],
+      frequent: [],
+    })
+    amendSpendingCategory.mockResolvedValue({ categories: [], frequent: [] })
     const view = await render()
     await view.findAll('button.list-row').at(0)?.trigger('click')
     await risen()
@@ -559,7 +571,7 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
 
   it('a name kept as it was is not checked again: one named as a preset of another language takes an icon (А2)', async () => {
     // «Rent» made on a Russian screen, where the preset is «Аренда жилья»; this screen is English.
-    spendingCategories.mockResolvedValue({ categories: [own(OWN, 'Rent')] })
+    spendingCategories.mockResolvedValue({ categories: [own(OWN, 'Rent')], frequent: [] })
     const view = await render()
     online(false)
     await view.findAll('button.list-row').at(0)?.trigger('click')
@@ -574,7 +586,7 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
   })
 
   it('one’s own row says it opens a sheet; a preset’s does not (review №3)', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
     const rows = view.findAllComponents(ListRow)
     expect(rows.map((row) => row.attributes('aria-haspopup') ?? null)).toEqual([
@@ -588,7 +600,7 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
   // Adversarial Б3: a new icon of another stands on no name, so a rename still folds past it.
   it('Б3а: «Metro» made offline, a ride in it, a new icon for «Gifts», «Metro» renamed — one «Добавить» under the last name', async () => {
     const gifts = own('ffffffff-0000-4000-8000-000000000022', 'Gifts')
-    spendingCategories.mockResolvedValue({ categories: [...LIST, gifts] })
+    spendingCategories.mockResolvedValue({ categories: [...LIST, gifts], frequent: [] })
     const view = await render()
     online(false)
     await addButton(view)?.trigger('click')
@@ -625,7 +637,7 @@ describe('MoneyCategoriesView: the icon and the colour of one’s own (MOL-285)'
   })
 
   it('must not fire: a new one has no «Take out»', async () => {
-    spendingCategories.mockResolvedValue({ categories: LIST })
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
     await addButton(view)?.trigger('click')
     await risen()
