@@ -25,9 +25,18 @@ test('a chosen legend row keeps its width, and its dot stands on a ring of the c
   // faces; come between the two measures, it widened the sum by 3/16 px on WebKit (MOL-306).
   await facesIn(page)
   const unchosen = (await amount.boundingBox())?.width
+  const name = row.locator('.name')
+  const weight = {
+    name: await name.evaluate((node) => getComputedStyle(node).fontWeight),
+    amount: await amount.evaluate((node) => getComputedStyle(node).fontWeight),
+  }
   await row.click()
   await expect(where.getByRole('radio', { name: /Cafés and restaurants/ })).toBeChecked()
   await expect(row).toHaveClass(/chosen/)
+  // The weight is held as itself: Chromium in CI sets this text on whole pixels, and a chosen row at 700
+  // measured 66 wide as at 600 — only WebKit's width told them apart (MOL-306).
+  await expect(name).toHaveCSS('font-weight', weight.name)
+  await expect(amount).toHaveCSS('font-weight', weight.amount)
   expect((await amount.boundingBox())?.width).toBe(unchosen)
 
   const ring = await row.locator('.dot').evaluate((dot) => {

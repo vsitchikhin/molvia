@@ -89,10 +89,19 @@ test('the ring of «Куда ушли» opens «Месяц» of the same month; 
   // the two measures on WebKit and widened the sum by 3/16 px; held so here, Chromium moved nothing (MOL-306).
   await facesIn(page)
   const unchosen = (await amount.boundingBox())?.width
+  const name = row.locator('.name')
+  const weight = {
+    name: await name.evaluate((node) => getComputedStyle(node).fontWeight),
+    amount: await amount.evaluate((node) => getComputedStyle(node).fontWeight),
+  }
   await row.click()
   await expect(where.getByRole('radio', { name: /Кафе и рестораны/ })).toBeChecked()
   // Chosen by a fill and a ring, at the weight of every row: the words do not grow (Ф-5, MOL-186).
   await expect(row).toHaveClass(/chosen/)
+  // The weight is held as itself: this test runs in Chromium alone, which in CI sets the text on whole
+  // pixels — a chosen row at 700 measured 69 wide here, as at 600 (MOL-306).
+  await expect(name).toHaveCSS('font-weight', weight.name)
+  await expect(amount).toHaveCSS('font-weight', weight.amount)
   expect((await amount.boundingBox())?.width).toBe(unchosen)
   await expect(centre).toContainText('Кафе и рестораны')
   await expect(centre).toContainText('100')
