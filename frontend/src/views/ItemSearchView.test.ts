@@ -2314,6 +2314,19 @@ describe('«What did you pick up?»', () => {
       ])
     })
 
+    it('a request that throws before it leaves takes nothing of the screen — «Часто берёте» stands', async () => {
+      previousItems.mockImplementation(() => {
+        throw new TypeError('the address could not be built')
+      })
+      remembered(milk)
+      onTrip()
+      const view = await render()
+      await flushPromises()
+
+      expect(view.find('input[role="combobox"]').exists()).toBe(true)
+      expect(groups(view)).toEqual([{ heading: en.item.group_recent, rows: [milk.name] }])
+    })
+
     describe('nothing remembered: the answer is waited for, a second at most (В-2)', () => {
       beforeEach(() => {
         vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })

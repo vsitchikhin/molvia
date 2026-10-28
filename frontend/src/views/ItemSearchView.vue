@@ -342,7 +342,7 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { ApiError } from '@molvia/client'
 import { ERROR, drawsNothing, pickLocale, placeNameIdentity } from '@molvia/model'
-import type { AppLocale, BarcodeHint, CatalogueEntry } from '@molvia/model'
+import type { AppLocale, BarcodeHint, CatalogueEntry, PreviousItemsResponse } from '@molvia/model'
 import IconBarcode from '~icons/mdi/barcode-scan'
 import IconClose from '~icons/mdi/close'
 import IconMagnify from '~icons/mdi/magnify'
@@ -510,7 +510,17 @@ export default defineComponent({
         return
       }
       const asked = ++hereAsked
-      api.previousItems(at.tripId).then(
+      // A throw before the request leaves the screen as it is too: the client builds the address
+      // synchronously, and a throw in the screen's setup took the whole screen down (adversarial Т1,
+      // the question it left).
+      let request: Promise<PreviousItemsResponse>
+      try {
+        request = api.previousItems(at.tripId)
+      } catch {
+        hereLate.value = true
+        return
+      }
+      request.then(
         (answer) => {
           if (asked !== hereAsked || !alive) return
           if (owner !== null && at.place !== null) {
