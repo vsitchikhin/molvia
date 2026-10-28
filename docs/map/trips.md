@@ -96,7 +96,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 - `frontend/src/stores/recentPlaces.ts` — Store: the shops this identity went to, kept on the device for «Где вы?» without a signal.
 - `frontend/src/stores/settingsMemory.ts` — The last known settings of an identity, remembered on the device and read back.
 - `frontend/src/stores/trip.ts` — Store: the trip as the server last answered it, remembered per identity and read leniently across builds.
-- `frontend/src/stores/tripHistory.ts` — Store: the history cache (a row's count and sums not kept yet, `ENTRY_NOT_CACHED_YET`), local snapshots of finishes not yet confirmed, the «answered empty» flag and the moment of the last answer (`answeredAt`, a key of its own, written with every page put on the shelf, MOL-204).
+- `frontend/src/stores/tripHistory.ts` — Store: the history cache (a row's count and sums kept, MOL-307; a trip view's money fields not, `NOT_CACHED_YET`), local snapshots of finishes not yet confirmed, the «answered empty» flag and the moment of the last answer (`answeredAt`, a key of its own, written with every page put on the shelf, MOL-204).
 - `frontend/src/stores/tripQueue.ts` — Store: the on-device queue of every write to a trip (start, purchases, finish, removal, «Вернуть», payment, receipt's sum), sent in order.
 
 ## e2e
