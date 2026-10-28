@@ -365,6 +365,25 @@ describe('«Брали здесь в прошлый раз» on the device (MOL-
       expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Яйца'])
     })
 
+    // Adversarial Д1 of review 5: the phone's copy says the trip goes on, the server has just named it
+    // the finished last time — it goes on no more.
+    it('«must not fire»: the trip the server named as the last time is not lifted, whatever the copy says', () => {
+      vi.useFakeTimers({ now: new Date('2026-10-06T10:05:00Z') })
+      rememberBoughtHere(ME, sas, trip(1), milk)
+      vi.setSystemTime(new Date('2026-10-08T12:00:00Z'))
+      rememberHereLast(
+        ME,
+        sas,
+        trip(2),
+        { previous: { tripId: trip(1), at: new Date('2026-10-06T18:00:00Z') }, items: [milk] },
+        printed,
+        [eggs],
+        trip(1),
+      )
+
+      expect(names(recallHereLast(ME, sas, trip(3)))).toEqual(['Яйца'])
+    })
+
     it('a trip finished here stands at its finish: finished before the receipt’s paper, the receipt is newer', () => {
       vi.useFakeTimers({ now: new Date('2026-10-06T10:05:00Z') })
       rememberBoughtHere(ME, sas, trip(1), milk)

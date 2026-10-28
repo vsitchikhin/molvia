@@ -510,6 +510,7 @@ export default defineComponent({
         return
       }
       const asked = ++hereAsked
+      const known = serverRows()
       // A throw before the request leaves the screen as it is too: the client builds the address
       // synchronously, and a throw in the screen's setup took the whole screen down (adversarial Т1,
       // the question it left).
@@ -530,7 +531,7 @@ export default defineComponent({
               at.tripId,
               answer,
               at.before,
-              heldWith(answer.holds),
+              heldWith(answer.holds, known),
               // Asked about a finished record, the one going on here — removed or finished elsewhere
               // it is none (Г2 of review 4).
               selected.id.value === null ? null : current.tripId.value,
@@ -584,21 +585,53 @@ export default defineComponent({
     const held = computed<CatalogueEntry[]>(() =>
       tripRows.value.flatMap((row) => (row.mark !== 'removing' && row.entry ? [row.entry] : [])),
     )
+    /** The server's rows of this trip the phone knows now: purchase → item. */
+    function serverRows(): Map<string, string> {
+      return new Map(
+        tripRows.value.flatMap((row) =>
+          row.expense !== null && row.entry ? [[row.expense.id, row.entry.id] as const] : [],
+        ),
+      )
+    }
+
     /**
      * What the trip holds for its memory: what the server says it holds (adversarial В1 of review 3) —
      * less what is being removed here — and the purchases the queue still carries into it, never the
      * phone's copy of the server's rows, which may keep what another device took out (Г1 of review 4).
+     * **The copy counts only for what changed while the answer was on its way** (Д2 of review 5): a
+     * purchase that reached the server meanwhile is in neither `holds` nor the queue, and one removed
+     * meanwhile is still in `holds` — told by the server's rows known as the question left (`known`).
      */
-    function heldWith(holds: readonly CatalogueEntry[]): CatalogueEntry[] {
+    function heldWith(
+      holds: readonly CatalogueEntry[],
+      known: ReadonlyMap<string, string>,
+    ): CatalogueEntry[] {
+      const rows = tripRows.value
       const removing = new Set(
-        tripRows.value.flatMap((row) =>
-          row.mark === 'removing' && row.entry ? [row.entry.id] : [],
+        rows.flatMap((row) => (row.mark === 'removing' && row.entry ? [row.entry.id] : [])),
+      )
+      const present = new Set(
+        rows.flatMap((row) => (row.mark !== 'removing' && row.entry ? [row.entry.id] : [])),
+      )
+      const now = new Set(rows.flatMap((row) => (row.expense === null ? [] : [row.expense.id])))
+      const gone = new Set(
+        [...known].flatMap(([expense, item]) =>
+          now.has(expense) || present.has(item) ? [] : [item],
         ),
       )
-      const queued = tripRows.value.flatMap((row) =>
+      const landed = rows.flatMap((row) =>
+        row.expense !== null && !known.has(row.expense.id) && row.mark !== 'removing' && row.entry
+          ? [row.entry]
+          : [],
+      )
+      const queued = rows.flatMap((row) =>
         row.expense === null && row.mark !== 'removing' && row.entry ? [row.entry] : [],
       )
-      return [...holds.filter((item) => !removing.has(item.id)), ...queued]
+      return [
+        ...holds.filter((item) => !removing.has(item.id) && !gone.has(item.id)),
+        ...landed,
+        ...queued,
+      ]
     }
     /** What this trip holds already goes from the group (Р-17). */
     const hereLast = computed<CatalogueEntry[]>(() => {

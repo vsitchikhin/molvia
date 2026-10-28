@@ -2460,6 +2460,70 @@ describe('«What did you pick up?»', () => {
       expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([marianna.name])
     })
 
+    // Adversarial Д2 of review 5, and its mirror: what changed while the answer was on its way — a
+    // purchase that reached the server, one removed there — is in neither `holds` nor the queue as it is.
+    describe('what changed while the answer was on its way', () => {
+      function trip(...bought: CatalogueEntry[]) {
+        return tripViewCodec.parse({
+          id: TRIP,
+          startedAt: '2026-10-05T08:00:00.000Z',
+          finishedAt: null,
+          currency: 'AMD',
+          rate: null,
+          rateProvider: null,
+          rateJump: null,
+          rateStale: false,
+          place: { id: 'aaaaaaaa-0000-4000-8000-000000000002', kind: 'store', name: sas.name },
+          placeCity: sas.city,
+          expenses: bought.map((item) => ({
+            id: `dddddddd-0000-4000-8000-${item.id.slice(-12)}`,
+            createdAt: '2026-10-05T08:01:00.000Z',
+            item,
+            quantity: null,
+            amount: null,
+            unitPrice: null,
+          })),
+          total: [],
+          converted: null,
+        })
+      }
+
+      async function slowly(
+        before: CatalogueEntry[],
+        after: CatalogueEntry[],
+        holds: CatalogueEntry[],
+      ): Promise<void> {
+        useTripStore(pinia).apply(trip(...before))
+        let answer: (value: PreviousItemsResponse) => void = () => undefined
+        previousItems.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+        await render()
+        await flushPromises()
+        useTripStore(pinia).apply(trip(...after))
+        answer({ ...lastTime, items: [eggs], holds })
+        await flushPromises()
+      }
+
+      const next = 'cccccccc-0000-4000-8000-000000000003'
+
+      it('a purchase that reached the server meanwhile is kept', async () => {
+        await slowly([marianna], [marianna, milk], [marianna])
+        expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([
+          marianna.name,
+          milk.name,
+        ])
+      })
+
+      it('a purchase removed there meanwhile is not brought back by the answer', async () => {
+        await slowly([marianna, milk], [marianna], [marianna, milk])
+        expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([marianna.name])
+      })
+
+      it('«must not fire»: a row the copy held before the question is not added past the server', async () => {
+        await slowly([marianna, milk], [marianna, milk], [marianna])
+        expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([marianna.name])
+      })
+    })
+
     describe('nothing remembered: the answer is waited for, a second at most (В-2)', () => {
       beforeEach(() => {
         vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })

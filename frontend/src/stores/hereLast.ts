@@ -239,8 +239,11 @@ export function rememberHereLast(
     }
     // A finished trip kept at its own moment does not stand over the trip going on here: that one is
     // finished after it (adversarial В2 of review 3) — a receipt keeps the moment its paper names.
+    // Not the trip the server named as the last time: it names finished ones only, so the phone's word
+    // that it goes on is out of date (adversarial Д1 of review 5).
     const goingId = going?.toLowerCase()
-    if (before !== null && goingId !== undefined && goingId !== id) {
+    const named = previous?.tripId.toLowerCase()
+    if (before !== null && goingId !== undefined && goingId !== id && goingId !== named) {
       const now = Date.now()
       trips = trips.map((trip) =>
         trip.tripId === goingId && trip.at < now ? { ...trip, at: now } : trip,
