@@ -72,8 +72,21 @@ const OFFLINE_STRIP =
 const OWNER_IPHONE = { width: 390, height: 699 }
 const OVER_THE_KEYS = OWNER_IPHONE.height - 304
 
-async function aboveTheKeys(button: Locator): Promise<void> {
+/**
+ * Where the state's buttons stand once it has come in: `appear` lifts the block into place, and a box
+ * read on the way is lower, or two read one after the other stand apart (CI, 1.4 px at 360).
+ */
+async function settled(button: Locator): Promise<void> {
   await expect(button).toBeVisible()
+  await button.evaluate((node) =>
+    Promise.all(
+      (node.closest('.state') ?? node).getAnimations({ subtree: true }).map((one) => one.finished),
+    ),
+  )
+}
+
+async function aboveTheKeys(button: Locator): Promise<void> {
+  await settled(button)
   const box = await button.boundingBox()
   expect(box!.y + box!.height, 'the button stands under the keys').toBeLessThanOrEqual(
     OVER_THE_KEYS,
@@ -420,7 +433,17 @@ test.describe('without the server', () => {
     for (const width of [375, 360]) {
       test(`the pair stays side by side at ${String(width)}`, async ({ page }) => {
         await errorInRussian(page, width)
-        const [a, b] = [await retry(page).boundingBox(), await recent(page).boundingBox()]
+        await settled(retry(page))
+        // Both in one reading, so no frame of the page falls between them.
+        const [a, b] = await page.evaluate(() =>
+          ['Повторить', 'Взять из недавних'].map((word) => {
+            const button = [...document.querySelectorAll('.state .action button')].find(
+              (one) => one.textContent.trim() === word,
+            )
+            const box = button!.getBoundingClientRect()
+            return { x: box.x, y: box.y, width: box.width, height: box.height }
+          }),
+        )
         expect(Math.abs(b!.y + b!.height / 2 - (a!.y + a!.height / 2))).toBeLessThan(1)
         expect(b!.x).toBeGreaterThan(a!.x + a!.width)
         expect(b!.x + b!.width).toBeLessThanOrEqual(width - 16)
