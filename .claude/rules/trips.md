@@ -265,7 +265,7 @@ neither, and its rows are `null`, unknown, never «0 позиций». **A sum i
 this build cannot read is dropped where the field may be absent** (adversarial А2): a currency of a later
 build — a rollback past a new country — is a sum not known, never the whole cache, which the next write of
 the window put over a finish made with no signal. Backwards the same holds by the argument of the builds:
-one before MOL-230 (06.10) knows neither the lari nor the dinar, and none of them is left. **A trip view's fields stay out**
+one before MOL-110 (05.10) knows no lari, one before MOL-230 (06.10) no dinar, and none of them is left. **A trip view's fields stay out**
 (`NOT_CACHED_YET`, owner's В-1 «а»): there no `receipt` reads «no receipt», so a copy shelved without
 them goes back with an explicit `null` and is then the same as a true one — the screen trusts no trip
 read back (`tripHistory.answered`). **The record typed by hand is a screen under it**
@@ -405,16 +405,20 @@ nothing it shows when the page shown is the server's last answer, row for row as
 no strip (А4, В1) — whatever moment came with it, none included; a page put back that is not the answer is
 memory, and the strip names its moment (Б4). The rows are then the shelf's copy, with its count and sum (Г1,
 MOL-307) — never the discarded answer's own, since the other window may have sent a purchase while it was on its
-way — and «row for row» is whole: a shelf with another count, or one a window of the build before wrote without
-them, is not the answer. **A purchase written into a recorded record moves its row on the shelf too**
-(`apply`, adversarial А1): only in place, where the first page holds it — a row the page has not got would move
-the boundary only `load()` reads. Left on screen alone, the first write of another window put the count before
-the purchase back as the server's answer, online and with no strip; and a window that sent it writes its row
-moved, so the page another window reads back is the answer (А3). **The prices, named** (MOL-307): while a window
-of the build before is open, a page it writes has no count and no sum, and a read discarded under it draws the
-strip; so does a page another window kept from before a purchase another device sent — the page is older than
-the answer, memory as in Б4. The kind is the worse of the two reads; **the time is the older of
-the reads that failed and drew a row** — nothing on screen is newer than that. The strip says its words again
+way. **«Row for row» is by the rows, not their counts** (owner's В-2 «а»): a count on the shelf is moved by the
+list's answer and by a write's, the phone cannot tell which is newer, and compared whole a shelf ahead of the
+answer — another window's queue sending one purchase a time — drew «Сервер не ответил» over a server that answered
+every time (adversarial А3, Б2). **So while the list moves under every read, a count and a sum the last answer does
+not say are unknown** (`unconfirmed`): the row reads where and when, as before the cache kept them — neither memory
+said as the answer nor a strip that blames the server — and they come back with the first answer taken. **A
+purchase written into a recorded record moves its row on the shelf too** (`apply`, adversarial А1): only in place,
+where the first page holds it — a row the page has not got would move the boundary only `load()` reads. Left on
+screen alone, the first write of another window put the count before the purchase back as the server's answer,
+online and with no strip. **The prices, named** (MOL-307): while a window of the build before is open, a page it
+writes has no count and no sum; and while another window's queue moves the list, a moved row loses its count and
+sum for those seconds. The kind is the worse of the two reads; **the time is the older of
+the reads that failed and drew a row** — nothing on screen is newer than that, but for a row a write moved since
+(MOL-307): the moment then understates what is shown, never overstates it. The strip says its words again
 for a try of the person's that failed, never for the receipts' own poll every five seconds (А1). **The moment of
 the history's answer is a key of its own** (`molvia.trip-history-at`), for the reason the «empty» flag is: a
 field of the strict cache would be no cache to a window on the previous build, which would write its own over a

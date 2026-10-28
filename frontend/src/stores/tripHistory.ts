@@ -115,11 +115,30 @@ function toShelf(cache: z.output<typeof cacheCodec>): string {
 }
 
 /**
- * A first page as the shelf keeps it, whole: what tells a page shown from the server's answer (В1) —
- * a row with another count is another page (MOL-307).
+ * A first page by its rows, not their counts: what tells a page shown from the server's answer (В1).
+ * A count on the shelf is moved by the list's answer and by a write's (`apply`), and which of them is
+ * newer the phone cannot tell — compared whole, a shelf ahead of the answer read as memory and drew
+ * «Сервер не ответил» over a server that answered every time (adversarial Б2 of MOL-307, owner's В-2
+ * «а»). The counts the answer does not confirm are `unconfirmed` instead.
  */
 function asShelvedPage(page: TripHistory): string {
-  return JSON.stringify(tripHistoryCodec.encode(page))
+  return JSON.stringify(
+    everyView(
+      { page: tripHistoryCodec.encode(page) },
+      () => true,
+      (key) => key !== 'itemCount' && key !== 'total',
+    ),
+  )
+}
+
+/** A row's count and sum, as compared with the answer's. */
+function countOf(row: TripHistoryEntry): string {
+  return JSON.stringify(tripHistoryEntryCodec.encode(row), [
+    'itemCount',
+    'total',
+    'amount',
+    'currency',
+  ])
 }
 
 /**
@@ -439,6 +458,18 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   }
 
   /**
+   * The rows of the first page whose count and sum the server's last answer does not say (owner's
+   * В-2 «а» of MOL-307): on a page another window kept moving under every read they may be older than
+   * the answer or newer, and «unknown» is neither wrong nor the strip's «не ответил».
+   */
+  function unconfirmed(): Set<string> {
+    const said = new Map((lastAnswer?.trips ?? []).map((row) => [row.id, countOf(row)]))
+    return new Set(
+      firstPage.trips.filter((row) => said.get(row.id) !== countOf(row)).map((row) => row.id),
+    )
+  }
+
+  /**
    * Whether the answer was taken. A false one is not a failure: the list changed under the
    * request — another window wrote the cache, a finish was taken back — and the answer may no
    * longer be true. The caller asks again rather than wait for a reconnect that may never come:
@@ -548,6 +579,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     drop,
     load,
     showsAnswer,
+    unconfirmed,
     known,
     answered,
     open,

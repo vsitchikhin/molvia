@@ -69,6 +69,9 @@ export function useTripHistory(): TripHistoryScreen {
   const moved = ref(false)
   let run = 0
   const rows = computed(() => {
+    // A list moved under every read is the answer by its rows; a count the answer does not say is
+    // unknown, never memory said as the answer (MOL-307, owner's В-2 «а»).
+    const unsure = moved.value ? history.unconfirmed() : new Set<string>()
     const rows = new Map(
       history.page.trips.map((row) => [
         row.id,
@@ -77,8 +80,8 @@ export function useTripHistory(): TripHistoryScreen {
           name: row.place.name,
           at: row.finishedOnDeviceAt ?? row.finishedAt,
           pending: false,
-          itemCount: row.itemCount,
-          total: row.total,
+          itemCount: unsure.has(row.id) ? null : row.itemCount,
+          total: unsure.has(row.id) ? null : row.total,
           fromReceipt: row.fromReceipt,
           onPhone: false,
         },

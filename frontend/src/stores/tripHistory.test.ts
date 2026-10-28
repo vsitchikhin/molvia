@@ -454,7 +454,7 @@ describe('when the server answered the first page (MOL-204)', () => {
     expect(store.showsAnswer()).toBe(true)
   })
 
-  it('a shelf with another count, or none, is not the answer (MOL-307)', async () => {
+  it('a shelf with another count, or none, is the answer by its rows, and its counts are unconfirmed (MOL-307, В-2 «а»)', async () => {
     const store = useTripHistoryStore()
     tripHistory.mockResolvedValueOnce({
       trips: [{ ...entry(A), itemCount: 3, total: [{ minor: 120000n, currency: 'AMD' }] }],
@@ -469,17 +469,27 @@ describe('when the server answered the first page (MOL-204)', () => {
       localStorage.setItem(`molvia.trip-history.${OWNER}`, JSON.stringify(cached))
       window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-history.${OWNER}` }))
     }
-    // A window that sent a purchase meanwhile wrote its newer page.
+    expect(store.unconfirmed()).toEqual(new Set())
+    // A window that sent a purchase meanwhile wrote its newer page — or one older than the answer:
+    // which, the phone cannot tell.
     shelf((row) => (row.itemCount = 4))
     expect(store.page.trips[0]?.itemCount).toBe(4)
-    expect(store.showsAnswer()).toBe(false)
+    expect(store.showsAnswer()).toBe(true)
+    expect(store.unconfirmed()).toEqual(new Set([A]))
+    // A sum alone the answer does not say.
+    shelf((row) => {
+      row.itemCount = 3
+      row.total = [{ amount: '1300.00', currency: 'AMD' }]
+    })
+    expect(store.unconfirmed()).toEqual(new Set([A]))
     // A window of the build before wrote the same page without the counts.
     shelf((row) => {
       delete row.itemCount
       delete row.total
     })
     expect(store.page.trips[0]?.itemCount).toBeNull()
-    expect(store.showsAnswer()).toBe(false)
+    expect(store.showsAnswer()).toBe(true)
+    expect(store.unconfirmed()).toEqual(new Set([A]))
   })
 
   it('another owner’s moment is not this owner’s', () => {

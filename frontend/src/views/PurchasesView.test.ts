@@ -796,6 +796,41 @@ describe('PurchasesView (MOL-128)', () => {
       }
     })
 
+    it('соседнее окно двигает число строки под каждым чтением — полосы нет, число и сумма, которых ответ не сказал, неизвестны (MOL-307, Б2, В-2 «а»)', async () => {
+      const before = new Date(NOW.getTime() - 5000)
+      const counted = (n: number) => ({
+        ...trip(1),
+        itemCount: n,
+        total: [parseMoney(String(n * 500), 'AMD')],
+      })
+      // Ahead of the answer — the other window's queue sends one purchase a time, and the server read
+      // the list just before each — and behind it — its page kept from before a purchase another
+      // device sent.
+      for (const ahead of [1, -1]) {
+        while (mounted.length) mounted.pop()?.unmount()
+        localStorage.clear()
+        tripHistory.mockReset()
+        let sent = 2
+        tripHistory.mockImplementation(() => {
+          const answered = counted(sent)
+          sent += 1
+          localStorage.setItem(`molvia.trip-history-at.${ME}`, before.toISOString())
+          remember([counted(sent - 1 + ahead)])
+          window.dispatchEvent(new StorageEvent('storage', { key }))
+          return Promise.resolve({ trips: [answered], nextCursor: null })
+        })
+        const { view } = await render()
+        await pausesPass()
+
+        // Asked four times and answered every time: nothing on screen says it did not.
+        expect(tripHistory).toHaveBeenCalledTimes(4)
+        expect(rows(view)).toHaveLength(1)
+        expect(view.findAll('.strip')).toHaveLength(0)
+        expect(rows(view)[0]?.text()).not.toContain('позиц')
+        expect(rows(view)[0]?.text()).not.toContain('֏')
+      }
+    })
+
     it('другое окно кладёт назад свою старую страницу — полоса со временем той страницы (адверсариальное Б4)', async () => {
       const old = new Date(NOW.getTime() - 3 * 86_400_000)
       // An `apply` of a window sending its queue: the page it read three days ago, with that moment.
