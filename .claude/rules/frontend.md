@@ -406,7 +406,12 @@ The detail behind the frontend lines of `CLAUDE.md`.
   (`aria-haspopup="dialog"`). **Among the fields of a form it is drawn as one** (`field`, MOL-199):
   the well of `AccountRow` — `--surface-2`, a `border-strong` edge, the tint under the pointer — since a
   list's row, with no fill and no edge, read in a form as plain text; `invalid` marks a field behind it
-  that holds an error (a `--bad` edge, `aria-invalid`). **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
+  that holds an error (a `--bad` edge, `aria-invalid`). **Their classes are the kit's own words**
+  (`nav-field`, `nav-invalid`): a root carries the scope of the screen it stands in, and the spending
+  sheet's `.field` — its column of a label and a field — stood the row in a column 84 high (adversarial
+  А1 of MOL-199). **Its label has no width of its own** (`width: 0` beside `flex: 1`, as `AccountRow`'s
+  value): its whole line counted in the sheet's least width, and a note of 32 letters made the spending
+  sheet wider than the phone, × off the screen (А3). **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
   handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
   its tint, in the strip's shape and never a live region; a tag a pill of 13/600, plain, warn or bad
   — rows had drawn them at 11/700, 11/600 and 13/600. Screens move onto them in their own tasks.
