@@ -123,6 +123,7 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     cursor: null,
     remaining: 0,
     remainingFrom: null,
+    frequent: [],
     remainingTo: null,
     ...patch,
   }

@@ -839,6 +839,7 @@ export default defineComponent({
       cursor: null,
       remaining: 0,
       remainingFrom: null,
+      frequent: [],
       remainingTo: null,
     }
     /** A month of «Графики» (MOL-186): two categories and «Остальные», a sector to choose. */

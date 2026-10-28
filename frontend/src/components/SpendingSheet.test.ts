@@ -104,6 +104,7 @@ function month(spentOn: string): MoneyMonthView {
     cursor: null,
     remaining: 0,
     remainingFrom: null,
+    frequent: [],
     remainingTo: null,
   }
 }

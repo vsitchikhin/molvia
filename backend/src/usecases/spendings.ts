@@ -2,6 +2,7 @@ import {
   DomainError,
   ERROR,
   categoryOrder,
+  frequentCategories,
   latestDay,
   spendingCategoryViewOf,
   spendingIn,
@@ -19,6 +20,8 @@ import type {
 } from '@molvia/model'
 import { knownAccounts, paymentOf } from './account-of'
 import { dayRates } from './money-rates'
+import { todayOf } from './today'
+import type { Today } from './today'
 import type { TripRepositories } from '@/db/unit-of-work'
 
 type Repositories = Pick<
@@ -178,19 +181,29 @@ export async function restoreSpending(
   return spendingViewOf(spending)
 }
 
-/** The owner's categories in the order of the chips, the removed ones marked (В-3). */
+/**
+ * The owner's categories in the order of the list, the removed ones marked (В-3), and the ones the
+ * chips of a spending stand first by (MOL-198).
+ */
 export async function spendingCategoriesOf(
   repositories: Pick<Repositories, 'spendingCategories'>,
-  owner: Pick<Owner, 'id'>,
+  owner: Pick<Owner, 'id'> & Today,
+  now: Date = new Date(),
 ): Promise<SpendingCategoriesResponse> {
-  const categories = await repositories.spendingCategories.list(owner.id)
-  return { categories: categoryOrder(categories).map(spendingCategoryViewOf) }
+  const [categories, uses] = await Promise.all([
+    repositories.spendingCategories.list(owner.id),
+    repositories.spendingCategories.uses(owner.id, todayOf(owner, now)),
+  ])
+  return {
+    categories: categoryOrder(categories).map(spendingCategoryViewOf),
+    frequent: frequentCategories(categories, uses),
+  }
 }
 
 /** «Добавить категорию»: the list whole, and whether this one is new. */
 export async function addSpendingCategory(
   repositories: Pick<Repositories, 'spendingCategories'>,
-  owner: Pick<Owner, 'id'>,
+  owner: Pick<Owner, 'id'> & Today,
   body: SpendingCategoryBody,
 ): Promise<{ list: SpendingCategoriesResponse; created: boolean }> {
   const { created } = await repositories.spendingCategories.add(owner.id, body)
@@ -203,7 +216,7 @@ export async function addSpendingCategory(
  */
 export async function amendSpendingCategory(
   repositories: Pick<Repositories, 'spendingCategories'>,
-  owner: Pick<Owner, 'id'>,
+  owner: Pick<Owner, 'id'> & Today,
   id: string,
   body: SpendingCategoryAmend,
 ): Promise<SpendingCategoriesResponse> {
@@ -216,7 +229,7 @@ export async function amendSpendingCategory(
 /** «Убрать из выбора» / «Вернуть»: the list whole; 404 for a category that is not the owner's. */
 export async function archiveSpendingCategory(
   repositories: Pick<Repositories, 'spendingCategories'>,
-  owner: Pick<Owner, 'id'>,
+  owner: Pick<Owner, 'id'> & Today,
   id: string,
   archived: boolean,
 ): Promise<SpendingCategoriesResponse> {

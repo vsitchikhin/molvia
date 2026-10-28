@@ -1,5 +1,10 @@
 import { z } from 'zod'
-import { spendingCategoryViewCodec, spendingCategoryViewOf, spendingViewCodec } from './spending'
+import {
+  frequentCategoriesCodec,
+  spendingCategoryViewCodec,
+  spendingCategoryViewOf,
+  spendingViewCodec,
+} from './spending'
 import { exchangeDaySchema } from '#model/entities/exchange'
 import { CHART_LEVEL, donutSlices } from '#model/entities/money-charts'
 import { journalKeyOf, journalOrder, lastDayOf } from '#model/entities/money-month'
@@ -165,6 +170,8 @@ export const moneyMonthCodec = z.strictObject({
     )
     .default([]),
   categories: z.array(spendingCategoryViewCodec),
+  /** The chips of a spending stand first by these (MOL-198), as in `/spending-categories`. */
+  frequent: frequentCategoriesCodec,
   days: z.array(
     z.strictObject({
       day: exchangeDaySchema,
@@ -223,6 +230,7 @@ export function moneyMonthViewOf(
   after?: JournalKey,
   budget: MoneyMonthView['budget'] = null,
   previousToDay: MoneyMonthView['previousToDay'] = null,
+  frequent: readonly string[] = [],
 ): MoneyMonthView {
   const all = month.days.flatMap((day) =>
     day.entries.map((entry) => ({ day, entry, key: journalKeyOf(entry) })),
@@ -270,6 +278,7 @@ export function moneyMonthViewOf(
     previousSpent,
     previousToDay,
     categories: categoryOrder(categories).map(spendingCategoryViewOf),
+    frequent: [...frequent],
     days,
     cursor: rest.length > 0 ? (page.at(-1)?.key ?? null) : null,
     remaining: rest.length,

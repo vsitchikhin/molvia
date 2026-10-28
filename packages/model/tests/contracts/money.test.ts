@@ -11,6 +11,7 @@ import type { MoneyMonthView } from '#model/contracts/money'
 import {
   spendingCategoryAmendSchema,
   spendingCategoryBodySchema,
+  spendingCategoriesResponseCodec,
   spendingCategoryViewCodec,
 } from '#model/contracts/spending'
 import { moneyMonth } from '#model/entities/money-month'
@@ -179,6 +180,23 @@ describe('a month on the wire', () => {
     const older: Record<string, unknown> = { ...z.encode(moneyMonthCodec, view) }
     delete older.slices
     expect(moneyMonthCodec.parse(older).slices).toEqual([])
+  })
+
+  it('carries the chips by frequency, and reads an answer older than them as a newcomer’s (MOL-198)', () => {
+    const view = moneyMonthViewOf(
+      monthOf(spendings(1, () => '2026-09-01')),
+      null,
+      categories,
+      undefined,
+      null,
+      null,
+      [categories[1]?.id ?? ''],
+    )
+    expect(view.frequent).toEqual([categories[1]?.id])
+    const older: Record<string, unknown> = { ...z.encode(moneyMonthCodec, view) }
+    delete older.frequent
+    expect(moneyMonthCodec.parse(older).frequent).toEqual([])
+    expect(spendingCategoriesResponseCodec.parse({ categories: [] }).frequent).toEqual([])
   })
 
   it('counts every row of the journal on every page, a page cut short too (MOL-159)', () => {

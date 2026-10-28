@@ -235,6 +235,7 @@ function fakeRepositories(
       amend: unexpected('spendingCategories.amend'),
       archive: unexpected('spendingCategories.archive'),
       restore: unexpected('spendingCategories.restore'),
+      uses: unexpected('spendingCategories.uses'),
     },
     money: {
       firstSpentDay: unexpected('money.firstSpentDay'),
