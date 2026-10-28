@@ -30,8 +30,6 @@ interface Words {
   /** The record typed by hand, over its search. */
   entry: string
   purchases: string
-  /** The longest label: «Записанные покупки» over «Что взяли?». */
-  finished: string
 }
 
 const LANGUAGES: [string, Words][] = [
@@ -44,7 +42,6 @@ const LANGUAGES: [string, Words][] = [
       money: 'Деньги',
       entry: 'Запись',
       purchases: 'Покупки',
-      finished: 'Записанные покупки',
     },
   ],
   [
@@ -56,7 +53,6 @@ const LANGUAGES: [string, Words][] = [
       money: 'Money',
       entry: 'Entry',
       purchases: 'Purchases',
-      finished: 'Recorded purchases',
     },
   ],
 ]
@@ -71,8 +67,8 @@ function screens(trip: string, words: Words): [string, string][] {
     ['/money/categories', words.money],
     ['/purchases/manual/add', words.entry],
     [`/purchases/${trip}`, words.purchases],
-    // The longest label: «Записанные покупки» over «Что взяли?».
-    [`/purchases/${trip}/add`, words.finished],
+    // A finished record is a record too: one word over its search and the open one's (MOL-208, Е-13).
+    [`/purchases/${trip}/add`, words.entry],
   ]
 }
 

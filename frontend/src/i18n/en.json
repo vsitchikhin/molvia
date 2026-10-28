@@ -176,7 +176,6 @@
     },
     "history": {
       "title": "Purchases",
-      "finished_title": "Recorded purchases",
       "error_title": "Could not load purchases",
       "error_body": "Saved data is still on this device. Try again.",
       "offline_title": "Offline — saved purchases",
