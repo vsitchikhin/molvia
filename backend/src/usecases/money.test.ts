@@ -170,6 +170,7 @@ function repositoriesOf(world: World) {
     }),
     spendingCategories: fake<TripRepositories['spendingCategories']>('spendingCategories', {
       list: () => Promise.resolve(categories),
+      uses: () => Promise.resolve(new Map()),
     }),
     spendings: fake<TripRepositories['spendings']>('spendings', {
       byId: (_, id) =>

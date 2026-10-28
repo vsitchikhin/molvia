@@ -825,6 +825,8 @@
       "conversion_counted": "≈ {amount} at the rate of the day",
       "category": "Category",
       "add_category": "Own",
+      "more": "More…",
+      "more_title": "Category",
       "date": "When",
       "date_today": "Today, {date}",
       "date_yesterday": "Yesterday, {date}",

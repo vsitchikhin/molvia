@@ -117,13 +117,14 @@
 
       <CategoryChips
         v-model="categoryId"
-        :categories="choice"
+        :categories="chips"
         :name-of="nameOf"
         :legend="t('spending.sheet.category')"
-        :add-label="t('spending.sheet.add_category')"
+        :more-label="t('spending.sheet.more')"
         :error="categoryBad ? t('spending.sheet.bad_category') : null"
         @update:model-value="categoryBad = false"
-        @add="$emit('add-category')"
+        @more="moreOpen = true"
+        @lift="lead = $event"
       />
 
       <AppField
@@ -208,6 +209,14 @@
     :selected="accountId"
     @pick="pick"
   />
+  <CategoryPickerSheet
+    v-model:open="moreOpen"
+    :categories="chips"
+    :name-of="nameOf"
+    :selected="categoryId"
+    @pick="pickCategory"
+    @add="$emit('add-category')"
+  />
 </template>
 
 <script lang="ts">
@@ -246,10 +255,11 @@ import AppField from '@/components/AppField.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import CategoryChips from '@/components/CategoryChips.vue'
+import CategoryPickerSheet from '@/components/CategoryPickerSheet.vue'
 import ChargedField from '@/components/ChargedField.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { defaultAccount, pageOrder } from '@/components/accounts'
-import { bankWords, categoryColour, groceriesOf, rateWords } from '@/components/spending'
+import { bankWords, categoryColour, chipOrder, groceriesOf, rateWords } from '@/components/spending'
 import type { JournalRow, Removed, SpendingTarget } from '@/components/spending'
 import { shown } from '@/composables/useItemDetails'
 import { calendarDay, localDay, shiftDay } from '@/days'
@@ -287,6 +297,7 @@ export default defineComponent({
     AppReveal,
     BottomSheet,
     CategoryChips,
+    CategoryPickerSheet,
     ChargedField,
     IconAlert,
     IconCart,
@@ -301,6 +312,8 @@ export default defineComponent({
     back: { type: Boolean, default: false },
     target: { type: Object as PropType<SpendingTarget>, required: true },
     categories: { type: Array as PropType<SpendingCategoryView[]>, required: true },
+    /** The ids the chips stand first by, the most used first (MOL-198); none — the list's order. */
+    frequent: { type: Array as PropType<readonly string[]>, default: () => [] },
     nameOf: {
       type: Function as PropType<(category: SpendingCategoryView) => string>,
       required: true,
@@ -404,6 +417,44 @@ export default defineComponent({
     const manual = computed(() => (props.target.kind === 'manual' ? props.target.row : null))
     const refusal = computed(() => manual.value?.refusal ?? null)
 
+    /** The live categories, and the one this spending already has even when it was taken out. */
+    const choice = computed(() =>
+      props.categories.filter(
+        (category) => !category.archived || category.id === manual.value?.spending.categoryId,
+      ),
+    )
+
+    // The order of the chips, taken when the sheet opens (MOL-198): an answer landing while it is up
+    // moves none of them — one that comes after is put at the end, one gone is taken out.
+    const order = ref(chipOrder(choice.value, props.frequent).map((category) => category.id))
+    // The chosen one standing first: put there at the opening, on a return from «Ещё…» — by a choice
+    // there, by «‹», Esc or «back» alike (adversarial А4) — and for one just made, never by a tap on a
+    // chip, which would move the chips under the finger (В-2 «а»). The list «Ещё…» stands in the order
+    // of the chips, the chosen one first there too (adversarial А2).
+    const lead = ref<string | null>(null)
+    const moreOpen = ref(false)
+    watch(moreOpen, (open, was) => {
+      if (was && !open) lead.value = categoryId.value
+    })
+    watch(choice, (live) => {
+      const ids = chipOrder(live, props.frequent).map((category) => category.id)
+      const kept = order.value.filter((id) => ids.includes(id))
+      order.value = [...kept, ...ids.filter((id) => !kept.includes(id))]
+    })
+    const byId = (id: string) => choice.value.find((category) => category.id === id)
+    const listed = computed(() => order.value.flatMap((id) => byId(id) ?? []))
+    // The one place the chosen one is put first: the chips and the list «Ещё…» alike — the chips ask it
+    // of the sheet when a measure would lay the chosen one past their rows (`lift`, review 2, Р2-А1).
+    const chips = computed(() => {
+      const first = lead.value === null ? undefined : byId(lead.value)
+      return first ? [first, ...listed.value.filter((one) => one !== first)] : listed.value
+    })
+    function pickCategory(id: string): void {
+      categoryId.value = id
+      categoryBad.value = false
+      lead.value = id
+    }
+
     watch(
       () => props.open,
       async (open) => {
@@ -441,6 +492,11 @@ export default defineComponent({
           day.value = prefill.day
           place.value = prefill.place
         }
+        // The chips stand as this opening finds them, the chosen one first, until the sheet is up
+        // again (MOL-198, owner's В-2 «а»).
+        order.value = chipOrder(choice.value, props.frequent).map((category) => category.id)
+        lead.value = categoryId.value
+        moreOpen.value = false
         amountBad.value = false
         categoryBad.value = false
         noteBad.value = false
@@ -486,7 +542,9 @@ export default defineComponent({
       () => props.categories,
       (categories) => {
         if (!props.open || props.target.kind !== 'add' || !props.target.prefill) return
-        categoryId.value ??= groceriesOf(categories)
+        if (categoryId.value !== null) return
+        categoryId.value = groceriesOf(categories)
+        lead.value = categoryId.value
       },
     )
 
@@ -496,6 +554,7 @@ export default defineComponent({
         if (made) {
           categoryId.value = made
           categoryBad.value = false
+          lead.value = made
         }
       },
     )
@@ -555,13 +614,6 @@ export default defineComponent({
     )
     const tripColour = computed(() =>
       groceries.value ? categoryColour(groceries.value) : 'var(--cat-groceries)',
-    )
-
-    /** The live categories, and the one this spending already has even when it was taken out. */
-    const choice = computed(() =>
-      props.categories.filter(
-        (category) => !category.archived || category.id === manual.value?.spending.categoryId,
-      ),
     )
 
     const currencyOptions = computed(() =>
@@ -879,6 +931,10 @@ export default defineComponent({
       amount,
       currency,
       categoryId,
+      chips,
+      lead,
+      moreOpen,
+      pickCategory,
       day,
       today,
       latest,

@@ -5,6 +5,8 @@ import {
   OWN_ICONS,
   categoriesWith,
   categoryIcon,
+  chipOrder,
+  chipsInTwoRows,
   dayTotalText,
   journalOf,
   journalRowProps,
@@ -123,6 +125,7 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     cursor: null,
     remaining: 0,
     remainingFrom: null,
+    frequent: [],
     remainingTo: null,
     ...patch,
   }
@@ -289,6 +292,72 @@ describe('the categories as the phone knows them', () => {
     expect(categoryIcon({ ...own, icon: null })).toBe(OWN_ICONS.tag)
     expect(categoryIcon(beauty)).toBe(OWN_ICONS.beauty)
     expect(new Set(Object.values(OWN_ICONS)).size).toBe(Object.keys(OWN_ICONS).length)
+  })
+})
+
+describe('the chips of a spending (MOL-198, Ф-17)', () => {
+  const preset = (id: string, key: SpendingCategoryView['preset']): SpendingCategoryView => ({
+    id,
+    preset: key,
+    name: null,
+    colour: null,
+    icon: null,
+    archived: false,
+  })
+  const groceries = preset('c0000000-0000-4000-8000-000000000001', 'groceries')
+  const cafe = preset('c0000000-0000-4000-8000-000000000002', 'cafe')
+  const rent = preset('c0000000-0000-4000-8000-000000000003', 'rent')
+  const telecom = preset('c0000000-0000-4000-8000-000000000004', 'telecom')
+  const list = [groceries, cafe, rent, telecom]
+  const ids = (chips: readonly SpendingCategoryView[]) => chips.map((one) => one.preset)
+
+  it('stands the frequent ones first, the rest in the order of the list', () => {
+    expect(ids(chipOrder(list, [telecom.id, cafe.id]))).toEqual([
+      'telecom',
+      'cafe',
+      'groceries',
+      'rent',
+    ])
+  })
+
+  it("is the list's order for a newcomer, and for an answer kept from before the field", () => {
+    expect(ids(chipOrder(list, []))).toEqual(['groceries', 'cafe', 'rent', 'telecom'])
+  })
+
+  // Chips as Onest 15/600 draws them with a dot of 10 and paddings of 12 and 16: «Продукты»,
+  // «Кафе и рестораны», «Транспорт», «Животные», «Связь и интернет», «Дом и быт»; «Ещё…» of 66.
+  const widths = [115, 170, 120, 115, 168, 110]
+  const more = 66
+
+  it('lays two rows at 390 as the handoff draws them: two, then two and «Ещё…»', () => {
+    // The sheet's column at 390: 358.
+    expect(chipsInTwoRows(widths, 358, more, 8)).toEqual({ first: 2, second: 2 })
+  })
+
+  it('lays fewer at 320, never a third row', () => {
+    // 288: «Продукты» and «Кафе и рестораны» are 293 with the gap.
+    expect(chipsInTwoRows(widths, 288, more, 8)).toEqual({ first: 1, second: 1 })
+  })
+
+  it('takes a chip that fits exactly, and not one a pixel wider', () => {
+    expect(chipsInTwoRows([100, 100], 208, more, 8)).toEqual({ first: 2, second: 0 })
+    expect(chipsInTwoRows([100, 101], 208, more, 8)).toEqual({ first: 1, second: 1 })
+    // The second row keeps the room of «Ещё…»: 208 − 8 − 66 = 134.
+    expect(chipsInTwoRows([208, 134], 208, more, 8)).toEqual({ first: 1, second: 1 })
+    expect(chipsInTwoRows([208, 135], 208, more, 8)).toEqual({ first: 1, second: 0 })
+  })
+
+  it('stands a name wider than the row first, cut, and goes on in the second', () => {
+    expect(chipsInTwoRows([400, 100, 100], 288, more, 8)).toEqual({ first: 1, second: 2 })
+  })
+
+  it('never skips a chip that does not fit for a narrower one after it', () => {
+    // The second row has 288 − 8 − 66 = 214: «250» does not fit, and «50» after it is not taken.
+    expect(chipsInTwoRows([200, 250, 50], 288, more, 8)).toEqual({ first: 1, second: 0 })
+  })
+
+  it('has nothing to lay out with no categories — «Ещё…» alone', () => {
+    expect(chipsInTwoRows([], 288, more, 8)).toEqual({ first: 0, second: 0 })
   })
 })
 

@@ -298,6 +298,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   by), a closed one whole. **«Пришло» may take a salary from a chosen day into the next month** (the owner's 25th),
   by the person's own setting, `actors.salary_shift_day`, kept beside the settings and never in the
   form of MOL-65.
+- **The chips of a spending stand by frequency, taken when the sheet opens** (MOL-198): two rows and
+  «Ещё…», the order the server's (`frequent`, 90 days), the chosen one first, never moved by a tap;
+  `categoryOrder` stays every other order.
 - **Removal is a mark, «Вернуть», final after ten minutes by the minute timer.**
 - **Every write of «Деньги» goes through its own queue** (`stores/spendingQueue`); a write a send
   has begun on is never folded into; a spending in the queue is a row, never a figure.

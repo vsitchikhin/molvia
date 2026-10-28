@@ -34,6 +34,8 @@ export interface MoneyScreen extends MoneyMonth {
   goMonth(next: string): void
   readonly online: Ref<boolean>
   readonly categories: ComputedRef<SpendingCategoryView[]>
+  /** The ids the chips of a spending stand first by (MOL-198). */
+  readonly frequent: ComputedRef<readonly string[]>
   readonly canWrite: ComputedRef<boolean>
   readonly spendCurrency: ComputedRef<Currency>
   readonly journal: ComputedRef<JournalDay[]>
@@ -161,6 +163,7 @@ export function useMoneyScreen(): MoneyScreen {
       money.categoriesAskedAt.value,
     ),
   )
+  const frequent = computed(() => money.knownFrequent.value)
   /** Whether a spending can be written here at all: a category is required, and known. */
   const canWrite = computed(() => categories.value.some((category) => !category.archived))
   const spendCurrency = computed(
@@ -315,6 +318,7 @@ export function useMoneyScreen(): MoneyScreen {
     goMonth,
     online,
     categories,
+    frequent,
     canWrite,
     spendCurrency,
     journal,

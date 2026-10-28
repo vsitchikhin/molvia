@@ -442,8 +442,54 @@ nothing up.
   other. The chevron names the screen it came from — «‹ Траты» since MOL-159 — and steps back onto
   the same month (`backTarget` compares the path, not the query); opened cold, that screen is laid
   underneath with its own parents — «Траты» of the running month over «Деньги».
-- **One's own category is made from the chips** («+ Своя», a sheet over the sheet, chosen as soon
-  as it exists) **and kept on «Деньги → Категории»** (В-1): «Убрать» asks nothing, since it erases
+- **The chips of a spending stand in two rows by frequency, «Ещё…» last in the second** (MOL-198, Ф-17
+  of MOL-118, owner's Р-16): thirteen presets and one's own — 21 chips — stood in six rows and pushed
+  «Сохранить трату» off the screen. MOL-82 had «the order is fixed, never by frequency — a chip must not
+  move from under the finger»; Ф-17, the owner's later word, takes the first half back and keeps the
+  second. **The frequency is the server's** (`frequent` of `GET /spending-categories` and of the month,
+  `frequentCategories`): the person's live spendings of the 90 days up to today by the phone's day, and
+  any dated later, a tie and a category not used in the order of the list — a newcomer's, the presets as
+  listed. A transfer's fee is no choice and does not count; «Прочее · сверка» does — only its note in the
+  language of a screen tells it, and the server knows none (the price: a check or two a month in
+  «Прочее»). A trip's purchases are no spending and never count. **An order, not counts**, and a field
+  of the answer, not of a category: the category's view is the budget's and the charts' too, and
+  `categoryOrder` stays the order of everything but the choice — a row of «Бюджет» does not move by
+  frequency. **The phone takes the order when the sheet opens and keeps it while it is up**
+  (`chipOrder`): an answer landing meanwhile puts a new category at the end and moves none. **The
+  chosen one stands first** (owner's В-2 «а», «выбранная категория всегда должна вставать первой»): at
+  the opening, on the way back from «Ещё…» — by a choice there, by «‹», Esc or «back» alike
+  (adversarial А4) — and for one just made — never on a tap of a chip, which is the finger's place; the
+  one chosen before goes back to its place by frequency. One place does it, the sheet (`chips`), for the
+  chips and the list alike — and the chips ask it of the sheet when a measure lifts the chosen one
+  (`lift`, below; review 2, Р2-А1): lifted in the rows alone, the list «Ещё…» stood it last. **How many stand is the browser's measure** (`chipsInTwoRows`): each chip at
+  its width in an unseen ruler, again when the field's width changes and whenever a face comes, while the
+  chips are there (`loadingdone`) — a face may come after the sheet has opened, and changes no width of
+  the field; a row takes the next chip while it fits whole, the second keeping room for «Ещё…», the first
+  chip always — a name wider than the row cut by its «…». Until there is a measure — a sheet still shut
+  — every chip stands, as before. **The chosen one never leaves the rows** (adversarial А1): a measure
+  that would lay it past them — the phone turned, a name before it grown longer by an answer — stands it
+  first and tells the sheet (`lift`), and one chosen from outside them is laid in; tapped in the rows,
+  it is there already and moves nothing. Lost from the rows, nothing on the sheet said what was chosen, and «Сохранить трату» saved it.
+  Only the chips shown are radios: the arrows walk them, the rest are in the list. **«Ещё…» opens
+  «Категория»** (`CategoryPickerSheet`), every category in the order of the chips, the chosen one first
+  there too (adversarial А2), on `ListRow` with its dot (owner's В-3 «а»: 52, the handoff's — the list
+  is the chips' own), a tap chooses and goes back. **The frequency is read again whenever a write of
+  the queue lands** — by the month on «Деньги» and «Траты», by `/spending-categories` on an account's
+  screen, its check and «не попали» (`useOwnCategories`, adversarial А3): read once when the screen came
+  up, a spending written there left the next sheet on the order from before it. Reads that answer out
+  of turn — the queue sending several after the connection came back — never lay an answer over one that
+  set out later (review 2, Р2-А2), as a month is never kept over one (MOL-262, А6). **The prices, named:**
+  a person's chips change between openings; an installed phone of the version before fails the new
+  field and is offered «Обновить»; a month kept before it reads as a newcomer's; every instance of the
+  categories on an account's screen asks again on each write landed — a small read each; a measure that
+  lifts the chosen one while «Ещё…» is open moves it first in the open list too — a turn of the phone,
+  which lays everything out anew anyway; and the lifted chip is drawn anew in the first row, so a
+  keyboard's focus on it falls to the page (review 3, named, not taken).
+- **One's own category is made from «Ещё…»** («+ Своя», under the list in a card of its own — a
+  button among the radios was read as one of the choices (self-review №5) — a sheet over the list, from
+  a check the fourth, С-16 — chosen as soon as it exists, and made it takes the list with it, the
+  spending standing with the new one first: `closeWith(1)`, owner's В-1 «а»; `close(2)` would have left
+  the screen; the focus goes back to «Ещё…», the list's opener) **and kept on «Деньги → Категории»** (В-1): «Убрать» asks nothing, since it erases
   nothing — and is a `ghost`, never red (MOL-191, Ф-34: thirteen red words stood in a column) — and
   «Вернуть» stands right under it. **«Добавить категорию» is the strip** (`#docked`, Ф-28) **over a
   list shown only** (owner's В-2 «а» of MOL-191), offline over it too, since the queue makes it either
