@@ -609,17 +609,20 @@ Owner's decisions of 28.10.2026 in `.scratch/tasks/requirements/MOL-239.md`.
   `POST /internal/silence/claim`, every minute: the warnings due, marked on `actors` (`silence_warning`,
   `silence_warned_at`) in the same statement under `for update skip locked`, so two claims never share a person. At
   most once: a bot that dies after the claim loses that message, and the account goes a week after the mark.
-- **Only in the person's day** (Р-5): 10:00 to 20:00 by `timeZoneOf` of their country (`silenceSendCountries`);
-  outside every country's day the claim asks the database nothing. A step is due until sent, so it comes the next day.
-- **Never to a blocked bot** (`bot_blocked_at`), whatever else is off: the reminders off, no edition accepted, the
-  statistics off are no reason to stay silent — it is a duty, as the message about a leak is (Р-9).
+- **Only in the person's day** (Р-5): 10:00 to 20:00 by the zone of their country, a country with none read in
+  Yerevan's (`silenceSendDay`, `silenceZoneOf`); outside every day the claim asks the database nothing. A step is due
+  until sent, so it comes the next day — and the first falls due thirty-one days before, so it still leaves thirty.
+- **To everybody, a blocked bot too** (adversarial А4): a block heard once is never heard lifted from Telegram's list,
+  so the claim tries, and a block still there answers 403 and is marked again. The reminders off, no edition accepted,
+  the statistics off are no reason to stay silent — it is a duty, as the message about a leak is (Р-9).
 - **Russian, then English, in one message** (owner's В-2 «а»): nobody's language is kept, and a warning not understood
   is data lost. Keys of the dictionary (`silence.warn`, `silence.days.*`), the date and the count by each language's own
   rules. **«откройте приложение и войдите»**: after 180 days the session is gone, the app opens on the door, and only a
-  login marks the visit (MOL-238) — the bot is no visit, and has no button to keep the account (Р-12). The day and the
+  login marks the visit (MOL-238) — the bot is no visit, and has no button to keep the account (requirements, «Чего не делать»). The day and the
   days left are the API's, in the person's zone: for the last warning, the day a week after it at the soonest.
-- **One URL button to the app**, a line of text on `http://`; sent through `deliver` — a 429 waited out once, a 403
-  marking the block by MOL-103's path, after which the account goes on its day unwarned.
+- **One URL button to the app**, named in both languages (self-review №3), a line of text on `http://`; sent through
+  `deliver` — a 429 waited out once, a 403 marking the block by MOL-103's path; the account then goes on the day the
+  warning named.
 - **The owner hears how many** (В-3 «а»): the claim queues `silence` with the warnings by step, the day's run with the
-  accounts erased and how many of them had the bot blocked (`owner.silence.*`). A notice that fails to queue is reported
+  accounts erased and how many of them had the bot blocked — tried, maybe refused (`owner.silence.*`). A notice that fails to queue is reported
   and the warnings still go — marked already, lost there they would be lost for good.

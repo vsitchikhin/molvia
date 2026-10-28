@@ -6,7 +6,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 ## packages/model
 
 - `packages/model/src/contracts/export.ts` — Contract of «Скачать мои данные» (MOL-93): the file whole — header, version and a section for everything erasure removes — with money, quantity and rates as decimal strings and no enum or band a stored row may predate.
-- `packages/model/src/entities/silence.ts` — Two years of silence (MOL-239): the years, the warnings 30 and 7 days before, a day between them, a week after the last; the countries whose day it is, and the day and the days left in a zone.
+- `packages/model/src/entities/silence.ts` — Two years of silence (MOL-239): the years, the warnings 30 and 7 days before — the first a day early — a day between them, a week after the last; whose day it is, a country with no zone read in Yerevan's, and the day and the days left in a zone.
 - `packages/model/src/contracts/consent.ts` — Contract of the consent to the terms and the privacy page (MOL-95): `POLICY_VERSION`, raised by hand for a change that matters; the edition a person accepted, the body that accepts one, and `consentNeeded` — whether this build asks.
 
 ## backend · usecases

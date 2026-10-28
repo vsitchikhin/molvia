@@ -420,8 +420,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   (Confluence 12091393, MOL-97) in the same PR, as must a new recipient; nothing holds that one —
   **and a new recipient is a line of `PRIVACY_RECIPIENTS` and a new edition** (MOL-236).
 - **Two years of silence erase the account by the same function** (MOL-239): `last_seen_at` + 2 years; the bot
-  warns 30 and 7 days before, the API marking the step, and an account the bot can reach is never erased sooner than
-  a week after its last warning — a blocked bot is the one exception; `erasures.silent` counts them apart.
+  warns 30 and 7 days before, the API marking the step; no account goes sooner than a week after its last warning,
+  and unwarned only with the bot blocked; a mark holds only for the day it falls before; `erasures.silent` apart.
 - **The copy is what erasure takes** (`GET /actors/me/export`, MOL-93): a section per erased table,
   counted against a dry run, **and every column exported or left out with its reason**
   (`EXPORT_COLUMNS`); stored, never counted; the removed marked; no secret.
