@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 // DOM for the code inside page.evaluate, which runs in the browser.
 import { expect, test } from '@playwright/test'
-import type { Locator } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { open } from './session'
 
 /**
@@ -547,4 +547,72 @@ test("a tap on the record's total flips it to the estimate", async ({ page }) =>
   await expect(face.locator('.sum')).toHaveText(/^≈/)
   await face.click()
   await expect(face).toHaveAttribute('aria-pressed', 'false')
+})
+
+// The chips of a spending in two rows (MOL-198, self-review №2): the browser's measure is the frailest
+// part of the task — fractional widths, the face, a chip that may shrink — and WebKit is the owner's
+// phone. On the kit, signed out, so the iPhone's engine runs it too. Two rows of 44, «More…» last in
+// the second, nothing past the field's edge.
+for (const width of [390, 320])
+  test(`at ${String(width)} the chips of a spending stand in two rows, «More…» last`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 720 })
+    await open(page, '/_kit')
+    const field = page.getByRole('group', { name: 'Category', exact: true })
+    const rows = field.locator('.chips .row')
+    await expect(rows).toHaveCount(2)
+    for (const row of await rows.all()) expect((await row.boundingBox())?.height).toBe(44)
+    await expect(rows.last().locator('> *').last()).toHaveText('More…')
+    const edge = await field.evaluate((box) => box.getBoundingClientRect().right)
+    const rights = await field
+      .locator('.chips .chip')
+      .evaluateAll((chips) => chips.map((chip) => chip.getBoundingClientRect().right))
+    for (const right of rights) expect(right).toBeLessThanOrEqual(edge + 0.5)
+  })
+
+/** The colour `--surface` computes to here, as a box-shadow prints it. */
+function surfaceOf(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const probe = document.createElement('div')
+    probe.style.background = 'var(--surface)'
+    document.body.append(probe)
+    const colour = getComputedStyle(probe).backgroundColor
+    probe.remove()
+    return colour
+  })
+}
+
+// Р-5 of MOL-198 (self-review №3): on the tint the dot of ten light categories fell under 3:1 (MOL-172
+// А2), and on a ring of `surface` each holds it. Only the chosen one's dot has the ring — the chip's and
+// the row's of «Category» — and the list opened by «More…» is a sheet over a sheet: «‹», no ×.
+test('the chosen dot stands on a ring of surface; «More…» opens «Category» with «‹» and chooses', async ({
+  page,
+}) => {
+  await open(page, '/_kit')
+  const surface = await surfaceOf(page)
+  const field = page.getByRole('group', { name: 'Category', exact: true })
+  const shadow = (dot: Locator) => dot.evaluate((one) => getComputedStyle(one).boxShadow)
+  const chosenDot = field.locator('.chip.on .dot')
+  expect(await shadow(chosenDot)).toContain(surface)
+  expect(await shadow(chosenDot)).toMatch(/0px 0px 0px 2px/)
+  expect(await shadow(field.locator('.chip:not(.on) .dot').first())).toBe('none')
+
+  await field.getByRole('button', { name: 'More…' }).click()
+  const list = page.locator('dialog[open]')
+  await expect(list).toContainText('Category')
+  await expect(list.getByRole('button', { name: 'Back' })).toHaveCount(1)
+  await expect(list.getByRole('button', { name: 'Close', exact: true })).toHaveCount(0)
+  const chosenRow = list.getByRole('radio', { checked: true })
+  expect(await shadow(chosenRow.locator('.dot'))).toContain(surface)
+  expect(await shadow(list.getByRole('radio', { checked: false }).first().locator('.dot'))).toBe(
+    'none',
+  )
+
+  // The list takes no tap while it rises.
+  await page.waitForTimeout(400)
+  await list.getByRole('radio', { name: 'Documents' }).click()
+  await expect(page.locator('dialog[open]')).toHaveCount(0)
+  // Chosen from the list, it stands in the rows, checked (adversarial А1).
+  await expect(field.getByRole('radio', { name: 'Documents' })).toBeChecked()
 })
