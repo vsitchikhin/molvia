@@ -15,6 +15,7 @@ import type {
   BarcodeHint,
   CatalogueEntry,
   CatalogueSearchResponse,
+  PreviousItemsResponse,
   ProposedItem,
 } from '@molvia/model'
 import en from '@/i18n/en.json'
@@ -25,6 +26,8 @@ import { useItemEntryStore } from '@/stores/itemEntry'
 import { useRecentItemsStore } from '@/stores/recentItems'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import { recallHereLast, rememberBoughtHere, rememberHereLast } from '@/stores/hereLast'
+import { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import ItemSearchView from '@/views/ItemSearchView.vue'
 import { holdsTyping } from '@/pwaUpdate'
 
@@ -40,6 +43,10 @@ const attachBarcode = vi.fn<(itemId: string, code: string) => Promise<CatalogueW
 const detachBarcode = vi.fn<(itemId: string, code: string) => Promise<void>>()
 const addExpense = vi.fn<(tripId: string, body: AddExpenseBody) => Promise<unknown>>()
 const currentTrip = vi.fn<() => Promise<unknown>>(() => Promise.resolve(null))
+/** «Брали здесь в прошлый раз» (MOL-209): no last time unless a test says so. */
+const previousItems = vi.fn<(tripId: string) => Promise<PreviousItemsResponse>>(() =>
+  Promise.resolve({ previous: null, items: [] }),
+)
 const catalogueByBarcode = vi.fn<(code: string) => Promise<CatalogueEntry | null>>()
 const catalogueBarcodeHint =
   vi.fn<(code: string, locale: AppLocale) => Promise<BarcodeHint | null>>()
@@ -56,6 +63,7 @@ vi.mock('@/api', () => ({
     detachBarcode: (itemId: string, code: string) => detachBarcode(itemId, code),
     addExpense: (tripId: string, body: AddExpenseBody) => addExpense(tripId, body),
     currentTrip: () => currentTrip(),
+    previousItems: (tripId: string) => previousItems(tripId),
     // «Тут дешевле» on the purchase sheet (MOL-92): never answered here.
     ownPrices: () => new Promise(() => undefined),
     // A finished record read for its search (MOL-208): never answered here.
@@ -166,6 +174,8 @@ beforeEach(() => {
   catalogueByBarcode.mockReset()
   catalogueBarcodeHint.mockReset()
   catalogueBarcodeHint.mockResolvedValue(null)
+  previousItems.mockReset()
+  previousItems.mockResolvedValue({ previous: null, items: [] })
   online(true)
 })
 
@@ -2126,6 +2136,217 @@ describe('«What did you pick up?»', () => {
 
       expect(useTripQueueStore(pinia).pending).toEqual([])
       expect(useRecentItemsStore(pinia).items).toEqual([bread])
+    }, 10_000)
+  })
+
+  describe('«Брали здесь в прошлый раз» (MOL-209)', () => {
+    const TRIP = 'cccccccc-0000-4000-8000-000000000002'
+    const BEFORE = 'cccccccc-0000-4000-8000-000000000001'
+    const sas = { city: 'Гюмри', name: 'SAS' }
+    const eggs = entry(4, 'Яйца С1', '10 шт')
+    const lastTime: PreviousItemsResponse = {
+      previous: { tripId: BEFORE, at: new Date('2026-10-01T10:00:00Z') },
+      items: [bread, eggs, marianna],
+    }
+
+    /** An open trip at SAS, as the server answered it, with `bought` written into it. */
+    function onTrip(...bought: CatalogueEntry[]): void {
+      const trip = tripViewCodec.parse({
+        id: TRIP,
+        startedAt: '2026-10-05T08:00:00.000Z',
+        finishedAt: null,
+        currency: 'AMD',
+        rate: null,
+        rateProvider: null,
+        rateJump: null,
+        rateStale: false,
+        place: { id: 'aaaaaaaa-0000-4000-8000-000000000002', kind: 'store', name: sas.name },
+        placeCity: sas.city,
+        expenses: bought.map((item, n) => ({
+          id: `dddddddd-0000-4000-8000-${String(n + 1).padStart(12, '0')}`,
+          createdAt: '2026-10-05T08:01:00.000Z',
+          item,
+          quantity: null,
+          amount: null,
+          unitPrice: null,
+        })),
+        total: [],
+        converted: null,
+      })
+      useTripStore(pinia).apply(trip)
+      currentTrip.mockResolvedValue(trip)
+    }
+
+    function groups(view: VueWrapper): { heading: string; rows: string[] }[] {
+      return view.findAll('[role="group"]').map((group) => ({
+        heading: view.get(`#${CSS.escape(group.attributes('aria-labelledby') ?? '')}`).text(),
+        rows: group.findAll('[role="option"] .title').map((row) => row.text()),
+      }))
+    }
+
+    it('1a: the place’s last time first, without what is in this trip, and «Часто берёте» without it', async () => {
+      previousItems.mockResolvedValue(lastTime)
+      remembered(milk, eggs)
+      onTrip(marianna)
+      const view = await render()
+      await flushPromises()
+
+      expect(previousItems).toHaveBeenCalledWith(TRIP)
+      expect(groups(view)).toEqual([
+        { heading: en.item.group_here_last, rows: [bread.name, eggs.name] },
+        { heading: en.item.group_recent, rows: [milk.name] },
+      ])
+      expect(view.findAll('[role="listbox"]')).toHaveLength(1)
+    })
+
+    it('shows five at most, counted after what is in this trip goes', async () => {
+      const many = Array.from({ length: 8 }, (_, n) => entry(10 + n, `Позиция ${String(n)}`))
+      previousItems.mockResolvedValue({ ...lastTime, items: many })
+      onTrip(many[0] ?? milk, many[2] ?? milk)
+      const view = await render()
+      await flushPromises()
+
+      expect(groups(view)[0]?.rows).toEqual([
+        'Позиция 1',
+        'Позиция 3',
+        'Позиция 4',
+        'Позиция 5',
+        'Позиция 6',
+      ])
+    })
+
+    it('1b: no last time here — «Часто берёте» alone', async () => {
+      remembered(milk)
+      onTrip()
+      const view = await render()
+      await flushPromises()
+
+      expect(groups(view)).toEqual([{ heading: en.item.group_recent, rows: [milk.name] }])
+    })
+
+    it('nothing at all — only the field and its hint', async () => {
+      onTrip()
+      const view = await render()
+      await flushPromises()
+
+      expect(view.find('[role="listbox"]').exists()).toBe(false)
+    })
+
+    it('typed, only the recent items are narrowed — the group is the empty field’s', async () => {
+      previousItems.mockResolvedValue(lastTime)
+      remembered(eggs)
+      onTrip()
+      online(false)
+      const view = await render()
+      await field(view).setValue('яйц')
+
+      expect(groups(view)).toEqual([{ heading: en.item.group_recent, rows: [eggs.name] }])
+    })
+
+    it('with no signal, from what the device remembers of the place, asking nothing', async () => {
+      rememberHereLast(ACTOR, sas, TRIP, lastTime)
+      remembered(milk)
+      onTrip()
+      online(false)
+      const view = await render()
+      await flushPromises()
+
+      expect(previousItems).not.toHaveBeenCalled()
+      expect(groups(view)).toEqual([
+        { heading: en.item.group_here_last, rows: [bread.name, eggs.name, marianna.name] },
+        { heading: en.item.group_recent, rows: [milk.name] },
+      ])
+    })
+
+    it('a trip still in the queue is not asked about; its place is remembered by city and name', async () => {
+      rememberHereLast(ACTOR, sas, BEFORE, { previous: null, items: [] })
+      rememberBoughtHere(ACTOR, sas, BEFORE, eggs)
+      useTripQueueStore(pinia).enqueue({
+        kind: 'start',
+        tripId: TRIP,
+        place: { kind: 'store', name: sas.name },
+        context: { country: 'AM', city: sas.city, spendCurrency: 'AMD', incomeCurrency: 'RUB' },
+        startedAt: new Date('2026-10-05T08:00:00Z'),
+      })
+      const view = await render()
+      await flushPromises()
+
+      expect(previousItems).not.toHaveBeenCalled()
+      expect(groups(view)[0]).toEqual({ heading: en.item.group_here_last, rows: [eggs.name] })
+    })
+
+    describe('nothing remembered: the answer is waited for, a second at most (В-2)', () => {
+      beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      })
+      afterEach(() => {
+        vi.useRealTimers()
+      })
+
+      it('nothing under the field while it is on its way, both groups at once when it comes', async () => {
+        let answer: (value: PreviousItemsResponse) => void = () => undefined
+        previousItems.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+        remembered(milk)
+        onTrip()
+        const view = await render()
+
+        expect(view.find('[role="listbox"]').exists()).toBe(false)
+        answer(lastTime)
+        await flushPromises()
+        expect(groups(view).map((group) => group.heading)).toEqual([
+          en.item.group_here_last,
+          en.item.group_recent,
+        ])
+      })
+
+      it('late, «Часто берёте» stands alone and the answer is only remembered — nothing moves', async () => {
+        let answer: (value: PreviousItemsResponse) => void = () => undefined
+        previousItems.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+        remembered(milk)
+        onTrip()
+        const view = await render()
+
+        await vi.advanceTimersByTimeAsync(STRIP_LATE_MS)
+        expect(groups(view)).toEqual([{ heading: en.item.group_recent, rows: [milk.name] }])
+        answer(lastTime)
+        await flushPromises()
+        expect(groups(view)).toEqual([{ heading: en.item.group_recent, rows: [milk.name] }])
+        expect(recallHereLast(ACTOR, sas, TRIP)?.map((item) => item.name)).toEqual([
+          bread.name,
+          eggs.name,
+          marianna.name,
+        ])
+      })
+
+      it('remembered, the memory stands at once and the answer takes its place', async () => {
+        rememberHereLast(ACTOR, sas, TRIP, { ...lastTime, items: [eggs] })
+        let answer: (value: PreviousItemsResponse) => void = () => undefined
+        previousItems.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+        onTrip()
+        const view = await render()
+
+        expect(groups(view)[0]?.rows).toEqual([eggs.name])
+        await vi.advanceTimersByTimeAsync(STRIP_LATE_MS)
+        answer(lastTime)
+        await flushPromises()
+        expect(groups(view)[0]?.rows).toEqual([bread.name, eggs.name, marianna.name])
+      })
+    })
+
+    it('an item that went into the trip is the place’s newest last time for the next trip (В-1)', async () => {
+      addExpense.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+      remembered(milk)
+      onTrip()
+      const view = await render()
+      await flushPromises()
+      await view.get('[role="option"]').trigger('click')
+      vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      const add = view.findAll('dialog[open] button').find((b) => b.text() === en.item.save)
+      await add?.trigger('click')
+
+      const next = 'cccccccc-0000-4000-8000-000000000003'
+      expect(recallHereLast(ACTOR, sas, next)?.map((item) => item.name)).toEqual([milk.name])
     }, 10_000)
   })
 })

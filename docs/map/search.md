@@ -73,7 +73,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 
 ## frontend · views
 
-- `frontend/src/views/ItemSearchView.vue` — «Что взяли?» screen: catalogue lookup for a trip, «Часто берёте» under an empty field, «Предложить товар» on a miss; its states under the field — empty and error with their buttons under the words (`ScreenState flow`, MOL-208), offline a `StatusStrip`.
+- `frontend/src/views/ItemSearchView.vue` — «Что взяли?» screen: catalogue lookup for a trip, «Брали здесь в прошлый раз» and «Часто берёте» under an empty field (MOL-209), «Предложить товар» on a miss; its states under the field — empty and error with their buttons under the words (`ScreenState flow`, MOL-208), offline a `StatusStrip`.
 
 ## frontend · components
 

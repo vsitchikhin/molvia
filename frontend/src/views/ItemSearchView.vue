@@ -341,7 +341,7 @@ import { useSelectedTrip } from '@/composables/useSelectedTrip'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { ApiError } from '@molvia/client'
-import { ERROR, pickLocale } from '@molvia/model'
+import { ERROR, drawsNothing, pickLocale } from '@molvia/model'
 import type { AppLocale, BarcodeHint, CatalogueEntry } from '@molvia/model'
 import IconBarcode from '~icons/mdi/barcode-scan'
 import IconClose from '~icons/mdi/close'
@@ -358,13 +358,24 @@ import ProposeItemSheet from '@/components/ProposeItemSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SkeletonPart from '@/components/SkeletonPart.vue'
-import StatusStrip from '@/components/StatusStrip.vue'
+import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import { api } from '@/api'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { packageSize, useBarcodeHint } from '@/composables/useBarcodeHint'
 import { useBarcodeLookup } from '@/composables/useBarcodeLookup'
 import { useCatalogueSearch } from '@/composables/useCatalogueSearch'
+import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useOnline } from '@/composables/useOnline'
+import { useReconnect } from '@/composables/useReconnect'
+import { useTripRows } from '@/composables/useTripRows'
+import { useActorStore } from '@/stores/actor'
+import {
+  HERE_LAST_SHOWN,
+  recallHereLast,
+  rememberBoughtHere,
+  rememberHereLast,
+} from '@/stores/hereLast'
+import type { HerePlace } from '@/stores/hereLast'
 import { currentIdentity } from '@/stores/identity'
 import { useItemEntryStore } from '@/stores/itemEntry'
 import { useRecentItemsStore } from '@/stores/recentItems'
@@ -425,6 +436,136 @@ export default defineComponent({
     const recent = useRecentItemsStore()
     const entry = useItemEntryStore()
     const announce = useAnnouncer()
+
+    /**
+     * «Брали здесь в прошлый раз» (MOL-209, Ф-24): the trip the search writes into and its place —
+     * the finished one the address names, else the one going on, sent or still in the queue. The
+     * place is its city and name, which a trip started with no signal knows too (Р-3).
+     */
+    const current = useCurrentTrip()
+    const actor = useActorStore()
+    const here = computed<{
+      readonly tripId: string
+      readonly place: HerePlace | null
+      /** The server may know the trip: one still in the queue is not asked about (Р-4). */
+      readonly sent: boolean
+      /** A finished trip looks only before itself. */
+      readonly before: Date | null
+    } | null>(() => {
+      if (selected.id.value !== null) {
+        const trip = selected.trip.value
+        if (!trip) return null
+        return {
+          tripId: trip.id,
+          place:
+            trip.placeCity === undefined ? null : { city: trip.placeCity, name: trip.place.name },
+          sent: true,
+          before: trip.finishedOnDeviceAt ?? trip.finishedAt,
+        }
+      }
+      const local = current.local.value
+      if (local) {
+        const city = local.context?.city ?? actor.settings?.city
+        return {
+          tripId: local.id,
+          place: city === undefined ? null : { city, name: local.placeName },
+          sent: false,
+          before: null,
+        }
+      }
+      const trip = current.trip.value
+      if (!trip) return null
+      return {
+        tripId: trip.id,
+        place:
+          trip.placeCity === undefined ? null : { city: trip.placeCity, name: trip.place.name },
+        sent: true,
+        before: null,
+      }
+    })
+    /** What is in this trip already — on the server, or in the queue — goes from the group (Р-17). */
+    const { rows: tripRows } = useTripRows(
+      computed(() => here.value?.tripId ?? null),
+      computed(() => (selected.id.value !== null ? selected.trip.value : current.trip.value)),
+      () => '',
+    )
+    /** The server's answer on this screen, and what the device remembered before it. */
+    const hereAnswer = ref<readonly CatalogueEntry[] | null>(null)
+    const hereRemembered = ref<readonly CatalogueEntry[] | null>(null)
+    /**
+     * With nothing remembered the screen waits for the answer, at most `STRIP_LATE_MS`, before
+     * «Часто берёте» stands alone (В-2 «а»): the group coming in over it would take its rows from
+     * under the finger (MOL-269). An answer later than that is only remembered, for next time.
+     */
+    const hereLate = ref(false)
+    let hereAsked = 0
+    let hereTimer: ReturnType<typeof setTimeout> | undefined
+
+    function askHere(): void {
+      const at = here.value
+      if (!at?.sent || hereAnswer.value !== null || !navigator.onLine) {
+        hereLate.value = true
+        return
+      }
+      const asked = ++hereAsked
+      api.previousItems(at.tripId).then(
+        (answer) => {
+          if (asked !== hereAsked || !alive) return
+          if (owner !== null && at.place !== null) {
+            rememberHereLast(owner, at.place, at.tripId, answer)
+          }
+          if (!hereLate.value || hereRemembered.value !== null) hereAnswer.value = answer.items
+          hereLate.value = true
+        },
+        // A trip the server does not know yet, no connection, a server that failed: the group is a
+        // help, never a state of the screen — what the device remembers stands, or nothing does.
+        () => {
+          if (asked === hereAsked) hereLate.value = true
+        },
+      )
+    }
+
+    watch(
+      () => [
+        here.value?.tripId,
+        here.value?.place?.city,
+        here.value?.place?.name,
+        here.value?.sent,
+      ],
+      () => {
+        const at = here.value
+        hereAnswer.value = null
+        hereRemembered.value =
+          at?.place != null ? recallHereLast(owner, at.place, at.tripId, at.before) : null
+        hereLate.value = false
+        clearTimeout(hereTimer)
+        hereTimer = setTimeout(() => {
+          hereLate.value = true
+        }, STRIP_LATE_MS)
+        askHere()
+      },
+      { immediate: true },
+    )
+    useReconnect(askHere)
+
+    const hereLast = computed<CatalogueEntry[]>(() => {
+      const taken = new Set(
+        tripRows.value.flatMap((row) =>
+          row.mark !== 'removing' && row.entry ? [row.entry.id] : [],
+        ),
+      )
+      return (hereAnswer.value ?? hereRemembered.value ?? [])
+        .filter((item) => !taken.has(item.id))
+        .slice(0, HERE_LAST_SHOWN)
+    })
+    /** Nothing remembered and the answer still on its way, for a second at most (В-2). */
+    const hereWaiting = computed(
+      () =>
+        here.value?.sent === true &&
+        hereAnswer.value === null &&
+        hereRemembered.value === null &&
+        !hereLate.value,
+    )
 
     /** «Взять из недавних» under an error — asked for, not shown by default. */
     const fallback = ref(false)
@@ -752,6 +893,20 @@ export default defineComponent({
     })
 
     const groups = computed<ComboboxGroup[]>(() => {
+      // Under an empty field the place's last time comes first, and «Часто берёте» does not repeat
+      // it (Ф-24); typed, only the recent items are narrowed, as with no signal (1j).
+      if (showsRecent.value && drawsNothing(query.value)) {
+        if (hereWaiting.value) return []
+        const first = new Set(hereLast.value.map((item) => item.id))
+        return [
+          { key: 'here-last', heading: t('item.group_here_last'), items: hereLast.value },
+          {
+            key: 'recent',
+            heading: t('item.group_recent'),
+            items: rows.value.filter((item) => !first.has(item.id)),
+          },
+        ]
+      }
       if (showsRecent.value)
         return [{ key: 'recent', heading: t('item.group_recent'), items: rows.value }]
       return phase.value === 'far'
@@ -911,6 +1066,10 @@ export default defineComponent({
     function added(item: CatalogueEntry): void {
       const code = pickedByCode.value
       recent.remember(item, code?.itemId === item.id ? code.code : undefined)
+      // And into the place's memory as its newest trip (В-1 «а»): the next trip here with no signal
+      // finds this one as the last time.
+      const at = here.value
+      if (owner !== null && at?.place) rememberBoughtHere(owner, at.place, at.tripId, item)
     }
 
     /**
@@ -1024,6 +1183,7 @@ export default defineComponent({
     })
     onUnmounted(() => {
       alive = false
+      clearTimeout(hereTimer)
       withdraw?.()
       withdrawCode?.()
       withdrawBind?.()
