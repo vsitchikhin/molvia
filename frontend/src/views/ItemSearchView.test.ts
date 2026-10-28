@@ -58,6 +58,8 @@ vi.mock('@/api', () => ({
     currentTrip: () => currentTrip(),
     // «Тут дешевле» on the purchase sheet (MOL-92): never answered here.
     ownPrices: () => new Promise(() => undefined),
+    // A finished record read for its search (MOL-208): never answered here.
+    trip: () => new Promise(() => undefined),
   },
 }))
 
@@ -111,9 +113,9 @@ function remembered(...items: CatalogueEntry[]): void {
  * The screen under the app's own live region, so what it reads out can be heard. `shown` takes the
  * screen away while the region stays — what leaving it does.
  */
-async function render(shown = ref(true)) {
+async function render(shown = ref(true), path = '/trip/add') {
   const router = createRouter({ history: createMemoryHistory(), routes })
-  await router.push('/trip/add')
+  await router.push(path)
   const wrapper = mount(
     defineComponent({
       setup() {
@@ -200,7 +202,9 @@ describe('«What did you pick up?»', () => {
     const view = await render()
 
     await field(view).setValue('молок')
-    expect(view.find('.loading .bars').exists()).toBe(true)
+    // The answer's shape (1g, Ф-13): a caption and a card of three rows, not paragraphs.
+    expect(view.findAll('.loading .skeleton-caption')).toHaveLength(1)
+    expect(view.findAll('.loading .skeleton-rows .item')).toHaveLength(3)
 
     await vi.waitFor(() => {
       expect(searchCatalogue).toHaveBeenCalledWith('молок')
@@ -213,6 +217,35 @@ describe('«What did you pick up?»', () => {
     expect(view.text()).not.toContain(en.item.group_recent)
     expect(view.find('.loading').exists()).toBe(false)
   }, 10_000)
+
+  // The search of a finished record while the record is read (Ф-13): the field and the recent items
+  // under it, as they will stand — not paragraphs in a card.
+  describe('while the finished record is read', () => {
+    const finished = '/purchases/aaaaaaaa-0000-4000-8000-000000000012/add'
+
+    it('draws the field and the rows of the recent items it has', async () => {
+      remembered(bread, milk)
+      const view = await render(ref(true), finished)
+
+      await vi.waitFor(() => {
+        expect(view.find('.skeleton-field').exists()).toBe(true)
+      })
+      // The field's hint stands under the well, or the rows came a line lower than their bars.
+      expect(view.get('.ghost-hint').text()).toBe(en.item.search_hint)
+      expect(view.findAll('.skeleton-caption')).toHaveLength(1)
+      expect(view.findAll('.skeleton-rows .item')).toHaveLength(2)
+      expect(view.find('input[role="combobox"]').exists()).toBe(false)
+    })
+
+    it('draws the field alone with no recent items', async () => {
+      const view = await render(ref(true), finished)
+
+      await vi.waitFor(() => {
+        expect(view.find('.skeleton-field').exists()).toBe(true)
+      })
+      expect(view.find('.skeleton-rows').exists()).toBe(false)
+    })
+  })
 
   it('reads the count out once the answer is in', async () => {
     searchCatalogue.mockResolvedValue([milk, marianna])
@@ -235,8 +268,11 @@ describe('«What did you pick up?»', () => {
 
     await field(view).setValue('молокоо')
 
+    // The whole region, so the words are said once: `ScreenState`'s alone, never the screen's beside them.
     await vi.waitFor(() => {
-      expect(view.get('.live').text()).toBe(en.item.empty.body.replace('{query}', 'молокоо'))
+      expect(view.get('.live').text()).toBe(
+        `${en.item.empty.title.replace('{query}', 'молокоо')}. ${en.item.empty.text}`,
+      )
     })
   }, 20_000)
 
@@ -310,6 +346,31 @@ describe('«What did you pick up?»', () => {
     expect(names(view)).toEqual([marianna.name])
   }, 25_000)
 
+  // A dimmed answer is for the text before, and the region says nothing of it (adversarial А3): the
+  // empty one too, now that it speaks for itself — and it speaks again once it is the answer once more.
+  it('takes «Nothing found» out of the region while the next search is out', async () => {
+    let second!: (entries: CatalogueEntry[]) => void
+    searchCatalogue
+      .mockResolvedValueOnce([])
+      .mockReturnValueOnce(new Promise((resolve) => (second = resolve)))
+    const view = await render()
+    await field(view).setValue('кефр')
+    await vi.waitFor(() => {
+      expect(view.get('.live').text()).toContain('Nothing found for «кефр»')
+    })
+
+    await field(view).setValue('кефри')
+    await vi.waitFor(() => {
+      expect(view.find('.state.stale').exists()).toBe(true)
+    })
+    expect(view.get('.live').text()).toBe('')
+
+    second([])
+    await vi.waitFor(() => {
+      expect(view.get('.live').text()).toContain('Nothing found for «кефри»')
+    })
+  }, 15_000)
+
   it('names the query nothing was found for', async () => {
     searchCatalogue.mockResolvedValue([])
     const view = await render()
@@ -317,9 +378,26 @@ describe('«What did you pick up?»', () => {
     await field(view).setValue('тан')
 
     await vi.waitFor(() => {
-      expect(view.get('.not-found-text').text()).toBe(en.item.empty.body.replace('{query}', 'тан'))
+      expect(view.get('.state h2').text()).toBe(en.item.empty.title.replace('{query}', 'тан'))
     })
+    expect(view.get('.state .body').text()).toBe(en.item.empty.text)
     expect(view.find('[role="listbox"]').exists()).toBe(false)
+  }, 10_000)
+
+  // It comes while the person types: under the words, where the keyboard leaves it in sight, never in
+  // the strip at the bottom (В-20 «а»). One form of an empty state, the quiet circle (Ф-16).
+  it('offers «Suggest an item» right under the words of an empty answer', async () => {
+    searchCatalogue.mockResolvedValue([])
+    const view = await render()
+
+    await field(view).setValue('тан')
+
+    await vi.waitFor(() => {
+      expect(view.find('.state').exists()).toBe(true)
+    })
+    const state = view.get('.state')
+    expect(state.classes()).toEqual(expect.arrayContaining(['flow', 'quiet']))
+    expect(state.find('.message + .action').text()).toBe(en.item.empty.action)
   }, 10_000)
 
   describe('a far answer — rows, none of them close (MOL-46)', () => {
@@ -338,10 +416,9 @@ describe('«What did you pick up?»', () => {
     it('says «not found» under the rows, with the button to suggest the item', async () => {
       const view = await farFor('пельмени')
 
-      expect(view.get('.not-found-text').text()).toBe(
-        en.item.empty.body.replace('{query}', 'пельмени'),
-      )
-      expect(button(view, en.item.empty.action).exists()).toBe(true)
+      expect(view.get('.far-title').text()).toBe(en.item.empty.title.replace('{query}', 'пельмени'))
+      expect(view.get('.far-text').text()).toBe(en.item.empty.text)
+      expect(view.get('.far').find('button').text()).toBe(en.item.empty.action)
     }, 10_000)
 
     it('puts nothing above the rows: they stay where they were as the answer flips near and far', async () => {
@@ -350,7 +427,7 @@ describe('«What did you pick up?»', () => {
       const view = await farFor('пельмени')
 
       const html = view.html()
-      expect(html.indexOf('class="not-found')).toBeGreaterThan(html.indexOf('role="listbox"'))
+      expect(html.indexOf('class="card plain far')).toBeGreaterThan(html.indexOf('role="listbox"'))
     }, 10_000)
 
     it('heads the rows as a likeness in spelling, not as a find', async () => {
@@ -534,7 +611,29 @@ describe('«What did you pick up?»', () => {
 
       // Narrowed by what was typed, as offline (Р-12): the bread is not what «молок» asked for.
       expect(names(view)).toEqual([milk.name])
-      expect(view.text()).toContain(en.item.error.title)
+      // The error is a section's now, the quiet card over the rows, in its own words (1i).
+      const state = view.get('.state')
+      expect(state.classes()).toContain('card')
+      expect(state.get('.body').text()).toBe(en.item.error.fallback_note)
+    }, 10_000)
+
+    // It comes while the person types: «Повторить» and «Взять из недавних» under the words, where the
+    // keyboard leaves them in sight, never in the strip at the bottom (В-20 «а»).
+    it('keeps its buttons under its words, in the words of a person', async () => {
+      remembered(milk)
+      searchCatalogue.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 500'))
+      const view = await render()
+      await field(view).setValue('молок')
+      await vi.waitFor(() => {
+        expect(view.text()).toContain(en.item.error.title)
+      })
+
+      const state = view.get('.state')
+      expect(state.classes()).toContain('flow')
+      expect(state.classes()).not.toContain('card')
+      expect(state.get('.body').text()).toBe(en.item.error.body)
+      expect(state.get('.action').text()).toContain(en.state.retry)
+      expect(state.get('.action').text()).toContain(en.item.error.fallback)
     }, 10_000)
 
     it('offers no «Pick from recent» when there are none to pick', async () => {
@@ -547,6 +646,21 @@ describe('«What did you pick up?»', () => {
 
       expect(view.text()).not.toContain(en.item.error.fallback)
       expect(view.text()).toContain(en.state.retry)
+      // Nor in words: a newcomer's first search is not told to take what it has none of (adversarial А2).
+      expect(view.get('.state .body').text()).toBe(en.item.error.body_alone)
+    }, 10_000)
+
+    it('says nothing of the recent items when none of them is what was typed (adversarial А2)', async () => {
+      remembered(bread)
+      searchCatalogue.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 500'))
+      const view = await render()
+      await field(view).setValue('молок')
+      await vi.waitFor(() => {
+        expect(view.text()).toContain(en.item.error.title)
+      })
+
+      expect(view.text()).not.toContain(en.item.error.fallback)
+      expect(view.get('.state .body').text()).toBe(en.item.error.body_alone)
     }, 10_000)
 
     it('keeps the recent items taken when the app is looked at again and the server is still down', async () => {
@@ -572,7 +686,12 @@ describe('«What did you pick up?»', () => {
   })
 
   describe('offline', () => {
-    it('says so in warning, not in red, and searches the recent items as typed', async () => {
+    // One strip under the field (Ф-14, С-2): never a block of its own over the rows, never red.
+    function strip(view: VueWrapper) {
+      return view.findAll('.strip')
+    }
+
+    it('says so in one strip under the field, not in red, and searches the recent items as typed', async () => {
       remembered(bread, milk, marianna)
       online(false)
       const view = await render()
@@ -580,14 +699,49 @@ describe('«What did you pick up?»', () => {
       await field(view).setValue('молоко')
 
       await vi.waitFor(() => {
-        expect(view.text()).toContain(en.item.offline.title)
+        expect(strip(view)).toHaveLength(1)
       })
-      expect(view.find('.tone-bad').exists()).toBe(false)
+      expect(strip(view)[0]?.text()).toBe(en.item.offline.strip)
+      expect(strip(view)[0]?.classes()).toContain('offline')
+      expect(view.find('.state').exists()).toBe(false)
       expect(names(view)).toEqual([milk.name, marianna.name])
       expect(searchCatalogue).not.toHaveBeenCalled()
     })
 
-    it('shows nothing under the notice when no recent item matches', async () => {
+    // Nothing above the control that chooses the answer (MOL-138, В-2): the strip comes and goes with
+    // the connection, and over the field it would move the field under the thumb.
+    it('stands under the field, never above it', async () => {
+      remembered(milk)
+      online(false)
+      const view = await render()
+      await field(view).setValue('молоко')
+      await vi.waitFor(() => {
+        expect(strip(view)).toHaveLength(1)
+      })
+
+      const html = view.html()
+      expect(html.indexOf('class="strip')).toBeGreaterThan(html.indexOf('<input'))
+      expect(html.indexOf('class="strip')).toBeLessThan(html.indexOf('role="listbox"'))
+    })
+
+    // As 1j draws it: typing offline searches the recent items at once, so the screen says it before.
+    it('says so with nothing typed too, over the recent items', async () => {
+      remembered(bread, milk)
+      online(false)
+      const view = await render()
+
+      expect(strip(view)).toHaveLength(1)
+      expect(names(view)).toEqual([bread.name, milk.name])
+    })
+
+    it('says nothing of the connection with nothing typed while online', async () => {
+      remembered(bread)
+      const view = await render()
+
+      expect(strip(view)).toHaveLength(0)
+    })
+
+    it('shows nothing under the strip when no recent item matches', async () => {
       remembered(bread)
       online(false)
       const view = await render()
@@ -595,7 +749,7 @@ describe('«What did you pick up?»', () => {
       await field(view).setValue('молоко')
 
       await vi.waitFor(() => {
-        expect(view.text()).toContain(en.item.offline.title)
+        expect(strip(view)).toHaveLength(1)
       })
       expect(view.find('[role="listbox"]').exists()).toBe(false)
     })
@@ -1764,7 +1918,7 @@ describe('«What did you pick up?»', () => {
       const view = await render()
       await field(view).setValue('тан')
       await vi.waitFor(() => {
-        expect(view.find('.not-found').exists()).toBe(true)
+        expect(view.find('.state').exists()).toBe(true)
       })
 
       await button(view, en.item.empty.action).trigger('click')

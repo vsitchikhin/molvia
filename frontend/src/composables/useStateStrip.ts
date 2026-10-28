@@ -29,6 +29,14 @@ export interface StateStrip {
   claim: (owner: symbol) => void
   release: (owner: symbol) => void
   owner: Readonly<Ref<symbol | null>>
+  /**
+   * An error that offers «Обновить» under its own words, holding no strip — a screen typed in
+   * (`flow`, MOL-208): the row of the version steps aside for it as for one that holds the strip, or a
+   * waiting version is offered twice.
+   */
+  offering: ComputedRef<boolean>
+  offer: (owner: symbol) => void
+  withdraw: (owner: symbol) => void
 }
 
 const stateStripKey: InjectionKey<StateStrip | null> = Symbol('state-strip')
@@ -37,6 +45,7 @@ export function provideStateStrip(
   target: Readonly<Ref<HTMLElement | null>> = shallowRef(null),
 ): StateStrip {
   const owner = shallowRef<symbol | null>(null)
+  const offers = shallowRef<readonly symbol[]>([])
   const strip: StateStrip = {
     target,
     held: computed(() => owner.value !== null),
@@ -47,6 +56,13 @@ export function provideStateStrip(
       if (owner.value === me) owner.value = null
     },
     owner,
+    offering: computed(() => offers.value.length > 0),
+    offer: (me) => {
+      if (!offers.value.includes(me)) offers.value = [...offers.value, me]
+    },
+    withdraw: (me) => {
+      if (offers.value.includes(me)) offers.value = offers.value.filter((one) => one !== me)
+    },
   }
   provide(stateStripKey, strip)
   return strip

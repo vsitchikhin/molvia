@@ -465,10 +465,16 @@
         <AppSwitch :checked="sectionError" @toggle="sectionError = $event" />
         {{ t('dev.kit.state_section') }}
       </label>
+      <!-- A screen typed in (В-20): the buttons under the words, the strip left alone. -->
+      <label class="toggle">
+        <AppSwitch :checked="flowError" @toggle="flowError = $event" />
+        {{ t('dev.kit.state_flow') }}
+      </label>
       <ScreenState
         v-if="screenError"
         kind="error"
         :inline="sectionError"
+        :flow="flowError"
         :title="t('devices.load_error.title')"
         :body="t('devices.load_error.body')"
         @retry="screenError = false"
@@ -1169,6 +1175,7 @@ export default defineComponent({
       working: ref(false),
       screenError: ref(false),
       sectionError: ref(false),
+      flowError: ref(false),
       toggles: reactive([
         { key: 'switch_off', on: false, inactive: false },
         { key: 'switch_on', on: true, inactive: false },

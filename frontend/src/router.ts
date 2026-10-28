@@ -145,8 +145,11 @@ export const routes = [
     path: '/purchases/:tripId',
     name: 'purchase',
     component: FinishedTripView,
+    // «Запись», as the record still being typed: the screen is named by its place, and the chevron of
+    // its search reads the route's name — «Записанные покупки» there stood for words the screen it led
+    // to never said (MOL-208, Е-13, owner's В-1 «а»).
     meta: {
-      titleKey: 'trip.history.finished_title',
+      titleKey: 'trip.title',
       parent: 'purchases',
       from: ['money', 'money-spendings'],
     },

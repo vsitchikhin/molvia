@@ -557,7 +557,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
   failure; polite states speak through the one live region in `App.vue`. **Empty is one quiet
   circle with its icon, attention a triangle; a full error's buttons stand in the strip, a
   section's error is the quiet card** (MOL-180): a screen whose strip works with the server down
-  draws its error `inline`. **The connection is one `StatusStrip` a screen, in its words** (MOL-181):
+  draws its error `inline`; a screen typed in keeps a state's buttons under its words (`flow`, В-20). **The connection is one `StatusStrip` a screen, in its words** (MOL-181):
   offline, «сервер не ответил» or «обновляем» once an answer is late (MOL-201), «Повторить» only in
   the second, a failed retry said again (`attempt`); it speaks through the live region — while a sheet is up, its own, and what a block in
   a closed sheet holds is said at the opening. **The skeleton is the
