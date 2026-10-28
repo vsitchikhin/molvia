@@ -481,7 +481,10 @@ nothing up.
   set out later (review 2, Р2-А2), as a month is never kept over one (MOL-262, А6). **The prices, named:**
   a person's chips change between openings; an installed phone of the version before fails the new
   field and is offered «Обновить»; a month kept before it reads as a newcomer's; every instance of the
-  categories on an account's screen asks again on each write landed — a small read each.
+  categories on an account's screen asks again on each write landed — a small read each; a measure that
+  lifts the chosen one while «Ещё…» is open moves it first in the open list too — a turn of the phone,
+  which lays everything out anew anyway; and the lifted chip is drawn anew in the first row, so a
+  keyboard's focus on it falls to the page (review 3, named, not taken).
 - **One's own category is made from «Ещё…»** («+ Своя», under the list in a card of its own — a
   button among the radios was read as one of the choices (self-review №5) — a sheet over the list, from
   a check the fourth, С-16 — chosen as soon as it exists, and made it takes the list with it, the
