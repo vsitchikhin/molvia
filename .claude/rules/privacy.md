@@ -236,8 +236,9 @@ The detail behind the privacy lines of `CLAUDE.md`.
   list says so (А2) — **the rights** with their term and what cannot be edited (А3) (five working days for what the app does not do itself, the
   strictest of the three laws), **the three authorities** by name and site, the two years of silence
   (MOL-239), what a breach brings, the transfer to France — Germany until edition 5, below. **The
-  consent is held by the switch, not by the tap**: «пока включено «Учитывать меня в статистике»» — true of whoever turned it off before
-  edition 2, since «Принимаю» does not touch the switch; it is shown on the step itself, apart from the
+  consent is held by the switch, not by the tap**: «пока включено «Учитывать меня в статистике»» — true
+  of whoever turned it off before edition 2, since «Принимаю» does not touch the switch; it is shown on
+  the step itself, apart from the
   rest (В-2, Georgia's art. 32), with no box of its own — unticked it would empty the gates, ticked it is
   no consent. **The server holds it too** (adversarial А1): no visit is written and neither gate counts
   whoever has not accepted `STATISTICS_CONSENT_EDITION` — `advice.md`. **The card and «что изменилось»
@@ -352,9 +353,12 @@ The detail behind the privacy lines of `CLAUDE.md`.
   lets it go, 21 days at most — a new purpose, so **only for whoever accepted edition 4**
   (`REVIEW_CONSENT_EDITION`) — and since edition 5 is the model's threshold (MOL-319), every receipt the
   model reads has it; the claim's `reviewable` stays as the guard for the day the review's edition
-  outgrows the model's, held by a test that tells the claim otherwise. A receipt «Переснять» replaced
-  leaves it (owner's В-6 «а»), any other removal of the receipt takes it by the cascade, and **the person erased takes it always** (`receipt_misses.actor_id`, in
-  `ACTOR_REFERENCES`). It enters no nightly copy; **the person's copy says what is kept, until when and why**
+  outgrows the model's, held by tests that tell the claim otherwise — a receipt read in part and a
+  «переснимите» (adversarial Р2-А1); the third outcome, lines the wire refuses, no answer of the model
+  reaches, and its guard is held by nothing — a price. A receipt «Переснять» replaced leaves it (owner's
+  В-6 «а»), any other removal of the receipt takes it by the cascade, and **the person erased takes it
+  always** (`receipt_misses.actor_id`, in `ACTOR_REFERENCES`). It enters no nightly copy; **the person's
+  copy says what is kept, until when and why**
   (`receiptReviews`, version 25) — never the photo or the reading; the developer's notice of it names no name,
   sum or shop, and the id's start only of a receipt kept. Its reasons are counted with no id, as `receipt_days` is. The copy of one's data carries receipts and their lines,
   never a photo. `/privacy` says all of it under «Чеки». `.claude/rules/receipts.md`.
