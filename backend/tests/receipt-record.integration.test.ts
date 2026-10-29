@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import {
   ERROR,
+  latestDay,
   moneyAccountsCodec,
   receiptRecordedCodec,
   tripHistoryCodec,
@@ -599,7 +600,9 @@ describe('«Записать»', () => {
       expect([response.statusCode, codeOf(response)]).toEqual([409, ERROR.CONFLICT])
     }
     const twoLines = [line, { position: 1, skip: true }]
-    const future = await record(me, id, body({ lines: twoLines, purchasedOn: '2026-10-30' }))
+    // The latest day on Earth a day from now: a fixed date stopped being «to come» once UTC+14 reached it.
+    const tomorrow = latestDay(new Date(Date.now() + 24 * 60 * 60 * 1000))
+    const future = await record(me, id, body({ lines: twoLines, purchasedOn: tomorrow }))
     expect([future.statusCode, codeOf(future)]).toEqual([400, ERROR.RECEIPT_IN_FUTURE])
     const unknownItem = await record(me, id, {
       ...body({
