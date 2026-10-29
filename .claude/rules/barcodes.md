@@ -306,9 +306,13 @@ lies on an iPad (as MOL-132 Р-3).
   not pressed (Ф-4). **The connection is the screen's one `StatusStrip`, first under the field**
   (MOL-181, С-2): «Без связи · ищем только среди ваших недавних позиций» over the line of a code looked up
   offline, «Без связи · код не привязан…» over the question of a code not linked — never a second cloud
-  inside the screen. **It says «без связи» only while it is so** (owner's В-1 «а»): the connection back
-  takes it away, the line standing until the lookup's quiet retry answers and the question until its
-  «Повторить» is tapped; a «Повторить» that failed offline again is said again (`attempt`).
+  inside the screen. **It says «без связи» exactly while it is so** (owner's В-1 «а»): the connection
+  back takes it away, the line standing until the lookup's quiet retry answers and the question until
+  its «Повторить» is tapped — and the connection gone again brings it back, though the answer stands
+  `offline` with no change of phase (adversarial А1, А2: a blink at the shelf left both with no word of
+  why). A «Повторить» that failed offline again is said again (`attempt`), and so is every code read
+  offline, the second in a row too (А4). Under the line stand the recent items, never an answer the
+  search held from before the connection went (А3).
 - **Offline and error ask again once the connection is back**, quietly — the block stays until the
   answer replaces it — as the search does (`useReconnect`, adversarial Ж). **What that retry finds
   does not open a sheet**: it says «По коду … нашлось» with the item as a button, and the sheet comes
