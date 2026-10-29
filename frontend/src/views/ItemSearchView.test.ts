@@ -94,6 +94,13 @@ function online(value: boolean): void {
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(value)
 }
 
+/** The connection as a phone tells of it: the property and its event together. */
+async function connection(value: boolean): Promise<void> {
+  online(value)
+  window.dispatchEvent(new Event(value ? 'online' : 'offline'))
+  await nextTick()
+}
+
 /**
  * The scanner as the screen sees it: open, a code read, put away (MOL-99). The camera and its
  * worker are MOL-98's and happy-dom has neither; what the screen does with a code is this task's.
@@ -121,20 +128,28 @@ function remembered(...items: CatalogueEntry[]): void {
 
 /**
  * The screen under the app's own live region, so what it reads out can be heard. `shown` takes the
- * screen away while the region stays — what leaving it does.
+ * screen away while the region stays — what leaving it does. `said` keeps every announcement once,
+ * by its id: the same words said again are a new entry.
  */
-async function render(shown = ref(true), path = '/trip/add') {
+async function render(shown = ref(true), path = '/trip/add', said: string[] = []) {
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push(path)
   const wrapper = mount(
     defineComponent({
       setup() {
         const announcements = provideAnnouncer()
-        return () =>
-          h('div', [
+        const heard = new Set<number>()
+        return () => {
+          for (const one of announcements.value) {
+            if (heard.has(one.id)) continue
+            heard.add(one.id)
+            said.push(one.text)
+          }
+          return h('div', [
             shown.value ? h(ItemSearchView) : null,
             h('p', { class: 'live' }, announcements.value.map((a) => a.text).join(' | ')),
           ])
+        }
       },
     }),
     {
@@ -506,7 +521,8 @@ describe('«What did you pick up?»', () => {
         expect(names(view)).toEqual([milk.name])
       })
 
-      expect(view.find('.not-found').exists()).toBe(false)
+      expect(view.find('.far').exists()).toBe(false)
+      expect(view.find('.state').exists()).toBe(false)
       expect(view.text()).toContain(en.item.group_found)
       expect(view.text()).toContain(en.item.not_listed)
     }, 10_000)
@@ -1053,9 +1069,155 @@ describe('«What did you pick up?»', () => {
 
       await scan(view, CODE)
 
-      expect(view.text()).toContain(en.item.barcode.offline_body)
+      expect(view.get('.code-offline').text()).toBe(en.item.barcode.offline_body)
       expect(names(view)).toEqual([bread.name])
       expect(useItemEntryStore(pinia).picked).toBeNull()
+      await vi.waitFor(() => {
+        expect(view.get('.live').text()).toContain(en.item.barcode.offline_body)
+      })
+    })
+
+    // 3g: the connection in one strip of the code's own words, under the field; the answer a line
+    // under it — no second cloud inside the screen (Ф-14).
+    it('offline, says the connection in the code’s strip, the answer as a line under it', async () => {
+      remembered(bread)
+      online(false)
+      const view = await render()
+
+      await scan(view, CODE)
+
+      const strips = view.findAll('.strip')
+      expect(strips).toHaveLength(1)
+      expect(strips[0]?.text()).toBe(en.item.barcode.offline_strip)
+      expect(view.find('.state').exists()).toBe(false)
+      const html = view.html()
+      expect(html.indexOf('class="strip')).toBeGreaterThan(html.indexOf('<input'))
+      expect(html.indexOf('class="strip')).toBeLessThan(html.indexOf('code-offline'))
+      expect(html.indexOf('code-offline')).toBeLessThan(html.indexOf('role="listbox"'))
+    })
+
+    // The connection back and gone again while the quiet retry was on its way: the answer stays
+    // `offline` with no change of phase, and the strip says so again (adversarial А1, А1′).
+    it('brings the code’s strip back once the connection goes again, the next code too', async () => {
+      online(false)
+      const view = await render()
+      await scan(view, CODE)
+      let fail!: (error: unknown) => void
+      catalogueByBarcode.mockReturnValue(new Promise((_, reject) => (fail = reject)))
+      await connection(true)
+      expect(view.findAll('.strip')).toHaveLength(0)
+      expect(catalogueByBarcode).toHaveBeenCalledTimes(1)
+
+      await connection(false)
+      fail(new ApiError(ERROR.INTERNAL, 'transport', false))
+      await flushPromises()
+
+      expect(view.findAll('.strip').map((s) => s.text())).toEqual([en.item.barcode.offline_strip])
+      expect(view.text()).toContain(en.item.barcode.offline_body)
+
+      await scan(view, '4850000000014')
+
+      expect(view.findAll('.strip').map((s) => s.text())).toEqual([en.item.barcode.offline_strip])
+    })
+
+    // The recent items, never the answer the search held from before the connection went: the search
+    // hears no `offline` and stays `ready` (adversarial А3).
+    it('lists the recent items under a code looked up offline, never an answer from before', async () => {
+      remembered(bread, milk)
+      searchCatalogue.mockResolvedValue([milk, marianna])
+      const view = await render()
+      await field(view).setValue('молок')
+      await vi.waitFor(() => {
+        expect(names(view)).toEqual([milk.name, marianna.name])
+      })
+      online(false)
+
+      await scan(view, CODE)
+
+      expect(view.text()).toContain(en.item.barcode.offline_body)
+      expect(view.text()).toContain(en.item.group_recent)
+      expect(names(view)).toEqual([milk.name])
+    }, 10_000)
+
+    // The recent items under a code looked up offline are no previous answer: nothing dims them, even
+    // while the search still waits for an answer to what was typed before (К-11, adversarial Б1).
+    it('never dims the recent items under a code looked up offline', async () => {
+      remembered(bread)
+      searchCatalogue.mockResolvedValueOnce([bread])
+      const view = await render()
+      await field(view).setValue('хле')
+      await vi.waitFor(() => {
+        expect(names(view)).toEqual([bread.name])
+      })
+      searchCatalogue.mockReturnValue(new Promise(() => undefined))
+      await field(view).setValue('хлеб')
+      await vi.waitFor(() => {
+        expect(searchCatalogue).toHaveBeenCalledWith('хлеб')
+      })
+      expect(view.get('[role="listbox"]').classes()).toContain('stale')
+      await connection(false)
+
+      await scan(view, CODE)
+
+      expect(view.text()).toContain(en.item.barcode.offline_body)
+      expect(names(view)).toEqual([bread.name])
+      const list = view.get('[role="listbox"]')
+      expect(list.classes()).not.toContain('stale')
+      expect(list.attributes('aria-busy')).toBeUndefined()
+    }, 10_000)
+
+    // A second code offline is `offline` over `offline`: said all the same (adversarial А4).
+    it('says a second code looked up offline as well', async () => {
+      online(false)
+      const said: string[] = []
+      const view = await render(ref(true), '/trip/add', said)
+      await scan(view, CODE)
+      await vi.waitFor(() => {
+        expect(said.filter((s) => s === en.item.barcode.offline_body)).toHaveLength(1)
+      })
+
+      await scan(view, '4850000000014')
+
+      await vi.waitFor(() => {
+        expect(said.filter((s) => s === en.item.barcode.offline_body)).toHaveLength(2)
+      })
+    })
+
+    it('takes the code’s strip away once the connection is back, the line staying for the answer', async () => {
+      online(false)
+      let answer!: (found: CatalogueEntry | null) => void
+      catalogueByBarcode.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+      const view = await render()
+      await scan(view, CODE)
+      expect(view.findAll('.strip')).toHaveLength(1)
+
+      online(true)
+      window.dispatchEvent(new Event('online'))
+      await nextTick()
+
+      expect(view.findAll('.strip')).toHaveLength(0)
+      expect(view.text()).toContain(en.item.barcode.offline_body)
+      answer(null)
+      await vi.waitFor(() => {
+        expect(view.text()).toContain(en.item.barcode.missing.replace('{code}', CODE))
+      })
+    })
+
+    // 3a–3f: a card of its question, never the dashed block centred.
+    it('answers in a card: the question, then the one filled button', async () => {
+      catalogueByBarcode.mockResolvedValue(null)
+      const view = await render()
+
+      await scan(view, CODE)
+
+      await vi.waitFor(() => {
+        expect(view.find('.code-card').exists()).toBe(true)
+      })
+      const card = view.get('.code-card')
+      expect(card.classes()).toContain('card')
+      expect(card.get('.code-title').text()).toBe(en.item.barcode.missing.replace('{code}', CODE))
+      expect(card.findAll('button.primary').map((b) => b.text())).toEqual([en.item.empty.action])
+      expect(card.get('.code-text').text()).toBe(en.item.barcode.missing_hint)
     })
 
     describe('a hint of Open Food Facts under a code nobody holds (MOL-162)', () => {
@@ -1079,7 +1241,7 @@ describe('«What did you pick up?»', () => {
         expect(view.get('.code-hint').text()).toContain(en.item.barcode.hint_source)
         expect(catalogueBarcodeHint).toHaveBeenCalledWith(CODE, 'en')
         // Under the button, which then never moves when the hint comes (В-5, adversarial Г).
-        const block = view.get('.not-found').html()
+        const block = view.get('.code-card').html()
         expect(block.indexOf('code-hint')).toBeGreaterThan(block.indexOf(en.item.empty.action))
         await vi.waitFor(() => {
           expect(view.get('.live').text()).toBe(
@@ -1518,12 +1680,111 @@ describe('«What did you pick up?»', () => {
 
         await button(view, en.item.barcode.bind).trigger('click')
 
+        // 3i: the strip says the connection, the question stays with its two ways on.
         await vi.waitFor(() => {
-          expect(view.text()).toContain(en.item.barcode.bind_offline_body)
+          expect(view.findAll('.strip').map((s) => s.text())).toEqual([
+            en.item.barcode.bind_offline_strip,
+          ])
         })
-        expect(button(view, en.state.retry).exists()).toBe(true)
+        expect(view.get('.code-title').text()).toBe(question)
+        expect(view.find('.code-text').exists()).toBe(false)
+        expect(view.find('.state').exists()).toBe(false)
+        expect(button(view, en.state.retry).classes()).toContain('primary')
+        expect(button(view, en.item.barcode.without_code).classes()).toContain('ghost')
+        expect(document.activeElement?.textContent.trim()).toBe(en.state.retry)
         await button(view, en.item.barcode.without_code).trigger('click')
         expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
+      }, 30_000)
+
+      it('offline again after «Try again»: the strip says it once more', async () => {
+        attachBarcode.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'transport', false))
+        const view = await render()
+        await pickAfterMiss(view)
+        online(false)
+        await button(view, en.item.barcode.bind).trigger('click')
+        await vi.waitFor(() => {
+          expect(view.findAll('.strip')).toHaveLength(1)
+        })
+        const attempt = () => view.findComponent({ name: 'StatusStrip' }).props('attempt') as number
+        const first = attempt()
+
+        await button(view, en.state.retry).trigger('click')
+
+        await vi.waitFor(() => {
+          expect(attempt()).toBe(first + 1)
+        })
+        expect(attachBarcode).toHaveBeenCalledTimes(2)
+        expect(document.activeElement?.textContent.trim()).toBe(en.state.retry)
+      }, 30_000)
+
+      // В-1 «а»: the strip does not say «offline» once it is not so; the write still waits for a tap.
+      it('takes the strip away once the connection is back, the question waiting for «Try again»', async () => {
+        attachBarcode.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'transport', false))
+        attachBarcode.mockResolvedValue({ entry: cream, created: true })
+        const view = await render()
+        await pickAfterMiss(view)
+        online(false)
+        window.dispatchEvent(new Event('offline'))
+        await button(view, en.item.barcode.bind).trigger('click')
+        await vi.waitFor(() => {
+          expect(view.findAll('.strip')).toHaveLength(1)
+        })
+
+        online(true)
+        window.dispatchEvent(new Event('online'))
+        await nextTick()
+
+        expect(view.findAll('.strip')).toHaveLength(0)
+        expect(view.get('.code-title').text()).toBe(question)
+        expect(document.activeElement?.textContent.trim()).toBe(en.state.retry)
+        expect(attachBarcode).toHaveBeenCalledTimes(1)
+        await button(view, en.state.retry).trigger('click')
+        await vi.waitFor(() => {
+          expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
+        })
+      }, 10_000)
+
+      // The connection back takes the strip away (В-1 «а»), gone again brings it back: the question
+      // stands `offline` with no tap, and «Try again» is never left without its why (adversarial А2).
+      it('brings the strip back over the question once the connection goes again', async () => {
+        attachBarcode.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'transport', false))
+        const view = await render()
+        await pickAfterMiss(view)
+        await connection(false)
+        await button(view, en.item.barcode.bind).trigger('click')
+        await vi.waitFor(() => {
+          expect(view.findAll('.strip')).toHaveLength(1)
+        })
+
+        await connection(true)
+        expect(view.findAll('.strip')).toHaveLength(0)
+        await connection(false)
+
+        expect(view.findAll('.strip').map((s) => s.text())).toEqual([
+          en.item.barcode.bind_offline_strip,
+        ])
+        expect(view.get('.code-title').text()).toBe(question)
+        expect(attachBarcode).toHaveBeenCalledTimes(1)
+      }, 10_000)
+
+      // One strip a screen, the connection first under the field: over the waiting code (Р-5, Р-6).
+      it('says the connection over the waiting code, in one strip', async () => {
+        const view = await render()
+        await scan(view, CODE)
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(missing)
+        })
+        online(false)
+        searchCatalogue.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'transport', false))
+
+        await field(view).setValue('сметана')
+
+        await vi.waitFor(() => {
+          expect(view.findAll('.strip').map((s) => s.text())).toEqual([en.item.offline.strip])
+        })
+        const html = view.html()
+        expect(html.indexOf('class="strip')).toBeLessThan(html.indexOf('class="pending'))
+        expect(view.get('.pending').text()).toBe(pending)
       }, 10_000)
 
       it('must not act on the other answers while the code is on its way (review Б)', async () => {

@@ -443,7 +443,8 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   arrows keep the row they stand on while the rows and the query are the same: the groups are built
   anew whenever the record is read again (adversarial А3).
 - **Only under an empty field**: typed, the recent items are narrowed alone, as with no signal (1j);
-  the answer to a code and the question «привязать?» show no groups. Both groups are one listbox of
+  the answer to a code and the question «привязать?» show no groups — but a code looked up offline,
+  whose line stands over the groups of an empty field with no signal (`barcodes.md`, MOL-210). Both groups are one listbox of
   `CatalogueCombobox` (`groups`), each `role="group"` named by its caption, the arrows one run through
   them; the listbox is named by the field.
 - **The phone remembers it per place** (`stores/hereLast.ts`, `molvia.here-last.<owner>`, thirty
