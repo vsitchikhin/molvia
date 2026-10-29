@@ -121,16 +121,20 @@ it('promises nothing it does not keep: no «никто не видит», no ter
   // The API's metrics keep their own thirty (MOL-145, named by MOL-236, Р6-А1), in a sentence of their own.
   const metrics = /Видны из них последние 30 дней[^.]*\./
   expect(ru.privacy.logs.text).toMatch(metrics)
-  // And Anthropic's thirty, a term of a recipient, not ours (MOL-319): named among the recipients and
-  // in one clause of «Чеки».
-  const anthropic = /фото, отправленное Anthropic, живёт у неё до 30 дней/
-  expect(ru.privacy.stored.receipts.text).toMatch(anthropic)
+  // And Anthropic's thirty, a term of a recipient, not ours (MOL-319): named among the recipients, in a
+  // sentence of «Чеки» and one of «Удалить всё» — each with the two years of what its check flagged, so
+  // thirty is never said as the limit (adversarial А2).
+  const receipts = /Фото, отправленное Anthropic, живёт у неё до 30 дней[^.]*\./
+  const erase = /До фото чеков, которые читала модель Claude, удаление не достаёт[^.]*\./
+  expect(receipts.exec(ru.privacy.stored.receipts.text)?.[0]).toMatch(/до 2 лет/)
+  expect(erase.exec(ru.privacy.erase.text)?.[0]).toMatch(/до 2 лет/)
   expect(
     text
       .replace(ru.privacy.failures.text, '')
       .replace(ru.privacy.recipients.anthropic.text, '')
       .replace(metrics, '')
-      .replace(anthropic, ''),
+      .replace(receipts, '')
+      .replace(erase, ''),
   ).not.toMatch(/никто не видит|30 дней/i)
   // Selfreview 1: the shared mode shows other people's prices, so «shown to nobody» is said of
   // the list of purchases, and the prices are named with their threshold.
@@ -361,13 +365,34 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
     expect(en.privacy.recipients.anthropic.text).toMatch(
       /up to 30 days.*up to 2 years.*up to 7 years/,
     )
-    // «Удаляется при записи» is ours, and the page says so beside Anthropic's copy.
+    // «Удаляется при записи» is ours, and the page says so beside Anthropic's copy — after the exception of
+    // a receipt kept for the review, which belongs to our deletion, not to Anthropic's term (self-review №3).
     const receipts = ru.privacy.stored.receipts.text
     expect(receipts).toMatch(/У нас фото удаляется, как только вы запишете чек/)
-    expect(receipts).toMatch(/фото, отправленное Anthropic, живёт у неё до 30 дней/)
+    expect(receipts).toMatch(
+      /через 28 дней после отправки\. Кроме чека, который модель прочитала не целиком/,
+    )
+    expect(receipts).toMatch(
+      /уйдёт и это\. Фото, отправленное Anthropic, живёт у неё до 30 дней, а отмеченное её проверкой — до 2 лет/,
+    )
     expect(receipts).not.toMatch(/Anthropic, США/)
-    expect(en.privacy.stored.receipts.text).toMatch(
-      /a photo sent to Anthropic lives there up to 30 days/,
+    const english = en.privacy.stored.receipts.text
+    expect(english).toMatch(/On our server the photo is deleted/)
+    expect(english).toMatch(
+      /28 days after it was sent\. Except a receipt the model did not read whole/,
+    )
+    expect(english).toMatch(
+      /A photo sent to Anthropic lives there up to 30 days, or up to 2 years if its check flags it/,
+    )
+  })
+
+  // Adversarial А1: «Удалить всё» says everything goes and lists what stays; Anthropic's copy outlives it.
+  it('says erasure does not reach the copy at Anthropic, and for how long it lives there', () => {
+    expect(ru.privacy.erase.text).toMatch(
+      /До фото чеков, которые читала модель Claude, удаление не достаёт: .*до 30 дней, отмеченные её проверкой — до 2 лет, оценка проверки — до 7 лет/,
+    )
+    expect(en.privacy.erase.text).toMatch(
+      /Deletion does not reach the receipt photos the Claude model read: .*up to 30 days, up to 2 years .*up to 7 years/,
     )
   })
 

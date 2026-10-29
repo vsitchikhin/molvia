@@ -194,9 +194,12 @@ describe('«Условия и приватность» (MOL-95)', () => {
     expect(view.findAll('.changes-text').map((p) => p.text())).toEqual([en.consent.changes['5']])
     expect(ru.consent.changes['5']).toMatch(/во Франции, а не в Германии/)
     expect(ru.consent.changes['5']).toMatch(/в любой стране, где у неё есть мощности/)
-    expect(ru.consent.changes['5']).toMatch(/до 30 дней/)
+    // the whole of the term, as the page says it: the one paragraph whoever accepted 4 reads (adversarial А3)
+    expect(ru.consent.changes['5']).toMatch(
+      /до 30 дней \(отмеченное её проверкой — до 2 лет, оценку проверки — до 7 лет\)/,
+    )
     expect(en.consent.changes['5']).toMatch(/in France, not in Germany/)
-    expect(en.consent.changes['5']).toMatch(/up to 30 days/)
+    expect(en.consent.changes['5']).toMatch(/up to 30 days \(up to 2 years .*up to 7 years\)/)
   })
 
   it('sends nothing of the age: the edition alone is the answer', async () => {
