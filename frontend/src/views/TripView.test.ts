@@ -1,5 +1,5 @@
 import { flushPromises, mount, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFailed, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import { RouterView, createMemoryHistory, createRouter, createWebHistory } from 'vue-router'
@@ -91,10 +91,13 @@ interface Row {
   readonly unitPrice?: string
 }
 
-function trip(rows: readonly Row[] = [], over: Partial<Record<'id', string>> = {}): TripViewModel {
+function trip(
+  rows: readonly Row[] = [],
+  over: Partial<Record<'id' | 'startedAt', string>> = {},
+): TripViewModel {
   return tripViewCodec.parse({
     id: over.id ?? TRIP,
-    startedAt: new Date().toISOString(),
+    startedAt: over.startedAt ?? new Date().toISOString(),
     finishedAt: null,
     currency: 'AMD',
     rate: null,
@@ -1708,20 +1711,45 @@ describe('TripView', () => {
     })
 
     it('у пустой записи суммы нет: «Закончить» предлагает записать тратой в «Деньгах» (В-1)', async () => {
-      currentTrip.mockResolvedValue(trip())
+      // Начата в прошлый день: «Сегодня» шторки его не подделает, и полночь его не сдвинет (MOL-308).
+      // В 22:00 UTC у телефона ещё 27-е, а в Ереване уже 28-е: передаётся день телефона (MOL-121).
+      currentTrip.mockResolvedValue(trip([], { startedAt: '2026-09-27T22:00:00.000Z' }))
       const { view, queue, router } = await render()
       expect(view.findAll('button').some((b) => b.text() === ru.trip.receipt.add)).toBe(false)
       await askFinish(view)
+      // «Деньги» ждём событием роутера, а не часами (MOL-308): предел — только тайм-аут теста.
+      // Ходы пишутся по пути: отчёт о падении приходит, когда экран уже снят. Прерванный, отменённый
+      // и повторный переход тоже доходят до `afterEach` с целью в `to` — они пишутся с типом отказа и
+      // прихода не значат; перенаправленный не доходит, приходит только новая цель. Зелёный прогон:
+      // `purchases×8 → purchase-manual×8 → money` — переход каждого шага назад отменён следующим.
+      const moves: string[] = []
+      const arrived = new Promise<void>((resolve) => {
+        router.afterEach((to, _from, failure) => {
+          moves.push(failure ? `${String(to.name)}×${String(failure.type)}` : String(to.name))
+          if (to.name === 'money' && !failure) resolve()
+        })
+      })
+      onTestFailed(() => {
+        const state = {
+          moves,
+          handed: useSpendingHandoffStore().handed,
+          queue: queue.pending.map((write) => write.kind),
+        }
+        console.error(`[MOL-308] где встал переход на «Деньги»: ${JSON.stringify(state)}`)
+      })
       inside(openSheet(), ru.trip.remove.empty.spending).click()
       await flushPromises()
-      expect(queue.pending).toEqual([{ kind: 'delete', tripId: TRIP }])
-      for (let step = 0; step < 20 && router.currentRoute.value.name !== 'money'; step += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 20))
-        await flushPromises()
-      }
-      expect(router.currentRoute.value.name).toBe('money')
+      expect(queue.pending, 'запись ушла в очередь на удаление').toEqual([
+        { kind: 'delete', tripId: TRIP },
+      ])
+      await arrived
+      await flushPromises()
+      expect(router.currentRoute.value.name, 'человек остался на «Деньгах»').toBe('money')
       // «Деньги» took what was handed over and opened the sheet on it.
-      expect(useSpendingHandoffStore().handed).toBeNull()
+      expect(useSpendingHandoffStore().handed, '«Деньги» забрали переданное').toBeNull()
+      expect(openSheet()?.textContent, 'шторка траты — на день и магазин записи').toContain(
+        '27 сент. · Ереван Сити',
+      )
     })
   })
 
