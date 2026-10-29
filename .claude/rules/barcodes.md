@@ -294,9 +294,21 @@ lies on an iPad (as MOL-132 Р-3).
   товар» — with the code since MOL-100 (below). **Proposed from
   there, the item was looked for by the code**: the name starts empty, whatever the field held before
   the scan, the pick carries no query, and the block goes once the item is proposed (adversarial Д,
-  review С-5). An error is red with «Повторить»; typing gives the search back and drops a lookup
-  still out. **Under the code's answer the search says nothing**: its rows are not shown, and an
-  answer landing then read «найдено два» over «не знаком» (adversarial Б).
+  review С-5). An error is the section's quiet card with «Повторить» (MOL-180, as 1i of the search);
+  typing gives the search back and drops a lookup still out. **Under the code's answer the search says
+  nothing**: its rows are not shown, and an answer landing then read «найдено два» over «не знаком»
+  (adversarial Б). **Offline is the one exception**: the answer is a line, «среди ваших недавних
+  позиций этого кода нет», and the recent items stand under it as under an empty field with no
+  signal — all the device can still find, and no answer of the search to be read over it.
+- **The answers look as v2 draws them** (MOL-210, Ф-35, frames 3a–3i): a card (`AppCard`) of its
+  question at 17/600, its words at 13 and its buttons full width, one of them filled; «Код … ждёт
+  позицию» and the hint of Open Food Facts are notes on `--surface-2`, not the accent's tint — they are
+  not pressed (Ф-4). **The connection is the screen's one `StatusStrip`, first under the field**
+  (MOL-181, С-2): «Без связи · ищем только среди ваших недавних позиций» over the line of a code looked up
+  offline, «Без связи · код не привязан…» over the question of a code not linked — never a second cloud
+  inside the screen. **It says «без связи» only while it is so** (owner's В-1 «а»): the connection back
+  takes it away, the line standing until the lookup's quiet retry answers and the question until its
+  «Повторить» is tapped; a «Повторить» that failed offline again is said again (`attempt`).
 - **Offline and error ask again once the connection is back**, quietly — the block stays until the
   answer replaces it — as the search does (`useReconnect`, adversarial Ж). **What that retry finds
   does not open a sheet**: it says «По коду … нашлось» with the item as a button, and the sheet comes
@@ -444,9 +456,10 @@ codes too, and a wrong one needs a way out (В-1, below).
   the person with the package decides, the last answer at hand. Typing drops a question not yet
   answered, and the code still waits.
 - **Taken** — «Код … уже у „…“»: «Взять „…“» takes the holder as found by the code, with no query;
-  «Записать „…“ без кода» goes on with the row picked. **No network** is an offline state with
-  «Повторить» and «Записать без кода» — the catalogue has no queue, as «Предложить товар» has none; an
-  error is red with «Повторить» and the same way out. **An item holding twenty codes** is said in the words of `error.barcodes_full`, with no «Повторить» — asking again changes nothing (review В). A retry of a write waits for a tap: nothing is
+  «Записать „…“ без кода» goes on with the row picked. **No network** leaves the question standing,
+  its strip over the field saying why, with «Повторить» and «Записать без кода» (MOL-210, 3i) — the
+  catalogue has no queue, as «Предложить товар» has none; an error is the quiet card with «Повторить»
+  and the same way out. **An item holding twenty codes** is said in the words of `error.barcodes_full`, with no «Повторить» — asking again changes nothing (review В). A retry of a write waits for a tap: nothing is
   sent by itself.
 - **A code written is remembered for offline** as one found is: the item it went to goes into «Часто
   берёте» with it once it is added to a record.
