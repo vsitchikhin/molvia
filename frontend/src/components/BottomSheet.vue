@@ -548,8 +548,13 @@ export default defineComponent({
   }
 }
 
+/* One column as wide as the sheet, never as its content (MOL-318, owner's В-1 «б»): an `auto` one took the
+   least width of whatever stood in it — a field's line (MOL-199 А3), a row of chips — and the whole
+   sheet, × and all, went past the phone. Content that cannot shrink still stands past its own edge,
+   and a test still sees it. */
 .panel {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
   padding: var(--space-4) calc(var(--space-4) + var(--safe-right))
     calc(var(--space-8) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
@@ -618,12 +623,16 @@ export default defineComponent({
   margin: 0;
   font-size: var(--text-title);
   line-height: var(--leading-snug);
+
+  /* An item's, a place's, a category's name may be one word wider than the sheet (MOL-318). */
+  overflow-wrap: anywhere;
 }
 
 .meta {
   margin: 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
+  overflow-wrap: anywhere;
 }
 
 @media (prefers-reduced-motion: reduce) {
