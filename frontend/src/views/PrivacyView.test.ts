@@ -121,9 +121,17 @@ it('promises nothing it does not keep: no «никто не видит», no ter
   // The API's metrics keep their own thirty (MOL-145, named by MOL-236, Р6-А1), in a sentence of their own.
   const metrics = /Видны из них последние 30 дней[^.]*\./
   expect(ru.privacy.logs.text).toMatch(metrics)
-  expect(text.replace(ru.privacy.failures.text, '').replace(metrics, '')).not.toMatch(
-    /никто не видит|30 дней/i,
-  )
+  // And Anthropic's thirty, a term of a recipient, not ours (MOL-319): named among the recipients and
+  // in one clause of «Чеки».
+  const anthropic = /фото, отправленное Anthropic, живёт у неё до 30 дней/
+  expect(ru.privacy.stored.receipts.text).toMatch(anthropic)
+  expect(
+    text
+      .replace(ru.privacy.failures.text, '')
+      .replace(ru.privacy.recipients.anthropic.text, '')
+      .replace(metrics, '')
+      .replace(anthropic, ''),
+  ).not.toMatch(/никто не видит|30 дней/i)
   // Selfreview 1: the shared mode shows other people's prices, so «shown to nobody» is said of
   // the list of purchases, and the prices are named with their threshold.
   expect(text).not.toMatch(/покупки никому не показываются/i)
@@ -151,8 +159,10 @@ it('names what stays after erasure in full — the items and the shops (adversar
 
 it('names the country and the copies, and what a restore would undo (MOL-70)', async () => {
   const text = (await render()).text()
-  // «Персональные данные» 5.4: the country goes on the page once there is a machine.
-  expect(text).toContain('Германии')
+  // «Персональные данные» 5.4: the country goes on the page once there is a machine — Contabo's «EU»
+  // is Lauterbourg, France (MOL-242, MOL-319).
+  expect(text).toContain('Франции')
+  expect(text).not.toMatch(/Германи/)
   // The copies are encrypted, in the EU, and live exactly as long as the bucket keeps them.
   expect(ru.privacy.backups.text).toMatch(/зашифрованном виде.*в ЕС/)
   expect(ru.privacy.backups.text).toContain('14 дней')
@@ -167,7 +177,7 @@ it('says the consent is kept — the edition and when — and nothing of the age
   expect(view.text()).toContain(ru.privacy.stored.consent.text)
   expect(ru.privacy.stored.consent.text).toMatch(/Возраст и дату рождения мы не храним/)
   // The subtitle is the revision written in code, not a sentence of the dictionary.
-  expect(view.text()).toContain('Редакция 4 от 28 октября 2026')
+  expect(view.text()).toContain('Редакция 5 от 29 октября 2026')
 })
 
 describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for (MOL-236)', () => {
@@ -277,10 +287,12 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
     )
   })
 
-  it('names the shops’ memory among what stays, and the transfer to Germany', async () => {
+  it('names the shops’ memory among what stays, and the transfer to France (MOL-319)', async () => {
     const text = (await render()).text()
     expect(ru.privacy.erase.text).toMatch(/память магазинов — какой товар стоит за строкой чека/)
-    expect(ru.privacy.backups.text).toMatch(/Германия — в его списке стран с достаточной защитой/)
+    expect(ru.privacy.backups.text).toMatch(/Франция — в его списке стран с достаточной защитой/)
+    expect(ru.privacy.recipients.contabo.term).toBe('Contabo, сервер во Франции')
+    expect(en.privacy.recipients.contabo.term).toBe('Contabo, server in France')
     // «No analytics» would be untrue beside the statistics: it is the third-party kind there is none of.
     expect(text).toContain(ru.privacy.summary)
     expect(ru.privacy.summary).toMatch(/сторонних трекеров и аналитики/)
@@ -332,6 +344,31 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
     expect(text).toMatch(/слово снова берётся из неё — её товар, цена и день/)
     expect(text).toMatch(/Строки, которые вы не стали записывать, удаляются при записи/)
     expect(text).not.toMatch(/пока есть аккаунт|исправляем/)
+  })
+
+  // MOL-319, from MOL-301 В-1 «б» and В-2 «а»: the workspace computes «global», and Anthropic keeps what
+  // it was sent for 30 days, flagged for 2 years — edition 5 says both where the receipt's photo goes.
+  it('says Anthropic stores in the USA and computes anywhere, and how long it keeps a receipt', () => {
+    for (const { privacy } of [ru, en]) {
+      expect(privacy.recipients.anthropic.term).not.toMatch(/^Anthropic, (США|USA)$/)
+    }
+    expect(ru.privacy.recipients.anthropic.term).toBe('Anthropic: США и другие страны')
+    const anthropic = ru.privacy.recipients.anthropic.text
+    expect(anthropic).toMatch(/Хранит присланное Anthropic в США, а считает — в любой стране/)
+    expect(anthropic).toMatch(/живут до 30 дней/)
+    expect(anthropic).toMatch(/до 2 лет, и оценка этой проверки — до 7 лет/)
+    expect(en.privacy.recipients.anthropic.text).toMatch(/computes it in any country/)
+    expect(en.privacy.recipients.anthropic.text).toMatch(
+      /up to 30 days.*up to 2 years.*up to 7 years/,
+    )
+    // «Удаляется при записи» is ours, and the page says so beside Anthropic's copy.
+    const receipts = ru.privacy.stored.receipts.text
+    expect(receipts).toMatch(/У нас фото удаляется, как только вы запишете чек/)
+    expect(receipts).toMatch(/фото, отправленное Anthropic, живёт у неё до 30 дней/)
+    expect(receipts).not.toMatch(/Anthropic, США/)
+    expect(en.privacy.stored.receipts.text).toMatch(
+      /a photo sent to Anthropic lives there up to 30 days/,
+    )
   })
 
   it('draws no notice of a breach while the dictionary has none', async () => {

@@ -13,7 +13,7 @@ import { z } from 'zod'
  * not exist yet. Which edition to ask about is the phone's (Р-3): the person accepts the text they
  * are shown, and that is the text of their build.
  */
-export const POLICY_VERSION = 4
+export const POLICY_VERSION = 5
 
 /**
  * The first edition whose text asks consent to the statistics (MOL-236): Armenia's law knows no
