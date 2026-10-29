@@ -615,7 +615,7 @@ function sideways(sheet: Locator): Promise<{ sheet: number; past: string[] }> {
       sheet: dialog.scrollWidth - dialog.clientWidth,
       past: [...dialog.querySelectorAll('.chips .chip')]
         .filter((chip) => chip.getBoundingClientRect().right > edge + 0.5)
-        .map((chip) => chip.textContent?.trim() ?? ''),
+        .map((chip) => chip.textContent.trim()),
     }
   })
 }
