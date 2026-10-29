@@ -600,7 +600,7 @@ describe('«Записать»', () => {
       expect([response.statusCode, codeOf(response)]).toEqual([409, ERROR.CONFLICT])
     }
     const twoLines = [line, { position: 1, skip: true }]
-    // The latest day on Earth a day from now: a fixed date stopped being «to come» once UTC+14 reached it.
+    // A day still to come anywhere on Earth, counted from now: a date written out ran out (29.10.2026).
     const tomorrow = latestDay(new Date(Date.now() + 24 * 60 * 60 * 1000))
     const future = await record(me, id, body({ lines: twoLines, purchasedOn: tomorrow }))
     expect([future.statusCode, codeOf(future)]).toEqual([400, ERROR.RECEIPT_IN_FUTURE])
