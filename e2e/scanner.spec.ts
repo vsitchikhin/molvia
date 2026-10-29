@@ -160,7 +160,7 @@ test.describe('on «What did you pick up?»', () => {
   // The block on the screen, not the app's live region, which says the same words (MOL-19).
   const missing = (page: Page) =>
     page
-      .locator('.not-found')
+      .locator('.code-card')
       .getByText(`The catalogue does not know the code ${BARCODE}`, { exact: true })
 
   test('a code the camera read and nobody holds offers «Suggest an item»', async ({
@@ -223,7 +223,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
   const tag = String(randomInt(10 ** 6))
   const missingOf = (page: Page, code: string) =>
     page
-      .locator('.not-found')
+      .locator('.code-card')
       .getByText(`The catalogue does not know the code ${code}`, { exact: true })
 
   async function typeCode(page: Page, code: string): Promise<void> {
@@ -256,7 +256,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
     await typeCode(page, '20000011')
 
     await expect(
-      page.locator('.not-found').getByText("Code 20000011 is a shop's own label", { exact: true }),
+      page.locator('.code-card').getByText("Code 20000011 is a shop's own label", { exact: true }),
     ).toBeVisible()
     await expect(page.getByRole('button', { name: 'Suggest an item' })).toHaveCount(0)
   })
@@ -299,7 +299,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
     await expect(missingOf(page, code)).toBeVisible()
 
     await expect(
-      page.locator('.not-found').getByText(`Looks like “${name}”, 0.325 kg`),
+      page.locator('.code-card').getByText(`Looks like “${name}”, 0.325 kg`),
     ).toBeVisible()
     await expect(page.locator('.announcer')).toContainText(`Looks like “${name}”, 0.325 kg`)
 
@@ -410,7 +410,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
     ).toBeVisible()
     await page.getByRole('option', { name: new RegExp(name) }).click()
     await expect(
-      page.locator('.not-found').getByText(`Link code ${code} to «${name}»?`),
+      page.locator('.code-card').getByText(`Link code ${code} to «${name}»?`),
     ).toBeVisible()
     await page.getByRole('button', { name: 'Link and record' }).click()
 
@@ -489,7 +489,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
         await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(name)
         await page.getByRole('option', { name: new RegExp(name) }).click()
         await expect(
-          page.locator('.not-found').getByText(`Link code ${code} to «${name}»?`),
+          page.locator('.code-card').getByText(`Link code ${code} to «${name}»?`),
         ).toBeVisible()
         await expect.poll(async () => (await focused(page)).text).toBe('Link and record')
       } finally {
@@ -526,14 +526,14 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
     }) => {
       await open(page, '/purchases/manual/add')
       await typeCode(page, freshCode())
-      await expect(page.locator('.not-found')).toBeVisible()
+      await expect(page.locator('.code-card')).toBeVisible()
       await expect.poll(async () => (await focused(page)).body).toBe(false)
 
       await typeCode(page, '20000011')
       // The block on the screen, not the live region, which says the same words (`e2e.md`): on a
       // loaded machine both are there at once.
       await expect(
-        page.locator('.bind-question').getByText("Code 20000011 is a shop's own label"),
+        page.locator('.code-title').getByText("Code 20000011 is a shop's own label"),
       ).toBeVisible()
       await expect.poll(async () => (await focused(page)).body).toBe(false)
     })
@@ -585,13 +585,16 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
 
       await page.keyboard.press('Enter')
 
-      // By its block: the live region says the same words (e2e.md, MOL-64).
+      // By its strip: the live region says the same words (e2e.md, MOL-64). The question stays (3i).
       await expect(
         page
-          .locator('.state')
+          .locator('.strip')
           .getByText(
-            'The code is not linked. Try again with a connection — or record without the code',
+            'Offline · the code is not linked. Try again with a connection — or record without the code',
           ),
+      ).toBeVisible()
+      await expect(
+        page.locator('.code-title').getByText(`Link code ${code} to «Кефир ${tag} ф2»?`),
       ).toBeVisible()
       await expect.poll(async () => (await focused(page)).text).toBe('Try again')
       await context.setOffline(false)

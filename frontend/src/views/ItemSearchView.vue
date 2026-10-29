@@ -36,7 +36,7 @@
       ref="combobox"
       v-model="query"
       :groups="groups"
-      :stale="stale"
+      :stale="listStale"
       :readonly="bind?.phase === 'sending'"
       :label="t('item.search_title')"
       :placeholder="t('item.search_placeholder')"
@@ -55,9 +55,23 @@
       </template>
 
       <template #before>
+        <!-- The connection, the answer's first line: under the field, never over it — nothing of the
+             answer stands above the control that chooses it (MOL-138, В-2) — and with nothing typed
+             too, as 1j draws it: typing offline searches the recent items at once, with no failure to
+             wait for (`useCatalogueSearch`). One a screen, in the words of what it is about (3g, 3i). -->
+        <StatusStrip
+          v-if="strip"
+          kind="offline"
+          class="connection"
+          :text="strip"
+          :attempt="stripAttempt"
+        />
+
         <!-- A code the catalogue did not know waits for its item (MOL-100): the search goes on
-             under it, and a pick asks whether the code is that item's. -->
+             under it, and a pick asks whether the code is that item's. A note, not a tint: it is not
+             pressed (Ф-4, 3c). -->
         <div v-if="pendingCode && barcode === 'idle' && !bind" class="pending">
+          <IconBarcode class="pending-icon" aria-hidden="true" />
           <p class="pending-text">{{ t('item.barcode.pending', { code: pendingCode }) }}</p>
           <AppButton variant="icon" :label="t('item.barcode.pending_drop')" @click="dropPending">
             <IconClose />
@@ -65,18 +79,40 @@
         </div>
 
         <!-- «Привязать код к ней?» (MOL-100, В-2): here, where the code's block stood, so that
-             «taken» or «no network» is said where the person is; the purchase sheet comes after. -->
-        <div v-if="bind && (bind.phase === 'ask' || bind.phase === 'sending')" class="not-found">
-          <p class="bind-question">
-            {{
-              t(bind.origin === 'pick' ? 'item.barcode.bind_question' : 'item.barcode.bind_named', {
-                code: bind.code,
-                name: bind.entry.name,
-              })
-            }}
-          </p>
-          <p class="not-found-text">{{ t('item.barcode.bind_hint') }}</p>
-          <div class="bind-actions">
+             «taken» or «no network» is said where the person is; the purchase sheet comes after.
+             Without a network the question stays, the strip above says why (3i). -->
+        <AppCard
+          v-if="
+            bind && (bind.phase === 'ask' || bind.phase === 'sending' || bind.phase === 'offline')
+          "
+          class="code-card"
+        >
+          <div class="code-words">
+            <p class="code-title">
+              {{
+                t(
+                  bind.origin === 'pick' ? 'item.barcode.bind_question' : 'item.barcode.bind_named',
+                  {
+                    code: bind.code,
+                    name: bind.entry.name,
+                  },
+                )
+              }}
+            </p>
+            <p v-if="bind.phase !== 'offline'" class="code-text">
+              {{ t('item.barcode.bind_hint') }}
+            </p>
+          </div>
+          <div v-if="bind.phase === 'offline'" class="code-actions">
+            <AppButton ref="bindFirst" block @click="attach">
+              <template #icon><IconRefresh /></template>
+              {{ t('state.retry') }}
+            </AppButton>
+            <AppButton variant="ghost" block @click="withoutCode">
+              {{ t('item.barcode.without_code') }}
+            </AppButton>
+          </div>
+          <div v-else class="code-actions">
             <AppButton
               ref="bindFirst"
               block
@@ -105,13 +141,13 @@
               {{ t('item.barcode.propose_other') }}
             </AppButton>
           </div>
-        </div>
+        </AppCard>
 
-        <div v-else-if="bind && bind.phase === 'taken' && bind.holder" class="not-found">
-          <p class="bind-question">
+        <AppCard v-else-if="bind && bind.phase === 'taken' && bind.holder" class="code-card">
+          <p class="code-title">
             {{ t('item.barcode.taken', { code: bind.code, name: bind.holder.name }) }}
           </p>
-          <div class="bind-actions">
+          <div class="code-actions">
             <AppButton ref="bindFirst" block @click="takeHolder">
               {{ t('item.propose.take', { name: bind.holder.name }) }}
             </AppButton>
@@ -119,23 +155,25 @@
               {{ t('item.barcode.without_code_named', { name: bind.entry.name }) }}
             </AppButton>
           </div>
-        </div>
+        </AppCard>
 
         <!-- The item holds as many codes as one may (review В): asking again changes nothing. -->
-        <div v-else-if="bind && bind.phase === 'full'" class="not-found">
-          <p class="bind-question">{{ t('error.barcodes_full') }}</p>
-          <div class="bind-actions">
+        <AppCard v-else-if="bind && bind.phase === 'full'" class="code-card">
+          <p class="code-title">{{ t('error.barcodes_full') }}</p>
+          <div class="code-actions">
             <AppButton ref="bindFirst" block @click="withoutCode">
               {{ t('item.barcode.without_code_named', { name: bind.entry.name }) }}
             </AppButton>
           </div>
-        </div>
+        </AppCard>
 
+        <!-- An error is the section's quiet card, as the search's own after «Взять из недавних» (1i). -->
         <ScreenState
           v-else-if="bind && bind.phase === 'error'"
           ref="bindState"
           kind="error"
           inline
+          class="code"
           :title="t('item.error.title')"
           :body="t('item.barcode.bind_error_body', { code: bind.code })"
           @retry="attach"
@@ -147,73 +185,61 @@
           </template>
         </ScreenState>
 
-        <ScreenState
-          v-else-if="bind && bind.phase === 'offline'"
-          ref="bindState"
-          kind="offline"
-          tone="warn"
-          inline
-          :title="t('item.offline.title')"
-          :body="t('item.barcode.bind_offline_body')"
-        >
-          <template #action>
-            <AppButton block @click="attach">{{ t('state.retry') }}</AppButton>
-            <AppButton variant="ghost" block @click="withoutCode">
-              {{ t('item.barcode.without_code') }}
-            </AppButton>
-          </template>
-        </ScreenState>
-
-        <!-- A code looked up (MOL-99) stands in for the search until something is typed. -->
-        <div v-else-if="barcode === 'loading'" class="loading">
-          <ScreenSkeleton :groups="[62]" />
-        </div>
+        <!-- A code looked up (MOL-99) stands in for the search until something is typed: a card of
+             one line while it is asked (Ф-13). -->
+        <ScreenSkeleton v-else-if="barcode === 'loading'" class="code">
+          <SkeletonPart kind="lines" :widths="[62]" />
+        </ScreenSkeleton>
 
         <!-- A shop's own code (MOL-100, В-4): nobody holds it, and nobody is asked to link it. -->
-        <div v-else-if="barcode === 'label'" class="not-found">
-          <p class="bind-question">{{ t('item.barcode.in_store', { code: barcodeCode }) }}</p>
-          <p class="not-found-text">{{ t('item.barcode.in_store_body') }}</p>
-        </div>
+        <AppCard v-else-if="barcode === 'label'" class="code-card">
+          <div class="code-words">
+            <p class="code-title">{{ t('item.barcode.in_store', { code: barcodeCode }) }}</p>
+            <p class="code-text">{{ t('item.barcode.in_store_body') }}</p>
+          </div>
+        </AppCard>
 
-        <div v-else-if="barcode === 'missing'" class="not-found">
-          <p class="not-found-text">{{ t('item.barcode.missing', { code: barcodeCode }) }}</p>
-          <AppButton @click="proposeByCode">
-            <template #icon><IconPlus /></template>
-            {{ t('item.empty.action') }}
-          </AppButton>
+        <AppCard v-else-if="barcode === 'missing'" class="code-card">
+          <p class="code-title">{{ t('item.barcode.missing', { code: barcodeCode }) }}</p>
+          <div class="code-actions">
+            <AppButton block @click="proposeByCode">
+              <template #icon><IconPlus /></template>
+              {{ t('item.empty.action') }}
+            </AppButton>
+          </div>
           <!-- What Open Food Facts says the package is (MOL-162): under the button, so the button
                stays where the thumb saw it when the hint comes (owner's decision В-5, in place of
-               В-1's «above», which moved it ~100 px — adversarial Г). -->
+               В-1's «above», which moved it ~100 px — adversarial Г). A note: it is not pressed (Ф-4). -->
           <p v-if="codeHint" class="code-hint">
             {{ hintWords(codeHint) }}
             <span class="code-hint-source">{{ t('item.barcode.hint_source') }}</span>
           </p>
-          <p class="not-found-text">{{ t('item.barcode.missing_hint') }}</p>
-        </div>
+          <p class="code-text">{{ t('item.barcode.missing_hint') }}</p>
+        </AppCard>
 
         <!-- Found by a retry nobody tapped for (adversarial Ж′): the sheet opens from this tap. -->
-        <div v-else-if="barcode === 'found' && barcodeItem" class="not-found">
-          <p class="not-found-text">{{ t('item.barcode.found', { code: barcodeCode }) }}</p>
-          <AppButton @click="takeFound">{{ barcodeItem.name }}</AppButton>
-        </div>
+        <AppCard v-else-if="barcode === 'found' && barcodeItem" class="code-card">
+          <p class="code-title">{{ t('item.barcode.found', { code: barcodeCode }) }}</p>
+          <div class="code-actions">
+            <AppButton block @click="takeFound">{{ barcodeItem.name }}</AppButton>
+          </div>
+        </AppCard>
 
         <ScreenState
           v-else-if="barcode === 'error'"
           kind="error"
           inline
+          class="code"
           :title="t('item.error.title')"
           :body="t('item.barcode.error_body', { code: barcodeCode })"
           @retry="lookup.retry"
         />
 
-        <ScreenState
-          v-else-if="barcode === 'offline'"
-          kind="offline"
-          tone="warn"
-          inline
-          :title="t('item.offline.title')"
-          :body="t('item.barcode.offline_body')"
-        />
+        <!-- Without a network the answer is a line under the strip, and the recent items stand under
+             it — all the device can still find (3g). -->
+        <p v-else-if="barcode === 'offline'" class="code-offline">
+          {{ t('item.barcode.offline_body') }}
+        </p>
 
         <!-- The answer's shape (1g): its caption and three rows of 64. -->
         <div v-else-if="phase === 'loading'" class="loading">
@@ -263,16 +289,6 @@
             </AppButton>
           </template>
         </ScreenState>
-
-        <!-- Under the field, never over it: nothing of the answer stands above the control that chooses
-             it (MOL-138, В-2) — and with nothing typed too, as 1j draws it: typing offline searches the
-             recent items at once, with no failure to wait for (`useCatalogueSearch`). -->
-        <StatusStrip
-          v-else-if="phase === 'offline' || (phase === 'idle' && !online)"
-          kind="offline"
-          class="connection"
-          :text="t('item.offline.strip')"
-        />
       </template>
 
       <!-- The answer is not empty, and still not the thing: «сметана» finds the crisps «со
@@ -347,6 +363,7 @@ import IconBarcode from '~icons/mdi/barcode-scan'
 import IconClose from '~icons/mdi/close'
 import IconMagnify from '~icons/mdi/magnify'
 import IconPlus from '~icons/mdi/plus'
+import IconRefresh from '~icons/mdi/refresh'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
@@ -406,6 +423,7 @@ export default defineComponent({
     IconBarcode,
     IconClose,
     IconPlus,
+    IconRefresh,
     ItemDetailsSheet,
     ProposeItemSheet,
     ScreenSkeleton,
@@ -750,6 +768,25 @@ export default defineComponent({
     })
     const bindState = ref<{ $el?: HTMLElement } | null>(null)
 
+    // A strip of the code says «без связи» exactly while it is so (owner's В-1 «а»): the connection
+    // back takes it away, and the question waits for its «Повторить» — a write is never sent by itself
+    // (MOL-100) — while the lookup asks again on its own (`useReconnect`), its line standing until
+    // the answer; the connection gone again brings it back, though the answer stays `offline` with no
+    // change of phase (adversarial А1, А2). Counted from the failure too: a failure that told no event
+    // of the connection still has its strip.
+    const reconnected = ref(false)
+    const stripAttempt = ref(0)
+    watch(online, (now) => {
+      reconnected.value = now
+    })
+    watch([barcode, () => bind.value?.phase], ([code, stage], [codeBefore, stageBefore]) => {
+      if (
+        (code === 'offline' && codeBefore !== 'offline') ||
+        (stage === 'offline' && stageBefore !== 'offline')
+      )
+        reconnected.value = false
+    })
+
     /*
      * Every block of the question replaces the one before under the button that held the focus, so
      * every change of it hands the focus on (adversarial О, О′) — left alone it fell to the body:
@@ -771,7 +808,7 @@ export default defineComponent({
         // block — the person may have gone to the field meanwhile (adversarial Р6-В).
         const nowhere = document.activeElement === null || document.activeElement === document.body
         if (before === 'sending' && !nowhere) return
-        if (next === 'error' || next === 'offline') {
+        if (next === 'error') {
           bindState.value?.$el?.querySelector<HTMLElement>('button')?.focus()
           return
         }
@@ -810,7 +847,10 @@ export default defineComponent({
         if (!alive || !stillAsked(asked)) return
         const full = error instanceof ApiError && error.code === ERROR.BARCODES_FULL
         // Offline or error is decided after the failure (MOL-19).
-        bind.value = { ...asked, phase: full ? 'full' : navigator.onLine ? 'error' : 'offline' }
+        const phase = full ? 'full' : navigator.onLine ? 'error' : 'offline'
+        // «Повторить» that failed the same way is still an answer, said again by the strip (MOL-181).
+        if (phase === 'offline') stripAttempt.value += 1
+        bind.value = { ...asked, phase }
       }
     }
 
@@ -864,6 +904,8 @@ export default defineComponent({
 
     // A new code is a new question: a find still held for the scanner to go belongs to the code
     // before it, and would come up over «Код … не знаком» of this one (adversarial А).
+    // Every code read is an answer to say, its phase the last one's or not (adversarial А4).
+    const scans = ref(0)
     function read(code: string): void {
       // A code on its way to an item is not dropped by another scan (adversarial Р5-Б): the answer
       // would land with the question gone, the code written where «без кода» was said.
@@ -871,6 +913,7 @@ export default defineComponent({
       foundByCode = null
       pendingCode.value = null
       bind.value = null
+      scans.value += 1
       lookup.lookUp(code)
     }
 
@@ -958,6 +1001,9 @@ export default defineComponent({
     const rows = computed<CatalogueEntry[]>(() => {
       if (bind.value !== null) return []
       if (barcode.value !== 'idle' && barcode.value !== 'offline') return []
+      // Under a code looked up offline the recent items, never an answer the search held from before
+      // the connection went (adversarial А3).
+      if (barcode.value === 'offline') return recent.filter(query.value)
       if (phase.value === 'ready' || phase.value === 'far') return results.value
       if (showsRecent.value) return recent.filter(query.value)
       return []
@@ -972,6 +1018,27 @@ export default defineComponent({
     const errorBody = computed(() => {
       if (fallback.value) return t('item.error.fallback_note')
       return hasRecent.value ? t('item.error.body') : t('item.error.body_alone')
+    })
+
+    // Dimmed only while the rows are the search's answer: under a code looked up offline they are the
+    // recent items, with no next answer to wait for (К-11, adversarial Б1).
+    const listStale = computed(() => stale.value && barcode.value === 'idle')
+
+    // One strip a screen (MOL-181), in the words of what it is about: the question about a code, the
+    // answer to a code, else the search's own — never under another answer to a code (3g, 3i).
+    const strip = computed<string | null>(() => {
+      const asked = bind.value
+      if (asked !== null) {
+        return asked.phase === 'offline' && !reconnected.value
+          ? t('item.barcode.bind_offline_strip')
+          : null
+      }
+      if (barcode.value === 'offline')
+        return reconnected.value ? null : t('item.barcode.offline_strip')
+      if (barcode.value !== 'idle') return null
+      return phase.value === 'offline' || (phase.value === 'idle' && !online.value)
+        ? t('item.offline.strip')
+        : null
     })
 
     const groups = computed<ComboboxGroup[]>(() => {
@@ -1022,8 +1089,9 @@ export default defineComponent({
 
     // «Код … не знаком» out loud, as an empty answer is: the block says nothing of itself. The
     // search's words go the moment a code is looked up — they describe what is no longer shown.
+    // Each code read once more: a second code offline is `offline` over `offline` (adversarial А4).
     let withdrawCode: (() => void) | undefined
-    watch(barcode, (next) => {
+    watch([barcode, scans], ([next]) => {
       withdrawCode?.()
       withdrawCode = undefined
       if (next === 'idle') return
@@ -1033,6 +1101,9 @@ export default defineComponent({
         withdrawCode = announce?.(t('item.barcode.in_store', { code: lookup.code.value }))
       } else if (next === 'missing') {
         withdrawCode = announce?.(t('item.barcode.missing', { code: lookup.code.value }))
+      } else if (next === 'offline') {
+        // The line is the answer to the code; the strip over it says only the connection.
+        withdrawCode = announce?.(t('item.barcode.offline_body'))
       } else if (next === 'found') {
         withdrawCode = announce?.(
           t('item.barcode.found_announced', {
@@ -1288,6 +1359,7 @@ export default defineComponent({
       query,
       phase,
       stale,
+      listStale,
       answered,
       retry,
       fallback,
@@ -1320,6 +1392,8 @@ export default defineComponent({
       bind,
       bindFirst,
       bindState,
+      strip,
+      stripAttempt,
       attach,
       withoutCode,
       takeHolder,
@@ -1331,7 +1405,6 @@ export default defineComponent({
       barcodeCode: lookup.code,
       barcodeItem: lookup.item,
       IconMagnify,
-      online,
       recentCount: computed(() => recent.items.length),
     }
   },
@@ -1354,16 +1427,37 @@ export default defineComponent({
   margin-top: var(--space-6);
 }
 
-.not-found {
+.code,
+.code-card {
+  margin-top: var(--space-4);
+}
+
+/* The answer to a code (3a–3f): a card of its question, its words and its buttons (Ф-35). */
+.code-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--space-4);
-  margin-top: var(--space-6);
-  padding: var(--space-6) var(--space-4);
-  border: var(--hairline) dashed var(--border-strong);
-  border-radius: var(--radius-lg);
-  text-align: center;
+  gap: var(--space-3);
+}
+
+.code-words {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.code-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Without a network the answer is a line, the strip over it says the rest (3g). */
+.code-offline {
+  margin: var(--space-4) 0 0;
+  padding: 0 var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
+  line-height: var(--leading-body);
 }
 
 /* The connection under the field and its hint (Ф-14, С-2). */
@@ -1384,7 +1478,8 @@ export default defineComponent({
   margin-top: var(--space-2);
 }
 
-.far-title {
+.far-title,
+.code-title {
   margin: 0;
   font-size: var(--text-headline);
   font-weight: var(--weight-medium);
@@ -1392,11 +1487,16 @@ export default defineComponent({
   overflow-wrap: anywhere;
 }
 
-.far-text {
-  margin: 0 0 var(--space-3);
+.far-text,
+.code-text {
+  margin: 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
   line-height: var(--leading-body);
+}
+
+.far-text {
+  margin-bottom: var(--space-3);
 }
 
 /* A previous answer left while the next is on its way (К-11). */
@@ -1409,45 +1509,21 @@ export default defineComponent({
   }
 }
 
-.not-found-text {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-callout);
-  line-height: var(--leading-body);
-}
-
 .code-hint {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  align-self: stretch;
   margin: 0;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius);
-  background: var(--accent-tint);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
   color: var(--text);
   font-size: var(--text-callout);
-  line-height: var(--leading-body);
+  line-height: var(--leading-snug);
 }
 
 .code-hint-source {
-  /* Ink, not muted: muted text is under 4.5:1 on a tint (MOL-172). */
-  color: var(--text);
+  color: var(--text-muted);
   font-size: var(--text-footnote);
-}
-
-.bind-question {
-  margin: 0;
-  font-weight: var(--weight-medium);
-  line-height: var(--leading-body);
-  overflow-wrap: anywhere;
-}
-
-.bind-actions {
-  display: flex;
-  flex-direction: column;
-  align-self: stretch;
-  gap: var(--space-2);
 }
 
 .pending {
@@ -1455,10 +1531,16 @@ export default defineComponent({
   align-items: center;
   gap: var(--space-2);
   margin-top: var(--space-4);
-  padding-left: var(--space-4);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
   border-radius: var(--radius);
-  background: var(--accent-tint);
-  color: var(--accent-ink);
+  background: var(--surface-2);
+}
+
+.pending-icon {
+  @include icon;
+
+  color: var(--text-muted);
+  font-size: var(--icon-sm);
 }
 
 .pending-text {
@@ -1466,6 +1548,7 @@ export default defineComponent({
   min-width: 0;
   margin: 0;
   font-size: var(--text-callout);
+  line-height: var(--leading-snug);
   overflow-wrap: anywhere;
 }
 
