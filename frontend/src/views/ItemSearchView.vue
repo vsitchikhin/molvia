@@ -768,14 +768,16 @@ export default defineComponent({
     })
     const bindState = ref<{ $el?: HTMLElement } | null>(null)
 
-    // A strip of the code says «без связи» only while it is so (owner's В-1 «а»): the connection back
-    // takes it away, and the question waits for its «Повторить» — a write is never sent by itself
+    // A strip of the code says «без связи» exactly while it is so (owner's В-1 «а»): the connection
+    // back takes it away, and the question waits for its «Повторить» — a write is never sent by itself
     // (MOL-100) — while the lookup asks again on its own (`useReconnect`), its line standing until
-    // the answer. Counted from the failure: a code failing again offline has its strip again.
+    // the answer; the connection gone again brings it back, though the answer stays `offline` with no
+    // change of phase (adversarial А1, А2). Counted from the failure too: a failure that told no event
+    // of the connection still has its strip.
     const reconnected = ref(false)
     const stripAttempt = ref(0)
     watch(online, (now) => {
-      if (now) reconnected.value = true
+      reconnected.value = now
     })
     watch([barcode, () => bind.value?.phase], ([code, stage], [codeBefore, stageBefore]) => {
       if (
@@ -902,6 +904,8 @@ export default defineComponent({
 
     // A new code is a new question: a find still held for the scanner to go belongs to the code
     // before it, and would come up over «Код … не знаком» of this one (adversarial А).
+    // Every code read is an answer to say, its phase the last one's or not (adversarial А4).
+    const scans = ref(0)
     function read(code: string): void {
       // A code on its way to an item is not dropped by another scan (adversarial Р5-Б): the answer
       // would land with the question gone, the code written where «без кода» was said.
@@ -909,6 +913,7 @@ export default defineComponent({
       foundByCode = null
       pendingCode.value = null
       bind.value = null
+      scans.value += 1
       lookup.lookUp(code)
     }
 
@@ -996,6 +1001,9 @@ export default defineComponent({
     const rows = computed<CatalogueEntry[]>(() => {
       if (bind.value !== null) return []
       if (barcode.value !== 'idle' && barcode.value !== 'offline') return []
+      // Under a code looked up offline the recent items, never an answer the search held from before
+      // the connection went (adversarial А3).
+      if (barcode.value === 'offline') return recent.filter(query.value)
       if (phase.value === 'ready' || phase.value === 'far') return results.value
       if (showsRecent.value) return recent.filter(query.value)
       return []
@@ -1077,8 +1085,9 @@ export default defineComponent({
 
     // «Код … не знаком» out loud, as an empty answer is: the block says nothing of itself. The
     // search's words go the moment a code is looked up — they describe what is no longer shown.
+    // Each code read once more: a second code offline is `offline` over `offline` (adversarial А4).
     let withdrawCode: (() => void) | undefined
-    watch(barcode, (next) => {
+    watch([barcode, scans], ([next]) => {
       withdrawCode?.()
       withdrawCode = undefined
       if (next === 'idle') return
