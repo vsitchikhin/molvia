@@ -430,6 +430,36 @@ test('без связи «Сверить» ждёт связь словами и
 test.describe('320 px, English', () => {
   test.use({ locale: 'en-US', viewport: { width: 320, height: 640 } })
 
+  // MOL-318: the screen's large title is the account's name, and a name of one word wider than the
+  // phone took the page sideways — the title had no place to break it.
+  test('an account named by one word wider than the phone breaks its title, not the page', async ({
+    page,
+  }) => {
+    const name = 'Raiffeisenbanksavingsaccountforholidays'
+    await signedIn(page)
+    const made = await page.request.post('/api/money/accounts', {
+      headers: await asBrowser(page),
+      data: {
+        id: randomUUID(),
+        name,
+        currency: 'AMD',
+        savings: false,
+        start: { amount: '1000', currency: 'AMD' },
+        startOn: yesterday(),
+      },
+    })
+    expect(made.status(), await made.text()).toBe(201)
+    await page.getByRole('link', { name: 'Money', exact: true }).click()
+    await page.getByRole('link', { name: /^Accounts/ }).click()
+    await page.getByRole('link', { name: new RegExp(name) }).click()
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(name)
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      ),
+    ).toBe(0)
+  })
+
   test('the page, the account and the check fit and speak English', async ({ page }) => {
     await signedIn(page)
     await page.getByRole('link', { name: 'Money', exact: true }).click()

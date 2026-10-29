@@ -630,6 +630,45 @@
       </template>
     </BottomSheet>
 
+    <!-- Names wider than the phone in a sheet (MOL-318): one's own category chosen, so first in the chips,
+         a select of it, a title of one word and a line under a row's words — none may take the sheet
+         sideways. For WebKit, where «Деньги» do not open on the loopback. -->
+    <AppButton block @click="wideOpen = true">{{ t('dev.kit.open_wide_sheet') }}</AppButton>
+
+    <BottomSheet v-model:open="wideOpen">
+      <template #title>{{ t('dev.kit.wide_title') }}</template>
+      <!-- Each in the box a screen puts it in: the chips in a flex column, as the spending's form; the
+           select and the row in a grid of a column `auto`, as the budget's form — it takes the least
+           width of what stands in it. -->
+      <div class="wide-column">
+        <CategoryChips
+          v-model="wideCategory"
+          :categories="wideCategories"
+          :name-of="wideName"
+          :legend="t('spending.sheet.category')"
+          :more-label="t('spending.sheet.more')"
+        />
+      </div>
+      <div class="wide-grid">
+        <AppField
+          v-model="wideCategory"
+          :label="t('spending.sheet.category')"
+          kind="select"
+          :options="wideOptions"
+        />
+        <AppCard as="ul" list>
+          <li>
+            <ListRow :icon="IconCart" :title="t('dev.kit.row_cash')">
+              <template #below
+                ><span class="printed">{{ t('dev.kit.wide_line') }}</span></template
+              >
+              <template #tail>{{ figures.balance }}</template>
+            </ListRow>
+          </li>
+        </AppCard>
+      </div>
+    </BottomSheet>
+
     <!-- The scanner, until a screen opens it (MOL-99): for end-to-end and for a real phone. -->
     <section class="group">
       <AppButton block variant="secondary" @click="scannerOpen = true">
@@ -779,6 +818,20 @@ export default defineComponent({
         archived: false,
       })),
     ]
+    // One's own with a name of the longest a category takes (MOL-318), chosen.
+    const wideOwn: SpendingCategoryView = {
+      id: '00000000-0000-4000-8000-000000000299',
+      preset: null,
+      name: 'Подарки родным и друзьям на дни рождения',
+      colour: 0,
+      icon: null,
+      archived: false,
+    }
+    const wideCategories = [...chipCategories, wideOwn]
+    const wideName = (category: SpendingCategoryView) => category.name ?? categoryName(category)
+    const wideOptions = computed(() =>
+      wideCategories.map((category) => ({ value: category.id, label: wideName(category) })),
+    )
     // A record of handoff 7a as the server answers it, every row priced (MOL-206).
     const kitTrip: TripView = tripViewCodec.parse({
       id: '00000000-0000-4000-8000-000000000301',
@@ -1218,6 +1271,11 @@ export default defineComponent({
       sheetOpen: ref(false),
       longOpen: ref(false),
       longNote: ref(''),
+      wideOpen: ref(false),
+      wideCategory: ref(wideOwn.id),
+      wideCategories,
+      wideName,
+      wideOptions,
       scannerOpen: ref(false),
       scanned: ref(''),
       // The verdict card blank, and as a refused draft comes back: a score, words, the error.
@@ -1262,6 +1320,25 @@ export default defineComponent({
 .pair {
   display: grid;
   gap: var(--space-2);
+}
+
+.wide-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.wide-grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* A till's line under a row's words, on one line as `TripRow` draws it (MOL-318). */
+.printed {
+  display: block;
+  overflow: hidden;
+  font-size: var(--text-footnote);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .row {

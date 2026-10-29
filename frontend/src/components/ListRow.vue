@@ -279,9 +279,12 @@ export default defineComponent({
   }
 }
 
+/* One column as wide as the words' place (MOL-318): an `auto` one took the least width of a line under them
+   — a till's line of a purchase, on one line — and it ran under the amount, never cut by its «…». */
 .words {
   display: grid;
   flex: 1;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
 }
 

@@ -490,6 +490,10 @@ export default defineComponent({
   line-height: var(--leading-tight);
   letter-spacing: -0.01em;
 
+  /* An account's or a place's name may be one word wider than the phone, and the page went sideways
+     (MOL-318). */
+  overflow-wrap: anywhere;
+
   /* Focused by the router after a move, for screen readers; nothing for the eye to see. */
   &:focus {
     outline: none;
@@ -502,6 +506,7 @@ export default defineComponent({
   margin-top: var(--space-1);
   color: var(--text-muted);
   font-size: var(--text-footnote);
+  overflow-wrap: anywhere;
 }
 
 /* Its bottom edge 24px below the top of the header: scrolled past it, the title counts as

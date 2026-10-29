@@ -223,6 +223,12 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* No least width of its own either (MOL-318): WebKit keeps a select's longest option as its least width
+   whatever the width of the select, and a field in a grid of a column `auto` widened the column. */
+.field {
+  min-width: 0;
+}
+
 .label {
   display: flex;
   align-items: center;
@@ -262,8 +268,11 @@ export default defineComponent({
   }
 }
 
+/* No width of its own (MOL-318), as `NavRow`'s label: a select is as wide as its longest option — a long
+   name of one's own category — and that width went into the least width of its sheet or card. */
 .control {
   flex: 1;
+  width: 0;
   min-width: 0;
   min-height: var(--touch-target);
   padding: 0;
