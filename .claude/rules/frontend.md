@@ -431,14 +431,16 @@ The detail behind the frontend lines of `CLAUDE.md`.
   every column `auto` above it, and «Против обычного» took «Месяц» 168 px sideways for «Подарки родным и друзьям
   на дни рождения» — `min-width: 0` lowers a flex item, never what it hands its parents. **What holds it:** the
   sheets of a transfer, «Куда», a check and «Списано» (`accounts.spec`), «Месяц» — «Против обычного», «Остальные»,
-  the centre — and «Год» (`money-charts.spec`), the screen's title (`accounts.spec`, English), all in Chromium;
+  the centre — and «Год» (`money-charts.spec`), the screen's title (`accounts.spec`, English), «Продолжить «…»»
+  (`trip.spec`) and «Record «…» without the code» (`scanner.spec`), all in Chromium;
   `/_kit` «Открыть шторку длинных имён» on `phone` and `iphone` — the chips, the select, a row's words, a sheet's
   title and meta, each in the box a screen puts it in. The rest was found by reading the CSS (MOL-318's audit) and
   has no test: the subtitle, «Где вы?», the notices, conflicts and versions, a field's error, the receipts', the
   caption, «Что брать» and the search. A new paragraph with a name in it takes the same line. **The prices, named:** a tail of `ListRow` keeps its `min-content` (MOL-176) — an amount
   of fifteen characters still stands past a row of 320; the figure in the middle of a ring stands past it for
-  a sum of eleven, over the ring and not the page; a name in `AppButton` is not broken, since its cell of two
-  words (MOL-225) would break with it. And WebKit says «ResizeObserver loop completed» as a sheet with the
+  a sum of eleven, over the ring and not the page; a name in an `AppButton` narrower than its row is not broken,
+  since its cell of two words (MOL-225) would break with it — the buttons with a name in them are all `block`,
+  which breaks it («Продолжить «…»», «Взять «…»», «Записать «…» без кода», adversarial Б1, Б2). And WebKit says «ResizeObserver loop completed» as a sheet with the
   chips opens — on master too, a window error with no frame of ours, which the phone's reports leave out. **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
   handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
   its tint, in the strip's shape and never a live region; a tag a pill of 13/600, plain, warn or bad
