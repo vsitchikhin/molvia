@@ -436,7 +436,6 @@ describe('словарь: повторяющиеся тексты', () => {
         'devices.offline.title',
         'exchange.offline.title',
         'income.offline.title',
-        'item.offline.title',
         'settings.offline.title',
         'spending.categories.offline.title',
         'spending.offline.title',
