@@ -1037,6 +1037,15 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     (await db.select().from(receiptReasonDays))
       .map((row) => `${row.reader} ${row.country} ${row.scope} ${row.reason} ${String(row.n)}`)
       .sort()
+  // The real claim, told the review may not keep what it hands out (MOL-319): unreachable since the model reads
+  // only edition 5, past the review's 4, and held for the day the review's edition outgrows the model's.
+  const unreviewable: ReadReceiptsDeps['receipts'] = {
+    ...repository,
+    claimNext: async () => {
+      const claimed = await repository.claimNext()
+      return claimed === null ? null : { ...claimed, reviewable: false }
+    },
+  }
   const notices = async () =>
     (await db.select({ payload: ownerNotices.payload }).from(ownerNotices)).map(
       (row) => row.payload,
@@ -1179,19 +1188,10 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     expect((await notices()).at(-1)).toEqual({ kind: 'receipt_partial_muted', count: 1 })
   }, 30_000)
 
-  // MOL-319: the model reads only whoever accepted edition 5, past the review's 4, so the claim never hands it a
-  // receipt it may not keep — this holds the guard for the day the review's edition outgrows the model's
-  // (self-review №2). The claim is the real one, its answer told otherwise.
+  // MOL-319, self-review №2: the guard of a receipt read in part.
   it('tells of a receipt the review may not keep, and keeps nothing of it (MOL-309, В-3 «б»)', async () => {
     const me = await person(LATER)
     await queued(me)
-    const unreviewable: ReadReceiptsDeps['receipts'] = {
-      ...repository,
-      claimNext: async () => {
-        const claimed = await repository.claimNext()
-        return claimed === null ? null : { ...claimed, reviewable: false }
-      },
-    }
     await readAll(benchReader(), fakeModel(notWhole), { told: told(), receipts: unreviewable })
     expect(await db.select().from(receiptMisses)).toEqual([])
     const [notice] = await notices()
@@ -1199,6 +1199,23 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     // nothing kept: no day, and no id that would name a receipt nothing here opens (self-review №3)
     expect(notice).not.toHaveProperty('keptUntil')
     expect(notice).not.toHaveProperty('receipt')
+  }, 30_000)
+
+  // adversarial Р2-А1: the guard stands in each outcome that keeps a review — a «переснимите» too, not only a
+  // receipt read in part. Lines the wire refuses are the third place, which no answer of the model reaches.
+  it('keeps nothing of a «переснимите» the review may not keep', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    const nothing = { ...ANSWER, lines: [], totals: [] }
+    await readAll(
+      benchReader(),
+      fakeModel(() =>
+        Promise.resolve({ kind: 'read', answer: nothing, costMicroUsd: 1_000, tokens: TOKENS }),
+      ),
+      { told: told(), receipts: unreviewable },
+    )
+    expect((await receiptOf(id))?.failure).toBe('reshoot')
+    expect(await db.select().from(receiptMisses)).toEqual([])
   }, 30_000)
 
   // adversarial А3: proven whole, a line «1 × 0 = 0» emptied all the same — no reason of the receipt to give
