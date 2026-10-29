@@ -601,6 +601,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   good. **A change of a screen's own query is not another screen** (MOL-136): no scroll, no
   animation, no arrival, and the page is held as tall as the window (MOL-138); **nothing of the
   answer stands above the control that chooses it** — a strip, a refusal, a note go under it.
+- **Nothing makes a sheet or a page wider than the phone** (MOL-318): a sheet's column is
+  `minmax(0, 1fr)`, a row of chips has no width of its own, and a name that can be one long word breaks
+  (`overflow-wrap: anywhere`) — a grid column of `auto` takes the least width of what stands in it.
 - **A screen is built from the kit** (MOL-18); the sheet is a native `<dialog>` with an entry in the
   history, and puts the page back — and focus, wherever the platform gave it — by what it was
   opened from (MOL-63, MOL-80). **Its press is heard on the document**: iOS hands a tap on the

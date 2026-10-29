@@ -465,7 +465,16 @@ nothing up.
   its width in an unseen ruler, again when the field's width changes and whenever a face comes, while the
   chips are there (`loadingdone`) — a face may come after the sheet has opened, and changes no width of
   the field; a row takes the next chip while it fits whole, the second keeping room for «Ещё…», the first
-  chip always — a name wider than the row cut by its «…». Until there is a measure — a sheet still shut
+  chip always — a name wider than the row cut by its «…». **The rows have no width of their own**
+  (`contain: inline-size`, MOL-318): on one line a row gave the sheet's grid the whole name of its first
+  chip as its least width, and one's own of forty letters, chosen and so first, took the sheet past the
+  phone, × and all — on a phone turned from wide to narrow any chip did, the rows laid for the wide one;
+  the measure, seeing the field wider, laid more chips in and widened it again (144 px at 390). The
+  sheet's column bounds it too (`frontend.md`); either alone holds the spending's sheet. **A chip is
+  13/600 with sides of 8, a dot of 8 four from its name, never narrower than 44** (owner's word on
+  MOL-318): at 15 with 12 and 16 a newcomer at 320 had «Продукты» alone in the first row and «Ещё…»
+  alone in the second; now «Продукты · Кафе и рестораны» stand side by side some 11 px to spare, and
+  from 375 the second row holds two besides «Ещё…». Until there is a measure — a sheet still shut
   — every chip stands, as before. **The chosen one never leaves the rows** (adversarial А1): a measure
   that would lay it past them — the phone turned, a name before it grown longer by an answer — stands it
   first and tells the sheet (`lift`), and one chosen from outside them is laid in; tapped in the rows,

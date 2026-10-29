@@ -411,7 +411,23 @@ The detail behind the frontend lines of `CLAUDE.md`.
   sheet's `.field` — its column of a label and a field — stood the row in a column 84 high (adversarial
   А1 of MOL-199). **Its label has no width of its own** (`width: 0` beside `flex: 1`, as `AccountRow`'s
   value): its whole line counted in the sheet's least width, and a note of 32 letters made the spending
-  sheet wider than the phone, × off the screen (А3). **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
+  sheet wider than the phone, × off the screen (А3). **A sheet's column is the sheet's width, never its
+  content's** (`.panel`, `minmax(0, 1fr)`, MOL-318, owner's В-1 «б»): an `auto` column took the least
+  width of whatever stood in it — the label above, then a row of chips with a long name of one's own —
+  and the whole sheet went sideways; what cannot shrink now stands past its own edge alone, the × in
+  place, and a test of the sheet's `scrollWidth` still sees it. **The same class, closed where it was found**
+  (MOL-318, the owner's «сразу везде»): the words of a `ListRow` are one column of `minmax(0, 1fr)` — a till's
+  line under a purchase ran under its amount, never cut; an `AppField` has no least width of its own
+  (`min-width: 0` on the field, `width: 0` on the control) — a select is as wide as its longest option — the
+  categories of «Бюджет» and «Год», found by reading, held on the kit — and WebKit keeps that width whatever
+  the select's; the large title of a screen, its subtitle, a sheet's title and meta and a place's button of
+  «Где вы?» break a word wider than the phone (`overflow-wrap: anywhere`) — an account's name took the page
+  348 px sideways. `/_kit` «Открыть шторку длинных имён» holds them on `phone` and `iphone`, each in the box a
+  screen puts it in. **The prices, named:** a tail of `ListRow` keeps its `min-content` (MOL-176) — an amount
+  of fifteen characters still stands past a row of 320; the figure in the middle of a ring stands past it for
+  a sum of eleven, over the ring and not the page; a name in `AppButton` is not broken, since its cell of two
+  words (MOL-225) would break with it. And WebKit says «ResizeObserver loop completed» as a sheet with the
+  chips opens — on master too, a window error with no frame of ours, which the phone's reports leave out. **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
   handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
   its tint, in the strip's shape and never a live region; a tag a pill of 13/600, plain, warn or bad
   — rows had drawn them at 11/700, 11/600 and 13/600. Screens move onto them in their own tasks.
