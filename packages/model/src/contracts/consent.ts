@@ -24,11 +24,14 @@ export const POLICY_VERSION = 5
 export const STATISTICS_CONSENT_EDITION = 2
 
 /**
- * The first edition that names Anthropic among the recipients (MOL-272, Т-9): a receipt's photo — which
- * may print a customer's name — goes to the model in the United States only for whoever accepted it.
- * Who accepted an older edition is read by Tesseract, whatever was granted to them.
+ * The first edition that says where Anthropic has a receipt's photo (MOL-319, owner's В-2 «а»): it stores in
+ * the United States and computes in any country it has capacity in, and keeps what it was sent up to 30
+ * days. Edition 3 named Anthropic among the recipients (MOL-272, Т-9) and promised the United States alone,
+ * so the photo — which may print a customer's name — goes to the model only for whoever accepted edition 5.
+ * Who accepted an older edition is read by Tesseract, whatever was granted to them. Never below
+ * `REVIEW_CONSENT_EDITION`: whoever the model reads has accepted the review as well.
  */
-export const MODEL_CONSENT_EDITION = 3
+export const MODEL_CONSENT_EDITION = 5
 
 /**
  * The first edition that says a receipt read not whole keeps its photo and what was read for the developer's
