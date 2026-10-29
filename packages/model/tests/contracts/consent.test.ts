@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  MODEL_CONSENT_EDITION,
   POLICY_VERSION,
+  REVIEW_CONSENT_EDITION,
   acceptConsentSchema,
   consentNeeded,
   consentSchema,
@@ -24,6 +26,17 @@ describe('consentNeeded (MOL-95)', () => {
   it('compares with the build’s own edition by default', () => {
     expect(consentNeeded(POLICY_VERSION)).toBe(false)
     expect(consentNeeded(POLICY_VERSION - 1)).toBe(true)
+  })
+})
+
+describe('the editions the model reads by (MOL-319)', () => {
+  it('reads only for whoever accepted the text of where Anthropic computes and how long it keeps', () => {
+    expect(MODEL_CONSENT_EDITION).toBe(5)
+    expect(MODEL_CONSENT_EDITION).toBeLessThanOrEqual(POLICY_VERSION)
+  })
+
+  it('reads for nobody who has not accepted the review too, so a receipt it read may always be kept', () => {
+    expect(MODEL_CONSENT_EDITION).toBeGreaterThanOrEqual(REVIEW_CONSENT_EDITION)
   })
 })
 

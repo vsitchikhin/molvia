@@ -14,9 +14,9 @@ import { calendarDay } from '@/days'
  * written here too, so raising the edition is an edit of this file and of the day.
  */
 export const POLICY_REVISION = {
-  day: '2026-10-28',
-  version: 4,
-  digest: '992a67c350f65476ba3846dfb45ad1ad24149662a6e6c039f327fa099a25cf1a',
+  day: '2026-10-29',
+  version: 5,
+  digest: '76a5d19911f173bbb3fd1eaa8d0b87ee4e48360a7d08bfe8e2dd2de08b4566ac',
 } as const
 
 // Which parts each page shows, in order — here and not in the pages, so the fingerprint holds them
