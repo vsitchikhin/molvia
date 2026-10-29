@@ -219,7 +219,12 @@ export default defineComponent({
   font-weight: var(--weight-medium);
 }
 
+/* No width of its own (MOL-318): a row on one line gave the sheet the whole name of its first chip as
+   its least width — a long one of one's own, chosen and so first, widened the sheet past the phone,
+   and the measure, seeing the field wider, laid more chips in and widened it again. The field's width
+   is what the rows are laid in, and a chip wider than it is cut by its «…». */
 .chips {
+  contain: inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -238,24 +243,27 @@ export default defineComponent({
   }
 }
 
+/* 13 with sides of 8 (MOL-318, owner's word): at 15 with 12 and 16 a newcomer's first row at 320 held
+   «Продукты» alone, «Кафе и рестораны» going under it; now both, some 11 px to spare. Never narrower
+   than a thumb, whatever the name. */
 .chip {
   position: relative;
   display: inline-flex;
   flex: 0 1 auto;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
   box-sizing: border-box;
-  min-width: 0;
+  min-width: var(--touch-target);
   max-width: 100%;
   min-height: var(--touch-target);
-  padding: 0 var(--space-4) 0 var(--space-3);
+  padding: 0 var(--space-2);
   border: 0;
   border-radius: var(--radius-pill);
   background: var(--surface-2);
   box-shadow: inset 0 0 0 var(--hairline) var(--border-strong);
   color: var(--text);
   font: inherit;
-  font-size: var(--text-callout);
+  font-size: var(--text-footnote);
   font-weight: var(--weight-medium);
   white-space: nowrap;
   cursor: pointer;
@@ -288,8 +296,8 @@ export default defineComponent({
 
 .dot {
   flex: none;
-  width: 0.625rem;
-  height: 0.625rem;
+  width: 0.5rem;
+  height: 0.5rem;
   border-radius: var(--radius-pill);
 
   /* On the tint ten light categories and three dark fell under 3:1; on `surface` each holds it. */
@@ -305,7 +313,7 @@ export default defineComponent({
 
 .more {
   flex: none;
-  padding: 0 var(--space-4);
+  padding: 0 var(--space-3);
 }
 
 /* A box of no size around the ruler: unseen, it lays the chips out at their own widths and adds nothing

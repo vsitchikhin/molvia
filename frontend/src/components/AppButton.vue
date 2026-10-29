@@ -231,9 +231,12 @@ export default defineComponent({
   min-height: var(--touch-target-lg);
 }
 
+/* A name of one word breaks inside the full width — «Продолжить «‹место›»» stood past the sheet on both
+   sides (MOL-318, adversarial Б1). Never a narrower button: its cell of two words would break too. */
 .block {
   display: flex;
   width: 100%;
+  overflow-wrap: anywhere;
 }
 
 /* `aria-disabled` is still `:enabled`: the press and the hover read both, or an inactive button

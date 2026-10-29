@@ -355,6 +355,7 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-footnote);
   text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .line:empty {
@@ -399,5 +400,6 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-footnote);
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 </style>

@@ -103,6 +103,7 @@ span.section-caption {
 
 .words {
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .tail {

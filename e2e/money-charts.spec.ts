@@ -387,6 +387,108 @@ test.describe('a line gone under the category', () => {
   })
 })
 
+// MOL-318, adversarial А5: the line of a stale link names the category shown, and a name of one word —
+// forty letters, the most a category takes — had no place to break: the card's column `auto` grew with
+// it, and the page went sideways at 320.
+test('at 320 the line of a stale link breaks a long name, not the page', async ({ page }) => {
+  const name = 'Электрооборудованиепромышленноговнедрени'
+  await page.setViewportSize({ width: 320, height: 720 })
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  const category = randomUUID()
+  const made = await page.request.post('/api/spending-categories', {
+    headers,
+    data: { id: category, name },
+  })
+  expect(made.status(), await made.text()).toBe(201)
+  const spent = await page.request.post('/api/spendings', {
+    headers,
+    data: {
+      id: randomUUID(),
+      spentOn: yerevanDay(),
+      amount: { amount: '6500', currency: 'AMD' },
+      categoryId: category,
+    },
+  })
+  expect(spent.status(), await spent.text()).toBe(201)
+  await page.goto(`/money/charts?mode=year&category=${randomUUID()}`)
+  await expect(page.getByText(`показаны «${name}»`)).toBeVisible()
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    ),
+  ).toBe(0)
+})
+
+// MOL-318, the audit after adversarial round 1: «Против обычного» kept a long name on one line in a
+// column `auto`, which took its full width — «Месяц» went 190 px sideways at 320, and 168 for a name
+// with spaces; the line of «Остальные» and the ring's centre had no place to break a word either.
+test('at 320 «Месяц» cuts or breaks a long category, never the page', async ({ page }) => {
+  const big = 'Электрооборудованиепромышленноговнедрени'
+  const small = 'Связьсродственникамивмессенджерахизвонки'
+  await page.setViewportSize({ width: 320, height: 720 })
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  const made = async (name: string) => {
+    const id = randomUUID()
+    const response = await page.request.post('/api/spending-categories', {
+      headers,
+      data: { id, name },
+    })
+    expect(response.status(), await response.text()).toBe(201)
+    return id
+  }
+  const spend = async (amount: string, spentOn: string, categoryId: string) => {
+    const response = await page.request.post('/api/spendings', {
+      headers,
+      data: { id: randomUUID(), spentOn, amount: { amount, currency: 'AMD' }, categoryId },
+    })
+    expect(response.status(), await response.text()).toBe(201)
+  }
+  const bigId = await made(big)
+  const smallId = await made(small)
+  // Three closed months make the usual one, so the big category stands in «Против обычного».
+  for (const back of [1, 2, 3]) await spend('5000', monthsAgoDay(back), bigId)
+  await spend('90000', yerevanDay(), bigId)
+  // Seven presets above the small one put it in «Остальные».
+  const { categories } = (await (
+    await page.request.get('/api/spending-categories', { headers })
+  ).json()) as { categories: { id: string; preset: string | null }[] }
+  const presets = categories.filter((category) => category.preset !== null).slice(0, 7)
+  for (const [index, category] of presets.entries())
+    await spend(String(20000 - index * 1000), yerevanDay(), category.id)
+  await spend('100', yerevanDay(), smallId)
+
+  await toCharts(page)
+  const usual = page.getByRole('region', { name: 'Против обычного' })
+  await expect(usual).toContainText(big)
+  await expect(page.getByText(new RegExp(`^В «Остальных» — .* и ${small}$`))).toBeVisible()
+  const sideways = () =>
+    page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  expect(await sideways()).toBe(0)
+  expect(
+    await usual
+      .locator('.name')
+      .first()
+      .evaluate((name) => name.scrollWidth > name.clientWidth),
+  ).toBe(true)
+
+  // The ring's centre names the sector chosen, inside the ring.
+  await page.locator('.legend').getByText(big).click()
+  const label = page.locator('.center-label')
+  await expect(label).toHaveText(big)
+  expect(
+    await label.evaluate((one) => {
+      const own = one.getBoundingClientRect()
+      const centre = one.closest('.center')?.getBoundingClientRect()
+      return (
+        centre !== undefined && own.left >= centre.left - 0.5 && own.right <= centre.right + 0.5
+      )
+    }),
+  ).toBe(true)
+  expect(await sideways()).toBe(0)
+})
+
 // The strip belongs to the month and stands under the switcher: neither its going with a month not
 // read nor its coming back over one the phone keeps moves the switcher (MOL-138, В-2; adversarial
 // Б2, round 2 Д1 of MOL-74).

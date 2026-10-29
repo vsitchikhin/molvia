@@ -430,6 +430,36 @@ test('без связи «Сверить» ждёт связь словами и
 test.describe('320 px, English', () => {
   test.use({ locale: 'en-US', viewport: { width: 320, height: 640 } })
 
+  // MOL-318: the screen's large title is the account's name, and a name of one word wider than the
+  // phone took the page sideways — the title had no place to break it.
+  test('an account named by one word wider than the phone breaks its title, not the page', async ({
+    page,
+  }) => {
+    const name = 'Raiffeisenbanksavingsaccountforholidays'
+    await signedIn(page)
+    const made = await page.request.post('/api/money/accounts', {
+      headers: await asBrowser(page),
+      data: {
+        id: randomUUID(),
+        name,
+        currency: 'AMD',
+        savings: false,
+        start: { amount: '1000', currency: 'AMD' },
+        startOn: yesterday(),
+      },
+    })
+    expect(made.status(), await made.text()).toBe(201)
+    await page.getByRole('link', { name: 'Money', exact: true }).click()
+    await page.getByRole('link', { name: /^Accounts/ }).click()
+    await page.getByRole('link', { name: new RegExp(name) }).click()
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(name)
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      ),
+    ).toBe(0)
+  })
+
   test('the page, the account and the check fit and speak English', async ({ page }) => {
     await signedIn(page)
     await page.getByRole('link', { name: 'Money', exact: true }).click()
@@ -804,4 +834,98 @@ test('the edit of an account keeps «Сохранить» pinned in sight over t
       }),
     )
     .toEqual({ pinned: true, save: true, name: true })
+})
+
+// MOL-318, adversarial round 1: an account's name of one word — forty letters, the most a name takes —
+// stands in the words of three sheets, and each took its sheet sideways: a paragraph with no place to
+// break it, in a grid whose column `auto` grew with it — the fee's line, the field of «Списано» too.
+test.describe('an account named by one word at 320', () => {
+  const LONG = 'Накопительныйсчётнаотпускиподаркиродными'
+
+  async function madeAccount(page: Page, name: string): Promise<string> {
+    const id = randomUUID()
+    const made = await page.request.post('/api/money/accounts', {
+      headers: await asBrowser(page),
+      data: {
+        id,
+        name,
+        currency: 'AMD',
+        savings: false,
+        start: { amount: '10000', currency: 'AMD' },
+        startOn: yesterday(),
+      },
+    })
+    expect(made.status(), await made.text()).toBe(201)
+    return id
+  }
+
+  /** How far a sheet scrolls sideways. */
+  function sideways(sheet: Locator): Promise<number> {
+    return sheet.evaluate((dialog) => dialog.scrollWidth - dialog.clientWidth)
+  }
+
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 720 })
+    await signedIn(page)
+  })
+
+  test('the transfer’s fee and the choice of «Куда» break the name, not the sheet', async ({
+    page,
+  }) => {
+    await madeAccount(page, LONG)
+    await madeAccount(page, 'Копилка')
+    await madeAccount(page, 'Наличные')
+    await open(page, '/money/accounts')
+    await page.getByRole('button', { name: /Перевод между счетами/ }).click()
+    const sheet = topSheet(page)
+    await expect(sheet).toContainText('Между своими счетами одной валюты')
+    await page.waitForTimeout(400)
+    await sheet.getByRole('button', { name: /Откуда/ }).click()
+    await page.waitForTimeout(400)
+    await topSheet(page)
+      .getByRole('radio', { name: new RegExp(LONG) })
+      .click()
+    await expect(sheet).toContainText(`со счёта «${LONG}»`)
+    expect(await sideways(sheet)).toBe(0)
+
+    await sheet.getByRole('button', { name: /Куда/ }).click()
+    const picker = topSheet(page)
+    await expect(picker).toContainText(`кроме «${LONG}»`)
+    await page.waitForTimeout(400)
+    expect(await sideways(picker)).toBe(0)
+  })
+
+  test('the check’s «Запишем расход … на «…»» breaks the name, not the sheet', async ({ page }) => {
+    const id = await madeAccount(page, LONG)
+    await open(page, `/money/accounts/${id}`)
+    await page.getByRole('button', { name: 'Сверить с фактом' }).click()
+    const check = topSheet(page)
+    await page.waitForTimeout(400)
+    await check.getByLabel('Сколько на счёте сейчас?').fill('9000')
+    await check.getByRole('button', { name: 'Сверить', exact: true }).click()
+    await expect(check).toContainText(`на «${LONG}»`)
+    expect(await sideways(check)).toBe(0)
+  })
+
+  test('«Списано со счёта» of a spending in dollars breaks the name, not the sheet', async ({
+    page,
+  }) => {
+    await madeAccount(page, LONG)
+    await open(page, '/money')
+    await page.getByRole('button', { name: 'Добавить трату' }).click()
+    const sheet = topSheet(page)
+    await expect(sheet).toContainText('Новая трата')
+    await page.waitForTimeout(400)
+    await sheet.locator('label').filter({ hasText: 'Доллары' }).click()
+    // Dollars put the sheet on «Без счёта»; the account in drams is chosen by hand.
+    await sheet.getByRole('button', { name: /Выбрать счёт/ }).click()
+    await page.waitForTimeout(400)
+    await topSheet(page)
+      .getByRole('radio', { name: new RegExp(LONG) })
+      .click()
+    await sheet.getByLabel(/Списано со счёта/).fill('4000')
+    await expect(sheet).toContainText(`«${LONG}» уменьшится ровно на`)
+    expect(await sideways(sheet)).toBe(0)
+    await expect(sheet.getByRole('button', { name: 'Закрыть' })).toBeInViewport({ ratio: 1 })
+  })
 })

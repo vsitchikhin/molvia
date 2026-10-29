@@ -178,6 +178,7 @@ export default defineComponent({
   font: inherit;
   font-weight: var(--weight-medium);
   text-align: left;
+  overflow-wrap: anywhere;
   cursor: pointer;
 
   &:focus-visible {

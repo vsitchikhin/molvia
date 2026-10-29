@@ -1519,6 +1519,7 @@ export default defineComponent({
   color: var(--text);
   font-size: var(--text-callout);
   line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
 }
 
 .code-hint-source {

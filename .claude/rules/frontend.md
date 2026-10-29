@@ -411,7 +411,40 @@ The detail behind the frontend lines of `CLAUDE.md`.
   sheet's `.field` — its column of a label and a field — stood the row in a column 84 high (adversarial
   А1 of MOL-199). **Its label has no width of its own** (`width: 0` beside `flex: 1`, as `AccountRow`'s
   value): its whole line counted in the sheet's least width, and a note of 32 letters made the spending
-  sheet wider than the phone, × off the screen (А3). **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
+  sheet wider than the phone, × off the screen (А3). **A sheet's column is the sheet's width, never its
+  content's** (`.panel`, `minmax(0, 1fr)`, MOL-318, owner's В-1 «б»): an `auto` column took the least
+  width of whatever stood in it — the label above, then a row of chips with a long name of one's own —
+  and the whole sheet went sideways; what cannot shrink now stands past its own edge alone, the × in
+  place, and a test of the sheet's `scrollWidth` still sees it. **The same class, closed where it was found**
+  (MOL-318, the owner's «сразу везде»): the words of a `ListRow` are one column of `minmax(0, 1fr)` — a till's
+  line under a purchase ran under its amount, never cut; an `AppField` has no least width of its own
+  (`min-width: 0` on the field, `width: 0` on the control) — a select is as wide as its longest option — the
+  categories of «Бюджет» and «Год» — and WebKit keeps that width whatever the select's. **Words that may hold a
+  name break it** (`overflow-wrap: anywhere`): an account's, a category's, a place's, an item's name, a note or a
+  query typed as one word of forty letters — the most a name of an account or a category takes — is wider than a
+  phone of 320. The large title of a screen took the page 348 px sideways; «Списано со счёта», under a field in a
+  grid of a column `auto`, took the spending's sheet 36 and its field with it (adversarial А4); «Графики» 30 for a
+  stale link. Every paragraph with a name in it breaks it too: the hints of a transfer, «Куда», a check, the notices of
+  «Покупки», the conflicts and versions of an exchange, an income, an account, the error of a field, the line of
+  «Остальные», the ring's centre, a receipt's lines and its difference, a caption of «Оценки». **A name kept on
+  one line has no width of its own** — `contain: inline-size`, as the chips' row: its full width went up through
+  every column `auto` above it, and «Против обычного» took «Месяц» 168 px sideways for «Подарки родным и друзьям
+  на дни рождения» — `min-width: 0` lowers a flex item, never what it hands its parents. **What holds it:** the
+  sheets of a transfer, «Куда», a check and «Списано» (`accounts.spec`), «Месяц» — «Против обычного», «Остальные»,
+  the centre — and «Год» (`money-charts.spec`), the screen's title (`accounts.spec`, English), «Продолжить «…»»
+  (`trip.spec`) and «Record «…» without the code» (`scanner.spec`), all in Chromium;
+  `/_kit` «Открыть шторку длинных имён» on `phone` and `iphone` — the chips, the select, a row's words, a sheet's
+  title and meta, each in the box a screen puts it in. The rest was found by reading the CSS (MOL-318's audit) and
+  has no test: the subtitle, «Где вы?», the notices, conflicts and versions, a field's error, the receipts', the
+  caption, «Что брать» and the search. A new paragraph with a name in it takes the same line. **The prices, named:** a tail of `ListRow` keeps its `min-content` (MOL-176) — an amount
+  of fifteen characters still stands past a row of 320; the figure in the middle of a ring stands past it for
+  a sum of eleven, over the ring and not the page; a name in an `AppButton` narrower than its row is not broken,
+  since its cell of two words (MOL-225) would break with it — the buttons with a name in them are all `block`,
+  which breaks it («Продолжить «…»», «Взять «…»», «Записать «…» без кода», adversarial Б1, Б2). What MOL-318 proved is a name at a text of 100 %: at 150 % on 320 the segments of `SegmentedControl` («Настройки»
+  120 px, the exchange's sheet 121) and the ring of «Деньги» (43 px) still stand past the phone, on master too and with
+  short names; probes found «Графики» at 150 % (47 px, 169 at 200 %), and only at 200 % «Траты» (50), «Бюджет» (40), an
+  account's screen (21) and «Обмен» (5), their causes not yet named — all MOL-321, where the segment's whole word (MOL-189) meets this rule. And WebKit says «ResizeObserver loop completed» as a sheet with the
+  chips opens — on master too, a window error with no frame of ours, which the phone's reports leave out. **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
   handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
   its tint, in the strip's shape and never a live region; a tag a pill of 13/600, plain, warn or bad
   — rows had drawn them at 11/700, 11/600 and 13/600. Screens move onto them in their own tasks.

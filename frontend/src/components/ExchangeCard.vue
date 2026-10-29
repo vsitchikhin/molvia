@@ -200,6 +200,7 @@ export default defineComponent({
 .account {
   color: var(--text-muted);
   font-size: var(--text-footnote);
+  overflow-wrap: anywhere;
 }
 
 .amount {

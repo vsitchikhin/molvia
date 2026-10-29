@@ -158,6 +158,7 @@ export default defineComponent({
 .result-note {
   color: var(--text-muted);
   font-size: var(--text-footnote);
+  overflow-wrap: anywhere;
 }
 
 .keep-new .result-name {

@@ -14,7 +14,7 @@
         line.line.printed
       }}</span>
       <!-- a new item's name is the proposal itself: «в чеке — …» would only repeat it (MOL-293) -->
-      <span v-if="line.check && !line.isNew && line.line.translation" class="figures">{{
+      <span v-if="line.check && !line.isNew && line.line.translation" class="figures note">{{
         t('receipt.review.check_note', { text: line.line.translation })
       }}</span>
       <span v-if="figures" class="figures">
@@ -195,6 +195,11 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-footnote);
   font-variant-numeric: tabular-nums;
+}
+
+/* The translation in it may be one word wider than the row (MOL-318); the figures stay whole. */
+.note {
+  overflow-wrap: anywhere;
 }
 
 .packed {

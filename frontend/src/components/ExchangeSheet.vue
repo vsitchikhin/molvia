@@ -722,10 +722,12 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-footnote);
   list-style: none;
+  overflow-wrap: anywhere;
 }
 
 .conflict {
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .current {

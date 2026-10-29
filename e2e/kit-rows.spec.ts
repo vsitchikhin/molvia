@@ -552,7 +552,8 @@ test("a tap on the record's total flips it to the estimate", async ({ page }) =>
 // The chips of a spending in two rows (MOL-198, self-review №2): the browser's measure is the frailest
 // part of the task — fractional widths, the face, a chip that may shrink — and WebKit is the owner's
 // phone. On the kit, signed out, so the iPhone's engine runs it too. Two rows of 44, «More…» last in
-// the second, nothing past the field's edge.
+// the second, nothing past the field's edge. A row's height to the hundredth: at 13 (MOL-318) the rows
+// stand at a fraction of a pixel, and a box read in the page's coordinates came 44.00006 once in 20.
 for (const width of [390, 320])
   test(`at ${String(width)} the chips of a spending stand in two rows, «More…» last`, async ({
     page,
@@ -562,7 +563,7 @@ for (const width of [390, 320])
     const field = page.getByRole('group', { name: 'Category', exact: true })
     const rows = field.locator('.chips .row')
     await expect(rows).toHaveCount(2)
-    for (const row of await rows.all()) expect((await row.boundingBox())?.height).toBe(44)
+    for (const row of await rows.all()) expect((await row.boundingBox())?.height).toBeCloseTo(44, 2)
     await expect(rows.last().locator('> *').last()).toHaveText('More…')
     const edge = await field.evaluate((box) => box.getBoundingClientRect().right)
     const rights = await field
@@ -570,6 +571,47 @@ for (const width of [390, 320])
       .evaluateAll((chips) => chips.map((chip) => chip.getBoundingClientRect().right))
     for (const right of rights) expect(right).toBeLessThanOrEqual(edge + 0.5)
   })
+
+// MOL-318: a sheet's column took the least width of what stood in it — the chips' row with a long name of
+// one's own first, a select as wide as its longest option, a title of one word — and a row's words took
+// a till's line on one line; the sheet went past the phone, × and all. Nothing stands past the sheet's edge
+// now, the chip and the line cut by their «…», in both engines: WebKit is the owner's phone.
+test('at 320 names wider than the phone stand in a sheet, nothing past its edge', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 720 })
+  await open(page, '/_kit')
+  await page.getByRole('button', { name: 'Open a sheet of long names' }).click()
+  const sheet = page.locator('dialog[open]')
+  await expect(sheet).toContainText('Electroequipment')
+  await page.waitForTimeout(400)
+  const field = sheet.getByRole('group', { name: 'Category', exact: true })
+  await expect(
+    field.locator('.chips .row').first().getByRole('radio').first(),
+  ).toHaveAccessibleName('Подарки родным и друзьям на дни рождения')
+  const look = await sheet.evaluate((dialog) => {
+    const edge = dialog.getBoundingClientRect().right
+    const cut = (selector: string) => {
+      const one = dialog.querySelector(selector)
+      return one ? one.scrollWidth > one.clientWidth : null
+    }
+    const words = dialog.querySelector('.list-row .words')?.getBoundingClientRect().right ?? 0
+    return {
+      sideways: dialog.scrollWidth - dialog.clientWidth,
+      past: [...dialog.querySelectorAll('*')]
+        .filter((one) => !one.closest('.ruler-box'))
+        .filter((one) => one.getBoundingClientRect().right > edge + 0.5)
+        .map((one) => one.tagName + (typeof one.className === 'string' ? `.${one.className}` : '')),
+      chip: cut('.chip.on .name'),
+      line: cut('.printed'),
+      lineInWords:
+        (dialog.querySelector('.printed')?.getBoundingClientRect().right ?? Infinity) <=
+        words + 0.5,
+    }
+  })
+  expect(look).toEqual({ sideways: 0, past: [], chip: true, line: true, lineInWords: true })
+  await expect(sheet.getByRole('button', { name: 'Close' })).toBeInViewport({ ratio: 1 })
+})
 
 /** The colour `--surface` computes to here, as a box-shadow prints it. */
 function surfaceOf(page: Page): Promise<string> {

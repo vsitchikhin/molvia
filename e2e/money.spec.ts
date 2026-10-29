@@ -580,7 +580,7 @@ test('the chips stand in two rows by frequency, «Ещё…» last, «Сохра
   const twoRows = async () => {
     await expect(rows).toHaveCount(2)
     // Each row on one line, as tall as a chip.
-    for (const row of await rows.all()) expect((await row.boundingBox())?.height).toBe(44)
+    for (const row of await rows.all()) expect((await row.boundingBox())?.height).toBeCloseTo(44, 2)
     await expect(rows.last().locator('> *').last()).toHaveText('Ещё…')
     await expect(sheet.getByRole('button', { name: 'Ещё…' })).toHaveAttribute(
       'aria-haspopup',
@@ -605,6 +605,66 @@ test('the chips stand in two rows by frequency, «Ещё…» last, «Сохра
   await opened()
   await twoRows()
   await expect(rows.first().getByRole('radio').first()).toHaveAccessibleName('Документы')
+})
+
+/** How far the sheet goes sideways, and whether any chip stands past its field. */
+function sideways(sheet: Locator): Promise<{ sheet: number; past: string[] }> {
+  return sheet.evaluate((dialog) => {
+    const edge = dialog.querySelector('.chips-field')?.getBoundingClientRect().right ?? 0
+    return {
+      sheet: dialog.scrollWidth - dialog.clientWidth,
+      past: [...dialog.querySelectorAll('.chips .chip')]
+        .filter((chip) => chip.getBoundingClientRect().right > edge + 0.5)
+        .map((chip) => chip.textContent.trim()),
+    }
+  })
+}
+
+// MOL-318: a row on one line gave the sheet's grid the whole name of its first chip as its least width,
+// and a long one of one's own, chosen and so first, took the sheet — × and all — past the phone, more so
+// once turned from wide to narrow, the rows laid for the wide one. A newcomer at 320 had «Продукты» alone
+// in the first row, the chips at 15 with sides of 12 and 16.
+test('a long name of one’s own is cut in the chips, and the sheet never goes sideways', async ({
+  page,
+}) => {
+  const long = 'Подарки родным и друзьям на дни рождения'
+  await page.setViewportSize({ width: 412, height: 760 })
+  await signedIn(page)
+  const made = await page.request.post('/api/spending-categories', {
+    headers: await asBrowser(page),
+    data: { id: randomUUID(), name: long },
+  })
+  expect(made.status(), await made.text()).toBe(201)
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
+
+  const sheet = page.locator('dialog[open]').first()
+  const rows = sheet.locator('.chips .row')
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  await expect(sheet).toContainText('Новая трата')
+  await page.waitForTimeout(400)
+  await chooseCategory(page, long)
+  await expect(rows.first().getByRole('radio').first()).toHaveAccessibleName(long)
+  expect(await sideways(sheet)).toEqual({ sheet: 0, past: [] })
+
+  // Turned to a narrow phone with the rows laid for the wide one.
+  await page.setViewportSize({ width: 320, height: 640 })
+  await expect(rows.first().getByRole('radio').first()).toHaveAccessibleName(long)
+  await expect.poll(() => sideways(sheet)).toEqual({ sheet: 0, past: [] })
+  const name = sheet.locator('.chips .chip.on .name')
+  expect(await name.evaluate((one) => one.scrollWidth > one.clientWidth)).toBe(true)
+  await expect(rows).toHaveCount(2)
+  for (const row of await rows.all()) expect((await row.boundingBox())?.height).toBeCloseTo(44, 2)
+  await expect(sheet.getByRole('button', { name: 'Закрыть' })).toBeInViewport({ ratio: 1 })
+
+  // A newcomer's two first at 320 stand side by side.
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  await expect(sheet).toContainText('Новая трата')
+  await page.waitForTimeout(400)
+  await expect(rows.first().locator('.chip')).toHaveText(['Продукты', 'Кафе и рестораны'])
+  expect(await sideways(sheet)).toEqual({ sheet: 0, past: [] })
 })
 
 test('a category of one’s own is made from the sheet, and a preset’s name is refused', async ({

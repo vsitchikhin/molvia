@@ -193,6 +193,11 @@ export default defineComponent({
 .name {
   flex: 1;
   min-width: 0;
+
+  /* No width of its own (MOL-318): a name kept on one line gave its full width to every column `auto`
+     above it — the ellipsis never came, and «Месяц» went 168 px sideways at 320 for «Подарки родным и
+     друзьям на дни рождения». `min-width: 0` lowers the flex item, never what it hands its parents. */
+  contain: inline-size;
   overflow: hidden;
   font-size: var(--text-callout);
   font-weight: var(--weight-medium);

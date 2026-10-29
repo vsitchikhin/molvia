@@ -296,6 +296,11 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
+/* A category's name of one word wider than the ring breaks inside it; the sum under it stays whole (MOL-318). */
+.center-label {
+  overflow-wrap: anywhere;
+}
+
 .center-figure {
   @include display-type;
 
@@ -392,5 +397,6 @@ export default defineComponent({
   margin: 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
+  overflow-wrap: anywhere;
 }
 </style>
