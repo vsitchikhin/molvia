@@ -631,12 +631,13 @@
     </BottomSheet>
 
     <!-- Names wider than the phone in a sheet (MOL-318): one's own category chosen, so first in the chips,
-         a select of it, a title of one word and a line under a row's words — none may take the sheet
-         sideways. For WebKit, where «Деньги» do not open on the loopback. -->
+         a select of it, a title and a meta of one word and a line under a row's words — none may take the
+         sheet sideways. For WebKit, where «Деньги» do not open on the loopback. -->
     <AppButton block @click="wideOpen = true">{{ t('dev.kit.open_wide_sheet') }}</AppButton>
 
     <BottomSheet v-model:open="wideOpen">
       <template #title>{{ t('dev.kit.wide_title') }}</template>
+      <template #meta>{{ t('dev.kit.wide_meta') }}</template>
       <!-- Each in the box a screen puts it in: the chips in a flex column, as the spending's form; the
            select and the row in a grid of a column `auto`, as the budget's form — it takes the least
            width of what stands in it. -->

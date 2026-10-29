@@ -582,6 +582,7 @@ export default defineComponent({
 
 .conflict {
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .current {

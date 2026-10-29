@@ -256,5 +256,6 @@ export default defineComponent({
 .held {
   margin: 0 0 var(--space-4);
   font-size: var(--text-callout);
+  overflow-wrap: anywhere;
 }
 </style>

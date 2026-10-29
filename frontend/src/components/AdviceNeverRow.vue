@@ -87,5 +87,6 @@ export default defineComponent({
   font-size: var(--text-footnote);
   font-style: italic;
   line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
 }
 </style>

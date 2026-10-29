@@ -203,6 +203,7 @@ export default defineComponent({
   background: var(--warn-tint);
   font-size: var(--text-footnote);
   font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
 }
 
 .difference-icon {

@@ -167,5 +167,6 @@ export default defineComponent({
   margin: var(--space-2) var(--space-1) 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
+  overflow-wrap: anywhere;
 }
 </style>

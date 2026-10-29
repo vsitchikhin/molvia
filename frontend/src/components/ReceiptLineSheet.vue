@@ -468,6 +468,7 @@ export default defineComponent({
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius);
   font-size: var(--text-footnote);
+  overflow-wrap: anywhere;
 
   &.quiet {
     color: var(--text-muted);
@@ -497,6 +498,7 @@ export default defineComponent({
 .hint {
   color: var(--text-muted);
   font-size: var(--text-footnote);
+  overflow-wrap: anywhere;
 }
 
 .hint {

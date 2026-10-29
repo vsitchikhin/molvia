@@ -386,6 +386,7 @@ textarea.control {
   margin: var(--space-1) 0 0;
   color: var(--bad-ink);
   font-size: var(--text-footnote);
+  overflow-wrap: anywhere;
 }
 
 .readonly {

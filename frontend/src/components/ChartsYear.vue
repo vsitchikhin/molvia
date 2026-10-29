@@ -854,6 +854,7 @@ export default defineComponent({
 
 .missing {
   margin-top: var(--space-2);
+  overflow-wrap: anywhere;
 }
 
 /* Two lines held whatever the month says: the running month's words — «к обычному к 9 октября» — take
