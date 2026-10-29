@@ -128,9 +128,9 @@ function remembered(...items: CatalogueEntry[]): void {
 
 /**
  * The screen under the app's own live region, so what it reads out can be heard. `shown` takes the
- * screen away while the region stays — what leaving it does.
+ * screen away while the region stays — what leaving it does. `said` keeps every announcement once,
+ * by its id: the same words said again are a new entry.
  */
-/** `said` keeps every announcement once, by its id: the same words said again are a new entry. */
 async function render(shown = ref(true), path = '/trip/add', said: string[] = []) {
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push(path)
@@ -1139,6 +1139,33 @@ describe('«What did you pick up?»', () => {
       expect(names(view)).toEqual([milk.name])
     }, 10_000)
 
+    // The recent items under a code looked up offline are no previous answer: nothing dims them, even
+    // while the search still waits for an answer to what was typed before (К-11, adversarial Б1).
+    it('never dims the recent items under a code looked up offline', async () => {
+      remembered(bread)
+      searchCatalogue.mockResolvedValueOnce([bread])
+      const view = await render()
+      await field(view).setValue('хле')
+      await vi.waitFor(() => {
+        expect(names(view)).toEqual([bread.name])
+      })
+      searchCatalogue.mockReturnValue(new Promise(() => undefined))
+      await field(view).setValue('хлеб')
+      await vi.waitFor(() => {
+        expect(searchCatalogue).toHaveBeenCalledWith('хлеб')
+      })
+      expect(view.get('[role="listbox"]').classes()).toContain('stale')
+      await connection(false)
+
+      await scan(view, CODE)
+
+      expect(view.text()).toContain(en.item.barcode.offline_body)
+      expect(names(view)).toEqual([bread.name])
+      const list = view.get('[role="listbox"]')
+      expect(list.classes()).not.toContain('stale')
+      expect(list.attributes('aria-busy')).toBeUndefined()
+    }, 10_000)
+
     // A second code offline is `offline` over `offline`: said all the same (adversarial А4).
     it('says a second code looked up offline as well', async () => {
       online(false)
@@ -1717,7 +1744,6 @@ describe('«What did you pick up?»', () => {
         })
       }, 10_000)
 
-      // One strip a screen, the connection first under the field: over the waiting code (Р-5, Р-6).
       // The connection back takes the strip away (В-1 «а»), gone again brings it back: the question
       // stands `offline` with no tap, and «Try again» is never left without its why (adversarial А2).
       it('brings the strip back over the question once the connection goes again', async () => {
@@ -1741,6 +1767,7 @@ describe('«What did you pick up?»', () => {
         expect(attachBarcode).toHaveBeenCalledTimes(1)
       }, 10_000)
 
+      // One strip a screen, the connection first under the field: over the waiting code (Р-5, Р-6).
       it('says the connection over the waiting code, in one strip', async () => {
         const view = await render()
         await scan(view, CODE)

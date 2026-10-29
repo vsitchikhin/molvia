@@ -36,7 +36,7 @@
       ref="combobox"
       v-model="query"
       :groups="groups"
-      :stale="stale"
+      :stale="listStale"
       :readonly="bind?.phase === 'sending'"
       :label="t('item.search_title')"
       :placeholder="t('item.search_placeholder')"
@@ -1020,6 +1020,10 @@ export default defineComponent({
       return hasRecent.value ? t('item.error.body') : t('item.error.body_alone')
     })
 
+    // Dimmed only while the rows are the search's answer: under a code looked up offline they are the
+    // recent items, with no next answer to wait for (К-11, adversarial Б1).
+    const listStale = computed(() => stale.value && barcode.value === 'idle')
+
     // One strip a screen (MOL-181), in the words of what it is about: the question about a code, the
     // answer to a code, else the search's own — never under another answer to a code (3g, 3i).
     const strip = computed<string | null>(() => {
@@ -1355,6 +1359,7 @@ export default defineComponent({
       query,
       phase,
       stale,
+      listStale,
       answered,
       retry,
       fallback,

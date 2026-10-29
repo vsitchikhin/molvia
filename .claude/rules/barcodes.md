@@ -312,7 +312,7 @@ lies on an iPad (as MOL-132 Р-3).
   `offline` with no change of phase (adversarial А1, А2: a blink at the shelf left both with no word of
   why). A «Повторить» that failed offline again is said again (`attempt`), and so is every code read
   offline, the second in a row too (А4). Under the line stand the recent items, never an answer the
-  search held from before the connection went (А3).
+  search held from before the connection went (А3), nor dimmed as one while the search waits (Б1).
 - **Offline and error ask again once the connection is back**, quietly — the block stays until the
   answer replaces it — as the search does (`useReconnect`, adversarial Ж). **What that retry finds
   does not open a sheet**: it says «По коду … нашлось» with the item as a button, and the sheet comes
