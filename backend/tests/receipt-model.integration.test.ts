@@ -217,11 +217,17 @@ async function readAll(
     cap = CAP,
     now,
     told,
-  }: { cap?: number; now?: () => Date; told?: ReadReceiptsDeps['told'] } = {},
+    receipts = repository,
+  }: {
+    cap?: number
+    now?: () => Date
+    told?: ReadReceiptsDeps['told']
+    receipts?: ReadReceiptsDeps['receipts']
+  } = {},
 ): Promise<ReadReport[]> {
   const reports: ReadReport[] = []
   await readQueuedReceipts({
-    receipts: repository,
+    receipts,
     reader,
     report: (event) => reports.push(event),
     bind: (claimed, lines) =>
@@ -1171,6 +1177,28 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     const later = new Date(at.getTime() + 60 * 60 * 1000)
     await readAll(benchReader(), fakeModel(notWhole), { told: channel, now: () => later })
     expect((await notices()).at(-1)).toEqual({ kind: 'receipt_partial_muted', count: 1 })
+  }, 30_000)
+
+  // MOL-319: the model reads only whoever accepted edition 5, past the review's 4, so the claim never hands it a
+  // receipt it may not keep — this holds the guard for the day the review's edition outgrows the model's
+  // (self-review №2). The claim is the real one, its answer told otherwise.
+  it('tells of a receipt the review may not keep, and keeps nothing of it (MOL-309, В-3 «б»)', async () => {
+    const me = await person(LATER)
+    await queued(me)
+    const unreviewable: ReadReceiptsDeps['receipts'] = {
+      ...repository,
+      claimNext: async () => {
+        const claimed = await repository.claimNext()
+        return claimed === null ? null : { ...claimed, reviewable: false }
+      },
+    }
+    await readAll(benchReader(), fakeModel(notWhole), { told: told(), receipts: unreviewable })
+    expect(await db.select().from(receiptMisses)).toEqual([])
+    const [notice] = await notices()
+    expect(notice).toMatchObject({ kind: 'receipt_partial', reason: 'line_not_as_printed' })
+    // nothing kept: no day, and no id that would name a receipt nothing here opens (self-review №3)
+    expect(notice).not.toHaveProperty('keptUntil')
+    expect(notice).not.toHaveProperty('receipt')
   }, 30_000)
 
   // adversarial А3: proven whole, a line «1 × 0 = 0» emptied all the same — no reason of the receipt to give
