@@ -581,6 +581,15 @@ test('the chips stand in two rows by frequency, «Ещё…» last, «Сохра
     await expect(rows).toHaveCount(2)
     // Each row on one line, as tall as a chip.
     for (const row of await rows.all()) expect((await row.boundingBox())?.height).toBeCloseTo(44, 2)
+    // Each row runs the field's width: the chips share what the measure left over.
+    const field = await sheet.locator('.chips').boundingBox()
+    for (const row of await rows.all()) {
+      const last = await row.locator('> *').last().boundingBox()
+      expect((last?.x ?? 0) + (last?.width ?? 0)).toBeCloseTo(
+        (field?.x ?? 0) + (field?.width ?? 0),
+        0,
+      )
+    }
     await expect(rows.last().locator('> *').last()).toHaveText('Ещё…')
     await expect(sheet.getByRole('button', { name: 'Ещё…' })).toHaveAttribute(
       'aria-haspopup',

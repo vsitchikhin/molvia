@@ -243,6 +243,13 @@ export default defineComponent({
   }
 }
 
+/* Measured, the chips of a row share what the row leaves over, so each row runs the field's width at any
+   phone's: the measure took them at their own widths, and growing changes none of it. */
+.laid .chip {
+  flex-grow: 1;
+  justify-content: center;
+}
+
 /* 13 with sides of 8 (MOL-318, owner's word): at 15 with 12 and 16 a newcomer's first row at 320 held
    «Продукты» alone, «Кафе и рестораны» going under it; now both, some 11 px to spare. Never narrower
    than a thumb, whatever the name. */

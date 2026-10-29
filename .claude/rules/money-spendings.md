@@ -474,7 +474,8 @@ nothing up.
   13/600 with sides of 8, a dot of 8 four from its name, never narrower than 44** (owner's word on
   MOL-318): at 15 with 12 and 16 a newcomer at 320 had «Продукты» alone in the first row and «Ещё…»
   alone in the second; now «Продукты · Кафе и рестораны» stand side by side some 11 px to spare, and
-  from 375 the second row holds two besides «Ещё…». Until there is a measure — a sheet still shut
+  from 375 the second row holds two besides «Ещё…». **Measured, a row runs the field's width** (MOL-322, owner's word): its chips share what the measure left over (`flex-grow`), so the measure, taken at their own
+  widths, and the field, which has none of its own, stay as they were. Until there is a measure — a sheet still shut
   — every chip stands, as before. **The chosen one never leaves the rows** (adversarial А1): a measure
   that would lay it past them — the phone turned, a name before it grown longer by an answer — stands it
   first and tells the sheet (`lift`), and one chosen from outside them is laid in; tapped in the rows,
