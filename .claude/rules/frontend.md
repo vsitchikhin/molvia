@@ -441,8 +441,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   a sum of eleven, over the ring and not the page; a name in an `AppButton` narrower than its row is not broken,
   since its cell of two words (MOL-225) would break with it — the buttons with a name in them are all `block`,
   which breaks it («Продолжить «…»», «Взять «…»», «Записать «…» без кода», adversarial Б1, Б2). What MOL-318 proved is a name at a text of 100 %: at 150 % on 320 the segments of `SegmentedControl` («Настройки»,
-  the exchange's sheet, 120 px) and the ring of «Деньги» and «Графики» (43–47 px) still stand past the phone, on master
-  too and with short names — MOL-321, where the segment's whole word (MOL-189) meets this rule. And WebKit says «ResizeObserver loop completed» as a sheet with the
+  the exchange's sheet, 120 px) and the ring of «Деньги» (43 px) still stand past the phone, on master too and with
+  short names; probes found «Графики», «Бюджет», an account's screen and «Обмен» (5–47 px), and «Траты» at 200 %, their
+  causes not yet named — all MOL-321, where the segment's whole word (MOL-189) meets this rule. And WebKit says «ResizeObserver loop completed» as a sheet with the
   chips opens — on master too, a window error with no frame of ours, which the phone's reports leave out. **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
   handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
   its tint, in the strip's shape and never a live region; a tag a pill of 13/600, plain, warn or bad
