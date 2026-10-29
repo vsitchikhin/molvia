@@ -235,7 +235,7 @@ The detail behind the privacy lines of `CLAUDE.md`.
   list — other people see the catalogue and the shops' memory with no access and no threshold, and the
   list says so (А2) — **the rights** with their term and what cannot be edited (А3) (five working days for what the app does not do itself, the
   strictest of the three laws), **the three authorities** by name and site, the two years of silence
-  (MOL-239), what a breach brings, the transfer to Germany. **The consent is held by the switch, not
+  (MOL-239), what a breach brings, the transfer to France — Germany until edition 5, below. **The consent is held by the switch, not
   by the tap**: «пока включено «Учитывать меня в статистике»» — true of whoever turned it off before
   edition 2, since «Принимаю» does not touch the switch; it is shown on the step itself, apart from the
   rest (В-2, Georgia's art. 32), with no box of its own — unticked it would empty the gates, ticked it is
@@ -254,6 +254,16 @@ The detail behind the privacy lines of `CLAUDE.md`.
   (`title`, `text`), absent until then: a revision, not an edition, and its merge is the deploy
   («Порядок при утечке», step 4). The subject's own name of art. 10 §2.1 cannot be given — none is
   kept; the price is in «Персональные данные», 2.1.
+- **Edition 5 says where the data is** (MOL-319, owner's В-1 «а» and В-2 «а», 29.10.2026). The DPA of
+  Contabo (MOL-242) put its region «EU» in Lauterbourg, France, where the page had said Germany; the
+  console of Anthropic (MOL-301) has the workspace store in the USA and compute «global», in any country
+  it has capacity in, and Anthropic keeps what it was sent up to 30 days — flagged by its check, 2 years,
+  the check's score 7. No recipient is new and the law reads the same — France is on the Agency's list —
+  **but the consent of art. 10 names the countries of the transfer, and two of them changed**, so it is an
+  edition, not a revision: «Anthropic: США и другие страны», «Contabo, сервер во Франции», and «Чеки» says
+  the deletion at «Записать» is ours. `consent.changes.3` keeps «США»: it is what edition 3 said, and
+  `changes.5`, shown after it, puts it right. **The model reads only for whoever accepted it**
+  (`MODEL_CONSENT_EDITION` 5, below).
 - **The record of processing is a page in Confluence, written from the code** (MOL-97,
   «Реестр обработки персональных данных», 12091393): a row per processing — the data, the purpose, the
   basis by country, the term and the constant or timer that holds it, who sees it, erasure and the
@@ -321,10 +331,11 @@ The detail behind the privacy lines of `CLAUDE.md`.
 - **A receipt is read on our own server, and its photo lives days** (MOL-125, the owner's decisions of
   27.09 and 02.10.2026): Tesseract in `services/receipt-reader`, a container with no database, no
   disk and no log, asked over the compose network only — no third party sees a receipt. **Except a
-  receipt the model reads** (MOL-272): Anthropic, in the USA, gets its photo whole — a customer's name
+  receipt the model reads** (MOL-272): Anthropic — storing in the USA, computing in any country it has
+  capacity in, keeping it up to 30 days (MOL-319) — gets its photo whole — a customer's name
   printed on it included — only for whoever it is granted to (`actors.receipts_model_until`) **and who
-  accepted edition 3** (`MODEL_CONSENT_EDITION`), which names Anthropic among the recipients and the
-  transfer abroad on that consent; anyone else's receipt never leaves the server, whatever is granted.
+  accepted edition 5** (`MODEL_CONSENT_EDITION`), which names those countries and that term and the
+  transfer abroad on that consent — edition 3 named Anthropic with the USA alone; anyone else's receipt never leaves the server, whatever is granted.
   What the model gives back is kept as any reading is; the grant is the person's — in the copy
   (version 20), gone with the row — and its row in the record of processing (12091393); what the model
   cost is nobody's (`model_spend`). The page says it under «Чеки» and among the recipients. The photo
@@ -336,7 +347,7 @@ The detail behind the privacy lines of `CLAUDE.md`.
   fourteen days, longer than the promise. **A receipt the model read not whole keeps its photo and the
   model's answer for the developer's review** (MOL-309, owner's В-3 «б»): past «Записать», until the review
   lets it go, 21 days at most — a new purpose, so **only for whoever accepted edition 4**
-  (`REVIEW_CONSENT_EDITION`); a receipt «Переснять» replaced leaves it (owner's В-6 «а»), any other removal of
+  (`REVIEW_CONSENT_EDITION`), which every reading by the model has since edition 5 is its threshold; a receipt «Переснять» replaced leaves it (owner's В-6 «а»), any other removal of
   the receipt takes it by the cascade, and **the person erased takes it always** (`receipt_misses.actor_id`, in
   `ACTOR_REFERENCES`). It enters no nightly copy; **the person's copy says what is kept, until when and why**
   (`receiptReviews`, version 25) — never the photo or the reading; the developer's notice of it names no name,
