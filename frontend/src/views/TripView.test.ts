@@ -91,10 +91,13 @@ interface Row {
   readonly unitPrice?: string
 }
 
-function trip(rows: readonly Row[] = [], over: Partial<Record<'id', string>> = {}): TripViewModel {
+function trip(
+  rows: readonly Row[] = [],
+  over: Partial<Record<'id' | 'startedAt', string>> = {},
+): TripViewModel {
   return tripViewCodec.parse({
     id: over.id ?? TRIP,
-    startedAt: new Date().toISOString(),
+    startedAt: over.startedAt ?? new Date().toISOString(),
     finishedAt: null,
     currency: 'AMD',
     rate: null,
@@ -1708,7 +1711,8 @@ describe('TripView', () => {
     })
 
     it('у пустой записи суммы нет: «Закончить» предлагает записать тратой в «Деньгах» (В-1)', async () => {
-      currentTrip.mockResolvedValue(trip())
+      // Начата в прошлый день: «Сегодня» шторки его не подделает, и полночь его не сдвинет (MOL-308).
+      currentTrip.mockResolvedValue(trip([], { startedAt: '2026-09-27T09:00:00.000Z' }))
       const { view, queue, router } = await render()
       expect(view.findAll('button').some((b) => b.text() === ru.trip.receipt.add)).toBe(false)
       await askFinish(view)
@@ -1743,7 +1747,7 @@ describe('TripView', () => {
       // «Деньги» took what was handed over and opened the sheet on it.
       expect(useSpendingHandoffStore().handed, '«Деньги» забрали переданное').toBeNull()
       expect(openSheet()?.textContent, 'шторка траты — на день и магазин записи').toContain(
-        'Сегодня · Ереван Сити',
+        '27 сент. · Ереван Сити',
       )
     })
   })
