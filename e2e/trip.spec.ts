@@ -810,3 +810,46 @@ for (const locale of ['en-US', 'ru-RU'] as const)
         ).toBe(true)
       })
   })
+
+// MOL-318, adversarial Б1: «Продолжить «‹место›»» is a button the width of the sheet; a place of one
+// word stood past it on both sides — the dialog 48 px sideways, the name's start left of the screen.
+test.describe('a place of one long word at 320', () => {
+  test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
+
+  test('«Уже записываете»: «Продолжить «…»» breaks the name inside the button, not the sheet', async ({
+    page,
+  }) => {
+    const place = 'Гипермаркетэлектроникиибытовойтехникинаг'
+    await page.setViewportSize({ width: 320, height: 720 })
+    await signedIn(page)
+    const headers = await asBrowser(page)
+    const context = settingsOf(
+      actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
+    )
+    const started = await page.request.post('/api/trips', {
+      headers,
+      data: { context, id: randomUUID(), place: { name: place, kind: 'store' } },
+    })
+    expect(started.status(), await started.text()).toBe(201)
+    await page.goto('/purchases')
+    // The phone knows the record is open only once «Покупки» has its answer.
+    await expect(page.getByRole('button', { name: `Продолжить «${place}»` })).toBeVisible()
+    await page.getByRole('button', { name: 'Записать вручную' }).click()
+    await expect(sheet(page)).toContainText('Открытая запись бывает одна')
+    await page.waitForTimeout(400)
+
+    const button = sheet(page).getByRole('button', { name: `Продолжить «${place}»` })
+    const look = await button.evaluate((one) => {
+      const range = document.createRange()
+      range.selectNodeContents(one)
+      const words = range.getBoundingClientRect()
+      const box = one.getBoundingClientRect()
+      const dialog = one.closest('dialog')
+      return {
+        sideways: dialog ? dialog.scrollWidth - dialog.clientWidth : -1,
+        inside: words.left >= box.left - 0.5 && words.right <= box.right + 0.5,
+      }
+    })
+    expect(look).toEqual({ sideways: 0, inside: true })
+  })
+})

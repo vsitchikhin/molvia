@@ -615,6 +615,38 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
         .toBe(`Record «${name}» without the code`)
     })
 
+    // MOL-318, adversarial Б2: the one button left is the page's width, and a name of one word stood
+    // past it on both sides — the page 55 px sideways.
+    test('at 320 an item of one long word: «Record «…» without the code» breaks it, not the page', async ({
+      page,
+    }) => {
+      const name = `Электрооборудованиепромышленного${tag}`
+      await page.setViewportSize({ width: 320, height: 720 })
+      await asked(page, name, freshCode(), (route) =>
+        route.fulfill({
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({ code: 'error.barcodes_full' }),
+        }),
+      )
+      await page.keyboard.press('Enter')
+
+      const button = page.getByRole('button', { name: `Record «${name}» without the code` })
+      await expect(button).toBeVisible()
+      const look = await button.evaluate((one) => {
+        const range = document.createRange()
+        range.selectNodeContents(one)
+        const words = range.getBoundingClientRect()
+        const box = one.getBoundingClientRect()
+        const root = document.documentElement
+        return {
+          sideways: root.scrollWidth - root.clientWidth,
+          inside: words.left >= box.left - 0.5 && words.right <= box.right + 0.5,
+        }
+      })
+      expect(look).toEqual({ sideways: 0, inside: true })
+    })
+
     test('«This code already belongs to …» in «Suggest an item»: the focus stays in the sheet, on «Take …»', async ({
       page,
     }) => {
