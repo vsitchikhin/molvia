@@ -1,5 +1,5 @@
 import { flushPromises, mount, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFailed, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import { RouterView, createMemoryHistory, createRouter, createWebHistory } from 'vue-router'
@@ -1712,16 +1712,32 @@ describe('TripView', () => {
       const { view, queue, router } = await render()
       expect(view.findAll('button').some((b) => b.text() === ru.trip.receipt.add)).toBe(false)
       await askFinish(view)
+      // «Деньги» ждём событием роутера, а не часами (MOL-308): предел — только тайм-аут теста.
+      // Ходы пишутся по пути: отчёт о падении приходит, когда экран уже снят.
+      const moves: string[] = []
+      const arrived = new Promise<void>((resolve) => {
+        router.afterEach((to) => {
+          moves.push(String(to.name))
+          if (to.name === 'money') resolve()
+        })
+      })
+      onTestFailed(() => {
+        const state = {
+          moves,
+          handed: useSpendingHandoffStore().handed,
+          queue: queue.pending.map((write) => write.kind),
+        }
+        console.error(`[MOL-308] где встал переход на «Деньги»: ${JSON.stringify(state)}`)
+      })
       inside(openSheet(), ru.trip.remove.empty.spending).click()
       await flushPromises()
-      expect(queue.pending).toEqual([{ kind: 'delete', tripId: TRIP }])
-      for (let step = 0; step < 20 && router.currentRoute.value.name !== 'money'; step += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 20))
-        await flushPromises()
-      }
-      expect(router.currentRoute.value.name).toBe('money')
+      expect(queue.pending, 'запись ушла в очередь на удаление').toEqual([
+        { kind: 'delete', tripId: TRIP },
+      ])
+      await arrived
+      await flushPromises()
       // «Деньги» took what was handed over and opened the sheet on it.
-      expect(useSpendingHandoffStore().handed).toBeNull()
+      expect(useSpendingHandoffStore().handed, '«Деньги» забрали переданное').toBeNull()
     })
   })
 
