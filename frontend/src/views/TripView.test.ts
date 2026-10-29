@@ -1712,7 +1712,8 @@ describe('TripView', () => {
 
     it('у пустой записи суммы нет: «Закончить» предлагает записать тратой в «Деньгах» (В-1)', async () => {
       // Начата в прошлый день: «Сегодня» шторки его не подделает, и полночь его не сдвинет (MOL-308).
-      currentTrip.mockResolvedValue(trip([], { startedAt: '2026-09-27T09:00:00.000Z' }))
+      // В 22:00 UTC у телефона ещё 27-е, а в Ереване уже 28-е: передаётся день телефона (MOL-121).
+      currentTrip.mockResolvedValue(trip([], { startedAt: '2026-09-27T22:00:00.000Z' }))
       const { view, queue, router } = await render()
       expect(view.findAll('button').some((b) => b.text() === ru.trip.receipt.add)).toBe(false)
       await askFinish(view)
