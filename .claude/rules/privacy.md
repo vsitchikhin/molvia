@@ -235,8 +235,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   list — other people see the catalogue and the shops' memory with no access and no threshold, and the
   list says so (А2) — **the rights** with their term and what cannot be edited (А3) (five working days for what the app does not do itself, the
   strictest of the three laws), **the three authorities** by name and site, the two years of silence
-  (MOL-239), what a breach brings, the transfer to France — Germany until edition 5, below. **The consent is held by the switch, not
-  by the tap**: «пока включено «Учитывать меня в статистике»» — true of whoever turned it off before
+  (MOL-239), what a breach brings, the transfer to France — Germany until edition 5, below. **The
+  consent is held by the switch, not by the tap**: «пока включено «Учитывать меня в статистике»» — true of whoever turned it off before
   edition 2, since «Принимаю» does not touch the switch; it is shown on the step itself, apart from the
   rest (В-2, Georgia's art. 32), with no box of its own — unticked it would empty the gates, ticked it is
   no consent. **The server holds it too** (adversarial А1): no visit is written and neither gate counts
@@ -332,10 +332,13 @@ The detail behind the privacy lines of `CLAUDE.md`.
   27.09 and 02.10.2026): Tesseract in `services/receipt-reader`, a container with no database, no
   disk and no log, asked over the compose network only — no third party sees a receipt. **Except a
   receipt the model reads** (MOL-272): Anthropic — storing in the USA, computing in any country it has
-  capacity in, keeping it up to 30 days (MOL-319) — gets its photo whole — a customer's name
-  printed on it included — only for whoever it is granted to (`actors.receipts_model_until`) **and who
-  accepted edition 5** (`MODEL_CONSENT_EDITION`), which names those countries and that term and the
-  transfer abroad on that consent — edition 3 named Anthropic with the USA alone; anyone else's receipt never leaves the server, whatever is granted.
+  capacity in, keeping it up to 30 days, 2 years if its check flags it (MOL-319) — gets its photo whole
+  — a customer's name printed on it included — only for whoever it is granted to
+  (`actors.receipts_model_until`) **and who accepted edition 5** (`MODEL_CONSENT_EDITION`), which names
+  those countries and that term and the transfer abroad on that consent — edition 3 named Anthropic with
+  the USA alone; anyone else's receipt never leaves the server, whatever is granted. Erasure does not
+  reach the copy at Anthropic, and «Удалить всё» says so (adversarial А1); the sheet and the bot speak
+  of what Molvia knows and do not name it — a price.
   What the model gives back is kept as any reading is; the grant is the person's — in the copy
   (version 20), gone with the row — and its row in the record of processing (12091393); what the model
   cost is nobody's (`model_spend`). The page says it under «Чеки» and among the recipients. The photo
@@ -347,8 +350,10 @@ The detail behind the privacy lines of `CLAUDE.md`.
   fourteen days, longer than the promise. **A receipt the model read not whole keeps its photo and the
   model's answer for the developer's review** (MOL-309, owner's В-3 «б»): past «Записать», until the review
   lets it go, 21 days at most — a new purpose, so **only for whoever accepted edition 4**
-  (`REVIEW_CONSENT_EDITION`), which every reading by the model has since edition 5 is its threshold; a receipt «Переснять» replaced leaves it (owner's В-6 «а»), any other removal of
-  the receipt takes it by the cascade, and **the person erased takes it always** (`receipt_misses.actor_id`, in
+  (`REVIEW_CONSENT_EDITION`) — and since edition 5 is the model's threshold (MOL-319), every receipt the
+  model reads has it; the claim's `reviewable` stays as the guard for the day the review's edition
+  outgrows the model's, held by a test that tells the claim otherwise. A receipt «Переснять» replaced
+  leaves it (owner's В-6 «а»), any other removal of the receipt takes it by the cascade, and **the person erased takes it always** (`receipt_misses.actor_id`, in
   `ACTOR_REFERENCES`). It enters no nightly copy; **the person's copy says what is kept, until when and why**
   (`receiptReviews`, version 25) — never the photo or the reading; the developer's notice of it names no name,
   sum or shop, and the id's start only of a receipt kept. Its reasons are counted with no id, as `receipt_days` is. The copy of one's data carries receipts and their lines,
