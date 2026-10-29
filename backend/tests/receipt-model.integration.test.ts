@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { MODEL_CONSENT_EDITION, REVIEW_CONSENT_EDITION, spendMonthOf } from '@molvia/model'
+import { MODEL_CONSENT_EDITION, spendMonthOf } from '@molvia/model'
 import type { ModelReceipt } from '@molvia/model'
 import am05 from '@molvia/model/testing/receipt-text.am-05.json'
 import type { FastifyInstance } from 'fastify'
@@ -217,11 +217,17 @@ async function readAll(
     cap = CAP,
     now,
     told,
-  }: { cap?: number; now?: () => Date; told?: ReadReceiptsDeps['told'] } = {},
+    receipts = repository,
+  }: {
+    cap?: number
+    now?: () => Date
+    told?: ReadReceiptsDeps['told']
+    receipts?: ReadReceiptsDeps['receipts']
+  } = {},
 ): Promise<ReadReport[]> {
   const reports: ReadReport[] = []
   await readQueuedReceipts({
-    receipts: repository,
+    receipts,
     reader,
     report: (event) => reports.push(event),
     bind: (claimed, lines) =>
@@ -310,12 +316,14 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
     expect(JSON.stringify(reports)).not.toContain('7,4,0')
   }, 30_000)
 
-  it('leaves to Tesseract whoever has no grant, a grant past or ending now, or no edition 3', async () => {
+  it('leaves to Tesseract whoever has no grant, a grant past or ending now, or no edition 5 (MOL-319)', async () => {
     const people = [
       await person(null),
       await person(new Date(Date.now() - 1_000)),
       await person(new Date()),
       await person(LATER, MODEL_CONSENT_EDITION - 1),
+      // edition 3 named Anthropic, in the United States alone (MOL-319)
+      await person(LATER, 3),
       await person(LATER, null),
     ]
     for (const one of people) await queued(one)
@@ -325,10 +333,10 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
     expect(model.asked).toBe(0)
     // Tesseract's figures are no model's: no count at all
     expect(reports.filter((r) => r.kind === 'read').map((r) => r.unparsed)).toEqual(
-      Array(5).fill(null),
+      Array(6).fill(null),
     )
     const rows = await db.select({ version: receipts.readerVersion }).from(receipts)
-    expect(rows.map((row) => row.version)).toEqual(Array(5).fill('tesseract 5.5.0 · test'))
+    expect(rows.map((row) => row.version)).toEqual(Array(6).fill('tesseract 5.5.0 · test'))
     expect(await month()).toBeNull()
   }, 30_000)
 
@@ -1029,13 +1037,22 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     (await db.select().from(receiptReasonDays))
       .map((row) => `${row.reader} ${row.country} ${row.scope} ${row.reason} ${String(row.n)}`)
       .sort()
+  // The real claim, told the review may not keep what it hands out (MOL-319): unreachable since the model reads
+  // only edition 5, past the review's 4, and held for the day the review's edition outgrows the model's.
+  const unreviewable: ReadReceiptsDeps['receipts'] = {
+    ...repository,
+    claimNext: async () => {
+      const claimed = await repository.claimNext()
+      return claimed === null ? null : { ...claimed, reviewable: false }
+    },
+  }
   const notices = async () =>
     (await db.select({ payload: ownerNotices.payload }).from(ownerNotices)).map(
       (row) => row.payload,
     )
 
   it('counts why, keeps the photo and the answer for the review, and tells the developer — no name, no sum', async () => {
-    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    const me = await person(LATER)
     const id = await queued(me)
     await readAll(benchReader(), fakeModel(notWhole), { told: told() })
     expect(await reasons()).toEqual([
@@ -1066,7 +1083,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
   }, 30_000)
 
   it('keeps the review after «Записать» deletes the receipt’s own photo, until its days pass', async () => {
-    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    const me = await person(LATER)
     const id = await queued(me)
     await readAll(benchReader(), fakeModel(notWhole))
     const placeId = await insertPlace(db, { name: 'Օրինակ' })
@@ -1101,7 +1118,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
   }, 30_000)
 
   it('goes with its receipt: the person erased', async () => {
-    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    const me = await person(LATER)
     await queued(me)
     await readAll(benchReader(), fakeModel(notWhole))
     expect(await db.select().from(receiptMisses)).toHaveLength(1)
@@ -1113,7 +1130,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
   }, 30_000)
 
   it('keeps and tells nothing of a receipt read whole, and counts it', async () => {
-    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    const me = await person(LATER)
     await queued(me)
     await readAll(
       benchReader(),
@@ -1126,7 +1143,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
   }, 30_000)
 
   it('keeps and tells a «переснимите» of the model: nothing read is the most to type', async () => {
-    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    const me = await person(LATER)
     const id = await queued(me)
     const nothing = { ...ANSWER, lines: [], totals: [] }
     await readAll(
@@ -1154,7 +1171,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
   }, 30_000)
 
   it('tells three of one person an hour, holds the rest and says how many once the hour is out', async () => {
-    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    const me = await person(LATER)
     for (let i = 0; i < 4; i += 1) await queued(me)
     const channel = told()
     const at = new Date('2026-10-27T10:00:00Z')
@@ -1171,10 +1188,11 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     expect((await notices()).at(-1)).toEqual({ kind: 'receipt_partial_muted', count: 1 })
   }, 30_000)
 
-  it('tells of a receipt whose owner accepted no edition 4, and keeps nothing of it (MOL-309, В-3 «б»)', async () => {
+  // MOL-319, self-review №2: the guard of a receipt read in part.
+  it('tells of a receipt the review may not keep, and keeps nothing of it (MOL-309, В-3 «б»)', async () => {
     const me = await person(LATER)
     await queued(me)
-    await readAll(benchReader(), fakeModel(notWhole), { told: told() })
+    await readAll(benchReader(), fakeModel(notWhole), { told: told(), receipts: unreviewable })
     expect(await db.select().from(receiptMisses)).toEqual([])
     const [notice] = await notices()
     expect(notice).toMatchObject({ kind: 'receipt_partial', reason: 'line_not_as_printed' })
@@ -1183,9 +1201,26 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     expect(notice).not.toHaveProperty('receipt')
   }, 30_000)
 
+  // adversarial Р2-А1: the guard stands in each outcome that keeps a review — a «переснимите» too, not only a
+  // receipt read in part. Lines the wire refuses are the third place, which no answer of the model reaches.
+  it('keeps nothing of a «переснимите» the review may not keep', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    const nothing = { ...ANSWER, lines: [], totals: [] }
+    await readAll(
+      benchReader(),
+      fakeModel(() =>
+        Promise.resolve({ kind: 'read', answer: nothing, costMicroUsd: 1_000, tokens: TOKENS }),
+      ),
+      { told: told(), receipts: unreviewable },
+    )
+    expect((await receiptOf(id))?.failure).toBe('reshoot')
+    expect(await db.select().from(receiptMisses)).toEqual([])
+  }, 30_000)
+
   // adversarial А3: proven whole, a line «1 × 0 = 0» emptied all the same — no reason of the receipt to give
   it('tells of a receipt proven whole with a line emptied, with no reason of the receipt', async () => {
-    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    const me = await person(LATER)
     await queued(me)
     const free: ModelReceipt = {
       ...ANSWER,
@@ -1217,7 +1252,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
 
   // self-review №5, №6: «Прочитали не всё» counted beside the reason, a receipt with no items apart from «not whole»
   it('counts a line lost with «read in part», and a receipt with no items apart', async () => {
-    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    const me = await person(LATER)
     await queued(me)
     const lost: ModelReceipt = {
       ...ANSWER,
@@ -1263,7 +1298,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
 
   // adversarial Б1: a line lost beside a line not as printed is said by «Прочитали не всё», in the notice and the review
   it('tells «Прочитали не всё» where a line lost stands behind a line not as printed', async () => {
-    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    const me = await person(LATER)
     const id = await queued(me)
     const [milk, bread] = ANSWER.lines
     const hidden: ModelReceipt = {
@@ -1304,7 +1339,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     }
 
     it('keeps the review of a receipt «Переснять» replaced, past the receipt itself', async () => {
-      const me = await person(LATER, REVIEW_CONSENT_EDITION)
+      const me = await person(LATER)
       const id = await queued(me)
       await readAll(benchReader(), fakeModel(notWhole))
       await removed(me, id, true)
@@ -1319,7 +1354,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     }, 30_000)
 
     it('lets the review go with a receipt removed by «Удалить чек»', async () => {
-      const me = await person(LATER, REVIEW_CONSENT_EDITION)
+      const me = await person(LATER)
       const id = await queued(me)
       await readAll(benchReader(), fakeModel(notWhole))
       await removed(me, id, false)
@@ -1327,7 +1362,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     }, 30_000)
 
     it('takes the mark back with «Вернуть»: brought back, the review goes with its receipt again', async () => {
-      const me = await person(LATER, REVIEW_CONSENT_EDITION)
+      const me = await person(LATER)
       const id = await queued(me)
       await readAll(benchReader(), fakeModel(notWhole))
       await app.inject({
@@ -1347,7 +1382,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
   })
 
   it('tells nobody where nobody is there to tell, and keeps the review all the same', async () => {
-    const me = await person(LATER, REVIEW_CONSENT_EDITION)
+    const me = await person(LATER)
     await queued(me)
     await readAll(benchReader(), fakeModel(notWhole))
     expect(await notices()).toEqual([])
@@ -1364,7 +1399,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
 
     // self-review №9: one rule with `show` — a start naming more than one receipt lets none go
     it('lets nothing go by a start of the id that names more than one receipt', async () => {
-      const me = await person(LATER, REVIEW_CONSENT_EDITION)
+      const me = await person(LATER)
       const reasons = { receipt: 'lines_lost', lines: [] }
       const kept = (receipt: string) => ({
         receipt,
@@ -1390,7 +1425,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     }, 30_000)
 
     it('reads the window’s reasons by reader and country, each share beside its n', async () => {
-      const me = await person(LATER, REVIEW_CONSENT_EDITION)
+      const me = await person(LATER)
       await queued(me)
       await readAll(benchReader(), fakeModel(notWhole))
       const today = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString().slice(0, 10)
@@ -1402,7 +1437,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
 
     // adversarial Б3: a review gone by itself — its days, its person erased — leaves no copy behind
     it('lets go of the copy of a review gone by itself, and never one brought from production', async () => {
-      const me = await person(LATER, REVIEW_CONSENT_EDITION)
+      const me = await person(LATER)
       const id = await queued(me)
       await readAll(benchReader(), fakeModel(notWhole))
       const root = await mkdtemp(join(tmpdir(), 'receipt-misses-'))
@@ -1433,7 +1468,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     }, 30_000)
 
     it('shows one receipt with its photo written out, and lets it go only with --yes — its copy too', async () => {
-      const me = await person(LATER, REVIEW_CONSENT_EDITION)
+      const me = await person(LATER)
       const id = await queued(me)
       await readAll(benchReader(), fakeModel(notWhole))
       const root = await mkdtemp(join(tmpdir(), 'receipt-misses-'))

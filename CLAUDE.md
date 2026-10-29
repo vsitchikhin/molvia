@@ -618,7 +618,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
 ### Receipts — `.claude/rules/receipts.md`
 
 - **Claude Haiku reads the receipts of those it is granted to, Tesseract the rest** (MOL-272): the model
-  only while `actors.receipts_model_until` is to come and edition 3 is accepted, under the month's cap
+  only while `actors.receipts_model_until` is to come and edition 5 is accepted, under the month's cap
   (`model_spend`: the worst price reserved before a call, its own after); refused, cut, malformed, over
   the cap or away past its wait — Tesseract in `services/receipt-reader`, a container with no database
   and no disk. The API holds the queue, the photos and the parse, one receipt at a time.

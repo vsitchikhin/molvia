@@ -144,7 +144,7 @@ describe('«Условия и приватность» (MOL-95)', () => {
     expect(view.find('.changes').exists()).toBe(false)
   })
 
-  it('whoever accepted edition 1 is told what changed in 2, 3 and 4, and sees the statistics too', async () => {
+  it('whoever accepted edition 1 is told what changed in 2, 3, 4 and 5, and sees the statistics too', async () => {
     consent.mockResolvedValue({ version: 1 })
     const { view } = await render()
     expect(view.text()).toContain(en.consent.updated.title)
@@ -152,6 +152,7 @@ describe('«Условия и приватность» (MOL-95)', () => {
       en.consent.changes['2'],
       en.consent.changes['3'],
       en.consent.changes['4'],
+      en.consent.changes['5'],
     ])
     // It is told what edition 1 told it wrong: the catalogue and a receipt's word have no threshold (Р3-А1).
     expect(en.consent.changes['2']).toMatch(/with no threshold/)
@@ -164,23 +165,41 @@ describe('«Условия и приватность» (MOL-95)', () => {
     expect(acceptConsent).toHaveBeenCalledWith(POLICY_VERSION)
   })
 
-  it('whoever accepted edition 2 is told what changed in 3 and 4: Anthropic, a new recipient (MOL-272)', async () => {
+  it('whoever accepted edition 2 is told what changed in 3, 4 and 5: Anthropic, a new recipient (MOL-272)', async () => {
     consent.mockResolvedValue({ version: 2 })
     const { view } = await render()
     expect(view.findAll('.changes-text').map((p) => p.text())).toEqual([
       en.consent.changes['3'],
       en.consent.changes['4'],
+      en.consent.changes['5'],
     ])
     expect(en.consent.changes['3']).toMatch(/Anthropic/)
     expect(ru.consent.changes['3']).toMatch(/Anthropic/)
   })
 
-  it('whoever accepted edition 3 is told only what changed in 4: a receipt kept for the review (MOL-309)', async () => {
+  it('whoever accepted edition 3 is told what changed in 4 and 5: a receipt kept for the review (MOL-309)', async () => {
     consent.mockResolvedValue({ version: 3 })
     const { view } = await render()
-    expect(view.findAll('.changes-text').map((p) => p.text())).toEqual([en.consent.changes['4']])
+    expect(view.findAll('.changes-text').map((p) => p.text())).toEqual([
+      en.consent.changes['4'],
+      en.consent.changes['5'],
+    ])
     expect(en.consent.changes['4']).toMatch(/21 days/)
     expect(ru.consent.changes['4']).toMatch(/21 дня/)
+  })
+
+  it('whoever accepted edition 4 is told only what changed in 5: France, and Anthropic beyond the USA (MOL-319)', async () => {
+    consent.mockResolvedValue({ version: 4 })
+    const { view } = await render()
+    expect(view.findAll('.changes-text').map((p) => p.text())).toEqual([en.consent.changes['5']])
+    expect(ru.consent.changes['5']).toMatch(/во Франции, а не в Германии/)
+    expect(ru.consent.changes['5']).toMatch(/в любой стране, где у неё есть мощности/)
+    // the whole of the term, as the page says it: the one paragraph whoever accepted 4 reads (adversarial А3)
+    expect(ru.consent.changes['5']).toMatch(
+      /до 30 дней \(отмеченное её проверкой — до 2 лет, оценку проверки — до 7 лет\)/,
+    )
+    expect(en.consent.changes['5']).toMatch(/in France, not in Germany/)
+    expect(en.consent.changes['5']).toMatch(/up to 30 days \(up to 2 years .*up to 7 years\)/)
   })
 
   it('sends nothing of the age: the edition alone is the answer', async () => {

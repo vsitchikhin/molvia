@@ -169,7 +169,8 @@ every part in one message, the answer by a schema (structured output), `effort: 
 
 **Who it reads for is a column and an edition** (В-4, Р-12): `actors.receipts_model_until` still to come —
 a moment, as `shared_until` is, set by hand with `psql` until the paid layer (MOL-271) — and
-`MODEL_CONSENT_EDITION` (3) accepted, since the photo goes to Anthropic in the USA (Т-9). Empty, past,
+`MODEL_CONSENT_EDITION` (5) accepted, since the photo goes to Anthropic, stored in the USA and computed in any
+country it has capacity in, kept there up to 30 days (Т-9, MOL-319; edition 3 named the USA alone). Empty, past,
 ending now or an older edition: Tesseract. **Without `CLAUDE_API_KEY` nobody is read by it.** A person's
 key (`sk-ant-usr-…`) is refused by the API without its workspace, so `CLAUDE_WORKSPACE_ID` names it.
 
@@ -1901,7 +1902,7 @@ the model cost. No text, no tax number, no photo — not in the API's log, not i
 logs nothing at all: whatever breaks in it answers 500 with no traceback, and a connection broken under
 a request is not printed (review А12). **The photo of a receipt the model reads goes to Anthropic**
 (MOL-272) — whole, the customer's name with it where the shop prints one — only for whoever accepted
-edition 3; what comes back is kept as any reading is.
+edition 5 (MOL-319); what comes back is kept as any reading is.
 
 **How the person learned it was read is kept** (MOL-129, `receipts.heard`): `app` once the list or the
 review handed it over read **to a phone that asked with its page in view** (`?shown=1`), `bot` once the
