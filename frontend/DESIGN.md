@@ -480,6 +480,7 @@ tabs are outlined, 600.
 - **SectionCaption:** caps 11/700, `text-muted`, 4 from the left, 8 above its card; a mark before the words (the verdict's dot, 24) and a tail on the right (a month's sum, 13/600). Inside a card, as the card's own title, it has no 4 and no 8. Caps are drawn nowhere else.
 - **NavRow:** "icon · label · value · ›", 52 — the entry into a nested screen, or a button opening a sheet. The chevron always.
 - **Note:** an 18 icon and 13 words on `surface-2`, radius 14, 8 / 12; `warn` on its tint. A tag in a row: a pill of 13/600, plain, `warn` or `bad`.
+- **Chip** (a spending's category): a pill of 13/600, sides 8 («Ещё…» 12), a dot of 8 four from its name, at least 44 × 44; two rows, «Ещё…» last. A row has no width of its own: a name wider than its row is cut with «…», never the sheet widened.
 - **OperationRow:** one row for spendings, an account's log, «not counted in balances» and a reconciliation. A circle of 40 under the 24 icon in the category's colour on its `cat-tint-share` — purchases in the colour of groceries, an income and an exchange on `surface-2` with a `text-muted` icon, never the accent · title 17/600 that wraps · meta 13 in two lines · a tag under it (`Отправляем…` warn, `Не принята` bad) · the amount 17/600 tabular, never wrapped or cut, and a 13 line under it that wraps only between its parts · a 20 chevron on every row, so the amounts stand in one column and a sum over them stands in it too (`space-tail`). Beside the words the tail takes at most 45 % of the row unless the amount is wider; a row narrower than 22rem stands the tail under the words, at the right, in the same column. The amount is always `text`: only a balance below zero is bad, on its card.
 
 ### Inputs / Fields
@@ -514,7 +515,8 @@ above the keyboard. Closes by ×, the scrim, Esc, "back" and **a pull down** —
 A sheet over a sheet has only "‹" on the left and no ×; one scrim. The footer — the main action —
 is pinned to the bottom edge, as wide as the sheet: `surface`, a hairline over it and the sheet shadow,
 12 / 16 / 12 over the home indicator (12 over the keyboard), 24 under the content, which scrolls under
-it; a field brought into sight stands above it. The header is not pinned.
+it; a field brought into sight stands above it. The header is not pinned. Nothing in it is wider than the phone:
+a name of one long word breaks wherever it stands in words, and is cut where it stands in a row.
 
 ### Navigation
 

@@ -419,11 +419,23 @@ The detail behind the frontend lines of `CLAUDE.md`.
   (MOL-318, the owner's «сразу везде»): the words of a `ListRow` are one column of `minmax(0, 1fr)` — a till's
   line under a purchase ran under its amount, never cut; an `AppField` has no least width of its own
   (`min-width: 0` on the field, `width: 0` on the control) — a select is as wide as its longest option — the
-  categories of «Бюджет» and «Год», found by reading, held on the kit — and WebKit keeps that width whatever
-  the select's; the large title of a screen, its subtitle, a sheet's title and meta and a place's button of
-  «Где вы?» break a word wider than the phone (`overflow-wrap: anywhere`) — an account's name took the page
-  348 px sideways. `/_kit` «Открыть шторку длинных имён» holds them on `phone` and `iphone`, each in the box a
-  screen puts it in. **The prices, named:** a tail of `ListRow` keeps its `min-content` (MOL-176) — an amount
+  categories of «Бюджет» and «Год» — and WebKit keeps that width whatever the select's. **Words that may hold a
+  name break it** (`overflow-wrap: anywhere`): an account's, a category's, a place's, an item's name, a note or a
+  query typed as one word of forty letters — the most a name of an account or a category takes — is wider than a
+  phone of 320. The large title of a screen took the page 348 px sideways; «Списано со счёта», under a field in a
+  grid of a column `auto`, took the spending's sheet 36 and its field with it (adversarial А4); «Графики» 30 for a
+  stale link. Every paragraph with a name in it breaks it too: the hints of a transfer, «Куда», a check, the notices of
+  «Покупки», the conflicts and versions of an exchange, an income, an account, the error of a field, the line of
+  «Остальные», the ring's centre, a receipt's lines and its difference, a caption of «Оценки». **A name kept on
+  one line has no width of its own** — `contain: inline-size`, as the chips' row: its full width went up through
+  every column `auto` above it, and «Против обычного» took «Месяц» 168 px sideways for «Подарки родным и друзьям
+  на дни рождения» — `min-width: 0` lowers a flex item, never what it hands its parents. **What holds it:** the
+  sheets of a transfer, «Куда», a check and «Списано» (`accounts.spec`), «Месяц» — «Против обычного», «Остальные»,
+  the centre — and «Год» (`money-charts.spec`), the screen's title (`accounts.spec`, English), all in Chromium;
+  `/_kit` «Открыть шторку длинных имён» on `phone` and `iphone` — the chips, the select, a row's words, a sheet's
+  title and meta, each in the box a screen puts it in. The rest was found by reading the CSS (MOL-318's audit) and
+  has no test: the subtitle, «Где вы?», the notices, conflicts and versions, a field's error, the receipts', the
+  caption, «Что брать» and the search. A new paragraph with a name in it takes the same line. **The prices, named:** a tail of `ListRow` keeps its `min-content` (MOL-176) — an amount
   of fifteen characters still stands past a row of 320; the figure in the middle of a ring stands past it for
   a sum of eleven, over the ring and not the page; a name in `AppButton` is not broken, since its cell of two
   words (MOL-225) would break with it. And WebKit says «ResizeObserver loop completed» as a sheet with the
