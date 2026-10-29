@@ -1713,12 +1713,13 @@ describe('TripView', () => {
       expect(view.findAll('button').some((b) => b.text() === ru.trip.receipt.add)).toBe(false)
       await askFinish(view)
       // «Деньги» ждём событием роутера, а не часами (MOL-308): предел — только тайм-аут теста.
-      // Ходы пишутся по пути: отчёт о падении приходит, когда экран уже снят.
+      // Ходы пишутся по пути: отчёт о падении приходит, когда экран уже снят. Неудавшийся переход
+      // тоже доходит до `afterEach` с целью в `to` — он пишется с типом отказа и прихода не значит.
       const moves: string[] = []
       const arrived = new Promise<void>((resolve) => {
-        router.afterEach((to) => {
-          moves.push(String(to.name))
-          if (to.name === 'money') resolve()
+        router.afterEach((to, _from, failure) => {
+          moves.push(failure ? `${String(to.name)}×${String(failure.type)}` : String(to.name))
+          if (to.name === 'money' && !failure) resolve()
         })
       })
       onTestFailed(() => {
@@ -1736,8 +1737,10 @@ describe('TripView', () => {
       ])
       await arrived
       await flushPromises()
+      expect(router.currentRoute.value.name, 'человек остался на «Деньгах»').toBe('money')
       // «Деньги» took what was handed over and opened the sheet on it.
       expect(useSpendingHandoffStore().handed, '«Деньги» забрали переданное').toBeNull()
+      expect(openSheet()?.textContent, 'шторка траты — на магазин записи').toContain('Ереван Сити')
     })
   })
 
