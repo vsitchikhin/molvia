@@ -405,10 +405,12 @@ MOL-291's doubt at reading takes it — with other people's price that line is s
 The server names the reader by the receipt's `reader_version` (`found.byModel`). The model's 1 100 → 1 400, 990 → 999,
 330 → 380 are prices changed, which «проверьте цифры» asked the person to put back; MOL-291's doubt at reading went by
 5↔6 already. A model's receipt Tesseract read in its place, and one read before MOL-255, are Tesseract's: one digit of
-`swaps`, **or the model's two 5↔6** — a Tesseract's receipt is doubted by them too. **The phone knows no reader** and
-doubts by that union, so every hint the server sent stands there: the server only narrows. **The price, named** (В-2
-«а»): a price the person typed on the sheet of a model's receipt is doubted by the union — 4 550 typed against a
-remembered 1 550 keeps the hint.
+`swaps`, as before — the owner's «в» was the model's two 5↔6, never Tesseract's (`byModel: false`). **The phone knows
+no reader** and doubts by the union of both (no `byModel`), so every hint the server sent stands there: the server only
+narrows. **The prices, named:** a price the person typed on the sheet of a model's receipt is doubted by the union (В-2
+«а») — 4 550 typed against a remembered 1 550 keeps the hint; and a phone of a build before the А2 fix doubts by one
+digit alone, so the model's «660» against other people's 550 shows no hint there, as on master, until the app updates
+(`pwaUpdate.ts`).
 
 ## What a line is (MOL-126)
 
@@ -634,7 +636,7 @@ threshold would lose the first receipt of every shop.
 **Recording writes the person's word on every line recorded**, over their earlier one; a line left out
 teaches nothing. The price kept is the shelf price of a line recorded as read, the memory's argument
 where a figure reads two ways — «60 60» for «50 50» adds up either way — and it is a hint, never a
-correction (В-1): a price its reader's confusion off the remembered (MOL-315, below) is `rememberedPrice` on the line, «
+correction (В-1): a price its reader may have confused for the remembered (MOL-315, below) is `rememberedPrice` on the line, «
 проверьте», and the parse's figures stay as read — unless the total proving the receipt points at the price, its only
 line's at its sum (MOL-314, below) — and, since MOL-291,
 on a line the check emptied too. **The price

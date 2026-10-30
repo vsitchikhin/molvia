@@ -117,11 +117,10 @@ export type ReceiptLineView = z.output<typeof receiptLineCodec>
 /**
  * A line on the review screen (MOL-126): as read, with the item it found and how — `weak` is
  * «проверьте» — the gloss, and what it will be recorded at (`amount`, MOL-124 В-5). `rememberedPrice`
- * is the shop's memory's shelf price when the one read is its reader's confusion off it — on a receipt the model
- * read up to two 5↔6 alone, else one digit of Tesseract's or two 5↔6 (MOL-315) — unless the total
- * proving the receipt points at it — its only line, one piece at its sum, nothing sent to the card (В-1,
- * MOL-314) — or when the line has no price — emptied by the check (MOL-291): a hint, the figures stay as
- * read.
+ * is the shop's memory's shelf price when its reader may have confused the one read for it — on a receipt the
+ * model read up to two 5↔6, on Tesseract's one digit of its pairs (MOL-315) — unless the total proving the
+ * receipt points at it — its only line, one piece at its sum, nothing sent to the card (В-1, MOL-314) — or when
+ * the line has no price — emptied by the check (MOL-291): a hint, the figures stay as read.
  */
 export const receiptReviewLineCodec = z.strictObject({
   ...receiptLineCodec.shape,

@@ -233,18 +233,20 @@ export function readPartly(lines: readonly ReadFigures[], total: Money | null): 
  * and a price off the memory's is a price changed (owner, В-1 «а» of MOL-270). One the model read is doubted by
  * the model's pairs alone, 5↔6 (MOL-315): its 1 100 → 1 400 is a price changed — and by two of them in the figure, as
  * MOL-290 measured it and MOL-291's doubt at reading takes it: «660» copied for 550 (adversarial А2, owner's «в»).
- * With no reader named, Tesseract's one digit or the model's two — the phone knows no reader, and so holds every
- * hint the server sent; the server alone narrows.
+ * Tesseract's own receipt (`byModel: false`) by its one digit, as before. With no reader named, either — the phone
+ * knows no reader, and so holds every hint the server sent; the server alone narrows.
  */
 export function priceInDoubt(
   country: ReceiptCountry,
   read: Money | null,
   remembered: Money | null,
-  { byModel = false } = {},
+  { byModel }: { byModel?: boolean } = {},
 ): boolean {
   const reading = receiptCard(country).photo
   if (reading === null || read === null || read.currency !== remembered?.currency) return false
   const [a, b] = [String(read.minor), String(remembered.minor)]
   const model = swapApart(reading.modelSwaps, a, b, REMEMBERED_PRICE_SWAPS)
-  return byModel ? model : model || swapApart(reading.swaps, a, b)
+  const ocr = swapApart(reading.swaps, a, b)
+  if (byModel === undefined) return model || ocr
+  return byModel ? model : ocr
 }

@@ -270,17 +270,18 @@ describe('a price in doubt by the memory (В-1)', () => {
     expect(priceInDoubt('AM', amd(660), amd(550), model)).toBe(true)
     expect(priceInDoubt('AM', amd(6_560), amd(5_550), model)).toBe(true)
     expect(priceInDoubt('AM', amd(6_660), amd(5_550), model)).toBe(false)
-    expect(priceInDoubt('AM', amd(1_660), amd(4_550), model)).toBe(false)
-    // no reader named — the phone's — and Tesseract's: all four pairs, and the model's two 5↔6, so the phone keeps
-    // every hint the server sent
+    expect(priceInDoubt('AM', amd(1_650), amd(4_550), model)).toBe(false)
+    // Tesseract's own receipt and no reader named — the phone's — by all four pairs, one digit
     for (const reading of [{}, { byModel: false }]) {
-      expect(priceInDoubt('AM', amd(660), amd(550), reading)).toBe(true)
       expect(priceInDoubt('AM', amd(1_400), amd(4_100), reading)).toBe(false)
       expect(priceInDoubt('AM', amd(650), amd(550), reading)).toBe(true)
       expect(priceInDoubt('AM', amd(1_400), amd(1_100), reading)).toBe(true)
       expect(priceInDoubt('AM', amd(999), amd(990), reading)).toBe(true)
       expect(priceInDoubt('AM', amd(380), amd(330), reading)).toBe(true)
     }
+    // the model's two 5↔6 only where the model read or nobody is named: the phone keeps every hint the server sent
+    expect(priceInDoubt('AM', amd(660), amd(550), { byModel: false })).toBe(false)
+    expect(priceInDoubt('AM', amd(660), amd(550))).toBe(true)
     expect(
       priceInDoubt(
         'RS',

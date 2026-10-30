@@ -497,7 +497,7 @@ describe('the review of a receipt', () => {
         { kind: 'sku', key: '1110004', itemId: butter, price: amd(550) },
       ])
     }
-    const hints = async (copied: number) =>
+    const hints = async (copied: number, readerVersion = byModel.readerVersion) =>
       (
         await review(
           me,
@@ -507,7 +507,7 @@ describe('the review of a receipt', () => {
               { printed: 'Կարագ «Օրինակ»', sku: '1110004', qty: 2, price: copied, sum: copied * 2 },
               { printed: 'Հաց «Օրինակ»', sku: '1110005', price: 200, sum: 200 },
             ],
-            { totalMinor: null, ...byModel },
+            { totalMinor: null, readerVersion },
           ),
         )
       ).lines.map((line) => line.rememberedPrice)
@@ -515,6 +515,10 @@ describe('the review of a receipt', () => {
     expect(await hints(660)).toEqual([amd(550), null])
     // Tesseract's 0↔9 is a price changed for the model
     expect(await hints(559)).toEqual([null, null])
+    // Tesseract's own receipt by its one digit, as before: the owner's «в» was the model's
+    const tesseract = 'tesseract 5.5.0 · hye+rus+eng'
+    expect(await hints(660, tesseract)).toEqual([null, null])
+    expect(await hints(559, tesseract)).toEqual([amd(550), null])
   }, 10_000)
 
   // MOL-314: «1 / 650 / 650» under a total of 650 two places print is the butter gone up, not a misread
