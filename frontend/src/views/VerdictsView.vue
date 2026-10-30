@@ -48,7 +48,9 @@
         :text="strip.text"
         :attempt="strip.kind === 'unanswered' ? attempt : 0"
       >
-        <template #action>
+        <!-- One «Повторить» a screen: while «Оценка не ушла» stands with its own, that one does
+             both — sends the rating and reads the list again (adversarial А3). -->
+        <template v-if="sending !== 'failed'" #action>
           <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
         </template>
       </StatusStrip>
@@ -70,7 +72,7 @@
         :inline="!alone"
         :title="t('verdict.error.title')"
         :body="t('verdict.error.body')"
-        @retry="send"
+        @retry="sendAgain"
       />
 
       <ScreenState
@@ -237,6 +239,12 @@ export default defineComponent({
         : { kind: 'unanswered', text: t('verdict.stale_error', { when: day(when) }) }
     })
 
+    /** «Повторить» of «Оценка не ушла»: the rating, and the list, if it is from memory too (А3). */
+    function sendAgain(): void {
+      void drafts.flush()
+      if (queue.stale.value === 'error') void queue.retry()
+    }
+
     function day(when: Date): string {
       return purchaseDay(when, locale.value)
     }
@@ -289,7 +297,7 @@ export default defineComponent({
       save,
       skip,
       keep,
-      send: () => void drafts.flush(),
+      sendAgain,
       goTab,
     }
   },

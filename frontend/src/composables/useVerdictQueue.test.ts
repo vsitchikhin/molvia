@@ -148,6 +148,34 @@ describe('useVerdictQueue', () => {
     expect((await mounted()).bought.value).toBe(true)
   })
 
+  it('А1: an empty queue from an earlier visit is not said while the fresh answer is on its way', async () => {
+    pendingVerdicts.mockResolvedValue({ items: [], total: 0, bought: false })
+    await mounted()
+    unmountAll()
+
+    freshPinia()
+    const answer = deferred<PendingVerdicts>()
+    pendingVerdicts.mockReturnValue(answer.promise)
+    const queue = await mounted()
+    // The memory says nothing was bought; the purchase recorded since may be on its way as a card.
+    expect(queue.phase.value).toBe('loading')
+
+    answer.resolve({ items: [milk], total: 1, bought: true })
+    await flushPromises()
+    expect(queue.phase.value).toBe('ready')
+  })
+
+  it('А1: an empty answer heard by this screen stays said while it asks again', async () => {
+    pendingVerdicts.mockResolvedValue({ items: [], total: 0, bought: true })
+    const queue = await mounted()
+    expect(queue.phase.value).toBe('empty')
+
+    pendingVerdicts.mockReturnValue(new Promise(() => undefined))
+    void queue.retry()
+    await flushPromises()
+    expect(queue.phase.value).toBe('empty')
+  })
+
   it('MOL-214: a server before the field — not known, never «nothing bought»', async () => {
     pendingVerdicts.mockResolvedValue(answer([]))
     expect((await mounted()).bought.value).toBeNull()

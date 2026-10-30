@@ -633,7 +633,13 @@ read as «Всё оценено», what they said before. **The prices, named:**
 installed build older than the field refuses it and shows «Оценки» as an error with «Обновить» first
 until it takes the version — as `ownScore` (MOL-202); a rollback forgets the queue the phone kept; and
 a purchase recorded offline, not yet sent, makes no `bought` — a newcomer reads «Оценивать пока
-нечего» until it lands, when no card could be shown anyway.
+нечего» until it lands, when no card could be shown anyway; and a first purchase written between the
+two statements answers an empty queue with `bought: true` — «Всё оценено» for one answer (self-review
+Н-1). **Empty is said only of an answer this screen heard** (adversarial А1), or of a queue the
+person emptied themselves with a rating on its way: the queue an earlier visit left on the phone,
+shown while the fresh answer was on its way, told a newcomer back from «Покупки» with a purchase to
+record one first, «К покупкам» under the thumb as the card came. With such a memory and nothing
+heard yet, the screen draws the skeleton; a failure still turns it into «offline» or the error.
 
 **The connection is one strip, over the card it is about** (Ф-14, MOL-181): a rating kept on the
 phone — «Без связи · оценка сохранена…» — else a list from memory, offline or «сервер не ответил» with
@@ -641,7 +647,10 @@ its «Повторить» and the count of failed loads (`attempt`). **The rati
 «а»): it is the news of the tap just made, and «без связи» says the list is not fresh; the date of the
 list is not shown meanwhile — the price. **With no card left the state is the screen** (owner's В-1
 «а»): the last rating kept offline is the whole «Оценка сохранена», as «Оценка не ушла» is the whole
-error, its «Повторить» in the strip — a strip is for an answer shown, and no card is shown.
+error, its «Повторить» in the strip — a strip is for an answer shown, and no card is shown. **One
+«Повторить» a screen** (adversarial А3): over a list from memory the quiet card «Оценка не ушла» has
+its own, and while it stands the strip draws none — the card's sends the rating and reads the list
+again; two of one name did two jobs, and a screen reader could not tell them apart.
 
 ## A withdrawn verdict
 

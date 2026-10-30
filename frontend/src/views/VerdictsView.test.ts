@@ -160,6 +160,25 @@ describe('VerdictsView', () => {
     expect(router.currentRoute.value.name).toBe('purchases')
   })
 
+  it('А1: back with a purchase, the newcomer is not told to record one while the card is on its way', async () => {
+    pendingVerdicts.mockResolvedValue({ items: [], total: 0, bought: false })
+    ;(await render()).view.unmount()
+
+    let answer: (value: PendingVerdicts) => void = () => undefined
+    pendingVerdicts.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    const { view } = await render()
+
+    expect(view.text()).not.toContain(en.verdict.none.title)
+    expect(view.findAll('button').map((found) => found.text())).not.toContain(
+      en.verdict.none.action,
+    )
+    expect(view.find('.skeleton').exists()).toBe(true)
+
+    answer({ items: [milk], total: 1, bought: true })
+    await flushPromises()
+    expect(view.get('.question').text()).toContain('Молоко')
+  })
+
   it('a server before MOL-214 says nothing of purchases — «everything is rated», as before', async () => {
     pendingVerdicts.mockResolvedValue({ items: [], total: 0 })
     const { view } = await render()
@@ -385,6 +404,29 @@ describe('VerdictsView', () => {
     expect(view.text()).toContain(en.verdict.offline.title)
     expect(view.text()).not.toContain(en.verdict.load_offline.title)
     expect(view.text()).not.toContain(en.verdict.empty.title)
+  })
+
+  it('А3: «not sent» over a list from memory — one «Try again», which sends the rating and reads the list', async () => {
+    pendingVerdicts.mockResolvedValue({ items: [milk, bread], total: 2 })
+    ;(await render()).view.unmount()
+
+    online(true)
+    pendingVerdicts.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 502'))
+    rateItem.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 502'))
+    const { view } = await render()
+    await rate(view, 4)
+
+    expect(view.text()).toContain(en.verdict.error.title)
+    expect(view.get('.strip').classes()).toContain('unanswered')
+    const retries = view.findAll('button').filter((found) => found.text() === en.state.retry)
+    expect(retries).toHaveLength(1)
+
+    rateItem.mockClear()
+    pendingVerdicts.mockClear()
+    await retries[0]?.trigger('click')
+    await flushPromises()
+    expect(rateItem).toHaveBeenCalledTimes(1)
+    expect(pendingVerdicts).toHaveBeenCalledTimes(1)
   })
 
   it('С-4: a rating refused while the next card is on screen — the person is told, the card stays', async () => {

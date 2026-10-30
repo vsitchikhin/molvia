@@ -116,6 +116,8 @@ export function useVerdictQueue(): VerdictQueue {
   const skips = ref<Skip[]>([])
   const failure = ref<'offline' | 'error' | null>(null)
   const failures = ref(0)
+  /** An answer came while this screen stood: the memory alone is an earlier visit's. */
+  const answered = ref(false)
   /** The card on screen stays put while the person is on it, whatever a reload brings. */
   const shownId = ref<string | null>(null)
 
@@ -124,6 +126,7 @@ export function useVerdictQueue(): VerdictQueue {
     remembered.value = id ? recallAnswer(`${ANSWER_KEY}.${id}`) : null
     skips.value = id ? recallSkips(`${SKIPS_KEY}.${id}`) : []
     failure.value = null
+    answered.value = false
     shownId.value = null
   }
 
@@ -237,7 +240,12 @@ export function useVerdictQueue(): VerdictQueue {
     // the person emptied it themselves, and a rating is on its way: then that is the news
     // (adversarial R4).
     if (failure.value && drafts.waiting.length === 0) return failure.value
-    return remembered.value ? 'empty' : 'loading'
+    // Empty is said of an answer this screen heard, or of a queue the person emptied themselves.
+    // The memory of an earlier visit, read while the fresh answer is on its way, told a newcomer
+    // back from «Покупки» with a purchase to record one first, its «К покупкам» under the thumb
+    // while the card came (MOL-214, adversarial А1).
+    const heard = answered.value || drafts.waiting.length > 0
+    return remembered.value && heard ? 'empty' : 'loading'
   })
 
   /** Shown from memory because a fresh answer could not be had — and why. */
@@ -267,6 +275,7 @@ export function useVerdictQueue(): VerdictQueue {
       if (owner.value !== id) return
       remembered.value = { answer: fresh, askedAt, fetchedAt: new Date() }
       failure.value = null
+      answered.value = true
       rememberAnswer()
       // What was confirmed before this was asked for, the answer already knows.
       drafts.settle(askedAt)
