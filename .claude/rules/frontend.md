@@ -411,7 +411,22 @@ The detail behind the frontend lines of `CLAUDE.md`.
   sheet's `.field` — its column of a label and a field — stood the row in a column 84 high (adversarial
   А1 of MOL-199). **Its label has no width of its own** (`width: 0` beside `flex: 1`, as `AccountRow`'s
   value): its whole line counted in the sheet's least width, and a note of 32 letters made the spending
-  sheet wider than the phone, × off the screen (А3). **A sheet's column is the sheet's width, never its
+  sheet wider than the phone, × off the screen (А3) — since MOL-304 the column of its words has none, the label and
+  the value in it. **Nothing of an entry is cut on a phone of 320** (MOL-304, owner's В-1 «а», В-2 «а»): held on
+  one line, the label «Перевод между счетами» of «Счета» ended in «…» in both languages, and on «Деньги» the value's
+  half of the row cut «Бюджет» to «Бю…» beside «сверх плана 1 250 300 ֏», the figure with it — the label could not be
+  mended without the value. **The label takes up to two lines, then «…»**, for every `NavRow` — the field of a note in
+  the spending sheet too, whose sheet shows the note whole; an option `wrap`, as `ListRow`'s, would be forgotten by
+  the next screen. **The value stands beside the label while both fit one line, else on a line of its own under it,
+  at the right** (`flex-wrap`), where a value beside a label ends — never cut, broken only between its words: the
+  formats keep a figure's groups and its sign together with no-break spaces. A row of one line stays 52 (8 above
+  and below inside its least height). `e2e/kit-rows` holds every entry of `/_kit` at 390 and 320, in Russian and
+  English, in Chromium and WebKit: nothing cut, a row of one line 52, the transfer on two lines at 320 and one at
+  390, a long figure under its label at 320 and a short one beside it. **The prices, named:** on 320 «Перевод между
+  счетами» is a row of 60, «Бюджет» and «Обмен денег» with a long figure 58 — rows of one card of different heights;
+  a note in the field takes a second line before its «…»; and the rate of «Обмен денег» comes with the month the
+  ways out wait for (MOL-269), except a month other than the running one opened with no rate kept on the phone,
+  where it comes with the running month's answer after and may grow its row by 6 px under the finger. **A sheet's column is the sheet's width, never its
   content's** (`.panel`, `minmax(0, 1fr)`, MOL-318, owner's В-1 «б»): an `auto` column took the least
   width of whatever stood in it — the label above, then a row of chips with a long name of one's own —
   and the whole sheet went sideways; what cannot shrink now stands past its own edge alone, the × in
