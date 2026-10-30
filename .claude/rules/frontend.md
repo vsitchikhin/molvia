@@ -1392,6 +1392,20 @@ bottom: 0`), a sibling of the panel and as wide as the sheet — never a middle 
   still kept in sight like any field typed in. **The price:** the very first keyboard on a phone, or
   after its data was cleared, has nothing to go by and still slides. Neither is the focus put off nor
   the window held — the rules above stand.
+- **A sheet gives its first field the focus only when it opens in the tap that asked for it** (MOL-212,
+  Е-12, owner's В-1 «а»). With `autofocus` the dialog's own opening puts the focus there, and iOS raises the
+  keys for a focus that comes in a tap — the sheet mounted by it, `showModal` in the same task — so the
+  digits go in with no second tap. **Opened by no tap** — the scanner put itself away, a server's answer
+  («Привязать и записать», a proposal made), a sheet opened after the fact — iOS raises no keys, while the
+  rule above has already given the sheet their remembered height: it stood short over nothing and fell back
+  1.5 s later (`KEYBOARD_LATE`). There × keeps the focus, as before. **Which opening is a tap is the
+  opener's to say** (`focusQuantity` of `ItemDetailsSheet`): the screen knows its path; the sheet cannot,
+  and `navigator.userActivation` holds for seconds in Chromium, so an answer a second after a tap would
+  pass for one. **A sheet with nothing to write keeps × too** — the purchase sheet with no record known as
+  it opens (`writeInto`), which is how it opens where the phone has not heard of a record the server holds.
+  **The price, named:** on iOS the keys for a field focused by a script a microtask after the tap were not
+  measured on a device — the owner checks it after the rollout; and a sheet found by a code opens on ×, the
+  keys a tap on the field away, as before.
 - **Under the keys, nothing of the page shows** (hotfix-bottom-menu). On iOS 26 and later the keys,
   the bar of «∧ ∨ ✓» over them and Safari's address bar floating above them are glass with clear
   room between them, and the sheet stands on the top of that frame, not of the keys: what lay under
