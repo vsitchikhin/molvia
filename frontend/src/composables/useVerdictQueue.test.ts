@@ -127,6 +127,47 @@ describe('useVerdictQueue', () => {
     expect((await mounted()).phase.value).toBe('empty')
   })
 
+  it('MOL-214: whether anything was bought, as the server said — remembered, and kept by a rating', async () => {
+    rateItem.mockImplementation((itemId) => Promise.resolve(sent(itemId)))
+    pendingVerdicts.mockResolvedValue({ items: [], total: 0, bought: false })
+    expect((await mounted()).bought.value).toBe(false)
+
+    freshPinia()
+    pendingVerdicts.mockResolvedValue({ items: [milk], total: 1, bought: true })
+    const queue = await mounted()
+    expect(queue.bought.value).toBe(true)
+    // The answer less what was rated since is still the same answer: it keeps what it said.
+    queue.save(milk, 4, '')
+    await flushPromises()
+    expect(queue.bought.value).toBe(true)
+
+    // From memory, with no connection.
+    freshPinia()
+    online(false)
+    pendingVerdicts.mockRejectedValue(offline())
+    expect((await mounted()).bought.value).toBe(true)
+  })
+
+  it('MOL-214: a server before the field — not known, never «nothing bought»', async () => {
+    pendingVerdicts.mockResolvedValue(answer([]))
+    expect((await mounted()).bought.value).toBeNull()
+  })
+
+  it('counts the failed loads, so a retry that failed the same way is said again (C1)', async () => {
+    pendingVerdicts.mockResolvedValue(answer([milk]))
+    await mounted()
+
+    freshPinia()
+    online(true)
+    pendingVerdicts.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 502'))
+    const queue = await mounted()
+    expect(queue.attempt.value).toBe(1)
+
+    await queue.retry()
+    expect(queue.attempt.value).toBe(2)
+    expect(queue.stale.value).toBe('error')
+  })
+
   it('13: a failed load with nothing remembered is offline or an error, decided after it', async () => {
     online(false)
     pendingVerdicts.mockRejectedValue(offline())

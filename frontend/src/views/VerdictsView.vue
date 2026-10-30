@@ -4,22 +4,55 @@
       {{ t('verdict.pending_count', { n: count }, count) }}
     </template>
 
-    <ScreenSkeleton v-if="phase === 'loading'" :groups="[58, 90]">
-      <div class="keys">
-        <span v-for="n in 5" :key="n" class="key"></span>
-      </div>
+    <!-- The card's own shape (Ф-13): its caption, the question on two lines, the five keys, the
+         field's label and the field — in a card, where the answer stands. -->
+    <ScreenSkeleton v-if="phase === 'loading'">
+      <AppCard class="ghost-card">
+        <span class="ghost-line ghost-caption"
+          ><span class="ghost-bar" :style="{ width: '30%' }"></span
+        ></span>
+        <span class="ghost-question">
+          <span class="ghost-line ghost-title"
+            ><span class="ghost-bar" :style="{ width: '52%' }"></span
+          ></span>
+          <span class="ghost-line ghost-title"
+            ><span class="ghost-bar" :style="{ width: '34%' }"></span
+          ></span>
+        </span>
+        <span class="keys">
+          <span v-for="n in 5" :key="n" class="key"></span>
+        </span>
+        <span class="ghost-line ghost-label"
+          ><span class="ghost-bar" :style="{ width: '58%' }"></span
+        ></span>
+        <span class="ghost-field"></span>
+      </AppCard>
     </ScreenSkeleton>
 
     <!-- Without an identity there is no queue to ask for; the notice above says why. -->
     <template v-else-if="phase !== 'idle'">
-      <!-- What happened to the last rating, above whatever comes next: the next card is the
-           answer to «saved», the notice says where the rating is when it has not arrived. -->
+      <!-- The connection in one line, over the card it is about (Ф-14, MOL-181): a rating kept on
+           the phone, else a list from memory — one strip a screen, the rating's first (owner's В-2
+           «а»): it is the news of the tap just made, and «без связи» says the list is not fresh. -->
+      <StatusStrip
+        v-if="strip"
+        class="strip"
+        :kind="strip.kind"
+        :text="strip.text"
+        :attempt="strip.kind === 'unanswered' ? attempt : 0"
+      >
+        <template #action>
+          <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+        </template>
+      </StatusStrip>
+
+      <!-- With nothing left to rate, what happened to the last rating is the screen: green without
+           a connection (owner's В-1 «а»), red when the server broke — its «Повторить» in the strip.
+           Over a card, «не ушла» is the quiet card with its own ghost «Повторить» (Ф-15). -->
       <ScreenState
-        v-if="sending === 'offline'"
-        class="notice"
+        v-if="sending === 'offline' && alone"
         kind="offline"
         tone="good"
-        :inline="!alone"
         :title="t('verdict.offline.title')"
         :body="t('verdict.offline.body')"
       />
@@ -61,21 +94,6 @@
           :title="t('verdict.returned', { name: bounced.name })"
         />
 
-        <!-- From memory: without a connection it refreshes by itself; with one, the server broke
-             and nothing will fire again on its own — so the person gets the button. -->
-        <div v-if="stale && fetchedAt" class="stale">
-          <p class="stale-text">
-            {{
-              t(stale === 'offline' ? 'verdict.stale' : 'verdict.stale_error', {
-                when: day(fetchedAt),
-              })
-            }}
-          </p>
-          <AppButton v-if="stale === 'error'" variant="ghost" @click="retry">
-            {{ t('state.retry') }}
-          </AppButton>
-        </div>
-
         <Transition name="card" mode="out-in">
           <VerdictCard
             :key="current.itemId"
@@ -97,20 +115,34 @@
         {{ t('verdict.sending') }}
       </p>
 
-      <!-- Empty is a success here, and the only green empty state in the app: nothing left
-           to rate is an achievement. Not while the last rating is still on its way — it may yet
-           come back, and «all rated» said before it arrives would be taken back. -->
+      <!-- Empty says the truth of it (Ф-16, Е-5): nothing bought yet is not «all rated». Not while
+           the last rating is still on its way — it may yet come back, and «all rated» said before
+           it arrives would be taken back. -->
       <ScreenState
-        v-else-if="phase === 'empty' && drafts.waiting.length === 0"
+        v-else-if="settled && bought === false"
+        kind="empty"
+        :icon="IconStar"
+        :title="t('verdict.none.title')"
+        :body="t('verdict.none.body')"
+      />
+      <ScreenState
+        v-else-if="settled"
         kind="empty"
         :icon="IconCheck"
         :title="t('verdict.empty.title')"
         :body="t('verdict.empty.body')"
-      >
-        <template #action>
-          <AppButton block @click="goTab('advice')">{{ t('verdict.empty.action') }}</AppButton>
-        </template>
-      </ScreenState>
+      />
+    </template>
+
+    <!-- The one action of an empty queue stands in the strip, at one height on every screen
+         (Ф-15, Ф-16), and comes with its state: under the skeleton there is none (MOL-269). -->
+    <template v-if="settled" #docked>
+      <AppButton v-if="bought === false" size="large" block @click="goTab('purchases')">
+        {{ t('verdict.none.action') }}
+      </AppButton>
+      <AppButton v-else size="large" block @click="goTab('advice')">
+        {{ t('verdict.empty.action') }}
+      </AppButton>
     </template>
   </AppScreen>
 </template>
@@ -120,10 +152,14 @@ import { computed, defineComponent, nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { cityWhereNameRepeats } from '@molvia/model'
 import IconCheck from '~icons/mdi/check-bold'
+import IconStar from '~icons/mdi/star-outline'
 import AppButton from '@/components/AppButton.vue'
+import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
+import type { StripKind } from '@/components/StatusStrip.vue'
 import VerdictCard from '@/components/VerdictCard.vue'
 import { useVerdictQueue } from '@/composables/useVerdictQueue'
 import { purchaseDay } from '@/days'
@@ -138,12 +174,20 @@ import { focusScreenTitle } from '@/transitions'
  *
  * No price here and no stars on the trip: a verdict and an expense are separate streams. No
  * toast either — the next card is the confirmation. «Сохранить» keeps the rating on the phone
- * and moves on; the app sends it, and a notice above the next card says so only when it could
- * not: green without a connection, red when the server broke.
+ * and moves on; the app sends it, and the screen says so only when it could not: the strip
+ * without a connection, the quiet red card when the server broke (MOL-214, Ф-14, Ф-15).
  */
 export default defineComponent({
   name: 'VerdictsView',
-  components: { AppButton, AppScreen, ScreenSkeleton, ScreenState, VerdictCard },
+  components: {
+    AppButton,
+    AppCard,
+    AppScreen,
+    ScreenSkeleton,
+    ScreenState,
+    StatusStrip,
+    VerdictCard,
+  },
   setup() {
     const { t, locale } = useI18n()
     const { goTab } = useNavigation()
@@ -172,6 +216,23 @@ export default defineComponent({
     )
     // The notice is the whole screen only when nothing else is: the queue is empty.
     const alone = computed(() => queue.phase.value === 'empty')
+    // The queue is empty and nothing of it is on its way: the truth of the empty state can be said.
+    const settled = computed(() => queue.phase.value === 'empty' && drafts.waiting.length === 0)
+
+    /** One strip a screen, only over a card: a rating kept on the phone first (owner's В-2 «а»). */
+    const strip = computed<{ kind: StripKind; text: string } | null>(() => {
+      if (queue.phase.value !== 'ready') return null
+      if (sending.value === 'offline') return { kind: 'offline', text: t('verdict.offline.strip') }
+      const when = queue.fetchedAt.value
+      if (!queue.stale.value || !when) return null
+      return queue.stale.value === 'offline'
+        ? { kind: 'offline', text: t('verdict.stale', { when: day(when) }) }
+        : { kind: 'unanswered', text: t('verdict.stale_error', { when: day(when) }) }
+    })
+
+    function day(when: Date): string {
+      return purchaseDay(when, locale.value)
+    }
 
     function afterMove(): void {
       moved.value = true
@@ -203,23 +264,25 @@ export default defineComponent({
     return {
       t,
       IconCheck,
+      IconStar,
       drafts,
       phase: queue.phase,
       current: queue.current,
       city,
       count: queue.count,
-      stale: queue.stale,
-      fetchedAt: queue.fetchedAt,
+      bought: queue.bought,
+      attempt: queue.attempt,
+      strip,
       retry: () => void queue.retry(),
       sending,
       alone,
+      settled,
       bounced,
       moved,
       save,
       skip,
       keep,
       send: () => void drafts.flush(),
-      day: (when: Date) => purchaseDay(when, locale.value),
       goTab,
     }
   },
@@ -227,6 +290,44 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* The card's own shape, as `VerdictCard` stands (Ф-13). `ghost-*`, never `skeleton-*`: those are the
+   roots of the kit's parts, and a scoped class of this screen would reach one put in the frame. */
+.ghost-card {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-6) var(--space-4);
+}
+
+.ghost-bar {
+  @include skeleton-bar;
+
+  height: var(--skeleton-line);
+}
+
+/* Each bar in a line of the words it stands for, so the bars are as tall as the card's lines. */
+.ghost-line {
+  display: flex;
+  align-items: center;
+}
+
+.ghost-caption {
+  height: calc(1em * var(--leading-body));
+  font-size: var(--text-caption);
+
+  .ghost-bar {
+    height: var(--skeleton-caption);
+  }
+}
+
+.ghost-question {
+  margin: var(--space-2) 0 var(--space-6);
+}
+
+.ghost-title {
+  height: calc(1em * var(--leading-snug));
+  font-size: var(--text-title);
+}
+
 .keys {
   display: flex;
   gap: var(--space-2);
@@ -240,26 +341,27 @@ export default defineComponent({
   border-radius: var(--radius);
 }
 
+.ghost-label {
+  height: calc(1em * var(--leading-body));
+  margin-top: var(--space-6);
+  font-size: var(--text-footnote);
+}
+
+.ghost-field {
+  box-sizing: border-box;
+  height: calc(var(--touch-target) * 2 + 2 * var(--hairline));
+  margin-top: var(--space-2);
+  border: var(--hairline) solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.strip,
 .notice {
   margin-bottom: var(--space-4);
 }
 
-.stale {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-3);
-}
-
 .sending {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
-.stale-text {
   margin: 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);

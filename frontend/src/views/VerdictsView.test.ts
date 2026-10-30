@@ -128,14 +128,54 @@ describe('VerdictsView', () => {
   })
 
   it('16: nothing to rate — the success leads to «What to buy»', async () => {
-    pendingVerdicts.mockResolvedValue({ items: [], total: 0 })
+    pendingVerdicts.mockResolvedValue({ items: [], total: 0, bought: true })
     const { view, router } = await render()
 
     expect(view.get('.state').classes()).toContain('quiet')
+    expect(view.text()).toContain(en.verdict.empty.title)
+    // The one action of the state stands in the strip, not in its block (Ф-15, Ф-16).
+    expect(view.get('.state').text()).not.toContain(en.verdict.empty.action)
     await button(view, en.verdict.empty.action).trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('advice')
+  })
+
+  it('Е-5: nothing bought yet — «nothing to rate», not «everything is rated», and on to «Purchases»', async () => {
+    pendingVerdicts.mockResolvedValue({ items: [], total: 0, bought: false })
+    const { view, router } = await render()
+
+    expect(view.text()).toContain(en.verdict.none.title)
+    expect(view.text()).toContain(en.verdict.none.body)
+    expect(view.text()).not.toContain(en.verdict.empty.title)
+    expect(view.get('.state').classes()).toContain('quiet')
+    expect(view.findAll('button').map((found) => found.text())).not.toContain(
+      en.verdict.empty.action,
+    )
+    await button(view, en.verdict.none.action).trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('purchases')
+  })
+
+  it('a server before MOL-214 says nothing of purchases — «everything is rated», as before', async () => {
+    pendingVerdicts.mockResolvedValue({ items: [], total: 0 })
+    const { view } = await render()
+
+    expect(view.text()).toContain(en.verdict.empty.title)
+    expect(view.text()).not.toContain(en.verdict.none.title)
+  })
+
+  it('no action under the skeleton: it comes with its state (MOL-269)', async () => {
+    pendingVerdicts.mockReturnValue(new Promise(() => undefined))
+    const { view } = await render()
+
+    expect(view.findAll('button').map((found) => found.text())).not.toContain(
+      en.verdict.empty.action,
+    )
+    expect(view.findAll('button').map((found) => found.text())).not.toContain(
+      en.verdict.none.action,
+    )
   })
 
   it('MOL-120: a city where another card names a shop of that name, gone once that one is rated', async () => {
@@ -191,7 +231,7 @@ describe('VerdictsView', () => {
     expect(lost.view.find('.bad').exists()).toBe(false)
   })
 
-  it('7: saved without a connection — the green «saved», and the next card under it', async () => {
+  it('7: saved without a connection — one strip over the next card, no card of «saved» (Ф-14)', async () => {
     online(false)
     rateItem.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
     pendingVerdicts.mockResolvedValue({ items: [milk, bread], total: 2 })
@@ -199,21 +239,43 @@ describe('VerdictsView', () => {
 
     await rate(view, 5)
 
-    expect(view.text()).toContain(en.verdict.offline.title)
+    expect(view.findAll('.strip')).toHaveLength(1)
+    expect(view.get('.strip').text()).toBe(en.verdict.offline.strip)
+    expect(view.get('.strip').classes()).toContain('offline')
+    expect(view.text()).not.toContain(en.verdict.offline.title)
     expect(view.find('.bad').exists()).toBe(false)
     expect(view.get('.question').text()).toContain('Хлеб')
   })
 
-  it('the last rating saved without a connection is «saved», not «everything is rated»', async () => {
+  it("В-2: a list from memory and a rating kept offline — one strip, the rating's", async () => {
+    pendingVerdicts.mockResolvedValue({ items: [milk, bread], total: 2 })
+    ;(await render()).view.unmount()
+
+    online(false)
+    pendingVerdicts.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+    rateItem.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+    const { view } = await render()
+    expect(view.get('.strip').text()).toContain('we will refresh it once')
+
+    await rate(view, 5)
+
+    expect(view.findAll('.strip')).toHaveLength(1)
+    expect(view.get('.strip').text()).toBe(en.verdict.offline.strip)
+  })
+
+  it('В-1: the last rating saved without a connection is «saved» whole, not «everything is rated»', async () => {
     online(false)
     rateItem.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
-    pendingVerdicts.mockResolvedValue({ items: [milk], total: 1 })
+    pendingVerdicts.mockResolvedValue({ items: [milk], total: 1, bought: true })
     const { view } = await render()
 
     await rate(view, 5)
 
     expect(view.text()).toContain(en.verdict.offline.title)
+    // Nothing is shown from an answer, so no strip — the state is the screen (owner's В-1 «а»).
+    expect(view.find('.strip').exists()).toBe(false)
     expect(view.text()).not.toContain(en.verdict.empty.title)
+    expect(view.text()).not.toContain(en.verdict.empty.action)
   })
 
   it('a server that broke keeps the draft, says so in red and sends again on «Try again»', async () => {
@@ -293,12 +355,18 @@ describe('VerdictsView', () => {
     online(true)
     pendingVerdicts.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 502'))
     const { view } = await render()
-    expect(view.get('.stale').text()).toContain('the server did not answer')
+    // The strip of 6h: the server's error, never red, its «Try again» inside (С-10).
+    expect(view.findAll('.strip')).toHaveLength(1)
+    expect(view.get('.strip').classes()).toContain('unanswered')
+    expect(view.get('.strip').text()).toContain('the server did not answer')
+    expect(view.findAll('button').filter((found) => found.text() === en.state.retry)).toHaveLength(
+      1,
+    )
 
     pendingVerdicts.mockResolvedValue({ items: [milk, bread], total: 2 })
-    await button(view, en.state.retry).trigger('click')
+    await view.get('.strip').get('button').trigger('click')
     await flushPromises()
-    expect(view.find('.stale').exists()).toBe(false)
+    expect(view.find('.strip').exists()).toBe(false)
     expect(view.text()).toContain('2 purchases are waiting to be rated')
   })
 

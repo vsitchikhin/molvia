@@ -26,6 +26,13 @@ export interface VerdictQueue {
   /** The cards come from memory: the last load failed, without a connection or with one. */
   readonly stale: ComputedRef<'offline' | 'error' | null>
   readonly fetchedAt: ComputedRef<Date | null>
+  /**
+   * Whether anything was bought at all, as the server last said (MOL-214): `false` tells «nothing to
+   * rate yet» from «all rated». Unknown — no answer, or one of a server before it — is `null`.
+   */
+  readonly bought: ComputedRef<boolean | null>
+  /** How many loads have failed: a retry that failed the same way is still an answer (C1). */
+  readonly attempt: ComputedRef<number>
   save(card: PendingVerdict, score: Score, review: string): void
   skip(card: PendingVerdict): void
   retry(): Promise<void>
@@ -108,6 +115,7 @@ export function useVerdictQueue(): VerdictQueue {
   const remembered = ref<Remembered | null>(null)
   const skips = ref<Skip[]>([])
   const failure = ref<'offline' | 'error' | null>(null)
+  const failures = ref(0)
   /** The card on screen stays put while the person is on it, whatever a reload brings. */
   const shownId = ref<string | null>(null)
 
@@ -139,7 +147,7 @@ export function useVerdictQueue(): VerdictQueue {
   function without(answer: PendingVerdicts, gone: ReadonlySet<string>): PendingVerdicts {
     const items = answer.items.filter((card) => !gone.has(card.itemId))
     const total = Math.max(items.length, answer.total - (answer.items.length - items.length))
-    return { items, total }
+    return { ...answer, items, total }
   }
 
   /**
@@ -235,6 +243,7 @@ export function useVerdictQueue(): VerdictQueue {
   /** Shown from memory because a fresh answer could not be had — and why. */
   const stale = computed(() => (remembered.value === null ? null : failure.value))
   const fetchedAt = computed(() => remembered.value?.fetchedAt ?? null)
+  const bought = computed(() => remembered.value?.answer.bought ?? null)
 
   /** Forgets what was put off about items the server no longer lists — rated, or withdrawn. */
   function pruneSkips(answer: PendingVerdicts): void {
@@ -268,6 +277,7 @@ export function useVerdictQueue(): VerdictQueue {
       // Decided after the failure: a connection lost while the answer was on its way is not
       // the server's fault, and is never drawn red.
       failure.value = navigator.onLine ? 'error' : 'offline'
+      failures.value += 1
     } finally {
       if (loadingFor === id) loadingFor = null
     }
@@ -318,6 +328,8 @@ export function useVerdictQueue(): VerdictQueue {
     count,
     stale,
     fetchedAt,
+    bought,
+    attempt: computed(() => failures.value),
     save,
     skip,
     retry: load,
