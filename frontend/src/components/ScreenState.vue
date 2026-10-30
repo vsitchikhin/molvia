@@ -73,6 +73,7 @@ import {
   defineComponent,
   nextTick,
   onBeforeUnmount,
+  onBeforeUpdate,
   onMounted,
   ref,
   watch,
@@ -224,11 +225,16 @@ export default defineComponent({
     const strip = useStateStrip()
     const me = Symbol('screen-state')
     // In a sheet a state with buttons of its own holds the footer too — the scanner's «Нет доступа к
-    // камере» (MOL-211). The slot is no reactive source: it is read again whenever the kind changes,
-    // which is when a block of the scanner turns from one refusal to another.
+    // камере» (MOL-211). The slot is no reactive source, so whether it is given is read at every update
+    // of the block: a button come later or gone with the kind unchanged (`v-if` on `#action`) held the
+    // footer only from the next change of kind (adversarial А1, А2).
+    const acting = ref(slots.action !== undefined)
+    onBeforeUpdate(() => {
+      acting.value = slots.action !== undefined
+    })
     watchEffect(() => {
       if (!strip) return
-      const holds = props.kind === 'error' || (strip.sheet && slots.action !== undefined)
+      const holds = props.kind === 'error' || (strip.sheet && acting.value)
       if (holds && !props.inline && !props.flow) strip.claim(me)
       else strip.release(me)
     })

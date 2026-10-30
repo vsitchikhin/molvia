@@ -32,7 +32,8 @@
     <!-- A full state of the sheet brings its buttons here, and its own footer steps aside for them,
          as a screen's `#docked` does for an error in its strip (MOL-211). -->
     <div v-if="$slots.footer || stateHeld" ref="footer" class="footer">
-      <slot v-if="!stateHeld" name="footer" />
+      <!-- Its own content sees no strip: a state there would hold the footer it stands in. -->
+      <WithoutStateStrip v-if="!stateHeld"><slot name="footer" /></WithoutStateStrip>
     </div>
 
     <div class="region" role="status">
@@ -63,7 +64,7 @@ import { provideSheetAnnouncer } from '@/composables/useAnnouncer'
 import { useHeight } from '@/composables/useCollapsed'
 import { typedIn, useKeyboardInset } from '@/composables/useKeyboardInset'
 import { useSheetDrag } from '@/composables/useSheetDrag'
-import { provideStateStrip } from '@/composables/useStateStrip'
+import { provideStateStrip, WithoutStateStrip } from '@/composables/useStateStrip'
 import { pageAnchor, sheetOpener, useSheetHistory } from '@/composables/useSheetHistory'
 
 /** A double tap lands within this — a platform convention, not a design token. */
@@ -121,7 +122,7 @@ function lineOf(field: HTMLElement): number {
  */
 export default defineComponent({
   name: 'BottomSheet',
-  components: { AppButton, IconBack, IconClose },
+  components: { AppButton, IconBack, IconClose, WithoutStateStrip },
   props: {
     open: { type: Boolean, required: true },
     /**

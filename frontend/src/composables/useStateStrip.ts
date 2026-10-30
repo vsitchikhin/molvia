@@ -1,5 +1,6 @@
 import {
   computed,
+  defineComponent,
   inject,
   provide,
   shallowRef,
@@ -30,7 +31,7 @@ export interface StateStrip {
   target: Readonly<Ref<HTMLElement | null>>
   /** A sheet's footer: a full state with buttons of its own holds it as an error does. */
   sheet: boolean
-  /** An error of the whole screen holds it. */
+  /** An error of the whole screen holds it — in a sheet, any full state with buttons of its own. */
   held: ComputedRef<boolean>
   /** Taken by the first error to ask, and by the next once that one lets go: one «Повторить». */
   claim: (owner: symbol) => void
@@ -76,6 +77,19 @@ export function provideStateStrip(
   provide(stateStripKey, strip)
   return strip
 }
+
+/**
+ * What it wraps sees no strip: the sheet's own footer (MOL-211, adversarial Б). A state there holding the
+ * footer it stands in took the footer's slot down with itself, let go, came back and held it again — a
+ * loop Vue stops in development and a built app never does. There it keeps its buttons, as before.
+ */
+export const WithoutStateStrip = defineComponent({
+  name: 'WithoutStateStrip',
+  setup(_, { slots }) {
+    provide(stateStripKey, null)
+    return () => slots.default?.()
+  },
+})
 
 /** The strip of the screen or the sheet around, or nothing — the kit, a block on its own. */
 export function useStateStrip(): StateStrip | null {
