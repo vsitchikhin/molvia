@@ -362,8 +362,11 @@ textarea.control {
   font-weight: var(--weight-medium);
 }
 
+/* The edge doubled, as a row of the kit draws an error (MOL-211, owner's В-3 «а»): a hairline is lost in
+   bad light. Inside the edge, so nothing in the well moves. */
 .invalid .well {
   border-color: var(--bad);
+  box-shadow: inset 0 0 0 var(--hairline) var(--bad);
 }
 
 .counter-spoken {
