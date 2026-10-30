@@ -431,7 +431,6 @@
     "edit": {
       "meta": "Only your own rating changes",
       "meta_new": "You have not rated this yet",
-      "current": "Your rating: {n}",
       "save_new": "Rate it",
       "keeps_score": "The rating stays as it was. To take it back, withdraw it",
       "withdraw": "Withdraw the rating",
@@ -512,6 +511,7 @@
     "pending_count": "{n} purchase is waiting to be rated | {n} purchases are waiting to be rated",
     "context": "{when} · {place}",
     "question_tail": "how was it?",
+    "current": "Your rating: {n}",
     "scale_low": "Poor",
     "scale_high": "Great",
     "scale_label": "Rating {n} out of 5",
@@ -522,7 +522,12 @@
     "save": "Save the rating",
     "save_disabled": "Pick a rating",
     "skip": "Not now",
-    "footnote": "Ratings and spending are separate flows. The reminder came the next day — at the till nobody has time for this",
+    "footnote": "Rating is separate from buying: the reminder comes the next day — nobody needs it at the till",
+    "none": {
+      "title": "Nothing to rate yet",
+      "body": "Record a purchase first — we will ask here how it was",
+      "action": "To purchases"
+    },
     "empty": {
       "title": "Everything is rated",
       "body": "Thank you — the base is more accurate for it. We will remind you when a new purchase turns up",
@@ -534,7 +539,8 @@
     },
     "offline": {
       "title": "The rating is saved",
-      "body": "It will go on its own once you are back online. You can close the app"
+      "body": "It will go on its own once you are back online. You can close the app",
+      "strip": "Offline · your rating is saved on the phone and will go by itself"
     },
     "stale": "The list as of {when} — we will refresh it once you are back online",
     "stale_error": "The list as of {when} — the server did not answer",
@@ -547,7 +553,8 @@
       "body": "Saved ratings are safe on the phone and will go on their own"
     },
     "returned": "The rating for «{name}» was not accepted — it comes back next",
-    "sending": "Sending the rating…"
+    "sending": "Sending the rating…",
+    "checking": "Checking what else is waiting to be rated…"
   },
   "money": {
     "approx": "≈ {amount}",

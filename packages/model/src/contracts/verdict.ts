@@ -119,13 +119,23 @@ export const PENDING_VERDICTS_LIMIT = 50
 /**
  * `GET /verdicts/pending`. `total` is how many items wait, the list only the first of them —
  * the counter under the title must not stop at the length of a page.
+ *
+ * `bought` — whether the person has bought any product in a record not removed, rated or not
+ * (MOL-214, С-8): an empty queue is «Всё оценено» only for someone who bought something, and a
+ * newcomer is told there is nothing to rate yet. Optional, though the server always sends it: an
+ * answer of a server before it, and the queue the phone kept from one, must still read — as
+ * «Всё оценено», what they said before. Nothing bought and something waiting is no answer.
  */
 export const pendingVerdictsCodec = z
   .strictObject({
     items: z.array(pendingVerdictCodec).max(PENDING_VERDICTS_LIMIT),
     total: z.int().nonnegative(),
+    bought: z.boolean().optional(),
   })
   .refine((answer) => answer.total >= answer.items.length, { error: ISSUE.RESPONSE_INVALID })
+  .refine((answer) => answer.bought !== false || answer.total === 0, {
+    error: ISSUE.RESPONSE_INVALID,
+  })
 export type PendingVerdicts = z.output<typeof pendingVerdictsCodec>
 
 /** At most so many of one's own «не брать нигде» come back: far above anyone's shelf of the bad. */

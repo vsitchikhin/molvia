@@ -127,6 +127,119 @@ describe('useVerdictQueue', () => {
     expect((await mounted()).phase.value).toBe('empty')
   })
 
+  it('MOL-214: whether anything was bought, as the server said — remembered, and kept by a rating', async () => {
+    rateItem.mockImplementation((itemId) => Promise.resolve(sent(itemId)))
+    pendingVerdicts.mockResolvedValue({ items: [], total: 0, bought: false })
+    expect((await mounted()).bought.value).toBe(false)
+
+    freshPinia()
+    pendingVerdicts.mockResolvedValue({ items: [milk], total: 1, bought: true })
+    const queue = await mounted()
+    expect(queue.bought.value).toBe(true)
+    // The answer less what was rated since is still the same answer: it keeps what it said.
+    queue.save(milk, 4, '')
+    await flushPromises()
+    expect(queue.bought.value).toBe(true)
+
+    // From memory, with no connection.
+    freshPinia()
+    online(false)
+    pendingVerdicts.mockRejectedValue(offline())
+    expect((await mounted()).bought.value).toBe(true)
+  })
+
+  it('А1: an empty queue from an earlier visit is not said while the fresh answer is on its way', async () => {
+    pendingVerdicts.mockResolvedValue({ items: [], total: 0, bought: false })
+    await mounted()
+    unmountAll()
+
+    freshPinia()
+    const answer = deferred<PendingVerdicts>()
+    pendingVerdicts.mockReturnValue(answer.promise)
+    const queue = await mounted()
+    // The memory says nothing was bought; the purchase recorded since may be on its way as a card.
+    expect(queue.phase.value).toBe('loading')
+
+    answer.resolve({ items: [milk], total: 1, bought: true })
+    await flushPromises()
+    expect(queue.phase.value).toBe('ready')
+  })
+
+  it('Б1, В1: the last remembered card rated here and arrived before the first answer — checking, then the answer', async () => {
+    pendingVerdicts.mockResolvedValue({ items: [milk], total: 1, bought: true })
+    await mounted()
+    unmountAll()
+
+    freshPinia()
+    rateItem.mockImplementation((itemId) => Promise.resolve(sent(itemId)))
+    const answer = deferred<PendingVerdicts>()
+    pendingVerdicts.mockReturnValue(answer.promise)
+    const queue = await mounted()
+    expect(queue.phase.value).toBe('ready')
+
+    queue.save(milk, 4, '')
+    await flushPromises()
+    expect(rateItem).toHaveBeenCalledTimes(1)
+    // Neither the skeleton after one's own rating (Б1) nor «all rated» before the answer (В1).
+    expect(queue.phase.value).toBe('checking')
+
+    // Bought since the memory was written: the answer brings it.
+    answer.resolve({ items: [bread], total: 1, bought: true })
+    await flushPromises()
+    expect(queue.phase.value).toBe('ready')
+    expect(queue.current.value?.itemId).toBe(bread.itemId)
+  })
+
+  it('В-3: checking ends at «all rated» when the answer is empty', async () => {
+    pendingVerdicts.mockResolvedValue({ items: [milk], total: 1, bought: true })
+    await mounted()
+    unmountAll()
+
+    freshPinia()
+    rateItem.mockImplementation((itemId) => Promise.resolve(sent(itemId)))
+    const answer = deferred<PendingVerdicts>()
+    pendingVerdicts.mockReturnValue(answer.promise)
+    const queue = await mounted()
+    queue.save(milk, 4, '')
+    await flushPromises()
+    expect(queue.phase.value).toBe('checking')
+
+    answer.resolve({ items: [], total: 0, bought: true })
+    await flushPromises()
+    expect(queue.phase.value).toBe('empty')
+  })
+
+  it('А1: an empty answer heard by this screen stays said while it asks again', async () => {
+    pendingVerdicts.mockResolvedValue({ items: [], total: 0, bought: true })
+    const queue = await mounted()
+    expect(queue.phase.value).toBe('empty')
+
+    pendingVerdicts.mockReturnValue(new Promise(() => undefined))
+    void queue.retry()
+    await flushPromises()
+    expect(queue.phase.value).toBe('empty')
+  })
+
+  it('MOL-214: a server before the field — not known, never «nothing bought»', async () => {
+    pendingVerdicts.mockResolvedValue(answer([]))
+    expect((await mounted()).bought.value).toBeNull()
+  })
+
+  it('counts the failed loads, so a retry that failed the same way is said again (C1)', async () => {
+    pendingVerdicts.mockResolvedValue(answer([milk]))
+    await mounted()
+
+    freshPinia()
+    online(true)
+    pendingVerdicts.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 502'))
+    const queue = await mounted()
+    expect(queue.attempt.value).toBe(1)
+
+    await queue.retry()
+    expect(queue.attempt.value).toBe(2)
+    expect(queue.stale.value).toBe('error')
+  })
+
   it('13: a failed load with nothing remembered is offline or an error, decided after it', async () => {
     online(false)
     pendingVerdicts.mockRejectedValue(offline())

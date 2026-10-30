@@ -234,9 +234,11 @@ test('7: rated without a connection and the app closed — kept on the phone, an
   )
   await rate(page, 3)
   await lost
-  // Kept on the phone: the attempt failed (`lost`), the screen says the rating is kept, and its draft
-  // waits in the drawer — the only one there.
-  await expect(page.getByRole('heading', { name: 'The rating is saved' })).toBeVisible()
+  // Kept on the phone: the attempt failed (`lost`), the strip over the next card says the rating is
+  // kept (Ф-14, MOL-214), and its draft waits in the drawer — the only one there.
+  await expect(page.locator('.strip')).toHaveText(
+    'Offline · your rating is saved on the phone and will go by itself',
+  )
   expect(await drawer(page, who.id)).toEqual([{ itemId: rated, state: 'saved', score: 3 }])
   await page.close()
 
@@ -288,4 +290,96 @@ test('the queue that could not load is red and loads again on «Try again»', as
   await page.getByRole('button', { name: 'Try again' }).click()
 
   await expect(question(page)).toContainText('Айран')
+})
+
+// Е-5 (MOL-214): a newcomer has nothing to rate, and «Всё оценено. Спасибо» was a lie to them. The
+// server says whether anything was bought; the way on stands in the strip.
+test('Е-5: nothing bought yet — «Nothing to rate yet», and on to «Purchases»', async ({ page }) => {
+  await person(page)
+
+  await page.goto('/verdicts')
+
+  await expect(page.getByRole('heading', { name: 'Nothing to rate yet' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Everything is rated' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Open «What to buy»' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'To purchases' }).click()
+
+  await expect(page).toHaveURL(/\/purchases$/)
+})
+
+// Ф-14 (MOL-214): a rating kept on the phone is said by one strip over the next card — the green card
+// of «saved» stood over it before. The strip is the screen's, not the live region's.
+test('Ф-14: rated offline with a card left — one strip over the next card, no card of «saved»', async ({
+  page,
+}) => {
+  const who = await person(page)
+  await bought(who, [`Простокваша ${tag}`, `Ряженка ${tag}`])
+  // A rating tapped before «who are we» is answered waits without a request, and nothing fails.
+  const known = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === '/api/actors/me' && response.ok(),
+  )
+  await page.goto('/verdicts')
+  await expect(question(page)).toContainText('Ряженка')
+  await (await known).finished()
+
+  await goOffline(page)
+  await rate(page, 5)
+
+  const strip = page.locator('.strip')
+  await expect(question(page)).toContainText('Простокваша')
+  await expect(strip).toHaveCount(1)
+  await expect(strip).toHaveText(
+    'Offline · your rating is saved on the phone and will go by itself',
+  )
+  await expect(strip.getByRole('button')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'The rating is saved' })).toHaveCount(0)
+})
+
+// Ф-13 (MOL-214): the skeleton is the card's shape, so the keys and the field come where the bars
+// stood and nothing jumps as the answer comes.
+test('Ф-13: the skeleton is the card — its keys and its field stand where the card puts them', async ({
+  page,
+}) => {
+  const who = await person(page)
+  await bought(who, [`Варенец ${tag}`])
+  // The home remembered the queue: with it «Оценки» open on the memory and draw no skeleton.
+  await page.addInitScript((owner) => {
+    localStorage.removeItem(`molvia.verdict-queue.${owner}`)
+    sessionStorage.removeItem(`molvia.verdict-queue.${owner}`)
+  }, who.id)
+  let release: () => void = () => undefined
+  const held = new Promise<void>((resolve) => (release = resolve))
+  await page.route('**/api/verdicts/pending', async (route) => {
+    await held
+    await route.continue()
+  })
+
+  await page.goto('/verdicts')
+  const ghostKey = page.locator('.skeleton .key').first()
+  await expect(ghostKey).toBeVisible()
+  // Every motion of the page played out, but the bars' breath, which never ends.
+  const settled = () =>
+    page.waitForFunction(() =>
+      document
+        .getAnimations()
+        .every((motion) => motion.effect?.getTiming().iterations === Number.POSITIVE_INFINITY),
+    )
+  await settled()
+  const keyBefore = await ghostKey.boundingBox()
+  const fieldBefore = await page.locator('.skeleton .ghost-field').boundingBox()
+
+  release()
+  await expect(question(page)).toContainText('Варенец')
+  await settled()
+  const keyAfter = await page.getByRole('button', { name: 'Rating 1 out of 5' }).boundingBox()
+  const fieldAfter = await page.locator('section.verdict .well').boundingBox()
+
+  expect(keyBefore && keyAfter && Math.abs(keyAfter.y - keyBefore.y)).toBeLessThanOrEqual(1)
+  expect(keyBefore && keyAfter && Math.abs(keyAfter.height - keyBefore.height)).toBeLessThanOrEqual(
+    1,
+  )
+  expect(fieldBefore && fieldAfter && Math.abs(fieldAfter.y - fieldBefore.y)).toBeLessThanOrEqual(1)
+  expect(
+    fieldBefore && fieldAfter && Math.abs(fieldAfter.height - fieldBefore.height),
+  ).toBeLessThanOrEqual(1)
 })

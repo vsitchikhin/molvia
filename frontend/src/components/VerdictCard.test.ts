@@ -76,10 +76,38 @@ describe('VerdictCard', () => {
     const save = button(view, en.verdict.save_disabled)
 
     expect(save.attributes('disabled')).toBeUndefined()
+    // The kit's not now (Ф-6): focusable, its words its name, a tap cancelled.
+    expect(save.attributes('aria-disabled')).toBe('true')
     await save.trigger('click')
 
     expect(view.emitted('save')).toBeUndefined()
     view.unmount()
+  })
+
+  it('6d: a card the server refused says the score it came back with over the scale (Ф-25)', async () => {
+    const view = render({
+      card: milk,
+      score: 4,
+      review: 'Солёный',
+      state: 'typing',
+      error: ERROR.INTERNAL,
+    })
+
+    expect(view.get('.current').text()).toBe('Your rating: 4')
+    expect(key(view, 4).attributes('aria-pressed')).toBe('true')
+    // Another digit chosen: the point it was changed from stays.
+    await key(view, 2).trigger('click')
+    expect(view.get('.current').text()).toBe('Your rating: 4')
+    view.unmount()
+  })
+
+  it('a card that was never refused says no score of its own', () => {
+    const typed = render({ card: milk, score: 3, review: '', state: 'typing', error: null })
+    expect(typed.find('.current').exists()).toBe(false)
+    typed.unmount()
+    const fresh = render()
+    expect(fresh.find('.current').exists()).toBe(false)
+    fresh.unmount()
   })
 
   it('saves the score and the words as typed', async () => {

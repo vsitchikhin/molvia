@@ -167,7 +167,8 @@ describe('чужая сессия не трогает чужую оценку', 
 
     const pending = await call('GET', '/verdicts/pending', theirs)
 
-    expect(pending.body).toEqual({ items: [], total: 0 })
+    // Nor do they make the person one who bought something (MOL-214).
+    expect(pending.body).toEqual({ items: [], total: 0, bought: false })
   }, 10_000)
 })
 

@@ -87,8 +87,9 @@ describe('GET /verdicts/pending', () => {
         },
       ],
       total: 1,
+      bought: true,
     })
-  })
+  }, 15_000)
 
   it('город — места последней покупки, у одноимённых мест двух городов свой (MOL-120)', async () => {
     const actor = await insertActor(db)
@@ -130,7 +131,8 @@ describe('GET /verdicts/pending', () => {
     await bought(actor, milk, await insertPlace(db), '2026-09-18T10:00:00.000Z')
 
     await rate(actor, milk)
-    expect(await queue(actor)).toEqual({ items: [], total: 0 })
+    // All rated is not nothing bought: «Всё оценено», not «Оценивать пока нечего» (MOL-214).
+    expect(await queue(actor)).toEqual({ items: [], total: 0, bought: true })
 
     await app.inject({
       method: 'DELETE',
@@ -257,7 +259,8 @@ describe('GET /verdicts/pending', () => {
     })
     await bought(actor, dish, await insertPlace(db, { kind: 'venue' }), '2026-09-18T10:00:00.000Z')
 
-    expect(await queue(actor)).toEqual({ items: [], total: 0 })
+    // Nor is it a purchase this screen counts: no card of it could ever come (MOL-214, Р-1).
+    expect(await queue(actor)).toEqual({ items: [], total: 0, bought: false })
   })
 
   it('без покупок — пусто, не ошибка; ответ не кешируется и журнал не пишется', async () => {
@@ -266,8 +269,30 @@ describe('GET /verdicts/pending', () => {
 
     expect(reply.status).toBe(200)
     expect(reply.headers['cache-control']).toBe('no-store')
-    expect(JSON.parse(reply.body)).toEqual({ items: [], total: 0 })
+    expect(JSON.parse(reply.body)).toEqual({ items: [], total: 0, bought: false })
     expect(await db.select().from(events)).toEqual([])
+  }, 10_000)
+
+  it('куплено ли что-нибудь: удалённая запись и чужая покупка — нет, своя — да (MOL-214)', async () => {
+    const me = await insertActor(db)
+    const stranger = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db)
+    await bought(stranger, milk, place, '2026-09-18T10:00:00.000Z')
+    const removed = await insertTrip(db, {
+      actorId: me,
+      placeId: place,
+      startedAt: new Date('2026-09-17T10:00:00.000Z'),
+      deletedAt: new Date('2026-09-17T12:00:00.000Z'),
+    })
+    await db.insert(expenses).values({ id: randomUUID(), tripId: removed, itemId: milk })
+
+    expect(await queue(me)).toEqual({ items: [], total: 0, bought: false })
+
+    // A purchase rated before it was made closes its card and is still a purchase.
+    await rate(me, milk)
+    await bought(me, milk, place, '2026-09-18T11:00:00.000Z')
+    expect(await queue(me)).toEqual({ items: [], total: 0, bought: true })
   }, 10_000)
 
   it('без заголовка владельца — 401', async () => {

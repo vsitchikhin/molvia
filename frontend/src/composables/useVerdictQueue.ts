@@ -11,8 +11,11 @@ import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 import type { Score } from '@/stores/verdictDrafts'
 import { reportFailure } from '@/failures'
 
-/** `idle` — no identity, so no queue to ask for. */
-export type QueuePhase = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'offline'
+/**
+ * `idle` — no identity, so no queue to ask for. `checking` — the person rated the last card the
+ * phone remembered, and what else waits on the server is not heard yet (MOL-214, В-3).
+ */
+export type QueuePhase = 'idle' | 'loading' | 'ready' | 'empty' | 'checking' | 'error' | 'offline'
 
 export interface VerdictQueue {
   readonly phase: ComputedRef<QueuePhase>
@@ -26,6 +29,13 @@ export interface VerdictQueue {
   /** The cards come from memory: the last load failed, without a connection or with one. */
   readonly stale: ComputedRef<'offline' | 'error' | null>
   readonly fetchedAt: ComputedRef<Date | null>
+  /**
+   * Whether anything was bought at all, as the server last said (MOL-214): `false` tells «nothing to
+   * rate yet» from «all rated». Unknown — no answer, or one of a server before it — is `null`.
+   */
+  readonly bought: ComputedRef<boolean | null>
+  /** How many loads have failed: a retry that failed the same way is still an answer (C1). */
+  readonly attempt: ComputedRef<number>
   save(card: PendingVerdict, score: Score, review: string): void
   skip(card: PendingVerdict): void
   retry(): Promise<void>
@@ -108,6 +118,11 @@ export function useVerdictQueue(): VerdictQueue {
   const remembered = ref<Remembered | null>(null)
   const skips = ref<Skip[]>([])
   const failure = ref<'offline' | 'error' | null>(null)
+  const failures = ref(0)
+  /** An answer came while this screen stood: the memory alone is an earlier visit's. */
+  const answered = ref(false)
+  /** A card was rated on this screen: what it emptied, the person emptied themselves. */
+  const ratedHere = ref(false)
   /** The card on screen stays put while the person is on it, whatever a reload brings. */
   const shownId = ref<string | null>(null)
 
@@ -116,6 +131,8 @@ export function useVerdictQueue(): VerdictQueue {
     remembered.value = id ? recallAnswer(`${ANSWER_KEY}.${id}`) : null
     skips.value = id ? recallSkips(`${SKIPS_KEY}.${id}`) : []
     failure.value = null
+    answered.value = false
+    ratedHere.value = false
     shownId.value = null
   }
 
@@ -139,7 +156,7 @@ export function useVerdictQueue(): VerdictQueue {
   function without(answer: PendingVerdicts, gone: ReadonlySet<string>): PendingVerdicts {
     const items = answer.items.filter((card) => !gone.has(card.itemId))
     const total = Math.max(items.length, answer.total - (answer.items.length - items.length))
-    return { items, total }
+    return { ...answer, items, total }
   }
 
   /**
@@ -229,12 +246,22 @@ export function useVerdictQueue(): VerdictQueue {
     // the person emptied it themselves, and a rating is on its way: then that is the news
     // (adversarial R4).
     if (failure.value && drafts.waiting.length === 0) return failure.value
-    return remembered.value ? 'empty' : 'loading'
+    if (!remembered.value) return 'loading'
+    // Empty is said of an answer this screen heard, or while a rating is on its way — its notice
+    // is the news (R4). The memory of an earlier visit, read while the fresh answer is on
+    // its way, told a newcomer back from «Покупки» with a purchase to record one first, «К
+    // покупкам» under the thumb as the card came (MOL-214, adversarial А1).
+    if (answered.value || drafts.waiting.length > 0) return 'empty'
+    // The last card of that memory rated here and arrived: the person emptied what they saw, not
+    // what the server holds — a purchase since may be on its way as a card. Neither «Загрузка…»
+    // after their own rating (Б1) nor «Всё оценено» before the answer (В1): «Проверяем…» (В-3 «а»).
+    return ratedHere.value ? 'checking' : 'loading'
   })
 
   /** Shown from memory because a fresh answer could not be had — and why. */
   const stale = computed(() => (remembered.value === null ? null : failure.value))
   const fetchedAt = computed(() => remembered.value?.fetchedAt ?? null)
+  const bought = computed(() => remembered.value?.answer.bought ?? null)
 
   /** Forgets what was put off about items the server no longer lists — rated, or withdrawn. */
   function pruneSkips(answer: PendingVerdicts): void {
@@ -258,6 +285,7 @@ export function useVerdictQueue(): VerdictQueue {
       if (owner.value !== id) return
       remembered.value = { answer: fresh, askedAt, fetchedAt: new Date() }
       failure.value = null
+      answered.value = true
       rememberAnswer()
       // What was confirmed before this was asked for, the answer already knows.
       drafts.settle(askedAt)
@@ -268,6 +296,7 @@ export function useVerdictQueue(): VerdictQueue {
       // Decided after the failure: a connection lost while the answer was on its way is not
       // the server's fault, and is never drawn red.
       failure.value = navigator.onLine ? 'error' : 'offline'
+      failures.value += 1
     } finally {
       if (loadingFor === id) loadingFor = null
     }
@@ -281,6 +310,7 @@ export function useVerdictQueue(): VerdictQueue {
       rememberSkips()
     }
     drafts.save(card, score, review)
+    ratedHere.value = true
     shownId.value = null
   }
 
@@ -318,6 +348,8 @@ export function useVerdictQueue(): VerdictQueue {
     count,
     stale,
     fetchedAt,
+    bought,
+    attempt: computed(() => failures.value),
     save,
     skip,
     retry: load,

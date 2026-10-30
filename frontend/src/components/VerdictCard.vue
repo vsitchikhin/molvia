@@ -7,7 +7,7 @@
       {{ card.name }}<br />{{ t('verdict.question_tail') }}
     </h2>
 
-    <RatingScale v-model="score" />
+    <RatingScale v-model="score" :current="returnedWith" />
 
     <AppField
       v-model="review"
@@ -21,10 +21,10 @@
       :error-text="unsupported ? t('verdict.review_unsupported') : null"
     />
 
-    <AppButton class="save" :class="{ idle: score === null }" block @click="save">
+    <AppButton class="save" :inactive="score === null" block @click="save">
       {{ score === null ? t('verdict.save_disabled') : t('verdict.save') }}
     </AppButton>
-    <AppButton class="skip" variant="ghost" block @click="$emit('skip')">
+    <AppButton variant="ghost" block @click="$emit('skip')">
       {{ t('verdict.skip') }}
     </AppButton>
   </AppCard>
@@ -41,7 +41,6 @@ import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
 import RatingScale from '@/components/RatingScale.vue'
 import { placeLabel } from '@/components/placeLabel'
-import { useAnnouncer } from '@/composables/useAnnouncer'
 import { purchaseDay } from '@/days'
 import { SCORES } from '@/components/rating'
 import SectionCaption from '@/components/SectionCaption.vue'
@@ -67,10 +66,11 @@ function domainCode(code: WireCode | null | undefined): ErrorCode | null {
  * Digits, not stars: five stars are hard to hit with a thumb and read as decoration, and here
  * the score is the entry into a verdict. A second tap on the chosen digit takes it back.
  *
- * «Сохранить» is not `disabled` without a score — it has to be reachable and heard — but it
- * does nothing then except say what is missing. The review is checked by the same schema the
- * server uses, for the person's sake only: the server decides. A card is keyed by its item, so
- * everything typed here is the card's own and goes with it.
+ * «Сохранить» is not `disabled` without a score — it has to be reachable and heard — but the
+ * kit's not now (`inactive`, Ф-6): its words say what is missing, and a tap does nothing. A card
+ * the server refused comes back with its score said over the scale (6d, Ф-25). The review is
+ * checked by the same schema the server uses, for the person's sake only: the server decides. A
+ * card is keyed by its item, so everything typed here is the card's own and goes with it.
  */
 export default defineComponent({
   name: 'VerdictCard',
@@ -98,7 +98,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const i18n = useI18n()
     const { t, locale } = i18n
-    const announce = useAnnouncer()
     const titleId = useId()
     const title = ref<HTMLElement | null>(null)
 
@@ -111,6 +110,9 @@ export default defineComponent({
     const refusedCode = Boolean(props.draft?.error) && error.value === null
     const unsupported = ref(refusedCode && Boolean(props.draft?.review.trim()))
     if (refusedCode && !unsupported.value) error.value = ERROR.INTERNAL
+    // The score the card came back refused with, kept while it is on screen: the point a change is
+    // made from. Touched and left, the draft has no refusal any more, and nothing is said again.
+    const returnedWith = props.draft?.error ? props.draft.score : null
     let saved = false
 
     const day = computed(() => purchaseDay(props.card.boughtAt, locale.value))
@@ -129,10 +131,8 @@ export default defineComponent({
 
     function save(): void {
       if (saved) return
-      if (score.value === null) {
-        announce?.(t('verdict.save_disabled'))
-        return
-      }
+      // The kit cancels a tap on «Выберите оценку»; this is for a call from anywhere else.
+      if (score.value === null) return
       // Tidied first, asked about after: a review of invisible marks is as empty as one of
       // spaces, and goes without a review the same way (self-review С-16).
       const tidied = tidyText(review.value)
@@ -159,6 +159,7 @@ export default defineComponent({
       review,
       error,
       unsupported,
+      returnedWith,
       day,
       place,
       save,
@@ -191,17 +192,5 @@ export default defineComponent({
 
 .save {
   margin-top: var(--space-6);
-}
-
-/* The handoff's «nothing chosen yet»: the button is there and speaks, but does not invite. */
-.save.idle {
-  background: var(--surface-2);
-  box-shadow: none;
-  color: var(--text-muted);
-}
-
-.skip {
-  color: var(--text-muted);
-  font-size: var(--text-callout);
 }
 </style>
