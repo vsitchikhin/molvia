@@ -424,11 +424,13 @@ The detail behind the frontend lines of `CLAUDE.md`.
   above and below inside its least height). **A rate that comes after the ways out of «Деньги» grows its row** (owner's
   В-3 «а»): another month on screen and none kept, today's rate comes with the running month's read after the
   month's own, and a rate too wide to stand beside its label goes under it — the rows under it some 6 px down. Which
-  rate is wide is a matter of the width, not of the currency (adversarial Г1 of round 3): the dollar's «386,50 ֏/$» in
-  either language at 320, and in English the rouble's «4.16 ֏/₽» too — «Money exchange» is 139 px to «Обмен денег»'s
-  107 — below some 345 px, the owner's own pair. Waited for (self-review №1), it cost more than it spared: no way out
-  at all for up to the client's 15 s when that read hung, and two reads in a row at every opening of a past month
-  for a person with no rate (round 2, В1, В2, №4). `e2e/kit-rows` holds
+  rate is wide is a matter of the width, the label and the currency (adversarial Г1, Д1 of rounds 3–4, measured px by
+  px in both engines): in Russian the dollar's «386,50 ֏/$» and the euro's «420,15 ֏/€» below some 337 px, the
+  rouble's «4,16 ֏/₽» never; in English — «Money exchange» is 139 px to «Обмен денег»'s 107 — the dollar and the euro
+  below some 368 px, so on the commonest Android width of 360 too, and the rouble below some 347, the owner's own
+  pair. Waited for (self-review №1), it cost more than it spared: no way out at all for up to the client's 15 s
+  when that read hung, and two reads in a row at every opening of a past month for a person with no rate (round 2,
+  В1, В2, №4). `e2e/kit-rows` holds
   every entry of `/_kit` at 390 and 320, in Russian and English, in Chromium and WebKit: nothing cut, a row of one line
   52, the transfer on two lines at 320 and one at 390, a long figure under its label at 320 and a short one beside it,
   a long note on two lines and its «…» (self-review №2: the clamp of a box in a flex item is WebKit's riskiest place).
