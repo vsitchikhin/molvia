@@ -33,6 +33,8 @@ vi.mock('@/api', () => ({
     // The trip's queue: nothing leaves — no signal at the shelf.
     removeExpense: () => new Promise(() => undefined),
     removeTrip: () => new Promise(() => undefined),
+    // «Тут дешевле» of a purchase sheet opened over the record.
+    ownPrices: () => new Promise(() => undefined),
   },
 }))
 
@@ -254,6 +256,18 @@ describe('FinishedTripView: шапка и состояния (MOL-207)', () => {
     await flushPromises()
     expect(view.findAll('.strip')).toHaveLength(0)
     expect(trip).toHaveBeenCalledTimes(2)
+  })
+
+  it('тап по строке открывает шторку позиции с фокусом в «Сколько» (MOL-212)', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    trip.mockResolvedValue(finished)
+    const view = await render()
+    await view.findAll('.row')[0]?.trigger('click')
+    await flushPromises()
+
+    const sheet = view.findComponent({ name: 'ItemDetailsSheet' })
+    expect(sheet.props('entry')).toMatchObject({ name: 'Товар 1' })
+    expect(sheet.props('focusQuantity')).toBe(true)
   })
 
   it('с ответом — одно крупное число: карточка итога под списком, в полосе внизу ничего', async () => {
