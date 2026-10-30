@@ -230,9 +230,9 @@ async function codeToAsk(
 /**
  * One receipt with its lines, as the review shows them (MOL-126): the shop's memory laid over what
  * the parse found — the article first, then the line as printed — the item's name, what each line
- * will be recorded at (В-5), a price the memory doubts unless the total points at its line (В-1, MOL-314), the place,
- * the rate of the receipt's day and the same receipt recorded before. 404 for a missing, removed or someone else's
- * one alike.
+ * will be recorded at (В-5), a price the memory doubts unless the total points at its line, the receipt's only one
+ * (В-1, MOL-314), the place, the rate of the receipt's day and the same receipt recorded before. 404 for a missing,
+ * removed or someone else's one alike.
  */
 export async function receiptOfOwner(
   repositories: ReceiptReviewRepositories,
@@ -307,20 +307,11 @@ export async function receiptOfOwner(
       ? null
       : await repositories.receipts.recordedTwin(actor.id, tin, number, receipt.id)
 
-  // a total proves the receipt's sum, never whose figure is right: it points at a line only where every other line's
-  // price is the memory's — two lines off it by ±d meet it alike, and a line the memory does not know may hide the
-  // other half (MOL-314, owner's В-2 «б»; the one line the total points at, as MOL-291's №7)
-  const confirmed = lines.map((line, i) => {
-    const price = rememberedOf(memory[i] ?? null)
-    return (
-      line.price !== null &&
-      price !== null &&
-      price.currency === line.price.currency &&
-      price.minor === line.price.minor
-    )
-  })
-  const pointedAt = (i: number): boolean =>
-    receipt.balanced && confirmed.every((yes, j) => yes || j === i)
+  // a total proves the receipt's sum, never whose figure is right: it points at a line only where that line is all the
+  // sum there is — the one line of the receipt, nothing sent to the card. Beside another line, a weight or a cashback the
+  // other half of a misread hides, and the memory that would vouch for them may be a shelf price gone (MOL-314, owner's
+  // В-4 «а» after two rounds of review)
+  const pointedAt = receipt.balanced && lines.length === 1 && found.cashback === null
 
   const asked: (string | null)[] = []
   for (const [i, line] of lines.entries()) {
@@ -372,12 +363,12 @@ export async function receiptOfOwner(
         ...(spelled && line.spelled && known === null ? { spelled: true } : {}),
         ...(packed === null ? {} : { pack: packed }),
         amount: amounts[i] ?? null,
-        // one confused digit off the price read (В-1), unless the total proving the receipt points at this line — there a
-        // price off the memory's is one that changed (MOL-314); or the line has none — the check emptied it, the memory
-        // doubting it among others (MOL-291, owner's В-2 «б»): a hint to type by, never a figure of the line
+        // one confused digit off the price read (В-1), unless the total proving the receipt points at this line, its
+        // only one — there a price off the memory's is one that changed (MOL-314); or the line has none — the check
+        // emptied it, the memory doubting it among others (MOL-291, owner's В-2 «б»): a hint to type by, never a figure
         rememberedPrice:
           line.price === null ||
-          (!pointedAt(i) && priceInDoubt(receipt.country, line.price, rememberedOf(remembered)))
+          (!pointedAt && priceInDoubt(receipt.country, line.price, rememberedOf(remembered)))
             ? rememberedOf(remembered)
             : null,
         ...(code === null ? {} : { code }),

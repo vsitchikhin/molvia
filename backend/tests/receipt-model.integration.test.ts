@@ -788,7 +788,7 @@ describe('the shop’s memory in the digits (MOL-291)', () => {
     expect(await reviewed([])).toEqual({ balanced: false, price: null, hint: amd(550) })
   }, 30_000)
 
-  // MOL-314, owner's В-2 «б» (adversarial А1): the faded font copied both ways, +100 and −100, under a total two places
+  // MOL-314, owner's В-4 «а» (adversarial А1): the faded font copied both ways, +100 and −100, under a total two places
   // print — the receipt proven whole, every line as copied, and the total says nothing of which price is right
   it('hints both old prices over two lines copied the opposite ways under a total they meet', async () => {
     const item = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
