@@ -720,8 +720,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   window's `resize`, which a media query switching as the phone turns comes with. **Never on the block's own
   attributes** (Ж3): `docked` as it moves into the footer, read again, let a rule hiding the button in the
   footer alone let the footer go, take it back and so on, a microtask each turn, for ever. **The price,
-  named:** such a rule leaves the footer held with its button out of sight — the rule's word; and a container
-  query or a class on an ancestor outside the block is not read until the block or the styles next change. **The sheet's own footer sees no
+  named:** such a rule leaves the footer held or let go by turns, at each resize or change of the styles — held,
+  its button is out of sight in it; let go, the button stands in the content — one turn an event, never a loop
+  (on Android every keyboard is a resize); and a container query, a class on an ancestor outside the block, a
+  `<link>` loaded later or a `media` of a stylesheet changed is not read until the block or the styles next
+  change. **The sheet's own footer sees no
   strip** (`WithoutStateStrip`, Б): a state drawn there held the footer it stands in, took the footer's
   slot down with itself, let go and held it again — a loop Vue stops in development and a built app
   never does; there it keeps its buttons, as before. A section's error (`inline`) in a sheet stays the
