@@ -699,9 +699,36 @@ The detail behind the frontend lines of `CLAUDE.md`.
   draws neither the screen's `#docked` nor «Вышла новая версия» — the error offers «Обновить»
   itself (8c) — and keeps only the words of a version that did not take, which offer nothing. Top
   down: «Обновить» (a version waits), «Повторить», the screen's `#action`, «Сообщить»; the first is
-  large, as every strip's main action. The first error to ask holds it; a sheet closes the strip
-  (`closeStateStrip`) and the login has one with no place, so there the buttons stay at the bottom
-  of the block, and the login hides its own row of the version while the error offers it. **A
+  large, as every strip's main action. The first error to ask holds it; the login has one with no
+  place, so there the buttons stay at the bottom of the block, and the login hides its own row of the
+  version while the error offers it. **A sheet's strip is its footer** (MOL-211, Ф-17, owner's В-1 «а»):
+  `BottomSheet` provides one of its own, so the screen's strip under it stays the screen's, and a
+  full state in the sheet carries its buttons into the pinned footer — drawn for it where the sheet has
+  none, the sheet's own footer stepping aside while it is held, as `#docked` does. Before, the scanner's
+  refusals stood their buttons in the scrolling content, 44 and with no hairline, under the one sheet
+  whose answer is a state. **There any full state with buttons of its own holds it, «attention»
+  included** — «Нет доступа к камере» and «Проверить снова» — where a screen's strip is an error's
+  alone: a notice of a screen beside the screen's own action is not its answer. **Whether it has buttons
+  is a button shown in its block of actions, read as that block's DOM changes** (a `MutationObserver`, in a
+  sheet only) — never once, never by the slot, never by an element drawn, never by the block's renders: a
+  button come later or gone with the kind unchanged held the footer only from the next change of kind
+  (adversarial А1, А2); a slot given whose button stands under its own `v-if`, a wrapper with no button in
+  it and a button under `v-show` held an empty footer pinned over the sheet's own «Сохранить» (round 2, А3;
+  round 3, Г); and a component in the slot that redraws itself left the block unread (round 3, Д). **And as the
+  styles change** (round 4, Ж1, Ж2): «shown» is computed from them, and a rule that starts or stops hiding a
+  button changes nothing in the block — read again as a stylesheet comes or goes in `<head>` and on the
+  window's `resize`, which a media query switching as the phone turns comes with. **Never on the block's own
+  attributes** (Ж3): `docked` as it moves into the footer, read again, let a rule hiding the button in the
+  footer alone let the footer go, take it back and so on, a microtask each turn, for ever. **The price,
+  named:** such a rule leaves the footer held or let go by turns, at each resize or change of the styles — held,
+  its button is out of sight in it; let go, the button stands in the content — one turn an event, never a loop
+  (on Android every keyboard is a resize); and a container query, a class on an ancestor outside the block, a
+  `<link>` loaded later or a `media` of a stylesheet changed is not read until the block or the styles next
+  change. **The sheet's own footer sees no
+  strip** (`WithoutStateStrip`, Б): a state drawn there held the footer it stands in, took the footer's
+  slot down with itself, let go and held it again — a loop Vue stops in development and a built app
+  never does; there it keeps its buttons, as before. A section's error (`inline`) in a sheet stays the
+  quiet card in the content, as on a screen. **A
   section's error is the quiet card** (К-13): `inline` makes the block an `AppCard` with a ghost
   «Повторить» the width of its word and no «Обновить» — the strip's row offers it while the screen
   works. **The choice of kind is the screen's: where its strip does work with the server down —

@@ -1,7 +1,18 @@
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, nextTick, ref, shallowRef, watch, type VNodeArrayChildren } from 'vue'
+import {
+  defineComponent,
+  h,
+  nextTick,
+  ref,
+  shallowRef,
+  vShow,
+  watch,
+  withDirectives,
+  type VNode,
+  type VNodeArrayChildren,
+} from 'vue'
 import IconPlus from '~icons/mdi/plus'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconAttention from '~icons/mdi/alert-outline'
@@ -12,7 +23,7 @@ import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import ScreenState from '@/components/ScreenState.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
-import { closeStateStrip, provideStateStrip, type StateStrip } from '@/composables/useStateStrip'
+import { provideStateStrip, type StateStrip } from '@/composables/useStateStrip'
 import type * as Api from '@/api'
 import { pwaUpdateKey, type UpdatePhase } from '@/pwaUpdate'
 import { useActorStore } from '@/stores/actor'
@@ -644,15 +655,34 @@ describe('ScreenState', () => {
     })
   })
 
-  // A strip of the screen around, as `AppScreen` gives one (MOL-180, К-1).
+  // A strip of the screen around, as `AppScreen` gives one (MOL-180, К-1), and a sheet's, as
+  // `BottomSheet` gives its footer (MOL-211).
   describe('the strip of the screen around', () => {
-    function inside(options: { sheet?: boolean; target?: boolean; flow?: boolean } = {}) {
+    interface Inside {
+      sheet?: boolean
+      target?: boolean
+      flow?: boolean
+      inline?: boolean
+      kind?: 'error' | 'attention'
+      action?: boolean
+      /** The `#action` slot as a screen writes it, in place of the plain button of `action`. */
+      slot?: () => VNode | null
+    }
+
+    function inside(options: Inside = {}) {
       let strip: StateStrip | undefined
+      let sheetStrip: StateStrip | undefined
       const target = shallowRef<HTMLElement | null>(null)
+      const footer = shallowRef<HTMLElement | null>(null)
+      const kind = ref(options.kind ?? 'error')
       const Sheet = defineComponent({
         setup: (_, { slots }) => {
-          closeStateStrip()
-          return () => h('div', { class: 'sheet' }, slots.default?.())
+          sheetStrip = provideStateStrip(footer, { sheet: true })
+          return () =>
+            h('div', { class: 'sheet' }, [
+              h('div', { class: 'content' }, slots.default?.()),
+              h('div', { class: 'footer', ref: (el) => (footer.value = el as HTMLElement) }),
+            ])
         },
       })
       const view = mount(
@@ -660,11 +690,20 @@ describe('ScreenState', () => {
           setup: () => {
             strip = provideStateStrip(options.target ? target : undefined)
             return () => {
-              const state = h(ScreenState, {
-                kind: 'error',
-                title: 'Broke',
-                flow: options.flow,
-              } as never)
+              const state = h(
+                ScreenState,
+                {
+                  kind: kind.value,
+                  title: 'Broke',
+                  flow: options.flow,
+                  inline: options.inline,
+                } as never,
+                options.slot
+                  ? { action: options.slot }
+                  : options.action
+                    ? { action: () => h('button', 'Type it in') }
+                    : undefined,
+              )
               return h('div', [
                 options.sheet ? h(Sheet, () => state) : state,
                 h('div', { class: 'strip', ref: (el) => (target.value = el as HTMLElement) }),
@@ -674,7 +713,17 @@ describe('ScreenState', () => {
         }),
         { attachTo: document.body, global: { plugins: [createAppI18n('en')] } },
       )
-      return { view, held: () => strip?.held.value }
+      return {
+        view,
+        kind,
+        held: () => strip?.held.value,
+        sheetHeld: () => sheetStrip?.held.value,
+        words: (selector: string) =>
+          view
+            .get(selector)
+            .findAll('.action button')
+            .map((button) => button.text()),
+      }
     }
 
     afterEach(() => {
@@ -701,7 +750,6 @@ describe('ScreenState', () => {
       const { view, held } = inside({ sheet: true, target: true })
       await nextTick()
       expect(held()).toBe(false)
-      expect(view.get('.sheet').find('.action').text()).toBe(en.state.retry)
       expect(view.get('.strip').find('.action').exists()).toBe(false)
     })
 
@@ -711,6 +759,196 @@ describe('ScreenState', () => {
       expect(held()).toBe(false)
       expect(view.get('.state').find('.action').text()).toBe(en.state.retry)
       expect(view.get('.strip').find('.action').exists()).toBe(false)
+    })
+
+    // A notice of the screen beside the screen's own action is not its answer (MOL-180).
+    it('must not take it for «attention», whatever buttons it brings', async () => {
+      const { view, held } = inside({ target: true, kind: 'attention', action: true })
+      await nextTick()
+      expect(held()).toBe(false)
+      expect(view.get('.state').find('.action').text()).toBe('Type it in')
+    })
+
+    describe('in a sheet, whose strip is its footer (MOL-211)', () => {
+      it('draws an error’s buttons in the footer, «Повторить» first and large', async () => {
+        const { view, sheetHeld, words } = inside({ sheet: true, target: true, action: true })
+        await nextTick()
+        expect(sheetHeld()).toBe(true)
+        expect(words('.footer')).toEqual([en.state.retry, 'Type it in'])
+        expect(view.get('.footer button').classes()).toContain('large')
+        expect(view.get('.content').find('.action').exists()).toBe(false)
+      })
+
+      it('takes «attention» with buttons of its own there too', async () => {
+        const { view, sheetHeld, words } = inside({ sheet: true, kind: 'attention', action: true })
+        await nextTick()
+        expect(sheetHeld()).toBe(true)
+        expect(words('.footer')).toEqual(['Type it in'])
+        expect(view.get('.content').find('.action').exists()).toBe(false)
+      })
+
+      it('must not take it for «attention» with no buttons: nothing to put there', async () => {
+        const { view, sheetHeld } = inside({ sheet: true, kind: 'attention' })
+        await nextTick()
+        expect(sheetHeld()).toBe(false)
+        expect(view.find('.action').exists()).toBe(false)
+      })
+
+      it('must not take it for a section’s error: the quiet card keeps its «Повторить»', async () => {
+        const { view, sheetHeld, words } = inside({ sheet: true, inline: true })
+        await nextTick()
+        expect(sheetHeld()).toBe(false)
+        expect(words('.content')).toEqual([en.state.retry])
+        expect(view.get('.footer').find('.action').exists()).toBe(false)
+      })
+
+      // The scanner's block turns from one refusal to another where it stands.
+      it('keeps the footer as the block turns from «attention» to an error and back', async () => {
+        const { kind, sheetHeld, words } = inside({ sheet: true, kind: 'attention', action: true })
+        await nextTick()
+        kind.value = 'error'
+        await nextTick()
+        expect(sheetHeld()).toBe(true)
+        expect(words('.footer')).toEqual([en.state.retry, 'Type it in'])
+        kind.value = 'attention'
+        await nextTick()
+        expect(sheetHeld()).toBe(true)
+        expect(words('.footer')).toEqual(['Type it in'])
+      })
+
+      // A button shown, read off the DOM as it changes (round 3 of the adversarial review, Г and Д).
+      describe('holds it only for a button shown, whoever draws it', () => {
+        const shown = ref(false)
+        // The MutationObserver answers after the DOM changed: a task, past the ticks.
+        async function settled(): Promise<void> {
+          await nextTick()
+          await new Promise((resolve) => setTimeout(resolve, 0))
+          await nextTick()
+        }
+        beforeEach(() => {
+          shown.value = false
+        })
+
+        it('must not take it for a wrapper whose button is not drawn (Г1)', async () => {
+          const slot = () =>
+            h('div', { class: 'wrap' }, shown.value ? [h('button', 'Type it in')] : [])
+          const { sheetHeld, words } = inside({ sheet: true, kind: 'attention', slot })
+          await settled()
+          expect(sheetHeld()).toBe(false)
+          shown.value = true
+          await settled()
+          expect(sheetHeld()).toBe(true)
+          expect(words('.footer')).toEqual(['Type it in'])
+        })
+
+        it('must not take it for a button hidden by `v-show` (Г2)', async () => {
+          const slot = () => withDirectives(h('button', 'Type it in'), [[vShow, shown.value]])
+          const { sheetHeld } = inside({ sheet: true, kind: 'attention', slot })
+          await settled()
+          expect(sheetHeld()).toBe(false)
+          shown.value = true
+          await settled()
+          expect(sheetHeld()).toBe(true)
+          shown.value = false
+          await settled()
+          expect(sheetHeld()).toBe(false)
+        })
+
+        // A rule of the stylesheet that starts or stops hiding the button, the block untouched (round 4).
+        describe('as the styles change', () => {
+          const upright = () => h('button', { class: 'upright' }, 'Type it in')
+          function rule(text: string): HTMLStyleElement {
+            const style = document.createElement('style')
+            style.className = 'turned'
+            style.textContent = text
+            document.head.append(style)
+            return style
+          }
+          afterEach(() => {
+            document.head.querySelectorAll('style.turned').forEach((style) => {
+              style.remove()
+            })
+          })
+
+          it('lets the footer go once a stylesheet hides the button (Ж1)', async () => {
+            const { sheetHeld } = inside({ sheet: true, kind: 'attention', slot: upright })
+            await settled()
+            expect(sheetHeld()).toBe(true)
+            rule('.upright { display: none; }')
+            await settled()
+            expect(sheetHeld()).toBe(false)
+          })
+
+          it('takes it once the stylesheet that hid the button goes (Ж2)', async () => {
+            const style = rule('.upright { display: none; }')
+            const { sheetHeld } = inside({ sheet: true, kind: 'attention', slot: upright })
+            await settled()
+            expect(sheetHeld()).toBe(false)
+            style.remove()
+            await settled()
+            expect(sheetHeld()).toBe(true)
+          })
+
+          // A media query switches with no node of the page changing: read on the window's resize.
+          it('reads it again as the window is resized', async () => {
+            const style = rule('')
+            const { sheetHeld } = inside({ sheet: true, kind: 'attention', slot: upright })
+            await settled()
+            expect(sheetHeld()).toBe(true)
+            style.sheet?.insertRule('.upright { display: none; }')
+            window.dispatchEvent(new Event('resize'))
+            await settled()
+            expect(sheetHeld()).toBe(false)
+          })
+
+          // Hidden in the footer alone: read again on its own move, it let the footer go, took it
+          // back, and so on for ever (Ж3). It stays held, the button out of sight — the rule's word.
+          it('must not take and let go without end for a rule that hides it in the footer alone (Ж3)', async () => {
+            const style = rule('.footer .upright { display: none; }')
+            // A brake: a loop of the observer's microtasks starves every timer, the test's own included.
+            const computed = window.getComputedStyle.bind(window)
+            const reads = vi
+              .spyOn(window, 'getComputedStyle')
+              .mockImplementation((element, pseudo) => {
+                if (reads.mock.calls.length === 200) style.remove()
+                return computed(element, pseudo)
+              })
+            const { sheetHeld } = inside({ sheet: true, kind: 'attention', slot: upright })
+            await settled()
+            await settled()
+            expect(reads.mock.calls.length).toBeLessThan(20)
+            expect(sheetHeld()).toBe(true)
+          })
+        })
+
+        // The component redraws itself, the block not at all.
+        it('follows a component of the slot that draws its button by itself (Д1, Д2)', async () => {
+          const OwnButton = defineComponent({
+            setup: () => () => (shown.value ? h('button', 'Type it in') : null),
+          })
+          const { sheetHeld, words } = inside({
+            sheet: true,
+            kind: 'attention',
+            slot: () => h(OwnButton),
+          })
+          await settled()
+          expect(sheetHeld()).toBe(false)
+          shown.value = true
+          await settled()
+          expect(sheetHeld()).toBe(true)
+          expect(words('.footer')).toEqual(['Type it in'])
+          shown.value = false
+          await settled()
+          expect(sheetHeld()).toBe(false)
+        })
+      })
+
+      it('lets the footer go with the block', async () => {
+        const { view, sheetHeld } = inside({ sheet: true, action: true })
+        await nextTick()
+        view.unmount()
+        expect(sheetHeld()).toBe(false)
+      })
     })
   })
 

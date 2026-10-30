@@ -1,5 +1,6 @@
 import {
   computed,
+  defineComponent,
   inject,
   provide,
   shallowRef,
@@ -19,11 +20,18 @@ import {
  * The buttons stay the error's own — its `retry`, its `#action`, its «Сообщить о проблеме» — and
  * are only drawn in the strip, by a `Teleport` into `target`. A host with no target (the login,
  * which has no strip) leaves them where the error stands and only learns that it is held.
+ *
+ * A sheet's footer is its strip (MOL-211, Ф-17): the action of a refusal under the thumb, pinned with
+ * the sheet's hairline and shadow, as every sheet's main action is. There any full state with buttons
+ * of its own holds it — the scanner's «Нет доступа к камере» and «Проверить снова» — where a screen's
+ * strip is an error's alone: a screen's notice beside its own action is not the screen's answer.
  */
 export interface StateStrip {
   /** Where the holder's buttons go; `null` while there is none, or for a host without a strip. */
   target: Readonly<Ref<HTMLElement | null>>
-  /** An error of the whole screen holds it. */
+  /** A sheet's footer: a full state with buttons of its own holds it as an error does. */
+  sheet: boolean
+  /** An error of the whole screen holds it — in a sheet, any full state with buttons of its own. */
   held: ComputedRef<boolean>
   /** Taken by the first error to ask, and by the next once that one lets go: one «Повторить». */
   claim: (owner: symbol) => void
@@ -43,11 +51,13 @@ const stateStripKey: InjectionKey<StateStrip | null> = Symbol('state-strip')
 
 export function provideStateStrip(
   target: Readonly<Ref<HTMLElement | null>> = shallowRef(null),
+  { sheet = false }: { sheet?: boolean } = {},
 ): StateStrip {
   const owner = shallowRef<symbol | null>(null)
   const offers = shallowRef<readonly symbol[]>([])
   const strip: StateStrip = {
     target,
+    sheet,
     held: computed(() => owner.value !== null),
     claim: (me) => {
       owner.value ??= me
@@ -69,14 +79,19 @@ export function provideStateStrip(
 }
 
 /**
- * A sheet is no strip's: an error in it keeps its buttons in the sheet, and the strip under the
- * sheet — inert while it is open — stays the screen's.
+ * What it wraps sees no strip: the sheet's own footer (MOL-211, adversarial Б). A state there holding the
+ * footer it stands in took the footer's slot down with itself, let go, came back and held it again — a
+ * loop Vue stops in development and a built app never does. There it keeps its buttons, as before.
  */
-export function closeStateStrip(): void {
-  provide(stateStripKey, null)
-}
+export const WithoutStateStrip = defineComponent({
+  name: 'WithoutStateStrip',
+  setup(_, { slots }) {
+    provide(stateStripKey, null)
+    return () => slots.default?.()
+  },
+})
 
-/** The strip of the screen around, or nothing — a sheet, the kit, a block on its own. */
+/** The strip of the screen or the sheet around, or nothing — the kit, a block on its own. */
 export function useStateStrip(): StateStrip | null {
   return inject(stateStripKey, null)
 }

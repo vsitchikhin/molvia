@@ -19,7 +19,8 @@
       <slot />
     </div>
     <!-- A screen-wide error draws its buttons in the screen's strip, where every screen has its
-         main action (К-1, Ф-15); anywhere else — the login, a sheet — at the bottom of its own. -->
+         main action (К-1, Ф-15), and a sheet's full state in the sheet's footer (MOL-211); the login
+         at the bottom of its own. -->
     <Teleport
       v-if="kind === 'error' || $slots.action"
       :to="dockTarget"
@@ -164,7 +165,8 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
  * Ф-15): «Повторить» stood at the bottom of the free height — on each screen at its own — and over
  * a strip with a live action it was a second filled button. The strip is then the error's alone:
  * the screen's own action and «Вышла новая версия» step aside, so «Обновить» is offered once (8c).
- * The login and a sheet have no strip, and keep them at the bottom of the block.
+ * The login has no strip, and keeps them at the bottom of the block. A sheet's strip is its footer
+ * (MOL-211): there any full state with an action of its own holds it as well — the scanner's refusals.
  *
  * Last, quieter than both, «Сообщить о проблеме» (MOL-147, Р-5): the sheet «Написать разработчику»
  * on «Сломалось», with the code of the API's last refusal before the error was shown (В-1). Only where the screen as a
@@ -221,9 +223,61 @@ export default defineComponent({
     // stops being one; the first to ask holds it, and the next takes it once that one lets go.
     const strip = useStateStrip()
     const me = Symbol('screen-state')
+    // In a sheet a state with buttons of its own holds the footer too — the scanner's «Нет доступа к
+    // камере» (MOL-211). Whether it has any is read off its block of actions: a button there that is shown.
+    // Not off the slot, which is no reactive source — a button come later or gone with the kind unchanged
+    // held the footer only from the next change of kind (adversarial А1, А2) — nor off an element drawn: a
+    // wrapper whose button stands under its `v-if`, or a button under `v-show`, held an empty footer over
+    // the sheet's «Сохранить» (round 2, А3; round 3, Г). And as the block's DOM changes, not as the block
+    // renders: a component in the slot redraws itself without it (round 3, Д) — and as the styles do.
+    // Watched in a sheet only.
+    const acting = ref(false)
+    function measureActing(): void {
+      const block = actions.value
+      acting.value = [...(block?.querySelectorAll('button') ?? [])].some((button) => {
+        for (let node: Element | null = button; node && node !== block; node = node.parentElement) {
+          // `hidden` and a class that hides are a `display: none` too, as the browser computes it.
+          if (getComputedStyle(node).display === 'none') return false
+        }
+        return true
+      })
+    }
+    watch(
+      actions,
+      (block, _, onCleanup) => {
+        measureActing()
+        if (!block || strip?.sheet !== true) return
+        // The block's own attributes are ours — `docked` as it moves into the footer — and read again on
+        // them a rule hiding the button in the footer alone let the footer go, took it back, and so on
+        // for ever (round 4, Ж3). What the slot drew under it is read on every change.
+        const observer = new MutationObserver((records) => {
+          if (records.some((record) => record.type !== 'attributes' || record.target !== block)) {
+            measureActing()
+          }
+        })
+        observer.observe(block, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['style', 'hidden', 'class'],
+        })
+        // A rule that starts or stops hiding a button changes nothing in the block: a stylesheet come or
+        // gone, a media query as the phone turns (round 4, Ж1, Ж2).
+        const styles = new MutationObserver(measureActing)
+        styles.observe(document.head, { childList: true, subtree: true, characterData: true })
+        window.addEventListener('resize', measureActing)
+        onCleanup(() => {
+          observer.disconnect()
+          styles.disconnect()
+          window.removeEventListener('resize', measureActing)
+        })
+      },
+      { flush: 'post' },
+    )
     watchEffect(() => {
       if (!strip) return
-      if (props.kind === 'error' && !props.inline && !props.flow) strip.claim(me)
+      const holds = props.kind === 'error' || (strip.sheet && acting.value)
+      if (holds && !props.inline && !props.flow) strip.claim(me)
       else strip.release(me)
     })
     const dockTarget = computed(() => (strip?.owner.value === me ? strip.target.value : null))

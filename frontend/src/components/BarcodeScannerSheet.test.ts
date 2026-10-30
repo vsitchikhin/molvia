@@ -257,6 +257,194 @@ describe('BarcodeScannerSheet', () => {
     expect(track.stop).toHaveBeenCalled()
   })
 
+  // Ф-17: the action of a refusal under the thumb, in the sheet's pinned footer, never in what
+  // scrolls (MOL-211). Each refusal by its own way of coming about.
+  describe('the refusal’s buttons, in the pinned footer (MOL-211)', () => {
+    // The scanner's own: «Камера без вопросов» is a sheet over it (`over`), mounted beside it.
+    function footer(sheet: VueWrapper) {
+      return sheet.findAll('dialog:not(.over) > .footer button').map((found) => ({
+        text: found.text(),
+        variant: ['primary', 'secondary'].find((name) => found.classes().includes(name)),
+        large: found.classes().includes('large'),
+      }))
+    }
+
+    const manual = { text: en.scanner.manual, variant: 'secondary', large: false }
+    const typingOnly = [{ text: en.scanner.manual, variant: 'primary', large: true }]
+    const retryFirst = [{ text: en.state.retry, variant: 'primary', large: true }, manual]
+
+    it.each([
+      [
+        'no access: «Check again» the main one, the digits beside it',
+        () => getUserMedia.mockRejectedValue(named('NotAllowedError')),
+        [{ text: en.scanner.try_again, variant: 'primary', large: true }, manual],
+      ],
+      [
+        'no camera: the digits alone, the main one',
+        () => getUserMedia.mockRejectedValue(named('NotFoundError')),
+        typingOnly,
+      ],
+      [
+        'no secure context: the digits alone, the main one',
+        () => Object.defineProperty(window, 'isSecureContext', { value: false }),
+        typingOnly,
+      ],
+      [
+        'a camera that would not start: one «Try again», the main one',
+        () => getUserMedia.mockRejectedValue(named('NotReadableError')),
+        retryFirst,
+      ],
+      [
+        'a reader that failed: the same',
+        () => {
+          getUserMedia.mockResolvedValue(fakeStream().stream)
+          warmAnswer = 'fail'
+        },
+        retryFirst,
+      ],
+    ])('%s', async (_, refuse, buttons) => {
+      refuse()
+      const sheet = await render()
+      expect(footer(sheet)).toEqual(buttons)
+      expect(sheet.find('.panel .action').exists()).toBe(false)
+      expect(sheet.get('dialog:not(.over)').classes()).toContain('pinned')
+    })
+
+    // Self-review №2: the button the focus was on goes with the refusal it stood in.
+    describe('the focus, as a refusal turns where it stands', () => {
+      const focusedText = () => document.activeElement?.textContent.trim()
+
+      it('goes to «Type it in» once «Check again» brings the viewfinder', async () => {
+        getUserMedia.mockRejectedValueOnce(named('NotAllowedError'))
+        getUserMedia.mockResolvedValueOnce(fakeStream().stream)
+        const sheet = await render()
+        const again = button(sheet, en.scanner.try_again)
+        ;(again.element as HTMLElement).focus()
+        await again.trigger('click')
+        await settle()
+        expect(sheet.find('video').exists()).toBe(true)
+        expect(focusedText()).toBe(en.scanner.manual)
+      })
+
+      it('goes to the first button of the refusal that came in its place', async () => {
+        getUserMedia.mockRejectedValueOnce(named('NotAllowedError'))
+        getUserMedia.mockRejectedValueOnce(named('NotReadableError'))
+        const sheet = await render()
+        const again = button(sheet, en.scanner.try_again)
+        ;(again.element as HTMLElement).focus()
+        await again.trigger('click')
+        await settle()
+        expect(heading(sheet)).toBe(en.scanner.error_title)
+        expect(focusedText()).toBe(en.state.retry)
+      })
+
+      // Round 2, №5: never the viewfinder's footer of a start still on its way.
+      it('waits for the start to end, never stopping on the footer of the viewfinder starting', async () => {
+        let refuse: (error: Error) => void = () => undefined
+        getUserMedia.mockRejectedValueOnce(named('NotAllowedError'))
+        getUserMedia.mockImplementationOnce(
+          () => new Promise<MediaStream>((_, reject) => (refuse = reject)),
+        )
+        const sheet = await render()
+        const again = button(sheet, en.scanner.try_again)
+        ;(again.element as HTMLElement).focus()
+        await again.trigger('click')
+        await settle()
+        expect(focusedText()).not.toBe(en.scanner.manual)
+        refuse(named('NotAllowedError'))
+        await settle()
+        expect(heading(sheet)).toBe(en.scanner.denied_title)
+        expect(focusedText()).toBe(en.scanner.try_again)
+      })
+
+      it('must not move a focus the person put in the sheet while the camera started', async () => {
+        let give: (stream: MediaStream) => void = () => undefined
+        getUserMedia.mockRejectedValueOnce(named('NotAllowedError'))
+        getUserMedia.mockImplementationOnce(
+          () => new Promise<MediaStream>((resolve) => (give = resolve)),
+        )
+        const sheet = await render()
+        const again = button(sheet, en.scanner.try_again)
+        ;(again.element as HTMLElement).focus()
+        await again.trigger('click')
+        await settle()
+        const close = sheet.get(`dialog:not(.over) button[aria-label="${en.sheet.close}"]`)
+        ;(close.element as HTMLElement).focus()
+        give(fakeStream().stream)
+        await settle()
+        expect(sheet.find('video').exists()).toBe(true)
+        expect(document.activeElement).toBe(close.element)
+      })
+
+      // Round 2, В: «Scan» of the digits goes with their footer as «Check again» goes with a refusal's.
+      it('follows «Scan» from the digits to the viewfinder, or to the refusal that comes', async () => {
+        getUserMedia.mockRejectedValueOnce(named('NotAllowedError'))
+        getUserMedia.mockResolvedValueOnce(fakeStream().stream)
+        getUserMedia.mockRejectedValueOnce(named('NotAllowedError'))
+        const sheet = await render()
+        await button(sheet, en.scanner.manual).trigger('click')
+        await settle()
+        let scan = button(sheet, en.scanner.scan)
+        ;(scan.element as HTMLElement).focus()
+        await scan.trigger('click')
+        await settle()
+        expect(sheet.find('video').exists()).toBe(true)
+        expect(focusedText()).toBe(en.scanner.manual)
+
+        await button(sheet, en.scanner.manual).trigger('click')
+        await settle()
+        scan = button(sheet, en.scanner.scan)
+        ;(scan.element as HTMLElement).focus()
+        await scan.trigger('click')
+        await settle()
+        expect(heading(sheet)).toBe(en.scanner.denied_title)
+        expect(focusedText()).toBe(en.scanner.try_again)
+      })
+
+      it('forgets what it followed once the sheet is put away', async () => {
+        let give: (stream: MediaStream) => void = () => undefined
+        getUserMedia.mockRejectedValueOnce(named('NotAllowedError'))
+        getUserMedia.mockImplementationOnce(
+          () => new Promise<MediaStream>((resolve) => (give = resolve)),
+        )
+        getUserMedia.mockResolvedValueOnce(fakeStream().stream)
+        const sheet = await render()
+        const again = button(sheet, en.scanner.try_again)
+        ;(again.element as HTMLElement).focus()
+        await again.trigger('click')
+        await settle()
+        await sheet.setProps({ open: false })
+        give(fakeStream().stream)
+        await settle()
+        await sheet.setProps({ open: true })
+        await settle()
+        expect(sheet.find('video').exists()).toBe(true)
+        expect(focusedText()).not.toBe(en.scanner.manual)
+      })
+
+      it('must not move a focus the person put elsewhere in the sheet', async () => {
+        getUserMedia.mockRejectedValueOnce(named('NotAllowedError'))
+        getUserMedia.mockResolvedValueOnce(fakeStream().stream)
+        const sheet = await render()
+        const close = sheet.get(`dialog:not(.over) button[aria-label="${en.sheet.close}"]`)
+        ;(close.element as HTMLElement).focus()
+        await button(sheet, en.scanner.try_again).trigger('click')
+        await settle()
+        expect(document.activeElement).toBe(close.element)
+      })
+    })
+
+    it('gives the footer back to the viewfinder once the camera is allowed', async () => {
+      getUserMedia.mockRejectedValueOnce(named('NotAllowedError'))
+      getUserMedia.mockResolvedValueOnce(fakeStream().stream)
+      const sheet = await render()
+      await button(sheet, en.scanner.try_again).trigger('click')
+      await settle()
+      expect(sheet.find('video').exists()).toBe(true)
+      expect(footer(sheet).map((found) => found.text)).toEqual([en.scanner.manual])
+    })
+  })
+
   it('starts a failed reader over on «Scan» from the digits, rather than land on its error', async () => {
     getUserMedia.mockResolvedValue(fakeStream().stream)
     warmAnswer = 'fail'
@@ -422,6 +610,8 @@ describe('BarcodeScannerSheet', () => {
 
     await sheet.setProps({ open: false })
     expect(heading(sheet)).toBe(en.scanner.denied_title)
+    // Its buttons slide down with it, in the footer they stood in (MOL-211).
+    expect(sheet.get('dialog:not(.over) > .footer').text()).toContain(en.scanner.try_again)
 
     window.dispatchEvent(new PopStateEvent('popstate'))
     await settle()

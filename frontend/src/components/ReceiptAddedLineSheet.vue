@@ -211,6 +211,7 @@ export default defineComponent({
 
   &.bad {
     border-color: var(--bad);
+    box-shadow: inset 0 0 0 var(--hairline) var(--bad);
   }
 
   &:focus-visible {

@@ -67,13 +67,16 @@
       :body="t(REFUSALS[refusal].body)"
       @retry="retry"
     >
+      <!-- In the sheet's pinned footer, which the state holds (MOL-211): the main action 52, as every
+           sheet's — «Проверить снова», or the digits where the camera will not come. -->
       <template #action>
-        <AppButton v-if="refusal === 'denied'" block @click="retry">
+        <AppButton v-if="refusal === 'denied'" size="large" block @click="retry">
           {{ t('scanner.try_again') }}
         </AppButton>
         <AppButton
           block
-          :variant="refusal === 'insecure' || refusal === 'none' ? 'primary' : 'secondary'"
+          :variant="cameraGone ? 'primary' : 'secondary'"
+          :size="cameraGone ? 'large' : 'regular'"
           @click="toTyping"
         >
           <template #icon><IconKeyboard /></template>
@@ -94,7 +97,7 @@
         <AppButton v-if="hint.offer.value" variant="ghost" block @click="hint.show">
           {{ t('scanner.camera_hint_offer') }}
         </AppButton>
-        <AppButton variant="secondary" block @click="toTyping">
+        <AppButton ref="manual" variant="secondary" block @click="toTyping">
           <template #icon><IconKeyboard /></template>
           {{ t('scanner.manual') }}
         </AppButton>
@@ -112,7 +115,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, nextTick, ref, watch } from 'vue'
-import type { PropType } from 'vue'
+import type { ComponentPublicInstance, PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { typedBarcode, type ErrorCode } from '@molvia/model'
 import IconScan from '~icons/mdi/barcode-scan'
@@ -237,6 +240,8 @@ export default defineComponent({
       { immediate: true },
     )
     const refusal = computed(() => (props.open ? current.value : shownRefusal.value))
+    // No camera to come back to: the digits are the one way on.
+    const cameraGone = computed(() => refusal.value === 'insecure' || refusal.value === 'none')
     const viewing = computed(() => !typing.value && refusal.value === null)
 
     watch(camera.kind, (kind) => {
@@ -295,6 +300,8 @@ export default defineComponent({
     }
 
     function toCamera(): void {
+      // «Сканировать» goes with the digits' footer: the focus on it follows the camera (round 2, В).
+      if (footerHoldsFocus()) following = true
       typing.value = false
       void startCamera()
     }
@@ -343,6 +350,52 @@ export default defineComponent({
       })
     }
 
+    // The focus on a button of the footer goes with it when the camera turns — «Проверить снова» or
+    // «Повторить» of a refusal, «Сканировать» of the digits (self-review №2, round 2 В) — and fell to the
+    // page. It follows where the camera settles: the first button of a refusal, «Ввести вручную» over a
+    // live viewfinder. Never the footer of a start still on its way (round 2, №5): a reader would hear
+    // «Ввести вручную» of a viewfinder gone the next moment. Only a focus that was in the footer, and never
+    // one the person put somewhere in the sheet meanwhile.
+    const manual = ref<ComponentPublicInstance | null>(null)
+    let following = false
+    function footerHoldsFocus(): boolean {
+      const footer = sheet.value?.$el.querySelector(':scope > .footer')
+      return Boolean(footer?.contains(document.activeElement))
+    }
+    watch(
+      refusal,
+      () => {
+        if (props.open && footerHoldsFocus()) following = true
+      },
+      { flush: 'pre' },
+    )
+    // Where the camera stands: a refusal, the live viewfinder, or nowhere yet while it starts.
+    const settled = computed(() => refusal.value ?? (camera.kind.value === 'live' ? 'live' : null))
+    watch([settled, () => props.open], () => {
+      if (!following) return
+      // Put away meanwhile: an opening later is another one, with nothing to follow.
+      if (!props.open) {
+        following = false
+        return
+      }
+      if (settled.value === null) return
+      following = false
+      // The state's buttons come into the footer by a deferred `Teleport`, a tick after the render.
+      void nextTick()
+        .then(() => nextTick())
+        .then(() => {
+          const dialog = sheet.value?.$el
+          const now = document.activeElement
+          if (!props.open || !dialog) return
+          if (now !== dialog && dialog.contains(now)) return
+          const into: unknown =
+            settled.value === 'live'
+              ? manual.value?.$el
+              : dialog.querySelector(':scope > .footer button')
+          if (into instanceof HTMLElement) into.focus()
+        })
+    })
+
     return {
       t,
       REFUSALS,
@@ -359,6 +412,8 @@ export default defineComponent({
       typedError,
       viewing,
       refusal,
+      cameraGone,
+      manual,
       kind: camera.kind,
       torch: camera.torch,
       setTorch: camera.setTorch,
@@ -427,10 +482,32 @@ export default defineComponent({
   text-align: center;
 }
 
-.torch {
+/* Off a ring, on a fill (Ф-5, MOL-211 В-2): in the viewfinder's own colours, dark in both schemes. In the
+   page's — `surface-2` off, the ink on — the light scheme drew two near-white circles, told apart by the
+   glyph alone. Under the pointer it keeps its fill: a change there would read as the switch. */
+.viewfinder .torch {
   position: absolute;
   top: var(--space-3);
   right: var(--space-3);
+  background: var(--viewfinder-dim);
+  box-shadow: inset 0 0 0 2px var(--viewfinder-ink);
+  color: var(--viewfinder-ink);
+
+  &[aria-pressed='true'] {
+    background: var(--viewfinder-ink);
+    box-shadow: none;
+    color: var(--viewfinder-ground);
+  }
+
+  @media (hover: hover) {
+    &:not(:disabled):hover {
+      background: var(--viewfinder-dim);
+    }
+
+    &[aria-pressed='true']:not(:disabled):hover {
+      background: var(--viewfinder-ink);
+    }
+  }
 }
 
 .typed,

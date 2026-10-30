@@ -53,4 +53,4 @@ Rules: `.claude/rules/barcodes.md`. A test beside its source, or mirroring it un
 
 ## e2e
 
-- `e2e/scanner.spec.ts` — Spec in the `camera` project: the fake camera's barcode read by the worker with the app's own wasm; no permission; no camera, and the digits typed by hand.
+- `e2e/scanner.spec.ts` — Spec in the `camera` project: the fake camera's barcode read by the worker with the app's own wasm; no permission, its buttons in the sheet's pinned footer; no camera, and the digits typed by hand; the torch's ring and fill (MOL-211).

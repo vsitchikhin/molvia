@@ -2,7 +2,7 @@
   <dialog
     ref="dialog"
     class="sheet"
-    :class="{ over: back, dragging, pinned: $slots.footer && !loose }"
+    :class="{ over: back, dragging, pinned: ($slots.footer || stateHeld) && !loose }"
     :style="{ '--sheet-footer-height': `${String(footerHeight)}px` }"
     :aria-labelledby="titleId"
     @cancel.prevent="close()"
@@ -12,7 +12,7 @@
     @focusin="settleFooter"
     @focusout="focusLeft"
   >
-    <div class="panel" :class="{ footed: $slots.footer }">
+    <div class="panel" :class="{ footed: $slots.footer || stateHeld }">
       <header class="head" :class="{ over: back }">
         <AppButton v-if="back" variant="icon" :label="t('nav.back_label')" @click="close()">
           <IconBack />
@@ -29,8 +29,11 @@
       <slot />
     </div>
 
-    <div v-if="$slots.footer" ref="footer" class="footer">
-      <slot name="footer" />
+    <!-- A full state of the sheet brings its buttons here, and its own footer steps aside for them,
+         as a screen's `#docked` does for an error in its strip (MOL-211). -->
+    <div v-if="$slots.footer || stateHeld" ref="footer" class="footer">
+      <!-- Its own content sees no strip: a state there would hold the footer it stands in. -->
+      <WithoutStateStrip v-if="!stateHeld"><slot name="footer" /></WithoutStateStrip>
     </div>
 
     <div class="region" role="status">
@@ -61,7 +64,7 @@ import { provideSheetAnnouncer } from '@/composables/useAnnouncer'
 import { useHeight } from '@/composables/useCollapsed'
 import { typedIn, useKeyboardInset } from '@/composables/useKeyboardInset'
 import { useSheetDrag } from '@/composables/useSheetDrag'
-import { closeStateStrip } from '@/composables/useStateStrip'
+import { provideStateStrip, WithoutStateStrip } from '@/composables/useStateStrip'
 import { pageAnchor, sheetOpener, useSheetHistory } from '@/composables/useSheetHistory'
 
 /** A double tap lands within this — a platform convention, not a design token. */
@@ -114,11 +117,12 @@ function lineOf(field: HTMLElement): number {
  * over the keys and `reveal` all go by the dialog's scroll, and stay as they were. What the sheet
  * brings into sight stops at the footer's top (`--sheet-footer-height` as its `scroll-padding`).
  * A footer that leaves no room for a line of the field typed in — over the keys of a turned phone —
- * is not pinned (`loose`).
+ * is not pinned (`loose`). A full state of the sheet — the scanner's refusal of the camera — draws its
+ * buttons in the footer, which it then holds alone (MOL-211, `useStateStrip`).
  */
 export default defineComponent({
   name: 'BottomSheet',
-  components: { AppButton, IconBack, IconClose },
+  components: { AppButton, IconBack, IconClose, WithoutStateStrip },
   props: {
     open: { type: Boolean, required: true },
     /**
@@ -144,10 +148,11 @@ export default defineComponent({
   },
   setup(props, { emit, expose }) {
     const { t } = useI18n()
-    // An error in the sheet keeps its buttons here: the strip under it is the screen's.
-    closeStateStrip()
     const dialog = ref<HTMLDialogElement | null>(null)
     const footer = ref<HTMLElement | null>(null)
+    // The footer is the strip of a state in the sheet (MOL-211): its buttons stand pinned under the
+    // thumb. A strip of the sheet's own, so the strip of the screen under it stays the screen's.
+    const strip = provideStateStrip(footer, { sheet: true })
     const footerBox = useHeight(footer)
     // Without its bottom padding, which the stylesheet adds to the edge itself: the keys coming up take
     // the home indicator's 34 off it in the same style change that moves the footer down. Measured
@@ -429,6 +434,7 @@ export default defineComponent({
       dialog,
       footer,
       footerHeight,
+      stateHeld: strip.held,
       loose,
       settleFooter,
       focusLeft,
