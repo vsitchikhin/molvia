@@ -122,6 +122,7 @@ function deps(world: World = {}) {
     remove: () => Promise.reject(new Error('remove was not expected')),
     unratedFor: () => Promise.reject(new Error('unratedFor was not expected')),
     pendingVerdictsFor: () => Promise.reject(new Error('pendingVerdictsFor was not expected')),
+    hasPurchases: () => Promise.reject(new Error('hasPurchases was not expected')),
     placePricesFor: (query) => {
       pricedItems.push([...query.itemIds])
       return Promise.resolve(world.prices ?? [])

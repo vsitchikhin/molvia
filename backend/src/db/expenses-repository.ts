@@ -76,6 +76,12 @@ export interface ExpenseRepository {
     bought?: { readonly from: Date; readonly to: Date },
   ): Promise<PendingVerdicts>
   /**
+   * Whether the person has bought any product in a record not removed, rated or not (MOL-214, С-8)
+   * — the circle a card of «Оценки» can come from at all, so an empty queue tells «Всё оценено»
+   * from «Оценивать пока нечего». A verdict given on «Что брать» without a purchase is none.
+   */
+  hasPurchases(actorId: string): Promise<boolean>
+  /**
    * «Что брать»: what each place charges, one row per place, currency and unit — the **last**
    * price paid there, not the lowest ever (MOL-166; the owner's decision of MOL-92, В-3: «цены в
    * магазинах подниматься могут, а вот спускаются редко»). Where this person bought, their own
@@ -795,6 +801,21 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
         })),
         total: rows[0]?.total ?? 0,
       }
+    },
+
+    async hasPurchases(actorId) {
+      if (idOrNull(actorId) === null) return false
+
+      const [row] = await db
+        .select({ one: sql<number>`1` })
+        .from(expenses)
+        .innerJoin(
+          trips,
+          and(eq(trips.id, expenses.tripId), eq(trips.actorId, actorId), isNull(trips.deletedAt)),
+        )
+        .innerJoin(items, and(eq(items.id, expenses.itemId), eq(items.kind, 'product')))
+        .limit(1)
+      return row !== undefined
     },
 
     async placePricesFor(query) {
