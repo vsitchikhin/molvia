@@ -1,5 +1,6 @@
 import { receiptCard } from '#model/entities/receipt-card'
-import { ocrSwapApart } from '#model/entities/receipt-text'
+import { REMEMBERED_PRICE_SWAPS } from '#model/entities/receipt-remembered'
+import { swapApart } from '#model/entities/receipt-text'
 import { divideRounded } from '#model/support/decimal'
 import { MINOR_EXPONENT, minorPerMajor } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
@@ -225,18 +226,27 @@ export function readPartly(lines: readonly ReadFigures[], total: Money | null): 
 }
 
 /**
- * The price read differs from the one the shop's memory holds for this article by one digit OCR confuses
- * in the country's tills (5↔6, 1↔4, 3↔8, 0↔9 in Armenia) — «60 60» read for «50 50» adds up either way,
- * and only the memory can tell (owner, В-1, 03.10.2026). A hint for the person, never a correction: the
+ * The price read differs from the one the shop's memory holds for this article by one digit its reader confuses
+ * in the country's tills (5↔6, 1↔4, 3↔8, 0↔9 Tesseract's in Armenia) — «60 60» read for «50 50» adds up either
+ * way, and only the memory can tell (owner, В-1, 03.10.2026). A hint for the person, never a correction: the
  * figures stay as read. A receipt the tax office gave (MOL-232) was read by nobody: no digit of it is in doubt,
- * and a price off the memory's is a price changed (owner, В-1 «а» of MOL-270).
+ * and a price off the memory's is a price changed (owner, В-1 «а» of MOL-270). One the model read is doubted by
+ * the model's pairs alone, 5↔6 (MOL-315): its 1 100 → 1 400 is a price changed — and by two of them in the figure, as
+ * MOL-290 measured it and MOL-291's doubt at reading takes it: «660» copied for 550 (adversarial А2, owner's «в»).
+ * Tesseract's own receipt (`byModel: false`) by its one digit, as before. With no reader named, either — the phone
+ * knows no reader, and so holds every hint the server sent; the server alone narrows.
  */
 export function priceInDoubt(
   country: ReceiptCountry,
   read: Money | null,
   remembered: Money | null,
+  { byModel }: { byModel?: boolean } = {},
 ): boolean {
   const reading = receiptCard(country).photo
   if (reading === null || read === null || read.currency !== remembered?.currency) return false
-  return ocrSwapApart(reading, String(read.minor), String(remembered.minor))
+  const [a, b] = [String(read.minor), String(remembered.minor)]
+  const model = swapApart(reading.modelSwaps, a, b, REMEMBERED_PRICE_SWAPS)
+  const ocr = swapApart(reading.swaps, a, b)
+  if (byModel === undefined) return model || ocr
+  return byModel ? model : ocr
 }

@@ -377,13 +377,17 @@ export async function receiptOfOwner(
         ...(spelled && line.spelled && known === null ? { spelled: true } : {}),
         ...(packed === null ? {} : { pack: packed }),
         amount: amounts[i] ?? null,
-        // one confused digit off the price read (В-1), unless the total proving the receipt points at this price, its
-        // only line's at its sum — there a price off the memory's is one that changed (MOL-314); or the line has none —
+        // its reader's confusion off the price read (В-1) — on a receipt the model read up to two 5↔6, on Tesseract's
+        // one digit of its pairs (MOL-315) — unless the total proving the receipt points at this price, its only
+        // line's at its sum — there a price off the memory's is one that changed (MOL-314); or the line has none —
         // the check emptied it, the memory doubting it among others (MOL-291, owner's В-2 «б»): a hint to type by,
         // never a figure
         rememberedPrice:
           line.price === null ||
-          (!pointedAt && priceInDoubt(receipt.country, line.price, rememberedOf(remembered)))
+          (!pointedAt &&
+            priceInDoubt(receipt.country, line.price, rememberedOf(remembered), {
+              byModel: found.byModel,
+            }))
             ? rememberedOf(remembered)
             : null,
         ...(code === null ? {} : { code }),
