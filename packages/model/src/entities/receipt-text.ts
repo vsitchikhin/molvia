@@ -1809,7 +1809,7 @@ const DAY_AND_MONTH: Readonly<Record<DateOrder, readonly [day: 1 | 2, month: 1 |
  * The day a receipt prints, read as its country's tills print it (MOL-305): a year of four digits first,
  * «2026-10-23», which one order alone reads — what the model is asked for — or the parts in the card's order, a year
  * of two digits or four last, «23-10-26», «04.10.2026», where it copied them as printed. Anything else, or no day of
- * the calendar, is none. Which order the model put a short year's parts in is not known here: the window of its sending
+ * the calendar, is none. Which order the model put a short year's parts in is not known here: the window of its arrival
  * (`receiptDateWindow`) is what refuses a day swapped with a year.
  */
 export function printedDayOf(printed: string | null, reading: PhotoReading): string | null {

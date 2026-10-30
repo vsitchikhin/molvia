@@ -652,7 +652,11 @@ export default defineComponent({
     const title = computed(() => {
       const one = detail.value
       if (!one) return t('receipt.review.title_loading')
-      return place.value?.name ?? t('receipt.review.title_no_place', { day: dayOf(day.value) })
+      if (place.value) return place.value.name
+      // the day it was sent is no date of the receipt, and the title does not say it is (MOL-305, Р2-А4)
+      return sentDay.value === day.value
+        ? t('receipt.review.title_sent', { day: dayOf(day.value) })
+        : t('receipt.review.title_no_place', { day: dayOf(day.value) })
     })
     const placeLine = computed(() => {
       const one = detail.value

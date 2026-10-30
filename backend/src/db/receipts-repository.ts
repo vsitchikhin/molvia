@@ -90,8 +90,11 @@ export interface ClaimedReceipt {
   readonly reviewable: boolean
   /** When it was queued: the model away longer than its wait leaves it to Tesseract (Р-9). */
   readonly queuedAt: Date | null
-  /** When the phone took its photo: the days the receipt may print run from it (MOL-305). */
-  readonly capturedAt: Date
+  /**
+   * When the server took the receipt in (MOL-305): the days it may print run from it, by the server's clock — never
+   * the phone's, which a battery that died sets to 1970, 2000 or the firmware's day.
+   */
+  readonly arrivedAt: Date
 }
 
 /**
@@ -1399,7 +1402,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             country: receipts.country,
             language: receipts.language,
             queuedAt: receipts.queuedAt,
-            capturedAt: receipts.capturedAt,
+            arrivedAt: receipts.createdAt,
           })
         const [owner] = await tx
           .select({

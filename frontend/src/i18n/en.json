@@ -2324,6 +2324,7 @@
     "review": {
       "title_loading": "Receipt",
       "title_no_place": "Receipt from {day}",
+      "title_sent": "Receipt sent {day}",
       "place_line": "{city} · TIN {inn} · {day}",
       "place_line_time": "{city} · TIN {inn} · {day}, {time}",
       "place_line_no_tin": "{city} · {day}",

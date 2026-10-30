@@ -142,6 +142,17 @@ let photos = 0
 /** The rows of `receipt_days` (MOL-222), in order of the day. */
 const days = () => db.select().from(receiptDays).orderBy(receiptDays.day)
 
+/**
+ * Taken in by the server when the phone stamped it (MOL-305): the days a receipt may print run from its arrival, and
+ * a date the test reads must not fall out of them as the calendar moves on.
+ */
+async function arrivedWhenSent(id: string): Promise<void> {
+  await db
+    .update(receipts)
+    .set({ createdAt: new Date(body().capturedAt) })
+    .where(eq(receipts.id, id))
+}
+
 async function queued(me: Owner, over: Record<string, unknown> = {}): Promise<string> {
   const receipt = body(over)
   expect((await send(me, receipt)).statusCode).toBe(201)
@@ -348,6 +359,7 @@ describe('the queue', () => {
   it('lays am-05 out into its 13 lines, the verified figures shown, and cuts the item lines out', async () => {
     const me = await owner()
     const id = await queued(me)
+    await arrivedWhenSent(id)
     const reader = benchReader()
     const reports = await readAll(reader)
     expect(reader.asked).toBe(2)
@@ -478,6 +490,7 @@ describe('the queue', () => {
   it('reads a receipt with no items, its head and its total, and counts it apart', async () => {
     const me = await owner()
     const id = await queued(me)
+    await arrivedWhenSent(id)
     const text = [
       'ԽԱՆՈՒԹ ԱՁ',
       'ԳՅՈՒՄՐԻ Աբովյան 10',

@@ -5,7 +5,6 @@ import { ARMENIAN_RECEIPTS } from '#model/entities/receipt-card'
 import { classListStart } from '#model/entities/receipt-text'
 import type { ReceiptText, ReceiptTextLine, TextRow } from '#model/entities/receipt-text'
 import { COUNTRY_CITIES } from '#model/contracts/settings'
-import { isDeviceTime } from '#model/contracts/trip'
 import { localClock } from '#model/entities/reminder'
 import { toSearchKey } from '#model/support/search-key'
 import { MINOR_EXPONENT } from '#model/values/money'
@@ -578,36 +577,31 @@ export function receiptDateOf(text: ReceiptText, window: ReceiptDateWindow): str
     : null
 }
 
-/** How many months back from its sending a receipt's date is still its date (MOL-305, owner's В-5 «а»). */
+/** How many months back from its arrival a receipt's date is still its date (MOL-305, owner's В-5 «а»). */
 export const RECEIPT_DATE_MONTHS = 6
 
 /**
- * The days a receipt sent at `sentAt` may print (MOL-305, owner's В-1, В-5 «а»): from the same day six months
- * before — the last day of a shorter month, 30 April for 31 October — to the day after the sending's on the till's
- * clock, never past the server's tomorrow. `sentAt` is the moment of «Отправить чек», not of the photo: a photo
- * picked from the gallery may be weeks old, so half a year, not a month — the swap of a day with a short year it
- * catches (the year 20ДД for 20ГГ) is eleven months off and more. A moment no phone lived through — a clock
- * reset to 1970, one run ahead (`isDeviceTime`) — is the server's moment of reading instead. A date outside is no
- * date of the receipt, «неверно прочитанное хуже непрочитанного»: the purchases go to the day it was sent, which
- * the review says it is.
+ * The days a receipt the server took in at `arrivedAt` may print (MOL-305, owner's В-1, В-5 «а»): from the same day
+ * six months before — the last day of a shorter month, 30 April for 31 October — to the day after, on the till's
+ * clock. Half a year, not a month: a photo picked from the gallery may be weeks old, and the swap of a day with a short
+ * year it catches (the year 20ДД for 20ГГ) is eleven months off and more. **The server's moment, never the phone's**
+ * (adversarial А3, Р2-А3): a battery that died sets a phone's clock to 1970, 2000 or its firmware's day, and a receipt
+ * sent before the network set it right moved the window years back; a queue that sent it days late moves it by as
+ * much, which half a year holds. A date outside is no date of the receipt, «неверно прочитанное хуже непрочитанного»:
+ * the purchases go to the day it was sent, which the review says it is.
  */
-export function receiptDateWindow(
-  sentAt: Date,
-  country: ReceiptCountry,
-  now: Date,
-): ReceiptDateWindow {
-  const sent = receiptClockOf(isDeviceTime(sentAt, now) ? sentAt : now, country).day
-  const [year = 0, month = 1, day = 1] = sent.split('-').map(Number)
+export function receiptDateWindow(arrivedAt: Date, country: ReceiptCountry): ReceiptDateWindow {
+  const arrived = receiptClockOf(arrivedAt, country).day
+  const [year = 0, month = 1, day = 1] = arrived.split('-').map(Number)
   // Date.UTC rolls a month below 0 back into the year before; day 0 of a month is the last of the one before
   const back = month - 1 - RECEIPT_DATE_MONTHS
   const lastOfBack = new Date(Date.UTC(year, back + 1, 0)).getUTCDate()
   const earliest = new Date(Date.UTC(year, back, Math.min(day, lastOfBack)))
-  const after = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10)
-  // the server's tomorrow, so no zone's today is refused
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  // the day after, for a till's clock a little ahead
+  const latest = new Date(Date.UTC(year, month - 1, day + 1))
   return {
     earliest: earliest.toISOString().slice(0, 10),
-    latest: after < tomorrow ? after : tomorrow,
+    latest: latest.toISOString().slice(0, 10),
   }
 }
 

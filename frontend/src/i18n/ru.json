@@ -2324,6 +2324,7 @@
     "review": {
       "title_loading": "Чек",
       "title_no_place": "Чек от {day}",
+      "title_sent": "Чек, отправлен {day}",
       "place_line": "{city} · ИНН {inn} · {day}",
       "place_line_time": "{city} · ИНН {inn} · {day}, {time}",
       "place_line_no_tin": "{city} · {day}",

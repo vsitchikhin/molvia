@@ -1135,6 +1135,8 @@ describe('ReceiptView of a receipt by its link (MOL-232)', () => {
     expect(sheet.props('open')).toBe(true)
     expect(document.body.textContent).toContain('1 октября, день отправки')
     const place = { id: PLACE, name: 'Ереван Сити', city: 'Гюмри' }
+    // no place read: the title says the day is the sending's, never the receipt's (Р2-А4)
+    expect(view.find('h1').text()).toMatch(/^Чек, отправлен 1 окт\.( 2026 г\.)?$/)
     // «Готово» with the day left as it was chose no day
     useReceiptDraftsStore().setPlace(ID, place, '2026-10-01')
     await flushPromises()

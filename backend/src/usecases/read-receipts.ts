@@ -68,9 +68,9 @@ const TILL_WORDS: ReadonlySet<string> = new Set([
   ...TILL_KINDS_LATIN,
 ])
 
-// The days a receipt may print, from the moment it was sent (MOL-305): one rule for both readers.
-const datesOf = (deps: ReadReceiptsDeps, claimed: ClaimedReceipt): ReceiptDateWindow =>
-  receiptDateWindow(claimed.capturedAt, claimed.country, (deps.now ?? (() => new Date()))())
+// The days a receipt may print, from the moment the server took it in (MOL-305): one rule for both readers.
+const datesOf = (claimed: ClaimedReceipt): ReceiptDateWindow =>
+  receiptDateWindow(claimed.arrivedAt, claimed.country)
 
 /** Rows cut out per request: the reader takes 64; a long receipt's lines go in several. */
 const STRIPS_PER_REQUEST = 32
@@ -307,7 +307,7 @@ async function readByModel(
     currency,
     [modelHeadRows(reading.answer)],
     modelPaidBy(photoReading, reading.answer),
-    datesOf(deps, claimed),
+    datesOf(claimed),
   )
   if (needsReshoot(text)) {
     const outcome: ReadOutcome = {
@@ -389,7 +389,7 @@ async function readByOcr(
     currency,
     readings,
     receiptPaidBy(photoReading, readings),
-    datesOf(deps, claimed),
+    datesOf(claimed),
   )
   if (needsReshoot(text))
     return { kind: 'failed', failure: 'reshoot', readerVersion: version, head }

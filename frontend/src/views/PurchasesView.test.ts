@@ -323,6 +323,33 @@ describe('PurchasesView (MOL-128)', () => {
       expect(view.text()).not.toContain('0 позиций')
     })
 
+    it('чек без даты с бумаги стоит на дне отправки и говорит это (MOL-305, Р2-А6)', async () => {
+      const read = (date: string | null) => ({
+        id: date ? 'cccccccc-0000-4000-8000-000000000001' : 'cccccccc-0000-4000-8000-000000000002',
+        status: 'parsed' as const,
+        failure: null,
+        parts: 1,
+        received: 1,
+        capturedAt: new Date('2026-09-26T16:00:00.000Z'),
+        country: 'AM' as const,
+        language: 'ru' as const,
+        header: { tin: '12345678', date, time: null, receiptNo: null, shop: null },
+        total: { minor: 170_000n, currency: 'AMD' as const },
+        balanced: false,
+        lineCount: 0,
+        unsettled: 0,
+        place: null,
+        tripId: null,
+      })
+      receipts.mockResolvedValue({ receipts: [read('2026-09-26'), read(null)] })
+      const { view } = await render()
+      // the day printed and the day it was sent are two rows, never one
+      expect(view.text()).toContain('Чек от 26 сент.')
+      expect(view.text()).toContain('без товаров · 26 сент.')
+      expect(view.text()).toContain('Чек, отправлен 26 сент.')
+      expect(view.text()).toContain('без товаров · 26 сент., день отправки')
+    })
+
     it('строки без цифр и несошедшиеся — одной меткой «проверьте N строк» (MOL-255)', async () => {
       receipts.mockResolvedValue({
         receipts: [
