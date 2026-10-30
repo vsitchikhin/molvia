@@ -831,7 +831,7 @@ describe('ScreenState', () => {
 
         it('must not take it for a wrapper whose button is not drawn (Г1)', async () => {
           const slot = () =>
-            h('div', { class: 'wrap' }, shown.value ? h('button', 'Type it in') : null)
+            h('div', { class: 'wrap' }, shown.value ? [h('button', 'Type it in')] : [])
           const { sheetHeld, words } = inside({ sheet: true, kind: 'attention', slot })
           await settled()
           expect(sheetHeld()).toBe(false)
