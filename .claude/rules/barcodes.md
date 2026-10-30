@@ -118,7 +118,9 @@ Open Food Facts is MOL-162.
   site, the one checked on a phone, and the search of Settings for «Safari», which finds it before
   iOS 18 too, where it stood at the top of Settings and «Приложения» was not yet (review 5). iOS
   opens no Settings from a web page (`App-Prefs:` is for native apps), so **the way is written out,
-  never linked**; the refusal «Нет доступа к камере» names the same path.
+  never linked**; the refusal «Нет доступа к камере» names the same path. **The sheet draws it as 2j does**
+  (MOL-211, owner's В-4 «а»): the paragraph and the path at 15, the path at 600 in a recess of
+  `--surface-2`, radius 8 — the one line to follow — and what it costs and the other ways at 13, muted.
 - **The scanner says where the setting is, right after Safari asked** (`useCameraHint`,
   `CameraHintSheet`, owner's decision of 01.10.2026). Before the camera starts it asks
   `permissions.query({ name: 'camera' })`: once the camera is given Safari answers `granted` until
