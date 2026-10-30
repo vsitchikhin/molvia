@@ -315,6 +315,33 @@ describe('ItemDetailsSheet', () => {
     },
   )
 
+  // The other way: opened before the phone knew the record, the server's answer brings it, and the
+  // footer of «К покупкам» goes — its focus to «Записать», not the body (adversarial Р6-А1, as on master).
+  it('gives «Записать» the focus when the record comes and «К покупкам» goes', async () => {
+    const { view } = await render({ trip: null, server: null })
+    const leave = button(view, 'К покупкам').element as HTMLButtonElement
+    leave.focus()
+
+    currentTrip.mockResolvedValue(trip())
+    await useTripStore().load()
+    await flushPromises()
+
+    expect(document.activeElement?.textContent.trim()).toBe('Записать')
+  })
+
+  it('leaves the focus where it is when the record comes and «К покупкам» did not hold it', async () => {
+    const { view } = await render({ trip: null, server: null })
+    const close = view.get('button[aria-label="Закрыть"]').element as HTMLButtonElement
+    close.focus()
+
+    currentTrip.mockResolvedValue(trip())
+    await useTripStore().load()
+    await flushPromises()
+
+    expect(button(view, 'Записать').exists()).toBe(true)
+    expect(document.activeElement).toBe(close)
+  })
+
   it('keeps the focus on × with no record to write to, tap or not', async () => {
     const { view } = await render({ trip: null, server: null, focusQuantity: true })
     expect(view.text()).toContain('Сначала начните запись')

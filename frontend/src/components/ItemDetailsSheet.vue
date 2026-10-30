@@ -464,20 +464,22 @@ export default defineComponent({
     // focus goes to «К покупкам», the one thing left to do (adversarial А3). Only a field the keys are up
     // for, by the sheet's own rule (`keyedIn`): a button, a unit's radio and the currency's picker bring
     // none, and «Отменить» of «Отвязать?» is where the focus must wait (adversarial Р2-А1, Р3-А1, Р4-А1).
-    // And a button of the footer that goes with the record: gone with it, the focus fell to the body,
-    // outside the modal sheet (adversarial Р5-А1, a fault master had too).
+    // And the footer swaps whole as the record goes or comes: a button of it in focus goes with it, and
+    // the focus fell to the body, outside the modal sheet (adversarial Р5-А1, Р6-А1, a fault master had
+    // too) — so it is handed to the main action of the footer that comes. Read before the swap (`pre`).
     const leaveButton = ref<{ $el?: HTMLElement } | null>(null)
     const saveButton = ref<{ $el?: HTMLElement } | null>(null)
     const removeButton = ref<{ $el?: HTMLElement } | null>(null)
-    watch(writeInto, async (into) => {
-      if (into !== null) return
+    watch(writeInto, async (into, was) => {
+      if ((into === null) === (was === null)) return
       const held = document.activeElement
-      const going = [saveButton.value?.$el, removeButton.value?.$el].some(
-        (button) => button !== undefined && button === held,
+      const going = (into === null ? [saveButton, removeButton] : [leaveButton]).some(
+        (button) => button.value?.$el !== undefined && button.value.$el === held,
       )
-      if (!going && !(form.value && keyedIn(form.value))) return
+      const keyed = into === null && form.value !== null && keyedIn(form.value) !== null
+      if (!going && !keyed) return
       await nextTick()
-      leaveButton.value?.$el?.focus()
+      ;(into === null ? leaveButton : saveButton).value?.$el?.focus()
     })
 
     let done = false
