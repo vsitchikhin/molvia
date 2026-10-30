@@ -92,24 +92,18 @@
           </p>
           <p class="caption">{{ t('item.barcode.detach_hint') }}</p>
           <!-- Destructive for everyone and with no «Вернуть»: not the filled button, and the focus
-               waits on «Отменить» (review Л). Side by side, as 4h draws them (MOL-212). -->
+               waits on «Отменить» (review Л). Side by side where both fit, as 4h draws them (MOL-212):
+               each as wide as its wider word, so «Отвязываем…» is never broken inside (adversarial А1). -->
           <div class="detach-actions">
             <AppButton
               variant="danger-ghost"
-              block
               :busy="detaching"
               :busy-label="t('item.barcode.detach_busy')"
               @click="notThis"
             >
               {{ t('item.barcode.detach') }}
             </AppButton>
-            <AppButton
-              ref="detachCancel"
-              variant="ghost"
-              block
-              :inactive="detaching"
-              @click="keepCode"
-            >
+            <AppButton ref="detachCancel" variant="ghost" :inactive="detaching" @click="keepCode">
               {{ t('item.cancel') }}
             </AppButton>
           </div>
@@ -136,7 +130,9 @@
       </template>
       <template v-else>
         <p class="no-trip">{{ t('item.no_trip.body') }}</p>
-        <AppButton size="large" block @click="leave">{{ t('item.no_trip.action') }}</AppButton>
+        <AppButton ref="leaveButton" size="large" block @click="leave">
+          {{ t('item.no_trip.action') }}
+        </AppButton>
       </template>
     </template>
   </BottomSheet>
@@ -433,6 +429,11 @@ export default defineComponent({
       online.value = navigator.onLine
     }
     onMounted(() => {
+      // The dialog has already given «Сколько» the focus (`focusQuantity`). Filled — a purchase amended,
+      // a refusal put right, the size of a pack — it is selected whole: the caret after «1» made «2»
+      // typed at the shelf 12 l, and the price per litre a twelfth (adversarial А2).
+      const quantity = form.value?.querySelector<HTMLInputElement>('[data-field="quantity"]')
+      if (quantity && document.activeElement === quantity) quantity.select()
       window.addEventListener('online', listen)
       window.addEventListener('offline', listen)
       // The server is asked every time the sheet opens: the trip in memory is for when it cannot
@@ -452,6 +453,16 @@ export default defineComponent({
     onUnmounted(() => {
       window.removeEventListener('online', listen)
       window.removeEventListener('offline', listen)
+    })
+
+    // The record went while the sheet was up — finished on another device, the server says so as the
+    // sheet asks: a field in focus would keep the keys up over a sheet with nothing to write, so the
+    // focus goes to «К покупкам», the one thing left to do (adversarial А3).
+    const leaveButton = ref<{ $el?: HTMLElement } | null>(null)
+    watch(writeInto, async (into) => {
+      if (into !== null || !form.value?.contains(document.activeElement)) return
+      await nextTick()
+      leaveButton.value?.$el?.focus()
     })
 
     let done = false
@@ -599,6 +610,7 @@ export default defineComponent({
       submit,
       remove,
       leave,
+      leaveButton,
       confirming,
       detachQuestionId,
       detachCancel,
@@ -751,9 +763,13 @@ export default defineComponent({
 }
 
 .detach-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
+
+  > * {
+    flex: 1 1 auto;
+  }
 }
 
 .detach-question {

@@ -132,6 +132,31 @@ test.describe('the sheet', () => {
     await expect(quantity).toHaveValue('2')
   })
 
+  // An amended purchase opens with «How much» filled and focused: selected whole, the digit typed replaces
+  // the old number — at the caret after «1», «2» went to the server as 12 l, the price per litre a
+  // twelfth (MOL-212, adversarial А2).
+  test('opens a purchase amended with its quantity selected: «2» over «1» is 2 l', async ({
+    page,
+  }) => {
+    const setting = await onTrip(page)
+    await pick(setting)
+    await sheet(page).getByLabel('How much').fill('1')
+    await sheet(page).getByLabel('Price as on the tag').fill('540')
+    await addButton(page).click()
+    await expect.poll(setting.rows).toHaveLength(1)
+
+    const row = page.locator('.row', { hasText: setting.word })
+    await row.click()
+    await expect(sheet(page)).toContainText(`Молоко «${setting.word}»`)
+    const quantity = sheet(page).getByLabel('How much')
+    await expect(quantity).toBeFocused()
+    await page.keyboard.type('2')
+    await expect(quantity).toHaveValue('2')
+    await sheet(page).getByRole('button', { name: 'Save', exact: true }).click()
+
+    await expect.poll(async () => (await setting.rows())[0]?.quantity?.value).toBe('2.000')
+  })
+
   test('adds the item alone when nothing else is filled in', async ({ page }) => {
     const setting = await onTrip(page)
     await pick(setting)

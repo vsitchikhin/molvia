@@ -229,6 +229,32 @@ describe('ItemDetailsSheet', () => {
     expect(autofocus((await render()).view)).toBeUndefined()
   })
 
+  // Finished on another device, the server says so as the sheet asks: the keys must not stay up over a
+  // sheet with nothing to write (adversarial А3).
+  it('gives «К покупкам» the focus when the record goes while a field holds it', async () => {
+    const { view } = await render({ focusQuantity: true })
+    ;(input(view, 'quantity').element as HTMLInputElement).focus()
+
+    currentTrip.mockResolvedValue(null)
+    await useTripStore().load()
+    await flushPromises()
+
+    expect(view.text()).toContain('Сначала начните запись')
+    expect(document.activeElement?.textContent.trim()).toBe('К покупкам')
+  })
+
+  it('leaves the focus where it is when the record goes and no field holds it', async () => {
+    const { view } = await render({ focusQuantity: true })
+    const close = view.get('button[aria-label="Закрыть"]').element as HTMLButtonElement
+    close.focus()
+
+    currentTrip.mockResolvedValue(null)
+    await useTripStore().load()
+    await flushPromises()
+
+    expect(document.activeElement).toBe(close)
+  })
+
   it('keeps the focus on × with no record to write to, tap or not', async () => {
     const { view } = await render({ trip: null, server: null, focusQuantity: true })
     expect(view.text()).toContain('Сначала начните запись')
