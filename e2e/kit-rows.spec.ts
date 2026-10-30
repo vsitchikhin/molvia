@@ -613,9 +613,10 @@ for (const locale of ['ru-RU', 'en-US'])
         expect(rows.length).toBeGreaterThan(4)
         for (const row of rows)
           expect(row, row.text).toMatchObject({ labelCut: false, valueCut: false })
-        // A row of one line, its value beside it, is as tall as before.
+        // A row of one line, its value beside it, is as tall as before — to the hundredth: a row stands on a
+        // fractional pixel in CI's Chromium, 51.99976 and 52.00024 (as the chips' rows, MOL-318).
         for (const row of rows.filter((one) => one.lines === 1 && !one.under))
-          expect(row.height, row.text).toBe(52)
+          expect(row.height, row.text).toBeCloseTo(52, 2)
         const transfer = rows.find((row) => /между счетами|between accounts/.test(row.text))
         const budget = rows.find((row) => /^(Бюджет|Budget)$/.test(row.text))
         const account = rows.find((row) => /^(Счёт|Account)$/.test(row.text))
