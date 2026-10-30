@@ -43,12 +43,6 @@ export interface MoneyMonth {
    * month is on screen (review С-5): a spending is written today whatever month is looked at.
    */
   readonly todayRate: ComputedRef<MoneyMonthView['rate']>
-  /**
-   * Today's rate is as it will stand (MOL-304): the month on screen is the running one, which brings
-   * it, or one is kept, or a read of the running month has answered or failed. Until
-   * then the rate the row «Обмен денег» shows may still come and grow the row.
-   */
-  readonly todayRateSettled: ComputedRef<boolean>
   /** The next page is being read, or could not be. */
   readonly more: ComputedRef<'idle' | 'loading' | 'failed'>
   readonly loadMore: () => Promise<void>
@@ -184,8 +178,6 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
   const keptFrequent = ref<MoneyMonthView['frequent']>([])
   /** Today's rate as the running month last answered it, for a sheet opened on another month. */
   const keptRate = ref<MoneyMonthView['rate']>(null)
-  /** A read of the running month has answered or failed, once in the screen's life. */
-  const todayAsked = ref(false)
 
   function adopt(): void {
     const id = actor.id
@@ -260,9 +252,6 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
       // Decided after the failure, never before the request (MOL-19, A1).
       failure.value = navigator.onLine ? 'error' : 'offline'
       failed.value += 1
-    } finally {
-      // The running month's own read settles today's rate as well as the read beside another month.
-      if (month === monthOf(localDay())) todayAsked.value = true
     }
   }
 
@@ -340,8 +329,6 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
       keep(id, await api.moneyMonth(today), new Date(), askedAt)
     } catch (error) {
       reportFailure(error, 'screen')
-    } finally {
-      todayAsked.value = true
     }
   }
   onMounted(() => void loadWithToday())
@@ -368,9 +355,6 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
     knownFrequent: computed(() => shown.value?.answer.frequent ?? keptFrequent.value),
     todayRate: computed(() =>
       shown.value?.answer.rateKind === 'live' ? shown.value.answer.rate : keptRate.value,
-    ),
-    todayRateSettled: computed(
-      () => todayAsked.value || keptRate.value !== null || selected.value === monthOf(localDay()),
     ),
     more: computed(() => more.value),
     loadMore,

@@ -299,18 +299,11 @@ export default defineComponent({
      * The ways out once nothing that answers above them can move them (MOL-269): the month answered,
      * failed or kept, and «Счета» too — their card over the switcher comes with their answer. Under
      * the skeleton they jumped 291 px up for a newcomer and 99 down with a spending, and the tap aimed
-     * at one landed on another, or on nothing. And today's rate, on another month with none kept: it
-     * comes with the running month's read after the month's, and on a phone of 320 the figure of «Обмен
-     * денег» stands under its label — the rows under it went 6 px down (MOL-304, self-review №1).
+     * at one landed on another, or on nothing.
      */
     const entriesShown = computed(() => {
       const phase = screen.phase.value
-      return (
-        phase !== 'loading' &&
-        phase !== 'offline' &&
-        accounts.phase !== 'loading' &&
-        screen.liveRateSettled.value
-      )
+      return phase !== 'loading' && phase !== 'offline' && accounts.phase !== 'loading'
     })
 
     /**

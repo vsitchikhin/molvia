@@ -828,51 +828,6 @@ describe('MoneyView: the ways out, one figure each (MOL-81, MOL-159)', () => {
     expect(entries(view)).toHaveLength(6)
   })
 
-  // MOL-304, self-review №1: on another month with no rate kept, today's rate comes with the running
-  // month's read after the month's own, and on a phone of 320 the figure of «Обмен денег» stands under
-  // its label — the rows under it went 6 px down from under the finger. They wait for that read too.
-  it('must not fire: on a closed month with no rate kept, nothing until the running month answers', async () => {
-    let answer: (value: MoneyMonthView) => void = () => undefined
-    moneyMonth.mockImplementation((asked) =>
-      asked === '2026-08'
-        ? Promise.resolve(month({ month: '2026-08', rateKind: 'frozen' }))
-        : new Promise((resolve) => (answer = resolve)),
-    )
-    const view = await render('/money?month=2026-08')
-    expect(moneyMonth).toHaveBeenCalledWith('2026-09', undefined)
-    expect(view.find('.skeleton').exists()).toBe(false)
-    expect(entries(view)).toEqual([])
-    answer(month())
-    await flushPromises()
-    expect(entries(view)).toHaveLength(6)
-    expect(entries(view).find(({ href }) => href === '/money/exchange')?.text).toMatch(/4[.,]62/)
-  })
-
-  // The running month read first, with no rate at all: another month then has nothing more to wait for.
-  it('must not fire: a person with no rate turns to the month before, and the rows stand', async () => {
-    moneyMonth.mockImplementation((asked) =>
-      Promise.resolve(
-        month({ month: asked, rate: null, rateKind: asked === '2026-09' ? 'live' : 'frozen' }),
-      ),
-    )
-    const view = await render()
-    expect(entries(view)).toHaveLength(6)
-    await view.find(`button[aria-label="${en.spending.month_prev}"]`).trigger('click')
-    await flushPromises()
-    expect(router.currentRoute.value.query.month).toBe('2026-08')
-    expect(entries(view)).toHaveLength(6)
-  })
-
-  it('must not fire: the running month refusing does not keep them away', async () => {
-    moneyMonth.mockImplementation((asked) =>
-      asked === '2026-08'
-        ? Promise.resolve(month({ month: '2026-08', rateKind: 'frozen' }))
-        : Promise.reject(new ApiError(ERROR.INTERNAL)),
-    )
-    const view = await render('/money?month=2026-08')
-    expect(entries(view)).toHaveLength(6)
-  })
-
   // Adversarial А1: «Повторить» keeps the phase `error` until its answer, which puts the month in place
   // of the error card — the rows stood the whole retry and went from under the finger with it. Unseen
   // with their place kept, never taken out: the page shortened under a phone scrolled down (Б2).
