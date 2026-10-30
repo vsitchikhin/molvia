@@ -633,7 +633,8 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   the button's word, and the sheet says it into its own region** as it opens offline and as the connection
   goes under it, taken back when it comes (adversarial А1): a name is heard only with the focus on it, and
   the search's strip stands in none of the phases the sheet opens from — `empty`, `far`, `ready`, a code
-  nobody knows. The connection is `useOnline`'s, read again as the app comes back into view (MOL-192,
+  nobody knows. Never over «Взять «…»» of a code another item holds: nothing is left to propose, and taking
+  the holder needs no connection (adversarial Б1). The connection is `useOnline`'s, read again as the app comes back into view (MOL-192,
   adversarial А2). «Этот код уже у …» and «… уже есть» are warnings on `--warn-tint`, not errors.
 
 ## The merge of twins (MOL-106)
