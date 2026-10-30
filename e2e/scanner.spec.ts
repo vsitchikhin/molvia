@@ -124,6 +124,31 @@ test('says how to allow the camera when it is not allowed', async ({ page }) => 
   await expect(scanner(page).locator('.panel .action')).toHaveCount(0)
 })
 
+// The focus on the refusal's button goes with it, and lands on the footer that came (MOL-211,
+// self-review №2): refused again, «Check again»; allowed, «Type it in» over the viewfinder. In a real
+// engine, since the state's buttons come into the footer by a deferred `Teleport`. The reader is held
+// unloaded, or the code the camera films would close the sheet.
+test('the focus follows «Check again» to the footer that comes', async ({ page, context }) => {
+  let release = () => undefined as unknown
+  await page.route(WASM, (route) => {
+    release = () => route.abort().catch(() => undefined)
+  })
+  await open(page, '/_kit')
+  await openScanner(page)
+  const again = scanner(page).getByRole('button', { name: 'Check again' })
+  await again.focus()
+
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('heading', { name: 'No access to the camera' })).toBeVisible()
+  await expect(again).toBeFocused()
+
+  await context.grantPermissions(['camera'])
+  await page.keyboard.press('Enter')
+  await expect(scanner(page).locator('video')).toBeVisible()
+  await expect(scanner(page).getByRole('button', { name: 'Type it in' })).toBeFocused()
+  release()
+})
+
 // Ф-5, owner's В-2 «а» of MOL-211: off a ring, on a fill, in the viewfinder's own colours — the
 // page's `surface-2` and the ink are both near-white in the light scheme. The fake camera has no torch,
 // so its track is given one; the reader is held unloaded, or the code it films would close the sheet.

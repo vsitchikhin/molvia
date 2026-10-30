@@ -97,7 +97,7 @@
         <AppButton v-if="hint.offer.value" variant="ghost" block @click="hint.show">
           {{ t('scanner.camera_hint_offer') }}
         </AppButton>
-        <AppButton variant="secondary" block @click="toTyping">
+        <AppButton ref="manual" variant="secondary" block @click="toTyping">
           <template #icon><IconKeyboard /></template>
           {{ t('scanner.manual') }}
         </AppButton>
@@ -115,7 +115,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, nextTick, ref, watch } from 'vue'
-import type { PropType } from 'vue'
+import type { ComponentPublicInstance, PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { typedBarcode, type ErrorCode } from '@molvia/model'
 import IconScan from '~icons/mdi/barcode-scan'
@@ -348,6 +348,34 @@ export default defineComponent({
       })
     }
 
+    // A refusal turned where it stands — to the viewfinder after «Проверить снова», or to another
+    // refusal — takes the button the focus was on with it, and the focus fell to the page (self-review
+    // №2). It goes to the first button of the footer that came, «Ввести вручную» over a live viewfinder;
+    // only a focus that was in the footer, never one the person put somewhere of their own. No button of
+    // the footer outlives such a turn: a retry passes the viewfinder's own footer on its way.
+    const manual = ref<ComponentPublicInstance | null>(null)
+    watch(
+      refusal,
+      () => {
+        const dialog = sheet.value?.$el
+        const footer = dialog?.querySelector(':scope > .footer')
+        const focused = document.activeElement
+        if (!props.open || !dialog || !footer?.contains(focused)) return
+        // The state's buttons come into the footer by a deferred `Teleport`, a tick after the render.
+        void nextTick()
+          .then(() => nextTick())
+          .then(() => {
+            if (!props.open || typing.value) return
+            const into: unknown =
+              refusal.value === null
+                ? manual.value?.$el
+                : dialog.querySelector(':scope > .footer button')
+            if (into instanceof HTMLElement) into.focus()
+          })
+      },
+      { flush: 'pre' },
+    )
+
     return {
       t,
       REFUSALS,
@@ -365,6 +393,7 @@ export default defineComponent({
       viewing,
       refusal,
       cameraGone,
+      manual,
       kind: camera.kind,
       torch: camera.torch,
       setTorch: camera.setTorch,

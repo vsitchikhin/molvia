@@ -310,6 +310,46 @@ describe('BarcodeScannerSheet', () => {
       expect(sheet.get('dialog:not(.over)').classes()).toContain('pinned')
     })
 
+    // Self-review №2: the button the focus was on goes with the refusal it stood in.
+    describe('the focus, as a refusal turns where it stands', () => {
+      const focusedText = () => document.activeElement?.textContent.trim()
+
+      it('goes to «Type it in» once «Check again» brings the viewfinder', async () => {
+        getUserMedia.mockRejectedValueOnce(named('NotAllowedError'))
+        getUserMedia.mockResolvedValueOnce(fakeStream().stream)
+        const sheet = await render()
+        const again = button(sheet, en.scanner.try_again)
+        ;(again.element as HTMLElement).focus()
+        await again.trigger('click')
+        await settle()
+        expect(sheet.find('video').exists()).toBe(true)
+        expect(focusedText()).toBe(en.scanner.manual)
+      })
+
+      it('goes to the first button of the refusal that came in its place', async () => {
+        getUserMedia.mockRejectedValueOnce(named('NotAllowedError'))
+        getUserMedia.mockRejectedValueOnce(named('NotReadableError'))
+        const sheet = await render()
+        const again = button(sheet, en.scanner.try_again)
+        ;(again.element as HTMLElement).focus()
+        await again.trigger('click')
+        await settle()
+        expect(heading(sheet)).toBe(en.scanner.error_title)
+        expect(focusedText()).toBe(en.state.retry)
+      })
+
+      it('must not move a focus the person put elsewhere in the sheet', async () => {
+        getUserMedia.mockRejectedValueOnce(named('NotAllowedError'))
+        getUserMedia.mockResolvedValueOnce(fakeStream().stream)
+        const sheet = await render()
+        const close = sheet.get(`dialog:not(.over) button[aria-label="${en.sheet.close}"]`)
+        ;(close.element as HTMLElement).focus()
+        await button(sheet, en.scanner.try_again).trigger('click')
+        await settle()
+        expect(document.activeElement).toBe(close.element)
+      })
+    })
+
     it('gives the footer back to the viewfinder once the camera is allowed', async () => {
       getUserMedia.mockRejectedValueOnce(named('NotAllowedError'))
       getUserMedia.mockResolvedValueOnce(fakeStream().stream)
