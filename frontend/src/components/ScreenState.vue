@@ -19,7 +19,8 @@
       <slot />
     </div>
     <!-- A screen-wide error draws its buttons in the screen's strip, where every screen has its
-         main action (К-1, Ф-15); anywhere else — the login, a sheet — at the bottom of its own. -->
+         main action (К-1, Ф-15), and a sheet's full state in the sheet's footer (MOL-211); the login
+         at the bottom of its own. -->
     <Teleport
       v-if="kind === 'error' || $slots.action"
       :to="dockTarget"
@@ -164,7 +165,8 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
  * Ф-15): «Повторить» stood at the bottom of the free height — on each screen at its own — and over
  * a strip with a live action it was a second filled button. The strip is then the error's alone:
  * the screen's own action and «Вышла новая версия» step aside, so «Обновить» is offered once (8c).
- * The login and a sheet have no strip, and keep them at the bottom of the block.
+ * The login has no strip, and keeps them at the bottom of the block. A sheet's strip is its footer
+ * (MOL-211): there any full state with an action of its own holds it as well — the scanner's refusals.
  *
  * Last, quieter than both, «Сообщить о проблеме» (MOL-147, Р-5): the sheet «Написать разработчику»
  * on «Сломалось», with the code of the API's last refusal before the error was shown (В-1). Only where the screen as a
@@ -205,7 +207,7 @@ export default defineComponent({
     silent: { type: Boolean, default: false },
   },
   emits: ['retry'],
-  setup(props) {
+  setup(props, { slots }) {
     const { t } = useI18n()
     const root = ref<HTMLElement | null>(null)
     // The root is a card's component for a section's error, a plain element otherwise.
@@ -221,9 +223,13 @@ export default defineComponent({
     // stops being one; the first to ask holds it, and the next takes it once that one lets go.
     const strip = useStateStrip()
     const me = Symbol('screen-state')
+    // In a sheet a state with buttons of its own holds the footer too — the scanner's «Нет доступа к
+    // камере» (MOL-211). The slot is no reactive source: it is read again whenever the kind changes,
+    // which is when a block of the scanner turns from one refusal to another.
     watchEffect(() => {
       if (!strip) return
-      if (props.kind === 'error' && !props.inline && !props.flow) strip.claim(me)
+      const holds = props.kind === 'error' || (strip.sheet && slots.action !== undefined)
+      if (holds && !props.inline && !props.flow) strip.claim(me)
       else strip.release(me)
     })
     const dockTarget = computed(() => (strip?.owner.value === me ? strip.target.value : null))
