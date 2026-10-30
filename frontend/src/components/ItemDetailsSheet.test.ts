@@ -243,12 +243,13 @@ describe('ItemDetailsSheet', () => {
     expect(document.activeElement?.textContent.trim()).toBe('К покупкам')
   })
 
-  // A button or a unit's radio brings no keys, and «Отменить» of «Отвязать?» is where the focus waits
-  // (adversarial Р2-А1, Р3-А1).
+  // A button, a unit's radio and the currency's picker bring no keys, and «Отменить» of «Отвязать?» is
+  // where the focus waits (adversarial Р2-А1, Р3-А1, Р4-А1).
   it.each([
     ['«Отменить» of «Отвязать?»', 'Отменить', true],
     ['«не этот товар?»', 'Код 4850001234562 — не этот товар?', false],
     ['the unit «л»', 'radio:l', false],
+    ['the currency', 'select', false],
   ] as const)('leaves %s in focus when the record goes', async (_, name, ask) => {
     const { view } = await render({ code: '4850001234562', focusQuantity: true })
     if (ask) {
@@ -256,7 +257,11 @@ describe('ItemDetailsSheet', () => {
       await flushPromises()
     }
     const held = (
-      name === 'radio:l' ? view.get('input[type="radio"][value="l"]') : button(view, name)
+      name === 'radio:l'
+        ? view.get('input[type="radio"][value="l"]')
+        : name === 'select'
+          ? view.get('select.currency-select')
+          : button(view, name)
     ).element as HTMLElement
     held.focus()
 
