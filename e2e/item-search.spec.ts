@@ -277,6 +277,8 @@ test.describe('nothing found', () => {
       // Playwright reads `aria-disabled` as disabled, so the native attribute is asked for by name.
       await expect(waiting).toHaveAttribute('aria-disabled', 'true')
       await expect(waiting).not.toHaveAttribute('disabled')
+      await waiting.focus()
+      await expect(waiting).toBeFocused()
       const submit = sheet.getByRole('button', { name: 'Add to the catalogue' })
       // The sheet takes no tap while it is still coming up (MOL-18), so the tap is repeated
       // until the unit is taken — as a person would tap again.

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { defineComponent, h, nextTick, ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
 import type { CatalogueWrite } from '@molvia/client'
@@ -7,8 +8,10 @@ import { ERROR, ISSUE, ITEM_NAME_MAX, ITEM_NOTE_MAX } from '@molvia/model'
 import type { BarcodeHint, CatalogueEntry, ProposedItem } from '@molvia/model'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { routes } from '@/router'
 import ProposeItemSheet from '@/components/ProposeItemSheet.vue'
+import SegmentedControl from '@/components/SegmentedControl.vue'
 
 const proposeItem = vi.fn<(input: ProposedItem) => Promise<CatalogueWrite>>()
 vi.mock('@/api', () => ({
@@ -153,16 +156,20 @@ describe('«Suggest an item»', () => {
       expect(mainButton(sheet).text()).toBe(en.item.propose.offline)
     })
 
-    it('is one button through every word: the focus stays on it while the form is filled', async () => {
+    it('is one button through every word: a new word drops no focus that stands on it', async () => {
       const sheet = await render('')
       const button = mainButton(sheet).element as HTMLButtonElement
       button.focus()
+      expect(mainButton(sheet).text()).toBe(en.item.propose.needs_name)
 
+      // Neither step moves the focus by itself: the name is set, the unit chosen by the control.
       await fields(sheet).name.setValue('Тан')
+      expect(mainButton(sheet).element).toBe(button)
       expect(mainButton(sheet).text()).toBe(en.item.propose.needs_unit)
-      await chooseUnit(sheet, en.item.unit_l)
-      button.focus()
+      expect(document.activeElement).toBe(button)
 
+      sheet.findComponent(SegmentedControl).vm.$emit('update:modelValue', 'l')
+      await nextTick()
       expect(mainButton(sheet).element).toBe(button)
       expect(mainButton(sheet).text()).toBe(en.item.propose.submit)
       expect(document.activeElement).toBe(button)
@@ -320,6 +327,111 @@ describe('«Suggest an item»', () => {
       expect(mainButton(sheet).text()).toBe(en.item.propose.offline)
     })
     expect(sheet.find('[role="alert"]').exists()).toBe(false)
+  })
+
+  it('comes back when the app does, the connection back with no «online» heard (adversarial А2)', async () => {
+    proposeItem.mockResolvedValue({ entry: tan, created: true })
+    online(false)
+    const sheet = await render()
+    await chooseUnit(sheet, en.item.unit_l)
+    expect(mainButton(sheet).text()).toBe(en.item.propose.offline)
+
+    // An iOS PWA frozen in the background misses `online` (MOL-192).
+    online(true)
+    document.dispatchEvent(new Event('visibilitychange'))
+    await nextTick()
+
+    expect(mainButton(sheet).text()).toBe(en.item.propose.submit)
+    await mainButton(sheet).trigger('click')
+    expect(proposeItem).toHaveBeenCalledTimes(1)
+  })
+
+  describe("the connection said into the sheet's region (adversarial А1)", () => {
+    /** The sheet in an app, whose announcer the sheet's region takes over while it is up. */
+    async function inApp() {
+      const router = createRouter({ history: createMemoryHistory(), routes })
+      await router.push('/trip/add')
+      const open = ref(true)
+      const Host = defineComponent({
+        setup() {
+          provideAnnouncer()
+          return () =>
+            h(ProposeItemSheet, {
+              open: open.value,
+              query: 'тан',
+              'onUpdate:open': (next: boolean) => (open.value = next),
+            })
+        },
+      })
+      const view = mount(Host, {
+        attachTo: document.body,
+        global: { plugins: [router, createAppI18n('en')] },
+      })
+      mounted.push(view)
+      clock += 1000
+      await said()
+      return { view, open }
+    }
+
+    /** Past the announcer's task (`useAnnouncer`, 100 ms). */
+    async function said(): Promise<void> {
+      await new Promise((resolve) => setTimeout(resolve, 150))
+    }
+
+    function region(view: VueWrapper): string {
+      return view.get('dialog .region').text()
+    }
+
+    function goes(value: boolean): void {
+      online(value)
+      window.dispatchEvent(new Event(value ? 'online' : 'offline'))
+    }
+
+    it('says it as the sheet opens offline, and leaves the line over the button to the field', async () => {
+      online(false)
+      const { view } = await inApp()
+
+      expect(region(view)).toBe(en.item.propose.offline)
+      expect(view.get('[role="status"].line').text()).toBe('')
+    })
+
+    it('says it when the connection goes under the open sheet, and takes it back when it comes', async () => {
+      const { view } = await inApp()
+      expect(region(view)).toBe('')
+
+      goes(false)
+      await said()
+      expect(region(view)).toBe(en.item.propose.offline)
+
+      goes(true)
+      await said()
+      expect(region(view)).toBe('')
+    })
+
+    it('says it again at the next opening offline', async () => {
+      online(false)
+      const { view, open } = await inApp()
+      open.value = false
+      await said()
+      expect(region(view)).toBe('')
+
+      open.value = true
+      await said()
+      expect(region(view)).toBe(en.item.propose.offline)
+    })
+
+    it('must not say it while it sends: the button says «Adding…»', async () => {
+      proposeItem.mockReturnValue(new Promise(() => undefined))
+      const { view } = await inApp()
+      await chooseUnit(view, en.item.unit_l)
+      await mainButton(view).trigger('click')
+
+      goes(false)
+      await said()
+
+      expect(mainButton(view).text()).toBe(en.item.propose.sending)
+      expect(region(view)).toBe('')
+    })
   })
 
   it('comes back when the connection does', async () => {

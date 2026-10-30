@@ -68,16 +68,7 @@
 </template>
 
 <script lang="ts">
-import {
-  computed,
-  defineComponent,
-  nextTick,
-  onMounted,
-  onUnmounted,
-  ref,
-  shallowRef,
-  watch,
-} from 'vue'
+import { computed, defineComponent, nextTick, onUnmounted, ref, shallowRef, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -92,7 +83,9 @@ import {
 import type { BarcodeHint, CatalogueEntry, Quantity } from '@molvia/model'
 import IconClose from '~icons/mdi/close'
 import { api } from '@/api'
+import { useAnnouncer } from '@/composables/useAnnouncer'
 import { packageSize } from '@/composables/useBarcodeHint'
+import { useOnline } from '@/composables/useOnline'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -173,7 +166,9 @@ export default defineComponent({
     const source = ref<string | null>(null)
     const sending = ref(false)
     const failed = ref(false)
-    const connected = ref(navigator.onLine)
+    // Read again as the app comes back into view too: an iOS PWA frozen in the background misses
+    // `online`, and the button said «со связью» over a connection back (MOL-192, adversarial А2).
+    const connected = useOnline()
     const holder = shallowRef<CatalogueEntry | null>(null)
     const takeButton = ref<{ $el?: HTMLElement } | null>(null)
 
@@ -335,17 +330,21 @@ export default defineComponent({
       }
     }
 
-    function sync(): void {
-      connected.value = navigator.onLine
-    }
-    onMounted(() => {
-      window.addEventListener('online', sync)
-      window.addEventListener('offline', sync)
-    })
-    onUnmounted(() => {
-      window.removeEventListener('online', sync)
-      window.removeEventListener('offline', sync)
-    })
+    // «Со связью» is the button's word, and a button's name is heard only once the focus is on it: the
+    // sheet says it too, as it opens offline and as the connection goes under it — the search's strip
+    // stands in none of the phases the sheet is opened from (adversarial А1). Through the announcer,
+    // so it lands in the sheet's own region; taken back once it is no longer so.
+    const announce = useAnnouncer()
+    let unsayOffline: (() => void) | undefined
+    watch(
+      () => props.open && !connected.value && !sending.value,
+      (offline) => {
+        unsayOffline?.()
+        unsayOffline = offline ? announce?.(t('item.propose.offline')) : undefined
+      },
+      { immediate: true },
+    )
+    onUnmounted(() => unsayOffline?.())
 
     return {
       t,
