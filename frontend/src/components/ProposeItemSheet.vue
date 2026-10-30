@@ -36,7 +36,7 @@
       <!-- There before its words, with only the text changing: a live region born together with
            what it says is often not read at all (MOL-19; review Р-18). -->
       <p class="line failed" role="status">{{ status }}</p>
-      <p v-if="connected && failed" class="line failed" role="alert">
+      <p v-if="failed" class="line failed" role="alert">
         {{ t('item.propose.failed') }}
       </p>
       <!-- Another item holds the code (MOL-100, Р-3): nothing was written, and that item is offered
@@ -169,6 +169,12 @@ export default defineComponent({
     // Read again as the app comes back into view too: an iOS PWA frozen in the background misses
     // `online`, and the button said «со связью» over a connection back (MOL-192, adversarial А2).
     const connected = useOnline()
+    // A failure is of the try that made it: the connection gone, «со связью» is the reason from then on,
+    // and the alert held for its return was born anew there — «Не получилось» said with nothing pressed
+    // (adversarial В1).
+    watch(connected, (on) => {
+      if (!on) failed.value = false
+    })
     const holder = shallowRef<CatalogueEntry | null>(null)
     const takeButton = ref<{ $el?: HTMLElement } | null>(null)
 

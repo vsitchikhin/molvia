@@ -454,6 +454,51 @@ describe('«Suggest an item»', () => {
     })
   })
 
+  describe('a failure is said once (adversarial В1)', () => {
+    async function failedOnce() {
+      proposeItem.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'transport'))
+      const sheet = await render()
+      await chooseUnit(sheet, en.item.unit_l)
+      await submitButton(sheet).trigger('click')
+      await vi.waitFor(() => {
+        expect(sheet.get('[role="alert"]').text()).toBe(en.item.propose.failed)
+      })
+      return sheet
+    }
+
+    for (const back of ['online', 'visibilitychange'] as const) {
+      it(`is not born again when the connection comes back (${back})`, async () => {
+        const sheet = await failedOnce()
+
+        online(false)
+        window.dispatchEvent(new Event('offline'))
+        await nextTick()
+        expect(sheet.find('[role="alert"]').exists()).toBe(false)
+
+        online(true)
+        if (back === 'online') window.dispatchEvent(new Event('online'))
+        else document.dispatchEvent(new Event('visibilitychange'))
+        await nextTick()
+
+        expect(sheet.find('[role="alert"]').exists()).toBe(false)
+        expect(mainButton(sheet).text()).toBe(en.item.propose.submit)
+        expect(notNow(sheet)).toBe(false)
+        expect(proposeItem).toHaveBeenCalledTimes(1)
+      })
+    }
+
+    it('stays while the connection does, until the next try', async () => {
+      const sheet = await failedOnce()
+      proposeItem.mockResolvedValueOnce({ entry: tan, created: true })
+      document.dispatchEvent(new Event('visibilitychange'))
+      await nextTick()
+      expect(sheet.get('[role="alert"]').text()).toBe(en.item.propose.failed)
+
+      await mainButton(sheet).trigger('click')
+      expect(sheet.find('[role="alert"]').exists()).toBe(false)
+    })
+  })
+
   it('comes back when the connection does', async () => {
     online(false)
     const sheet = await render()
