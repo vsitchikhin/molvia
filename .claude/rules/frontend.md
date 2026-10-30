@@ -1443,9 +1443,11 @@ bottom: 0`), a sibling of the panel and as wide as the sheet — never a middle 
   write. **Only a field the keys are up for, by the sheet's own rule** (`keyedIn` — `typedIn` less a
   picker's field, Р2-А1, Р3-А1, Р4-А1): a button, a unit's radio and the currency's `select` bring no keys,
   and «Отменить» of «Отвязать?» is where the focus waits. A list of its own (`input, textarea`) took the
-  radio along, and `typedIn` alone the `select`, whose picker closed under the finger. **And a button of the
-  footer that goes with the record** — «Записать», «Удалить позицию» — hands it there too (Р5-А1): gone with
-  the footer, the focus fell to the body, outside the modal sheet, on master as well. **The price, named:**
+  radio along, and `typedIn` alone the `select`, whose picker closed under the finger. **And the footer swaps
+  whole as the record goes or comes**: a button of it in focus — «Записать», «Удалить позицию», or «К
+  покупкам» when the server's answer brings the record — hands the focus to the main action of the footer
+  that comes (Р5-А1, Р6-А1): gone with its footer, the focus fell to the body, outside the modal sheet, on
+  master as well. **The price, named:**
   that picker stays open over a sheet with nothing to write, until it is put away.
   **The price, named:** on iOS the keys for a field focused by a script a microtask after the tap were not
   measured on a device — the owner checks it after the rollout; and a sheet found by a code opens on ×, the
