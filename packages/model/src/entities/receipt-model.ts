@@ -6,7 +6,12 @@
 
 import { cardRate, rememberedLines } from '#model/entities/receipt-remembered'
 import type { RememberedPrices } from '#model/entities/receipt-remembered'
-import { DEPARTMENT, TOLERANCE_HUNDREDTHS, paidByOf } from '#model/entities/receipt-text'
+import {
+  DEPARTMENT,
+  TOLERANCE_HUNDREDTHS,
+  paidByOf,
+  printedDayOf,
+} from '#model/entities/receipt-text'
 import type { ReceiptPaidBy } from '#model/entities/receipt'
 import type { PhotoReading } from '#model/entities/receipt-card'
 import type { ReceiptText, ReceiptTextLine, TextRow } from '#model/entities/receipt-text'
@@ -122,11 +127,10 @@ const articleOf = (article: string | null): string | null => {
   return /^[\p{L}\d_./-]{1,40}$/u.test(trimmed) ? trimmed : null
 }
 
-const dayOf = (date: string | null): string | null =>
-  /^\d{4}-\d{2}-\d{2}$/.test(date ?? '') ? date : null
+// the time as printed (MOL-305), its seconds dropped: «23:49:53» is 23:49
 const clockOf = (time: string | null): string | null => {
-  const found = /^(\d{2}):(\d{2})$/.exec(time ?? '')
-  return found !== null && Number(found[1]) < 24 && Number(found[2]) < 60 ? (time ?? null) : null
+  const [, hour = '', minute = ''] = /^(\d{2}):(\d{2})(?::[0-5]\d)?$/.exec(time?.trim() ?? '') ?? []
+  return hour !== '' && Number(hour) < 24 && Number(minute) < 60 ? `${hour}:${minute}` : null
 }
 
 /**
@@ -661,7 +665,8 @@ export function receiptTextOfModel(
   return {
     layout,
     tin,
-    date: dayOf(answer.date),
+    // the date as printed, read in the card's order — never the model's guess of it (MOL-305)
+    date: printedDayOf(answer.date, reading),
     time: clockOf(answer.time),
     receiptNo: number,
     totalHundredths: total,

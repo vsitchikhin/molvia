@@ -128,9 +128,37 @@ describe('a model’s answer as the parse’s reading (MOL-272)', () => {
       receiptNo: '27410811',
     })
     const odd = read(
-      answer({ id_rows: ['ՀՎՀՀ: 0123456', 'Ֆիսկալ համար'], date: '08.10.2026', time: '25:10' }),
+      answer({ id_rows: ['ՀՎՀՀ: 0123456', 'Ֆիսկալ համար'], date: '10.2026', time: '25:10' }),
     )
     expect([odd.tin, odd.date, odd.time, odd.receiptNo]).toEqual([null, null, null, null])
+  })
+
+  it('reads the date as printed in the card’s order, never as the model ordered it (MOL-305)', () => {
+    const day = (date: string | null) => read(answer({ date })).date
+    // the terminal of a sole trader, MOL-227: «23-10-26 14:06» is 23 October 2026, which the model made 2023-10-26
+    expect(day('23-10-26')).toBe('2026-10-23')
+    expect(day('04-10-26')).toBe('2026-10-04')
+    // the tills: a year of four digits last
+    expect(day('04.10.2026')).toBe('2026-10-04')
+    expect(day('8.10.2026')).toBe('2026-10-08')
+    // a year of four digits first is one order alone: an answer of prompt v5, or a model that did not do as asked
+    expect(day('2026-10-23')).toBe('2026-10-23')
+    // must not: a day no calendar has, a date cut short, words
+    expect(day('31-02-26')).toBeNull()
+    expect(day('23-13-26')).toBeNull()
+    expect(day('23-10')).toBeNull()
+    expect(day('23 окт 2026')).toBeNull()
+    expect(day(null)).toBeNull()
+  })
+
+  it('reads the time as printed, its seconds dropped (MOL-305)', () => {
+    const time = (printed: string | null) => read(answer({ time: printed })).time
+    expect(time('14:06')).toBe('14:06')
+    expect(time('23:49:53')).toBe('23:49')
+    expect(time(' 00:00 ')).toBe('00:00')
+    expect(time('24:00')).toBeNull()
+    expect(time('14:06:61:1')).toBeNull()
+    expect(time('1406')).toBeNull()
   })
 
   it('keys a second record by the words of the card, as Tesseract reads it (adversarial А5, А6, review №10)', () => {
