@@ -428,7 +428,6 @@
     "edit": {
       "meta": "Only your own rating changes",
       "meta_new": "You have not rated this yet",
-      "current": "Your rating: {n}",
       "save_new": "Rate it",
       "keeps_score": "The rating stays as it was. To take it back, withdraw it",
       "withdraw": "Withdraw the rating",
@@ -509,6 +508,7 @@
     "pending_count": "{n} purchase is waiting to be rated | {n} purchases are waiting to be rated",
     "context": "{when} · {place}",
     "question_tail": "how was it?",
+    "current": "Your rating: {n}",
     "scale_low": "Poor",
     "scale_high": "Great",
     "scale_label": "Rating {n} out of 5",
