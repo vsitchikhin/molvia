@@ -120,10 +120,10 @@
 
     <template #footer>
       <template v-if="writeInto">
-        <AppButton size="large" block @click="submit">
+        <AppButton ref="saveButton" size="large" block @click="submit">
           {{ editing ? t('item.save_edit') : t('item.save') }}
         </AppButton>
-        <AppButton v-if="removable" variant="danger-ghost" block @click="remove">
+        <AppButton v-if="removable" ref="removeButton" variant="danger-ghost" block @click="remove">
           {{ t('item.delete') }}
         </AppButton>
         <p v-if="!online" class="caption offline">{{ t('item.offline_note') }}</p>
@@ -464,9 +464,18 @@ export default defineComponent({
     // focus goes to «К покупкам», the one thing left to do (adversarial А3). Only a field the keys are up
     // for, by the sheet's own rule (`keyedIn`): a button, a unit's radio and the currency's picker bring
     // none, and «Отменить» of «Отвязать?» is where the focus must wait (adversarial Р2-А1, Р3-А1, Р4-А1).
+    // And a button of the footer that goes with the record: gone with it, the focus fell to the body,
+    // outside the modal sheet (adversarial Р5-А1, a fault master had too).
     const leaveButton = ref<{ $el?: HTMLElement } | null>(null)
+    const saveButton = ref<{ $el?: HTMLElement } | null>(null)
+    const removeButton = ref<{ $el?: HTMLElement } | null>(null)
     watch(writeInto, async (into) => {
-      if (into !== null || !form.value || !keyedIn(form.value)) return
+      if (into !== null) return
+      const held = document.activeElement
+      const going = [saveButton.value?.$el, removeButton.value?.$el].some(
+        (button) => button !== undefined && button === held,
+      )
+      if (!going && !(form.value && keyedIn(form.value))) return
       await nextTick()
       leaveButton.value?.$el?.focus()
     })
@@ -617,6 +626,8 @@ export default defineComponent({
       remove,
       leave,
       leaveButton,
+      saveButton,
+      removeButton,
       confirming,
       detachQuestionId,
       detachCancel,

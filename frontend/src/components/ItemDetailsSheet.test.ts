@@ -285,6 +285,36 @@ describe('ItemDetailsSheet', () => {
     expect(document.activeElement).toBe(close)
   })
 
+  // The footer that writes goes with the record, and the button in focus with it: the focus would fall
+  // to the body, outside the modal sheet (adversarial Р5-А1, as on master).
+  it.each([
+    ['«Записать»', 'Записать', null],
+    ['«Удалить позицию»', 'Удалить позицию', 'amend'],
+  ] as const)(
+    'gives «К покупкам» the focus when %s goes with the record',
+    async (_, name, amend) => {
+      const written: TripExpenseView = {
+        id: 'cccccccc-0000-4000-8000-000000000002',
+        createdAt: new Date('2026-09-19T08:10:00.000Z'),
+        item: milk,
+        quantity: null,
+        amount: parseMoney('540', 'AMD'),
+        unitPrice: null,
+        printed: null,
+        discount: null,
+      }
+      const { view } = await render(amend ? { expense: written } : {})
+      ;(button(view, name).element as HTMLButtonElement).focus()
+
+      currentTrip.mockResolvedValue(null)
+      await useTripStore().load()
+      await flushPromises()
+
+      expect(view.text()).toContain('Сначала начните запись')
+      expect(document.activeElement?.textContent.trim()).toBe('К покупкам')
+    },
+  )
+
   it('keeps the focus on × with no record to write to, tap or not', async () => {
     const { view } = await render({ trip: null, server: null, focusQuantity: true })
     expect(view.text()).toContain('Сначала начните запись')
