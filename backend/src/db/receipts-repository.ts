@@ -250,6 +250,8 @@ export interface StoredReceipt {
   readonly readPartly: boolean | null
   /** How it was paid, as its words say (MOL-312); `null` — it does not say, or read before it. */
   readonly paidBy: ReceiptPaidBy | null
+  /** The model read it (MOL-272), by its `reader_version` as the measure of 0.2 counts it; Tesseract, a link, none. */
+  readonly byModel: boolean
 }
 
 /**
@@ -710,6 +712,7 @@ function toStored(found: SummaryRow): StoredReceipt {
     redeemed: cashOf(found.row.redeemedMinor, found.row.currency),
     readPartly: found.row.readPartly,
     paidBy: found.row.paidBy,
+    byModel: byModel(found.row.readerVersion),
   }
 }
 
