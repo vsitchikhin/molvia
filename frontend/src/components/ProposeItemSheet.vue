@@ -22,7 +22,9 @@
       :maxlength="noteMax"
       enterkeyhint="done"
     />
-    <p v-if="nameTaken" class="code">{{ t('item.propose.name_taken', { name: nameTaken }) }}</p>
+    <p v-if="nameTaken" class="code warn">
+      {{ t('item.propose.name_taken', { name: nameTaken }) }}
+    </p>
     <p v-if="code" class="code">{{ t('item.propose.code', { code }) }}</p>
     <!-- The attribution the base's licence asks for (MOL-162): its page, opened by the person. Last,
          away from the fields and with a target a thumb can take (review 2). -->
@@ -33,22 +35,33 @@
     <template #footer>
       <!-- There before its words, with only the text changing: a live region born together with
            what it says is often not read at all (MOL-19; review Р-18). -->
-      <p class="line" :class="{ failed: textRefused }" role="status">{{ status }}</p>
+      <p class="line failed" role="status">{{ status }}</p>
       <p v-if="connected && failed" class="line failed" role="alert">
         {{ t('item.propose.failed') }}
       </p>
       <!-- Another item holds the code (MOL-100, Р-3): nothing was written, and that item is offered
-           — the package in the hand is what the catalogue already knows it as. -->
+           — the package in the hand is what the catalogue already knows it as. A warning, not an
+           error (MOL-213, 5e). -->
       <template v-if="holder">
-        <p class="line failed" role="alert">
+        <p class="code warn taken" role="alert">
           {{ t('item.propose.taken', { name: holder.name }) }}
         </p>
         <AppButton ref="takeButton" size="large" block @click="$emit('taken', holder)">
           {{ t('item.propose.take', { name: holder.name }) }}
         </AppButton>
       </template>
-      <AppButton v-else size="large" block :disabled="!ready" @click="submit">
-        {{ t('item.propose.submit') }}
+      <!-- One button through every word, so the focus stays on it while the person fills the form
+           (Ф-6): not now says why by its own name. -->
+      <AppButton
+        v-else
+        size="large"
+        block
+        :busy="sending"
+        :busy-label="t('item.propose.sending')"
+        :inactive="!ready && !sending"
+        @click="submit"
+      >
+        {{ submitWord }}
       </AppButton>
     </template>
   </BottomSheet>
@@ -113,6 +126,11 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
  * What the server refuses reads as one line, not under a field: its refusals are issue codes,
  * which the dictionary does not translate, and a blank name — the one refusal a person can make
  * here — never leaves, because the button waits for a name.
+ *
+ * The button says why it waits (MOL-213, Ф-6): «со связью», then «Напишите название», then «Выберите
+ * единицу» — the order of frames 5f and 5g — in the kit's not now, focusable and heard by its name.
+ * A character the catalogue will not take leaves it «Добавить в справочник», not now, under the line
+ * that names the field: the button cannot say which one.
  */
 /** As long as the app's live region waits before its words (`useAnnouncer`). */
 const STATUS_DELAY_MS = 100
@@ -246,12 +264,18 @@ export default defineComponent({
       () =>
         !drawsNothing(note.value) && !proposedItemSchema.shape.note.safeParse(note.value).success,
     )
-    const textRefused = computed(() => nameRefused.value || noteRefused.value)
+    // While it sends the kit says «Добавляем…» in its place, a connection lost meanwhile included.
+    const submitWord = computed(() => {
+      if (!connected.value) return t('item.propose.offline')
+      if (drawsNothing(name.value)) return t('item.propose.needs_name')
+      if (unit.value === '') return t('item.propose.needs_unit')
+      return t('item.propose.submit')
+    })
 
     // The status line is in the sheet from the start, but a closed <dialog> is outside the
-    // accessibility tree: a sheet opened offline would show the region and its words in one frame,
-    // the case Р-18 left. The words come a moment after the sheet does, as the app's own region
-    // lets them (MOL-19).
+    // accessibility tree: a name from the query with a character refused would show the region and
+    // its words in one frame, the case Р-18 left. The words come a moment after the sheet does, as
+    // the app's own region lets them (MOL-19).
     const settled = ref(false)
     let settling: ReturnType<typeof setTimeout> | undefined
     watch(
@@ -273,7 +297,6 @@ export default defineComponent({
 
     const status = computed(() => {
       if (!settled.value) return ''
-      if (!connected.value) return t('item.propose.offline')
       if (nameRefused.value) return t('item.propose.name_invalid')
       if (noteRefused.value) return t('item.propose.note_invalid')
       return ''
@@ -339,7 +362,8 @@ export default defineComponent({
       holder,
       takeButton,
       ready,
-      textRefused,
+      sending,
+      submitWord,
       status,
       submit,
       nameMax: ITEM_NAME_MAX,
@@ -372,7 +396,8 @@ export default defineComponent({
   align-self: flex-start;
   min-height: var(--touch-target);
   color: var(--accent-ink);
-  font-size: var(--text-footnote);
+  font-size: var(--text-callout);
+  font-weight: var(--weight-medium);
 }
 
 .size {
@@ -401,5 +426,14 @@ export default defineComponent({
   font-size: var(--text-footnote);
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
+}
+
+.warn {
+  background: var(--warn-tint);
+  color: var(--warn-ink);
+}
+
+.taken {
+  margin-bottom: var(--space-3);
 }
 </style>
