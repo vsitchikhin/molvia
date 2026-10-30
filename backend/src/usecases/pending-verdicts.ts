@@ -7,10 +7,17 @@ import type { ExpenseRepository } from '@/db/expenses-repository'
  * bot of 0.2 this screen is the only way a verdict is born, so it reads the person's own
  * purchases and nothing else — and writes nothing to the log: it is entering, not reading
  * someone else's data.
+ *
+ * With it, whether anything was bought at all (MOL-214): the screen's own question, which the
+ * reminder asking the same queue does not need.
  */
 export async function pendingVerdicts(
   expenses: ExpenseRepository,
   actorId: string,
 ): Promise<PendingVerdicts> {
-  return expenses.pendingVerdictsFor(actorId, PENDING_VERDICTS_LIMIT)
+  const pending = await expenses.pendingVerdictsFor(actorId, PENDING_VERDICTS_LIMIT)
+  // Asked only of an empty queue, and after it: a card is a purchase, and a second statement that
+  // missed one written meanwhile would send «nothing bought» beside it, which the phone refuses.
+  const bought = pending.total > 0 || (await expenses.hasPurchases(actorId))
+  return { ...pending, bought }
 }

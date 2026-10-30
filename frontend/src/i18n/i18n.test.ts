@@ -194,8 +194,8 @@ describe('словарь: повторяющиеся тексты', () => {
       // Шторка места чека и шторка траты спрашивают о дне одним словом (MOL-127).
       Когда: ['receipt.place.when', 'spending.sheet.date'],
       // Выход с экрана чека, которого больше нет, и с шторки покупки без записи — одни слова о
-      // том же месте (MOL-127).
-      'К покупкам': ['item.no_trip.action', 'receipt.gone.action'],
+      // том же месте (MOL-127). И из пустых «Оценок» новичка (MOL-214, 7b).
+      'К покупкам': ['item.no_trip.action', 'receipt.gone.action', 'verdict.none.action'],
       // Та же цена у офлайна: у настроек, у обменов, у доходов и у устройств своё состояние
       // (MOL-40, MOL-57, MOL-66).
       'Нет связи': [
@@ -341,6 +341,8 @@ describe('словарь: повторяющиеся тексты', () => {
     // текстов меньше, расходится там, где первичный разведён, и заметить это может только
     // проверка по обоим.
     expect(duplicates(EN)).toEqual({
+      // The way out of a receipt gone and of «Оценки» with nothing bought yet (MOL-214, 7b).
+      'To purchases': ['receipt.gone.action', 'verdict.none.action'],
       // One verb for two sheets, as in Russian: an account's balance, a barcode's digits (MOL-98).
       Done: [
         'accounts.done',

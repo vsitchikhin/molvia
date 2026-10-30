@@ -172,6 +172,33 @@ describe('pendingVerdictsCodec', () => {
     expect(pendingVerdictCodec.safeParse({ ...wire, placeCity: '\u200B' }).success).toBe(false)
   })
 
+  it('says whether anything was bought, and reads an answer without it (MOL-214)', () => {
+    const empty = { items: [], total: 0, bought: false }
+
+    expect(z.decode(pendingVerdictsCodec, z.encode(pendingVerdictsCodec, empty))).toEqual(empty)
+    expect(
+      z.decode(pendingVerdictsCodec, z.encode(pendingVerdictsCodec, { ...empty, bought: true })),
+    ).toEqual({ ...empty, bought: true })
+    // An answer of the server before MOL-214, and the queue the phone kept from one.
+    expect(pendingVerdictsCodec.safeParse({ items: [], total: 0 }).success).toBe(true)
+    expect(pendingVerdictsCodec.safeParse({ ...empty, bought: 'no' }).success).toBe(false)
+  })
+
+  it('refuses something waiting from someone who bought nothing', () => {
+    const wire = { ...card, boughtAt: '2026-09-18T17:40:00.000Z' }
+
+    expect(pendingVerdictsCodec.safeParse({ items: [wire], total: 1, bought: false }).success).toBe(
+      false,
+    )
+    // Past the page too: the total counts what the list does not carry.
+    expect(pendingVerdictsCodec.safeParse({ items: [], total: 1, bought: false }).success).toBe(
+      false,
+    )
+    expect(pendingVerdictsCodec.safeParse({ items: [wire], total: 1, bought: true }).success).toBe(
+      true,
+    )
+  })
+
   it('carries at most one page, and a total that is a count', () => {
     const page = Array.from({ length: PENDING_VERDICTS_LIMIT + 1 }, () => card)
 

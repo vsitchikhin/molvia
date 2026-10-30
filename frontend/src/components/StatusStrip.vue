@@ -2,14 +2,23 @@
   <div ref="root" class="strip" :class="kind" :role="role">
     <component :is="glyph" class="icon" aria-hidden="true" />
     <p class="words">{{ text }}</p>
-    <div v-if="kind === 'unanswered' && $slots.action" class="action">
+    <div v-if="kind === 'unanswered' && $slots.action" ref="action" class="action">
       <slot name="action" />
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import {
+  computed,
+  defineComponent,
+  onBeforeUnmount,
+  onBeforeUpdate,
+  onMounted,
+  onUpdated,
+  ref,
+  watch,
+} from 'vue'
 import type { PropType } from 'vue'
 import IconUnanswered from '~icons/mdi/alert-circle-outline'
 import IconOffline from '~icons/mdi/cloud-off-outline'
@@ -85,7 +94,27 @@ export default defineComponent({
         focusScreenTitle()
     })
 
-    return { glyph, role, root }
+    // The strip may stay and its button go: «Повторить» pressed, the retry failed offline, and the
+    // strip turned to `offline`, which draws none (MOL-214, adversarial А2). A focus on it fell to the
+    // body; it goes to the button that stands in its place, else to the title, as when the strip goes.
+    const action = ref<HTMLElement | null>(null)
+    let held = false
+    onBeforeUpdate(() => {
+      held = Boolean(action.value?.contains(document.activeElement))
+    })
+    onUpdated(() => {
+      if (!held) return
+      held = false
+      const focus = document.activeElement
+      // Kept by the strip, or taken by someone else in the same render: not ours to move.
+      if (focus && focus !== document.body) return
+      if (root.value?.closest('dialog')) return
+      const button = action.value?.querySelector<HTMLElement>('button')
+      if (button) button.focus()
+      else focusScreenTitle()
+    })
+
+    return { glyph, role, root, action }
   },
 })
 </script>

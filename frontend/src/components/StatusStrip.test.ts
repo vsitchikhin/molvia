@@ -1,10 +1,12 @@
 import { mount } from '@vue/test-utils'
 import { defineComponent, h, nextTick, ref, watch } from 'vue'
+import type { PropType } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import IconUnanswered from '~icons/mdi/alert-circle-outline'
 import IconOffline from '~icons/mdi/cloud-off-outline'
 import IconRefreshing from '~icons/mdi/sync'
 import StatusStrip from '@/components/StatusStrip.vue'
+import type { StripKind } from '@/components/StatusStrip.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
 
 describe('StatusStrip', () => {
@@ -93,6 +95,33 @@ describe('StatusStrip', () => {
         const view = mount(Screen(false), { props: { shown: true }, attachTo: document.body })
         ;(view.get('.row').element as HTMLElement).focus()
         await view.setProps({ shown: false })
+        expect(document.activeElement).toBe(view.get('.row').element)
+        view.unmount()
+      })
+
+      // The strip stays and only its button goes: a retry that failed offline (MOL-214, А2).
+      const Stays = defineComponent({
+        props: { kind: { type: String as PropType<StripKind>, required: true } },
+        setup: (props) => () => [
+          h('h1', { tabindex: -1 }, 'Оценки'),
+          h('button', { class: 'row' }, 'Молоко'),
+          h(StatusStrip, { kind: props.kind, text: 'Список на вчера' }, action),
+        ],
+      })
+
+      it('hands it to the title when the button goes and the strip stays', async () => {
+        const view = mount(Stays, { props: { kind: 'unanswered' }, attachTo: document.body })
+        ;(view.get('.action button').element as HTMLElement).focus()
+        await view.setProps({ kind: 'offline' })
+        expect(view.find('.action').exists()).toBe(false)
+        expect(document.activeElement).toBe(view.get('h1').element)
+        view.unmount()
+      })
+
+      it('leaves a focus elsewhere where it is when the button goes', async () => {
+        const view = mount(Stays, { props: { kind: 'unanswered' }, attachTo: document.body })
+        ;(view.get('.row').element as HTMLElement).focus()
+        await view.setProps({ kind: 'offline' })
         expect(document.activeElement).toBe(view.get('.row').element)
         view.unmount()
       })

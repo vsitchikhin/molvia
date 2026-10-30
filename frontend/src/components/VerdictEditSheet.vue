@@ -3,21 +3,9 @@
     <template #title>{{ name }}</template>
     <template #meta>{{ own.mine ? t('advice.edit.meta') : t('advice.edit.meta_new') }}</template>
 
-    <!-- The score as it stands, kept while another digit is chosen: the point a change is made
-         from, in both modes — the row's figure may be everyone's average (Ф-25, MOL-202). The
-         messages are the app's one global scope; unnamed, intlify warned at every opening. -->
-    <I18nT
-      v-if="own.mine && own.score !== null && !waiting"
-      keypath="advice.edit.current"
-      scope="global"
-      tag="p"
-      class="current"
-    >
-      <template #n>
-        <b>{{ own.score }}</b>
-      </template>
-    </I18nT>
-    <RatingScale v-model="score" />
+    <!-- The score as it stands, said over the scale: the point a change is made from, in both
+         modes — the row's figure may be everyone's average (Ф-25, MOL-202). -->
+    <RatingScale v-model="score" :current="own.mine && !waiting ? own.score : null" />
     <!-- The scale has one undo — a second tap on the chosen digit — and clearing it is not a
          change the server can be asked for: a verdict without a score does not exist. Said
          here rather than left to be discovered after saving (А5). -->
@@ -74,7 +62,7 @@
 <script lang="ts">
 import { computed, defineComponent, ref, watch } from 'vue'
 import type { PropType } from 'vue'
-import { Translation, useI18n } from 'vue-i18n'
+import { useI18n } from 'vue-i18n'
 import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE, ratingSchema, tidyText } from '@molvia/model'
 import type { VerdictAmendment, WireCode } from '@molvia/model'
@@ -139,7 +127,7 @@ const SPOKEN: Partial<Record<WireCode, string>> = {
  */
 export default defineComponent({
   name: 'VerdictEditSheet',
-  components: { AppButton, AppField, AppReveal, BottomSheet, I18nT: Translation, RatingScale },
+  components: { AppButton, AppField, AppReveal, BottomSheet, RatingScale },
   props: {
     itemId: { type: String, required: true },
     name: { type: String, required: true },
@@ -397,17 +385,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.current {
-  margin: 0 0 var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-callout);
-
-  b {
-    color: var(--text);
-    font-weight: var(--weight-medium);
-  }
-}
-
 .review {
   margin-top: var(--space-6);
 }
