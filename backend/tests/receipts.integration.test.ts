@@ -143,13 +143,13 @@ let photos = 0
 const days = () => db.select().from(receiptDays).orderBy(receiptDays.day)
 
 /**
- * Taken in by the server when the phone stamped it (MOL-305): the days a receipt may print run from its arrival, and
- * a date the test reads must not fall out of them as the calendar moves on.
+ * Taken in by the server when the phone stamped it, or at `at` (MOL-305): the days a receipt may print run from its
+ * arrival, and a date the test reads must not fall out of them as the calendar moves on.
  */
-async function arrivedWhenSent(id: string): Promise<void> {
+async function arrivedWhenSent(id: string, at = body().capturedAt): Promise<void> {
   await db
     .update(receipts)
-    .set({ createdAt: new Date(body().capturedAt) })
+    .set({ createdAt: new Date(at) })
     .where(eq(receipts.id, id))
 }
 
@@ -490,7 +490,8 @@ describe('the queue', () => {
   it('reads a receipt with no items, its head and its total, and counts it apart', async () => {
     const me = await owner()
     const id = await queued(me)
-    await arrivedWhenSent(id)
+    // taken in after the moment it prints, 04.10 16:30 in Yerevan: a day later is past the latest day on Earth (Р3-А7)
+    await arrivedWhenSent(id, '2026-10-04T13:00:00.000Z')
     const text = [
       'ԽԱՆՈՒԹ ԱՁ',
       'ԳՅՈՒՄՐԻ Աբովյան 10',
