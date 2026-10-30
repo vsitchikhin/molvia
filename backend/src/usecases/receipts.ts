@@ -230,8 +230,9 @@ async function codeToAsk(
 /**
  * One receipt with its lines, as the review shows them (MOL-126): the shop's memory laid over what
  * the parse found — the article first, then the line as printed — the item's name, what each line
- * will be recorded at (В-5), a price the memory doubts (В-1), the place, the rate of the receipt's
- * day and the same receipt recorded before. 404 for a missing, removed or someone else's one alike.
+ * will be recorded at (В-5), a price the memory doubts on a receipt not proven whole (В-1, MOL-314), the place,
+ * the rate of the receipt's day and the same receipt recorded before. 404 for a missing, removed or someone else's
+ * one alike.
  */
 export async function receiptOfOwner(
   repositories: ReceiptReviewRepositories,
@@ -356,10 +357,12 @@ export async function receiptOfOwner(
         ...(spelled && line.spelled && known === null ? { spelled: true } : {}),
         ...(packed === null ? {} : { pack: packed }),
         amount: amounts[i] ?? null,
-        // one confused digit off the price read (В-1); or the line has none — the check emptied it, the memory
-        // doubting it among others (MOL-291, owner's В-2 «б»): a hint to type by, never a figure of the line
+        // one confused digit off the price read (В-1), on a receipt its total did not prove whole — there a price off
+        // the memory's is one that changed (MOL-314); or the line has none — the check emptied it, the memory doubting
+        // it among others (MOL-291, owner's В-2 «б»): a hint to type by, never a figure of the line
         rememberedPrice:
-          line.price === null || priceInDoubt(receipt.country, line.price, rememberedOf(remembered))
+          line.price === null ||
+          (!receipt.balanced && priceInDoubt(receipt.country, line.price, rememberedOf(remembered)))
             ? rememberedOf(remembered)
             : null,
         ...(code === null ? {} : { code }),

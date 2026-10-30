@@ -453,6 +453,30 @@ describe('the review of a receipt', () => {
     expect(detail.lines.map((line) => line.rememberedPrice)).toEqual([amd(50), null])
   })
 
+  // MOL-314: «1 / 650 / 650» under a total of 650 two places print is the butter gone up, not a misread
+  it('doubts no price on a receipt its total proved whole, and still hints a line with none', async () => {
+    const me = await insertActor(db)
+    const butter = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    await memory.remember(me, TIN, [
+      { kind: 'sku', key: '1110004', itemId: butter, price: amd(550) },
+    ])
+    const line = { printed: 'Կարագ «Օրինակ»', sku: '1110004', price: 650, sum: 650 }
+    const remembered = async (balanced: boolean) =>
+      (
+        await review(
+          me,
+          await parsedReceipt(me, [line], { totalMinor: 65_000n, balanced, layout: 'class' }),
+        )
+      ).lines[0]?.rememberedPrice
+    expect(await remembered(true)).toBeNull()
+    expect(await remembered(false)).toEqual(amd(550))
+
+    // a line the check took the price off keeps the memory as its hint (MOL-291)
+    const id = await parsedReceipt(me, [line], { totalMinor: 65_000n, balanced: true })
+    await db.update(receiptLines).set({ priceMinor: null }).where(eq(receiptLines.receiptId, id))
+    expect((await review(me, id)).lines[0]?.rememberedPrice).toEqual(amd(550))
+  }, 10_000)
+
   // В6 of the adversarial review: a shelf price is someone's figure — the person's own always, other
   // people's only with access and from three people
   it('names another person’s remembered price only with access and from three prices, their lower median', async () => {

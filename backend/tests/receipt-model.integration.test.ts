@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { MODEL_CONSENT_EDITION, spendMonthOf } from '@molvia/model'
+import { MODEL_CONSENT_EDITION, receiptDetailCodec, spendMonthOf } from '@molvia/model'
 import type { ModelReceipt } from '@molvia/model'
 import am05 from '@molvia/model/testing/receipt-text.am-05.json'
 import type { FastifyInstance } from 'fastify'
@@ -748,6 +748,44 @@ describe('the shop’s memory in the digits (MOL-291)', () => {
     expect(
       await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id)),
     ).toMatchObject([{ priceMinor: null, sumMinor: null, repaired: false, remembered: false }])
+  }, 30_000)
+
+  // MOL-314: the hint «В прошлый раз здесь было 550 — проверьте цифры» argued with the voices that settled it
+  it('hints no old price over a line its total proved, and hints it where no total did', async () => {
+    const item = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    const me = await person(LATER)
+    await say(me.id, item)
+    // the butter gone up to 650, copied as printed: 1 × 650 = 650
+    const gone = { ...butter, unit_price: '650', discount: null, sum: '650' }
+    const reviewed = async (totals: ModelReceipt['totals']) => {
+      const id = await queued(me)
+      await readAll(benchReader(), model(answer({ lines: [gone], totals })))
+      const [stored] = await db.select().from(receipts).where(eq(receipts.id, id))
+      const response = await app.inject({
+        method: 'GET',
+        url: `/receipts/${id}`,
+        headers: { cookie: me.cookie, 'x-molvia-today': '2026-10-22' },
+      })
+      expect(response.statusCode).toBe(200)
+      const [line] = receiptDetailCodec.parse(response.json()).lines
+      return { balanced: stored?.balanced, price: line?.price, hint: line?.rememberedPrice }
+    }
+    const amd = (drams: number) => ({ minor: BigInt(drams * 100), currency: 'AMD' })
+
+    expect(
+      await reviewed([
+        { label: 'Ընդամենը', amount: '650' },
+        { label: 'Վճարված է Առձեռն', amount: '650' },
+      ]),
+    ).toEqual({ balanced: true, price: amd(650), hint: null })
+    // in one place, met by the lines as copied, it is the second source (MOL-244) and the memory says nothing (MOL-291)
+    expect(await reviewed([{ label: 'Ընդամենը', amount: '650' }])).toEqual({
+      balanced: true,
+      price: amd(650),
+      hint: null,
+    })
+    // no total: the memory doubts the line, the check empties it, and the hint is what to type it by
+    expect(await reviewed([])).toEqual({ balanced: false, price: null, hint: amd(550) })
   }, 30_000)
 
   it('shows no price of other people’s that the line’s own sum does not hold, and doubts nothing by it (А2, review №4)', async () => {
