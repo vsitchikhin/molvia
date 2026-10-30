@@ -398,6 +398,15 @@ back. The card decides, not the country: a country read by photo comes with its 
 still shows the memory (MOL-291), which asks no doubt. **The price, named:** a price of such a receipt changed by
 one such digit is told nowhere, as any other change of a price is not.
 
+**A receipt is doubted by its reader's confusions** (MOL-315, owner's В-1 «а», 30.10.2026): `priceInDoubt(…, { byModel })`
+takes the card's `modelSwaps` for a receipt the model read — 5↔6 alone, measured (MOL-290) — and `swaps` with no
+reader named; the server names it by the receipt's `reader_version` (`found.byModel`). The model's 1 100 → 1 400, 990 →
+999, 330 → 380 are prices changed, which «проверьте цифры» asked the person to put back; MOL-291's doubt at reading
+went by 5↔6 already. A model's receipt Tesseract read in its place, and one read before MOL-255, are Tesseract's.
+**The phone knows no reader** and doubts by `swaps`: the server only narrows, so a hint it sent stands while the model's
+pairs are among Tesseract's — the card's test holds that. **The price, named** (В-2 «а»): a price the person typed on
+the sheet of a model's receipt is doubted by Tesseract's pairs — 4 550 typed against a remembered 1 550 keeps the hint.
+
 ## What a line is (MOL-126)
 
 **A line finds its item in five steps, the first that answers deciding** (MOL-114's order, approved
