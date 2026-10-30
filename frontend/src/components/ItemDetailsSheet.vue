@@ -92,30 +92,33 @@
           </p>
           <p class="caption">{{ t('item.barcode.detach_hint') }}</p>
           <!-- Destructive for everyone and with no «Вернуть»: not the filled button, and the focus
-               waits on «Отменить» (review Л). -->
-          <AppButton
-            variant="danger-ghost"
-            block
-            :busy="detaching"
-            :busy-label="t('item.barcode.detach_busy')"
-            @click="notThis"
-          >
-            {{ t('item.barcode.detach') }}
-          </AppButton>
-          <AppButton
-            ref="detachCancel"
-            variant="ghost"
-            block
-            :inactive="detaching"
-            @click="keepCode"
-          >
-            {{ t('item.cancel') }}
-          </AppButton>
+               waits on «Отменить» (review Л). Side by side, as 4h draws them (MOL-212). -->
+          <div class="detach-actions">
+            <AppButton
+              variant="danger-ghost"
+              block
+              :busy="detaching"
+              :busy-label="t('item.barcode.detach_busy')"
+              @click="notThis"
+            >
+              {{ t('item.barcode.detach') }}
+            </AppButton>
+            <AppButton
+              ref="detachCancel"
+              variant="ghost"
+              block
+              :inactive="detaching"
+              @click="keepCode"
+            >
+              {{ t('item.cancel') }}
+            </AppButton>
+          </div>
           <p v-if="detachFailed" class="caption offline" role="alert">
             {{ t('item.barcode.not_this_failed') }}
           </p>
         </div>
         <AppButton v-else ref="notThisButton" variant="ghost" block @click="askDetach">
+          <template #icon><IconBarcodeScan /></template>
           {{ t('item.barcode.not_this', { code }) }}
         </AppButton>
       </template>
@@ -144,6 +147,7 @@ import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, useId
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconArrowDown from '~icons/mdi/arrow-down'
+import IconBarcodeScan from '~icons/mdi/barcode-scan'
 import IconCheck from '~icons/mdi/check'
 import IconEqual from '~icons/mdi/equal'
 import IconMenuDown from '~icons/mdi/menu-down'
@@ -198,6 +202,7 @@ export default defineComponent({
     AppField,
     AppReveal,
     BottomSheet,
+    IconBarcodeScan,
     IconMenuDown,
     IconSwapHorizontal,
     SegmentedControl,
@@ -678,7 +683,7 @@ export default defineComponent({
   margin: 0;
   padding: var(--space-2) var(--space-4) var(--space-3);
   border-top: var(--hairline) solid var(--border);
-  font-size: var(--text-callout);
+  font-size: var(--text-footnote);
   line-height: var(--leading-snug);
   overflow-wrap: anywhere;
 }
@@ -687,7 +692,6 @@ export default defineComponent({
   @include icon;
 
   font-size: var(--icon-sm);
-  margin-top: var(--space-1);
 }
 
 .hint-there {
@@ -722,11 +726,11 @@ export default defineComponent({
 .caption {
   margin: calc(var(--space-2) * -1) 0 0;
   color: var(--text-muted);
-  font-size: var(--text-caption);
+  font-size: var(--text-footnote);
 }
 
-.note::before {
-  content: ' · ';
+.note {
+  display: block;
 }
 
 .offline {
@@ -742,8 +746,14 @@ export default defineComponent({
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-4);
-  border: var(--hairline) solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.detach-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-2);
 }
 
 .detach-question {
@@ -754,10 +764,6 @@ export default defineComponent({
 
 .no-trip {
   margin: 0;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius);
-  background: var(--accent-tint);
-  color: var(--accent-ink);
-  font-weight: var(--weight-medium);
+  font-size: var(--text-footnote);
 }
 </style>

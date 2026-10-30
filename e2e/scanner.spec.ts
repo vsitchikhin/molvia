@@ -724,6 +724,28 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       await expect.poll(async () => (await focused(page)).body).toBe(false)
     })
 
+    // «Unlink» and «Cancel» side by side, as 4h draws them (MOL-212), on the narrowest phone too — with
+    // a long name in the question, which breaks rather than widening the sheet (MOL-318).
+    test('«Unlink?» at 320: both answers on one row, the sheet no wider than the phone', async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 320, height: 720 })
+      const code = freshCode()
+      const name = `Кефирныйнапитокбезлактозныйультрапастеризованный ${tag}`
+      await open(page, '/purchases/manual/add')
+      await anItem(page, name, [code])
+      await typeCode(page, code)
+      const found = await sheetOf(page, name)
+      await found.getByRole('button', { name: `Code ${code} — not this item?` }).click()
+
+      const unlink = await found.getByRole('button', { name: 'Unlink', exact: true }).boundingBox()
+      const cancel = await found.getByRole('button', { name: 'Cancel', exact: true }).boundingBox()
+      expect(unlink?.y).toBe(cancel?.y)
+      expect((unlink?.x ?? 0) + (unlink?.width ?? 0)).toBeLessThanOrEqual(cancel?.x ?? 0)
+      const wide = await found.evaluate((dialog) => dialog.scrollWidth - dialog.clientWidth)
+      expect(wide).toBeLessThanOrEqual(0)
+    })
+
     test('«Unlink?»: the focus on «Cancel», back on «not this item?», and after the unlink never the body', async ({
       page,
     }) => {

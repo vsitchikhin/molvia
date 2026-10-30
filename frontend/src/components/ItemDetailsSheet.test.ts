@@ -601,6 +601,13 @@ describe('«не этот товар?» (MOL-100)', () => {
     expect(document.activeElement?.textContent.trim()).toBe('Отменить')
     const detach = view.findAll('button').find((button) => button.text() === 'Отвязать')
     expect(detach?.classes()).toContain('danger-ghost')
+    // Side by side, as 4h draws them (MOL-212): one row holds both answers and nothing else.
+    expect(
+      view
+        .get('.detach-actions')
+        .findAll('button')
+        .map((button) => button.text()),
+    ).toEqual(['Отвязать', 'Отменить'])
   })
 })
 
