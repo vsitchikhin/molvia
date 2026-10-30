@@ -331,6 +331,7 @@
       :proposed="detail.receipt.header?.shop ?? null"
       :read="!!detail.receipt.place && !placeChosen"
       :day="day"
+      :sent-day="sentDay"
       :action="recordAfterPlace ? recordLabel : null"
       :on-closed="placeClosed"
       @chosen="choosePlace"
@@ -426,7 +427,7 @@ import { api } from '@/api'
 import { useOnline } from '@/composables/useOnline'
 import { useReceipt } from '@/composables/useReceipt'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
-import { calendarDay, dayOfAnyYear, localDay } from '@/days'
+import { calendarDayOfAnyYear, dayOfAnyYear, localDay } from '@/days'
 import { reportFailure } from '@/failures'
 import { newId } from '@/ids'
 import { afterStep, useNavigation } from '@/navigation'
@@ -546,6 +547,9 @@ export default defineComponent({
     const day = computed(() =>
       detail.value ? reviewDay(detail.value, draft.value, taken.value) : taken.value,
     )
+    // no date of the receipt — none read, or none it could print (MOL-305): the day it was sent stands in, said as
+    // such wherever the day is shown while it is that day — a «Готово» that left it so chose nothing
+    const sentDay = computed(() => (detail.value?.receipt.header?.date ? null : taken.value))
     const shownTotal = computed<Money | null>(
       () => draft.value?.total ?? detail.value?.receipt.total ?? null,
     )
@@ -641,30 +645,35 @@ export default defineComponent({
 
     const dayOf = (at: Date | string) =>
       typeof at === 'string'
-        ? calendarDay(at, locale.value, { day: 'numeric', month: 'short' })
+        ? calendarDayOfAnyYear(at, locale.value)
         : dayOfAnyYear(at, locale.value)
     const positions = (n: number): string => t('trip.items_count', { n }, n)
 
     const title = computed(() => {
       const one = detail.value
       if (!one) return t('receipt.review.title_loading')
-      return place.value?.name ?? t('receipt.review.title_no_place', { day: dayOf(day.value) })
+      if (place.value) return place.value.name
+      // the day it was sent is no date of the receipt, and the title does not say it is (MOL-305, Р2-А4)
+      return sentDay.value === day.value
+        ? t('receipt.review.title_sent', { day: dayOf(day.value) })
+        : t('receipt.review.title_no_place', { day: dayOf(day.value) })
     })
     const placeLine = computed(() => {
       const one = detail.value
       if (!one || !place.value) return t('receipt.review.place_missing')
       const tin = one.receipt.header?.tin
       const time = one.receipt.header?.time
+      const sent = sentDay.value === day.value
       const words = {
         city: place.value.city,
         inn: tin ?? '',
-        day: dayOf(day.value),
+        day: sent ? t('receipt.review.sent_day', { day: dayOf(day.value) }) : dayOf(day.value),
         time: time ?? '',
       }
       if (!tin) return t('receipt.review.place_line_no_tin', words)
       // a Serbian seller's tax number is its ПИБ (MOL-232)
       const kind = byLink.value ? 'place_line_pib' : 'place_line'
-      return time && !placeChosen.value
+      return time && !placeChosen.value && !sent
         ? t(`receipt.review.${kind}_time`, words)
         : t(`receipt.review.${kind}`, words)
     })
@@ -981,6 +990,7 @@ export default defineComponent({
       place,
       placeChosen,
       day,
+      sentDay,
       shownTotal,
       suspect,
       checks,

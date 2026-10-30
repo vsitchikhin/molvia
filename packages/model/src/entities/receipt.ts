@@ -8,6 +8,7 @@ import { COUNTRY_CITIES } from '#model/contracts/settings'
 import { localClock } from '#model/entities/reminder'
 import { toSearchKey } from '#model/support/search-key'
 import { MINOR_EXPONENT } from '#model/values/money'
+import { latestDay } from '#model/values/rates'
 import type { Currency, Money } from '#model/values/money'
 import type { Quantity } from '#model/values/units'
 
@@ -557,16 +558,55 @@ export function receiptLineOf(line: ReceiptTextLine, currency: Currency): Receip
   }
 }
 
+/** The days a receipt shot at a moment may print (MOL-305): `receiptDateWindow`. */
+export interface ReceiptDateWindow {
+  readonly earliest: string
+  readonly latest: string
+}
+
 /**
  * The date a receipt prints, if it is one a receipt can have: `YYYY-MM-DD`, a day of the calendar,
- * not before 2000 and not after `latest` — the server's today and a day for the zones (review Р10,
- * Р13). OCR makes up «01.01.0000», which Postgres refuses, and «2099».
+ * not before 2000 and within its window (review Р10, Р13, MOL-305). OCR makes up «01.01.0000», which
+ * Postgres refuses, and «2099»; a model made 26 October 2023 of a receipt shot on 23 October 2026.
  */
-export function receiptDateOf(text: ReceiptText, latest: string): string | null {
+export function receiptDateOf(text: ReceiptText, window: ReceiptDateWindow): string | null {
   if (text.date === null) return null
   const day = new Date(`${text.date}T00:00:00Z`)
   if (Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== text.date) return null
-  return text.date >= '2000-01-01' && text.date <= latest ? text.date : null
+  return text.date >= '2000-01-01' && text.date >= window.earliest && text.date <= window.latest
+    ? text.date
+    : null
+}
+
+/** How many months back from its arrival a receipt's date is still its date (MOL-305, owner's В-5 «а»). */
+export const RECEIPT_DATE_MONTHS = 6
+
+/**
+ * The days a receipt the server took in at `arrivedAt` may print (MOL-305, owner's В-1, В-5 «а»): from the same day
+ * six months before — the last day of a shorter month, 30 April for 31 October — to the day after, on the till's
+ * clock, and never past the latest day on Earth then (`latestDay`, adversarial Р3-А7): «Записать» refuses a day past
+ * it, so a date the window took was refused until 14:00 in Yerevan, and the queue set the receipt aside. Half a year,
+ * not a month: a photo picked from the gallery may be weeks old, and the swap of a day with a short year it catches
+ * (the year 20ДД for 20ГГ) is eleven months off and more. **The server's moment, never the phone's** (adversarial А3,
+ * Р2-А3): a battery that died sets a phone's clock to 1970, 2000 or its firmware's day, and a receipt sent before the
+ * network set it right moved the window years back; a queue that sent it days late moves it by as much, which half a
+ * year holds. A date outside is no date of the receipt, «неверно прочитанное хуже непрочитанного»: the purchases go to
+ * the day it was sent, which the review says it is.
+ */
+export function receiptDateWindow(arrivedAt: Date, country: ReceiptCountry): ReceiptDateWindow {
+  const arrived = receiptClockOf(arrivedAt, country).day
+  const [year = 0, month = 1, day = 1] = arrived.split('-').map(Number)
+  // Date.UTC rolls a month below 0 back into the year before; day 0 of a month is the last of the one before
+  const back = month - 1 - RECEIPT_DATE_MONTHS
+  const lastOfBack = new Date(Date.UTC(year, back + 1, 0)).getUTCDate()
+  const earliest = new Date(Date.UTC(year, back, Math.min(day, lastOfBack)))
+  // the day after, for a till's clock a little ahead
+  const after = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10)
+  const latest = latestDay(arrivedAt)
+  return {
+    earliest: earliest.toISOString().slice(0, 10),
+    latest: after < latest ? after : latest,
+  }
 }
 
 /**

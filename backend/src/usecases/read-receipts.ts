@@ -15,6 +15,7 @@ import {
   receiptCard,
   receiptCityOf,
   receiptDateOf,
+  receiptDateWindow,
   receiptTextOfModel,
   rememberedReading,
   unparsedFigures,
@@ -32,6 +33,7 @@ import type {
   PhotoReading,
   ReceiptLineReason,
   ReceiptLine,
+  ReceiptDateWindow,
   ReceiptPaidBy,
   ReceiptText,
   RememberedPrice,
@@ -66,9 +68,9 @@ const TILL_WORDS: ReadonlySet<string> = new Set([
   ...TILL_KINDS_LATIN,
 ])
 
-// The latest day a receipt may print: the server's tomorrow, so no zone's today is refused.
-const latestPrinted = (): string =>
-  new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+// The days a receipt may print, from the moment the server took it in (MOL-305): one rule for both readers.
+const datesOf = (claimed: ClaimedReceipt): ReceiptDateWindow =>
+  receiptDateWindow(claimed.arrivedAt, claimed.country)
 
 /** Rows cut out per request: the reader takes 64; a long receipt's lines go in several. */
 const STRIPS_PER_REQUEST = 32
@@ -177,11 +179,14 @@ function headOf(
   currency: Currency,
   readings: readonly (readonly TextRow[])[],
   paidBy: ReceiptPaidBy | null,
+  dates: ReceiptDateWindow,
 ): ReceiptHead {
+  const printedOn = receiptDateOf(text, dates)
   return {
     tin: text.tin,
-    printedOn: receiptDateOf(text, latestPrinted()),
-    printedTime: receiptTimeOf(text),
+    printedOn,
+    // a time without its day dates nothing: the purchases go to the day it was sent, never at its time (MOL-305)
+    printedTime: printedOn === null ? null : receiptTimeOf(text),
     receiptNo: text.receiptNo,
     totalMinor: moneyOfHundredths(text.totalHundredths, currency)?.minor ?? null,
     readTotalMinor: moneyOfHundredths(text.readTotalHundredths, currency)?.minor ?? null,
@@ -302,6 +307,7 @@ async function readByModel(
     currency,
     [modelHeadRows(reading.answer)],
     modelPaidBy(photoReading, reading.answer),
+    datesOf(claimed),
   )
   if (needsReshoot(text)) {
     const outcome: ReadOutcome = {
@@ -378,7 +384,13 @@ async function readByOcr(
   // a figure goes to the review as read only where it is verified, the rest is left empty (MOL-255)
   const explained = explainedReading(text)
   const { shown } = explained
-  const head = headOf(shown, currency, readings, receiptPaidBy(photoReading, readings))
+  const head = headOf(
+    shown,
+    currency,
+    readings,
+    receiptPaidBy(photoReading, readings),
+    datesOf(claimed),
+  )
   if (needsReshoot(text))
     return { kind: 'failed', failure: 'reshoot', readerVersion: version, head }
   let images: LineImage[] = []

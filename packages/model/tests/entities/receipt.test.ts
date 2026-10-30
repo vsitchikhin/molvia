@@ -5,6 +5,7 @@ import {
   needsReshoot,
   withoutItems,
   receiptDateOf,
+  receiptDateWindow,
   STORE_MEMORY_KEY_MAX_OCTETS,
   receiptCityOf,
   receiptLineOf,
@@ -14,6 +15,7 @@ import {
   receiptTimeOf,
 } from '#model/entities/receipt'
 import type { ReceiptText, ReceiptTextLine } from '#model/entities/receipt-text'
+import { latestDay } from '#model/values/rates'
 
 const line = (over: Partial<ReceiptTextLine> = {}): ReceiptTextLine => ({
   printed: 'Կաթ',
@@ -110,26 +112,101 @@ describe('the figures as the domain’s values', () => {
 })
 
 describe('the date a receipt prints', () => {
-  const latest = '2026-10-04'
-  it('takes a real day, up to the latest one', () => {
-    expect(receiptDateOf({ ...receipt([]), date: '2026-09-30' }, latest)).toBe('2026-09-30')
-    expect(receiptDateOf({ ...receipt([]), date: latest }, latest)).toBe(latest)
+  const window = { earliest: '2026-09-04', latest: '2026-10-04' }
+  const dated = (date: string) => receiptDateOf({ ...receipt([]), date }, window)
+
+  it('takes a real day within its window, both ends included', () => {
+    expect(dated('2026-09-30')).toBe('2026-09-30')
+    expect(dated(window.latest)).toBe(window.latest)
+    expect(dated(window.earliest)).toBe(window.earliest)
   })
 
   it('drops a day OCR made up: 30 February, month 13', () => {
-    expect(receiptDateOf({ ...receipt([]), date: '2026-02-30' }, latest)).toBeNull()
-    expect(receiptDateOf({ ...receipt([]), date: '2026-13-01' }, latest)).toBeNull()
+    expect(dated('2026-02-30')).toBeNull()
+    expect(dated('2026-13-01')).toBeNull()
   })
 
   it('drops a year no receipt has: 0000, which Postgres refuses, 1999, and the future (review Р10, Р13)', () => {
-    expect(receiptDateOf({ ...receipt([]), date: '0000-01-01' }, latest)).toBeNull()
-    expect(receiptDateOf({ ...receipt([]), date: '1999-12-31' }, latest)).toBeNull()
-    expect(receiptDateOf({ ...receipt([]), date: '2026-10-05' }, latest)).toBeNull()
-    expect(receiptDateOf({ ...receipt([]), date: '2099-10-01' }, latest)).toBeNull()
+    expect(
+      receiptDateOf({ ...receipt([]), date: '0000-01-01' }, { ...window, earliest: '0000-01-01' }),
+    ).toBeNull()
+    expect(
+      receiptDateOf({ ...receipt([]), date: '1999-12-31' }, { ...window, earliest: '1990-01-01' }),
+    ).toBeNull()
+    expect(dated('2026-10-05')).toBeNull()
+    expect(dated('2099-10-01')).toBeNull()
+  })
+
+  it('drops a day before its window: 26 October 2023 of a receipt shot on 23 October 2026 (MOL-305)', () => {
+    expect(dated('2026-09-03')).toBeNull()
+    expect(
+      receiptDateOf(
+        { ...receipt([]), date: '2023-10-26' },
+        { earliest: '2026-09-23', latest: '2026-10-24' },
+      ),
+    ).toBeNull()
   })
 
   it('has none when none was read', () => {
-    expect(receiptDateOf(receipt([]), latest)).toBeNull()
+    expect(receiptDateOf(receipt([]), window)).toBeNull()
+  })
+})
+
+describe('the days a receipt the server took in may print (MOL-305, В-1, В-5 «а»)', () => {
+  // 20:00 in Yerevan is 16:00 UTC: its tomorrow has begun east of it
+  const at = (day: string, time = '16:00') => new Date(`${day}T${time}:00Z`)
+
+  it('from the same day six months before to the day after', () => {
+    expect(receiptDateWindow(at('2026-10-23'), 'AM')).toEqual({
+      earliest: '2026-04-23',
+      latest: '2026-10-24',
+    })
+  })
+
+  it('from the last day of a shorter month: 30 April for 31 October, 28 February for 31 August, 29 in a leap year', () => {
+    expect(receiptDateWindow(at('2026-10-31'), 'AM').earliest).toBe('2026-04-30')
+    expect(receiptDateWindow(at('2026-08-31'), 'AM').earliest).toBe('2026-02-28')
+    expect(receiptDateWindow(at('2028-08-31'), 'AM').earliest).toBe('2028-02-29')
+    expect(receiptDateWindow(at('2026-08-28'), 'AM').earliest).toBe('2026-02-28')
+  })
+
+  it('across a year: July of the year before for January, 1 January after 31 December', () => {
+    expect(receiptDateWindow(at('2027-01-15'), 'AM')).toEqual({
+      earliest: '2026-07-15',
+      latest: '2027-01-16',
+    })
+    expect(receiptDateWindow(at('2026-12-31'), 'AM').latest).toBe('2027-01-01')
+  })
+
+  it('counts the day on the till’s clock: 22:30 UTC is the next day in Yerevan', () => {
+    expect(receiptDateWindow(at('2026-10-22', '22:30'), 'AM').earliest).toBe('2026-04-23')
+  })
+
+  it('ends no later than the latest day on Earth, which «Записать» refuses past (adversarial Р3-А7)', () => {
+    // 00:30 on 24 October in Yerevan: the 25th has begun nowhere yet
+    expect(receiptDateWindow(at('2026-10-23', '20:30'), 'AM').latest).toBe('2026-10-24')
+    // 10:00 on the 23rd: nowhere is it the 24th yet; from 14:00 in Yerevan it is, at UTC+14
+    expect(receiptDateWindow(at('2026-10-23', '06:00'), 'AM').latest).toBe('2026-10-23')
+    expect(receiptDateWindow(at('2026-10-23', '09:59'), 'AM').latest).toBe('2026-10-23')
+    expect(receiptDateWindow(at('2026-10-23', '10:00'), 'AM').latest).toBe('2026-10-24')
+    // whatever the moment, a date the window takes is one «Записать» takes then
+    for (let minute = 0; minute < 24 * 60; minute += 7) {
+      const moment = new Date(Date.UTC(2026, 9, 23) + minute * 60_000)
+      expect(receiptDateWindow(moment, 'AM').latest <= latestDay(moment)).toBe(true)
+      expect(receiptDateWindow(moment, 'RS').latest <= latestDay(moment)).toBe(true)
+    }
+  })
+
+  it('drops the swap of a day and a short year eleven months off and more, and lets that of a day and a month through — the named price (adversarial А1, Р2-А1)', () => {
+    const on = (arrived: string, date: string) =>
+      receiptDateOf({ ...receipt([]), date }, receiptDateWindow(at(arrived), 'AM'))
+    // «25-01-26» read year first is 2025-01-26: 364 days before it came, the nearest a swap comes
+    expect(on('2026-01-25', '2025-01-26')).toBeNull()
+    // «27-10-26» read year first is 2027: past the window's end
+    expect(on('2026-10-27', '2027-10-26')).toBeNull()
+    // «10-11-26» read month first is 11 October, «05-10-26» 10 May: within the window, as on master — the price
+    expect(on('2026-11-10', '2026-10-11')).toBe('2026-10-11')
+    expect(on('2026-10-05', '2026-05-10')).toBe('2026-05-10')
   })
 })
 

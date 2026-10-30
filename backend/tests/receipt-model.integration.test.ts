@@ -140,7 +140,7 @@ async function person(until: Date | null, edition: number | null = MODEL_CONSENT
 
 const LATER = new Date(Date.now() + 24 * 60 * 60 * 1000)
 
-async function queued(me: Person): Promise<string> {
+async function queued(me: Person, capturedAt = '2026-10-08T16:00:00.000Z'): Promise<string> {
   const id = randomUUID()
   const sent = await app.inject({
     method: 'POST',
@@ -151,7 +151,7 @@ async function queued(me: Person): Promise<string> {
       parts: 1,
       country: 'AM',
       language: 'ru',
-      capturedAt: '2026-10-08T16:00:00.000Z',
+      capturedAt,
     },
   })
   expect(sent.statusCode).toBe(201)
@@ -346,6 +346,83 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
     await readAll(benchReader(), null)
     expect((await receiptOf(id))?.readerVersion).toBe('tesseract 5.5.0 · test')
   }, 30_000)
+})
+
+describe('the date a receipt prints, held to the window of its arrival (MOL-305)', () => {
+  // 10:06 UTC is 14:06 in Gyumri: sent and taken in on 23 October 2026, as the owner's of IP Mobile
+  const SENT = '2026-10-23T10:06:00.000Z'
+  /** A receipt the phone stamped `capturedAt` and the server took in at `arrivedAt`, its own clock. */
+  const arrived = async (me: Person, arrivedAt: string, capturedAt = arrivedAt) => {
+    const id = await queued(me, capturedAt)
+    await db
+      .update(receipts)
+      .set({ createdAt: new Date(arrivedAt) })
+      .where(eq(receipts.id, id))
+    return id
+  }
+  const head = async (date: string | null, time: string | null, capturedAt = SENT) => {
+    const id = await arrived(await person(LATER), SENT, capturedAt)
+    const answer: ModelReceipt = { ...ANSWER, date, time }
+    await readAll(
+      benchReader(),
+      fakeModel(() =>
+        Promise.resolve({ kind: 'read', answer, costMicroUsd: 2_180, tokens: TOKENS }),
+      ),
+    )
+    const row = await receiptOf(id)
+    expect(row?.status).toBe('parsed')
+    return [row?.printedOn ?? null, row?.printedTime ?? null]
+  }
+
+  it('takes the date as asked, or as printed day first by the card', async () => {
+    expect(await head('2026-10-23', '14:06')).toEqual(['2026-10-23', '14:06'])
+    expect(await head('23-10-26', '14:06')).toEqual(['2026-10-23', '14:06'])
+    expect(await head('04.10.2026', '19:57:31')).toEqual(['2026-10-04', '19:57'])
+  }, 30_000)
+
+  it('takes no date the model ordered year first three years back, nor its time', async () => {
+    // what prompt v5 brought back of «23-10-26»: the purchases go to the day it was sent, never 2023
+    expect(await head('2023-10-26', '14:06')).toEqual([null, null])
+    // read in the card's order, «26-10-23» is 26 October 2023 all the same
+    expect(await head('26-10-23', '14:06')).toEqual([null, null])
+  }, 30_000)
+
+  it('takes a date from the same day six months before to the day after, and no further (В-5 «а»)', async () => {
+    // a photo picked from the gallery weeks after the purchase keeps its date
+    expect(await head('20-09-26', '10:00')).toEqual(['2026-09-20', '10:00'])
+    expect(await head('23-04-26', '10:00')).toEqual(['2026-04-23', '10:00'])
+    expect(await head('22-04-26', '10:00')).toEqual([null, null])
+    expect(await head('24-10-26', '10:00')).toEqual(['2026-10-24', '10:00'])
+    // must not: a two-digit year that makes a day past it is no date
+    expect(await head('25-10-26', '10:00')).toEqual([null, null])
+  }, 30_000)
+
+  it('holds Tesseract’s reading to the same window', async () => {
+    // Tesseract reads am-05's moment as 01.10.2026 12:00: taken in within half a year after, its date; a day later, none
+    const byOcr = async (at: string) => {
+      const id = await arrived(await person(null), at)
+      await readAll(benchReader(), null)
+      const row = await receiptOf(id)
+      return [row?.printedOn ?? null, row?.printedTime ?? null]
+    }
+    expect(await byOcr('2026-10-08T16:00:00.000Z')).toEqual(['2026-10-01', '12:00'])
+    expect(await byOcr('2027-04-01T08:00:00.000Z')).toEqual(['2026-10-01', '12:00'])
+    expect(await byOcr('2027-04-02T08:00:00.000Z')).toEqual([null, null])
+    // must not: taken in before the day it prints
+    expect(await byOcr('2026-09-29T08:00:00.000Z')).toEqual([null, null])
+  }, 30_000)
+
+  it('counts the window by the server’s clock, never the phone’s (adversarial А3, Р2-А3)', async () => {
+    // a battery that died: 1970, 2000, the firmware's day, two days behind — the receipt's own date stands
+    for (const clock of [
+      '1970-01-01T00:05:00.000Z',
+      '2000-01-01T00:05:00.000Z',
+      '2025-01-01T00:05:00.000Z',
+      '2026-10-21T10:06:00.000Z',
+    ]) {
+      expect(await head('23-10-26', '14:06', clock)).toEqual(['2026-10-23', '14:06'])
+    }
+  }, 60_000)
 })
 
 describe('the month’s cap (Т-4, В-2 «а»)', () => {

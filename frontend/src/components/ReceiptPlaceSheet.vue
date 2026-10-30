@@ -114,6 +114,8 @@ export default defineComponent({
      */
     proposed: { type: String as PropType<string | null>, default: null },
     day: { type: String, required: true },
+    /** The day the receipt was sent, where it stands in for a date not read off it (MOL-305): said so. */
+    sentDay: { type: String as PropType<string | null>, default: null },
     /** The word of the main button when it records as well: «Записать 7 покупок». */
     action: { type: String as PropType<string | null>, default: null },
     onClosed: { type: Function as PropType<() => void>, default: undefined },
@@ -219,9 +221,11 @@ export default defineComponent({
           ? t('receipt.place.read', { place: props.current.name, city: props.current.city })
           : t('receipt.place.missing'),
       ),
-      dayShown: computed(() =>
-        when.value ? calendarDay(when.value, locale.value, { day: 'numeric', month: 'long' }) : '',
-      ),
+      dayShown: computed(() => {
+        if (!when.value) return ''
+        const shown = calendarDay(when.value, locale.value, { day: 'numeric', month: 'long' })
+        return when.value === props.sentDay ? t('receipt.review.sent_day', { day: shown }) : shown
+      }),
       choose: (key: string) => {
         chosen.value = key
         name.value = ''

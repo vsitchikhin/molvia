@@ -2334,9 +2334,11 @@
     "review": {
       "title_loading": "Receipt",
       "title_no_place": "Receipt from {day}",
+      "title_sent": "Receipt sent {day}",
       "place_line": "{city} · TIN {inn} · {day}",
       "place_line_time": "{city} · TIN {inn} · {day}, {time}",
       "place_line_no_tin": "{city} · {day}",
+      "sent_day": "{day}, the day it was sent",
       "place_missing": "Place not read · set it",
       "count_hint": "{count} · tap to fix",
       "tag_new": "new item",

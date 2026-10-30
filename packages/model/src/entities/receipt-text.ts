@@ -14,7 +14,7 @@
 
 import type { ReceiptPaidBy } from '#model/entities/receipt'
 import { PARSED_FRACTION_DIGITS } from '#model/entities/receipt-card'
-import type { PhotoReading } from '#model/entities/receipt-card'
+import type { DateOrder, PhotoReading } from '#model/entities/receipt-card'
 
 /** A line's four figures: thousandths of its unit, hundredths of money. */
 export interface LineFigures {
@@ -1790,11 +1790,37 @@ function votedTotal(
   return totals.length === 1 ? (totals[0]?.[0] ?? null) : null
 }
 
-/** A day of the calendar and a time a clock shows, or null: «64-10-26» or «76:36» is no reading at all. */
+/**
+ * A day of the calendar and a time a clock shows, or null: «64-10-26» or «76:36» is no reading at all. A year of
+ * two digits is of this century.
+ */
 function calendarDayOf(year: string, month: string, day: string): string | null {
-  const iso = `20${year}-${month}-${day}`
+  const iso = `${year.length === 2 ? '20' : ''}${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
   const date = new Date(`${iso}T00:00:00Z`)
   return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== iso ? null : iso
+}
+
+// where the day and the month stand among a date's first two parts, by the card's order
+const DAY_AND_MONTH: Readonly<Record<DateOrder, readonly [day: 1 | 2, month: 1 | 2]>> = {
+  'day-first': [1, 2],
+}
+
+/**
+ * The day a receipt prints, read as its country's tills print it (MOL-305): a year of four digits first,
+ * «2026-10-23», which one order alone reads — what the model is asked for — or the parts in the card's order, a year
+ * of two digits or four last, «23-10-26», «04.10.2026», where it copied them as printed. Anything else, or no day of
+ * the calendar, is none. Which order the model put a short year's parts in is not known here: the window of its arrival
+ * (`receiptDateWindow`) is what refuses a day swapped with a year.
+ */
+export function printedDayOf(printed: string | null, reading: PhotoReading): string | null {
+  const text = printed?.trim() ?? ''
+  const yearFirst = /^(\d{4})[-./](\d{1,2})[-./](\d{1,2})$/u.exec(text)
+  if (yearFirst !== null)
+    return calendarDayOf(yearFirst[1] ?? '', yearFirst[2] ?? '', yearFirst[3] ?? '')
+  const parts = /^(\d{1,2})[-./]\s?(\d{1,2})[-./]\s?(\d{4}|\d{2})$/u.exec(text)
+  if (parts === null) return null
+  const [day, month] = DAY_AND_MONTH[reading.dateOrder]
+  return calendarDayOf(parts[3] ?? '', parts[month] ?? '', parts[day] ?? '')
 }
 const clockOf = (hour: string, minute: string): string | null =>
   Number(hour) < 24 && Number(minute) < 60 ? `${hour}:${minute}` : null

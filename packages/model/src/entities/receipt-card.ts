@@ -114,8 +114,17 @@ export interface PhotoReading {
   readonly modelSwaps: Readonly<Record<string, string>>
   /** Letters Tesseract puts where the font has digits, before a digit or a point. */
   readonly digitLike: Readonly<Record<string, string>>
+  /**
+   * The order the tills print a date's parts in (MOL-305): Armenia's day first, «23-10-26», «04.10.2026». A date
+   * written as printed is read in this order, never by a guess: asked for «YYYY-MM-DD», Haiku made «23-10-26» of
+   * 26 October 2023 — caught by the window of its arrival, since asking it for the date as printed cost the lines (v7).
+   */
+  readonly dateOrder: DateOrder
   readonly words: ReceiptWords
 }
+
+/** The orders of a date's parts a card may name: one so far, the next with the country that prints it. */
+export type DateOrder = 'day-first'
 
 export interface ReceiptCard {
   readonly currency: Currency
@@ -137,6 +146,8 @@ export const ARMENIAN_RECEIPTS: PhotoReading = {
   // «Ереван Сити»'s «5» has a flat top: am-44's six lines the model lost, am-34 faded
   modelSwaps: { 5: '6', 6: '5' },
   digitLike: { Յ: '3', З: '3', б: '6', О: '0', O: '0', o: '0' },
+  // «23-10-26 14:06» of the terminal (MOL-227), «04.10.2026 16:23» of the tills
+  dateOrder: 'day-first',
   words: {
     total: 'Ընդամենը',
     totalKept: 'դամե',

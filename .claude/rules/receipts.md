@@ -157,7 +157,7 @@ first 80 letters (Р22), and the strict seam compares digits by a loop: two hund
 seventy milliseconds, not two seconds of CI.
 
 **What is printed at the head is checked as a calendar and a clock** (Р10, Р12, Р13): a date of
-the calendar from 2000 to the server's tomorrow, a time `HH:MM` — OCR makes up «01.01.0000», which
+the calendar from 2000 and within the window of its arrival (MOL-305, below), a time `HH:MM` — OCR makes up «01.01.0000», which
 Postgres refuses, «2099» and «99:99».
 
 ## The model reads (MOL-272)
@@ -187,6 +187,51 @@ a printed total every one as read, else one amount two places print — and a pr
 neither it is «переснимите». Then **the one check, `verifiedReading(text, { byModel: true })`**, and
 everything after it is Tesseract's path: `readPartly`, the lines' items, the wire. No line is cut out for
 training (Р-4): there are no boxes.
+
+**The model's date is held by the window of its arrival, not by the prompt** (MOL-305, owner's В-4 «а»): asked for
+«YYYY-MM-DD» (v5), the model orders a short year's parts itself — a sole trader's terminal prints «23-10-26 14:06»
+(MOL-227), the bench's nine «04-10-26» came back right, and production's of 23.10.2026 came back 2023-10-26: the
+trip three years back, at the rate of 2023, on no account, `firstSpentDay` in 2023. **Asking for the date as printed
+cost the lines** (v7, three runs against three of v5 on the same photos, `status/MOL-290/score.mts`): the lines'
+fields 789, 669, 731 right, 3, 0, 1 made up, against v5's 801, 833, 827 and 0, 4, 1 — every run of it below the
+worst of v5, as v6 of MOL-293 was; the figures copied were as many, and receipts lost being proven whole (am-44's 39
+lines in one run, am-26's in two) — and one date came back in words, «07 октября 2026», which no rule reads. So v5
+stays, and **the window catches the swap of a day and a short year**: «ДД-ММ-ГГ» read year first is the year 20ДД,
+eleven months and more from the day it came unless ДД = ГГ — and then the swap is the same day. **Not that of a day
+and a month** (adversarial А1, Р2-А1): «10-11-26» read month first is 11 October, «05-10-26» 10 May — any month
+one to five back, a third of the days — inside the window, as on master — whether
+the model does it is not measured; the bench has no such date. `printedDayOf` reads what the model writes — a year of
+four digits first, or the parts in the card's order (`dateOrder`, Armenia's day first), the rule `DEPARTMENT_DATE`
+reads Tesseract's by, one `calendarDayOf` under both — and a time with its seconds is its minutes («23:49:53» was none).
+**The price, named:** a receipt whose day and year the model swaps goes to the day it was sent, not the paper's — the
+same day unless it was sent later, and said «день отправки» on the review.
+
+**A date far from its arrival is no date of the receipt, for either reader** (MOL-305, owner's В-1, В-5 «а»):
+`receiptDateWindow` — from the same day six months before the server took the receipt in (`receipts.created_at`,
+`RECEIPT_DATE_MONTHS`), the last day of a shorter month («31.10» → «30.04»), to the day after, on the till's clock,
+and never past the latest day on Earth then (`latestDay`, adversarial Р3-А7) — the day «Записать» refuses past: a
+tomorrow of Yerevan the window took was refused until 14:00 there, and the queue set the record aside for good;
+`headOf` holds both readers to it. Outside, the receipt has no date and no time — a time without its day dates
+nothing — and the review takes the day it was sent and says so wherever that day is shown, while it is that day: the
+title of a receipt with no place («Чек, отправлен 23 окт.», Р2-А4), the line of the place («23 окт., день отправки»),
+«Когда» of «Где купили?» («23 октября, день отправки», adversarial А4) — a «Готово» that left it so chose nothing — and
+its row in «Покупки» (Р2-А6), with nothing of its head read too (Р3-А6); a day not of this year is printed with its
+year. **The price, named** (self-review №7): the bot's «Чек разобран» still names it «Чек от» that day, as on master —
+it goes only to whoever had not the review in view for 30 s, and the review says it. **From the server's arrival, never the
+phone's clock** (adversarial А2, А3, Р2-А3): `captured_at` is the phone's moment of «Отправить чек», and a battery that
+died sets it to 1970, 2000 or the firmware's day — a receipt sent before the network put it right moved the window
+years back; the server's clock is one, and a queue that brought the receipt days late moves the window by as much,
+which half a year holds. The photo itself is never dated: one picked from the gallery may be weeks old, and neither
+its file's moment nor its EXIF is read (iOS gives the moment of the pick, and the photo is drawn anew without EXIF).
+**Why half a year** (В-5 «а», after the review; В-1 said a month): the swap of a day and a year is eleven months off
+and more, so half a year still catches every one, while a receipt kept in a pocket or a week of photos sent at the
+weekend a month later keeps its date. **The prices, named:** a receipt sent more than half a year after its day goes
+to the day it was sent unless the person picks the printed one in «Где купили?»; a month misread one to five months
+back passes (am-05c of the bench, 09 as 03, stands on the edge; as 01, outside); a digit misread within the window —
+a day 28 as 23 — passes as before, and only the eye on the review catches it; and **the day it was sent is the
+phone's** (self-review №5, Р2-А5): with no date of the receipt the review stands on `localDay(captured_at)`, and a clock
+in 1970 still records the trip in 1970 (`purchasedOn` is refused only in the future), as on master — the window keeps a
+date read off the receipt, it dates nothing else.
 
 **A figure is read in every spelling the model writes it** (MOL-294): thousands grouped by a space, a no-break or a
 narrow one («1 000,00»), a comma for the point where it is the only one and no point stands («0,50»), and a minus
