@@ -50,6 +50,16 @@ describe('a country’s card (MOL-247)', () => {
     }
   })
 
+  // the phone knows no reader and doubts by Tesseract's pairs: the server narrows by the model's only while they are
+  // among them, or the phone would hide a hint the server sent (MOL-315)
+  it('confuses no pair as the model that Tesseract does not', () => {
+    for (const { country, photo } of photoCards) {
+      for (const [from, to] of Object.entries(photo.modelSwaps)) {
+        expect(photo.swaps[from], `${country}: ${from}↔${to}`).toBe(to)
+      }
+    }
+  })
+
   it('swaps a digit for a digit, and back', () => {
     for (const { country, photo } of photoCards) {
       for (const [from, to] of Object.entries(photo.swaps)) {

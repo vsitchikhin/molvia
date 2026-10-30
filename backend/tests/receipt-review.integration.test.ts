@@ -456,6 +456,35 @@ describe('the review of a receipt', () => {
     expect(detail.lines.map((line) => line.rememberedPrice)).toEqual([amd(50), null])
   })
 
+  // MOL-315: the model confuses 5↔6 alone — its 1 100 → 1 400 is a price changed, Tesseract's a misread
+  it('doubts a price of a receipt the model read by the model’s confusions alone', async () => {
+    const me = await insertActor(db)
+    const butter = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    const cheese = await insertItem(db, { name: 'Сыр', searchKey: 'syr' })
+    await memory.remember(me, TIN, [
+      { kind: 'sku', key: '1110004', itemId: butter, price: amd(1_100) },
+      { kind: 'sku', key: '1110005', itemId: cheese, price: amd(550) },
+    ])
+    const lines = [
+      { printed: 'Կարագ «Օրինակ»', sku: '1110004', price: 1_400, sum: 1_400 },
+      { printed: 'Պանիր «Օրինակ»', sku: '1110005', price: 650, sum: 650 },
+    ]
+    const hints = async (readerVersion: string) =>
+      (
+        await review(me, await parsedReceipt(me, lines, { totalMinor: 205_000n, readerVersion }))
+      ).lines.map((line) => line.rememberedPrice)
+    expect(await hints(byModel.readerVersion)).toEqual([null, amd(550)])
+    expect(await hints('tesseract 5.5.0 · hye+rus+eng')).toEqual([amd(1_100), amd(550)])
+
+    // a line the check took the price off keeps the memory as its hint, whoever read it (MOL-291)
+    const id = await parsedReceipt(me, lines, { totalMinor: 205_000n, ...byModel })
+    await db.update(receiptLines).set({ priceMinor: null }).where(eq(receiptLines.receiptId, id))
+    expect((await review(me, id)).lines.map((line) => line.rememberedPrice)).toEqual([
+      amd(1_100),
+      amd(550),
+    ])
+  }, 10_000)
+
   // MOL-314: «1 / 650 / 650» under a total of 650 two places print is the butter gone up, not a misread
   it('doubts no price on a receipt its total proved whole, and still hints a line with none', async () => {
     const me = await insertActor(db)
