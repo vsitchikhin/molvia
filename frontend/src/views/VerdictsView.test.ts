@@ -95,6 +95,8 @@ describe('VerdictsView', () => {
 
     expect(view.find('.skeleton').exists()).toBe(true)
     expect(view.findAll('.keys .key')).toHaveLength(5)
+    // The line under the title is held, so the card does not move down as the queue comes.
+    expect(view.find('.subtitle-bar').exists()).toBe(true)
   })
 
   it('shows one card, the counter of what waits and the footnote', async () => {

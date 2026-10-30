@@ -1,7 +1,12 @@
 <template>
   <AppScreen :title="t('verdict.title')">
-    <template v-if="phase === 'ready'" #subtitle>
-      {{ t('verdict.pending_count', { n: count }, count) }}
+    <!-- Said only over the queue (Д-2), and held by a bar while it loads: a queue is the common
+         answer, and the line coming with it took the card 23 px down from under its skeleton. -->
+    <template v-if="phase === 'ready' || phase === 'loading'" #subtitle>
+      <template v-if="phase === 'ready'">
+        {{ t('verdict.pending_count', { n: count }, count) }}
+      </template>
+      <span v-else class="subtitle-bar"></span>
     </template>
 
     <!-- The card's own shape (Ф-13): its caption, the question on two lines, the five keys, the
@@ -22,6 +27,8 @@
         <span class="keys">
           <span v-for="n in 5" :key="n" class="key"></span>
         </span>
+        <!-- The line of the scale's ends, unseen: the handoff draws no bars there (7a). -->
+        <span class="ghost-ends"></span>
         <span class="ghost-line ghost-label"
           ><span class="ghost-bar" :style="{ width: '58%' }"></span
         ></span>
@@ -290,6 +297,16 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* An inline block keeps the subtitle's line box, and the strut its height. */
+.subtitle-bar {
+  @include skeleton-bar;
+
+  display: inline-block;
+  width: 46%;
+  height: var(--skeleton-sub);
+  vertical-align: middle;
+}
+
 /* The card's own shape, as `VerdictCard` stands (Ф-13). `ghost-*`, never `skeleton-*`: those are the
    roots of the kit's parts, and a scoped class of this screen would reach one put in the frame. */
 .ghost-card {
@@ -341,19 +358,28 @@ export default defineComponent({
   border-radius: var(--radius);
 }
 
+/* As `RatingScale`'s `.ends`: 8 under the keys, a line of 13. */
+.ghost-ends {
+  height: calc(1em * var(--leading-body));
+  margin-top: var(--space-2);
+  font-size: var(--text-footnote);
+}
+
 .ghost-label {
   height: calc(1em * var(--leading-body));
   margin-top: var(--space-6);
   font-size: var(--text-footnote);
 }
 
+/* The review's three lines, as `rows="3"` draws them, with their padding and edge. */
 .ghost-field {
   box-sizing: border-box;
-  height: calc(var(--touch-target) * 2 + 2 * var(--hairline));
+  height: calc(3em * var(--leading-body) + 2 * var(--space-3) + 2 * var(--hairline));
   margin-top: var(--space-2);
   border: var(--hairline) solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--surface-2);
+  font-size: var(--text-body);
 }
 
 .strip,
