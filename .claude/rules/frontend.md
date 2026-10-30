@@ -682,7 +682,12 @@ The detail behind the frontend lines of `CLAUDE.md`.
   button come later or gone with the kind unchanged held the footer only from the next change of kind
   (adversarial А1, А2); a slot given whose button stands under its own `v-if`, a wrapper with no button in
   it and a button under `v-show` held an empty footer pinned over the sheet's own «Сохранить» (round 2, А3;
-  round 3, Г); and a component in the slot that redraws itself left the block unread (round 3, Д). **The sheet's own footer sees no
+  round 3, Г); and a component in the slot that redraws itself left the block unread (round 3, Д). **The
+  price, named** (round 4, Ж): «shown» is computed from styles but read again only as the block's DOM
+  changes, so a rule outside the block that starts or stops hiding a button — a media or container query on
+  turning the phone, a rule that depends on an ancestor, a style that came later — is not read until the
+  block next changes: an empty footer held, or a button left in the content. No state in a sheet hides its
+  buttons so; following the cascade would be one more mechanism for forms the product has not got. **The sheet's own footer sees no
   strip** (`WithoutStateStrip`, Б): a state drawn there held the footer it stands in, took the footer's
   slot down with itself, let go and held it again — a loop Vue stops in development and a built app
   never does; there it keeps its buttons, as before. A section's error (`inline`) in a sheet stays the
