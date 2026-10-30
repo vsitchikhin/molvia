@@ -67,13 +67,16 @@
       :body="t(REFUSALS[refusal].body)"
       @retry="retry"
     >
+      <!-- In the sheet's pinned footer, which the state holds (MOL-211): the main action 52, as every
+           sheet's — «Проверить снова», or the digits where the camera will not come. -->
       <template #action>
-        <AppButton v-if="refusal === 'denied'" block @click="retry">
+        <AppButton v-if="refusal === 'denied'" size="large" block @click="retry">
           {{ t('scanner.try_again') }}
         </AppButton>
         <AppButton
           block
-          :variant="refusal === 'insecure' || refusal === 'none' ? 'primary' : 'secondary'"
+          :variant="cameraGone ? 'primary' : 'secondary'"
+          :size="cameraGone ? 'large' : 'regular'"
           @click="toTyping"
         >
           <template #icon><IconKeyboard /></template>
@@ -237,6 +240,8 @@ export default defineComponent({
       { immediate: true },
     )
     const refusal = computed(() => (props.open ? current.value : shownRefusal.value))
+    // No camera to come back to: the digits are the one way on.
+    const cameraGone = computed(() => refusal.value === 'insecure' || refusal.value === 'none')
     const viewing = computed(() => !typing.value && refusal.value === null)
 
     watch(camera.kind, (kind) => {
@@ -359,6 +364,7 @@ export default defineComponent({
       typedError,
       viewing,
       refusal,
+      cameraGone,
       kind: camera.kind,
       torch: camera.torch,
       setTorch: camera.setTorch,

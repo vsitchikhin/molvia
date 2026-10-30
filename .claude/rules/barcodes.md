@@ -182,7 +182,10 @@ takes `useCamera`.
 
 ## States (MOL-19)
 
-Every refusal is drawn by `ScreenState` in the sheet, and every one offers the digits typed by hand:
+Every refusal is drawn by `ScreenState` in the sheet, and every one offers the digits typed by hand.
+**Its buttons stand in the sheet's pinned footer** (MOL-211, Ф-17), which the state holds as an error holds a
+screen's strip (`frontend.md`): the main one 52 — «Повторить», «Проверить снова», or the digits alone where
+the camera will not come — and «Ввести вручную» a secondary beside a way back to the camera:
 
 | The camera        | Kind      | Drawn as                                                         |
 | ----------------- | --------- | ---------------------------------------------------------------- |

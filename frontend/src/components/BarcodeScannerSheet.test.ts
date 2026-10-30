@@ -257,6 +257,70 @@ describe('BarcodeScannerSheet', () => {
     expect(track.stop).toHaveBeenCalled()
   })
 
+  // Ф-17: the action of a refusal under the thumb, in the sheet's pinned footer, never in what
+  // scrolls (MOL-211). Each refusal by its own way of coming about.
+  describe('the refusal’s buttons, in the pinned footer (MOL-211)', () => {
+    // The scanner's own: «Камера без вопросов» is a sheet over it (`over`), mounted beside it.
+    function footer(sheet: VueWrapper) {
+      return sheet.findAll('dialog:not(.over) > .footer button').map((found) => ({
+        text: found.text(),
+        variant: ['primary', 'secondary'].find((name) => found.classes().includes(name)),
+        large: found.classes().includes('large'),
+      }))
+    }
+
+    const manual = { text: en.scanner.manual, variant: 'secondary', large: false }
+    const typingOnly = [{ text: en.scanner.manual, variant: 'primary', large: true }]
+    const retryFirst = [{ text: en.state.retry, variant: 'primary', large: true }, manual]
+
+    it.each([
+      [
+        'no access: «Check again» the main one, the digits beside it',
+        () => getUserMedia.mockRejectedValue(named('NotAllowedError')),
+        [{ text: en.scanner.try_again, variant: 'primary', large: true }, manual],
+      ],
+      [
+        'no camera: the digits alone, the main one',
+        () => getUserMedia.mockRejectedValue(named('NotFoundError')),
+        typingOnly,
+      ],
+      [
+        'no secure context: the digits alone, the main one',
+        () => Object.defineProperty(window, 'isSecureContext', { value: false }),
+        typingOnly,
+      ],
+      [
+        'a camera that would not start: one «Try again», the main one',
+        () => getUserMedia.mockRejectedValue(named('NotReadableError')),
+        retryFirst,
+      ],
+      [
+        'a reader that failed: the same',
+        () => {
+          getUserMedia.mockResolvedValue(fakeStream().stream)
+          warmAnswer = 'fail'
+        },
+        retryFirst,
+      ],
+    ])('%s', async (_, refuse, buttons) => {
+      refuse()
+      const sheet = await render()
+      expect(footer(sheet)).toEqual(buttons)
+      expect(sheet.find('.panel .action').exists()).toBe(false)
+      expect(sheet.get('dialog:not(.over)').classes()).toContain('pinned')
+    })
+
+    it('gives the footer back to the viewfinder once the camera is allowed', async () => {
+      getUserMedia.mockRejectedValueOnce(named('NotAllowedError'))
+      getUserMedia.mockResolvedValueOnce(fakeStream().stream)
+      const sheet = await render()
+      await button(sheet, en.scanner.try_again).trigger('click')
+      await settle()
+      expect(sheet.find('video').exists()).toBe(true)
+      expect(footer(sheet).map((found) => found.text)).toEqual([en.scanner.manual])
+    })
+  })
+
   it('starts a failed reader over on «Scan» from the digits, rather than land on its error', async () => {
     getUserMedia.mockResolvedValue(fakeStream().stream)
     warmAnswer = 'fail'
@@ -422,6 +486,8 @@ describe('BarcodeScannerSheet', () => {
 
     await sheet.setProps({ open: false })
     expect(heading(sheet)).toBe(en.scanner.denied_title)
+    // Its buttons slide down with it, in the footer they stood in (MOL-211).
+    expect(sheet.get('dialog:not(.over) > .footer').text()).toContain(en.scanner.try_again)
 
     window.dispatchEvent(new PopStateEvent('popstate'))
     await settle()
