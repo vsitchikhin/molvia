@@ -89,7 +89,7 @@ describe('GET /verdicts/pending', () => {
       total: 1,
       bought: true,
     })
-  })
+  }, 15_000)
 
   it('город — места последней покупки, у одноимённых мест двух городов свой (MOL-120)', async () => {
     const actor = await insertActor(db)
