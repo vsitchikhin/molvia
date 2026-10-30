@@ -52,6 +52,8 @@ export interface MoneyScreen extends MoneyMonth {
   /** «сентябре», «September»: a month after «в», as the words of the screens say it. */
   monthIn(month: string): string
   readonly liveRate: ComputedRef<ExchangeRate | null>
+  /** `liveRate` is as it will stand: nothing on its way may still bring one (MOL-304). */
+  readonly liveRateSettled: ComputedRef<boolean>
   nameOf(category: SpendingCategoryView): string
   whenOf(at: Date): string
   readonly sheetOpen: Ref<boolean>
@@ -331,6 +333,7 @@ export function useMoneyScreen(): MoneyScreen {
     monthIn,
     /** «Мой курс на сегодня» for the sheet: only a running month's rate is today's. */
     liveRate: money.todayRate,
+    liveRateSettled: money.todayRateSettled,
     nameOf,
     whenOf,
     sheetOpen,
