@@ -403,8 +403,11 @@ takes the card's `modelSwaps` for a receipt the model read — 5↔6 alone, meas
 the figure** (`REMEMBERED_PRICE_SWAPS`, adversarial А2, owner's «в»): «660» copied for 550, as MOL-290 measured and
 MOL-291's doubt at reading takes it — with other people's price that line is shown, and the hint is all that is left.
 The server names the reader by the receipt's `reader_version` (`found.byModel`). The model's 1 100 → 1 400, 990 → 999,
-330 → 380 are prices changed, which «проверьте цифры» asked the person to put back; MOL-291's doubt at reading went by
-5↔6 already. A model's receipt Tesseract read in its place, and one read before MOL-255, are Tesseract's: one digit of
+330 → 380 are taken for prices changed, which «проверьте цифры» asked the person to put back; MOL-291's doubt at reading
+went by 5↔6 already. **The price, named** (adversarial А1, owner's «а», 31.10.2026): `modelSwaps` are the pairs the
+model's repair was measured on, not every pair it confuses — the bench saw it copy an 8 as a 3 once, in a tax number
+(MOL-272, am-01). Such a slip copied alike into a price, its sum and the total passes with no hint, as MOL-314's Г1 does:
+on a receipt proven whole a price gone up and the same digit misread everywhere read the same. Not seen in a price. A model's receipt Tesseract read in its place, and one read before MOL-255, are Tesseract's: one digit of
 `swaps`, as before — the owner's «в» was the model's two 5↔6, never Tesseract's (`byModel: false`). **The phone knows
 no reader** and doubts by the union of both (no `byModel`), so every hint the server sent stands there: the server only
 narrows. **The prices, named:** a price the person typed on the sheet is doubted by the union whoever read the receipt
