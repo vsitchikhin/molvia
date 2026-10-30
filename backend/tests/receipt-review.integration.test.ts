@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   RECEIPT_CASHBACK_HEADER,
+  RECEIPT_MODEL,
   RECEIPT_PAID_BY_HEADER,
   RECEIPT_PACK_HEADER,
   RECEIPT_REPAIRED_HEADER,
@@ -129,6 +130,8 @@ async function review(actorId: string, id: string) {
 }
 
 const milkWord = { kind: 'sku' as const, key: '1163909' }
+/** Read by the model (MOL-272): the one reader whose total vouches for a price (MOL-314, review round 5). */
+const byModel = { readerVersion: `${RECEIPT_MODEL}@v5` }
 const amd = (drams: number) => ({ minor: BigInt(drams * 100), currency: 'AMD' as const })
 
 describe('the shops’ memory (Р-2)', () => {
@@ -452,6 +455,103 @@ describe('the review of a receipt', () => {
     const detail = await review(me, id)
     expect(detail.lines.map((line) => line.rememberedPrice)).toEqual([amd(50), null])
   })
+
+  // MOL-314: «1 / 650 / 650» under a total of 650 two places print is the butter gone up, not a misread
+  it('doubts no price on a receipt its total proved whole, and still hints a line with none', async () => {
+    const me = await insertActor(db)
+    const butter = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    await memory.remember(me, TIN, [
+      { kind: 'sku', key: '1110004', itemId: butter, price: amd(550) },
+    ])
+    const line = { printed: 'Կարագ «Օրինակ»', sku: '1110004', price: 650, sum: 650 }
+    const remembered = async (balanced: boolean, readerVersion = byModel.readerVersion) =>
+      (
+        await review(
+          me,
+          await parsedReceipt(me, [line], {
+            totalMinor: 65_000n,
+            balanced,
+            layout: 'class',
+            readerVersion,
+          }),
+        )
+      ).lines[0]?.rememberedPrice
+    expect(await remembered(true)).toBeNull()
+    expect(await remembered(false)).toEqual(amd(550))
+    // Tesseract misreads a digit in the line and in both places of the total alike (adversarial Г1): its total
+    // vouches for no price, and the hint stands
+    expect(await remembered(true, 'tesseract 5.5.0 · hye+rus+eng')).toEqual(amd(550))
+
+    // a line the check took the price off keeps the memory as its hint (MOL-291)
+    const id = await parsedReceipt(me, [line], { totalMinor: 65_000n, balanced: true, ...byModel })
+    await db.update(receiptLines).set({ priceMinor: null }).where(eq(receiptLines.receiptId, id))
+    expect((await review(me, id)).lines[0]?.rememberedPrice).toEqual(amd(550))
+  }, 10_000)
+
+  // MOL-314, owner's В-4 «а» (adversarial А1, Б1–Б3): a total proves the sum, never whose figure is right — it
+  // points at a line only where that line is all of it
+  it('hints over a proven receipt of more than one line, a cashback, a weight, a count or a discount', async () => {
+    const me = await insertActor(db)
+    const butter = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    const cheese = await insertItem(db, { name: 'Сыр', searchKey: 'syr' })
+    await memory.remember(me, TIN, [
+      { kind: 'sku', key: '1110004', itemId: butter, price: amd(550) },
+    ])
+    const butterLine = { printed: 'Կարագ «Օրինակ»', sku: '1110004', price: 650, sum: 650 }
+    const hints = async (cheesePrice: number, total: number) =>
+      (
+        await review(
+          me,
+          await parsedReceipt(
+            me,
+            [
+              butterLine,
+              { printed: 'Պանիր «Օրինակ»', sku: '1110005', price: cheesePrice, sum: cheesePrice },
+            ],
+            { totalMinor: BigInt(total * 100), balanced: true, ...byModel },
+          ),
+        )
+      ).lines.map((line) => line.rememberedPrice)
+
+    // the cheese the memory does not know may hide the other half: 650 + 560 for 550 + 660
+    expect(await hints(560, 1_210)).toEqual([amd(550), null])
+    // both lines off the memory's by ±100 meet the total alike
+    await memory.remember(me, TIN, [
+      { kind: 'sku', key: '1110005', itemId: cheese, price: amd(660) },
+    ])
+    expect(await hints(560, 1_210)).toEqual([amd(550), amd(660)])
+    // the cheese as remembered vouches for nothing: its weight, or a shelf price gone, may hide the other half
+    // (adversarial Б1, Б3)
+    expect(await hints(660, 1_310)).toEqual([amd(550), null])
+
+    // one line, and what went to the card is the other half's place (Б2): «160» for 150 beside «54» for 64
+    const carded = await parsedReceipt(me, [butterLine], {
+      totalMinor: 70_400n,
+      cashbackMinor: 5_400n,
+      balanced: true,
+      ...byModel,
+    })
+    expect((await review(me, carded)).lines[0]?.rememberedPrice).toEqual(amd(550))
+
+    // one line, but the total proves its sum, not how it splits (adversarial В1, owner's В-5 «б»): a weight, a count
+    // or a discount may hold the other half — adversarial В1's paper: 0,6 kg × 5 000 copied «0,5 × 6 000», one 3 000
+    const split = async (over: Partial<typeof receiptLines.$inferInsert>, total: number) => {
+      const id = await parsedReceipt(me, [butterLine], {
+        totalMinor: BigInt(total * 100),
+        balanced: true,
+        ...byModel,
+      })
+      if (Object.keys(over).length > 0) {
+        await db.update(receiptLines).set(over).where(eq(receiptLines.receiptId, id))
+      }
+      return (await review(me, id)).lines[0]?.rememberedPrice
+    }
+    expect(await split({ qtyMilli: 500n, qtyUnit: 'kg', sumMinor: 32_500n }, 325)).toEqual(amd(550))
+    expect(await split({ qtyMilli: 2_000n, sumMinor: 130_000n }, 1_300)).toEqual(amd(550))
+    expect(await split({ discountMinor: 650n, sumMinor: 64_350n }, 643.5)).toEqual(amd(550))
+    // one piece at its sum, as the first test: the price is the sum, and the total proves it
+    expect(await split({}, 650)).toBeNull()
+  }, 10_000)
 
   // В6 of the adversarial review: a shelf price is someone's figure — the person's own always, other
   // people's only with access and from three people

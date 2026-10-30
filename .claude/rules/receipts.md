@@ -623,7 +623,9 @@ threshold would lose the first receipt of every shop.
 teaches nothing. The price kept is the shelf price of a line recorded as read, the memory's argument
 where a figure reads two ways — «60 60» for «50 50» adds up either way — and it is a hint, never a
 correction (В-1): a price one confused digit off the remembered is `rememberedPrice` on the line, «
-проверьте», and the parse's figures stay as read — and, since MOL-291, on a line the check emptied too. **The price
+проверьте», and the parse's figures stay as read — unless the total proving the receipt points at the price, its only
+line's at its sum (MOL-314, below) — and, since MOL-291,
+on a line the check emptied too. **The price
 goes into the digits since MOL-291** (below): as a voice beside the line's arithmetic and the total, measured on the
 bench, by its own rule of whose price — not the hint's. **The price is someone's figure** (review 5, В6; round 2, Р2-В3): the
 person's own always; other people's only as their figures are — with access (`shared_until`) and from
@@ -1401,7 +1403,32 @@ memory would speak on every other receipt; its cut-out rows are not confirmed, a
 
 **The review**: a line with no price — the check emptied it, a doubt among them — shows the remembered price as the hint
 «В прошлый раз здесь было …» (`rememberedPrice`, the hint's own rule of access); the mark of a line put right says
-«Цифры поправили — сверьте с бумагой», since it may be the memory's and not the total's. The log of a reading counts
+«Цифры поправили — сверьте с бумагой», since it may be the memory's and not the total's. **A total that proves the receipt
+silences the hint over the one price it points at** (MOL-314, owner's В-1 «а», В-4 «а» and В-5 «б», 30.10.2026): on
+`balanced`, read by the model, where the receipt has one line — one piece with no discount, its price its sum — and sent
+nothing to the card,
+the server sends that line `rememberedPrice` only with no price of its own, so the phone says nothing over one with its
+figures. The total settled that price before the hint: the memory said nothing at reading where the lines met it as read
+(`met`), and «1 / 650 / 650» under a total of 650 is the butter gone up from a remembered 550 — «проверьте цифры» there
+asked the person to put the old price back and break the total. **Only where the price is all the sum there is** (three
+rounds of review): a total proves the sum — quantity × price less the discount, less what went to the card — never
+whose figure is right, nor how one line's sum splits. The faded font copied both ways, butter «650» for 550 and cheese
+«560» for 660, meets 1 210 as the paper does (adversarial А1); asked to vouch for the other lines, the memory confirms a
+price only — the cheese's weight copied «0,5» for 0,6 hides the other half under its remembered price (Б1), a cashback
+«54» for 64 beside water «160» for 150 has no line to ask (Б2), and a price read as remembered may be a shelf price gone
+(Б3); and within the one line a weight and a price misread the opposite ways keep its sum, 0,6 kg × 5 000 copied
+«0,5 × 6 000» (В1). So the rule is the count's, never the memory's: a receipt of more lines, a cashback, a weight, a
+count or a discount keeps every hint, as before. `balanced` is the check's «proven whole» (MOL-255), so the total may
+stand in one place where the lines as read are its second source (MOL-244), as the memory's silence does. **Only as the model read it** (owner, review round 5): Tesseract misreads any
+digit of the till, and alike in the line and in both places of the total — «1Հտ 650 650», «Ընդամենը 650.00» and the card
+payment 650 for 550 (adversarial Г1), «4» for «1» in a total printed once (А2) or in a count, «1 × 400» for 4 × 100 — so
+its total vouches for no price, and its receipts keep every hint, as before. **The prices, named:** a price that really
+changed still reads «проверьте» on a receipt Tesseract read, on a receipt of more than one line — the same item twice in
+one purchase too — and on one line weighed, of a count or discounted; **one line the model copied with the line and its
+total misread alike by its 5↔6** (am-34's faded paper), in one place or in two, is shown as read with no hint: by the
+text it is the very butter gone up the rule is for, the price of В-1 «а» itself (owner, review round 5). A receipt read
+before MOL-255, whose `balanced` was the parse's «met», is Tesseract's: the model reads since MOL-272, a day after it.
+The log of a reading counts
 what the memory said, line by line — confirmed, put right, doubted (`rememberedConfirmed`, `rememberedRepaired`,
 `rememberedDoubted`, review №5) — never a price: the doubts are the price named, lines a changed shelf price emptied.
 
