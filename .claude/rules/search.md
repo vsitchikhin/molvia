@@ -634,8 +634,10 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   goes under it, taken back when it comes (adversarial А1): a name is heard only with the focus on it, and
   the search's strip stands in none of the phases the sheet opens from — `empty`, `far`, `ready`, a code
   nobody knows. Never over «Взять «…»» of a code another item holds: nothing is left to propose, and taking
-  the holder needs no connection (adversarial Б1). The connection is `useOnline`'s, read again as the app comes back into view (MOL-192,
-  adversarial А2). «Этот код уже у …» and «… уже есть» are warnings on `--warn-tint`, not errors.
+  the holder needs no connection (adversarial Б1). The connection is `useOnline`'s, read again as the app
+  comes back into view (MOL-192, adversarial А2). **A failure is of the try that made it**: the connection
+  gone takes «Не получилось» away for good, and its return brings back no alert nobody's press asked for
+  (adversarial В1). «Этот код уже у …» and «… уже есть» are warnings on `--warn-tint`, not errors.
 
 ## The merge of twins (MOL-106)
 
