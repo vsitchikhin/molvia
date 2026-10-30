@@ -93,7 +93,11 @@ Open Food Facts is MOL-162.
 - **The torch is offered only where the track has one** (`getCapabilities().torch`, Р-3): bad light
   at the shelf is the product's premise, and a button that does nothing is worse than none. A track
   with no `getCapabilities` (Firefox before 132) is a camera without a torch, not a camera that
-  failed (adversarial Г).
+  failed (adversarial Г). **Off it is a ring, on a fill** (Ф-5, MOL-211, owner's В-2 «а»): a circle of
+  `--viewfinder-dim` ringed in `--viewfinder-ink`, and filled with the ink, its `flashlight-off` in
+  `--viewfinder-ground`, with `aria-pressed`. The viewfinder's colours, not the page's: the handoff's
+  `surface-2` off and the ink on are both near-white in the light scheme, and the glyph alone told them
+  apart. A departure from frame 2a, named.
 - **A code taken by the camera buzzes** where the phone can (`navigator.vibrate`, not on iPhone) —
   no sound, and not for digits typed by hand, where the person is looking already (review С-11).
 
@@ -114,7 +118,9 @@ Open Food Facts is MOL-162.
   site, the one checked on a phone, and the search of Settings for «Safari», which finds it before
   iOS 18 too, where it stood at the top of Settings and «Приложения» was not yet (review 5). iOS
   opens no Settings from a web page (`App-Prefs:` is for native apps), so **the way is written out,
-  never linked**; the refusal «Нет доступа к камере» names the same path.
+  never linked**; the refusal «Нет доступа к камере» names the same path. **The sheet draws it as 2j does**
+  (MOL-211, owner's В-4 «а»): the paragraph and the path at 15, the path at 600 in a recess of
+  `--surface-2`, radius 8 — the one line to follow — and what it costs and the other ways at 13, muted.
 - **The scanner says where the setting is, right after Safari asked** (`useCameraHint`,
   `CameraHintSheet`, owner's decision of 01.10.2026). Before the camera starts it asks
   `permissions.query({ name: 'camera' })`: once the camera is given Safari answers `granted` until
@@ -182,7 +188,10 @@ takes `useCamera`.
 
 ## States (MOL-19)
 
-Every refusal is drawn by `ScreenState` in the sheet, and every one offers the digits typed by hand:
+Every refusal is drawn by `ScreenState` in the sheet, and every one offers the digits typed by hand.
+**Its buttons stand in the sheet's pinned footer** (MOL-211, Ф-17), which the state holds as an error holds a
+screen's strip (`frontend.md`): the main one 52 — «Повторить», «Проверить снова», or the digits alone where
+the camera will not come — and «Ввести вручную» a secondary beside a way back to the camera:
 
 | The camera        | Kind      | Drawn as                                                         |
 | ----------------- | --------- | ---------------------------------------------------------------- |
@@ -197,10 +206,15 @@ Every refusal is drawn by `ScreenState` in the sheet, and every one offers the d
 now (review С-9). The reader's failure has words of its own: «another app holds the camera» sent the
 person to close apps that were not at fault (review С-10).
 
-**The named price of focus** (review С-2): after «Проверить снова» or «Повторить» the state goes,
-and `ScreenState` hands the focus to the screen's title — which under a modal sheet is inert, so it
-lands on the dialog itself. It is `ScreenState`'s behaviour, and the sheet is its first user inside a
-`<dialog>`; a task of its own if it gets in the way.
+**The focus follows the footer** (MOL-211, self-review №2, round 2; it was review С-2's price): «Проверить
+снова» and «Повторить» of a refusal, «Сканировать» of the digits go with their footer as the camera turns, and
+the focus on them fell to the page. A focus that stood in the footer then follows where the camera settles —
+refused, the refusal's first button; live, «Ввести вручную» over the viewfinder — a tick after the deferred
+`Teleport` brings the state's buttons. **Never the footer of a start still on its way** (round 2, №5): a retry
+passes the viewfinder's own footer while the camera starts, and a reader heard «Ввести вручную» of a viewfinder
+gone the next moment. One the person put somewhere in the sheet meanwhile stays; the sheet put away forgets it.
+`e2e/scanner.spec` holds it in a real engine. Safari focuses no tapped button, so there nothing was in the footer
+to follow.
 
 The text of «no permission» names both phones rather than guessing one from the user agent, which
 lies on an iPad (as MOL-132 Р-3).

@@ -261,6 +261,7 @@ export default defineComponent({
   background: var(--surface-2);
   transition:
     border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
     outline-color var(--dur-fast) var(--ease-out);
 
   &:focus-within {
@@ -362,8 +363,11 @@ textarea.control {
   font-weight: var(--weight-medium);
 }
 
+/* The edge doubled, as a row of the kit draws an error (MOL-211, owner's В-3 «а»): a hairline is lost in
+   bad light. Inside the edge, so nothing in the well moves. */
 .invalid .well {
   border-color: var(--bad);
+  box-shadow: inset 0 0 0 var(--hairline) var(--bad);
 }
 
 .counter-spoken {

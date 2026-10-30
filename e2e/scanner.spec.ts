@@ -117,7 +117,91 @@ test('says how to allow the camera when it is not allowed', async ({ page }) => 
   await openScanner(page)
 
   await expect(page.getByRole('heading', { name: 'No access to the camera' })).toBeVisible()
-  await expect(scanner(page).getByRole('button', { name: 'Check again' })).toBeVisible()
+  // In the sheet's pinned footer, under the thumb, never in what scrolls (MOL-211, Ф-17).
+  const footer = scanner(page).locator('.footer')
+  await expect(footer.getByRole('button', { name: 'Check again' })).toBeInViewport({ ratio: 1 })
+  await expect(footer.getByRole('button', { name: 'Type it in' })).toBeInViewport({ ratio: 1 })
+  await expect(scanner(page).locator('.panel .action')).toHaveCount(0)
+})
+
+// The focus on the refusal's button goes with it, and lands on the footer that came (MOL-211,
+// self-review №2): refused again, «Check again»; allowed, «Type it in» over the viewfinder. In a real
+// engine, since the state's buttons come into the footer by a deferred `Teleport`. The reader is held
+// unloaded, or the code the camera films would close the sheet.
+test('the focus follows «Check again» and «Scan» to the footer that comes', async ({
+  page,
+  context,
+}) => {
+  let release = () => undefined as unknown
+  await page.route(WASM, (route) => {
+    release = () => route.abort().catch(() => undefined)
+  })
+  await open(page, '/_kit')
+  await openScanner(page)
+  const again = scanner(page).getByRole('button', { name: 'Check again' })
+  await again.focus()
+
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('heading', { name: 'No access to the camera' })).toBeVisible()
+  await expect(again).toBeFocused()
+
+  await context.grantPermissions(['camera'])
+  await page.keyboard.press('Enter')
+  await expect(scanner(page).locator('video')).toBeVisible()
+  const typing = scanner(page).getByRole('button', { name: 'Type it in' })
+  await expect(typing).toBeFocused()
+
+  // «Scan» of the digits goes with their footer the same way (round 2, В).
+  await page.keyboard.press('Enter')
+  await scanner(page).getByRole('button', { name: 'Scan', exact: true }).focus()
+  await page.keyboard.press('Enter')
+  await expect(scanner(page).locator('video')).toBeVisible()
+  await expect(typing).toBeFocused()
+  release()
+})
+
+// Ф-5, owner's В-2 «а» of MOL-211: off a ring, on a fill, in the viewfinder's own colours — the
+// page's `surface-2` and the ink are both near-white in the light scheme. The fake camera has no torch,
+// so its track is given one; the reader is held unloaded, or the code it films would close the sheet.
+test('the torch is a ring off and a fill on, in the viewfinder’s colours (MOL-211)', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['camera'])
+  await page.addInitScript(() => {
+    const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices)
+    navigator.mediaDevices.getUserMedia = async (constraints) => {
+      const stream = await original(constraints)
+      for (const track of stream.getVideoTracks()) {
+        const capabilities = track.getCapabilities.bind(track)
+        const apply = track.applyConstraints.bind(track)
+        track.getCapabilities = () => ({ ...capabilities(), torch: true }) as MediaTrackCapabilities
+        track.applyConstraints = (wanted) =>
+          wanted?.advanced?.some((set) => 'torch' in set) ? Promise.resolve() : apply(wanted)
+      }
+      return stream
+    }
+  })
+  let release = () => undefined as unknown
+  await page.route(WASM, (route) => {
+    release = () => route.abort().catch(() => undefined)
+  })
+  await open(page, '/_kit')
+  await openScanner(page)
+
+  const off = scanner(page).getByRole('button', { name: 'Turn on the torch' })
+  await expect(off).toHaveAttribute('aria-pressed', 'false')
+  await expect(off).toHaveCSS('background-color', 'rgba(0, 0, 0, 0.45)')
+  await expect(off).toHaveCSS('box-shadow', 'rgb(255, 250, 242) 0px 0px 0px 2px inset')
+  await expect(off).toHaveCSS('color', 'rgb(255, 250, 242)')
+
+  await off.click()
+  const on = scanner(page).getByRole('button', { name: 'Turn off the torch' })
+  await expect(on).toHaveAttribute('aria-pressed', 'true')
+  await expect(on).toHaveCSS('background-color', 'rgb(255, 250, 242)')
+  await expect(on).toHaveCSS('box-shadow', 'none')
+  await expect(on).toHaveCSS('color', 'rgb(20, 17, 15)')
+  release()
 })
 
 test.describe('with no camera', () => {
@@ -129,7 +213,8 @@ test.describe('with no camera', () => {
     await open(page, '/_kit')
     await openScanner(page)
     await expect(page.getByRole('heading', { name: 'No camera' })).toBeVisible()
-    await scanner(page).getByRole('button', { name: 'Type it in' }).click()
+    // The one way on, the sheet's main action in its pinned footer (MOL-211).
+    await scanner(page).locator('.footer').getByRole('button', { name: 'Type it in' }).click()
   })
 
   test('takes the digits typed by hand', async ({ page }) => {
@@ -148,6 +233,17 @@ test.describe('with no camera', () => {
 
     await expect(scanner(page).getByText("The digits don't add up — check the code")).toBeVisible()
     await expect(scanner(page)).toBeVisible()
+    // The edge doubled, as a row of the kit draws an error: a hairline is lost in bad light (MOL-211).
+    // Read once the well's colour has settled: its edge comes by a transition, the shadow at once, and
+    // CI read the edge half-way (rgb(187, 117, 102) against the shadow's --bad).
+    const edge = await scanner(page)
+      .locator('.well')
+      .evaluate(async (well) => {
+        await Promise.allSettled(well.getAnimations().map((animation) => animation.finished))
+        const style = getComputedStyle(well)
+        return { colour: style.borderTopColor, shadow: style.boxShadow }
+      })
+    expect(edge.shadow).toBe(`${edge.colour} 0px 0px 0px 1px inset`)
   })
 })
 

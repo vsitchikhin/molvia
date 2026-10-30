@@ -433,7 +433,7 @@ Soft but not bubbly. Radii: 2 (`mark`, the corner of a bar, a legend key, a tick
 segment, a small well), 14 (`default`, fields, list cards,
 the "Брать" card), 20 (`lg`, cards), 24 (`sheet`, the top corners of a sheet), pill (buttons, badges,
 chips, search). Borders are a 1 px hairline; a verdict badge's outline is 1.5 px, because 1 px
-disappears in bad light. Circles are a form (`50%`), not a size.
+disappears in bad light, and an error's edge — a field's, a row's — is doubled for the same reason. Circles are a form (`50%`), not a size.
 
 ## Components
 
@@ -485,7 +485,7 @@ tabs are outlined, 600.
 
 ### Inputs / Fields
 
-- **Field:** a well on `surface-2` — a target of 44 inside its hairline edge, 46 outside — radius 14, hairline `border-strong`; label above in 13/600 `text-muted`; focus turns the edge `accent` with a 2 px `accent-tint` halo; the error is a word from the registry under the field. Never `type="number"`.
+- **Field:** a well on `surface-2` — a target of 44 inside its hairline edge, 46 outside — radius 14, hairline `border-strong`; label above in 13/600 `text-muted`; focus turns the edge `accent` with a 2 px `accent-tint` halo; the error is a word from the registry under the field, and its edge `bad`, doubled inside the hairline as a row's (MOL-211). Never `type="number"`.
 - **SearchField (one):** a pill on `surface-2` with a 1 `border-strong` edge — a target of 44 inside the edge, 46 outside, as every field of the kit · a 20 magnifier in `text-muted`, 16 from the edge and 8 from the text · text 17, placeholder `text-muted` · at the right the screen's action (the scanner, a 44 circle with a 24 glyph) or "Очистить" (a 20 `close-circle` in a 44 target) while there is text, never both · the focus of a field: an `accent` edge and a 2 `accent-tint` halo · a hint under it 13 `text-muted`, 8 above and 16 from the edge. One look for every search in the app: «Что взяли?», «Что брать», «Выбрать товар». Its list is a card of `ListRow` options, 64 high with a 20 chevron, the name wrapped, never cut — its end tells two items apart; the one the arrows stand on is filled `accent-tint`, the weight unchanged and its meta in `text`. "Очистить" does not stand on a read-only field; in a dialog Esc closes it — in a sheet that is «back» — never clears the field.
 - **Segmented control:** a `surface-2` track, segments 38 that answer the thumb over the full 44, radius 11 (`radius` less the inset). Inactive: one stop, the arrows walk the focus without choosing; the selected one on `surface` with a `graphic` edge and its word in `text`, the others `text-muted`.
 - **Switch:** a 52 × 32 track, `graphic` off and `accent-solid` on with a ✓ on the knob. Inactive: a `surface-2` well with a `border-strong` edge and a `text-muted` knob, still focusable.

@@ -76,18 +76,24 @@ export default defineComponent({
 .hint {
   display: grid;
   gap: var(--space-3);
+  font-size: var(--text-callout);
 
   p {
     margin: 0;
   }
 }
 
+/* The way through Settings in a recess of its own, as 2j draws it (MOL-211): the one line to follow. */
 .path {
-  font-weight: var(--weight-bold);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-weight: var(--weight-medium);
 }
 
+/* What it costs and the other ways — a step down from the paragraph (Ф-8: 13 for what explains). */
 .aside {
   color: var(--text-muted);
-  font-size: var(--text-callout);
+  font-size: var(--text-footnote);
 }
 </style>

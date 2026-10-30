@@ -6,6 +6,7 @@ import type { Router } from 'vue-router'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import BottomSheet from '@/components/BottomSheet.vue'
+import ScreenState from '@/components/ScreenState.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { provideAnnouncer, useAnnouncer } from '@/composables/useAnnouncer'
 import { pageAnchor } from '@/composables/useSheetHistory'
@@ -63,12 +64,22 @@ async function render(
     back?: boolean
     footer?: boolean
     field?: boolean | 'lines'
+    /** A state standing in the sheet: the whole sheet's error, a notice, or a section's (`inline`). */
+    state?: 'error' | 'attention' | 'inline'
+    /** Whether the state brings a button of its own (`#action`), changed while it stands. */
+    action?: boolean
+    /** The slot given always, the button in it drawn by `action` — a screen's `v-if` inside the slot. */
+    slotAlways?: boolean
+    /** A failure to send drawn in the sheet's own footer, by the kit's state (adversarial Б). */
+    stateInFooter?: boolean
   } = {},
 ) {
   const router: Router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/')
   if (options.at) await router.push(options.at)
   const open = ref(options.open ?? false)
+  const state = ref(options.state)
+  const action = ref(options.action ?? false)
   const closed = vi.fn()
   const push = vi.spyOn(router.options.history, 'push')
   const go = vi.spyOn(router, 'go')
@@ -88,17 +99,37 @@ async function render(
             title: () => 'Milk «Ashkhar»',
             meta: () => 'UHT, 2.5%',
             default: () =>
-              options.field
-                ? [
-                    h('p', { class: 'content' }, 'Quantity and price'),
-                    h(options.field === 'lines' ? 'textarea' : 'input', {
-                      class: 'price',
-                      'aria-label': 'Price',
-                    }),
-                  ]
-                : h('p', { class: 'content' }, 'Quantity and price'),
+              state.value
+                ? h(
+                    ScreenState,
+                    {
+                      kind: state.value === 'attention' ? 'attention' : 'error',
+                      title: 'Camera did not start',
+                      inline: state.value === 'inline',
+                    },
+                    options.slotAlways
+                      ? {
+                          action: () =>
+                            action.value ? h('button', { class: 'typing' }, 'Type it in') : null,
+                        }
+                      : action.value
+                        ? { action: () => h('button', { class: 'typing' }, 'Type it in') }
+                        : undefined,
+                  )
+                : options.field
+                  ? [
+                      h('p', { class: 'content' }, 'Quantity and price'),
+                      h(options.field === 'lines' ? 'textarea' : 'input', {
+                        class: 'price',
+                        'aria-label': 'Price',
+                      }),
+                    ]
+                  : h('p', { class: 'content' }, 'Quantity and price'),
             ...(options.footer === true && {
-              footer: () => h('button', { class: 'save', type: 'button' }, 'Save'),
+              footer: () => [
+                h('button', { class: 'save', type: 'button' }, 'Save'),
+                options.stateInFooter ? h(ScreenState, { kind: 'error', title: 'Not sent' }) : null,
+              ],
             }),
           },
         ),
@@ -110,7 +141,7 @@ async function render(
   // A sheet mounted open has had time to come up, unless a test is about the moment it rises.
   if (options.rising !== true) wait(1000)
   await realTime()
-  return { router, host, open, closed, push, go, dialog, sheet }
+  return { router, host, open, state, action, closed, push, go, dialog, sheet }
 }
 
 describe('BottomSheet', () => {
@@ -999,6 +1030,119 @@ describe('the pinned footer', () => {
     expect(dialog().querySelector('.panel')?.classList.contains('footed')).toBe(false)
     expect(dialog().classList.contains('pinned')).toBe(false)
     expect(dialog().style.getPropertyValue('--sheet-footer-height')).toBe('0px')
+  })
+
+  // A full state of the sheet holds its footer, as an error of a screen holds the screen's strip
+  // (MOL-211): its buttons pinned under the thumb, the sheet's own footer stepped aside for them.
+  describe('as the strip of a state in the sheet (MOL-211)', () => {
+    const buttons = (dialog: HTMLDialogElement) =>
+      [...(dialog.querySelector('.footer')?.querySelectorAll('button') ?? [])].map((button) =>
+        button.textContent.trim(),
+      )
+
+    it('holds the state’s buttons, pinned, in place of its own', async () => {
+      const { dialog } = await render({ open: true, footer: true, state: 'error' })
+      await nextTick()
+      expect(buttons(dialog())).toEqual([en.state.retry])
+      expect(dialog().querySelector('.panel .action')).toBeNull()
+      expect(dialog().classList.contains('pinned')).toBe(true)
+      expect(dialog().querySelector('.panel')?.classList.contains('footed')).toBe(true)
+    })
+
+    it('is drawn for the state where the sheet has no footer of its own', async () => {
+      const { dialog } = await render({ open: true, state: 'error' })
+      await nextTick()
+      expect(buttons(dialog())).toEqual([en.state.retry])
+      expect(dialog().classList.contains('pinned')).toBe(true)
+    })
+
+    it('gives the footer back once the state goes', async () => {
+      const { dialog, state } = await render({ open: true, footer: true, state: 'error' })
+      await nextTick()
+      state.value = undefined
+      await nextTick()
+      await nextTick()
+      expect(buttons(dialog())).toEqual(['Save'])
+    })
+
+    it('goes with the state where the sheet has none of its own', async () => {
+      const { dialog, state } = await render({ open: true, state: 'error' })
+      await nextTick()
+      state.value = undefined
+      await nextTick()
+      await nextTick()
+      expect(dialog().querySelector('.footer')).toBeNull()
+      expect(dialog().classList.contains('pinned')).toBe(false)
+    })
+
+    // Whether the state brings a button is read as the block updates, not once (adversarial А1, А2).
+    it('takes the footer for a button that comes while the kind stands', async () => {
+      const { dialog, action } = await render({ open: true, state: 'attention' })
+      await nextTick()
+      expect(dialog().querySelector('.footer')).toBeNull()
+      action.value = true
+      await nextTick()
+      await nextTick()
+      expect(buttons(dialog())).toEqual(['Type it in'])
+      expect(dialog().querySelector('.panel .action')).toBeNull()
+      expect(dialog().classList.contains('pinned')).toBe(true)
+    })
+
+    it('gives the sheet’s own footer back once the state’s button goes', async () => {
+      const { dialog, action } = await render({
+        open: true,
+        footer: true,
+        state: 'attention',
+        action: true,
+      })
+      await nextTick()
+      expect(buttons(dialog())).toEqual(['Type it in'])
+      action.value = false
+      await nextTick()
+      await nextTick()
+      expect(buttons(dialog())).toEqual(['Save'])
+    })
+
+    // A slot given is no button drawn (round 2, А3): a screen writes the button under its own `v-if`.
+    it('must not take it for a slot that draws no button, and takes it once one is drawn', async () => {
+      const { dialog, action } = await render({
+        open: true,
+        footer: true,
+        state: 'attention',
+        slotAlways: true,
+      })
+      await nextTick()
+      expect(buttons(dialog())).toEqual(['Save'])
+      action.value = true
+      await nextTick()
+      await nextTick()
+      expect(buttons(dialog())).toEqual(['Type it in'])
+      action.value = false
+      await nextTick()
+      await nextTick()
+      expect(buttons(dialog())).toEqual(['Save'])
+    })
+
+    // The sheet's own footer sees no strip (adversarial Б): a state there held the footer it stood in,
+    // took its slot down, let go and held it again, for ever in a built app.
+    it('must not take it for a state drawn in the sheet’s own footer', async () => {
+      const failed: unknown[] = []
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      const { dialog, host } = await render({ open: true, footer: true, stateInFooter: true })
+      host.vm.$.appContext.config.errorHandler = (error) => void failed.push(error)
+      await nextTick()
+      await nextTick()
+      expect(failed).toEqual([])
+      expect(warn).not.toHaveBeenCalledWith(expect.stringMatching(/recursive updates/))
+      expect(buttons(dialog())).toEqual(['Save', en.state.retry])
+    })
+
+    it('must not fire: a section’s error keeps its quiet «Повторить» in the content', async () => {
+      const { dialog } = await render({ open: true, footer: true, state: 'inline' })
+      await nextTick()
+      expect(buttons(dialog())).toEqual(['Save'])
+      expect(dialog().querySelector('.panel .action')?.textContent.trim()).toBe(en.state.retry)
+    })
   })
 
   // What the sheet scrolls into sight stops at the footer's top: its `scroll-padding` is the
