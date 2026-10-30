@@ -572,6 +572,63 @@ for (const width of [390, 320])
     for (const right of rights) expect(right).toBeLessThanOrEqual(edge + 0.5)
   })
 
+// MOL-304: an entry held its label on one line and gave its value half the row, so on a phone of 320
+// «Перевод между счетами» ended in «…», and «Бюджет» beside «сверх плана 1 250 300 ֏» was «Бю…» with its
+// figure cut too. Now nothing of an entry is cut: the label takes a second line, and a value that cannot
+// stand beside its label goes under it, at the right — beside it while both fit, and a row of one line
+// stays 52.
+for (const locale of ['ru-RU', 'en-US'])
+  test.describe(`an entry row in ${locale}`, () => {
+    test.use({ locale })
+    for (const width of [390, 320])
+      test(`at ${String(width)} cuts neither its label nor its value`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 720 })
+        await open(page, '/_kit')
+        await expect(page.locator('.nav-row').first()).toBeVisible()
+        const rows = await page.locator('.nav-row').evaluateAll((all) =>
+          all
+            .filter((row) => row.getClientRects().length > 0)
+            .map((row) => {
+              const label = row.querySelector<HTMLElement>('.label')!
+              const value = row.querySelector<HTMLElement>('.value')
+              const cut = (one: HTMLElement) =>
+                one.scrollWidth > one.clientWidth || one.scrollHeight > one.clientHeight + 1
+              const box = label.getBoundingClientRect()
+              const lines = Math.round(box.height / parseFloat(getComputedStyle(label).lineHeight))
+              const under = value ? value.getBoundingClientRect().top >= box.bottom - 1 : false
+              return {
+                text: label.textContent.trim(),
+                height: row.getBoundingClientRect().height,
+                lines,
+                labelCut: cut(label),
+                valueCut: value ? cut(value) : false,
+                valueEnd: value
+                  ? row.getBoundingClientRect().right - value.getBoundingClientRect().right
+                  : null,
+                under,
+              }
+            }),
+        )
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width)
+        expect(rows.length).toBeGreaterThan(4)
+        for (const row of rows)
+          expect(row, row.text).toMatchObject({ labelCut: false, valueCut: false })
+        // A row of one line, its value beside it, is as tall as before.
+        for (const row of rows.filter((one) => one.lines === 1 && !one.under))
+          expect(row.height, row.text).toBe(52)
+        const transfer = rows.find((row) => /между счетами|between accounts/.test(row.text))
+        const budget = rows.find((row) => /^(Бюджет|Budget)$/.test(row.text))
+        const account = rows.find((row) => /^(Счёт|Account)$/.test(row.text))
+        // At 320 the transfer's label breaks rather than ends in «…»; at 390 it stands on one line.
+        expect(transfer?.lines).toBe(width === 320 ? 2 : 1)
+        // A long figure goes under its label on a phone of 320, ending where a value beside one ends;
+        // a short one stays beside.
+        if (width === 320) expect(budget?.under).toBe(true)
+        expect(account?.under).toBe(false)
+        expect(budget?.valueEnd).toBeCloseTo(account?.valueEnd ?? 0, 0)
+      })
+  })
+
 // MOL-318: a sheet's column took the least width of what stood in it — the chips' row with a long name of
 // one's own first, a select as wide as its longest option, a title of one word — and a row's words took
 // a till's line on one line; the sheet went past the phone, × and all. Nothing stands past the sheet's edge

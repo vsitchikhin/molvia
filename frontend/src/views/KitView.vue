@@ -383,6 +383,23 @@
               @click="sheetOpen = true"
             />
           </li>
+          <!-- The two that were cut on a phone of 320 (MOL-304): a label of two lines, and a value too
+               long to stand beside its label, on a line of its own under it. -->
+          <li>
+            <NavRow
+              :icon="IconTransfer"
+              :label="t('accounts.screen.transfer')"
+              @click="sheetOpen = true"
+            />
+          </li>
+          <li>
+            <NavRow
+              :icon="IconTarget"
+              :label="t('budget.title')"
+              :value="figures.budgetOver"
+              @click="sheetOpen = true"
+            />
+          </li>
         </AppCard>
       </div>
       <!-- The same entry among the fields of a form, and with an error behind it (MOL-199). -->
@@ -714,6 +731,8 @@ import IconDownload from '~icons/mdi/download-outline'
 import IconPlus from '~icons/mdi/plus'
 import IconRefresh from '~icons/mdi/refresh'
 import IconShape from '~icons/mdi/shape-outline'
+import IconTarget from '~icons/mdi/target'
+import IconTransfer from '~icons/mdi/bank-transfer'
 import IconWallet from '~icons/mdi/wallet-outline'
 import IconCalendar from '~icons/mdi/calendar-blank-outline'
 import AppButton from '@/components/AppButton.vue'
@@ -743,7 +762,7 @@ import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import TripTotalCard from '@/components/TripTotalCard.vue'
 import { operationRowProps, shortDay } from '@/components/accounts'
-import { journalRowProps } from '@/components/spending'
+import { budgetAmount, journalRowProps } from '@/components/spending'
 import type { JournalRow } from '@/components/spending'
 import VerdictBadge from '@/components/VerdictBadge.vue'
 import VerdictCard from '@/components/VerdictCard.vue'
@@ -1203,6 +1222,9 @@ export default defineComponent({
       figures: {
         balance: formatMoney(money(4230000n, 'AMD')),
         month: formatMoney(money(12000000n, 'RUB')),
+        budgetOver: t('budget.entry.over', {
+          amount: budgetAmount(money(125_030_000n, 'AMD'), locale.value),
+        }),
       },
       // Icons a row draws at its own step are handed to it as components.
       IconAlert,
@@ -1216,6 +1238,8 @@ export default defineComponent({
       IconUpload,
       IconWallet,
       IconCalendar,
+      IconTarget,
+      IconTransfer,
       accounts: computed(() => [
         {
           id: 'card',
