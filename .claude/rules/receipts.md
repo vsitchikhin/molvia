@@ -623,7 +623,8 @@ threshold would lose the first receipt of every shop.
 teaches nothing. The price kept is the shelf price of a line recorded as read, the memory's argument
 where a figure reads two ways — «60 60» for «50 50» adds up either way — and it is a hint, never a
 correction (В-1): a price one confused digit off the remembered is `rememberedPrice` on the line, «
-проверьте», and the parse's figures stay as read — and, since MOL-291, on a line the check emptied too. **The price
+проверьте», and the parse's figures stay as read — on a receipt not proven whole (MOL-314, below) — and, since MOL-291,
+on a line the check emptied too. **The price
 goes into the digits since MOL-291** (below): as a voice beside the line's arithmetic and the total, measured on the
 bench, by its own rule of whose price — not the hint's. **The price is someone's figure** (review 5, В6; round 2, Р2-В3): the
 person's own always; other people's only as their figures are — with access (`shared_until`) and from
@@ -1401,7 +1402,16 @@ memory would speak on every other receipt; its cut-out rows are not confirmed, a
 
 **The review**: a line with no price — the check emptied it, a doubt among them — shows the remembered price as the hint
 «В прошлый раз здесь было …» (`rememberedPrice`, the hint's own rule of access); the mark of a line put right says
-«Цифры поправили — сверьте с бумагой», since it may be the memory's and not the total's. The log of a reading counts
+«Цифры поправили — сверьте с бумагой», since it may be the memory's and not the total's. **A receipt proven whole
+doubts no price it shows** (MOL-314, owner's В-1 «а», 30.10.2026): on `balanced` the server sends `rememberedPrice` only to
+a line with no price, so the phone says nothing over one with its figures. The total settled that line before the hint:
+the memory said nothing at reading where the lines met it as read (`met`), and «1 / 650 / 650» under a total of 650 is
+the butter gone up from a remembered 550 — «проверьте цифры» there asked the person to put the old price back and break
+the total. `balanced` is the check's «proven whole» (MOL-255), so the total may stand in one place where the lines as
+read are its second source (MOL-244), as the memory's silence does. **The price, named:** one line under a total printed
+once, both misread alike by the font's 5↔6 (am-34's faded paper), is shown as read with no hint — as MOL-291 already
+shows it with no doubt; and a receipt read before MOL-255 (20.10) and not recorded — its `balanced` then the parse's
+«met», not the check's — loses the hint too, until 17.11, on the owner's receipts alone. The log of a reading counts
 what the memory said, line by line — confirmed, put right, doubted (`rememberedConfirmed`, `rememberedRepaired`,
 `rememberedDoubted`, review №5) — never a price: the doubts are the price named, lines a changed shelf price emptied.
 
