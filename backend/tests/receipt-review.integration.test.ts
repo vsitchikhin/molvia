@@ -522,7 +522,7 @@ describe('the review of a receipt', () => {
     expect((await review(me, carded)).lines[0]?.rememberedPrice).toEqual(amd(550))
 
     // one line, but the total proves its sum, not how it splits (adversarial В1, owner's В-5 «б»): a weight, a count
-    // or a discount may hold the other half — 0,6 kg × 550 copied «0,5 × 650» meets the same 325
+    // or a discount may hold the other half — 0,6 kg × 5 000 copied «0,5 × 6 000» meets the same 3 000
     const split = async (over: Partial<typeof receiptLines.$inferInsert>, total: number) => {
       const id = await parsedReceipt(me, [butterLine], {
         totalMinor: BigInt(total * 100),

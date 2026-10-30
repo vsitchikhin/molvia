@@ -1420,10 +1420,11 @@ price only — the cheese's weight copied «0,5» for 0,6 hides the other half u
 count or a discount keeps every hint, as before. `balanced` is the check's «proven whole» (MOL-255), so the total may
 stand in one place where the lines as read are its second source (MOL-244), as the memory's silence does. **The prices,
 named:** a price that really changed still reads «проверьте» on a receipt of more than one line — the same item twice in
-one purchase too — and on one line weighed, of a count or discounted; **one line under a total read in one place, both
-misread alike by any of the reader's swaps** — the model's 5↔6 (am-34's faded paper), Tesseract's 1↔4, 3↔8, 0↔9 too,
-which MOL-291 never doubts (adversarial А2, owner's В-3 «а») — is shown as read with no hint, where the total is printed
-once is not stored, so it cannot be told, and so is Tesseract's count «1» read for a 4 («4 × 100» as «1 × 400»; the
+one purchase too — and on one line weighed, of a count or discounted; **one line and its total misread alike by any of
+the reader's swaps** — the model's 5↔6 (am-34's faded paper), Tesseract's 1↔4, 3↔8, 0↔9 too, which MOL-291 never
+doubts — **in one place or in two**, the font's «5» read «6» in the total and the payment alike as MOL-244 saw it (round
+2, Б1) — is shown as read with no hint (adversarial А2 and Г1, owner's В-3 «а»): by the text it is the very butter gone
+up the rule is for; and so is Tesseract's count «1» read for a 4 («4 × 100» as «1 × 400»; the
 model's 5↔6 has none in a «1»); and a receipt read before MOL-255 (20.10) and not recorded — its `balanced` then the
 parse's «met», not the check's — loses the hint too, until 17.11, on the owner's receipts alone. The log of a reading counts
 what the memory said, line by line — confirmed, put right, doubted (`rememberedConfirmed`, `rememberedRepaired`,

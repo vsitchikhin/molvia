@@ -375,8 +375,9 @@ export async function receiptOfOwner(
         ...(packed === null ? {} : { pack: packed }),
         amount: amounts[i] ?? null,
         // one confused digit off the price read (В-1), unless the total proving the receipt points at this price, its
-        // only line's at its sum — there a price off the memory's is one that changed (MOL-314); or the line has none — the check
-        // emptied it, the memory doubting it among others (MOL-291, owner's В-2 «б»): a hint to type by, never a figure
+        // only line's at its sum — there a price off the memory's is one that changed (MOL-314); or the line has none —
+        // the check emptied it, the memory doubting it among others (MOL-291, owner's В-2 «б»): a hint to type by,
+        // never a figure
         rememberedPrice:
           line.price === null ||
           (!pointedAt && priceInDoubt(receipt.country, line.price, rememberedOf(remembered)))
