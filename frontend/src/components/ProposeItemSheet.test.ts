@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { defineComponent, h, nextTick, ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
 import type { CatalogueWrite } from '@molvia/client'
@@ -7,8 +8,10 @@ import { ERROR, ISSUE, ITEM_NAME_MAX, ITEM_NOTE_MAX } from '@molvia/model'
 import type { BarcodeHint, CatalogueEntry, ProposedItem } from '@molvia/model'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { routes } from '@/router'
 import ProposeItemSheet from '@/components/ProposeItemSheet.vue'
+import SegmentedControl from '@/components/SegmentedControl.vue'
 
 const proposeItem = vi.fn<(input: ProposedItem) => Promise<CatalogueWrite>>()
 vi.mock('@/api', () => ({
@@ -81,6 +84,19 @@ function submitButton(sheet: VueWrapper) {
   return button
 }
 
+/** The sheet's one main button, whatever it says (MOL-213, Ф-6). */
+function mainButton(sheet: VueWrapper) {
+  const button = sheet.findAll('.footer button').at(-1)
+  if (!button) throw new Error('no main button')
+  return button
+}
+
+/** Not now as the kit draws it: in the focus order, never the native `disabled`. */
+function notNow(sheet: VueWrapper): boolean {
+  expect(mainButton(sheet).attributes('disabled')).toBeUndefined()
+  return mainButton(sheet).attributes('aria-disabled') === 'true'
+}
+
 beforeEach(() => {
   clock = 0
   vi.spyOn(performance, 'now').mockImplementation(() => clock)
@@ -104,21 +120,104 @@ describe('«Suggest an item»', () => {
 
   it('waits for a unit: guessed wrong, it would be the unit of every later purchase', async () => {
     const sheet = await render()
-    expect(submitButton(sheet).attributes('disabled')).toBeDefined()
+    expect(notNow(sheet)).toBe(true)
+    expect(mainButton(sheet).text()).toBe(en.item.propose.needs_unit)
 
     await chooseUnit(sheet, en.item.unit_l)
 
-    expect(submitButton(sheet).attributes('disabled')).toBeUndefined()
+    expect(notNow(sheet)).toBe(false)
+    expect(mainButton(sheet).text()).toBe(en.item.propose.submit)
   })
 
-  it('waits for a name that draws something', async () => {
+  it('waits for a name that draws something, and says so', async () => {
     const sheet = await render('')
     await chooseUnit(sheet, en.item.unit_kg)
 
     for (const blank of ['', '   ', String.fromCodePoint(0x200b)]) {
       await fields(sheet).name.setValue(blank)
-      expect(submitButton(sheet).attributes('disabled'), JSON.stringify(blank)).toBeDefined()
+      expect(notNow(sheet), JSON.stringify(blank)).toBe(true)
+      expect(mainButton(sheet).text(), JSON.stringify(blank)).toBe(en.item.propose.needs_name)
     }
+  })
+
+  describe('the button says why it waits (MOL-213, Ф-6)', () => {
+    it('asks for the name before the unit (5f)', async () => {
+      const sheet = await render('')
+
+      expect(notNow(sheet)).toBe(true)
+      expect(mainButton(sheet).text()).toBe(en.item.propose.needs_name)
+    })
+
+    it('asks for the connection before anything else (5g)', async () => {
+      online(false)
+      const sheet = await render('')
+
+      expect(notNow(sheet)).toBe(true)
+      expect(mainButton(sheet).text()).toBe(en.item.propose.offline)
+    })
+
+    it('is one button through every word: a new word drops no focus that stands on it', async () => {
+      const sheet = await render('')
+      const button = mainButton(sheet).element as HTMLButtonElement
+      button.focus()
+      expect(mainButton(sheet).text()).toBe(en.item.propose.needs_name)
+
+      // Neither step moves the focus by itself: the name is set, the unit chosen by the control.
+      await fields(sheet).name.setValue('Тан')
+      expect(mainButton(sheet).element).toBe(button)
+      expect(mainButton(sheet).text()).toBe(en.item.propose.needs_unit)
+      expect(document.activeElement).toBe(button)
+
+      sheet.findComponent(SegmentedControl).vm.$emit('update:modelValue', 'l')
+      await nextTick()
+      expect(mainButton(sheet).element).toBe(button)
+      expect(mainButton(sheet).text()).toBe(en.item.propose.submit)
+      expect(document.activeElement).toBe(button)
+    })
+
+    it('must not send on a press while not now', async () => {
+      const sheet = await render()
+
+      await mainButton(sheet).trigger('click')
+      online(false)
+      await chooseUnit(sheet, en.item.unit_l)
+      window.dispatchEvent(new Event('offline'))
+      await sheet.vm.$nextTick()
+      await mainButton(sheet).trigger('click')
+
+      expect(proposeItem).not.toHaveBeenCalled()
+    })
+
+    it('says the work while it sends, in the live look, not grey', async () => {
+      let land!: (written: CatalogueWrite) => void
+      proposeItem.mockReturnValue(new Promise((resolve) => (land = resolve)))
+      const sheet = await render()
+      await chooseUnit(sheet, en.item.unit_l)
+
+      await submitButton(sheet).trigger('click')
+
+      expect(mainButton(sheet).text()).toBe(en.item.propose.sending)
+      expect(mainButton(sheet).attributes('aria-busy')).toBe('true')
+      expect(mainButton(sheet).attributes('disabled')).toBeUndefined()
+      land({ entry: tan, created: true })
+      await flushPromises()
+    })
+
+    it('keeps the word of the work when the connection goes while it sends', async () => {
+      let land!: (written: CatalogueWrite) => void
+      proposeItem.mockReturnValue(new Promise((resolve) => (land = resolve)))
+      const sheet = await render()
+      await chooseUnit(sheet, en.item.unit_l)
+      await submitButton(sheet).trigger('click')
+
+      online(false)
+      window.dispatchEvent(new Event('offline'))
+      await sheet.vm.$nextTick()
+
+      expect(mainButton(sheet).text()).toBe(en.item.propose.sending)
+      land({ entry: tan, created: true })
+      await flushPromises()
+    })
   })
 
   it('sends a product with its name and unit, and no note when none was written', async () => {
@@ -179,7 +278,7 @@ describe('«Suggest an item»', () => {
     await chooseUnit(sheet, en.item.unit_l)
 
     await submitButton(sheet).trigger('click')
-    await submitButton(sheet).trigger('click')
+    await mainButton(sheet).trigger('click')
     answer({ entry: tan, created: true })
 
     await vi.waitFor(() => {
@@ -199,16 +298,18 @@ describe('«Suggest an item»', () => {
       expect(sheet.get('[role="alert"]').text()).toBe(en.item.propose.failed)
     })
     expect(sheet.emitted('proposed')).toBeUndefined()
-    expect(submitButton(sheet).attributes('disabled')).toBeUndefined()
+    expect(notNow(sheet)).toBe(false)
   })
 
-  it('waits for the connection offline rather than failing', async () => {
+  it('waits for the connection offline rather than failing, and says so on the button', async () => {
     online(false)
     const sheet = await render()
     await chooseUnit(sheet, en.item.unit_l)
 
-    expect(sheet.text()).toContain(en.item.propose.offline)
-    expect(submitButton(sheet).attributes('disabled')).toBeDefined()
+    expect(mainButton(sheet).text()).toBe(en.item.propose.offline)
+    expect(notNow(sheet)).toBe(true)
+    // The line over it is the field's alone now (5g): «со связью» is not said twice.
+    expect(sheet.get('[role="status"]').text()).toBe('')
     expect(proposeItem).not.toHaveBeenCalled()
   })
 
@@ -223,9 +324,179 @@ describe('«Suggest an item»', () => {
     await submitButton(sheet).trigger('click')
 
     await vi.waitFor(() => {
-      expect(sheet.text()).toContain(en.item.propose.offline)
+      expect(mainButton(sheet).text()).toBe(en.item.propose.offline)
     })
     expect(sheet.find('[role="alert"]').exists()).toBe(false)
+  })
+
+  it('comes back when the app does, the connection back with no «online» heard (adversarial А2)', async () => {
+    proposeItem.mockResolvedValue({ entry: tan, created: true })
+    online(false)
+    const sheet = await render()
+    await chooseUnit(sheet, en.item.unit_l)
+    expect(mainButton(sheet).text()).toBe(en.item.propose.offline)
+
+    // An iOS PWA frozen in the background misses `online` (MOL-192).
+    online(true)
+    document.dispatchEvent(new Event('visibilitychange'))
+    await nextTick()
+
+    expect(mainButton(sheet).text()).toBe(en.item.propose.submit)
+    await mainButton(sheet).trigger('click')
+    expect(proposeItem).toHaveBeenCalledTimes(1)
+  })
+
+  describe("the connection said into the sheet's region (adversarial А1)", () => {
+    /** The sheet in an app, whose announcer the sheet's region takes over while it is up. */
+    async function inApp(code: string | null = null) {
+      const router = createRouter({ history: createMemoryHistory(), routes })
+      await router.push('/trip/add')
+      const open = ref(true)
+      const Host = defineComponent({
+        setup() {
+          provideAnnouncer()
+          return () =>
+            h(ProposeItemSheet, {
+              open: open.value,
+              query: 'тан',
+              code,
+              'onUpdate:open': (next: boolean) => (open.value = next),
+            })
+        },
+      })
+      const view = mount(Host, {
+        attachTo: document.body,
+        global: { plugins: [router, createAppI18n('en')] },
+      })
+      mounted.push(view)
+      clock += 1000
+      await said()
+      return { view, open }
+    }
+
+    /** Past the announcer's task (`useAnnouncer`, 100 ms). */
+    async function said(): Promise<void> {
+      await new Promise((resolve) => setTimeout(resolve, 150))
+    }
+
+    function region(view: VueWrapper): string {
+      return view.get('dialog .region').text()
+    }
+
+    function goes(value: boolean): void {
+      online(value)
+      window.dispatchEvent(new Event(value ? 'online' : 'offline'))
+    }
+
+    it('says it as the sheet opens offline, and leaves the line over the button to the field', async () => {
+      online(false)
+      const { view } = await inApp()
+
+      expect(region(view)).toBe(en.item.propose.offline)
+      expect(view.get('[role="status"].line').text()).toBe('')
+    })
+
+    it('says it when the connection goes under the open sheet, and takes it back when it comes', async () => {
+      const { view } = await inApp()
+      expect(region(view)).toBe('')
+
+      goes(false)
+      await said()
+      expect(region(view)).toBe(en.item.propose.offline)
+
+      goes(true)
+      await said()
+      expect(region(view)).toBe('')
+    })
+
+    it('says it again at the next opening offline', async () => {
+      online(false)
+      const { view, open } = await inApp()
+      open.value = false
+      await said()
+      expect(region(view)).toBe('')
+
+      open.value = true
+      await said()
+      expect(region(view)).toBe(en.item.propose.offline)
+    })
+
+    it('must not say it over «Take «…»»: nothing is left to propose, and taking needs no connection (Б1)', async () => {
+      const kefir = { ...tan, id: '1c7a3d5f-9e2b-4a4c-8d8f-6b3e2f1a4c5d', name: 'Кефир 1%' }
+      proposeItem.mockResolvedValue({ taken: kefir })
+      const { view } = await inApp('4850001234562')
+      await chooseUnit(view, en.item.unit_l)
+      await mainButton(view).trigger('click')
+      await flushPromises()
+      const take = mainButton(view)
+      expect(take.text()).toBe(en.item.propose.take.replace('{name}', 'Кефир 1%'))
+
+      goes(false)
+      await said()
+
+      expect(region(view)).toBe('')
+      expect(take.attributes('aria-disabled')).toBeUndefined()
+      await take.trigger('click')
+      expect(view.findComponent(ProposeItemSheet).emitted('taken')).toEqual([[kefir]])
+    })
+
+    it('must not say it while it sends: the button says «Adding…»', async () => {
+      proposeItem.mockReturnValue(new Promise(() => undefined))
+      const { view } = await inApp()
+      await chooseUnit(view, en.item.unit_l)
+      await mainButton(view).trigger('click')
+
+      goes(false)
+      await said()
+
+      expect(mainButton(view).text()).toBe(en.item.propose.sending)
+      expect(region(view)).toBe('')
+    })
+  })
+
+  describe('a failure is said once (adversarial В1)', () => {
+    async function failedOnce() {
+      proposeItem.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'transport'))
+      const sheet = await render()
+      await chooseUnit(sheet, en.item.unit_l)
+      await submitButton(sheet).trigger('click')
+      await vi.waitFor(() => {
+        expect(sheet.get('[role="alert"]').text()).toBe(en.item.propose.failed)
+      })
+      return sheet
+    }
+
+    for (const back of ['online', 'visibilitychange'] as const) {
+      it(`is not born again when the connection comes back (${back})`, async () => {
+        const sheet = await failedOnce()
+
+        online(false)
+        window.dispatchEvent(new Event('offline'))
+        await nextTick()
+        expect(sheet.find('[role="alert"]').exists()).toBe(false)
+
+        online(true)
+        if (back === 'online') window.dispatchEvent(new Event('online'))
+        else document.dispatchEvent(new Event('visibilitychange'))
+        await nextTick()
+
+        expect(sheet.find('[role="alert"]').exists()).toBe(false)
+        expect(mainButton(sheet).text()).toBe(en.item.propose.submit)
+        expect(notNow(sheet)).toBe(false)
+        expect(proposeItem).toHaveBeenCalledTimes(1)
+      })
+    }
+
+    it('stays while the connection does, until the next try', async () => {
+      const sheet = await failedOnce()
+      proposeItem.mockResolvedValueOnce({ entry: tan, created: true })
+      document.dispatchEvent(new Event('visibilitychange'))
+      await nextTick()
+      expect(sheet.get('[role="alert"]').text()).toBe(en.item.propose.failed)
+
+      await mainButton(sheet).trigger('click')
+      expect(sheet.find('[role="alert"]').exists()).toBe(false)
+    })
   })
 
   it('comes back when the connection does', async () => {
@@ -237,7 +508,7 @@ describe('«Suggest an item»', () => {
     window.dispatchEvent(new Event('online'))
     await sheet.vm.$nextTick()
 
-    expect(submitButton(sheet).attributes('disabled')).toBeUndefined()
+    expect(notNow(sheet)).toBe(false)
   })
 
   it('opens fresh each time, from the query of that moment', async () => {
@@ -250,7 +521,7 @@ describe('«Suggest an item»', () => {
 
     expect(fields(sheet).name.element.value).toBe('мацун')
     expect(fields(sheet).note.element.value).toBe('')
-    expect(submitButton(sheet).attributes('disabled')).toBeDefined()
+    expect(notNow(sheet)).toBe(true)
   })
 
   describe('closed while the suggestion is on its way', () => {
@@ -287,12 +558,12 @@ describe('«Suggest an item»', () => {
       await sheet.setProps({ query: 'мацун', open: true })
       clock += 1000
       await chooseUnit(sheet, en.item.unit_kg)
-      expect(submitButton(sheet).attributes('disabled')).toBeUndefined()
+      expect(notNow(sheet)).toBe(false)
 
       answer.resolve({ entry: tan, created: true })
       await new Promise((resolve) => setTimeout(resolve, 10))
       expect(sheet.emitted('proposed')).toBeUndefined()
-      expect(submitButton(sheet).attributes('disabled')).toBeUndefined()
+      expect(notNow(sheet)).toBe(false)
     })
   })
 
@@ -306,7 +577,7 @@ describe('«Suggest an item»', () => {
       await fields(sheet).note.setValue('пастеризованное\t3,2%')
 
       expect(fields(sheet).name.element.value).toBe('Молоко Ашхар')
-      expect(submitButton(sheet).attributes('disabled')).toBeUndefined()
+      expect(notNow(sheet)).toBe(false)
       await submitButton(sheet).trigger('click')
       expect(proposeItem).toHaveBeenCalledWith({
         kind: 'product',
@@ -334,7 +605,7 @@ describe('«Suggest an item»', () => {
 
         expect(fields(sheet).name.element.value, code.toString(16)).toBe('Молоко Ашхар')
         expect(fields(sheet).note.element.value, code.toString(16)).toBe('Ашхар 2%')
-        expect(submitButton(sheet).attributes('disabled'), code.toString(16)).toBeUndefined()
+        expect(notNow(sheet), code.toString(16)).toBe(false)
       }
     })
 
@@ -348,7 +619,7 @@ describe('«Suggest an item»', () => {
 
       expect(fields(sheet).name.element.value).toBe('Молоко «Ашхар»')
       expect(fields(sheet).note.element.value).toBe('2%')
-      expect(submitButton(sheet).attributes('disabled')).toBeUndefined()
+      expect(notNow(sheet)).toBe(false)
       expect(sheet.text()).not.toContain(en.item.propose.name_invalid)
       expect(sheet.text()).not.toContain(en.item.propose.note_invalid)
     })
@@ -359,13 +630,23 @@ describe('«Suggest an item»', () => {
       await chooseUnit(sheet, en.item.unit_l)
 
       await fields(sheet).name.setValue(`Молоко${privateUse}`)
-      expect(submitButton(sheet).attributes('disabled')).toBeDefined()
+      expect(notNow(sheet)).toBe(true)
       expect(sheet.get('[role="status"]').text()).toBe(en.item.propose.name_invalid)
 
       await fields(sheet).name.setValue('Молоко')
       await fields(sheet).note.setValue(`2%${privateUse}`)
-      expect(submitButton(sheet).attributes('disabled')).toBeDefined()
+      expect(notNow(sheet)).toBe(true)
       expect(sheet.get('[role="status"]').text()).toBe(en.item.propose.note_invalid)
+      expect(mainButton(sheet).text()).toBe(en.item.propose.submit)
+    })
+
+    it("names the field refused offline too: the connection is the button's word", async () => {
+      online(false)
+      const sheet = await render(`Молоко${String.fromCodePoint(0xe000)}`)
+      await chooseUnit(sheet, en.item.unit_l)
+
+      expect(sheet.get('[role="status"]').text()).toBe(en.item.propose.name_invalid)
+      expect(mainButton(sheet).text()).toBe(en.item.propose.offline)
     })
 
     it('keeps its status line in place before there is anything to say — only the words change', async () => {
@@ -380,19 +661,18 @@ describe('«Suggest an item»', () => {
     })
 
     it('says its first words a moment after the sheet comes up, not in the same frame', async () => {
-      online(false)
       const router = createRouter({ history: createMemoryHistory(), routes })
       await router.push('/trip/add')
       const sheet = mount(ProposeItemSheet, {
         attachTo: document.body,
-        props: { open: true, query: 'тан' },
+        props: { open: true, query: `тан${String.fromCodePoint(0xe000)}` },
         global: { plugins: [router, createAppI18n('en')] },
       })
       mounted.push(sheet)
 
       expect(sheet.get('[role="status"]').text()).toBe('')
       await vi.waitFor(() => {
-        expect(sheet.get('[role="status"]').text()).toBe(en.item.propose.offline)
+        expect(sheet.get('[role="status"]').text()).toBe(en.item.propose.name_invalid)
       })
     })
 
@@ -416,7 +696,7 @@ describe('«Suggest an item»', () => {
       await chooseUnit(sheet, en.item.unit_l)
       await fields(sheet).note.setValue(String.fromCodePoint(0x200b))
 
-      expect(submitButton(sheet).attributes('disabled')).toBeUndefined()
+      expect(notNow(sheet)).toBe(false)
       await submitButton(sheet).trigger('click')
       expect(proposeItem).toHaveBeenCalledWith({
         kind: 'product',
@@ -453,6 +733,11 @@ describe('«Suggest an item»', () => {
       await flushPromises()
 
       expect(sheet.text()).toContain(en.item.propose.taken.replace('{name}', 'Кефир 1%'))
+      // A warning, not an error (5e): the package in the hand is known.
+      const taken = sheet.get('[role="alert"]')
+      expect(taken.text()).toBe(en.item.propose.taken.replace('{name}', 'Кефир 1%'))
+      expect(taken.classes()).toContain('warn')
+      expect(taken.classes()).not.toContain('failed')
       expect(sheet.emitted('proposed')).toBeUndefined()
       const take = sheet
         .findAll('button')
@@ -495,6 +780,16 @@ describe('«Suggest an item»', () => {
 
       expect(sheet.text()).not.toContain(en.item.propose.code.split('{code}')[0] ?? '∅')
     })
+
+    it('says a name already taken as a warning, the code as a plain note (5f)', async () => {
+      const sheet = await render('', '4850001234562')
+      await sheet.setProps({ nameTaken: 'Молоко' })
+
+      const [taken, code] = sheet.findAll('p.code')
+      expect(taken?.text()).toBe(en.item.propose.name_taken.replace('{name}', 'Молоко'))
+      expect(taken?.classes()).toContain('warn')
+      expect(code?.classes()).not.toContain('warn')
+    })
   })
 
   describe('a hint of Open Food Facts (MOL-162)', () => {
@@ -511,7 +806,7 @@ describe('«Suggest an item»', () => {
       const sheet = await render('', CODE, nutella)
 
       expect(fields(sheet).name.element.value).toBe('Nutella')
-      expect(submitButton(sheet).attributes('disabled')).toBeUndefined()
+      expect(notNow(sheet)).toBe(false)
       expect(sizeLine(sheet).text()).toContain('0.4 kg')
       expect(source(sheet).attributes()).toMatchObject({
         href: nutella.url,
@@ -568,7 +863,7 @@ describe('«Suggest an item»', () => {
       expect(fields(sheet).name.element.value).toBe('')
       expect(sizeLine(sheet).exists()).toBe(false)
       expect(source(sheet).exists()).toBe(false)
-      expect(submitButton(sheet).attributes('disabled')).toBeDefined()
+      expect(notNow(sheet)).toBe(true)
     })
 
     it('puts the attribution last, under the code, as a target a thumb can take (review 2)', async () => {
@@ -590,7 +885,7 @@ describe('«Suggest an item»', () => {
 
       expect(fields(sheet).name.element.value).toBe('Nutella')
       expect(sizeLine(sheet).exists()).toBe(false)
-      expect(submitButton(sheet).attributes('disabled')).toBeDefined()
+      expect(notNow(sheet)).toBe(true)
       expect(source(sheet).exists()).toBe(true)
     })
 
