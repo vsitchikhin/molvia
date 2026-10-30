@@ -293,6 +293,12 @@ function keyed(field: HTMLElement): boolean {
   return !field.matches(PICKED)
 }
 
+/** The field of the sheet typed in from the keys — not a picker's, a button's or a radio's (MOL-212). */
+export function keyedIn(sheet: HTMLElement): HTMLElement | null {
+  const field = typedIn(sheet)
+  return field && keyed(field) ? field : null
+}
+
 /**
  * How long a height foreseen for the keys waits for them. The first keyboard of a page came after
  * 815 ms at worst on the owner's iPhone (MOL-151); a hardware keyboard never comes, and the sheet

@@ -30,6 +30,7 @@ import { useItemEntryStore } from '@/stores/itemEntry'
 import { useSpendingHandoffStore } from '@/stores/spendingHandoff'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import TripNotices from '@/components/TripNotices.vue'
 
 const currentTrip = vi.fn<() => Promise<TripViewModel | null>>()
@@ -557,6 +558,8 @@ describe('TripView', () => {
     const sheet = document.body.querySelector('dialog[open]')
     expect(sheet?.textContent).toContain('Молоко «Марианна»')
     expect(sheet?.textContent).toContain(ru.item.save_edit)
+    // Opened by the tap: «Сколько» takes the focus (MOL-212).
+    expect(view.findComponent(ItemDetailsSheet).props('focusQuantity')).toBe(true)
   })
 
   // Review Р-7: the record may end under a sheet — finished on another phone — and nothing else
@@ -597,6 +600,7 @@ describe('TripView', () => {
       await flushPromises()
       await button(view, ru.trip.rejected.fix).trigger('click')
       await flushPromises()
+      expect(view.findComponent(ItemDetailsSheet).props('focusQuantity')).toBe(true)
       clock += 1000
 
       trips.closed(TRIP)

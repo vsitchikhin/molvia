@@ -615,7 +615,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   **its footer is pinned to its edge, sticky in its own scroll, and what it brings into sight stops at
   the footer's top** (`scroll-padding`, MOL-182);
   **the lift is the pinned box less the visible height**, never `100dvh` or `innerHeight`, and
-  **before the keys come it takes the height they left last time** (MOL-151).
+  **before the keys come it takes the height they left last time** (MOL-151); **a field takes the focus
+  at the opening only in the tap that opened it** (MOL-212), else × keeps it.
 - **Nothing comes or goes in one frame** (MOL-151): `appear` fades in what is put in the page,
   `AppReveal` grows and shrinks what pushes its neighbours; never while a screen moves, never under
   «reduce motion», never for an answer read (more than three rows at once), and never the sheet's

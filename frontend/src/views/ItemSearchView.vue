@@ -342,6 +342,7 @@
       :query="picked.query"
       :missed-query="picked.missedQuery ?? null"
       :code="pickedByCode?.itemId === picked.entry.id ? pickedByCode.code : null"
+      :focus-quantity="tapped"
       :close-steps="2"
       :on-closed="putAway"
       @added="added"
@@ -686,6 +687,8 @@ export default defineComponent({
      * beside the recent items (В-2), and «не этот товар?» on the sheet lets it go (В-1).
      */
     const pickedByCode = ref<{ itemId: string; code: string } | null>(null)
+    /** The purchase sheet opens in the tap that asked for it — `focusQuantity` says why (MOL-212). */
+    const tapped = ref(false)
 
     const lookup = useBarcodeLookup({
       found: (item, code) => {
@@ -840,7 +843,7 @@ export default defineComponent({
         }
         bind.value = null
         pendingCode.value = null
-        goOn(asked)
+        goOn(asked, false)
         pickedByCode.value = { itemId: asked.entry.id, code: asked.code }
       } catch (error) {
         reportFailure(error, 'screen')
@@ -859,16 +862,16 @@ export default defineComponent({
       if (asked === null || asked.phase === 'sending') return
       bind.value = null
       pendingCode.value = null
-      goOn(asked)
+      goOn(asked, true)
     }
 
     // The purchase sheet of the item asked about — with no query where the code brought it. The
     // block that held the focus goes with the answer: the title holds it while the sheet is up, so the
     // sheet gives it back there — gone with its opener, it fell to the body (adversarial Ф).
-    function goOn(asked: Bind): void {
+    function goOn(asked: Bind, tap: boolean): void {
       focusScreenTitle()
-      if (asked.origin === 'proposedByCode') pickWithoutQuery(asked.entry)
-      else take(asked.entry, asked.learns, asked.at)
+      if (asked.origin === 'proposedByCode') pickWithoutQuery(asked.entry, tap)
+      else take(asked.entry, asked.learns, tap, asked.at)
     }
 
     // The package in the hand is the item the catalogue holds the code for: taken as found by it.
@@ -878,7 +881,7 @@ export default defineComponent({
       bind.value = null
       pendingCode.value = null
       focusScreenTitle()
-      pickWithoutQuery(asked.holder)
+      pickWithoutQuery(asked.holder, true)
       pickedByCode.value = { itemId: asked.holder.id, code: asked.code }
     }
 
@@ -929,12 +932,13 @@ export default defineComponent({
       if (!scannerAway || foundByCode === null) return
       const { entry: chosen, code } = foundByCode
       foundByCode = null
-      pickWithoutQuery(chosen)
+      pickWithoutQuery(chosen, takingFound)
       pickedByCode.value = { itemId: chosen.id, code }
     }
 
-    function pickWithoutQuery(chosen: CatalogueEntry): void {
+    function pickWithoutQuery(chosen: CatalogueEntry, tap: boolean): void {
       opened.value += 1
+      tapped.value = tap
       takeMissed('')
       pickedByCode.value = null
       entry.pick({ entry: chosen, query: '' })
@@ -942,9 +946,13 @@ export default defineComponent({
 
     // «По коду … нашлось» by a retry nobody tapped for: its block goes with the tap that takes the
     // item, and the title holds the focus for the sheet to give back (adversarial Ф′).
+    // The find is handed over in this tap, unless the scanner is still up and holds it back.
+    let takingFound = false
     function takeFound(): void {
       focusScreenTitle()
+      takingFound = true
       lookup.take()
+      takingFound = false
     }
 
     /**
@@ -1193,7 +1201,7 @@ export default defineComponent({
         }
         return
       }
-      take(chosen, learns)
+      take(chosen, learns, true)
     }
 
     function pickedAt(): PickedAt {
@@ -1201,8 +1209,14 @@ export default defineComponent({
       return { found, text: found ? answered.value : query.value, missed: missed.value }
     }
 
-    function take(chosen: CatalogueEntry, learns: boolean, at: PickedAt = pickedAt()): void {
+    function take(
+      chosen: CatalogueEntry,
+      learns: boolean,
+      tap: boolean,
+      at: PickedAt = pickedAt(),
+    ): void {
       opened.value += 1
+      tapped.value = tap
       pickedByCode.value = null
       // Something else taken answers the code's question too: a retry of it must not come over the
       // sheet now opening (adversarial Ж′).
@@ -1327,8 +1341,8 @@ export default defineComponent({
         // the button the sheet would give the focus back to: the title holds it (adversarial Ф′).
         lookup.clear()
         focusScreenTitle()
-        pickWithoutQuery(item)
-      } else if (item) take(item, false)
+        pickWithoutQuery(item, false)
+      } else if (item) take(item, false, false)
       if (item && code !== null) pickedByCode.value = { itemId: item.id, code }
     }
 
@@ -1400,6 +1414,7 @@ export default defineComponent({
       proposeOther,
       detached,
       pickedByCode,
+      tapped,
       lookup,
       barcode,
       barcodeCode: lookup.code,

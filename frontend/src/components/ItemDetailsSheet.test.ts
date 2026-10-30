@@ -128,6 +128,7 @@ interface Options {
   readonly locale?: 'ru' | 'en'
   readonly selected?: TripView
   readonly code?: string
+  readonly focusQuantity?: boolean
 }
 
 async function router() {
@@ -157,6 +158,7 @@ async function render(options: Options = {}) {
       expense: options.expense ?? null,
       closeSteps: options.closeSteps ?? 1,
       code: options.code ?? null,
+      focusQuantity: options.focusQuantity ?? false,
     },
     attachTo: document.body,
     global: { plugins: [made, pinia, createAppI18n(options.locale ?? 'ru')] },
@@ -218,6 +220,132 @@ describe('ItemDetailsSheet', () => {
     expect(view.text()).toContain('ультрапастеризованное, 2,5%')
     expect(perUnit(view)).toBe('—')
     expect(view.text()).toContain('Считается само, вводить не надо')
+  })
+
+  // The dialog gives the focus to what carries `autofocus` — the browser's part, held end to end (MOL-212).
+  it('gives «Сколько» the focus when opened by the tap that asked for it, × otherwise', async () => {
+    const autofocus = (view: VueWrapper) => input(view, 'quantity').attributes('autofocus')
+    expect(autofocus((await render({ focusQuantity: true })).view)).toBeDefined()
+    expect(autofocus((await render()).view)).toBeUndefined()
+  })
+
+  // Finished on another device, the server says so as the sheet asks: the keys must not stay up over a
+  // sheet with nothing to write (adversarial А3).
+  it('gives «К покупкам» the focus when the record goes while a field holds it', async () => {
+    const { view } = await render({ focusQuantity: true })
+    ;(input(view, 'quantity').element as HTMLInputElement).focus()
+
+    currentTrip.mockResolvedValue(null)
+    await useTripStore().load()
+    await flushPromises()
+
+    expect(view.text()).toContain('Сначала начните запись')
+    expect(document.activeElement?.textContent.trim()).toBe('К покупкам')
+  })
+
+  // A button, a unit's radio and the currency's picker bring no keys, and «Отменить» of «Отвязать?» is
+  // where the focus waits (adversarial Р2-А1, Р3-А1, Р4-А1).
+  it.each([
+    ['«Отменить» of «Отвязать?»', 'Отменить', true],
+    ['«не этот товар?»', 'Код 4850001234562 — не этот товар?', false],
+    ['the unit «л»', 'radio:l', false],
+    ['the currency', 'select', false],
+  ] as const)('leaves %s in focus when the record goes', async (_, name, ask) => {
+    const { view } = await render({ code: '4850001234562', focusQuantity: true })
+    if (ask) {
+      await button(view, 'Код 4850001234562 — не этот товар?').trigger('click')
+      await flushPromises()
+    }
+    const held = (
+      name === 'radio:l'
+        ? view.get('input[type="radio"][value="l"]')
+        : name === 'select'
+          ? view.get('select.currency-select')
+          : button(view, name)
+    ).element as HTMLElement
+    held.focus()
+
+    currentTrip.mockResolvedValue(null)
+    await useTripStore().load()
+    await flushPromises()
+
+    expect(view.text()).toContain('Сначала начните запись')
+    expect(document.activeElement).toBe(held)
+  })
+
+  it('leaves the focus where it is when the record goes and no field holds it', async () => {
+    const { view } = await render({ focusQuantity: true })
+    const close = view.get('button[aria-label="Закрыть"]').element as HTMLButtonElement
+    close.focus()
+
+    currentTrip.mockResolvedValue(null)
+    await useTripStore().load()
+    await flushPromises()
+
+    expect(document.activeElement).toBe(close)
+  })
+
+  // The footer that writes goes with the record, and the button in focus with it: the focus would fall
+  // to the body, outside the modal sheet (adversarial Р5-А1, as on master).
+  it.each([
+    ['«Записать»', 'Записать', null],
+    ['«Удалить позицию»', 'Удалить позицию', 'amend'],
+  ] as const)(
+    'gives «К покупкам» the focus when %s goes with the record',
+    async (_, name, amend) => {
+      const written: TripExpenseView = {
+        id: 'cccccccc-0000-4000-8000-000000000002',
+        createdAt: new Date('2026-09-19T08:10:00.000Z'),
+        item: milk,
+        quantity: null,
+        amount: parseMoney('540', 'AMD'),
+        unitPrice: null,
+        printed: null,
+        discount: null,
+      }
+      const { view } = await render(amend ? { expense: written } : {})
+      ;(button(view, name).element as HTMLButtonElement).focus()
+
+      currentTrip.mockResolvedValue(null)
+      await useTripStore().load()
+      await flushPromises()
+
+      expect(view.text()).toContain('Сначала начните запись')
+      expect(document.activeElement?.textContent.trim()).toBe('К покупкам')
+    },
+  )
+
+  // The other way: opened before the phone knew the record, the server's answer brings it, and the
+  // footer of «К покупкам» goes — its focus to «Записать», not the body (adversarial Р6-А1, as on master).
+  it('gives «Записать» the focus when the record comes and «К покупкам» goes', async () => {
+    const { view } = await render({ trip: null, server: null })
+    const leave = button(view, 'К покупкам').element as HTMLButtonElement
+    leave.focus()
+
+    currentTrip.mockResolvedValue(trip())
+    await useTripStore().load()
+    await flushPromises()
+
+    expect(document.activeElement?.textContent.trim()).toBe('Записать')
+  })
+
+  it('leaves the focus where it is when the record comes and «К покупкам» did not hold it', async () => {
+    const { view } = await render({ trip: null, server: null })
+    const close = view.get('button[aria-label="Закрыть"]').element as HTMLButtonElement
+    close.focus()
+
+    currentTrip.mockResolvedValue(trip())
+    await useTripStore().load()
+    await flushPromises()
+
+    expect(button(view, 'Записать').exists()).toBe(true)
+    expect(document.activeElement).toBe(close)
+  })
+
+  it('keeps the focus on × with no record to write to, tap or not', async () => {
+    const { view } = await render({ trip: null, server: null, focusQuantity: true })
+    expect(view.text()).toContain('Сначала начните запись')
+    expect(input(view, 'quantity').attributes('autofocus')).toBeUndefined()
   })
 
   it.each([
@@ -586,6 +714,13 @@ describe('«не этот товар?» (MOL-100)', () => {
     expect(document.activeElement?.textContent.trim()).toBe('Отменить')
     const detach = view.findAll('button').find((button) => button.text() === 'Отвязать')
     expect(detach?.classes()).toContain('danger-ghost')
+    // Side by side, as 4h draws them (MOL-212): one row holds both answers and nothing else.
+    expect(
+      view
+        .get('.detach-actions')
+        .findAll('button')
+        .map((button) => button.text()),
+    ).toEqual(['Отвязать', 'Отменить'])
   })
 })
 

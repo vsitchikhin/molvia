@@ -232,6 +232,7 @@
       v-if="opened"
       :key="opened.key"
       :entry="opened.entry"
+      focus-quantity
       :expense="opened.expense"
       :trip-id="opened.tripId"
       :retry="opened.retry"

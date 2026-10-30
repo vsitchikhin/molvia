@@ -546,6 +546,45 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
         field: document.activeElement?.getAttribute('role') === 'combobox',
       }))
 
+    /**
+     * The pair of «Unlink?» read in one go once the question has risen in (`appear`): two reads during
+     * the rise stood the buttons 2–4 px apart on CI. `workLines` — the lines the word of the work stands
+     * in while it is shown, 0 at rest: one word broken inside is two (adversarial А1).
+     */
+    function detachPair(found: Locator) {
+      return found.evaluate(async (dialog) => {
+        const rising = dialog
+          .getAnimations({ subtree: true })
+          .filter((motion) => motion.effect?.getComputedTiming().endTime !== Infinity)
+        await Promise.all(rising.map((motion) => motion.finished))
+        const buttons = [...dialog.querySelectorAll('.detach-actions button')]
+        const [first, second] = buttons.map((button) => button.getBoundingClientRect())
+        // The word shown: in its cell beside the hidden one, or the whole text of a block button.
+        const busy = dialog.querySelector('.detach-actions [aria-busy]')
+        const work = busy?.querySelector('.words > :not(.unseen)') ?? busy
+        const range = document.createRange()
+        if (work) range.selectNodeContents(work)
+        const tops = new Set([...range.getClientRects()].map((line) => Math.round(line.top)))
+        return {
+          buttons: buttons.length,
+          oneRow:
+            first !== undefined &&
+            second !== undefined &&
+            Math.abs(first.top - second.top) < 1 &&
+            first.right <= second.left,
+          workLines: work ? tops.size : 0,
+          // The word of the work inside its button: a button squeezed below its word lets it out.
+          workInside:
+            !busy ||
+            [...range.getClientRects()].every((line) => {
+              const box = busy.getBoundingClientRect()
+              return line.left >= box.left - 0.5 && line.right <= box.right + 0.5
+            }),
+          wide: dialog.scrollWidth - dialog.clientWidth,
+        }
+      })
+    }
+
     async function anItem(page: Page, name: string, barcodes: string[] = []): Promise<string> {
       const created = await page.request.post('/api/catalogue/items', {
         headers: await asBrowser(page),
@@ -820,6 +859,77 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       await expect.poll(async () => (await focused(page)).body).toBe(false)
     })
 
+    // «Unlink» and «Cancel» side by side where both fit, as 4h draws them (MOL-212), the sheet no wider
+    // than the phone — a long name in the question breaks rather than widening it (MOL-318).
+    test('«Unlink?» at 320: both answers on one row, the sheet no wider than the phone', async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 320, height: 720 })
+      const code = freshCode()
+      const name = `Кефирныйнапитокбезлактозныйультрапастеризованный ${tag}`
+      await open(page, '/purchases/manual/add')
+      await anItem(page, name, [code])
+      await typeCode(page, code)
+      const found = await sheetOf(page, name)
+      await found.getByRole('button', { name: `Code ${code} — not this item?` }).click()
+      await expect(found.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible()
+
+      expect(await detachPair(found)).toEqual({
+        buttons: 2,
+        oneRow: true,
+        workLines: 0,
+        workInside: true,
+        wide: 0,
+      })
+    })
+
+    // In Russian «Отвязываем…» is the widest word of the pair: where the two do not fit side by side they
+    // stand one under the other, and the word of the work is never broken inside (adversarial А1).
+    test.describe('«Отвязать?» по-русски, пока отвязывается', () => {
+      test.use({ locale: 'ru-RU' })
+
+      // 360 stands within a few pixels of the pair's width: either way is right there, a broken word never.
+      for (const [width, oneRow] of [
+        [320, false],
+        [360, null],
+        [390, true],
+      ] as const) {
+        test(`at ${String(width)}: «Отвязываем…» in one line`, async ({ page }) => {
+          await page.setViewportSize({ width, height: 720 })
+          // The answer is held: the button says its work for as long as the test reads it.
+          await page.route('**/api/catalogue/items/*/barcodes?*', async (route) => {
+            if (route.request().method() === 'DELETE') return
+            await route.fallback()
+          })
+          const code = freshCode()
+          const name = `Кефир ${tag} р${String(width)}`
+          await open(page, '/purchases/manual/add')
+          await anItem(page, name, [code])
+          // The scanner by its Russian words, its rise waited for as `openScanner` does.
+          await page.getByRole('button', { name: 'Сканировать штрихкод' }).click()
+          const reader = page.getByRole('dialog', { name: 'Штрихкод' })
+          await reader.evaluate((dialog) =>
+            Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished)),
+          )
+          await page.waitForTimeout(350)
+          await reader.getByRole('button', { name: 'Ввести вручную' }).click()
+          await reader.getByLabel('Цифры под штрихкодом').fill(code)
+          await reader.getByRole('button', { name: 'Готово' }).click()
+          const found = await sheetOf(page, name)
+          await found.getByRole('button', { name: `Код ${code} — не этот товар?` }).click()
+          await found.getByRole('button', { name: 'Отвязать', exact: true }).click()
+          // Both words stand in its cell, the one not shown hidden: the name is the word of the work.
+          await expect(
+            found.getByRole('button', { name: 'Отвязываем…', exact: true }),
+          ).toBeVisible()
+
+          const pair = await detachPair(found)
+          expect(pair).toMatchObject({ buttons: 2, workLines: 1, workInside: true, wide: 0 })
+          if (oneRow !== null) expect(pair.oneRow).toBe(oneRow)
+        })
+      }
+    })
+
     test('«Unlink?»: the focus on «Cancel», back on «not this item?», and after the unlink never the body', async ({
       page,
     }) => {
@@ -830,6 +940,9 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       await typeCode(page, code)
       const found = await sheetOf(page, name)
       const notThis = found.getByRole('button', { name: `Code ${code} — not this item?` })
+      // Opened by the answer, not by a tap: no keys would come for «How much», so × keeps the focus
+      // (MOL-212, В-1 «а»).
+      await expect(found.getByRole('button', { name: 'Close' })).toBeFocused()
 
       await notThis.click()
       await expect.poll(async () => (await focused(page)).text).toBe('Cancel')

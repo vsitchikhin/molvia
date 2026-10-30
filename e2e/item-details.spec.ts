@@ -117,6 +117,51 @@ test.describe('the sheet', () => {
     expect(row?.unitPrice?.amount).toMatch(/^577\.7{2}/)
   })
 
+  // Opened by the tap on its row, the sheet gives «How much» the focus: the keys come up at once and
+  // the digits go into it with no second tap on the field (MOL-212, Е-12). The record is known on the
+  // phone first, as it is at a shelf — with none known the sheet opens on «start a record» and ×.
+  test('opens with «How much» focused, and the digits go into it at once', async ({ page }) => {
+    const setting = await onTrip(page)
+    await page.goto('/purchases/manual')
+    await expect(page.getByRole('heading', { name: 'Ереван Сити' })).toBeVisible()
+    await pick(setting)
+
+    const quantity = sheet(page).getByLabel('How much')
+    await expect(quantity).toBeFocused()
+    await page.keyboard.type('2')
+    await expect(quantity).toHaveValue('2')
+  })
+
+  // An amended purchase opens with «How much» filled and focused: selected whole, the digit typed replaces
+  // the old number — at the caret after «1», «2» went to the server as 12 l, the price per litre a
+  // twelfth (MOL-212, adversarial А2).
+  test('opens a purchase amended with its quantity selected: «2» over «1» is 2 l', async ({
+    page,
+  }) => {
+    const setting = await onTrip(page)
+    await pick(setting)
+    await sheet(page).getByLabel('How much').fill('1')
+    await sheet(page).getByLabel('Price as on the tag').fill('540')
+    await addButton(page).click()
+    await expect.poll(setting.rows).toHaveLength(1)
+
+    // The row as the server holds it: one still waiting in the queue opens as that write, another path
+    // (MOL-325).
+    const row = page.locator('.row', { hasText: setting.word })
+    await expect(row).not.toHaveClass(/waiting/)
+    await row.click()
+    await expect(sheet(page)).toContainText(`Молоко «${setting.word}»`)
+    // The sheet takes no tap while it rises (MOL-69): «Save» pressed then went nowhere on CI.
+    await page.waitForTimeout(400)
+    const quantity = sheet(page).getByLabel('How much')
+    await expect(quantity).toBeFocused()
+    await page.keyboard.type('2')
+    await expect(quantity).toHaveValue('2')
+    await sheet(page).getByRole('button', { name: 'Save', exact: true }).click()
+
+    await expect.poll(async () => (await setting.rows())[0]?.quantity?.value).toBe('2.000')
+  })
+
   test('adds the item alone when nothing else is filled in', async ({ page }) => {
     const setting = await onTrip(page)
     await pick(setting)
@@ -465,11 +510,13 @@ test.describe('«Тут дешевле»', () => {
   test('says something else over frames too: one line to two (adversarial Е′)', async ({
     page,
   }) => {
-    const { word } = await boughtAtZovuni(page, undefined, 'Зовуни Плюс')
+    // The name sets the lines: at 13 (MOL-212) «Same as at …» stands 299 px of the 322 on a Pixel 7 and
+    // «Cheaper here — … was …» some 343 — one line, then two, 22 px either way.
+    const { word } = await boughtAtZovuni(page, undefined, 'Зовуни Плюс Север')
     await pick({ page, word })
     await sheet(page).getByLabel('How much').fill('1')
     await sheet(page).getByLabel('Price as on the tag').fill('540')
-    await expect(hint(page)).toContainText('Same as at Зовуни Плюс')
+    await expect(hint(page)).toContainText('Same as at Зовуни Плюс Север')
     await still(page)
 
     const motion = await priceFieldMoves(page, async () => {

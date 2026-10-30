@@ -12,6 +12,7 @@
           kind="decimal"
           :error="errors.quantity"
           data-field="quantity"
+          :autofocus="focusQuantity && writeInto !== null"
           @blur="leaveField('quantity')"
         />
         <SegmentedControl v-model="unit" :legend="t('item.unit')" :options="units" />
@@ -91,30 +92,27 @@
           </p>
           <p class="caption">{{ t('item.barcode.detach_hint') }}</p>
           <!-- Destructive for everyone and with no «Вернуть»: not the filled button, and the focus
-               waits on «Отменить» (review Л). -->
-          <AppButton
-            variant="danger-ghost"
-            block
-            :busy="detaching"
-            :busy-label="t('item.barcode.detach_busy')"
-            @click="notThis"
-          >
-            {{ t('item.barcode.detach') }}
-          </AppButton>
-          <AppButton
-            ref="detachCancel"
-            variant="ghost"
-            block
-            :inactive="detaching"
-            @click="keepCode"
-          >
-            {{ t('item.cancel') }}
-          </AppButton>
+               waits on «Отменить» (review Л). Side by side where both fit, as 4h draws them (MOL-212):
+               each as wide as its wider word, so «Отвязываем…» is never broken inside (adversarial А1). -->
+          <div class="detach-actions">
+            <AppButton
+              variant="danger-ghost"
+              :busy="detaching"
+              :busy-label="t('item.barcode.detach_busy')"
+              @click="notThis"
+            >
+              {{ t('item.barcode.detach') }}
+            </AppButton>
+            <AppButton ref="detachCancel" variant="ghost" :inactive="detaching" @click="keepCode">
+              {{ t('item.cancel') }}
+            </AppButton>
+          </div>
           <p v-if="detachFailed" class="caption offline" role="alert">
             {{ t('item.barcode.not_this_failed') }}
           </p>
         </div>
         <AppButton v-else ref="notThisButton" variant="ghost" block @click="askDetach">
+          <template #icon><IconBarcodeScan /></template>
           {{ t('item.barcode.not_this', { code }) }}
         </AppButton>
       </template>
@@ -122,17 +120,19 @@
 
     <template #footer>
       <template v-if="writeInto">
-        <AppButton size="large" block @click="submit">
+        <AppButton ref="saveButton" size="large" block @click="submit">
           {{ editing ? t('item.save_edit') : t('item.save') }}
         </AppButton>
-        <AppButton v-if="removable" variant="danger-ghost" block @click="remove">
+        <AppButton v-if="removable" ref="removeButton" variant="danger-ghost" block @click="remove">
           {{ t('item.delete') }}
         </AppButton>
         <p v-if="!online" class="caption offline">{{ t('item.offline_note') }}</p>
       </template>
       <template v-else>
         <p class="no-trip">{{ t('item.no_trip.body') }}</p>
-        <AppButton size="large" block @click="leave">{{ t('item.no_trip.action') }}</AppButton>
+        <AppButton ref="leaveButton" size="large" block @click="leave">
+          {{ t('item.no_trip.action') }}
+        </AppButton>
       </template>
     </template>
   </BottomSheet>
@@ -143,6 +143,7 @@ import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, useId
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconArrowDown from '~icons/mdi/arrow-down'
+import IconBarcodeScan from '~icons/mdi/barcode-scan'
 import IconCheck from '~icons/mdi/check'
 import IconEqual from '~icons/mdi/equal'
 import IconMenuDown from '~icons/mdi/menu-down'
@@ -169,6 +170,7 @@ import { useCheaperHint } from '@/composables/useCheaperHint'
 import type { HintRecord } from '@/composables/useCheaperHint'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useItemDetails } from '@/composables/useItemDetails'
+import { keyedIn } from '@/composables/useKeyboardInset'
 import type { DetailsField, RetryPurchase } from '@/composables/useItemDetails'
 import { calendarDay } from '@/days'
 import { useRecentItemsStore } from '@/stores/recentItems'
@@ -197,6 +199,7 @@ export default defineComponent({
     AppField,
     AppReveal,
     BottomSheet,
+    IconBarcodeScan,
     IconMenuDown,
     IconSwapHorizontal,
     SegmentedControl,
@@ -223,6 +226,13 @@ export default defineComponent({
     onClosed: { type: Function as PropType<() => void>, default: undefined },
     /** The code the item was found by or just given on the search (MOL-100); none otherwise. */
     code: { type: String as PropType<string | null>, default: null },
+    /**
+     * The sheet opens in the tap that asked for it, so «Сколько» takes the focus and iOS raises the
+     * keys (MOL-212, Е-12). Opened by no tap — after the scanner, after a server's answer — the keys
+     * stay down, and the field focused would have the sheet take their remembered height and fall
+     * back 1.5 s later (MOL-151): × keeps the focus there, and where there is no record to write to.
+     */
+    focusQuantity: { type: Boolean, default: false },
   },
   emits: {
     added: (entry: CatalogueEntry) => typeof entry === 'object',
@@ -420,6 +430,14 @@ export default defineComponent({
       online.value = navigator.onLine
     }
     onMounted(() => {
+      // The dialog has already given «Сколько» the focus (`focusQuantity`). Filled — a purchase amended,
+      // a refusal put right, the size of a pack — it is selected whole: the caret after «1» made «2»
+      // typed at the shelf 12 l, and the price per litre a twelfth (adversarial А2).
+      const quantity = form.value?.querySelector<HTMLInputElement>('[data-field="quantity"]')
+      // A range set, not `select()`: WebKit on iOS has been unreliable with the latter (adversarial Р2).
+      if (quantity && document.activeElement === quantity) {
+        quantity.setSelectionRange(0, quantity.value.length)
+      }
       window.addEventListener('online', listen)
       window.addEventListener('offline', listen)
       // The server is asked every time the sheet opens: the trip in memory is for when it cannot
@@ -439,6 +457,29 @@ export default defineComponent({
     onUnmounted(() => {
       window.removeEventListener('online', listen)
       window.removeEventListener('offline', listen)
+    })
+
+    // The record went while the sheet was up — finished on another device, the server says so as the
+    // sheet asks: a field in focus would keep the keys up over a sheet with nothing to write, so the
+    // focus goes to «К покупкам», the one thing left to do (adversarial А3). Only a field the keys are up
+    // for, by the sheet's own rule (`keyedIn`): a button, a unit's radio and the currency's picker bring
+    // none, and «Отменить» of «Отвязать?» is where the focus must wait (adversarial Р2-А1, Р3-А1, Р4-А1).
+    // And the footer swaps whole as the record goes or comes: a button of it in focus goes with it, and
+    // the focus fell to the body, outside the modal sheet (adversarial Р5-А1, Р6-А1, a fault master had
+    // too) — so it is handed to the main action of the footer that comes. Read before the swap (`pre`).
+    const leaveButton = ref<{ $el?: HTMLElement } | null>(null)
+    const saveButton = ref<{ $el?: HTMLElement } | null>(null)
+    const removeButton = ref<{ $el?: HTMLElement } | null>(null)
+    watch(writeInto, async (into, was) => {
+      if ((into === null) === (was === null)) return
+      const held = document.activeElement
+      const going = (into === null ? [saveButton, removeButton] : [leaveButton]).some(
+        (button) => button.value?.$el !== undefined && button.value.$el === held,
+      )
+      const keyed = into === null && form.value !== null && keyedIn(form.value) !== null
+      if (!going && !keyed) return
+      await nextTick()
+      ;(into === null ? leaveButton : saveButton).value?.$el?.focus()
     })
 
     let done = false
@@ -586,6 +627,9 @@ export default defineComponent({
       submit,
       remove,
       leave,
+      leaveButton,
+      saveButton,
+      removeButton,
       confirming,
       detachQuestionId,
       detachCancel,
@@ -670,7 +714,7 @@ export default defineComponent({
   margin: 0;
   padding: var(--space-2) var(--space-4) var(--space-3);
   border-top: var(--hairline) solid var(--border);
-  font-size: var(--text-callout);
+  font-size: var(--text-footnote);
   line-height: var(--leading-snug);
   overflow-wrap: anywhere;
 }
@@ -679,7 +723,6 @@ export default defineComponent({
   @include icon;
 
   font-size: var(--icon-sm);
-  margin-top: var(--space-1);
 }
 
 .hint-there {
@@ -714,11 +757,11 @@ export default defineComponent({
 .caption {
   margin: calc(var(--space-2) * -1) 0 0;
   color: var(--text-muted);
-  font-size: var(--text-caption);
+  font-size: var(--text-footnote);
 }
 
-.note::before {
-  content: ' · ';
+.note {
+  display: block;
 }
 
 .offline {
@@ -734,8 +777,21 @@ export default defineComponent({
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-4);
-  border: var(--hairline) solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.detach-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+
+  /* Halves where both fit, as 4h draws them: a share of nothing each, never narrower than the cell of
+     the wider word — so where the two do not fit they go one under the other (review №5). */
+  > * {
+    flex: 1 1 0;
+    min-width: max-content;
+  }
 }
 
 .detach-question {
@@ -746,10 +802,6 @@ export default defineComponent({
 
 .no-trip {
   margin: 0;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius);
-  background: var(--accent-tint);
-  color: var(--accent-ink);
-  font-weight: var(--weight-medium);
+  font-size: var(--text-footnote);
 }
 </style>
