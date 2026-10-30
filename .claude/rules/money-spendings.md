@@ -191,7 +191,9 @@ nothing up.
   answers of their own, and the month that failed is not theirs. **Under the skeleton there are no ways
   out at all** (MOL-269, owner's В-1 «а»): they come once the month has answered, failed or is kept —
   **and «Счета» too**, answered, failed or kept, since their card over the switcher comes with their
-  answer and the row «Счета» goes with it. Under the skeleton the answer moved them from under the
+  answer and the row «Счета» goes with it — **and today's rate, on another month with none kept** (MOL-304,
+  self-review №1): it comes with the running month's read after the month's own, and since MOL-304 a value
+  too long to stand beside its label goes under it — «386,50 ֏/$» under «Обмен денег» at 320 grew the row. Under the skeleton the answer moved them from under the
   finger: a newcomer's empty state is 239 px shorter than the skeleton and has no «Траты», so
   «Обмен денег» went 291 px up; a month with a spending stands its card and ring some 100 px taller than
   the skeleton, and it went 99 down; and the strip «Добавить трату» comes with the first answer over the

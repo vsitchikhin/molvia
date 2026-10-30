@@ -155,7 +155,8 @@ export default defineComponent({
 }
 
 /* Two lines, then «…» (owner's В-1 «а»): the label is the one word of the entry, and two lines hold every
-   one of the app at 320; a note in the spending sheet's field may be long, and the sheet opens it whole. */
+   one of the app at 320 at a text of 100 % — large text is MOL-321; a note in the spending sheet's field may
+   be long, and the sheet opens it whole. */
 .label {
   display: -webkit-box;
   flex: 1 1 auto;

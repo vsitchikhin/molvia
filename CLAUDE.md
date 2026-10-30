@@ -594,7 +594,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17); no gesture
   is intercepted but the sheet's own pull down (MOL-80); only the page scrolls, except a sheet.
   **Nothing to tap stands under a skeleton where the answer moves it** (MOL-269): the ways out of
-  «Деньги» wait for the month and «Счета» and are unseen in their place while «Повторить» reads a failed
+  «Деньги» wait for the month, «Счета» and, on another month, today's rate (MOL-304) and are unseen in their
+  place while «Повторить» reads a failed
   month again, the groups of
   «Настройки» never stand under the form's skeleton.
   **«Что брать» is home** (MOL-128): the `tabMove` of «back»; old addresses of «Поход» redirect for
