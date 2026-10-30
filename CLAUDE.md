@@ -634,8 +634,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   the total our code's by the card's words, never the model's; a figure in any spelling it writes it, a
   discount's minus its size, and the log counts what was not read (`unparsed`, MOL-294). **A date is
   held by the window of its arrival** (MOL-305, В-4, В-5 «а»: asked as printed, the model read the lines worse): before
-  the same day six months before the server took the receipt in, or after its day + 1, it is none for either reader — the
-  day it was sent, said so wherever that day is shown.
+  the same day six months before the server took the receipt in, or after its day + 1 or the latest day on Earth, it
+  is none for either reader — the day it was sent, said so wherever that day is shown.
 - **The parse is MOL-114's prototype, measured on the bench** (`receipt-text.ts`, `score.mjs`): a rule
   changed is run on the bench's truth before and after; amounts in hundredths, never floats.
 - **A country's words are its card's, never a literal of the parse** (MOL-247, `receipt-card.ts`): currency,

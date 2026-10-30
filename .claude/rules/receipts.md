@@ -208,12 +208,16 @@ same day unless it was sent later, and said «день отправки» on the
 
 **A date far from its arrival is no date of the receipt, for either reader** (MOL-305, owner's В-1, В-5 «а»):
 `receiptDateWindow` — from the same day six months before the server took the receipt in (`receipts.created_at`,
-`RECEIPT_DATE_MONTHS`), the last day of a shorter month («31.10» → «30.04»), to the day after, on the till's clock;
+`RECEIPT_DATE_MONTHS`), the last day of a shorter month («31.10» → «30.04»), to the day after, on the till's clock,
+and never past the latest day on Earth then (`latestDay`, adversarial Р3-А7) — the day «Записать» refuses past: a
+tomorrow of Yerevan the window took was refused until 14:00 there, and the queue set the record aside for good;
 `headOf` holds both readers to it. Outside, the receipt has no date and no time — a time without its day dates
 nothing — and the review takes the day it was sent and says so wherever that day is shown, while it is that day: the
 title of a receipt with no place («Чек, отправлен 23 окт.», Р2-А4), the line of the place («23 окт., день отправки»),
 «Когда» of «Где купили?» («23 октября, день отправки», adversarial А4) — a «Готово» that left it so chose nothing — and
-its row in «Покупки» (Р2-А6); a day not of this year is printed with its year. **From the server's arrival, never the
+its row in «Покупки» (Р2-А6), with nothing of its head read too (Р3-А6); a day not of this year is printed with its
+year. **The price, named** (self-review №7): the bot's «Чек разобран» still names it «Чек от» that day, as on master —
+it goes only to whoever had not the review in view for 30 s, and the review says it. **From the server's arrival, never the
 phone's clock** (adversarial А2, А3, Р2-А3): `captured_at` is the phone's moment of «Отправить чек», and a battery that
 died sets it to 1970, 2000 or the firmware's day — a receipt sent before the network put it right moved the window
 years back; the server's clock is one, and a queue that brought the receipt days late moves the window by as much,

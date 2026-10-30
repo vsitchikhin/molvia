@@ -473,12 +473,13 @@ export default defineComponent({
       day: purchaseDay(at, locale.value),
       time: timeOfDay(at, locale.value),
     })
-    // A printed day is a calendar day, never a moment (review 23). A receipt read with no date of its own stands on the
-    // day it was sent, and says so (MOL-305, Р2-А6): beside one that prints that day, it was the same row.
+    // A printed day is a calendar day, never a moment (review 23). A receipt with no date of its own stands on the
+    // day it was sent, and says so (MOL-305, Р2-А6), with no head read at all too, as its review does (Р3-А6): beside
+    // one that prints that day, it was the same row.
     const readDay = (row: ReceiptRow): { day: string; sent: boolean } => {
       const printed = row.summary?.header?.date
       if (printed) return { day: calendarDayOfAnyYear(printed, locale.value), sent: false }
-      return { day: when(row.capturedAt).day, sent: !!row.summary?.header }
+      return { day: when(row.capturedAt).day, sent: true }
     }
     const readDayWords = (row: ReceiptRow): string => {
       const { day, sent } = readDay(row)
