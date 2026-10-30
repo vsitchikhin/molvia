@@ -165,6 +165,7 @@
       v-if="opened"
       :key="opened.key"
       :entry="opened.entry"
+      focus-quantity
       :expense="opened.expense"
       :retry="opened.retry"
       :trip-id="id"

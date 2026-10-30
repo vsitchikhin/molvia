@@ -28,6 +28,7 @@ import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { recallHereLast, rememberBoughtHere, rememberHereLast } from '@/stores/hereLast'
 import { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
+import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ItemSearchView from '@/views/ItemSearchView.vue'
 import { holdsTyping } from '@/pwaUpdate'
 
@@ -170,6 +171,12 @@ function field(view: VueWrapper) {
 
 function names(view: VueWrapper): string[] {
   return view.findAll('[role="option"] .title').map((name) => name.text())
+}
+
+/** «Сколько» takes the focus only where the purchase sheet opens in the tap that asked for it (MOL-212). */
+async function focusesQuantity(view: VueWrapper): Promise<unknown> {
+  await nextTick()
+  return view.findComponent(ItemDetailsSheet).props('focusQuantity')
 }
 
 function button(view: VueWrapper, text: string): DOMWrapper<HTMLButtonElement> {
@@ -959,6 +966,8 @@ describe('«What did you pick up?»', () => {
         expect(useItemEntryStore(pinia).picked).toEqual({ entry: milk, query: '' })
       })
       expect(searchCatalogue).not.toHaveBeenCalled()
+      // The scanner went by itself: no tap, so no keys for «Сколько».
+      expect(await focusesQuantity(view)).toBe(false)
     })
 
     it('waits for the scanner to be put away before the purchase sheet comes up', async () => {
@@ -1464,6 +1473,7 @@ describe('«What did you pick up?»', () => {
         await button(view, milk.name).trigger('click')
 
         expect(useItemEntryStore(pinia).picked).toEqual({ entry: milk, query: '' })
+        expect(await focusesQuantity(view)).toBe(true)
       })
 
       it('lets a sheet opened from the recent items alone when the connection comes back (Ж′)', async () => {
@@ -1644,6 +1654,8 @@ describe('«What did you pick up?»', () => {
           expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
         })
         expect(view.text()).not.toContain(pending)
+        // Opened by the server's answer, not by the tap that asked.
+        expect(await focusesQuantity(view)).toBe(false)
       }, 10_000)
 
       it('records without the code when asked to, and writes nothing', async () => {
@@ -1655,6 +1667,7 @@ describe('«What did you pick up?»', () => {
         expect(attachBarcode).not.toHaveBeenCalled()
         expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
         expect(view.text()).not.toContain(pending)
+        expect(await focusesQuantity(view)).toBe(true)
       }, 10_000)
 
       it('names the item that holds the code, and takes it as found by the code', async () => {
@@ -1670,6 +1683,7 @@ describe('«What did you pick up?»', () => {
         })
         await button(view, en.item.propose.take.replace('{name}', kefir.name)).trigger('click')
         expect(useItemEntryStore(pinia).picked).toEqual({ entry: kefir, query: '' })
+        expect(await focusesQuantity(view)).toBe(true)
       }, 10_000)
 
       it('offline, says the code is not linked and offers both ways on', async () => {
@@ -2210,6 +2224,8 @@ describe('«What did you pick up?»', () => {
       await vi.waitFor(() => {
         expect(useItemEntryStore(pinia).picked).toEqual({ entry: tan, query: 'тан' })
       })
+      // Opened once the proposal was answered, not by the tap on «Предложить».
+      expect(await focusesQuantity(view)).toBe(false)
     }, 10_000)
 
     it('is a quiet line under an answer that has rows — the answer may still not be the thing', async () => {
@@ -2314,6 +2330,7 @@ describe('«What did you pick up?»', () => {
       const sheet = view.get('dialog[open]')
       expect(sheet.text()).toContain(milk.name)
       expect(sheet.text()).toContain(en.item.save)
+      expect(sheet.get('[data-field="quantity"]').attributes()).toHaveProperty('autofocus')
     })
 
     it('adds with the query of the search, and only then remembers the item', async () => {

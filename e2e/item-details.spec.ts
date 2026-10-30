@@ -117,6 +117,21 @@ test.describe('the sheet', () => {
     expect(row?.unitPrice?.amount).toMatch(/^577\.7{2}/)
   })
 
+  // Opened by the tap on its row, the sheet gives «How much» the focus: the keys come up at once and
+  // the digits go into it with no second tap on the field (MOL-212, Е-12). The record is known on the
+  // phone first, as it is at a shelf — with none known the sheet opens on «start a record» and ×.
+  test('opens with «How much» focused, and the digits go into it at once', async ({ page }) => {
+    const setting = await onTrip(page)
+    await page.goto('/purchases/manual')
+    await expect(page.getByRole('heading', { name: 'Ереван Сити' })).toBeVisible()
+    await pick(setting)
+
+    const quantity = sheet(page).getByLabel('How much')
+    await expect(quantity).toBeFocused()
+    await page.keyboard.type('2')
+    await expect(quantity).toHaveValue('2')
+  })
+
   test('adds the item alone when nothing else is filled in', async ({ page }) => {
     const setting = await onTrip(page)
     await pick(setting)

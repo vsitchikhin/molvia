@@ -12,6 +12,7 @@
           kind="decimal"
           :error="errors.quantity"
           data-field="quantity"
+          :autofocus="focusQuantity && writeInto !== null"
           @blur="leaveField('quantity')"
         />
         <SegmentedControl v-model="unit" :legend="t('item.unit')" :options="units" />
@@ -223,6 +224,13 @@ export default defineComponent({
     onClosed: { type: Function as PropType<() => void>, default: undefined },
     /** The code the item was found by or just given on the search (MOL-100); none otherwise. */
     code: { type: String as PropType<string | null>, default: null },
+    /**
+     * The sheet opens in the tap that asked for it, so «Сколько» takes the focus and iOS raises the
+     * keys (MOL-212, Е-12). Opened by no tap — after the scanner, after a server's answer — the keys
+     * stay down, and the field focused would have the sheet take their remembered height and fall
+     * back 1.5 s later (MOL-151): × keeps the focus there, and where there is no record to write to.
+     */
+    focusQuantity: { type: Boolean, default: false },
   },
   emits: {
     added: (entry: CatalogueEntry) => typeof entry === 'object',

@@ -734,6 +734,9 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       await typeCode(page, code)
       const found = await sheetOf(page, name)
       const notThis = found.getByRole('button', { name: `Code ${code} — not this item?` })
+      // Opened by the answer, not by a tap: no keys would come for «How much», so × keeps the focus
+      // (MOL-212, В-1 «а»).
+      await expect(found.getByRole('button', { name: 'Close' })).toBeFocused()
 
       await notThis.click()
       await expect.poll(async () => (await focused(page)).text).toBe('Cancel')

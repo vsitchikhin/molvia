@@ -128,6 +128,7 @@ interface Options {
   readonly locale?: 'ru' | 'en'
   readonly selected?: TripView
   readonly code?: string
+  readonly focusQuantity?: boolean
 }
 
 async function router() {
@@ -157,6 +158,7 @@ async function render(options: Options = {}) {
       expense: options.expense ?? null,
       closeSteps: options.closeSteps ?? 1,
       code: options.code ?? null,
+      focusQuantity: options.focusQuantity ?? false,
     },
     attachTo: document.body,
     global: { plugins: [made, pinia, createAppI18n(options.locale ?? 'ru')] },
@@ -218,6 +220,19 @@ describe('ItemDetailsSheet', () => {
     expect(view.text()).toContain('ультрапастеризованное, 2,5%')
     expect(perUnit(view)).toBe('—')
     expect(view.text()).toContain('Считается само, вводить не надо')
+  })
+
+  // The dialog gives the focus to what carries `autofocus` — the browser's part, held end to end (MOL-212).
+  it('gives «Сколько» the focus when opened by the tap that asked for it, × otherwise', async () => {
+    const autofocus = (view: VueWrapper) => input(view, 'quantity').attributes('autofocus')
+    expect(autofocus((await render({ focusQuantity: true })).view)).toBeDefined()
+    expect(autofocus((await render()).view)).toBeUndefined()
+  })
+
+  it('keeps the focus on × with no record to write to, tap or not', async () => {
+    const { view } = await render({ trip: null, server: null, focusQuantity: true })
+    expect(view.text()).toContain('Сначала начните запись')
+    expect(input(view, 'quantity').attributes('autofocus')).toBeUndefined()
   })
 
   it.each([
