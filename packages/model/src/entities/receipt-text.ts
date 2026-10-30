@@ -1998,9 +1998,24 @@ export function rowsOf(text: string, part: number): TextRow[] {
 // No seam — an overlap of a name row only — joins the parts, dropping the rows both of them hold.
 const ARTICLE = /\d{4}\s*\/\s*(\d{5,})/
 
-/** Two figures one digit OCR confuses apart (5↔6, 1↔4, 3↔8, 0↔9 in Armenia) — not the same figure. */
-export function ocrSwapApart(reading: PhotoReading, a: string, b: string): boolean {
-  return a !== b && near(a, b, reading.swaps)
+/**
+ * Two figures at most `depth` digits of `swaps` apart — a reader's confusions, Tesseract's or the model's — not the
+ * same figure.
+ */
+export function swapApart(
+  swaps: Readonly<Record<string, string>>,
+  a: string,
+  b: string,
+  depth = 1,
+): boolean {
+  if (a === b || a.length !== b.length) return false
+  let off = 0
+  for (let i = 0; i < a.length; i++) {
+    if (a.charAt(i) === b.charAt(i)) continue
+    off += 1
+    if (off > depth || swaps[a.charAt(i)] !== b.charAt(i)) return false
+  }
+  return true
 }
 
 // One digit off the way OCR misreads this font (5 for 6, 1 for 4, 3 for 8, 0 for 9) — not any

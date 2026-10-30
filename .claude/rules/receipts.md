@@ -398,6 +398,24 @@ back. The card decides, not the country: a country read by photo comes with its 
 still shows the memory (MOL-291), which asks no doubt. **The price, named:** a price of such a receipt changed by
 one such digit is told nowhere, as any other change of a price is not.
 
+**A receipt is doubted by its reader's confusions** (MOL-315, owner's В-1 «а», 30.10.2026): `priceInDoubt(…, { byModel })`
+takes the card's `modelSwaps` for a receipt the model read — 5↔6 alone, measured (MOL-290), **up to two of them in
+the figure** (`REMEMBERED_PRICE_SWAPS`, adversarial А2, owner's «в»): «660» copied for 550, as MOL-290 measured and
+MOL-291's doubt at reading takes it — with other people's price that line is shown, and the hint is all that is left.
+The server names the reader by the receipt's `reader_version` (`found.byModel`). The model's 1 100 → 1 400, 990 → 999,
+330 → 380 are taken for prices changed, which «проверьте цифры» asked the person to put back; MOL-291's doubt at reading
+went by 5↔6 already. **The price, named** (adversarial А1, owner's «а», 31.10.2026): `modelSwaps` are the pairs the
+model's repair was measured on, not every pair it confuses — the bench saw it copy an 8 as a 3 once, in a tax number
+(MOL-272, am-01). Such a slip copied alike into a price, its sum and the total passes with no hint, as MOL-314's Г1 does:
+on a receipt proven whole a price gone up and the same digit misread everywhere read the same. Not seen in a price. A model's receipt Tesseract read in its place, and one read before MOL-255, are Tesseract's: one digit of
+`swaps`, as before — the owner's «в» was the model's two 5↔6, never Tesseract's (`byModel: false`). **The phone knows
+no reader** and doubts by the union of both (no `byModel`), so every hint the server sent stands there: the server only
+narrows. **The prices, named:** a price the person typed on the sheet is doubted by the union whoever read the receipt
+(В-2 «а») — 4 550 typed against a remembered 1 550 on a model's receipt keeps the hint, and «660» typed against 550 on
+Tesseract's, which master let go; and a phone of a build before the А2 fix doubts by one
+digit alone, so the model's «660» against other people's 550 shows no hint there, as on master, until the app updates
+(`pwaUpdate.ts`).
+
 ## What a line is (MOL-126)
 
 **A line finds its item in five steps, the first that answers deciding** (MOL-114's order, approved
@@ -622,7 +640,7 @@ threshold would lose the first receipt of every shop.
 **Recording writes the person's word on every line recorded**, over their earlier one; a line left out
 teaches nothing. The price kept is the shelf price of a line recorded as read, the memory's argument
 where a figure reads two ways — «60 60» for «50 50» adds up either way — and it is a hint, never a
-correction (В-1): a price one confused digit off the remembered is `rememberedPrice` on the line, «
+correction (В-1): a price its reader may have confused for the remembered (MOL-315, below) is `rememberedPrice` on the line, «
 проверьте», and the parse's figures stay as read — unless the total proving the receipt points at the price, its only
 line's at its sum (MOL-314, below) — and, since MOL-291,
 on a line the check emptied too. **The price
