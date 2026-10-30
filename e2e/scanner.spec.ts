@@ -198,9 +198,12 @@ test.describe('with no camera', () => {
     await expect(scanner(page).getByText("The digits don't add up — check the code")).toBeVisible()
     await expect(scanner(page)).toBeVisible()
     // The edge doubled, as a row of the kit draws an error: a hairline is lost in bad light (MOL-211).
+    // Read once the well's colour has settled: its edge comes by a transition, the shadow at once, and
+    // CI read the edge half-way (rgb(187, 117, 102) against the shadow's --bad).
     const edge = await scanner(page)
       .locator('.well')
-      .evaluate((well) => {
+      .evaluate(async (well) => {
+        await Promise.allSettled(well.getAnimations().map((animation) => animation.finished))
         const style = getComputedStyle(well)
         return { colour: style.borderTopColor, shadow: style.boxShadow }
       })
