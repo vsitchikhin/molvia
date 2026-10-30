@@ -477,6 +477,13 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
             Math.abs(first.top - second.top) < 1 &&
             first.right <= second.left,
           workLines: work ? tops.size : 0,
+          // The word of the work inside its button: a button squeezed below its word lets it out.
+          workInside:
+            !busy ||
+            [...range.getClientRects()].every((line) => {
+              const box = busy.getBoundingClientRect()
+              return line.left >= box.left - 0.5 && line.right <= box.right + 0.5
+            }),
           wide: dialog.scrollWidth - dialog.clientWidth,
         }
       })
@@ -771,7 +778,13 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       await found.getByRole('button', { name: `Code ${code} — not this item?` }).click()
       await expect(found.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible()
 
-      expect(await detachPair(found)).toEqual({ buttons: 2, oneRow: true, workLines: 0, wide: 0 })
+      expect(await detachPair(found)).toEqual({
+        buttons: 2,
+        oneRow: true,
+        workLines: 0,
+        workInside: true,
+        wide: 0,
+      })
     })
 
     // In Russian «Отвязываем…» is the widest word of the pair: where the two do not fit side by side they
@@ -815,7 +828,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
           ).toBeVisible()
 
           const pair = await detachPair(found)
-          expect(pair).toMatchObject({ buttons: 2, workLines: 1, wide: 0 })
+          expect(pair).toMatchObject({ buttons: 2, workLines: 1, workInside: true, wide: 0 })
           if (oneRow !== null) expect(pair.oneRow).toBe(oneRow)
         })
       }

@@ -433,7 +433,10 @@ export default defineComponent({
       // a refusal put right, the size of a pack — it is selected whole: the caret after «1» made «2»
       // typed at the shelf 12 l, and the price per litre a twelfth (adversarial А2).
       const quantity = form.value?.querySelector<HTMLInputElement>('[data-field="quantity"]')
-      if (quantity && document.activeElement === quantity) quantity.select()
+      // A range set, not `select()`: WebKit on iOS has been unreliable with the latter (adversarial Р2).
+      if (quantity && document.activeElement === quantity) {
+        quantity.setSelectionRange(0, quantity.value.length)
+      }
       window.addEventListener('online', listen)
       window.addEventListener('offline', listen)
       // The server is asked every time the sheet opens: the trip in memory is for when it cannot
@@ -457,10 +460,12 @@ export default defineComponent({
 
     // The record went while the sheet was up — finished on another device, the server says so as the
     // sheet asks: a field in focus would keep the keys up over a sheet with nothing to write, so the
-    // focus goes to «К покупкам», the one thing left to do (adversarial А3).
+    // focus goes to «К покупкам», the one thing left to do (adversarial А3). A field only: a button
+    // brings no keys, and «Отменить» of «Отвязать?» is where the focus must wait (adversarial Р2-А1).
     const leaveButton = ref<{ $el?: HTMLElement } | null>(null)
     watch(writeInto, async (into) => {
-      if (into !== null || !form.value?.contains(document.activeElement)) return
+      const held = document.activeElement
+      if (into !== null || !held?.matches('input, textarea') || !form.value?.contains(held)) return
       await nextTick()
       leaveButton.value?.$el?.focus()
     })
@@ -767,8 +772,11 @@ export default defineComponent({
   flex-wrap: wrap;
   gap: var(--space-2);
 
+  /* Halves where both fit, as 4h draws them: a share of nothing each, never narrower than the cell of
+     the wider word — so where the two do not fit they go one under the other (review №5). */
   > * {
-    flex: 1 1 auto;
+    flex: 1 1 0;
+    min-width: max-content;
   }
 }
 
