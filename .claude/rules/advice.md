@@ -616,6 +616,33 @@ decisions of 02.10.2026 are В-1…В-10 of `requirements/MOL-92.md`.
   adversarial Е′): changed in place from one line to two, it lifted the price by 17 px in a frame. Never red — red is «не брать нигде». Read out with the unit price, after the
   same pause, through the one live region.
 
+## The queue of «Оценки»: empty, and what it says (MOL-214)
+
+**An empty queue says the truth of it** (Е-5, С-8): «Всё оценено. Спасибо — база стала точнее» was
+said to a newcomer who had bought nothing. `GET /verdicts/pending` carries `bought` — whether the
+person has bought any product in a record not removed, rated or not — and with `false` the screen
+says «Оценивать пока нечего» and leads to «Покупки». **The circle is the queue's own** (Р-1):
+products only, records not removed — `false` is exactly «no card could have come from here»; a
+verdict given on «Что брать» with no purchase is none, and «запишите покупку — здесь спросим» stays
+true of this screen. **It is the use case's, asked only of an empty queue and after it**
+(`hasPurchases`): a card is a purchase, and a second statement that missed one written meanwhile
+would send «nothing bought» beside it — the schema refuses that as no answer, so the phone would
+draw an error; the reminder, which asks the same queue, does not count it. **Optional in the
+schema**, as `placeCity` is: an answer of a server before it, and the queue the phone kept from one,
+read as «Всё оценено», what they said before. **The prices, named:** the answer is strict, so an
+installed build older than the field refuses it and shows «Оценки» as an error with «Обновить» first
+until it takes the version — as `ownScore` (MOL-202); a rollback forgets the queue the phone kept; and
+a purchase recorded offline, not yet sent, makes no `bought` — a newcomer reads «Оценивать пока
+нечего» until it lands, when no card could be shown anyway.
+
+**The connection is one strip, over the card it is about** (Ф-14, MOL-181): a rating kept on the
+phone — «Без связи · оценка сохранена…» — else a list from memory, offline or «сервер не ответил» with
+its «Повторить» and the count of failed loads (`attempt`). **The rating's strip wins** (owner's В-2
+«а»): it is the news of the tap just made, and «без связи» says the list is not fresh; the date of the
+list is not shown meanwhile — the price. **With no card left the state is the screen** (owner's В-1
+«а»): the last rating kept offline is the whole «Оценка сохранена», as «Оценка не ушла» is the whole
+error, its «Повторить» in the strip — a strip is for an answer shown, and no card is shown.
+
 ## A withdrawn verdict
 
 - **A withdrawn verdict is still a row (MOL-27).** `DELETE /verdicts/:itemId` sets
