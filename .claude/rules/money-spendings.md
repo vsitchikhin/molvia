@@ -231,7 +231,10 @@ nothing up.
   the control that chooses (MOL-138) and the rows are already there; and «Счета» that failed, then
   answer a later read — a connection back, a spending landed, «Повторить» — putting their card over the
   switcher and taking the row «Счета» away: hiding the rows on every read of «Счета» after a failure
-  would take them away at every spending that lands. e2e holds both answers back in turn (`money.spec`). **A refusal stands once, and always somewhere it can be put
+  would take them away at every spending that lands; and today's rate on another month with none kept, which
+  comes with the running month's read after the month's own and, too wide to stand beside «Обмен денег», goes
+  under it and grows its row (MOL-304, owner's В-3 «а»; which rate is too wide — `frontend.md`). e2e holds
+  both answers back in turn (`money.spec`). **A refusal stands once, and always somewhere it can be put
   right** (MOL-159): about a row the journal on screen shows, it marks that row, and any amendment of
   the row takes it away; with no such row, it is a row of «Не приняты» on top of «Траты», in every
   month and whatever its pages (`refusedRows`). «Не приняты» names the marked ones too and leads to the
@@ -586,11 +589,12 @@ nothing up.
   day of another year is «28 сент.» with no year, as `dayWords` says it everywhere — the field behind
   says it whole; the focus put on a field as the details open raises no keyboard on iOS, which takes a
   tap — the field is focused and its error said; and Enter there does nothing, as in the form before:
-  «Готово» is in the footer, out of the fields' way; at 320 the line is cut by «…» even as «Сегодня · без
-  заметки» (185 px of words in a label of 166) — from 375 it fits, and its name is whole; and the sheet
-  over the spending runs in Chromium alone — WebKit keeps no `Secure` cookie on the loopback and opens
-  no «Деньги» (`e2e.md`): «‹», Esc and the focus given back are `BottomSheet`'s, held on WebKit by
-  `sheet.spec` on the kit.
+  «Готово» is in the footer, out of the fields' way; at 320 the line takes two lines even as «Сегодня · без
+  заметки» (185 px of words in a label of 166), the field 62 for 52, and a long note ends in «…» after the second
+  (MOL-304, owner's В-1 «а»; it ended in «…» on one line before) — from 375 the short one fits one, and its name is
+  whole; and the sheet over the spending runs in Chromium alone — WebKit keeps no `Secure` cookie on the
+  loopback and opens no «Деньги» (`e2e.md`): «‹», Esc and the focus given back are `BottomSheet`'s, held on
+  WebKit by `sheet.spec` on the kit — the line's clamp by `kit-rows` (MOL-304).
 - **The summary of a trip's spending loads its items as their shape** (MOL-199, Ф-13, Ф-15): four rows
   «name · sum» of bars in the card of the items, through `ScreenSkeleton` — 1.35:1 on `--surface-2` in
   the light scheme, 1.39 in the dark, over the 1.31 of the ground under a caption — and failed, the kit's

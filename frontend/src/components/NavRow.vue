@@ -10,8 +10,10 @@
     @click="click"
   >
     <component :is="icon" v-if="icon" class="icon" aria-hidden="true" />
-    <span class="label">{{ label }}</span>
-    <span v-if="value" class="value">{{ value }}</span>
+    <span class="words">
+      <span class="label">{{ label }}</span>
+      <span v-if="value" class="value">{{ value }}</span>
+    </span>
     <IconChevronRight class="chevron" aria-hidden="true" />
   </component>
 </template>
@@ -34,6 +36,9 @@ import IconChevronRight from '~icons/mdi/chevron-right'
  * form read as plain text. `invalid` marks a field behind it that holds an error. Their classes are the
  * kit's own words: a root carries the scope of the screen it stands in, and the spending sheet's own
  * `.field` — its column of a label and a field — stood the row in a column (adversarial А1 of MOL-199).
+ *
+ * Nothing of it is cut on a phone of 320 (MOL-304): the label takes up to two lines, then «…», and the value
+ * stands beside it while both fit on one line, else on a line of its own under it, at the right.
  */
 export default defineComponent({
   name: 'NavRow',
@@ -68,7 +73,7 @@ export default defineComponent({
   box-sizing: border-box;
   width: 100%;
   min-height: var(--touch-target-lg);
-  padding: 0 var(--space-3) 0 var(--space-4);
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
   color: var(--text);
   font-family: var(--font);
   font-size: var(--text-body);
@@ -99,7 +104,7 @@ export default defineComponent({
 
 /* A field's well, as `AccountRow`: under the pointer the tint, where muted text is under 4.5:1 (MOL-172). */
 .nav-field {
-  padding: 0 var(--space-2) 0 var(--space-3);
+  padding-inline: var(--space-3) var(--space-2);
   border: var(--hairline) solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--surface-2);
@@ -131,28 +136,49 @@ export default defineComponent({
   color: var(--text-muted);
 }
 
-/* No width of its own (`width: 0` beside `flex: 1`), as `AccountRow`'s value: `min-width: 0` lets it
-   shrink, but its whole line still counted in the sheet's least width, and a note of 32 letters made
-   the spending sheet wider than the phone (adversarial А3 of MOL-199). */
-.label {
+/* The words have no width of their own (`width: 0` beside `flex: 1`), as `AccountRow`'s value: `min-width: 0`
+   lets them shrink, but the label's whole line still counted in the sheet's least width, and a note of 32 letters made
+   the spending sheet wider than the phone (adversarial А3 of MOL-199).
+
+   The label and the value share its lines (MOL-304, owner's В-2 «а»): beside each other while both fit,
+   else the value goes to a line of its own, at the right where the values end. Held on one line, on a
+   phone of 320 «Перевод между счетами» was cut, and the value's half of the row cut «Бюджет» to «Бю…» and
+   «сверх плана 1 250 300 ֏» with it. */
+.words {
+  display: flex;
   flex: 1;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-3);
   width: 0;
   min-width: 0;
-  overflow: hidden;
-  font-weight: var(--weight-medium);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.value {
-  flex: none;
-  max-width: 50%;
+/* Two lines, then «…» (owner's В-1 «а»): the label is the one word of the entry, and two lines hold every
+   one of the app at 320 at a text of 100 % — large text is MOL-321; a note in the spending sheet's field may
+   be long, and the sheet opens it whole. */
+.label {
+  display: -webkit-box;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
+  overflow-wrap: anywhere;
+  font-weight: var(--weight-medium);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* Never cut: on its own line it breaks between its words, never inside a figure, whose groups the
+   formats keep together. */
+.value {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-inline-start: auto;
   color: var(--text-muted);
   font-size: var(--text-callout);
   font-variant-numeric: tabular-nums;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-align: end;
 }
 
 .chevron {

@@ -762,6 +762,7 @@ test('the day, the note and the place are behind one line, in a sheet over the s
 // The line is a row of the kit in the form too — the sheet's own `.field` stood it in a column 84 high
 // (adversarial А1) — and a long note ends in «…» inside it: without `width: 0` its whole line widened
 // the sheet past a phone, × off the screen (А3). At 320, where the fewest letters do it (self-review 3).
+// Since MOL-304 its label takes two lines before the «…» (owner's В-1 «а»).
 test('the line of the day, the note and the place is one row, and a long one ends in «…» at 320', async ({
   page,
 }) => {
@@ -789,19 +790,19 @@ test('the line of the day, the note and the place is one row, and a long one end
         row: icon.right <= text.left && text.right <= chevron.left,
         inside: chevron.right <= own.right && own.right <= dialog.getBoundingClientRect().right,
         wider: dialog.scrollWidth - dialog.clientWidth,
-        cut: label.scrollWidth > label.clientWidth,
+        cut: label.scrollWidth > label.clientWidth || label.scrollHeight > label.clientHeight + 1,
+        lines: Math.round(text.height / parseFloat(getComputedStyle(label).lineHeight)),
       }
     })
-  // Widths are measured once the faces have come (MOL-306). At 320 even «Сегодня · без заметки» needs
-  // 185 of the label's 166 and ends in «…» — the price, named in `money-spendings.md`; from 375 it fits.
+  // Widths are measured once the faces have come (MOL-306). At 320 «Сегодня · без заметки» needs 185 of
+  // the label's 166: it stands whole on two lines (MOL-304), where it ended in «…»; from 375 it fits one.
   await facesIn(page)
-  expect(await shape()).toMatchObject({ row: true, inside: true, wider: 0 })
-  expect((await shape()).height).toBeLessThan(60)
+  expect(await shape()).toMatchObject({ row: true, inside: true, wider: 0, cut: false, lines: 2 })
 
   const note = 'Подарок коллеге на день рождения'
   await fillDetails(page, { note, place: 'Торговый центр «Ташир»' })
-  expect(await shape()).toMatchObject({ row: true, inside: true, wider: 0, cut: true })
-  expect((await shape()).height).toBeLessThan(60)
+  expect(await shape()).toMatchObject({ row: true, inside: true, wider: 0, cut: true, lines: 2 })
+  expect((await shape()).height).toBeLessThan(70)
   await expect(line).toHaveAccessibleName(
     `Дата, заметка, место: Сегодня · ${note} · Торговый центр «Ташир»`,
   )
