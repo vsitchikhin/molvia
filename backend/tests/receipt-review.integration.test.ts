@@ -487,6 +487,36 @@ describe('the review of a receipt', () => {
     ])
   }, 10_000)
 
+  // MOL-315, adversarial А2: the model copies 5↔6 twice in a figure (MOL-290) — the person's own price empties such a
+  // line at reading (MOL-291); other people's leaves it shown, and the hint is what is left
+  it('doubts a price the model read two 5↔6 off other people’s price', async () => {
+    const me = await insertActor(db, { sharedUntil: new Date(Date.now() + 30 * 86_400_000) })
+    const butter = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    for (let n = 0; n < 3; n++) {
+      await memory.remember(await insertActor(db), TIN, [
+        { kind: 'sku', key: '1110004', itemId: butter, price: amd(550) },
+      ])
+    }
+    const hints = async (copied: number) =>
+      (
+        await review(
+          me,
+          await parsedReceipt(
+            me,
+            [
+              { printed: 'Կարագ «Օրինակ»', sku: '1110004', qty: 2, price: copied, sum: copied * 2 },
+              { printed: 'Հաց «Օրինակ»', sku: '1110005', price: 200, sum: 200 },
+            ],
+            { totalMinor: null, ...byModel },
+          ),
+        )
+      ).lines.map((line) => line.rememberedPrice)
+    expect(await hints(650)).toEqual([amd(550), null])
+    expect(await hints(660)).toEqual([amd(550), null])
+    // Tesseract's 0↔9 is a price changed for the model
+    expect(await hints(559)).toEqual([null, null])
+  }, 10_000)
+
   // MOL-314: «1 / 650 / 650» under a total of 650 two places print is the butter gone up, not a misread
   it('doubts no price on a receipt its total proved whole, and still hints a line with none', async () => {
     const me = await insertActor(db)

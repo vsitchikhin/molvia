@@ -1,4 +1,5 @@
 import { receiptCard } from '#model/entities/receipt-card'
+import { REMEMBERED_PRICE_SWAPS } from '#model/entities/receipt-remembered'
 import { swapApart } from '#model/entities/receipt-text'
 import { divideRounded } from '#model/support/decimal'
 import { MINOR_EXPONENT, minorPerMajor } from '#model/values/money'
@@ -230,8 +231,10 @@ export function readPartly(lines: readonly ReadFigures[], total: Money | null): 
  * way, and only the memory can tell (owner, В-1, 03.10.2026). A hint for the person, never a correction: the
  * figures stay as read. A receipt the tax office gave (MOL-232) was read by nobody: no digit of it is in doubt,
  * and a price off the memory's is a price changed (owner, В-1 «а» of MOL-270). One the model read is doubted by
- * the model's pairs alone, 5↔6 (MOL-315): its 1 100 → 1 400 is a price changed. With no reader named, Tesseract's
- * — the phone knows none, and they hold the model's (the card's test), so the server alone narrows.
+ * the model's pairs alone, 5↔6 (MOL-315): its 1 100 → 1 400 is a price changed — and by two of them in the figure, as
+ * MOL-290 measured it and MOL-291's doubt at reading takes it: «660» copied for 550 (adversarial А2, owner's «в»).
+ * With no reader named, Tesseract's one digit or the model's two — the phone knows no reader, and so holds every
+ * hint the server sent; the server alone narrows.
  */
 export function priceInDoubt(
   country: ReceiptCountry,
@@ -241,6 +244,7 @@ export function priceInDoubt(
 ): boolean {
   const reading = receiptCard(country).photo
   if (reading === null || read === null || read.currency !== remembered?.currency) return false
-  const swaps = byModel ? reading.modelSwaps : reading.swaps
-  return swapApart(swaps, String(read.minor), String(remembered.minor))
+  const [a, b] = [String(read.minor), String(remembered.minor)]
+  const model = swapApart(reading.modelSwaps, a, b, REMEMBERED_PRICE_SWAPS)
+  return byModel ? model : model || swapApart(reading.swaps, a, b)
 }
