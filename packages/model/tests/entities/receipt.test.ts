@@ -5,6 +5,7 @@ import {
   needsReshoot,
   withoutItems,
   receiptDateOf,
+  receiptDateWindow,
   STORE_MEMORY_KEY_MAX_OCTETS,
   receiptCityOf,
   receiptLineOf,
@@ -110,26 +111,82 @@ describe('the figures as the domain’s values', () => {
 })
 
 describe('the date a receipt prints', () => {
-  const latest = '2026-10-04'
-  it('takes a real day, up to the latest one', () => {
-    expect(receiptDateOf({ ...receipt([]), date: '2026-09-30' }, latest)).toBe('2026-09-30')
-    expect(receiptDateOf({ ...receipt([]), date: latest }, latest)).toBe(latest)
+  const window = { earliest: '2026-09-04', latest: '2026-10-04' }
+  const dated = (date: string) => receiptDateOf({ ...receipt([]), date }, window)
+
+  it('takes a real day within its window, both ends included', () => {
+    expect(dated('2026-09-30')).toBe('2026-09-30')
+    expect(dated(window.latest)).toBe(window.latest)
+    expect(dated(window.earliest)).toBe(window.earliest)
   })
 
   it('drops a day OCR made up: 30 February, month 13', () => {
-    expect(receiptDateOf({ ...receipt([]), date: '2026-02-30' }, latest)).toBeNull()
-    expect(receiptDateOf({ ...receipt([]), date: '2026-13-01' }, latest)).toBeNull()
+    expect(dated('2026-02-30')).toBeNull()
+    expect(dated('2026-13-01')).toBeNull()
   })
 
   it('drops a year no receipt has: 0000, which Postgres refuses, 1999, and the future (review Р10, Р13)', () => {
-    expect(receiptDateOf({ ...receipt([]), date: '0000-01-01' }, latest)).toBeNull()
-    expect(receiptDateOf({ ...receipt([]), date: '1999-12-31' }, latest)).toBeNull()
-    expect(receiptDateOf({ ...receipt([]), date: '2026-10-05' }, latest)).toBeNull()
-    expect(receiptDateOf({ ...receipt([]), date: '2099-10-01' }, latest)).toBeNull()
+    expect(
+      receiptDateOf({ ...receipt([]), date: '0000-01-01' }, { ...window, earliest: '0000-01-01' }),
+    ).toBeNull()
+    expect(
+      receiptDateOf({ ...receipt([]), date: '1999-12-31' }, { ...window, earliest: '1990-01-01' }),
+    ).toBeNull()
+    expect(dated('2026-10-05')).toBeNull()
+    expect(dated('2099-10-01')).toBeNull()
+  })
+
+  it('drops a day before its window: 26 October 2023 of a receipt shot on 23 October 2026 (MOL-305)', () => {
+    expect(dated('2026-09-03')).toBeNull()
+    expect(
+      receiptDateOf(
+        { ...receipt([]), date: '2023-10-26' },
+        { earliest: '2026-09-23', latest: '2026-10-24' },
+      ),
+    ).toBeNull()
   })
 
   it('has none when none was read', () => {
-    expect(receiptDateOf(receipt([]), latest)).toBeNull()
+    expect(receiptDateOf(receipt([]), window)).toBeNull()
+  })
+})
+
+describe('the days a receipt shot at a moment may print (MOL-305, В-1)', () => {
+  const far = '2099-12-31'
+  // 12:00 in Yerevan is 08:00 UTC
+  const at = (day: string, time = '08:00') => new Date(`${day}T${time}:00Z`)
+
+  it('from the same day of the month before to the day after the photo’s', () => {
+    expect(receiptDateWindow(at('2026-10-23'), 'AM', far)).toEqual({
+      earliest: '2026-09-23',
+      latest: '2026-10-24',
+    })
+  })
+
+  it('from the last day of a shorter month before: 28 February for 31 March, 29 in a leap year', () => {
+    expect(receiptDateWindow(at('2026-03-31'), 'AM', far).earliest).toBe('2026-02-28')
+    expect(receiptDateWindow(at('2028-03-31'), 'AM', far).earliest).toBe('2028-02-29')
+    expect(receiptDateWindow(at('2026-05-31'), 'AM', far).earliest).toBe('2026-04-30')
+    expect(receiptDateWindow(at('2026-03-28'), 'AM', far).earliest).toBe('2026-02-28')
+  })
+
+  it('across a year: December of the year before for January, 1 January after 31 December', () => {
+    expect(receiptDateWindow(at('2027-01-15'), 'AM', far)).toEqual({
+      earliest: '2026-12-15',
+      latest: '2027-01-16',
+    })
+    expect(receiptDateWindow(at('2026-12-31'), 'AM', far).latest).toBe('2027-01-01')
+  })
+
+  it('counts the photo’s day on the till’s clock: 22:30 UTC is the next day in Yerevan', () => {
+    expect(receiptDateWindow(at('2026-10-22', '22:30'), 'AM', far)).toEqual({
+      earliest: '2026-09-23',
+      latest: '2026-10-24',
+    })
+  })
+
+  it('never past the server’s latest day: a phone’s clock is the phone’s', () => {
+    expect(receiptDateWindow(at('2027-05-01'), 'AM', '2026-10-24').latest).toBe('2026-10-24')
   })
 })
 

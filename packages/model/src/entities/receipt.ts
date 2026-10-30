@@ -557,16 +557,48 @@ export function receiptLineOf(line: ReceiptTextLine, currency: Currency): Receip
   }
 }
 
+/** The days a receipt shot at a moment may print (MOL-305): `receiptDateWindow`. */
+export interface ReceiptDateWindow {
+  readonly earliest: string
+  readonly latest: string
+}
+
 /**
  * The date a receipt prints, if it is one a receipt can have: `YYYY-MM-DD`, a day of the calendar,
- * not before 2000 and not after `latest` — the server's today and a day for the zones (review Р10,
- * Р13). OCR makes up «01.01.0000», which Postgres refuses, and «2099».
+ * not before 2000 and within its window (review Р10, Р13, MOL-305). OCR makes up «01.01.0000», which
+ * Postgres refuses, and «2099»; a model made 26 October 2023 of a receipt shot on 23 October 2026.
  */
-export function receiptDateOf(text: ReceiptText, latest: string): string | null {
+export function receiptDateOf(text: ReceiptText, window: ReceiptDateWindow): string | null {
   if (text.date === null) return null
   const day = new Date(`${text.date}T00:00:00Z`)
   if (Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== text.date) return null
-  return text.date >= '2000-01-01' && text.date <= latest ? text.date : null
+  return text.date >= '2000-01-01' && text.date >= window.earliest && text.date <= window.latest
+    ? text.date
+    : null
+}
+
+/**
+ * The days a receipt photographed at `capturedAt` may print (MOL-305, owner's В-1): from the same day of the month
+ * before — its last day where that month is shorter, 28 February for 31 March — to the day after the photo's on the
+ * till's clock, for a till's clock a little ahead, and never past `latest`, the server's today and a day for the
+ * zones: a phone's clock is the phone's. A date outside is no date of the receipt, «неверно прочитанное хуже
+ * непрочитанного»: the purchases go to the photo's day, which the review says it is.
+ */
+export function receiptDateWindow(
+  capturedAt: Date,
+  country: ReceiptCountry,
+  latest: string,
+): ReceiptDateWindow {
+  const shot = receiptClockOf(capturedAt, country).day
+  const [year = 0, month = 1, day = 1] = shot.split('-').map(Number)
+  // Date.UTC rolls month 0 back to December of the year before; day 0 of a month is the last of the one before
+  const lastOfBefore = new Date(Date.UTC(year, month - 1, 0)).getUTCDate()
+  const earliest = new Date(Date.UTC(year, month - 2, Math.min(day, lastOfBefore)))
+  const after = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10)
+  return {
+    earliest: earliest.toISOString().slice(0, 10),
+    latest: after < latest ? after : latest,
+  }
 }
 
 /**
