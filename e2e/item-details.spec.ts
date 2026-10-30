@@ -145,9 +145,14 @@ test.describe('the sheet', () => {
     await addButton(page).click()
     await expect.poll(setting.rows).toHaveLength(1)
 
+    // The row as the server holds it: one still waiting in the queue opens as that write, another path
+    // (MOL-325).
     const row = page.locator('.row', { hasText: setting.word })
+    await expect(row).not.toHaveClass(/waiting/)
     await row.click()
     await expect(sheet(page)).toContainText(`Молоко «${setting.word}»`)
+    // The sheet takes no tap while it rises (MOL-69): «Save» pressed then went nowhere on CI.
+    await page.waitForTimeout(400)
     const quantity = sheet(page).getByLabel('How much')
     await expect(quantity).toBeFocused()
     await page.keyboard.type('2')
