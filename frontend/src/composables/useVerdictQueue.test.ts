@@ -165,6 +165,23 @@ describe('useVerdictQueue', () => {
     expect(queue.phase.value).toBe('ready')
   })
 
+  it('Б1: the last remembered card rated here, its rating arrived before the first answer — empty, not loading', async () => {
+    pendingVerdicts.mockResolvedValue({ items: [milk], total: 1, bought: true })
+    await mounted()
+    unmountAll()
+
+    freshPinia()
+    rateItem.mockImplementation((itemId) => Promise.resolve(sent(itemId)))
+    pendingVerdicts.mockReturnValue(new Promise(() => undefined))
+    const queue = await mounted()
+    expect(queue.phase.value).toBe('ready')
+
+    queue.save(milk, 4, '')
+    await flushPromises()
+    expect(rateItem).toHaveBeenCalledTimes(1)
+    expect(queue.phase.value).toBe('empty')
+  })
+
   it('А1: an empty answer heard by this screen stays said while it asks again', async () => {
     pendingVerdicts.mockResolvedValue({ items: [], total: 0, bought: true })
     const queue = await mounted()

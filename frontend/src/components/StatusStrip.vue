@@ -106,7 +106,8 @@ export default defineComponent({
       if (!held) return
       held = false
       const focus = document.activeElement
-      if (focus && focus !== document.body && root.value?.contains(focus)) return
+      // Kept by the strip, or taken by someone else in the same render: not ours to move.
+      if (focus && focus !== document.body) return
       if (root.value?.closest('dialog')) return
       const button = action.value?.querySelector<HTMLElement>('button')
       if (button) button.focus()

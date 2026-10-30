@@ -118,6 +118,8 @@ export function useVerdictQueue(): VerdictQueue {
   const failures = ref(0)
   /** An answer came while this screen stood: the memory alone is an earlier visit's. */
   const answered = ref(false)
+  /** A card was rated on this screen: what it emptied, the person emptied themselves. */
+  const ratedHere = ref(false)
   /** The card on screen stays put while the person is on it, whatever a reload brings. */
   const shownId = ref<string | null>(null)
 
@@ -127,6 +129,7 @@ export function useVerdictQueue(): VerdictQueue {
     skips.value = id ? recallSkips(`${SKIPS_KEY}.${id}`) : []
     failure.value = null
     answered.value = false
+    ratedHere.value = false
     shownId.value = null
   }
 
@@ -240,11 +243,12 @@ export function useVerdictQueue(): VerdictQueue {
     // the person emptied it themselves, and a rating is on its way: then that is the news
     // (adversarial R4).
     if (failure.value && drafts.waiting.length === 0) return failure.value
-    // Empty is said of an answer this screen heard, or of a queue the person emptied themselves.
-    // The memory of an earlier visit, read while the fresh answer is on its way, told a newcomer
-    // back from «Покупки» with a purchase to record one first, its «К покупкам» under the thumb
-    // while the card came (MOL-214, adversarial А1).
-    const heard = answered.value || drafts.waiting.length > 0
+    // Empty is said of an answer this screen heard, or of a queue the person emptied themselves —
+    // by a rating made here, on its way or arrived (adversarial Б1). The memory of an earlier
+    // visit, read while the fresh answer is on its way, told a newcomer back from «Покупки» with a
+    // purchase to record one first, its «К покупкам» under the thumb as the card came (MOL-214,
+    // adversarial А1).
+    const heard = answered.value || ratedHere.value || drafts.waiting.length > 0
     return remembered.value && heard ? 'empty' : 'loading'
   })
 
@@ -300,6 +304,7 @@ export function useVerdictQueue(): VerdictQueue {
       rememberSkips()
     }
     drafts.save(card, score, review)
+    ratedHere.value = true
     shownId.value = null
   }
 

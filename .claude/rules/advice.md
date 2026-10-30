@@ -636,7 +636,8 @@ a purchase recorded offline, not yet sent, makes no `bought` — a newcomer read
 нечего» until it lands, when no card could be shown anyway; and a first purchase written between the
 two statements answers an empty queue with `bought: true` — «Всё оценено» for one answer (self-review
 Н-1). **Empty is said only of an answer this screen heard** (adversarial А1), or of a queue the
-person emptied themselves with a rating on its way: the queue an earlier visit left on the phone,
+person emptied themselves by a rating made here — on its way or arrived, since a rating that lands
+before the first answer leaves the waiting list and must not bring the skeleton back (Б1): the queue an earlier visit left on the phone,
 shown while the fresh answer was on its way, told a newcomer back from «Покупки» with a purchase to
 record one first, «К покупкам» under the thumb as the card came. With such a memory and nothing
 heard yet, the screen draws the skeleton; a failure still turns it into «offline» or the error.
