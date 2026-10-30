@@ -93,7 +93,11 @@ Open Food Facts is MOL-162.
 - **The torch is offered only where the track has one** (`getCapabilities().torch`, Р-3): bad light
   at the shelf is the product's premise, and a button that does nothing is worse than none. A track
   with no `getCapabilities` (Firefox before 132) is a camera without a torch, not a camera that
-  failed (adversarial Г).
+  failed (adversarial Г). **Off it is a ring, on a fill** (Ф-5, MOL-211, owner's В-2 «а»): a circle of
+  `--viewfinder-dim` ringed in `--viewfinder-ink`, and filled with the ink, its `flashlight-off` in
+  `--viewfinder-ground`, with `aria-pressed`. The viewfinder's colours, not the page's: the handoff's
+  `surface-2` off and the ink on are both near-white in the light scheme, and the glyph alone told them
+  apart. A departure from frame 2a, named.
 - **A code taken by the camera buzzes** where the phone can (`navigator.vibrate`, not on iPhone) —
   no sound, and not for digits typed by hand, where the person is looking already (review С-11).
 

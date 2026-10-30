@@ -433,10 +433,32 @@ export default defineComponent({
   text-align: center;
 }
 
-.torch {
+/* Off a ring, on a fill (Ф-5, MOL-211 В-2): in the viewfinder's own colours, dark in both schemes. In the
+   page's — `surface-2` off, the ink on — the light scheme drew two near-white circles, told apart by the
+   glyph alone. Under the pointer it keeps its fill: a change there would read as the switch. */
+.viewfinder .torch {
   position: absolute;
   top: var(--space-3);
   right: var(--space-3);
+  background: var(--viewfinder-dim);
+  box-shadow: inset 0 0 0 2px var(--viewfinder-ink);
+  color: var(--viewfinder-ink);
+
+  &[aria-pressed='true'] {
+    background: var(--viewfinder-ink);
+    box-shadow: none;
+    color: var(--viewfinder-ground);
+  }
+
+  @media (hover: hover) {
+    &:not(:disabled):hover {
+      background: var(--viewfinder-dim);
+    }
+
+    &[aria-pressed='true']:not(:disabled):hover {
+      background: var(--viewfinder-ink);
+    }
+  }
 }
 
 .typed,
