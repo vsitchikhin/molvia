@@ -128,7 +128,10 @@ test('says how to allow the camera when it is not allowed', async ({ page }) => 
 // self-review №2): refused again, «Check again»; allowed, «Type it in» over the viewfinder. In a real
 // engine, since the state's buttons come into the footer by a deferred `Teleport`. The reader is held
 // unloaded, or the code the camera films would close the sheet.
-test('the focus follows «Check again» to the footer that comes', async ({ page, context }) => {
+test('the focus follows «Check again» and «Scan» to the footer that comes', async ({
+  page,
+  context,
+}) => {
   let release = () => undefined as unknown
   await page.route(WASM, (route) => {
     release = () => route.abort().catch(() => undefined)
@@ -145,7 +148,15 @@ test('the focus follows «Check again» to the footer that comes', async ({ page
   await context.grantPermissions(['camera'])
   await page.keyboard.press('Enter')
   await expect(scanner(page).locator('video')).toBeVisible()
-  await expect(scanner(page).getByRole('button', { name: 'Type it in' })).toBeFocused()
+  const typing = scanner(page).getByRole('button', { name: 'Type it in' })
+  await expect(typing).toBeFocused()
+
+  // «Scan» of the digits goes with their footer the same way (round 2, В).
+  await page.keyboard.press('Enter')
+  await scanner(page).getByRole('button', { name: 'Scan', exact: true }).focus()
+  await page.keyboard.press('Enter')
+  await expect(scanner(page).locator('video')).toBeVisible()
+  await expect(typing).toBeFocused()
   release()
 })
 

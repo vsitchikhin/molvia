@@ -300,6 +300,8 @@ export default defineComponent({
     }
 
     function toCamera(): void {
+      // «Сканировать» goes with the digits' footer: the focus on it follows the camera (round 2, В).
+      if (footerHoldsFocus()) following = true
       typing.value = false
       void startCamera()
     }
@@ -348,33 +350,51 @@ export default defineComponent({
       })
     }
 
-    // A refusal turned where it stands — to the viewfinder after «Проверить снова», or to another
-    // refusal — takes the button the focus was on with it, and the focus fell to the page (self-review
-    // №2). It goes to the first button of the footer that came, «Ввести вручную» over a live viewfinder;
-    // only a focus that was in the footer, never one the person put somewhere of their own. No button of
-    // the footer outlives such a turn: a retry passes the viewfinder's own footer on its way.
+    // The focus on a button of the footer goes with it when the camera turns — «Проверить снова» or
+    // «Повторить» of a refusal, «Сканировать» of the digits (self-review №2, round 2 В) — and fell to the
+    // page. It follows where the camera settles: the first button of a refusal, «Ввести вручную» over a
+    // live viewfinder. Never the footer of a start still on its way (round 2, №5): a reader would hear
+    // «Ввести вручную» of a viewfinder gone the next moment. Only a focus that was in the footer, and never
+    // one the person put somewhere in the sheet meanwhile.
     const manual = ref<ComponentPublicInstance | null>(null)
+    let following = false
+    function footerHoldsFocus(): boolean {
+      const footer = sheet.value?.$el.querySelector(':scope > .footer')
+      return Boolean(footer?.contains(document.activeElement))
+    }
     watch(
       refusal,
       () => {
-        const dialog = sheet.value?.$el
-        const footer = dialog?.querySelector(':scope > .footer')
-        const focused = document.activeElement
-        if (!props.open || !dialog || !footer?.contains(focused)) return
-        // The state's buttons come into the footer by a deferred `Teleport`, a tick after the render.
-        void nextTick()
-          .then(() => nextTick())
-          .then(() => {
-            if (!props.open || typing.value) return
-            const into: unknown =
-              refusal.value === null
-                ? manual.value?.$el
-                : dialog.querySelector(':scope > .footer button')
-            if (into instanceof HTMLElement) into.focus()
-          })
+        if (props.open && footerHoldsFocus()) following = true
       },
       { flush: 'pre' },
     )
+    // Where the camera stands: a refusal, the live viewfinder, or nowhere yet while it starts.
+    const settled = computed(() => refusal.value ?? (camera.kind.value === 'live' ? 'live' : null))
+    watch([settled, () => props.open], () => {
+      if (!following) return
+      // Put away meanwhile: an opening later is another one, with nothing to follow.
+      if (!props.open) {
+        following = false
+        return
+      }
+      if (settled.value === null) return
+      following = false
+      // The state's buttons come into the footer by a deferred `Teleport`, a tick after the render.
+      void nextTick()
+        .then(() => nextTick())
+        .then(() => {
+          const dialog = sheet.value?.$el
+          const now = document.activeElement
+          if (!props.open || !dialog) return
+          if (now !== dialog && dialog.contains(now)) return
+          const into: unknown =
+            settled.value === 'live'
+              ? manual.value?.$el
+              : dialog.querySelector(':scope > .footer button')
+          if (into instanceof HTMLElement) into.focus()
+        })
+    })
 
     return {
       t,

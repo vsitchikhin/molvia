@@ -206,14 +206,15 @@ the camera will not come — and «Ввести вручную» a secondary bes
 now (review С-9). The reader's failure has words of its own: «another app holds the camera» sent the
 person to close apps that were not at fault (review С-10).
 
-**The focus follows the footer** (MOL-211, self-review №2; it was review С-2's price): after
-«Проверить снова» or «Повторить» the state goes or turns, its button with it, and the focus fell to the
-page. A focus that stood in the footer goes to the first button of the footer that came — refused
-again, «Проверить снова» or «Повторить»; allowed, «Ввести вручную» over the viewfinder — a tick after
-the deferred `Teleport` brings the state's buttons; one the person put elsewhere in the sheet stays. No
-button of the footer outlives such a turn — a retry passes the viewfinder's own footer on its way — so a
-focus on «Ввести вручную» of a refusal comes back on the next refusal's first. `e2e/scanner.spec` holds
-it in a real engine. Safari focuses no tapped button, so there nothing was in the footer to follow.
+**The focus follows the footer** (MOL-211, self-review №2, round 2; it was review С-2's price): «Проверить
+снова» and «Повторить» of a refusal, «Сканировать» of the digits go with their footer as the camera turns, and
+the focus on them fell to the page. A focus that stood in the footer then follows where the camera settles —
+refused, the refusal's first button; live, «Ввести вручную» over the viewfinder — a tick after the deferred
+`Teleport` brings the state's buttons. **Never the footer of a start still on its way** (round 2, №5): a retry
+passes the viewfinder's own footer while the camera starts, and a reader heard «Ввести вручную» of a viewfinder
+gone the next moment. One the person put somewhere in the sheet meanwhile stays; the sheet put away forgets it.
+`e2e/scanner.spec` holds it in a real engine. Safari focuses no tapped button, so there nothing was in the footer
+to follow.
 
 The text of «no permission» names both phones rather than guessing one from the user agent, which
 lies on an iPad (as MOL-132 Р-3).
