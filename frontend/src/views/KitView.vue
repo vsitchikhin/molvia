@@ -416,6 +416,13 @@
         :label="t('spending.sheet.details_title')"
         @click="sheetOpen = true"
       />
+      <!-- A note longer than two lines ends in «…» after the second (MOL-304, В-1 «а»). -->
+      <NavRow
+        field
+        :icon="IconCalendar"
+        :label="t('dev.kit.row_details_long')"
+        @click="sheetOpen = true"
+      />
       <AppNote>{{ t('dev.kit.note_plain') }}</AppNote>
       <AppNote tone="warn" :icon="IconAlert">{{ t('dev.kit.note_warn') }}</AppNote>
       <div class="row">

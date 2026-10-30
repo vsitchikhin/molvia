@@ -606,13 +606,20 @@ for (const locale of ['ru-RU', 'en-US'])
                   ? row.getBoundingClientRect().right - value.getBoundingClientRect().right
                   : null,
                 under,
+                inside:
+                  (row.querySelector('.words')?.getBoundingClientRect().right ?? Infinity) <=
+                  row.getBoundingClientRect().right,
               }
             }),
         )
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width)
         expect(rows.length).toBeGreaterThan(4)
-        for (const row of rows)
-          expect(row, row.text).toMatchObject({ labelCut: false, valueCut: false })
+        // A note longer than two lines ends in «…» after the second, inside its row (self-review №2: the
+        // clamp of a box in a flex item is WebKit's riskiest place, and only Chromium opened the spending sheet).
+        const note = rows.find((row) => /^(Вчера|Yesterday) · /.test(row.text))
+        expect(note).toMatchObject({ lines: 2, labelCut: true, inside: true })
+        for (const row of rows.filter((one) => one !== note))
+          expect(row, row.text).toMatchObject({ labelCut: false, valueCut: false, inside: true })
         // A row of one line, its value beside it, is as tall as before — to the hundredth: a row stands on a
         // fractional pixel in CI's Chromium, 51.99976 and 52.00024 (as the chips' rows, MOL-318).
         for (const row of rows.filter((one) => one.lines === 1 && !one.under))
