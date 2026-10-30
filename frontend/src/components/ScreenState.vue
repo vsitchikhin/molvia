@@ -229,7 +229,8 @@ export default defineComponent({
     // held the footer only from the next change of kind (adversarial А1, А2) — nor off an element drawn: a
     // wrapper whose button stands under its `v-if`, or a button under `v-show`, held an empty footer over
     // the sheet's «Сохранить» (round 2, А3; round 3, Г). And as the block's DOM changes, not as the block
-    // renders: a component in the slot redraws itself without it (round 3, Д). Watched in a sheet only.
+    // renders: a component in the slot redraws itself without it (round 3, Д) — and as the styles do.
+    // Watched in a sheet only.
     const acting = ref(false)
     function measureActing(): void {
       const block = actions.value
@@ -246,15 +247,29 @@ export default defineComponent({
       (block, _, onCleanup) => {
         measureActing()
         if (!block || strip?.sheet !== true) return
-        const observer = new MutationObserver(measureActing)
+        // The block's own attributes are ours — `docked` as it moves into the footer — and read again on
+        // them a rule hiding the button in the footer alone let the footer go, took it back, and so on
+        // for ever (round 4, Ж3). What the slot drew under it is read on every change.
+        const observer = new MutationObserver((records) => {
+          if (records.some((record) => record.type !== 'attributes' || record.target !== block)) {
+            measureActing()
+          }
+        })
         observer.observe(block, {
           childList: true,
           subtree: true,
           attributes: true,
           attributeFilter: ['style', 'hidden', 'class'],
         })
+        // A rule that starts or stops hiding a button changes nothing in the block: a stylesheet come or
+        // gone, a media query as the phone turns (round 4, Ж1, Ж2).
+        const styles = new MutationObserver(measureActing)
+        styles.observe(document.head, { childList: true, subtree: true, characterData: true })
+        window.addEventListener('resize', measureActing)
         onCleanup(() => {
           observer.disconnect()
+          styles.disconnect()
+          window.removeEventListener('resize', measureActing)
         })
       },
       { flush: 'post' },

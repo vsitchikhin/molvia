@@ -854,6 +854,73 @@ describe('ScreenState', () => {
           expect(sheetHeld()).toBe(false)
         })
 
+        // A rule of the stylesheet that starts or stops hiding the button, the block untouched (round 4).
+        describe('as the styles change', () => {
+          const upright = () => h('button', { class: 'upright' }, 'Type it in')
+          function rule(text: string): HTMLStyleElement {
+            const style = document.createElement('style')
+            style.className = 'turned'
+            style.textContent = text
+            document.head.append(style)
+            return style
+          }
+          afterEach(() => {
+            document.head.querySelectorAll('style.turned').forEach((style) => {
+              style.remove()
+            })
+          })
+
+          it('lets the footer go once a stylesheet hides the button (Ж1)', async () => {
+            const { sheetHeld } = inside({ sheet: true, kind: 'attention', slot: upright })
+            await settled()
+            expect(sheetHeld()).toBe(true)
+            rule('.upright { display: none; }')
+            await settled()
+            expect(sheetHeld()).toBe(false)
+          })
+
+          it('takes it once the stylesheet that hid the button goes (Ж2)', async () => {
+            const style = rule('.upright { display: none; }')
+            const { sheetHeld } = inside({ sheet: true, kind: 'attention', slot: upright })
+            await settled()
+            expect(sheetHeld()).toBe(false)
+            style.remove()
+            await settled()
+            expect(sheetHeld()).toBe(true)
+          })
+
+          // A media query switches with no node of the page changing: read on the window's resize.
+          it('reads it again as the window is resized', async () => {
+            const style = rule('')
+            const { sheetHeld } = inside({ sheet: true, kind: 'attention', slot: upright })
+            await settled()
+            expect(sheetHeld()).toBe(true)
+            style.sheet?.insertRule('.upright { display: none; }')
+            window.dispatchEvent(new Event('resize'))
+            await settled()
+            expect(sheetHeld()).toBe(false)
+          })
+
+          // Hidden in the footer alone: read again on its own move, it let the footer go, took it
+          // back, and so on for ever (Ж3). It stays held, the button out of sight — the rule's word.
+          it('must not take and let go without end for a rule that hides it in the footer alone (Ж3)', async () => {
+            const style = rule('.footer .upright { display: none; }')
+            // A brake: a loop of the observer's microtasks starves every timer, the test's own included.
+            const computed = window.getComputedStyle.bind(window)
+            const reads = vi
+              .spyOn(window, 'getComputedStyle')
+              .mockImplementation((element, pseudo) => {
+                if (reads.mock.calls.length === 200) style.remove()
+                return computed(element, pseudo)
+              })
+            const { sheetHeld } = inside({ sheet: true, kind: 'attention', slot: upright })
+            await settled()
+            await settled()
+            expect(reads.mock.calls.length).toBeLessThan(20)
+            expect(sheetHeld()).toBe(true)
+          })
+        })
+
         // The component redraws itself, the block not at all.
         it('follows a component of the slot that draws its button by itself (Д1, Д2)', async () => {
           const OwnButton = defineComponent({
