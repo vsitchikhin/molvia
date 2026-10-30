@@ -635,12 +635,15 @@ until it takes the version — as `ownScore` (MOL-202); a rollback forgets the q
 a purchase recorded offline, not yet sent, makes no `bought` — a newcomer reads «Оценивать пока
 нечего» until it lands, when no card could be shown anyway; and a first purchase written between the
 two statements answers an empty queue with `bought: true` — «Всё оценено» for one answer (self-review
-Н-1). **Empty is said only of an answer this screen heard** (adversarial А1), or of a queue the
-person emptied themselves by a rating made here — on its way or arrived, since a rating that lands
-before the first answer leaves the waiting list and must not bring the skeleton back (Б1): the queue an earlier visit left on the phone,
-shown while the fresh answer was on its way, told a newcomer back from «Покупки» with a purchase to
-record one first, «К покупкам» under the thumb as the card came. With such a memory and nothing
-heard yet, the screen draws the skeleton; a failure still turns it into «offline» or the error.
+Н-1). **Empty is said only of an answer this screen heard** (adversarial А1), or while a rating is on
+its way, whose notice is the news: the queue an earlier visit left on the phone, shown while the
+fresh answer was on its way, told a newcomer back from «Покупки» with a purchase to record one first,
+«К покупкам» under the thumb as the card came. With such a memory and nothing heard, the screen draws
+the skeleton; a failure still turns it into «offline» or the error. **The last remembered card rated
+here, its rating arrived before the answer, is «Проверяем, что ещё ждёт оценки…»** (owner's В-3 «а»):
+a line of 13 as «Отправляем оценку…», no circle and no action, until the answer — empty, «Всё
+оценено»; a card, the card. The skeleton there said «Загрузка…» after the person's own rating (Б1),
+and «Всё оценено» claimed what the server holds while a purchase since came as a card (В1).
 
 **The connection is one strip, over the card it is about** (Ф-14, MOL-181): a rating kept on the
 phone — «Без связи · оценка сохранена…» — else a list from memory, offline or «сервер не ответил» with

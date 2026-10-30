@@ -165,20 +165,47 @@ describe('useVerdictQueue', () => {
     expect(queue.phase.value).toBe('ready')
   })
 
-  it('Б1: the last remembered card rated here, its rating arrived before the first answer — empty, not loading', async () => {
+  it('Б1, В1: the last remembered card rated here and arrived before the first answer — checking, then the answer', async () => {
     pendingVerdicts.mockResolvedValue({ items: [milk], total: 1, bought: true })
     await mounted()
     unmountAll()
 
     freshPinia()
     rateItem.mockImplementation((itemId) => Promise.resolve(sent(itemId)))
-    pendingVerdicts.mockReturnValue(new Promise(() => undefined))
+    const answer = deferred<PendingVerdicts>()
+    pendingVerdicts.mockReturnValue(answer.promise)
     const queue = await mounted()
     expect(queue.phase.value).toBe('ready')
 
     queue.save(milk, 4, '')
     await flushPromises()
     expect(rateItem).toHaveBeenCalledTimes(1)
+    // Neither the skeleton after one's own rating (Б1) nor «all rated» before the answer (В1).
+    expect(queue.phase.value).toBe('checking')
+
+    // Bought since the memory was written: the answer brings it.
+    answer.resolve({ items: [bread], total: 1, bought: true })
+    await flushPromises()
+    expect(queue.phase.value).toBe('ready')
+    expect(queue.current.value?.itemId).toBe(bread.itemId)
+  })
+
+  it('В-3: checking ends at «all rated» when the answer is empty', async () => {
+    pendingVerdicts.mockResolvedValue({ items: [milk], total: 1, bought: true })
+    await mounted()
+    unmountAll()
+
+    freshPinia()
+    rateItem.mockImplementation((itemId) => Promise.resolve(sent(itemId)))
+    const answer = deferred<PendingVerdicts>()
+    pendingVerdicts.mockReturnValue(answer.promise)
+    const queue = await mounted()
+    queue.save(milk, 4, '')
+    await flushPromises()
+    expect(queue.phase.value).toBe('checking')
+
+    answer.resolve({ items: [], total: 0, bought: true })
+    await flushPromises()
     expect(queue.phase.value).toBe('empty')
   })
 

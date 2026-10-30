@@ -550,7 +550,8 @@
       "body": "Saved ratings are safe on the phone and will go on their own"
     },
     "returned": "The rating for «{name}» was not accepted — it comes back next",
-    "sending": "Sending the rating…"
+    "sending": "Sending the rating…",
+    "checking": "Checking what else is waiting to be rated…"
   },
   "money": {
     "approx": "≈ {amount}",

@@ -179,6 +179,29 @@ describe('VerdictsView', () => {
     expect(view.get('.question').text()).toContain('Молоко')
   })
 
+  it('В-3: the last remembered card rated, the answer still on its way — «checking», no state and no action', async () => {
+    pendingVerdicts.mockResolvedValue({ items: [milk], total: 1, bought: true })
+    ;(await render()).view.unmount()
+
+    rateItem.mockImplementation((itemId) => Promise.resolve(answered(itemId)))
+    let answer: (value: PendingVerdicts) => void = () => undefined
+    pendingVerdicts.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    const { view } = await render()
+    await rate(view, 4)
+
+    expect(view.text()).toContain(en.verdict.checking)
+    expect(view.text()).not.toContain(en.verdict.empty.title)
+    expect(view.find('.skeleton').exists()).toBe(false)
+    expect(view.findAll('button').map((found) => found.text())).not.toContain(
+      en.verdict.empty.action,
+    )
+
+    answer({ items: [bread], total: 1, bought: true })
+    await flushPromises()
+    expect(view.get('.question').text()).toContain('Хлеб')
+    expect(view.text()).not.toContain(en.verdict.checking)
+  })
+
   it('a server before MOL-214 says nothing of purchases — «everything is rated», as before', async () => {
     pendingVerdicts.mockResolvedValue({ items: [], total: 0 })
     const { view } = await render()

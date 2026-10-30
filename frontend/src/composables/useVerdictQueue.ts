@@ -11,8 +11,11 @@ import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 import type { Score } from '@/stores/verdictDrafts'
 import { reportFailure } from '@/failures'
 
-/** `idle` — no identity, so no queue to ask for. */
-export type QueuePhase = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'offline'
+/**
+ * `idle` — no identity, so no queue to ask for. `checking` — the person rated the last card the
+ * phone remembered, and what else waits on the server is not heard yet (MOL-214, В-3).
+ */
+export type QueuePhase = 'idle' | 'loading' | 'ready' | 'empty' | 'checking' | 'error' | 'offline'
 
 export interface VerdictQueue {
   readonly phase: ComputedRef<QueuePhase>
@@ -243,13 +246,16 @@ export function useVerdictQueue(): VerdictQueue {
     // the person emptied it themselves, and a rating is on its way: then that is the news
     // (adversarial R4).
     if (failure.value && drafts.waiting.length === 0) return failure.value
-    // Empty is said of an answer this screen heard, or of a queue the person emptied themselves —
-    // by a rating made here, on its way or arrived (adversarial Б1). The memory of an earlier
-    // visit, read while the fresh answer is on its way, told a newcomer back from «Покупки» with a
-    // purchase to record one first, its «К покупкам» under the thumb as the card came (MOL-214,
-    // adversarial А1).
-    const heard = answered.value || ratedHere.value || drafts.waiting.length > 0
-    return remembered.value && heard ? 'empty' : 'loading'
+    if (!remembered.value) return 'loading'
+    // Empty is said of an answer this screen heard, or while a rating is on its way — its notice
+    // is the news (R4). The memory of an earlier visit, read while the fresh answer is on
+    // its way, told a newcomer back from «Покупки» with a purchase to record one first, «К
+    // покупкам» under the thumb as the card came (MOL-214, adversarial А1).
+    if (answered.value || drafts.waiting.length > 0) return 'empty'
+    // The last card of that memory rated here and arrived: the person emptied what they saw, not
+    // what the server holds — a purchase since may be on its way as a card. Neither «Загрузка…»
+    // after their own rating (Б1) nor «Всё оценено» before the answer (В1): «Проверяем…» (В-3 «а»).
+    return ratedHere.value ? 'checking' : 'loading'
   })
 
   /** Shown from memory because a fresh answer could not be had — and why. */

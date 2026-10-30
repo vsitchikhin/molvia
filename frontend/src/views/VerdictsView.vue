@@ -124,6 +124,10 @@
         {{ t('verdict.sending') }}
       </p>
 
+      <!-- The last remembered card rated, and what else waits not heard yet: no «Всё оценено»
+           before the answer, no action it would take from under the thumb (owner's В-3 «а»). -->
+      <p v-else-if="phase === 'checking'" class="sending">{{ t('verdict.checking') }}</p>
+
       <!-- Empty says the truth of it (Ф-16, Е-5): nothing bought yet is not «all rated». Not while
            the last rating is still on its way — it may yet come back, and «all rated» said before
            it arrives would be taken back. -->
