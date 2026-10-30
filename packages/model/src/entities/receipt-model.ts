@@ -127,7 +127,7 @@ const articleOf = (article: string | null): string | null => {
   return /^[\p{L}\d_./-]{1,40}$/u.test(trimmed) ? trimmed : null
 }
 
-// the time as printed (MOL-305), its seconds dropped: «23:49:53» is 23:49
+// a time with its seconds is its minutes (MOL-305): «23:49:53» is 23:49, never none
 const clockOf = (time: string | null): string | null => {
   const [, hour = '', minute = ''] = /^(\d{2}):(\d{2})(?::[0-5]\d)?$/.exec(time?.trim() ?? '') ?? []
   return hour !== '' && Number(hour) < 24 && Number(minute) < 60 ? `${hour}:${minute}` : null
@@ -665,7 +665,7 @@ export function receiptTextOfModel(
   return {
     layout,
     tin,
-    // the date as printed, read in the card's order — never the model's guess of it (MOL-305)
+    // as asked, or as printed in the card's order (MOL-305); a short year the model put first is the window's
     date: printedDayOf(answer.date, reading),
     time: clockOf(answer.time),
     receiptNo: number,

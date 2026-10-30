@@ -133,7 +133,7 @@ describe('a model’s answer as the parse’s reading (MOL-272)', () => {
     expect([odd.tin, odd.date, odd.time, odd.receiptNo]).toEqual([null, null, null, null])
   })
 
-  it('reads the date as printed in the card’s order, never as the model ordered it (MOL-305)', () => {
+  it('reads a date as asked, or as printed in the card’s order (MOL-305)', () => {
     const day = (date: string | null) => read(answer({ date })).date
     // the terminal of a sole trader, MOL-227: «23-10-26 14:06» is 23 October 2026, which the model made 2023-10-26
     expect(day('23-10-26')).toBe('2026-10-23')
@@ -141,7 +141,7 @@ describe('a model’s answer as the parse’s reading (MOL-272)', () => {
     // the tills: a year of four digits last
     expect(day('04.10.2026')).toBe('2026-10-04')
     expect(day('8.10.2026')).toBe('2026-10-08')
-    // a year of four digits first is one order alone: an answer of prompt v5, or a model that did not do as asked
+    // a year of four digits first is one order alone: what prompt v5 asks for
     expect(day('2026-10-23')).toBe('2026-10-23')
     // must not: a day no calendar has, a date cut short, words
     expect(day('31-02-26')).toBeNull()

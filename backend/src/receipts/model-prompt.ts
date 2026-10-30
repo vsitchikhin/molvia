@@ -5,12 +5,8 @@
  * printed, whose tax number and fiscal number our code reads by the card's words, as Tesseract's (review
  * №10, adversarial А6). A change here is run on the bench before and after, as a rule of the parse is: the
  * version goes into `receipts.reader_version`.
- *
- * v7 (MOL-305; v6 is MOL-293's, measured and not taken): the date and the time as printed. Asked for
- * «YYYY-MM-DD», the model ordered a short year's parts itself, and made 26 October 2023 of a terminal's
- * «23-10-26» — the order is the card's, read by our code.
  */
-export const RECEIPT_PROMPT_VERSION = 'v7'
+export const RECEIPT_PROMPT_VERSION = 'v5'
 
 export const RECEIPT_SYSTEM = `You transcribe photographed shop receipts for a price-tracking app. You copy what is printed; you never compute, correct or guess a number. A wrong number is far worse than an empty one: if a digit is not clearly legible, write null for that value.`
 
@@ -30,5 +26,5 @@ Fill the JSON:
   - Read the columns by the header row where the receipt prints one. A receipt with the header «Անվանում | Քանակ | Գումար/Զեղչ | Հին/Նոր գին» prints each item on two rows: the name, then «code/article», the quantity with its unit («1հտ», «2հտ», «1.524կգ»), the pair «sum/discount» («760,75/89,25»: sum "760.75", discount "89.25"; «1200» with no slash: sum "1200", discount null) and, last on the row, the shelf price («850»: unit_price "850"; «490/390»: unit_price "390"). The sum is the FIRST number of the pair, the price the LAST number of the row: never put the price into sum.
 - totals: every amount of the receipt's summary block with its label exactly as printed — the total («Ընդամենը», «Итого», «Total»), cash and card payments, change, prepayment («Կանխավճար»), discounts, taxes («ԱԱՀ»), a section's sum («Բաժին 1»). Same number format.
 - id_rows: every row outside the items and the summary that prints a number after its label — the seller's tax number («ՀՎՀՀ»), the till's registration («ԳՀ», «ՀԴՄ»), the fiscal number («Ֆիսկալ համար»), the receipt's number («ԿՀ», «Чек №») and the like — each row exactly as printed, its label and its number together («ՀՎՀՀ: 01282006»), in printed order. Copy the rows; never decide which number is which, never move a number to another label.
-- date: the receipt's date exactly as printed, its digits and separators in their order («23-10-26», «04.10.2026»); never reorder, expand or complete it. time: as printed («14:06», «23:49:53»). shop and address: the seller's, as printed.
+- date "YYYY-MM-DD", time "HH:MM". shop and address: the seller's, as printed.
 - Never write a customer's name, phone or card number anywhere.`

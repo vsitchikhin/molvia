@@ -348,7 +348,7 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
   }, 30_000)
 })
 
-describe('the date a receipt prints, read by our code as printed (MOL-305)', () => {
+describe('the date a receipt prints, held to its photo’s window (MOL-305)', () => {
   // 10:06 UTC is 14:06 in Gyumri: the photo of 23 October 2026, as the owner's of IP Mobile
   const SHOT = '2026-10-23T10:06:00.000Z'
   const head = async (date: string | null, time: string | null, capturedAt = SHOT) => {
@@ -366,7 +366,8 @@ describe('the date a receipt prints, read by our code as printed (MOL-305)', () 
     return [row?.printedOn ?? null, row?.printedTime ?? null]
   }
 
-  it('reads a terminal’s «23-10-26 14:06» as 23 October 2026, day first by the card', async () => {
+  it('takes the date as asked, or as printed day first by the card', async () => {
+    expect(await head('2026-10-23', '14:06')).toEqual(['2026-10-23', '14:06'])
     expect(await head('23-10-26', '14:06')).toEqual(['2026-10-23', '14:06'])
     expect(await head('04.10.2026', '19:57:31')).toEqual(['2026-10-04', '19:57'])
   }, 30_000)
