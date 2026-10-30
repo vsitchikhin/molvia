@@ -480,11 +480,13 @@ test.describe('«Тут дешевле»', () => {
   test('says something else over frames too: one line to two (adversarial Е′)', async ({
     page,
   }) => {
-    const { word } = await boughtAtZovuni(page, undefined, 'Зовуни Плюс')
+    // The name sets the lines: at 13 (MOL-212) «Same as at …» stands 299 px of the 322 on a Pixel 7 and
+    // «Cheaper here — … was …» some 343 — one line, then two, 22 px either way.
+    const { word } = await boughtAtZovuni(page, undefined, 'Зовуни Плюс Север')
     await pick({ page, word })
     await sheet(page).getByLabel('How much').fill('1')
     await sheet(page).getByLabel('Price as on the tag').fill('540')
-    await expect(hint(page)).toContainText('Same as at Зовуни Плюс')
+    await expect(hint(page)).toContainText('Same as at Зовуни Плюс Север')
     await still(page)
 
     const motion = await priceFieldMoves(page, async () => {

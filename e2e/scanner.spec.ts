@@ -737,13 +737,25 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       await typeCode(page, code)
       const found = await sheetOf(page, name)
       await found.getByRole('button', { name: `Code ${code} — not this item?` }).click()
+      await expect(found.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible()
 
-      const unlink = await found.getByRole('button', { name: 'Unlink', exact: true }).boundingBox()
-      const cancel = await found.getByRole('button', { name: 'Cancel', exact: true }).boundingBox()
-      expect(unlink?.y).toBe(cancel?.y)
-      expect((unlink?.x ?? 0) + (unlink?.width ?? 0)).toBeLessThanOrEqual(cancel?.x ?? 0)
-      const wide = await found.evaluate((dialog) => dialog.scrollWidth - dialog.clientWidth)
-      expect(wide).toBeLessThanOrEqual(0)
+      // Read in one go once the question has risen in (`appear`): two reads during the rise stood
+      // the buttons 2–4 px apart on CI.
+      const row = await found.evaluate(async (dialog) => {
+        const rising = dialog
+          .getAnimations({ subtree: true })
+          .filter((motion) => motion.effect?.getComputedTiming().endTime !== Infinity)
+        await Promise.all(rising.map((motion) => motion.finished))
+        const [unlink, cancel] = [...dialog.querySelectorAll('.detach-actions button')].map(
+          (button) => button.getBoundingClientRect(),
+        )
+        return {
+          sameRow: unlink?.top === cancel?.top,
+          apart: (unlink?.right ?? Infinity) <= (cancel?.left ?? 0),
+          wide: dialog.scrollWidth - dialog.clientWidth,
+        }
+      })
+      expect(row).toEqual({ sameRow: true, apart: true, wide: 0 })
     })
 
     test('«Unlink?»: the focus on «Cancel», back on «not this item?», and after the unlink never the body', async ({
