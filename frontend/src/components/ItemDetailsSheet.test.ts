@@ -243,17 +243,21 @@ describe('ItemDetailsSheet', () => {
     expect(document.activeElement?.textContent.trim()).toBe('К покупкам')
   })
 
-  // A button brings no keys, and «Отменить» of «Отвязать?» is where the focus waits (adversarial Р2-А1).
+  // A button or a unit's radio brings no keys, and «Отменить» of «Отвязать?» is where the focus waits
+  // (adversarial Р2-А1, Р3-А1).
   it.each([
     ['«Отменить» of «Отвязать?»', 'Отменить', true],
     ['«не этот товар?»', 'Код 4850001234562 — не этот товар?', false],
+    ['the unit «л»', 'radio:l', false],
   ] as const)('leaves %s in focus when the record goes', async (_, name, ask) => {
     const { view } = await render({ code: '4850001234562', focusQuantity: true })
     if (ask) {
       await button(view, 'Код 4850001234562 — не этот товар?').trigger('click')
       await flushPromises()
     }
-    const held = button(view, name).element as HTMLButtonElement
+    const held = (
+      name === 'radio:l' ? view.get('input[type="radio"][value="l"]') : button(view, name)
+    ).element as HTMLElement
     held.focus()
 
     currentTrip.mockResolvedValue(null)

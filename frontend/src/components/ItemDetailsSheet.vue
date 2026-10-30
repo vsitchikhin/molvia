@@ -170,6 +170,7 @@ import { useCheaperHint } from '@/composables/useCheaperHint'
 import type { HintRecord } from '@/composables/useCheaperHint'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useItemDetails } from '@/composables/useItemDetails'
+import { typedIn } from '@/composables/useKeyboardInset'
 import type { DetailsField, RetryPurchase } from '@/composables/useItemDetails'
 import { calendarDay } from '@/days'
 import { useRecentItemsStore } from '@/stores/recentItems'
@@ -460,12 +461,12 @@ export default defineComponent({
 
     // The record went while the sheet was up — finished on another device, the server says so as the
     // sheet asks: a field in focus would keep the keys up over a sheet with nothing to write, so the
-    // focus goes to «К покупкам», the one thing left to do (adversarial А3). A field only: a button
-    // brings no keys, and «Отменить» of «Отвязать?» is where the focus must wait (adversarial Р2-А1).
+    // focus goes to «К покупкам», the one thing left to do (adversarial А3). A field typed in only, by
+    // the sheet's own rule (`typedIn`): a button or a unit's radio brings no keys, and «Отменить» of
+    // «Отвязать?» is where the focus must wait (adversarial Р2-А1, Р3-А1).
     const leaveButton = ref<{ $el?: HTMLElement } | null>(null)
     watch(writeInto, async (into) => {
-      const held = document.activeElement
-      if (into !== null || !held?.matches('input, textarea') || !form.value?.contains(held)) return
+      if (into !== null || !form.value || !typedIn(form.value)) return
       await nextTick()
       leaveButton.value?.$el?.focus()
     })
