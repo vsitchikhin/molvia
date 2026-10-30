@@ -807,7 +807,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   nothing new; **a retry that failed the same way is still an answer** (C1, review С-7, adversarial
   А4): the screen counts its failed answers in `attempt`, and a new one says the same words again —
   the strip stays through the retry, so nothing else would. **Gone with the focus on «Повторить», it gives it to the
-  title** (MOL-194, Б1), as a full error does: the retry answered is exactly when it goes. Not in a
+  title** (MOL-194, Б1), as a full error does: the retry answered is exactly when it goes. **And so
+  when the strip stays and only its button goes** (MOL-214, adversarial А2) — a retry failed offline
+  turns `unanswered` to `offline`, which draws none: the focus goes to a button standing in its place,
+  else to the title; one elsewhere stays where it is. Not in a
   sheet — the page under it is inert and a sheet's title takes no focus; there it falls as before, a
   price. «From
   memory» has two forms only: `ScreenState` when there is no answer, the strip when an old one is
