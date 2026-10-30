@@ -310,9 +310,12 @@ export async function receiptOfOwner(
   // a total proves the receipt's sum, never whose figure is right: it points at a price only where the price is all the
   // sum there is — the one line of the receipt, one piece with no discount, nothing sent to the card. Beside another
   // line, a weight, a count or a cashback the other half of a misread hides, and the memory that would vouch for them
-  // may be a shelf price gone (MOL-314, owner's В-4 «а» and В-5 «б» after three rounds of review)
+  // may be a shelf price gone (MOL-314, owner's В-4 «а» and В-5 «б» after three rounds of review). And only as the
+  // model read it: Tesseract misreads any digit of the till, in the line and the total's two places alike — «1Հտ 650
+  // 650» under 650 twice for 550 (adversarial Г1, А2) — so its total vouches for no price (owner, review round 5)
   const [only] = lines
   const pointedAt =
+    found.byModel &&
     receipt.balanced &&
     lines.length === 1 &&
     found.cashback === null &&

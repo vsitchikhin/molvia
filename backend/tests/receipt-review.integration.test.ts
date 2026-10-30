@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   RECEIPT_CASHBACK_HEADER,
+  RECEIPT_MODEL,
   RECEIPT_PAID_BY_HEADER,
   RECEIPT_PACK_HEADER,
   RECEIPT_REPAIRED_HEADER,
@@ -129,6 +130,8 @@ async function review(actorId: string, id: string) {
 }
 
 const milkWord = { kind: 'sku' as const, key: '1163909' }
+/** Read by the model (MOL-272): the one reader whose total vouches for a price (MOL-314, review round 5). */
+const byModel = { readerVersion: `${RECEIPT_MODEL}@v5` }
 const amd = (drams: number) => ({ minor: BigInt(drams * 100), currency: 'AMD' as const })
 
 describe('the shops’ memory (Р-2)', () => {
@@ -461,18 +464,26 @@ describe('the review of a receipt', () => {
       { kind: 'sku', key: '1110004', itemId: butter, price: amd(550) },
     ])
     const line = { printed: 'Կարագ «Օրինակ»', sku: '1110004', price: 650, sum: 650 }
-    const remembered = async (balanced: boolean) =>
+    const remembered = async (balanced: boolean, readerVersion = byModel.readerVersion) =>
       (
         await review(
           me,
-          await parsedReceipt(me, [line], { totalMinor: 65_000n, balanced, layout: 'class' }),
+          await parsedReceipt(me, [line], {
+            totalMinor: 65_000n,
+            balanced,
+            layout: 'class',
+            readerVersion,
+          }),
         )
       ).lines[0]?.rememberedPrice
     expect(await remembered(true)).toBeNull()
     expect(await remembered(false)).toEqual(amd(550))
+    // Tesseract misreads a digit in the line and in both places of the total alike (adversarial Г1): its total
+    // vouches for no price, and the hint stands
+    expect(await remembered(true, 'tesseract 5.5.0 · hye+rus+eng')).toEqual(amd(550))
 
     // a line the check took the price off keeps the memory as its hint (MOL-291)
-    const id = await parsedReceipt(me, [line], { totalMinor: 65_000n, balanced: true })
+    const id = await parsedReceipt(me, [line], { totalMinor: 65_000n, balanced: true, ...byModel })
     await db.update(receiptLines).set({ priceMinor: null }).where(eq(receiptLines.receiptId, id))
     expect((await review(me, id)).lines[0]?.rememberedPrice).toEqual(amd(550))
   }, 10_000)
@@ -497,7 +508,7 @@ describe('the review of a receipt', () => {
               butterLine,
               { printed: 'Պանիր «Օրինակ»', sku: '1110005', price: cheesePrice, sum: cheesePrice },
             ],
-            { totalMinor: BigInt(total * 100), balanced: true },
+            { totalMinor: BigInt(total * 100), balanced: true, ...byModel },
           ),
         )
       ).lines.map((line) => line.rememberedPrice)
@@ -518,15 +529,17 @@ describe('the review of a receipt', () => {
       totalMinor: 70_400n,
       cashbackMinor: 5_400n,
       balanced: true,
+      ...byModel,
     })
     expect((await review(me, carded)).lines[0]?.rememberedPrice).toEqual(amd(550))
 
     // one line, but the total proves its sum, not how it splits (adversarial В1, owner's В-5 «б»): a weight, a count
-    // or a discount may hold the other half — 0,6 kg × 5 000 copied «0,5 × 6 000» meets the same 3 000
+    // or a discount may hold the other half — adversarial В1's paper: 0,6 kg × 5 000 copied «0,5 × 6 000», one 3 000
     const split = async (over: Partial<typeof receiptLines.$inferInsert>, total: number) => {
       const id = await parsedReceipt(me, [butterLine], {
         totalMinor: BigInt(total * 100),
         balanced: true,
+        ...byModel,
       })
       if (Object.keys(over).length > 0) {
         await db.update(receiptLines).set(over).where(eq(receiptLines.receiptId, id))
