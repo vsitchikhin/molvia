@@ -1,7 +1,18 @@
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, nextTick, ref, shallowRef, watch, type VNodeArrayChildren } from 'vue'
+import {
+  defineComponent,
+  h,
+  nextTick,
+  ref,
+  shallowRef,
+  vShow,
+  watch,
+  withDirectives,
+  type VNode,
+  type VNodeArrayChildren,
+} from 'vue'
 import IconPlus from '~icons/mdi/plus'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconAttention from '~icons/mdi/alert-outline'
@@ -654,6 +665,8 @@ describe('ScreenState', () => {
       inline?: boolean
       kind?: 'error' | 'attention'
       action?: boolean
+      /** The `#action` slot as a screen writes it, in place of the plain button of `action`. */
+      slot?: () => VNode | null
     }
 
     function inside(options: Inside = {}) {
@@ -685,7 +698,11 @@ describe('ScreenState', () => {
                   flow: options.flow,
                   inline: options.inline,
                 } as never,
-                options.action ? { action: () => h('button', 'Type it in') } : undefined,
+                options.slot
+                  ? { action: options.slot }
+                  : options.action
+                    ? { action: () => h('button', 'Type it in') }
+                    : undefined,
               )
               return h('div', [
                 options.sheet ? h(Sheet, () => state) : state,
@@ -797,6 +814,66 @@ describe('ScreenState', () => {
         await nextTick()
         expect(sheetHeld()).toBe(true)
         expect(words('.footer')).toEqual(['Type it in'])
+      })
+
+      // A button shown, read off the DOM as it changes (round 3 of the adversarial review, Г and Д).
+      describe('holds it only for a button shown, whoever draws it', () => {
+        const shown = ref(false)
+        // The MutationObserver answers after the DOM changed: a task, past the ticks.
+        async function settled(): Promise<void> {
+          await nextTick()
+          await new Promise((resolve) => setTimeout(resolve, 0))
+          await nextTick()
+        }
+        beforeEach(() => {
+          shown.value = false
+        })
+
+        it('must not take it for a wrapper whose button is not drawn (Г1)', async () => {
+          const slot = () =>
+            h('div', { class: 'wrap' }, shown.value ? h('button', 'Type it in') : null)
+          const { sheetHeld, words } = inside({ sheet: true, kind: 'attention', slot })
+          await settled()
+          expect(sheetHeld()).toBe(false)
+          shown.value = true
+          await settled()
+          expect(sheetHeld()).toBe(true)
+          expect(words('.footer')).toEqual(['Type it in'])
+        })
+
+        it('must not take it for a button hidden by `v-show` (Г2)', async () => {
+          const slot = () => withDirectives(h('button', 'Type it in'), [[vShow, shown.value]])
+          const { sheetHeld } = inside({ sheet: true, kind: 'attention', slot })
+          await settled()
+          expect(sheetHeld()).toBe(false)
+          shown.value = true
+          await settled()
+          expect(sheetHeld()).toBe(true)
+          shown.value = false
+          await settled()
+          expect(sheetHeld()).toBe(false)
+        })
+
+        // The component redraws itself, the block not at all.
+        it('follows a component of the slot that draws its button by itself (Д1, Д2)', async () => {
+          const OwnButton = defineComponent({
+            setup: () => () => (shown.value ? h('button', 'Type it in') : null),
+          })
+          const { sheetHeld, words } = inside({
+            sheet: true,
+            kind: 'attention',
+            slot: () => h(OwnButton),
+          })
+          await settled()
+          expect(sheetHeld()).toBe(false)
+          shown.value = true
+          await settled()
+          expect(sheetHeld()).toBe(true)
+          expect(words('.footer')).toEqual(['Type it in'])
+          shown.value = false
+          await settled()
+          expect(sheetHeld()).toBe(false)
+        })
       })
 
       it('lets the footer go with the block', async () => {

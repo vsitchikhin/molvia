@@ -74,7 +74,6 @@ import {
   nextTick,
   onBeforeUnmount,
   onMounted,
-  onUpdated,
   ref,
   watch,
   watchEffect,
@@ -225,16 +224,41 @@ export default defineComponent({
     const strip = useStateStrip()
     const me = Symbol('screen-state')
     // In a sheet a state with buttons of its own holds the footer too — the scanner's «Нет доступа к
-    // камере» (MOL-211). Whether it has any is read off what its `#action` drew, after every render:
-    // the slot is no reactive source — a button come later or gone with the kind unchanged held the
-    // footer only from the next change of kind (adversarial А1, А2) — and a slot given is not a button
-    // drawn: one under its own `v-if` held an empty footer over the sheet's «Сохранить» (round 2, А3).
+    // камере» (MOL-211). Whether it has any is read off its block of actions: a button there that is shown.
+    // Not off the slot, which is no reactive source — a button come later or gone with the kind unchanged
+    // held the footer only from the next change of kind (adversarial А1, А2) — nor off an element drawn: a
+    // wrapper whose button stands under its `v-if`, or a button under `v-show`, held an empty footer over
+    // the sheet's «Сохранить» (round 2, А3; round 3, Г). And as the block's DOM changes, not as the block
+    // renders: a component in the slot redraws itself without it (round 3, Д). Watched in a sheet only.
     const acting = ref(false)
     function measureActing(): void {
-      acting.value = (actions.value?.childElementCount ?? 0) > 0
+      const block = actions.value
+      acting.value = [...(block?.querySelectorAll('button') ?? [])].some((button) => {
+        for (let node: Element | null = button; node && node !== block; node = node.parentElement) {
+          // `hidden` and a class that hides are a `display: none` too, as the browser computes it.
+          if (getComputedStyle(node).display === 'none') return false
+        }
+        return true
+      })
     }
-    onMounted(measureActing)
-    onUpdated(measureActing)
+    watch(
+      actions,
+      (block, _, onCleanup) => {
+        measureActing()
+        if (!block || strip?.sheet !== true) return
+        const observer = new MutationObserver(measureActing)
+        observer.observe(block, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['style', 'hidden', 'class'],
+        })
+        onCleanup(() => {
+          observer.disconnect()
+        })
+      },
+      { flush: 'post' },
+    )
     watchEffect(() => {
       if (!strip) return
       const holds = props.kind === 'error' || (strip.sheet && acting.value)
