@@ -479,7 +479,7 @@ describe('the review of a receipt', () => {
 
   // MOL-314, owner's В-4 «а» (adversarial А1, Б1–Б3): a total proves the sum, never whose figure is right — it
   // points at a line only where that line is all of it
-  it('hints over a proven receipt of more than one line, or one that sent a discount to the card', async () => {
+  it('hints over a proven receipt of more than one line, a cashback, a weight, a count or a discount', async () => {
     const me = await insertActor(db)
     const butter = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
     const cheese = await insertItem(db, { name: 'Сыр', searchKey: 'syr' })
@@ -520,6 +520,24 @@ describe('the review of a receipt', () => {
       balanced: true,
     })
     expect((await review(me, carded)).lines[0]?.rememberedPrice).toEqual(amd(550))
+
+    // one line, but the total proves its sum, not how it splits (adversarial В1, owner's В-5 «б»): a weight, a count
+    // or a discount may hold the other half — 0,6 kg × 550 copied «0,5 × 650» meets the same 325
+    const split = async (over: Partial<typeof receiptLines.$inferInsert>, total: number) => {
+      const id = await parsedReceipt(me, [butterLine], {
+        totalMinor: BigInt(total * 100),
+        balanced: true,
+      })
+      if (Object.keys(over).length > 0) {
+        await db.update(receiptLines).set(over).where(eq(receiptLines.receiptId, id))
+      }
+      return (await review(me, id)).lines[0]?.rememberedPrice
+    }
+    expect(await split({ qtyMilli: 500n, qtyUnit: 'kg', sumMinor: 32_500n }, 325)).toEqual(amd(550))
+    expect(await split({ qtyMilli: 2_000n, sumMinor: 130_000n }, 1_300)).toEqual(amd(550))
+    expect(await split({ discountMinor: 650n, sumMinor: 64_350n }, 643.5)).toEqual(amd(550))
+    // one piece at its sum, as the first test: the price is the sum, and the total proves it
+    expect(await split({}, 650)).toBeNull()
   }, 10_000)
 
   // В6 of the adversarial review: a shelf price is someone's figure — the person's own always, other
