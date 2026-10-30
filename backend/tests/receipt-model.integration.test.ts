@@ -788,6 +788,41 @@ describe('the shop’s memory in the digits (MOL-291)', () => {
     expect(await reviewed([])).toEqual({ balanced: false, price: null, hint: amd(550) })
   }, 30_000)
 
+  // MOL-314, owner's В-2 «б» (adversarial А1): the faded font copied both ways, +100 and −100, under a total two places
+  // print — the receipt proven whole, every line as copied, and the total says nothing of which price is right
+  it('hints both old prices over two lines copied the opposite ways under a total they meet', async () => {
+    const item = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    const cheese = await insertItem(db, { name: 'Сыр', searchKey: 'syr' })
+    const me = await person(LATER)
+    await say(me.id, item)
+    await memory.remember(me.id, TIN, [
+      { kind: 'sku', key: '1110005', itemId: cheese, price: { minor: 66_000n, currency: 'AMD' } },
+    ])
+    const id = await queued(me)
+    const lines = [
+      { ...butter, unit_price: '650', discount: null, sum: '650' },
+      { ...butter, article: '1110005', unit_price: '560', discount: null, sum: '560' },
+    ]
+    const totals = [
+      { label: 'Ընդամենը', amount: '1210' },
+      { label: 'Վճարված է Առձեռն', amount: '1210' },
+    ]
+    await readAll(benchReader(), model(answer({ lines, totals })))
+    const [stored] = await db.select().from(receipts).where(eq(receipts.id, id))
+    expect(stored?.balanced).toBe(true)
+    const response = await app.inject({
+      method: 'GET',
+      url: `/receipts/${id}`,
+      headers: { cookie: me.cookie, 'x-molvia-today': '2026-10-22' },
+    })
+    expect(response.statusCode).toBe(200)
+    const shown = receiptDetailCodec.parse(response.json()).lines
+    expect(shown.map((line) => [line.price?.minor, line.rememberedPrice?.minor])).toEqual([
+      [65_000n, 55_000n],
+      [56_000n, 66_000n],
+    ])
+  }, 30_000)
+
   it('shows no price of other people’s that the line’s own sum does not hold, and doubts nothing by it (А2, review №4)', async () => {
     const item = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
     const cheese = await insertItem(db, { name: 'Сыр', searchKey: 'syr' })

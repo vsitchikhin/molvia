@@ -477,6 +477,40 @@ describe('the review of a receipt', () => {
     expect((await review(me, id)).lines[0]?.rememberedPrice).toEqual(amd(550))
   }, 10_000)
 
+  // MOL-314, owner's В-2 «б» (adversarial А1): a total proves the sum, never whose figure is right
+  it('hints over a proven receipt where the total does not point at the line — every other line the memory’s', async () => {
+    const me = await insertActor(db)
+    const butter = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
+    const cheese = await insertItem(db, { name: 'Сыр', searchKey: 'syr' })
+    await memory.remember(me, TIN, [
+      { kind: 'sku', key: '1110004', itemId: butter, price: amd(550) },
+    ])
+    const hints = async (cheesePrice: number, total: number) =>
+      (
+        await review(
+          me,
+          await parsedReceipt(
+            me,
+            [
+              { printed: 'Կարագ «Օրինակ»', sku: '1110004', price: 650, sum: 650 },
+              { printed: 'Պանիր «Օրինակ»', sku: '1110005', price: cheesePrice, sum: cheesePrice },
+            ],
+            { totalMinor: BigInt(total * 100), balanced: true },
+          ),
+        )
+      ).lines.map((line) => line.rememberedPrice)
+
+    // the cheese the memory does not know may hide the other half: 650 + 560 for 550 + 660
+    expect(await hints(560, 1_210)).toEqual([amd(550), null])
+    // both lines off the memory's by ±100 meet the total alike: neither is the one it points at
+    await memory.remember(me, TIN, [
+      { kind: 'sku', key: '1110005', itemId: cheese, price: amd(660) },
+    ])
+    expect(await hints(560, 1_210)).toEqual([amd(550), amd(660)])
+    // the cheese as remembered: the total points at the butter, gone up to 650
+    expect(await hints(660, 1_310)).toEqual([null, null])
+  }, 10_000)
+
   // В6 of the adversarial review: a shelf price is someone's figure — the person's own always, other
   // people's only with access and from three people
   it('names another person’s remembered price only with access and from three prices, their lower median', async () => {
