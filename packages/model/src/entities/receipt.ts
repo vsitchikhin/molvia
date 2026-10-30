@@ -585,12 +585,13 @@ export const RECEIPT_DATE_MONTHS = 6
  * The days a receipt the server took in at `arrivedAt` may print (MOL-305, owner's В-1, В-5 «а»): from the same day
  * six months before — the last day of a shorter month, 30 April for 31 October — to the day after, on the till's
  * clock, and never past the latest day on Earth then (`latestDay`, adversarial Р3-А7): «Записать» refuses a day past
- * it, so a date the window took was refused until 14:00 in Yerevan, and the queue set the receipt aside. Half a year, not a month: a photo picked from the gallery may be weeks old, and the swap of a day with a short
- * year it catches (the year 20ДД for 20ГГ) is eleven months off and more. **The server's moment, never the phone's**
- * (adversarial А3, Р2-А3): a battery that died sets a phone's clock to 1970, 2000 or its firmware's day, and a receipt
- * sent before the network set it right moved the window years back; a queue that sent it days late moves it by as
- * much, which half a year holds. A date outside is no date of the receipt, «неверно прочитанное хуже непрочитанного»:
- * the purchases go to the day it was sent, which the review says it is.
+ * it, so a date the window took was refused until 14:00 in Yerevan, and the queue set the receipt aside. Half a year,
+ * not a month: a photo picked from the gallery may be weeks old, and the swap of a day with a short year it catches
+ * (the year 20ДД for 20ГГ) is eleven months off and more. **The server's moment, never the phone's** (adversarial А3,
+ * Р2-А3): a battery that died sets a phone's clock to 1970, 2000 or its firmware's day, and a receipt sent before the
+ * network set it right moved the window years back; a queue that sent it days late moves it by as much, which half a
+ * year holds. A date outside is no date of the receipt, «неверно прочитанное хуже непрочитанного»: the purchases go to
+ * the day it was sent, which the review says it is.
  */
 export function receiptDateWindow(arrivedAt: Date, country: ReceiptCountry): ReceiptDateWindow {
   const arrived = receiptClockOf(arrivedAt, country).day
