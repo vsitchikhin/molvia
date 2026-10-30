@@ -157,7 +157,7 @@ first 80 letters (Р22), and the strict seam compares digits by a loop: two hund
 seventy milliseconds, not two seconds of CI.
 
 **What is printed at the head is checked as a calendar and a clock** (Р10, Р12, Р13): a date of
-the calendar from 2000 to the server's tomorrow, a time `HH:MM` — OCR makes up «01.01.0000», which
+the calendar from 2000 and within its sending's window (MOL-305, below), a time `HH:MM` — OCR makes up «01.01.0000», which
 Postgres refuses, «2099» and «99:99».
 
 ## The model reads (MOL-272)
@@ -188,7 +188,7 @@ neither it is «переснимите». Then **the one check, `verifiedReading
 everything after it is Tesseract's path: `readPartly`, the lines' items, the wire. No line is cut out for
 training (Р-4): there are no boxes.
 
-**The model's date is held by the photo's window, not by the prompt** (MOL-305, owner's В-4 «а»): asked for
+**The model's date is held by the sending's window, not by the prompt** (MOL-305, owner's В-4 «а»): asked for
 «YYYY-MM-DD» (v5), the model orders a short year's parts itself — a sole trader's terminal prints «23-10-26 14:06»
 (MOL-227), the bench's nine «04-10-26» came back right, and production's of 23.10.2026 came back 2023-10-26: the
 trip three years back, at the rate of 2023, on no account, `firstSpentDay` in 2023. **Asking for the date as printed
@@ -196,23 +196,33 @@ cost the lines** (v7, three runs against three of v5 on the same photos, `status
 fields 789, 669, 731 right, 3, 0, 1 made up, against v5's 801, 833, 827 and 0, 4, 1 — every run of it below the
 worst of v5, as v6 of MOL-293 was; the figures copied were as many, and receipts lost being proven whole (am-44's 39
 lines in one run, am-26's in two) — and one date came back in words, «07 октября 2026», which no rule reads. So v5
-stays, and **the window catches the swap**: «ДД-ММ-ГГ» read year first is the year 20ДД, outside a month of the
-photo unless ДД = ГГ — and then the swap is the same day. `printedDayOf` reads what the model writes — a year of four
-digits first, or the parts in the card's order (`dateOrder`, Armenia's day first), the rule `DEPARTMENT_DATE` reads
-Tesseract's by, one `calendarDayOf` under both — and a time with its seconds is its minutes («23:49:53» was none).
-**The price, named:** a receipt whose parts the model swaps goes to the photo's day, not the paper's — the same day
-unless it was shot later, and said «день снимка» on the review.
+stays, and **the window catches the swap of a day and a short year**: «ДД-ММ-ГГ» read year first is the year 20ДД,
+eleven months and more from the day it was sent unless ДД = ГГ — and then the swap is the same day. **Not that of a day
+and a month** (adversarial А1): «10-11-26» read month first is 11 October, inside the window, as on master — whether
+the model does it is not measured; the bench has no such date. `printedDayOf` reads what the model writes — a year of
+four digits first, or the parts in the card's order (`dateOrder`, Armenia's day first), the rule `DEPARTMENT_DATE`
+reads Tesseract's by, one `calendarDayOf` under both — and a time with its seconds is its minutes («23:49:53» was none).
+**The price, named:** a receipt whose day and year the model swaps goes to the day it was sent, not the paper's — the
+same day unless it was sent later, and said «день отправки» on the review.
 
-**A date far from its photo is no date of the receipt, for either reader** (MOL-305, owner's В-1 «а»):
-`receiptDateWindow` — from the same day of the photo's month before, the last day of a shorter month («31.03» →
-«28.02»), to the photo's day + 1 on the till's clock, never past the server's tomorrow; `headOf` holds both readers to
-it. Outside, the receipt has no date and no time — a time without its day dates nothing — and the review takes the
-photo's day and says so, «23 окт., день снимка» (В-2 «а»); a day not of this year is printed with its year. **Why a
-month and not a count of days**: the model's own mistakes with a date are a year for a day (the case above) and a
-month misread (am-05c of the bench: 09 as 03 and as 01, months back), while a receipt kept in a pocket and shot a week
-or two later is a person's ordinary day. **The prices, named:** a receipt shot more than a month after its day goes to
-the photo's day unless the person picks the printed one in «Где купили?»; a digit misread within the window — a day
-28 as 23, a month 10 as 09 on a day not before the photo's — passes as before, and only the eye on the review catches it.
+**A date far from its sending is no date of the receipt, for either reader** (MOL-305, owner's В-1, В-5 «а»):
+`receiptDateWindow` — from the same day six months before the sending (`RECEIPT_DATE_MONTHS`), the last day of a
+shorter month («31.10» → «30.04»), to the sending's day + 1 on the till's clock, never past the server's tomorrow;
+`headOf` holds both readers to it. Outside, the receipt has no date and no time — a time without its day dates nothing
+— and the review takes the day it was sent and says so wherever that day is shown: «23 окт., день отправки» on the line
+of the place, and «23 октября, день отправки» in «Где купили?» (В-2 «а», adversarial А4) — while the day is that day,
+so a «Готово» that left it so chose nothing; a day not of this year is printed with its year. **From the sending, and
+said so** (adversarial А2): `captured_at` is the moment of «Отправить чек», not of the photo — one picked from the
+gallery may be weeks old, and neither its file's moment nor its EXIF is read (iOS gives the moment of the pick, and
+the photo is drawn anew without EXIF). **Why half a year** (В-5 «а», after the review; В-1 said a month): the swap of a
+day and a year is eleven months off and more, so half a year still catches every one, while a receipt kept in a pocket
+or a week of photos sent at the weekend a month later keeps its date. **A phone's clock is believed only where a phone
+could have lived** (`isDeviceTime`, adversarial А3): a moment before 2000 — a battery that died — or past the server's
+tomorrow is the server's moment of reading instead, which an empty window and a trip in 1970 came of. **The prices,
+named:** a receipt sent more than half a year after its day goes to the day it was sent unless the person picks the
+printed one in «Где купили?»; a month misread one to five months back passes (am-05c of the bench, 09 as 03, stands on
+the edge; as 01, outside); a clock a few days behind moves the window by as much — a real date after it is none; and a
+digit misread within the window — a day 28 as 23 — passes as before, and only the eye on the review catches it.
 
 **A figure is read in every spelling the model writes it** (MOL-294): thousands grouped by a space, a no-break or a
 narrow one («1 000,00»), a comma for the point where it is the only one and no point stands («0,50»), and a minus

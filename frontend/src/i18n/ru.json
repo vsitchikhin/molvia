@@ -2327,7 +2327,7 @@
       "place_line": "{city} · ИНН {inn} · {day}",
       "place_line_time": "{city} · ИНН {inn} · {day}, {time}",
       "place_line_no_tin": "{city} · {day}",
-      "photo_day": "{day}, день снимка",
+      "sent_day": "{day}, день отправки",
       "place_missing": "Место не прочитали · указать",
       "count_hint": "{count} · тап — поправить",
       "tag_new": "новый товар",

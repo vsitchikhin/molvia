@@ -331,6 +331,7 @@
       :proposed="detail.receipt.header?.shop ?? null"
       :read="!!detail.receipt.place && !placeChosen"
       :day="day"
+      :sent-day="sentDay"
       :action="recordAfterPlace ? recordLabel : null"
       :on-closed="placeClosed"
       @chosen="choosePlace"
@@ -546,6 +547,9 @@ export default defineComponent({
     const day = computed(() =>
       detail.value ? reviewDay(detail.value, draft.value, taken.value) : taken.value,
     )
+    // no date of the receipt — none read, or none it could print (MOL-305): the day it was sent stands in, said as
+    // such wherever the day is shown while it is that day — a «Готово» that left it so chose nothing
+    const sentDay = computed(() => (detail.value?.receipt.header?.date ? null : taken.value))
     const shownTotal = computed<Money | null>(
       () => draft.value?.total ?? detail.value?.receipt.total ?? null,
     )
@@ -655,19 +659,17 @@ export default defineComponent({
       if (!one || !place.value) return t('receipt.review.place_missing')
       const tin = one.receipt.header?.tin
       const time = one.receipt.header?.time
-      // no date of the receipt — none read, or none it could print (MOL-305) — and none chosen: the photo's day,
-      // said as such, so a person holding the paper sees which day the purchases go to
-      const photoDay = !draft.value?.purchasedOn && !one.receipt.header?.date
+      const sent = sentDay.value === day.value
       const words = {
         city: place.value.city,
         inn: tin ?? '',
-        day: photoDay ? t('receipt.review.photo_day', { day: dayOf(day.value) }) : dayOf(day.value),
+        day: sent ? t('receipt.review.sent_day', { day: dayOf(day.value) }) : dayOf(day.value),
         time: time ?? '',
       }
       if (!tin) return t('receipt.review.place_line_no_tin', words)
       // a Serbian seller's tax number is its ПИБ (MOL-232)
       const kind = byLink.value ? 'place_line_pib' : 'place_line'
-      return time && !placeChosen.value && !photoDay
+      return time && !placeChosen.value && !sent
         ? t(`receipt.review.${kind}_time`, words)
         : t(`receipt.review.${kind}`, words)
     })
@@ -984,6 +986,7 @@ export default defineComponent({
       place,
       placeChosen,
       day,
+      sentDay,
       shownTotal,
       suspect,
       checks,

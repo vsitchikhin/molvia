@@ -348,18 +348,20 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
   }, 30_000)
 })
 
-describe('the date a receipt prints, held to its photo’s window (MOL-305)', () => {
-  // 10:06 UTC is 14:06 in Gyumri: the photo of 23 October 2026, as the owner's of IP Mobile
+describe('the date a receipt prints, held to the window of its sending (MOL-305)', () => {
+  // 10:06 UTC is 14:06 in Gyumri: sent on 23 October 2026, as the owner's of IP Mobile
   const SHOT = '2026-10-23T10:06:00.000Z'
   const head = async (date: string | null, time: string | null, capturedAt = SHOT) => {
     const me = await person(LATER)
     const id = await queued(me, capturedAt)
     const answer: ModelReceipt = { ...ANSWER, date, time }
+    // read at 16:00 the same day, so the window stands still whatever day the suite runs on
     await readAll(
       benchReader(),
       fakeModel(() =>
         Promise.resolve({ kind: 'read', answer, costMicroUsd: 2_180, tokens: TOKENS }),
       ),
+      { now: () => new Date('2026-10-23T12:00:00.000Z') },
     )
     const row = await receiptOf(id)
     expect(row?.status).toBe('parsed')
@@ -373,32 +375,44 @@ describe('the date a receipt prints, held to its photo’s window (MOL-305)', ()
   }, 30_000)
 
   it('takes no date the model ordered year first three years before the photo, nor its time', async () => {
-    // what prompt v5 brought back of «23-10-26»: the purchases go to the photo's day, never 2023
+    // what prompt v5 brought back of «23-10-26»: the purchases go to the day it was sent, never 2023
     expect(await head('2023-10-26', '14:06')).toEqual([null, null])
     // read in the card's order, «26-10-23» is 26 October 2023 all the same
     expect(await head('26-10-23', '14:06')).toEqual([null, null])
   }, 30_000)
 
-  it('takes a date from the same day of the month before to the day after the photo’s, and no further', async () => {
-    expect(await head('23-09-26', '10:00')).toEqual(['2026-09-23', '10:00'])
-    expect(await head('22-09-26', '10:00')).toEqual([null, null])
+  it('takes a date from the same day six months before to the day after the sending’s, and no further (В-5 «а»)', async () => {
+    // a photo picked from the gallery weeks after the purchase keeps its date
+    expect(await head('20-09-26', '10:00')).toEqual(['2026-09-20', '10:00'])
+    expect(await head('23-04-26', '10:00')).toEqual(['2026-04-23', '10:00'])
+    expect(await head('22-04-26', '10:00')).toEqual([null, null])
     expect(await head('24-10-26', '10:00')).toEqual(['2026-10-24', '10:00'])
     // must not: a two-digit year that makes a day past the photo's is no date
     expect(await head('25-10-26', '10:00')).toEqual([null, null])
   }, 30_000)
 
   it('holds Tesseract’s reading to the same window', async () => {
-    // Tesseract reads am-05's moment as 01.10.2026 12:00: shot within the month after, its date; a day later, none
-    const byOcr = async (capturedAt: string) => {
+    // Tesseract reads am-05's moment as 01.10.2026 12:00: sent within half a year after, its date; a day later, none
+    const byOcr = async (sent: string) => {
       const me = await person(null)
-      const id = await queued(me, capturedAt)
-      await readAll(benchReader(), null)
+      const id = await queued(me, sent)
+      await readAll(benchReader(), null, { now: () => new Date(sent) })
       const row = await receiptOf(id)
       return [row?.printedOn ?? null, row?.printedTime ?? null]
     }
     expect(await byOcr('2026-10-08T16:00:00.000Z')).toEqual(['2026-10-01', '12:00'])
-    expect(await byOcr('2026-11-01T08:00:00.000Z')).toEqual(['2026-10-01', '12:00'])
-    expect(await byOcr('2026-11-02T08:00:00.000Z')).toEqual([null, null])
+    expect(await byOcr('2027-04-01T08:00:00.000Z')).toEqual(['2026-10-01', '12:00'])
+    expect(await byOcr('2027-04-02T08:00:00.000Z')).toEqual([null, null])
+    // must not: sent before the day it prints
+    expect(await byOcr('2026-09-29T08:00:00.000Z')).toEqual([null, null])
+  }, 30_000)
+
+  it('counts the window from the server’s moment where the phone’s clock lived through none (adversarial А3)', async () => {
+    // a clock reset to 1970 by a battery that died: the receipt's own date stands, read today
+    expect(await head('23-10-26', '14:06', '1970-01-01T00:00:00.000Z')).toEqual([
+      '2026-10-23',
+      '14:06',
+    ])
   }, 30_000)
 })
 

@@ -68,13 +68,9 @@ const TILL_WORDS: ReadonlySet<string> = new Set([
   ...TILL_KINDS_LATIN,
 ])
 
-// The latest day a receipt may print: the server's tomorrow, so no zone's today is refused.
-const latestPrinted = (): string =>
-  new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-
-// The days a receipt may print, from its photo's moment (MOL-305): one rule for both readers.
-const datesOf = (claimed: ClaimedReceipt): ReceiptDateWindow =>
-  receiptDateWindow(claimed.capturedAt, claimed.country, latestPrinted())
+// The days a receipt may print, from the moment it was sent (MOL-305): one rule for both readers.
+const datesOf = (deps: ReadReceiptsDeps, claimed: ClaimedReceipt): ReceiptDateWindow =>
+  receiptDateWindow(claimed.capturedAt, claimed.country, (deps.now ?? (() => new Date()))())
 
 /** Rows cut out per request: the reader takes 64; a long receipt's lines go in several. */
 const STRIPS_PER_REQUEST = 32
@@ -189,7 +185,7 @@ function headOf(
   return {
     tin: text.tin,
     printedOn,
-    // a time without its day dates nothing: the purchases go to the photo's day, never at its time (MOL-305)
+    // a time without its day dates nothing: the purchases go to the day it was sent, never at its time (MOL-305)
     printedTime: printedOn === null ? null : receiptTimeOf(text),
     receiptNo: text.receiptNo,
     totalMinor: moneyOfHundredths(text.totalHundredths, currency)?.minor ?? null,
@@ -311,7 +307,7 @@ async function readByModel(
     currency,
     [modelHeadRows(reading.answer)],
     modelPaidBy(photoReading, reading.answer),
-    datesOf(claimed),
+    datesOf(deps, claimed),
   )
   if (needsReshoot(text)) {
     const outcome: ReadOutcome = {
@@ -393,7 +389,7 @@ async function readByOcr(
     currency,
     readings,
     receiptPaidBy(photoReading, readings),
-    datesOf(claimed),
+    datesOf(deps, claimed),
   )
   if (needsReshoot(text))
     return { kind: 'failed', failure: 'reshoot', readerVersion: version, head }

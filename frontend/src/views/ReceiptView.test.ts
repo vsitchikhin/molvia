@@ -1095,7 +1095,7 @@ describe('ReceiptView of a receipt by its link (MOL-232)', () => {
     expect(view.text()).toContain('Secer kristal 1kg sunoko')
   })
 
-  it('says the year of a day not this year’s, and that a day not read off the receipt is the photo’s (MOL-305)', async () => {
+  it('says the year of a day not this year’s, and that a day not read off the receipt is the day it was sent (MOL-305)', async () => {
     const shown = detail()
     const line = async (header: Partial<typeof HEAD>) => {
       receipt.mockResolvedValue({
@@ -1113,25 +1113,36 @@ describe('ReceiptView of a receipt by its link (MOL-232)', () => {
     expect(await line({ date: '2023-10-26', time: '14:06' })).toBe(
       'Гюмри · ИНН 01234567 · 26 окт. 2023 г., 14:06',
     )
-    // none read, or none the receipt could print: the purchases go to the photo's day, said as such, with no time
+    // none read, or none the receipt could print: the purchases go to the day it was sent, said as such, with no time
     const photo = await line({ date: null, time: null })
-    expect(photo).toMatch(/^Гюмри · ИНН 01234567 · 1 окт\.( 2026 г\.)?, день снимка$/)
+    expect(photo).toMatch(/^Гюмри · ИНН 01234567 · 1 окт\.( 2026 г\.)?, день отправки$/)
     // must not: a day read off the receipt is never the photo's
-    expect(await line({})).not.toContain('день снимка')
+    expect(await line({})).not.toContain('день отправки')
   })
 
-  it('names no photo’s day once the person chose the day (MOL-305)', async () => {
+  it('names the day it was sent while that is the day, «Готово» left so or not, and in «Где купили?» (MOL-305, adversarial А4)', async () => {
     const shown = detail()
     receipt.mockResolvedValue({
       ...shown,
-      receipt: { ...shown.receipt, header: { ...HEAD, date: null, time: null } },
+      receipt: { ...shown.receipt, place: null, header: { ...HEAD, date: null, time: null } },
     })
     const { view } = await render()
-    useReceiptDraftsStore().setPlace(
-      ID,
-      { id: PLACE, name: 'Ереван Сити', city: 'Гюмри' },
-      '2026-09-30',
+    // no place read: «Где купили?» is where the day is shown, and it says what that day is
+    const sheet = view.findComponent(ReceiptPlaceSheet)
+    expect(sheet.props('sentDay')).toBe('2026-10-01')
+    await view.find('.place-line').trigger('click')
+    await flushPromises()
+    expect(sheet.props('open')).toBe(true)
+    expect(document.body.textContent).toContain('1 октября, день отправки')
+    const place = { id: PLACE, name: 'Ереван Сити', city: 'Гюмри' }
+    // «Готово» with the day left as it was chose no day
+    useReceiptDraftsStore().setPlace(ID, place, '2026-10-01')
+    await flushPromises()
+    expect(view.find('.place-line').text()).toMatch(
+      /^Гюмри · ИНН 01234567 · 1 окт\.( 2026 г\.)?, день отправки$/,
     )
+    // must not: a day the person chose is no day it was sent
+    useReceiptDraftsStore().setPlace(ID, place, '2026-09-30')
     await flushPromises()
     expect(view.find('.place-line').text()).toMatch(
       /^Гюмри · ИНН 01234567 · 30 сент\.( 2026 г\.)?$/,

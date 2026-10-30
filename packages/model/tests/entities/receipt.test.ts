@@ -151,42 +151,60 @@ describe('the date a receipt prints', () => {
   })
 })
 
-describe('the days a receipt shot at a moment may print (MOL-305, В-1)', () => {
-  const far = '2099-12-31'
+describe('the days a receipt sent at a moment may print (MOL-305, В-1, В-5 «а»)', () => {
+  const now = new Date('2026-10-30T08:00:00Z')
   // 12:00 in Yerevan is 08:00 UTC
   const at = (day: string, time = '08:00') => new Date(`${day}T${time}:00Z`)
 
-  it('from the same day of the month before to the day after the photo’s', () => {
-    expect(receiptDateWindow(at('2026-10-23'), 'AM', far)).toEqual({
-      earliest: '2026-09-23',
+  it('from the same day six months before to the day after the sending’s', () => {
+    expect(receiptDateWindow(at('2026-10-23'), 'AM', now)).toEqual({
+      earliest: '2026-04-23',
       latest: '2026-10-24',
     })
   })
 
-  it('from the last day of a shorter month before: 28 February for 31 March, 29 in a leap year', () => {
-    expect(receiptDateWindow(at('2026-03-31'), 'AM', far).earliest).toBe('2026-02-28')
-    expect(receiptDateWindow(at('2028-03-31'), 'AM', far).earliest).toBe('2028-02-29')
-    expect(receiptDateWindow(at('2026-05-31'), 'AM', far).earliest).toBe('2026-04-30')
-    expect(receiptDateWindow(at('2026-03-28'), 'AM', far).earliest).toBe('2026-02-28')
+  it('from the last day of a shorter month: 30 April for 31 October, 28 February for 31 August, 29 in a leap year', () => {
+    expect(receiptDateWindow(at('2026-10-31'), 'AM', now).earliest).toBe('2026-04-30')
+    expect(receiptDateWindow(at('2026-08-31'), 'AM', now).earliest).toBe('2026-02-28')
+    expect(receiptDateWindow(at('2028-08-31'), 'AM', at('2028-09-01')).earliest).toBe('2028-02-29')
+    expect(receiptDateWindow(at('2026-08-28'), 'AM', now).earliest).toBe('2026-02-28')
   })
 
-  it('across a year: December of the year before for January, 1 January after 31 December', () => {
-    expect(receiptDateWindow(at('2027-01-15'), 'AM', far)).toEqual({
-      earliest: '2026-12-15',
+  it('across a year: July of the year before for January, 1 January after 31 December', () => {
+    expect(receiptDateWindow(at('2027-01-15'), 'AM', at('2027-01-15'))).toEqual({
+      earliest: '2026-07-15',
       latest: '2027-01-16',
     })
-    expect(receiptDateWindow(at('2026-12-31'), 'AM', far).latest).toBe('2027-01-01')
+    expect(receiptDateWindow(at('2026-12-31'), 'AM', at('2026-12-31')).latest).toBe('2027-01-01')
   })
 
-  it('counts the photo’s day on the till’s clock: 22:30 UTC is the next day in Yerevan', () => {
-    expect(receiptDateWindow(at('2026-10-22', '22:30'), 'AM', far)).toEqual({
-      earliest: '2026-09-23',
+  it('counts the sending’s day on the till’s clock: 22:30 UTC is the next day in Yerevan', () => {
+    expect(receiptDateWindow(at('2026-10-22', '22:30'), 'AM', now)).toEqual({
+      earliest: '2026-04-23',
       latest: '2026-10-24',
     })
   })
 
-  it('never past the server’s latest day: a phone’s clock is the phone’s', () => {
-    expect(receiptDateWindow(at('2027-05-01'), 'AM', '2026-10-24').latest).toBe('2026-10-24')
+  it('never past the server’s tomorrow', () => {
+    expect(receiptDateWindow(at('2026-10-30', '23:00'), 'AM', now).latest).toBe('2026-10-31')
+  })
+
+  it('takes the server’s moment for one no phone lived through: a clock reset to 1970, one run ahead (adversarial А3)', () => {
+    const own = receiptDateWindow(now, 'AM', now)
+    expect(own).toEqual({ earliest: '2026-04-30', latest: '2026-10-31' })
+    expect(receiptDateWindow(new Date('1970-01-01T00:00:00Z'), 'AM', now)).toEqual(own)
+    expect(receiptDateWindow(at('2027-12-01'), 'AM', now)).toEqual(own)
+    // must not: a phone a little ahead, within the day the server believes, is the phone's
+    expect(receiptDateWindow(at('2026-10-31', '07:00'), 'AM', now).latest).toBe('2026-10-31')
+  })
+
+  it('drops the swap of a day and a short year eleven months off and more, and lets that of a day and a month through — the named price (adversarial А1)', () => {
+    const on = (sent: string, date: string) =>
+      receiptDateOf({ ...receipt([]), date }, receiptDateWindow(at(sent), 'AM', at(sent)))
+    // «25-01-26» read year first is 2025-01-26: 364 days before the day it was sent, the nearest a swap comes
+    expect(on('2026-01-25', '2025-01-26')).toBeNull()
+    // «10-11-26» read month first is 11 October: within the window, as on master — the price
+    expect(on('2026-11-10', '2026-10-11')).toBe('2026-10-11')
   })
 })
 

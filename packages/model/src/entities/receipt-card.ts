@@ -117,7 +117,7 @@ export interface PhotoReading {
   /**
    * The order the tills print a date's parts in (MOL-305): Armenia's day first, «23-10-26», «04.10.2026». A date
    * written as printed is read in this order, never by a guess: asked for «YYYY-MM-DD», Haiku made «23-10-26» of
-   * 26 October 2023 — caught by the photo's window, since asking it for the date as printed cost the lines (v7).
+   * 26 October 2023 — caught by the window of its sending, since asking it for the date as printed cost the lines (v7).
    */
   readonly dateOrder: DateOrder
   readonly words: ReceiptWords
