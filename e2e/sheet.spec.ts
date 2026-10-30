@@ -928,7 +928,6 @@ test.describe('the sheet', () => {
   })
 })
 
-// The segment looks as in the handoff and still answers a thumb over the whole 44px (review Р-3).
 // A full state of a sheet holds its footer as an error holds a screen's strip (MOL-211, Ф-17): the
 // scanner's refusal, with its one way on, pinned at the sheet's bottom edge — on WebKit too, where
 // Safari draws the sheet. «No camera» is played by a `getUserMedia` that finds none.
@@ -966,6 +965,7 @@ test('a sheet’s full state stands its buttons in the pinned footer', async ({ 
   expect(footer.gap).toBeLessThanOrEqual(1)
 })
 
+// The segment looks as in the handoff and still answers a thumb over the whole 44px (review Р-3).
 test('a segment answers a tap anywhere over the track’s 44px', async ({ page }) => {
   await open(page, '/_kit')
   const segment = page
