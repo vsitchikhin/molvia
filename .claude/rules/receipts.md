@@ -1426,9 +1426,9 @@ its total vouches for no price, and its receipts keep every hint, as before. **T
 changed still reads «проверьте» on a receipt Tesseract read, on a receipt of more than one line — the same item twice in
 one purchase too — and on one line weighed, of a count or discounted; **one line the model copied with the line and its
 total misread alike by its 5↔6** (am-34's faded paper), in one place or in two, is shown as read with no hint: by the
-text it is the very butter gone up the rule is for, the price of В-1 «а» itself (owner, review round 5); and a receipt
-read before MOL-255 (20.10) and not recorded — its `balanced` then the parse's «met», not the check's — loses the hint
-too, until 17.11, on the owner's receipts alone. The log of a reading counts
+text it is the very butter gone up the rule is for, the price of В-1 «а» itself (owner, review round 5). A receipt read
+before MOL-255, whose `balanced` was the parse's «met», is Tesseract's: the model reads since MOL-272, a day after it.
+The log of a reading counts
 what the memory said, line by line — confirmed, put right, doubted (`rememberedConfirmed`, `rememberedRepaired`,
 `rememberedDoubted`, review №5) — never a price: the doubts are the price named, lines a changed shelf price emptied.
 
