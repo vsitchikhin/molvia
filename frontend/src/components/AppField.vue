@@ -261,6 +261,7 @@ export default defineComponent({
   background: var(--surface-2);
   transition:
     border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
     outline-color var(--dur-fast) var(--ease-out);
 
   &:focus-within {
