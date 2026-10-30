@@ -6,10 +6,11 @@
  * №10, adversarial А6). A change here is run on the bench before and after, as a rule of the parse is: the
  * version goes into `receipts.reader_version`.
  *
- * v6 (MOL-305): the date and the time as printed. Asked for «YYYY-MM-DD», the model ordered a short year's parts
- * itself, and made 26 October 2023 of a terminal's «23-10-26» — the order is the card's, read by our code.
+ * v7 (MOL-305; v6 is MOL-293's, measured and not taken): the date and the time as printed. Asked for
+ * «YYYY-MM-DD», the model ordered a short year's parts itself, and made 26 October 2023 of a terminal's
+ * «23-10-26» — the order is the card's, read by our code.
  */
-export const RECEIPT_PROMPT_VERSION = 'v6'
+export const RECEIPT_PROMPT_VERSION = 'v7'
 
 export const RECEIPT_SYSTEM = `You transcribe photographed shop receipts for a price-tracking app. You copy what is printed; you never compute, correct or guess a number. A wrong number is far worse than an empty one: if a digit is not clearly legible, write null for that value.`
 

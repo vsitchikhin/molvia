@@ -243,7 +243,7 @@ describe('the model that reads receipts (MOL-272)', () => {
     const one = reader.inputTokensMax([jpeg(750, 1)])
     expect(reader.inputTokensMax([jpeg(750, 1), jpeg(750, 2)])).toBe((one ?? 0) + 2)
     expect(reader.inputTokensMax([jpeg(10, 10), Buffer.from('no photo')])).toBeNull()
-    expect(reader.version).toBe('claude-haiku-5-5@v6')
+    expect(reader.version).toBe('claude-haiku-5-5@v7')
   })
 
   it('sends no part past the API’s image and no request past its whole, counted in base64 (review №3)', () => {
