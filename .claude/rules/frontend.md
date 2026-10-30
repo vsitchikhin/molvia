@@ -1405,9 +1405,11 @@ bottom: 0`), a sibling of the panel and as wide as the sheet — never a middle 
   it opens (`writeInto`), which is how it opens where the phone has not heard of a record the server holds.
   **A field filled as it opens is selected whole** (adversarial А2): a purchase amended, a refusal put
   right, a pack's size — at the caret after «1», «2» went to the server as 12 l and the price per litre a
-  twelfth; selected, the first digit replaces it. **A record gone under the sheet takes the focus off the
-  field** to «К покупкам» (А3): finished on another device, the server says so as the sheet asks, and the
-  keys stayed up over a sheet with nothing to write.
+  twelfth; selected (`setSelectionRange`, which WebKit on iOS keeps better than `select()`), the first digit
+  replaces it. **A record gone under the sheet takes the focus off a field** to «К покупкам» (А3): finished on
+  another device, the server says so as the sheet asks, and the keys stayed up over a sheet with nothing to
+  write. **A field only** (Р2-А1): a button brings no keys, and «Отменить» of «Отвязать?» is where the focus
+  waits.
   **The price, named:** on iOS the keys for a field focused by a script a microtask after the tap were not
   measured on a device — the owner checks it after the rollout; and a sheet found by a code opens on ×, the
   keys a tap on the field away, as before.

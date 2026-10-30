@@ -405,7 +405,7 @@ codes too, and a wrong one needs a way out (В-1, below).
   footer under «Записать» a finger took it at the shelf, and it goes for everyone with no «Вернуть».
   «Отвязать» is `danger-ghost`, as every destructive confirmation of the app, and the focus waits on
   «Отменить» (Р-15, review Л). **The question is a note on `--surface-2`, its two answers side by side where
-  both fit** (MOL-212, Ф-4, frame 4h): each as wide as its wider word, «Отвязываем…» held in its cell
+  both fit** (MOL-212, Ф-4, frame 4h): halves, never narrower than the wider word, «Отвязываем…» held in its cell
   (MOL-225), so the word of the work is never broken inside — two `block` halves broke it at 320 and 360
   (adversarial А1); where both do not fit — Russian at 320 — one stands under the other. The name in the
   question breaks rather than widening the sheet (MOL-318). **A block that takes itself away hands the focus
