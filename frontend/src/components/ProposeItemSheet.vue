@@ -22,7 +22,9 @@
       :maxlength="noteMax"
       enterkeyhint="done"
     />
-    <p v-if="nameTaken" class="code">{{ t('item.propose.name_taken', { name: nameTaken }) }}</p>
+    <p v-if="nameTaken" class="code warn">
+      {{ t('item.propose.name_taken', { name: nameTaken }) }}
+    </p>
     <p v-if="code" class="code">{{ t('item.propose.code', { code }) }}</p>
     <!-- The attribution the base's licence asks for (MOL-162): its page, opened by the person. Last,
          away from the fields and with a target a thumb can take (review 2). -->
@@ -33,38 +35,40 @@
     <template #footer>
       <!-- There before its words, with only the text changing: a live region born together with
            what it says is often not read at all (MOL-19; review Р-18). -->
-      <p class="line" :class="{ failed: textRefused }" role="status">{{ status }}</p>
-      <p v-if="connected && failed" class="line failed" role="alert">
+      <p class="line failed" role="status">{{ status }}</p>
+      <p v-if="failed" class="line failed" role="alert">
         {{ t('item.propose.failed') }}
       </p>
       <!-- Another item holds the code (MOL-100, Р-3): nothing was written, and that item is offered
-           — the package in the hand is what the catalogue already knows it as. -->
+           — the package in the hand is what the catalogue already knows it as. A warning, not an
+           error (MOL-213, 5e). -->
       <template v-if="holder">
-        <p class="line failed" role="alert">
+        <p class="code warn taken" role="alert">
           {{ t('item.propose.taken', { name: holder.name }) }}
         </p>
         <AppButton ref="takeButton" size="large" block @click="$emit('taken', holder)">
           {{ t('item.propose.take', { name: holder.name }) }}
         </AppButton>
       </template>
-      <AppButton v-else size="large" block :disabled="!ready" @click="submit">
-        {{ t('item.propose.submit') }}
+      <!-- One button through every word, so a new word drops no focus that stands on it (Ф-6): not now
+           says why by its own name. -->
+      <AppButton
+        v-else
+        size="large"
+        block
+        :busy="sending"
+        :busy-label="t('item.propose.sending')"
+        :inactive="!ready && !sending"
+        @click="submit"
+      >
+        {{ submitWord }}
       </AppButton>
     </template>
   </BottomSheet>
 </template>
 
 <script lang="ts">
-import {
-  computed,
-  defineComponent,
-  nextTick,
-  onMounted,
-  onUnmounted,
-  ref,
-  shallowRef,
-  watch,
-} from 'vue'
+import { computed, defineComponent, nextTick, onUnmounted, ref, shallowRef, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -79,7 +83,9 @@ import {
 import type { BarcodeHint, CatalogueEntry, Quantity } from '@molvia/model'
 import IconClose from '~icons/mdi/close'
 import { api } from '@/api'
+import { useAnnouncer } from '@/composables/useAnnouncer'
 import { packageSize } from '@/composables/useBarcodeHint'
+import { useOnline } from '@/composables/useOnline'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -113,6 +119,11 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
  * What the server refuses reads as one line, not under a field: its refusals are issue codes,
  * which the dictionary does not translate, and a blank name — the one refusal a person can make
  * here — never leaves, because the button waits for a name.
+ *
+ * The button says why it waits (MOL-213, Ф-6): «со связью», then «Напишите название», then «Выберите
+ * единицу» — the order of frames 5f and 5g — in the kit's not now, focusable and heard by its name.
+ * A character the catalogue will not take leaves it «Добавить в справочник», not now, under the line
+ * that names the field: the button cannot say which one.
  */
 /** As long as the app's live region waits before its words (`useAnnouncer`). */
 const STATUS_DELAY_MS = 100
@@ -155,7 +166,15 @@ export default defineComponent({
     const source = ref<string | null>(null)
     const sending = ref(false)
     const failed = ref(false)
-    const connected = ref(navigator.onLine)
+    // Read again as the app comes back into view too: an iOS PWA frozen in the background misses
+    // `online`, and the button said «со связью» over a connection back (MOL-192, adversarial А2).
+    const connected = useOnline()
+    // A failure is of the try that made it: the connection gone, «со связью» is the reason from then on,
+    // and the alert held for its return was born anew there — «Не получилось» said with nothing pressed
+    // (adversarial В1).
+    watch(connected, (on) => {
+      if (!on) failed.value = false
+    })
     const holder = shallowRef<CatalogueEntry | null>(null)
     const takeButton = ref<{ $el?: HTMLElement } | null>(null)
 
@@ -246,12 +265,18 @@ export default defineComponent({
       () =>
         !drawsNothing(note.value) && !proposedItemSchema.shape.note.safeParse(note.value).success,
     )
-    const textRefused = computed(() => nameRefused.value || noteRefused.value)
+    // While it sends the kit says «Добавляем…» in its place, a connection lost meanwhile included.
+    const submitWord = computed(() => {
+      if (!connected.value) return t('item.propose.offline')
+      if (drawsNothing(name.value)) return t('item.propose.needs_name')
+      if (unit.value === '') return t('item.propose.needs_unit')
+      return t('item.propose.submit')
+    })
 
     // The status line is in the sheet from the start, but a closed <dialog> is outside the
-    // accessibility tree: a sheet opened offline would show the region and its words in one frame,
-    // the case Р-18 left. The words come a moment after the sheet does, as the app's own region
-    // lets them (MOL-19).
+    // accessibility tree: a name from the query with a character refused would show the region and
+    // its words in one frame, the case Р-18 left. The words come a moment after the sheet does, as
+    // the app's own region lets them (MOL-19).
     const settled = ref(false)
     let settling: ReturnType<typeof setTimeout> | undefined
     watch(
@@ -273,7 +298,6 @@ export default defineComponent({
 
     const status = computed(() => {
       if (!settled.value) return ''
-      if (!connected.value) return t('item.propose.offline')
       if (nameRefused.value) return t('item.propose.name_invalid')
       if (noteRefused.value) return t('item.propose.note_invalid')
       return ''
@@ -312,17 +336,22 @@ export default defineComponent({
       }
     }
 
-    function sync(): void {
-      connected.value = navigator.onLine
-    }
-    onMounted(() => {
-      window.addEventListener('online', sync)
-      window.addEventListener('offline', sync)
-    })
-    onUnmounted(() => {
-      window.removeEventListener('online', sync)
-      window.removeEventListener('offline', sync)
-    })
+    // «Со связью» is the button's word, and a button's name is heard only once the focus is on it: the
+    // sheet says it too, as it opens offline and as the connection goes under it — the search's strip
+    // stands in none of the phases the sheet is opened from (adversarial А1). Through the announcer,
+    // so it lands in the sheet's own region; taken back once it is no longer so. Not over «Взять «…»»:
+    // there is nothing to propose any more, and taking the holder needs no connection (adversarial Б1).
+    const announce = useAnnouncer()
+    let unsayOffline: (() => void) | undefined
+    watch(
+      () => props.open && !connected.value && !sending.value && holder.value === null,
+      (offline) => {
+        unsayOffline?.()
+        unsayOffline = offline ? announce?.(t('item.propose.offline')) : undefined
+      },
+      { immediate: true },
+    )
+    onUnmounted(() => unsayOffline?.())
 
     return {
       t,
@@ -339,7 +368,8 @@ export default defineComponent({
       holder,
       takeButton,
       ready,
-      textRefused,
+      sending,
+      submitWord,
       status,
       submit,
       nameMax: ITEM_NAME_MAX,
@@ -372,7 +402,8 @@ export default defineComponent({
   align-self: flex-start;
   min-height: var(--touch-target);
   color: var(--accent-ink);
-  font-size: var(--text-footnote);
+  font-size: var(--text-callout);
+  font-weight: var(--weight-medium);
 }
 
 .size {
@@ -401,5 +432,14 @@ export default defineComponent({
   font-size: var(--text-footnote);
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
+}
+
+.warn {
+  background: var(--warn-tint);
+  color: var(--warn-ink);
+}
+
+.taken {
+  margin-bottom: var(--space-3);
 }
 </style>

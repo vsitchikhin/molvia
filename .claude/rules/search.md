@@ -623,6 +623,22 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   «Milo» — and is proposed by hand, since «Предложить товар» compares names (review К, С-9). A line
   left out costs a proposal; a twin written would be there for good, since the seed only adds.
 
+- **«Предложить товар» says why it waits, on its one button** (MOL-213, Ф-6, frames 5a–5h): the kit's
+  not now, in the focus order, named by the reason — «Предложить можно со связью», then «Напишите название»,
+  then «Выберите единицу» (5f: an empty name and no unit ask for the name), else «Добавить в справочник»;
+  one element through every word, so a new word drops no focus and no reader's cursor that stands on it,
+  and sending is «Добавляем…» (MOL-225), never grey. A press while not now is the kit's — cancelled and
+  silent: the words are the button's name, heard before it is pressed (owner's В-1 «а»). **The line over it
+  is the field's alone** — a character the catalogue will not take, said offline too. **The connection is
+  the button's word, and the sheet says it into its own region** as it opens offline and as the connection
+  goes under it, taken back when it comes (adversarial А1): a name is heard only with the focus on it, and
+  the search's strip stands in none of the phases the sheet opens from — `empty`, `far`, `ready`, a code
+  nobody knows. Never over «Взять «…»» of a code another item holds: nothing is left to propose, and taking
+  the holder needs no connection (adversarial Б1). The connection is `useOnline`'s, read again as the app
+  comes back into view (MOL-192, adversarial А2). **A failure is of the try that made it**: the connection
+  gone takes «Не получилось» away for good, and its return brings back no alert nobody's press asked for
+  (adversarial В1). «Этот код уже у …» and «… уже есть» are warnings on `--warn-tint`, not errors.
+
 ## The merge of twins (MOL-106)
 
 The owner's decision of 26.09.2026: strangers proposing items make twins — «Молоко 3.2%» beside
