@@ -424,7 +424,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   English, in Chromium and WebKit: nothing cut, a row of one line 52, the transfer on two lines at 320 and one at
   390, a long figure under its label at 320 and a short one beside it. **The prices, named:** on 320 «Перевод между
   счетами» is a row of 60, «Бюджет» and «Обмен денег» with a long figure 58 — rows of one card of different heights;
-  a note in the field takes a second line before its «…»; and the rate of «Обмен денег» comes with the month the
+  the field of the spending sheet takes two lines at 320 even for «Сегодня · без заметки» — its label is 166, not
+  a list card's 192 — so the sheet's everyday field is 62 there, not 52, and a note's «…» comes after the second
+  line; and the rate of «Обмен денег» comes with the month the
   ways out wait for (MOL-269), except a month other than the running one opened with no rate kept on the phone,
   where it comes with the running month's answer after and may grow its row by 6 px under the finger. **A sheet's column is the sheet's width, never its
   content's** (`.panel`, `minmax(0, 1fr)`, MOL-318, owner's В-1 «б»): an `auto` column took the least

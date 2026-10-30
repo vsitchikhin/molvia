@@ -586,8 +586,10 @@ nothing up.
   day of another year is «28 сент.» with no year, as `dayWords` says it everywhere — the field behind
   says it whole; the focus put on a field as the details open raises no keyboard on iOS, which takes a
   tap — the field is focused and its error said; and Enter there does nothing, as in the form before:
-  «Готово» is in the footer, out of the fields' way; at 320 the line is cut by «…» even as «Сегодня · без
-  заметки» (185 px of words in a label of 166) — from 375 it fits, and its name is whole; and the sheet
+  «Готово» is in the footer, out of the fields' way; at 320 the line takes two lines even as «Сегодня · без
+  заметки» (185 px of words in a label of 166), the field 62 for 52, and a long note ends in «…» after the second
+  (MOL-304, owner's В-1 «а»; it ended in «…» on one line before) — from 375 the short one fits one, and its name is
+  whole; and the sheet
   over the spending runs in Chromium alone — WebKit keeps no `Secure` cookie on the loopback and opens
   no «Деньги» (`e2e.md`): «‹», Esc and the focus given back are `BottomSheet`'s, held on WebKit by
   `sheet.spec` on the kit.
