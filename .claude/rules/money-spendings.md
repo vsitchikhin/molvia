@@ -231,7 +231,10 @@ nothing up.
   the control that chooses (MOL-138) and the rows are already there; and «Счета» that failed, then
   answer a later read — a connection back, a spending landed, «Повторить» — putting their card over the
   switcher and taking the row «Счета» away: hiding the rows on every read of «Счета» after a failure
-  would take them away at every spending that lands. e2e holds both answers back in turn (`money.spec`). **A refusal stands once, and always somewhere it can be put
+  would take them away at every spending that lands; and today's rate on another month with none kept, which
+  comes with the running month's read after the month's own and, too wide to stand beside «Обмен денег», goes
+  under it and grows its row (MOL-304, owner's В-3 «а»; which rate is too wide — `frontend.md`). e2e holds
+  both answers back in turn (`money.spec`). **A refusal stands once, and always somewhere it can be put
   right** (MOL-159): about a row the journal on screen shows, it marks that row, and any amendment of
   the row takes it away; with no such row, it is a row of «Не приняты» on top of «Траты», in every
   month and whatever its pages (`refusedRows`). «Не приняты» names the marked ones too and leads to the

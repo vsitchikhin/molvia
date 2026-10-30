@@ -423,10 +423,12 @@ The detail behind the frontend lines of `CLAUDE.md`.
   by a plain space, which no width at a text of 100 % breaks (adversarial, observed). A row of one line stays 52 (8
   above and below inside its least height). **A rate that comes after the ways out of «Деньги» grows its row** (owner's
   В-3 «а»): another month on screen and none kept, today's rate comes with the running month's read after the
-  month's own, and the dollar's «386,50 ֏/$» stands under «Обмен денег» at 320 — the rows under it 6 px down. Waited
-  for (self-review №1), it cost more than it spared: no way out at all for up to the client's 15 s when that read
-  hung, and two reads in a row at every opening of a past month for a person with no rate (round 2, В1, В2, №4).
-  The rouble's «4,16 ֏/₽» stands beside its label at 320 and moves nothing. `e2e/kit-rows` holds
+  month's own, and a rate too wide to stand beside its label goes under it — the rows under it some 6 px down. Which
+  rate is wide is a matter of the width, not of the currency (adversarial Г1 of round 3): the dollar's «386,50 ֏/$» in
+  either language at 320, and in English the rouble's «4.16 ֏/₽» too — «Money exchange» is 139 px to «Обмен денег»'s
+  107 — below some 345 px, the owner's own pair. Waited for (self-review №1), it cost more than it spared: no way out
+  at all for up to the client's 15 s when that read hung, and two reads in a row at every opening of a past month
+  for a person with no rate (round 2, В1, В2, №4). `e2e/kit-rows` holds
   every entry of `/_kit` at 390 and 320, in Russian and English, in Chromium and WebKit: nothing cut, a row of one line
   52, the transfer on two lines at 320 and one at 390, a long figure under its label at 320 and a short one beside it,
   a long note on two lines and its «…» (self-review №2: the clamp of a box in a flex item is WebKit's riskiest place).
