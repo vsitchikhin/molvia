@@ -929,6 +929,43 @@ test.describe('the sheet', () => {
 })
 
 // The segment looks as in the handoff and still answers a thumb over the whole 44px (review Р-3).
+// A full state of a sheet holds its footer as an error holds a screen's strip (MOL-211, Ф-17): the
+// scanner's refusal, with its one way on, pinned at the sheet's bottom edge — on WebKit too, where
+// Safari draws the sheet. «No camera» is played by a `getUserMedia` that finds none.
+test('a sheet’s full state stands its buttons in the pinned footer', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: () => Promise.reject(new DOMException('no camera', 'NotFoundError')),
+      },
+    })
+  })
+  await open(page, '/_kit')
+  await expect(heading(page)).toHaveText('Kit')
+  await page.getByRole('button', { name: 'Scan a barcode' }).click()
+  const scanner = page.getByRole('dialog', { name: 'Barcode' })
+  await expect(scanner.getByRole('heading', { name: 'No camera' })).toBeVisible()
+  await scanner.evaluate(async (dialog) => {
+    await Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished))
+  })
+
+  const typing = scanner.locator('.footer').getByRole('button', { name: 'Type it in' })
+  await expect(typing).toBeInViewport({ ratio: 1 })
+  await expect(scanner.locator('.panel .action')).toHaveCount(0)
+  const footer = await scanner.evaluate((dialog) => {
+    const element = dialog.querySelector('.footer')
+    return {
+      position: element ? getComputedStyle(element).position : '',
+      gap: Math.abs(
+        dialog.getBoundingClientRect().bottom - (element?.getBoundingClientRect().bottom ?? 0),
+      ),
+    }
+  })
+  expect(footer.position).toBe('sticky')
+  expect(footer.gap).toBeLessThanOrEqual(1)
+})
+
 test('a segment answers a tap anywhere over the track’s 44px', async ({ page }) => {
   await open(page, '/_kit')
   const segment = page
