@@ -407,8 +407,9 @@ The server names the reader by the receipt's `reader_version` (`found.byModel`).
 5↔6 already. A model's receipt Tesseract read in its place, and one read before MOL-255, are Tesseract's: one digit of
 `swaps`, as before — the owner's «в» was the model's two 5↔6, never Tesseract's (`byModel: false`). **The phone knows
 no reader** and doubts by the union of both (no `byModel`), so every hint the server sent stands there: the server only
-narrows. **The prices, named:** a price the person typed on the sheet of a model's receipt is doubted by the union (В-2
-«а») — 4 550 typed against a remembered 1 550 keeps the hint; and a phone of a build before the А2 fix doubts by one
+narrows. **The prices, named:** a price the person typed on the sheet is doubted by the union whoever read the receipt
+(В-2 «а») — 4 550 typed against a remembered 1 550 on a model's receipt keeps the hint, and «660» typed against 550 on
+Tesseract's, which master let go; and a phone of a build before the А2 fix doubts by one
 digit alone, so the model's «660» against other people's 550 shows no hint there, as on master, until the app updates
 (`pwaUpdate.ts`).
 

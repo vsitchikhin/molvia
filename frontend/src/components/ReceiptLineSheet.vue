@@ -289,7 +289,8 @@ export default defineComponent({
     const remembered = computed(() =>
       figures.rememberedPrice &&
       // a line with no price was emptied by the check: the memory is the hint to type it by (MOL-291); the phone
-      // knows no reader, so Tesseract's one digit or the model's two 5↔6: a hint the server sent by either stands (MOL-315)
+      // knows no reader, so Tesseract's one digit or the model's two 5↔6: a hint the server sent by either stands
+      // (MOL-315)
       (figures.price === null ||
         priceInDoubt(props.country, figures.price, figures.rememberedPrice))
         ? t('receipt.line.remembered', {
