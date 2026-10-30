@@ -68,6 +68,8 @@ async function render(
     state?: 'error' | 'attention' | 'inline'
     /** Whether the state brings a button of its own (`#action`), changed while it stands. */
     action?: boolean
+    /** The slot given always, the button in it drawn by `action` — a screen's `v-if` inside the slot. */
+    slotAlways?: boolean
     /** A failure to send drawn in the sheet's own footer, by the kit's state (adversarial Б). */
     stateInFooter?: boolean
   } = {},
@@ -105,9 +107,14 @@ async function render(
                       title: 'Camera did not start',
                       inline: state.value === 'inline',
                     },
-                    action.value
-                      ? { action: () => h('button', { class: 'typing' }, 'Type it in') }
-                      : undefined,
+                    options.slotAlways
+                      ? {
+                          action: () =>
+                            action.value ? h('button', { class: 'typing' }, 'Type it in') : null,
+                        }
+                      : action.value
+                        ? { action: () => h('button', { class: 'typing' }, 'Type it in') }
+                        : undefined,
                   )
                 : options.field
                   ? [
@@ -1088,6 +1095,26 @@ describe('the pinned footer', () => {
         state: 'attention',
         action: true,
       })
+      await nextTick()
+      expect(buttons(dialog())).toEqual(['Type it in'])
+      action.value = false
+      await nextTick()
+      await nextTick()
+      expect(buttons(dialog())).toEqual(['Save'])
+    })
+
+    // A slot given is no button drawn (round 2, А3): a screen writes the button under its own `v-if`.
+    it('must not take it for a slot that draws no button, and takes it once one is drawn', async () => {
+      const { dialog, action } = await render({
+        open: true,
+        footer: true,
+        state: 'attention',
+        slotAlways: true,
+      })
+      await nextTick()
+      expect(buttons(dialog())).toEqual(['Save'])
+      action.value = true
+      await nextTick()
       await nextTick()
       expect(buttons(dialog())).toEqual(['Type it in'])
       action.value = false

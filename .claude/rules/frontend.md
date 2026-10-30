@@ -676,10 +676,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   refusals stood their buttons in the scrolling content, 44 and with no hairline, under the one sheet
   whose answer is a state. **There any full state with buttons of its own holds it, «attention»
   included** — «Нет доступа к камере» and «Проверить снова» — where a screen's strip is an error's
-  alone: a notice of a screen beside the screen's own action is not its answer. Whether `#action` is
-  given is read at every update of the block, never once: a button come later or gone with the kind
-  unchanged held the footer only from the next change of kind — nothing pinned under it, or an empty
-  footer pinned over the sheet's own «Сохранить» (adversarial А1, А2). **The sheet's own footer sees no
+  alone: a notice of a screen beside the screen's own action is not its answer. **Whether it has buttons
+  is read off what its `#action` drew, after every render** — never once, never by the slot: a button
+  come later or gone with the kind unchanged held the footer only from the next change of kind (adversarial
+  А1, А2), and a slot given whose button stands under its own `v-if` held an empty footer pinned over the
+  sheet's own «Сохранить» (round 2, А3). **The sheet's own footer sees no
   strip** (`WithoutStateStrip`, Б): a state drawn there held the footer it stands in, took the footer's
   slot down with itself, let go and held it again — a loop Vue stops in development and a built app
   never does; there it keeps its buttons, as before. A section's error (`inline`) in a sheet stays the

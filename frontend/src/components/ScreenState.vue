@@ -73,8 +73,8 @@ import {
   defineComponent,
   nextTick,
   onBeforeUnmount,
-  onBeforeUpdate,
   onMounted,
+  onUpdated,
   ref,
   watch,
   watchEffect,
@@ -208,7 +208,7 @@ export default defineComponent({
     silent: { type: Boolean, default: false },
   },
   emits: ['retry'],
-  setup(props, { slots }) {
+  setup(props) {
     const { t } = useI18n()
     const root = ref<HTMLElement | null>(null)
     // The root is a card's component for a section's error, a plain element otherwise.
@@ -225,13 +225,16 @@ export default defineComponent({
     const strip = useStateStrip()
     const me = Symbol('screen-state')
     // In a sheet a state with buttons of its own holds the footer too — the scanner's «Нет доступа к
-    // камере» (MOL-211). The slot is no reactive source, so whether it is given is read at every update
-    // of the block: a button come later or gone with the kind unchanged (`v-if` on `#action`) held the
-    // footer only from the next change of kind (adversarial А1, А2).
-    const acting = ref(slots.action !== undefined)
-    onBeforeUpdate(() => {
-      acting.value = slots.action !== undefined
-    })
+    // камере» (MOL-211). Whether it has any is read off what its `#action` drew, after every render:
+    // the slot is no reactive source — a button come later or gone with the kind unchanged held the
+    // footer only from the next change of kind (adversarial А1, А2) — and a slot given is not a button
+    // drawn: one under its own `v-if` held an empty footer over the sheet's «Сохранить» (round 2, А3).
+    const acting = ref(false)
+    function measureActing(): void {
+      acting.value = (actions.value?.childElementCount ?? 0) > 0
+    }
+    onMounted(measureActing)
+    onUpdated(measureActing)
     watchEffect(() => {
       if (!strip) return
       const holds = props.kind === 'error' || (strip.sheet && acting.value)
