@@ -188,6 +188,32 @@ neither it is «переснимите». Then **the one check, `verifiedReading
 everything after it is Tesseract's path: `readPartly`, the lines' items, the wire. No line is cut out for
 training (Р-4): there are no boxes.
 
+**The model's date is held by the photo's window, not by the prompt** (MOL-305, owner's В-4 «а»): asked for
+«YYYY-MM-DD» (v5), the model orders a short year's parts itself — a sole trader's terminal prints «23-10-26 14:06»
+(MOL-227), the bench's nine «04-10-26» came back right, and production's of 23.10.2026 came back 2023-10-26: the
+trip three years back, at the rate of 2023, on no account, `firstSpentDay` in 2023. **Asking for the date as printed
+cost the lines** (v7, three runs against three of v5 on the same photos, `status/MOL-290/score.mts`): the lines'
+fields 789, 669, 731 right, 3, 0, 1 made up, against v5's 801, 833, 827 and 0, 4, 1 — every run of it below the
+worst of v5, as v6 of MOL-293 was; the figures copied were as many, and receipts lost being proven whole (am-44's 39
+lines in one run, am-26's in two) — and one date came back in words, «07 октября 2026», which no rule reads. So v5
+stays, and **the window catches the swap**: «ДД-ММ-ГГ» read year first is the year 20ДД, outside a month of the
+photo unless ДД = ГГ — and then the swap is the same day. `printedDayOf` reads what the model writes — a year of four
+digits first, or the parts in the card's order (`dateOrder`, Armenia's day first), the rule `DEPARTMENT_DATE` reads
+Tesseract's by, one `calendarDayOf` under both — and a time with its seconds is its minutes («23:49:53» was none).
+**The price, named:** a receipt whose parts the model swaps goes to the photo's day, not the paper's — the same day
+unless it was shot later, and said «день снимка» on the review.
+
+**A date far from its photo is no date of the receipt, for either reader** (MOL-305, owner's В-1 «а»):
+`receiptDateWindow` — from the same day of the photo's month before, the last day of a shorter month («31.03» →
+«28.02»), to the photo's day + 1 on the till's clock, never past the server's tomorrow; `headOf` holds both readers to
+it. Outside, the receipt has no date and no time — a time without its day dates nothing — and the review takes the
+photo's day and says so, «23 окт., день снимка» (В-2 «а»); a day not of this year is printed with its year. **Why a
+month and not a count of days**: the model's own mistakes with a date are a year for a day (the case above) and a
+month misread (am-05c of the bench: 09 as 03 and as 01, months back), while a receipt kept in a pocket and shot a week
+or two later is a person's ordinary day. **The prices, named:** a receipt shot more than a month after its day goes to
+the photo's day unless the person picks the printed one in «Где купили?»; a digit misread within the window — a day
+28 as 23, a month 10 as 09 on a day not before the photo's — passes as before, and only the eye on the review catches it.
+
 **A figure is read in every spelling the model writes it** (MOL-294): thousands grouped by a space, a no-break or a
 narrow one («1 000,00»), a comma for the point where it is the only one and no point stands («0,50»), and a minus
 before a line's or the summary's discount — its size. A minus before a quantity, a price, a sum or a total is no
