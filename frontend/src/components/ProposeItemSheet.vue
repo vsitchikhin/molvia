@@ -50,8 +50,8 @@
           {{ t('item.propose.take', { name: holder.name }) }}
         </AppButton>
       </template>
-      <!-- One button through every word, so the focus stays on it while the person fills the form
-           (Ф-6): not now says why by its own name. -->
+      <!-- One button through every word, so a new word drops no focus that stands on it (Ф-6): not now
+           says why by its own name. -->
       <AppButton
         v-else
         size="large"
@@ -333,11 +333,12 @@ export default defineComponent({
     // «Со связью» is the button's word, and a button's name is heard only once the focus is on it: the
     // sheet says it too, as it opens offline and as the connection goes under it — the search's strip
     // stands in none of the phases the sheet is opened from (adversarial А1). Through the announcer,
-    // so it lands in the sheet's own region; taken back once it is no longer so.
+    // so it lands in the sheet's own region; taken back once it is no longer so. Not over «Взять «…»»:
+    // there is nothing to propose any more, and taking the holder needs no connection (adversarial Б1).
     const announce = useAnnouncer()
     let unsayOffline: (() => void) | undefined
     watch(
-      () => props.open && !connected.value && !sending.value,
+      () => props.open && !connected.value && !sending.value && holder.value === null,
       (offline) => {
         unsayOffline?.()
         unsayOffline = offline ? announce?.(t('item.propose.offline')) : undefined

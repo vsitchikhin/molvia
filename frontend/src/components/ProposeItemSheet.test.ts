@@ -348,7 +348,7 @@ describe('«Suggest an item»', () => {
 
   describe("the connection said into the sheet's region (adversarial А1)", () => {
     /** The sheet in an app, whose announcer the sheet's region takes over while it is up. */
-    async function inApp() {
+    async function inApp(code: string | null = null) {
       const router = createRouter({ history: createMemoryHistory(), routes })
       await router.push('/trip/add')
       const open = ref(true)
@@ -359,6 +359,7 @@ describe('«Suggest an item»', () => {
             h(ProposeItemSheet, {
               open: open.value,
               query: 'тан',
+              code,
               'onUpdate:open': (next: boolean) => (open.value = next),
             })
         },
@@ -418,6 +419,25 @@ describe('«Suggest an item»', () => {
       open.value = true
       await said()
       expect(region(view)).toBe(en.item.propose.offline)
+    })
+
+    it('must not say it over «Take «…»»: nothing is left to propose, and taking needs no connection (Б1)', async () => {
+      const kefir = { ...tan, id: '1c7a3d5f-9e2b-4a4c-8d8f-6b3e2f1a4c5d', name: 'Кефир 1%' }
+      proposeItem.mockResolvedValue({ taken: kefir })
+      const { view } = await inApp('4850001234562')
+      await chooseUnit(view, en.item.unit_l)
+      await mainButton(view).trigger('click')
+      await flushPromises()
+      const take = mainButton(view)
+      expect(take.text()).toBe(en.item.propose.take.replace('{name}', 'Кефир 1%'))
+
+      goes(false)
+      await said()
+
+      expect(region(view)).toBe('')
+      expect(take.attributes('aria-disabled')).toBeUndefined()
+      await take.trigger('click')
+      expect(view.findComponent(ProposeItemSheet).emitted('taken')).toEqual([[kefir]])
     })
 
     it('must not say it while it sends: the button says «Adding…»', async () => {
