@@ -45,6 +45,15 @@ describe('NavRow', () => {
     expect(view.get('.chevron').attributes('aria-hidden')).toBe('true')
   })
 
+  // MOL-304: the label and the value share the lines of one column of words, so a value that cannot
+  // stand beside its label goes under it (the layout itself is held in a real engine by `e2e/kit-rows`).
+  it('stands the label and the value in one column of words, the chevron outside it', () => {
+    const view = mount(NavRow, { props: { label: 'Бюджет', value: 'сверх плана 1 250 300 ֏' } })
+    const words = view.get('.words')
+    expect(words.findAll(':scope > *').map((one) => one.classes()[0])).toEqual(['label', 'value'])
+    expect(words.find('.chevron').exists()).toBe(false)
+  })
+
   it('draws no value it was not given', () => {
     expect(
       mount(NavRow, { props: { label: 'Устройства' } })
