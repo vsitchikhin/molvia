@@ -631,7 +631,7 @@ threshold would lose the first receipt of every shop.
 **Recording writes the person's word on every line recorded**, over their earlier one; a line left out
 teaches nothing. The price kept is the shelf price of a line recorded as read, the memory's argument
 where a figure reads two ways — «60 60» for «50 50» adds up either way — and it is a hint, never a
-correction (В-1): a price one confused digit off the remembered is `rememberedPrice` on the line, «
+correction (В-1): a price one digit its reader confuses off the remembered (MOL-315, below) is `rememberedPrice` on the line, «
 проверьте», and the parse's figures stay as read — unless the total proving the receipt points at the price, its only
 line's at its sum (MOL-314, below) — and, since MOL-291,
 on a line the check emptied too. **The price

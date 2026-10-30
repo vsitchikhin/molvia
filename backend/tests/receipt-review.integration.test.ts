@@ -469,12 +469,14 @@ describe('the review of a receipt', () => {
       { printed: 'Կարագ «Օրինակ»', sku: '1110004', price: 1_400, sum: 1_400 },
       { printed: 'Պանիր «Օրինակ»', sku: '1110005', price: 650, sum: 650 },
     ]
-    const hints = async (readerVersion: string) =>
+    const hints = async (readerVersion: string | null) =>
       (
         await review(me, await parsedReceipt(me, lines, { totalMinor: 205_000n, readerVersion }))
       ).lines.map((line) => line.rememberedPrice)
     expect(await hints(byModel.readerVersion)).toEqual([null, amd(550)])
     expect(await hints('tesseract 5.5.0 · hye+rus+eng')).toEqual([amd(1_100), amd(550)])
+    // a receipt read before MOL-255 has no reader written: only Tesseract read then
+    expect(await hints(null)).toEqual([amd(1_100), amd(550)])
 
     // a line the check took the price off keeps the memory as its hint, whoever read it (MOL-291)
     const id = await parsedReceipt(me, lines, { totalMinor: 205_000n, ...byModel })
