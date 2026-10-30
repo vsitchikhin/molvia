@@ -87,6 +87,14 @@ function line(printed: string, sum: string): ReceiptReviewLine {
   }
 }
 
+const HEAD: NonNullable<ReceiptDetail['receipt']['header']> = {
+  tin: '01234567',
+  date: '2026-10-01',
+  time: '12:00',
+  receiptNo: '1',
+  shop: null,
+}
+
 function detail(over: { place?: boolean; status?: 'parsed' | 'failed' } = {}): ReceiptDetail {
   return {
     receipt: {
@@ -98,7 +106,7 @@ function detail(over: { place?: boolean; status?: 'parsed' | 'failed' } = {}): R
       capturedAt: new Date('2026-10-01T10:00:00Z'),
       country: 'AM',
       language: 'ru',
-      header: { tin: '01234567', date: '2026-10-01', time: '12:00', receiptNo: '1', shop: null },
+      header: HEAD,
       total: amd('900'),
       balanced: true,
       lineCount: 2,
@@ -1085,6 +1093,49 @@ describe('ReceiptView of a receipt by its link (MOL-232)', () => {
     expect(view.text()).not.toContain(ru.receipt.capture.retake)
     // the new item is named by the line less its unit word
     expect(view.text()).toContain('Secer kristal 1kg sunoko')
+  })
+
+  it('says the year of a day not this year’s, and that a day not read off the receipt is the photo’s (MOL-305)', async () => {
+    const shown = detail()
+    const line = async (header: Partial<typeof HEAD>) => {
+      receipt.mockResolvedValue({
+        ...shown,
+        receipt: { ...shown.receipt, header: { ...HEAD, ...header } },
+      })
+      const { view } = await render()
+      const text = view.find('.place-line').text()
+      view.unmount()
+      mounted.pop()
+      document.body.innerHTML = ''
+      return text
+    }
+    // a year left out hid 26 October 2023 of a receipt shot in 2026
+    expect(await line({ date: '2023-10-26', time: '14:06' })).toBe(
+      'Гюмри · ИНН 01234567 · 26 окт. 2023 г., 14:06',
+    )
+    // none read, or none the receipt could print: the purchases go to the photo's day, said as such, with no time
+    const photo = await line({ date: null, time: null })
+    expect(photo).toMatch(/^Гюмри · ИНН 01234567 · 1 окт\.( 2026 г\.)?, день снимка$/)
+    // must not: a day read off the receipt is never the photo's
+    expect(await line({})).not.toContain('день снимка')
+  })
+
+  it('names no photo’s day once the person chose the day (MOL-305)', async () => {
+    const shown = detail()
+    receipt.mockResolvedValue({
+      ...shown,
+      receipt: { ...shown.receipt, header: { ...HEAD, date: null, time: null } },
+    })
+    const { view } = await render()
+    useReceiptDraftsStore().setPlace(
+      ID,
+      { id: PLACE, name: 'Ереван Сити', city: 'Гюмри' },
+      '2026-09-30',
+    )
+    await flushPromises()
+    expect(view.find('.place-line').text()).toMatch(
+      /^Гюмри · ИНН 01234567 · 30 сент\.( 2026 г\.)?$/,
+    )
   })
 
   it('names the seller’s ПИБ, and proposes the shop the tax office names as a new place', async () => {

@@ -426,7 +426,7 @@ import { api } from '@/api'
 import { useOnline } from '@/composables/useOnline'
 import { useReceipt } from '@/composables/useReceipt'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
-import { calendarDay, dayOfAnyYear, localDay } from '@/days'
+import { calendarDayOfAnyYear, dayOfAnyYear, localDay } from '@/days'
 import { reportFailure } from '@/failures'
 import { newId } from '@/ids'
 import { afterStep, useNavigation } from '@/navigation'
@@ -641,7 +641,7 @@ export default defineComponent({
 
     const dayOf = (at: Date | string) =>
       typeof at === 'string'
-        ? calendarDay(at, locale.value, { day: 'numeric', month: 'short' })
+        ? calendarDayOfAnyYear(at, locale.value)
         : dayOfAnyYear(at, locale.value)
     const positions = (n: number): string => t('trip.items_count', { n }, n)
 
@@ -655,16 +655,19 @@ export default defineComponent({
       if (!one || !place.value) return t('receipt.review.place_missing')
       const tin = one.receipt.header?.tin
       const time = one.receipt.header?.time
+      // no date of the receipt — none read, or none it could print (MOL-305) — and none chosen: the photo's day,
+      // said as such, so a person holding the paper sees which day the purchases go to
+      const photoDay = !draft.value?.purchasedOn && !one.receipt.header?.date
       const words = {
         city: place.value.city,
         inn: tin ?? '',
-        day: dayOf(day.value),
+        day: photoDay ? t('receipt.review.photo_day', { day: dayOf(day.value) }) : dayOf(day.value),
         time: time ?? '',
       }
       if (!tin) return t('receipt.review.place_line_no_tin', words)
       // a Serbian seller's tax number is its ПИБ (MOL-232)
       const kind = byLink.value ? 'place_line_pib' : 'place_line'
-      return time && !placeChosen.value
+      return time && !placeChosen.value && !photoDay
         ? t(`receipt.review.${kind}_time`, words)
         : t(`receipt.review.${kind}`, words)
     })

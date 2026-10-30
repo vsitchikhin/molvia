@@ -117,6 +117,18 @@ export function calendarDay(
   return new Intl.DateTimeFormat(locale, { ...options, timeZone: 'UTC' }).format(utcDay(day))
 }
 
+/**
+ * A calendar day short, the year only when not this one's: «23 окт.», «26 окт. 2023 г.» — a date read off a receipt
+ * may be of any year, and a year left out hid one three years back (MOL-305).
+ */
+export function calendarDayOfAnyYear(day: string, locale: string, today = localDay()): string {
+  return calendarDay(day, locale, {
+    day: 'numeric',
+    month: 'short',
+    ...(day.slice(0, 4) === today.slice(0, 4) ? {} : { year: 'numeric' }),
+  })
+}
+
 /** The day `by` days from `day` in the same calendar — «yesterday» of a Yerevan day. */
 export function shiftDay(day: string, by: number): string {
   const moved = utcDay(day)

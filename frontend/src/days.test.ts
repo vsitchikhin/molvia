@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { yerevanDate } from '@molvia/model'
 import {
   answeredAt,
+  calendarDayOfAnyYear,
   dayOfAnyYear,
   dayWords,
   localDay,
@@ -86,6 +87,14 @@ describe('dayOfAnyYear (MOL-57, self-review С-5)', () => {
 
   it('across New Year yesterday is still «вчера», not a date with a year', () => {
     expect(dayOfAnyYear(new Date(2025, 11, 31, 20), 'ru', new Date(2026, 0, 1, 9))).toBe('вчера')
+  })
+})
+
+describe('calendarDayOfAnyYear (MOL-305)', () => {
+  it('a day of this year is short, another year’s carries its year', () => {
+    expect(calendarDayOfAnyYear('2026-10-23', 'ru', '2026-10-30')).toBe('23 окт.')
+    expect(calendarDayOfAnyYear('2023-10-26', 'ru', '2026-10-30')).toBe('26 окт. 2023 г.')
+    expect(calendarDayOfAnyYear('2026-12-31', 'ru', '2027-01-01')).toBe('31 дек. 2026 г.')
   })
 })
 

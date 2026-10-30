@@ -278,7 +278,7 @@ import { useTripHistory } from '@/composables/useTripHistory'
 import type { HistoryRow } from '@/composables/useTripHistory'
 import { useTripRows } from '@/composables/useTripRows'
 import { useVerdictQueue } from '@/composables/useVerdictQueue'
-import { calendarDay, dateOfAnyYear, dayOfAnyYear, purchaseDay, timeOfDay } from '@/days'
+import { calendarDayOfAnyYear, dateOfAnyYear, dayOfAnyYear, purchaseDay, timeOfDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
@@ -476,9 +476,7 @@ export default defineComponent({
     // A printed day is a calendar day, never a moment (review 23).
     const readDay = (row: ReceiptRow): string => {
       const printed = row.summary?.header?.date
-      return printed
-        ? calendarDay(printed, locale.value, { day: 'numeric', month: 'short' })
-        : when(row.capturedAt).day
+      return printed ? calendarDayOfAnyYear(printed, locale.value) : when(row.capturedAt).day
     }
     function receiptTitle(row: ReceiptRow): string {
       // a receipt by its link has no photo to name (MOL-232)
