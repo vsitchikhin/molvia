@@ -557,9 +557,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   group's description is read by some readers on entering it, by others never. Round 2 had named it a
   price of a chip in focus, «refused only for a category the server called unknown» — untrue. **The rule is
   closed by where the focus goes, not by a list of sheets** (adversarial Р4-А1): every focus a refusal puts in
-  a field goes through `useFieldRefusal` — the spending, the check, the transfer, the purchase, a plan of
-  «Бюджет», an account; a bare `focus()` on a refused field is the defect, the purchase's price the
-  commonest at the shelf. **The price, named:** a sheet that moves no focus on a refusal at all — an
+  a field goes through `useFieldRefusal` — the spending and its «Дата, заметка, место», the check, the
+  transfer, the purchase, a plan of «Бюджет», an account; a bare `focus()` on a refused field is the defect,
+  the purchase's price the commonest at the shelf. **A sheet of several fields finds the first one marked
+  in its own form** (`[aria-invalid="true"]`), never by a list of its fields: an account's day refused
+  alone, on the phone or by the server, was in none of them and moved no focus (adversarial Р5-А1). **The price, named:** a sheet that moves no focus on a refusal at all — an
   exchange, an income, a receipt's lines, total and place, a trip's rate, a verdict — shows its error and
   is heard only on reaching the field, as on master; MOL-333 brings them to it. **The checkbox is
   `AppCheckbox`** (В-4 «а»), a native checkbox the kit draws, by the grammar of `AppSwitch`: off a square edged in
