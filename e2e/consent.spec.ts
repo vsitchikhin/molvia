@@ -106,7 +106,7 @@ test('«I do not accept» shows the account is there and leads out through «Sig
   await risen(page)
   await page.getByRole('button', { name: 'Sign out and erase' }).click()
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
   await expect(page.getByRole('button', { name: 'Sign in with Telegram' })).toBeVisible()
 })
 
@@ -211,7 +211,7 @@ test('«Terms of use» opens by its address without a session, and from the logi
   await expect(page.getByRole('heading', { name: 'No advertising' })).toBeVisible()
 
   await page.goto('/')
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
   await page.getByRole('link', { name: 'Terms of use', exact: true }).click()
   await expect(page).toHaveURL(/\/terms$/)
 })

@@ -555,7 +555,7 @@ test('the session over under a changed month: the login stands from the top', as
   await context.clearCookies()
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
   const title = page.getByRole('heading', { level: 1 })
-  await expect(title).toHaveText('Вход')
+  await expect(title).toHaveText('Molvia')
   expect(await page.evaluate(() => window.scrollY)).toBe(0)
   expect(await topOf(title)).toBeGreaterThan(0)
   expect(

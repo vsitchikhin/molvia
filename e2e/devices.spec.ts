@@ -47,7 +47,8 @@ async function openDevices(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Devices')
 }
 
-const LOGIN_TITLE = /^Sign in$/
+// The door's first screen, put out (MOL-216: titled by the product's name).
+const LOGIN_TITLE = /^Molvia$/
 
 test('one device ends another: the other meets the login screen, this one stays', async ({
   page,
