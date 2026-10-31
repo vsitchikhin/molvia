@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { shallowRef } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
@@ -29,52 +29,83 @@ afterEach(() => {
   me.mockReset()
 })
 
+/**
+ * The app shown at `path` on the drawer of somebody claimed who accepted this edition, while the
+ * server is still asked who we are; `shut` is the server's «no session», which shuts the door.
+ */
+async function shownOnTheDrawer(path: string) {
+  localStorage.setItem('molvia.actor', OWNER)
+  localStorage.setItem('molvia.login', JSON.stringify({ claimed: OWNER }))
+  localStorage.setItem(`molvia.consent.${OWNER}`, String(POLICY_VERSION))
+  let refuse: (error: unknown) => void = () => undefined
+  me.mockReturnValue(
+    new Promise((_, reject) => {
+      refuse = reject
+    }),
+  )
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  const started = useActorStore().start()
+  window.history.replaceState(null, '', path)
+  const router = createRouter({ history: createWebHistory(), routes })
+  await router.push(path)
+  await router.isReady()
+  const view = mount(App, {
+    attachTo: document.body,
+    global: {
+      plugins: [pinia, router, createAppI18n('en')],
+      provide: {
+        [pwaUpdateKey as symbol]: {
+          phase: shallowRef('none'),
+          apply: vi.fn(),
+          serverVersion: vi.fn(),
+        },
+      },
+    },
+  })
+  onTestFinished(() => {
+    view.unmount()
+  })
+  await flushPromises()
+  return {
+    view,
+    shut: async () => {
+      refuse(new ApiError(ERROR.NO_ACTOR))
+      await started.catch(() => undefined)
+      await flushPromises()
+    },
+  }
+}
+
 // MOL-216, self-review №1: the session ended on another phone, and the door shut over the app took the
 // screen the focus stood on. On master the first screen said its words into the live region; it is a
 // screen now, not a state, and says nothing — so the focus goes to its heading, as a move's does.
 describe('a door shut over the app', () => {
   it('gives the focus to its heading', async () => {
-    // Somebody on the device, claimed, who accepted this edition: the app is shown on the drawer.
-    localStorage.setItem('molvia.actor', OWNER)
-    localStorage.setItem('molvia.login', JSON.stringify({ claimed: OWNER }))
-    localStorage.setItem(`molvia.consent.${OWNER}`, String(POLICY_VERSION))
-    let refuse: (error: unknown) => void = () => undefined
-    me.mockReturnValue(
-      new Promise((_, reject) => {
-        refuse = reject
-      }),
-    )
-    const pinia = createPinia()
-    setActivePinia(pinia)
-    const started = useActorStore().start()
-    window.history.replaceState(null, '', '/')
-    const router = createRouter({ history: createWebHistory(), routes })
-    await router.push('/')
-    await router.isReady()
-    const view = mount(App, {
-      attachTo: document.body,
-      global: {
-        plugins: [pinia, router, createAppI18n('en')],
-        provide: {
-          [pwaUpdateKey as symbol]: {
-            phase: shallowRef('none'),
-            apply: vi.fn(),
-            serverVersion: vi.fn(),
-          },
-        },
-      },
-    })
-    await flushPromises()
+    const { view, shut } = await shownOnTheDrawer('/')
     const tab = view.get<HTMLElement>('a[href="/purchases"]').element
     tab.focus()
     expect(document.activeElement).toBe(tab)
 
-    refuse(new ApiError(ERROR.NO_ACTOR))
-    await started.catch(() => undefined)
-    await flushPromises()
+    await shut()
 
     const heading = document.activeElement?.closest('h1')
     expect(heading?.textContent).toMatch(new RegExp(`^(${en.app.name}|${en.login.title})$`))
-    view.unmount()
+  })
+
+  // Adversarial Р2-А1: a public screen stays behind the shut door, and nothing went from under the
+  // focus. On the body it is a page being read — the privacy policy — and taken to its heading, the
+  // reading jumped to the top.
+  it('leaves the focus where it was over a public screen, which stays', async () => {
+    const { view, shut } = await shownOnTheDrawer('/privacy')
+    const heading = view.get('h1').element
+    expect(heading.textContent.trim()).toBe(en.privacy.title)
+    expect(document.activeElement).toBe(document.body)
+
+    await shut()
+
+    expect(view.find('.login').exists()).toBe(false)
+    expect(view.get('h1').element).toBe(heading)
+    expect(document.activeElement).toBe(document.body)
   })
 })
