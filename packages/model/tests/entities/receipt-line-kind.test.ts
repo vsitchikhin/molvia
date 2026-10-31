@@ -74,6 +74,12 @@ const WORDS = {
   մարտկոց: 'батарейка',
   սուպեր: 'супер',
   ձեռնոց: 'перчатки',
+  եգիպտացորեն: 'кукуруза',
+  հայկական: 'армянский',
+  տեղական: 'местный',
+  ռուսական: 'русский',
+  բուլղարական: 'болгарский',
+  պղպեղ: 'перец',
   դրաժե: 'драже',
   շոկոլադե: 'шоколадный',
   կոնդիցիոներ: 'кондиционер',
@@ -840,5 +846,25 @@ describe('a word the reader misread by the font (MOL-326, В-3 «б»)', () => {
 
   it('must not take a swap of letters it has not measured: «լոշիկ» is no «լոլիկ»', () => {
     expect(glyphsMended('Լոշիկ', new Set(['լոլիկ']))).toBeNull()
+  })
+})
+
+describe('where a thing was grown or made (MOL-326, owner’s В-2 «а»)', () => {
+  it('names no new item by its origin, so that two lines of one thing make one item', () => {
+    expect(named('Եգիպտացորեն (հայկական) հտ')?.name).toBe('Кукуруза')
+    expect(named('Եգիպտացորեն հտ')?.name).toBe('Кукуруза')
+    expect(named('Վարունգ ընտիր (ռուսական) կգ')?.name).toBe('Огурец отборный')
+    expect(named('Խոզի ֆիլե կգ (տեղական)')?.name).not.toMatch(/местн/u)
+    expect(named('Վարունգ տեղական')?.name).toBe('Огурец')
+  })
+
+  it('lets the item of one stand on the line of the other', () => {
+    expect(fits('Եգիպտացորեն (հայկական) հտ', 'Кукуруза')).toBe(true)
+    expect(fits('Եգիպտացորեն հտ', 'Кукуруза')).toBe(true)
+  })
+
+  it('keeps a country printed bare: it is a kind as often', () => {
+    expect(named('Պղպեղ բուլղարական կգ')?.name).toBe('Перец болгарский')
+    expect(named('Սուրճ հայկական')?.name).toBe('Кофе армянский')
   })
 })

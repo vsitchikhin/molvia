@@ -199,7 +199,17 @@ function lettersOf(text: string): string | null {
   return run !== null && run.length === tokens.length ? run.latin : null
 }
 
-export function receiptLineParts(printed: string): ReceiptLineParts {
+/**
+ * Where a thing was grown or made, which makes it no other thing (MOL-326, owner's В-2 «а»): «Եգիպտացորեն (հայկական)»
+ * and «Եգիպտացորեն» are one corn. A country in parentheses — «(հայկական)», «(ռուսական)», the bench's every one — and
+ * local or imported anywhere. A country printed bare is a kind as often: «Պղպեղ բուլղարական» is a bell pepper,
+ * «Սուրճ հայկական» the seed's Armenian coffee.
+ */
+const ORIGIN_IN_PARENTHESES = /\(\s*(?:[ա-ֆԱ-Ֆ]+ական|ներմուծված)\s*\)/giu
+const ORIGINS = new Set(['տեղական', 'ներմուծված'])
+
+export function receiptLineParts(line: string): ReceiptLineParts {
+  const printed = line.replace(ORIGIN_IN_PARENTHESES, ' ')
   const open = printed.indexOf('«')
   const close = open < 0 ? -1 : printed.indexOf('»', open + 1)
   const quoted = open < 0 ? null : printed.slice(open + 1, close < 0 ? undefined : close).trim()
@@ -207,7 +217,7 @@ export function receiptLineParts(printed: string): ReceiptLineParts {
   const inQuotes = quoted !== null && /\p{L}/u.test(quoted) ? quoted : null
   const tokens = tokensOf(
     inQuotes === null ? printed.replace(/[«»]/gu, ' ') : printed.slice(0, open),
-  )
+  ).filter((token) => !ORIGINS.has(keyed(token)))
   // a brand said letter by letter is the line's brand where no «…» is, «Լվացքի կոնդիցիոներ Էյ Բի Սի» (MOL-326)
   const spokenAt =
     inQuotes === null ? tokens.findIndex((_, at) => letterRun(tokens, at) !== null) : -1
@@ -220,7 +230,7 @@ export function receiptLineParts(printed: string): ReceiptLineParts {
       ? tokens.slice(spokenAt + spoken.length)
       : brand === null || close < 0
         ? []
-        : tokensOf(printed.slice(close + 1))
+        : tokensOf(printed.slice(close + 1)).filter((token) => !ORIGINS.has(keyed(token)))
   const head = brand === null ? [...before, ...after] : before.length > 0 ? before : after
   const words = head.filter(
     (token) =>
