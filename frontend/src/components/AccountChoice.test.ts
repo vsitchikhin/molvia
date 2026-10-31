@@ -141,6 +141,24 @@ async function spendingSheet(pinia: Pinia): Promise<VueWrapper> {
   )
 }
 
+/** The sheet of a new spending under an announcer, as `App.vue` holds every sheet (MOL-235). */
+async function announcedSpendingSheet(pinia: Pinia): Promise<VueWrapper> {
+  const Host = defineComponent({
+    setup() {
+      provideAnnouncer()
+      return () =>
+        h(SpendingSheet, {
+          open: true,
+          target: { kind: 'add' },
+          categories,
+          nameOf: () => 'Cafe',
+          spendCurrency: 'AMD',
+        })
+    },
+  })
+  return mounted(Host, {}, pinia)
+}
+
 async function currency(view: VueWrapper, value: Currency): Promise<void> {
   await view.get(`input[type="radio"][value="${value}"]`).setValue(true)
   await flushPromises()
@@ -203,20 +221,7 @@ describe('the account in the sheet of a spending (handoff 06)', () => {
   // tapped on an iPhone, which leaves the focus in it (MOL-80) — or Enter — so its own error is said.
   it('«Списано» refused with the focus in it: nothing is queued, and its error is said', async () => {
     const pinia = withAccounts([cash, card])
-    const Host = defineComponent({
-      setup() {
-        provideAnnouncer()
-        return () =>
-          h(SpendingSheet, {
-            open: true,
-            target: { kind: 'add' },
-            categories,
-            nameOf: () => 'Cafe',
-            spendCurrency: 'AMD',
-          })
-      },
-    })
-    const view = await mounted(Host, {}, pinia)
+    const view = await announcedSpendingSheet(pinia)
     view.findComponent(AccountPickerSheet).vm.$emit('pick', card.id)
     await flushPromises()
     await view.get(`input[type="radio"][value="${CAFE}"]`).setValue(true)
@@ -237,6 +242,48 @@ describe('the account in the sheet of a spending (handoff 06)', () => {
     expect(document.querySelector('dialog .region')?.textContent).toContain(
       en.spending.sheet.bad_amount,
     )
+  })
+
+  // No category chosen — a new spending opens with none — is the commonest refusal of the chips
+  // (adversarial Р3-А1): the focus goes to a radio, and the radio is read with the error, which once
+  // described only the group; with the focus on a radio already, the error is said.
+  describe('no category chosen', () => {
+    async function noCategory(): Promise<{ view: VueWrapper; pinia: Pinia }> {
+      const pinia = withAccounts([])
+      const view = await announcedSpendingSheet(pinia)
+      await view.get('.well input').setValue('500')
+      return { view, pinia }
+    }
+    const save = (view: VueWrapper) =>
+      view.findAll('button').find((one) => one.text() === en.spending.sheet.save)
+    async function landed(): Promise<string> {
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      await flushPromises()
+      return document.querySelector('dialog .region')?.textContent ?? ''
+    }
+
+    it('the focus goes to a chip, read with the error', async () => {
+      const { view, pinia } = await noCategory()
+      view.get<HTMLInputElement>('.well input').element.focus()
+      await save(view)?.trigger('click')
+      await landed()
+      expect(useSpendingQueueStore(pinia).pending).toHaveLength(0)
+      const radio = view.get<HTMLInputElement>(`input[type="radio"][value="${CAFE}"]`)
+      expect(document.activeElement).toBe(radio.element)
+      const described = (radio.attributes('aria-describedby') ?? '')
+        .split(' ')
+        .map((id) => document.getElementById(id)?.textContent.trim())
+      expect(described).toContain(en.spending.sheet.bad_category)
+    })
+
+    it('with the focus on a chip already, the error is said', async () => {
+      const { view } = await noCategory()
+      const radio = view.get<HTMLInputElement>(`input[type="radio"][value="${CAFE}"]`)
+      radio.element.focus()
+      await save(view)?.trigger('click')
+      expect(await landed()).toContain(en.spending.sheet.bad_category)
+      expect(document.activeElement).toBe(radio.element)
+    })
   })
 
   it('«Без счёта» is said out loud — an explicit null, not a field left out', async () => {

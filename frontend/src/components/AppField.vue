@@ -27,6 +27,7 @@
         :readonly="readonly"
         :placeholder="placeholder"
         :aria-invalid="failed ? 'true' : undefined"
+        :aria-errormessage="failed ? `${id}-error` : undefined"
         :aria-describedby="describedBy()"
         @input="update"
       ></textarea>
@@ -39,6 +40,7 @@
         :value="modelValue"
         :disabled="readonly || !!attrs.disabled"
         :aria-invalid="failed ? 'true' : undefined"
+        :aria-errormessage="failed ? `${id}-error` : undefined"
         :aria-describedby="describedBy()"
         @change="update"
       >
@@ -63,6 +65,7 @@
         :readonly="readonly"
         :placeholder="placeholder"
         :aria-invalid="failed ? 'true' : undefined"
+        :aria-errormessage="failed ? `${id}-error` : undefined"
         :aria-describedby="describedBy()"
         @input="update"
       />

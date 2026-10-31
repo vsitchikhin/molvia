@@ -11,7 +11,8 @@ import { useAnnouncer } from '@/composables/useAnnouncer'
  *
  * `find` is asked after the render, so a screen names the first field that is wrong by its mark
  * (`[aria-invalid="true"]`) and is answered in the order of its form. The words are the field's own
- * error, `<id>-error` of `AppField`: no second copy of them.
+ * error, the one its `aria-errormessage` names — `AppField`'s, a radio of `CategoryChips`' — no second
+ * copy of them.
  */
 export function useFieldRefusal(): (find: () => HTMLElement | null | undefined) => Promise<void> {
   const say = useAnnouncer()
@@ -23,7 +24,8 @@ export function useFieldRefusal(): (find: () => HTMLElement | null | undefined) 
       field.focus()
       return
     }
-    const words = document.getElementById(`${field.id}-error`)?.textContent.trim()
+    const error = field.getAttribute('aria-errormessage')
+    const words = error ? document.getElementById(error)?.textContent.trim() : undefined
     if (words) say?.(words)
   }
 }

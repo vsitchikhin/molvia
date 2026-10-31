@@ -115,10 +115,19 @@ describe('AppField', () => {
     expect(view.get('input').attributes('aria-describedby')).toBe(error.attributes('id'))
   })
 
+  // A refusal reads the words of the error the field names (`useFieldRefusal`, MOL-235).
+  it('names its error as its error message', () => {
+    const view = render({ error: ERROR.INVALID_AMOUNT })
+    expect(view.get('input').attributes('aria-errormessage')).toBe(
+      view.get('.error').attributes('id'),
+    )
+  })
+
   it('must not fire: no error — no aria-invalid and no empty message', () => {
     const view = render()
     const input = view.get('input')
     expect(input.attributes('aria-invalid')).toBeUndefined()
+    expect(input.attributes('aria-errormessage')).toBeUndefined()
     expect(input.attributes('aria-describedby')).toBeUndefined()
     expect(view.find('.error').exists()).toBe(false)
   })
