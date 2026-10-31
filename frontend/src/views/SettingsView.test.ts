@@ -516,11 +516,35 @@ describe('a form shown from memory says as of when, and what became of the read 
     expect(me).toHaveBeenCalledTimes(3)
     const strip = strips(view)[0]
     expect(strip?.props('kind')).toBe('unanswered')
+    // One «Повторить» on the screen, the save's (adversarial Ж1 of round 7): the strip has none meanwhile.
+    expect(view.findAll('button').filter((one) => one.text() === en.state.retry)).toHaveLength(1)
+    expect(strip?.find('button').exists()).toBe(false)
 
     await field(view, 'spend')?.setValue('USD')
     await flushPromises()
     expect(view.find('[role="alert"]').exists()).toBe(false)
     expect(strips(view)[0]?.element).toBe(strip?.element)
+    // The save's «Повторить» gone with its notice, the strip's comes back.
+    expect(strips(view)[0]?.find('button').text()).toBe(en.state.retry)
+  })
+
+  // Adversarial Ж2 of round 7: a 409 has no notice, so the strip of the read after it is the screen's one
+  // word — and the edit took it away, the fields moving up under the finger.
+  it('must not fire: an edit after a 409 takes away the strip of the read after it', async () => {
+    const view = await render()
+    await field(view, 'city')?.setValue('Ереван')
+    save.mockRejectedValue(new ApiError(ERROR.CONFLICT))
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    await view.get('.dock > button').trigger('click')
+    await flushPromises()
+    expect(view.find('[role="alert"]').exists()).toBe(false)
+    const strip = strips(view)[0]
+    expect(strip?.props('kind')).toBe('unanswered')
+
+    await field(view, 'spend')?.setValue('USD')
+    await flushPromises()
+    expect(strips(view)[0]?.element).toBe(strip?.element)
+    expect(me).toHaveBeenCalledTimes(2)
   })
 
   it('must not fire: a failed save speaks for itself, with no strip of the read beside it', async () => {

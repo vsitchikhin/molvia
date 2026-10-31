@@ -49,7 +49,9 @@
         :text="strip.text"
         :attempt="form.failures"
       >
-        <template #action>
+        <!-- One «Повторить» a screen (MOL-181, К-5): while the strip under the thumb offers the save's,
+             the strip of the read has none — two of one name, one reading and one writing (Ж1). -->
+        <template v-if="!retriesSave" #action>
           <AppButton variant="ghost" @click="form.refresh(true)">{{ t('state.retry') }}</AppButton>
         </template>
       </StatusStrip>
@@ -187,9 +189,7 @@
         :aria-describedby="notice ? `${id}-notice` : undefined"
         @click="form.save"
       >
-        <template v-if="form.saveError && online && !form.saving && !form.loading" #icon
-          ><IconRefresh
-        /></template>
+        <template v-if="retriesSave && !form.saving" #icon><IconRefresh /></template>
         {{ saveWord }}
       </AppButton>
     </template>
@@ -325,9 +325,10 @@ export default defineComponent({
      * only where the read keeps the save back: an unchanged form says «изменений нет» while the read of
      * every opening is on its way, or the word would blink at each one.
      */
+    /** «Сохранить» is the save's «Повторить» (adversarial А3: not while the read after it is on its way). */
+    const retriesSave = computed(() => form.saveError && online.value && !form.loading)
     const saveWord = computed(() => {
-      // Not while the read after the refusal is on its way: that keeps it back (adversarial А3).
-      if (form.saveError && online.value && !form.loading) return t('state.retry')
+      if (retriesSave.value) return t('state.retry')
       if (!online.value) return t('settings.save_needs_network')
       if (form.unknown) return t('settings.save')
       if (!form.draft) return t('state.loading')
@@ -383,6 +384,7 @@ export default defineComponent({
       askToLeave,
       groupsShown,
       strip,
+      retriesSave,
       saveWord,
       IconDevices,
       IconLogout,

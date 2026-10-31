@@ -7,6 +7,7 @@ import { ApiError } from '@molvia/client'
 import { ERROR, sameSettings, settingsOf, settingsUpdateSchema } from '@molvia/model'
 import type { ActorSettings } from '@molvia/model'
 import { api } from '@/api'
+import { reportFailure } from '@/failures'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
 import { forget, read, writeEverywhere } from '@/stores/storage'
@@ -211,11 +212,15 @@ const useSettingsStore = defineStore('settingsForm', () => {
       failure.value = null
       failureOfSave.value = false
       return true
-    } catch {
+    } catch (error) {
       // A session that ended is heard by the seam in `@/api`, not by every caller (MOL-56).
       if (mine === generation) {
+        // The phone's own defect reaches the owner; the API's word and the weather do not (MOL-144).
+        reportFailure(error, 'screen')
         failure.value = navigator.onLine ? 'error' : 'offline'
-        failureOfSave.value = afterSave
+        // Only a refusal «Не удалось сохранить» speaks for: a 409 says nothing, and the strip is then
+        // the screen's one word, which an edit must not take (adversarial Ж2 of round 7).
+        failureOfSave.value = afterSave && saveError.value
         if (retry) failures.value += 1
       }
       return false
