@@ -178,6 +178,18 @@ describe('a line taken apart (MOL-293)', () => {
     expect(receiptLineParts('Գազար կգ').size).toBeNull()
     expect(receiptLineParts('Մագնեզիումի գլիցինատ 120մգ').size).toBeNull()
   })
+
+  it('takes a word glued to its package apart, and a unit in capitals for a unit (MOL-326)', () => {
+    expect(receiptLineParts('Շաքարավազ1կգ')).toMatchObject({
+      before: ['Շաքարավազ', '1կգ'],
+      kind: 'Շաքարավազ',
+      size: '1 кг',
+    })
+    expect(receiptLineParts('ԷՄ ԸՆԴ ԷՄՍ 45Գ').size).toBe('45 г')
+    expect(receiptLineParts('ՇԱՔԱՐԱՎԱԶ 1ԿԳ')).toMatchObject({ kind: 'ՇԱՔԱՐԱՎԱԶ', size: '1 кг' })
+    // a letter and a figure of a code stay one token, no word
+    expect(receiptLineParts('Մարտկոց Ա1 4հտ').before).toEqual(['Մարտկոց', 'Ա1', '4հտ'])
+  })
 })
 
 describe('a name of the seed in the till’s language for the line’s kind (MOL-293, adversarial А1)', () => {

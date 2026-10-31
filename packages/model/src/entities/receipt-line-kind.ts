@@ -94,21 +94,26 @@ function isNameWord(token: string): boolean {
   return !/\d/u.test(token) && !token.includes('/') && (ARMENIAN.test(token) || latin)
 }
 
-/** The tokens of a name: spaces and commas apart, «Գազ.ըմպելիք» at its point, parentheses dropped. */
+/**
+ * The tokens of a name: spaces and commas apart, «Գազ.ըմպելիք» at its point, a word glued to its package at its
+ * figure — «Շաքարավազ1կգ» lost its word whole (MOL-326) — parentheses dropped. A letter before a figure is a code's:
+ * «Ա1».
+ */
 function tokensOf(text: string): string[] {
   return text
     .replace(/[()]/gu, ' ')
     .split(/[\s,;:]+/u)
-    .flatMap((token) => token.split(/(?<=[ա-ֆԱ-Ֆ]\.)(?=[ա-ֆԱ-Ֆ])/u))
+    .flatMap((token) => token.split(/(?<=[ա-ֆԱ-Ֆ]\.)(?=[ա-ֆԱ-Ֆ])|(?<=[ա-ֆԱ-Ֆ]{2})(?=\d)/u))
     .map((token) => token.replace(/^[^\p{L}\d#№]+|[^\p{L}\d.%]+$/gu, ''))
     .filter((token) => token !== '')
 }
 
 const decimal = (figure: string): string => figure.replace('.', ',')
 
-// «130գր», «0.25լ», «250±10գր», «2x40գր», «6լ(հատ)»; a till's «կգ» alone is a line sold by weight
+// «130գր», «0.25լ», «250±10գր», «2x40գր», «6լ(հատ)», «45Գ» in capitals (MOL-326); a till's «կգ» alone is a line
+// sold by weight
 const SIZE =
-  /(?<![\d.,])(?:(\d+)\s*[xх×*]\s*)?(\d+(?:[.,]\d+)?)(?:±\d+)?\s*(կգ|գր|գ|մլ|լ)(?![ա-ֆ])/u
+  /(?<![\d.,])(?:(\d+)\s*[xх×*]\s*)?(\d+(?:[.,]\d+)?)(?:±\d+)?\s*(կգ|գր|գ|մլ|լ)(?![ա-ֆ])/iu
 const SIZE_UNITS: Readonly<Record<string, string>> = {
   կգ: 'кг',
   գր: 'г',
@@ -160,7 +165,7 @@ export function receiptLineParts(printed: string): ReceiptLineParts {
     size:
       size === null
         ? null
-        : `${size[1] === undefined ? '' : `${size[1]}×`}${decimal(size[2] ?? '')} ${SIZE_UNITS[size[3] ?? ''] ?? ''}`,
+        : `${size[1] === undefined ? '' : `${size[1]}×`}${decimal(size[2] ?? '')} ${SIZE_UNITS[(size[3] ?? '').toLowerCase()] ?? ''}`,
   }
 }
 
