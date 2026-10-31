@@ -1,11 +1,24 @@
 <template>
   <AppScreen :title="t('settings.title')">
-    <ScreenSkeleton v-if="form.loading && !form.draft" :groups="[32]">
+    <!-- The form's shape (Ф-13): its two groups, each field its label, its well and its hint — the
+         country has none. -->
+    <ScreenSkeleton v-if="form.loading && !form.draft">
+      <SkeletonPart kind="caption" :width="28" />
       <div class="ghost-card">
-        <span class="ghost-label"></span><span class="ghost-field"></span>
+        <div class="ghost-group">
+          <span class="ghost-label"></span><span class="ghost-field"></span>
+        </div>
+        <div class="ghost-group">
+          <span class="ghost-label"></span><span class="ghost-field"></span>
+          <span class="ghost-label hint"></span>
+        </div>
       </div>
+      <SkeletonPart kind="caption" :width="20" />
       <div class="ghost-card">
-        <span class="ghost-field"></span><span class="ghost-field"></span>
+        <div v-for="at in 2" :key="at" class="ghost-group">
+          <span class="ghost-label"></span><span class="ghost-field"></span>
+          <span class="ghost-label hint"></span>
+        </div>
       </div>
     </ScreenSkeleton>
     <ScreenState
@@ -76,66 +89,61 @@
     <SalaryShiftGroup v-show="groupsShown" class="group" />
     <!-- The bot's messages, a switch each, on a page of their own (MOL-129, В-2). -->
     <section v-show="groupsShown" class="group">
-      <h2 class="caption">{{ t('settings.group_bot') }}</h2>
+      <SectionCaption>{{ t('settings.group_bot') }}</SectionCaption>
       <AppCard as="ul" list>
         <li>
-          <RouterLink class="entry" :to="{ name: 'bot' }">
-            <IconRobot class="entry-icon" aria-hidden="true" />
-            <span class="entry-text">
-              <span class="entry-label">{{ t('bot.title') }}</span>
-              <span class="entry-hint">{{ t('settings.bot.hint') }}</span>
-            </span>
-            <IconChevron class="entry-chevron" aria-hidden="true" />
-          </RouterLink>
+          <ListRow
+            as="router-link"
+            :to="{ name: 'bot' }"
+            :icon="IconRobot"
+            :title="t('bot.title')"
+            :meta="t('settings.bot.hint')"
+            next
+          />
         </li>
       </AppCard>
     </section>
     <!-- This device's own, not the account's: nothing goes to the server (MOL-111). -->
     <SchemeGroup v-show="groupsShown" class="group" />
     <!-- Outside the form's states: the way into the account does not depend on whether its
-         settings loaded (MOL-57) — only on the skeleton having gone, answer or failure (MOL-269). -->
+         settings loaded (MOL-57) — only on the skeleton having gone, answer or failure (MOL-269).
+         One group (owner's Q3) and two cards: «Устройства» goes on to a screen and «Выйти» asks to
+         confirm, and one card never holds both (В-14 «а»; MOL-215, owner's В-1 «а»). -->
     <section v-show="groupsShown" class="group">
       <SectionCaption>{{ t('settings.group_account') }}</SectionCaption>
       <AppCard as="ul" list>
         <li>
-          <RouterLink class="entry" :to="{ name: 'devices' }">
-            <IconDevices class="entry-icon" aria-hidden="true" />
-            <span class="entry-label">{{ t('devices.title') }}</span>
-            <IconChevron class="entry-chevron" aria-hidden="true" />
-          </RouterLink>
+          <NavRow :to="{ name: 'devices' }" :icon="IconDevices" :label="t('devices.title')" />
         </li>
-        <!-- Here and not beside «Это устройство» in the list: leaving a laptop that is not yours
-             is «quickly, then go», and it is looked for on this screen (owner's decision Q3). -->
+      </AppCard>
+      <!-- Here and not beside «Это устройство» in the list: leaving a laptop that is not yours
+           is «quickly, then go», and it is looked for on this screen (owner's decision Q3). -->
+      <AppCard as="ul" list class="second">
         <li>
-          <button class="entry leave" type="button" @click="askToLeave">
-            <IconLogout class="entry-icon" aria-hidden="true" />
-            <span class="entry-label">{{ t('settings.sign_out') }}</span>
-          </button>
+          <ListRow
+            class="leave"
+            :icon="IconLogout"
+            :title="t('settings.sign_out')"
+            danger
+            @click="askToLeave"
+          />
         </li>
       </AppCard>
     </section>
-    <!-- «Написать разработчику» (MOL-147): opens the app's one sheet rather than a screen, as «Выйти»
-         and «Удалить мои данные» do, so there is no chevron. Offline it opens all the same: written
-         now, sent once there is a connection. -->
+    <!-- «Написать разработчику» (MOL-147): a sheet with fields, so the chevron of В-14 (Р-3 of
+         MOL-175). Offline it opens all the same: written now, sent once there is a connection. -->
     <section v-show="groupsShown" class="group">
       <SectionCaption>{{ t('settings.group_app') }}</SectionCaption>
       <AppCard as="ul" list>
         <li>
-          <button
-            class="entry opener"
-            type="button"
+          <ListRow
+            :icon="IconMessage"
+            :title="t('settings.feedback.label')"
+            :meta="t('settings.feedback.hint')"
             aria-haspopup="dialog"
-            :aria-describedby="`${id}-feedback`"
+            next
             @click="feedback.open({ from: 'settings' })"
-          >
-            <IconMessage class="entry-icon" aria-hidden="true" />
-            <span class="entry-text">
-              <span class="entry-label">{{ t('settings.feedback.label') }}</span>
-              <span :id="`${id}-feedback`" class="entry-hint">{{
-                t('settings.feedback.hint')
-              }}</span>
-            </span>
-          </button>
+          />
         </li>
       </AppCard>
     </section>
@@ -190,7 +198,6 @@ import IconPencil from '~icons/mdi/pencil-outline'
 import IconCheck from '~icons/mdi/check'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconRefresh from '~icons/mdi/refresh'
-import IconChevron from '~icons/mdi/chevron-right'
 import IconDevices from '~icons/mdi/devices'
 import IconRobot from '~icons/mdi/robot-outline'
 import IconLogout from '~icons/mdi/logout'
@@ -199,12 +206,15 @@ import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
+import ListRow from '@/components/ListRow.vue'
+import NavRow from '@/components/NavRow.vue'
 import SalaryShiftGroup from '@/components/SalaryShiftGroup.vue'
 import SchemeGroup from '@/components/SchemeGroup.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SettingsFields from '@/components/SettingsFields.vue'
 import { countryLabel } from '@/components/placeLabel'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SignOutSheet from '@/components/SignOutSheet.vue'
 import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
@@ -227,18 +237,16 @@ export default defineComponent({
     AppScreen,
     IconAlert,
     IconCheck,
-    IconChevron,
     IconCloud,
-    IconDevices,
-    IconRobot,
-    IconLogout,
-    IconMessage,
     IconPencil,
     IconRefresh,
+    ListRow,
+    NavRow,
     SalaryShiftGroup,
     SchemeGroup,
     ScreenSkeleton,
     ScreenState,
+    SkeletonPart,
     SectionCaption,
     SettingsFields,
     SignOutSheet,
@@ -367,6 +375,10 @@ export default defineComponent({
       groupsShown,
       strip,
       saveWord,
+      IconDevices,
+      IconLogout,
+      IconMessage,
+      IconRobot,
       feedback: useFeedbackSheetStore(),
     }
   },
@@ -461,69 +473,9 @@ export default defineComponent({
   margin-top: var(--space-6);
 }
 
-.entry {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--touch-target-lg);
-  padding: 0 var(--space-4);
-  color: inherit;
-  text-decoration: none;
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-}
-
-.entry-icon,
-.entry-chevron {
-  @include icon;
-
-  color: var(--text-muted);
-}
-
-.entry-icon {
-  font-size: var(--icon-md);
-}
-
-.entry-chevron {
-  font-size: var(--icon);
-}
-
-.entry-label {
-  flex: 1;
-}
-
-.entry-text {
-  display: grid;
-  flex: 1;
-  min-width: 0;
-  padding: var(--space-2) 0;
-}
-
-.entry-hint {
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
-// A button dressed as the link beside it: the same row. Never `.plain`: that is AppCard's tone on
-// its root, which carries this screen's scope as well, and the rule took the card's surface.
-.leave,
-.opener {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-// The colour of an action that ends something (MOL-57).
-.leave {
-  &,
-  .entry-icon {
-    color: var(--bad-ink);
-  }
+// The second card of a group, as close to the first as a caption is to its card.
+.second {
+  margin-top: var(--space-2);
 }
 
 .ghost-card {
@@ -546,10 +498,19 @@ export default defineComponent({
   background: var(--surface-2);
 }
 
+.ghost-group {
+  display: grid;
+  gap: var(--space-2);
+}
+
 .ghost-label {
   @include skeleton-bar;
 
   width: 38%;
   height: var(--skeleton-line);
+
+  &.hint {
+    width: 72%;
+  }
 }
 </style>

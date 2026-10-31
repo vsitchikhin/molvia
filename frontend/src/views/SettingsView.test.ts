@@ -6,6 +6,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
 import { actorCodec, ERROR } from '@molvia/model'
 import type { ActorView, SettingsUpdate } from '@molvia/model'
+import AppTag from '@/components/AppTag.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import { purchaseDay, timeOfDay } from '@/days'
@@ -353,7 +354,7 @@ it.each([
   // The way into the account does not depend on whether its settings loaded.
   if (!online) me.mockRejectedValue(new TypeError('network'))
   const view = await render(cached, online)
-  const entry = view.findAll('a.entry').find((link) => link.text() === en.devices.title)
+  const entry = view.findAll('a.nav-row').find((link) => link.text() === en.devices.title)
   expect(entry?.attributes('href')).toBe('/settings/devices')
   expect(view.text()).toContain(en.settings.group_account)
 })
@@ -549,5 +550,50 @@ describe('«Сохранить» says why it cannot be pressed, on itself (Ф-6)
     await field(view, 'city')?.setValue('Ереван')
     expect(button(view).text()).toBe(en.state.loading)
     expect(button(view).attributes('aria-disabled')).toBe('true')
+  })
+})
+
+describe('the rows and the fields of the kit (MOL-215, Ф-4, Ф-12)', () => {
+  it('a changed field is marked by the kit’s tag of what waits, not by a fill that says «press»', async () => {
+    const view = await render()
+    await field(view, 'city')?.setValue('Ереван')
+    const tags = view.findAllComponents(AppTag)
+    expect(tags).toHaveLength(1)
+    expect(tags[0]?.props('tone')).toBe('warn')
+    expect(tags[0]?.text()).toBe(en.settings.changed)
+  })
+
+  it('a chevron on what goes on, none on what acts or asks — and never both in one card (В-14 «а»)', async () => {
+    const view = await render()
+    const cards = view.findAll('ul').filter((list) => list.findAll(':scope > li').length > 0)
+    const rows = cards.map((card) =>
+      card.findAll(':scope > li').map((row) => ({
+        text: row.text(),
+        next: row.find('.chevron').exists(),
+      })),
+    )
+    for (const card of rows) expect(new Set(card.map((row) => row.next)).size).toBe(1)
+
+    const nextOf = (label: string) => rows.flat().find((row) => row.text.startsWith(label))?.next
+    for (const label of [
+      en.bot.title,
+      en.devices.title,
+      en.settings.feedback.label,
+      en.privacy.title,
+      en.terms.title,
+    ])
+      expect(nextOf(label), label).toBe(true)
+    for (const label of [en.settings.sign_out, en.settings.export.label, en.settings.erase.label])
+      expect(nextOf(label), label).toBe(false)
+  })
+
+  it('«Устройства» and «Выйти» stay one group, two cards (owner’s Q3, MOL-215 В-1 «а»)', async () => {
+    const view = await render()
+    const group = view
+      .findAll('section.group')
+      .find((section) => section.text().startsWith(en.settings.group_account))
+    expect(group?.findAll('ul')).toHaveLength(2)
+    expect(group?.text()).toContain(en.devices.title)
+    expect(group?.text()).toContain(en.settings.sign_out)
   })
 })

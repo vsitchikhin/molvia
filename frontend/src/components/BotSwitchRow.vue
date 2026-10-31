@@ -23,7 +23,9 @@
       @retry="$emit('retry')"
     />
     <p v-else-if="saveFailed" class="failed" role="alert">
-      <IconAlert aria-hidden="true" />{{ t('settings.tap.save_failed') }}
+      <span class="said"
+        ><IconAlert aria-hidden="true" /><span>{{ t('settings.tap.save_failed') }}</span></span
+      >
     </p>
   </li>
 </template>
@@ -127,5 +129,15 @@ export default defineComponent({
 
     font-size: var(--icon-sm);
   }
+}
+
+// An icon and its words as one item of the line: the words wrap beside the icon, and a button after
+// them goes under once the line is full — as «Ваши данные» (MOL-96, Р3-А4).
+.said {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
 }
 </style>

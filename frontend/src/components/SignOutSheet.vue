@@ -16,6 +16,7 @@
         :inactive="offline"
         @click="$emit('confirm')"
       >
+        <template #icon><IconLogout /></template>
         {{ t('sign_out.confirm') }}
       </AppButton>
     </template>
@@ -26,6 +27,7 @@
 import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
+import IconLogout from '~icons/mdi/logout'
 import AppButton from '@/components/AppButton.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 
@@ -40,7 +42,7 @@ import BottomSheet from '@/components/BottomSheet.vue'
  */
 export default defineComponent({
   name: 'SignOutSheet',
-  components: { AppButton, BottomSheet },
+  components: { AppButton, BottomSheet, IconLogout },
   props: {
     open: { type: Boolean, required: true },
     /** Writes this device holds that the server does not have yet. */

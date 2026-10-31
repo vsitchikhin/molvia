@@ -65,7 +65,7 @@ async function render() {
   return view
 }
 
-const download = (view: VueWrapper) => view.get('button.entry')
+const download = (view: VueWrapper) => view.get('button.download')
 const refusal = (name: string) => new DOMException(name, name)
 
 function shareable(on: boolean): void {
@@ -136,6 +136,8 @@ describe('«Скачать мои данные» (MOL-93)', () => {
     await download(view).trigger('click')
     await flushPromises()
     expect(view.get('.ready').text()).toContain(en.settings.export.ready)
+    // Secondary: «Сохранить» in the strip may be the screen's one filled button meanwhile (Ф-15).
+    expect(view.get('.ready button').classes()).toContain('secondary')
 
     await view.get('.ready button').trigger('click')
     await flushPromises()
