@@ -1,8 +1,12 @@
 <template>
-  <label class="app-checkbox" :class="{ inactive }">
+  <label
+    class="app-checkbox"
+    :class="[attrs.class, { 'app-checkbox-inactive': inactive }]"
+    :style="attrs.style"
+  >
     <span class="box">
       <input
-        v-bind="$attrs"
+        v-bind="control()"
         class="input"
         type="checkbox"
         :checked="checked"
@@ -17,7 +21,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { defineComponent, useAttrs } from 'vue'
 import IconCheck from '~icons/mdi/check'
 
 /**
@@ -30,7 +34,8 @@ import IconCheck from '~icons/mdi/check'
  * (Ф-6, MOL-174): `aria-disabled`, still in the focus order, and neither a tap, a tap on its words nor
  * Space moves it; drawn on `surface-2` with its words in `text-muted` at 600, no opacity. The focus is
  * a field's (`field-focus`) on the whole row, which the tap takes. `v-model:checked`; every other
- * attribute goes to the checkbox.
+ * attribute goes to the checkbox, `class` and `style` to the row, where the layout is — as `AppField`'s
+ * (self-review №4) — and the row's classes are the kit's words, a root carrying its screen's scope.
  */
 export default defineComponent({
   name: 'AppCheckbox',
@@ -42,6 +47,13 @@ export default defineComponent({
   },
   emits: { 'update:checked': (on: boolean) => typeof on === 'boolean' },
   setup(props, { emit }) {
+    const attrs = useAttrs()
+    // A function, not a computed: attrs are not reactive (AppField's reason).
+    function control(): Record<string, unknown> {
+      return Object.fromEntries(
+        Object.entries(attrs).filter(([name]) => name !== 'class' && name !== 'style'),
+      )
+    }
     /** A cancelled click leaves the checkbox as it was: a tap, a tap on its words, and Space. */
     function hold(event: MouseEvent): void {
       if (props.inactive) event.preventDefault()
@@ -49,7 +61,7 @@ export default defineComponent({
     function toggle(event: Event): void {
       emit('update:checked', (event.target as HTMLInputElement).checked)
     }
-    return { hold, toggle }
+    return { attrs, control, hold, toggle }
   },
 })
 </script>
@@ -121,7 +133,7 @@ export default defineComponent({
 }
 
 /* Not now, in either position: a well with an edge, the ✓ and the words muted (Ф-6). */
-.inactive {
+.app-checkbox-inactive {
   color: var(--text-muted);
   font-weight: var(--weight-medium);
   cursor: default;

@@ -280,6 +280,7 @@ import { calendarDay, localDay, shiftDay } from '@/days'
 import { afterStep, useNavigation } from '@/navigation'
 import { newId } from '@/ids'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useAccountsStore } from '@/stores/accounts'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import type { SpendingFields } from '@/stores/spendingQueue'
@@ -380,9 +381,11 @@ export default defineComponent({
     const dayBad = ref(false)
     const placeBad = ref(false)
     const form = ref<HTMLFormElement | null>(null)
+    const amountField = () => form.value?.querySelector<HTMLInputElement>('[data-field="amount"]')
     function focusAmount(): void {
-      form.value?.querySelector<HTMLInputElement>('[data-field="amount"]')?.focus()
+      amountField()?.focus()
     }
+    const refuse = useFieldRefusal()
     const detailsOpen = ref(false)
     /** The field «Дата, заметка, место» opens on: the first wrong one, none for a tap on its line. */
     const detailsFocus = ref<SpendingDetailsField | null>(null)
@@ -872,7 +875,7 @@ export default defineComponent({
         // The first field that is wrong gets the focus (handoff 02), in the order of the form: the sum,
         // «списано», a chip — and only then the fields behind «Дата, заметка, место», whose sheet opens
         // on the wrong one (MOL-199). Opened over an error above it, it would hide the error.
-        if (!value) focusAmount()
+        if (!value) void refuse(amountField)
         else if (charge === 'bad' || !chosen)
           document.querySelector<HTMLInputElement>('.form [aria-invalid="true"]')?.focus()
         else openDetails(dayBad.value ? 'day' : typedNote.bad ? 'note' : 'place')

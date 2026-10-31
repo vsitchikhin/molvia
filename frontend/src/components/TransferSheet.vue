@@ -29,7 +29,7 @@
       :title="t('transfer.unavailable')"
       @retry="load"
     />
-    <form v-else class="form" novalidate @submit.prevent="submit">
+    <form v-else ref="form" class="form" novalidate @submit.prevent="submit">
       <StatusStrip v-if="!online" kind="offline" :text="t('transfer.offline')" />
 
       <div class="field">
@@ -203,6 +203,7 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { pageOrder, shortDay } from '@/components/accounts'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { shown } from '@/composables/useItemDetails'
 import { useReconnect } from '@/composables/useReconnect'
 import { useTransfers } from '@/composables/useTransfers'
@@ -279,6 +280,9 @@ export default defineComponent({
     const loading = ref(false)
     const unread = ref<'error' | 'offline' | 'gone' | null>(null)
     const amountBad = ref(false)
+    // A field refused is heard (adversarial А2): the first one marked, in the order of the form.
+    const form = ref<HTMLFormElement | null>(null)
+    const refuse = useFieldRefusal()
     const feeBad = ref(false)
     const dayBad = ref(false)
     const noteBad = ref(false)
@@ -526,7 +530,10 @@ export default defineComponent({
       const typedNote = note.value.trim() ? exchangeNoteSchema.safeParse(note.value) : null
       noteBad.value = typedNote !== null && !typedNote.success
       dayBad.value = !isRateDay(day.value) || day.value > today.value
-      if (!sum || feeBad.value || noteBad.value || dayBad.value) return
+      if (!sum || feeBad.value || noteBad.value || dayBad.value) {
+        void refuse(() => form.value?.querySelector<HTMLElement>('[aria-invalid="true"]'))
+        return
+      }
 
       const fields = {
         fromAccountId: giver.id,
@@ -608,6 +615,7 @@ export default defineComponent({
     }
 
     return {
+      form,
       t,
       amountId,
       amount,

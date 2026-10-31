@@ -41,6 +41,16 @@ describe('AppCheckbox (MOL-235)', () => {
     view.unmount()
   })
 
+  // Laid out by the screen as a field is (self-review №4): a class on the box moved it inside the row.
+  it('puts a class and a style of its owner on the row, not on the box', () => {
+    const view = render({ checked: false }, { class: 'age', style: 'margin-top: 8px' })
+    expect(view.classes()).toContain('age')
+    expect(view.attributes('style')).toContain('margin-top: 8px')
+    expect(view.get('input').classes()).not.toContain('age')
+    expect(view.get('input').attributes('style')).toBeUndefined()
+    view.unmount()
+  })
+
   it('takes an id and a description from its owner, on the checkbox', () => {
     const view = render({ checked: false }, { id: 'aged', 'aria-describedby': 'hint' })
     expect(view.get('input').attributes('id')).toBe('aged')
@@ -63,7 +73,7 @@ describe('inactive (Ф-6)', () => {
     const input = view.get('input')
     expect(input.attributes('disabled')).toBeUndefined()
     expect(input.attributes('aria-disabled')).toBe('true')
-    expect(view.classes()).toContain('inactive')
+    expect(view.classes()).toContain('app-checkbox-inactive')
     view.unmount()
   })
 

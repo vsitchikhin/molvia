@@ -191,16 +191,23 @@ describe('TransferSheet (MOL-253)', () => {
     expect(mainButton(two).text()).toBe('Choose where to')
   })
 
-  // The kit's error, in words under the field (MOL-235): the copy before drew a red edge and said nothing.
-  it('a sum it cannot read is said under the field, and nothing is sent', async () => {
+  // The kit's error, in words under the field (MOL-235): the copy before drew a red edge and said nothing;
+  // the focus goes to the field once it is marked, so it is read with its error (adversarial А2).
+  it('a sum it cannot read: nothing is sent, and the focus goes to the field, read with its error', async () => {
     const view = await sheet({ from: card.id }, withAccounts([card, dollars]))
     await typeAmount(view, 'abc')
+    const amount = view.get<HTMLInputElement>('input[data-field="amount"]')
+    let invalidAtFocus: string | null = null
+    amount.element.addEventListener('focus', () => {
+      invalidAtFocus = amount.element.getAttribute('aria-invalid')
+    })
+    ;(mainButton(view).element as HTMLButtonElement).focus()
     await mainButton(view).trigger('click')
     await flushPromises()
-    const amount = view.get('input[data-field="amount"]')
-    expect(amount.attributes('aria-invalid')).toBe('true')
-    expect(view.get('.error').text()).toBe(en.spending.sheet.bad_amount)
     expect(recordTransfer).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(amount.element)
+    expect(invalidAtFocus).toBe('true')
+    expect(view.get('.error').text()).toBe(en.spending.sheet.bad_amount)
     await typeAmount(view, '2000')
     expect(amount.attributes('aria-invalid')).toBeUndefined()
   })

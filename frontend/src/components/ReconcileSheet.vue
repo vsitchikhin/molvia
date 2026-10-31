@@ -12,7 +12,6 @@
     <StatusStrip v-if="!online" class="status" kind="offline" :text="t(offlineLine)" />
 
     <!-- Step one: the fact, before the count — so as not to fit the number (В-4 MOL-43). -->
-    <!-- An empty fact takes the focus back to the field, so its error is read with it (MOL-235). -->
     <form v-if="!result" ref="form" class="form" novalidate @submit.prevent="check">
       <div class="field">
         <AppField
@@ -230,6 +229,7 @@ import {
 } from '@/components/accounts'
 import type { Removed } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import type { IncomeDraft } from '@/composables/useIncomes'
 import { useReconnect } from '@/composables/useReconnect'
 import { newId } from '@/ids'
@@ -308,9 +308,13 @@ export default defineComponent({
     const fact = ref('')
     const factBad = ref(false)
     const form = ref<HTMLFormElement | null>(null)
+    const factField = () => form.value?.querySelector<HTMLInputElement>('[data-field="fact"]')
     function focusFact(): void {
-      form.value?.querySelector<HTMLInputElement>('[data-field="fact"]')?.focus()
+      factField()?.focus()
     }
+    // An empty fact is heard (adversarial А1): the field is focused with its error, or, holding the
+    // focus already — Enter in it, a tap on «Сверить» Safari does not focus — says it.
+    const refuse = useFieldRefusal()
     const result = ref<AccountCheckResponse | null>(null)
     const sending = ref(false)
     /** Why the last ask did not answer — read after the failure, never before (MOL-19, A1). */
@@ -432,7 +436,7 @@ export default defineComponent({
       const value = parseSigned(fact.value, props.account.currency)
       if (!value) {
         factBad.value = true
-        focusFact()
+        void refuse(factField)
         return
       }
       const earlier = [sent, tried].find((one) => one?.fact.minor === value.minor)

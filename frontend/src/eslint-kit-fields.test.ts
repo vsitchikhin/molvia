@@ -53,6 +53,17 @@ describe('the fields of the kit, outside it (MOL-235)', () => {
     expect(await said('<input type="search" />', VIEW)).toEqual([SEARCH])
   }, 120_000)
 
+  // HTML takes an enumerated value in any case, and Vue sets `inputMode` as the DOM property: the same
+  // field, so the same refusal (adversarial А3).
+  it('refuses a copy in any case, the name as the DOM spells it too', async () => {
+    expect(await said('<input type="Checkbox" />', VIEW)).toEqual([CHECKBOX])
+    expect(await said('<INPUT TYPE="CHECKBOX" />', VIEW)).toEqual([CHECKBOX])
+    expect(await said('<input type="text" inputmode="Decimal" />', VIEW)).toEqual([AMOUNT])
+    expect(await said('<input type="text" inputMode="decimal" />', VIEW)).toEqual([AMOUNT])
+    expect(await said('<input type="Search" />', VIEW)).toEqual([SEARCH])
+    expect(await said('<input enterKeyHint="search" />', VIEW)).toEqual([SEARCH])
+  }, 120_000)
+
   it('must not fire: what is not a copy passes', async () => {
     expect(await said('<input type="text" />', VIEW)).toEqual([])
     expect(await said('<input type="radio" />', VIEW)).toEqual([])

@@ -104,7 +104,7 @@ describe('AppField', () => {
     expect(error.text()).toBe(en.error.invalid_amount)
     expect(input.attributes('aria-invalid')).toBe('true')
     expect(input.attributes('aria-describedby')).toBe(error.attributes('id'))
-    expect(view.classes()).toContain('invalid')
+    expect(view.classes()).toContain('app-field-invalid')
   })
 
   it('shows words the screen gave when the registry has no code, over the code', () => {
@@ -146,16 +146,20 @@ describe('AppField', () => {
     expect(view.get('.error').text()).toBe(en.error.invalid_amount)
   })
 
-  it('keeps its classes its own, so a sheet styling its `.field` reaches no field of the kit (MOL-235)', () => {
-    const view = render()
-    expect(view.classes()).toContain('app-field')
-    expect(view.classes()).not.toContain('field')
+  // A root carries the scope of the screen it stands in: a sheet's `.field`, `.invalid` or `.readonly`
+  // would reach it (MOL-235, adversarial А5; `nav-invalid` of MOL-199 by the same reason).
+  it('keeps its classes its own, its states too, so no class of a screen reaches it', () => {
+    const view = render({ error: ERROR.INVALID_AMOUNT, readonly: true })
+    expect(view.classes()).toEqual(
+      expect.arrayContaining(['app-field', 'app-field-invalid', 'app-field-readonly']),
+    )
+    for (const word of ['field', 'invalid', 'readonly']) expect(view.classes()).not.toContain(word)
   })
 
   it('passes readonly to the input', () => {
     const view = render({ readonly: true })
     expect(view.get('input').attributes('readonly')).toBeDefined()
-    expect(view.classes()).toContain('readonly')
+    expect(view.classes()).toContain('app-field-readonly')
   })
 
   // A screen adds `autofocus` or `enterkeyhint` to the input it means, and lays the field out by
@@ -188,22 +192,25 @@ describe('the amount being typed (MOL-235)', () => {
 
   it('marks its error as every field does', () => {
     const view = render({ kind: 'decimal', size: 'entry', errorText: 'Enter an amount above zero' })
-    expect(view.classes()).toContain('invalid')
+    expect(view.classes()).toContain('app-field-invalid')
     expect(view.get('input').attributes('aria-invalid')).toBe('true')
     expect(view.get('input').attributes('aria-describedby')).toBe(
       view.get('.error').attributes('id'),
     )
   })
 
-  it('joins the sheet’s hint to its own descriptions', () => {
+  // The sign right after the value, the error after it, the sheet's hint last: a hint of twenty words
+  // first left «֏» alone at the end (adversarial А4).
+  it('reads the sign after the value, then the error, then the sheet’s hint', () => {
     const view = render(
-      { kind: 'decimal', size: 'entry' },
+      { kind: 'decimal', size: 'entry', errorText: 'Enter an amount — 0 is fine' },
       { suffix: '₽' },
       { 'aria-describedby': 'hint' },
     )
     expect(view.get('input').attributes('aria-describedby')?.split(' ')).toEqual([
-      'hint',
       view.get('.suffix').attributes('id'),
+      view.get('.error').attributes('id'),
+      'hint',
     ])
   })
 
@@ -235,7 +242,7 @@ it('opens native select, preserves its label and all descriptions, and emits the
   expect(view.get('label').attributes('for')).toBe(select.attributes('id'))
   expect(view.get('option[value=""]').attributes('disabled')).toBeDefined()
   expect(select.attributes('aria-describedby')).toBe(
-    `city-hint ${view.get('.error').attributes('id') ?? ''}`,
+    `${view.get('.error').attributes('id') ?? ''} city-hint`,
   )
   await select.setValue('AMD')
   expect(view.emitted('update:modelValue')).toEqual([['AMD']])

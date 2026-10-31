@@ -1,7 +1,14 @@
 <template>
   <div
     class="app-field"
-    :class="[attrs.class, { invalid: failed, readonly, 'app-field-entry': size === 'entry' }]"
+    :class="[
+      attrs.class,
+      {
+        'app-field-invalid': failed,
+        'app-field-readonly': readonly,
+        'app-field-entry': size === 'entry',
+      },
+    ]"
     :style="attrs.style"
   >
     <div class="label" :class="{ unseen: hideLabel, question }">
@@ -119,8 +126,9 @@ export type FieldSize = 'body' | 'entry'
  *
  * Every other attribute — `autofocus`, `enterkeyhint`, `maxlength` — goes to the control
  * itself; `class` and `style` stay on the field, where the layout is. The field's own classes are
- * the kit's words (`app-field…`): a root carries the scope of the screen it stands in, and a sheet's
- * `.field` — its column of a label and a field — doubled the space under the label (MOL-235).
+ * the kit's words (`app-field…`, its states too): a root carries the scope of the screen it stands in,
+ * and a sheet's `.field` — its column of a label and a field — doubled the space under the label
+ * (MOL-235).
  *
  * **`size="entry"` is the amount a sheet is opened to type** (MOL-235, Ф-12): the spending, the
  * check, the transfer had each drawn its own copy of it, with three looks of the focus. The same
@@ -184,11 +192,13 @@ export default defineComponent({
       )
     }
 
+    // The tail first, right after the value, then the error, then what the screen adds: a hint of
+    // twenty words between the figure and its «֏» left the sign alone at the end (MOL-235, А4).
     function describedBy(): string | undefined {
       const parts = [
-        attrs['aria-describedby'],
         slots.suffix ? `${id}-suffix` : undefined,
         failed.value ? `${id}-error` : undefined,
+        attrs['aria-describedby'],
         counter.value ? `${id}-counter` : undefined,
       ].filter(Boolean)
       return parts.length > 0 ? parts.join(' ') : undefined
@@ -393,7 +403,7 @@ textarea.control {
 
 /* The edge doubled, as a row of the kit draws an error (MOL-211, owner's В-3 «а»): a hairline is lost in
    bad light. Inside the edge, so nothing in the well moves. */
-.invalid .well {
+.app-field-invalid .well {
   border-color: var(--bad);
   box-shadow: inset 0 0 0 var(--hairline) var(--bad);
 }
@@ -406,10 +416,12 @@ textarea.control {
     border-radius: var(--radius-lg);
   }
 
+  /* The figure's own line, as the copies had it: inherited, the body's leading made the input 58, not 54. */
   .control {
     @include display-type;
 
     font-size: var(--text-entry);
+    line-height: normal;
   }
 
   .suffix {
@@ -451,7 +463,7 @@ textarea.control {
   font-size: var(--icon-sm);
 }
 
-.readonly {
+.app-field-readonly {
   .well {
     background: var(--surface);
   }

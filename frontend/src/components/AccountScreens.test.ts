@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import type { Pinia } from 'pinia'
+import { defineComponent, h, ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
@@ -20,6 +21,7 @@ import AccountSheet from './AccountSheet.vue'
 import OperationSheet from './OperationSheet.vue'
 import ReconcileSheet from './ReconcileSheet.vue'
 import StatusStrip from './StatusStrip.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -224,20 +226,94 @@ describe('ReconcileSheet (handoff 05)', () => {
     expect(dialog.html()).not.toMatch(/190\s132/)
   })
 
-  // The kit's field (MOL-235): the error is read with the field the focus goes back to, the hint beside it.
-  it('no fact: nothing is sent, the error is under the field and the focus in it', async () => {
-    const view = await reconcile(withAccounts([cash]))
-    await button(view, en.accounts.reconcile.check)?.trigger('click')
-    await flushPromises()
-    const input = view.get('input[data-field="fact"]')
-    expect(checkAccount).not.toHaveBeenCalled()
-    expect(input.attributes('aria-invalid')).toBe('true')
-    expect(document.activeElement).toBe(input.element)
-    const described = (input.attributes('aria-describedby') ?? '').split(' ')
-    const words = described.map((id) => document.getElementById(id)?.textContent.trim())
-    expect(words).toContain(en.accounts.reconcile.no_fact)
-    expect(words).toContain(en.accounts.reconcile.hint)
-    expect(view.get('label').text()).toBe(en.accounts.reconcile.question)
+  // An empty fact is heard (MOL-235, adversarial А1): the error of the kit's field has no voice of its own.
+  describe('no fact', () => {
+    /** The sheet under an announcer, as in the app, opened as a screen opens it: the fact takes the focus. */
+    async function opened(): Promise<VueWrapper> {
+      moneyAccounts.mockResolvedValue(page([cash]))
+      const open = ref(false)
+      const Host = defineComponent({
+        setup() {
+          provideAnnouncer()
+          return () =>
+            h(ReconcileSheet, {
+              open: open.value,
+              account: cash,
+              categories,
+              nameOf: () => 'Other',
+              accountName: () => null,
+            })
+        },
+      })
+      const view = await mounted(Host, {}, withAccounts([cash]))
+      open.value = true
+      await flushPromises()
+      clock += 1000
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      return view
+    }
+    const fact = (view: VueWrapper) => view.get<HTMLInputElement>('input[data-field="fact"]')
+    /** What the sheet's own region said, once its words have landed (a task and 100 ms later). */
+    async function said(): Promise<string> {
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      await flushPromises()
+      return document.querySelector('dialog .region')?.textContent ?? ''
+    }
+    /** What a screen reader reads as the field takes the focus: its mark and its descriptions. */
+    function readAtFocus(
+      input: HTMLInputElement,
+    ): { invalid: string | null; described: string[] }[] {
+      const read: { invalid: string | null; described: string[] }[] = []
+      input.addEventListener('focus', () => {
+        const ids = (input.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean)
+        read.push({
+          invalid: input.getAttribute('aria-invalid'),
+          described: ids.map((id) => document.getElementById(id)?.textContent.trim() ?? ''),
+        })
+      })
+      return read
+    }
+
+    // Enter in the field — Android's «Go», a hardware keyboard — sends the form with the focus where it is.
+    it('Enter in the field: nothing is sent, and the error is said, the focus staying in it', async () => {
+      const view = await opened()
+      const input = fact(view)
+      expect(document.activeElement).toBe(input.element)
+      const read = readAtFocus(input.element)
+      await view.get('form').trigger('submit')
+      expect(await said()).toContain(en.accounts.reconcile.no_fact)
+      expect(checkAccount).not.toHaveBeenCalled()
+      expect(input.attributes('aria-invalid')).toBe('true')
+      expect(read).toHaveLength(0)
+    })
+
+    // Safari does not focus a tapped button (MOL-80): «Сверить» tapped leaves the focus in the field.
+    it('«Сверить» tapped with the focus in the field: the error is said', async () => {
+      const view = await opened()
+      await button(view, en.accounts.reconcile.check)?.trigger('click')
+      expect(await said()).toContain(en.accounts.reconcile.no_fact)
+      expect(document.activeElement).toBe(fact(view).element)
+    })
+
+    // Tab to «Сверить», Enter: the focus comes back once the error is drawn, so the field is read with it
+    // — and only then; said as well, it would be heard twice.
+    it('from the button: the focus comes back to a field already marked and described by its error', async () => {
+      const view = await opened()
+      const input = fact(view)
+      const read = readAtFocus(input.element)
+      const check = button(view, en.accounts.reconcile.check)
+      ;(check?.element as HTMLButtonElement).focus()
+      await check?.trigger('click')
+      expect(await said()).not.toContain(en.accounts.reconcile.no_fact)
+      expect(read).toHaveLength(1)
+      expect(read[0]?.invalid).toBe('true')
+      expect(read[0]?.described).toEqual([
+        '֏',
+        en.accounts.reconcile.no_fact,
+        en.accounts.reconcile.hint,
+      ])
+      expect(view.get('label').text()).toBe(en.accounts.reconcile.question)
+    })
   })
 
   it('a difference is neutral, with its reason; the same fact again is the same check', async () => {

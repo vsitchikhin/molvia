@@ -6,28 +6,36 @@ import { base } from '../eslint.config.base.js'
 
 const tsconfigRootDir = fileURLToPath(new URL('.', import.meta.url))
 
-/** The attributes that make a field of the kit outside it (MOL-177, MOL-235), one list a field. */
+/**
+ * The attributes that make a field of the kit outside it (MOL-177, MOL-235), one list a field. HTML
+ * matches an enumerated value in any case, and Vue sets `inputMode` as the DOM's own property: both are
+ * the same field, so name and value are matched without case (adversarial А3).
+ */
 const SEARCH_FIELD = [
   {
-    key: 'type',
-    value: 'search',
-    element: 'input',
+    key: '/^type$/i',
+    value: '/^search$/i',
+    element: '/^input$/i',
     message: 'A search field is SearchField (MOL-177).',
   },
-  { key: 'enterkeyhint', value: 'search', message: 'A search field is SearchField (MOL-177).' },
+  {
+    key: '/^enterkeyhint$/i',
+    value: '/^search$/i',
+    message: 'A search field is SearchField (MOL-177).',
+  },
 ]
 const CHECKBOX = [
   {
-    key: 'type',
-    value: 'checkbox',
-    element: 'input',
+    key: '/^type$/i',
+    value: '/^checkbox$/i',
+    element: '/^input$/i',
     message: 'A checkbox is AppCheckbox, a switch AppSwitch (MOL-235).',
   },
 ]
 const AMOUNT = [
   {
-    key: 'inputmode',
-    value: 'decimal',
+    key: '/^inputmode$/i',
+    value: '/^decimal$/i',
     message: 'An amount is AppField kind="decimal", the large one size="entry" (MOL-235).',
   },
 ]
