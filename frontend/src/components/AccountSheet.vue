@@ -124,7 +124,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, nextTick, ref, useId, watch } from 'vue'
+import { computed, defineComponent, ref, useId, watch } from 'vue'
 import type { ComponentPublicInstance, PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconArchive from '~icons/mdi/archive-arrow-down-outline'
@@ -150,6 +150,7 @@ import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { parseSigned, shortDay, signedAmount } from '@/components/accounts'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { shown } from '@/composables/useItemDetails'
 import { calendarDay, localDay, shiftDay } from '@/days'
 import { newId } from '@/ids'
@@ -346,10 +347,13 @@ export default defineComponent({
       )
     }
 
+    // A field refused is heard (MOL-235): focused once its error is drawn, or, holding the focus, said.
+    const refuse = useFieldRefusal()
     async function focusFirstProblem(): Promise<void> {
-      await nextTick()
-      const field = nameProblem.value ? nameField.value : startBad.value ? startField.value : null
-      ;(field?.$el as HTMLElement | undefined)?.querySelector<HTMLElement>('input')?.focus()
+      await refuse(() => {
+        const field = nameProblem.value ? nameField.value : startBad.value ? startField.value : null
+        return (field?.$el as HTMLElement | undefined)?.querySelector<HTMLElement>('input')
+      })
     }
 
     /**

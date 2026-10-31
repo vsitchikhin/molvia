@@ -162,6 +162,7 @@ import { formatRating, unitPriceText } from '@/components/adviceRow'
 import { useCheaperHint } from '@/composables/useCheaperHint'
 import type { HintRecord } from '@/composables/useCheaperHint'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useItemDetails } from '@/composables/useItemDetails'
 import { keyedIn } from '@/composables/useKeyboardInset'
 import type { DetailsField, RetryPurchase } from '@/composables/useItemDetails'
@@ -482,8 +483,11 @@ export default defineComponent({
       else open.value = false
     }
 
+    // A field refused is heard (MOL-235, adversarial Р4-А1): «57о» in the price with the focus in it — a tap
+    // on «Записать» Safari does not focus, or Enter — moved no focus and said nothing.
+    const refuse = useFieldRefusal()
     function focus(field: DetailsField): void {
-      form.value?.querySelector<HTMLElement>(`[data-field="${field}"]`)?.focus()
+      void refuse(() => form.value?.querySelector<HTMLElement>(`[data-field="${field}"]`))
     }
 
     function submit(): void {

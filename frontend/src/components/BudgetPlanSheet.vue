@@ -80,7 +80,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, nextTick, ref, watch } from 'vue'
+import { computed, defineComponent, ref, watch } from 'vue'
 import type { ComponentPublicInstance, PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconCheck from '~icons/mdi/check'
@@ -110,6 +110,7 @@ import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { monthGenitive, monthName } from '@/components/charts'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { shown } from '@/composables/useItemDetails'
 
 /** What the plan is of: a category on screen, one to choose, or the savings target (В-4). */
@@ -325,11 +326,14 @@ export default defineComponent({
       }
     }
 
+    // A plan refused is heard (MOL-235): the field focused once its error is drawn, or its error said.
+    const refuse = useFieldRefusal()
     async function submit(): Promise<void> {
       const plan = typed()
       if (!plan) {
-        await nextTick()
-        ;(valueField.value?.$el as HTMLElement | undefined)?.querySelector('input')?.focus()
+        void refuse(() =>
+          (valueField.value?.$el as HTMLElement | undefined)?.querySelector<HTMLElement>('input'),
+        )
         return
       }
       await send(plan)
