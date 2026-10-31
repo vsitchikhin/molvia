@@ -266,10 +266,14 @@ error over the fields being edited, which said no time; with no form, the screen
 **Why the read failed is decided as it failed** (`failure`: `offline` or `error`, `navigator.onLine` read in
 the `catch`, MOL-19's rule): a flag of «failed» said «Сервер не ответил» with «Повторить» over the read the
 connection's return starts, of a server nobody had asked yet — and at the next opening too, the flag living
-in the store (review 1 №1, adversarial А2). **The moment is said by `answeredAt` with the screen's day**
+in the store (review 1 №1, adversarial А2). **The connection going makes an `error` an `offline`** (adversarial
+Б1 of round 2): with no connection nothing is read, and a refusal from before it stood over the read the
+return starts; only the person's own retry with the connection up keeps it. **The moment is said by `answeredAt` with the screen's day**
 (`useLocalDay`, MOL-187's А2): counted once, an app left overnight said «сегодня» of yesterday's answer the
 next morning (adversarial А1) — so «настройки на сегодня, 14:05», as the strips of «Деньги» say it, never by
-«Покупки»' `{day} в {time}`, which counts the day once.
+«Покупки»' `{day} в {time}`, which counts the day once. **A moment of another year says its year**
+(`answeredAt` by `dayOfAnyYear`, Б2 of round 2): the settings' moment moves only with an answer, and «на 30
+окт.» of last year read as this one — so do the strips of «Деньги», whose kept answers may be as old.
 **The time is when the server last said the settings to this phone**, by its clock (`readAt` in the
 envelope of `molvia.settings.<owner>`, `settingsReadAt` of the identity), never the row's `updatedAt`, which
 is when they were changed: set as an answer lands (`settle`, `apply`), brought by another window with its
