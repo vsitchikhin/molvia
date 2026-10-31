@@ -1,6 +1,7 @@
 import { useRoute, useRouter } from 'vue-router'
 import type { LocationQuery, RouteLocationNormalizedLoaded, RouteParams, Router } from 'vue-router'
 import type { RouteName, Tab } from '@/router'
+import { useLoginStore } from '@/stores/login'
 
 /**
  * How a tap on a tab is written into the history.
@@ -38,9 +39,17 @@ export function tabMove(from: Tab | undefined, to: Tab, below: RouteName | undef
 export interface BackTarget {
   readonly location: ReturnType<Router['resolve']>
   readonly step: boolean
+  /** What the chevron is called where the screen it lands on is not what is drawn there: the door. */
+  readonly titleKey?: string
 }
 
-export function backTarget(router: Router, route: Routed): BackTarget | null {
+/**
+ * `door` — the login stands in front of the app (`login.closed`). A public screen behind it leads
+ * back to the door, not to its parent (MOL-216, Е-9): «‹ Настройки» promised a screen nobody is let
+ * into, and `App.vue` drew the login at `/settings`.
+ */
+export function backTarget(router: Router, route: Routed, door = false): BackTarget | null {
+  if (door && route.meta.public) return doorTarget(router)
   const parent = parentOf(router, route)
   if (!parent) return null
   const below: unknown = router.options.history.state.back
@@ -49,6 +58,23 @@ export function backTarget(router: Router, route: Routed): BackTarget | null {
     if (ancestor.path === path) return { location: ancestor, step: true }
   return { location: parent, step: false }
 }
+
+/**
+ * Back to the door: a step onto the entry underneath — the login, at whatever address the person was
+ * going to, so they arrive there once in (MOL-56) — and with nothing of ours underneath, a replace onto
+ * home, where the door is drawn. Opened cold behind the door, home is what `settleColdStart` lays
+ * underneath (owner's В-1 «а»). An entry underneath that is public itself is drawn as itself, and is
+ * named so.
+ */
+function doorTarget(router: Router): BackTarget {
+  const below: unknown = router.options.history.state.back
+  if (typeof below !== 'string')
+    return { location: router.resolve({ name: HOME }), step: false, titleKey: DOOR_TITLE }
+  const location = router.resolve(below)
+  return { location, step: true, titleKey: location.meta.public ? undefined : DOOR_TITLE }
+}
+
+const DOOR_TITLE = 'login.title'
 
 /**
  * Onto the parent itself, never past it to an older ancestor: a step back when the parent is the
@@ -120,7 +146,7 @@ function parentName(route: Pick<Routed, 'meta' | 'query'>): RouteName | undefine
 }
 
 interface Routed {
-  meta: { parent?: RouteName; from?: readonly RouteName[] }
+  meta: { parent?: RouteName; from?: readonly RouteName[]; public?: boolean }
   params: RouteParams
   query?: LocationQuery
 }
@@ -131,11 +157,19 @@ interface Routed {
  * promises the parent. The parent is laid underneath, out of sight, before the first paint:
  * one replace onto it, one push back onto the screen.
  */
-export async function settleColdStart(router: Router): Promise<void> {
+export async function settleColdStart(router: Router, door = () => false): Promise<void> {
   await router.isReady()
   const route = router.currentRoute.value
   const parent = parentName(route)
   if (!parent || router.options.history.state.back) return
+
+  // A public screen behind the door leads back to it, and the door stands at home (MOL-216, В-1 «а»):
+  // with «Настройки» underneath, a stranger who read the privacy page signed in onto the settings.
+  if (route.meta.public && door()) {
+    await router.replace({ name: HOME })
+    await router.push(route.fullPath)
+    return
+  }
 
   const ancestors: string[] = []
   let cursor = router.resolve(route.fullPath)
@@ -250,7 +284,8 @@ export function useNavigation(): {
 
   async function goBack(): Promise<void> {
     if (stepping) return
-    await go(backTarget(router, route))
+    // Read at the tap, as the chevron's label is read: only a screen with a chevron gets here.
+    await go(backTarget(router, route, useLoginStore().closed))
   }
 
   async function goUp(): Promise<void> {
