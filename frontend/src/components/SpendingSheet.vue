@@ -1156,6 +1156,10 @@ export default defineComponent({
   /* The figure measures itself against the card (`figure-fit`, MOL-321). */
   container-type: inline-size;
   display: grid;
+
+  /* A column of `auto` took the least width of the items' skeleton — its bars of 9 and 11rem and the sum's —
+     and stood the sheet 112 px sideways at 150 % while the items came (MOL-318's rule, MOL-321). */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
   padding: var(--space-4);
 }
@@ -1212,6 +1216,7 @@ export default defineComponent({
 
 .item {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
@@ -1227,13 +1232,18 @@ export default defineComponent({
   align-items: center;
 }
 
-/* A bar gives way to the sheet's width (MOL-321): its name of 9rem was 216 px at 150 %, and the sheet stood 112 px
-   sideways while the items came. */
+/* A bar gives way to its row (MOL-321): a name of 9rem is 216 px at 150 %. */
 .ghost-line {
   display: flex;
   align-items: center;
   min-width: 0;
   height: calc(1em * var(--leading-body));
+}
+
+/* The name's line is as wide as an item's name, so a row of bars goes on two lines where a row of the answer does. */
+.ghost-line:first-child {
+  flex: 1 1 0;
+  min-width: min(6rem, 100%);
 }
 
 .ghost-bar {
@@ -1263,8 +1273,11 @@ export default defineComponent({
   }
 }
 
+/* The sum goes under the name only where the two do not fit (MOL-321): in a column no wider than the sheet the sum
+   «12 540 ֏» left the name 0 px at 200 %. 6rem keeps a row at 100 % on 320 as it was. */
 .item-name {
-  min-width: 0;
+  flex: 1 1 0;
+  min-width: min(6rem, 100%);
   font-size: var(--text-callout);
   overflow-wrap: anywhere;
 }
@@ -1276,6 +1289,7 @@ export default defineComponent({
 
 .item-amount {
   flex: none;
+  margin-inline-start: auto;
   font-variant-numeric: tabular-nums;
 }
 

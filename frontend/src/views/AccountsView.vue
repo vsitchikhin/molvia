@@ -693,10 +693,6 @@ export default defineComponent({
   }
 }
 
-.unassigned-text {
-  flex: 1;
-}
-
 .unassigned-icon {
   @include icon;
 

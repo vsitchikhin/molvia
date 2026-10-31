@@ -259,6 +259,19 @@ for (const size of ['150%', '200%'])
         [`/money/accounts/${savings}`, page.locator('.balance .figure')],
         [`/money/accounts/${dinars}`, page.locator('.balance .figure')],
       ]
+      // First while the answer is on its way, before the device remembers any: the ring of the charts' skeleton, a square of 13.25rem, stood
+      // «Графики» 47 px sideways at 150 % (adversarial Е1).
+      const held =
+        /\/api\/(money|spendings|spending-categories|budget|exchanges|incomes|trips|rates)/
+      await page.route(held, () => undefined)
+      for (const [path] of screens) {
+        await page.goto(path)
+        expect(
+          await pageSideways(page, page.locator('[class*="skeleton-"]')),
+          `${path} loading`,
+        ).toBe(0)
+      }
+      await page.unroute(held)
       for (const [path, answer] of screens) {
         await page.goto(path)
         expect(await pageSideways(page, answer), path).toBe(0)
@@ -275,13 +288,15 @@ for (const size of ['150%', '200%'])
       expect(await pastCard(page, '.list-row .tail')).toBeLessThanOrEqual(0.5)
       // From the row's own edge too: a sum in the words' face is wider than the figures' (adversarial Г2).
       expect(await pastCard(page, '.list-row .tail', '.list-row')).toBeLessThanOrEqual(0.5)
-      // «Осталось» of «Бюджет» within its line and still read: shrunk to a column of the words some 30 px wide
-      // it was 4.9 px at 200 %, hidden by the title's `overflow` from any width of the page (adversarial Г1, В4).
+      // The chevron of «1 операция не попала в остатки» within the phone: the words took it 19 px past at 200 %
+      // (adversarial Д1).
       const unassigned = page.locator('button.unassigned svg').last()
       await expect(unassigned).toBeVisible()
       expect(
         (await unassigned.boundingBox())!.x + (await unassigned.boundingBox())!.width,
       ).toBeLessThanOrEqual(320.5)
+      // «Осталось» of «Бюджет» within its line and still read: shrunk to a column of the words some 30 px wide
+      // it was 4.9 px at 200 %, hidden by the title's `overflow` from any width of the page (adversarial Г1, В4).
       await page.goto('/money/budget')
       const left = page.locator('.head .amount').first()
       await expect(left).toBeVisible()
@@ -369,12 +384,27 @@ for (const size of ['150%', '200%'])
       await page.goto('/money/spendings')
       const record = page.getByRole('button', { name: /Ереван Сити/ }).first()
       await expect(record).toBeVisible()
+      // While its items come their skeleton stands, a bar of 9rem stood the sheet 112 px sideways at 150 %: the
+      // trip's answer is held until the skeleton is measured.
+      const trip = /\/api\/trips\/[0-9a-f-]{36}$/
+      let release = () => {}
+      const answered = new Promise<void>((resolve) => (release = resolve))
+      await page.route(
+        trip,
+        async (route) => {
+          await answered
+          await route.continue()
+        },
+        { times: 1 },
+      )
       await record.click()
       const sheet = page.locator('dialog[open]').last()
       await expect(sheet.locator('.summary .figure')).toBeVisible()
-      // While its items come their skeleton stands, a bar of 9rem stood the sheet 112 px sideways at 150 %.
+      await expect(sheet.locator('.ghost-item').first()).toBeVisible()
+      await facesIn(page)
       const sideways = () => sheet.evaluate((dialog) => dialog.scrollWidth - dialog.clientWidth)
-      if (await sheet.locator('.ghost-item').count()) expect(await sideways()).toBe(0)
+      expect(await sideways()).toBe(0)
+      release()
       await expect(sheet.locator('.item-name').first()).toBeVisible()
       await expect
         .poll(() => sheet.evaluate((dialog) => dialog.getAnimations({ subtree: true }).length))

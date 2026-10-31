@@ -80,16 +80,23 @@ export default defineComponent({
   width: 30%;
 }
 
-/* The ring of `DonutChart`: 212, its band 12 of the hundred. */
+/* The ring measures its card for its band (MOL-321). */
+.ghost-donut {
+  container-type: inline-size;
+}
+
+/* The ring of `DonutChart`: 212, its band 12 of the hundred — and never wider than the card, as the ring
+   that comes (MOL-321): a square of 13.25rem took «Графики» 47 px past a phone of 320 at 150 % while the
+   answer was on its way, 169 at 200 % (adversarial Е1). */
 .ghost-ring {
   @include skeleton-bar;
 
-  width: 13.25rem;
-  height: 13.25rem;
+  width: min(13.25rem, 100%);
+  aspect-ratio: 1;
   margin: 0 auto;
   border-radius: 50%;
   background: none;
-  box-shadow: inset 0 0 0 1.59rem var(--border-strong);
+  box-shadow: inset 0 0 0 calc(min(13.25rem, 100cqi) * 0.12) var(--border-strong);
 }
 
 .ghost-legend {
