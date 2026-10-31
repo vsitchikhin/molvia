@@ -68,7 +68,7 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 ## frontend · views
 
 - `frontend/src/views/DevicesView.vue` — «Устройства» screen under «Настройки»: every live session, this device first and marked, «Завершить» on the others.
-- `frontend/src/views/LoginView.vue` — The login screen `App.vue` draws in place of any route: «Войти через Telegram», the wait for the bot, the whose-account question, then the terms (MOL-95), the dev seam; once after «Удалить мои данные», what came of it — erased, not known, or not erased (MOL-94).
+- `frontend/src/views/LoginView.vue` — The login screen `App.vue` draws in place of any route: first the mark, «Molvia» and the promise over «Войти через Telegram» (MOL-216), the wait for the bot, the whose-account question, then the terms (MOL-95), the dev seam; once after «Удалить мои данные», what came of it — erased, not known, or not erased (MOL-94).
 - `frontend/src/views/SettingsErase.test.ts` — Component test: «Удалить мои данные» in «Ваши данные» names what goes and what stays, erases the device only after the server's `204` and marks it for the login screen, is inactive offline, settles a lost answer by the server's «nobody», erases nothing on a session already gone, keeps each door's failure to its own sheet (MOL-94).
 - `frontend/src/views/SettingsSignOut.test.ts` — Component test: «Выйти» in «Настройки» asks first, counts what would be lost, erases the device only after the server's answer, is inactive offline.
 

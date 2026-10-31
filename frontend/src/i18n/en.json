@@ -1313,6 +1313,7 @@
   },
   "login": {
     "title": "Sign in",
+    "promise": "What to buy in a new place — and where",
     "offer": {
       "title": "Sign in with your Telegram",
       "body": "Your purchases and ratings then survive a change of phone. We store neither your name nor your phone number."

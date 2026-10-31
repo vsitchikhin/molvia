@@ -1071,7 +1071,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   leads to the screen underneath when that screen is any ancestor** — the step the system
   button takes — and otherwise replaces onto the parent (`backTarget`, MOL-77): the search of a
   record opened cold, with the record and «Покупки» laid underneath, says «‹ Запись»; with
-  «Покупки» right underneath and no record, «‹ Покупки» — and both «back»s go there. A tab
+  «Покупки» right underneath and no record, «‹ Покупки» — and both «back»s go there. **Behind the
+  login a public screen's chevron is the door's, «‹ Вход»** (MOL-216, `auth.md`). A tab
   asked for on a nested screen — never tapped there, the bar is shown only on a section's root, but
   a screen may send a person to a tab when it is done — goes from its section: up the chain the way
   «back» goes while an ancestor is underneath, then the tab from there (MOL-128, adversarial Б) —

@@ -86,7 +86,8 @@ function start(): void {
   // Mounted once the first route is settled: a nested screen opened cold gets its parent laid
   // underneath first, so the first paint is already the screen and not a flash of the parent.
   // Transitions and focus are installed after that, so neither step counts as a move.
-  void settleColdStart(router)
+  // Behind the door a public screen has home laid underneath, where the door stands (MOL-216).
+  void settleColdStart(router, () => useLoginStore().closed)
     // Settling the route is a nicety; the app is not. Vue is not running yet, so its error
     // handler would never see this — logged here, and the app is mounted either way instead of
     // leaving a blank screen at the shelf.
