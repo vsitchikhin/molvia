@@ -32,7 +32,7 @@ test('«Удалить мои данные» стирает человека и 
   await expect(sheet.getByText(/Отменить это нельзя/)).toBeVisible()
   await sheet.getByRole('button', { name: 'Удалить навсегда', exact: true }).click()
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Вход')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
   // Outside the live region, which says the same words (MOL-64).
   await expect(page.locator('.erasure')).toHaveText(/Ваши данные удалены/)
   expect(await page.evaluate(() => localStorage.getItem('molvia.actor'))).toBeNull()
@@ -89,7 +89,7 @@ test('сессию кончили, пока лист открыт: нажати�
     .click()
   expect((await answered).status()).toBe(401)
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Вход')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
   await expect(page.locator('.erasure')).toHaveText(/это нажатие ничего не удалило/)
   // A 401 erases nothing: the drawer of an account that is still there stays.
   expect(await page.evaluate(() => localStorage.getItem('molvia.actor'))).toBe(owner)
@@ -145,5 +145,5 @@ test('«Удалить навсегда» на время работы гово�
   expect(sent).toBe(1)
 
   release()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Вход')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
 })

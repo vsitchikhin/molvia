@@ -17,11 +17,48 @@ test('and from the login screen, which is where a person without a session meets
   page,
 }) => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Вход')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
   await page.getByRole('link', { name: 'Данные и приватность', exact: true }).click()
   await expect(page).toHaveURL(/\/privacy$/)
   await expect(page.getByRole('heading', { name: 'Удалить всё' })).toBeVisible()
 })
+
+// MOL-216, Е-9: without a session «‹ Настройки» promised a screen nobody is let into. Behind the door
+// the chevron is the door's, and it lands where the login stood — the address the person was going to.
+test('back from it without a session is «‹ Вход», onto the address the login stood at', async ({
+  page,
+}) => {
+  await page.goto('/purchases')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
+  await page.getByRole('link', { name: 'Данные и приватность', exact: true }).click()
+  await expect(page).toHaveURL(/\/privacy$/)
+
+  await page.getByRole('button', { name: 'Назад Вход', exact: true }).click()
+  await expect(page).toHaveURL(/\/purchases$/)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
+})
+
+// Owner's В-1 «а»: opened by a link with nobody on the device, home is laid underneath, where the door
+// stands — not «Настройки», where a stranger would have signed in. The chevron and the system «back» agree.
+for (const [path, title] of [
+  ['/privacy', 'Данные и приватность'],
+  ['/terms', 'Условия использования'],
+] as const)
+  test(`opened by its address without a session, ${path} leads back home to the door`, async ({
+    page,
+  }) => {
+    await page.goto(path)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(title)
+    await page.getByRole('button', { name: 'Назад Вход', exact: true }).click()
+    await expect(page).toHaveURL(/:\d+\/$/)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
+
+    await page.goto(path)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(title)
+    await page.goBack()
+    await expect(page).toHaveURL(/:\d+\/$/)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
+  })
 
 test('and from the settings, with the chevron back to them', async ({ page }) => {
   await signedIn(page)
