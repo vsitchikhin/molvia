@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -38,6 +39,11 @@ test('back from it without a session is «‹ Вход», onto the address the l
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
 })
 
+/** The entry the router laid under the screen, as the history keeps it. */
+async function below(page: Page): Promise<unknown> {
+  return page.evaluate(() => (window.history.state as { back?: unknown } | null)?.back)
+}
+
 // Owner's В-1 «а»: opened by a link with nobody on the device, home is laid underneath, where the door
 // stands — not «Настройки», where a stranger would have signed in. The chevron and the system «back» agree.
 for (const [path, title] of [
@@ -49,12 +55,15 @@ for (const [path, title] of [
   }) => {
     await page.goto(path)
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(title)
+    // Home is laid underneath — not «Настройки», and not nothing (self-review №5).
+    expect(await below(page)).toBe('/')
     await page.getByRole('button', { name: 'Назад Вход', exact: true }).click()
     await expect(page).toHaveURL(/:\d+\/$/)
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
 
     await page.goto(path)
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(title)
+    expect(await below(page)).toBe('/')
     await page.goBack()
     await expect(page).toHaveURL(/:\d+\/$/)
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
