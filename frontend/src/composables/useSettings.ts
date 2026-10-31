@@ -141,11 +141,20 @@ const useSettingsStore = defineStore('settingsForm', () => {
       JSON.stringify({ previous: base.value, settings: draft.value, pending: !!pending.value }),
     )
   }
+  /**
+   * «Не удалось сохранить» spoke for the read after it too, and the person's own edit takes it away: the
+   * refusal of that read goes with it, or the strip «Сервер не ответил» came out of the very tap and
+   * moved the fields under it (MOL-215, adversarial Д1). The next read says what the server does.
+   */
+  function letSaveErrorGo(): void {
+    if (saveError.value && failure.value === 'error') failure.value = null
+    saveError.value = false
+  }
   function edit(value: ActorSettings): void {
     if (saving.value || unknown.value) return
     draft.value = value
     saved.value = false
-    saveError.value = false
+    letSaveErrorGo()
     keep()
   }
   function cancel(): void {
@@ -153,7 +162,7 @@ const useSettingsStore = defineStore('settingsForm', () => {
     base.value = current.value
     draft.value = current.value ? { ...current.value } : null
     saved.value = false
-    saveError.value = false
+    letSaveErrorGo()
     keep()
   }
   /**

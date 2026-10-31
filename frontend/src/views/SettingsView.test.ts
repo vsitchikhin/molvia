@@ -479,6 +479,25 @@ describe('a form shown from memory says as of when, and what became of the read 
     expect(strips(view)).toHaveLength(0)
   })
 
+  // Adversarial Д1 of round 5: the edit after a refused save took its notice away, and the strip of the
+  // read after it came out of the very tap, moving the fields under it.
+  it('must not fire: an edit after a refused save brings no strip of the read before it', async () => {
+    const view = await render()
+    await field(view, 'city')?.setValue('Ереван')
+    save.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    await view.get('.dock > button').trigger('click')
+    await flushPromises()
+    expect(view.find('[role="alert"]').text()).toContain(en.settings.save_error.title)
+    expect(strips(view)).toHaveLength(0)
+
+    await field(view, 'spend')?.setValue('USD')
+    await flushPromises()
+    expect(view.find('[role="alert"]').exists()).toBe(false)
+    expect(strips(view)).toHaveLength(0)
+    expect(me).toHaveBeenCalledTimes(2)
+  })
+
   it('must not fire: a failed save speaks for itself, with no strip of the read beside it', async () => {
     const view = await render()
     await field(view, 'city')?.setValue('Ереван')
