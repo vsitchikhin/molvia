@@ -87,7 +87,7 @@ async function render(
 }
 
 function field(view: VueWrapper, label: string) {
-  const found = view.findAll('.field').find((one) => one.text().includes(label))
+  const found = view.findAll('.app-field').find((one) => one.text().includes(label))
   if (!found) throw new Error(`no field «${label}»`)
   return found
 }

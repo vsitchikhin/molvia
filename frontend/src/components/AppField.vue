@@ -1,6 +1,10 @@
 <template>
-  <div class="field" :class="[attrs.class, { invalid: failed, readonly }]" :style="attrs.style">
-    <div class="label" :class="{ unseen: hideLabel }">
+  <div
+    class="app-field"
+    :class="[attrs.class, { invalid: failed, readonly, 'app-field-entry': size === 'entry' }]"
+    :style="attrs.style"
+  >
+    <div class="label" :class="{ unseen: hideLabel, question }">
       <label :for="id">{{ label }}</label>
       <slot name="label-extra" />
     </div>
@@ -61,7 +65,9 @@
     </div>
 
     <AppReveal>
-      <p v-if="failed" :id="`${id}-error`" class="error">{{ errorText ?? t(error ?? '') }}</p>
+      <p v-if="failed" :id="`${id}-error`" class="error">
+        <IconAlert class="alert" aria-hidden="true" />{{ errorText ?? t(error ?? '') }}
+      </p>
     </AppReveal>
     <!-- Read with the field when it is focused, not at every letter: two hundred announcements over
          the echo of the typing drown it (MOL-147, review №4). -->
@@ -75,6 +81,7 @@
 import { computed, defineComponent, onUnmounted, ref, useAttrs, useId, useSlots, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
+import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconCalendar from '~icons/mdi/calendar-blank-outline'
 import IconChevronDown from '~icons/mdi/chevron-down'
 import type { ErrorCode } from '@molvia/model'
@@ -85,6 +92,9 @@ import { LINGER_MS } from '@/composables/useAnnouncer'
 const SPOKEN_MARKS = [20, 100]
 
 export type FieldKind = 'text' | 'decimal' | 'digits' | 'multiline' | 'date' | 'select'
+
+/** `entry` is the amount a sheet is opened to type (MOL-235): Entry 40 in a well of 72, the sign 32. */
+export type FieldSize = 'body' | 'entry'
 
 /**
  * A native input with its label, its error and its tail, wired the same way every time: the
@@ -102,21 +112,29 @@ export type FieldKind = 'text' | 'decimal' | 'digits' | 'multiline' | 'date' | '
  * and still text, so a leading zero stays.
  *
  * The error is a code from the domain registry and doubles as its i18n key, so no message is
- * written where it is shown. `errorText` is for a refusal the registry has no code for — the
+ * written where it is shown; an 18 alert stands before it (DESIGN.md, owner's В-3 «а» of MOL-235), so
+ * an error is told by more than its colour in bad light. `errorText` is for a refusal the registry has no code for — the
  * screen's own words, already translated: the review's «a character that cannot be saved»
  * (MOL-28, G2). It wins over `error` when both are given.
  *
  * Every other attribute — `autofocus`, `enterkeyhint`, `maxlength` — goes to the control
- * itself; `class` and `style` stay on the field, where the layout is.
+ * itself; `class` and `style` stay on the field, where the layout is. The field's own classes are
+ * the kit's words (`app-field…`): a root carries the scope of the screen it stands in, and a sheet's
+ * `.field` — its column of a label and a field — doubled the space under the label (MOL-235).
+ *
+ * **`size="entry"` is the amount a sheet is opened to type** (MOL-235, Ф-12): the spending, the
+ * check, the transfer had each drawn its own copy of it, with three looks of the focus. The same
+ * field, its label, its error and its tail the same — only drawn large, the sign in the tail.
  */
 export default defineComponent({
   name: 'AppField',
-  components: { AppReveal, IconCalendar, IconChevronDown },
+  components: { AppReveal, IconAlert, IconCalendar, IconChevronDown },
   inheritAttrs: false,
   props: {
     modelValue: { type: String, required: true },
     label: { type: String, required: true },
     kind: { type: String as PropType<FieldKind>, default: 'text' },
+    size: { type: String as PropType<FieldSize>, default: 'body' },
     error: { type: String as PropType<ErrorCode | null>, default: null },
     errorText: { type: String as PropType<string | null>, default: null },
     options: {
@@ -136,6 +154,11 @@ export default defineComponent({
      * (MOL-74): the label is still there for a screen reader, only not drawn.
      */
     hideLabel: { type: Boolean, default: false },
+    /**
+     * The label is the sheet's one question — «Сколько на счёте сейчас?» of the check (handoff 116 v2,
+     * owner's В-2 «а» of MOL-235): 17/600 in the text's colour, not the 13 of a field among others.
+     */
+    question: { type: Boolean, default: false },
     /**
      * How many characters left of `maxlength` start to be counted under the field (MOL-147): silent
      * before, so a long message is not met by a number from its first letter, and not cut short at
@@ -225,7 +248,7 @@ export default defineComponent({
 <style scoped lang="scss">
 /* No least width of its own either (MOL-318): WebKit keeps a select's longest option as its least width
    whatever the width of the select, and a field in a grid of a column `auto` widened the column. */
-.field {
+.app-field {
   min-width: 0;
 }
 
@@ -241,6 +264,11 @@ export default defineComponent({
 
 .unseen {
   @include visually-hidden;
+}
+
+.question {
+  color: var(--text);
+  font-size: var(--text-headline);
 }
 
 /* A mark before the value — the colour of the category chosen (MOL-74); the words are the value's. */
@@ -370,6 +398,27 @@ textarea.control {
   box-shadow: inset 0 0 0 var(--hairline) var(--bad);
 }
 
+/* The amount being typed (MOL-235): the well, the figure and the sign of the spending's sheet as it was. */
+.app-field-entry {
+  .well {
+    min-height: 4.5rem;
+    padding: 0 var(--space-4);
+    border-radius: var(--radius-lg);
+  }
+
+  .control {
+    @include display-type;
+
+    font-size: var(--text-entry);
+  }
+
+  .suffix {
+    @include display-type;
+
+    font-size: var(--text-entry-sign);
+  }
+}
+
 .counter-spoken {
   @include visually-hidden;
 }
@@ -387,10 +436,19 @@ textarea.control {
 }
 
 .error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
   margin: var(--space-1) 0 0;
   color: var(--bad-ink);
   font-size: var(--text-footnote);
   overflow-wrap: anywhere;
+}
+
+.alert {
+  @include icon;
+
+  font-size: var(--icon-sm);
 }
 
 .readonly {

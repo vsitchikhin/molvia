@@ -33,21 +33,19 @@
       <StatusStrip v-if="!online" kind="offline" :text="t('transfer.offline')" />
 
       <div class="field">
-        <label :for="amountId" class="label">{{ t('transfer.amount') }}</label>
-        <div class="well" :class="{ bad: amountBad }">
-          <input
-            :id="amountId"
-            v-model="amount"
-            class="entry"
-            type="text"
-            inputmode="decimal"
-            autocomplete="off"
-            :readonly="sending"
-            :aria-invalid="amountBad ? 'true' : undefined"
-            @input="amountBad = false"
-          />
-          <span v-if="source" class="sign" aria-hidden="true">{{ sign }}</span>
-        </div>
+        <AppField
+          v-model="amount"
+          :label="t('transfer.amount')"
+          kind="decimal"
+          size="entry"
+          autocomplete="off"
+          :readonly="sending"
+          :error-text="amountBad ? t('spending.sheet.bad_amount') : null"
+          data-field="amount"
+          @update:model-value="amountBad = false"
+        >
+          <template v-if="source" #suffix>{{ sign }}</template>
+        </AppField>
         <p v-if="amendedLine" class="hint">{{ amendedLine }}</p>
       </div>
 
@@ -671,56 +669,6 @@ export default defineComponent({
 .accounts {
   display: grid;
   gap: var(--space-2);
-}
-
-.label {
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-  font-weight: var(--weight-medium);
-}
-
-.well {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 4.5rem;
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--surface-2);
-  box-shadow: inset 0 0 0 var(--hairline) var(--border-strong);
-
-  &:focus-within {
-    box-shadow:
-      inset 0 0 0 var(--hairline) var(--accent),
-      0 0 0 2px var(--accent-tint);
-  }
-
-  &.bad {
-    box-shadow: inset 0 0 0 2px var(--bad);
-  }
-}
-
-.entry {
-  @include display-type;
-
-  flex: 1;
-  width: 0;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text);
-  font-size: var(--text-entry);
-  font-variant-numeric: tabular-nums;
-  outline: none;
-}
-
-.sign {
-  @include display-type;
-
-  flex: none;
-  color: var(--text-muted);
-  font-size: var(--text-entry-sign);
 }
 
 .hint,

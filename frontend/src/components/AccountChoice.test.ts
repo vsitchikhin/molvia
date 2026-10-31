@@ -237,9 +237,13 @@ describe('the account of an income: its own currency only, and no «Списан
     const picker = view.findComponent(AccountPickerSheet)
     expect(picker.props()).toMatchObject({ currency: 'RUB', strict: true })
     expect(view.text()).not.toContain('Charged to the account')
-    const amount = view.findAll('.field').find((one) => one.text().includes(en.income.sheet.amount))
+    const amount = view
+      .findAll('.app-field')
+      .find((one) => one.text().includes(en.income.sheet.amount))
     await amount?.get('input').setValue('99615')
-    const source = view.findAll('.field').find((one) => one.text().includes(en.income.sheet.source))
+    const source = view
+      .findAll('.app-field')
+      .find((one) => one.text().includes(en.income.sheet.source))
     await source?.get('select').setValue('salary')
     await view
       .findAll('button')
@@ -282,7 +286,7 @@ describe('an amendment moved to another currency (review 11)', () => {
         .find((one) => one.text().includes(en.accounts.picker.row_income))
     expect(row()?.text()).toContain('Card ₽')
     const currencyField = view
-      .findAll('.field')
+      .findAll('.app-field')
       .find((one) => one.text().includes(en.income.sheet.currency))
     await currencyField?.get('select').setValue('USD')
     await flushPromises()

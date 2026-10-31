@@ -224,6 +224,22 @@ describe('ReconcileSheet (handoff 05)', () => {
     expect(dialog.html()).not.toMatch(/190\s132/)
   })
 
+  // The kit's field (MOL-235): the error is read with the field the focus goes back to, the hint beside it.
+  it('no fact: nothing is sent, the error is under the field and the focus in it', async () => {
+    const view = await reconcile(withAccounts([cash]))
+    await button(view, en.accounts.reconcile.check)?.trigger('click')
+    await flushPromises()
+    const input = view.get('input[data-field="fact"]')
+    expect(checkAccount).not.toHaveBeenCalled()
+    expect(input.attributes('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(input.element)
+    const described = (input.attributes('aria-describedby') ?? '').split(' ')
+    const words = described.map((id) => document.getElementById(id)?.textContent.trim())
+    expect(words).toContain(en.accounts.reconcile.no_fact)
+    expect(words).toContain(en.accounts.reconcile.hint)
+    expect(view.get('label').text()).toBe(en.accounts.reconcile.question)
+  })
+
   it('a difference is neutral, with its reason; the same fact again is the same check', async () => {
     checkAccount.mockResolvedValue(
       answer('185000', '190132', [{ kind: 'unassigned', operation: taxi() }]),
@@ -771,7 +787,7 @@ describe('AccountSheet (handoff 03)', () => {
     const inputs = view.findAll('input')
     await inputs.at(0)?.setValue('Credit card')
     await view
-      .findAll('.field')
+      .findAll('.app-field')
       .find((one) => one.text().includes(en.accounts.balance))
       ?.get('input')
       .setValue('−12400')
@@ -907,7 +923,7 @@ describe('AccountSheet (handoff 03)', () => {
   /** The field of the amount and the line under it, as a reader meets them. */
   function startOf(view: VueWrapper) {
     const field = view
-      .findAll('.field')
+      .findAll('.app-field')
       .find((one) => one.find('input[inputmode="decimal"]').exists())
     if (!field) throw new Error('no amount field')
     const input = field.get('input')

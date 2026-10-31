@@ -121,6 +121,45 @@
       <AppField v-model="date" :label="t('dev.kit.date')" kind="date" readonly />
       <AppField v-model="city" :label="t('settings.city')" kind="select" :options="cities" />
       <SegmentedControl v-model="unit" :legend="t('item.unit')" :options="units" />
+      <!-- The amount a sheet is opened to type (MOL-235): at rest, refused, read-only while it is sent,
+           and with the sheet's question for its label — the check's. -->
+      <AppField
+        v-model="entry"
+        :label="t('spending.sheet.amount')"
+        kind="decimal"
+        size="entry"
+        :placeholder="t('spending.sheet.amount_placeholder')"
+        data-kit="entry"
+      >
+        <template #suffix>{{ sign }}</template>
+      </AppField>
+      <AppField
+        v-model="entryBad"
+        :label="t('spending.sheet.amount')"
+        kind="decimal"
+        size="entry"
+        :error-text="t('spending.sheet.bad_amount')"
+      >
+        <template #suffix>{{ sign }}</template>
+      </AppField>
+      <AppField
+        v-model="entryLong"
+        :label="t('transfer.amount')"
+        kind="decimal"
+        size="entry"
+        readonly
+      >
+        <template #suffix>{{ sign }}</template>
+      </AppField>
+      <AppField
+        v-model="entry"
+        :label="t('accounts.reconcile.question')"
+        kind="decimal"
+        size="entry"
+        question
+      >
+        <template #suffix>{{ sign }}</template>
+      </AppField>
     </section>
 
     <section class="group">
@@ -1268,6 +1307,9 @@ export default defineComponent({
       searchItem: ref(t('dev.kit.search_sample')),
       quantity: ref('1'),
       price: ref('57о'),
+      entry: ref(''),
+      entryBad: ref(''),
+      entryLong: ref('1 250 300,50'),
       review: ref(''),
       city: ref<string>(COUNTRY_CITIES.AM[0]),
       cities: COUNTRY_CITIES.AM.map((city) => ({ value: city, label: city })),
