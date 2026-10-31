@@ -607,7 +607,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   `minmax(0, 1fr)`; a name kept on one line — a row of chips, a cut name — has no width of its own
   (`contain: inline-size`), and words that may hold a name break it (`overflow-wrap: anywhere`) — a grid
   column of `auto` takes the least width of what stands in it, and a name is forty letters of one word.
-  Large text (150 % at 320) still takes a few screens sideways — MOL-321.
+- **Nor does large text** (MOL-321): Android's 150 % and 200 % on 320 stand within the phone
+  (`e2e/large-text.spec.ts`). A row of segments its words do not fit stands them one under another, the
+  word whole; what stands beside a figure turns by `@container` in `rem` — the text's size, not the
+  phone's — and a line wraps only where the least widths do not fit, so 100 % keeps its look.
 - **A screen is built from the kit** (MOL-18); the sheet is a native `<dialog>` with an entry in the
   history, and puts the page back — and focus, wherever the platform gave it — by what it was
   opened from (MOL-63, MOL-80). **Its press is heard on the document**: iOS hands a tap on the
