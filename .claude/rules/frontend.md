@@ -501,18 +501,25 @@ The detail behind the frontend lines of `CLAUDE.md`.
     ring below 8rem (200 %); the month's name stands over its arrows below 13rem; «Пришло и ушло» stands its three
     figures one under another below 12rem; «На счетах сейчас» stands «1 счёт ›» under its words below 12rem; an
     icon of `NavRow` gives way below 12rem and the wallet of `AccountRow` below 10rem, where the account's name
-    goes to a line of its own — decorations, where the words had 64 px. **A box cannot ask its own width**: the
-    rules under a query stand on its children, and what the box itself does — `flex-wrap` — is set outside it.
+    goes to a line of its own — decorations, where the words had 64 px. **A row's tail goes under its words only
+    with large text in a container named `row-tight`** (`ListRow`, below 12rem): the rows of «Счета» and «Категории»
+    keep it beside at 100 % on 320, where `row`'s 22rem would turn them, and at 200 % «1 234 567,89 ₽» was cut by 68 px
+    and «Убрать» by 37 (adversarial Б1, Б2); one look for both, a mixin of the kit. **A box cannot ask its own
+    width**: the rules under a query stand on its children, and what the box itself does — `flex-wrap` — is set
+    outside it.
   - **A line wraps only where its least widths do not fit**: `flex-wrap` with the words at `flex-basis:
 min-content` — the day's head and the total of «Траты», a line of an exchange's card, «Против обычного»,
-    «Покупки ›» of a spending's sheet, the difference of a check. A flex line breaks by its items' bases, so at
+    «Покупки ›» of a spending's sheet, the difference of a check, a record's sum and its category in the sheet
+    opened from «Траты» (adversarial Б4). A flex line breaks by its items' bases, so at
     100 % the words still give way first, as before, and the figure goes under them only when even the words
     broken leave it no room. The sum and the share of a ring's name are one `figures` span, `display: contents`
     beside the ring and a wrapping line of its own under it.
   - **A figure that is its card's answer shrinks to its card by its length** (`@include figure-fit`, adversarial
     А1…А6): `min(var(--text-figure), 100cqi / (characters × 0.56))`, the characters set beside it by
-    `figureChars` (`--figure-chars`, set by script), the box measured the nearest `container-type: inline-size` —
-    the card, the column of words. A sum never breaks, and at 200 % «Потрачено 125 403 ֏» was 276 px in a card of
+    `figureChars` (`--figure-chars`, set by script) — a capital Latin letter and a minus counted 1.15, wider than
+    a figure («−999,99 RSD» was 0.568 of its size a character, adversarial Б3) — the box measured the nearest
+    `container-type: inline-size`: the card, the column of words, the sheet's column (the figure of a check that
+    came out even, which measured the window before). A sum never breaks, and at 200 % «Потрачено 125 403 ֏» was 276 px in a card of
     190; a width alone (`18cqi`, the first try) did not know the length, and «1 234 567,89 ₽» stood 15 px past at
     150 %. 0.56 of the size a character is above Nunito 800's widest (0.55), so a figure of fourteen keeps its size
     at 100 % on 320. Ten figures of «Деньги»; the totals of a receipt and a record are MOL-334.
@@ -524,13 +531,15 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     over 17.6 px — a width in `rem` tells the box, not the text, and a block of a pair is narrow at 100 % too. At
     100 % no engine hyphenates: Safari knows no `hyphenate-limit-chars` in any version, and WebKit hyphenates any
     word at a line's end («Запишите первые по-купки», self-review №2); where the limit is known, only a word of
-    twelve letters and more. A block button's words are a `span.text` for it.
+    twelve letters and more; a block button takes it on itself, its words inherit it.
     **The prices, named:** at 200 % a word of eight letters and more in a `NavRow` still breaks («Категории» — 171 px
     of 136, MOL-334); CI's Chromium may have no dictionary, so e2e reads the style and the eye the hyphen; at 200 %
     the docked strip and the tab bar take half a window of 720 — the list ends over them and scrolls, but a tap aimed
     by a script scrolled under them («Написать разработчику»); and **Android's page zoom is not this model**
     (self-review №3): it narrows the window in CSS pixels — 213 at 150 % — a phone narrower than the 320 the project
-    holds, where `--text-tab`, in px, limits nothing; which one the owner's Chrome takes is asked in MOL-334.
+    holds, where `--text-tab`, in px, limits nothing, and `data-large-text`, which reads a rem in CSS px, is never
+    set — no hyphen there, a word broken as before В-2 (round 2, №3); which one the owner's Chrome takes is asked in
+    MOL-334.
 - **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
   handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
   its tint, in the strip's shape and never a live region; a tag a pill of 13/600, plain, warn or bad
