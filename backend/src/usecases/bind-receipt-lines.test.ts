@@ -13,11 +13,13 @@ const MILK = '00000000-0000-4000-8000-000000000001'
 const GLUE = '00000000-0000-4000-8000-000000000002'
 const SOUR_CREAM = '00000000-0000-4000-8000-000000000003'
 const SUGAR = '00000000-0000-4000-8000-000000000004'
+const EGGS = '00000000-0000-4000-8000-000000000005'
 
 const NODES: CatalogueNode[] = [
   { itemId: MILK, name: 'Молоко', names: ['կաթ'], headings: ['0401'] },
   { itemId: GLUE, name: 'Клей', names: ['սոսինձ'], headings: ['3506'] },
   { itemId: SUGAR, name: 'Сахар', names: ['շաքար', 'շաքարավազ'], headings: ['1701'] },
+  { itemId: EGGS, name: 'Яйца', names: ['ձու', 'հավկիթ'], headings: ['0407'] },
 ]
 
 function item(id: string, name: string): Item {
@@ -394,6 +396,27 @@ describe('a word the model misread by the font (MOL-326, В-3 «б»)', () => {
         spelled: false,
       },
     ])
+  })
+
+  it('stands only on an item that names the word put right: corn bread read «Ձու» is no egg (adversarial Б1)', async () => {
+    // the seed's eggs by their till name, and the search's
+    const BREAD = '00000000-0000-4000-8000-0000000000e2'
+    const { items } = fakeItems({
+      items: [item(BREAD, 'Хлеб кукурузный'), item(EGGS, 'Яйца')],
+      near: true,
+      nearIds: [BREAD, EGGS],
+    })
+    const [bound] = await bindReceiptLines(
+      { items, embedder: NO_EMBEDDER },
+      ACTOR,
+      'AM',
+      'ru',
+      // the bench's reading of «Հաց եգիպտացորենի 350գր»: «Հաց» read as an egg, «եգ» as «եզ» — the mend is right
+      [line('Ձու եզիպտացորենի 350գր')],
+      [],
+      { byModel: true },
+    )
+    expect(bound).toMatchObject({ itemId: null, match: 'weak' })
   })
 
   it('must not be put right on a line Tesseract read: it misreads otherwise', async () => {

@@ -5,6 +5,8 @@ import {
   headingRulesOut,
   isServiceClass,
   lineFitter,
+  mendedWords,
+  namesWord,
   newLineName,
   receiptCard,
   receiptLineName,
@@ -142,6 +144,7 @@ export async function bindReceiptLines(
   const lexicon = await spelt(namingLexicon(nodes))
   // the headings the seed gave the catalogue's nodes; an item the search finds outside them has none known
   const headings = new Map(nodes.map((node) => [node.itemId, node.headings]))
+  const nodeNames = new Map(nodes.map((node) => [node.itemId, node.name]))
   const bound: LineBinding[] = []
   for (const [position, line] of lines.entries()) {
     if (names === null) {
@@ -163,10 +166,14 @@ export async function bindReceiptLines(
     }
     const mended = mendedLines[position] ?? null
     const printed = mended ?? line.printed
+    // a line put right stands only on an item that names what was put right (adversarial Б1)
+    const put = mended === null ? [] : mendedWords(line.printed, mended)
+    const holds = (name: string): boolean =>
+      put.every((word) => namesWord(name, word, TILL_WORDS_RU, lexicon))
     const gloss = matcher.gloss(printed)
     const translation = language === 'ru' && gloss !== '' ? gloss : null
     const found = matcher.match(printed, line.hs)
-    if (found !== null) {
+    if (found !== null && holds(nodeNames.get(found.itemId) ?? '')) {
       const sure = !found.far && mended === null
       bound.push({ itemId: found.itemId, match: sure ? 'search' : 'weak', translation })
       continue
@@ -187,7 +194,8 @@ export async function bindReceiptLines(
       const first = answer.items.find(
         (item) =>
           fits(item.name, { generic: SEED_NAMES.has(item.name) }) &&
-          !headingRulesOut(line.hs, headings.get(item.id) ?? []),
+          !headingRulesOut(line.hs, headings.get(item.id) ?? []) &&
+          holds(item.name),
       )
       if (first !== undefined) {
         // a dish of a class of services is never sure among the catalogue's goods (MOL-226)
