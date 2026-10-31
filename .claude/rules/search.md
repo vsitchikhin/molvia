@@ -206,7 +206,10 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   (28.09.2026) and both still stand — there «ыср» is a far answer of «Икра красная» — and two
   more with them: «Сааар» folds its doubling to `sar`, so «Сардельки», «Сардины» and «Сыр» rank
   above «Сахар»; «Cheesecake» finds nothing, since no alphabet makes «чиз» of `cheese` — only the
-  dictionary could. Left for the real input MOL-47 waits for. A name without a size ranks level
+  dictionary could. MOL-47 measured them a third time with the search by meaning (31.10.2026): none
+  moved — under four letters there is no vector, and «Cheesecake» is no nearer by meaning — and one
+  appeared: «cheesecak» finds «Сыр чечил» by its meaning alone and calls the answer near (MOL-332).
+  A name without a size ranks level
   with a wrong size — unknown is not worse than wrong, which is likely right.
 - **The answer says how near it is (MOL-46), and nothing is dropped for it.** The budget is
   absolute: `pelmeni` is two edits from `zeleni` of «Чай зелёный» exactly as `malako` is from
@@ -411,10 +414,27 @@ share two letters, a pick for Coca-Cola on «ко» puts it above «Колбас
 «Креветки» on «кр» above «Крекеры» on «кре», and each the other way round — and once at 3 and at
 4, whatever the prefix: the owner's «кол» is a query of its own, for the cola, and a sausage
 picked on «кол» while typing «колбаса» takes its first row through the equal key. That is the
-price of memory belonging to the query — one short word serving two items. 3 stays, and real
-picks measure it again (MOL-47). The corpus pins every answer whole — the shelf, those fifty
+price of memory belonging to the query — one short word serving two items. 3 stays. Real picks
+were to measure it again, and a month of production gave one (MOL-47): the owner's purchases come
+by receipts, and a purchase from a receipt writes no pick — so it waits for the picks of 0.2's
+people (MOL-330). The corpus pins every answer whole — the shelf, those fifty
 words, Latin and Cyrillic brand spellings, Armenian labels — so a change of either threshold
 shows what it moves.
+
+**Measured again on real input, and kept (MOL-47, 31.10.2026).** What the shelf of MOL-14 lacked —
+names off receipts, Armenian labels — came by the receipts: the matcher searches the catalogue by a
+line's gloss (`receipts.md`). 103 lines of the owner's recorded receipts went through the product's
+own `bindReceiptLines`, the seed's Armenian names with it and the shops' memory off, against the
+catalogue of production as it stood when each receipt was recorded; the truth is what the owner
+recorded (`.scratch/tasks/status/MOL-47-results.md`). Of 38 lines whose item was in the catalogue,
+30 found it sure, none another item, 8 a new one; all 65 whose item was not there stayed new. **No
+point of the grid — 0.10–0.30 × a budget of 1–3 — moves a single line with the meaning on**, so by
+MOL-14's rule nothing moves: a gloss is short and clean («молоко», «кинза шт»), and what decides is
+around the search — the names, the kind and brand of MOL-293, the heading. The eight lines lost are
+those rules', each with its item in the search's answer (MOL-331). **The meaning earns its place**:
+without it 23 of the 38, and four more under «проверьте» — «газированный напиток кола кола» finds
+«Coca-Cola» by meaning alone. The search typed at a shelf is not measured by it: one person's
+receipts, two shops mostly, and the gloss of today's dictionary over yesterday's lines.
 
 ## «Брали здесь в прошлый раз» on «Что взяли?» (MOL-209)
 
