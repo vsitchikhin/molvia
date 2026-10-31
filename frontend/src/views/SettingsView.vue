@@ -1,12 +1,27 @@
 <template>
   <AppScreen :title="t('settings.title')">
-    <ScreenSkeleton v-if="form.loading && !form.draft" :groups="[32]">
+    <!-- The form's shape (Ф-13): its two groups, each field its label, its well and its hint — the
+         country has none — and the footnote under them. -->
+    <ScreenSkeleton v-if="form.loading && !form.draft">
+      <SkeletonPart kind="caption" :width="28" />
       <div class="ghost-card">
-        <span class="ghost-label"></span><span class="ghost-field"></span>
+        <div class="ghost-group">
+          <span class="ghost-label"></span><span class="ghost-field"></span>
+        </div>
+        <div class="ghost-group">
+          <span class="ghost-label"></span><span class="ghost-field"></span>
+          <span class="ghost-label hint"></span>
+        </div>
       </div>
+      <SkeletonPart kind="caption" :width="20" />
       <div class="ghost-card">
-        <span class="ghost-field"></span><span class="ghost-field"></span>
+        <div v-for="at in 2" :key="at" class="ghost-group">
+          <span class="ghost-label"></span><span class="ghost-field"></span>
+          <span class="ghost-label hint"></span>
+        </div>
       </div>
+      <!-- The form's footnote, two lines at 390 (review 1 №2). -->
+      <SkeletonPart kind="lines" :card="false" :widths="[92]" />
     </ScreenSkeleton>
     <ScreenState
       v-else-if="!form.draft && !online"
@@ -16,17 +31,30 @@
       :body="t('settings.offline.body')"
     />
     <ScreenState
-      v-else-if="online && form.failure && !form.unknown && !form.saveError"
+      v-else-if="
+        !form.draft && online && form.failure === 'error' && !form.unknown && !form.saveError
+      "
       kind="error"
-      :inline="!!form.draft"
       :title="t('settings.load_error.title')"
       :body="t('settings.load_error.body')"
       @retry="form.refresh"
     />
     <template v-if="form.draft">
-      <p v-if="!online" class="offline">
-        <IconCloud aria-hidden="true" />{{ t('settings.offline.strip') }}
-      </p>
+      <!-- A form shown from what the phone remembers says as of when, and what became of the read
+           (MOL-215, Е-8): the strip, never the quiet card over the fields being edited (MOL-181). -->
+      <StatusStrip
+        v-if="strip"
+        class="status"
+        :kind="strip.kind"
+        :text="strip.text"
+        :attempt="form.failures"
+      >
+        <!-- One «Повторить» a screen (MOL-181, К-5): while the strip under the thumb offers the save's,
+             the strip of the read has none — two of one name, one reading and one writing (Ж1). -->
+        <template v-if="!saveRefused" #action>
+          <AppButton variant="ghost" @click="form.refresh(true)">{{ t('state.retry') }}</AppButton>
+        </template>
+      </StatusStrip>
       <AppReveal>
         <AppCard
           v-if="form.dirty && !form.unknown && (form.returned || form.conflict || !form.stored)"
@@ -67,66 +95,61 @@
     <SalaryShiftGroup v-show="groupsShown" class="group" />
     <!-- The bot's messages, a switch each, on a page of their own (MOL-129, В-2). -->
     <section v-show="groupsShown" class="group">
-      <h2 class="caption">{{ t('settings.group_bot') }}</h2>
+      <SectionCaption>{{ t('settings.group_bot') }}</SectionCaption>
       <AppCard as="ul" list>
         <li>
-          <RouterLink class="entry" :to="{ name: 'bot' }">
-            <IconRobot class="entry-icon" aria-hidden="true" />
-            <span class="entry-text">
-              <span class="entry-label">{{ t('bot.title') }}</span>
-              <span class="entry-hint">{{ t('settings.bot.hint') }}</span>
-            </span>
-            <IconChevron class="entry-chevron" aria-hidden="true" />
-          </RouterLink>
+          <ListRow
+            as="router-link"
+            :to="{ name: 'bot' }"
+            :icon="IconRobot"
+            :title="t('bot.title')"
+            :meta="t('settings.bot.hint')"
+            next
+          />
         </li>
       </AppCard>
     </section>
     <!-- This device's own, not the account's: nothing goes to the server (MOL-111). -->
     <SchemeGroup v-show="groupsShown" class="group" />
     <!-- Outside the form's states: the way into the account does not depend on whether its
-         settings loaded (MOL-57) — only on the skeleton having gone, answer or failure (MOL-269). -->
+         settings loaded (MOL-57) — only on the skeleton having gone, answer or failure (MOL-269).
+         One group (owner's Q3) and two cards: «Устройства» goes on to a screen and «Выйти» asks to
+         confirm, and one card never holds both (В-14 «а»; MOL-215, owner's В-1 «а»). -->
     <section v-show="groupsShown" class="group">
       <SectionCaption>{{ t('settings.group_account') }}</SectionCaption>
       <AppCard as="ul" list>
         <li>
-          <RouterLink class="entry" :to="{ name: 'devices' }">
-            <IconDevices class="entry-icon" aria-hidden="true" />
-            <span class="entry-label">{{ t('devices.title') }}</span>
-            <IconChevron class="entry-chevron" aria-hidden="true" />
-          </RouterLink>
+          <NavRow :to="{ name: 'devices' }" :icon="IconDevices" :label="t('devices.title')" />
         </li>
-        <!-- Here and not beside «Это устройство» in the list: leaving a laptop that is not yours
-             is «quickly, then go», and it is looked for on this screen (owner's decision Q3). -->
+      </AppCard>
+      <!-- Here and not beside «Это устройство» in the list: leaving a laptop that is not yours
+           is «quickly, then go», and it is looked for on this screen (owner's decision Q3). -->
+      <AppCard as="ul" list class="second">
         <li>
-          <button class="entry leave" type="button" @click="askToLeave">
-            <IconLogout class="entry-icon" aria-hidden="true" />
-            <span class="entry-label">{{ t('settings.sign_out') }}</span>
-          </button>
+          <ListRow
+            class="leave"
+            :icon="IconLogout"
+            :title="t('settings.sign_out')"
+            danger
+            @click="askToLeave"
+          />
         </li>
       </AppCard>
     </section>
-    <!-- «Написать разработчику» (MOL-147): opens the app's one sheet rather than a screen, as «Выйти»
-         and «Удалить мои данные» do, so there is no chevron. Offline it opens all the same: written
-         now, sent once there is a connection. -->
+    <!-- «Написать разработчику» (MOL-147): a sheet with fields, so the chevron of В-14 (Р-3 of
+         MOL-175). Offline it opens all the same: written now, sent once there is a connection. -->
     <section v-show="groupsShown" class="group">
       <SectionCaption>{{ t('settings.group_app') }}</SectionCaption>
       <AppCard as="ul" list>
         <li>
-          <button
-            class="entry opener"
-            type="button"
+          <ListRow
+            :icon="IconMessage"
+            :title="t('settings.feedback.label')"
+            :meta="t('settings.feedback.hint')"
             aria-haspopup="dialog"
-            :aria-describedby="`${id}-feedback`"
+            next
             @click="feedback.open({ from: 'settings' })"
-          >
-            <IconMessage class="entry-icon" aria-hidden="true" />
-            <span class="entry-text">
-              <span class="entry-label">{{ t('settings.feedback.label') }}</span>
-              <span :id="`${id}-feedback`" class="entry-hint">{{
-                t('settings.feedback.hint')
-              }}</span>
-            </span>
-          </button>
+          />
         </li>
       </AppCard>
     </section>
@@ -158,31 +181,22 @@
           </p>
         </div>
       </div>
-      <p v-else-if="!online" :id="`${id}-notice`" class="note">
-        {{ t('settings.save_needs_network') }}
-      </p>
       <AppButton
         block
         :inactive="!online || !form.dirty || form.loading || form.unknown"
         :busy="form.saving"
         :busy-label="t('settings.saving')"
-        :aria-describedby="notice || !online ? `${id}-notice` : undefined"
+        :aria-describedby="notice ? `${id}-notice` : undefined"
         @click="form.save"
       >
-        <template v-if="form.saveError && online && !form.saving" #icon><IconRefresh /></template>
-        {{
-          form.saveError && online
-            ? t('state.retry')
-            : form.conflict
-              ? t('settings.overwrite')
-              : t('settings.save')
-        }}
+        <template v-if="retriesSave && !form.saving" #icon><IconRefresh /></template>
+        {{ saveWord }}
       </AppButton>
     </template>
   </AppScreen>
 </template>
 <script lang="ts">
-import { computed, defineComponent, ref, useId, watch } from 'vue'
+import { computed, defineComponent, onUnmounted, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { ActorSettings } from '@molvia/model'
 import IconCloud from '~icons/mdi/cloud-off-outline'
@@ -190,7 +204,6 @@ import IconPencil from '~icons/mdi/pencil-outline'
 import IconCheck from '~icons/mdi/check'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconRefresh from '~icons/mdi/refresh'
-import IconChevron from '~icons/mdi/chevron-right'
 import IconDevices from '~icons/mdi/devices'
 import IconRobot from '~icons/mdi/robot-outline'
 import IconLogout from '~icons/mdi/logout'
@@ -199,16 +212,24 @@ import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
+import ListRow from '@/components/ListRow.vue'
+import NavRow from '@/components/NavRow.vue'
 import SalaryShiftGroup from '@/components/SalaryShiftGroup.vue'
 import SchemeGroup from '@/components/SchemeGroup.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SettingsFields from '@/components/SettingsFields.vue'
 import { countryLabel } from '@/components/placeLabel'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SignOutSheet from '@/components/SignOutSheet.vue'
+import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
+import type { StripKind } from '@/components/StatusStrip.vue'
 import YourDataGroup from '@/components/YourDataGroup.vue'
 import { useSettings } from '@/composables/useSettings'
+import { useLocalDay } from '@/composables/useLocalDay'
+import { answeredAt } from '@/days'
+import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 import { useSignOutStore } from '@/stores/signOut'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -223,21 +244,20 @@ export default defineComponent({
     AppScreen,
     IconAlert,
     IconCheck,
-    IconChevron,
     IconCloud,
-    IconDevices,
-    IconRobot,
-    IconLogout,
-    IconMessage,
     IconPencil,
     IconRefresh,
+    ListRow,
+    NavRow,
     SalaryShiftGroup,
     SchemeGroup,
     ScreenSkeleton,
     ScreenState,
+    SkeletonPart,
     SectionCaption,
     SettingsFields,
     SignOutSheet,
+    StatusStrip,
     YourDataGroup,
   },
   setup() {
@@ -254,6 +274,74 @@ export default defineComponent({
       incomeCurrency: t(`settings.currencies.${value.incomeCurrency}`),
     })
     const settings = useSettings()
+    const { form, online } = settings
+    const actor = useActorStore()
+
+    /**
+     * A read on its way for longer than a moment: only then does the strip say so — a quick one
+     * replaces the form in silence (MOL-201), and the read goes at every opening of the screen.
+     */
+    const late = ref(false)
+    let lateTimer: ReturnType<typeof setTimeout> | undefined
+    watch(
+      () => form.loading && !!form.draft,
+      (waiting) => {
+        clearTimeout(lateTimer)
+        late.value = false
+        if (waiting) {
+          lateTimer = setTimeout(() => {
+            late.value = true
+          }, STRIP_LATE_MS)
+        }
+      },
+      { immediate: true },
+    )
+    onUnmounted(() => {
+      clearTimeout(lateTimer)
+    })
+
+    /**
+     * The form shown and what the server can say of it now (MOL-215, С-11, С-12), as of when the
+     * server last said it to this phone — a shelf of the build before keeps no time, and then the
+     * words say «из памяти». A failure of a save speaks in the strip of the button instead. The day is
+     * the screen's (`answeredAt`, MOL-187 А2): an app left overnight said «сегодня» of yesterday's
+     * answer the next morning (adversarial А1).
+     */
+    const today = useLocalDay()
+    const strip = computed<{ kind: StripKind; text: string } | null>(() => {
+      if (!form.draft) return null
+      const at = actor.settingsReadAt
+      const said = (key: string): string =>
+        at ? t(key, { when: answeredAt(at, i18n.locale.value, today.value) }) : t(`${key}_untimed`)
+      if (!online.value) return { kind: 'offline', text: said('settings.offline.strip') }
+      if (form.failure === 'error' && !form.unknown && !(form.saveError && form.failureOfSave))
+        return { kind: 'unanswered', text: said('settings.stale_error') }
+      if (late.value) return { kind: 'refreshing', text: said('settings.stale_loading') }
+      return null
+    })
+
+    /**
+     * The button says why it cannot be pressed (Ф-6), on itself and not in a line over it. «Загружаем…»
+     * only where the read keeps the save back: an unchanged form says «изменений нет» while the read of
+     * every opening is on its way, or the word would blink at each one.
+     */
+    /**
+     * A refused save is the strip's «Повторить» to offer, so the strip of the read has none (Ж1) — by the
+     * refusal alone, never by the read on its way: tied to it, the strip's button came and went with every
+     * read the screen made itself, and the strip grew and shrank under the finger (adversarial З1).
+     */
+    const saveRefused = computed(() => form.saveError && online.value)
+    /** «Сохранить» says «Повторить» — not while the read after the refusal is on its way (adversarial А3). */
+    const retriesSave = computed(() => saveRefused.value && !form.loading)
+    const saveWord = computed(() => {
+      if (retriesSave.value) return t('state.retry')
+      if (!online.value) return t('settings.save_needs_network')
+      if (form.unknown) return t('settings.save')
+      if (!form.draft) return t('state.loading')
+      if (!form.dirty) return t('settings.save_unchanged')
+      if (form.loading) return t('state.loading')
+      return form.conflict ? t('settings.overwrite') : t('settings.save')
+    })
 
     // «Выйти» (MOL-57): what would be lost is counted while the sheet is open, and the app is
     // asked to send it first — with a connection that is usually everything. Counted is all the
@@ -301,6 +389,14 @@ export default defineComponent({
       unsent,
       askToLeave,
       groupsShown,
+      strip,
+      saveRefused,
+      retriesSave,
+      saveWord,
+      IconDevices,
+      IconLogout,
+      IconMessage,
+      IconRobot,
       feedback: useFeedbackSheetStore(),
     }
   },
@@ -318,7 +414,6 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
-.offline,
 .notice {
   display: flex;
   align-items: flex-start;
@@ -337,7 +432,7 @@ export default defineComponent({
   }
 }
 
-.offline,
+.status,
 .draft {
   margin-bottom: var(--space-3);
 }
@@ -396,69 +491,9 @@ export default defineComponent({
   margin-top: var(--space-6);
 }
 
-.entry {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--touch-target-lg);
-  padding: 0 var(--space-4);
-  color: inherit;
-  text-decoration: none;
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-}
-
-.entry-icon,
-.entry-chevron {
-  @include icon;
-
-  color: var(--text-muted);
-}
-
-.entry-icon {
-  font-size: var(--icon-md);
-}
-
-.entry-chevron {
-  font-size: var(--icon);
-}
-
-.entry-label {
-  flex: 1;
-}
-
-.entry-text {
-  display: grid;
-  flex: 1;
-  min-width: 0;
-  padding: var(--space-2) 0;
-}
-
-.entry-hint {
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
-// A button dressed as the link beside it: the same row. Never `.plain`: that is AppCard's tone on
-// its root, which carries this screen's scope as well, and the rule took the card's surface.
-.leave,
-.opener {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-// The colour of an action that ends something (MOL-57).
-.leave {
-  &,
-  .entry-icon {
-    color: var(--bad-ink);
-  }
+// The second card of a group, as close to the first as a caption is to its card.
+.second {
+  margin-top: var(--space-2);
 }
 
 .ghost-card {
@@ -481,10 +516,19 @@ export default defineComponent({
   background: var(--surface-2);
 }
 
+.ghost-group {
+  display: grid;
+  gap: var(--space-2);
+}
+
 .ghost-label {
   @include skeleton-bar;
 
   width: 38%;
   height: var(--skeleton-line);
+
+  &.hint {
+    width: 72%;
+  }
 }
 </style>

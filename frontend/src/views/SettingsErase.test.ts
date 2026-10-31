@@ -159,6 +159,8 @@ describe('«Удалить мои данные» в настройках (MOL-94
     expect(en.erase.stays).toMatch(/shops’ memory/)
     expect(words).toContain(en.erase.devices)
     expect(words).toContain(en.erase.final)
+    // Its own glyph beside the word (5d, MOL-215 R18).
+    expect(confirmButton().querySelector('.glyph svg')).not.toBeNull()
     expect(eraseMe).not.toHaveBeenCalled()
     expect(logout).not.toHaveBeenCalled()
   })

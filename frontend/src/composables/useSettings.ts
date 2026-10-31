@@ -7,6 +7,7 @@ import { ApiError } from '@molvia/client'
 import { ERROR, sameSettings, settingsOf, settingsUpdateSchema } from '@molvia/model'
 import type { ActorSettings } from '@molvia/model'
 import { api } from '@/api'
+import { reportFailure } from '@/failures'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
 import { forget, read, writeEverywhere } from '@/stores/storage'
@@ -25,7 +26,20 @@ const useSettingsStore = defineStore('settingsForm', () => {
   const current = ref<ActorSettings | null>(null)
   const loading = ref(false)
   const saving = ref(false)
-  const failure = ref(false)
+  /**
+   * Why the last read failed, decided as it failed (MOL-19: `navigator.onLine` read then): a read lost
+   * with no connection is no server's silence, and once the connection is back the next read is a read
+   * (MOL-215, review 1 №1, adversarial А2) — a flag of «failed» said «Сервер не ответил» over it.
+   */
+  const failure = ref<'offline' | 'error' | null>(null)
+  /**
+   * The failure is of the read a refused save started: «Не удалось сохранить» speaks for it, so the strip
+   * does not, and the person's edit that takes the notice away takes this failure too (adversarial Д1).
+   * Any other read's failure is the strip's at once, with its answer (Е2 of round 6).
+   */
+  const failureOfSave = ref(false)
+  /** The person's retries that failed, counted, so the strip says its words again for each (C1). */
+  const failures = ref(0)
   const stored = ref(true)
   const saved = ref(false)
   const saveError = ref(false)
@@ -88,7 +102,8 @@ const useSettingsStore = defineStore('settingsForm', () => {
     generation += 1
     loading.value = false
     saving.value = false
-    failure.value = false
+    failure.value = null
+    failureOfSave.value = false
     saved.value = false
     saveError.value = false
     pending.value = null
@@ -134,11 +149,21 @@ const useSettingsStore = defineStore('settingsForm', () => {
       JSON.stringify({ previous: base.value, settings: draft.value, pending: !!pending.value }),
     )
   }
+  /**
+   * «Не удалось сохранить» spoke for the read after it too, and the person's own edit takes it away: the
+   * refusal of that read goes with it, or the strip «Сервер не ответил» came out of the very tap and
+   * moved the fields under it (MOL-215, adversarial Д1). The next read says what the server does.
+   */
+  function letSaveErrorGo(): void {
+    if (failureOfSave.value && failure.value === 'error') failure.value = null
+    failureOfSave.value = false
+    saveError.value = false
+  }
   function edit(value: ActorSettings): void {
     if (saving.value || unknown.value) return
     draft.value = value
     saved.value = false
-    saveError.value = false
+    letSaveErrorGo()
     keep()
   }
   function cancel(): void {
@@ -146,10 +171,16 @@ const useSettingsStore = defineStore('settingsForm', () => {
     base.value = current.value
     draft.value = current.value ? { ...current.value } : null
     saved.value = false
-    saveError.value = false
+    letSaveErrorGo()
     keep()
   }
-  async function refresh(): Promise<boolean> {
+  /**
+   * `retry` — the person's own «Повторить»: only its failure is counted, so a retry that fails the same
+   * way says the strip's words again (MOL-181, C1), and a read nobody asked for — the connection or the
+   * app back — does not (MOL-204's А1). Every read keeps the failure standing until its own outcome: the
+   * strip holds through it, never taken down and put up again under the finger (adversarial Г1).
+   */
+  async function refresh(retry = false, afterSave = false): Promise<boolean> {
     const owner = actor.id
     if (!owner || saving.value) return false
     const mine = ++generation
@@ -178,11 +209,20 @@ const useSettingsStore = defineStore('settingsForm', () => {
         draft.value = next.draft
         keep()
       }
-      failure.value = false
+      failure.value = null
+      failureOfSave.value = false
       return true
-    } catch {
+    } catch (error) {
       // A session that ended is heard by the seam in `@/api`, not by every caller (MOL-56).
-      if (mine === generation) failure.value = true
+      if (mine === generation) {
+        // The phone's own defect reaches the owner; the API's word and the weather do not (MOL-144).
+        reportFailure(error, 'screen')
+        failure.value = navigator.onLine ? 'error' : 'offline'
+        // Only a refusal «Не удалось сохранить» speaks for: a 409 says nothing, and the strip is then
+        // the screen's one word, which an edit must not take (adversarial Ж2 of round 7).
+        failureOfSave.value = afterSave && saveError.value
+        if (retry) failures.value += 1
+      }
       return false
     } finally {
       if (mine === generation) loading.value = false
@@ -210,7 +250,8 @@ const useSettingsStore = defineStore('settingsForm', () => {
     pending.value = settings
     keep()
     loading.value = false
-    failure.value = false
+    failure.value = null
+    failureOfSave.value = false
     try {
       const loaded = await api.saveSettings({ previous, settings })
       if (mine !== generation || actor.id !== owner || loaded.id !== owner) return
@@ -229,7 +270,7 @@ const useSettingsStore = defineStore('settingsForm', () => {
       keep()
       // Refresh only reads. A lost response never causes an automatic second write.
       saving.value = false
-      await refresh()
+      await refresh(false, true)
     } finally {
       if (mine === generation) saving.value = false
     }
@@ -246,6 +287,8 @@ const useSettingsStore = defineStore('settingsForm', () => {
     loading,
     saving,
     failure,
+    failureOfSave,
+    failures,
     stored,
     saved,
     edit,
@@ -296,11 +339,18 @@ export function useSettings(): {
     },
     { immediate: true },
   )
+  // A server's refusal from before the connection went is no word on the read its return starts
+  // (adversarial Б1): from here the last thing known is «no connection».
   const offline = (): void => {
     online.value = false
+    if (form.failure === 'error') form.failure = 'offline'
   }
   onMounted(() => {
     form.returned = form.dirty
+    // The store outlives the screen: a refusal it kept — from another screen's stretch with no
+    // connection, from an hour ago — is no word on the read of this opening (adversarial В1, В2).
+    form.failure = null
+    form.failureOfSave = false
     window.addEventListener('offline', offline)
     void form.refresh()
   })
@@ -311,6 +361,7 @@ export function useSettings(): {
   useReconnect(() => {
     online.value = navigator.onLine
     if (online.value) void form.refresh()
+    else offline()
   })
   return { form, online, notice, hasAnnouncer: !!announce }
 }

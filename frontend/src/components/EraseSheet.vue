@@ -29,6 +29,7 @@
         :inactive="offline"
         @click="$emit('confirm')"
       >
+        <template #icon><IconDelete /></template>
         {{ t('erase.confirm') }}
       </AppButton>
     </template>
@@ -39,6 +40,7 @@
 import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
+import IconDelete from '~icons/mdi/delete-outline'
 import AppButton from '@/components/AppButton.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 
@@ -53,7 +55,7 @@ import BottomSheet from '@/components/BottomSheet.vue'
  */
 export default defineComponent({
   name: 'EraseSheet',
-  components: { AppButton, BottomSheet },
+  components: { AppButton, BottomSheet, IconDelete },
   props: {
     open: { type: Boolean, required: true },
     busy: { type: Boolean, default: false },

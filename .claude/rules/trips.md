@@ -259,6 +259,54 @@ are typing into. «Что брать» answers with the geography it counted by,
 the phone compares it with its own: a different city is a list to load again, and an answer the
 settings will not move to is taken as it is — the screen used to stay on a skeleton for good.
 
+**A form shown from what the phone remembers says as of when, and what became of the read** (MOL-215,
+Е-8, С-11, С-12): one `StatusStrip` under the header — offline, «Сервер не ответил» with «Повторить» and
+its count of failed reads, «Обновляем» once a read is late by `STRIP_LATE_MS` — never the quiet card of an
+error over the fields being edited, which said no time; with no form, the screen's own states, as before.
+**Why the read failed is decided as it failed** (`failure`: `offline` or `error`, `navigator.onLine` read in
+the `catch`, MOL-19's rule): a flag of «failed» said «Сервер не ответил» with «Повторить» over the read the
+connection's return starts, of a server nobody had asked yet — and at the next opening too, the flag living
+in the store (review 1 №1, adversarial А2). **The screen opened lets a refusal the store kept go** — from another
+screen's stretch with no connection, from an hour ago (adversarial В1, В2 of round 3): its read is «Обновляем» once
+late (MOL-201). **While the screen stands, the strip holds through every read** until that read's own outcome — the
+app or the connection back took it down and put it up again, the fields moving twice under the finger (review 4,
+adversarial Г1) — **and says its words again only for the person's own «Повторить» that failed** (`refresh(true)`
+counts `failures`, MOL-181's C1; MOL-204's А1). **The connection going makes an `error` an `offline`** (adversarial
+Б1 of round 2): from there the last thing known is «no connection», and its return reads as a read. **A refused
+save speaks for the read after it** — that read alone (`failureOfSave`, Е2 of round 6: the notice silenced a later
+read's refusal too, and the edit then dropped it unsaid) — and the person's own edit, taking «Не удалось сохранить»
+away, takes that read's refusal with it (adversarial Д1 of round 5): the strip came out of the very tap and moved the
+fields under it. Only a refused save with that notice marks its read — a 409 says nothing, and there the strip is the
+screen's one word, which an edit took away (Ж2 of round 7). Any other read's refusal is the strip's at once, with its
+answer, beside the notice — **with no «Повторить» of its own while the save stands refused** (`saveRefused`, Ж1): the
+strip and the docked button never offer two of one name, one reading and one writing (MOL-181, К-5) — by the refusal
+alone, never by the read on its way, or the strip's button came and went with every read the screen made itself and
+the strip grew and shrank under the finger (З1 of round 8). **The price, named** (З2): the groups keep the «Повторить» of
+their own section's error — the salary's day, «Учитывать меня в статистике» (MOL-180's quiet card) — so with the server
+down the screen has three of one name, each under the words of its own section, as on master. **And the strip's height
+moves with the refusal** (review 9 №7, adversarial И1): under a refused save the strip of a later read stands with no
+button, 36 high; the edit that takes the notice away gives it «Повторить», and it grows to 44 — or a line, the button
+taking the words' width at 390 — moving the fields under it by that much. A `select` is closed by then, so nothing is
+under the finger; holding the button's place would be a mechanism for three conditions in one window. **A failed read reports
+the phone's own defect** (`reportFailure`, MOL-144; review 7 №6). **The price,
+named** (review 6 №5): after that edit the form stands with no strip until the next read — the app or the connection
+back, the screen opened, «Сохранить» — while the server may still be silent. **The moment is said by `answeredAt` with the screen's day**
+(`useLocalDay`, MOL-187's А2): counted once, an app left overnight said «сегодня» of yesterday's answer the
+next morning (adversarial А1) — so «настройки на сегодня, 14:05», as the strips of «Деньги» say it, never by
+«Покупки»' `{day} в {time}`, which counts the day once. **A moment of another year says its year**
+(`answeredAt` by `dayOfAnyYear`, Б2 of round 2): the settings' moment moves only with an answer, and «на 30
+окт.» of last year read as this one — so do the strips of «Деньги», whose kept answers may be as old.
+**The time is when the server last said the settings to this phone**, by its clock (`readAt` in the
+envelope of `molvia.settings.<owner>`, `settingsReadAt` of the identity), never the row's `updatedAt`, which
+is when they were changed: set as an answer lands (`settle`, `apply`), brought by another window with its
+shelf, and never by the shelf being written — the identity's watcher writes it on every change of `actor`,
+another window's included. **The price, named:** a shelf of the build before has no `readAt`, and that
+build writes the envelope back without it — the strip says «из памяти телефона» with no time until the
+next answer. **«Сохранить» says why it cannot be pressed, on itself** (Ф-6): «когда появится связь», «Сохранить
+· изменений нет», «Загружаем…» — the last only where the read keeps the save back (no form yet, a changed
+form while the read is on its way, or the read after a refused save, which held «Повторить» inactive with no
+word, adversarial А3), or the word would blink at every opening.
+
 ## «Покупки», the record typed by hand, and the newcomer's home (MOL-77, MOL-128)
 
 **«Поход» became «Покупки», and «Что брать» became home** (MOL-128, the owner's decision on the
