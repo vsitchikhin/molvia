@@ -214,7 +214,9 @@ the round trip through Telegram, and ask whose account this turned out to be.
   the two headings are two elements, and the focus follows them** (adversarial А2): a change of step
   that takes the heading or the button the focus stood on gives it to the heading that came, and a
   door shut over the app — a session ended on another phone — gives it to the door's heading
-  (`App.vue`), since the first screen no longer says its words. A focus put outside the door stays.
+  (`App.vue`), since the first screen no longer says its words. A focus put outside the door stays,
+  and so does one over a public screen the shut door leaves in place: on the body there it is a page
+  being read, and taken to the heading the reading jumped to the top (adversarial Р2-А1).
   The mark is `/favicon.svg` by its address, the tab's icon and precached; only the dev server inlines it.
 - **The door has one definition** — `login.closed`, which `App.vue` only reads — and it turns on
   what is actually known. A session the server named and the person claimed opens it; «no
