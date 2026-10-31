@@ -287,6 +287,56 @@ describe('ScreenState', () => {
       expect(document.activeElement).toBe(elsewhere)
       view.unmount()
     })
+
+    // The page under a modal sheet is inert, and its heading took no focus: it fell to <body>
+    // (MOL-317). A section's quiet card, as the summary of a spending draws one (MOL-199).
+    function inSheet() {
+      const shown = ref(true)
+      const screen = onScreen(() => [
+        h('dialog', { open: true, 'aria-labelledby': 'sheet-title' }, [
+          h('h2', { id: 'sheet-title' }, 'Sheet'),
+          h('button', { class: 'elsewhere' }, 'Elsewhere'),
+          shown.value ? h(ScreenState, { kind: 'error', title: 'Title', inline: true }) : null,
+        ]),
+      ])
+      return { ...screen, shown }
+    }
+
+    it('hands a focus inside it to the sheet’s own title in a sheet (MOL-317)', async () => {
+      const { view, shown } = inSheet()
+      ;(view.get('.action button').element as HTMLButtonElement).focus()
+
+      shown.value = false
+      await nextTick()
+      expect(document.activeElement).toBe(view.get('h2').element)
+      view.unmount()
+    })
+
+    // A tap on the title stays a tap on text, and a field typed in keeps the keys (В-2 «а»).
+    it('lets the sheet’s title be focusable only while it holds that focus', async () => {
+      const { view, shown } = inSheet()
+      const title = view.get('h2').element
+      expect(title.hasAttribute('tabindex')).toBe(false)
+      ;(view.get('.action button').element as HTMLButtonElement).focus()
+
+      shown.value = false
+      await nextTick()
+      expect(title.getAttribute('tabindex')).toBe('-1')
+      ;(view.get('.elsewhere').element as HTMLButtonElement).focus()
+      expect(title.hasAttribute('tabindex')).toBe(false)
+      view.unmount()
+    })
+
+    it('leaves a focus elsewhere in the sheet where it is', async () => {
+      const { view, shown } = inSheet()
+      const elsewhere = view.get('.elsewhere').element as HTMLButtonElement
+      elsewhere.focus()
+
+      shown.value = false
+      await nextTick()
+      expect(document.activeElement).toBe(elsewhere)
+      view.unmount()
+    })
   })
 
   // Inside the app the polite words go to its live region, which exists before them: a region

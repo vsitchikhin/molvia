@@ -387,7 +387,9 @@ export default defineComponent({
           const dialog = sheet.value?.$el
           const now = document.activeElement
           if (!props.open || !dialog) return
-          if (now !== dialog && dialog.contains(now)) return
+          // The sheet's title holds the focus the refusal handed it as it went (MOL-317): nobody's.
+          const title = document.getElementById(dialog.getAttribute('aria-labelledby') ?? '')
+          if (now !== dialog && now !== title && dialog.contains(now)) return
           const into: unknown =
             settled.value === 'live'
               ? manual.value?.$el

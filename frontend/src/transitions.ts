@@ -186,6 +186,35 @@ export function focusScreenTitle(): void {
 }
 
 /**
+ * Focus on the heading of where `from` stands: in an open sheet, the sheet's own title — the page
+ * under a modal sheet is inert, its heading takes no focus, and the focus fell to <body> (MOL-317);
+ * elsewhere, the screen's. The title is what names the dialog (`aria-labelledby`), and it is made
+ * focusable only for this focus: a tap on it stays a tap on text, and a field typed in keeps the keys
+ * (owner's В-2 «а»).
+ */
+export function focusTitleOf(from: Element | null): void {
+  const sheet = from?.closest('dialog[open]')
+  if (!sheet) {
+    focusScreenTitle()
+    return
+  }
+  const id = sheet.getAttribute('aria-labelledby')
+  const title = id === null ? null : document.getElementById(id)
+  if (!title) return
+  if (!title.hasAttribute('tabindex')) {
+    title.tabIndex = -1
+    title.addEventListener(
+      'blur',
+      () => {
+        title.removeAttribute('tabindex')
+      },
+      { once: true },
+    )
+  }
+  title.focus({ preventScroll: true })
+}
+
+/**
  * What a person who cannot see the screen needs after a move: the tab's title names the screen
  * (and the Android task switcher shows it), and focus lands on the new heading instead of
  * staying on a button that has just disappeared. Not on the first render — nothing moved yet.
