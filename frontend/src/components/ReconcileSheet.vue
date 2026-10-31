@@ -12,27 +12,22 @@
     <StatusStrip v-if="!online" class="status" kind="offline" :text="t(offlineLine)" />
 
     <!-- Step one: the fact, before the count — so as not to fit the number (В-4 MOL-43). -->
-    <form v-if="!result" class="form" novalidate @submit.prevent="check">
+    <form v-if="!result" ref="form" class="form" novalidate @submit.prevent="check">
       <div class="field">
-        <label :for="factId" class="question">{{ t('accounts.reconcile.question') }}</label>
-        <div class="well" :class="{ bad: factBad }">
-          <input
-            :id="factId"
-            ref="factInput"
-            v-model="fact"
-            class="entry"
-            type="text"
-            inputmode="decimal"
-            autocomplete="off"
-            :aria-invalid="factBad ? 'true' : undefined"
-            :aria-describedby="`${factId}-hint`"
-            @input="factBad = false"
-          />
-          <span class="sign" aria-hidden="true">{{ sign }}</span>
-        </div>
-        <p v-if="factBad" class="error" role="alert">
-          <IconAlert class="alert" aria-hidden="true" />{{ t('accounts.reconcile.no_fact') }}
-        </p>
+        <AppField
+          v-model="fact"
+          :label="t('accounts.reconcile.question')"
+          kind="decimal"
+          size="entry"
+          question
+          autocomplete="off"
+          :error-text="factBad ? t('accounts.reconcile.no_fact') : null"
+          :aria-describedby="`${factId}-hint`"
+          data-field="fact"
+          @update:model-value="factBad = false"
+        >
+          <template #suffix>{{ sign }}</template>
+        </AppField>
         <p :id="`${factId}-hint`" class="hint">{{ t('accounts.reconcile.hint') }}</p>
       </div>
     </form>
@@ -206,7 +201,6 @@
 import { computed, defineComponent, nextTick, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconCheck from '~icons/mdi/check'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconHelp from '~icons/mdi/help-circle-outline'
@@ -222,6 +216,7 @@ import type {
 import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppField from '@/components/AppField.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import OperationRow from '@/components/OperationRow.vue'
@@ -239,6 +234,7 @@ import {
 import type { Removed } from '@/components/spending'
 import { figureChars } from '@/components/figure'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import type { IncomeDraft } from '@/composables/useIncomes'
 import { useReconnect } from '@/composables/useReconnect'
 import { newId } from '@/ids'
@@ -274,9 +270,9 @@ export default defineComponent({
   components: {
     AppButton,
     AppCard,
+    AppField,
     AppReveal,
     BottomSheet,
-    IconAlert,
     IconCheck,
     IconCloudOff,
     IconHelp,
@@ -316,7 +312,14 @@ export default defineComponent({
 
     const fact = ref('')
     const factBad = ref(false)
-    const factInput = ref<HTMLInputElement | null>(null)
+    const form = ref<HTMLFormElement | null>(null)
+    const factField = () => form.value?.querySelector<HTMLInputElement>('[data-field="fact"]')
+    function focusFact(): void {
+      factField()?.focus()
+    }
+    // An empty fact is heard (adversarial А1): the field is focused with its error, or, holding the
+    // focus already — Enter in it, a tap on «Сверить» Safari does not focus — says it.
+    const refuse = useFieldRefusal()
     const result = ref<AccountCheckResponse | null>(null)
     const sending = ref(false)
     /** Why the last ask did not answer — read after the failure, never before (MOL-19, A1). */
@@ -363,7 +366,7 @@ export default defineComponent({
         asking += 1
         recountOnLanding = false
         await nextTick()
-        factInput.value?.focus()
+        focusFact()
       },
     )
 
@@ -438,7 +441,7 @@ export default defineComponent({
       const value = parseSigned(fact.value, props.account.currency)
       if (!value) {
         factBad.value = true
-        factInput.value?.focus()
+        void refuse(factField)
         return
       }
       const earlier = [sent, tried].find((one) => one?.fact.minor === value.minor)
@@ -458,7 +461,7 @@ export default defineComponent({
       recountOnLanding = false
       recountPending.value = false
       result.value = null
-      void nextTick(() => factInput.value?.focus())
+      void nextTick(focusFact)
     }
 
     /** The same check once more, after a reason was put right or the difference written. */
@@ -801,7 +804,7 @@ export default defineComponent({
       factId,
       fact,
       factBad,
-      factInput,
+      form,
       result,
       sending,
       failure,
@@ -860,68 +863,6 @@ export default defineComponent({
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
-}
-
-.question {
-  font-size: var(--text-headline);
-  font-weight: var(--weight-medium);
-}
-
-.well {
-  display: flex;
-  align-items: center;
-  min-height: 4.5rem;
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--surface-2);
-  box-shadow: inset 0 0 0 var(--hairline) var(--border-strong);
-
-  &:focus-within {
-    box-shadow: inset 0 0 0 2px var(--accent);
-  }
-
-  &.bad {
-    box-shadow: inset 0 0 0 2px var(--bad);
-  }
-}
-
-.entry {
-  @include display-type;
-
-  flex: 1;
-  width: 0;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text);
-  font-size: var(--text-entry);
-  font-variant-numeric: tabular-nums;
-  outline: none;
-}
-
-.sign {
-  @include display-type;
-
-  flex: none;
-  color: var(--text-muted);
-  font-size: var(--text-entry-sign);
-}
-
-.error {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  margin: 0;
-  color: var(--bad-ink);
-  font-size: var(--text-footnote);
-  font-weight: var(--weight-medium);
-}
-
-.alert {
-  @include icon;
-
-  font-size: var(--icon-sm);
 }
 
 .hint,

@@ -77,7 +77,12 @@ describe('StatusStrip', () => {
             return [
               h('h1', { tabindex: -1 }, 'Счёт'),
               h('button', { class: 'row' }, 'Такси'),
-              inSheet ? h('dialog', { open: true }, [strip]) : strip,
+              inSheet
+                ? h('dialog', { open: true, 'aria-labelledby': 'sheet-title' }, [
+                    h('h2', { id: 'sheet-title' }, 'Сверить'),
+                    strip,
+                  ])
+                : strip,
             ]
           },
         })
@@ -126,12 +131,30 @@ describe('StatusStrip', () => {
         view.unmount()
       })
 
-      // The page under a sheet is inert: its title is no place for a focus that was in the sheet.
-      it('must not take it out of a sheet', async () => {
+      // The page under a sheet is inert, and its title took no focus: it fell to the body. The
+      // sheet's own title takes it (MOL-317).
+      it('hands it to the sheet’s own title in a sheet', async () => {
         const view = mount(Screen(true), { props: { shown: true }, attachTo: document.body })
         ;(view.get('.action button').element as HTMLElement).focus()
         await view.setProps({ shown: false })
-        expect(document.activeElement).not.toBe(view.get('h1').element)
+        expect(document.activeElement).toBe(view.get('h2').element)
+        view.unmount()
+      })
+
+      it('hands it to the sheet’s own title when the button goes and the strip stays', async () => {
+        const InSheet = defineComponent({
+          props: { kind: { type: String as PropType<StripKind>, required: true } },
+          setup: (props) => () =>
+            h('dialog', { open: true, 'aria-labelledby': 'sheet-title' }, [
+              h('h2', { id: 'sheet-title' }, 'Сверить'),
+              h(StatusStrip, { kind: props.kind, text: 'Счёт на вчера' }, action),
+            ]),
+        })
+        const view = mount(InSheet, { props: { kind: 'unanswered' }, attachTo: document.body })
+        ;(view.get('.action button').element as HTMLElement).focus()
+        await view.setProps({ kind: 'offline' })
+        expect(view.find('.action').exists()).toBe(false)
+        expect(document.activeElement).toBe(view.get('h2').element)
         view.unmount()
       })
     })

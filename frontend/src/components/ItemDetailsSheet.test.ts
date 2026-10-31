@@ -3,7 +3,7 @@ import type { VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import type { Pinia } from 'pinia'
-import { nextTick } from 'vue'
+import { defineComponent, h, nextTick } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { parseMoney, parseQuantity, tripViewCodec } from '@molvia/model'
 import type {
@@ -15,6 +15,7 @@ import type {
   TripView,
 } from '@molvia/model'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { HINT_SETTLE_MS } from '@/composables/useCheaperHint'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
@@ -129,6 +130,8 @@ interface Options {
   readonly selected?: TripView
   readonly code?: string
   readonly focusQuantity?: boolean
+  /** Under an announcer, as `App.vue` holds every sheet: what the sheet says lands in its region. */
+  readonly announced?: boolean
 }
 
 async function router() {
@@ -150,19 +153,30 @@ async function render(options: Options = {}) {
   const made = await router()
   const go = vi.spyOn(made, 'go')
 
-  const view = mount(ItemDetailsSheet, {
-    props: {
-      ...(options.selected ? { tripId: options.selected.id, tripContext: options.selected } : {}),
-      entry: options.entry ?? milk,
-      query: options.query ?? null,
-      expense: options.expense ?? null,
-      closeSteps: options.closeSteps ?? 1,
-      code: options.code ?? null,
-      focusQuantity: options.focusQuantity ?? false,
-    },
+  const props = {
+    ...(options.selected ? { tripId: options.selected.id, tripContext: options.selected } : {}),
+    entry: options.entry ?? milk,
+    query: options.query ?? null,
+    expense: options.expense ?? null,
+    closeSteps: options.closeSteps ?? 1,
+    code: options.code ?? null,
+    focusQuantity: options.focusQuantity ?? false,
+  } as const
+  const mounting = {
     attachTo: document.body,
     global: { plugins: [made, pinia, createAppI18n(options.locale ?? 'ru')] },
-  })
+  }
+  const view: VueWrapper = options.announced
+    ? mount(
+        defineComponent({
+          setup() {
+            provideAnnouncer()
+            return () => h(ItemDetailsSheet, props)
+          },
+        }),
+        mounting,
+      )
+    : mount(ItemDetailsSheet, { props, ...mounting })
   // Past the moment the sheet rises: until then it takes no tap at all.
   clock += 1000
   await new Promise((resolve) => setTimeout(resolve, 5))
@@ -260,7 +274,7 @@ describe('ItemDetailsSheet', () => {
       name === 'radio:l'
         ? view.get('input[type="radio"][value="l"]')
         : name === 'select'
-          ? view.get('select.currency-select')
+          ? view.get('.currency-select select')
           : button(view, name)
     ).element as HTMLElement
     held.focus()
@@ -414,6 +428,23 @@ describe('ItemDetailsSheet', () => {
     expect(view.text()).toContain('Это не похоже на сумму')
     expect(document.activeElement).toBe(input(view, 'amount').element)
     expect(view.emitted('added')).toBeUndefined()
+  })
+
+  // The price refused with the focus in it — a tap on «Записать» Safari does not focus (MOL-80), or
+  // Enter — moves no focus, so the error is said (MOL-235, adversarial Р4-А1).
+  it('a price refused with the focus in it is said', async () => {
+    const { view, queue } = await render({ announced: true })
+    await type(view, 'amount', '57о')
+    const price = input(view, 'amount').element as HTMLInputElement
+    price.focus()
+    await button(view, 'Записать').trigger('click')
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    await flushPromises()
+    expect(queue.pending).toEqual([])
+    expect(document.activeElement).toBe(price)
+    expect(document.querySelector('dialog .region')?.textContent).toContain(
+      'Это не похоже на сумму',
+    )
   })
 
   it('queues one purchase for a double tap', async () => {

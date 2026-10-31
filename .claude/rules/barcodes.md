@@ -210,7 +210,9 @@ person to close apps that were not at fault (review С-10).
 снова» and «Повторить» of a refusal, «Сканировать» of the digits go with their footer as the camera turns, and
 the focus on them fell to the page. A focus that stood in the footer then follows where the camera settles —
 refused, the refusal's first button; live, «Ввести вручную» over the viewfinder — a tick after the deferred
-`Teleport` brings the state's buttons. **Never the footer of a start still on its way** (round 2, №5): a retry
+`Teleport` brings the state's buttons. **The sheet's title is nobody's focus here** (MOL-317): the refusal
+going with the focus gives it to the title (`frontend.md`), and read as the person's, the camera's turn left
+it there — a reader heard the sheet's name in place of «Ввести вручную». **Never the footer of a start still on its way** (round 2, №5): a retry
 passes the viewfinder's own footer while the camera starts, and a reader heard «Ввести вручную» of a viewfinder
 gone the next moment. One the person put somewhere in the sheet meanwhile stays; the sheet put away forgets it.
 `e2e/scanner.spec` holds it in a real engine. Safari focuses no tapped button, so there nothing was in the footer

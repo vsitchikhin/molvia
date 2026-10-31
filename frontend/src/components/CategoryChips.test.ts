@@ -131,10 +131,13 @@ describe('CategoryChips — two rows and «Ещё…» (MOL-198, Ф-17)', () => 
     const field = wrapper.get('fieldset')
     const error = wrapper.get('.error')
     expect(error.text()).toBe('Выберите категорию')
-    expect(field.attributes('aria-describedby')).toBe(error.attributes('id'))
-    expect(
-      wrapper.findAll('input[type="radio"]').every((radio) => radio.attributes('aria-invalid')),
-    ).toBe(true)
+    // On each radio, which a refusal focuses (adversarial Р3-А1), never the group's alone.
+    expect(field.attributes('aria-describedby')).toBeUndefined()
+    for (const radio of wrapper.findAll('input[type="radio"]')) {
+      expect(radio.attributes('aria-invalid')).toBe('true')
+      expect(radio.attributes('aria-describedby')).toBe(error.attributes('id'))
+      expect(radio.attributes('aria-errormessage')).toBe(error.attributes('id'))
+    }
     expect(wrapper.get('button.more').attributes('aria-invalid')).toBeUndefined()
   })
 })

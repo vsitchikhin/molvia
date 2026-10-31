@@ -114,7 +114,9 @@ async function render(
 }
 
 function field(view: VueWrapper, label: string) {
-  const found = view.findAll('.field').find((candidate) => candidate.get('label').text() === label)
+  const found = view
+    .findAll('.app-field')
+    .find((candidate) => candidate.get('label').text() === label)
   if (!found) throw new Error(`no field «${label}»`)
   return found
 }
@@ -155,7 +157,7 @@ describe('ExchangeSheet', () => {
     const view = await render()
     await fill(view, '20 000', '95000,50')
     const held = view
-      .findAll('.field')
+      .findAll('.app-field')
       .find((candidate) => candidate.get('label').text().includes('held before the exchange'))
     await held?.get('input').setValue('20000')
     await save(view)
@@ -178,7 +180,7 @@ describe('ExchangeSheet', () => {
     const view = await render()
     await fill(view, '20 000', '95000,50')
     const held = view
-      .findAll('.field')
+      .findAll('.app-field')
       .find((candidate) => candidate.get('label').text().includes('held before the exchange'))
     await held?.get('input').setValue('20000')
     const button = view.findAll('button').find((one) => one.text() === en.exchange.sheet.save)
