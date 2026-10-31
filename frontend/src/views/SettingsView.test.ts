@@ -9,7 +9,7 @@ import type { ActorView, SettingsUpdate } from '@molvia/model'
 import AppTag from '@/components/AppTag.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
-import { purchaseDay, timeOfDay } from '@/days'
+import { answeredAt, localDay } from '@/days'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -50,7 +50,7 @@ async function render(cached = true, online?: boolean) {
   const view = mount(SettingsView, { global: { plugins: [pinia, router, createAppI18n('en')] } })
   views.push(view)
   await flushPromises()
-  return Object.assign(view, { router })
+  return Object.assign(view, { router, pinia })
 }
 beforeEach(() => {
   vi.restoreAllMocks()
@@ -419,9 +419,9 @@ describe('«Write to the developer» (MOL-147)', () => {
 describe('a form shown from memory says as of when, and what became of the read (MOL-215, Е-8)', () => {
   const READ = new Date('2026-10-31T10:05:00.000Z')
   const strips = (view: VueWrapper) => view.findAllComponents(StatusStrip)
-  // The day and the time as every strip of the app prints them (`days.ts`, the purchases' too).
-  const asOf = (template: string) =>
-    template.replace('{day}', purchaseDay(READ, 'en')).replace('{time}', timeOfDay(READ, 'en'))
+  // The moment as the strips of «Деньги» print it, by the screen's day (`answeredAt`).
+  const asOf = (template: string, at = READ, now = new Date()) =>
+    template.replace('{when}', answeredAt(at, 'en', localDay(now), now))
 
   /** The phone remembers the settings and, unless `readAt` is null, when the server said them. */
   function remember(readAt: Date | null): void {
@@ -491,6 +491,77 @@ describe('a form shown from memory says as of when, and what became of the read 
     expect(strips(view)).toHaveLength(0)
   })
 
+  // Adversarial А2 of review 1: a read lost with no connection is no server's silence — the connection
+  // back read again under «Сервер не ответил» with «Повторить», of a server nobody had asked yet.
+  it('must not fire: the connection back says no «Сервер не ответил» over the read it starts', async () => {
+    remember(READ)
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    me.mockRejectedValue(new TypeError('Failed to fetch'))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const view = await render(false)
+      expect(strips(view)[0]?.props('kind')).toBe('offline')
+
+      me.mockReturnValue(new Promise(() => undefined))
+      onLine.mockReturnValue(true)
+      window.dispatchEvent(new Event('online'))
+      await flushPromises()
+      expect(me).toHaveBeenCalledTimes(2)
+      expect(strips(view)).toHaveLength(0)
+
+      vi.advanceTimersByTime(STRIP_LATE_MS)
+      await flushPromises()
+      expect(strips(view)).toHaveLength(1)
+      expect(strips(view)[0]?.props('kind')).toBe('refreshing')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('must not fire: the screen opened again with the connection back, after an offline failure', async () => {
+    // The failure lives in the store, not in the screen (adversarial А2б).
+    remember(READ)
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    me.mockRejectedValue(new TypeError('Failed to fetch'))
+    const first = await render(false)
+    expect(strips(first)[0]?.props('kind')).toBe('offline')
+    first.unmount()
+
+    onLine.mockReturnValue(true)
+    me.mockReturnValue(new Promise(() => undefined))
+    const again = mount(SettingsView, {
+      global: { plugins: [first.pinia, first.router, createAppI18n('en')] },
+    })
+    views.push(again)
+    await flushPromises()
+    expect(strips(again)).toHaveLength(0)
+  })
+
+  // Adversarial А1: the day was counted once, and the app left overnight said «today» of yesterday.
+  it('the day follows the screen past midnight, the app back in view', async () => {
+    const before = new Date('2026-10-30T23:50:00.000Z')
+    const after = new Date('2026-10-31T00:10:00.000Z')
+    const read = new Date('2026-10-30T23:40:00.000Z')
+    remember(read)
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(before)
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      me.mockRejectedValue(new TypeError('Failed to fetch'))
+      const view = await render(false)
+      expect(strips(view)[0]?.props('text')).toBe(asOf(en.settings.offline.strip, read, before))
+      expect(strips(view)[0]?.props('text')).toContain('today')
+
+      vi.setSystemTime(after)
+      document.dispatchEvent(new Event('visibilitychange'))
+      await flushPromises()
+      expect(strips(view)[0]?.props('text')).toBe(asOf(en.settings.offline.strip, read, after))
+      expect(strips(view)[0]?.props('text')).toContain('yesterday')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('a read late past a moment says «обновляем»; a quick one says nothing', async () => {
     remember(READ)
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
@@ -538,6 +609,29 @@ describe('«Сохранить» says why it cannot be pressed, on itself (Ф-6)
     me.mockReturnValue(new Promise(() => undefined))
     const view = await render(false)
     expect(button(view).text()).toBe(en.state.loading)
+  })
+
+  // Adversarial А3: «Повторить» after a refused save stood inactive through the read after it.
+  it('loading, the read after a refused save — not a «Повторить» that cannot be pressed', async () => {
+    const view = await render()
+    await field(view, 'city')?.setValue('Ереван')
+    save.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    let answer: (value: ActorView) => void = () => undefined
+    me.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+    await button(view).trigger('click')
+    await flushPromises()
+    expect(button(view).text()).toBe(en.state.loading)
+    expect(button(view).attributes('aria-disabled')).toBe('true')
+    expect(button(view).find('.glyph').exists()).toBe(false)
+
+    answer(initial)
+    await flushPromises()
+    expect(button(view).text()).toBe(en.state.retry)
+    expect(button(view).attributes('aria-disabled')).toBeUndefined()
   })
 
   it('loading, a changed form waiting for the read — and not an unchanged one', async () => {

@@ -1,7 +1,7 @@
 <template>
   <AppScreen :title="t('settings.title')">
     <!-- The form's shape (Ф-13): its two groups, each field its label, its well and its hint — the
-         country has none. -->
+         country has none — and the footnote under them. -->
     <ScreenSkeleton v-if="form.loading && !form.draft">
       <SkeletonPart kind="caption" :width="28" />
       <div class="ghost-card">
@@ -20,6 +20,8 @@
           <span class="ghost-label hint"></span>
         </div>
       </div>
+      <!-- The form's footnote, two lines at 390 (review 1 №2). -->
+      <SkeletonPart kind="lines" :card="false" :widths="[92]" />
     </ScreenSkeleton>
     <ScreenState
       v-else-if="!form.draft && !online"
@@ -29,7 +31,9 @@
       :body="t('settings.offline.body')"
     />
     <ScreenState
-      v-else-if="!form.draft && online && form.failure && !form.unknown && !form.saveError"
+      v-else-if="
+        !form.draft && online && form.failure === 'error' && !form.unknown && !form.saveError
+      "
       kind="error"
       :title="t('settings.load_error.title')"
       :body="t('settings.load_error.body')"
@@ -183,7 +187,9 @@
         :aria-describedby="notice ? `${id}-notice` : undefined"
         @click="form.save"
       >
-        <template v-if="form.saveError && online && !form.saving" #icon><IconRefresh /></template>
+        <template v-if="form.saveError && online && !form.saving && !form.loading" #icon
+          ><IconRefresh
+        /></template>
         {{ saveWord }}
       </AppButton>
     </template>
@@ -221,7 +227,8 @@ import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import type { StripKind } from '@/components/StatusStrip.vue'
 import YourDataGroup from '@/components/YourDataGroup.vue'
 import { useSettings } from '@/composables/useSettings'
-import { purchaseDay, timeOfDay } from '@/days'
+import { useLocalDay } from '@/composables/useLocalDay'
+import { answeredAt } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 import { useSignOutStore } from '@/stores/signOut'
@@ -296,17 +303,18 @@ export default defineComponent({
     /**
      * The form shown and what the server can say of it now (MOL-215, С-11, С-12), as of when the
      * server last said it to this phone — a shelf of the build before keeps no time, and then the
-     * words say «из памяти». A failure of a save speaks in the strip of the button instead.
+     * words say «из памяти». A failure of a save speaks in the strip of the button instead. The day is
+     * the screen's (`answeredAt`, MOL-187 А2): an app left overnight said «сегодня» of yesterday's
+     * answer the next morning (adversarial А1).
      */
+    const today = useLocalDay()
     const strip = computed<{ kind: StripKind; text: string } | null>(() => {
       if (!form.draft) return null
       const at = actor.settingsReadAt
-      const when = at
-        ? { day: purchaseDay(at, i18n.locale.value), time: timeOfDay(at, i18n.locale.value) }
-        : null
-      const said = (key: string): string => (when ? t(key, when) : t(`${key}_untimed`))
+      const said = (key: string): string =>
+        at ? t(key, { when: answeredAt(at, i18n.locale.value, today.value) }) : t(`${key}_untimed`)
       if (!online.value) return { kind: 'offline', text: said('settings.offline.strip') }
-      if (form.failure && !form.unknown && !form.saveError)
+      if (form.failure === 'error' && !form.unknown && !form.saveError)
         return { kind: 'unanswered', text: said('settings.stale_error') }
       if (late.value) return { kind: 'refreshing', text: said('settings.stale_loading') }
       return null
@@ -318,7 +326,8 @@ export default defineComponent({
      * every opening is on its way, or the word would blink at each one.
      */
     const saveWord = computed(() => {
-      if (form.saveError && online.value) return t('state.retry')
+      // Not while the read after the refusal is on its way: that keeps it back (adversarial А3).
+      if (form.saveError && online.value && !form.loading) return t('state.retry')
       if (!online.value) return t('settings.save_needs_network')
       if (form.unknown) return t('settings.save')
       if (!form.draft) return t('state.loading')

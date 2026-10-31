@@ -25,7 +25,12 @@ const useSettingsStore = defineStore('settingsForm', () => {
   const current = ref<ActorSettings | null>(null)
   const loading = ref(false)
   const saving = ref(false)
-  const failure = ref(false)
+  /**
+   * Why the last read failed, decided as it failed (MOL-19: `navigator.onLine` read then): a read lost
+   * with no connection is no server's silence, and once the connection is back the next read is a read
+   * (MOL-215, review 1 №1, adversarial А2) — a flag of «failed» said «Сервер не ответил» over it.
+   */
+  const failure = ref<'offline' | 'error' | null>(null)
   /** Failed reads, counted, so a strip whose retry failed the same way says its words again (C1). */
   const failures = ref(0)
   const stored = ref(true)
@@ -90,7 +95,7 @@ const useSettingsStore = defineStore('settingsForm', () => {
     generation += 1
     loading.value = false
     saving.value = false
-    failure.value = false
+    failure.value = null
     saved.value = false
     saveError.value = false
     pending.value = null
@@ -180,12 +185,12 @@ const useSettingsStore = defineStore('settingsForm', () => {
         draft.value = next.draft
         keep()
       }
-      failure.value = false
+      failure.value = null
       return true
     } catch {
       // A session that ended is heard by the seam in `@/api`, not by every caller (MOL-56).
       if (mine === generation) {
-        failure.value = true
+        failure.value = navigator.onLine ? 'error' : 'offline'
         failures.value += 1
       }
       return false
@@ -215,7 +220,7 @@ const useSettingsStore = defineStore('settingsForm', () => {
     pending.value = settings
     keep()
     loading.value = false
-    failure.value = false
+    failure.value = null
     try {
       const loaded = await api.saveSettings({ previous, settings })
       if (mine !== generation || actor.id !== owner || loaded.id !== owner) return

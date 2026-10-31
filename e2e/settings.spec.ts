@@ -57,7 +57,7 @@ test('settings draft survives tabs and offline; another device produces an expli
   const strip = page.locator('.strip')
   await expect(strip).toHaveCount(1)
   await expect(strip).toHaveText(
-    /^Без связи · настройки на сегодня в \d{1,2}:\d{2}\. Изменения можно сохранить, когда интернет появится$/,
+    /^Без связи · настройки на сегодня, \d{1,2}:\d{2}\. Изменения можно сохранить, когда интернет появится$/,
   )
   await page.context().setOffline(false)
   await expect(page.getByRole('button', { name: 'Сохранить', exact: true })).toBeEnabled()
@@ -135,7 +135,7 @@ test('the server silent over a form from memory: the strip as of the last answer
 
   const strip = page.locator('.strip')
   await expect(strip).toHaveCount(1)
-  await expect(strip).toContainText(/^Сервер не ответил · настройки на сегодня в \d{1,2}:\d{2}/)
+  await expect(strip).toContainText(/^Сервер не ответил · настройки на сегодня, \d{1,2}:\d{2}/)
   // The fields stay, and no card of the error stands over them.
   await expect(page.getByLabel('Город', { exact: true })).toHaveValue('Гюмри')
   await expect(
