@@ -263,6 +263,13 @@ settings will not move to is taken as it is — the screen used to stay on a ske
 Е-8, С-11, С-12): one `StatusStrip` under the header — offline, «Сервер не ответил» with «Повторить» and
 its count of failed reads, «Обновляем» once a read is late by `STRIP_LATE_MS` — never the quiet card of an
 error over the fields being edited, which said no time; with no form, the screen's own states, as before.
+**Why the read failed is decided as it failed** (`failure`: `offline` or `error`, `navigator.onLine` read in
+the `catch`, MOL-19's rule): a flag of «failed» said «Сервер не ответил» with «Повторить» over the read the
+connection's return starts, of a server nobody had asked yet — and at the next opening too, the flag living
+in the store (review 1 №1, adversarial А2). **The moment is said by `answeredAt` with the screen's day**
+(`useLocalDay`, MOL-187's А2): counted once, an app left overnight said «сегодня» of yesterday's answer the
+next morning (adversarial А1) — so «настройки на сегодня, 14:05», as the strips of «Деньги» say it, never by
+«Покупки»' `{day} в {time}`, which counts the day once.
 **The time is when the server last said the settings to this phone**, by its clock (`readAt` in the
 envelope of `molvia.settings.<owner>`, `settingsReadAt` of the identity), never the row's `updatedAt`, which
 is when they were changed: set as an answer lands (`settle`, `apply`), brought by another window with its
@@ -270,8 +277,9 @@ shelf, and never by the shelf being written — the identity's watcher writes it
 another window's included. **The price, named:** a shelf of the build before has no `readAt`, and that
 build writes the envelope back without it — the strip says «из памяти телефона» with no time until the
 next answer. **«Сохранить» says why it cannot be pressed, on itself** (Ф-6): «когда появится связь», «Сохранить
-· изменений нет», «Загружаем…» — the last only where the read keeps the save back (no form yet, or a changed
-form while the read is on its way), or the word would blink at every opening.
+· изменений нет», «Загружаем…» — the last only where the read keeps the save back (no form yet, a changed
+form while the read is on its way, or the read after a refused save, which held «Повторить» inactive with no
+word, adversarial А3), or the word would blink at every opening.
 
 ## «Покупки», the record typed by hand, and the newcomer's home (MOL-77, MOL-128)
 
