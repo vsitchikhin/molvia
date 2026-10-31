@@ -272,7 +272,9 @@ late (MOL-201). **While the screen stands, the strip holds through every read** 
 app or the connection back took it down and put it up again, the fields moving twice under the finger (review 4,
 adversarial Г1) — **and says its words again only for the person's own «Повторить» that failed** (`refresh(true)`
 counts `failures`, MOL-181's C1; MOL-204's А1). **The connection going makes an `error` an `offline`** (adversarial
-Б1 of round 2): from there the last thing known is «no connection», and its return reads as a read. **The moment is said by `answeredAt` with the screen's day**
+Б1 of round 2): from there the last thing known is «no connection», and its return reads as a read. **A refused
+save speaks for the read after it**, and the person's own edit, taking «Не удалось сохранить» away, takes that read's
+refusal with it (adversarial Д1 of round 5): the strip came out of the very tap and moved the fields under it. **The moment is said by `answeredAt` with the screen's day**
 (`useLocalDay`, MOL-187's А2): counted once, an app left overnight said «сегодня» of yesterday's answer the
 next morning (adversarial А1) — so «настройки на сегодня, 14:05», as the strips of «Деньги» say it, never by
 «Покупки»' `{day} в {time}`, which counts the day once. **A moment of another year says its year**
