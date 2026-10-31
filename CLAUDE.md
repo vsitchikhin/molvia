@@ -183,8 +183,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   a synonym counts only as the word of the kind, at most sixteen per query, never into a brand.
 - **At one distance the order is fixed** (MOL-112): found by the word before by a synonym, whole
   word before a start, fats typed with «%», then the shorter name, then the similarity, the uuid.
-- **The thresholds were measured and kept** (MOL-14); a change of either is checked against the
-  pinned corpus.
+- **The thresholds were measured and kept** (MOL-14; on the lines of real receipts, MOL-47); a change
+  of either is checked against the pinned corpus.
 - **The meaning is an addition, never a condition** (MOL-105): EmbeddingGemma in the API, one
   writer of `item_embeddings`; without the model the search is the letters'. A name found by meaning
   stands after one edit and before two, near; nothing within one edit moves. Similarity 0.40, from
