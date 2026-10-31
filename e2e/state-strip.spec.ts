@@ -66,3 +66,62 @@ test('the focus on «Try again» goes with it between the strip and the block', 
   await flip(section, 'As a section')
   await expect(inStrip).toBeFocused()
 })
+
+/**
+ * A block of a sheet that goes with the focus on its button hands it to the sheet's own title (MOL-317):
+ * the page under a modal sheet is inert, the screen's title took no focus, and it fell to the body —
+ * the next Tab started the sheet over and a screen reader lost its place. Pressed by the keyboard: Safari
+ * focuses no tapped button, and a focus never on the button would prove nothing here.
+ */
+test.describe('a block of a sheet that goes with the focus', () => {
+  async function statesSheet(page: Page): Promise<Locator> {
+    await open(page, '/_kit')
+    await page.getByRole('button', { name: 'Open a sheet of states' }).click()
+    const sheet = page.getByRole('dialog', { name: 'States in a sheet' })
+    await expect(sheet).toBeVisible()
+    // Until it has risen a sheet takes no press at all (MOL-69): its rise, then the double tap's floor.
+    await sheet.evaluate(async (dialog) => {
+      await Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished))
+    })
+    await page.waitForTimeout(400)
+    return sheet
+  }
+
+  async function pressAndExpectTitle(page: Page, sheet: Locator, retry: Locator): Promise<void> {
+    await retry.focus()
+    await expect(retry).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(retry).toHaveCount(0)
+    const title = sheet.getByRole('heading', { name: 'States in a sheet' })
+    await expect(title).toBeFocused()
+    // The next Tab goes on from the title — to × — and the title is text again. Not in WebKit, whose
+    // Tab reaches fields only, and the sheet has none: the focus left the title is held by a script.
+    if (test.info().project.name === 'iphone') {
+      await sheet.getByRole('button', { name: 'Close' }).focus()
+    } else {
+      await page.keyboard.press('Tab')
+      await expect(sheet.getByRole('button', { name: 'Close' })).toBeFocused()
+    }
+    await expect(title).not.toHaveAttribute('tabindex')
+  }
+
+  test('the quiet card’s «Try again»', async ({ page }) => {
+    const sheet = await statesSheet(page)
+    const card = sheet.locator('.state.card', { hasText: 'The server did not answer' })
+    await pressAndExpectTitle(page, sheet, card.getByRole('button', { name: 'Try again' }))
+  })
+
+  test('a full error’s «Try again» in the footer', async ({ page }) => {
+    const sheet = await statesSheet(page)
+    const retry = sheet.locator('.footer').getByRole('button', { name: 'Try again' })
+    await expect(retry).toBeVisible()
+    await pressAndExpectTitle(page, sheet, retry)
+  })
+
+  test('the strip’s «Try again», the strip staying offline', async ({ page }) => {
+    const sheet = await statesSheet(page)
+    const strip = sheet.locator('.strip')
+    await pressAndExpectTitle(page, sheet, strip.getByRole('button', { name: 'Try again' }))
+    await expect(strip).toHaveClass(/\boffline\b/)
+  })
+})

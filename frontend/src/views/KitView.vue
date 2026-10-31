@@ -694,6 +694,37 @@
       </div>
     </BottomSheet>
 
+    <!-- A block of a sheet that goes with the focus on its «Повторить» hands it to the sheet's own title:
+         the page under a modal sheet is inert (MOL-317). The quiet card, a full error in the footer and a
+         strip whose button goes while it stays — for WebKit, where a screen with data does not open. -->
+    <AppButton block @click="openStates">{{ t('dev.kit.open_states_sheet') }}</AppButton>
+
+    <BottomSheet v-model:open="statesOpen">
+      <template #title>{{ t('dev.kit.states_sheet') }}</template>
+      <StatusStrip :kind="statesStrip" :text="t('dev.kit.strip_unanswered')">
+        <template #action>
+          <AppButton variant="ghost" @click="statesStrip = 'offline'">
+            {{ t('state.retry') }}
+          </AppButton>
+        </template>
+      </StatusStrip>
+      <ScreenState
+        v-if="statesCard"
+        kind="error"
+        inline
+        :title="t('trip.error.title')"
+        :body="t('trip.error.body')"
+        @retry="statesCard = false"
+      />
+      <ScreenState
+        v-if="statesFull"
+        kind="error"
+        :title="t('devices.load_error.title')"
+        :body="t('devices.load_error.body')"
+        @retry="statesFull = false"
+      />
+    </BottomSheet>
+
     <!-- The scanner, until a screen opens it (MOL-99): for end-to-end and for a real phone. -->
     <section class="group">
       <AppButton block variant="secondary" @click="scannerOpen = true">
@@ -767,6 +798,7 @@ import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
+import type { StripKind } from '@/components/StatusStrip.vue'
 import TripTotalCard from '@/components/TripTotalCard.vue'
 import { operationRowProps, shortDay } from '@/components/accounts'
 import { budgetAmount, journalRowProps } from '@/components/spending'
@@ -1201,6 +1233,17 @@ export default defineComponent({
       { value: 'l', label: t('item.unit_l') },
       { value: 'piece', label: t('item.unit_piece') },
     ])
+    // Every block of the sheet of states back, at each opening (MOL-317).
+    const statesOpen = ref(false)
+    const statesStrip = ref<StripKind>('unanswered')
+    const statesCard = ref(true)
+    const statesFull = ref(true)
+    function openStates(): void {
+      statesStrip.value = 'unanswered'
+      statesCard.value = true
+      statesFull.value = true
+      statesOpen.value = true
+    }
     return {
       t,
       ERROR,
@@ -1308,6 +1351,11 @@ export default defineComponent({
       wideCategories,
       wideName,
       wideOptions,
+      statesOpen,
+      statesStrip,
+      statesCard,
+      statesFull,
+      openStates,
       scannerOpen: ref(false),
       scanned: ref(''),
       // The verdict card blank, and as a refused draft comes back: a score, words, the error.
