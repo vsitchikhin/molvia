@@ -1,8 +1,14 @@
-import { describeFailure, newLineName, receiptCard, receiptLineParts } from '@molvia/model'
+import {
+  describeFailure,
+  glyphsMended,
+  newLineName,
+  receiptCard,
+  receiptLineParts,
+} from '@molvia/model'
 import type { CatalogueNode, ItemNameLanguage, NameLexicon } from '@molvia/model'
 import type { RenameReport, RenameRepository } from '@/db/rename-repository'
 import { TILL_WORDS_RU } from '@/receipts/till-words-ru'
-import { namingLexicon } from '@/usecases/bind-receipt-lines'
+import { knownTillWords, namingLexicon } from '@/usecases/bind-receipt-lines'
 
 export const RENAME_USAGE = 'usage: rename-receipt-items [--yes]'
 
@@ -31,16 +37,23 @@ export async function renameReceiptItems(
   let report: RenameReport
   try {
     const lexicons = new Map<ItemNameLanguage, NameLexicon>()
+    const known = new Map<ItemNameLanguage, ReadonlySet<string>>()
     for (const language of ['hy'] as const) {
-      lexicons.set(language, namingLexicon(await deps.nodes(language)))
+      const nodes = await deps.nodes(language)
+      lexicons.set(language, namingLexicon(nodes))
+      known.set(language, knownTillWords(nodes))
     }
     report = await deps.renamer.rename({
       dryRun,
-      nameOf: (printed, country) => {
+      // the line as the queue reads it: a word the model misread put right (MOL-326)
+      nameOf: (printed, country, byModel) => {
         const language = receiptCard(country).nameLanguage
         const lexicon = language === null ? undefined : lexicons.get(language)
-        if (lexicon === undefined) return null
-        return newLineName(receiptLineParts(printed), TILL_WORDS_RU, lexicon)?.name ?? null
+        if (language === null || lexicon === undefined) return null
+        const words = known.get(language)
+        const read =
+          (byModel && words !== undefined ? glyphsMended(printed, words) : null) ?? printed
+        return newLineName(receiptLineParts(read), TILL_WORDS_RU, lexicon)?.name ?? null
       },
     })
   } catch (error) {

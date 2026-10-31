@@ -368,6 +368,71 @@ export const armenianInRussian = (text: string): string =>
   text.replace(/[ա-ֆԱ-Ֆև]+/gu, (word) => spellWord(word))
 
 /**
+ * Letters of the till's font a reader takes one for another, measured on the bench's readings against their truth
+ * (MOL-326, `.scratch/tasks/research/MOL-326.md`) — «Շաքարավազ» read «Ցաքարավազ» on 31.10.2026. Only these: a word
+ * one edit off is another word as often as the same, «լոշիկ» was no «լոլիկ» (MOL-293).
+ */
+const GLYPH_SWAPS: readonly (readonly [string, string])[] = [
+  ['մ', 'ս'],
+  ['չ', 'ջ'],
+  ['ի', 'հ'],
+  ['փ', 'ֆ'],
+  ['գ', 'զ'],
+  ['շ', 'չ'],
+  ['շ', 'ց'],
+  ['ծ', 'յ'],
+  ['ջ', 'տ'],
+  ['զ', 'ջ'],
+  ['ո', 'ր'],
+  ['թ', 'լ'],
+  ['ք', 'բ'],
+  ['թ', 'տ'],
+]
+const SWAPS_OF = new Map<string, string[]>()
+for (const [a, b] of GLYPH_SWAPS) {
+  SWAPS_OF.set(a, [...(SWAPS_OF.get(a) ?? []), b])
+  SWAPS_OF.set(b, [...(SWAPS_OF.get(b) ?? []), a])
+}
+// a word shorter than this has too many neighbours to be put right
+const SHORTEST_MENDED = 4
+
+/**
+ * The line with a word the reader misread put right (MOL-326, owner's В-3 «б»): a word no `known` one, from four
+ * letters, outside «…», that one swap of the font's letters makes exactly one known word — «Ցաքարավազ 1կգ» is
+ * «Շաքարավազ 1կգ». Two known words of one swap are a guess, and the word stays as read. `null` where nothing was
+ * put right: what was is offered under «проверьте», never as read.
+ */
+export function glyphsMended(printed: string, known: ReadonlySet<string>): string | null {
+  let quoted = false
+  const out = printed.replace(/[«»]|[ա-ֆԱ-Ֆև]+/gu, (word) => {
+    if (word === '«' || word === '»') {
+      quoted = word === '«'
+      return word
+    }
+    // an Armenian letter is one code unit, upper case and lower alike
+    const lower = word.toLowerCase()
+    if (quoted || lower.length < SHORTEST_MENDED || known.has(lower)) return word
+    const found: (readonly [number, string])[] = []
+    for (let at = 0; at < lower.length; at += 1) {
+      for (const other of SWAPS_OF.get(lower.charAt(at)) ?? []) {
+        if (known.has(lower.slice(0, at) + other + lower.slice(at + 1))) found.push([at, other])
+      }
+    }
+    const only = found.length === 1 ? found[0] : undefined
+    if (only === undefined) return word
+    const [at, other] = only
+    const was = word.charAt(at)
+    return (
+      word.slice(0, at) +
+      (was === was.toLowerCase() ? other : other.toUpperCase()) +
+      word.slice(at + 1)
+    )
+  })
+  // a word put right is another letter: the line differs
+  return out === printed ? null : out
+}
+
+/**
  * What a new item's name is written with beyond the till's words (MOL-261). Each part is the backend's
  * dictionary, as the till's words are; without one the name is as MOL-293 made it.
  */

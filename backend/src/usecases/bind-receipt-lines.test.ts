@@ -10,10 +10,12 @@ const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const MILK = '00000000-0000-4000-8000-000000000001'
 const GLUE = '00000000-0000-4000-8000-000000000002'
 const SOUR_CREAM = '00000000-0000-4000-8000-000000000003'
+const SUGAR = '00000000-0000-4000-8000-000000000004'
 
 const NODES: CatalogueNode[] = [
   { itemId: MILK, name: 'Молоко', names: ['կաթ'], headings: ['0401'] },
   { itemId: GLUE, name: 'Клей', names: ['սոսինձ'], headings: ['3506'] },
+  { itemId: SUGAR, name: 'Сахар', names: ['շաքար', 'շաքարավազ'], headings: ['1701'] },
 ]
 
 function item(id: string, name: string): Item {
@@ -241,6 +243,43 @@ describe('binding the lines of a parsed receipt (MOL-126)', () => {
       line('ԹԹՎԱՍԵՐ 20%'),
     ])
     expect(line0).toEqual({ itemId: null, match: 'weak', translation: null, spelled: false })
+  })
+})
+
+describe('a word the model misread by the font (MOL-326, В-3 «б»)', () => {
+  it('is put right for the item and the name alike, and the line is «проверьте»', async () => {
+    const { items } = fakeItems()
+    const bound = await bindReceiptLines(
+      { items, embedder: NO_EMBEDDER },
+      ACTOR,
+      'AM',
+      'ru',
+      [
+        line('Ցաքարավազ 1կգ', '1701'),
+        line('Շաքարավազ 1կգ', '1701'),
+        line('Ցաքարավազ «Մաքուր» 1կգ'),
+      ],
+      [],
+      { mendGlyphs: true },
+    )
+    expect(bound).toEqual([
+      { itemId: SUGAR, match: 'weak', translation: 'сахар-песок' },
+      { itemId: SUGAR, match: 'search', translation: 'сахар-песок' },
+      {
+        itemId: null,
+        match: 'weak',
+        translation: 'Сахар-песок «Макур» 1 кг',
+        spelled: false,
+      },
+    ])
+  })
+
+  it('must not be put right on a line Tesseract read: it misreads otherwise', async () => {
+    const { items } = fakeItems()
+    const [bound] = await bindReceiptLines({ items, embedder: NO_EMBEDDER }, ACTOR, 'AM', 'ru', [
+      line('Ցաքարավազ 1կգ', '1701'),
+    ])
+    expect(bound).toMatchObject({ itemId: null, match: 'weak', spelled: true })
   })
 })
 

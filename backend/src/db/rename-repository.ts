@@ -3,6 +3,7 @@ import { nameIdentity, toSearchKey } from '@molvia/model'
 import type { ReceiptCountry } from '@molvia/model'
 import type { Conn } from './index'
 import { lockItemKey } from './items-repository'
+import { byModel } from './receipts-repository'
 import { expenses, itemEmbeddings, items, receiptLines, receipts } from './schema'
 
 /** An item a receipt's record made, and the name it takes now. */
@@ -17,8 +18,12 @@ export interface RenameReport {
   readonly taken: readonly RenamedItem[]
 }
 
-/** The name a line would propose today, or none. */
-export type LineNamer = (printed: string, country: ReceiptCountry) => string | null
+/** The name a line would propose today, or none; `byModel` — the model read it (MOL-326). */
+export type LineNamer = (
+  printed: string,
+  country: ReceiptCountry,
+  byModel: boolean,
+) => string | null
 
 export interface RenameRepository {
   /**
@@ -45,6 +50,7 @@ export function createRenameRepository(db: Conn): RenameRepository {
           const rows = await tx
             .select({
               country: receipts.country,
+              readerVersion: receipts.readerVersion,
               actorId: receipts.actorId,
               recordedAt: receipts.recordedAt,
               printed: receiptLines.printed,
@@ -82,7 +88,7 @@ export function createRenameRepository(db: Conn): RenameRepository {
             if (!made || row.proposed === null) continue
             if (nameIdentity(row.name) !== nameIdentity(row.proposed)) continue
             seen.add(row.itemId)
-            const to = nameOf(row.printed, row.country)
+            const to = nameOf(row.printed, row.country, byModel(row.readerVersion))
             if (to === null || nameIdentity(to) === nameIdentity(row.name)) continue
 
             const key = toSearchKey(to)

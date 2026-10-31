@@ -99,6 +99,8 @@ export interface ReadReceiptsDeps {
   readonly bind: (
     claimed: ClaimedReceipt,
     lines: readonly ReceiptLine[],
+    /** The model read them (MOL-326): a word it misread by the font may be put right. */
+    read: { readonly byModel: boolean },
   ) => Promise<readonly LineBinding[]>
   /** What happened, for the log: never the receipt's text, its tax number or its photo (MOL-58). */
   readonly report: (event: ReadReport) => void
@@ -327,6 +329,7 @@ async function readByModel(
     head,
     version: model.version,
     images: [],
+    byModel: true,
   })
   if (outcome.kind !== 'parsed') {
     return {
@@ -407,7 +410,14 @@ async function readByOcr(
     }
     report({ kind: 'strips_failed', reason: error.reason })
   }
-  const outcome = await parsed(deps, claimed, { text, shown, head, version: version ?? '', images })
+  const outcome = await parsed(deps, claimed, {
+    text,
+    shown,
+    head,
+    version: version ?? '',
+    images,
+    byModel: false,
+  })
   // Tesseract's: counted, never kept nor told (owner, 27.10.2026, MOL-309 В-4)
   return outcome.kind === 'parsed'
     ? { ...outcome, reasons: { receipt: explained.receipt, lines: explained.lines } }
@@ -497,9 +507,10 @@ async function parsed(
     readonly head: ReceiptHead
     readonly version: string
     readonly images: readonly LineImage[]
+    readonly byModel: boolean
   },
 ): Promise<ReadOutcome> {
-  const { text, shown, head, version, images } = reading
+  const { text, shown, head, version, images, byModel } = reading
   const { currency } = receiptCard(claimed.country)
   const lines = shown.lines.map((line) => receiptLineOf(line, currency))
   // the lines go out on the wire as the contract says, or the receipt is not read (Т-5)
@@ -508,7 +519,7 @@ async function parsed(
   }
   let bindings: readonly LineBinding[] = []
   try {
-    bindings = await bind(claimed, lines)
+    bindings = await bind(claimed, lines, { byModel })
   } catch (error) {
     // what the lines are is the review's help, not the receipt: it is read without it, every line new
     report({ kind: 'bind_failed', error })

@@ -896,7 +896,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                         options.receiptModelCapMicroUsd ??
                         Math.round(env.RECEIPT_MODEL_MONTHLY_CAP_USD * 1_000_000),
                     },
-              bind: (claimed, lines) =>
+              bind: (claimed, lines, read) =>
                 bindReceiptLines(
                   {
                     items: createItemRepository(db),
@@ -910,6 +910,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                   claimed.country,
                   claimed.language,
                   lines,
+                  [],
+                  { mendGlyphs: read.byModel },
                 ),
             })
           },

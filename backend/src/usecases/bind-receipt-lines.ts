@@ -1,5 +1,6 @@
 import {
   createLineMatcher,
+  glyphsMended,
   headingRulesOut,
   isServiceClass,
   lineFitter,
@@ -67,6 +68,23 @@ export function namingLexicon(nodes: readonly CatalogueNode[]): NameLexicon {
   }
 }
 
+/**
+ * Every word of the till's language the backend knows — the dictionary, its genitives, phrases and brands, the
+ * seed's names — that a word the model misread is put right to (MOL-326, `glyphsMended`), and never away from.
+ */
+export function knownTillWords(nodes: readonly CatalogueNode[]): Set<string> {
+  const texts = [
+    ...Object.keys(TILL_WORDS_RU),
+    ...Object.keys(TILL_GENITIVES_RU),
+    ...Object.keys(TILL_PHRASES_RU),
+    ...Object.keys(TILL_BRANDS),
+    ...nodes.flatMap((node) => node.names),
+  ]
+  return new Set(
+    texts.flatMap((text) => text.toLowerCase().split(/[^ա-ֆև]+/u)).filter((word) => word !== ''),
+  )
+}
+
 /** A name shorter than this is no item to search by: «Ko», a unit's cut that stood alone. */
 const SHORTEST_NAME = 3
 
@@ -93,12 +111,19 @@ export async function bindReceiptLines(
   lines: readonly ReceiptLine[],
   /** Each line's code, in their order, where the tax office gave one (MOL-234). */
   codes: readonly (string | null)[] = [],
+  /**
+   * The model read the lines (MOL-326, owner's В-3 «б»): a word it misread by the font is put right for the name and
+   * the item alike, and the line is «проверьте». Tesseract misreads otherwise, and its lines stay as read: «թայմ» of
+   * «թարմ» was put right to a lime.
+   */
+  { mendGlyphs = false }: { readonly mendGlyphs?: boolean } = {},
 ): Promise<LineBinding[]> {
   const names = receiptCard(country).nameLanguage
   const nodes = names === null ? [] : await items.nodes(names)
   if (names !== null && nodes.length === 0) namesMissing?.(new CatalogueNamesMissing(names))
   const matcher = createLineMatcher(nodes, TILL_WORDS_RU)
   const lexicon = namingLexicon(nodes)
+  const known = mendGlyphs && names !== null ? knownTillWords(nodes) : null
   // the headings the seed gave the catalogue's nodes; an item the search finds outside them has none known
   const headings = new Map(nodes.map((node) => [node.itemId, node.headings]))
   const bound: LineBinding[] = []
@@ -120,14 +145,17 @@ export async function bindReceiptLines(
       bound.push(await bySearch(receiptLineName(line.printed, country)))
       continue
     }
-    const gloss = matcher.gloss(line.printed)
+    const mended = known === null ? null : glyphsMended(line.printed, known)
+    const printed = mended ?? line.printed
+    const gloss = matcher.gloss(printed)
     const translation = language === 'ru' && gloss !== '' ? gloss : null
-    const found = matcher.match(line.printed, line.hs)
+    const found = matcher.match(printed, line.hs)
     if (found !== null) {
-      bound.push({ itemId: found.itemId, match: found.far ? 'weak' : 'search', translation })
+      const sure = !found.far && mended === null
+      bound.push({ itemId: found.itemId, match: sure ? 'search' : 'weak', translation })
       continue
     }
-    const parts = receiptLineParts(line.printed)
+    const parts = receiptLineParts(printed)
     if (gloss !== '') {
       const answer = await items.search(
         gloss,
@@ -147,7 +175,8 @@ export async function bindReceiptLines(
       )
       if (first !== undefined) {
         // a dish of a class of services is never sure among the catalogue's goods (MOL-226)
-        const near = answer.nearIds.includes(first.id) && !isServiceClass(line.hs)
+        const near =
+          answer.nearIds.includes(first.id) && !isServiceClass(line.hs) && mended === null
         bound.push({ itemId: first.id, match: near ? 'search' : 'weak', translation })
         continue
       }

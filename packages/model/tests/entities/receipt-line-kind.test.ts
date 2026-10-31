@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   armenianInRussian,
+  glyphsMended,
   lineFitter,
   newLineName,
   receiptLineParts,
@@ -792,5 +793,39 @@ describe('an item standing on a line (MOL-293, В-1 «а», В-2 «а»)', () =>
   it('takes nothing for a name of no word', () => {
     expect(fits(yoghurt, '')).toBe(false)
     expect(fits(yoghurt, 'для')).toBe(false)
+  })
+})
+
+describe('a word the reader misread by the font (MOL-326, В-3 «б»)', () => {
+  const KNOWN = new Set([
+    'շաքարավազ',
+    'յոգուրտ',
+    'չիպս',
+    'զուգարանի',
+    'ճզմիչ',
+    'չամիչով',
+    'շամիչով',
+  ])
+
+  it('is put right where one swap of the font’s letters makes one known word, its capital kept', () => {
+    expect(glyphsMended('Ցաքարավազ 1կգ', KNOWN)).toBe('Շաքարավազ 1կգ')
+    expect(glyphsMended('Ծոգուրտ «Երեմյան Փրոդաքթս» ելակ', KNOWN)).toBe(
+      'Յոգուրտ «Երեմյան Փրոդաքթս» ելակ',
+    )
+    expect(glyphsMended('Թուղթ գուգարանի', KNOWN)).toBe('Թուղթ զուգարանի')
+    expect(glyphsMended('ՑԱՔԱՐԱՎԱԶ 1ԿԳ', KNOWN)).toBe('ՇԱՔԱՐԱՎԱԶ 1ԿԳ')
+  })
+
+  it('must not touch a known word, a short one, a brand in «…», or one two known words are a swap from', () => {
+    expect(glyphsMended('Շաքարավազ 1կգ', KNOWN)).toBeNull()
+    expect(glyphsMended('Ջիպս', KNOWN)).toBe('Չիպս')
+    expect(glyphsMended('Ջիպ 1հտ', KNOWN)).toBeNull()
+    expect(glyphsMended('Չիպս «Ջիպս»', KNOWN)).toBeNull()
+    // «չամիշով» is «չամիչով» and «շամիչով» alike: a guess, left as read
+    expect(glyphsMended('չամիշով', new Set(['չամիչով', 'շամիշով']))).toBeNull()
+  })
+
+  it('must not take a swap of letters it has not measured: «լոշիկ» is no «լոլիկ»', () => {
+    expect(glyphsMended('Լոշիկ', new Set(['լոլիկ']))).toBeNull()
   })
 })
