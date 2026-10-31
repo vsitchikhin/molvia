@@ -156,11 +156,19 @@ const useSettingsStore = defineStore('settingsForm', () => {
     saveError.value = false
     keep()
   }
-  async function refresh(): Promise<boolean> {
+  /**
+   * `retry` — the person's own «Повторить»: the strip «Сервер не ответил» stands through it, so a retry
+   * that fails the same way says its words again (MOL-181, C1). Any other read — the screen opened, the
+   * connection or the app back — has no answer yet and lets the last failure go as it starts: it is
+   * «Обновляем» once late (MOL-201), never a refusal from before it, an hour ago, on another screen, or
+   * before a stretch with no connection (MOL-215, adversarial Б1, В1, В2).
+   */
+  async function refresh(retry = false): Promise<boolean> {
     const owner = actor.id
     if (!owner || saving.value) return false
     const mine = ++generation
     loading.value = true
+    if (!retry) failure.value = null
     try {
       const loaded = await api.me()
       if (mine !== generation || actor.id !== owner || loaded.id !== owner) return false
@@ -307,12 +315,8 @@ export function useSettings(): {
     },
     { immediate: true },
   )
-  // A server's refusal from before the connection went is no word on the read its return starts: from
-  // here the last thing known is «no connection» (MOL-215, adversarial Б1). A failure is never made
-  // an `error` this way, and the person's own retry with the connection up keeps it.
   const offline = (): void => {
     online.value = false
-    if (form.failure === 'error') form.failure = 'offline'
   }
   onMounted(() => {
     form.returned = form.dirty
@@ -326,7 +330,6 @@ export function useSettings(): {
   useReconnect(() => {
     online.value = navigator.onLine
     if (online.value) void form.refresh()
-    else offline()
   })
   return { form, online, notice, hasAnnouncer: !!announce }
 }

@@ -50,7 +50,7 @@
         :attempt="form.failures"
       >
         <template #action>
-          <AppButton variant="ghost" @click="form.refresh">{{ t('state.retry') }}</AppButton>
+          <AppButton variant="ghost" @click="form.refresh(true)">{{ t('state.retry') }}</AppButton>
         </template>
       </StatusStrip>
       <AppReveal>

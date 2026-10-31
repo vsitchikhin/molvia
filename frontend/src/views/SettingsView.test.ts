@@ -559,6 +559,58 @@ describe('a form shown from memory says as of when, and what became of the read 
     expect(strips(view)).toHaveLength(0)
   })
 
+  // Adversarial В1, В2 of round 3: the failure lives in the store, and the screen opened again — after
+  // a stretch with no connection lived on another screen, or an hour later — read under «Сервер не
+  // ответил» with «Повторить». Only the person's own retry holds it.
+  it.each([
+    ['after a stretch with no connection on another screen', true],
+    ['an hour later, the connection never gone', false],
+  ])(
+    'must not fire: a refusal from before, over the read of the screen opened again — %s',
+    async (_name, wentOffline) => {
+      remember(READ)
+      const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+      me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      try {
+        const first = await render(false)
+        expect(strips(first)[0]?.props('kind')).toBe('unanswered')
+        first.unmount()
+        if (wentOffline) {
+          onLine.mockReturnValue(false)
+          window.dispatchEvent(new Event('offline'))
+          onLine.mockReturnValue(true)
+          window.dispatchEvent(new Event('online'))
+        }
+
+        me.mockReturnValue(new Promise(() => undefined))
+        const again = mount(SettingsView, {
+          global: { plugins: [first.pinia, first.router, createAppI18n('en')] },
+        })
+        views.push(again)
+        await flushPromises()
+        expect(strips(again)).toHaveLength(0)
+
+        vi.advanceTimersByTime(STRIP_LATE_MS)
+        await flushPromises()
+        expect(strips(again)[0]?.props('kind')).toBe('refreshing')
+      } finally {
+        vi.useRealTimers()
+      }
+    },
+  )
+
+  it('the person’s own «Повторить» keeps «Сервер не ответил» while it is on its way (C1)', async () => {
+    remember(READ)
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render(false)
+    me.mockReturnValue(new Promise(() => undefined))
+    await strips(view)[0]?.get('button').trigger('click')
+    await flushPromises()
+    expect(me).toHaveBeenCalledTimes(2)
+    expect(strips(view)[0]?.props('kind')).toBe('unanswered')
+  })
+
   // Adversarial Б2 of round 2: the moment moves only with an answer, and a year-old one read as this year.
   it('a moment of another year says its year', async () => {
     remember(new Date('2025-10-30T10:05:00.000Z'))
