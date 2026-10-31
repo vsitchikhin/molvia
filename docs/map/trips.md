@@ -56,7 +56,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 
 - `frontend/src/views/FinishedTripView.vue` — «Записанные покупки» (`/purchases/:id`, MOL-207): named by its place, «город · день, время» under it, the purchases, the total as the card of the record typed by hand under them, «+ Сумма по чеку», «Добавить позицию» and «Удалить запись» after it; one `StatusStrip` of the connection, the answer's skeleton.
 - `frontend/src/views/PurchasesView.vue` — «Покупки» tab (MOL-128): the record going on first, «ждут оценки», «Записаны» with count and sum, rows of the kit (`ListRow`, MOL-204), one `StatusStrip` over what a failed read drew from memory, dated by the older such read, the receipts' own quiet card with none of them shown, «Раньше … — со связью» offline, «Записать покупки» in the strip, four states.
-- `frontend/src/views/SettingsView.vue` — «Настройки» screen: the four settings with draft and conflict notices, links to devices and «Выйти», and the group «Ваши данные» (`YourDataGroup`).
+- `frontend/src/views/SettingsView.vue` — «Настройки» screen: the four settings with draft and conflict notices, the strip of a form shown from memory, the button that says why it cannot save, the rows of the kit to the bot, devices, «Выйти» and the developer, and the group «Ваши данные» (`YourDataGroup`).
 - `frontend/src/views/TripView.vue` — The record typed by hand (`/purchases/manual`, MOL-128): named by its place, rows, the total as a card under them, «Удалить запись»; the strip «Штрихкод · + Позиция · Закончить» (MOL-206), one `StatusStrip` of the connection, the queue's notices over the skeleton; goes up to «Покупки» once no record is open.
 
 ## frontend · components
@@ -96,7 +96,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 
 - `frontend/src/stores/queueing.ts` — What every on-device queue shares (trip, verdicts, spendings): the holding codes, write keys, cross-window lock, doubling retry.
 - `frontend/src/stores/recentPlaces.ts` — Store: the shops this identity went to, kept on the device for «Где вы?» without a signal.
-- `frontend/src/stores/settingsMemory.ts` — The last known settings of an identity, remembered on the device and read back.
+- `frontend/src/stores/settingsMemory.ts` — The last known settings of an identity, remembered on the device with when the server last said them (`readAt`), and read back.
 - `frontend/src/stores/trip.ts` — Store: the trip as the server last answered it, remembered per identity and read leniently across builds.
 - `frontend/src/stores/tripHistory.ts` — Store: the history cache (a row's count and sums kept, MOL-307; a trip view's money fields not, `NOT_CACHED_YET`), local snapshots of finishes not yet confirmed, the «answered empty» flag and the moment of the last answer (`answeredAt`, a key of its own, written with every page put on the shelf, MOL-204).
 - `frontend/src/stores/tripQueue.ts` — Store: the on-device queue of every write to a trip (start, purchases, finish, removal, «Вернуть», payment, receipt's sum), sent in order.

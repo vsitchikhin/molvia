@@ -6,7 +6,10 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
 import { actorCodec, ERROR } from '@molvia/model'
 import type { ActorView, SettingsUpdate } from '@molvia/model'
+import AppTag from '@/components/AppTag.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
+import { answeredAt, localDay } from '@/days'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -47,7 +50,7 @@ async function render(cached = true, online?: boolean) {
   const view = mount(SettingsView, { global: { plugins: [pinia, router, createAppI18n('en')] } })
   views.push(view)
   await flushPromises()
-  return Object.assign(view, { router })
+  return Object.assign(view, { router, pinia })
 }
 beforeEach(() => {
   vi.restoreAllMocks()
@@ -180,7 +183,12 @@ it('offline with memory keeps fields editable and explains when save becomes pos
   me.mockRejectedValue(new TypeError('network'))
   const view = await render()
   await field(view, 'city')?.setValue('Ереван')
-  expect(view.text()).toContain(en.settings.offline.strip)
+  const strips = view.findAllComponents(StatusStrip)
+  expect(strips).toHaveLength(1)
+  expect(strips[0]?.props('kind')).toBe('offline')
+  // Said on the button itself, with no line over it (Ф-6).
+  expect(view.get('.dock > button').text()).toBe(en.settings.save_needs_network)
+  expect(view.find('.dock .note').exists()).toBe(false)
   expect(view.get('.dock > button').attributes('aria-disabled')).toBe('true')
   expect(view.find('[role="alert"]').exists()).toBe(false)
 })
@@ -313,7 +321,7 @@ it('replaces a previous write error with the offline notice when the connection 
   window.dispatchEvent(new Event('offline'))
   await flushPromises()
   expect(view.find('[role="alert"]').exists()).toBe(false)
-  expect(view.get('.dock > button').text()).toBe(en.settings.save)
+  expect(view.get('.dock > button').text()).toBe(en.settings.save_needs_network)
   expect(view.get('.dock > button').attributes('aria-disabled')).toBe('true')
 })
 
@@ -346,7 +354,7 @@ it.each([
   // The way into the account does not depend on whether its settings loaded.
   if (!online) me.mockRejectedValue(new TypeError('network'))
   const view = await render(cached, online)
-  const entry = view.findAll('a.entry').find((link) => link.text() === en.devices.title)
+  const entry = view.findAll('a.nav-row').find((link) => link.text() === en.devices.title)
   expect(entry?.attributes('href')).toBe('/settings/devices')
   expect(view.text()).toContain(en.settings.group_account)
 })
@@ -405,5 +413,503 @@ describe('«Write to the developer» (MOL-147)', () => {
     await row(view)?.trigger('click')
 
     expect(useFeedbackSheetStore().shown).toBe(true)
+  })
+})
+
+describe('a form shown from memory says as of when, and what became of the read (MOL-215, Е-8)', () => {
+  const READ = new Date('2026-10-31T10:05:00.000Z')
+  const strips = (view: VueWrapper) => view.findAllComponents(StatusStrip)
+  // The moment as the strips of «Деньги» print it, by the screen's day (`answeredAt`).
+  const asOf = (template: string, at = READ, now = new Date()) =>
+    template.replace('{when}', answeredAt(at, 'en', localDay(now), now))
+
+  /** The phone remembers the settings and, unless `readAt` is null, when the server said them. */
+  function remember(readAt: Date | null): void {
+    localStorage.setItem(
+      `molvia.settings.${initial.id}`,
+      JSON.stringify({
+        settings: { country: 'AM', city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' },
+        updatedAt: initial.updatedAt.toISOString(),
+        ...(readAt ? { readAt: readAt.toISOString() } : {}),
+      }),
+    )
+  }
+
+  it('offline: one strip, at the moment the server last said them', async () => {
+    remember(READ)
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    me.mockRejectedValue(new TypeError('network'))
+    const view = await render(false)
+
+    expect(strips(view)).toHaveLength(1)
+    expect(strips(view)[0]?.props('kind')).toBe('offline')
+    expect(strips(view)[0]?.props('text')).toBe(asOf(en.settings.offline.strip))
+  })
+
+  it('offline, a shelf of the build before: from memory, no time', async () => {
+    remember(null)
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    me.mockRejectedValue(new TypeError('network'))
+    const view = await render(false)
+
+    expect(strips(view)[0]?.props('text')).toBe(en.settings.offline.strip_untimed)
+  })
+
+  it('the server did not answer: the strip with «Повторить», never the quiet card over the fields', async () => {
+    remember(READ)
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render(false)
+
+    expect(view.find('select').exists()).toBe(true)
+    expect(strips(view)).toHaveLength(1)
+    expect(strips(view)[0]?.props('kind')).toBe('unanswered')
+    expect(strips(view)[0]?.props('text')).toBe(asOf(en.settings.stale_error))
+    expect(view.text()).not.toContain(en.settings.load_error.title)
+    const attempt = strips(view)[0]?.props('attempt') as number
+
+    // A retry that failed the same way is an answer too: the strip says its words again (C1).
+    await strips(view)[0]?.get('button').trigger('click')
+    await flushPromises()
+    expect(me).toHaveBeenCalledTimes(2)
+    expect(strips(view)[0]?.props('attempt')).toBe(attempt + 1)
+
+    me.mockResolvedValue(initial)
+    await strips(view)[0]?.get('button').trigger('click')
+    await flushPromises()
+    expect(strips(view)).toHaveLength(0)
+  })
+
+  // Adversarial Д1 of round 5: the edit after a refused save took its notice away, and the strip of the
+  // read after it came out of the very tap, moving the fields under it.
+  it('must not fire: an edit after a refused save brings no strip of the read before it', async () => {
+    const view = await render()
+    await field(view, 'city')?.setValue('Ереван')
+    save.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    await view.get('.dock > button').trigger('click')
+    await flushPromises()
+    expect(view.find('[role="alert"]').text()).toContain(en.settings.save_error.title)
+    expect(strips(view)).toHaveLength(0)
+
+    await field(view, 'spend')?.setValue('USD')
+    await flushPromises()
+    expect(view.find('[role="alert"]').exists()).toBe(false)
+    expect(strips(view)).toHaveLength(0)
+    expect(me).toHaveBeenCalledTimes(2)
+  })
+
+  // Adversarial Е2 of round 6: the notice of a refused save silenced a later read's refusal too, and the
+  // edit then took it away with nothing said. Only the read the save started is the notice's.
+  it('a later read’s refusal under «Не удалось сохранить» is the strip’s, with its answer, and stays through an edit', async () => {
+    const view = await render()
+    await field(view, 'city')?.setValue('Ереван')
+    save.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    me.mockResolvedValue(initial)
+    await view.get('.dock > button').trigger('click')
+    await flushPromises()
+    expect(view.find('[role="alert"]').text()).toContain(en.settings.save_error.title)
+    expect(strips(view)).toHaveLength(0)
+
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(me).toHaveBeenCalledTimes(3)
+    const strip = strips(view)[0]
+    expect(strip?.props('kind')).toBe('unanswered')
+    // One «Повторить» on the screen, the save's (adversarial Ж1 of round 7): the strip has none meanwhile.
+    expect(view.findAll('button').filter((one) => one.text() === en.state.retry)).toHaveLength(1)
+    expect(strip?.find('button').exists()).toBe(false)
+
+    await field(view, 'spend')?.setValue('USD')
+    await flushPromises()
+    expect(view.find('[role="alert"]').exists()).toBe(false)
+    expect(strips(view)[0]?.element).toBe(strip?.element)
+    // The save's «Повторить» gone with its notice, the strip's comes back.
+    expect(strips(view)[0]?.find('button').text()).toBe(en.state.retry)
+  })
+
+  // Adversarial З1 of round 8: the strip's «Повторить» followed the read on its way and came and went with
+  // every read the screen made itself, the strip growing and shrinking under the finger.
+  it('the strip keeps no button through a read of its own while the save is refused', async () => {
+    const view = await render()
+    await field(view, 'city')?.setValue('Ереван')
+    save.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    me.mockResolvedValue(initial)
+    await view.get('.dock > button').trigger('click')
+    await flushPromises()
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(strips(view)[0]?.find('button').exists()).toBe(false)
+
+    let refuse: (error: Error) => void = () => undefined
+    me.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        refuse = reject
+      }),
+    )
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(view.get('.dock > button').text()).toBe(en.state.loading)
+    expect(strips(view)[0]?.find('button').exists()).toBe(false)
+
+    refuse(new ApiError(ERROR.INTERNAL))
+    await flushPromises()
+    expect(strips(view)[0]?.find('button').exists()).toBe(false)
+    expect(view.get('.dock > button').text()).toBe(en.state.retry)
+  })
+
+  // Adversarial Ж2 of round 7: a 409 has no notice, so the strip of the read after it is the screen's one
+  // word — and the edit took it away, the fields moving up under the finger.
+  it('must not fire: an edit after a 409 takes away the strip of the read after it', async () => {
+    const view = await render()
+    await field(view, 'city')?.setValue('Ереван')
+    save.mockRejectedValue(new ApiError(ERROR.CONFLICT))
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    await view.get('.dock > button').trigger('click')
+    await flushPromises()
+    expect(view.find('[role="alert"]').exists()).toBe(false)
+    const strip = strips(view)[0]
+    expect(strip?.props('kind')).toBe('unanswered')
+
+    await field(view, 'spend')?.setValue('USD')
+    await flushPromises()
+    expect(strips(view)[0]?.element).toBe(strip?.element)
+    expect(me).toHaveBeenCalledTimes(2)
+  })
+
+  it('must not fire: a failed save speaks for itself, with no strip of the read beside it', async () => {
+    const view = await render()
+    await field(view, 'city')?.setValue('Ереван')
+    save.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    await view.get('.dock > button').trigger('click')
+    await flushPromises()
+
+    expect(view.find('[role="alert"]').text()).toContain(en.settings.save_error.title)
+    expect(strips(view)).toHaveLength(0)
+  })
+
+  // Adversarial А2 of review 1: a read lost with no connection is no server's silence — the connection
+  // back read again under «Сервер не ответил» with «Повторить», of a server nobody had asked yet.
+  it('must not fire: the connection back says no «Сервер не ответил» over the read it starts', async () => {
+    remember(READ)
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    me.mockRejectedValue(new TypeError('Failed to fetch'))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const view = await render(false)
+      expect(strips(view)[0]?.props('kind')).toBe('offline')
+
+      me.mockReturnValue(new Promise(() => undefined))
+      onLine.mockReturnValue(true)
+      window.dispatchEvent(new Event('online'))
+      await flushPromises()
+      expect(me).toHaveBeenCalledTimes(2)
+      expect(strips(view)).toHaveLength(0)
+
+      vi.advanceTimersByTime(STRIP_LATE_MS)
+      await flushPromises()
+      expect(strips(view)).toHaveLength(1)
+      expect(strips(view)[0]?.props('kind')).toBe('refreshing')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('must not fire: the screen opened again with the connection back, after an offline failure', async () => {
+    // The failure lives in the store, not in the screen (adversarial А2б).
+    remember(READ)
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    me.mockRejectedValue(new TypeError('Failed to fetch'))
+    const first = await render(false)
+    expect(strips(first)[0]?.props('kind')).toBe('offline')
+    first.unmount()
+
+    onLine.mockReturnValue(true)
+    me.mockReturnValue(new Promise(() => undefined))
+    const again = mount(SettingsView, {
+      global: { plugins: [first.pinia, first.router, createAppI18n('en')] },
+    })
+    views.push(again)
+    await flushPromises()
+    expect(strips(again)).toHaveLength(0)
+  })
+
+  // Adversarial Б1 of round 2: a server's refusal lived through a stretch with no connection, and the
+  // connection back said «Сервер не ответил» over the read it starts.
+  it('must not fire: a refusal from before the connection went, over the read its return starts', async () => {
+    remember(READ)
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render(false)
+    expect(strips(view)[0]?.props('kind')).toBe('unanswered')
+
+    onLine.mockReturnValue(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+    expect(strips(view)[0]?.props('kind')).toBe('offline')
+
+    me.mockReturnValue(new Promise(() => undefined))
+    onLine.mockReturnValue(true)
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(me).toHaveBeenCalledTimes(2)
+    expect(strips(view)).toHaveLength(0)
+  })
+
+  // Adversarial В1, В2 of round 3: the failure lives in the store, and the screen opened again — after
+  // a stretch with no connection lived on another screen, or an hour later — read under «Сервер не
+  // ответил» with «Повторить». Only the person's own retry holds it.
+  it.each([
+    ['after a stretch with no connection on another screen', true],
+    ['an hour later, the connection never gone', false],
+  ])(
+    'must not fire: a refusal from before, over the read of the screen opened again — %s',
+    async (_name, wentOffline) => {
+      remember(READ)
+      const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+      me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      try {
+        const first = await render(false)
+        expect(strips(first)[0]?.props('kind')).toBe('unanswered')
+        first.unmount()
+        if (wentOffline) {
+          onLine.mockReturnValue(false)
+          window.dispatchEvent(new Event('offline'))
+          onLine.mockReturnValue(true)
+          window.dispatchEvent(new Event('online'))
+        }
+
+        me.mockReturnValue(new Promise(() => undefined))
+        const again = mount(SettingsView, {
+          global: { plugins: [first.pinia, first.router, createAppI18n('en')] },
+        })
+        views.push(again)
+        await flushPromises()
+        expect(strips(again)).toHaveLength(0)
+
+        vi.advanceTimersByTime(STRIP_LATE_MS)
+        await flushPromises()
+        expect(strips(again)[0]?.props('kind')).toBe('refreshing')
+      } finally {
+        vi.useRealTimers()
+      }
+    },
+  )
+
+  // Adversarial Г1 of round 4: the read of the app back in view took the strip down and put it up again
+  // — the fields moved twice under the finger, and «Сервер не ответил» was said anew at every return.
+  it.each([
+    ['the app back in view', () => document.dispatchEvent(new Event('visibilitychange'))],
+    ['the connection back', () => window.dispatchEvent(new Event('online'))],
+  ])(
+    'the strip stands through a read nobody asked for, %s, and says nothing again',
+    async (_name, back) => {
+      remember(READ)
+      me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+      const view = await render(false)
+      const strip = strips(view)[0]
+      expect(strip?.props('kind')).toBe('unanswered')
+      const attempt = strip?.props('attempt') as number
+
+      let refuse: (error: Error) => void = () => undefined
+      me.mockReturnValue(
+        new Promise((_resolve, reject) => {
+          refuse = reject
+        }),
+      )
+      back()
+      await flushPromises()
+      expect(me).toHaveBeenCalledTimes(2)
+      expect(strips(view)).toHaveLength(1)
+      expect(strips(view)[0]?.element).toBe(strip?.element)
+
+      refuse(new ApiError(ERROR.INTERNAL))
+      await flushPromises()
+      expect(strips(view)[0]?.element).toBe(strip?.element)
+      expect(strips(view)[0]?.props('attempt')).toBe(attempt)
+    },
+  )
+
+  it('the person’s own «Повторить» keeps «Сервер не ответил» while it is on its way (C1)', async () => {
+    remember(READ)
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render(false)
+    me.mockReturnValue(new Promise(() => undefined))
+    await strips(view)[0]?.get('button').trigger('click')
+    await flushPromises()
+    expect(me).toHaveBeenCalledTimes(2)
+    expect(strips(view)[0]?.props('kind')).toBe('unanswered')
+  })
+
+  // Adversarial Б2 of round 2: the moment moves only with an answer, and a year-old one read as this year.
+  it('a moment of another year says its year', async () => {
+    remember(new Date('2025-10-30T10:05:00.000Z'))
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(new Date('2026-11-02T12:00:00.000Z'))
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      me.mockRejectedValue(new TypeError('Failed to fetch'))
+      const view = await render(false)
+      expect(strips(view)[0]?.props('text')).toContain('2025')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // Adversarial А1: the day was counted once, and the app left overnight said «today» of yesterday.
+  it('the day follows the screen past midnight, the app back in view', async () => {
+    const before = new Date('2026-10-30T23:50:00.000Z')
+    const after = new Date('2026-10-31T00:10:00.000Z')
+    const read = new Date('2026-10-30T23:40:00.000Z')
+    remember(read)
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(before)
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      me.mockRejectedValue(new TypeError('Failed to fetch'))
+      const view = await render(false)
+      expect(strips(view)[0]?.props('text')).toBe(asOf(en.settings.offline.strip, read, before))
+      expect(strips(view)[0]?.props('text')).toContain('today')
+
+      vi.setSystemTime(after)
+      document.dispatchEvent(new Event('visibilitychange'))
+      await flushPromises()
+      expect(strips(view)[0]?.props('text')).toBe(asOf(en.settings.offline.strip, read, after))
+      expect(strips(view)[0]?.props('text')).toContain('yesterday')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a read late past a moment says «обновляем»; a quick one says nothing', async () => {
+    remember(READ)
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      let answer: (value: ActorView) => void = () => undefined
+      me.mockReturnValue(
+        new Promise((resolve) => {
+          answer = resolve
+        }),
+      )
+      const view = await render(false)
+      vi.advanceTimersByTime(STRIP_LATE_MS - 1)
+      await flushPromises()
+      expect(strips(view)).toHaveLength(0)
+
+      vi.advanceTimersByTime(1)
+      await flushPromises()
+      expect(strips(view)[0]?.props('kind')).toBe('refreshing')
+      expect(strips(view)[0]?.props('text')).toBe(asOf(en.settings.stale_loading))
+      expect(strips(view)[0]?.find('button').exists()).toBe(false)
+
+      answer(initial)
+      await flushPromises()
+      expect(strips(view)).toHaveLength(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('«Сохранить» says why it cannot be pressed, on itself (Ф-6)', () => {
+  const button = (view: VueWrapper) => view.get('.dock > button')
+
+  it('no changes', async () => {
+    const view = await render()
+    expect(button(view).text()).toBe(en.settings.save_unchanged)
+    expect(button(view).attributes('aria-disabled')).toBe('true')
+
+    await field(view, 'city')?.setValue('Ереван')
+    expect(button(view).text()).toBe(en.settings.save)
+    expect(button(view).attributes('aria-disabled')).toBeUndefined()
+  })
+
+  it('loading, with no form yet', async () => {
+    me.mockReturnValue(new Promise(() => undefined))
+    const view = await render(false)
+    expect(button(view).text()).toBe(en.state.loading)
+  })
+
+  // Adversarial А3: «Повторить» after a refused save stood inactive through the read after it.
+  it('loading, the read after a refused save — not a «Повторить» that cannot be pressed', async () => {
+    const view = await render()
+    await field(view, 'city')?.setValue('Ереван')
+    save.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    let answer: (value: ActorView) => void = () => undefined
+    me.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+    await button(view).trigger('click')
+    await flushPromises()
+    expect(button(view).text()).toBe(en.state.loading)
+    expect(button(view).attributes('aria-disabled')).toBe('true')
+    expect(button(view).find('.glyph').exists()).toBe(false)
+
+    answer(initial)
+    await flushPromises()
+    expect(button(view).text()).toBe(en.state.retry)
+    expect(button(view).attributes('aria-disabled')).toBeUndefined()
+  })
+
+  it('loading, a changed form waiting for the read — and not an unchanged one', async () => {
+    // An unchanged form says «no changes» through the read of every opening: the word would
+    // otherwise blink at each one.
+    me.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    expect(button(view).text()).toBe(en.settings.save_unchanged)
+
+    await field(view, 'city')?.setValue('Ереван')
+    expect(button(view).text()).toBe(en.state.loading)
+    expect(button(view).attributes('aria-disabled')).toBe('true')
+  })
+})
+
+describe('the rows and the fields of the kit (MOL-215, Ф-4, Ф-12)', () => {
+  it('a changed field is marked by the kit’s tag of what waits, not by a fill that says «press»', async () => {
+    const view = await render()
+    await field(view, 'city')?.setValue('Ереван')
+    const tags = view.findAllComponents(AppTag)
+    expect(tags).toHaveLength(1)
+    expect(tags[0]?.props('tone')).toBe('warn')
+    expect(tags[0]?.text()).toBe(en.settings.changed)
+  })
+
+  it('a chevron on what goes on, none on what acts or asks — and never both in one card (В-14 «а»)', async () => {
+    const view = await render()
+    const cards = view.findAll('ul').filter((list) => list.findAll(':scope > li').length > 0)
+    const rows = cards.map((card) =>
+      card.findAll(':scope > li').map((row) => ({
+        text: row.text(),
+        next: row.find('.chevron').exists(),
+      })),
+    )
+    for (const card of rows) expect(new Set(card.map((row) => row.next)).size).toBe(1)
+
+    const nextOf = (label: string) => rows.flat().find((row) => row.text.startsWith(label))?.next
+    for (const label of [
+      en.bot.title,
+      en.devices.title,
+      en.settings.feedback.label,
+      en.privacy.title,
+      en.terms.title,
+    ])
+      expect(nextOf(label), label).toBe(true)
+    for (const label of [en.settings.sign_out, en.settings.export.label, en.settings.erase.label])
+      expect(nextOf(label), label).toBe(false)
+  })
+
+  it('«Устройства» and «Выйти» stay one group, two cards (owner’s Q3, MOL-215 В-1 «а»)', async () => {
+    const view = await render()
+    const group = view
+      .findAll('section.group')
+      .find((section) => section.text().startsWith(en.settings.group_account))
+    expect(group?.findAll('ul')).toHaveLength(2)
+    expect(group?.text()).toContain(en.devices.title)
+    expect(group?.text()).toContain(en.settings.sign_out)
   })
 })

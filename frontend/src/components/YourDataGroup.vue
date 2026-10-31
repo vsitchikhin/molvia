@@ -71,26 +71,18 @@
         </div>
       </li>
       <li>
-        <!-- Inactive rather than disabled, as «Сохранить» is: it keeps its focus and its hint. -->
-        <button
+        <!-- Inactive rather than disabled, as «Сохранить» is: it keeps its focus and its hint. It acts
+             at once, so no chevron (В-14 «а»). -->
+        <ListRow
           ref="row"
-          class="entry"
-          type="button"
-          :aria-disabled="!online || busy ? true : undefined"
+          class="download"
+          :icon="IconDownload"
+          :title="busy ? t('settings.export.busy') : t('settings.export.label')"
+          :meta="online ? t('settings.export.hint') : t('settings.export.offline')"
+          :inactive="!online || busy"
           :aria-busy="busy"
-          :aria-describedby="`${id}-hint`"
           @click="start"
-        >
-          <IconDownload class="entry-icon" aria-hidden="true" />
-          <span class="entry-text">
-            <span class="entry-label">{{
-              busy ? t('settings.export.busy') : t('settings.export.label')
-            }}</span>
-            <span :id="`${id}-hint`" class="entry-hint">{{
-              online ? t('settings.export.hint') : t('settings.export.offline')
-            }}</span>
-          </span>
-        </button>
+        />
         <p v-if="failure === 'error' && online" class="failed" role="alert">
           <IconAlert aria-hidden="true" />
           <span>{{ t('settings.export.failed') }}</span>
@@ -102,7 +94,7 @@
         <AppReveal>
           <div v-if="ready" class="ready">
             <p class="ready-title">{{ t('settings.export.ready') }}</p>
-            <AppButton block @click="handOverFromCard">{{
+            <AppButton variant="secondary" block @click="handOverFromCard">{{
               t('settings.export.hand_over')
             }}</AppButton>
           </div>
@@ -110,27 +102,24 @@
       </li>
       <!-- Under the copy, so the copy is one row above it (MOL-94, owner's decision В-2). -->
       <li>
-        <button class="entry erase" type="button" @click="eraseOpen = true">
-          <IconDelete class="entry-icon" aria-hidden="true" />
-          <span class="entry-text">
-            <span class="entry-label">{{ t('settings.erase.label') }}</span>
-            <span class="entry-hint">{{ t('settings.erase.hint') }}</span>
-          </span>
-        </button>
+        <ListRow
+          class="erase"
+          :icon="IconDelete"
+          :title="t('settings.erase.label')"
+          :meta="t('settings.erase.hint')"
+          danger
+          @click="eraseOpen = true"
+        />
+      </li>
+    </AppCard>
+    <!-- The pages go on to read, the rows above act or ask: one card never holds both (В-14 «а»), so
+         they are a card of their own in the same group (MOL-215, owner's В-1 «а»). -->
+    <AppCard as="ul" list class="pages">
+      <li>
+        <NavRow :to="{ name: 'privacy' }" :icon="IconShield" :label="t('privacy.title')" />
       </li>
       <li>
-        <RouterLink class="entry" :to="{ name: 'privacy' }">
-          <IconShield class="entry-icon" aria-hidden="true" />
-          <span class="entry-label">{{ t('privacy.title') }}</span>
-          <IconChevron class="entry-chevron" aria-hidden="true" />
-        </RouterLink>
-      </li>
-      <li>
-        <RouterLink class="entry" :to="{ name: 'terms' }">
-          <IconTerms class="entry-icon" aria-hidden="true" />
-          <span class="entry-label">{{ t('terms.title') }}</span>
-          <IconChevron class="entry-chevron" aria-hidden="true" />
-        </RouterLink>
+        <NavRow :to="{ name: 'terms' }" :icon="IconTerms" :label="t('terms.title')" />
       </li>
     </AppCard>
     <EraseSheet
@@ -147,7 +136,6 @@
 import { defineComponent, onUnmounted, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconAlert from '~icons/mdi/alert-circle-outline'
-import IconChevron from '~icons/mdi/chevron-right'
 import IconCloud from '~icons/mdi/cloud-off-outline'
 import IconDelete from '~icons/mdi/delete-outline'
 import IconDownload from '~icons/mdi/tray-arrow-down'
@@ -159,6 +147,8 @@ import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppSwitch from '@/components/AppSwitch.vue'
 import EraseSheet from '@/components/EraseSheet.vue'
+import ListRow from '@/components/ListRow.vue'
+import NavRow from '@/components/NavRow.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import TapUnsureLine from '@/components/TapUnsureLine.vue'
 import { useAnalytics } from '@/composables/useAnalytics'
@@ -180,13 +170,10 @@ export default defineComponent({
     AppSwitch,
     EraseSheet,
     IconAlert,
-    IconChevron,
     IconCloud,
-    IconDelete,
-    IconDownload,
-    IconShield,
     IconStatistics,
-    IconTerms,
+    ListRow,
+    NavRow,
     SectionCaption,
     TapUnsureLine,
   },
@@ -194,7 +181,7 @@ export default defineComponent({
     const { t } = useI18n()
     const exporting = useExport()
     const announce = useAnnouncer()
-    const row = ref<HTMLButtonElement | null>(null)
+    const row = ref<{ $el: HTMLElement } | null>(null)
     let withdraw: (() => void) | undefined
     watch([exporting.ready, exporting.failure], ([file, failure]) => {
       withdraw?.()
@@ -207,12 +194,12 @@ export default defineComponent({
     onUnmounted(() => withdraw?.())
     // The button tapped goes with its block: the focus goes back to the row, not to the page.
     async function retry(): Promise<void> {
-      row.value?.focus()
+      row.value?.$el.focus()
       await exporting.start()
     }
     function handOverFromCard(): void {
       exporting.handOver()
-      row.value?.focus()
+      row.value?.$el.focus()
     }
     // «Удалить мои данные» leaves through the door «Выйти» does (MOL-94): closing the sheet after a
     // failure asks the server rather than drop the intent, as there.
@@ -234,6 +221,10 @@ export default defineComponent({
       t,
       id: useId(),
       row,
+      IconDelete,
+      IconDownload,
+      IconShield,
+      IconTerms,
       ...exporting,
       retry,
       handOverFromCard,
@@ -272,19 +263,11 @@ export default defineComponent({
   }
 }
 
-.entry-icon,
-.entry-chevron {
+.entry-icon {
   @include icon;
 
   color: var(--text-muted);
-}
-
-.entry-icon {
   font-size: var(--icon-md);
-}
-
-.entry-chevron {
-  font-size: var(--icon);
 }
 
 .entry-text {
@@ -295,10 +278,6 @@ export default defineComponent({
 
 .entry-label {
   flex: 1;
-}
-
-.entry[aria-disabled='true'] .entry-label {
-  color: var(--text-muted);
 }
 
 .entry-hint {
@@ -315,20 +294,17 @@ export default defineComponent({
   }
 }
 
+// The second card of the group, as close to the first as a caption is to its card.
+.pages {
+  margin-top: var(--space-2);
+}
+
 // A switch's place, held while its answer is on the way (adversarial А1).
 .switch-slot {
   display: flex;
   flex: none;
   justify-content: flex-end;
   min-width: var(--switch-width);
-}
-
-// The colour of an action that ends something, as «Выйти» beside it (MOL-57).
-.erase {
-  &,
-  .entry-icon {
-    color: var(--bad-ink);
-  }
 }
 
 .failed,

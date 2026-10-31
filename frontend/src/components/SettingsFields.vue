@@ -13,7 +13,9 @@
             @update:model-value="change('country', $event)"
           >
             <template v-if="changed('country')" #label-extra>
-              <span class="badge" aria-hidden="true">{{ t('settings.changed') }}</span>
+              <AppTag class="badge" tone="warn" aria-hidden="true">{{
+                t('settings.changed')
+              }}</AppTag>
             </template>
           </AppField>
           <span v-if="changed('country')" :id="`${id}-country-changed`" class="hidden">
@@ -23,10 +25,10 @@
         <div>
           <!-- A city the two of 0.1 do not carry: the person keeps it (В-4а) and is told why it
                is there, with the whole of it readable — a native select clips it (кадр 5b). -->
-          <p v-if="historical" :id="`${id}-city-kept`" class="kept">
-            <span>{{ t('settings.city_current', { city: historical.city }) }}</span>
-            <span class="note">{{ t('settings.city_not_listed') }}</span>
-          </p>
+          <AppNote v-if="historical" :id="`${id}-city-kept`" class="kept" tone="warn">
+            <p>{{ t('settings.city_current', { city: historical.city }) }}</p>
+            <p>{{ t('settings.city_not_listed') }}</p>
+          </AppNote>
           <AppField
             :model-value="modelValue.city"
             :label="t('settings.city')"
@@ -36,16 +38,18 @@
             @update:model-value="change('city', $event)"
           >
             <template v-if="changed('city')" #label-extra>
-              <span class="badge" aria-hidden="true">{{ t('settings.changed') }}</span>
+              <AppTag class="badge" tone="warn" aria-hidden="true">{{
+                t('settings.changed')
+              }}</AppTag>
             </template>
           </AppField>
           <p :id="`${id}-city-hint`" class="hint">{{ t('settings.city_hint') }}</p>
-          <p v-if="changed('city')" :id="`${id}-city-changed`" class="info">
+          <AppNote v-if="changed('city')" :id="`${id}-city-changed`" class="info">
             <span class="hidden">{{
               t(uncertain ? 'settings.changed' : 'settings.changed_announced')
             }}</span>
-            <IconInfo aria-hidden="true" />{{ t('settings.city_changed') }}
-          </p>
+            {{ t('settings.city_changed') }}
+          </AppNote>
         </div>
       </AppCard>
     </section>
@@ -62,7 +66,9 @@
             @update:model-value="change(field, $event)"
           >
             <template v-if="changed(field)" #label-extra>
-              <span class="badge" aria-hidden="true">{{ t('settings.changed') }}</span>
+              <AppTag class="badge" tone="warn" aria-hidden="true">{{
+                t('settings.changed')
+              }}</AppTag>
             </template>
           </AppField>
           <p :id="`${id}-${field}-hint`" class="hint">
@@ -72,9 +78,9 @@
             {{ t(uncertain ? 'settings.changed' : 'settings.changed_announced') }}
           </span>
         </div>
-        <p v-if="modelValue.spendCurrency === modelValue.incomeCurrency" class="info equal">
-          <IconInfo aria-hidden="true" />{{ t('settings.same_currencies') }}
-        </p>
+        <AppNote v-if="modelValue.spendCurrency === modelValue.incomeCurrency" class="equal">
+          {{ t('settings.same_currencies') }}
+        </AppNote>
       </AppCard>
     </section>
   </fieldset>
@@ -91,15 +97,16 @@ import {
   SETTINGS_COUNTRIES,
 } from '@molvia/model'
 import type { ActorSettings } from '@molvia/model'
-import IconInfo from '~icons/mdi/information-outline'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
+import AppNote from '@/components/AppNote.vue'
+import AppTag from '@/components/AppTag.vue'
 import { countryLabel } from '@/components/placeLabel'
 import SectionCaption from '@/components/SectionCaption.vue'
 
 export default defineComponent({
   name: 'SettingsFields',
-  components: { AppCard, AppField, IconInfo, SectionCaption },
+  components: { AppCard, AppField, AppNote, AppTag, SectionCaption },
   props: {
     modelValue: { type: Object as PropType<ActorSettings>, required: true },
     base: { type: Object as PropType<ActorSettings | null>, default: null },
@@ -210,61 +217,20 @@ export default defineComponent({
   gap: var(--space-4);
 }
 
-.hint,
-.info {
+.hint {
   margin: var(--space-2) 0 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
 }
 
 .info {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  color: var(--text);
-
-  svg {
-    @include icon;
-
-    font-size: var(--icon-sm);
-    color: var(--accent-ink);
-  }
+  margin-top: var(--space-2);
 }
 
-.equal {
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text-muted);
-
-  svg {
-    color: inherit;
-  }
-}
-
+// A city outside the list stands over its field, whole: a native select clips it (кадр 5b).
 .kept {
-  display: grid;
-  gap: var(--space-1);
-  margin: 0 0 var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  font-size: var(--text-footnote);
+  margin-bottom: var(--space-3);
   overflow-wrap: anywhere;
-
-  .note {
-    color: var(--text-muted);
-  }
-}
-
-.badge {
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-pill);
-  background: var(--accent-tint);
-  color: var(--accent-ink);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
 }
 
 .hidden {

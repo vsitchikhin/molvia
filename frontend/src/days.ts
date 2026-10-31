@@ -56,7 +56,7 @@ export function timeOfDay(when: Date, locale: string): string {
 }
 
 /**
- * When the answer on screen came — «сегодня, 14:05», «14 окт., 14:05» — for the strip of the
+ * When the answer on screen came — «сегодня, 14:05», «14 окт., 14:05», «30 окт. 2025 г., 10:05» — for the strip of the
  * connection (MOL-181). Counted from the later of the day the screen holds (`useLocalDay`) and the
  * clock's: the screen's day draws the strip again when the app comes back into view on another day
  * (adversarial А2 of MOL-187), and the clock's is right for a redraw made past midnight before the
@@ -64,7 +64,9 @@ export function timeOfDay(when: Date, locale: string): string {
  */
 export function answeredAt(at: Date, locale: string, today = localDay(), now = new Date()): string {
   const [year = 0, month = 1, date = 1] = shownDay(today, now).split('-').map(Number)
-  return `${purchaseDay(at, locale, new Date(year, month - 1, date))}, ${timeOfDay(at, locale)}`
+  // With its year when another: a memory may be that old — the settings' moment moves only with an
+  // answer (MOL-215, adversarial Б2), and a kept month may be read last a year ago.
+  return `${dayOfAnyYear(at, locale, new Date(year, month - 1, date))}, ${timeOfDay(at, locale)}`
 }
 
 /**

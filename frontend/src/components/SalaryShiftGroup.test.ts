@@ -84,6 +84,10 @@ it('puts the switch back where the server holds it when the answer does not come
   await flushPromises()
   expect(switchOf(view).element.checked).toBe(false)
   expect(view.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
+  // The icon and its words are one box: the words wrap beside the icon (MOL-96 Р3-А4, MOL-215 R17).
+  const said = view.get('[role="alert"] .said')
+  expect(said.find('svg').exists()).toBe(true)
+  expect(said.text()).toBe(en.settings.tap.save_failed)
 })
 
 it('waits offline: the switch is inactive and says why', async () => {
@@ -99,6 +103,8 @@ it('offers «Try again» after a server failure, and reads again on it', async (
   read.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
   const view = await render()
   expect(view.text()).toContain(en.settings.tap.load_error)
+  expect(view.get('.failed .said').text()).toBe(en.settings.tap.load_error)
+  expect(view.get('.failed .said').find('svg').exists()).toBe(true)
   read.mockResolvedValue({ day: 25 })
   await view.get('button').trigger('click')
   await flushPromises()

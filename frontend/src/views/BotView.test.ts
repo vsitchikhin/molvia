@@ -153,6 +153,10 @@ describe('«Telegram bot» (MOL-129, В-2)', () => {
     await flushPromises()
     expect(receipts(view).element.checked).toBe(true)
     expect(view.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
+    // The icon and its words are one box: the words wrap beside the icon (MOL-96 Р3-А4, MOL-215 R17).
+    const said = view.get('[role="alert"] .said')
+    expect(said.find('svg').exists()).toBe(true)
+    expect(said.text()).toBe(en.settings.tap.save_failed)
   })
 })
 

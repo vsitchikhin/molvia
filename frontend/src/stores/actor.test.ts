@@ -515,3 +515,109 @@ describe('two tabs opened at once', () => {
     expect(store.state).toBe('ready')
   })
 })
+
+describe('when the server last said the settings (MOL-215)', () => {
+  const SETTINGS_KEY = (owner: string) => `molvia.settings.${owner}`
+  const READ = new Date('2026-10-31T10:05:00.000Z')
+
+  it('is the moment its answer landed, and goes on the shelf with the settings', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(READ)
+    me.mockResolvedValue(FIRST)
+    const { store } = await freshStore()
+
+    await store.start()
+
+    expect(store.settingsReadAt).toEqual(READ)
+    const kept = JSON.parse(localStorage.getItem(SETTINGS_KEY(FIRST.id)) ?? '{}') as {
+      readAt?: string
+    }
+    expect(kept.readAt).toBe(READ.toISOString())
+  })
+
+  it('is read from the shelf at a launch with no connection', async () => {
+    localStorage.setItem(KEY, FIRST.id)
+    localStorage.setItem(
+      SETTINGS_KEY(FIRST.id),
+      JSON.stringify({
+        settings: { country: 'AM', city: 'Ереван', spendCurrency: 'AMD', incomeCurrency: 'RUB' },
+        updatedAt: FIRST.updatedAt.toISOString(),
+        readAt: READ.toISOString(),
+      }),
+    )
+    online(false)
+    const { store } = await freshStore()
+
+    await store.start()
+
+    expect(store.settingsReadAt).toEqual(READ)
+    expect(store.settings?.city).toBe('Ереван')
+  })
+
+  it('moves with an answer `apply` takes, and not with one it refuses', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(READ)
+    me.mockResolvedValue(FIRST)
+    const { store } = await freshStore()
+    await store.start()
+
+    const later = new Date('2026-10-31T11:00:00.000Z')
+    vi.setSystemTime(later)
+    store.apply({ ...FIRST, updatedAt: new Date('2026-09-01T00:00:00.000Z') })
+    expect(store.settingsReadAt).toEqual(READ)
+
+    store.apply({ ...FIRST, city: 'Ереван' })
+    expect(store.settingsReadAt).toEqual(later)
+  })
+
+  it('is the other window’s when its shelf brings the settings', async () => {
+    // The watcher rewrites the shelf on every change of `actor`: had it stamped its own clock, a
+    // window that never heard the server would say «на 11:00» of an answer given at 10:05.
+    me.mockResolvedValue(FIRST)
+    const { store } = await freshStore()
+    await store.start()
+    const value = JSON.stringify({
+      settings: { country: 'AM', city: 'Ереван', spendCurrency: 'AMD', incomeCurrency: 'RUB' },
+      updatedAt: new Date('2026-10-31T10:00:00.000Z').toISOString(),
+      readAt: READ.toISOString(),
+    })
+    localStorage.setItem(SETTINGS_KEY(FIRST.id), value)
+
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: SETTINGS_KEY(FIRST.id), newValue: value }),
+    )
+
+    expect(store.settings?.city).toBe('Ереван')
+    expect(store.settingsReadAt).toEqual(READ)
+    const kept = JSON.parse(localStorage.getItem(SETTINGS_KEY(FIRST.id)) ?? '{}') as {
+      readAt?: string
+    }
+    expect(kept.readAt).toBe(READ.toISOString())
+  })
+
+  it('is the new owner’s own when another owner signs in', async () => {
+    // Their id brings their shelf back on the way; the answer that named them is the moment.
+    localStorage.setItem(KEY, FIRST.id)
+    localStorage.setItem(
+      SETTINGS_KEY(SECOND.id),
+      JSON.stringify({
+        settings: { country: 'AM', city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' },
+        updatedAt: SECOND.updatedAt.toISOString(),
+        readAt: new Date('2026-10-01T00:00:00.000Z').toISOString(),
+      }),
+    )
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(READ)
+    me.mockResolvedValue(SECOND)
+    const { store } = await freshStore()
+
+    await store.start()
+
+    expect(store.id).toBe(SECOND.id)
+    expect(store.settingsReadAt).toEqual(READ)
+    const kept = JSON.parse(localStorage.getItem(SETTINGS_KEY(SECOND.id)) ?? '{}') as {
+      readAt?: string
+    }
+    expect(kept.readAt).toBe(READ.toISOString())
+  })
+})

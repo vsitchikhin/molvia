@@ -159,6 +159,8 @@ describe('«Выйти» на этом устройстве', () => {
 
     expect(sheet().textContent).toContain(en.sign_out.title)
     expect(sheet().textContent).toContain(en.sign_out.body)
+    // Свой значок у главного действия (5b, MOL-215 R18).
+    expect(confirmButton().querySelector('.glyph svg')).not.toBeNull()
     // Неотправленного нет — и о нём не говорится.
     expect(sheet().textContent).not.toContain('not been sent')
     expect(logout).not.toHaveBeenCalled()
