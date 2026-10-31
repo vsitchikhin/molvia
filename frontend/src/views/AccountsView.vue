@@ -703,6 +703,14 @@ export default defineComponent({
   font-size: var(--icon-md);
 }
 
+/* The words take what is left and break, the chevron keeps its place (MOL-321): at 200 % «операция» held whole
+   took the chevron 19 px past the phone (adversarial Д1). */
+.unassigned-text {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
 .unassigned-chevron {
   @include icon;
 

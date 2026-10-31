@@ -1227,9 +1227,12 @@ export default defineComponent({
   align-items: center;
 }
 
+/* A bar gives way to the sheet's width (MOL-321): its name of 9rem was 216 px at 150 %, and the sheet stood 112 px
+   sideways while the items came. */
 .ghost-line {
   display: flex;
   align-items: center;
+  min-width: 0;
   height: calc(1em * var(--leading-body));
 }
 

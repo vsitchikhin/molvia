@@ -158,6 +158,14 @@ async function aMonth(page: Page): Promise<{ card: string; savings: string; dina
       categoryId: categories[index]?.id,
       accountId: card,
     })
+  // A spending on no account: «Счета» say «1 операция не попала в остатки», whose chevron stood past the phone
+  // at 200 % (adversarial Д1).
+  await post(page, '/api/spendings', {
+    id: randomUUID(),
+    spentOn: day(0),
+    amount: { amount: '500', currency: 'AMD' },
+    categoryId: categories[1]?.id,
+  })
   // A plan of six figures and a spending of six in it: «Осталось 124 597 ֏» of a row of «Бюджет» stood 31 px
   // past the phone at 200 % (adversarial В4).
   const planned = await page.request.put('/api/budget/plans', {
@@ -269,6 +277,11 @@ for (const size of ['150%', '200%'])
       expect(await pastCard(page, '.list-row .tail', '.list-row')).toBeLessThanOrEqual(0.5)
       // «Осталось» of «Бюджет» within its line and still read: shrunk to a column of the words some 30 px wide
       // it was 4.9 px at 200 %, hidden by the title's `overflow` from any width of the page (adversarial Г1, В4).
+      const unassigned = page.locator('button.unassigned svg').last()
+      await expect(unassigned).toBeVisible()
+      expect(
+        (await unassigned.boundingBox())!.x + (await unassigned.boundingBox())!.width,
+      ).toBeLessThanOrEqual(320.5)
       await page.goto('/money/budget')
       const left = page.locator('.head .amount').first()
       await expect(left).toBeVisible()
@@ -277,6 +290,11 @@ for (const size of ['150%', '200%'])
       expect(
         await left.evaluate((amount) => parseFloat(getComputedStyle(amount).fontSize)),
       ).toBeGreaterThanOrEqual(13)
+      // The plan under the name whole, never under «…»: «125 403 ֏ из» and the plan hidden (adversarial Д2).
+      const meta = page.locator('.list-row .meta').first()
+      expect(
+        await meta.evaluate((line) => line.scrollHeight - line.clientHeight),
+      ).toBeLessThanOrEqual(1)
       await page.goto('/money/categories')
       await expect(page.locator('.list-row .tail').first()).toBeVisible()
       await facesIn(page)
@@ -354,11 +372,15 @@ for (const size of ['150%', '200%'])
       await record.click()
       const sheet = page.locator('dialog[open]').last()
       await expect(sheet.locator('.summary .figure')).toBeVisible()
+      // While its items come their skeleton stands, a bar of 9rem stood the sheet 112 px sideways at 150 %.
+      const sideways = () => sheet.evaluate((dialog) => dialog.scrollWidth - dialog.clientWidth)
+      if (await sheet.locator('.ghost-item').count()) expect(await sideways()).toBe(0)
+      await expect(sheet.locator('.item-name').first()).toBeVisible()
       await expect
         .poll(() => sheet.evaluate((dialog) => dialog.getAnimations({ subtree: true }).length))
         .toBe(0)
       await facesIn(page)
-      expect(await sheet.evaluate((dialog) => dialog.scrollWidth - dialog.clientWidth)).toBe(0)
+      expect(await sideways()).toBe(0)
       expect(await pastCard(page, 'dialog[open] .summary .badge', '.summary')).toBeLessThanOrEqual(
         0.5,
       )

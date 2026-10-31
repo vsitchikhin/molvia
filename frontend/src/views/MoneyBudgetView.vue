@@ -106,6 +106,7 @@
               :tint="row.tint"
               :next="!row.archived"
               wrap
+              whole
               :data-category="row.categoryId"
               @click="row.archived || edit(row.categoryId, row.plan)"
             >
@@ -150,6 +151,7 @@
                 :meta="row.meta"
                 :next="!row.archived"
                 wrap
+                whole
                 :data-category="row.categoryId"
                 @click="row.archived || edit(row.categoryId, null)"
               >
@@ -176,6 +178,7 @@
             :meta="savings.goal"
             next
             wrap
+            whole
             @click="editSavings"
           >
             <template #title>
@@ -731,6 +734,18 @@ export default defineComponent({
 @container row-tight (width < 12rem) {
   .tight :deep(.circle) {
     display: none;
+  }
+
+  /* The words take the circle's column with its gap, and a removed category's empty tail stays where the
+     chevron stands, so its figures and its bar end with the live rows' (self-review 5, №1). */
+  .tight :deep(.words) {
+    grid-column: 1 / 3;
+  }
+
+  .tight :deep(.tail) {
+    grid-column: 3;
+    grid-row: 1;
+    margin-top: 0;
   }
 }
 </style>
