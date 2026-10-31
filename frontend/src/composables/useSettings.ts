@@ -307,8 +307,12 @@ export function useSettings(): {
     },
     { immediate: true },
   )
+  // A server's refusal from before the connection went is no word on the read its return starts: from
+  // here the last thing known is «no connection» (MOL-215, adversarial Б1). A failure is never made
+  // an `error` this way, and the person's own retry with the connection up keeps it.
   const offline = (): void => {
     online.value = false
+    if (form.failure === 'error') form.failure = 'offline'
   }
   onMounted(() => {
     form.returned = form.dirty
@@ -322,6 +326,7 @@ export function useSettings(): {
   useReconnect(() => {
     online.value = navigator.onLine
     if (online.value) void form.refresh()
+    else offline()
   })
   return { form, online, notice, hasAnnouncer: !!announce }
 }

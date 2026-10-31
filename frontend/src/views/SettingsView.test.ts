@@ -537,6 +537,43 @@ describe('a form shown from memory says as of when, and what became of the read 
     expect(strips(again)).toHaveLength(0)
   })
 
+  // Adversarial Б1 of round 2: a server's refusal lived through a stretch with no connection, and the
+  // connection back said «Сервер не ответил» over the read it starts.
+  it('must not fire: a refusal from before the connection went, over the read its return starts', async () => {
+    remember(READ)
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render(false)
+    expect(strips(view)[0]?.props('kind')).toBe('unanswered')
+
+    onLine.mockReturnValue(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+    expect(strips(view)[0]?.props('kind')).toBe('offline')
+
+    me.mockReturnValue(new Promise(() => undefined))
+    onLine.mockReturnValue(true)
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(me).toHaveBeenCalledTimes(2)
+    expect(strips(view)).toHaveLength(0)
+  })
+
+  // Adversarial Б2 of round 2: the moment moves only with an answer, and a year-old one read as this year.
+  it('a moment of another year says its year', async () => {
+    remember(new Date('2025-10-30T10:05:00.000Z'))
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(new Date('2026-11-02T12:00:00.000Z'))
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      me.mockRejectedValue(new TypeError('Failed to fetch'))
+      const view = await render(false)
+      expect(strips(view)[0]?.props('text')).toContain('2025')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   // Adversarial А1: the day was counted once, and the app left overnight said «today» of yesterday.
   it('the day follows the screen past midnight, the app back in view', async () => {
     const before = new Date('2026-10-30T23:50:00.000Z')

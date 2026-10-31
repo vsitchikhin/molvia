@@ -67,6 +67,16 @@ describe('answeredAt (MOL-187)', () => {
     expect(answeredAt(at(19, 23, 58), 'en', '2026-09-19', at(20, 0, 5))).toBe('yesterday, 11:58 PM')
   })
 
+  it('an answer of another year says its year (MOL-215, adversarial Б2)', () => {
+    expect(
+      answeredAt(new Date(2025, 9, 30, 10, 5), 'en', '2026-11-02', new Date(2026, 10, 2, 12)),
+    ).toBe('Oct 30, 2025, 10:05 AM')
+    // «Вчера» beats the year, as `dayOfAnyYear` has it.
+    expect(
+      answeredAt(new Date(2025, 11, 31, 23, 40), 'en', '2026-01-01', new Date(2026, 0, 1, 9)),
+    ).toBe('yesterday, 11:40 PM')
+  })
+
   it('an answer of a day neither has reached yet is today’s, never a date', () => {
     expect(answeredAt(at(20, 0, 10), 'ru', '2026-09-19', at(19, 23, 58))).toBe('сегодня, 00:10')
   })
