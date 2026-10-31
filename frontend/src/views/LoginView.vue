@@ -1,35 +1,45 @@
 <template>
   <div class="login">
-    <div class="head">
+    <!-- The first screen names the product and what it is for, not «Вход» (Ф-35, 41 v2 7a); every
+         later step is a step of signing in, and keeps the title. -->
+    <div v-if="phase !== 'offer'" class="head">
       <h1 class="title" tabindex="-1">{{ t('login.title') }}</h1>
     </div>
 
-    <div class="content">
+    <div class="content" :class="{ offer: phase === 'offer' }">
       <!-- Said once, right after «Удалить мои данные» (MOL-94, В-3): the same screen with no word
            left «did it work?» open — and when it did not, or nobody can tell, it says that. -->
       <p v-if="erasure" class="erasure" :class="erasure.tone">
         <IconCheck v-if="erasure.tone === 'done'" aria-hidden="true" />
         <IconAlert v-else aria-hidden="true" />{{ erasure.words }}
       </p>
-      <ScreenSkeleton v-if="phase === 'loading'" :groups="[70, 45]" />
-
-      <ScreenState
-        v-else-if="phase === 'offer'"
-        kind="empty"
-        :icon="IconSend"
-        :title="t('login.offer.title')"
-        :body="t('login.offer.body')"
-      >
-        <p v-if="insecure" class="hint">{{ t('dev.login_insecure') }}</p>
-        <template #action>
-          <AppButton block :busy="starting" :busy-label="t('login.starting')" @click="begin">
+      <!-- A screen, not a state of one: the words are read from the focus on the name, and nothing
+           here goes to the live region. The mark is the home screen's icon; the name beside it says it. -->
+      <template v-if="phase === 'offer'">
+        <img class="mark" src="/favicon.svg" alt="" width="64" height="64" />
+        <h1 class="brand" tabindex="-1">{{ t('app.name') }}</h1>
+        <p class="promise">{{ t('login.promise') }}</p>
+        <div class="ask">
+          <h2>{{ t('login.offer.title') }}</h2>
+          <p>{{ t('login.offer.body') }}</p>
+          <p v-if="insecure" class="hint">{{ t('dev.login_insecure') }}</p>
+          <AppButton
+            size="large"
+            block
+            :busy="starting"
+            :busy-label="t('login.starting')"
+            @click="begin"
+          >
+            <template #icon><IconSend /></template>
             {{ t('login.start') }}
           </AppButton>
           <AppButton v-if="seam" block variant="ghost" @click="devSignIn">
             {{ t('dev.login_seam') }}
           </AppButton>
-        </template>
-      </ScreenState>
+        </div>
+      </template>
+
+      <ScreenSkeleton v-else-if="phase === 'loading'" :groups="[70, 45]" />
 
       <ScreenState
         v-else-if="phase === 'waiting'"
@@ -180,6 +190,7 @@ export default defineComponent({
     ConsentStep,
     IconAlert,
     IconCheck,
+    IconSend,
     ScreenSkeleton,
     ScreenState,
     UpdateBand,
@@ -317,6 +328,65 @@ export default defineComponent({
   flex-direction: column;
   padding: var(--space-4) calc(var(--space-4) + var(--safe-right))
     calc(var(--space-4) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
+}
+
+// 40 under the status bar, as the title of every other step stands (41 v2 7a).
+.offer {
+  padding-top: calc(var(--safe-top) + var(--space-8) + var(--space-2));
+}
+
+// Its 64 is the image's own attributes: a picture, not an icon of the scale.
+.mark {
+  display: block;
+}
+
+.brand {
+  @include display-type;
+
+  margin: var(--space-6) 0 0;
+  font-size: var(--text-display);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.promise {
+  @include display-type;
+
+  max-width: 30ch;
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-title);
+  line-height: var(--leading-tight);
+  text-wrap: balance;
+}
+
+// The free height is above the ask, so the one action stands where the thumb is.
+.ask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-8);
+
+  h2 {
+    margin: 0;
+    font-size: var(--text-headline);
+    font-weight: var(--weight-medium);
+  }
+
+  p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--text-callout);
+    line-height: var(--leading-body);
+  }
+
+  .button:first-of-type {
+    margin-top: var(--space-2);
+  }
 }
 
 .erasure {

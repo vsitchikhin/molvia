@@ -109,7 +109,6 @@ describe('экран входа', () => {
     // вход при каждом показе экрана, закрывает дверь всем.
     const { view } = await render()
 
-    expect(view.get('h1').text()).toBe('Sign in')
     expect(view.text()).toContain('Sign in with your Telegram')
     expect(startLogin).not.toHaveBeenCalled()
   })
@@ -184,6 +183,52 @@ describe('экран входа', () => {
     await button(view, 'Start again').trigger('click')
     await flushPromises()
     expect(startLogin).toHaveBeenCalledTimes(2)
+  })
+})
+
+// Ф-35, 41 v2 7a: the first screen names the product and what it is for — a stranger meets it first.
+describe('первый экран — имя и обещание (MOL-216)', () => {
+  it('знак, «Molvia» заголовком, обещание; «Вход» — не заголовок первого экрана', async () => {
+    const { view } = await render()
+
+    const headings = view.findAll('h1')
+    expect(headings.map((one) => one.text())).toEqual([en.app.name])
+    expect(headings[0]?.attributes('tabindex')).toBe('-1')
+    expect(view.get('.promise').text()).toBe(en.login.promise)
+    // The mark says nothing the heading beside it does not.
+    const mark = view.get('img.mark')
+    // The home screen's icon, inlined by the build: the door asks the network for nothing.
+    expect(mark.attributes('src')).toMatch(/^data:image\/svg\+xml,.*aria-label='Molvia'/)
+    expect(mark.attributes('alt')).toBe('')
+    expect(view.get('.ask h2').text()).toBe(en.login.offer.title)
+    expect(view.get('.ask').text()).toContain(en.login.offer.body)
+  })
+
+  it('слова первого экрана идут сверху вниз: имя, обещание, просьба, кнопка, версия, ссылки', async () => {
+    const { view } = await render('ready')
+    const text = view.text()
+    const order = [
+      en.app.name,
+      en.login.promise,
+      en.login.offer.title,
+      en.login.start,
+      en.update.ready,
+      en.privacy.title,
+    ].map((words) => text.indexOf(words))
+
+    expect(order.every((at) => at >= 0)).toBe(true)
+    expect(order).toEqual([...order].sort((a, b) => a - b))
+  })
+
+  it('любой следующий шаг — под заголовком «Вход», без знака и обещания', async () => {
+    const { view } = await render()
+    pollLogin.mockResolvedValue({ status: 'pending', expiresAt: REQUEST.expiresAt })
+    await button(view, 'Sign in with Telegram').trigger('click')
+    await flushPromises()
+
+    expect(view.findAll('h1').map((one) => one.text())).toEqual([en.login.title])
+    expect(view.find('img.mark').exists()).toBe(false)
+    expect(view.text()).not.toContain(en.login.promise)
   })
 })
 
@@ -308,6 +353,10 @@ describe('после «Удалить мои данные» (MOL-94, В-3)', () 
     const first = await render()
     expect(first.view.text()).toContain(en.login.erased)
     expect(first.view.text()).toContain(en.login.offer.title)
+    // Said over the mark, first on the screen (7h).
+    const offer = first.view.get('.offer').element
+    expect(offer.firstElementChild?.classList.contains('erasure')).toBe(true)
+    expect(offer.children[1]?.classList.contains('mark')).toBe(true)
     expect(sessionStorage.getItem('molvia.erased')).toBeNull()
     first.view.unmount()
 
