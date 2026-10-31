@@ -278,8 +278,12 @@ read's refusal too, and the edit then dropped it unsaid) — and the person's ow
 away, takes that read's refusal with it (adversarial Д1 of round 5): the strip came out of the very tap and moved the
 fields under it. Only a refused save with that notice marks its read — a 409 says nothing, and there the strip is the
 screen's one word, which an edit took away (Ж2 of round 7). Any other read's refusal is the strip's at once, with its
-answer, beside the notice — **with no «Повторить» of its own while «Сохранить» is the save's** (`retriesSave`, Ж1):
-one «Повторить» a screen (MOL-181, К-5), never two of one name, one reading and one writing. **A failed read reports
+answer, beside the notice — **with no «Повторить» of its own while the save stands refused** (`saveRefused`, Ж1): the
+strip and the docked button never offer two of one name, one reading and one writing (MOL-181, К-5) — by the refusal
+alone, never by the read on its way, or the strip's button came and went with every read the screen made itself and
+the strip grew and shrank under the finger (З1 of round 8). **The price, named** (З2): the groups keep the «Повторить» of
+their own section's error — the salary's day, «Учитывать меня в статистике» (MOL-180's quiet card) — so with the server
+down the screen has three of one name, each under the words of its own section, as on master. **A failed read reports
 the phone's own defect** (`reportFailure`, MOL-144; review 7 №6). **The price,
 named** (review 6 №5): after that edit the form stands with no strip until the next read — the app or the connection
 back, the screen opened, «Сохранить» — while the server may still be silent. **The moment is said by `answeredAt` with the screen's day**
