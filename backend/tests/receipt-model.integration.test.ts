@@ -1250,11 +1250,12 @@ describe('a receipt read not whole: its reasons, its review and the developer to
 
   it('names the day of the review in Yerevan, on either side of its midnight (MOL-316)', async () => {
     const me = await person(LATER)
-    // half an hour either side of midnight in Yerevan: 20:30 in UTC is the 22nd there and still the 21st in Moscow,
-    // 19:30 the 21st there and already the 22nd in Tashkent — only a day counted at +4 names both
+    // a quarter of an hour either side of midnight in Yerevan: 20:15 in UTC is the 16th there and still the 15th in
+    // Tehran, 19:45 the 15th there and already the 16th at +4:30 — of the real zones only those at +4 name both;
+    // a day years off, which no `keep_until` of today's reading falls on
     const moments = new Map([
-      [await queued(me), { at: '2026-11-21T20:30:00.000Z', day: '2026-11-22' }],
-      [await queued(me), { at: '2026-11-21T19:30:00.000Z', day: '2026-11-21' }],
+      [await queued(me), { at: '2030-01-15T20:15:00.000Z', day: '2030-01-16' }],
+      [await queued(me), { at: '2030-01-15T19:45:00.000Z', day: '2030-01-15' }],
     ])
     const evening: ReadReceiptsDeps['receipts'] = {
       ...repository,
