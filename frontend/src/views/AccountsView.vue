@@ -152,7 +152,7 @@
                           <span
                             class="balance-figure"
                             :class="{ negative: account.balance.minor < 0n }"
-                            :style="figureChars(signed(account.balance))"
+                            :style="figureChars(signed(account.balance), 'text')"
                           >
                             {{ signed(account.balance) }}
                           </span>

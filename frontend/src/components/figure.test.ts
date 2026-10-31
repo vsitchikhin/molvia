@@ -20,6 +20,13 @@ describe('figureChars (MOL-321)', () => {
     expect(width('−999,99 RSD')).toBeGreaterThanOrEqual(0.568 * 11)
   })
 
+  // A sum in a row is set in the words' face, whose figure is 12 % wider (adversarial Г2): «124 597 ֏» in Onest.
+  it('measures a sum set in the words’ face by that face', () => {
+    const text = (sum: string) => Number(Object.values(figureChars(sum, 'text') as object)[0])
+    expect(text('124\u00a0597\u00a0֏')).toBeGreaterThanOrEqual(6 * 0.673 + 2 * 0.278 + 0.747)
+    expect(text('124\u00a0597\u00a0֏')).toBeGreaterThan(width('124\u00a0597\u00a0֏'))
+  })
+
   it('takes a character it does not know as a capital, the widest a figure holds', () => {
     expect(width('Q')).toBeGreaterThan(width('8'))
   })

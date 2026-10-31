@@ -99,7 +99,7 @@
              И): no button and no chevron, its place kept so the figures and the bars stay in one
              column. -->
         <AppCard v-if="rows.length > 0" as="ul" list>
-          <li v-for="row in rows" :key="row.categoryId">
+          <li v-for="row in rows" :key="row.categoryId" class="tight">
             <ListRow
               :as="row.archived ? 'div' : 'button'"
               :icon="row.icon"
@@ -112,9 +112,12 @@
               <template #title>
                 <span class="head">
                   <span>{{ row.name }}</span>
-                  <span class="amount" :class="{ over: row.over }" :style="figureChars(row.left)">{{
-                    row.left
-                  }}</span>
+                  <span
+                    class="amount"
+                    :class="{ over: row.over }"
+                    :style="figureChars(row.left, 'text')"
+                    >{{ row.left }}</span
+                  >
                 </span>
               </template>
               <template #meta>
@@ -139,7 +142,7 @@
         <div v-if="unplanned.length > 0">
           <SectionCaption>{{ t('budget.unplanned') }}</SectionCaption>
           <AppCard as="ul" list>
-            <li v-for="row in unplanned" :key="row.categoryId">
+            <li v-for="row in unplanned" :key="row.categoryId" class="tight">
               <ListRow
                 :as="row.archived ? 'div' : 'button'"
                 :icon="row.icon"
@@ -153,7 +156,9 @@
                 <template #title>
                   <span class="head">
                     <span>{{ row.name }}</span>
-                    <span class="amount" :style="figureChars(row.spent)">{{ row.spent }}</span>
+                    <span class="amount" :style="figureChars(row.spent, 'text')">{{
+                      row.spent
+                    }}</span>
                   </span>
                 </template>
                 <template v-if="row.archived" #tail><span class="no-chevron"></span></template>
@@ -164,7 +169,7 @@
 
         <!-- The target has no category's colour: its circle is quiet, its bar `--graphic` — data
              without a colour of its own — and the mark of the target the ink of the text. -->
-        <AppCard as="section" list :aria-labelledby="`${id}-savings`">
+        <AppCard as="section" list class="tight" :aria-labelledby="`${id}-savings`">
           <ListRow
             :icon="IconPiggyBank"
             tint="muted"
@@ -176,7 +181,7 @@
             <template #title>
               <span class="head">
                 <span :id="`${id}-savings`">{{ t('budget.savings.title') }}</span>
-                <span class="amount" :style="figureChars(savings.actual)">{{
+                <span class="amount" :style="figureChars(savings.actual, 'text')">{{
                   savings.actual
                 }}</span>
               </span>
@@ -714,5 +719,18 @@ export default defineComponent({
 /* The answer comes in where the skeleton stood, faded only (MOL-138, MOL-151). */
 .content > :not(:first-child) {
   @include appear(0);
+}
+
+/* With large text a row's words take the place of its circle (`ListRow`, `row-tight`, MOL-321): at 200 % the
+   circle and the chevron left the words some 30 px, «Продукты» stood a letter a line, and «Осталось», shrunk to
+   that, was 4.9 px (adversarial Г1). The category stays said by its name and its bar's colour. */
+.tight {
+  container: row-tight / inline-size;
+}
+
+@container row-tight (width < 12rem) {
+  .tight :deep(.circle) {
+    display: none;
+  }
 }
 </style>

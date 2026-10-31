@@ -152,7 +152,8 @@ async function aMonth(page: Page): Promise<{ card: string; savings: string; dina
   for (const [index, amount] of ['123603', '1800'].entries())
     await post(page, '/api/spendings', {
       id: randomUUID(),
-      spentOn: day(1),
+      // Today, never yesterday: on the 1st yesterday is the month before, with no ring in this one.
+      spentOn: day(0),
       amount: { amount, currency: 'AMD' },
       categoryId: categories[index]?.id,
       accountId: card,
@@ -163,7 +164,7 @@ async function aMonth(page: Page): Promise<{ card: string; savings: string; dina
     headers: await asBrowser(page),
     data: {
       categoryId: categories[0]?.id,
-      from: day(1).slice(0, 7),
+      from: day(0).slice(0, 7),
       plan: { kind: 'amount', amount: { amount: '250000', currency: 'AMD' } },
     },
   })
@@ -264,6 +265,18 @@ for (const size of ['150%', '200%'])
       await expect(page.locator('.list-row .tail').first()).toBeVisible()
       await facesIn(page)
       expect(await pastCard(page, '.list-row .tail')).toBeLessThanOrEqual(0.5)
+      // From the row's own edge too: a sum in the words' face is wider than the figures' (adversarial Г2).
+      expect(await pastCard(page, '.list-row .tail', '.list-row')).toBeLessThanOrEqual(0.5)
+      // «Осталось» of «Бюджет» within its line and still read: shrunk to a column of the words some 30 px wide
+      // it was 4.9 px at 200 %, hidden by the title's `overflow` from any width of the page (adversarial Г1, В4).
+      await page.goto('/money/budget')
+      const left = page.locator('.head .amount').first()
+      await expect(left).toBeVisible()
+      await facesIn(page)
+      expect(await pastCard(page, '.head .amount', '.head')).toBeLessThanOrEqual(0.5)
+      expect(
+        await left.evaluate((amount) => parseFloat(getComputedStyle(amount).fontSize)),
+      ).toBeGreaterThanOrEqual(13)
       await page.goto('/money/categories')
       await expect(page.locator('.list-row .tail').first()).toBeVisible()
       await facesIn(page)
