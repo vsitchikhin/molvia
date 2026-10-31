@@ -504,7 +504,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
     goes to a line of its own — decorations, where the words had 64 px. **A row's tail goes under its words only
     with large text in a container named `row-tight`** (`ListRow`, below 12rem): the rows of «Счета» and «Категории»
     keep it beside at 100 % on 320, where `row`'s 22rem would turn them, and at 200 % «1 234 567,89 ₽» was cut by 68 px
-    and «Убрать» by 37 (adversarial Б1, Б2); one look for both, a mixin of the kit. **A box cannot ask its own
+    and «Убрать» by 37 (adversarial Б1, Б2). There the tail takes the row's whole width, the circle and the chevron
+    at the top, and the title breaks: in the column of the words alone a sum stood past the card's left edge —
+    «100 000 ₽» read «00 000 ₽», worse than cut at the right (В5) — and the sum shrinks to the row (`figure-fit`).
+    `row` keeps the words' column, as `OperationRow` drew it. **A box cannot ask its own
     width**: the rules under a query stand on its children, and what the box itself does — `flex-wrap` — is set
     outside it.
   - **A line wraps only where its least widths do not fit**: `flex-wrap` with the words at `flex-basis:
@@ -514,15 +517,18 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     100 % the words still give way first, as before, and the figure goes under them only when even the words
     broken leave it no room. The sum and the share of a ring's name are one `figures` span, `display: contents`
     beside the ring and a wrapping line of its own under it.
-  - **A figure that is its card's answer shrinks to its card by its length** (`@include figure-fit`, adversarial
-    А1…А6): `min(var(--text-figure), 100cqi / (characters × 0.56))`, the characters set beside it by
-    `figureChars` (`--figure-chars`, set by script) — a capital Latin letter and a minus counted 1.15, wider than
-    a figure («−999,99 RSD» was 0.568 of its size a character, adversarial Б3) — the box measured the nearest
-    `container-type: inline-size`: the card, the column of words, the sheet's column (the figure of a check that
-    came out even, which measured the window before). A sum never breaks, and at 200 % «Потрачено 125 403 ֏» was 276 px in a card of
-    190; a width alone (`18cqi`, the first try) did not know the length, and «1 234 567,89 ₽» stood 15 px past at
-    150 %. 0.56 of the size a character is above Nunito 800's widest (0.55), so a figure of fourteen keeps its size
-    at 100 % on 320. Ten figures of «Деньги»; the totals of a receipt and a record are MOL-334.
+  - **A figure shrinks to its box by its width** (`@include figure-fit`, adversarial А1…А6, В2): `min(size,
+100cqi / width)`, the size `--text-figure` for a card's figure or `1em` for one set in the text — a sum in a
+    row's tail, «Осталось» of «Бюджет» (В4) — and the width the figure's in its own size, set beside it by
+    `figureChars` (`--figure-width`, set by script) from a table of the face's characters, measured: a figure
+    0.600, a no-break space 0.279, a comma 0.26, «֏» 0.765, a capital as wide as a figure holds, with 3 % room for
+    another engine. A count of characters at 0.56 (the round before) held only where spaces and commas pulled
+    the share down: «֏125,403» in English is 0.578 and stood 6 px past its card, «−999,99 RSD» 0.568 (Б3). The box
+    is the nearest `container-type: inline-size`: the card, the column of words, a row, the sheet's column (the
+    figure of a check that came out even measured the window before). A sum never breaks, and at 200 % «Потрачено
+    125 403 ֏» was 276 px in a card of 190; a width alone (`18cqi`, the first try) did not know the length. A
+    figure of fourteen keeps its size at 100 % on 320. Twelve figures of «Деньги»; the totals of a receipt and a
+    record are MOL-334.
   - **The tab label stops growing at 125 %**: `--text-tab`, `min(var(--text-caption), 13.75px)`, as iOS keeps its
     tab bar (В-3 «а»); a token, named one by one in Stylelint's list of sizes. The tab bar is fixed and in no width
     of the page, so `large-text` reads every label within its column.
