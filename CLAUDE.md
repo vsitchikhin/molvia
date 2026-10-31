@@ -567,7 +567,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
   field fails ESLint.
 - **The amount typed is `AppField size="entry"`, a currency beside it `CurrencySelect`, a checkbox
   `AppCheckbox`** (MOL-235): a static `inputmode="decimal"`, `type="checkbox"` or a `<select>` outside the kit
-  fails ESLint, name and value in any case; a field's classes are the kit's own words (`app-field…`), and a field
+  fails ESLint, in any case; a field's classes are the kit's own words (`app-field…`), and a field
   refused at a send is heard (`useFieldRefusal`).
 - **Every screen has four states — loading, empty, error, offline — drawn by `ScreenSkeleton` and
   `ScreenState` only** (MOL-19): offline is never red, and offline or error is decided after the

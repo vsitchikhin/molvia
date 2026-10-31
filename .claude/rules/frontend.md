@@ -549,7 +549,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   field without it — and where the focus stands in it already, Enter in the field or a tap Safari does not move
   the focus for, the field's own error is said in the region, the open sheet's: a description changed under the
   focus is read by nobody. The check's error had been `role="alert"` and lost it to the kit; the transfer's new
-  words had no way to be heard at all; the spending's sum was as silent on master. **The checkbox is
+  words had no way to be heard at all; the spending's sum and «списано» were as silent on master (adversarial
+  Р2-А1), and the spending looks in its own form, never the document's. **The price, named:** a chip of a
+  category refused with the focus on it already is focused and not said — the chips' error is their
+  fieldset's, no `<id>-error` of a field; a chip is refused only for a category the server called unknown. **The checkbox is
   `AppCheckbox`** (В-4 «а»), a native checkbox the kit draws, by the grammar of `AppSwitch`: off a square edged in
   `graphic`, on `accent-solid` with a ✓, not now `inactive` — `aria-disabled`, focusable, a tap, a tap on its
   words and Space put back (`e2e/kit-inactive` in both engines) — and the focus a field's, on the row; its
@@ -558,9 +561,12 @@ The detail behind the frontend lines of `CLAUDE.md`.
   before. **A copy is refused by ESLint**: a static `inputmode="decimal"` anywhere (`AppField` binds its own),
   `<input type="checkbox">` outside `AppSwitch` and `AppCheckbox`, a `<select>` outside `AppField` and
   `CurrencySelect` — every `<select>` there is; one option of the rule a file, so each file of the kit is
-  refused the others' (`src/eslint-kit-fields.test.ts`). **Name and value without case** (adversarial А3): HTML
-  takes `type="Checkbox"` and `inputmode="Decimal"` as the field, and Vue sets `inputMode` as the DOM's own
-  property — the search's two entries likewise. Closes carelessness, not intent: a bound `:type` passes. `inputmode="decimal"` stays on the `<input>`, where the
+  refused the others' (`src/eslint-kit-fields.test.ts`). **Name, value and tag without case** (adversarial А3,
+  Р2-А2): HTML takes `type="Checkbox"` and `inputmode="Decimal"` as the field, Vue sets `inputMode` as the
+  DOM's own property, and `<Select>`, which Vue resolves to no component, is the browser's select — the
+  search's two entries likewise; the select by a selector of `vue/no-restricted-syntax`
+  (`VElement[rawName=/^select$/i]`), since the rule of elements matches a tag as written, in one list with
+  MOL-225's `busy`. Closes carelessness, not intent: a bound `:type` passes. `inputmode="decimal"` stays on the `<input>`, where the
   keyboard's remembered height reads it (MOL-151). **Not here:** the currency as a field of its own
   (`kind="select"`) or as segments (the spending) — other forms, not copies.
 - **An operation is one row, `OperationRow`, and it knows no operation** (MOL-176, Ф-12). «Траты» drew
