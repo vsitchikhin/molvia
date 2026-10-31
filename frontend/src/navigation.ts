@@ -71,7 +71,9 @@ function doorTarget(router: Router): BackTarget {
   if (typeof below !== 'string')
     return { location: router.resolve({ name: HOME }), step: false, titleKey: DOOR_TITLE }
   const location = router.resolve(below)
-  return { location, step: true, titleKey: location.meta.public ? undefined : DOOR_TITLE }
+  return location.meta.public
+    ? { location, step: true }
+    : { location, step: true, titleKey: DOOR_TITLE }
 }
 
 const DOOR_TITLE = 'login.title'
