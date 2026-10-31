@@ -510,7 +510,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
     `row` keeps the words' column, as `OperationRow` drew it. The rows of «Бюджет» take it too, and **there the
     category's circle gives way** below 12rem: with it and the chevron the words had some 30 px at 200 %,
     «Продукты» a letter a line, and «Осталось», shrunk to that, was 4.9 px (adversarial Г1) — a width is closed by
-    the layout, never by a size nobody reads; the category stays said by its name and its bar. On «Категории» the
+    the layout, never by a size nobody reads; the category stays said by its name and its bar. The words take the circle's column
+    with its gap, a removed category's empty tail stays in the chevron's (self-review 5), and the plan under the
+    name stands whole (`whole`): two lines held «125 403 ֏ из» and hid the plan at 200 % (adversarial Д2). On «Категории» the
     circle is the category's own icon and stays. **A box cannot ask its own
     width**: the rules under a query stand on its children, and what the box itself does — `flex-wrap` — is set
     outside it.
