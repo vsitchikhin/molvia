@@ -1,5 +1,7 @@
 <template>
-  <fieldset ref="field" class="chips-field" :aria-describedby="error ? errorId : undefined">
+  <!-- The error describes each radio, not the group (MOL-235, adversarial Р3-А1): a refusal takes the
+       focus to a radio, and a group's description is read by some readers on entering it, by others never. -->
+  <fieldset ref="field" class="chips-field">
     <legend class="legend">{{ legend }}</legend>
     <div class="chips" :class="{ bad: !!error, laid: rows !== null }">
       <div v-for="(row, index) in shownRows" :key="index" class="row">
@@ -16,6 +18,8 @@
             :value="category.id"
             :checked="category.id === modelValue"
             :aria-invalid="error ? 'true' : undefined"
+            :aria-describedby="error ? errorId : undefined"
+            :aria-errormessage="error ? errorId : undefined"
             @change="$emit('update:modelValue', category.id)"
           />
           <span class="dot" :style="{ background: colourOf(category) }" aria-hidden="true"></span>

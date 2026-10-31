@@ -104,7 +104,7 @@ describe('AppField', () => {
     expect(error.text()).toBe(en.error.invalid_amount)
     expect(input.attributes('aria-invalid')).toBe('true')
     expect(input.attributes('aria-describedby')).toBe(error.attributes('id'))
-    expect(view.classes()).toContain('invalid')
+    expect(view.classes()).toContain('app-field-invalid')
   })
 
   it('shows words the screen gave when the registry has no code, over the code', () => {
@@ -115,10 +115,19 @@ describe('AppField', () => {
     expect(view.get('input').attributes('aria-describedby')).toBe(error.attributes('id'))
   })
 
+  // A refusal reads the words of the error the field names (`useFieldRefusal`, MOL-235).
+  it('names its error as its error message', () => {
+    const view = render({ error: ERROR.INVALID_AMOUNT })
+    expect(view.get('input').attributes('aria-errormessage')).toBe(
+      view.get('.error').attributes('id'),
+    )
+  })
+
   it('must not fire: no error — no aria-invalid and no empty message', () => {
     const view = render()
     const input = view.get('input')
     expect(input.attributes('aria-invalid')).toBeUndefined()
+    expect(input.attributes('aria-errormessage')).toBeUndefined()
     expect(input.attributes('aria-describedby')).toBeUndefined()
     expect(view.find('.error').exists()).toBe(false)
   })
@@ -138,10 +147,28 @@ describe('AppField', () => {
     expect(ids).toEqual([view.get('.suffix').attributes('id'), view.get('.error').attributes('id')])
   })
 
+  // Told by more than its colour in bad light (DESIGN.md, В-3 «а» of MOL-235); the glyph says nothing aloud.
+  it('stands an alert before the error, unheard', () => {
+    const view = render({ error: ERROR.INVALID_AMOUNT })
+    const alert = view.get('.error svg')
+    expect(alert.attributes('aria-hidden')).toBe('true')
+    expect(view.get('.error').text()).toBe(en.error.invalid_amount)
+  })
+
+  // A root carries the scope of the screen it stands in: a sheet's `.field`, `.invalid` or `.readonly`
+  // would reach it (MOL-235, adversarial А5; `nav-invalid` of MOL-199 by the same reason).
+  it('keeps its classes its own, its states too, so no class of a screen reaches it', () => {
+    const view = render({ error: ERROR.INVALID_AMOUNT, readonly: true })
+    expect(view.classes()).toEqual(
+      expect.arrayContaining(['app-field', 'app-field-invalid', 'app-field-readonly']),
+    )
+    for (const word of ['field', 'invalid', 'readonly']) expect(view.classes()).not.toContain(word)
+  })
+
   it('passes readonly to the input', () => {
     const view = render({ readonly: true })
     expect(view.get('input').attributes('readonly')).toBeDefined()
-    expect(view.classes()).toContain('readonly')
+    expect(view.classes()).toContain('app-field-readonly')
   })
 
   // A screen adds `autofocus` or `enterkeyhint` to the input it means, and lays the field out by
@@ -160,6 +187,55 @@ describe('AppField', () => {
   })
 })
 
+describe('the amount being typed (MOL-235)', () => {
+  it('is the same field drawn large: the decimal keys, the label, the sign read after the value', () => {
+    const view = render({ modelValue: '1500', kind: 'decimal', size: 'entry' }, { suffix: '֏' })
+    const input = view.get('input')
+    expect(view.classes()).toContain('app-field-entry')
+    expect(input.attributes('type')).toBe('text')
+    // The keyboard's height is remembered by it (MOL-151), so it stays on the input itself.
+    expect(input.attributes('inputmode')).toBe('decimal')
+    expect(view.get('label').attributes('for')).toBe(input.attributes('id'))
+    expect(input.attributes('aria-describedby')).toBe(view.get('.suffix').attributes('id'))
+  })
+
+  it('marks its error as every field does', () => {
+    const view = render({ kind: 'decimal', size: 'entry', errorText: 'Enter an amount above zero' })
+    expect(view.classes()).toContain('app-field-invalid')
+    expect(view.get('input').attributes('aria-invalid')).toBe('true')
+    expect(view.get('input').attributes('aria-describedby')).toBe(
+      view.get('.error').attributes('id'),
+    )
+  })
+
+  // The sign right after the value, the error after it, the sheet's hint last: a hint of twenty words
+  // first left «֏» alone at the end (adversarial А4).
+  it('reads the sign after the value, then the error, then the sheet’s hint', () => {
+    const view = render(
+      { kind: 'decimal', size: 'entry', errorText: 'Enter an amount — 0 is fine' },
+      { suffix: '₽' },
+      { 'aria-describedby': 'hint' },
+    )
+    expect(view.get('input').attributes('aria-describedby')?.split(' ')).toEqual([
+      view.get('.suffix').attributes('id'),
+      view.get('.error').attributes('id'),
+      'hint',
+    ])
+  })
+
+  it('must not fire: a field not asked to be large stays as it was', () => {
+    const view = render({ kind: 'decimal' })
+    expect(view.classes()).not.toContain('app-field-entry')
+    expect(view.get('.label').classes()).not.toContain('question')
+  })
+
+  it('draws the label as the sheet’s question when asked to', () => {
+    const view = render({ kind: 'decimal', size: 'entry', question: true })
+    expect(view.get('.label').classes()).toContain('question')
+    expect(view.get('label').text()).toBe('How much')
+  })
+})
+
 it('opens native select, preserves its label and all descriptions, and emits the selection', async () => {
   const view = render(
     {
@@ -175,7 +251,7 @@ it('opens native select, preserves its label and all descriptions, and emits the
   expect(view.get('label').attributes('for')).toBe(select.attributes('id'))
   expect(view.get('option[value=""]').attributes('disabled')).toBeDefined()
   expect(select.attributes('aria-describedby')).toBe(
-    `city-hint ${view.get('.error').attributes('id') ?? ''}`,
+    `${view.get('.error').attributes('id') ?? ''} city-hint`,
   )
   await select.setValue('AMD')
   expect(view.emitted('update:modelValue')).toEqual([['AMD']])

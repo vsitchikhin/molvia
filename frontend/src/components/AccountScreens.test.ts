@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import type { Pinia } from 'pinia'
+import { defineComponent, h, ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
@@ -20,6 +21,7 @@ import AccountSheet from './AccountSheet.vue'
 import OperationSheet from './OperationSheet.vue'
 import ReconcileSheet from './ReconcileSheet.vue'
 import StatusStrip from './StatusStrip.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -222,6 +224,96 @@ describe('ReconcileSheet (handoff 05)', () => {
     const dialog = view.get('dialog')
     expect(dialog.text()).not.toMatch(/190\s132/)
     expect(dialog.html()).not.toMatch(/190\s132/)
+  })
+
+  // An empty fact is heard (MOL-235, adversarial А1): the error of the kit's field has no voice of its own.
+  describe('no fact', () => {
+    /** The sheet under an announcer, as in the app, opened as a screen opens it: the fact takes the focus. */
+    async function opened(): Promise<VueWrapper> {
+      moneyAccounts.mockResolvedValue(page([cash]))
+      const open = ref(false)
+      const Host = defineComponent({
+        setup() {
+          provideAnnouncer()
+          return () =>
+            h(ReconcileSheet, {
+              open: open.value,
+              account: cash,
+              categories,
+              nameOf: () => 'Other',
+              accountName: () => null,
+            })
+        },
+      })
+      const view = await mounted(Host, {}, withAccounts([cash]))
+      open.value = true
+      await flushPromises()
+      clock += 1000
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      return view
+    }
+    const fact = (view: VueWrapper) => view.get<HTMLInputElement>('input[data-field="fact"]')
+    /** What the sheet's own region said, once its words have landed (a task and 100 ms later). */
+    async function said(): Promise<string> {
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      await flushPromises()
+      return document.querySelector('dialog .region')?.textContent ?? ''
+    }
+    /** What a screen reader reads as the field takes the focus: its mark and its descriptions. */
+    function readAtFocus(
+      input: HTMLInputElement,
+    ): { invalid: string | null; described: string[] }[] {
+      const read: { invalid: string | null; described: string[] }[] = []
+      input.addEventListener('focus', () => {
+        const ids = (input.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean)
+        read.push({
+          invalid: input.getAttribute('aria-invalid'),
+          described: ids.map((id) => document.getElementById(id)?.textContent.trim() ?? ''),
+        })
+      })
+      return read
+    }
+
+    // Enter in the field — Android's «Go», a hardware keyboard — sends the form with the focus where it is.
+    it('Enter in the field: nothing is sent, and the error is said, the focus staying in it', async () => {
+      const view = await opened()
+      const input = fact(view)
+      expect(document.activeElement).toBe(input.element)
+      const read = readAtFocus(input.element)
+      await view.get('form').trigger('submit')
+      expect(await said()).toContain(en.accounts.reconcile.no_fact)
+      expect(checkAccount).not.toHaveBeenCalled()
+      expect(input.attributes('aria-invalid')).toBe('true')
+      expect(read).toHaveLength(0)
+    })
+
+    // Safari does not focus a tapped button (MOL-80): «Сверить» tapped leaves the focus in the field.
+    it('«Сверить» tapped with the focus in the field: the error is said', async () => {
+      const view = await opened()
+      await button(view, en.accounts.reconcile.check)?.trigger('click')
+      expect(await said()).toContain(en.accounts.reconcile.no_fact)
+      expect(document.activeElement).toBe(fact(view).element)
+    })
+
+    // Tab to «Сверить», Enter: the focus comes back once the error is drawn, so the field is read with it
+    // — and only then; said as well, it would be heard twice.
+    it('from the button: the focus comes back to a field already marked and described by its error', async () => {
+      const view = await opened()
+      const input = fact(view)
+      const read = readAtFocus(input.element)
+      const check = button(view, en.accounts.reconcile.check)
+      ;(check?.element as HTMLButtonElement).focus()
+      await check?.trigger('click')
+      expect(await said()).not.toContain(en.accounts.reconcile.no_fact)
+      expect(read).toHaveLength(1)
+      expect(read[0]?.invalid).toBe('true')
+      expect(read[0]?.described).toEqual([
+        '֏',
+        en.accounts.reconcile.no_fact,
+        en.accounts.reconcile.hint,
+      ])
+      expect(view.get('label').text()).toBe(en.accounts.reconcile.question)
+    })
   })
 
   it('a difference is neutral, with its reason; the same fact again is the same check', async () => {
@@ -764,6 +856,52 @@ describe('AccountSheet (handoff 03)', () => {
     expect(addMoneyAccount).not.toHaveBeenCalled()
   })
 
+  // A day refused alone had no field to go to (MOL-235, adversarial Р5-А1): the focus goes to the first
+  // field marked in the form, the day, once its error is drawn — refused on the phone or by the server.
+  describe('the start day refused', () => {
+    async function typed(day: string) {
+      const view = await mounted(
+        AccountSheet,
+        { open: true, spendCurrency: 'AMD', online: true },
+        withAccounts([]),
+      )
+      await view.findAll('input').at(0)?.setValue('Card')
+      const label = view.findAll('label').find((one) => one.text().trim() === en.accounts.balance)
+      await view.get(`#${CSS.escape(label?.attributes('for') ?? '')}`).setValue('1000')
+      const date = view.get<HTMLInputElement>('input[type="date"]')
+      await date.setValue(day)
+      let invalidAtFocus: string | null = null
+      date.element.addEventListener('focus', () => {
+        invalidAtFocus = date.element.getAttribute('aria-invalid')
+      })
+      const save = button(view, en.accounts.sheet.save)
+      ;(save?.element as HTMLButtonElement).focus()
+      return { date, save, invalidAtFocus: () => invalidAtFocus }
+    }
+
+    it('cleared on the phone: nothing is sent, the focus goes to the day, marked', async () => {
+      const { date, save, invalidAtFocus } = await typed('')
+      await save?.trigger('click')
+      await flushPromises()
+      expect(addMoneyAccount).not.toHaveBeenCalled()
+      expect(document.activeElement).toBe(date.element)
+      expect(invalidAtFocus()).toBe('true')
+    })
+
+    it('to come, by the server: the focus goes to the day, marked with its words', async () => {
+      addMoneyAccount.mockRejectedValue(new ApiError(ERROR.MONEY_ACCOUNT_IN_FUTURE, 'future', true))
+      const { date, save, invalidAtFocus } = await typed('2026-10-31')
+      await save?.trigger('click')
+      await flushPromises()
+      expect(addMoneyAccount).toHaveBeenCalledTimes(1)
+      expect(document.activeElement).toBe(date.element)
+      expect(invalidAtFocus()).toBe('true')
+      expect(
+        document.getElementById(date.attributes('aria-errormessage') ?? '')?.textContent,
+      ).toContain(en.error.money_account_in_future)
+    })
+  })
+
   it('takes a card in debt, and a repeat of the same sheet names the same account', async () => {
     addMoneyAccount.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'offline', false))
     addMoneyAccount.mockResolvedValue({ accounts: page([]), created: true })
@@ -771,7 +909,7 @@ describe('AccountSheet (handoff 03)', () => {
     const inputs = view.findAll('input')
     await inputs.at(0)?.setValue('Credit card')
     await view
-      .findAll('.field')
+      .findAll('.app-field')
       .find((one) => one.text().includes(en.accounts.balance))
       ?.get('input')
       .setValue('−12400')
@@ -907,7 +1045,7 @@ describe('AccountSheet (handoff 03)', () => {
   /** The field of the amount and the line under it, as a reader meets them. */
   function startOf(view: VueWrapper) {
     const field = view
-      .findAll('.field')
+      .findAll('.app-field')
       .find((one) => one.find('input[inputmode="decimal"]').exists())
     if (!field) throw new Error('no amount field')
     const input = field.get('input')

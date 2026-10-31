@@ -29,25 +29,23 @@
       :title="t('transfer.unavailable')"
       @retry="load"
     />
-    <form v-else class="form" novalidate @submit.prevent="submit">
+    <form v-else ref="form" class="form" novalidate @submit.prevent="submit">
       <StatusStrip v-if="!online" kind="offline" :text="t('transfer.offline')" />
 
       <div class="field">
-        <label :for="amountId" class="label">{{ t('transfer.amount') }}</label>
-        <div class="well" :class="{ bad: amountBad }">
-          <input
-            :id="amountId"
-            v-model="amount"
-            class="entry"
-            type="text"
-            inputmode="decimal"
-            autocomplete="off"
-            :readonly="sending"
-            :aria-invalid="amountBad ? 'true' : undefined"
-            @input="amountBad = false"
-          />
-          <span v-if="source" class="sign" aria-hidden="true">{{ sign }}</span>
-        </div>
+        <AppField
+          v-model="amount"
+          :label="t('transfer.amount')"
+          kind="decimal"
+          size="entry"
+          autocomplete="off"
+          :readonly="sending"
+          :error-text="amountBad ? t('spending.sheet.bad_amount') : null"
+          data-field="amount"
+          @update:model-value="amountBad = false"
+        >
+          <template v-if="source" #suffix>{{ sign }}</template>
+        </AppField>
         <p v-if="amendedLine" class="hint">{{ amendedLine }}</p>
       </div>
 
@@ -205,6 +203,7 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { pageOrder, shortDay } from '@/components/accounts'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { shown } from '@/composables/useItemDetails'
 import { useReconnect } from '@/composables/useReconnect'
 import { useTransfers } from '@/composables/useTransfers'
@@ -281,6 +280,9 @@ export default defineComponent({
     const loading = ref(false)
     const unread = ref<'error' | 'offline' | 'gone' | null>(null)
     const amountBad = ref(false)
+    // A field refused is heard (adversarial А2): the first one marked, in the order of the form.
+    const form = ref<HTMLFormElement | null>(null)
+    const refuse = useFieldRefusal()
     const feeBad = ref(false)
     const dayBad = ref(false)
     const noteBad = ref(false)
@@ -528,7 +530,10 @@ export default defineComponent({
       const typedNote = note.value.trim() ? exchangeNoteSchema.safeParse(note.value) : null
       noteBad.value = typedNote !== null && !typedNote.success
       dayBad.value = !isRateDay(day.value) || day.value > today.value
-      if (!sum || feeBad.value || noteBad.value || dayBad.value) return
+      if (!sum || feeBad.value || noteBad.value || dayBad.value) {
+        void refuse(() => form.value?.querySelector<HTMLElement>('[aria-invalid="true"]'))
+        return
+      }
 
       const fields = {
         fromAccountId: giver.id,
@@ -610,6 +615,7 @@ export default defineComponent({
     }
 
     return {
+      form,
       t,
       amountId,
       amount,
@@ -671,56 +677,6 @@ export default defineComponent({
 .accounts {
   display: grid;
   gap: var(--space-2);
-}
-
-.label {
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-  font-weight: var(--weight-medium);
-}
-
-.well {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 4.5rem;
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--surface-2);
-  box-shadow: inset 0 0 0 var(--hairline) var(--border-strong);
-
-  &:focus-within {
-    box-shadow:
-      inset 0 0 0 var(--hairline) var(--accent),
-      0 0 0 2px var(--accent-tint);
-  }
-
-  &.bad {
-    box-shadow: inset 0 0 0 2px var(--bad);
-  }
-}
-
-.entry {
-  @include display-type;
-
-  flex: 1;
-  width: 0;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text);
-  font-size: var(--text-entry);
-  font-variant-numeric: tabular-nums;
-  outline: none;
-}
-
-.sign {
-  @include display-type;
-
-  flex: none;
-  color: var(--text-muted);
-  font-size: var(--text-entry-sign);
 }
 
 .hint,

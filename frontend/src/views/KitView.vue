@@ -88,6 +88,17 @@
           {{ t(`dev.kit.${toggle.key}`) }}
         </label>
       </div>
+      <!-- The checkbox (MOL-235): off, on and not now in either position, its words its own label. -->
+      <div class="boxes">
+        <AppCheckbox
+          v-for="box in boxes"
+          :key="box.key"
+          v-model:checked="box.on"
+          :inactive="box.inactive"
+        >
+          {{ t(`dev.kit.${box.key}`) }}
+        </AppCheckbox>
+      </div>
       <MonthSwitcher :month="month" current="2026-10" @change="month = $event" />
       <CategoryChips
         v-model="category"
@@ -117,10 +128,55 @@
       >
         <template #suffix>{{ sign }}</template>
       </AppField>
+      <!-- The currency beside an amount, chosen by its sign (MOL-235). -->
+      <AppField v-model="price" :label="t('item.price')" kind="decimal" data-kit="currency">
+        <template #suffix>
+          <CurrencySelect v-model="kitCurrency" :label="t('item.currency')" />
+        </template>
+      </AppField>
       <AppField v-model="review" :label="t('verdict.review_label')" kind="multiline" />
       <AppField v-model="date" :label="t('dev.kit.date')" kind="date" readonly />
       <AppField v-model="city" :label="t('settings.city')" kind="select" :options="cities" />
       <SegmentedControl v-model="unit" :legend="t('item.unit')" :options="units" />
+      <!-- The amount a sheet is opened to type (MOL-235): at rest, refused, read-only while it is sent,
+           and with the sheet's question for its label — the check's. -->
+      <AppField
+        v-model="entry"
+        :label="t('spending.sheet.amount')"
+        kind="decimal"
+        size="entry"
+        :placeholder="t('spending.sheet.amount_placeholder')"
+        data-kit="entry"
+      >
+        <template #suffix>{{ sign }}</template>
+      </AppField>
+      <AppField
+        v-model="entryBad"
+        :label="t('spending.sheet.amount')"
+        kind="decimal"
+        size="entry"
+        :error-text="t('spending.sheet.bad_amount')"
+      >
+        <template #suffix>{{ sign }}</template>
+      </AppField>
+      <AppField
+        v-model="entryLong"
+        :label="t('transfer.amount')"
+        kind="decimal"
+        size="entry"
+        readonly
+      >
+        <template #suffix>{{ sign }}</template>
+      </AppField>
+      <AppField
+        v-model="entry"
+        :label="t('accounts.reconcile.question')"
+        kind="decimal"
+        size="entry"
+        question
+      >
+        <template #suffix>{{ sign }}</template>
+      </AppField>
     </section>
 
     <section class="group">
@@ -751,6 +807,7 @@ import {
 } from '@molvia/model'
 import type {
   AccountOperationView,
+  Currency,
   MoneyMonthView,
   SpendingCategoryView,
   TripView,
@@ -775,6 +832,7 @@ import IconWallet from '~icons/mdi/wallet-outline'
 import IconCalendar from '~icons/mdi/calendar-blank-outline'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppCheckbox from '@/components/AppCheckbox.vue'
 import AppField from '@/components/AppField.vue'
 import AppNote from '@/components/AppNote.vue'
 import AppScreen from '@/components/AppScreen.vue'
@@ -784,6 +842,7 @@ import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import CategoryChips from '@/components/CategoryChips.vue'
 import CategoryPickerSheet from '@/components/CategoryPickerSheet.vue'
+import CurrencySelect from '@/components/CurrencySelect.vue'
 import DonutChart from '@/components/DonutChart.vue'
 import type { DonutData } from '@/components/DonutChart.vue'
 import ListRow from '@/components/ListRow.vue'
@@ -819,7 +878,9 @@ export default defineComponent({
   components: {
     AppButton,
     AppCard,
+    AppCheckbox,
     AppField,
+    CurrencySelect,
     AppNote,
     AppScreen,
     AppSwitch,
@@ -1311,6 +1372,10 @@ export default defineComponent({
       searchItem: ref(t('dev.kit.search_sample')),
       quantity: ref('1'),
       price: ref('57о'),
+      entry: ref(''),
+      kitCurrency: ref<Currency>('AMD'),
+      entryBad: ref(''),
+      entryLong: ref('1 250 300,50'),
       review: ref(''),
       city: ref<string>(COUNTRY_CITIES.AM[0]),
       cities: COUNTRY_CITIES.AM.map((city) => ({ value: city, label: city })),
@@ -1325,6 +1390,12 @@ export default defineComponent({
         { key: 'switch_on', on: true, inactive: false },
         { key: 'switch_inactive_off', on: false, inactive: true },
         { key: 'switch_inactive_on', on: true, inactive: true },
+      ]),
+      boxes: reactive([
+        { key: 'checkbox_off', on: false, inactive: false },
+        { key: 'checkbox_on', on: true, inactive: false },
+        { key: 'checkbox_inactive_off', on: false, inactive: true },
+        { key: 'checkbox_inactive_on', on: true, inactive: true },
       ]),
       // The current month at the edge: «›» is the inactive arrow.
       month: ref('2026-10'),
@@ -1425,6 +1496,11 @@ export default defineComponent({
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  gap: var(--space-2);
+}
+
+.boxes {
+  display: grid;
   gap: var(--space-2);
 }
 

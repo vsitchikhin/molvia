@@ -71,33 +71,24 @@
       </p>
     </div>
 
-    <form v-else class="form" novalidate @submit.prevent="submit">
+    <form v-else ref="form" class="form" novalidate @submit.prevent="submit">
       <!-- The kit's strip, in the sheet's words (Ф-14, MOL-181): never red, and «Сохранить трату» works. -->
       <StatusStrip v-if="!online" kind="offline" :text="t('spending.sheet.offline')" />
       <p v-if="refusalText" class="refused" role="alert">{{ refusalText }}</p>
 
-      <div class="field">
-        <label :for="amountId" class="label">{{ t('spending.sheet.amount') }}</label>
-        <div class="well" :class="{ bad: amountBad }">
-          <input
-            :id="amountId"
-            ref="amountInput"
-            v-model="amount"
-            class="entry"
-            type="text"
-            inputmode="decimal"
-            autocomplete="off"
-            :placeholder="t('spending.sheet.amount_placeholder')"
-            :aria-invalid="amountBad ? 'true' : undefined"
-            :aria-describedby="amountBad ? `${amountId}-error` : undefined"
-            @input="amountBad = false"
-          />
-          <span class="sign" aria-hidden="true">{{ sign(currency) }}</span>
-        </div>
-        <p v-if="amountBad" :id="`${amountId}-error`" class="error">
-          <IconAlert class="alert" aria-hidden="true" />{{ t('spending.sheet.bad_amount') }}
-        </p>
-      </div>
+      <AppField
+        v-model="amount"
+        :label="t('spending.sheet.amount')"
+        kind="decimal"
+        size="entry"
+        autocomplete="off"
+        :placeholder="t('spending.sheet.amount_placeholder')"
+        :error-text="amountBad ? t('spending.sheet.bad_amount') : null"
+        data-field="amount"
+        @update:model-value="amountBad = false"
+      >
+        <template #suffix>{{ sign(currency) }}</template>
+      </AppField>
 
       <div class="field">
         <SegmentedControl
@@ -226,11 +217,10 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, nextTick, ref, useId, watch } from 'vue'
+import { computed, defineComponent, nextTick, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconCalendar from '~icons/mdi/calendar-blank-outline'
 import IconCart from '~icons/mdi/cart-outline'
 import IconCheck from '~icons/mdi/check'
@@ -258,6 +248,7 @@ import { api } from '@/api'
 import AccountPickerSheet from '@/components/AccountPickerSheet.vue'
 import AccountRow from '@/components/AccountRow.vue'
 import AppButton from '@/components/AppButton.vue'
+import AppField from '@/components/AppField.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import CategoryChips from '@/components/CategoryChips.vue'
@@ -289,6 +280,7 @@ import { calendarDay, localDay, shiftDay } from '@/days'
 import { afterStep, useNavigation } from '@/navigation'
 import { newId } from '@/ids'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useAccountsStore } from '@/stores/accounts'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import type { SpendingFields } from '@/stores/spendingQueue'
@@ -316,12 +308,12 @@ export default defineComponent({
     AccountPickerSheet,
     AccountRow,
     AppButton,
+    AppField,
     AppReveal,
     BottomSheet,
     CategoryChips,
     CategoryPickerSheet,
     ChargedField,
-    IconAlert,
     IconCart,
     IconCheck,
     IconDelete,
@@ -365,7 +357,6 @@ export default defineComponent({
     const router = useRouter()
     const { goTab } = useNavigation()
     const queue = useSpendingQueueStore()
-    const amountId = useId()
 
     const amount = ref('')
     const currency = ref<Currency>('AMD')
@@ -389,7 +380,12 @@ export default defineComponent({
     const noteBad = ref(false)
     const dayBad = ref(false)
     const placeBad = ref(false)
-    const amountInput = ref<HTMLInputElement | null>(null)
+    const form = ref<HTMLFormElement | null>(null)
+    const amountField = () => form.value?.querySelector<HTMLInputElement>('[data-field="amount"]')
+    function focusAmount(): void {
+      amountField()?.focus()
+    }
+    const refuse = useFieldRefusal()
     const detailsOpen = ref(false)
     /** The field «Дата, заметка, место» opens on: the first wrong one, none for a tap on its line. */
     const detailsFocus = ref<SpendingDetailsField | null>(null)
@@ -555,7 +551,7 @@ export default defineComponent({
         // for an amendment, where the person came to look first.
         if (props.target.kind === 'add') {
           await nextTick()
-          amountInput.value?.focus()
+          focusAmount()
         }
       },
       { immediate: true },
@@ -879,9 +875,11 @@ export default defineComponent({
         // The first field that is wrong gets the focus (handoff 02), in the order of the form: the sum,
         // «списано», a chip — and only then the fields behind «Дата, заметка, место», whose sheet opens
         // on the wrong one (MOL-199). Opened over an error above it, it would hide the error.
-        if (!value) amountInput.value?.focus()
+        // Heard either way, by the field's own error (adversarial А1, Р2-А1): a focus already in
+        // «списано» moves nothing, and the sheet's own form is looked in, never the document's.
+        if (!value) void refuse(amountField)
         else if (charge === 'bad' || !chosen)
-          document.querySelector<HTMLInputElement>('.form [aria-invalid="true"]')?.focus()
+          void refuse(() => form.value?.querySelector<HTMLElement>('[aria-invalid="true"]'))
         else openDetails(dayBad.value ? 'day' : typedNote.bad ? 'note' : 'place')
         return
       }
@@ -985,7 +983,6 @@ export default defineComponent({
 
     return {
       t,
-      amountId,
       amount,
       currency,
       categoryId,
@@ -1008,7 +1005,7 @@ export default defineComponent({
       noteBad,
       placeBad,
       dayBad,
-      amountInput,
+      form,
       items,
       money,
       sign,
@@ -1068,70 +1065,6 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-}
-
-.label {
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-  font-weight: var(--weight-medium);
-}
-
-.well {
-  display: flex;
-  align-items: center;
-  min-height: 4.5rem;
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--surface-2);
-  box-shadow: inset 0 0 0 var(--hairline) var(--border-strong);
-
-  &:focus-within {
-    box-shadow: inset 0 0 0 2px var(--accent);
-  }
-
-  &.bad {
-    box-shadow: inset 0 0 0 2px var(--bad);
-  }
-}
-
-.entry {
-  @include display-type;
-
-  /* An input is as wide as its `size` in its own font — at 40 px that is wider than the phone. */
-  flex: 1;
-  width: 0;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text);
-  font-size: var(--text-entry);
-  font-variant-numeric: tabular-nums;
-  outline: none;
-}
-
-.sign {
-  @include display-type;
-
-  flex: none;
-  color: var(--text-muted);
-  font-size: var(--text-entry-sign);
-}
-
-.error {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  margin: 0;
-  color: var(--bad-ink);
-  font-size: var(--text-footnote);
-  font-weight: var(--weight-medium);
-}
-
-.alert {
-  @include icon;
-
-  font-size: var(--icon-sm);
 }
 
 .conversion {

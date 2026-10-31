@@ -525,6 +525,61 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the combobox had kept that itself, and `ListRow` had lost it for a chosen row with a meta (MOL-175).
   `e2e/kit-rows` holds the pill, its one height of 46 with or without the scanner, the active option's weight
   and meta, a chosen row's meta, and an option's whole name at 390 and 320, in both engines.
+- **The amount typed, the currency beside it and the checkbox are the kit's** (MOL-235, Ф-12). The spending,
+  the check and the transfer had each drawn the large amount anew — a well of 72, Entry 40, the sign 32 — with
+  three looks of the focus (a 2 `accent` ring inside, the same with a halo, none of the kit's), an error with
+  words or none, and a sign `aria-hidden`, so a screen reader never heard the currency; the price of a purchase
+  and the sum of a receipt the same select of signs with 30 lines of styles each; the consent the browser's own
+  box. **The amount is `AppField size="entry"`** (owner's В-1 «а»): the same field drawn large — its label, its
+  error, `aria-invalid`, `aria-describedby` and read-only are the field's, the sign in its `#suffix`, read after
+  the value — not a component of its own, which would be a second source of truth about a field. **Its label may
+  be the sheet's question** (`question`, В-2 «а»): «Сколько на счёте сейчас?» of the check at 17/600 in `text`,
+  as 116 v2 draws it. **The error of every field stands after an 18 alert** (В-3 «а», DESIGN.md): two copies had
+  it and the kit had not, so an error was told by colour alone on every other form. **The field's classes are the
+  kit's words** (`app-field`, `app-field-entry`): a root carries the scope of the screen it stands in, and a
+  sheet's `.field` — its column of a label and a field — doubled the space under the label of every field of the
+  kit in it (the transfer's fee and day, a receipt's line) — the class of MOL-199's `nav-field`. **The currency is
+  `CurrencySelect`** in the field's tail (Р-2): the field's focus around it and its own ring in it, so the keyboard
+  tells the currency from the figure. **The tail is read first, right after the value, then the error, then what
+  the screen adds** (adversarial А4): the check's hint of twenty words first left «֏» alone at the end. **Its
+  states are the kit's words too** (`app-field-invalid`, `app-field-readonly`, adversarial А5) — a screen's
+  `.invalid` would reach the root as its `.field` did. **A field refused at a send is heard**
+  (`useFieldRefusal`, adversarial А1, А2): its error has no voice of its own and is read with the field, so the
+  focus goes to the first field marked once the render has drawn its error — a focus that came first read the
+  field without it — and where the focus stands in it already, Enter in the field or a tap Safari does not move
+  the focus for, the field's own error is said in the region, the open sheet's: a description changed under the
+  focus is read by nobody. The check's error had been `role="alert"` and lost it to the kit; the transfer's new
+  words had no way to be heard at all; the spending's sum and «списано» were as silent on master (adversarial
+  Р2-А1), and the spending looks in its own form, never the document's. **The words are the error the field
+  names by `aria-errormessage`** — `AppField`'s, and each radio of `CategoryChips`, **which the error now
+  describes, not the group** (adversarial Р3-А1): a new spending opens with no category, so «Выберите
+  категорию» is the chips' commonest refusal, and the radio the focus went to was read without it — a
+  group's description is read by some readers on entering it, by others never. Round 2 had named it a
+  price of a chip in focus, «refused only for a category the server called unknown» — untrue. **The rule is
+  closed by where the focus goes, not by a list of sheets** (adversarial Р4-А1): every focus a refusal puts in
+  a field goes through `useFieldRefusal` — the spending and its «Дата, заметка, место», the check, the
+  transfer, the purchase, a plan of «Бюджет», an account; a bare `focus()` on a refused field is the defect,
+  the purchase's price the commonest at the shelf. **A sheet of several fields finds the first one marked
+  in its own form** (`[aria-invalid="true"]`), never by a list of its fields: an account's day refused
+  alone, on the phone or by the server, was in none of them and moved no focus (adversarial Р5-А1). **The price, named:** a sheet that moves no focus on a refusal at all — an
+  exchange, an income, a receipt's lines, total and place, a trip's rate, a verdict — shows its error and
+  is heard only on reaching the field, as on master; MOL-333 brings them to it. **The checkbox is
+  `AppCheckbox`** (В-4 «а»), a native checkbox the kit draws, by the grammar of `AppSwitch`: off a square edged in
+  `graphic`, on `accent-solid` with a ✓, not now `inactive` — `aria-disabled`, focusable, a tap, a tap on its
+  words and Space put back (`e2e/kit-inactive` in both engines) — and the focus a field's, on the row; its
+  `class` and `style` go to the row, as `AppField`'s (self-review №4), its state is `app-checkbox-inactive`.
+  **The price, named:** `AppSwitch` still gives `class` and `style` to its checkbox and wears `inactive`, as
+  before. **A copy is refused by ESLint**: a static `inputmode="decimal"` anywhere (`AppField` binds its own),
+  `<input type="checkbox">` outside `AppSwitch` and `AppCheckbox`, a `<select>` outside `AppField` and
+  `CurrencySelect` — every `<select>` there is; one option of the rule a file, so each file of the kit is
+  refused the others' (`src/eslint-kit-fields.test.ts`). **Name, value and tag without case** (adversarial А3,
+  Р2-А2): HTML takes `type="Checkbox"` and `inputmode="Decimal"` as the field, Vue sets `inputMode` as the
+  DOM's own property, and `<Select>`, which Vue resolves to no component, is the browser's select — the
+  search's two entries likewise; the select by a selector of `vue/no-restricted-syntax`
+  (`VElement[rawName=/^select$/i]`), since the rule of elements matches a tag as written, in one list with
+  MOL-225's `busy`. Closes carelessness, not intent: a bound `:type` passes. `inputmode="decimal"` stays on the `<input>`, where the
+  keyboard's remembered height reads it (MOL-151). **Not here:** the currency as a field of its own
+  (`kind="select"`) or as segments (the spending) — other forms, not copies.
 - **An operation is one row, `OperationRow`, and it knows no operation** (MOL-176, Ф-12). «Траты» drew
   `SpendingRow`, an account's journal, «не попали» and a check drew an `OperationRow` bound to
   `AccountOperationView`, and the two parted on everything seen: the chevron on purchases alone or on

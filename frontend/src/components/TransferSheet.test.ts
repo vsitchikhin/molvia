@@ -21,6 +21,7 @@ import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { useTransferOutcome } from '@/composables/useTransferOutcome'
 import type { TransferOutcomes } from '@/composables/useTransferOutcome'
 import { createAppI18n } from '@/i18n'
+import en from '@/i18n/en.json'
 import { routes } from '@/router'
 import { useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
@@ -158,7 +159,7 @@ const row = (view: VueWrapper, label: string) => {
 }
 
 async function typeAmount(view: VueWrapper, text: string): Promise<void> {
-  await view.get('input.entry').setValue(text)
+  await view.get('input[data-field="amount"]').setValue(text)
 }
 
 describe('TransferSheet (MOL-253)', () => {
@@ -190,6 +191,27 @@ describe('TransferSheet (MOL-253)', () => {
     expect(mainButton(two).text()).toBe('Choose where to')
   })
 
+  // The kit's error, in words under the field (MOL-235): the copy before drew a red edge and said nothing;
+  // the focus goes to the field once it is marked, so it is read with its error (adversarial А2).
+  it('a sum it cannot read: nothing is sent, and the focus goes to the field, read with its error', async () => {
+    const view = await sheet({ from: card.id }, withAccounts([card, dollars]))
+    await typeAmount(view, 'abc')
+    const amount = view.get<HTMLInputElement>('input[data-field="amount"]')
+    let invalidAtFocus: string | null = null
+    amount.element.addEventListener('focus', () => {
+      invalidAtFocus = amount.element.getAttribute('aria-invalid')
+    })
+    ;(mainButton(view).element as HTMLButtonElement).focus()
+    await mainButton(view).trigger('click')
+    await flushPromises()
+    expect(recordTransfer).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(amount.element)
+    expect(invalidAtFocus).toBe('true')
+    expect(view.get('.error').text()).toBe(en.spending.sheet.bad_amount)
+    await typeAmount(view, '2000')
+    expect(amount.attributes('aria-invalid')).toBeUndefined()
+  })
+
   it('offline: one yellow line, the button says it waits, nothing is sent', async () => {
     const view = await sheet({ from: card.id, online: false }, withAccounts([card, dollars]))
     expect(view.text()).toContain('No connection. You can transfer once online')
@@ -211,7 +233,10 @@ describe('TransferSheet (MOL-253)', () => {
     await typeAmount(view, '2000')
     const fee = view
       .findAll('input')
-      .find((one) => one.attributes('inputmode') === 'decimal' && !one.classes('entry'))
+      .find(
+        (one) =>
+          one.attributes('inputmode') === 'decimal' && one.attributes('data-field') !== 'amount',
+      )
     await fee?.setValue('20')
     expect(view.text()).toContain('leaves in all')
     await mainButton(view).trigger('click')
@@ -252,7 +277,7 @@ describe('TransferSheet (MOL-253)', () => {
     await flushPromises()
     expect(view.text()).toContain('«Dollars» was deleted on another phone')
     expect(row(view, 'To').attributes('aria-invalid')).toBe('true')
-    expect((view.get('input.entry').element as HTMLInputElement).value).toBe('2000')
+    expect((view.get('input[data-field="amount"]').element as HTMLInputElement).value).toBe('2000')
   })
 
   it('amends what it opened on and removes it with its fee', async () => {
@@ -299,7 +324,9 @@ describe('TransferSheet (MOL-253)', () => {
       expect(refusal).toContain('The transfer was edited on another phone')
       expect(refusal).toMatch(/Recorded now: \$2,500 → «Dollars» · fee \$20/)
       expect(refusal).not.toMatch(/exchange|below/i)
-      expect((view.get('input.entry').element as HTMLInputElement).value).toBe('2100')
+      expect((view.get('input[data-field="amount"]').element as HTMLInputElement).value).toBe(
+        '2100',
+      )
       // «Сохранить» again goes over the version held now.
       await mainButton(view).trigger('click')
       await settle()

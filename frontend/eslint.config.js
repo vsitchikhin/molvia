@@ -6,6 +6,54 @@ import { base } from '../eslint.config.base.js'
 
 const tsconfigRootDir = fileURLToPath(new URL('.', import.meta.url))
 
+/** The two refusals of `vue/no-restricted-syntax`, one list a file (MOL-225, MOL-235). */
+const BUSY = [
+  {
+    selector: busyWithoutWord(),
+    message: 'A busy button says what it does: give it a busy-label (MOL-225).',
+  },
+]
+const SELECT = [
+  {
+    selector: 'VElement[rawName=/^select$/i]',
+    message: 'A select is AppField kind="select" or CurrencySelect (MOL-235).',
+  },
+]
+
+/**
+ * The attributes that make a field of the kit outside it (MOL-177, MOL-235), one list a field. HTML
+ * matches an enumerated value in any case, and Vue sets `inputMode` as the DOM's own property: both are
+ * the same field, so name and value are matched without case (adversarial А3).
+ */
+const SEARCH_FIELD = [
+  {
+    key: '/^type$/i',
+    value: '/^search$/i',
+    element: '/^input$/i',
+    message: 'A search field is SearchField (MOL-177).',
+  },
+  {
+    key: '/^enterkeyhint$/i',
+    value: '/^search$/i',
+    message: 'A search field is SearchField (MOL-177).',
+  },
+]
+const CHECKBOX = [
+  {
+    key: '/^type$/i',
+    value: '/^checkbox$/i',
+    element: '/^input$/i',
+    message: 'A checkbox is AppCheckbox, a switch AppSwitch (MOL-235).',
+  },
+]
+const AMOUNT = [
+  {
+    key: '/^inputmode$/i',
+    value: '/^decimal$/i',
+    message: 'An amount is AppField kind="decimal", the large one size="entry" (MOL-235).',
+  },
+]
+
 /**
  * The defaults of `vue/no-bare-strings-in-template`, copied from the plugin so the options
  * below can extend them instead of replacing them.
@@ -179,26 +227,23 @@ export default defineConfigWithVueTs(
   // One search field (MOL-177, Ф-12): «Что взяли?», «Что брать» and «Выбрать товар» had grown three
   // looks, and a fourth screen would draw a fourth. A field of search outside `SearchField` — by its
   // type or by the key it asks the keyboard for — is refused, as caps outside `SectionCaption` are.
-  // A bound `:type` passes: it closes carelessness, not intent.
+  // So are the amount typed and the checkbox outside the kit (MOL-235): the spending, the check and
+  // the transfer had drawn three copies of the large amount, and the consent the browser's own box.
+  // `AppField` binds its `:inputmode`, so a static one is a copy anywhere. A bound `:type` passes: it
+  // closes carelessness, not intent. One rule a file, so each file of the kit is refused the others'.
   {
     files: ['src/**/*.vue'],
-    ignores: ['src/components/SearchField.vue'],
     rules: {
-      'vue/no-restricted-static-attribute': [
-        'error',
-        {
-          key: 'type',
-          value: 'search',
-          element: 'input',
-          message: 'A search field is SearchField (MOL-177).',
-        },
-        {
-          key: 'enterkeyhint',
-          value: 'search',
-          message: 'A search field is SearchField (MOL-177).',
-        },
-      ],
+      'vue/no-restricted-static-attribute': ['error', ...SEARCH_FIELD, ...CHECKBOX, ...AMOUNT],
     },
+  },
+  {
+    files: ['src/components/SearchField.vue'],
+    rules: { 'vue/no-restricted-static-attribute': ['error', ...CHECKBOX, ...AMOUNT] },
+  },
+  {
+    files: ['src/components/AppSwitch.vue', 'src/components/AppCheckbox.vue'],
+    rules: { 'vue/no-restricted-static-attribute': ['error', ...SEARCH_FIELD, ...AMOUNT] },
   },
   // A busy button says what it does (MOL-225): at work it reads «Удаляем…» in place of its action's
   // word, in the action's look. Without its word it looked live — or, beside `disabled`, not now —
@@ -212,17 +257,18 @@ export default defineConfigWithVueTs(
   // cannot see: a button at work through `disabled` or `inactive` alone, which reads the same as a
   // neighbour put out while another works; a key computed from a name; an object from the script
   // or a call; a word bound and empty. It closes carelessness, not intent.
+  //
+  // A `<select>` is a field of the kit or the currency beside an amount (MOL-235): the price and the
+  // receipt's sum had each drawn the same select of signs with its own styles. By a selector, since the
+  // rule of elements matches a tag as written and `<Select>` is the browser's select all the same
+  // (adversarial Р2-А2) — so in this rule, one option list a file, the kit's two files keeping theirs.
   {
     files: ['src/**/*.vue'],
-    rules: {
-      'vue/no-restricted-syntax': [
-        'error',
-        {
-          selector: busyWithoutWord(),
-          message: 'A busy button says what it does: give it a busy-label (MOL-225).',
-        },
-      ],
-    },
+    rules: { 'vue/no-restricted-syntax': ['error', ...BUSY, ...SELECT] },
+  },
+  {
+    files: ['src/components/AppField.vue', 'src/components/CurrencySelect.vue'],
+    rules: { 'vue/no-restricted-syntax': ['error', ...BUSY] },
   },
   prettier,
 )
