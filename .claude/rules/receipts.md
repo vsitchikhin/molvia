@@ -673,6 +673,57 @@ phrase, «Мак Кофе» for MacCoffee, «Киндер» for Kinder — and l
 it tells a word replaced from a word in another form, never better from worse. The key goes with the name, and the
 vector goes, for the API's writer to make again. A second run finds nothing.
 
+## What a till does to a name, put back (MOL-326)
+
+**The owner's receipts of 31.10.2026 named items no shelf has** («M&Ms перевёлся как „Эм ынд Эмс“… кондиционер
+„ABC“ — „ЭйБиСи“, сахар — „цакараваз“, одна и та же кукуруза — два товара, наполнитель Tofu — „земля тофу“»). Each cause
+has its rule; the bench and its figures are `.scratch/tasks/research/MOL-326.md`.
+
+- **A word glued to its package is a word** (`tokensOf`, `receiptWords`): «Շաքարավազ1կգ» lost its word whole and was named
+  «1 кг». It is split where two Armenian letters meet a figure — a letter before a figure is a code's, «Ա1». A unit in
+  capitals is a unit: «45Գ».
+- **A Latin brand said letter by letter is the line's brand, in Latin** (`letterRun`): the Armenian names of the Latin
+  letters, two at least — «Էյ Բի Սի» ABC — «ընդ» or «էնդ» between them «&», a plural «-ս» on the last after it, «Էմ ընդ
+  Էմս» M&M's. It is the line's brand with no «…» as well, so the seed's item stands on no such line and `lineFitter` finds
+  the owner's «M&M's» by it; `wordsOf` keeps «M&M's» one word, which three letters too short were not. One letter's name
+  is no brand, «Վիտամին Դի». On the bench's 321 lines the rule fires never, falsely or not: its tests are the domain's.
+- **A word the model misread by the font is put right — the model's lines only** (`glyphsMended`, owner's В-3 «б»): a
+  word no known one, from four letters, outside «…», that one swap of a pair of `GLYPH_SWAPS` makes exactly one known
+  word — the dictionary, its genitives, phrases, brands and the seed's names (`knownTillWords`). The pairs are measured:
+  Haiku's readings of the bench against the truth, a word against a word, the swaps that came four times and more, and
+  Շ↔Ց of the owner's sugar. Two candidates are a guess, and the word stays. The line put right goes to the name and to the
+  item alike, and is «проверьте» whatever it found. On the model's readings 33 words were put right and none wrong; of
+  the lines bound, 18 of 40 stand as their truth's line does and none on another item. **Tesseract's lines stay as read**:
+  it misreads otherwise, and of 17 put right 11 were wrong — «Խոզի թայմ ֆիլե», «թարմ» read twice wrong, became a lime. So
+  the rule «a dictionary's word is read exactly, never one edit off» (MOL-293) holds, but for one measured swap of the
+  font on the model's lines, as its 5↔6 of the figures (MOL-290). `make rename-items` reads a recorded line so too, by its
+  `reader_version`.
+- **The tables grew by the owner's lines**: «լցոնիչ» наполнитель; «կատվի», «շան» кошачий, собачий; the phrases «կատվի
+  հող», «ՏՈՖՈՒ ՀՈՂ» — «наполнитель для лотка», the seed's name of it, so `kindKey` is one — and «լվացքի կոնդիցիոներ» «для
+  белья»; Tofu. **A brand of the table that is a word of the dictionary is the word where it is the line's kind**:
+  «Տոֆու 200գ» is tofu, «Լցոնիչ Տոֆու» a litter of Tofu. «կատվի հող» is a phrase, never a name of the seed: the seed's
+  item would stand on a bare-branded litter and lose Tofu (the bench judged it bad).
+- **Where a thing was grown or made makes it no other thing** (owner's В-2 «а»): a country in parentheses —
+  «(հայկական)», «(ռուսական)», every one the bench prints — and «տեղական», «ներմուծված» anywhere are no word of the line,
+  for the name and the binding alike: «Եգիպտացորեն (հայկական)» and «Եգիպտացորեն» are one «Кукуруза», each standing on the
+  other's item. A country printed bare is a kind as often — «Պղպեղ բուլղարական» a bell pepper, «Սուրճ հայկական» the
+  seed's Armenian coffee — and stays. **The price, named:** words exactly as the truth writes them 783 → 776, since the
+  truth writes «(армянская)».
+- **A brand no table and no rule spells is the model's, for its receipts** (owner's В-1 «б», which takes back MOL-261's
+  В-1 «а» for brands alone): the brands in «…» of a receipt the model read that `brandToAsk` finds no spelling for are
+  asked of Haiku once for the receipt — text alone, never the photo, a call of its own (`spellBrands`, `brands-v1`): the
+  reading's prompt is never touched, since every word added to it read the lines worse (MOL-293). **A spelling is taken
+  only where it sounds as the till printed it** (`heardSpelling`): Latin or Cyrillic, a name's length, its search key
+  within 0.3 of the key of the till's letters in Russian ones — on the 48 pairs of `TILL_BRANDS` 45 pass and no pair of
+  two brands of 2 256; 0.34 lets Barilla be Gorilla. A local brand is null by the prompt, and spelt in Russian letters
+  in «…» as before. **Each brand is asked once** (`brand_spellings`, a table of no person: a brand is a shelf's): the
+  spelling or none, the first answer standing, under the version that said it. **Its price is the reading's cap's**
+  (`model_spend`): the worst reserved before — 8 000 tokens of output, since 2 000 cut two answers of three — its own
+  after; over the cap, refused, away or cut, the brand is spelt in letters and asked with the next receipt. On the
+  bench's 66 brands, three runs: none invented; «Boyscout» and «Freken Bók» of a first prompt are why it says a Russian
+  brand is Cyrillic «even where it sounds English» and «never an accent the brand does not carry». `make rename-items`
+  names a recorded item by the spellings remembered, and asks nothing.
+
 ## The shops' memory (MOL-126)
 
 **The memory is shared** (owner, 30.09.2026; it was personal, Р-2 of the epic): «1163909 at "Ереван
@@ -1992,7 +2043,9 @@ the model cost. No text, no tax number, no photo — not in the API's log, not i
 logs nothing at all: whatever breaks in it answers 500 with no traceback, and a connection broken under
 a request is not printed (review А12). **The photo of a receipt the model reads goes to Anthropic**
 (MOL-272) — whole, the customer's name with it where the shop prints one — only for whoever accepted
-edition 5 (MOL-319); what comes back is kept as any reading is.
+edition 5 (MOL-319); what comes back is kept as any reading is. **So do the brands in «…» no table spells**
+(MOL-326), as text, of that very receipt and to that very recipient — no new one, no edition; what is remembered of them
+is a shelf's, of nobody.
 
 **How the person learned it was read is kept** (MOL-129, `receipts.heard`): `app` once the list or the
 review handed it over read **to a phone that asked with its page in view** (`?shown=1`), `bot` once the
