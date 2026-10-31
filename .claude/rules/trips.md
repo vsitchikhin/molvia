@@ -283,7 +283,11 @@ strip and the docked button never offer two of one name, one reading and one wri
 alone, never by the read on its way, or the strip's button came and went with every read the screen made itself and
 the strip grew and shrank under the finger (З1 of round 8). **The price, named** (З2): the groups keep the «Повторить» of
 their own section's error — the salary's day, «Учитывать меня в статистике» (MOL-180's quiet card) — so with the server
-down the screen has three of one name, each under the words of its own section, as on master. **A failed read reports
+down the screen has three of one name, each under the words of its own section, as on master. **And the strip's height
+moves with the refusal** (review 9 №7, adversarial И1): under a refused save the strip of a later read stands with no
+button, 36 high; the edit that takes the notice away gives it «Повторить», and it grows to 44 — or a line, the button
+taking the words' width at 390 — moving the fields under it by that much. A `select` is closed by then, so nothing is
+under the finger; holding the button's place would be a mechanism for three conditions in one window. **A failed read reports
 the phone's own defect** (`reportFailure`, MOL-144; review 7 №6). **The price,
 named** (review 6 №5): after that edit the form stands with no strip until the next read — the app or the connection
 back, the screen opened, «Сохранить» — while the server may still be silent. **The moment is said by `answeredAt` with the screen's day**
