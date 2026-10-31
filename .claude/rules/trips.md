@@ -266,9 +266,12 @@ error over the fields being edited, which said no time; with no form, the screen
 **Why the read failed is decided as it failed** (`failure`: `offline` or `error`, `navigator.onLine` read in
 the `catch`, MOL-19's rule): a flag of «failed» said «Сервер не ответил» with «Повторить» over the read the
 connection's return starts, of a server nobody had asked yet — and at the next opening too, the flag living
-in the store (review 1 №1, adversarial А2). **The connection going makes an `error` an `offline`** (adversarial
-Б1 of round 2): with no connection nothing is read, and a refusal from before it stood over the read the
-return starts; only the person's own retry with the connection up keeps it. **The moment is said by `answeredAt` with the screen's day**
+in the store (review 1 №1, adversarial А2). **A refusal stands only through the person's own «Повторить»**
+(`refresh(true)`, MOL-181's C1): every other read — the screen opened, the connection or the app back — has no
+answer yet and lets the last failure go as it starts, «Обновляем» once late (MOL-201). A refusal from before
+stood over such a read — after a stretch with no connection, on the screen or on another, or an hour later
+(adversarial Б1 of round 2, В1 and В2 of round 3); a guard on the connection going held only while the screen
+was there to hear it. **The moment is said by `answeredAt` with the screen's day**
 (`useLocalDay`, MOL-187's А2): counted once, an app left overnight said «сегодня» of yesterday's answer the
 next morning (adversarial А1) — so «настройки на сегодня, 14:05», as the strips of «Деньги» say it, never by
 «Покупки»' `{day} в {time}`, which counts the day once. **A moment of another year says its year**
