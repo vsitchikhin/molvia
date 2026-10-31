@@ -1237,13 +1237,30 @@ describe('a receipt read not whole: its reasons, its review and the developer to
       lines: 3,
       shown: 2,
       reason: 'line_not_as_printed',
-      lineReasons: { unsettled: 1 },
     })
     // the id and the day may hold any digits: the name and the sums are looked for in the rest (MOL-316)
     const { receipt, keptUntil, ...rest } = notice as { receipt?: string; keptUntil?: string }
     expect(receipt).toBe(id.slice(0, 8))
     expect(keptUntil).toBe(dayIn(kept!.keepUntil))
     expect(JSON.stringify(rest)).not.toMatch(/Օրինակ|1627|600/)
+    // the bot words each: no kind of line it does not have, no «Прочитали не всё» of lines that meet the total
+    expect(rest).toHaveProperty('lineReasons', { unsettled: 1 })
+    expect(rest).not.toHaveProperty('partly')
+  }, 30_000)
+
+  it('names the day of the review in Yerevan, where it is the next day in UTC (MOL-316)', async () => {
+    const me = await person(LATER)
+    await queued(me)
+    // kept until 21:00 in UTC — already the 22nd in Yerevan: a day counted without the zone is a day short
+    const evening: ReadReceiptsDeps['receipts'] = {
+      ...repository,
+      finish: async (id, outcome) => {
+        const written = await repository.finish(id, outcome)
+        return written?.keptUntil ? { keptUntil: new Date('2026-11-21T21:00:00.000Z') } : written
+      },
+    }
+    await readAll(benchReader(), fakeModel(notWhole), { told: told(), receipts: evening })
+    expect(await notices()).toMatchObject([{ kind: 'receipt_partial', keptUntil: '2026-11-22' }])
   }, 30_000)
 
   it('keeps the review after «Записать» deletes the receipt’s own photo, until its days pass', async () => {
