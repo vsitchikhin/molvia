@@ -18,11 +18,11 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, watch } from 'vue'
+import { computed, defineComponent, nextTick, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import FeedbackSheet from '@/components/FeedbackSheet.vue'
 import TabBar from '@/components/TabBar.vue'
-import { releaseHeightHold } from '@/transitions'
+import { focusScreenTitle, releaseHeightHold } from '@/transitions'
 import LoginView from '@/views/LoginView.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { useReconnect } from '@/composables/useReconnect'
@@ -57,8 +57,14 @@ export default defineComponent({
     // The login takes the router's place without a move, so no move takes the page's hold away:
     // held, the login was drawn scrolled off the window, all of it above it on an iPhone (MOL-138,
     // adversarial А).
-    watch(closed, (now) => {
-      if (now) releaseHeightHold()
+    watch(closed, async (now) => {
+      if (!now) return
+      releaseHeightHold()
+      // A door shut over the app — the session ended on another phone — took the screen and the focus
+      // with it: the focus goes to the door's heading, as a move's does (MOL-216, self-review №1).
+      await nextTick()
+      const focused = document.activeElement
+      if (focused === null || focused === document.body) focusScreenTitle()
     })
 
     // The app, not a screen, sends what waits on the phone, whichever screen is open when the

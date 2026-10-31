@@ -3,7 +3,7 @@ import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { shallowRef } from 'vue'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
 import { actorCodec, ERROR } from '@molvia/model'
 import type { ActorView, LoginPoll, LoginStarted } from '@molvia/model'
@@ -47,8 +47,8 @@ const REQUEST = {
 const views: VueWrapper[] = []
 let opened: ReturnType<typeof vi.spyOn>
 
-/** Экран в том состоянии, в котором его и видят: сессии нет. */
-async function render(update: UpdatePhase = 'none') {
+/** Экран в том состоянии, в котором его и видят: сессии нет. `attach` — в документе, где есть фокус. */
+async function render(update: UpdatePhase = 'none', attach = false) {
   const pinia = createPinia()
   setActivePinia(pinia)
   const actor = useActorStore()
@@ -57,6 +57,7 @@ async function render(update: UpdatePhase = 'none') {
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/')
   const view = mount(LoginView, {
+    ...(attach ? { attachTo: document.body } : {}),
     global: {
       plugins: [pinia, router, createAppI18n('en')],
       provide: {
@@ -197,8 +198,11 @@ describe('первый экран — имя и обещание (MOL-216)', () 
     expect(view.get('.promise').text()).toBe(en.login.promise)
     // The mark says nothing the heading beside it does not.
     const mark = view.get('img.mark')
-    // The home screen's icon, inlined by the build: the door asks the network for nothing.
-    expect(mark.attributes('src')).toMatch(/^data:image\/svg\+xml,.*aria-label='Molvia'/)
+    // The home screen's icon: `/favicon.svg` in the build, the tab's icon and precached; the dev
+    // server, and so vitest, inlines it (adversarial А3).
+    expect(mark.attributes('src')).toMatch(
+      /favicon\.svg$|^data:image\/svg\+xml,.*aria-label='Molvia'/,
+    )
     expect(mark.attributes('alt')).toBe('')
     expect(view.get('.ask h2').text()).toBe(en.login.offer.title)
     expect(view.get('.ask').text()).toContain(en.login.offer.body)
@@ -229,6 +233,77 @@ describe('первый экран — имя и обещание (MOL-216)', () 
     expect(view.findAll('h1').map((one) => one.text())).toEqual([en.login.title])
     expect(view.find('img.mark').exists()).toBe(false)
     expect(view.text()).not.toContain(en.login.promise)
+  })
+})
+
+// The first screen's heading is «Molvia», every other step's «Вход» — two elements. A change between
+// them took the heading the focus stood on, and the focus fell to <body> (adversarial А2, self-review №1).
+describe('фокус на заголовке переживает смену шага (MOL-216)', () => {
+  let online = true
+  beforeEach(() => {
+    online = true
+    vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => online)
+  })
+  function setOnline(value: boolean): void {
+    online = value
+    window.dispatchEvent(new Event(value ? 'online' : 'offline'))
+  }
+  /** What `installArrival` does after a move onto the door. */
+  function arrive(): HTMLElement {
+    const title = document.querySelector<HTMLElement>('h1')
+    if (!title) throw new Error('нет h1')
+    title.focus()
+    return title
+  }
+  const focusedHeading = () =>
+    (document.activeElement as HTMLElement | null)?.closest('h1')?.textContent
+
+  it('с «Molvia» без связи — на «Вход»', async () => {
+    const { view } = await render('none', true)
+    arrive()
+    setOnline(false)
+    await flushPromises()
+
+    expect(view.text()).toContain(en.login.offline.title)
+    expect(focusedHeading()).toBe(en.login.title)
+  })
+
+  it('с «Вход» без связи, когда связь вернулась, — на «Molvia»', async () => {
+    setOnline(false)
+    const { view } = await render('none', true)
+    expect(view.text()).toContain(en.login.offline.title)
+    arrive()
+    setOnline(true)
+    await flushPromises()
+
+    expect(button(view, en.login.start).exists()).toBe(true)
+    expect(focusedHeading()).toBe(en.app.name)
+  })
+
+  it('с нажатой кнопки, ушедшей вместе с шагом, — на заголовок следующего', async () => {
+    const { view } = await render('none', true)
+    pollLogin.mockResolvedValue({ status: 'pending', expiresAt: REQUEST.expiresAt })
+    const start = button(view, en.login.start)
+    ;(start.element as HTMLElement).focus()
+    await start.trigger('click')
+    await flushPromises()
+
+    expect(view.text()).toContain('Open Telegram and tap')
+    expect(focusedHeading()).toBe(en.login.title)
+  })
+
+  it('фокус, который человек поставил не в экран, остаётся, где был', async () => {
+    const outside = document.createElement('button')
+    document.body.append(outside)
+    onTestFinished(() => {
+      outside.remove()
+    })
+    await render('none', true)
+    outside.focus()
+    setOnline(false)
+    await flushPromises()
+
+    expect(document.activeElement).toBe(outside)
   })
 })
 
@@ -344,6 +419,26 @@ it('leads to «Data and privacy», which opens without a session', async () => {
   await flushPromises()
   expect(router.currentRoute.value.name).toBe('privacy')
   expect(router.currentRoute.value.meta.public).toBe(true)
+})
+
+// The tab is named by the screen shown: the door names it «Sign in» and gives back what it found — but
+// not over a public screen opened from it, which `installArrival` has already named (adversarial А4).
+describe('заголовок вкладки', () => {
+  it('уходя, дверь возвращает тот, что застала', async () => {
+    document.title = 'Purchases · Molvia'
+    const { view } = await render()
+    expect(document.title).toBe(`${en.login.title} · ${en.app.name}`)
+    view.unmount()
+    expect(document.title).toBe('Purchases · Molvia')
+  })
+
+  it('но не поверх заголовка экрана, открытого с неё', async () => {
+    document.title = 'Purchases · Molvia'
+    const { view } = await render()
+    document.title = `${en.privacy.title} · ${en.app.name}`
+    view.unmount()
+    expect(document.title).toBe(`${en.privacy.title} · ${en.app.name}`)
+  })
 })
 
 describe('после «Удалить мои данные» (MOL-94, В-3)', () => {
