@@ -550,9 +550,12 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the focus for, the field's own error is said in the region, the open sheet's: a description changed under the
   focus is read by nobody. The check's error had been `role="alert"` and lost it to the kit; the transfer's new
   words had no way to be heard at all; the spending's sum and «списано» were as silent on master (adversarial
-  Р2-А1), and the spending looks in its own form, never the document's. **The price, named:** a chip of a
-  category refused with the focus on it already is focused and not said — the chips' error is their
-  fieldset's, no `<id>-error` of a field; a chip is refused only for a category the server called unknown. **The checkbox is
+  Р2-А1), and the spending looks in its own form, never the document's. **The words are the error the field
+  names by `aria-errormessage`** — `AppField`'s, and each radio of `CategoryChips`, **which the error now
+  describes, not the group** (adversarial Р3-А1): a new spending opens with no category, so «Выберите
+  категорию» is the chips' commonest refusal, and the radio the focus went to was read without it — a
+  group's description is read by some readers on entering it, by others never. Round 2 had named it a
+  price of a chip in focus, «refused only for a category the server called unknown» — untrue. **The checkbox is
   `AppCheckbox`** (В-4 «а»), a native checkbox the kit draws, by the grammar of `AppSwitch`: off a square edged in
   `graphic`, on `accent-solid` with a ✓, not now `inactive` — `aria-disabled`, focusable, a tap, a tap on its
   words and Space put back (`e2e/kit-inactive` in both engines) — and the focus a field's, on the row; its
