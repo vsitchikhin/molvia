@@ -425,22 +425,22 @@ is — a month of production gave one pick — but the search sees a line only a
 Russian gloss (`receipts.md`): an Armenian label is matched by the seed's names before it. 103 lines
 of the owner's recorded receipts went through the product's own `bindReceiptLines` — with `byModel`
 by the reader, the seed's Armenian names of today, the shops' memory off — against the catalogue's
-items as they stood when each receipt was recorded; the truth is what the owner recorded
-(`.scratch/tasks/status/MOL-47-results.md`). Of 38 lines whose item was there, 30 found it sure,
-none another item, 8 a new one; all 65 whose item was not there stayed new. **The n is small**: of
-the 38, 10 by the names, 28 through the search — 13 different glosses, eight lines of them one bag.
-**The axis of the candidates moves nothing**, 0.10 to 0.30. **A budget of 1 moves nothing with the
-meaning; a budget of 3** — the nearness and the meaning's place moving with it, as the constants
-do — **turns four lines from sure to «проверьте»** (a coconut drink, by А3 above). No point is
-better on both halves, so by MOL-14's rule nothing moves: a gloss is short and clean («молоко»,
-«кинза шт»), and what decides is around the search — the names, the kind and brand of MOL-293, the
-heading. The eight lines lost are those rules', each with its item in the search's answer: three of
-Haiku's — a carrot the model gave a heading of citrus, a brand a letter short, «10» without its «%»
-(MOL-331); five of Tesseract's, a brand or a unit OCR spoilt, where MOL-293 rightly seats no line on
-another brand — the price. **The meaning earns its place**: without it 23 of the 38, and four more
-under «проверьте» — «газированный напиток кола кола» finds «Coca-Cola» by meaning alone. The search
-typed at a shelf is not measured by it: one person's receipts, two shops mostly, and today's
-dictionary and names over yesterday's lines.
+items as they stood when each receipt was recorded, an item a record made counted from that record
+on; the truth is what the owner recorded (`.scratch/tasks/status/MOL-47-results.md`). Of 32 lines
+whose item was there, 29 found it sure, none another item, 3 a new one; all 71 whose item was not
+there stayed new. **The n is small**: of the 32, 10 by the names, 22 through the search — 10
+different glosses, seven lines of them one bag. **The axis of the candidates moves nothing**, 0.10
+to 0.30. **A budget of 1 moves nothing with the meaning; a budget of 3** — the nearness and the
+meaning's place moving with it, as the constants do — **turns four lines from sure to «проверьте»**:
+a coconut drink, its mean within one edit and a word two off (see «Where a name found by meaning
+stands», MOL-332). No point is better on both halves, so by MOL-14's rule nothing moves: a gloss is
+short and clean («молоко», «кинза шт»), and what decides is around the search — the names, the kind
+and brand of MOL-293, the heading. The three lines lost are those rules', each with its item in the
+search's answer, all of Haiku's — a carrot the model gave a heading of citrus, a brand a letter
+short, «10» without its «%» (MOL-331). **The meaning earns its place**: without it 23 of the 32, and
+four more under «проверьте» — «газированный напиток кола кола» finds «Coca-Cola» by meaning alone.
+The search typed at a shelf is not measured by it: one person's receipts, two shops mostly, and
+today's dictionary and names over yesterday's lines.
 
 ## «Брали здесь в прошлый раз» on «Что взяли?» (MOL-209)
 
