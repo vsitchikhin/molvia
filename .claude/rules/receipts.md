@@ -705,8 +705,9 @@ has its rule; the bench and its figures are `.scratch/tasks/research/MOL-326.md`
   stay as read**: it misreads otherwise, and of 17 put right 11 were wrong — «Խոզի թայմ ֆիլե», «թարմ» read twice wrong,
   became a lime. So the rule «a dictionary's word is read exactly, never one edit off» (MOL-293) holds, but for one
   measured swap of the font on the model's lines, as its 5↔6 of the figures (MOL-290). `make rename-items` reads a
-  recorded line so too, by its `reader_version`. **Which receipt is the model's is one flag** (`byModel`): `readByOcr` says false, the server hands
-  it to `bindReceiptLines`, and a test through the server's own queue turns red for either flipped (self-review №4).
+  recorded line so too, by its `reader_version`. **Which receipt is the model's is one flag** (`byModel`): `readByOcr`
+  says false, the server hands it to `bindReceiptLines`, and a test through the server's own queue turns red for either
+  flipped (self-review №4).
 - **The tables grew by the owner's lines**: «լցոնիչ» наполнитель; «կատվի», «շան» кошачий, собачий; the phrases «կատվի
   հող», «ՏՈՖՈՒ ՀՈՂ» — «наполнитель для лотка», the seed's name of it, so `kindKey` is one — and «լվացքի կոնդիցիոներ» «для
   белья»; Tofu. **What names an item finds it again** (adversarial А1): `lineFitter` reads a line's words by the
