@@ -314,7 +314,7 @@ export default defineComponent({
       const said = (key: string): string =>
         at ? t(key, { when: answeredAt(at, i18n.locale.value, today.value) }) : t(`${key}_untimed`)
       if (!online.value) return { kind: 'offline', text: said('settings.offline.strip') }
-      if (form.failure === 'error' && !form.unknown && !form.saveError)
+      if (form.failure === 'error' && !form.unknown && !(form.saveError && form.failureOfSave))
         return { kind: 'unanswered', text: said('settings.stale_error') }
       if (late.value) return { kind: 'refreshing', text: said('settings.stale_loading') }
       return null

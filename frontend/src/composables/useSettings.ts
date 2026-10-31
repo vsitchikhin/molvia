@@ -31,6 +31,12 @@ const useSettingsStore = defineStore('settingsForm', () => {
    * (MOL-215, review 1 №1, adversarial А2) — a flag of «failed» said «Сервер не ответил» over it.
    */
   const failure = ref<'offline' | 'error' | null>(null)
+  /**
+   * The failure is of the read a refused save started: «Не удалось сохранить» speaks for it, so the strip
+   * does not, and the person's edit that takes the notice away takes this failure too (adversarial Д1).
+   * Any other read's failure is the strip's at once, with its answer (Е2 of round 6).
+   */
+  const failureOfSave = ref(false)
   /** The person's retries that failed, counted, so the strip says its words again for each (C1). */
   const failures = ref(0)
   const stored = ref(true)
@@ -96,6 +102,7 @@ const useSettingsStore = defineStore('settingsForm', () => {
     loading.value = false
     saving.value = false
     failure.value = null
+    failureOfSave.value = false
     saved.value = false
     saveError.value = false
     pending.value = null
@@ -147,7 +154,8 @@ const useSettingsStore = defineStore('settingsForm', () => {
    * moved the fields under it (MOL-215, adversarial Д1). The next read says what the server does.
    */
   function letSaveErrorGo(): void {
-    if (saveError.value && failure.value === 'error') failure.value = null
+    if (failureOfSave.value && failure.value === 'error') failure.value = null
+    failureOfSave.value = false
     saveError.value = false
   }
   function edit(value: ActorSettings): void {
@@ -171,7 +179,7 @@ const useSettingsStore = defineStore('settingsForm', () => {
    * app back — does not (MOL-204's А1). Every read keeps the failure standing until its own outcome: the
    * strip holds through it, never taken down and put up again under the finger (adversarial Г1).
    */
-  async function refresh(retry = false): Promise<boolean> {
+  async function refresh(retry = false, afterSave = false): Promise<boolean> {
     const owner = actor.id
     if (!owner || saving.value) return false
     const mine = ++generation
@@ -201,11 +209,13 @@ const useSettingsStore = defineStore('settingsForm', () => {
         keep()
       }
       failure.value = null
+      failureOfSave.value = false
       return true
     } catch {
       // A session that ended is heard by the seam in `@/api`, not by every caller (MOL-56).
       if (mine === generation) {
         failure.value = navigator.onLine ? 'error' : 'offline'
+        failureOfSave.value = afterSave
         if (retry) failures.value += 1
       }
       return false
@@ -236,6 +246,7 @@ const useSettingsStore = defineStore('settingsForm', () => {
     keep()
     loading.value = false
     failure.value = null
+    failureOfSave.value = false
     try {
       const loaded = await api.saveSettings({ previous, settings })
       if (mine !== generation || actor.id !== owner || loaded.id !== owner) return
@@ -254,7 +265,7 @@ const useSettingsStore = defineStore('settingsForm', () => {
       keep()
       // Refresh only reads. A lost response never causes an automatic second write.
       saving.value = false
-      await refresh()
+      await refresh(false, true)
     } finally {
       if (mine === generation) saving.value = false
     }
@@ -271,6 +282,7 @@ const useSettingsStore = defineStore('settingsForm', () => {
     loading,
     saving,
     failure,
+    failureOfSave,
     failures,
     stored,
     saved,
@@ -333,6 +345,7 @@ export function useSettings(): {
     // The store outlives the screen: a refusal it kept — from another screen's stretch with no
     // connection, from an hour ago — is no word on the read of this opening (adversarial В1, В2).
     form.failure = null
+    form.failureOfSave = false
     window.addEventListener('offline', offline)
     void form.refresh()
   })

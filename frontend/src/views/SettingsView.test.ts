@@ -498,6 +498,31 @@ describe('a form shown from memory says as of when, and what became of the read 
     expect(me).toHaveBeenCalledTimes(2)
   })
 
+  // Adversarial Е2 of round 6: the notice of a refused save silenced a later read's refusal too, and the
+  // edit then took it away with nothing said. Only the read the save started is the notice's.
+  it('a later read’s refusal under «Не удалось сохранить» is the strip’s, with its answer, and stays through an edit', async () => {
+    const view = await render()
+    await field(view, 'city')?.setValue('Ереван')
+    save.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    me.mockResolvedValue(initial)
+    await view.get('.dock > button').trigger('click')
+    await flushPromises()
+    expect(view.find('[role="alert"]').text()).toContain(en.settings.save_error.title)
+    expect(strips(view)).toHaveLength(0)
+
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(me).toHaveBeenCalledTimes(3)
+    const strip = strips(view)[0]
+    expect(strip?.props('kind')).toBe('unanswered')
+
+    await field(view, 'spend')?.setValue('USD')
+    await flushPromises()
+    expect(view.find('[role="alert"]').exists()).toBe(false)
+    expect(strips(view)[0]?.element).toBe(strip?.element)
+  })
+
   it('must not fire: a failed save speaks for itself, with no strip of the read beside it', async () => {
     const view = await render()
     await field(view, 'city')?.setValue('Ереван')
