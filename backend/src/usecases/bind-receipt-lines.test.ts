@@ -268,6 +268,48 @@ describe('the owner’s lines of 31.10.2026, by the backend’s own tables (MOL-
   })
 })
 
+describe('a brand no table spells, asked of the model (MOL-326, В-1 «б»)', () => {
+  it('names the new item by the package’s spelling, asking once for the receipt’s brands no table spells', async () => {
+    const { items } = fakeItems()
+    const spellings = vi.fn((asked: readonly { brand: string }[]) =>
+      Promise.resolve(
+        new Map(asked.flatMap(({ brand }) => (brand === 'Ֆելիքս' ? [['ֆելիքս', 'Felix']] : []))),
+      ),
+    )
+    const bound = await bindReceiptLines(
+      { items, embedder: NO_EMBEDDER, spellings },
+      ACTOR,
+      'AM',
+      'ru',
+      [
+        line('Կատվի կեր «Ֆելիքս» 85գ'),
+        line('Կաթ «Աշտարակ Կաթ» 1լ'),
+        line('Թխվածքաբլիթ «Ռոշեն» Լովիտա'),
+      ],
+    )
+    expect(bound.map((one) => one.translation)).toEqual([
+      'Корм кошачий Felix 85 г',
+      // the model knew no local brand: in Russian letters, as before
+      'Молоко «Аштарак Кат» 1 л',
+      'Печенье Roshen Lovita',
+    ])
+    // Roshen is the table's, and asked of nobody
+    expect(spellings).toHaveBeenCalledTimes(1)
+    expect(spellings.mock.calls[0]?.[0].map(({ brand }) => brand)).toEqual([
+      'Ֆելիքս',
+      'Աշտարակ Կաթ',
+    ])
+  })
+
+  it('must not ask without the model: a brand no table spells stays in Russian letters', async () => {
+    const { items } = fakeItems()
+    const [bound] = await bindReceiptLines({ items, embedder: NO_EMBEDDER }, ACTOR, 'AM', 'ru', [
+      line('Կատվի կեր «Ֆելիքս» 85գ'),
+    ])
+    expect(bound?.translation).toBe('Корм кошачий «Феликс» 85 г')
+  })
+})
+
 describe('a word the model misread by the font (MOL-326, В-3 «б»)', () => {
   it('is put right for the item and the name alike, and the line is «проверьте»', async () => {
     const { items } = fakeItems()

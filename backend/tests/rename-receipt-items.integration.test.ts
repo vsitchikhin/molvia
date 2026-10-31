@@ -3,6 +3,7 @@ import { asc, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import { RECEIPT_MODEL, toSearchKey } from '@molvia/model'
+import { createBrandSpellingRepository } from '@/db/brand-spellings-repository'
 import { createItemRepository } from '@/db/items-repository'
 import { createRenameRepository } from '@/db/rename-repository'
 import { itemEmbeddings, items, receiptLines, receiptParts, receipts } from '@/db/schema'
@@ -22,6 +23,7 @@ const catalogue = createItemRepository(db)
 const deps = {
   renamer: createRenameRepository(db),
   nodes: (language: 'hy') => catalogue.nodes(language),
+  spellings: createBrandSpellingRepository(db),
 }
 let app: FastifyInstance
 
@@ -219,6 +221,30 @@ describe('rename-receipt-items (MOL-261, В-3 «а»)', () => {
     const out: string[] = []
     expect(await renameReceiptItems([], deps, (line) => out.push(line))).toBe(0)
     expect(out.slice(0, 2)).toEqual(['  renamed     1', '    Цакараваз 1 кг → Сахар-песок 1 кг'])
+  }, 30_000)
+
+  it('spells a brand as the model spelt it for a receipt read since (MOL-326, В-1 «б»)', async () => {
+    const me = await insertActor(db)
+    const fanta = await insertItem(db, { name: 'Фанта', searchKey: toSearchKey('Фанта') })
+    await deps.spellings.remember(
+      [{ brand: 'ֆելիքս', spelling: 'Felix' }],
+      'claude-haiku-5-5@brands-v1',
+    )
+    const felix = [
+      {
+        printed: 'Կատվի կեր «Ֆելիքս» 85գ',
+        proposed: 'Корм кошачий «Феликс» 85 г',
+        named: 'Корм кошачий «Феликс» 85 г',
+      },
+    ]
+    await recorded(me, fanta, felix)
+
+    const out: string[] = []
+    expect(await renameReceiptItems([], deps, (line) => out.push(line))).toBe(0)
+    expect(out.slice(0, 2)).toEqual([
+      '  renamed     1',
+      '    Корм кошачий «Феликс» 85 г → Корм кошачий Felix 85 г',
+    ])
   }, 30_000)
 
   it('refuses any word but --yes', async () => {

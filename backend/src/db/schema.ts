@@ -3221,3 +3221,27 @@ export const storeMemory = pgTable(
     ),
   ],
 )
+
+/**
+ * How a brand a till prints in «…» is spelt on its package, as the model said it (MOL-326, owner's В-1 «б»): asked
+ * once a brand, for the receipts the model reads, and taken only where it sounds as the till printed it
+ * (`heardSpelling`). `spelling` is null where the model knew none, or said one that did not sound so — remembered too,
+ * so that no brand is paid for twice. A brand of a shop's shelf is nobody's: no person, kept as the catalogue is.
+ */
+export const brandSpellings = pgTable(
+  'brand_spellings',
+  {
+    // `brandKey`: lower case, «և» one letter, words one space apart
+    brand: text('brand').primaryKey(),
+    spelling: text('spelling'),
+    // the model and the prompt that said it, `reader_version`'s form
+    said: text('said').notNull(),
+    askedAt: timestamp('asked_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    check('brand_spellings_brand_armenian', sql`${table.brand} ~ '[ա-ֆ]'`),
+    check('brand_spellings_spelling_short', sql`char_length(${table.spelling}) <= 40`),
+  ],
+)

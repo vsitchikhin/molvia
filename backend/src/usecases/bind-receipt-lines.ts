@@ -1,4 +1,5 @@
 import {
+  brandToAsk,
   createLineMatcher,
   glyphsMended,
   headingRulesOut,
@@ -20,6 +21,7 @@ import type {
 import type { ItemRepository } from '@/db/items-repository'
 import type { LineBinding } from '@/db/receipts-repository'
 import type { Embedder } from '@/embeddings/embedder'
+import type { BrandAsked } from '@/receipts/model-reader'
 import { CATALOGUE_SEED } from '@/catalogue-seed'
 import { TILL_BRANDS } from '@/receipts/till-brands'
 import { TILL_GENITIVES_RU, TILL_PHRASES_RU, TILL_WORDS_RU } from '@/receipts/till-words-ru'
@@ -35,6 +37,11 @@ export interface BindReceiptLinesDeps {
    * manual seed writes them, and production went nineteen days without — every line by the gloss alone.
    */
   readonly namesMissing?: (error: CatalogueNamesMissing) => void
+  /**
+   * How the packages spell the brands in «…» no table spells, by their `brandKey` (MOL-326, owner's В-1 «б»): the
+   * model's, for a receipt it read; without it such a brand is spelt in letters.
+   */
+  readonly spellings?: (asked: readonly BrandAsked[]) => Promise<ReadonlyMap<string, string>>
 }
 
 /** The catalogue has no names in a till's language: a fault of ours the owner hears of (MOL-293). */
@@ -104,7 +111,7 @@ const SHORTEST_NAME = 3
  * the search asks it whatever the receipt's language.
  */
 export async function bindReceiptLines(
-  { items, embedder, namesMissing }: BindReceiptLinesDeps,
+  { items, embedder, namesMissing, spellings }: BindReceiptLinesDeps,
   actorId: string,
   country: ReceiptCountry,
   language: AppLocale,
@@ -122,8 +129,12 @@ export async function bindReceiptLines(
   const nodes = names === null ? [] : await items.nodes(names)
   if (names !== null && nodes.length === 0) namesMissing?.(new CatalogueNamesMissing(names))
   const matcher = createLineMatcher(nodes, TILL_WORDS_RU)
-  const lexicon = namingLexicon(nodes)
   const known = mendGlyphs && names !== null ? knownTillWords(nodes) : null
+  // each line as it is read: a word the model misread put right
+  const mendedLines = lines.map((line) =>
+    known === null ? null : glyphsMended(line.printed, known),
+  )
+  const lexicon = await spelt(namingLexicon(nodes))
   // the headings the seed gave the catalogue's nodes; an item the search finds outside them has none known
   const headings = new Map(nodes.map((node) => [node.itemId, node.headings]))
   const bound: LineBinding[] = []
@@ -145,7 +156,7 @@ export async function bindReceiptLines(
       bound.push(await bySearch(receiptLineName(line.printed, country)))
       continue
     }
-    const mended = known === null ? null : glyphsMended(line.printed, known)
+    const mended = mendedLines[position] ?? null
     const printed = mended ?? line.printed
     const gloss = matcher.gloss(printed)
     const translation = language === 'ru' && gloss !== '' ? gloss : null
@@ -192,6 +203,21 @@ export async function bindReceiptLines(
     })
   }
   return bound
+
+  /** The lexicon with the brands the model spelt for this receipt's lines, asked once for all of them. */
+  async function spelt(base: NameLexicon): Promise<NameLexicon> {
+    if (spellings === undefined || names === null) return base
+    const asked = lines.flatMap((line, at): BrandAsked[] => {
+      const printed = mendedLines[at] ?? line.printed
+      const brand = brandToAsk(receiptLineParts(printed), base)
+      return brand === null ? [] : [{ brand, line: printed }]
+    })
+    if (asked.length === 0) return base
+    const learned = await spellings(asked)
+    return learned.size === 0
+      ? base
+      : { ...base, brands: { ...base.brands, ...Object.fromEntries(learned) } }
+  }
 
   /**
    * The line's name whole (MOL-232, В-3). Measured on the 98 Serbian lines of MOL-223 and MOL-229

@@ -6,6 +6,7 @@ import {
   receiptLineParts,
 } from '@molvia/model'
 import type { CatalogueNode, ItemNameLanguage, NameLexicon } from '@molvia/model'
+import type { BrandSpellingRepository } from '@/db/brand-spellings-repository'
 import type { RenameReport, RenameRepository } from '@/db/rename-repository'
 import { TILL_WORDS_RU } from '@/receipts/till-words-ru'
 import { knownTillWords, namingLexicon } from '@/usecases/bind-receipt-lines'
@@ -25,6 +26,8 @@ export async function renameReceiptItems(
   deps: {
     readonly renamer: RenameRepository
     readonly nodes: (language: ItemNameLanguage) => Promise<CatalogueNode[]>
+    /** The brands the model spelt for the receipts it read since (MOL-326): the names here ask it nothing. */
+    readonly spellings: Pick<BrandSpellingRepository, 'spelt'>
   },
   write: (line: string) => void,
 ): Promise<RenameExit> {
@@ -38,9 +41,11 @@ export async function renameReceiptItems(
   try {
     const lexicons = new Map<ItemNameLanguage, NameLexicon>()
     const known = new Map<ItemNameLanguage, ReadonlySet<string>>()
+    const spelt = Object.fromEntries(await deps.spellings.spelt())
     for (const language of ['hy'] as const) {
       const nodes = await deps.nodes(language)
-      lexicons.set(language, namingLexicon(nodes))
+      const lexicon = namingLexicon(nodes)
+      lexicons.set(language, { ...lexicon, brands: { ...lexicon.brands, ...spelt } })
       known.set(language, knownTillWords(nodes))
     }
     report = await deps.renamer.rename({

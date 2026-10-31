@@ -13,6 +13,7 @@ import type { Db } from '@/db/index'
 import type { PriceQuery } from '@/db/expenses-repository'
 import {
   actors,
+  brandSpellings,
   catalogueApart,
   catalogueMergeCandidates,
   catalogueMergeMoves,
@@ -238,6 +239,7 @@ export async function clearAll(db: Db): Promise<void> {
   await db.delete(failures)
   await db.delete(ownerNotices)
   await db.delete(broadcasts)
+  await db.delete(brandSpellings)
 }
 
 /**

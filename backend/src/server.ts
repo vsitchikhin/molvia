@@ -75,6 +75,8 @@ import { proposeItem } from '@/usecases/propose-item'
 import { embedMissing, startItemEmbedding } from '@/usecases/embed-items'
 import { mergeTick } from '@/usecases/merge-twins'
 import { readQueuedReceipts } from '@/usecases/read-receipts'
+import { spelledBrands } from '@/usecases/spell-brands'
+import type { SpellReport } from '@/usecases/spell-brands'
 import { readTaxReceipts } from '@/usecases/read-tax-receipts'
 import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
 import { receiptSettled, recordReceipt } from '@/usecases/record-receipt'
@@ -90,7 +92,7 @@ import {
 import { receiptRoutes } from '@/routes/receipts'
 import { createModelSpendRepository } from '@/db/model-spend-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
-import type { ReceiptModel } from '@/receipts/model-reader'
+import type { BrandAsked, ReceiptModel } from '@/receipts/model-reader'
 import type { ReceiptReader } from '@/receipts/reader'
 import { recentPlaces } from '@/usecases/recent-places'
 import { rateFromBot } from '@/usecases/rate-from-bot'
@@ -197,6 +199,7 @@ import { createExchangeRepository } from '@/db/exchanges-repository'
 import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
 import { createStoreMemoryRepository } from '@/db/store-memory-repository'
+import { createBrandSpellingRepository } from '@/db/brand-spellings-repository'
 import { createOpenFoodFactsRepository } from '@/db/open-food-facts-repository'
 import { createItemEmbeddingRepository } from '@/db/item-embeddings-repository'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
@@ -874,6 +877,40 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           PHONE_NOTICES_PER_SENDER,
           (count) => ({ kind: 'receipt_partial_muted', count }),
         )
+        const modelDeps =
+          model === null
+            ? null
+            : {
+                reader: model,
+                spend: modelSpend,
+                capMicroUsd:
+                  options.receiptModelCapMicroUsd ??
+                  Math.round(env.RECEIPT_MODEL_MONTHLY_CAP_USD * 1_000_000),
+              }
+        const brandSpellings = createBrandSpellingRepository(db)
+        // the brands of a receipt the model read, asked of it (MOL-326): counts and reasons only, never a brand
+        const brandReport = (event: SpellReport): void => {
+          if (event.kind === 'brands_spelt') {
+            instance.log.info(
+              {
+                asked: event.asked,
+                taken: event.taken,
+                costMicroUsd: event.paid.costMicroUsd,
+                inputTokens: event.paid.tokens.input,
+                outputTokens: event.paid.tokens.output,
+              },
+              'receipt brands spelt',
+            )
+          } else if (event.kind === 'brands_passed') {
+            instance.log.info({ reason: event.reason }, 'receipt brands not spelt by the model')
+          } else if (event.kind === 'brands_unavailable') {
+            instance.log.warn({ reason: event.reason }, 'receipt model unavailable for brands')
+          } else if (event.kind === 'brands_rejected') {
+            failures.report(event.error, job('receipt-model'), 'receipt model refused the brands')
+          } else {
+            failures.report(event.error, job('receipt-binding'), 'receipt brands not spelt')
+          }
+        }
         const queue = startItemEmbedding(
           async () => {
             await receipts.requeueInterrupted()
@@ -886,16 +923,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                 owner === null
                   ? null
                   : { notices: createOwnerNoticeRepository(db), budget: receiptNotices },
-              model:
-                model === null
-                  ? null
-                  : {
-                      reader: model,
-                      spend: modelSpend,
-                      capMicroUsd:
-                        options.receiptModelCapMicroUsd ??
-                        Math.round(env.RECEIPT_MODEL_MONTHLY_CAP_USD * 1_000_000),
-                    },
+              model: modelDeps,
               bind: (claimed, lines, read) =>
                 bindReceiptLines(
                   {
@@ -905,6 +933,15 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                     namesMissing: (error) => {
                       failures.report(error, job('receipt-binding'), 'catalogue has no till names')
                     },
+                    ...(read.byModel && modelDeps !== null
+                      ? {
+                          spellings: (asked: readonly BrandAsked[]) =>
+                            spelledBrands(
+                              { spellings: brandSpellings, model: modelDeps, report: brandReport },
+                              asked,
+                            ),
+                        }
+                      : {}),
                   },
                   claimed.actorId,
                   claimed.country,

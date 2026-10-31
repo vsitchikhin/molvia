@@ -486,6 +486,48 @@ const LATIN_NAME = /^[\p{Script=Latin}\d\s'&.-]+$/u
 const shelfOf = (text: string, lexicon: NameLexicon): string | null =>
   lexicon.brands?.[lexiconKey(text)] ?? lettersOf(text)
 
+/** The key a lexicon keys a brand by: lower case, «և» one letter, words one space apart. */
+export const brandKey = (printed: string): string => lexiconKey(printed)
+
+/**
+ * The line's brand in «…» no lexicon and no rule spells (MOL-326, owner's В-1 «б»): the one the model may be asked
+ * how its package spells it. A brand said letter by letter is spelt by the rule, and one in Latin letters already is.
+ */
+export function brandToAsk(parts: ReceiptLineParts, lexicon: NameLexicon): string | null {
+  const brand = parts.brand
+  if (brand === null || !ARMENIAN.test(brand) || shelfOf(brand, lexicon) !== null) return null
+  return brand
+}
+
+// Latin or Cyrillic letters, figures and what a brand's name holds between them
+const SPELLING =
+  /^[\p{Script=Latin}\p{Script=Cyrillic}\d][\p{Script=Latin}\p{Script=Cyrillic}\d\s'’&.!-]*$/u
+const SPELLING_MAX = 40
+/**
+ * How far the package's spelling may sound from the till's, a share of the longer key: on the 48 pairs of
+ * `TILL_BRANDS` 0.3 keeps 45 — «Белая шляпка» is a translation, «Art Bakery», «Délice» two letters off — and lets
+ * through no pair of two brands of 2 256 (MOL-326, `.scratch/tasks/research/MOL-326.md`); 0.34 lets Barilla be
+ * Gorilla.
+ */
+const SPELLING_SOUND_SHARE = 0.3
+
+const soundKey = (text: string): string => toSearchKey(text).replace(/[^a-zц\d]/gu, '')
+
+/**
+ * The model's spelling of a brand taken only where it sounds as the till printed it (MOL-326, owner's В-1 «б»): its
+ * letters Latin or Cyrillic, its length a name's, and its search key within `SPELLING_SOUND_SHARE` of the key of the
+ * till's letters in Russian ones — «Ֆելիքս» is Felix, never Whiskas. Else none: a guess is worse than letters
+ * (MOL-255).
+ */
+export function heardSpelling(printed: string, spelling: string): string | null {
+  const shelf = spelling.trim().replace(/\s+/gu, ' ')
+  if (shelf.length > SPELLING_MAX || !SPELLING.test(shelf)) return null
+  const [till, said] = [soundKey(armenianInRussian(printed)), soundKey(shelf)]
+  if (till.length < 2 || said.length < 2) return null
+  const share = levenshtein(till, said) / Math.max(till.length, said.length)
+  return share <= SPELLING_SOUND_SHARE ? shelf : null
+}
+
 /**
  * A brand as a name writes it (MOL-261, owner's В-2 «а»): the package's spelling, a Latin one with no quotes —
  * «Coca-Cola», «Roshen» — a Cyrillic one in «…»; a brand the lexicon has not, in Russian letters in «…».

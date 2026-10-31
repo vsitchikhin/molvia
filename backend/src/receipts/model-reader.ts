@@ -16,6 +16,9 @@ import type { ModelReceipt } from '@molvia/model'
 import { z } from 'zod'
 import { jpegSize } from '@/receipts/jpeg'
 import {
+  BRANDS_INSTRUCTIONS,
+  BRANDS_PROMPT_VERSION,
+  BRANDS_SYSTEM,
   RECEIPT_INSTRUCTIONS,
   RECEIPT_PROMPT_VERSION,
   RECEIPT_SYSTEM,
@@ -78,9 +81,40 @@ export class ModelRejected extends Error {
   }
 }
 
+/** A brand the model is asked how its package spells (MOL-326): as the till printed it, with its line. */
+export interface BrandAsked {
+  readonly brand: string
+  readonly line: string
+}
+
+/**
+ * The most an answer of brands may take, thinking included: forty brands took some 1 900 on the bench, and 2 000 cut
+ * two answers of three (MOL-326). It is the output the worst price of the call counts.
+ */
+export const BRANDS_OUTPUT_MAX = 8_000
+
+/** What the model said of the brands asked, each by its place among them — `null` where it knew none — and the price. */
+export type BrandSpelling = (
+  | { readonly kind: 'read'; readonly spellings: readonly (string | null)[] }
+  | { readonly kind: 'refused' | 'cut' | 'invalid' }
+) & {
+  readonly costMicroUsd: number
+  readonly tokens: { readonly input: number; readonly output: number }
+}
+
+const brandsAnswerSchema = z.object({
+  brands: z.array(z.object({ id: z.number().int(), spelling: z.string().nullable() })),
+})
+
 export interface ReceiptModel {
   /** The reader's version for `receipts.reader_version` (Р-7): the model and the prompt. */
   readonly version: string
+  /** The speller's version for `brand_spellings.said` (MOL-326): the model and its prompt. */
+  readonly brandsVersion: string
+  /** The input of a call of brands at most: its text by its UTF-8 bytes, a token at least one byte. */
+  brandsInputTokensMax(brands: readonly BrandAsked[]): number
+  /** How the packages of the brands spell them (MOL-326, owner's В-1 «б»): text alone, never a photo. */
+  spellBrands(brands: readonly BrandAsked[]): Promise<BrandSpelling>
   /**
    * The input of a call at most, or null where it is not to be sent: a part no JPEG this side can measure, or
    * past what the API takes (`MODEL_IMAGE_BYTES_MAX`, `MODEL_REQUEST_BYTES_MAX`).
@@ -90,16 +124,13 @@ export interface ReceiptModel {
 }
 
 // The answer's schema as the API takes it: JSON Schema of the very zod the answer is read back by. The
-// lengths are read back by zod, never asked of the model: structured outputs do not hold them.
-function outputSchema(): Record<string, unknown> {
-  const schema = z.toJSONSchema(modelReceiptSchema, { target: 'draft-7' }) as Record<
-    string,
-    unknown
-  >
+// lengths and an integer's bounds are read back by zod, never asked of the model: structured outputs do not
+// hold them, and refuse an integer's with a 400 (MOL-326)
+const UNHELD = new Set(['$schema', 'maxLength', 'maxItems', 'minimum', 'maximum'])
+function outputSchema(answer: z.ZodType = modelReceiptSchema): Record<string, unknown> {
+  const schema = z.toJSONSchema(answer, { target: 'draft-7' }) as Record<string, unknown>
   return JSON.parse(
-    JSON.stringify(schema, (key, value: unknown) =>
-      key === '$schema' || key === 'maxLength' || key === 'maxItems' ? undefined : value,
-    ),
+    JSON.stringify(schema, (key, value: unknown) => (UNHELD.has(key) ? undefined : value)),
   ) as Record<string, unknown>
 }
 
@@ -130,14 +161,114 @@ export function receiptModel(options: {
     timeout: timeoutMs,
   })
   const schema = outputSchema()
+  const brandsSchema = outputSchema(brandsAnswerSchema)
+  const brandsTextBytes =
+    Buffer.byteLength(BRANDS_SYSTEM) +
+    Buffer.byteLength(BRANDS_INSTRUCTIONS) +
+    Buffer.byteLength(JSON.stringify(brandsSchema))
+  // each brand by its place: the model's echo of a name may differ from it by a letter
+  const brandsText = (brands: readonly BrandAsked[]): string =>
+    JSON.stringify(brands.map(({ brand, line }, id) => ({ id, brand, line })))
   // the schema is sent with the request, so it is counted with the text (review №7)
   const textBytes =
     Buffer.byteLength(RECEIPT_SYSTEM) +
     Buffer.byteLength(RECEIPT_INSTRUCTIONS) +
     Buffer.byteLength(JSON.stringify(schema))
 
+  /**
+   * One call of the model, its answer whole, or why there is none: unavailable — the receipt waits (Р-9) — or
+   * rejected for what the request is.
+   */
+  async function call(
+    params: Anthropic.MessageCreateParamsNonStreaming,
+  ): Promise<Anthropic.Message> {
+    // the client's time is armed around `fetch` alone, and an answer whose body stalls outlived it (adversarial
+    // А3 «б»): this one is the whole call's
+    const deadline = AbortSignal.timeout(timeoutMs)
+    let message: Anthropic.Message
+    try {
+      const asked = client.messages.create(params, { signal: deadline })
+      // raced against the deadline too: what reads the body is the transport's, and one that does not hear
+      // the signal would hold the queue (adversarial А3 «б»); the loser's end is nobody's
+      const outlived = new Promise<never>((_resolve, reject) => {
+        deadline.addEventListener('abort', () => {
+          reject(new Error('the call outlived its time'))
+        })
+      })
+      asked.catch(() => undefined)
+      outlived.catch(() => undefined)
+      message = await Promise.race([asked, outlived])
+    } catch (error) {
+      // the request may have reached the model before the time ran out: its price is not known
+      if (deadline.aborted || error instanceof APIConnectionTimeoutError) {
+        throw new ModelUnavailable('timeout', null)
+      }
+      if (error instanceof RateLimitError) throw new ModelUnavailable('status 429', 0)
+      // 5xx and 529, the model overloaded
+      if (error instanceof InternalServerError) {
+        throw new ModelUnavailable(`status ${String(error.status)}`, 0)
+      }
+      if (error instanceof APIError && !(error instanceof APIConnectionError)) {
+        const status: unknown = error.status
+        if (typeof status === 'number') throw new ModelRejected(status)
+      }
+      // no answer, or one torn under its head or its body (adversarial А3): the request may have gone, and
+      // been paid (review №2)
+      throw error instanceof APIConnectionError
+        ? new ModelUnavailable('unreachable', null)
+        : new ModelUnavailable('dropped', null, error)
+    }
+    // an answer of 200 with no body is one torn too: the SDK hands it over as nothing
+    const answered: unknown = message
+    if (typeof answered !== 'object' || answered === null || !('usage' in answered)) {
+      throw new ModelUnavailable('dropped', null, new TypeError('an answer with no body'))
+    }
+    return message
+  }
+
   return {
     version: `${RECEIPT_MODEL}@${RECEIPT_PROMPT_VERSION}`,
+    brandsVersion: `${RECEIPT_MODEL}@${BRANDS_PROMPT_VERSION}`,
+
+    brandsInputTokensMax(brands) {
+      return brandsTextBytes + Buffer.byteLength(brandsText(brands))
+    },
+
+    async spellBrands(brands) {
+      const message = await call({
+        model: RECEIPT_MODEL,
+        max_tokens: BRANDS_OUTPUT_MAX,
+        system: BRANDS_SYSTEM,
+        output_config: { effort: 'low', format: { type: 'json_schema', schema: brandsSchema } },
+        messages: [
+          {
+            role: 'user',
+            content: [{ type: 'text', text: `${BRANDS_INSTRUCTIONS}\n\n${brandsText(brands)}` }],
+          },
+        ],
+      })
+      const paid = {
+        costMicroUsd: modelCallMicroUsd(message.usage),
+        tokens: { input: message.usage.input_tokens, output: message.usage.output_tokens },
+      }
+      if (message.stop_reason === 'refusal') return { kind: 'refused', ...paid }
+      if (message.stop_reason !== 'end_turn') return { kind: 'cut', ...paid }
+      const text = message.content.find((block) => block.type === 'text')?.text
+      let json: unknown
+      try {
+        json = text === undefined ? undefined : JSON.parse(text)
+      } catch {
+        return { kind: 'invalid', ...paid }
+      }
+      const answer = brandsAnswerSchema.safeParse(json)
+      if (!answer.success) return { kind: 'invalid', ...paid }
+      // a brand answered twice, or not at all, is a brand the model did not say
+      const spellings = brands.map((_, id) => {
+        const said = answer.data.brands.filter((one) => one.id === id)
+        return said.length === 1 ? (said[0]?.spelling ?? null) : null
+      })
+      return { kind: 'read', spellings, ...paid }
+    },
 
     inputTokensMax(parts) {
       const sizes = parts.map((part) => jpegSize(part))
@@ -152,71 +283,28 @@ export function receiptModel(options: {
     },
 
     async read(parts) {
-      // the client's time is armed around `fetch` alone, and an answer whose body stalls outlived it (adversarial
-      // А3 «б»): this one is the whole call's
-      const deadline = AbortSignal.timeout(timeoutMs)
-      let message: Anthropic.Message
-      try {
-        const asked = client.messages.create(
+      const message = await call({
+        model: RECEIPT_MODEL,
+        max_tokens: RECEIPT_MODEL_OUTPUT_MAX,
+        system: RECEIPT_SYSTEM,
+        output_config: { effort: 'medium', format: { type: 'json_schema', schema } },
+        messages: [
           {
-            model: RECEIPT_MODEL,
-            max_tokens: RECEIPT_MODEL_OUTPUT_MAX,
-            system: RECEIPT_SYSTEM,
-            output_config: { effort: 'medium', format: { type: 'json_schema', schema } },
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  ...parts.map((part) => ({
-                    type: 'image' as const,
-                    source: {
-                      type: 'base64' as const,
-                      media_type: 'image/jpeg' as const,
-                      data: part.toString('base64'),
-                    },
-                  })),
-                  { type: 'text' as const, text: RECEIPT_INSTRUCTIONS },
-                ],
-              },
+            role: 'user',
+            content: [
+              ...parts.map((part) => ({
+                type: 'image' as const,
+                source: {
+                  type: 'base64' as const,
+                  media_type: 'image/jpeg' as const,
+                  data: part.toString('base64'),
+                },
+              })),
+              { type: 'text' as const, text: RECEIPT_INSTRUCTIONS },
             ],
           },
-          { signal: deadline },
-        )
-        // raced against the deadline too: what reads the body is the transport's, and one that does not hear
-        // the signal would hold the queue (adversarial А3 «б»); the loser's end is nobody's
-        const outlived = new Promise<never>((_resolve, reject) => {
-          deadline.addEventListener('abort', () => {
-            reject(new Error('the call outlived its time'))
-          })
-        })
-        asked.catch(() => undefined)
-        outlived.catch(() => undefined)
-        message = await Promise.race([asked, outlived])
-      } catch (error) {
-        // the request may have reached the model before the time ran out: its price is not known
-        if (deadline.aborted || error instanceof APIConnectionTimeoutError) {
-          throw new ModelUnavailable('timeout', null)
-        }
-        if (error instanceof RateLimitError) throw new ModelUnavailable('status 429', 0)
-        // 5xx and 529, the model overloaded
-        if (error instanceof InternalServerError) {
-          throw new ModelUnavailable(`status ${String(error.status)}`, 0)
-        }
-        if (error instanceof APIError && !(error instanceof APIConnectionError)) {
-          const status: unknown = error.status
-          if (typeof status === 'number') throw new ModelRejected(status)
-        }
-        // no answer, or one torn under its head or its body (adversarial А3): the request may have gone, and
-        // been paid (review №2)
-        throw error instanceof APIConnectionError
-          ? new ModelUnavailable('unreachable', null)
-          : new ModelUnavailable('dropped', null, error)
-      }
-      // an answer of 200 with no body is one torn too: the SDK hands it over as nothing
-      const answered: unknown = message
-      if (typeof answered !== 'object' || answered === null || !('usage' in answered)) {
-        throw new ModelUnavailable('dropped', null, new TypeError('an answer with no body'))
-      }
+        ],
+      })
       const paid = {
         costMicroUsd: modelCallMicroUsd(message.usage),
         tokens: { input: message.usage.input_tokens, output: message.usage.output_tokens },

@@ -267,3 +267,79 @@ describe('the model that reads receipts (MOL-272)', () => {
     ).toBeNull()
   })
 })
+
+describe('the model asked how the packages spell the brands (MOL-326, В-1 «б»)', () => {
+  const BRANDS = [
+    { brand: 'Ֆելիքս', line: 'Կատվի կեր «Ֆելիքս» 85գ' },
+    { brand: 'Աշտարակ Կաթ', line: 'Կաթ «Աշտարակ Կաթ» 1լ' },
+  ]
+  const spelt = (brands: unknown): Response =>
+    message({
+      content: [{ type: 'text', text: JSON.stringify({ brands }) }],
+      usage: { input_tokens: 600, output_tokens: 80 },
+    })
+
+  it('sends the brands as text, each by its place, at low effort and with no photo', async () => {
+    const { fetch, sent } = api(() =>
+      spelt([
+        { id: 0, spelling: 'Felix' },
+        { id: 1, spelling: null },
+      ]),
+    )
+    expect(await model(fetch).spellBrands(BRANDS)).toEqual({
+      kind: 'read',
+      spellings: ['Felix', null],
+      costMicroUsd: 100,
+      tokens: { input: 600, output: 80 },
+    })
+    const [one] = sent
+    expect(one?.body).toMatchObject({
+      model: 'claude-haiku-5-5',
+      max_tokens: 8_000,
+      output_config: { effort: 'low', format: { type: 'json_schema' } },
+    })
+    const content = (one?.body.messages as { content: { type: string; text?: string }[] }[])[0]
+      ?.content
+    expect(content?.map((block) => block.type)).toEqual(['text'])
+    // an integer's bounds the API refuses with a 400: never sent
+    expect(JSON.stringify(one?.body.output_config)).not.toMatch(/minimum|maximum/u)
+    expect(content?.[0]?.text).toContain(
+      '{"id":0,"brand":"Ֆելիքս","line":"Կատվի կեր «Ֆելիքս» 85գ"}',
+    )
+  })
+
+  it('takes a brand answered twice, or not at all, for one the model did not say', async () => {
+    const { fetch } = api(() =>
+      spelt([
+        { id: 0, spelling: 'Felix' },
+        { id: 0, spelling: 'Felics' },
+      ]),
+    )
+    expect(await model(fetch).spellBrands(BRANDS)).toMatchObject({
+      kind: 'read',
+      spellings: [null, null],
+    })
+  })
+
+  it('counts a refusal, a cut answer and one of no schema — each paid — and is unavailable as a reading is', async () => {
+    for (const [over, kind] of [
+      [{ stop_reason: 'refusal' }, 'refused'],
+      [{ stop_reason: 'max_tokens' }, 'cut'],
+      [{ content: [{ type: 'text', text: '{"brands":' }] }, 'invalid'],
+      [{ content: [{ type: 'text', text: '{"brands":[{"id":"0"}]}' }] }, 'invalid'],
+    ] as const) {
+      const { fetch } = api(() => message(over))
+      expect(await model(fetch).spellBrands(BRANDS)).toMatchObject({ kind })
+    }
+    const { fetch } = api(() => failing(529))
+    await expect(model(fetch).spellBrands(BRANDS)).rejects.toBeInstanceOf(ModelUnavailable)
+    const bad = api(() => failing(400))
+    await expect(model(bad.fetch).spellBrands(BRANDS)).rejects.toBeInstanceOf(ModelRejected)
+  })
+
+  it('bounds the input by its text', () => {
+    const one = model(api(() => message()).fetch)
+    expect(one.brandsInputTokensMax(BRANDS)).toBeGreaterThan(one.brandsInputTokensMax([]))
+    expect(one.brandsVersion).toBe('claude-haiku-5-5@brands-v1')
+  })
+})

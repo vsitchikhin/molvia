@@ -201,6 +201,10 @@ function fakeModel(
       model.asked += 1
       return answer()
     },
+    // these tests bind with no brands asked (MOL-326)
+    brandsVersion: 'claude-haiku-5-5@brands-v1',
+    brandsInputTokensMax: () => 1_000,
+    spellBrands: () => Promise.reject(new Error('no brand is asked in these tests')),
   }
   return model
 }

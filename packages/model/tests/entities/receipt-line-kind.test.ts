@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   armenianInRussian,
+  brandToAsk,
   glyphsMended,
+  heardSpelling,
   lineFitter,
   newLineName,
   receiptLineParts,
@@ -866,5 +868,33 @@ describe('where a thing was grown or made (MOL-326, owner’s В-2 «а»)', () 
   it('keeps a country printed bare: it is a kind as often', () => {
     expect(named('Պղպեղ բուլղարական կգ')?.name).toBe('Перец болгарский')
     expect(named('Սուրճ հայկական')?.name).toBe('Кофе армянский')
+  })
+})
+
+describe('a brand the model is asked about (MOL-326, owner’s В-1 «б»)', () => {
+  it('is a brand in «…» no lexicon and no rule spells', () => {
+    const ask = (printed: string) => brandToAsk(receiptLineParts(printed), { brands: BRANDS })
+    expect(ask('Կատվի կեր «Ֆելիքս» 85գ')).toBe('Ֆելիքս')
+    expect(ask('Թխվածքաբլիթ «Ռոշեն» Լովիտա')).toBeNull()
+    expect(ask('Կոնդիցիոներ «Էյ Բի Սի» 1լ')).toBeNull()
+    expect(ask('Չիպս «Lay’s» 90գ')).toBeNull()
+    expect(ask('Լցոնիչ Տոֆու 6լ')).toBeNull()
+  })
+
+  it('takes the model’s spelling only where it sounds as the till printed it', () => {
+    expect(heardSpelling('Ֆելիքս', 'Felix')).toBe('Felix')
+    expect(heardSpelling('Կոկա Կոլա', ' Coca-Cola ')).toBe('Coca-Cola')
+    expect(heardSpelling('Ալյոնկա', 'Алёнка')).toBe('Алёнка')
+    expect(heardSpelling('Ֆելիքս', 'Whiskas')).toBeNull()
+    expect(heardSpelling('Բարիլլա', 'Gorilla')).toBeNull()
+    // a translation is no spelling: «Սպիտակ Գլխարկ» is «Белая шляпка» on no package the till heard
+    expect(heardSpelling('Սպիտակ Գլխարկ', 'Белая шляпка')).toBeNull()
+  })
+
+  it('takes no spelling in Armenian letters, of signs, or past a name’s length', () => {
+    expect(heardSpelling('Ֆելիքս', 'Ֆելիքս')).toBeNull()
+    expect(heardSpelling('Ֆելիքս', '<b>Felix</b>')).toBeNull()
+    expect(heardSpelling('Ֆելիքս', `Felix ${'x'.repeat(40)}`)).toBeNull()
+    expect(heardSpelling('Ֆ', 'F')).toBeNull()
   })
 })
