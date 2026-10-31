@@ -259,6 +259,20 @@ are typing into. «Что брать» answers with the geography it counted by,
 the phone compares it with its own: a different city is a list to load again, and an answer the
 settings will not move to is taken as it is — the screen used to stay on a skeleton for good.
 
+**A form shown from what the phone remembers says as of when, and what became of the read** (MOL-215,
+Е-8, С-11, С-12): one `StatusStrip` under the header — offline, «Сервер не ответил» with «Повторить» and
+its count of failed reads, «Обновляем» once a read is late by `STRIP_LATE_MS` — never the quiet card of an
+error over the fields being edited, which said no time; with no form, the screen's own states, as before.
+**The time is when the server last said the settings to this phone**, by its clock (`readAt` in the
+envelope of `molvia.settings.<owner>`, `settingsReadAt` of the identity), never the row's `updatedAt`, which
+is when they were changed: set as an answer lands (`settle`, `apply`), brought by another window with its
+shelf, and never by the shelf being written — the identity's watcher writes it on every change of `actor`,
+another window's included. **The price, named:** a shelf of the build before has no `readAt`, and that
+build writes the envelope back without it — the strip says «из памяти телефона» with no time until the
+next answer. **«Сохранить» says why it cannot be pressed, on itself** (Ф-6): «когда появится связь», «Сохранить
+· изменений нет», «Загружаем…» — the last only where the read keeps the save back (no form yet, or a changed
+form while the read is on its way), or the word would blink at every opening.
+
 ## «Покупки», the record typed by hand, and the newcomer's home (MOL-77, MOL-128)
 
 **«Поход» became «Покупки», and «Что брать» became home** (MOL-128, the owner's decision on the
