@@ -88,6 +88,17 @@
           {{ t(`dev.kit.${toggle.key}`) }}
         </label>
       </div>
+      <!-- The checkbox (MOL-235): off, on and not now in either position, its words its own label. -->
+      <div class="boxes">
+        <AppCheckbox
+          v-for="box in boxes"
+          :key="box.key"
+          v-model:checked="box.on"
+          :inactive="box.inactive"
+        >
+          {{ t(`dev.kit.${box.key}`) }}
+        </AppCheckbox>
+      </div>
       <MonthSwitcher :month="month" current="2026-10" @change="month = $event" />
       <CategoryChips
         v-model="category"
@@ -790,6 +801,7 @@ import IconWallet from '~icons/mdi/wallet-outline'
 import IconCalendar from '~icons/mdi/calendar-blank-outline'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppCheckbox from '@/components/AppCheckbox.vue'
 import AppField from '@/components/AppField.vue'
 import AppNote from '@/components/AppNote.vue'
 import AppScreen from '@/components/AppScreen.vue'
@@ -834,6 +846,7 @@ export default defineComponent({
   components: {
     AppButton,
     AppCard,
+    AppCheckbox,
     AppField,
     CurrencySelect,
     AppNote,
@@ -1335,6 +1348,12 @@ export default defineComponent({
         { key: 'switch_inactive_off', on: false, inactive: true },
         { key: 'switch_inactive_on', on: true, inactive: true },
       ]),
+      boxes: reactive([
+        { key: 'checkbox_off', on: false, inactive: false },
+        { key: 'checkbox_on', on: true, inactive: false },
+        { key: 'checkbox_inactive_off', on: false, inactive: true },
+        { key: 'checkbox_inactive_on', on: true, inactive: true },
+      ]),
       // The current month at the edge: «›» is the inactive arrow.
       month: ref('2026-10'),
       categories,
@@ -1429,6 +1448,11 @@ export default defineComponent({
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  gap: var(--space-2);
+}
+
+.boxes {
+  display: grid;
   gap: var(--space-2);
 }
 

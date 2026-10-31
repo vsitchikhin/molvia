@@ -71,6 +71,30 @@ test('an inactive switch takes the focus and holds against Space and a tap on it
   await expect(kit.getByRole('switch', { name: 'Off', exact: true })).toBeChecked()
 })
 
+// The kit's checkbox (MOL-235) by the same rule, and its words are its own label.
+test('an inactive checkbox takes the focus and holds against Space and a tap on its words', async ({
+  page,
+}) => {
+  const kit = await section(page)
+  const held = kit.getByRole('checkbox', { name: 'Box · not now · off' })
+  await held.focus()
+  await expect(held).toBeFocused()
+  await expect(held).toBeDisabled()
+  await page.keyboard.press('Space')
+  await expect(held).not.toBeChecked()
+  await kit.locator('label', { hasText: 'Box · not now · off' }).click({ force: true })
+  await expect(held).not.toBeChecked()
+  await expect(kit.getByRole('checkbox', { name: 'Box · not now · on' })).toBeChecked()
+
+  // Control: the live checkbox answers a tap on its words and Space.
+  const live = kit.getByRole('checkbox', { name: 'Box · off', exact: true })
+  await kit.locator('label', { hasText: /^\s*Box · off\s*$/ }).click()
+  await expect(live).toBeChecked()
+  await live.focus()
+  await page.keyboard.press('Space')
+  await expect(live).not.toBeChecked()
+})
+
 // The phone profiles have no hover — `(hover: hover)` is false in both — so the pointer is a mouse
 // here, in a context of its own, or the check would hold by the media query alone.
 test('an inactive button takes the focus and does not light up under the pointer', async ({

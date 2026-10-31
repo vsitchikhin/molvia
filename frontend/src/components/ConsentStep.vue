@@ -40,10 +40,7 @@
         <p class="statistics-title">{{ t('consent.statistics.title') }}</p>
         <p class="statistics-text">{{ t('consent.statistics.text') }}</p>
       </AppCard>
-      <label class="age">
-        <input v-model="consent.aged" type="checkbox" />
-        <span>{{ t('consent.age') }}</span>
-      </label>
+      <AppCheckbox v-model:checked="consent.aged">{{ t('consent.age') }}</AppCheckbox>
       <p v-if="!online" class="warn">{{ t('consent.offline') }}</p>
       <!-- Keys written whole: one built from a string is seen by neither the linter nor vue-tsc. -->
       <p v-else-if="consent.failure" class="failed" role="alert">
@@ -107,6 +104,7 @@ import IconShield from '~icons/mdi/shield-check-outline'
 import { POLICY_VERSION } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppCheckbox from '@/components/AppCheckbox.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import EraseSheet from '@/components/EraseSheet.vue'
 import ScreenState from '@/components/ScreenState.vue'
@@ -144,6 +142,7 @@ export default defineComponent({
   components: {
     AppButton,
     AppCard,
+    AppCheckbox,
     BottomSheet,
     EraseSheet,
     IconChevron,
@@ -260,26 +259,6 @@ export default defineComponent({
     @include icon;
 
     font-size: var(--icon);
-  }
-}
-
-.age {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--touch-target);
-  padding: var(--space-2) var(--space-3);
-  border: var(--hairline) solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--surface);
-  cursor: pointer;
-
-  input {
-    flex: none;
-    width: var(--space-6);
-    height: var(--space-6);
-    margin: 0;
-    accent-color: var(--accent-solid);
   }
 }
 
