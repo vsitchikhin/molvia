@@ -574,7 +574,10 @@ export function newLineName(
     units.flatMap(({ text: token, at, kind, phrase }): Said[] => {
       // what the seed's name stands for
       if (covered.has(token)) return []
-      const shelf = phrase === null ? shelfOf(token, lexicon) : null
+      // a brand that is a word of the dictionary is the word where it is the line's kind: «Տոֆու 200գ» is tofu, and
+      // «Լցոնիչ Տոֆու» a litter of Tofu (MOL-326)
+      const glossed = kind && glossOf(token, dictionary) !== null
+      const shelf = phrase === null && !glossed ? shelfOf(token, lexicon) : null
       // a brand the till printed bare is written as its package is all the same: «Шоколад «Алёнка»» (adversarial А5)
       if (shelf !== null) return [{ word: LATIN_NAME.test(shelf) ? shelf : `«${shelf}»`, at, kind }]
       if (phrase === null && (!isNameWord(token) || UNIT_WORDS.has(keyed(token)))) return []

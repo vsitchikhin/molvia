@@ -274,6 +274,19 @@ describe('a brand as its package spells it (MOL-261, В-2 «а»)', () => {
     expect(shelved('Թխվածքաբլիթ Ռոշեն Լովիտա')?.name).toBe('Печенье Roshen Lovita')
   })
 
+  it('takes a brand that is a word of the dictionary for the word where it is the line’s kind (MOL-326)', () => {
+    const tofu = (printed: string) =>
+      newLineName(
+        receiptLineParts(printed),
+        { ...WORDS, տոֆու: 'тофу', լցոնիչ: 'наполнитель' },
+        {
+          brands: { տոֆու: 'Tofu' },
+        },
+      )?.name
+    expect(tofu('Լցոնիչ Տոֆու 6լ')).toBe('Наполнитель Tofu 6 л')
+    expect(tofu('Տոֆու 200գ')).toBe('Тофу 200 г')
+  })
+
   it('writes a Cyrillic one in «…», and one it does not know in Russian letters, as before', () => {
     expect(shelved('Շոկոլադ «Ալյոնկա» 100գր')?.name).toBe('Шоколад «Алёнка» 100 г')
     expect(shelved('Յոգուրտ «Երեմյան Փրոդաքթս» ելակ')?.name).toBe(

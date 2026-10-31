@@ -49,9 +49,11 @@ const MATCH_SCORE = 0.7
  * the words with an Armenian letter, two letters or more.
  */
 export function receiptWords(text: string): string[] {
+  // a word glued to its package, «շաքարավազ1կգ», is a word (MOL-326)
   return text
     .toLowerCase()
     .replace(/և|եւ/gu, 'եվ')
+    .replace(/(?<=[ա-և]{2})(?=\d)/gu, ' ')
     .split(/[^ա-ևԱ-Ֆa-zа-яё0-9%]+/u)
     .filter((word) => word.length >= 2 && /[ա-և]/u.test(word))
 }

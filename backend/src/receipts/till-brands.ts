@@ -32,6 +32,8 @@ export const TILL_BRANDS: Readonly<Record<string, string>> = {
   բոնֆեստո: 'Bonfesto',
   ցագերմեյստեր: 'Jägermeister',
   'ալպեն գոլդ': 'Alpen Gold',
+  // a cat litter's, never the bean curd of a line whose kind it is: «Տոֆու 200գ» stays тофу (MOL-326)
+  տոֆու: 'Tofu',
   // the lines of a brand, printed after it
   լովիտա: 'Lovita',
   'արտ բեյքրի': 'Art Bakery',

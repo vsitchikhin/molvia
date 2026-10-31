@@ -246,6 +246,28 @@ describe('binding the lines of a parsed receipt (MOL-126)', () => {
   })
 })
 
+describe('the owner’s lines of 31.10.2026, by the backend’s own tables (MOL-326)', () => {
+  it('names each new item as its shelf does', async () => {
+    const { items } = fakeItems()
+    const bound = await bindReceiptLines({ items, embedder: NO_EMBEDDER }, ACTOR, 'AM', 'ru', [
+      line('Շոկոլադե դրաժե Էմ ընդ Էմս 45գ'),
+      line('Լվացքի կոնդիցիոներ Էյ Բի Սի 1լ'),
+      line('Կատվի հող Տոֆու 6լ'),
+      line('Լցոնիչ Տոֆու 6լ'),
+      line('Շաքարավազ1կգ'),
+    ])
+    expect(bound.map((one) => one.translation)).toEqual([
+      "Драже шоколадное M&M's 45 г",
+      'Кондиционер для белья ABC 1 л',
+      'Наполнитель для лотка Tofu 6 л',
+      'Наполнитель Tofu 6 л',
+      // the seed's sugar, the word glued to its package read
+      'сахар-песок',
+    ])
+    expect(bound[4]).toMatchObject({ itemId: SUGAR, match: 'search' })
+  })
+})
+
 describe('a word the model misread by the font (MOL-326, В-3 «б»)', () => {
   it('is put right for the item and the name alike, and the line is «проверьте»', async () => {
     const { items } = fakeItems()
