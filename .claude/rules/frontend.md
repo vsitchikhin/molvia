@@ -474,12 +474,15 @@ The detail behind the frontend lines of `CLAUDE.md`.
   since its cell of two words (MOL-225) would break with it — the buttons with a name in them are all `block`,
   which breaks it («Продолжить «…»», «Взять «…»», «Записать «…» без кода», adversarial Б1, Б2). What MOL-318 proved is a name at a text of 100 %; large text is the rule after this one (MOL-321). And WebKit says «ResizeObserver loop completed» as a sheet with the
   chips opens — on master too, a window error with no frame of ours, which the phone's reports leave out.
-- **Large text stands within the phone: Android's 150 % and 200 % on 320** (MOL-321, owner's В-1…В-4). The
-  project measures it as its specs make it — the root's font-size, which every size of the app is in — and
-  `e2e/large-text.spec.ts` holds a newcomer's «Что брать», «Настройки», every screen and the sheets of «Деньги»
-  at both. Before it «Настройки» and the exchange's sheet went 120 px sideways at 150 %, the rings of «Деньги»
-  and «Графики» 43 and 47, a newcomer's «Что брать» 42, and at 200 % the month's switcher, the day's sum, the
-  account's balance, «Пришло и ушло» and the sheets of an account and a plan besides. Five ways, one each:
+- **Large text stands within the phone on «Деньги», «Настройки» and a newcomer's «Что брать»: Android's 150 % and
+  200 % on 320** (MOL-321, owner's В-1…В-4). The project measures it as its specs make it — the root's font-size,
+  which every size of the app is in — and `e2e/large-text.spec.ts` holds those screens and the sheets of «Деньги» at
+  both, with the sums a month in drams and savings in roubles have («Потрачено 125 403 ֏», «1 234 567,89 ₽» — a month
+  of four digits passed by, adversarial А1, А4). Before it «Настройки» and the exchange's sheet went 120 px sideways
+  at 150 %, the rings of «Деньги» and «Графики» 43 and 47, a newcomer's «Что брать» 42, and at 200 % the month's
+  switcher, the day's sum, the figures of «Деньги», «Пришло и ушло» and the sheets of an account, a plan and a
+  category besides. **The rest of the app is MOL-334**: the scale of «Оценки», «Продолжить» of «Покупки», the totals
+  of a receipt and a record. Six ways:
   - **A row of segments its words do not fit stands them one under another** (`SegmentedControl`, В-1 «а»):
     the word stays whole — MOL-189 holds, and now a test holds it (`kit-rows`: every word of «Как меняли» on one
     line, in both engines and languages; m7, which broke the word, went green on 66 tests before). The row is
@@ -489,34 +492,45 @@ The detail behind the frontend lines of `CLAUDE.md`.
     own** (`contain: inline-size`): in the form of a new account, a grid column of `auto`, it handed its words up
     as the column's width, always «fitted», and the sheet went 82 px sideways at 200 %. **A hard hyphen is a
     word's end**: «Non-|cash» breaks where print breaks it, at 100 % on 320 in English.
-  - **What stands beside a figure turns by `@container` in `rem`**: everything beside it grows with the text,
+  - **What stands beside something turns by `@container` in `rem`**: everything beside it grows with the text,
     so a threshold in `rem` turns at the text's size, not the phone's width or the language. The ring of «Куда
     ушли» stands over its names below 15rem — **and so on a phone of 320 at 100 % too** (13.9rem), where the names
     had 41 px beside the ring and broke inside every word («Прод|укты», «рест|оран|ы»): the one look of 100 %
-    the task changes, named. The legend of «Графики» puts its name on a line of its own below 15rem (16rem at
-    100 % on 320 keeps it), and its centre goes under the ring below 8rem (200 %); the month's name stands over
-    its arrows below 13rem; «Пришло и ушло» stands its three figures one under another below 12rem; the wallet
-    of `AccountRow` gives way below 10rem — a decoration, where «Account» of one word did not fit.
+    the task changes, named. The legend of «Графики» puts its name on a line of its own below 15rem (its card is
+    15.9rem at 100 % on 320), the sum and the share under it across the whole row, and its centre goes under the
+    ring below 8rem (200 %); the month's name stands over its arrows below 13rem; «Пришло и ушло» stands its three
+    figures one under another below 12rem; «На счетах сейчас» stands «1 счёт ›» under its words below 12rem; an
+    icon of `NavRow` gives way below 12rem and the wallet of `AccountRow` below 10rem, where the account's name
+    goes to a line of its own — decorations, where the words had 64 px. **A box cannot ask its own width**: the
+    rules under a query stand on its children, and what the box itself does — `flex-wrap` — is set outside it.
   - **A line wraps only where its least widths do not fit**: `flex-wrap` with the words at `flex-basis:
 min-content` — the day's head and the total of «Траты», a line of an exchange's card, «Против обычного»,
-    «Покупки ›» of a spending's sheet. A flex line breaks by its items' bases, so at 100 % the words still give way
-    first, as before, and the figure goes under them only when even the words broken leave it no room. The sum
-    and the share of a ring's name are one `figures` span, `display: contents` beside the ring and a wrapping
-    line of its own under it, so they line up under the name with no indent to count.
-  - **A label and a figure stop growing where the phone runs out**: the tab label is `--text-tab`,
-    `min(var(--text-caption), 13.75px)` — 125 % of the caption and no further, as iOS keeps its tab bar (В-3
-    «а»); the balance of an account is `--text-figure-fit`, `min(var(--text-figure), 18cqi)` of its card — a sum
-    never breaks, and at 200 % «118 200 ֏» was 276 px in a card of 190; 18cqi is wider than the figure up to
-    some 140 %. Both are tokens and named one by one in Stylelint's list of sizes.
-  - **A word wider than its column breaks with a hyphen where the browser knows the language** — the
-    newcomer's heading and a `block` button (В-2 «а»: «Сфотогра-фируйте», «Сфотографи-ровать чек») — **from twelve
-    letters** (`hyphenate-limit-chars: 12 5 5`): WebKit hyphenates any word at a line's end, and «Запишите первые
-    по-купки» came at 100 %; Chromium only breaks a word that does not fit at all.
-    **The prices, named:** Safari below the support of `hyphenate-limit-chars` hyphenates short words at a line's
-    end; CI's Chromium may have no dictionary, so e2e holds the width and the eye the hyphen; at 200 % the docked
-    strip and the tab bar take half a window of 720 — the list ends over them and scrolls, but a tap aimed by a
-    script scrolled under them («Написать разработчику»); and a word of fewer than twelve letters wider than its
-    column still breaks with no hyphen.
+    «Покупки ›» of a spending's sheet, the difference of a check. A flex line breaks by its items' bases, so at
+    100 % the words still give way first, as before, and the figure goes under them only when even the words
+    broken leave it no room. The sum and the share of a ring's name are one `figures` span, `display: contents`
+    beside the ring and a wrapping line of its own under it.
+  - **A figure that is its card's answer shrinks to its card by its length** (`@include figure-fit`, adversarial
+    А1…А6): `min(var(--text-figure), 100cqi / (characters × 0.56))`, the characters set beside it by
+    `figureChars` (`--figure-chars`, set by script), the box measured the nearest `container-type: inline-size` —
+    the card, the column of words. A sum never breaks, and at 200 % «Потрачено 125 403 ֏» was 276 px in a card of
+    190; a width alone (`18cqi`, the first try) did not know the length, and «1 234 567,89 ₽» stood 15 px past at
+    150 %. 0.56 of the size a character is above Nunito 800's widest (0.55), so a figure of fourteen keeps its size
+    at 100 % on 320. Ten figures of «Деньги»; the totals of a receipt and a record are MOL-334.
+  - **The tab label stops growing at 125 %**: `--text-tab`, `min(var(--text-caption), 13.75px)`, as iOS keeps its
+    tab bar (В-3 «а»); a token, named one by one in Stylelint's list of sizes. The tab bar is fixed and in no width
+    of the page, so `large-text` reads every label within its column.
+  - **A word wider than its column breaks with a hyphen only while the text is large** (В-2 «а»: «Сфотогра-фируйте»,
+    «Сфотографи-ровать чек»): `html[data-large-text]`, set by `useLargeText` from a box one rem wide while a rem is
+    over 17.6 px — a width in `rem` tells the box, not the text, and a block of a pair is narrow at 100 % too. At
+    100 % no engine hyphenates: Safari knows no `hyphenate-limit-chars` in any version, and WebKit hyphenates any
+    word at a line's end («Запишите первые по-купки», self-review №2); where the limit is known, only a word of
+    twelve letters and more. A block button's words are a `span.text` for it.
+    **The prices, named:** at 200 % a word of eight letters and more in a `NavRow` still breaks («Категории» — 171 px
+    of 136, MOL-334); CI's Chromium may have no dictionary, so e2e reads the style and the eye the hyphen; at 200 %
+    the docked strip and the tab bar take half a window of 720 — the list ends over them and scrolls, but a tap aimed
+    by a script scrolled under them («Написать разработчику»); and **Android's page zoom is not this model**
+    (self-review №3): it narrows the window in CSS pixels — 213 at 150 % — a phone narrower than the 320 the project
+    holds, where `--text-tab`, in px, limits nothing; which one the owner's Chrome takes is asked in MOL-334.
 - **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
   handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
   its tint, in the strip's shape and never a live region; a tag a pill of 13/600, plain, warn or bad
