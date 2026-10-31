@@ -63,10 +63,17 @@ export const useActorStore = defineStore('actor', () => {
   const settings = computed(() =>
     actor.value?.id === id.value ? settingsOf(actor.value) : cachedSettings.value,
   )
+  /**
+   * When the server last told this phone the settings shown (MOL-215): set by an answer as it lands,
+   * brought by another window with its shelf, never by the shelf being written — the watcher below
+   * writes it for every change of `actor`, another window's included.
+   */
+  const settingsReadAt = ref(recallSettingsSnapshot(id.value)?.readAt ?? null)
   watch(
     id,
     (owner) => {
       cachedSettings.value = recallSettings(owner)
+      settingsReadAt.value = recallSettingsSnapshot(owner)?.readAt ?? null
     },
     { flush: 'sync' },
   )
@@ -75,7 +82,7 @@ export const useActorStore = defineStore('actor', () => {
     (loaded) => {
       if (loaded?.id === id.value) {
         cachedSettings.value = settingsOf(loaded)
-        rememberSettings(loaded.id, cachedSettings.value, loaded.updatedAt)
+        rememberSettings(loaded.id, cachedSettings.value, loaded.updatedAt, settingsReadAt.value)
       }
     },
     { flush: 'sync' },
@@ -89,6 +96,7 @@ export const useActorStore = defineStore('actor', () => {
       )
         return
       cachedSettings.value = snapshot.settings
+      settingsReadAt.value = snapshot.readAt
       if (actor.value)
         actor.value = {
           ...actor.value,
@@ -117,6 +125,8 @@ export const useActorStore = defineStore('actor', () => {
     revision += 1
     const was = currentIdentity()
     if (actor.value?.id === loaded.id && actor.value.updatedAt > loaded.updatedAt) return
+    const heardAt = new Date()
+    settingsReadAt.value = heardAt
     actor.value = loaded
     id.value = loaded.id
     // Written down because the app needs it **before** the server can be asked: at the shelf
@@ -125,7 +135,9 @@ export const useActorStore = defineStore('actor', () => {
     // it anywhere — it is the name of a drawer.
     rememberIdentity(loaded.id)
     cachedSettings.value = settingsOf(loaded)
-    rememberSettings(loaded.id, cachedSettings.value, loaded.updatedAt)
+    // Again: a new owner's id brought their shelf's moment back on the way.
+    settingsReadAt.value = heardAt
+    rememberSettings(loaded.id, cachedSettings.value, loaded.updatedAt, heardAt)
 
     // **A different owner than last time leaves the previous one's drawers where they are, and
     // out of reach** (MOL-53, Б1/Б2): the trip queue, the recent items and the verdict drafts
@@ -356,6 +368,7 @@ export const useActorStore = defineStore('actor', () => {
       (actor.value?.id === loaded.id && actor.value.updatedAt > loaded.updatedAt)
     )
       return
+    settingsReadAt.value = new Date()
     actor.value = loaded
     state.value = 'ready'
   }
@@ -364,6 +377,7 @@ export const useActorStore = defineStore('actor', () => {
     actor,
     id,
     settings,
+    settingsReadAt,
     state,
     start,
     apply,
