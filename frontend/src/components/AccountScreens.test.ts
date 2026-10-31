@@ -856,6 +856,52 @@ describe('AccountSheet (handoff 03)', () => {
     expect(addMoneyAccount).not.toHaveBeenCalled()
   })
 
+  // A day refused alone had no field to go to (MOL-235, adversarial Р5-А1): the focus goes to the first
+  // field marked in the form, the day, once its error is drawn — refused on the phone or by the server.
+  describe('the start day refused', () => {
+    async function typed(day: string) {
+      const view = await mounted(
+        AccountSheet,
+        { open: true, spendCurrency: 'AMD', online: true },
+        withAccounts([]),
+      )
+      await view.findAll('input').at(0)?.setValue('Card')
+      const label = view.findAll('label').find((one) => one.text().trim() === en.accounts.balance)
+      await view.get(`#${CSS.escape(label?.attributes('for') ?? '')}`).setValue('1000')
+      const date = view.get<HTMLInputElement>('input[type="date"]')
+      await date.setValue(day)
+      let invalidAtFocus: string | null = null
+      date.element.addEventListener('focus', () => {
+        invalidAtFocus = date.element.getAttribute('aria-invalid')
+      })
+      const save = button(view, en.accounts.sheet.save)
+      ;(save?.element as HTMLButtonElement).focus()
+      return { date, save, invalidAtFocus: () => invalidAtFocus }
+    }
+
+    it('cleared on the phone: nothing is sent, the focus goes to the day, marked', async () => {
+      const { date, save, invalidAtFocus } = await typed('')
+      await save?.trigger('click')
+      await flushPromises()
+      expect(addMoneyAccount).not.toHaveBeenCalled()
+      expect(document.activeElement).toBe(date.element)
+      expect(invalidAtFocus()).toBe('true')
+    })
+
+    it('to come, by the server: the focus goes to the day, marked with its words', async () => {
+      addMoneyAccount.mockRejectedValue(new ApiError(ERROR.MONEY_ACCOUNT_IN_FUTURE, 'future', true))
+      const { date, save, invalidAtFocus } = await typed('2026-10-31')
+      await save?.trigger('click')
+      await flushPromises()
+      expect(addMoneyAccount).toHaveBeenCalledTimes(1)
+      expect(document.activeElement).toBe(date.element)
+      expect(invalidAtFocus()).toBe('true')
+      expect(
+        document.getElementById(date.attributes('aria-errormessage') ?? '')?.textContent,
+      ).toContain(en.error.money_account_in_future)
+    })
+  })
+
   it('takes a card in debt, and a repeat of the same sheet names the same account', async () => {
     addMoneyAccount.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'offline', false))
     addMoneyAccount.mockResolvedValue({ accounts: page([]), created: true })

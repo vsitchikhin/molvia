@@ -54,7 +54,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, nextTick, ref, watch } from 'vue'
+import { defineComponent, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconCheck from '~icons/mdi/check'
@@ -63,6 +63,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import type { SpendingDetailsField } from '@/components/spending'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 
 /**
  * «Дата, заметка, место» over the spending sheet (MOL-199, handoff 72 v2, Ф-17): the three fields that
@@ -98,14 +99,16 @@ export default defineComponent({
   setup(props) {
     const { t } = useI18n()
     const fields = ref<HTMLElement | null>(null)
+    const refuse = useFieldRefusal()
 
     watch(
       () => props.open,
-      async (open) => {
-        if (!open || props.focus === null) return
-        await nextTick()
-        // `AppField` hands every attribute but class and style to its control.
-        fields.value?.querySelector<HTMLInputElement>(`[data-field="${props.focus}"]`)?.focus()
+      (open) => {
+        const field = props.focus
+        if (!open || field === null) return
+        // Opened by a refusal on its field (MOL-199): through the one way a refused field is focused
+        // (MOL-235) — `AppField` hands every attribute but class and style to its control.
+        void refuse(() => fields.value?.querySelector<HTMLElement>(`[data-field="${field}"]`))
       },
     )
 

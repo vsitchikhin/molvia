@@ -13,9 +13,8 @@
     <!-- First in the sheet (MOL-181), outside the form: a line of the sheet, not a field. -->
     <StatusStrip v-if="!online" class="status" kind="offline" :text="t('accounts.sheet.offline')" />
 
-    <form class="form" novalidate @submit.prevent="submit">
+    <form ref="form" class="form" novalidate @submit.prevent="submit">
       <AppField
-        ref="nameField"
         v-model="name"
         :label="t('accounts.sheet.name')"
         :placeholder="t('accounts.sheet.name_placeholder')"
@@ -50,7 +49,6 @@
            server counts from it stands under it — as recorded, never worked out from what is typed. -->
       <div>
         <AppField
-          ref="startField"
           v-model="start"
           :label="t(account ? 'accounts.sheet.start_amount' : 'accounts.balance')"
           kind="decimal"
@@ -125,7 +123,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, ref, useId, watch } from 'vue'
-import type { ComponentPublicInstance, PropType } from 'vue'
+import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconArchive from '~icons/mdi/archive-arrow-down-outline'
 import IconCheck from '~icons/mdi/check'
@@ -229,8 +227,7 @@ export default defineComponent({
      */
     let revision: number | null = null
     let outcome: AccountOutcome | null = null
-    const nameField = ref<ComponentPublicInstance | null>(null)
-    const startField = ref<ComponentPublicInstance | null>(null)
+    const form = ref<HTMLFormElement | null>(null)
 
     /** The amount as it would be typed back: «241530», «-12400,5», never the grouping spaces. */
     function typed(account: MoneyAccountView): string {
@@ -349,11 +346,10 @@ export default defineComponent({
 
     // A field refused is heard (MOL-235): focused once its error is drawn, or, holding the focus, said.
     const refuse = useFieldRefusal()
+    // The first field marked, in the order of the form — the name, the start, its day (adversarial Р5-А1:
+    // a day refused alone, on the phone or by the server, had no field to go to).
     async function focusFirstProblem(): Promise<void> {
-      await refuse(() => {
-        const field = nameProblem.value ? nameField.value : startBad.value ? startField.value : null
-        return (field?.$el as HTMLElement | undefined)?.querySelector<HTMLElement>('input')
-      })
+      await refuse(() => form.value?.querySelector<HTMLElement>('[aria-invalid="true"]'))
     }
 
     /**
@@ -427,6 +423,7 @@ export default defineComponent({
           void focusFirstProblem()
         } else if (code === ERROR.MONEY_ACCOUNT_IN_FUTURE) {
           dayProblem.value = t('error.money_account_in_future')
+          void focusFirstProblem()
         } else if (code === ERROR.MONEY_ACCOUNT_CURRENCY_LOCKED) {
           // An operation came meanwhile: the currency goes back to the account's, and the lock says
           // why in its own words — sent again it would only be refused again (adversarial Ж).
@@ -520,8 +517,7 @@ export default defineComponent({
       currencyOptions,
       currentOf,
       removeWord,
-      nameField,
-      startField,
+      form,
       submit,
       remove,
       afterClose,
