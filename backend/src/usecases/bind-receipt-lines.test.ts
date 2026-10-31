@@ -398,11 +398,10 @@ describe('a word the model misread by the font (MOL-326, В-3 «б»)', () => {
     ])
   })
 
-  it('stands only on an item that names the word put right: corn bread read «Ձու» is no egg (adversarial Б1)', async () => {
-    // the seed's eggs by their till name, and the search's
+  it('must not put a line on an item its printed heading rules out: corn bread read «Ձու» is no egg (adversarial Б1)', async () => {
     const BREAD = '00000000-0000-4000-8000-0000000000e2'
     const { items } = fakeItems({
-      items: [item(BREAD, 'Хлеб кукурузный'), item(EGGS, 'Яйца')],
+      items: [item(BREAD, 'Хлеб'), item(EGGS, 'Яйца')],
       near: true,
       nearIds: [BREAD, EGGS],
     })
@@ -411,12 +410,13 @@ describe('a word the model misread by the font (MOL-326, В-3 «б»)', () => {
       ACTOR,
       'AM',
       'ru',
-      // the bench's reading of «Հաց եգիպտացորենի 350գր»: «Հաց» read as an egg, «եգ» as «եզ» — the mend is right
-      [line('Ձու եզիպտացորենի 350գր')],
+      // the bench's reading of «Հաց եգիպտացորենի 350գր»: «Հաց» read as an egg, «եգ» as «եզ» — the mend is right, and
+      // the class the till printed, read with it, rules the egg out by the seed's name and the search alike
+      [line('Ձու եզիպտացորենի 350գր', '1905')],
       [],
       { byModel: true },
     )
-    expect(bound).toMatchObject({ itemId: null, match: 'weak' })
+    expect(bound?.itemId).not.toBe(EGGS)
   })
 
   it('must not be put right on a line Tesseract read: it misreads otherwise', async () => {

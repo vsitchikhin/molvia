@@ -458,33 +458,6 @@ export function glyphsMended(printed: string, known: ReadonlySet<string>): strin
   return out === printed ? null : out
 }
 
-/** The words a line's mend put right, as they now read: «Շաքարավազ» of «Ցաքարավազ 1կգ». */
-export function mendedWords(printed: string, mended: string): string[] {
-  const words = (text: string): string[] => text.match(/[ա-ֆԱ-Ֆև]+/gu) ?? []
-  const was = words(printed)
-  return words(mended).filter((word, at) => word !== was[at])
-}
-
-/**
- * Whether an item's name says a word of the line — by a sense of the dictionary, by its genitive's adjective, or by its
- * letters. A line the model's mend put right stands only on an item that names the word put right (MOL-326,
- * adversarial Б1): the mend took away the unknown word that held the fitter back, and the line's other words may be
- * misread too — «Ձու եզիպտացորենի», corn bread with «Հաց» read as an egg, stood on «Яйца».
- */
-export function namesWord(
-  itemName: string,
-  word: string,
-  dictionary: Readonly<Record<string, string>>,
-  lexicon: NameLexicon = {},
-): boolean {
-  const item = wordsOf(itemName)
-  const said = [
-    ...sensesOf(word, dictionary).flatMap(wordsOf),
-    ...wordsOf(lexicon.genitives?.[lexiconKey(word)] ?? ''),
-  ]
-  return item.some((one) => said.some((sense) => sameRussian(sense, one)) || sameLetters(word, one))
-}
-
 /**
  * What a new item's name is written with beyond the till's words (MOL-261). Each part is the backend's
  * dictionary, as the till's words are; without one the name is as MOL-293 made it.

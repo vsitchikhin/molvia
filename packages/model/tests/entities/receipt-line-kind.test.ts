@@ -5,8 +5,6 @@ import {
   glyphsMended,
   heardSpelling,
   lineFitter,
-  mendedWords,
-  namesWord,
   newLineName,
   receiptLineParts,
   seedNameFits,
@@ -850,16 +848,6 @@ describe('a word the reader misread by the font (MOL-326, В-3 «б»)', () => {
     expect(glyphsMended('Չիպս «Ջիպս»', KNOWN)).toBeNull()
     // «չամիշով» is «չամիչով» and «շամիչով» alike: a guess, left as read
     expect(glyphsMended('չամիշով', new Set(['չամիչով', 'շամիշով']))).toBeNull()
-  })
-
-  it('says the words it put right, and which item names one (adversarial Б1)', () => {
-    expect(mendedWords('Ցաքարավազ 1կգ', 'Շաքարավազ 1կգ')).toEqual(['Շաքարավազ'])
-    expect(mendedWords('Ձու եզիպտացորենի', 'Ձու եգիպտացորենի')).toEqual(['եգիպտացորենի'])
-    const words = { ...WORDS, շաքարավազ: 'сахар-песок' }
-    const genitives = { genitives: { եգիպտացորենի: 'кукурузный' } }
-    expect(namesWord('Сахар', 'Շաքարավազ', words)).toBe(true)
-    expect(namesWord('Хлеб кукурузный', 'եգիպտացորենի', words, genitives)).toBe(true)
-    expect(namesWord('Яйца', 'եգիպտացորենի', words, genitives)).toBe(false)
   })
 
   it('must not take a swap of letters it has not measured: «լոշիկ» is no «լոլիկ»', () => {
