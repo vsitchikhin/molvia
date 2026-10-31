@@ -55,12 +55,50 @@ async function comeBack(page: Page): Promise<void> {
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
 }
 
+// MOL-216, 41 v2 7a (Ф-35): a stranger's first screen names the product and what it is for, and the one
+// action stands at the thumb — on the narrowest phone too, nothing wider than it.
+for (const width of [390, 320])
+  test(`первый экран — знак, имя, обещание, кнопка у нижнего края (${String(width)})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 700 })
+    await page.goto('/')
+
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
+    await expect(
+      page.getByText('What to buy in a new place — and where', { exact: true }),
+    ).toBeVisible()
+    const mark = page.locator('img.mark')
+    await expect(mark).toHaveAttribute('alt', '')
+    await expect
+      .poll(() => mark.evaluate((img: HTMLImageElement) => img.naturalWidth))
+      .toBeGreaterThan(0)
+    const button = page.getByRole('button', { name: 'Sign in with Telegram' })
+    const box = await button.boundingBox()
+    expect(box && box.y + box.height).toBeGreaterThan(700 / 2)
+    // The promise stands above the free height, the ask under it, by the button.
+    const promise = await page.locator('.promise').boundingBox()
+    const ask = await page
+      .getByRole('heading', { name: 'Sign in with your Telegram' })
+      .boundingBox()
+    expect(promise && ask && ask.y - (promise.y + promise.height)).toBeGreaterThan(32)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+    ).toBeLessThanOrEqual(0)
+    // The links under it keep the page's margins of 16, never flush with the edge.
+    for (const name of ['Data and privacy', 'Terms of use']) {
+      const link = await page.getByRole('link', { name, exact: true }).boundingBox()
+      expect(link?.x).toBeGreaterThanOrEqual(16)
+      expect(link && link.x + link.width).toBeLessThanOrEqual(width - 16)
+    }
+  })
+
 test('вход целиком, и человек оказывается там, куда шёл', async ({ page, request }) => {
   await withoutTelegram(page)
   // Ссылка из бота ведёт в раздел, а не на главную: адрес обязан пережить вход.
   await page.goto('/purchases')
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
   const code = await start(page)
   await expect(page.getByRole('heading', { name: 'Open Telegram and tap «Sign in»' })).toBeVisible()
 
@@ -143,5 +181,5 @@ test('сессия, которой не стало, поднимает экра�
   await page.getByRole('link', { name: 'Purchases' }).click()
   await refused
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
 })

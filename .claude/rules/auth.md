@@ -192,6 +192,32 @@ the round trip through Telegram, and ask whose account this turned out to be.
   брать» the moment they are in. A `/login` entry would have to be written into the rules of
   «back» (MOL-17) and would need to remember, separately from the address bar, where the person
   was headed. The one price is the tab's title, which the screen sets and puts back.
+- **Behind the door a public screen leads back to the door** (MOL-216, Е-9): «Данные и
+  приватность» and «Условия» open without a session, and their parent is «Настройки», where nobody
+  is let in — the chevron said «‹ Настройки» and `App.vue` drew the login at `/settings`. While
+  `login.closed`, `backTarget` names it «‹ Вход» (`titleKey`) and takes a step onto the entry
+  underneath — the login, at whatever address the person was going to, so they arrive there once in;
+  a public screen underneath is itself and keeps its own name. **Opened cold behind the door, home is
+  laid underneath** (`settleColdStart`, owner's В-1 «а»): with «Настройки» there, a stranger who read
+  the privacy page by a link signed in onto the settings. The door is read once at the start, before
+  the first paint and before the first `me()`, so by the drawer. **The prices, named:** a door that
+  opens afterwards leaves the chevron «‹ Настройки», a replace onto the parent as for any screen with
+  no ancestor underneath; and one that shuts afterwards — an owner on the device whose session is
+  gone, 180 days unused or ended from «Устройства» — finds «Настройки» laid underneath, and «‹ Вход»
+  steps there: the owner signs in onto the settings (self-review №4, adversarial А1). Led past that
+  entry, the chevron and the system «back» would part, and the history underneath cannot be laid
+  again.
+- **The first screen names the product and what it is for** (MOL-216, Ф-35): the home screen's mark,
+  «Molvia» as the heading the focus lands on, «Что брать на новом месте — и где» — no country, since
+  the app has three — and the one action at the bottom of the free height. A screen, not a state of
+  one: it goes to no live region; every later step stands under «Вход» and its `ScreenState`. **So
+  the two headings are two elements, and the focus follows them** (adversarial А2): a change of step
+  that takes the heading or the button the focus stood on gives it to the heading that came, and a
+  door shut over the app — a session ended on another phone — gives it to the door's heading
+  (`App.vue`), since the first screen no longer says its words. A focus put outside the door stays,
+  and so does one over a public screen the shut door leaves in place: on the body there it is a page
+  being read, and taken to the heading the reading jumped to the top (adversarial Р2-А1).
+  The mark is `/favicon.svg` by its address, the tab's icon and precached; only the dev server inlines it.
 - **The door has one definition** — `login.closed`, which `App.vue` only reads — and it turns on
   what is actually known. A session the server named and the person claimed opens it; «no
   session» is an answer too and shuts it, whatever the device remembers. **Where nothing has

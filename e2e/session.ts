@@ -34,7 +34,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * `settings.spec` идёт по-русски, остальные по-английски.
  */
 export const DEV_SEAM = /^(Sign in for development|Войти для разработки)$/
-const LOGIN_TITLE = /^(Sign in|Вход)$/
+// The door's first screen is titled by the product's name (MOL-216), every later step «Вход».
+const LOGIN_TITLE = /^(Sign in|Вход|Molvia)$/
 /** The step of the door after the claim (MOL-95), in both languages, as the seam is. */
 export const AGE = /^(I am 16 or older|Мне 16 лет или больше)$/
 export const ACCEPT = /^(I accept|Принимаю)$/

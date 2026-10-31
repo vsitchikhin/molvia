@@ -4,7 +4,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { MODEL_CONSENT_EDITION, receiptDetailCodec, spendMonthOf } from '@molvia/model'
+import {
+  MODEL_CONSENT_EDITION,
+  dayIn,
+  ownerNoticeSchema,
+  receiptDetailCodec,
+  spendMonthOf,
+} from '@molvia/model'
 import type { ModelReceipt } from '@molvia/model'
 import am05 from '@molvia/model/testing/receipt-text.am-05.json'
 import type { FastifyInstance } from 'fastify'
@@ -140,8 +146,11 @@ async function person(until: Date | null, edition: number | null = MODEL_CONSENT
 
 const LATER = new Date(Date.now() + 24 * 60 * 60 * 1000)
 
-async function queued(me: Person, capturedAt = '2026-10-08T16:00:00.000Z'): Promise<string> {
-  const id = randomUUID()
+async function queued(
+  me: Person,
+  capturedAt = '2026-10-08T16:00:00.000Z',
+  id: string = randomUUID(),
+): Promise<string> {
   const sent = await app.inject({
     method: 'POST',
     url: '/receipts',
@@ -1207,7 +1216,8 @@ describe('a receipt read not whole: its reasons, its review and the developer to
 
   it('counts why, keeps the photo and the answer for the review, and tells the developer — no name, no sum', async () => {
     const me = await person(LATER)
-    const id = await queued(me)
+    // an id that starts with one of the sums: the receipt is named by it all the same (MOL-316)
+    const id = await queued(me, undefined, '600b451a-0000-4000-8000-000000000316')
     await readAll(benchReader(), fakeModel(notWhole), { told: told() })
     expect(await reasons()).toEqual([
       'model AM line unsettled 1',
@@ -1223,17 +1233,50 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     })
     expect(await db.select().from(receiptMissParts)).toHaveLength(1)
     const [notice] = await notices()
+    // read as the bot reads it: a field the schema does not name would lose the notice (adversarial А1)
+    expect(ownerNoticeSchema.safeParse(notice).success).toBe(true)
     expect(notice).toMatchObject({
       kind: 'receipt_partial',
-      receipt: id.slice(0, 8),
       country: 'AM',
       lines: 3,
       shown: 2,
       reason: 'line_not_as_printed',
-      lineReasons: { unsettled: 1 },
     })
-    expect((notice as { keptUntil?: string }).keptUntil).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-    expect(JSON.stringify(notice)).not.toMatch(/Օրինակ|1627|600/)
+    // the id and the day may hold any digits: the name and the sums are looked for in the rest (MOL-316)
+    const { receipt, keptUntil, ...rest } = notice as { receipt?: string; keptUntil?: string }
+    expect(receipt).toBe(id.slice(0, 8))
+    expect(keptUntil).toBe(dayIn(kept!.keepUntil))
+    expect(JSON.stringify(rest)).not.toMatch(/Օրինակ|1627|600/)
+    // the bot words each: no kind of line it does not have, no «Прочитали не всё» of lines that meet the total
+    expect(rest).toHaveProperty('lineReasons', { unsettled: 1 })
+    expect(rest).not.toHaveProperty('partly')
+  }, 30_000)
+
+  it('names the day of the review in Yerevan, on either side of its midnight (MOL-316)', async () => {
+    const me = await person(LATER)
+    // a quarter of an hour either side of midnight in Yerevan: 20:15 in UTC is the 16th there and still the 15th in
+    // Tehran, 19:45 the 15th there and already the 16th at +4:30 — of the real zones only those at +4 name both;
+    // a day years off, which no `keep_until` of today's reading falls on
+    const moments = new Map([
+      [await queued(me), { at: '2030-01-15T20:15:00.000Z', day: '2030-01-16' }],
+      [await queued(me), { at: '2030-01-15T19:45:00.000Z', day: '2030-01-15' }],
+    ])
+    const evening: ReadReceiptsDeps['receipts'] = {
+      ...repository,
+      finish: async (id, outcome) => {
+        const written = await repository.finish(id, outcome)
+        const moment = moments.get(id)
+        return written?.keptUntil && moment ? { keptUntil: new Date(moment.at) } : written
+      },
+    }
+    await readAll(benchReader(), fakeModel(notWhole), { told: told(), receipts: evening })
+    const named = (await notices()).map((notice) => {
+      const { receipt, keptUntil } = notice as { receipt?: string; keptUntil?: string }
+      return [receipt, keptUntil]
+    })
+    expect(Object.fromEntries(named)).toEqual(
+      Object.fromEntries([...moments].map(([id, { day }]) => [id.slice(0, 8), day])),
+    )
   }, 30_000)
 
   it('keeps the review after «Записать» deletes the receipt’s own photo, until its days pass', async () => {
