@@ -539,6 +539,14 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   - **The tab label stops growing at 125 %**: `--text-tab`, `min(var(--text-caption), 13.75px)`, as iOS keeps its
     tab bar (В-3 «а»); a token, named one by one in Stylelint's list of sizes. The tab bar is fixed and in no width
     of the page, so `large-text` reads every label within its column.
+  - **A skeleton is the answer's shape at large text too** (MOL-178): the ring of `ChartsSkeleton` is
+    `min(13.25rem, 100%)` as the ring that comes, its band 12 of the hundred of that width — the square of 13.25rem
+    took «Графики» 47 px sideways at 150 % and 169 at 200 % while the answer was on its way (adversarial Е1); the
+    trip's card in a record's sheet is a column of `minmax(0, 1fr)` (MOL-318's rule) — `auto` took its bars of 9 and
+    11rem and stood the sheet 112 px sideways — and an item's name keeps 6rem, its sum going under it where the two do
+    not fit, the name's bar likewise. `large-text` holds every screen of «Деньги» with its answer held, before the
+    device remembers one, and the record's sheet with the trip's answer held: a check that measured the skeleton
+    only when it caught it passed it by (self-review 6, №1).
   - **A word wider than its column breaks with a hyphen only while the text is large** (В-2 «а»: «Сфотогра-фируйте»,
     «Сфотографи-ровать чек»): `html[data-large-text]`, set by `useLargeText` from a box one rem wide while a rem is
     over 17.6 px — a width in `rem` tells the box, not the text, and a block of a pair is narrow at 100 % too. At
