@@ -416,7 +416,8 @@ export default defineComponent({
 
 /* Narrower than this a row of the legend stands its name on a line of its own, the sum and the share
    under it (MOL-321): with the ring in the card at 150 % the name had no width left and was gone, and
-   beside the share alone «Продукты» still broke in its middle. In rem, as `CategoryDonutCard`: the card's 15.9rem at 100 % on 320 keeps the row as it was. */
+   beside the share alone «Продукты» still broke in its middle. In rem, as `CategoryDonutCard`: the
+   card's 15.9rem at 100 % on 320 keeps the row as it was. */
 $row-beside: 15rem;
 
 @container (width < #{$row-beside}) {
@@ -432,11 +433,12 @@ $row-beside: 15rem;
   }
 
   /* As «Куда ушли» of «Деньги»: the sum and the share side by side while they fit, the share under the
-     sum when not — at 200 % two columns ran into each other. */
+     sum when not — at 200 % two columns ran into each other — and under the dot too: alone in its column
+     the sum «125 403 ֏» was 160 px in 125 at 200 % (adversarial А3), and a sum never breaks. */
   .figures {
     display: flex;
     flex-wrap: wrap;
-    grid-column: 2;
+    grid-column: 1 / -1;
     column-gap: var(--space-2);
   }
 

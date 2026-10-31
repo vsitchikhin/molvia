@@ -232,9 +232,8 @@ export default defineComponent({
   gap: var(--space-4);
 }
 
-/* The ring and, in its middle, «0 ֏» of a month with nothing spent. */
-
-/* Never wider than the card: under the names at 200 % the ring of 6.75rem was 216 px in a card of 190. */
+/* The ring and, in its middle, «0 ֏» of a month with nothing spent. Never wider than the card: under
+   the names at 200 % the ring of 6.75rem was 216 px in a card of 190 (MOL-321). */
 .ring-box {
   display: grid;
   flex: none;
@@ -281,13 +280,12 @@ export default defineComponent({
   border-radius: var(--radius-pill);
 }
 
-/* The whole name, on as many lines as it takes (Е-19): cut, «Аренда и комм…» read as another. */
-
 /* Of the sector's grid beside the ring; the second line of its own under it (below). */
 .figures {
   display: contents;
 }
 
+/* The whole name, on as many lines as it takes (Е-19): cut, «Аренда и комм…» read as another. */
 .sector-name {
   font-size: var(--text-callout);
   font-weight: var(--weight-medium);
@@ -353,7 +351,7 @@ $ring-beside: 15rem;
   .figures {
     display: flex;
     flex-wrap: wrap;
-    grid-column: 2;
+    grid-column: 1 / -1;
     column-gap: var(--space-2);
   }
 

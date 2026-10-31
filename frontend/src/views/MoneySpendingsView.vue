@@ -591,7 +591,6 @@ export default defineComponent({
    three currencies with their cents put the page at 400 px on a phone of 320 (MOL-184, round 2). Never
    narrower than its widest figure: a figure wider than 60 % — «≈ 50 000 000 ֏» in a large system font —
    takes the room from the day's words rather than standing past the column (round 3). */
-
 .day-total {
   flex: none;
   min-width: min-content;
