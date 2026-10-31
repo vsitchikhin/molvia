@@ -1248,19 +1248,30 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     expect(rest).not.toHaveProperty('partly')
   }, 30_000)
 
-  it('names the day of the review in Yerevan, where it is the next day in UTC (MOL-316)', async () => {
+  it('names the day of the review in Yerevan, on either side of its midnight (MOL-316)', async () => {
     const me = await person(LATER)
-    await queued(me)
-    // kept until 21:00 in UTC — already the 22nd in Yerevan: a day counted without the zone is a day short
+    // half an hour either side of midnight in Yerevan: 20:30 in UTC is the 22nd there and still the 21st in Moscow,
+    // 19:30 the 21st there and already the 22nd in Tashkent — only a day counted at +4 names both
+    const moments = new Map([
+      [await queued(me), { at: '2026-11-21T20:30:00.000Z', day: '2026-11-22' }],
+      [await queued(me), { at: '2026-11-21T19:30:00.000Z', day: '2026-11-21' }],
+    ])
     const evening: ReadReceiptsDeps['receipts'] = {
       ...repository,
       finish: async (id, outcome) => {
         const written = await repository.finish(id, outcome)
-        return written?.keptUntil ? { keptUntil: new Date('2026-11-21T21:00:00.000Z') } : written
+        const moment = moments.get(id)
+        return written?.keptUntil && moment ? { keptUntil: new Date(moment.at) } : written
       },
     }
     await readAll(benchReader(), fakeModel(notWhole), { told: told(), receipts: evening })
-    expect(await notices()).toMatchObject([{ kind: 'receipt_partial', keptUntil: '2026-11-22' }])
+    const named = (await notices()).map((notice) => {
+      const { receipt, keptUntil } = notice as { receipt?: string; keptUntil?: string }
+      return [receipt, keptUntil]
+    })
+    expect(Object.fromEntries(named)).toEqual(
+      Object.fromEntries([...moments].map(([id, { day }]) => [id.slice(0, 8), day])),
+    )
   }, 30_000)
 
   it('keeps the review after «Записать» deletes the receipt’s own photo, until its days pass', async () => {
