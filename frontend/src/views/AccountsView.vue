@@ -149,7 +149,11 @@
                     >
                       <template #tail>
                         <span class="money">
-                          <span :class="{ negative: account.balance.minor < 0n }">
+                          <span
+                            class="balance-figure"
+                            :class="{ negative: account.balance.minor < 0n }"
+                            :style="figureChars(signed(account.balance))"
+                          >
                             {{ signed(account.balance) }}
                           </span>
                           <span v-if="account.inSpend" class="approx">
@@ -714,6 +718,16 @@ export default defineComponent({
   display: grid;
   justify-items: end;
   white-space: nowrap;
+}
+
+/* A sum never breaks: under the words at 200 % it shrinks to the row (`figure-fit` of the text's size,
+   MOL-321), measured against the row itself. */
+.tight > .list-row {
+  container-type: inline-size;
+}
+
+.balance-figure {
+  @include figure-fit(1em);
 }
 
 .approx {

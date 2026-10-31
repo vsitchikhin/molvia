@@ -201,7 +201,9 @@
                (Е-11, handoff 157 v2 `year-category`). -->
           <template v-if="categoryPoint">
             <p class="month">{{ monthLabel(categoryPoint.month) }}</p>
-            <p class="figure small">{{ whole(categoryPoint.amount) }}</p>
+            <p class="figure small" :style="figureChars(whole(categoryPoint.amount))">
+              {{ whole(categoryPoint.amount) }}
+            </p>
             <p class="detail held">{{ categoryDetail }}</p>
           </template>
         </BarChart>
@@ -789,7 +791,7 @@ export default defineComponent({
   font-variant-numeric: tabular-nums;
 
   &.small {
-    font-size: var(--text-title);
+    @include figure-fit(var(--text-title));
   }
 }
 

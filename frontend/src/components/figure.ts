@@ -3,21 +3,43 @@ import type { StyleValue } from 'vue'
 const letters = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 
 /**
- * A capital Latin letter and a minus are wider than a figure: «−999,99 RSD» was 0.568 of its size a character
- * against `figure-fit`'s 0.56, and stood 3 px past its card (adversarial Б3 of MOL-321). Counted a little more,
- * they keep the share under it — 0.539 there — and a sum of figures alone is counted as before.
+ * How wide a character of the figures' face is, a share of its size — Dram and Nunito at 800 with tabular
+ * figures, measured in Chromium (adversarial В2 of MOL-321): a figure is 0.600, and a count of characters
+ * at some 0.55 held only where spaces and commas pulled the share down — «֏125,403» was 0.578. Anything not
+ * here counts as a capital letter, the widest a figure holds.
  */
-const WIDE = /^[A-Z−-]$/u
-const WIDE_WEIGHT = 1.15
+const WIDTH: Readonly<Record<string, number>> = {
+  ' ': 0.279,
+  ' ': 0.279,
+  ' ': 0.139,
+  ',': 0.26,
+  '.': 0.26,
+  '-': 0.44,
+  '−': 0.6,
+  '+': 0.6,
+  '%': 0.75,
+  '/': 0.4,
+  '≈': 0.661,
+  '֏': 0.765,
+  '₽': 0.661,
+  $: 0.6,
+  '€': 0.6,
+  '₾': 0.773,
+}
+const FIGURE = 0.6
+const OTHER = 0.78
+
+/** The measures are of one engine: a little room for another's rounding and kerning. */
+const ROOM = 1.03
 
 /**
- * How many characters a figure is, for `@include figure-fit` (MOL-321): CSS cannot count them, and a figure
- * shrinks to its box by its length. Counted as the eye sees them — «֏» is one, as is «≈» — the wide ones a
- * little more.
+ * How wide a figure is in its own size, for `@include figure-fit` (MOL-321): CSS cannot measure text, and a
+ * figure shrinks to its box by its width. Counted as the eye sees the characters — «֏» is one — each by its
+ * width in the face.
  */
 export function figureChars(text: string): StyleValue {
-  let count = 0
+  let width = 0
   for (const { segment } of letters.segment(text.trim()))
-    count += WIDE.test(segment) ? WIDE_WEIGHT : 1
-  return { '--figure-chars': String(Math.round(count * 100) / 100) }
+    width += /^\d$/.test(segment) ? FIGURE : (WIDTH[segment] ?? OTHER)
+  return { '--figure-width': String(Math.round(width * ROOM * 1000) / 1000) }
 }

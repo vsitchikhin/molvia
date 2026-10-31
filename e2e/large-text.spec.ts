@@ -54,8 +54,8 @@ async function sheetSideways(page: Page, opener: Locator): Promise<number> {
 }
 
 /**
- * How far the words of the elements a selector finds stand past the inner edge of their card, at most — a tail
- * of a row cut by its card is no width of the page (adversarial Б1, Б2, Б4).
+ * How far the words of the elements a selector finds stand past an inner edge of their card, either side, at
+ * most — a tail of a row cut by its card is no width of the page (adversarial Б1, Б2, Б4, В5).
  */
 function pastCard(page: Page, selector: string, card = '.card'): Promise<number> {
   return page.locator(selector).evaluateAll(
@@ -64,11 +64,17 @@ function pastCard(page: Page, selector: string, card = '.card'): Promise<number>
         -1,
         ...elements.map((element) => {
           const box = element.closest(around)!
-          const edge =
-            box.getBoundingClientRect().right - parseFloat(getComputedStyle(box).paddingRight)
+          const rect = box.getBoundingClientRect()
+          const style = getComputedStyle(box)
           const range = document.createRange()
           range.selectNodeContents(element)
-          return Math.max(...[...range.getClientRects()].map((line) => line.right)) - edge
+          const lines = [...range.getClientRects()]
+          // Either side: a sum under narrow words stood past the card's left edge, «00 000 ₽» (adversarial В5).
+          return Math.max(
+            Math.max(...lines.map((line) => line.right)) -
+              (rect.right - parseFloat(style.paddingRight)),
+            rect.left + parseFloat(style.paddingLeft) - Math.min(...lines.map((line) => line.left)),
+          )
         }),
       ),
     card,
@@ -151,6 +157,17 @@ async function aMonth(page: Page): Promise<{ card: string; savings: string; dina
       categoryId: categories[index]?.id,
       accountId: card,
     })
+  // A plan of six figures and a spending of six in it: «Осталось 124 597 ֏» of a row of «Бюджет» stood 31 px
+  // past the phone at 200 % (adversarial В4).
+  const planned = await page.request.put('/api/budget/plans', {
+    headers: await asBrowser(page),
+    data: {
+      categoryId: categories[0]?.id,
+      from: day(1).slice(0, 7),
+      plan: { kind: 'amount', amount: { amount: '250000', currency: 'AMD' } },
+    },
+  })
+  expect(planned.ok(), await planned.text()).toBe(true)
   await post(page, '/api/exchanges', {
     id: randomUUID(),
     given: { amount: '1000', currency: 'RUB' },
@@ -339,5 +356,24 @@ for (const size of ['150%', '200%'])
       expect(
         await sheetSideways(page, page.getByRole('button', { name: 'Добавить категорию' })),
       ).toBe(0)
+    })
+
+    // In English a whole sum of drams is «֏125,403», wider for its count than Russian's «125 403 ֏» — a count at
+    // 0.56 of the size let it 6 px past its card (adversarial В2, В3).
+    test.describe('in English', () => {
+      test.use({ locale: 'en-US' })
+      test('the figures of «Money» stand within their cards', async ({ page }) => {
+        test.setTimeout(60_000)
+        await signedIn(page)
+        await aMonth(page)
+        await page.goto('/money')
+        await expect(page.locator('.spent .figure')).toBeVisible()
+        await facesIn(page)
+        expect(await pastCard(page, '.spent .figure', '.spent')).toBeLessThanOrEqual(0.5)
+        await page.goto('/money/charts?mode=year')
+        await expect(page.locator('.chart-card .figure').first()).toBeVisible()
+        await facesIn(page)
+        expect(await pastCard(page, '.chart-card .figure', '.chart-card')).toBeLessThanOrEqual(0.5)
+      })
     })
   })

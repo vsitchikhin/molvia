@@ -112,7 +112,9 @@
               <template #title>
                 <span class="head">
                   <span>{{ row.name }}</span>
-                  <span class="amount" :class="{ over: row.over }">{{ row.left }}</span>
+                  <span class="amount" :class="{ over: row.over }" :style="figureChars(row.left)">{{
+                    row.left
+                  }}</span>
                 </span>
               </template>
               <template #meta>
@@ -151,7 +153,7 @@
                 <template #title>
                   <span class="head">
                     <span>{{ row.name }}</span>
-                    <span class="amount">{{ row.spent }}</span>
+                    <span class="amount" :style="figureChars(row.spent)">{{ row.spent }}</span>
                   </span>
                 </template>
                 <template v-if="row.archived" #tail><span class="no-chevron"></span></template>
@@ -174,7 +176,9 @@
             <template #title>
               <span class="head">
                 <span :id="`${id}-savings`">{{ t('budget.savings.title') }}</span>
-                <span class="amount">{{ savings.actual }}</span>
+                <span class="amount" :style="figureChars(savings.actual)">{{
+                  savings.actual
+                }}</span>
               </span>
             </template>
             <template #below>
@@ -618,19 +622,23 @@ export default defineComponent({
   background: var(--surface-2);
 }
 
+/* The sum goes under its word only where the two cannot stand side by side (MOL-321): at 200 % «370 000 ֏»
+   stood past the plate. */
 .plate-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
 
   dt {
+    flex: 1 1 min-content;
     color: var(--text-muted);
     font-size: var(--text-footnote);
   }
 
   dd {
-    margin: 0;
+    margin: 0 0 0 auto;
     font-size: var(--text-callout);
     font-weight: var(--weight-medium);
     font-variant-numeric: tabular-nums;
@@ -642,9 +650,16 @@ export default defineComponent({
    whole name no longer fits beside it (MOL-200). */
 .head {
   @include name-beside-figure;
+
+  /* The figure measures itself against the title's line (`figure-fit`, MOL-321). */
+  container-type: inline-size;
 }
 
+/* A sum never breaks: under the name at 200 % «124 597 ֏» stood 31 px past the phone (adversarial В4); it
+   shrinks to the line instead, the text's size otherwise. */
 .amount {
+  @include figure-fit(1em);
+
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

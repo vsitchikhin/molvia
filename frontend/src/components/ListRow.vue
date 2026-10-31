@@ -359,7 +359,7 @@ export default defineComponent({
    and 348 in their gutter of 32. The handoff's card of 390 (358) keeps the amount beside. The container
    is the caller's — `OperationRow` sets it — so every row of a card is laid out alike. No row gap: a row
    with no tail is not a line taller. */
-@mixin tail-under {
+@mixin tail-under($whole: false) {
   .list-row {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -389,6 +389,27 @@ export default defineComponent({
     grid-column: 3;
     grid-row: 1 / span 2;
   }
+
+  /* The whole row under the words, the circle and the chevron at the top: in the column of the words alone a
+     sum at 200 % stood past the card's left edge — «100 000 ₽» read «00 000 ₽» (adversarial В5). The title
+     breaks rather than end in «…», «Коп…» at 200 %. */
+  @if $whole {
+    .circle,
+    .list-row > .icon,
+    .chevron,
+    .check {
+      grid-row: 1;
+    }
+
+    .tail {
+      grid-column: 1 / -1;
+    }
+
+    .title {
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+  }
 }
 
 @container row (width < #{$row-narrow}) {
@@ -399,7 +420,7 @@ export default defineComponent({
    «Категории» keep their tail beside the words at 100 % on 320 (16rem), and at 200 % «1 234 567,89 ₽» was
    cut by 68 px and «Убрать» by 37, the chevron past the phone. 12rem: some 133 % of the text and up. */
 @container row-tight (width < 12rem) {
-  @include tail-under;
+  @include tail-under($whole: true);
 }
 
 .chevron {
