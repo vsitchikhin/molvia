@@ -45,7 +45,9 @@
         <div class="matched">
           <span class="circle" aria-hidden="true"><IconCheck class="circle-icon" /></span>
           <p class="matched-title">{{ t('accounts.reconcile.match_title') }}</p>
-          <p class="figure">{{ money(result.counted) }}</p>
+          <p class="figure" :style="figureChars(money(result.counted))">
+            {{ money(result.counted) }}
+          </p>
           <p class="hint">
             {{ t('accounts.reconcile.match_body', { date: shortDay(result.checkedOn) }) }}
           </p>
@@ -62,7 +64,9 @@
         </p>
         <p class="difference">
           <span class="difference-label">{{ t('accounts.reconcile.difference') }}</span>
-          <span class="difference-figure">{{ signed(result.difference) }}</span>
+          <span class="difference-figure" :style="figureChars(signed(result.difference))">{{
+            signed(result.difference)
+          }}</span>
         </p>
         <!-- What the difference waits for is said in words, never by dimming it (round 3, Н4; Ф-6). -->
         <p v-if="recountPending" class="hint">{{ t('accounts.reconcile.recounting') }}</p>
@@ -233,6 +237,7 @@ import {
   signedAmount,
 } from '@/components/accounts'
 import type { Removed } from '@/components/spending'
+import { figureChars } from '@/components/figure'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import type { IncomeDraft } from '@/composables/useIncomes'
 import { useReconnect } from '@/composables/useReconnect'
@@ -791,6 +796,7 @@ export default defineComponent({
     }
 
     return {
+      figureChars,
       t,
       factId,
       fact,
@@ -963,9 +969,9 @@ export default defineComponent({
 
 .figure {
   @include display-type;
+  @include figure-fit;
 
   margin: 0;
-  font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
 }
 
@@ -975,7 +981,11 @@ export default defineComponent({
 }
 
 .difference {
+  /* The figure measures itself against the plate, and goes under its word only where the two cannot
+     stand side by side (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
@@ -986,14 +996,15 @@ export default defineComponent({
 }
 
 .difference-label {
+  flex: 1 1 min-content;
   color: var(--text-muted);
   font-size: var(--text-callout);
 }
 
 .difference-figure {
   @include display-type;
+  @include figure-fit;
 
-  font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

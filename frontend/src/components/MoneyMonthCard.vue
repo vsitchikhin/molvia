@@ -4,7 +4,7 @@
       <SectionCaption as="span" inset>{{ t('spending.spent') }}</SectionCaption>
       <span v-if="change" class="change">{{ change }}</span>
     </p>
-    <p class="figure">{{ whole(month.spent) }}</p>
+    <p class="figure" :style="figureChars(whole(month.spent))">{{ whole(month.spent) }}</p>
     <!-- Only in another currency, never «≈ 0 ₽» beside «0 ֏» (`spentApprox`, MOL-184). -->
     <p v-if="approx" class="approx">≈ {{ whole(approx) }}</p>
     <p v-for="line in foreign" :key="line" class="footnote">{{ line }}</p>
@@ -88,6 +88,7 @@ import SectionCaption from '@/components/SectionCaption.vue'
 import { signedAmount } from '@/components/accounts'
 import { signedPercent } from '@/components/charts'
 import { bankWords, rateWords, spentApprox } from '@/components/spending'
+import { figureChars } from '@/components/figure'
 import { calendarDay } from '@/days'
 
 /**
@@ -212,6 +213,7 @@ export default defineComponent({
     })
 
     return {
+      figureChars,
       t,
       running,
       approx,
@@ -232,6 +234,8 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .spent {
+  /* The figure measures itself against the card (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: grid;
   gap: var(--space-1);
   padding: var(--space-4);
@@ -257,9 +261,9 @@ export default defineComponent({
 
 .figure {
   @include display-type;
+  @include figure-fit;
 
   margin: 0;
-  font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
   line-height: var(--leading-tight);
 }

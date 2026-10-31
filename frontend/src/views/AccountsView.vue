@@ -63,7 +63,11 @@
                too (В-1 «б»). Every figure is the server's. -->
           <AppCard v-if="main" class="total">
             <SectionCaption as="p" inset>{{ t('accounts.total') }}</SectionCaption>
-            <p class="figure" :class="{ negative: main.total.minor < 0n }">
+            <p
+              class="figure"
+              :class="{ negative: main.total.minor < 0n }"
+              :style="figureChars(`≈ ${estimate(main.total)}`)"
+            >
               ≈ {{ estimate(main.total) }}
             </p>
             <p v-if="second" class="figure-second" :class="{ negative: second.total.minor < 0n }">
@@ -299,6 +303,7 @@ import {
   signedAmount,
 } from '@/components/accounts'
 import { bankWords, rateWords } from '@/components/spending'
+import { figureChars } from '@/components/figure'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useOnline } from '@/composables/useOnline'
 import { useReconnect } from '@/composables/useReconnect'
@@ -533,6 +538,7 @@ export default defineComponent({
     }
 
     return {
+      figureChars,
       IconTransfer,
       transferable,
       transferOpen,
@@ -590,9 +596,9 @@ export default defineComponent({
 
 .figure {
   @include display-type;
+  @include figure-fit;
 
   margin: 0;
-  font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
   line-height: var(--leading-tight);
 }

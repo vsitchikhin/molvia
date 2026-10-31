@@ -70,7 +70,12 @@
             <span aria-hidden="true">•••</span>
             <span class="unseen">{{ t('accounts.account.balance_hidden') }}</span>
           </p>
-          <p v-else class="figure" :class="{ negative: account.balance.minor < 0n }">
+          <p
+            v-else
+            class="figure"
+            :class="{ negative: account.balance.minor < 0n }"
+            :style="figureChars(money(account.balance))"
+          >
             {{ money(account.balance) }}
           </p>
           <!-- It pushes the footnote and the journal in sight over the sheet: it grows and shrinks
@@ -262,6 +267,7 @@ import {
   signedAmount,
 } from '@/components/accounts'
 import type { Removed } from '@/components/spending'
+import { figureChars } from '@/components/figure'
 import { useAccountJournal } from '@/composables/useAccountJournal'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useLocalDay } from '@/composables/useLocalDay'
@@ -540,6 +546,7 @@ export default defineComponent({
     }
 
     return {
+      figureChars,
       IconArchive,
       title,
       failures,
@@ -604,7 +611,7 @@ export default defineComponent({
 /* A column, not a grid: «≈» grows and goes by `AppReveal`, which takes a flex column's gap back with
    it — a grid's stays and jumped (MOL-151). */
 .balance {
-  /* The balance's figure fits its card (`--text-figure-fit`, MOL-321). */
+  /* The balance measures itself against the card (`figure-fit`, MOL-321). */
   container-type: inline-size;
   display: flex;
   flex-direction: column;
@@ -626,9 +633,9 @@ export default defineComponent({
 
 .figure {
   @include display-type;
+  @include figure-fit;
 
   margin: 0;
-  font-size: var(--text-figure-fit);
   font-variant-numeric: tabular-nums;
   line-height: var(--leading-tight);
 

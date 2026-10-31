@@ -66,7 +66,9 @@
           <SectionCaption as="p" inset>
             {{ overall.over ? t('budget.total.over') : t('budget.total.left') }}
           </SectionCaption>
-          <p class="figure" :class="{ over: overall.over }">{{ overall.figure }}</p>
+          <p class="figure" :class="{ over: overall.over }" :style="figureChars(overall.figure)">
+            {{ overall.figure }}
+          </p>
           <p v-if="budget.total.leftIncome" class="approx">
             ≈ {{ amount(budget.total.leftIncome) }}
           </p>
@@ -238,6 +240,7 @@ import { budgetAmount, spendingLook } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
+import { figureChars } from '@/components/figure'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useMoneyBudget } from '@/composables/useMoneyBudget'
@@ -509,6 +512,7 @@ export default defineComponent({
     }
 
     return {
+      figureChars,
       t,
       id,
       IconPiggyBank,
@@ -566,15 +570,17 @@ export default defineComponent({
 }
 
 .total {
+  /* The figure measures itself against the card (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: grid;
   gap: var(--space-1);
 }
 
 .figure {
   @include display-type;
+  @include figure-fit;
 
   margin: 0;
-  font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
   line-height: var(--leading-tight);
 

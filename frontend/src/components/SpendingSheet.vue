@@ -11,7 +11,9 @@
     <!-- A trip's spending is read here and amended in the trip (handoff 02, 4c). -->
     <div v-if="target.kind === 'trip'" class="summary">
       <p class="total">
-        <span class="figure">{{ money(target.row.amount) }}</span>
+        <span class="figure" :style="figureChars(money(target.row.amount))">{{
+          money(target.row.amount)
+        }}</span>
         <span class="badge">
           <span class="dot" :style="{ background: tripColour }" aria-hidden="true"></span>
           {{ tripCategory }}
@@ -270,6 +272,7 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import SpendingDetailsSheet from '@/components/SpendingDetailsSheet.vue'
 import { defaultAccount, pageOrder } from '@/components/accounts'
+import { figureChars } from '@/components/figure'
 import {
   bankWords,
   categoryColour,
@@ -984,6 +987,7 @@ export default defineComponent({
     }
 
     return {
+      figureChars,
       t,
       amountId,
       amount,
@@ -1216,6 +1220,8 @@ export default defineComponent({
 }
 
 .summary {
+  /* The figure measures itself against the card (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: grid;
   gap: var(--space-3);
   padding: var(--space-4);
@@ -1231,8 +1237,8 @@ export default defineComponent({
 
 .figure {
   @include display-type;
+  @include figure-fit;
 
-  font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
 }
 

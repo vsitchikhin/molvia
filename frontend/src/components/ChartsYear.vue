@@ -80,7 +80,9 @@
         >
           <template v-if="spentMonth">
             <p class="month">{{ monthLabel(spentMonth.month) }}</p>
-            <p class="figure">{{ whole(spentMonth.spent) }}</p>
+            <p class="figure" :style="figureChars(whole(spentMonth.spent))">
+              {{ whole(spentMonth.spent) }}
+            </p>
             <p class="detail held">{{ spentDetail }}</p>
           </template>
         </BarChart>
@@ -239,6 +241,7 @@ import {
 import { categoryColour } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
+import { figureChars } from '@/components/figure'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useMoneyChartYear } from '@/composables/useMoneyCharts'
 import { calendarDay } from '@/days'
@@ -666,6 +669,7 @@ export default defineComponent({
     })
 
     return {
+      figureChars,
       t,
       locale,
       id: useId(),
@@ -778,10 +782,10 @@ export default defineComponent({
 
 .figure {
   @include display-type;
+  @include figure-fit;
 
   display: block;
   margin: 0;
-  font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
 
   &.small {
