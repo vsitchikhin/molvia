@@ -24,7 +24,7 @@ import IconUnanswered from '~icons/mdi/alert-circle-outline'
 import IconOffline from '~icons/mdi/cloud-off-outline'
 import IconRefreshing from '~icons/mdi/sync'
 import { useAnnouncer } from '@/composables/useAnnouncer'
-import { focusScreenTitle } from '@/transitions'
+import { focusTitleOf } from '@/transitions'
 
 /**
  * `offline` — no connection; `unanswered` — the server did not answer, and the last answer is shown;
@@ -84,14 +84,12 @@ export default defineComponent({
     watch([() => props.text, () => props.attempt], speak)
 
     // «Повторить» answered takes the strip away, and a focus on it fell to the body: it goes to the
-    // title, as a full error's does (MOL-194, Б1). Not in a sheet: the page under it is inert, and a
-    // sheet's title takes no focus — there it falls as before, a price.
+    // title, as a full error's does (MOL-194, Б1) — in a sheet, the sheet's own (MOL-317).
     const root = ref<HTMLElement | null>(null)
     onBeforeUnmount(() => {
       withdraw?.()
       const element = root.value
-      if (element?.contains(document.activeElement) && !element.closest('dialog'))
-        focusScreenTitle()
+      if (element?.contains(document.activeElement)) focusTitleOf(element)
     })
 
     // The strip may stay and its button go: «Повторить» pressed, the retry failed offline, and the
@@ -108,10 +106,9 @@ export default defineComponent({
       const focus = document.activeElement
       // Kept by the strip, or taken by someone else in the same render: not ours to move.
       if (focus && focus !== document.body) return
-      if (root.value?.closest('dialog')) return
       const button = action.value?.querySelector<HTMLElement>('button')
       if (button) button.focus()
-      else focusScreenTitle()
+      else focusTitleOf(root.value)
     })
 
     return { glyph, role, root, action }

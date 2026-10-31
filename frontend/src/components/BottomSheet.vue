@@ -632,6 +632,12 @@ export default defineComponent({
 
   /* An item's, a place's, a category's name may be one word wider than the sheet (MOL-318). */
   overflow-wrap: anywhere;
+
+  /* Focused when a block of the sheet went with the focus (`focusTitleOf`, MOL-317), for screen
+     readers; nothing for the eye to see, as the screen's own title. */
+  &:focus {
+    outline: none;
+  }
 }
 
 .meta {

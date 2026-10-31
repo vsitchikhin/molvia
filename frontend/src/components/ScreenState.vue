@@ -98,7 +98,7 @@ import { useUpdateAnnouncement } from '@/composables/useUpdateAnnouncement'
 import { usePwaUpdate } from '@/pwaUpdate'
 import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
-import { focusScreenTitle } from '@/transitions'
+import { focusTitleOf } from '@/transitions'
 
 export type StateKind = 'empty' | 'error' | 'offline' | 'attention'
 
@@ -369,9 +369,10 @@ export default defineComponent({
       withdraw?.()
       strip?.release(me)
       strip?.withdraw(me)
-      // The buttons may stand in the strip, out of the block: a focus on them goes with them too.
+      // The buttons may stand in the strip, out of the block: a focus on them goes with them too. In a
+      // sheet the sheet is looked for from the button, which may stand in its footer (MOL-317).
       const focused = document.activeElement
-      if (root.value?.contains(focused) || actions.value?.contains(focused)) focusScreenTitle()
+      if (root.value?.contains(focused) || actions.value?.contains(focused)) focusTitleOf(focused)
     })
 
     const update = usePwaUpdate()

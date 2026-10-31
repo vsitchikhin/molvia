@@ -602,10 +602,9 @@ nothing up.
   inside the card of the items would have been a second look of a section's error). Offline is the line
   of the code: the screen's strip under the sheet says it, and there is nothing to retry. **Only the
   latest read is laid** (`reading`, self-review 1): «Повторить» over a server that hangs, the sheet opened
-  again and read, and the first read's refusal came last over the items. **The price, named**
-  (self-review 2): the quiet card goes with the focus on its «Повторить», and the kit gives it to the
-  screen's title, which is inert under the sheet — the focus falls to the page, as a `StatusStrip`'s does
-  in a sheet (`frontend.md`); the kit's task of the focus in a sheet is MOL-317.
+  again and read, and the first read's refusal came last over the items. The quiet card goes
+  with the focus on its «Повторить», and the kit gives it to the sheet's title (MOL-317, `frontend.md`) —
+  until then it fell to the page, a price named by self-review 2.
 - **«Категории» stands in three groups** (owner's В-2 «а» of MOL-285): «Готовые» with a quiet
   «Убрать» in the tail, «Свои» — rows that open their sheet, with the chevron and no button, since a
   card never mixes the two (MOL-175, В-14) — and «Убранные» with «Вернуть»; each only when it has a
