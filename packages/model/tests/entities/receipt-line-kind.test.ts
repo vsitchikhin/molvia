@@ -202,6 +202,9 @@ describe('a line taken apart (MOL-293)', () => {
     expect(receiptLineParts('ՇԱՔԱՐԱՎԱԶ 1ԿԳ')).toMatchObject({ kind: 'ՇԱՔԱՐԱՎԱԶ', size: '1 кг' })
     // a letter and a figure of a code stay one token, no word
     expect(receiptLineParts('Մարտկոց Ա1 4հտ').before).toEqual(['Մարտկոց', 'Ա1', '4հտ'])
+    // a figure alone is the model's «շ», never a package: «Ֆրեշ» read «Ֆրե2», «Լավաշ» «Լավա2» (adversarial А4)
+    expect(receiptLineParts('Թաղանթ «Գոսիա» Ֆրե2 30մ').after).toEqual(['Ֆրե2', '30մ'])
+    expect(receiptLineParts('Լավա2 կգ').before).toEqual(['Լավա2', 'կգ'])
   })
 })
 

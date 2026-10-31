@@ -96,16 +96,21 @@ function isNameWord(token: string): boolean {
   return !/\d/u.test(token) && !token.includes('/') && (ARMENIAN.test(token) || latin)
 }
 
+// «Գազ.ըմպելիք» at its point, and a word before the package glued to it, «Շաքարավազ1կգ»
+const GLUED =
+  /(?<=[ա-ֆԱ-Ֆ]\.)(?=[ա-ֆԱ-Ֆ])|(?<=[ա-ֆԱ-Ֆ]{2})(?=\d+(?:[.,]\d+)?(?:կգ|գր|գ|մլ|լ)(?![ա-ֆ]))/iu
+
 /**
- * The tokens of a name: spaces and commas apart, «Գազ.ըմպելիք» at its point, a word glued to its package at its
- * figure — «Շաքարավազ1կգ» lost its word whole (MOL-326) — parentheses dropped. A letter before a figure is a code's:
- * «Ա1».
+ * The tokens of a name: spaces and commas apart, «Գազ.ըմպելիք» at its point, a word glued to its package at it —
+ * «Շաքարավազ1կգ» lost its word whole (MOL-326) — parentheses dropped. Only a package whole, its figure and its unit:
+ * a figure alone is the model's «շ», «Ֆրե2» of «Ֆրեշ», «Լավա2» of «Լավաշ» (adversarial А4), and a letter before a
+ * figure a code's, «Ա1».
  */
 function tokensOf(text: string): string[] {
   return text
     .replace(/[()]/gu, ' ')
     .split(/[\s,;:]+/u)
-    .flatMap((token) => token.split(/(?<=[ա-ֆԱ-Ֆ]\.)(?=[ա-ֆԱ-Ֆ])|(?<=[ա-ֆԱ-Ֆ]{2})(?=\d)/u))
+    .flatMap((token) => token.split(GLUED))
     .map((token) => token.replace(/^[^\p{L}\d#№]+|[^\p{L}\d.%]+$/gu, ''))
     .filter((token) => token !== '')
 }
