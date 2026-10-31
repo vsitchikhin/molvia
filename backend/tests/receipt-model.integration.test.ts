@@ -4,7 +4,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { MODEL_CONSENT_EDITION, receiptDetailCodec, spendMonthOf } from '@molvia/model'
+import {
+  MODEL_CONSENT_EDITION,
+  dayIn,
+  ownerNoticeSchema,
+  receiptDetailCodec,
+  spendMonthOf,
+} from '@molvia/model'
 import type { ModelReceipt } from '@molvia/model'
 import am05 from '@molvia/model/testing/receipt-text.am-05.json'
 import type { FastifyInstance } from 'fastify'
@@ -1223,9 +1229,10 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     })
     expect(await db.select().from(receiptMissParts)).toHaveLength(1)
     const [notice] = await notices()
+    // read as the bot reads it: a field the schema does not name would lose the notice (adversarial А1)
+    expect(ownerNoticeSchema.safeParse(notice).success).toBe(true)
     expect(notice).toMatchObject({
       kind: 'receipt_partial',
-      receipt: id.slice(0, 8),
       country: 'AM',
       lines: 3,
       shown: 2,
@@ -1235,7 +1242,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     // the id and the day may hold any digits: the name and the sums are looked for in the rest (MOL-316)
     const { receipt, keptUntil, ...rest } = notice as { receipt?: string; keptUntil?: string }
     expect(receipt).toBe(id.slice(0, 8))
-    expect(keptUntil).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(keptUntil).toBe(dayIn(kept!.keepUntil))
     expect(JSON.stringify(rest)).not.toMatch(/Օրինակ|1627|600/)
   }, 30_000)
 
