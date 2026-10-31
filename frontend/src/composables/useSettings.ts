@@ -31,7 +31,7 @@ const useSettingsStore = defineStore('settingsForm', () => {
    * (MOL-215, review 1 №1, adversarial А2) — a flag of «failed» said «Сервер не ответил» over it.
    */
   const failure = ref<'offline' | 'error' | null>(null)
-  /** Failed reads, counted, so a strip whose retry failed the same way says its words again (C1). */
+  /** The person's retries that failed, counted, so the strip says its words again for each (C1). */
   const failures = ref(0)
   const stored = ref(true)
   const saved = ref(false)
@@ -157,18 +157,16 @@ const useSettingsStore = defineStore('settingsForm', () => {
     keep()
   }
   /**
-   * `retry` — the person's own «Повторить»: the strip «Сервер не ответил» stands through it, so a retry
-   * that fails the same way says its words again (MOL-181, C1). Any other read — the screen opened, the
-   * connection or the app back — has no answer yet and lets the last failure go as it starts: it is
-   * «Обновляем» once late (MOL-201), never a refusal from before it, an hour ago, on another screen, or
-   * before a stretch with no connection (MOL-215, adversarial Б1, В1, В2).
+   * `retry` — the person's own «Повторить»: only its failure is counted, so a retry that fails the same
+   * way says the strip's words again (MOL-181, C1), and a read nobody asked for — the connection or the
+   * app back — does not (MOL-204's А1). Every read keeps the failure standing until its own outcome: the
+   * strip holds through it, never taken down and put up again under the finger (adversarial Г1).
    */
   async function refresh(retry = false): Promise<boolean> {
     const owner = actor.id
     if (!owner || saving.value) return false
     const mine = ++generation
     loading.value = true
-    if (!retry) failure.value = null
     try {
       const loaded = await api.me()
       if (mine !== generation || actor.id !== owner || loaded.id !== owner) return false
@@ -199,7 +197,7 @@ const useSettingsStore = defineStore('settingsForm', () => {
       // A session that ended is heard by the seam in `@/api`, not by every caller (MOL-56).
       if (mine === generation) {
         failure.value = navigator.onLine ? 'error' : 'offline'
-        failures.value += 1
+        if (retry) failures.value += 1
       }
       return false
     } finally {
@@ -315,11 +313,17 @@ export function useSettings(): {
     },
     { immediate: true },
   )
+  // A server's refusal from before the connection went is no word on the read its return starts
+  // (adversarial Б1): from here the last thing known is «no connection».
   const offline = (): void => {
     online.value = false
+    if (form.failure === 'error') form.failure = 'offline'
   }
   onMounted(() => {
     form.returned = form.dirty
+    // The store outlives the screen: a refusal it kept — from another screen's stretch with no
+    // connection, from an hour ago — is no word on the read of this opening (adversarial В1, В2).
+    form.failure = null
     window.addEventListener('offline', offline)
     void form.refresh()
   })
@@ -330,6 +334,7 @@ export function useSettings(): {
   useReconnect(() => {
     online.value = navigator.onLine
     if (online.value) void form.refresh()
+    else offline()
   })
   return { form, online, notice, hasAnnouncer: !!announce }
 }

@@ -600,6 +600,40 @@ describe('a form shown from memory says as of when, and what became of the read 
     },
   )
 
+  // Adversarial Г1 of round 4: the read of the app back in view took the strip down and put it up again
+  // — the fields moved twice under the finger, and «Сервер не ответил» was said anew at every return.
+  it.each([
+    ['the app back in view', () => document.dispatchEvent(new Event('visibilitychange'))],
+    ['the connection back', () => window.dispatchEvent(new Event('online'))],
+  ])(
+    'the strip stands through a read nobody asked for, %s, and says nothing again',
+    async (_name, back) => {
+      remember(READ)
+      me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+      const view = await render(false)
+      const strip = strips(view)[0]
+      expect(strip?.props('kind')).toBe('unanswered')
+      const attempt = strip?.props('attempt') as number
+
+      let refuse: (error: Error) => void = () => undefined
+      me.mockReturnValue(
+        new Promise((_resolve, reject) => {
+          refuse = reject
+        }),
+      )
+      back()
+      await flushPromises()
+      expect(me).toHaveBeenCalledTimes(2)
+      expect(strips(view)).toHaveLength(1)
+      expect(strips(view)[0]?.element).toBe(strip?.element)
+
+      refuse(new ApiError(ERROR.INTERNAL))
+      await flushPromises()
+      expect(strips(view)[0]?.element).toBe(strip?.element)
+      expect(strips(view)[0]?.props('attempt')).toBe(attempt)
+    },
+  )
+
   it('the person’s own «Повторить» keeps «Сервер не ответил» while it is on its way (C1)', async () => {
     remember(READ)
     me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
