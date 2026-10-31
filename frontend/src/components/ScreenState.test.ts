@@ -323,6 +323,28 @@ describe('ScreenState', () => {
       await nextTick()
       expect(title.getAttribute('tabindex')).toBe('-1')
       ;(view.get('.elsewhere').element as HTMLButtonElement).focus()
+      await new Promise((resolve) => setTimeout(resolve))
+      expect(title.hasAttribute('tabindex')).toBe(false)
+      view.unmount()
+    })
+
+    // The window put away blurs the focused element and leaves it focused: taken off then, the
+    // `tabindex` handed the focus to <body>, outside the sheet (adversarial А1).
+    it('keeps the title focusable through a blur that moves no focus', async () => {
+      const { view, shown } = inSheet()
+      const title = view.get('h2').element
+      ;(view.get('.action button').element as HTMLButtonElement).focus()
+      shown.value = false
+      await nextTick()
+
+      title.dispatchEvent(new FocusEvent('blur'))
+      await new Promise((resolve) => setTimeout(resolve))
+      expect(document.activeElement).toBe(title)
+      expect(title.getAttribute('tabindex')).toBe('-1')
+
+      // …and still lets it go when the focus does move on.
+      ;(view.get('.elsewhere').element as HTMLButtonElement).focus()
+      await new Promise((resolve) => setTimeout(resolve))
       expect(title.hasAttribute('tabindex')).toBe(false)
       view.unmount()
     })

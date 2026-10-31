@@ -185,12 +185,17 @@ export function focusScreenTitle(): void {
   document.querySelector<HTMLElement>('h1')?.focus({ preventScroll: true })
 }
 
+/** A sheet's title: the element its `aria-labelledby` names — never a class, which is the screen's. */
+export function sheetTitleOf(sheet: Element): HTMLElement | null {
+  const id = sheet.getAttribute('aria-labelledby')
+  return id === null ? null : document.getElementById(id)
+}
+
 /**
  * Focus on the heading of where `from` stands: in an open sheet, the sheet's own title — the page
  * under a modal sheet is inert, its heading takes no focus, and the focus fell to <body> (MOL-317);
- * elsewhere, the screen's. The title is what names the dialog (`aria-labelledby`), and it is made
- * focusable only for this focus: a tap on it stays a tap on text, and a field typed in keeps the keys
- * (owner's В-2 «а»).
+ * elsewhere, the screen's. The title is made focusable only while it holds this focus: a tap on it
+ * stays a tap on text, and a field typed in keeps the keys (owner's В-2 «а»).
  */
 export function focusTitleOf(from: Element | null): void {
   const sheet = from?.closest('dialog[open]')
@@ -198,20 +203,32 @@ export function focusTitleOf(from: Element | null): void {
     focusScreenTitle()
     return
   }
-  const id = sheet.getAttribute('aria-labelledby')
-  const title = id === null ? null : document.getElementById(id)
+  const title = sheetTitleOf(sheet)
   if (!title) return
   if (!title.hasAttribute('tabindex')) {
     title.tabIndex = -1
-    title.addEventListener(
-      'blur',
-      () => {
-        title.removeAttribute('tabindex')
-      },
-      { once: true },
-    )
+    holdWhileFocused(title)
   }
   title.focus({ preventScroll: true })
+}
+
+/**
+ * Takes the title's `tabindex` off once the focus has gone from it. Not at the `blur` itself: the window
+ * put away — another app, the notification shade — blurs the focused element and leaves it focused, and
+ * a title no longer focusable then handed the focus to <body>, outside the sheet (adversarial А1). Where
+ * the focus stands is read a task later, once the move, if any, is done.
+ */
+function holdWhileFocused(title: HTMLElement): void {
+  title.addEventListener(
+    'blur',
+    () => {
+      setTimeout(() => {
+        if (document.activeElement === title) holdWhileFocused(title)
+        else title.removeAttribute('tabindex')
+      })
+    },
+    { once: true },
+  )
 }
 
 /**

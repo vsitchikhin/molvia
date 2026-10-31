@@ -133,6 +133,7 @@ import { useBarcodeScan } from '@/composables/useBarcodeScan'
 import { useCamera } from '@/composables/useCamera'
 import { useCameraHint } from '@/composables/useCameraHint'
 import { videoFrames } from '@/scanner/capture'
+import { sheetTitleOf } from '@/transitions'
 
 // The camera's refusals the sheet draws, each with its own way out (MOL-19). Keys written out
 // whole: one assembled from a string is invisible to the linter and to vue-tsc (MOL-16, О-12).
@@ -388,8 +389,7 @@ export default defineComponent({
           const now = document.activeElement
           if (!props.open || !dialog) return
           // The sheet's title holds the focus the refusal handed it as it went (MOL-317): nobody's.
-          const title = document.getElementById(dialog.getAttribute('aria-labelledby') ?? '')
-          if (now !== dialog && now !== title && dialog.contains(now)) return
+          if (now !== dialog && now !== sheetTitleOf(dialog) && dialog.contains(now)) return
           const into: unknown =
             settled.value === 'live'
               ? manual.value?.$el

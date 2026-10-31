@@ -118,6 +118,25 @@ test.describe('a block of a sheet that goes with the focus', () => {
     await pressAndExpectTitle(page, sheet, retry)
   })
 
+  // The window put away — another app, the notification shade — blurs the focused title and moves no
+  // focus: its `tabindex` taken off then, the engine handed the focus to <body> (adversarial А1). A real
+  // loss of the window does not happen headless, so the event is the window's own, sent by hand.
+  test('a blur that moves no focus leaves it on the title', async ({ page }) => {
+    const sheet = await statesSheet(page)
+    const retry = sheet
+      .locator('.state.card', { hasText: 'The server did not answer' })
+      .getByRole('button', { name: 'Try again' })
+    await retry.focus()
+    await page.keyboard.press('Enter')
+    const title = sheet.getByRole('heading', { name: 'States in a sheet' })
+    await expect(title).toBeFocused()
+
+    await title.evaluate((element) => element.dispatchEvent(new FocusEvent('blur')))
+    await page.waitForTimeout(100)
+    await expect(title).toBeFocused()
+    await expect(title).toHaveAttribute('tabindex', '-1')
+  })
+
   test('the strip’s «Try again», the strip staying offline', async ({ page }) => {
     const sheet = await statesSheet(page)
     const strip = sheet.locator('.strip')
