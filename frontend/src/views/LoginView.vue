@@ -445,7 +445,10 @@ export default defineComponent({
   flex-wrap: wrap;
   justify-content: center;
   gap: 0 var(--space-6);
-  margin-bottom: calc(var(--space-2) + var(--safe-bottom));
+
+  // The page's margins: at 320 the two links stood flush with both edges of the phone.
+  margin: 0 calc(var(--space-4) + var(--safe-right)) calc(var(--space-2) + var(--safe-bottom))
+    calc(var(--space-4) + var(--safe-left));
 
   a {
     display: flex;
