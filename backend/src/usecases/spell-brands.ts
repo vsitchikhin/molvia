@@ -35,7 +35,8 @@ export type SpellReport =
 
 export interface SpellBrandsDeps {
   readonly spellings: BrandSpellingRepository
-  readonly model: ReceiptModelDeps
+  /** Without the model — no key — only what it said before. */
+  readonly model: ReceiptModelDeps | null
   readonly report: (event: SpellReport) => void
   readonly now?: () => Date
 }
@@ -46,16 +47,14 @@ export interface SpellBrandsDeps {
  * under the month's cap as a reading is, its worst reserved before the call and its own price after. A spelling is
  * taken only where it sounds as the till printed it (`heardSpelling`); what the model said is remembered either way,
  * so that no brand is paid for twice. A model away, refusing or over the cap asks again with the next receipt: the
- * brand is spelt in letters meanwhile, as before.
+ * brand is spelt in letters meanwhile, as before. **What was said is read for every receipt**, Tesseract's too — one
+ * brand, one spelling, whoever read the line (self-review №3) — and **the model is asked only where `ask` says the
+ * receipt is its own**: a receipt Tesseract read sends nothing to anybody, the person may not have accepted edition 5.
  */
 export async function spelledBrands(
-  {
-    spellings,
-    model: { reader, spend, capMicroUsd },
-    report,
-    now = () => new Date(),
-  }: SpellBrandsDeps,
+  { spellings, model, report, now = () => new Date() }: SpellBrandsDeps,
   asked: readonly BrandAsked[],
+  { ask }: { readonly ask: boolean },
 ): Promise<Map<string, string>> {
   const byKey = new Map<string, BrandAsked>()
   for (const one of asked) {
@@ -67,7 +66,8 @@ export async function spelledBrands(
   const taken = new Map<string, string>()
   for (const [key, spelling] of said) if (spelling !== null) taken.set(key, spelling)
   const missing = [...byKey].filter(([key]) => !said.has(key)).slice(0, BRANDS_A_CALL)
-  if (missing.length === 0) return taken
+  if (missing.length === 0 || !ask || model === null) return taken
+  const { reader, spend, capMicroUsd } = model
 
   const brands = missing.map(([, one]) => one)
   const input = reader.brandsInputTokensMax(brands)

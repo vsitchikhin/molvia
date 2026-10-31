@@ -3,10 +3,12 @@ import { itemSchema } from '@molvia/model'
 import type { CatalogueNode, Item, ReceiptLine } from '@molvia/model'
 import type { ItemRepository, SearchAnswer } from '@/db/items-repository'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
-import type { CatalogueNamesMissing } from './bind-receipt-lines'
+import type { BindReceiptLinesDeps, CatalogueNamesMissing } from './bind-receipt-lines'
 import { bindReceiptLines } from './bind-receipt-lines'
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
+
+type Spellings = NonNullable<BindReceiptLinesDeps['spellings']>
 const MILK = '00000000-0000-4000-8000-000000000001'
 const GLUE = '00000000-0000-4000-8000-000000000002'
 const SOUR_CREAM = '00000000-0000-4000-8000-000000000003'
@@ -308,7 +310,7 @@ describe('an item a line named, found again by the line (MOL-326, adversarial А
 describe('a brand no table spells, asked of the model (MOL-326, В-1 «б»)', () => {
   it('names the new item by the package’s spelling, asking once for the receipt’s brands no table spells', async () => {
     const { items } = fakeItems()
-    const spellings = vi.fn((asked: readonly { brand: string }[]) =>
+    const spellings = vi.fn<Spellings>((asked) =>
       Promise.resolve(
         new Map(asked.flatMap(({ brand }) => (brand === 'Ֆելիքս' ? [['ֆելիքս', 'Felix']] : []))),
       ),
@@ -323,6 +325,8 @@ describe('a brand no table spells, asked of the model (MOL-326, В-1 «б»)', (
         line('Կաթ «Աշտարակ Կաթ» 1լ'),
         line('Թխվածքաբլիթ «Ռոշեն» Լովիտա'),
       ],
+      [],
+      { byModel: true },
     )
     expect(bound.map((one) => one.translation)).toEqual([
       'Корм кошачий Felix 85 г',
@@ -336,6 +340,23 @@ describe('a brand no table spells, asked of the model (MOL-326, В-1 «б»)', (
       'Ֆելիքս',
       'Աշտարակ Կաթ',
     ])
+    expect(spellings.mock.calls[0]?.[1]).toEqual({ ask: true })
+  })
+
+  it('names a receipt Tesseract read by what the model said before, and asks it nothing (self-review №3)', async () => {
+    const { items } = fakeItems()
+    const spellings = vi.fn<Spellings>(() => Promise.resolve(new Map([['ֆելիքս', 'Felix']])))
+    const [bound] = await bindReceiptLines(
+      { items, embedder: NO_EMBEDDER, spellings },
+      ACTOR,
+      'AM',
+      'ru',
+      [line('Կատվի կեր «Ֆելիքս» 85գ')],
+    )
+    expect(bound?.translation).toBe('Корм кошачий Felix 85 г')
+    expect(spellings).toHaveBeenCalledWith([expect.objectContaining({ brand: 'Ֆելիքս' })], {
+      ask: false,
+    })
   })
 
   it('must not ask without the model: a brand no table spells stays in Russian letters', async () => {
@@ -361,7 +382,7 @@ describe('a word the model misread by the font (MOL-326, В-3 «б»)', () => {
         line('Ցաքարավազ «Մաքուր» 1կգ'),
       ],
       [],
-      { mendGlyphs: true },
+      { byModel: true },
     )
     expect(bound).toEqual([
       { itemId: SUGAR, match: 'weak', translation: 'сахар-песок' },

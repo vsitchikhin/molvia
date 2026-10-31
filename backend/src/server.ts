@@ -933,22 +933,20 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                     namesMissing: (error) => {
                       failures.report(error, job('receipt-binding'), 'catalogue has no till names')
                     },
-                    ...(read.byModel && modelDeps !== null
-                      ? {
-                          spellings: (asked: readonly BrandAsked[]) =>
-                            spelledBrands(
-                              { spellings: brandSpellings, model: modelDeps, report: brandReport },
-                              asked,
-                            ),
-                        }
-                      : {}),
+                    // what the model said of a brand before, for every receipt; asked of it for its own only
+                    spellings: (asked: readonly BrandAsked[], { ask }: { readonly ask: boolean }) =>
+                      spelledBrands(
+                        { spellings: brandSpellings, model: modelDeps, report: brandReport },
+                        asked,
+                        { ask },
+                      ),
                   },
                   claimed.actorId,
                   claimed.country,
                   claimed.language,
                   lines,
                   [],
-                  { mendGlyphs: read.byModel },
+                  { byModel: read.byModel },
                 ),
             })
           },

@@ -45,7 +45,8 @@ export async function renameReceiptItems(
     for (const language of ['hy'] as const) {
       const nodes = await deps.nodes(language)
       const lexicon = namingLexicon(nodes)
-      lexicons.set(language, { ...lexicon, brands: { ...lexicon.brands, ...spelt } })
+      // the table over the model, as the queue reads it: a brand the table spells is never asked (adversarial А3)
+      lexicons.set(language, { ...lexicon, brands: { ...spelt, ...lexicon.brands } })
       known.set(language, knownTillWords(nodes))
     }
     report = await deps.renamer.rename({

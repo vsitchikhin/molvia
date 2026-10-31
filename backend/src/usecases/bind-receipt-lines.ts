@@ -38,10 +38,14 @@ export interface BindReceiptLinesDeps {
    */
   readonly namesMissing?: (error: CatalogueNamesMissing) => void
   /**
-   * How the packages spell the brands in «…» no table spells, by their `brandKey` (MOL-326, owner's В-1 «б»): the
-   * model's, for a receipt it read; without it such a brand is spelt in letters.
+   * How the packages spell the brands in «…» no table spells, by their `brandKey` (MOL-326, owner's В-1 «б»): what the
+   * model said before, for every receipt — a brand is spelt one way whoever read the line (self-review №3) — and
+   * asked of it only for a receipt it read (`ask`); without it such a brand is spelt in letters.
    */
-  readonly spellings?: (asked: readonly BrandAsked[]) => Promise<ReadonlyMap<string, string>>
+  readonly spellings?: (
+    asked: readonly BrandAsked[],
+    options: { readonly ask: boolean },
+  ) => Promise<ReadonlyMap<string, string>>
 }
 
 /** The catalogue has no names in a till's language: a fault of ours the owner hears of (MOL-293). */
@@ -119,17 +123,18 @@ export async function bindReceiptLines(
   /** Each line's code, in their order, where the tax office gave one (MOL-234). */
   codes: readonly (string | null)[] = [],
   /**
-   * The model read the lines (MOL-326, owner's В-3 «б»): a word it misread by the font is put right for the name and
-   * the item alike, and the line is «проверьте». Tesseract misreads otherwise, and its lines stay as read: «թայմ» of
-   * «թարմ» was put right to a lime.
+   * The model read the lines (MOL-326): a word it misread by the font is put right for the name and the item alike,
+   * and the line is «проверьте» (owner's В-3 «б») — Tesseract misreads otherwise, and its lines stay as read: «թայմ» of
+   * «թարմ» was put right to a lime; and the brands no table spells may be asked of it (В-1 «б»), of its receipts alone,
+   * whom edition 5 lets.
    */
-  { mendGlyphs = false }: { readonly mendGlyphs?: boolean } = {},
+  { byModel = false }: { readonly byModel?: boolean } = {},
 ): Promise<LineBinding[]> {
   const names = receiptCard(country).nameLanguage
   const nodes = names === null ? [] : await items.nodes(names)
   if (names !== null && nodes.length === 0) namesMissing?.(new CatalogueNamesMissing(names))
   const matcher = createLineMatcher(nodes, TILL_WORDS_RU)
-  const known = mendGlyphs && names !== null ? knownTillWords(nodes) : null
+  const known = byModel && names !== null ? knownTillWords(nodes) : null
   // each line as it is read: a word the model misread put right
   const mendedLines = lines.map((line) =>
     known === null ? null : glyphsMended(line.printed, known),
@@ -204,7 +209,11 @@ export async function bindReceiptLines(
   }
   return bound
 
-  /** The lexicon with the brands the model spelt for this receipt's lines, asked once for all of them. */
+  /**
+   * The lexicon with the brands the model spelt for this receipt's lines, asked once for all of them. The catalogue's
+   * names bind no line of a brand in «…» — the seed's items are kinds — so each is a line the search or a new item
+   * names (self-review №5).
+   */
   async function spelt(base: NameLexicon): Promise<NameLexicon> {
     if (spellings === undefined || names === null) return base
     const asked = lines.flatMap((line, at): BrandAsked[] => {
@@ -213,7 +222,7 @@ export async function bindReceiptLines(
       return brand === null ? [] : [{ brand, line: printed }]
     })
     if (asked.length === 0) return base
-    const learned = await spellings(asked)
+    const learned = await spellings(asked, { ask: byModel })
     return learned.size === 0
       ? base
       : { ...base, brands: { ...base.brands, ...Object.fromEntries(learned) } }

@@ -226,8 +226,12 @@ describe('rename-receipt-items (MOL-261, В-3 «а»)', () => {
   it('spells a brand as the model spelt it for a receipt read since (MOL-326, В-1 «б»)', async () => {
     const me = await insertActor(db)
     const fanta = await insertItem(db, { name: 'Фанта', searchKey: toSearchKey('Фанта') })
+    // a brand the table spells since it was asked: the table stands, as the queue reads it (adversarial А3)
     await deps.spellings.remember(
-      [{ brand: 'ֆելիքս', spelling: 'Felix' }],
+      [
+        { brand: 'ֆելիքս', spelling: 'Felix' },
+        { brand: 'ռոշեն', spelling: 'Рошен' },
+      ],
       'claude-haiku-5-5@brands-v1',
     )
     const felix = [
@@ -236,14 +240,20 @@ describe('rename-receipt-items (MOL-261, В-3 «а»)', () => {
         proposed: 'Корм кошачий «Феликс» 85 г',
         named: 'Корм кошачий «Феликс» 85 г',
       },
+      {
+        printed: 'Թխվածքաբլիթ «Ռոշեն» Լովիտա',
+        proposed: 'Печенье «Рошен» Ловита',
+        named: 'Печенье «Рошен» Ловита',
+      },
     ]
     await recorded(me, fanta, felix)
 
     const out: string[] = []
     expect(await renameReceiptItems([], deps, (line) => out.push(line))).toBe(0)
-    expect(out.slice(0, 2)).toEqual([
-      '  renamed     1',
+    expect(out.slice(0, 3)).toEqual([
+      '  renamed     2',
       '    Корм кошачий «Феликс» 85 г → Корм кошачий Felix 85 г',
+      '    Печенье «Рошен» Ловита → Печенье Roshen Lovita',
     ])
   }, 30_000)
 
