@@ -2,6 +2,17 @@
 // never has to remember to import it. Tokens stay CSS custom properties: they must be
 // swappable at runtime for the dark scheme, which a Sass variable cannot do.
 
+/// A figure that is its card's answer: the size of `--text-figure`, smaller only where its characters would
+/// stand past the box it is measured in — the nearest `container-type: inline-size` (MOL-321). A sum never
+/// breaks, and at 200 % on 320 «Потрачено 125 403 ֏» was 276 px in a card of 190. The component says how
+/// many characters the figure is (`figureChars`), since CSS cannot — a capital Latin letter and a minus
+/// counted 1.15, as they are wider; a figure of Nunito 800 is at most some 0.55 of its size, so 0.56 leaves a
+/// figure of fourteen («1 234 567,89 ₽») at 100 % on 320 as it was.
+@mixin figure-fit {
+  /* stylelint-disable-next-line declaration-property-value-allowed-list -- the one place a figure's size is worked out (MOL-321) */
+  font-size: min(var(--text-figure), calc(100cqi / (var(--figure-chars, 1) * 0.56)));
+}
+
 /// Anything a thumb has to hit at a shelf, in bad light.
 @mixin touch-target {
   display: inline-flex;

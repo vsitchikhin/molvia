@@ -62,7 +62,12 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .row {
+  /* It measures itself for the icon below (MOL-321). */
+  container-type: inline-size;
   display: flex;
+
+  /* Wraps only where the value takes a line of its own (below); a row cannot ask its own width. */
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
   width: 100%;
@@ -120,8 +125,10 @@ export default defineComponent({
   color: var(--text-muted);
 }
 
+/* Breaks between its words, never inside one, where the row is short (MOL-321): «Получил на» held on
+   one line took the exchange's sheet 33 px past a phone at 200 %. */
 .label {
-  flex: none;
+  flex: 0 1 auto;
   color: var(--text-muted);
   font-size: var(--text-callout);
 }
@@ -154,5 +161,27 @@ export default defineComponent({
 
   font-size: var(--icon);
   color: var(--text-muted);
+}
+
+/* Narrower than this the wallet gives its place to the words, and the account's name goes to a line of its
+   own under the label (MOL-321): the wallet only decorates, and at 200 % «Account» of one word, the wallet
+   and the chevron stood 23 px past the spending's sheet; beside «Получил на» the name had some 20 px and
+   was «…» — the row's very answer. In rem: from some 160 % of the text on 320, never at 100 %. */
+$icon-beside: 10rem;
+
+@container (width < #{$icon-beside}) {
+  .icon {
+    display: none;
+  }
+
+  .label {
+    flex: 1 1 calc(100% - var(--icon) - var(--space-2));
+  }
+
+  .value {
+    flex-basis: 100%;
+    order: 1;
+    text-align: left;
+  }
 }
 </style>

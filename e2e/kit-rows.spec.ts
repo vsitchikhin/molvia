@@ -723,3 +723,84 @@ test('the chosen dot stands on a ring of surface; «More…» opens «Category»
   // Chosen from the list, it stands in the rows, checked (adversarial А1).
   await expect(field.getByRole('radio', { name: 'Documents' })).toBeChecked()
 })
+
+// A row of segments its words do not fit stands them one under another (MOL-321, owner's В-1 «а»):
+// with Android's text at 150 % on a phone of 320 «Как меняли» took the exchange's sheet 121 px
+// sideways, since a segment is never narrower than its word and the word is never broken (MOL-189,
+// which no test held until now). The widest words a screen sets in one row, in both languages.
+for (const locale of ['ru-RU', 'en-US'])
+  test.describe(`a segmented row in ${locale}`, () => {
+    test.use({ locale })
+    test('stands one under another at 150 % on 320, every word whole, and back to a row', async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 320, height: 720 })
+      await open(page, '/_kit')
+      const name = locale === 'ru-RU' ? 'Как меняли' : 'How it was changed'
+      const track = page.getByRole('group', { name }).locator('.track')
+      await track.scrollIntoViewIfNeeded()
+      const look = () =>
+        track.evaluate((row) => {
+          // A word on one line: broken, it has two boxes of its text. A word ends at a space or after a
+          // hyphen of its own — «Non-|cash» breaks where print breaks it, not inside a word.
+          const broken: string[] = []
+          for (const word of row.querySelectorAll('.word')) {
+            const text = word.firstChild
+            if (text?.nodeType !== Node.TEXT_NODE) continue
+            for (const part of (text.textContent ?? '').matchAll(/[^\s-]+-?/g)) {
+              const range = document.createRange()
+              range.setStart(text, part.index)
+              range.setEnd(text, part.index + part[0].length)
+              const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)))
+              if (lines.size > 1) broken.push(part[0])
+            }
+          }
+          const box = row.getBoundingClientRect()
+          const segments = [...row.querySelectorAll('.segment')].map((one) =>
+            one.getBoundingClientRect(),
+          )
+          return {
+            broken,
+            past: segments.filter((one) => one.right > box.right + 0.5).length,
+            // The kit's page has wider things of its own at 150 %; the row is measured in itself.
+            sideways: row.scrollWidth - row.clientWidth,
+            full: segments.every((one) => Math.abs(one.width - segments[0]!.width) < 0.5),
+          }
+        })
+
+      // Must not fire: at a text of 100 % the row fits a phone of 320.
+      await expect(track).not.toHaveClass(/stacked/)
+      expect(await look()).toMatchObject({ broken: [], past: 0, sideways: 0 })
+
+      await page.evaluate(() => {
+        document.documentElement.style.fontSize = '150%'
+      })
+      await expect(track).toHaveClass(/stacked/)
+      const large = await look()
+      expect(large).toMatchObject({ broken: [], past: 0, sideways: 0, full: true })
+      // Each a whole 44 to the thumb.
+      for (const segment of await track.locator('.segment').all())
+        expect((await segment.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+
+      await page.evaluate(() => {
+        document.documentElement.style.fontSize = ''
+      })
+      await expect(track).not.toHaveClass(/stacked/)
+    })
+  })
+
+// A block button hyphenates its words only where the text is large (MOL-321, self-review №2): Safari
+// knows no `hyphenate-limit-chars`, and WebKit hyphenates any word at a line's end — at 100 % «Сохранить
+// из-менения». The style is read, not a hyphen drawn: Playwright's WebKit knows the limit, a phone's does not.
+test('a block button hyphenates only with large text, never at 100 % on 320', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 720 })
+  await open(page, '/_kit')
+  const words = page.locator('.button.block').first()
+  await expect(words).toBeAttached()
+  const hyphens = () => words.evaluate((text) => getComputedStyle(text).hyphens)
+  expect(await hyphens()).toBe('manual')
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '150%'
+  })
+  await expect.poll(hyphens).toBe('auto')
+})

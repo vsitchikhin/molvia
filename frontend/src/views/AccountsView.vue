@@ -63,7 +63,11 @@
                too (В-1 «б»). Every figure is the server's. -->
           <AppCard v-if="main" class="total">
             <SectionCaption as="p" inset>{{ t('accounts.total') }}</SectionCaption>
-            <p class="figure" :class="{ negative: main.total.minor < 0n }">
+            <p
+              class="figure"
+              :class="{ negative: main.total.minor < 0n }"
+              :style="figureChars(`≈ ${estimate(main.total)}`)"
+            >
               ≈ {{ estimate(main.total) }}
             </p>
             <p v-if="second" class="figure-second" :class="{ negative: second.total.minor < 0n }">
@@ -135,7 +139,7 @@
               <SectionCaption>{{ group.title }}</SectionCaption>
               <AppCard as="ul" list>
                 <AppReveal group>
-                  <li v-for="account in group.accounts" :key="account.id">
+                  <li v-for="account in group.accounts" :key="account.id" class="tight">
                     <ListRow
                       as="router-link"
                       :to="{ name: 'money-account', params: { accountId: account.id } }"
@@ -182,7 +186,11 @@
                        connection «Вернуть» is not now, and says why on itself (Ф-6, С-10); nor while
                        another «Вернуть» of the screen is in the air — each answers with the page whole,
                        and the later to land would take the other back (MOL-189). -->
-                  <li v-for="account in removedAccounts" :key="account.id" class="removed-row">
+                  <li
+                    v-for="account in removedAccounts"
+                    :key="account.id"
+                    class="tight removed-row"
+                  >
                     <ListRow
                       as="router-link"
                       class="removed-open"
@@ -299,6 +307,7 @@ import {
   signedAmount,
 } from '@/components/accounts'
 import { bankWords, rateWords } from '@/components/spending'
+import { figureChars } from '@/components/figure'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useOnline } from '@/composables/useOnline'
 import { useReconnect } from '@/composables/useReconnect'
@@ -533,6 +542,7 @@ export default defineComponent({
     }
 
     return {
+      figureChars,
       IconTransfer,
       transferable,
       transferOpen,
@@ -590,9 +600,9 @@ export default defineComponent({
 
 .figure {
   @include display-type;
+  @include figure-fit;
 
   margin: 0;
-  font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
   line-height: var(--leading-tight);
 }
@@ -806,5 +816,10 @@ export default defineComponent({
    own, which `AppScreen` does not see, and nothing under the thumb may move (review №5, MOL-138). */
 .content > * {
   @include appear(0);
+}
+
+/* A row's tail goes under its words only with large text (`ListRow`, `row-tight`, MOL-321). */
+.tight {
+  container: row-tight / inline-size;
 }
 </style>

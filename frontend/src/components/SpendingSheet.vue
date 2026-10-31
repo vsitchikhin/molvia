@@ -11,7 +11,9 @@
     <!-- A trip's spending is read here and amended in the trip (handoff 02, 4c). -->
     <div v-if="target.kind === 'trip'" class="summary">
       <p class="total">
-        <span class="figure">{{ money(target.row.amount) }}</span>
+        <span class="figure" :style="figureChars(money(target.row.amount))">{{
+          money(target.row.amount)
+        }}</span>
         <span class="badge">
           <span class="dot" :style="{ background: tripColour }" aria-hidden="true"></span>
           {{ tripCategory }}
@@ -261,6 +263,7 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import SpendingDetailsSheet from '@/components/SpendingDetailsSheet.vue'
 import { defaultAccount, pageOrder } from '@/components/accounts'
+import { figureChars } from '@/components/figure'
 import {
   bankWords,
   categoryColour,
@@ -982,6 +985,7 @@ export default defineComponent({
     }
 
     return {
+      figureChars,
       t,
       amount,
       currency,
@@ -1085,8 +1089,11 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
+/* «Покупки ›» goes under the words only where it cannot stand beside them (MOL-321): at 200 % it stood
+   15 px past the sheet. */
 .shop {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   min-height: 3.75rem;
@@ -1124,7 +1131,7 @@ export default defineComponent({
 
 .shop-text {
   display: grid;
-  flex: 1;
+  flex: 1 1 min-content;
   min-width: 0;
 }
 
@@ -1140,28 +1147,38 @@ export default defineComponent({
 
 .shop-action {
   flex: none;
+  margin-left: auto;
   color: var(--accent-ink);
   font-weight: var(--weight-bold);
 }
 
 .summary {
+  /* The figure measures itself against the card (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: grid;
   gap: var(--space-3);
   padding: var(--space-4);
 }
 
+/* The category goes under the sum only where the two cannot stand side by side (MOL-321, adversarial Б4):
+   the sum fits its card by `figure-fit`, and beside it the badge took the sheet 18 px sideways at 150 %. */
 .total {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   margin: 0;
+
+  > .figure {
+    flex: 1 1 min-content;
+  }
 }
 
 .figure {
   @include display-type;
+  @include figure-fit;
 
-  font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1169,6 +1186,8 @@ export default defineComponent({
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+  max-width: 100%;
+  min-width: 0;
   min-height: var(--badge-height);
   padding: 0 var(--space-3);
   border-radius: var(--radius-pill);

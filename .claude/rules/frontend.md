@@ -443,7 +443,7 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the price MOL-269 names for showing the memory at once; before, the value was cut and the row never grew. **Two
   lines are the label's at a text of 100 %** (adversarial Б1): at 125 % «Перевод между счетами» takes three on 320 and
   ends in «…» after the second, and at 150 % a word wider than the column breaks inside itself («Устройств|а», by the
-  rule of names) — on master it was cut on one line; large text is MOL-321. **A sheet's column is the sheet's width, never its
+  rule of names) — on master it was cut on one line; how large text holds is the rule «Large text stands within the phone» below (MOL-321). **A sheet's column is the sheet's width, never its
   content's** (`.panel`, `minmax(0, 1fr)`, MOL-318, owner's В-1 «б»): an `auto` column took the least
   width of whatever stood in it — the label above, then a row of chips with a long name of one's own —
   and the whole sheet went sideways; what cannot shrink now stands past its own edge alone, the × in
@@ -472,11 +472,75 @@ The detail behind the frontend lines of `CLAUDE.md`.
   of fifteen characters still stands past a row of 320; the figure in the middle of a ring stands past it for
   a sum of eleven, over the ring and not the page; a name in an `AppButton` narrower than its row is not broken,
   since its cell of two words (MOL-225) would break with it — the buttons with a name in them are all `block`,
-  which breaks it («Продолжить «…»», «Взять «…»», «Записать «…» без кода», adversarial Б1, Б2). What MOL-318 proved is a name at a text of 100 %: at 150 % on 320 the segments of `SegmentedControl` («Настройки»
-  120 px, the exchange's sheet 121) and the ring of «Деньги» (43 px) still stand past the phone, on master too and with
-  short names; probes found «Графики» at 150 % (47 px, 169 at 200 %), and only at 200 % «Траты» (50), «Бюджет» (40), an
-  account's screen (21) and «Обмен» (5), their causes not yet named — all MOL-321, where the segment's whole word (MOL-189) meets this rule. And WebKit says «ResizeObserver loop completed» as a sheet with the
-  chips opens — on master too, a window error with no frame of ours, which the phone's reports leave out. **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
+  which breaks it («Продолжить «…»», «Взять «…»», «Записать «…» без кода», adversarial Б1, Б2). What MOL-318 proved is a name at a text of 100 %; large text is the rule after this one (MOL-321). And WebKit says «ResizeObserver loop completed» as a sheet with the
+  chips opens — on master too, a window error with no frame of ours, which the phone's reports leave out.
+- **Large text stands within the phone on «Деньги», «Настройки» and a newcomer's «Что брать»: Android's 150 % and
+  200 % on 320** (MOL-321, owner's В-1…В-4). The project measures it as its specs make it — the root's font-size,
+  which every size of the app is in — and `e2e/large-text.spec.ts` holds those screens and the sheets of «Деньги» at
+  both, with the sums a month in drams and savings in roubles have («Потрачено 125 403 ֏», «1 234 567,89 ₽» — a month
+  of four digits passed by, adversarial А1, А4). Before it «Настройки» and the exchange's sheet went 120 px sideways
+  at 150 %, the rings of «Деньги» and «Графики» 43 and 47, a newcomer's «Что брать» 42, and at 200 % the month's
+  switcher, the day's sum, the figures of «Деньги», «Пришло и ушло» and the sheets of an account, a plan and a
+  category besides. **The rest of the app is MOL-334**: the scale of «Оценки», «Продолжить» of «Покупки», the totals
+  of a receipt and a record. Six ways:
+  - **A row of segments its words do not fit stands them one under another** (`SegmentedControl`, В-1 «а»):
+    the word stays whole — MOL-189 holds, and now a test holds it (`kit-rows`: every word of «Как меняли» on one
+    line, in both engines and languages; m7, which broke the word, went green on 66 tests before). The row is
+    measured on itself, its class off for the moment: as it mounts, before the first paint, then on a
+    segment's resize in the next frame — a size changed inside the observer's callback is «ResizeObserver loop
+    completed», which the class would cause. Each segment a whole 44 there. **The row has no least width of its
+    own** (`contain: inline-size`): in the form of a new account, a grid column of `auto`, it handed its words up
+    as the column's width, always «fitted», and the sheet went 82 px sideways at 200 %. **A hard hyphen is a
+    word's end**: «Non-|cash» breaks where print breaks it, at 100 % on 320 in English.
+  - **What stands beside something turns by `@container` in `rem`**: everything beside it grows with the text,
+    so a threshold in `rem` turns at the text's size, not the phone's width or the language. The ring of «Куда
+    ушли» stands over its names below 15rem — **and so on a phone of 320 at 100 % too** (13.9rem), where the names
+    had 41 px beside the ring and broke inside every word («Прод|укты», «рест|оран|ы»): the one look of 100 %
+    the task changes, named. The legend of «Графики» puts its name on a line of its own below 15rem (its card is
+    15.9rem at 100 % on 320), the sum and the share under it across the whole row, and its centre goes under the
+    ring below 8rem (200 %); the month's name stands over its arrows below 13rem; «Пришло и ушло» stands its three
+    figures one under another below 12rem; «На счетах сейчас» stands «1 счёт ›» under its words below 12rem; an
+    icon of `NavRow` gives way below 12rem and the wallet of `AccountRow` below 10rem, where the account's name
+    goes to a line of its own — decorations, where the words had 64 px. **A row's tail goes under its words only
+    with large text in a container named `row-tight`** (`ListRow`, below 12rem): the rows of «Счета» and «Категории»
+    keep it beside at 100 % on 320, where `row`'s 22rem would turn them, and at 200 % «1 234 567,89 ₽» was cut by 68 px
+    and «Убрать» by 37 (adversarial Б1, Б2); one look for both, a mixin of the kit. **A box cannot ask its own
+    width**: the rules under a query stand on its children, and what the box itself does — `flex-wrap` — is set
+    outside it.
+  - **A line wraps only where its least widths do not fit**: `flex-wrap` with the words at `flex-basis:
+min-content` — the day's head and the total of «Траты», a line of an exchange's card, «Против обычного»,
+    «Покупки ›» of a spending's sheet, the difference of a check, a record's sum and its category in the sheet
+    opened from «Траты» (adversarial Б4). A flex line breaks by its items' bases, so at
+    100 % the words still give way first, as before, and the figure goes under them only when even the words
+    broken leave it no room. The sum and the share of a ring's name are one `figures` span, `display: contents`
+    beside the ring and a wrapping line of its own under it.
+  - **A figure that is its card's answer shrinks to its card by its length** (`@include figure-fit`, adversarial
+    А1…А6): `min(var(--text-figure), 100cqi / (characters × 0.56))`, the characters set beside it by
+    `figureChars` (`--figure-chars`, set by script) — a capital Latin letter and a minus counted 1.15, wider than
+    a figure («−999,99 RSD» was 0.568 of its size a character, adversarial Б3) — the box measured the nearest
+    `container-type: inline-size`: the card, the column of words, the sheet's column (the figure of a check that
+    came out even, which measured the window before). A sum never breaks, and at 200 % «Потрачено 125 403 ֏» was 276 px in a card of
+    190; a width alone (`18cqi`, the first try) did not know the length, and «1 234 567,89 ₽» stood 15 px past at
+    150 %. 0.56 of the size a character is above Nunito 800's widest (0.55), so a figure of fourteen keeps its size
+    at 100 % on 320. Ten figures of «Деньги»; the totals of a receipt and a record are MOL-334.
+  - **The tab label stops growing at 125 %**: `--text-tab`, `min(var(--text-caption), 13.75px)`, as iOS keeps its
+    tab bar (В-3 «а»); a token, named one by one in Stylelint's list of sizes. The tab bar is fixed and in no width
+    of the page, so `large-text` reads every label within its column.
+  - **A word wider than its column breaks with a hyphen only while the text is large** (В-2 «а»: «Сфотогра-фируйте»,
+    «Сфотографи-ровать чек»): `html[data-large-text]`, set by `useLargeText` from a box one rem wide while a rem is
+    over 17.6 px — a width in `rem` tells the box, not the text, and a block of a pair is narrow at 100 % too. At
+    100 % no engine hyphenates: Safari knows no `hyphenate-limit-chars` in any version, and WebKit hyphenates any
+    word at a line's end («Запишите первые по-купки», self-review №2); where the limit is known, only a word of
+    twelve letters and more; a block button takes it on itself, its words inherit it.
+    **The prices, named:** at 200 % a word of eight letters and more in a `NavRow` still breaks («Категории» — 171 px
+    of 136, MOL-334); CI's Chromium may have no dictionary, so e2e reads the style and the eye the hyphen; at 200 %
+    the docked strip and the tab bar take half a window of 720 — the list ends over them and scrolls, but a tap aimed
+    by a script scrolled under them («Написать разработчику»); and **Android's page zoom is not this model**
+    (self-review №3): it narrows the window in CSS pixels — 213 at 150 % — a phone narrower than the 320 the project
+    holds, where `--text-tab`, in px, limits nothing, and `data-large-text`, which reads a rem in CSS px, is never
+    set — no hyphen there, a word broken as before В-2 (round 2, №3); which one the owner's Chrome takes is asked in
+    MOL-334.
+- **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
   handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
   its tint, in the strip's shape and never a live region; a tag a pill of 13/600, plain, warn or bad
   — rows had drawn them at 11/700, 11/600 and 13/600. Screens move onto them in their own tasks.
@@ -657,7 +721,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   read as «Системная» it put every other window in a scheme nobody chose (adversarial Б′) — the
   window keeps its own, as its reload does. The control is `SegmentedControl` with `fit` — each
   segment the width of its word (two words of a label break between them where the row is short,
-  never a word: «Как меняли» stood past the field at 320, MOL-189, Е-11), the semibold reserved under it so a tap moves nothing; the word
+  never a word: «Как меняли» stood past the field at 320, MOL-189, Е-11; a row its words do not fit stands
+  one under another, MOL-321), the semibold reserved under it so a tap moves nothing; the word
   lies over its segment's hit area, so a tap on it lands on the label, **inside the track's own
   stacking context** (`isolation`) — lifted without it, it rose over the pinned header too, drawn
   through it and taking its taps (adversarial Д); even thirds on a 320 px phone left «Системная» (91

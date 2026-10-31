@@ -273,4 +273,16 @@ export default defineComponent({
     transition: none;
   }
 }
+
+/* With a hyphen where the browser knows the language, and only while the text is large (MOL-321,
+   `useLargeText`): «Сфотографи-ровать чек», not «Сфотографирова|ть». Only a word of twelve letters and more
+   where the engine knows the limit — Safari does not, and WebKit hyphenates any word at a line's end
+   («Сохранить из-менения») — so never at 100 %. A width would not tell it: a block of a pair is narrow
+   at 100 % too. Inherited by the words. */
+.block {
+  html[data-large-text] & {
+    hyphens: auto;
+    hyphenate-limit-chars: 12 5 5;
+  }
+}
 </style>

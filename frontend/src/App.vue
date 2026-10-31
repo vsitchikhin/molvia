@@ -25,6 +25,7 @@ import TabBar from '@/components/TabBar.vue'
 import { focusScreenTitle, releaseHeightHold } from '@/transitions'
 import LoginView from '@/views/LoginView.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
+import { useLargeText } from '@/composables/useLargeText'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
@@ -44,6 +45,7 @@ export default defineComponent({
     const actor = useActorStore()
     const login = useLoginStore()
     const route = useRoute()
+    useLargeText()
 
     // Whether the app is shown at all, or the login screen instead. The rule lives in the login
     // store, where it can be read and tested without mounting the app (MOL-56).

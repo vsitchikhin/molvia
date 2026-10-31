@@ -30,6 +30,7 @@ const ruleName = 'molvia/known-custom-property'
 // alarm is fixed here and not by a disable comment in the component.
 export const SET_BY_SCRIPT = {
   '--sheet-drag': 'composables/useSheetDrag.ts',
+  '--figure-chars': 'components/figure.ts',
 }
 
 const DECLARATION = /(--[\w-]+)\s*:/g

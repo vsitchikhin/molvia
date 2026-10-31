@@ -110,7 +110,9 @@
             t('exchange.my_rate')
           }}</SectionCaption>
           <template v-if="overview.wallet">
-            <p class="figure">{{ rateOf(overview.wallet.rate) }}</p>
+            <p class="figure" :style="figureChars(rateOf(overview.wallet.rate))">
+              {{ rateOf(overview.wallet.rate) }}
+            </p>
             <p class="meta">
               {{ t(basisKey(overview.wallet.basis), { date: dayOf(overview.wallet.rate.asOf) }) }}
             </p>
@@ -285,6 +287,7 @@ import { useExchanges } from '@/composables/useExchanges'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 import { bankWords } from '@/components/spending'
+import { figureChars } from '@/components/figure'
 import { answeredAt } from '@/days'
 
 /**
@@ -528,6 +531,7 @@ export default defineComponent({
     }
 
     return {
+      figureChars,
       t,
       ...exchanges,
       saving,
@@ -597,6 +601,8 @@ export default defineComponent({
 }
 
 .rate {
+  /* The figure measures itself against the card (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   margin-bottom: var(--space-2);
 }
 
@@ -606,9 +612,9 @@ export default defineComponent({
 
 .figure {
   @include display-type;
+  @include figure-fit;
 
   margin: 0;
-  font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
 }
 
