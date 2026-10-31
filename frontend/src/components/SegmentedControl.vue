@@ -1,7 +1,7 @@
 <template>
   <fieldset class="segmented" :class="{ fit, inactive: inactive || disabled }" :disabled="disabled">
     <legend class="legend" :class="{ hidden: hideLegend }">{{ legend }}</legend>
-    <div class="track">
+    <div ref="track" class="track" :class="{ stacked }">
       <label
         v-for="option in options"
         :key="option.value"
@@ -29,7 +29,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, useId } from 'vue'
+import { defineComponent, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 
 export interface Segment {
@@ -55,6 +55,12 @@ const ARROWS: Record<string, -1 | 1> = { ArrowLeft: -1, ArrowUp: -1, ArrowRight:
  *
  * **Chosen is a fill** (Ф-5, MOL-174): `accent-solid` with `on-accent`, every word at 600, so the
  * chosen unit is seen in the dark too and no segment changes width on a tap.
+ *
+ * **A row its words do not fit stands its segments one under another** (MOL-321, owner's В-1 «а»):
+ * with Android's text at 150 % on a phone of 320 «Системная · Светлая · Тёмная» and «Как меняли»
+ * took the page 120 px sideways — a segment is never narrower than its word, and a word is never
+ * broken (MOL-189). Measured on the row itself, so the language, the text's size and the width are
+ * all in it.
  */
 export default defineComponent({
   name: 'SegmentedControl',
@@ -93,6 +99,57 @@ export default defineComponent({
       console.warn(`[SegmentedControl] ${String(props.options.length)} segments: use a <select>`)
     }
     const name = useId()
+    const track = ref<HTMLElement | null>(null)
+    const stacked = ref(false)
+
+    /** The row laid out for a moment, as the page never paints it: whether its words overflow it. */
+    function measure(): void {
+      const row = track.value
+      // A shut sheet lays nothing out: the last measure stands until it opens.
+      if (!row || row.clientWidth === 0) return
+      const was = row.classList.contains('stacked')
+      if (was) row.classList.remove('stacked')
+      const overflows = row.scrollWidth > row.clientWidth
+      if (was) row.classList.add('stacked')
+      stacked.value = overflows
+    }
+
+    let observer: ResizeObserver | null = null
+    let frame = 0
+    /**
+     * A segment resized — the text's size, the width, a sheet opened — is measured in the next frame:
+     * a size changed inside the observer's own callback is the «loop completed» error, and the class
+     * would change it.
+     */
+    function later(): void {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(measure)
+    }
+    onMounted(() => {
+      if (typeof ResizeObserver !== 'undefined' && track.value) {
+        observer = new ResizeObserver(later)
+        for (const segment of track.value.children) observer.observe(segment)
+      }
+      if ('fonts' in document) document.fonts.addEventListener('loadingdone', later)
+      // Before the first paint, so a screen opened with large text never shows the row it leaves.
+      measure()
+    })
+    onBeforeUnmount(() => {
+      observer?.disconnect()
+      cancelAnimationFrame(frame)
+      if ('fonts' in document) document.fonts.removeEventListener('loadingdone', later)
+    })
+    watch(
+      () => props.options.map((option) => option.label).join('\n'),
+      async () => {
+        await nextTick()
+        if (observer && track.value) {
+          observer.disconnect()
+          for (const segment of track.value.children) observer.observe(segment)
+        }
+        measure()
+      },
+    )
     /** A cancelled click puts the radio back: a tap, and the click a browser sends for an arrow. */
     function hold(event: MouseEvent): void {
       if (props.inactive) event.preventDefault()
@@ -127,7 +184,7 @@ export default defineComponent({
         radio.checked = radio.value === props.modelValue
       }
     }
-    return { name, hold, holdArrows, choose }
+    return { name, track, stacked, hold, holdArrows, choose }
   },
 })
 </script>
@@ -215,6 +272,20 @@ export default defineComponent({
   flex: 1 1 auto;
   padding: 0 var(--space-2);
   text-align: center;
+}
+
+/* One under another, each a whole 44 to the thumb: the hit area no longer reaches over the track's
+   padding, which here would lie over the neighbour's. */
+.stacked {
+  flex-direction: column;
+}
+
+.stacked .segment {
+  min-height: var(--touch-target);
+
+  &::after {
+    inset: 0;
+  }
 }
 
 .on {

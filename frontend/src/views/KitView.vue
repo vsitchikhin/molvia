@@ -73,6 +73,12 @@
       </div>
       <SegmentedControl v-model="unit" :legend="t('dev.kit.segment_fit')" :options="units" fit />
       <SegmentedControl
+        v-model="channel"
+        :legend="t('exchange.sheet.channel')"
+        :options="channels"
+        fit
+      />
+      <SegmentedControl
         v-model="unit"
         :legend="t('dev.kit.segment_inactive')"
         :options="units"
@@ -716,6 +722,7 @@ import {
   money,
   COUNTRY_CITIES,
   SPENDING_PRESETS,
+  exchangeChannelSchema,
   tripViewCodec,
 } from '@molvia/model'
 import type {
@@ -1201,6 +1208,14 @@ export default defineComponent({
       { value: 'l', label: t('item.unit_l') },
       { value: 'piece', label: t('item.unit_piece') },
     ])
+    // The widest words a screen sets in one row — «Как меняли» of an exchange (MOL-321).
+    const channels = computed(() => [
+      { value: '', label: '—', spoken: t('exchange.sheet.channel_none') },
+      ...exchangeChannelSchema.options.map((value) => ({
+        value,
+        label: t(`exchange.sheet.channel_${value}`),
+      })),
+    ])
     return {
       t,
       ERROR,
@@ -1216,6 +1231,7 @@ export default defineComponent({
         'icon-tab': 27,
       },
       units,
+      channels,
       moneyMonth,
       kitTrip,
       kitTripNamed,
@@ -1273,6 +1289,7 @@ export default defineComponent({
       cities: COUNTRY_CITIES.AM.map((city) => ({ value: city, label: city })),
       date: ref('2026-09-19'),
       unit: ref('l'),
+      channel: ref('exchanger'),
       working: ref(false),
       screenError: ref(false),
       sectionError: ref(false),
