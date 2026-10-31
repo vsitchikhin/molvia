@@ -1252,12 +1252,36 @@ export function lineFitter(
   lexicon: NameLexicon = {},
 ): (itemName: string, options?: FitOptions) => boolean {
   const tokens = [...parts.before, ...(parts.brand === null ? [] : [parts.brand]), ...parts.after]
-  const glossed = tokens.flatMap((token) => sensesOf(token, dictionary).flatMap(wordsOf))
+  // the phrases of the lexicon the line prints, two or three words in its order, and whether each holds the kind
+  const phrases = [2, 3].flatMap((size) =>
+    tokens.slice(0, tokens.length - size + 1).flatMap((_, at) => {
+      const group = tokens.slice(at, at + size)
+      const phrase = lexicon.phrases?.[lexiconKey(group.join(' '))]
+      return phrase === undefined
+        ? []
+        : [{ words: wordsOf(phrase), kind: parts.kind !== null && group.includes(parts.kind) }]
+    }),
+  )
+  // a word of the line by the dictionary, by its genitive's adjective and by its phrase — the very words a new item
+  // is named by (MOL-326, adversarial А1): «Корм кошачий», «Кондиционер для белья» are found again by their line
+  const glossed = [
+    ...tokens.flatMap((token) => sensesOf(token, dictionary).flatMap(wordsOf)),
+    ...tokens.flatMap((token) => wordsOf(lexicon.genitives?.[lexiconKey(token)] ?? '')),
+    ...phrases.flatMap((phrase) => phrase.words),
+  ]
   // a brand or a line the lexicon knows is the line's in its package's spelling too: «Կինդեր» is Kinder
   const shelves = [...tokens, ...tokens.slice(1).map((token, at) => `${tokens[at] ?? ''} ${token}`)]
     .map((token) => shelfOf(token, lexicon))
     .filter((shelf): shelf is string => shelf !== null)
   const spelt = [...tokens, ...shelves].flatMap(wordsOf)
+  // a brand of the lexicon printed bare is a brand all the same, but for the line's kind: «Կատվի հող Տոֆու» takes no
+  // litter of the seed, «Տոֆու 200գ» the seed's tofu (MOL-326)
+  const others = tokens.filter((token) => token !== parts.kind)
+  const branded =
+    parts.brand !== null ||
+    [...others, ...others.slice(1).map((token, at) => `${others[at] ?? ''} ${token}`)].some(
+      (token) => shelfOf(token, lexicon) !== null,
+    )
   const figures = [
     ...tokens.flatMap(figuresOf),
     ...figuresOf(parts.percent ?? ''),
@@ -1267,7 +1291,11 @@ export function lineFitter(
   const shelfBrand = wordsOf(parts.brand === null ? '' : (shelfOf(parts.brand, lexicon) ?? ''))
   const brands = shelfBrand.length > 0 ? [brand, shelfBrand] : [brand]
   // any of the kind's senses: «հրուշակեղեն» is pastry and confectionery
-  const kinds = parts.kind === null ? [] : sensesOf(parts.kind, dictionary).map(wordsOf)
+  // and a phrase that holds the kind names it: «Կատվի հող» is a litter, never soil
+  const kinds = [
+    ...(parts.kind === null ? [] : sensesOf(parts.kind, dictionary).map(wordsOf)),
+    ...phrases.filter((phrase) => phrase.kind).map((phrase) => phrase.words),
+  ]
   const next = nextThing(parts, dictionary)
   const nexts = next === null ? [] : sensesOf(next, dictionary).map(wordsOf)
   // a thing the dictionary has not is said by its letters: «Смузи» for «սմուզի»
@@ -1284,7 +1312,7 @@ export function lineFitter(
   return (itemName, options = {}) => {
     const item = wordsOf(itemName)
     if (item.length === 0) return false
-    if (parts.brand !== null && options.generic === true) return false
+    if (branded && options.generic === true) return false
     if (!item.every(lineHas)) return false
     if (!figuresOf(itemName).every((figure) => figures.includes(figure))) return false
     const named = brands.find((one) =>

@@ -268,6 +268,43 @@ describe('the owner’s lines of 31.10.2026, by the backend’s own tables (MOL-
   })
 })
 
+describe('an item a line named, found again by the line (MOL-326, adversarial А1)', () => {
+  const FOUND = '00000000-0000-4000-8000-0000000000f1'
+  const found = (name: string) =>
+    fakeItems({ items: [item(FOUND, name)], near: true, nearIds: [FOUND] }).items
+
+  it('takes the item named by the genitive’s adjective and the phrase, whatever the case and the order', async () => {
+    for (const [printed, name] of [
+      ['Կատվի կեր «Ֆելիքս» 85գ', 'Корм кошачий «Феликс» 85 г'],
+      ['ԿԱՏՎԻ ԿԵՐ «ՖԵԼԻՔՍ» 85Գ', 'Корм кошачий «Феликс» 85 г'],
+      ['Կատվի կեր «Ֆելիքս» 85գ', 'Корм кошачий «Феликс»'],
+      ['Կատվի հող Տոֆու 6լ', 'Наполнитель для лотка Tofu 6 л'],
+      ['Լվացքի կոնդիցիոներ Էյ Բի Սի 1լ', 'Кондиционер для белья ABC 1 л'],
+      ['Կոնդիցիոներ լվացքի «Լենոր» 1լ', 'Кондиционер для белья «Ленор» 1 л'],
+    ] as const) {
+      const [bound] = await bindReceiptLines(
+        { items: found(name), embedder: NO_EMBEDDER },
+        ACTOR,
+        'AM',
+        'ru',
+        [line(printed)],
+      )
+      expect(bound, `${printed} → ${name}`).toMatchObject({ itemId: FOUND, match: 'search' })
+    }
+  })
+
+  it('must not take the seed’s litter for a line of a brand the table knows, printed bare', async () => {
+    const [bound] = await bindReceiptLines(
+      { items: found('Наполнитель для лотка'), embedder: NO_EMBEDDER },
+      ACTOR,
+      'AM',
+      'ru',
+      [line('Կատվի հող Տոֆու 6լ')],
+    )
+    expect(bound).toMatchObject({ itemId: null, translation: 'Наполнитель для лотка Tofu 6 л' })
+  })
+})
+
 describe('a brand no table spells, asked of the model (MOL-326, В-1 «б»)', () => {
   it('names the new item by the package’s spelling, asking once for the receipt’s brands no table spells', async () => {
     const { items } = fakeItems()
