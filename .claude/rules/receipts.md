@@ -693,17 +693,19 @@ has its rule; the bench and its figures are `.scratch/tasks/research/MOL-326.md`
   word — the dictionary, its genitives, phrases, brands and the seed's names (`knownTillWords`). The pairs are measured:
   Haiku's readings of the bench against the truth, a word against a word, the swaps that came four times and more, and
   Շ↔Ց of the owner's sugar. Two candidates are a guess, and the word stays. The line put right goes to the name and to the
-  item alike, and is «проверьте» whatever it found. **It stands only on an item that names every word put right**
-  (`mendedWords`, `namesWord`, adversarial Б1): a word unknown held the fitter back, and the mend takes that away while
-  the line's other words may be misread too — «Ձու եզիպտացորենի», corn bread with «Հաց» read as an egg, stood on «Яйца»;
-  now it is a new item. On all 25 of the bench's model runs, 220 lines put right: 105 stand as their truth's does, none
-  on a wrong item. **The price, named:** a qualifier put right keeps a line off the seed's item that does not name it —
-  «Պղպեղ բուլղարական ջերմոցի» goes past «Перец болгарский» to the search, which found «… тепличный» (2 lines). On the model's readings 33 words were put right and none wrong; of
-  the lines bound, 18 of 40 stand as their truth's line does and none on another item. **Tesseract's lines stay as read**:
-  it misreads otherwise, and of 17 put right 11 were wrong — «Խոզի թայմ ֆիլե», «թարմ» read twice wrong, became a lime. So
-  the rule «a dictionary's word is read exactly, never one edit off» (MOL-293) holds, but for one measured swap of the
-  font on the model's lines, as its 5↔6 of the figures (MOL-290). `make rename-items` reads a recorded line so too, by its
-  `reader_version`. **Which receipt is the model's is one flag** (`byModel`): `readByOcr` says false, the server hands
+  item alike, and is «проверьте» whatever it found. On Haiku's three runs of the production prompt, v5, 33 words were
+  put right and none wrong, and of 40 lines put right 18 stand as their truth's line does and none on another item; on
+  all 25 of the bench's model runs, 220 lines put right: 109 as their truth's, none on a wrong item. **A mend may take
+  away the unknown word that held a misread line back** (adversarial Б1: «Ձու եզիպտացորենի», corn bread with «Հաց» read
+  as an egg), and **what holds it then is the class the till prints** — the model read «1905» with it, and the eggs'
+  «0407» is ruled out by the seed's names and the search alike (MOL-255). **An item that must name the word put right
+  was tried and dropped** (adversarial В1): a mend puts right a qualifier more often than a kind, and «Հաց եզիպտացորենի»
+  then refused its «Хлеб» — four lines of 220 lost their item, and «Перец болгарский» went to «… тепличный».
+  **The price, named:** a till that prints no class leaves such a line nothing but its «проверьте». **Tesseract's lines
+  stay as read**: it misreads otherwise, and of 17 put right 11 were wrong — «Խոզի թայմ ֆիլե», «թարմ» read twice wrong,
+  became a lime. So the rule «a dictionary's word is read exactly, never one edit off» (MOL-293) holds, but for one
+  measured swap of the font on the model's lines, as its 5↔6 of the figures (MOL-290). `make rename-items` reads a
+  recorded line so too, by its `reader_version`. **Which receipt is the model's is one flag** (`byModel`): `readByOcr` says false, the server hands
   it to `bindReceiptLines`, and a test through the server's own queue turns red for either flipped (self-review №4).
 - **The tables grew by the owner's lines**: «լցոնիչ» наполнитель; «կատվի», «շան» кошачий, собачий; the phrases «կատվի
   հող», «ՏՈՖՈՒ ՀՈՂ» — «наполнитель для лотка», the seed's name of it, so `kindKey` is one — and «լվացքի կոնդիցիոներ» «для
