@@ -795,7 +795,7 @@ for (const locale of ['ru-RU', 'en-US'])
 test('a block button hyphenates only with large text, never at 100 % on 320', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 720 })
   await open(page, '/_kit')
-  const words = page.locator('.button.block .text').first()
+  const words = page.locator('.button.block').first()
   await expect(words).toBeAttached()
   const hyphens = () => words.evaluate((text) => getComputedStyle(text).hyphens)
   expect(await hyphens()).toBe('manual')

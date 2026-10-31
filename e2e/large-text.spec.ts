@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
 // DOM for the code inside page.evaluate, which runs in the browser.
+import { actorCodec, settingsOf } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
@@ -53,11 +54,64 @@ async function sheetSideways(page: Page, opener: Locator): Promise<number> {
 }
 
 /**
+ * How far the words of the elements a selector finds stand past the inner edge of their card, at most — a tail
+ * of a row cut by its card is no width of the page (adversarial Б1, Б2, Б4).
+ */
+function pastCard(page: Page, selector: string, card = '.card'): Promise<number> {
+  return page.locator(selector).evaluateAll(
+    (elements, around) =>
+      Math.max(
+        -1,
+        ...elements.map((element) => {
+          const box = element.closest(around)!
+          const edge =
+            box.getBoundingClientRect().right - parseFloat(getComputedStyle(box).paddingRight)
+          const range = document.createRange()
+          range.selectNodeContents(element)
+          return Math.max(...[...range.getClientRects()].map((line) => line.right)) - edge
+        }),
+      ),
+    card,
+  )
+}
+
+/** A record by hand at «Ереван Сити», finished: a row of «Траты» that opens the sheet of a record. */
+async function aRecord(page: Page, amount: string): Promise<void> {
+  const headers = await asBrowser(page)
+  const made = await page.request.post('/api/catalogue/items', {
+    headers,
+    data: {
+      kind: 'product',
+      name: `Молоко «Марианна» ${randomUUID().slice(0, 4)}`,
+      defaultUnit: 'l',
+    },
+  })
+  expect(made.status()).toBeLessThan(300)
+  const body = (await made.json()) as { id?: string; item?: { id: string } }
+  const context = settingsOf(
+    actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
+  )
+  const trip = randomUUID()
+  await post(page, '/api/trips', {
+    context,
+    id: trip,
+    place: { kind: 'store', name: 'Ереван Сити' },
+  })
+  await post(page, `/api/trips/${trip}/expenses`, {
+    id: randomUUID(),
+    itemId: body.item?.id ?? body.id,
+    quantity: { value: '1', unit: 'l' },
+    amount: { amount, currency: 'AMD' },
+  })
+  await post(page, `/api/trips/${trip}/finish`, {})
+}
+
+/**
  * An account, two spendings of the month, an exchange and an income: every figure of «Деньги» drawn — and the
  * sums of a month in drams and of savings in roubles, «Потрачено 125 403 ֏» and «1 234 567,89 ₽», which a
  * month of four digits passed by (adversarial А1, А4, А5).
  */
-async function aMonth(page: Page): Promise<{ card: string; savings: string }> {
+async function aMonth(page: Page): Promise<{ card: string; savings: string; dinars: string }> {
   const card = randomUUID()
   await post(page, '/api/money/accounts', {
     id: card,
@@ -77,6 +131,16 @@ async function aMonth(page: Page): Promise<{ card: string; savings: string }> {
     currency: 'RUB',
     savings: true,
     start: { amount: '1234567.89', currency: 'RUB' },
+    startOn: day(3),
+  })
+  // A minus and capital letters are wider than figures: «−999,99 RSD» stood past its card (adversarial Б3).
+  const dinars = randomUUID()
+  await post(page, '/api/money/accounts', {
+    id: dinars,
+    name: 'Динары',
+    currency: 'RSD',
+    savings: false,
+    start: { amount: '-999.99', currency: 'RSD' },
     startOn: day(3),
   })
   for (const [index, amount] of ['123603', '1800'].entries())
@@ -101,7 +165,7 @@ async function aMonth(page: Page): Promise<{ card: string; savings: string }> {
     source: 'salary',
     accountId: card,
   })
-  return { card, savings }
+  return { card, savings, dinars }
 }
 
 for (const size of ['150%', '200%'])
@@ -155,7 +219,7 @@ for (const size of ['150%', '200%'])
     test('every screen of «Деньги» stands within the phone', async ({ page }) => {
       test.setTimeout(90_000)
       await signedIn(page)
-      const { card, savings } = await aMonth(page)
+      const { card, savings, dinars } = await aMonth(page)
       const screens: [string, Locator][] = [
         ['/money', page.locator('.donut .sector-name')],
         ['/money/spendings', page.locator('.day-head')],
@@ -167,11 +231,26 @@ for (const size of ['150%', '200%'])
         ['/money/accounts', page.getByRole('button', { name: 'Добавить счёт' })],
         [`/money/accounts/${card}`, page.locator('.balance .figure')],
         [`/money/accounts/${savings}`, page.locator('.balance .figure')],
+        [`/money/accounts/${dinars}`, page.locator('.balance .figure')],
       ]
       for (const [path, answer] of screens) {
         await page.goto(path)
         expect(await pageSideways(page, answer), path).toBe(0)
+        // Every balance within its card, «−999,99 RSD» too (adversarial А6, Б3).
+        if (path.startsWith('/money/accounts/'))
+          expect(await pastCard(page, '.balance p.figure', '.balance'), path).toBeLessThanOrEqual(
+            0.5,
+          )
       }
+      // A row's tail within its card: the savings' «1 234 567,89 ₽», «Убрать» (adversarial Б1, Б2).
+      await page.goto('/money/accounts')
+      await expect(page.locator('.list-row .tail').first()).toBeVisible()
+      await facesIn(page)
+      expect(await pastCard(page, '.list-row .tail')).toBeLessThanOrEqual(0.5)
+      await page.goto('/money/categories')
+      await expect(page.locator('.list-row .tail').first()).toBeVisible()
+      await facesIn(page)
+      expect(await pastCard(page, '.list-row .tail')).toBeLessThanOrEqual(0.5)
       // «На счетах сейчас» is one line, never a sign a line beside «1 счёт ›» (adversarial А8).
       await page.goto('/money')
       const now = page.locator('.now .figure')
@@ -236,6 +315,25 @@ for (const size of ['150%', '200%'])
       expect(
         await sheetSideways(page, page.getByRole('button', { name: 'Задать план категории' })),
       ).toBe(0)
+      // A record opened from «Траты»: its sum and its category, the category under the sum where the two do
+      // not fit (adversarial Б4).
+      await aRecord(page, '12540')
+      await page.goto('/money/spendings')
+      const record = page.getByRole('button', { name: /Ереван Сити/ }).first()
+      await expect(record).toBeVisible()
+      await record.click()
+      const sheet = page.locator('dialog[open]').last()
+      await expect(sheet.locator('.summary .figure')).toBeVisible()
+      await expect
+        .poll(() => sheet.evaluate((dialog) => dialog.getAnimations({ subtree: true }).length))
+        .toBe(0)
+      await facesIn(page)
+      expect(await sheet.evaluate((dialog) => dialog.scrollWidth - dialog.clientWidth)).toBe(0)
+      expect(await pastCard(page, 'dialog[open] .summary .badge', '.summary')).toBeLessThanOrEqual(
+        0.5,
+      )
+      await page.keyboard.press('Escape')
+      await expect(page.locator('dialog[open]')).toHaveCount(0)
       // A new category's colours, four and four (adversarial А10).
       await page.goto('/money/categories')
       expect(
