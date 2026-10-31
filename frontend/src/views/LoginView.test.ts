@@ -305,6 +305,18 @@ describe('фокус на заголовке переживает смену ш�
 
     expect(document.activeElement).toBe(outside)
   })
+
+  // Adversarial Р3-А2: a link of the door outlives the step, and the focus on it is the person's.
+  it('фокус на ссылке двери, пережившей смену шага, остаётся на ней', async () => {
+    const { view } = await render('none', true)
+    const link = view.get<HTMLElement>('a[href="/privacy"]').element
+    link.focus()
+    setOnline(false)
+    await flushPromises()
+
+    expect(view.text()).toContain(en.login.offline.title)
+    expect(document.activeElement).toBe(link)
+  })
 })
 
 describe('в чей аккаунт вошли', () => {
