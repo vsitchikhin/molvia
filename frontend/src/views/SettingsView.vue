@@ -51,7 +51,7 @@
       >
         <!-- One «Повторить» a screen (MOL-181, К-5): while the strip under the thumb offers the save's,
              the strip of the read has none — two of one name, one reading and one writing (Ж1). -->
-        <template v-if="!retriesSave" #action>
+        <template v-if="!saveRefused" #action>
           <AppButton variant="ghost" @click="form.refresh(true)">{{ t('state.retry') }}</AppButton>
         </template>
       </StatusStrip>
@@ -325,8 +325,14 @@ export default defineComponent({
      * only where the read keeps the save back: an unchanged form says «изменений нет» while the read of
      * every opening is on its way, or the word would blink at each one.
      */
-    /** «Сохранить» is the save's «Повторить» (adversarial А3: not while the read after it is on its way). */
-    const retriesSave = computed(() => form.saveError && online.value && !form.loading)
+    /**
+     * A refused save is the strip's «Повторить» to offer, so the strip of the read has none (Ж1) — by the
+     * refusal alone, never by the read on its way: tied to it, the strip's button came and went with every
+     * read the screen made itself, and the strip grew and shrank under the finger (adversarial З1).
+     */
+    const saveRefused = computed(() => form.saveError && online.value)
+    /** «Сохранить» says «Повторить» — not while the read after the refusal is on its way (adversarial А3). */
+    const retriesSave = computed(() => saveRefused.value && !form.loading)
     const saveWord = computed(() => {
       if (retriesSave.value) return t('state.retry')
       if (!online.value) return t('settings.save_needs_network')
@@ -384,6 +390,7 @@ export default defineComponent({
       askToLeave,
       groupsShown,
       strip,
+      saveRefused,
       retriesSave,
       saveWord,
       IconDevices,

@@ -528,6 +528,37 @@ describe('a form shown from memory says as of when, and what became of the read 
     expect(strips(view)[0]?.find('button').text()).toBe(en.state.retry)
   })
 
+  // Adversarial З1 of round 8: the strip's «Повторить» followed the read on its way and came and went with
+  // every read the screen made itself, the strip growing and shrinking under the finger.
+  it('the strip keeps no button through a read of its own while the save is refused', async () => {
+    const view = await render()
+    await field(view, 'city')?.setValue('Ереван')
+    save.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    me.mockResolvedValue(initial)
+    await view.get('.dock > button').trigger('click')
+    await flushPromises()
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(strips(view)[0]?.find('button').exists()).toBe(false)
+
+    let refuse: (error: Error) => void = () => undefined
+    me.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        refuse = reject
+      }),
+    )
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(view.get('.dock > button').text()).toBe(en.state.loading)
+    expect(strips(view)[0]?.find('button').exists()).toBe(false)
+
+    refuse(new ApiError(ERROR.INTERNAL))
+    await flushPromises()
+    expect(strips(view)[0]?.find('button').exists()).toBe(false)
+    expect(view.get('.dock > button').text()).toBe(en.state.retry)
+  })
+
   // Adversarial Ж2 of round 7: a 409 has no notice, so the strip of the read after it is the screen's one
   // word — and the edit took it away, the fields moving up under the finger.
   it('must not fire: an edit after a 409 takes away the strip of the read after it', async () => {
