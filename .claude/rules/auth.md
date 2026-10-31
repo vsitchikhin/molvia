@@ -200,12 +200,22 @@ the round trip through Telegram, and ask whose account this turned out to be.
   a public screen underneath is itself and keeps its own name. **Opened cold behind the door, home is
   laid underneath** (`settleColdStart`, owner's В-1 «а»): with «Настройки» there, a stranger who read
   the privacy page by a link signed in onto the settings. The door is read once at the start, before
-  the first paint, as `App.vue` reads it a moment later; one that opens afterwards leaves the chevron
-  «‹ Настройки», a replace onto the parent as for any screen with no ancestor underneath.
+  the first paint and before the first `me()`, so by the drawer. **The prices, named:** a door that
+  opens afterwards leaves the chevron «‹ Настройки», a replace onto the parent as for any screen with
+  no ancestor underneath; and one that shuts afterwards — an owner on the device whose session is
+  gone, 180 days unused or ended from «Устройства» — finds «Настройки» laid underneath, and «‹ Вход»
+  steps there: the owner signs in onto the settings (self-review №4, adversarial А1). Led past that
+  entry, the chevron and the system «back» would part, and the history underneath cannot be laid
+  again.
 - **The first screen names the product and what it is for** (MOL-216, Ф-35): the home screen's mark,
   «Molvia» as the heading the focus lands on, «Что брать на новом месте — и где» — no country, since
   the app has three — and the one action at the bottom of the free height. A screen, not a state of
-  one: it goes to no live region; every later step stands under «Вход» and its `ScreenState`.
+  one: it goes to no live region; every later step stands under «Вход» and its `ScreenState`. **So
+  the two headings are two elements, and the focus follows them** (adversarial А2): a change of step
+  that takes the heading or the button the focus stood on gives it to the heading that came, and a
+  door shut over the app — a session ended on another phone — gives it to the door's heading
+  (`App.vue`), since the first screen no longer says its words. A focus put outside the door stays.
+  The mark is `/favicon.svg` by its address, the tab's icon and precached; only the dev server inlines it.
 - **The door has one definition** — `login.closed`, which `App.vue` only reads — and it turns on
   what is actually known. A session the server named and the person claimed opens it; «no
   session» is an answer too and shuts it, whatever the device remembers. **Where nothing has
