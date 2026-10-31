@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   armenianInRussian,
+  brandToAsk,
+  glyphsMended,
+  heardSpelling,
   lineFitter,
   newLineName,
   receiptLineParts,
@@ -73,6 +76,15 @@ const WORDS = {
   մարտկոց: 'батарейка',
   սուպեր: 'супер',
   ձեռնոց: 'перчатки',
+  եգիպտացորեն: 'кукуруза',
+  հայկական: 'армянский',
+  տեղական: 'местный',
+  ռուսական: 'русский',
+  բուլղարական: 'болгарский',
+  պղպեղ: 'перец',
+  դրաժե: 'драже',
+  շոկոլադե: 'шоколадный',
+  կոնդիցիոներ: 'кондиционер',
 }
 
 const kind = (printed: string) => receiptLineParts(printed).kind
@@ -101,6 +113,7 @@ describe('a line taken apart (MOL-293)', () => {
       kind: 'յոգուրտ',
       percent: '1,5%',
       size: '270 г',
+      origins: [],
     })
   })
 
@@ -177,6 +190,21 @@ describe('a line taken apart (MOL-293)', () => {
     expect(receiptLineParts('Շամպինիոն «Սպիտակ Գլխարկ» 0.3կգ').size).toBe('0,3 кг')
     expect(receiptLineParts('Գազար կգ').size).toBeNull()
     expect(receiptLineParts('Մագնեզիումի գլիցինատ 120մգ').size).toBeNull()
+  })
+
+  it('takes a word glued to its package apart, and a unit in capitals for a unit (MOL-326)', () => {
+    expect(receiptLineParts('Շաքարավազ1կգ')).toMatchObject({
+      before: ['Շաքարավազ', '1կգ'],
+      kind: 'Շաքարավազ',
+      size: '1 кг',
+    })
+    expect(receiptLineParts('ԷՄ ԸՆԴ ԷՄՍ 45Գ').size).toBe('45 г')
+    expect(receiptLineParts('ՇԱՔԱՐԱՎԱԶ 1ԿԳ')).toMatchObject({ kind: 'ՇԱՔԱՐԱՎԱԶ', size: '1 кг' })
+    // a letter and a figure of a code stay one token, no word
+    expect(receiptLineParts('Մարտկոց Ա1 4հտ').before).toEqual(['Մարտկոց', 'Ա1', '4հտ'])
+    // a figure alone is the model's «շ», never a package: «Ֆրեշ» read «Ֆրե2», «Լավաշ» «Լավա2» (adversarial А4)
+    expect(receiptLineParts('Թաղանթ «Գոսիա» Ֆրե2 30մ').after).toEqual(['Ֆրե2', '30մ'])
+    expect(receiptLineParts('Լավա2 կգ').before).toEqual(['Լավա2', 'կգ'])
   })
 })
 
@@ -258,6 +286,19 @@ describe('a brand as its package spells it (MOL-261, В-2 «а»)', () => {
     expect(shelved('Թխվածքաբլիթ Ռոշեն Լովիտա')?.name).toBe('Печенье Roshen Lovita')
   })
 
+  it('takes a brand that is a word of the dictionary for the word where it is the line’s kind (MOL-326)', () => {
+    const tofu = (printed: string) =>
+      newLineName(
+        receiptLineParts(printed),
+        { ...WORDS, տոֆու: 'тофу', լցոնիչ: 'наполнитель' },
+        {
+          brands: { տոֆու: 'Tofu' },
+        },
+      )?.name
+    expect(tofu('Լցոնիչ Տոֆու 6լ')).toBe('Наполнитель Tofu 6 л')
+    expect(tofu('Տոֆու 200գ')).toBe('Тофу 200 г')
+  })
+
   it('writes a Cyrillic one in «…», and one it does not know in Russian letters, as before', () => {
     expect(shelved('Շոկոլադ «Ալյոնկա» 100գր')?.name).toBe('Шоколад «Алёнка» 100 г')
     expect(shelved('Յոգուրտ «Երեմյան Փրոդաքթս» ելակ')?.name).toBe(
@@ -273,6 +314,45 @@ describe('a brand as its package spells it (MOL-261, В-2 «а»)', () => {
     expect(fit('Печенье Roshen Lovita')).toBe(false)
     // without the lexicon the brand is two letters off its package, and another
     expect(lineFitter(delice, WORDS)('Печенье Kinder Délice')).toBe(false)
+  })
+})
+
+describe('a Latin brand the till prints as it is said, letter by letter (MOL-326)', () => {
+  it('is the line’s brand, its letters in Latin', () => {
+    expect(receiptLineParts('Լվացքի կոնդիցիոներ Էյ Բի Սի 1լ')).toMatchObject({
+      before: ['Լվացքի', 'կոնդիցիոներ'],
+      brand: 'Էյ Բի Սի',
+      after: ['1լ'],
+      kind: 'կոնդիցիոներ',
+    })
+    expect(named('Լվացքի կոնդիցիոներ Էյ Բի Սի 1լ')?.name).toMatch(/^Кондиционер .*ABC 1 л$/u)
+    expect(named('Կոնդիցիոներ «Էյ Բի Սի» 1լ')?.name).toBe('Кондиционер ABC 1 л')
+  })
+
+  it('reads «and» between letters and a plural «-ս» at the end of them', () => {
+    expect(named('Շոկոլադե դրաժե Էմ ընդ Էմս 45գ')).toEqual({
+      name: "Драже шоколадное M&M's 45 г",
+      spelled: false,
+    })
+    expect(named('ԷՄ ԸՆԴ ԷՄՍ 45Գ')).toEqual({ name: "M&M's 45 г", spelled: false })
+    expect(receiptLineParts('Դրաժե Էմ էնդ Էմս').brand).toBe('Էմ էնդ Էմս')
+  })
+
+  it('takes one letter’s name, or «and» with nothing after it, for no brand', () => {
+    expect(receiptLineParts('Վիտամին Դի 30հտ').brand).toBeNull()
+    expect(receiptLineParts('Դրաժե Էմ ընդ').brand).toBeNull()
+    expect(receiptLineParts('Դրաժե Էմս').brand).toBeNull()
+  })
+
+  it('lets an item named by its letters stand on the line, and takes no item of the seed', () => {
+    const fit = (printed: string, item: string, generic = false) =>
+      lineFitter(receiptLineParts(printed), WORDS)(item, { generic })
+    expect(fit('ԷՄ ԸՆԴ ԷՄՍ 45Գ', "M&M's")).toBe(true)
+    expect(fit('Շոկոլադե դրաժե Էմ ընդ Էմս 45գ', "Драже M&M's")).toBe(true)
+    expect(fit('Շոկոլադե դրաժե Էմ ընդ Էմս 45գ', 'Драже Skittles')).toBe(false)
+    expect(fit('Շոկոլադե դրաժե Էմ ընդ Էմս 45գ', 'Драже', true)).toBe(false)
+    expect(fit('Լվացքի կոնդիցիոներ Էյ Բի Սի 1լ', 'Кондиционер ABC')).toBe(true)
+    expect(fit('Լվացքի կոնդիցիոներ Էյ Բի Սի 1լ', 'Кондиционер Lenor')).toBe(false)
   })
 })
 
@@ -738,5 +818,112 @@ describe('an item standing on a line (MOL-293, В-1 «а», В-2 «а»)', () =>
   it('takes nothing for a name of no word', () => {
     expect(fits(yoghurt, '')).toBe(false)
     expect(fits(yoghurt, 'для')).toBe(false)
+  })
+})
+
+describe('a word the reader misread by the font (MOL-326, В-3 «б»)', () => {
+  const KNOWN = new Set([
+    'շաքարավազ',
+    'յոգուրտ',
+    'չիպս',
+    'զուգարանի',
+    'ճզմիչ',
+    'չամիչով',
+    'շամիչով',
+  ])
+
+  it('is put right where one swap of the font’s letters makes one known word, its capital kept', () => {
+    expect(glyphsMended('Ցաքարավազ 1կգ', KNOWN)).toBe('Շաքարավազ 1կգ')
+    expect(glyphsMended('Ծոգուրտ «Երեմյան Փրոդաքթս» ելակ', KNOWN)).toBe(
+      'Յոգուրտ «Երեմյան Փրոդաքթս» ելակ',
+    )
+    expect(glyphsMended('Թուղթ գուգարանի', KNOWN)).toBe('Թուղթ զուգարանի')
+    expect(glyphsMended('ՑԱՔԱՐԱՎԱԶ 1ԿԳ', KNOWN)).toBe('ՇԱՔԱՐԱՎԱԶ 1ԿԳ')
+  })
+
+  it('must not touch a known word, a short one, a brand in «…», or one two known words are a swap from', () => {
+    expect(glyphsMended('Շաքարավազ 1կգ', KNOWN)).toBeNull()
+    expect(glyphsMended('Ջիպս', KNOWN)).toBe('Չիպս')
+    expect(glyphsMended('Ջիպ 1հտ', KNOWN)).toBeNull()
+    expect(glyphsMended('Չիպս «Ջիպս»', KNOWN)).toBeNull()
+    // «չամիշով» is «չամիչով» and «շամիչով» alike: a guess, left as read
+    expect(glyphsMended('չամիշով', new Set(['չամիչով', 'շամիշով']))).toBeNull()
+  })
+
+  it('must not take a swap of letters it has not measured: «լոշիկ» is no «լոլիկ»', () => {
+    expect(glyphsMended('Լոշիկ', new Set(['լոլիկ']))).toBeNull()
+  })
+})
+
+describe('where a thing was grown or made (MOL-326, owner’s В-2 «а»)', () => {
+  it('names no new item by its origin, so that two lines of one thing make one item', () => {
+    expect(named('Եգիպտացորեն (հայկական) հտ')?.name).toBe('Кукуруза')
+    expect(named('Եգիպտացորեն հտ')?.name).toBe('Кукуруза')
+    // printed bare as well (self-review №1)
+    expect(named('Եգիպտացորեն հայկական հտ')?.name).toBe('Кукуруза')
+    expect(receiptLineParts('Եգիպտացորեն (հայկական) հտ').origins).toEqual(['հայկական'])
+    expect(named('Վարունգ ընտիր (ռուսական) կգ')?.name).toBe('Огурец отборный')
+    expect(named('Խոզի ֆիլե կգ (տեղական)')?.name).not.toMatch(/местн/u)
+    expect(named('Վարունգ տեղական')?.name).toBe('Огурец')
+  })
+
+  it('lets the item of one stand on the line of the other', () => {
+    expect(fits('Եգիպտացորեն (հայկական) հտ', 'Кукуруза')).toBe(true)
+    expect(fits('Եգիպտացորեն հտ', 'Кукуруза')).toBe(true)
+  })
+
+  it('keeps a word of no origin, in parentheses or not: «болгарский» is a kind, «(детская)» another thing (№2)', () => {
+    expect(named('Պղպեղ բուլղարական կգ')?.name).toBe('Перец болгарский')
+    expect(
+      newLineName(receiptLineParts('Ատամի մածուկ (մանկական) 50մլ'), {
+        ...WORDS,
+        մածուկ: 'паста',
+        մանկական: 'детский',
+      })?.name,
+    ).toMatch(/детск/u)
+  })
+
+  it('keeps the origin a seed’s name holds with the kind, in parentheses or not (self-review №1)', () => {
+    const seed = [{ name: 'Кофе армянский', names: ['սուրճ հայկական'] }]
+    for (const printed of ['Սուրճ հայկական «Ռոյալ» 100գ', 'Սուրճ (հայկական) «Ռոյալ» 100գ']) {
+      expect(newLineName(receiptLineParts(printed), WORDS, { seed })?.name).toBe(
+        'Кофе армянский «Роял» 100 г',
+      )
+      expect(lineFitter(receiptLineParts(printed), WORDS)('Кофе армянский «Роял»')).toBe(true)
+    }
+    // the seed’s name with no origin does not keep it: the line’s word goes
+    expect(
+      newLineName(receiptLineParts('Սուրճ հայկական «Ռոյալ»'), WORDS, {
+        seed: [{ name: 'Кофе', names: ['սուրճ'] }],
+      })?.name,
+    ).toBe('Кофе «Роял»')
+  })
+})
+
+describe('a brand the model is asked about (MOL-326, owner’s В-1 «б»)', () => {
+  it('is a brand in «…» no lexicon and no rule spells', () => {
+    const ask = (printed: string) => brandToAsk(receiptLineParts(printed), { brands: BRANDS })
+    expect(ask('Կատվի կեր «Ֆելիքս» 85գ')).toBe('Ֆելիքս')
+    expect(ask('Թխվածքաբլիթ «Ռոշեն» Լովիտա')).toBeNull()
+    expect(ask('Կոնդիցիոներ «Էյ Բի Սի» 1լ')).toBeNull()
+    expect(ask('Չիպս «Lay’s» 90գ')).toBeNull()
+    expect(ask('Լցոնիչ Տոֆու 6լ')).toBeNull()
+  })
+
+  it('takes the model’s spelling only where it sounds as the till printed it', () => {
+    expect(heardSpelling('Ֆելիքս', 'Felix')).toBe('Felix')
+    expect(heardSpelling('Կոկա Կոլա', ' Coca-Cola ')).toBe('Coca-Cola')
+    expect(heardSpelling('Ալյոնկա', 'Алёнка')).toBe('Алёнка')
+    expect(heardSpelling('Ֆելիքս', 'Whiskas')).toBeNull()
+    expect(heardSpelling('Բարիլլա', 'Gorilla')).toBeNull()
+    // a translation is no spelling: «Սպիտակ Գլխարկ» is «Белая шляпка» on no package the till heard
+    expect(heardSpelling('Սպիտակ Գլխարկ', 'Белая шляпка')).toBeNull()
+  })
+
+  it('takes no spelling in Armenian letters, of signs, or past a name’s length', () => {
+    expect(heardSpelling('Ֆելիքս', 'Ֆելիքս')).toBeNull()
+    expect(heardSpelling('Ֆելիքս', '<b>Felix</b>')).toBeNull()
+    expect(heardSpelling('Ֆելիքս', `Felix ${'x'.repeat(40)}`)).toBeNull()
+    expect(heardSpelling('Ֆ', 'F')).toBeNull()
   })
 })

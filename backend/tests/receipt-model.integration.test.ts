@@ -210,6 +210,10 @@ function fakeModel(
       model.asked += 1
       return answer()
     },
+    // these tests bind with no brands asked (MOL-326)
+    brandsVersion: 'claude-haiku-5-5@brands-v1',
+    brandsInputTokensMax: () => 1_000,
+    spellBrands: () => Promise.reject(new Error('no brand is asked in these tests')),
   }
   return model
 }
@@ -1689,4 +1693,102 @@ describe('a receipt read not whole: its reasons, its review and the developer to
       }
     }, 30_000)
   })
+})
+
+describe('the brands and the font of a receipt the model read, and of no other (MOL-326)', () => {
+  // the queue as the server runs it: what `read.byModel` decides is the person's edition 5 (self-review №4)
+  const BRANDED: ModelReceipt = {
+    ...ANSWER,
+    lines: [
+      { ...ANSWER.lines[0]!, printed: 'Կաթ «Ֆելիքս» 3.2% 1լ' },
+      { ...ANSWER.lines[1]!, printed: 'Ցաքարավազ 1կգ', code: '1701' },
+    ],
+  }
+
+  function speller(answer: () => Promise<ModelReading>): ReceiptModel & { spelt: number } {
+    const model = {
+      spelt: 0,
+      version: 'claude-haiku-5-5@v5',
+      inputTokensMax: () => 10_000,
+      read: answer,
+      brandsVersion: 'claude-haiku-5-5@brands-v1',
+      brandsInputTokensMax: () => 1_000,
+      spellBrands: (brands: readonly { brand: string }[]) => {
+        model.spelt += 1
+        return Promise.resolve({
+          kind: 'read' as const,
+          spellings: brands.map(({ brand }) => (brand === 'Ֆելիքս' ? 'Felix' : null)),
+          costMicroUsd: 100,
+          tokens: { input: 300, output: 40 },
+        })
+      },
+    }
+    return model
+  }
+
+  /** The receipt sent through the reading server, read by its own queue, its lines as bound. */
+  async function readThrough(me: Person, model: ReceiptModel) {
+    const reading = buildServer({ db, receiptReader: benchReader(), receiptModel: model })
+    await reading.ready()
+    try {
+      const id = randomUUID()
+      await reading.inject({
+        method: 'POST',
+        url: '/receipts',
+        headers: { cookie: me.cookie },
+        payload: {
+          id,
+          parts: 1,
+          country: 'AM',
+          language: 'ru',
+          capturedAt: '2026-10-08T16:00:00.000Z',
+        },
+      })
+      await reading.inject({
+        method: 'PUT',
+        url: `/receipts/${id}/parts/1`,
+        headers: { cookie: me.cookie, 'content-type': 'image/jpeg' },
+        payload: jpeg(800, 2_400, ++photos % 256),
+      })
+      for (let i = 0; i < 100 && (await receiptOf(id))?.status !== 'parsed'; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+      expect((await receiptOf(id))?.status).toBe('parsed')
+      return await db
+        .select({
+          printed: receiptLines.printed,
+          match: receiptLines.match,
+          translation: receiptLines.translation,
+        })
+        .from(receiptLines)
+        .where(eq(receiptLines.receiptId, id))
+        .orderBy(receiptLines.position)
+    } finally {
+      await reading.close()
+    }
+  }
+
+  it('asks the model of the brands of its own receipt, and puts right the word it misread', async () => {
+    const model = speller(() =>
+      Promise.resolve({ kind: 'read', answer: BRANDED, costMicroUsd: 2_180, tokens: TOKENS }),
+    )
+    const lines = await readThrough(await person(LATER), model)
+    expect(model.spelt).toBe(1)
+    expect(lines).toEqual([
+      { printed: 'Կաթ «Ֆելիքս» 3.2% 1լ', match: 'weak', translation: 'Молоко Felix 3,2% 1 л' },
+      { printed: 'Ցաքարավազ 1կգ', match: 'weak', translation: 'Сахар-песок 1 кг' },
+    ])
+  }, 30_000)
+
+  it('asks nothing, and puts right nothing, of a receipt Tesseract read — no grant, or the model refused', async () => {
+    for (const [me, model] of [
+      [await person(null), speller(() => Promise.reject(new Error('never asked')))],
+      [await person(LATER), speller(() => Promise.reject(new ModelRejected(400)))],
+    ] as const) {
+      const lines = await readThrough(me, model)
+      expect(model.spelt).toBe(0)
+      // am-05 as Tesseract read it, its brands in Russian letters: «Игит», «Еремян Продактс»
+      expect(lines.map((line) => line.translation).join(' ')).toMatch(/«Игит»/u)
+    }
+  }, 60_000)
 })

@@ -409,7 +409,8 @@ const tally = (
   readerVersion: string | null = null,
 ) => addToDay(db, byModel(readerVersion) ? modelReceiptDays : receiptDays, counts, day, source)
 
-const byModel = (readerVersion: string | null): boolean =>
+/** The model read the receipt (MOL-272), by its `reader_version`; Tesseract, a link, none. */
+export const byModel = (readerVersion: string | null): boolean =>
   readerVersion?.startsWith(`${RECEIPT_MODEL}@`) ?? false
 
 /** Adds to `tax_receipt_days`: the receipts by their link (MOL-234). */

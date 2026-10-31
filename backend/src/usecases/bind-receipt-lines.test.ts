@@ -3,17 +3,23 @@ import { itemSchema } from '@molvia/model'
 import type { CatalogueNode, Item, ReceiptLine } from '@molvia/model'
 import type { ItemRepository, SearchAnswer } from '@/db/items-repository'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
-import type { CatalogueNamesMissing } from './bind-receipt-lines'
+import type { BindReceiptLinesDeps, CatalogueNamesMissing } from './bind-receipt-lines'
 import { bindReceiptLines } from './bind-receipt-lines'
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
+
+type Spellings = NonNullable<BindReceiptLinesDeps['spellings']>
 const MILK = '00000000-0000-4000-8000-000000000001'
 const GLUE = '00000000-0000-4000-8000-000000000002'
 const SOUR_CREAM = '00000000-0000-4000-8000-000000000003'
+const SUGAR = '00000000-0000-4000-8000-000000000004'
+const EGGS = '00000000-0000-4000-8000-000000000005'
 
 const NODES: CatalogueNode[] = [
   { itemId: MILK, name: 'Молоко', names: ['կաթ'], headings: ['0401'] },
   { itemId: GLUE, name: 'Клей', names: ['սոսինձ'], headings: ['3506'] },
+  { itemId: SUGAR, name: 'Сахар', names: ['շաքար', 'շաքարավազ'], headings: ['1701'] },
+  { itemId: EGGS, name: 'Яйца', names: ['ձու', 'հավկիթ'], headings: ['0407'] },
 ]
 
 function item(id: string, name: string): Item {
@@ -241,6 +247,184 @@ describe('binding the lines of a parsed receipt (MOL-126)', () => {
       line('ԹԹՎԱՍԵՐ 20%'),
     ])
     expect(line0).toEqual({ itemId: null, match: 'weak', translation: null, spelled: false })
+  })
+})
+
+describe('the owner’s lines of 31.10.2026, by the backend’s own tables (MOL-326)', () => {
+  it('names each new item as its shelf does', async () => {
+    const { items } = fakeItems()
+    const bound = await bindReceiptLines({ items, embedder: NO_EMBEDDER }, ACTOR, 'AM', 'ru', [
+      line('Շոկոլադե դրաժե Էմ ընդ Էմս 45գ'),
+      line('Լվացքի կոնդիցիոներ Էյ Բի Սի 1լ'),
+      line('Կատվի հող Տոֆու 6լ'),
+      line('Լցոնիչ Տոֆու 6լ'),
+      line('Շաքարավազ1կգ'),
+    ])
+    expect(bound.map((one) => one.translation)).toEqual([
+      "Драже шоколадное M&M's 45 г",
+      'Кондиционер для белья ABC 1 л',
+      'Наполнитель для лотка Tofu 6 л',
+      'Наполнитель Tofu 6 л',
+      // the seed's sugar, the word glued to its package read
+      'сахар-песок',
+    ])
+    expect(bound[4]).toMatchObject({ itemId: SUGAR, match: 'search' })
+  })
+})
+
+describe('an item a line named, found again by the line (MOL-326, adversarial А1)', () => {
+  const FOUND = '00000000-0000-4000-8000-0000000000f1'
+  const found = (name: string) =>
+    fakeItems({ items: [item(FOUND, name)], near: true, nearIds: [FOUND] }).items
+
+  it('takes the item named by the genitive’s adjective and the phrase, whatever the case and the order', async () => {
+    for (const [printed, name] of [
+      ['Կատվի կեր «Ֆելիքս» 85գ', 'Корм кошачий «Феликс» 85 г'],
+      ['ԿԱՏՎԻ ԿԵՐ «ՖԵԼԻՔՍ» 85Գ', 'Корм кошачий «Феликс» 85 г'],
+      ['Կատվի կեր «Ֆելիքս» 85գ', 'Корм кошачий «Феликс»'],
+      ['Կատվի հող Տոֆու 6լ', 'Наполнитель для лотка Tofu 6 л'],
+      ['Լվացքի կոնդիցիոներ Էյ Բի Սի 1լ', 'Кондиционер для белья ABC 1 л'],
+      ['Կոնդիցիոներ լվացքի «Լենոր» 1լ', 'Кондиционер для белья «Ленор» 1 л'],
+    ] as const) {
+      const [bound] = await bindReceiptLines(
+        { items: found(name), embedder: NO_EMBEDDER },
+        ACTOR,
+        'AM',
+        'ru',
+        [line(printed)],
+      )
+      expect(bound, `${printed} → ${name}`).toMatchObject({ itemId: FOUND, match: 'search' })
+    }
+  })
+
+  it('must not take the seed’s litter for a line of a brand the table knows, printed bare', async () => {
+    const [bound] = await bindReceiptLines(
+      { items: found('Наполнитель для лотка'), embedder: NO_EMBEDDER },
+      ACTOR,
+      'AM',
+      'ru',
+      [line('Կատվի հող Տոֆու 6լ')],
+    )
+    expect(bound).toMatchObject({ itemId: null, translation: 'Наполнитель для лотка Tofu 6 л' })
+  })
+})
+
+describe('a brand no table spells, asked of the model (MOL-326, В-1 «б»)', () => {
+  it('names the new item by the package’s spelling, asking once for the receipt’s brands no table spells', async () => {
+    const { items } = fakeItems()
+    const spellings = vi.fn<Spellings>((asked) =>
+      Promise.resolve(
+        new Map(asked.flatMap(({ brand }) => (brand === 'Ֆելիքս' ? [['ֆելիքս', 'Felix']] : []))),
+      ),
+    )
+    const bound = await bindReceiptLines(
+      { items, embedder: NO_EMBEDDER, spellings },
+      ACTOR,
+      'AM',
+      'ru',
+      [
+        line('Կատվի կեր «Ֆելիքս» 85գ'),
+        line('Կաթ «Աշտարակ Կաթ» 1լ'),
+        line('Թխվածքաբլիթ «Ռոշեն» Լովիտա'),
+      ],
+      [],
+      { byModel: true },
+    )
+    expect(bound.map((one) => one.translation)).toEqual([
+      'Корм кошачий Felix 85 г',
+      // the model knew no local brand: in Russian letters, as before
+      'Молоко «Аштарак Кат» 1 л',
+      'Печенье Roshen Lovita',
+    ])
+    // Roshen is the table's, and asked of nobody
+    expect(spellings).toHaveBeenCalledTimes(1)
+    expect(spellings.mock.calls[0]?.[0].map(({ brand }) => brand)).toEqual([
+      'Ֆելիքս',
+      'Աշտարակ Կաթ',
+    ])
+    expect(spellings.mock.calls[0]?.[1]).toEqual({ ask: true })
+  })
+
+  it('names a receipt Tesseract read by what the model said before, and asks it nothing (self-review №3)', async () => {
+    const { items } = fakeItems()
+    const spellings = vi.fn<Spellings>(() => Promise.resolve(new Map([['ֆելիքս', 'Felix']])))
+    const [bound] = await bindReceiptLines(
+      { items, embedder: NO_EMBEDDER, spellings },
+      ACTOR,
+      'AM',
+      'ru',
+      [line('Կատվի կեր «Ֆելիքս» 85գ')],
+    )
+    expect(bound?.translation).toBe('Корм кошачий Felix 85 г')
+    expect(spellings).toHaveBeenCalledWith([expect.objectContaining({ brand: 'Ֆելիքս' })], {
+      ask: false,
+    })
+  })
+
+  it('must not ask without the model: a brand no table spells stays in Russian letters', async () => {
+    const { items } = fakeItems()
+    const [bound] = await bindReceiptLines({ items, embedder: NO_EMBEDDER }, ACTOR, 'AM', 'ru', [
+      line('Կատվի կեր «Ֆելիքս» 85գ'),
+    ])
+    expect(bound?.translation).toBe('Корм кошачий «Феликс» 85 г')
+  })
+})
+
+describe('a word the model misread by the font (MOL-326, В-3 «б»)', () => {
+  it('is put right for the item and the name alike, and the line is «проверьте»', async () => {
+    const { items } = fakeItems()
+    const bound = await bindReceiptLines(
+      { items, embedder: NO_EMBEDDER },
+      ACTOR,
+      'AM',
+      'ru',
+      [
+        line('Ցաքարավազ 1կգ', '1701'),
+        line('Շաքարավազ 1կգ', '1701'),
+        line('Ցաքարավազ «Մաքուր» 1կգ'),
+      ],
+      [],
+      { byModel: true },
+    )
+    expect(bound).toEqual([
+      { itemId: SUGAR, match: 'weak', translation: 'сахар-песок' },
+      { itemId: SUGAR, match: 'search', translation: 'сахар-песок' },
+      {
+        itemId: null,
+        match: 'weak',
+        translation: 'Сахар-песок «Макур» 1 кг',
+        spelled: false,
+      },
+    ])
+  })
+
+  it('must not put a line on an item its printed heading rules out: corn bread read «Ձու» is no egg (adversarial Б1)', async () => {
+    const BREAD = '00000000-0000-4000-8000-0000000000e2'
+    const { items } = fakeItems({
+      items: [item(BREAD, 'Хлеб'), item(EGGS, 'Яйца')],
+      near: true,
+      nearIds: [BREAD, EGGS],
+    })
+    const [bound] = await bindReceiptLines(
+      { items, embedder: NO_EMBEDDER },
+      ACTOR,
+      'AM',
+      'ru',
+      // the bench's reading of «Հաց եգիպտացորենի 350գր»: «Հաց» read as an egg, «եգ» as «եզ» — the mend is right, and
+      // the class the till printed, read with it, rules the egg out by the seed's name and the search alike
+      [line('Ձու եզիպտացորենի 350գր', '1905')],
+      [],
+      { byModel: true },
+    )
+    expect(bound?.itemId).not.toBe(EGGS)
+  })
+
+  it('must not be put right on a line Tesseract read: it misreads otherwise', async () => {
+    const { items } = fakeItems()
+    const [bound] = await bindReceiptLines({ items, embedder: NO_EMBEDDER }, ACTOR, 'AM', 'ru', [
+      line('Ցաքարավազ 1կգ', '1701'),
+    ])
+    expect(bound).toMatchObject({ itemId: null, match: 'weak', spelled: true })
   })
 })
 

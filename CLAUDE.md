@@ -702,11 +702,15 @@ that are easiest to break; the file holds every rule of the area and the reason 
   common start, every figure with its unit, the line's brand in it (the seed's items are kinds), its name the line's
   kind — or all of it that brand; two things side by side, both; a heading's item it rules out is none. Else a new
   item named in full, «проверьте» on the wire too — a word spelt in letters taken away by one press (`spelled`). A
-  dictionary's word is read exactly, never one edit off.
+  dictionary's word is read exactly, never one edit off — but for one measured swap of the font's letters, on the model's
+  lines only, «проверьте» (`glyphsMended`, MOL-326).
 - **A new item's name is a shelf's** (MOL-261): the brand as its package spells it — a Latin one bare, else in «…»,
   a line may name an item by either (`TILL_BRANDS`, В-2 «а») — the kind the seed's, in its number, so `kindKey` is one;
   adjectives agreed, a genitive by its own form's adjective, a till's phrase whole — each a table of the backend, never
-  code; what was recorded before is renamed once by `make rename-items`, by the owner's word (В-3 «а»).
+  code; what was recorded before is renamed once by `make rename-items`, by the owner's word (В-3 «а»). **A brand said
+  letter by letter is Latin, one no table spells the model's for its receipts — taken only as it sounds printed, read
+  for every receipt once said — and where a thing was grown is no word of it but a seed's name's** (MOL-326:
+  `letterRun`, `heardSpelling`, `brand_spellings`, `ORIGINS`, В-2 «а»).
 - **The shops' memory is shared** (owner, 30.09.2026): the person's own word first, else the item most
   people said, the later on a tie; the erased still count; nobody's word is shown as someone's, and
   another person's shelf price only with access and from three prices, their lower median. **A person's word

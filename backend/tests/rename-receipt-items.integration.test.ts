@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { asc, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
-import { toSearchKey } from '@molvia/model'
+import { RECEIPT_MODEL, toSearchKey } from '@molvia/model'
+import { createBrandSpellingRepository } from '@/db/brand-spellings-repository'
 import { createItemRepository } from '@/db/items-repository'
 import { createRenameRepository } from '@/db/rename-repository'
 import { itemEmbeddings, items, receiptLines, receiptParts, receipts } from '@/db/schema'
@@ -22,6 +23,7 @@ const catalogue = createItemRepository(db)
 const deps = {
   renamer: createRenameRepository(db),
   nodes: (language: 'hy') => catalogue.nodes(language),
+  spellings: createBrandSpellingRepository(db),
 }
 let app: FastifyInstance
 
@@ -62,11 +64,23 @@ const LINES = [
   { printed: 'Ֆանտա 0.5լ', proposed: 'Фанта 0,5 л', named: null },
 ] as const
 
-async function recorded(me: string, fanta: string): Promise<void> {
+interface Line {
+  readonly printed: string
+  readonly proposed: string
+  readonly named: string | null
+}
+
+async function recorded(
+  me: string,
+  fanta: string,
+  lines: readonly Line[] = LINES,
+  readerVersion: string | null = null,
+): Promise<void> {
   const id = randomUUID()
   await db.insert(receipts).values({
     id,
     actorId: me,
+    readerVersion,
     status: 'parsed',
     parts: 1,
     country: 'AM',
@@ -78,7 +92,7 @@ async function recorded(me: string, fanta: string): Promise<void> {
     printedOn: '2026-10-20',
     printedTime: '19:42',
     receiptNo: randomUUID().slice(0, 8),
-    totalMinor: BigInt(LINES.length * 50_000),
+    totalMinor: BigInt(lines.length * 50_000),
     city: 'Гюмри',
     layout: 'card',
   })
@@ -90,7 +104,7 @@ async function recorded(me: string, fanta: string): Promise<void> {
     height: 2400,
   })
   await db.insert(receiptLines).values(
-    LINES.map((line, position) => ({
+    lines.map((line, position) => ({
       receiptId: id,
       position,
       printed: line.printed,
@@ -111,9 +125,10 @@ async function recorded(me: string, fanta: string): Promise<void> {
     headers: { cookie: await signIn(db, me), 'x-molvia-today': '2026-10-26' },
     payload: {
       tripId: randomUUID(),
-      place: { id: await insertPlace(db) },
+      // a place of each record: two records of one shop would be one place
+      place: { id: await insertPlace(db, { name: `SAS ${id.slice(0, 4)}` }) },
       purchasedOn: '2026-10-20',
-      lines: LINES.map((line, position) => ({
+      lines: lines.map((line, position) => ({
         position,
         skip: false,
         item: line.named === null ? { id: fanta } : { name: line.named },
@@ -188,6 +203,58 @@ describe('rename-receipt-items (MOL-261, В-3 «а»)', () => {
     const out: string[] = []
     expect(await renameReceiptItems(['--yes'], deps, (line) => out.push(line))).toBe(0)
     expect(out.slice(0, 1)).toEqual(['  renamed     0'])
+  }, 30_000)
+
+  it('reads a line the model read as the queue does, a word it misread put right (MOL-326)', async () => {
+    const me = await insertActor(db)
+    const fanta = await insertItem(db, { name: 'Фанта', searchKey: toSearchKey('Фанта') })
+    const misread = [
+      { printed: 'Ցաքարավազ 1կգ', proposed: 'Цакараваз 1 кг', named: 'Цакараваз 1 кг' },
+    ]
+    await recorded(me, fanta, misread, `${RECEIPT_MODEL}@v5`)
+    // Tesseract misreads otherwise: its line stays as read
+    const byTesseract = [
+      { printed: 'Ցաքարավազ 2կգ', proposed: 'Цакараваз 2 кг', named: 'Цакараваз 2 кг' },
+    ]
+    await recorded(me, fanta, byTesseract, 'tesseract-5.5')
+
+    const out: string[] = []
+    expect(await renameReceiptItems([], deps, (line) => out.push(line))).toBe(0)
+    expect(out.slice(0, 2)).toEqual(['  renamed     1', '    Цакараваз 1 кг → Сахар-песок 1 кг'])
+  }, 30_000)
+
+  it('spells a brand as the model spelt it for a receipt read since (MOL-326, В-1 «б»)', async () => {
+    const me = await insertActor(db)
+    const fanta = await insertItem(db, { name: 'Фанта', searchKey: toSearchKey('Фанта') })
+    // a brand the table spells since it was asked: the table stands, as the queue reads it (adversarial А3)
+    await deps.spellings.remember(
+      [
+        { brand: 'ֆելիքս', spelling: 'Felix' },
+        { brand: 'ռոշեն', spelling: 'Рошен' },
+      ],
+      'claude-haiku-5-5@brands-v1',
+    )
+    const felix = [
+      {
+        printed: 'Կատվի կեր «Ֆելիքս» 85գ',
+        proposed: 'Корм кошачий «Феликс» 85 г',
+        named: 'Корм кошачий «Феликс» 85 г',
+      },
+      {
+        printed: 'Թխվածքաբլիթ «Ռոշեն» Լովիտա',
+        proposed: 'Печенье «Рошен» Ловита',
+        named: 'Печенье «Рошен» Ловита',
+      },
+    ]
+    await recorded(me, fanta, felix)
+
+    const out: string[] = []
+    expect(await renameReceiptItems([], deps, (line) => out.push(line))).toBe(0)
+    expect(out.slice(0, 3)).toEqual([
+      '  renamed     2',
+      '    Корм кошачий «Феликс» 85 г → Корм кошачий Felix 85 г',
+      '    Печенье «Рошен» Ловита → Печенье Roshen Lovita',
+    ])
   }, 30_000)
 
   it('refuses any word but --yes', async () => {

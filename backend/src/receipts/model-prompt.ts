@@ -28,3 +28,21 @@ Fill the JSON:
 - id_rows: every row outside the items and the summary that prints a number after its label — the seller's tax number («ՀՎՀՀ»), the till's registration («ԳՀ», «ՀԴՄ»), the fiscal number («Ֆիսկալ համար»), the receipt's number («ԿՀ», «Чек №») and the like — each row exactly as printed, its label and its number together («ՀՎՀՀ: 01282006»), in printed order. Copy the rows; never decide which number is which, never move a number to another label.
 - date "YYYY-MM-DD", time "HH:MM". shop and address: the seller's, as printed.
 - Never write a customer's name, phone or card number anywhere.`
+
+/**
+ * What the model is asked of the brands its receipts print in «…» that no table of ours spells (MOL-326, owner's
+ * В-1 «б»): text alone, never the photo, in a call of its own — the reading's prompt is never touched, since every
+ * word added to it read the lines worse (MOL-293). Its answer is taken only where it sounds as the till printed it
+ * (`heardSpelling`). The version goes into `brand_spellings.said`.
+ */
+export const BRANDS_PROMPT_VERSION = 'brands-v1'
+
+export const BRANDS_SYSTEM = `You name brands for a price-tracking app in Armenia. An Armenian till prints a brand in Armenian letters, as it sounds. You say how the brand is spelt on its package, or null. A wrong brand is far worse than none: never guess, never translate.`
+
+export const BRANDS_INSTRUCTIONS = `Each item is a brand as an Armenian receipt prints it, with the receipt's line it stands on.
+For each, write spelling:
+- an international brand in its own spelling, usually Latin: «Ֆելիքս» → "Felix", «Կոկա Կոլա» → "Coca-Cola", «Մակ Կոֆե» → "MacCoffee";
+- a Russian, Ukrainian or Belarusian brand in Cyrillic, as its package spells it, even where it sounds English: «Ալյոնկա» → "Алёнка", «Ռայսկի Սադ» → "Райский сад", «Բոյսքաութ» → "Бойскаут";
+- the letters the package prints and no others: never an accent or a sign the brand does not carry;
+- null for a local Armenian brand, for a brand you do not know, and for one you are not sure of.
+Never translate a name into a word of its meaning. Answer every id once.`

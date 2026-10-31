@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import { env } from '@/env'
 import * as schema from '@/db/schema'
+import { createBrandSpellingRepository } from '@/db/brand-spellings-repository'
 import { createItemRepository } from '@/db/items-repository'
 import { createRenameRepository } from '@/db/rename-repository'
 import { renameReceiptItems } from '@/rename-receipt-items'
@@ -18,6 +19,7 @@ try {
     {
       renamer: createRenameRepository(db),
       nodes: (language) => catalogue.nodes(language),
+      spellings: createBrandSpellingRepository(db),
     },
     (line) => {
       console.log(line)

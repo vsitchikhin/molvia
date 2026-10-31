@@ -21,6 +21,8 @@ export interface ReceiptLineParts {
   readonly percent: string | null
   /** The package's weight or volume, «130 г», «0,25 л», «2×40 г»; none for a line sold by weight. */
   readonly size: string | null
+  /** Where it was grown or made, as printed, no word of the line but a seed's name that holds it (MOL-326, В-2 «а»). */
+  readonly origins: readonly string[]
 }
 
 // words with no ending of their own that qualify the head: «Թարմ հավ» is a chicken, «Չոր վառելիք» a fuel
@@ -94,21 +96,31 @@ function isNameWord(token: string): boolean {
   return !/\d/u.test(token) && !token.includes('/') && (ARMENIAN.test(token) || latin)
 }
 
-/** The tokens of a name: spaces and commas apart, «Գազ.ըմպելիք» at its point, parentheses dropped. */
+// «Գազ.ըմպելիք» at its point, and a word before the package glued to it, «Շաքարավազ1կգ»
+const GLUED =
+  /(?<=[ա-ֆԱ-Ֆ]\.)(?=[ա-ֆԱ-Ֆ])|(?<=[ա-ֆԱ-Ֆ]{2})(?=\d+(?:[.,]\d+)?(?:կգ|գր|գ|մլ|լ)(?![ա-ֆ]))/iu
+
+/**
+ * The tokens of a name: spaces and commas apart, «Գազ.ըմպելիք» at its point, a word glued to its package at it —
+ * «Շաքարավազ1կգ» lost its word whole (MOL-326) — parentheses dropped. Only a package whole, its figure and its unit:
+ * a figure alone is the model's «շ», «Ֆրե2» of «Ֆրեշ», «Լավա2» of «Լավաշ» (adversarial А4), and a letter before a
+ * figure a code's, «Ա1».
+ */
 function tokensOf(text: string): string[] {
   return text
     .replace(/[()]/gu, ' ')
     .split(/[\s,;:]+/u)
-    .flatMap((token) => token.split(/(?<=[ա-ֆԱ-Ֆ]\.)(?=[ա-ֆԱ-Ֆ])/u))
+    .flatMap((token) => token.split(GLUED))
     .map((token) => token.replace(/^[^\p{L}\d#№]+|[^\p{L}\d.%]+$/gu, ''))
     .filter((token) => token !== '')
 }
 
 const decimal = (figure: string): string => figure.replace('.', ',')
 
-// «130գր», «0.25լ», «250±10գր», «2x40գր», «6լ(հատ)»; a till's «կգ» alone is a line sold by weight
+// «130գր», «0.25լ», «250±10գր», «2x40գր», «6լ(հատ)», «45Գ» in capitals (MOL-326); a till's «կգ» alone is a line
+// sold by weight
 const SIZE =
-  /(?<![\d.,])(?:(\d+)\s*[xх×*]\s*)?(\d+(?:[.,]\d+)?)(?:±\d+)?\s*(կգ|գր|գ|մլ|լ)(?![ա-ֆ])/u
+  /(?<![\d.,])(?:(\d+)\s*[xх×*]\s*)?(\d+(?:[.,]\d+)?)(?:±\d+)?\s*(կգ|գր|գ|մլ|լ)(?![ա-ֆ])/iu
 const SIZE_UNITS: Readonly<Record<string, string>> = {
   կգ: 'кг',
   գր: 'г',
@@ -117,14 +129,123 @@ const SIZE_UNITS: Readonly<Record<string, string>> = {
   լ: 'л',
 }
 
+// The Armenian names of the Latin letters, as a till spells a brand it hears letter by letter (MOL-326)
+const LETTER_NAMES: Readonly<Record<string, string>> = {
+  էյ: 'A',
+  բի: 'B',
+  սի: 'C',
+  դի: 'D',
+  ի: 'E',
+  էֆ: 'F',
+  ջի: 'G',
+  էյչ: 'H',
+  այ: 'I',
+  ջեյ: 'J',
+  քեյ: 'K',
+  կեյ: 'K',
+  էլ: 'L',
+  էմ: 'M',
+  էն: 'N',
+  օ: 'O',
+  փի: 'P',
+  պի: 'P',
+  քյու: 'Q',
+  ար: 'R',
+  էս: 'S',
+  թի: 'T',
+  տի: 'T',
+  յու: 'U',
+  վի: 'V',
+  դաբլյու: 'W',
+  էքս: 'X',
+  ուայ: 'Y',
+  զեդ: 'Z',
+  զի: 'Z',
+}
+const LETTERS_AND = new Set(['ընդ', 'էնդ'])
+
+/**
+ * A Latin brand printed as it is said, from the token at `at` (MOL-326): two letters' names at least —
+ * «Էյ Բի Սի» ABC — «and» between two of them, and a plural «-ս» on the last after an «and», «Էմ ընդ Էմս» M&M's.
+ * One letter's name is no brand: «Վիտամին Դի» is a vitamin D.
+ */
+function letterRun(
+  tokens: readonly string[],
+  at: number,
+): { readonly length: number; readonly latin: string } | null {
+  let latin = ''
+  let letters = 0
+  let end = at
+  for (let i = at; i < tokens.length; i += 1) {
+    const token = keyed(tokens[i] ?? '')
+    const letter = LETTER_NAMES[token]
+    if (letter !== undefined) {
+      latin += letter
+      letters += 1
+      end = i + 1
+      continue
+    }
+    const plural = token.endsWith('ս') ? LETTER_NAMES[token.slice(0, -1)] : undefined
+    if (plural !== undefined && letters > 0 && latin.endsWith('&')) {
+      latin += `${plural}'s`
+      letters += 1
+      end = i + 1
+      break
+    }
+    if (!LETTERS_AND.has(token) || letters === 0 || latin.endsWith('&')) break
+    latin += '&'
+  }
+  if (letters < 2) return null
+  return { length: end - at, latin: latin.replace(/&$/u, '') }
+}
+
+/** A brand that is letters' names whole, in Latin: «Էյ Բի Սի» ABC; else none. */
+function lettersOf(text: string): string | null {
+  const tokens = text.split(/\s+/u).filter((token) => token !== '')
+  const run = letterRun(tokens, 0)
+  return run !== null && run.length === tokens.length ? run.latin : null
+}
+
+/**
+ * Where a thing was grown or made, which makes it no other thing (MOL-326, owner's В-2 «а»): «Եգիպտացորեն (հայկական)»
+ * and «Եգիպտացորեն հայկական» are «Եգիպտացորեն», one corn — in parentheses or not (self-review №1). A list, never an
+ * ending: «(մանկական)» is a child's toothpaste, another thing (№2), and «Պղպեղ բուլղարական» a bell pepper, a kind.
+ * Local, imported, and the countries a till prints of its produce; a seed's name that holds one with the kind keeps it —
+ * «սուրճ հայկական» is the seed's «Кофе армянский» — so it is set apart (`origins`), never thrown away.
+ */
+// the words of where the bench's and the owner's receipts print it; a country a till names a kind by — «չինական
+// կաղամբ» the seed's Peking cabbage, a Georgian or a Turkish dish — is none of them
+const ORIGINS = new Set(['տեղական', 'ներմուծված', 'ներկրված', 'հայկական', 'ռուսական', 'իրանական'])
+
 export function receiptLineParts(printed: string): ReceiptLineParts {
+  const origins: string[] = []
+  const withoutOrigins = (tokens: readonly string[]): string[] =>
+    tokens.filter((token) => {
+      if (!ORIGINS.has(keyed(token))) return true
+      origins.push(token)
+      return false
+    })
   const open = printed.indexOf('«')
   const close = open < 0 ? -1 : printed.indexOf('»', open + 1)
   const quoted = open < 0 ? null : printed.slice(open + 1, close < 0 ? undefined : close).trim()
   // «…» a till cut, «22/24» a calibre: no letter, no brand — its text stays a word of the line
-  const brand = quoted !== null && /\p{L}/u.test(quoted) ? quoted : null
-  const before = tokensOf(brand === null ? printed.replace(/[«»]/gu, ' ') : printed.slice(0, open))
-  const after = brand === null || close < 0 ? [] : tokensOf(printed.slice(close + 1))
+  const inQuotes = quoted !== null && /\p{L}/u.test(quoted) ? quoted : null
+  const tokens = withoutOrigins(
+    tokensOf(inQuotes === null ? printed.replace(/[«»]/gu, ' ') : printed.slice(0, open)),
+  )
+  // a brand said letter by letter is the line's brand where no «…» is, «Լվացքի կոնդիցիոներ Էյ Բի Սի» (MOL-326)
+  const spokenAt =
+    inQuotes === null ? tokens.findIndex((_, at) => letterRun(tokens, at) !== null) : -1
+  const spoken = spokenAt < 0 ? null : letterRun(tokens, spokenAt)
+  const brand =
+    spoken === null ? inQuotes : tokens.slice(spokenAt, spokenAt + spoken.length).join(' ')
+  const before = spoken === null ? tokens : tokens.slice(0, spokenAt)
+  const after =
+    spoken !== null
+      ? tokens.slice(spokenAt + spoken.length)
+      : brand === null || close < 0
+        ? []
+        : withoutOrigins(tokensOf(printed.slice(close + 1)))
   const head = brand === null ? [...before, ...after] : before.length > 0 ? before : after
   const words = head.filter(
     (token) =>
@@ -160,7 +281,8 @@ export function receiptLineParts(printed: string): ReceiptLineParts {
     size:
       size === null
         ? null
-        : `${size[1] === undefined ? '' : `${size[1]}×`}${decimal(size[2] ?? '')} ${SIZE_UNITS[size[3] ?? ''] ?? ''}`,
+        : `${size[1] === undefined ? '' : `${size[1]}×`}${decimal(size[2] ?? '')} ${SIZE_UNITS[(size[3] ?? '').toLowerCase()] ?? ''}`,
+    origins,
   }
 }
 
@@ -272,6 +394,71 @@ export const armenianInRussian = (text: string): string =>
   text.replace(/[ա-ֆԱ-Ֆև]+/gu, (word) => spellWord(word))
 
 /**
+ * Letters of the till's font a reader takes one for another, measured on the bench's readings against their truth
+ * (MOL-326, `.scratch/tasks/research/MOL-326.md`) — «Շաքարավազ» read «Ցաքարավազ» on 31.10.2026. Only these: a word
+ * one edit off is another word as often as the same, «լոշիկ» was no «լոլիկ» (MOL-293).
+ */
+const GLYPH_SWAPS: readonly (readonly [string, string])[] = [
+  ['մ', 'ս'],
+  ['չ', 'ջ'],
+  ['ի', 'հ'],
+  ['փ', 'ֆ'],
+  ['գ', 'զ'],
+  ['շ', 'չ'],
+  ['շ', 'ց'],
+  ['ծ', 'յ'],
+  ['ջ', 'տ'],
+  ['զ', 'ջ'],
+  ['ո', 'ր'],
+  ['թ', 'լ'],
+  ['ք', 'բ'],
+  ['թ', 'տ'],
+]
+const SWAPS_OF = new Map<string, string[]>()
+for (const [a, b] of GLYPH_SWAPS) {
+  SWAPS_OF.set(a, [...(SWAPS_OF.get(a) ?? []), b])
+  SWAPS_OF.set(b, [...(SWAPS_OF.get(b) ?? []), a])
+}
+// a word shorter than this has too many neighbours to be put right
+const SHORTEST_MENDED = 4
+
+/**
+ * The line with a word the reader misread put right (MOL-326, owner's В-3 «б»): a word no `known` one, from four
+ * letters, outside «…», that one swap of the font's letters makes exactly one known word — «Ցաքարավազ 1կգ» is
+ * «Շաքարավազ 1կգ». Two known words of one swap are a guess, and the word stays as read. `null` where nothing was
+ * put right: what was is offered under «проверьте», never as read.
+ */
+export function glyphsMended(printed: string, known: ReadonlySet<string>): string | null {
+  let quoted = false
+  const out = printed.replace(/[«»]|[ա-ֆԱ-Ֆև]+/gu, (word) => {
+    if (word === '«' || word === '»') {
+      quoted = word === '«'
+      return word
+    }
+    // an Armenian letter is one code unit, upper case and lower alike
+    const lower = word.toLowerCase()
+    if (quoted || lower.length < SHORTEST_MENDED || known.has(lower)) return word
+    const found: (readonly [number, string])[] = []
+    for (let at = 0; at < lower.length; at += 1) {
+      for (const other of SWAPS_OF.get(lower.charAt(at)) ?? []) {
+        if (known.has(lower.slice(0, at) + other + lower.slice(at + 1))) found.push([at, other])
+      }
+    }
+    const only = found.length === 1 ? found[0] : undefined
+    if (only === undefined) return word
+    const [at, other] = only
+    const was = word.charAt(at)
+    return (
+      word.slice(0, at) +
+      (was === was.toLowerCase() ? other : other.toUpperCase()) +
+      word.slice(at + 1)
+    )
+  })
+  // a word put right is another letter: the line differs
+  return out === printed ? null : out
+}
+
+/**
  * What a new item's name is written with beyond the till's words (MOL-261). Each part is the backend's
  * dictionary, as the till's words are; without one the name is as MOL-293 made it.
  */
@@ -311,9 +498,51 @@ const lexiconKey = (text: string): string =>
 // a package's spelling in Latin letters is written bare, as the shelf writes it: «Печенье Roshen Lovita»
 const LATIN_NAME = /^[\p{Script=Latin}\d\s'&.-]+$/u
 
-/** The package's spelling of a brand or a line the lexicon knows, else none. */
+/** The package's spelling of a brand or a line the lexicon knows, or of one said letter by letter, else none. */
 const shelfOf = (text: string, lexicon: NameLexicon): string | null =>
-  lexicon.brands?.[lexiconKey(text)] ?? null
+  lexicon.brands?.[lexiconKey(text)] ?? lettersOf(text)
+
+/** The key a lexicon keys a brand by: lower case, «և» one letter, words one space apart. */
+export const brandKey = (printed: string): string => lexiconKey(printed)
+
+/**
+ * The line's brand in «…» no lexicon and no rule spells (MOL-326, owner's В-1 «б»): the one the model may be asked
+ * how its package spells it. A brand said letter by letter is spelt by the rule, and one in Latin letters already is.
+ */
+export function brandToAsk(parts: ReceiptLineParts, lexicon: NameLexicon): string | null {
+  const brand = parts.brand
+  if (brand === null || !ARMENIAN.test(brand) || shelfOf(brand, lexicon) !== null) return null
+  return brand
+}
+
+// Latin or Cyrillic letters, figures and what a brand's name holds between them
+const SPELLING =
+  /^[\p{Script=Latin}\p{Script=Cyrillic}\d][\p{Script=Latin}\p{Script=Cyrillic}\d\s'’&.!-]*$/u
+const SPELLING_MAX = 40
+/**
+ * How far the package's spelling may sound from the till's, a share of the longer key: on the 48 pairs of
+ * `TILL_BRANDS` 0.3 keeps 45 — «Белая шляпка» is a translation, «Art Bakery», «Délice» two letters off — and lets
+ * through no pair of two brands of 2 256 (MOL-326, `.scratch/tasks/research/MOL-326.md`); 0.34 lets Barilla be
+ * Gorilla.
+ */
+const SPELLING_SOUND_SHARE = 0.3
+
+const soundKey = (text: string): string => toSearchKey(text).replace(/[^a-zц\d]/gu, '')
+
+/**
+ * The model's spelling of a brand taken only where it sounds as the till printed it (MOL-326, owner's В-1 «б»): its
+ * letters Latin or Cyrillic, its length a name's, and its search key within `SPELLING_SOUND_SHARE` of the key of the
+ * till's letters in Russian ones — «Ֆելիքս» is Felix, never Whiskas. Else none: a guess is worse than letters
+ * (MOL-255).
+ */
+export function heardSpelling(printed: string, spelling: string): string | null {
+  const shelf = spelling.trim().replace(/\s+/gu, ' ')
+  if (shelf.length > SPELLING_MAX || !SPELLING.test(shelf)) return null
+  const [till, said] = [soundKey(armenianInRussian(printed)), soundKey(shelf)]
+  if (till.length < 2 || said.length < 2) return null
+  const share = levenshtein(till, said) / Math.max(till.length, said.length)
+  return share <= SPELLING_SOUND_SHARE ? shelf : null
+}
 
 /**
  * A brand as a name writes it (MOL-261, owner's В-2 «а»): the package's spelling, a Latin one with no quotes —
@@ -413,7 +642,10 @@ export function newLineName(
     units.flatMap(({ text: token, at, kind, phrase }): Said[] => {
       // what the seed's name stands for
       if (covered.has(token)) return []
-      const shelf = phrase === null ? shelfOf(token, lexicon) : null
+      // a brand that is a word of the dictionary is the word where it is the line's kind: «Տոֆու 200գ» is tofu, and
+      // «Լցոնիչ Տոֆու» a litter of Tofu (MOL-326)
+      const glossed = kind && glossOf(token, dictionary) !== null
+      const shelf = phrase === null && !glossed ? shelfOf(token, lexicon) : null
       // a brand the till printed bare is written as its package is all the same: «Шоколад «Алёнка»» (adversarial А5)
       if (shelf !== null) return [{ word: LATIN_NAME.test(shelf) ? shelf : `«${shelf}»`, at, kind }]
       if (phrase === null && (!isNameWord(token) || UNIT_WORDS.has(keyed(token)))) return []
@@ -700,7 +932,8 @@ function seedKindOf(
   genitives: Readonly<Record<string, string>>,
 ): SeedKind | null {
   if (parts.kind === null || seed.length === 0) return null
-  const tokens = [...parts.before, ...parts.after].filter(
+  // the seed's name of a kind with its origin keeps it, «սուրճ հայկական» (MOL-326, self-review №1)
+  const tokens = [...parts.before, ...parts.after, ...parts.origins].filter(
     (token) => isNameWord(token) && ARMENIAN.test(token),
   )
   let best: { name: string; covered: Set<string> } | null = null
@@ -792,6 +1025,8 @@ const wordsOf = (text: string): string[] =>
   text
     .toLowerCase()
     .replace(/ё/gu, 'е')
+    // «M&M's» is one word, never three letters too short to be any (MOL-326)
+    .replace(/(?<=\p{L})[&'’](?=\p{L})/gu, '')
     .split(/[^\p{L}]+/u)
     .filter((word) => word.length > 2 && !NO_WORD.has(word))
 
@@ -1034,12 +1269,38 @@ export function lineFitter(
   lexicon: NameLexicon = {},
 ): (itemName: string, options?: FitOptions) => boolean {
   const tokens = [...parts.before, ...(parts.brand === null ? [] : [parts.brand]), ...parts.after]
-  const glossed = tokens.flatMap((token) => sensesOf(token, dictionary).flatMap(wordsOf))
+  // the phrases of the lexicon the line prints, two or three words in its order, and whether each holds the kind
+  const phrases = [2, 3].flatMap((size) =>
+    tokens.slice(0, tokens.length - size + 1).flatMap((_, at) => {
+      const group = tokens.slice(at, at + size)
+      const phrase = lexicon.phrases?.[lexiconKey(group.join(' '))]
+      return phrase === undefined
+        ? []
+        : [{ words: wordsOf(phrase), kind: parts.kind !== null && group.includes(parts.kind) }]
+    }),
+  )
+  // a word of the line by the dictionary, by its genitive's adjective and by its phrase — the very words a new item
+  // is named by (MOL-326, adversarial А1): «Корм кошачий», «Кондиционер для белья» are found again by their line
+  const glossed = [
+    ...tokens.flatMap((token) => sensesOf(token, dictionary).flatMap(wordsOf)),
+    ...tokens.flatMap((token) => wordsOf(lexicon.genitives?.[lexiconKey(token)] ?? '')),
+    ...phrases.flatMap((phrase) => phrase.words),
+    // an item that names where it was grown stands on a line that prints it, «Кофе армянский» (self-review №1)
+    ...parts.origins.flatMap((origin) => sensesOf(origin, dictionary).flatMap(wordsOf)),
+  ]
   // a brand or a line the lexicon knows is the line's in its package's spelling too: «Կինդեր» is Kinder
   const shelves = [...tokens, ...tokens.slice(1).map((token, at) => `${tokens[at] ?? ''} ${token}`)]
     .map((token) => shelfOf(token, lexicon))
     .filter((shelf): shelf is string => shelf !== null)
   const spelt = [...tokens, ...shelves].flatMap(wordsOf)
+  // a brand of the lexicon printed bare is a brand all the same, but for the line's kind: «Կատվի հող Տոֆու» takes no
+  // litter of the seed, «Տոֆու 200գ» the seed's tofu (MOL-326)
+  const others = tokens.filter((token) => token !== parts.kind)
+  const branded =
+    parts.brand !== null ||
+    [...others, ...others.slice(1).map((token, at) => `${others[at] ?? ''} ${token}`)].some(
+      (token) => shelfOf(token, lexicon) !== null,
+    )
   const figures = [
     ...tokens.flatMap(figuresOf),
     ...figuresOf(parts.percent ?? ''),
@@ -1049,7 +1310,11 @@ export function lineFitter(
   const shelfBrand = wordsOf(parts.brand === null ? '' : (shelfOf(parts.brand, lexicon) ?? ''))
   const brands = shelfBrand.length > 0 ? [brand, shelfBrand] : [brand]
   // any of the kind's senses: «հրուշակեղեն» is pastry and confectionery
-  const kinds = parts.kind === null ? [] : sensesOf(parts.kind, dictionary).map(wordsOf)
+  // and a phrase that holds the kind names it: «Կատվի հող» is a litter, never soil
+  const kinds = [
+    ...(parts.kind === null ? [] : sensesOf(parts.kind, dictionary).map(wordsOf)),
+    ...phrases.filter((phrase) => phrase.kind).map((phrase) => phrase.words),
+  ]
   const next = nextThing(parts, dictionary)
   const nexts = next === null ? [] : sensesOf(next, dictionary).map(wordsOf)
   // a thing the dictionary has not is said by its letters: «Смузи» for «սմուզի»
@@ -1066,7 +1331,7 @@ export function lineFitter(
   return (itemName, options = {}) => {
     const item = wordsOf(itemName)
     if (item.length === 0) return false
-    if (parts.brand !== null && options.generic === true) return false
+    if (branded && options.generic === true) return false
     if (!item.every(lineHas)) return false
     if (!figuresOf(itemName).every((figure) => figures.includes(figure))) return false
     const named = brands.find((one) =>
