@@ -788,3 +788,19 @@ for (const locale of ['ru-RU', 'en-US'])
       await expect(track).not.toHaveClass(/stacked/)
     })
   })
+
+// A block button hyphenates its words only where the text is large (MOL-321, self-review №2): Safari
+// knows no `hyphenate-limit-chars`, and WebKit hyphenates any word at a line's end — at 100 % «Сохранить
+// из-менения». The style is read, not a hyphen drawn: Playwright's WebKit knows the limit, a phone's does not.
+test('a block button hyphenates only with large text, never at 100 % on 320', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 720 })
+  await open(page, '/_kit')
+  const words = page.locator('.button.block .text').first()
+  await expect(words).toBeAttached()
+  const hyphens = () => words.evaluate((text) => getComputedStyle(text).hyphens)
+  expect(await hyphens()).toBe('manual')
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '150%'
+  })
+  await expect.poll(hyphens).toBe('auto')
+})

@@ -252,10 +252,11 @@ describe('SegmentedControl', () => {
       expect(view.get('.track').classes()).toContain('stacked')
     })
 
-    it('must not fire: a row that fits stays a row, at exactly its width too', () => {
+    it('must not fire: a row that fits stays a row, at exactly its width too', async () => {
       laidOut()
       rowWidth = box
       const view = render()
+      await view.vm.$nextTick()
       expect(view.get('.track').classes()).not.toContain('stacked')
     })
 
@@ -279,18 +280,20 @@ describe('SegmentedControl', () => {
       expect(view.get('.track').classes()).toContain('stacked')
     })
 
+    // A row, its sheet shut: a box of no width holds any word, so read, it would stand one under another.
     it('must not fire: a row not laid out — a shut sheet — keeps its last measure', async () => {
       laidOut()
-      rowWidth = 220
+      rowWidth = box
       const view = render()
+      await view.vm.$nextTick()
+      expect(view.get('.track').classes()).not.toContain('stacked')
       Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
         configurable: true,
         get: () => 0,
       })
-      rowWidth = box
       resized?.()
       await view.vm.$nextTick()
-      expect(view.get('.track').classes()).toContain('stacked')
+      expect(view.get('.track').classes()).not.toContain('stacked')
     })
 
     it('measures again when its words change', async () => {

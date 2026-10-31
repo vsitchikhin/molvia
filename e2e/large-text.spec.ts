@@ -52,8 +52,12 @@ async function sheetSideways(page: Page, opener: Locator): Promise<number> {
   return sideways
 }
 
-/** An account, two spendings of the month, an exchange and an income: every figure of «Деньги» drawn. */
-async function aMonth(page: Page): Promise<string> {
+/**
+ * An account, two spendings of the month, an exchange and an income: every figure of «Деньги» drawn — and the
+ * sums of a month in drams and of savings in roubles, «Потрачено 125 403 ֏» and «1 234 567,89 ₽», which a
+ * month of four digits passed by (adversarial А1, А4, А5).
+ */
+async function aMonth(page: Page): Promise<{ card: string; savings: string }> {
   const card = randomUUID()
   await post(page, '/api/money/accounts', {
     id: card,
@@ -66,7 +70,16 @@ async function aMonth(page: Page): Promise<string> {
   const { categories } = (await (
     await page.request.get('/api/spending-categories', { headers: await asBrowser(page) })
   ).json()) as { categories: { id: string }[] }
-  for (const [index, amount] of ['6500', '1800'].entries())
+  const savings = randomUUID()
+  await post(page, '/api/money/accounts', {
+    id: savings,
+    name: 'Рубли',
+    currency: 'RUB',
+    savings: true,
+    start: { amount: '1234567.89', currency: 'RUB' },
+    startOn: day(3),
+  })
+  for (const [index, amount] of ['123603', '1800'].entries())
     await post(page, '/api/spendings', {
       id: randomUUID(),
       spentOn: day(1),
@@ -88,7 +101,7 @@ async function aMonth(page: Page): Promise<string> {
     source: 'salary',
     accountId: card,
   })
-  return card
+  return { card, savings }
 }
 
 for (const size of ['150%', '200%'])
@@ -106,7 +119,31 @@ for (const size of ['150%', '200%'])
 
     test('a newcomer’s «Что брать» and «Настройки» stand within the phone', async ({ page }) => {
       await signedIn(page, '/')
-      expect(await pageSideways(page, page.locator('.intro-title'))).toBe(0)
+      const title = page.locator('.intro-title')
+      expect(await pageSideways(page, title)).toBe(0)
+      // A hyphen only with large text: Safari knows no limit to it, and at 100 % it broke «по-купки»
+      // (self-review №2). The inline size beats the injected one.
+      const hyphens = () => title.evaluate((heading) => getComputedStyle(heading).hyphens)
+      expect(await hyphens()).toBe('auto')
+      await page.evaluate(() => {
+        document.documentElement.style.fontSize = '100%'
+      })
+      await expect.poll(hyphens).toBe('manual')
+      await page.evaluate(() => {
+        document.documentElement.style.fontSize = ''
+      })
+      // The tab bar is fixed, so it is in no width of the page: every label within its own column and
+      // the phone, as `--text-tab` holds it (self-review №1).
+      for (const tab of await page.locator('nav.tabbar .tab').all()) {
+        const fits = await tab.evaluate((column) => {
+          const label = column.querySelector('.label')!.getBoundingClientRect()
+          const box = column.getBoundingClientRect()
+          return (
+            label.left >= box.left - 0.5 && label.right <= box.right + 0.5 && box.right <= 320.5
+          )
+        })
+        expect(fits, await tab.innerText()).toBe(true)
+      }
       await page.goto('/settings')
       // The scheme's three segments one under another, each word whole (MOL-189).
       expect(await pageSideways(page, page.getByText('Тёмная', { exact: true }))).toBe(0)
@@ -118,7 +155,7 @@ for (const size of ['150%', '200%'])
     test('every screen of «Деньги» stands within the phone', async ({ page }) => {
       test.setTimeout(90_000)
       await signedIn(page)
-      const card = await aMonth(page)
+      const { card, savings } = await aMonth(page)
       const screens: [string, Locator][] = [
         ['/money', page.locator('.donut .sector-name')],
         ['/money/spendings', page.locator('.day-head')],
@@ -129,16 +166,55 @@ for (const size of ['150%', '200%'])
         ['/money/charts?mode=year', page.locator('.columns')],
         ['/money/accounts', page.getByRole('button', { name: 'Добавить счёт' })],
         [`/money/accounts/${card}`, page.locator('.balance .figure')],
+        [`/money/accounts/${savings}`, page.locator('.balance .figure')],
       ]
       for (const [path, answer] of screens) {
         await page.goto(path)
         expect(await pageSideways(page, answer), path).toBe(0)
       }
-      // The legend of «Графики» keeps its names: with the ring in the card they were narrowed to nothing.
+      // «На счетах сейчас» is one line, never a sign a line beside «1 счёт ›» (adversarial А8).
+      await page.goto('/money')
+      const now = page.locator('.now .figure')
+      await expect(now).toBeVisible()
+      await facesIn(page)
+      expect(
+        await now.evaluate((figure) => {
+          const range = document.createRange()
+          range.selectNodeContents(figure)
+          return new Set([...range.getClientRects()].map((line) => Math.round(line.top))).size
+        }),
+      ).toBe(1)
+      // The legend of «Графики» keeps its names: with the ring in the card they were narrowed to nothing;
+      // and every sum stands within the card (adversarial А3).
       await page.goto('/money/charts')
       await expect(page.locator('.legend .name').first()).toBeVisible()
+      await facesIn(page)
       for (const name of await page.locator('.legend .name').all())
         expect((await name.boundingBox())!.width).toBeGreaterThan(40)
+      const amountsPast = await page.locator('.legend .amount').evaluateAll((amounts) =>
+        amounts.map((amount) => {
+          const card = amount.closest('.card')!
+          const inner =
+            card.getBoundingClientRect().right - parseFloat(getComputedStyle(card).paddingRight)
+          return amount.getBoundingClientRect().right - inner
+        }),
+      )
+      expect(Math.max(...amountsPast)).toBeLessThanOrEqual(0.5)
+      // A balance of nine figures fits its card, not only the page (adversarial А6).
+      await page.goto(`/money/accounts/${savings}`)
+      const balance = page.locator('p.figure').first()
+      await expect(balance).toBeVisible()
+      await facesIn(page)
+      expect(
+        await balance.evaluate((figure) => {
+          const card = figure.parentElement!
+          const inner =
+            card.getBoundingClientRect().right - parseFloat(getComputedStyle(card).paddingRight)
+          const range = document.createRange()
+          range.selectNodeContents(figure)
+          return Math.max(...[...range.getClientRects()].map((line) => line.right)) - inner
+        }),
+      ).toBeLessThanOrEqual(0.5)
     })
 
     test('the sheets of «Деньги» stand within the phone', async ({ page }) => {
@@ -159,6 +235,11 @@ for (const size of ['150%', '200%'])
       await page.goto('/money/budget')
       expect(
         await sheetSideways(page, page.getByRole('button', { name: 'Задать план категории' })),
+      ).toBe(0)
+      // A new category's colours, four and four (adversarial А10).
+      await page.goto('/money/categories')
+      expect(
+        await sheetSideways(page, page.getByRole('button', { name: 'Добавить категорию' })),
       ).toBe(0)
     })
   })
