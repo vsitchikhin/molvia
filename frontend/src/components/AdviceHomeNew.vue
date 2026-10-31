@@ -254,13 +254,9 @@ export default defineComponent({
   line-height: var(--leading-tight);
   text-wrap: balance;
 
-  /* A word wider than the column breaks, with a hyphen where the browser knows the language
-     (MOL-321): «Сфотографируйте» at 150 % on 320 is 332 px in a column of 260, and took the page 42 px
-     sideways. Only a word of twelve letters and more: WebKit hyphenates any word at a line's end, and
-     «Запишите первые по-купки» came at a text of 100 %. The skeleton's words break as the answer's. */
+  /* A word wider than the column breaks (MOL-321): «Сфотографируйте» at 150 % on 320 is 332 px in a
+     column of 260, and took the page 42 px sideways. The skeleton's words break as the answer's. */
   overflow-wrap: break-word;
-  hyphens: auto;
-  hyphenate-limit-chars: 12 5 5;
 }
 
 .intro-body,
@@ -343,5 +339,16 @@ export default defineComponent({
   margin: var(--space-6) var(--space-1) 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
+}
+
+/* With a hyphen, «Сфотогра-фируйте», only while the text is large (MOL-321, `useLargeText`): Safari knows
+   no `hyphenate-limit-chars`, and WebKit hyphenates any word at a line's end — «Запишите первые по-купки»
+   at a text of 100 %. */
+.intro-title,
+.ghost-title {
+  html[data-large-text] & {
+    hyphens: auto;
+    hyphenate-limit-chars: 12 5 5;
+  }
 }
 </style>

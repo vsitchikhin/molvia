@@ -23,6 +23,8 @@
         <span v-else class="unseen" aria-hidden="true" :data-word="busyLabel" />
       </span>
       <template v-else-if="busy && busyLabel !== undefined">{{ busyLabel }}</template>
+      <!-- A block button's words in a box of their own, so the hyphen can ask the button's width (MOL-321). -->
+      <span v-else-if="block" class="text"><slot /></span>
       <slot v-else />
     </template>
   </button>
@@ -237,12 +239,6 @@ export default defineComponent({
   display: flex;
   width: 100%;
   overflow-wrap: anywhere;
-
-  /* With a hyphen where the browser knows the language: «Сфотографи-ровать чек», not
-     «Сфотографирова|ть» (MOL-321) — only a word of twelve letters and more, or WebKit hyphenates any
-     word at a line's end («Сохранить из-менения»). */
-  hyphens: auto;
-  hyphenate-limit-chars: 12 5 5;
 }
 
 /* `aria-disabled` is still `:enabled`: the press and the hover read both, or an inactive button
@@ -277,6 +273,18 @@ export default defineComponent({
 @media (prefers-reduced-motion: reduce) {
   .button {
     transition: none;
+  }
+}
+
+/* With a hyphen where the browser knows the language, and only while the text is large (MOL-321,
+   `useLargeText`): «Сфотографи-ровать чек», not «Сфотографирова|ть». Only a word of twelve letters and more
+   where the engine knows the limit — Safari does not, and WebKit hyphenates any word at a line's end
+   («Сохранить из-менения») — so never at 100 %. A width would not tell it: a block of a pair is narrow
+   at 100 % too. */
+.text {
+  html[data-large-text] & {
+    hyphens: auto;
+    hyphenate-limit-chars: 12 5 5;
   }
 }
 </style>
