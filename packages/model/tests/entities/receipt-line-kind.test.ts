@@ -113,6 +113,7 @@ describe('a line taken apart (MOL-293)', () => {
       kind: 'յոգուրտ',
       percent: '1,5%',
       size: '270 г',
+      origins: [],
     })
   })
 
@@ -855,6 +856,9 @@ describe('where a thing was grown or made (MOL-326, owner’s В-2 «а»)', () 
   it('names no new item by its origin, so that two lines of one thing make one item', () => {
     expect(named('Եգիպտացորեն (հայկական) հտ')?.name).toBe('Кукуруза')
     expect(named('Եգիպտացորեն հտ')?.name).toBe('Кукуруза')
+    // printed bare as well (self-review №1)
+    expect(named('Եգիպտացորեն հայկական հտ')?.name).toBe('Кукуруза')
+    expect(receiptLineParts('Եգիպտացորեն (հայկական) հտ').origins).toEqual(['հայկական'])
     expect(named('Վարունգ ընտիր (ռուսական) կգ')?.name).toBe('Огурец отборный')
     expect(named('Խոզի ֆիլե կգ (տեղական)')?.name).not.toMatch(/местн/u)
     expect(named('Վարունգ տեղական')?.name).toBe('Огурец')
@@ -865,9 +869,31 @@ describe('where a thing was grown or made (MOL-326, owner’s В-2 «а»)', () 
     expect(fits('Եգիպտացորեն հտ', 'Кукуруза')).toBe(true)
   })
 
-  it('keeps a country printed bare: it is a kind as often', () => {
+  it('keeps a word of no origin, in parentheses or not: «болгарский» is a kind, «(детская)» another thing (№2)', () => {
     expect(named('Պղպեղ բուլղարական կգ')?.name).toBe('Перец болгарский')
-    expect(named('Սուրճ հայկական')?.name).toBe('Кофе армянский')
+    expect(
+      newLineName(receiptLineParts('Ատամի մածուկ (մանկական) 50մլ'), {
+        ...WORDS,
+        մածուկ: 'паста',
+        մանկական: 'детский',
+      })?.name,
+    ).toMatch(/детск/u)
+  })
+
+  it('keeps the origin a seed’s name holds with the kind, in parentheses or not (self-review №1)', () => {
+    const seed = [{ name: 'Кофе армянский', names: ['սուրճ հայկական'] }]
+    for (const printed of ['Սուրճ հայկական «Ռոյալ» 100գ', 'Սուրճ (հայկական) «Ռոյալ» 100գ']) {
+      expect(newLineName(receiptLineParts(printed), WORDS, { seed })?.name).toBe(
+        'Кофе армянский «Роял» 100 г',
+      )
+      expect(lineFitter(receiptLineParts(printed), WORDS)('Кофе армянский «Роял»')).toBe(true)
+    }
+    // the seed’s name with no origin does not keep it: the line’s word goes
+    expect(
+      newLineName(receiptLineParts('Սուրճ հայկական «Ռոյալ»'), WORDS, {
+        seed: [{ name: 'Кофе', names: ['սուրճ'] }],
+      })?.name,
+    ).toBe('Кофе «Роял»')
   })
 })
 

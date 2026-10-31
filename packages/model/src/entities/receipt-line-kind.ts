@@ -21,6 +21,8 @@ export interface ReceiptLineParts {
   readonly percent: string | null
   /** The package's weight or volume, «130 г», «0,25 л», «2×40 г»; none for a line sold by weight. */
   readonly size: string | null
+  /** Where it was grown or made, as printed, no word of the line but a seed's name that holds it (MOL-326, В-2 «а»). */
+  readonly origins: readonly string[]
 }
 
 // words with no ending of their own that qualify the head: «Թարմ հավ» is a chicken, «Չոր վառելիք» a fuel
@@ -201,23 +203,31 @@ function lettersOf(text: string): string | null {
 
 /**
  * Where a thing was grown or made, which makes it no other thing (MOL-326, owner's В-2 «а»): «Եգիպտացորեն (հայկական)»
- * and «Եգիպտացորեն» are one corn. A country in parentheses — «(հայկական)», «(ռուսական)», the bench's every one — and
- * local or imported anywhere. A country printed bare is a kind as often: «Պղպեղ բուլղարական» is a bell pepper,
- * «Սուրճ հայկական» the seed's Armenian coffee.
+ * and «Եգիպտացորեն հայկական» are «Եգիպտացորեն», one corn — in parentheses or not (self-review №1). A list, never an
+ * ending: «(մանկական)» is a child's toothpaste, another thing (№2), and «Պղպեղ բուլղարական» a bell pepper, a kind.
+ * Local, imported, and the countries a till prints of its produce; a seed's name that holds one with the kind keeps it —
+ * «սուրճ հայկական» is the seed's «Кофе армянский» — so it is set apart (`origins`), never thrown away.
  */
-const ORIGIN_IN_PARENTHESES = /\(\s*(?:[ա-ֆԱ-Ֆ]+ական|ներմուծված)\s*\)/giu
-const ORIGINS = new Set(['տեղական', 'ներմուծված'])
+// the words of where the bench's and the owner's receipts print it; a country a till names a kind by — «չինական
+// կաղամբ» the seed's Peking cabbage, a Georgian or a Turkish dish — is none of them
+const ORIGINS = new Set(['տեղական', 'ներմուծված', 'ներկրված', 'հայկական', 'ռուսական', 'իրանական'])
 
-export function receiptLineParts(line: string): ReceiptLineParts {
-  const printed = line.replace(ORIGIN_IN_PARENTHESES, ' ')
+export function receiptLineParts(printed: string): ReceiptLineParts {
+  const origins: string[] = []
+  const withoutOrigins = (tokens: readonly string[]): string[] =>
+    tokens.filter((token) => {
+      if (!ORIGINS.has(keyed(token))) return true
+      origins.push(token)
+      return false
+    })
   const open = printed.indexOf('«')
   const close = open < 0 ? -1 : printed.indexOf('»', open + 1)
   const quoted = open < 0 ? null : printed.slice(open + 1, close < 0 ? undefined : close).trim()
   // «…» a till cut, «22/24» a calibre: no letter, no brand — its text stays a word of the line
   const inQuotes = quoted !== null && /\p{L}/u.test(quoted) ? quoted : null
-  const tokens = tokensOf(
-    inQuotes === null ? printed.replace(/[«»]/gu, ' ') : printed.slice(0, open),
-  ).filter((token) => !ORIGINS.has(keyed(token)))
+  const tokens = withoutOrigins(
+    tokensOf(inQuotes === null ? printed.replace(/[«»]/gu, ' ') : printed.slice(0, open)),
+  )
   // a brand said letter by letter is the line's brand where no «…» is, «Լվացքի կոնդիցիոներ Էյ Բի Սի» (MOL-326)
   const spokenAt =
     inQuotes === null ? tokens.findIndex((_, at) => letterRun(tokens, at) !== null) : -1
@@ -230,7 +240,7 @@ export function receiptLineParts(line: string): ReceiptLineParts {
       ? tokens.slice(spokenAt + spoken.length)
       : brand === null || close < 0
         ? []
-        : tokensOf(printed.slice(close + 1)).filter((token) => !ORIGINS.has(keyed(token)))
+        : withoutOrigins(tokensOf(printed.slice(close + 1)))
   const head = brand === null ? [...before, ...after] : before.length > 0 ? before : after
   const words = head.filter(
     (token) =>
@@ -267,6 +277,7 @@ export function receiptLineParts(line: string): ReceiptLineParts {
       size === null
         ? null
         : `${size[1] === undefined ? '' : `${size[1]}×`}${decimal(size[2] ?? '')} ${SIZE_UNITS[(size[3] ?? '').toLowerCase()] ?? ''}`,
+    origins,
   }
 }
 
@@ -916,7 +927,8 @@ function seedKindOf(
   genitives: Readonly<Record<string, string>>,
 ): SeedKind | null {
   if (parts.kind === null || seed.length === 0) return null
-  const tokens = [...parts.before, ...parts.after].filter(
+  // the seed's name of a kind with its origin keeps it, «սուրճ հայկական» (MOL-326, self-review №1)
+  const tokens = [...parts.before, ...parts.after, ...parts.origins].filter(
     (token) => isNameWord(token) && ARMENIAN.test(token),
   )
   let best: { name: string; covered: Set<string> } | null = null
@@ -1268,6 +1280,8 @@ export function lineFitter(
     ...tokens.flatMap((token) => sensesOf(token, dictionary).flatMap(wordsOf)),
     ...tokens.flatMap((token) => wordsOf(lexicon.genitives?.[lexiconKey(token)] ?? '')),
     ...phrases.flatMap((phrase) => phrase.words),
+    // an item that names where it was grown stands on a line that prints it, «Кофе армянский» (self-review №1)
+    ...parts.origins.flatMap((origin) => sensesOf(origin, dictionary).flatMap(wordsOf)),
   ]
   // a brand or a line the lexicon knows is the line's in its package's spelling too: «Կինդեր» is Kinder
   const shelves = [...tokens, ...tokens.slice(1).map((token, at) => `${tokens[at] ?? ''} ${token}`)]
