@@ -140,8 +140,11 @@ async function person(until: Date | null, edition: number | null = MODEL_CONSENT
 
 const LATER = new Date(Date.now() + 24 * 60 * 60 * 1000)
 
-async function queued(me: Person, capturedAt = '2026-10-08T16:00:00.000Z'): Promise<string> {
-  const id = randomUUID()
+async function queued(
+  me: Person,
+  capturedAt = '2026-10-08T16:00:00.000Z',
+  id: string = randomUUID(),
+): Promise<string> {
   const sent = await app.inject({
     method: 'POST',
     url: '/receipts',
@@ -1203,7 +1206,8 @@ describe('a receipt read not whole: its reasons, its review and the developer to
 
   it('counts why, keeps the photo and the answer for the review, and tells the developer — no name, no sum', async () => {
     const me = await person(LATER)
-    const id = await queued(me)
+    // an id that starts with one of the sums: the receipt is named by it all the same (MOL-316)
+    const id = await queued(me, undefined, '600b451a-0000-4000-8000-000000000316')
     await readAll(benchReader(), fakeModel(notWhole), { told: told() })
     expect(await reasons()).toEqual([
       'model AM line unsettled 1',
@@ -1228,8 +1232,11 @@ describe('a receipt read not whole: its reasons, its review and the developer to
       reason: 'line_not_as_printed',
       lineReasons: { unsettled: 1 },
     })
-    expect((notice as { keptUntil?: string }).keptUntil).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-    expect(JSON.stringify(notice)).not.toMatch(/Օրինակ|1627|600/)
+    // the id and the day may hold any digits: the name and the sums are looked for in the rest (MOL-316)
+    const { receipt, keptUntil, ...rest } = notice as { receipt?: string; keptUntil?: string }
+    expect(receipt).toBe(id.slice(0, 8))
+    expect(keptUntil).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(JSON.stringify(rest)).not.toMatch(/Օրինակ|1627|600/)
   }, 30_000)
 
   it('keeps the review after «Записать» deletes the receipt’s own photo, until its days pass', async () => {
