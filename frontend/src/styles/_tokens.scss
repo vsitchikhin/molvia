@@ -65,6 +65,11 @@
      do not fit --text-title, and --text-headline loses «the amount before the rate». */
   --text-card-figure: 1.25rem; /* 20 */
 
+  /* A figure that is a card's answer, never wider than its card (MOL-321): the figure's size, and
+     smaller only where a sum of seven digits would stand past the card — some 140 % of the text and
+     up. Measured against the nearest container (`container-type: inline-size` on the card). */
+  --text-figure-fit: min(var(--text-figure), 18cqi);
+
   --leading-tight: 1.15;
   --leading-snug: 1.3;
   --leading-body: 1.45;

@@ -214,6 +214,11 @@ export default defineComponent({
 }
 
 .track {
+  /* No least width of its own (MOL-321): in a column of `auto` — the form of a new account — the row
+     handed its words up as the column's width, so it always «fitted» and the sheet went 82 px past a
+     phone at 200 %. The width is the column's; whether the words fit is then measured against it. */
+  contain: inline-size;
+
   /* Its own stacking context: the word is lifted over its segment's hit area (below), and without
      this it rose over everything of the same level — the pinned header too, which a segment
      scrolled under it then drew through and took the taps of («‹ Деньги» on «Графики»). */

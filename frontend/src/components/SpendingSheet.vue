@@ -1152,8 +1152,11 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
+/* «Покупки ›» goes under the words only where it cannot stand beside them (MOL-321): at 200 % it stood
+   15 px past the sheet. */
 .shop {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   min-height: 3.75rem;
@@ -1191,7 +1194,7 @@ export default defineComponent({
 
 .shop-text {
   display: grid;
-  flex: 1;
+  flex: 1 1 min-content;
   min-width: 0;
 }
 
@@ -1207,6 +1210,7 @@ export default defineComponent({
 
 .shop-action {
   flex: none;
+  margin-left: auto;
   color: var(--accent-ink);
   font-weight: var(--weight-bold);
 }

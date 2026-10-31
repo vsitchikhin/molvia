@@ -142,7 +142,7 @@
             <AppReveal :key="month.month" group>
               <section v-for="day in journal" :key="day.day" class="day">
                 <h2 class="day-head">
-                  <span>{{ dayTitle(day.day) }}</span>
+                  <span class="day-words">{{ dayTitle(day.day) }}</span>
                   <span v-if="day.total" class="day-total">{{ dayTotalText(day, locale) }}</span>
                 </h2>
                 <AppCard as="ul" list>
@@ -512,8 +512,11 @@ export default defineComponent({
   margin-block: var(--space-4);
 }
 
+/* The sum goes under the count only where the two cannot stand side by side even with the count's
+   words broken (MOL-321): at 200 % on 320 «6 600 ֏» stood past the phone. */
 .total {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
@@ -521,6 +524,7 @@ export default defineComponent({
 }
 
 .count {
+  flex: 1 1 min-content;
   padding-top: var(--space-2);
   color: var(--text-muted);
   font-size: var(--text-callout);
@@ -560,6 +564,7 @@ export default defineComponent({
 /* The day's sum stands over the rows' sums (157 v2 02 п. 4, MOL-176 В-1). */
 .day-head {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--space-3);
   margin: 0;
@@ -573,16 +578,25 @@ export default defineComponent({
   justify-self: start;
 }
 
+/* Where even the words broken leave no room for the day's sum — its least width beside the day's
+   longest word, at 200 % on 320 the page 47 px sideways — it goes under them, at the right (MOL-321):
+   a line wraps only where the least widths do not fit, so at 100 % the words still give way first. */
+.day-words {
+  flex: 1 1 min-content;
+}
+
 /* The day's words give way on a narrow phone, never a figure of its sum: broken, «≈» stood over
    «125 403 ֏» and the figure left the column (review Р3-1). A sum of several currencies breaks only after
    its «+» (`dayTotalText` binds the rest), right-aligned in at most 60 % of the head: unbroken, drams and
    three currencies with their cents put the page at 400 px on a phone of 320 (MOL-184, round 2). Never
    narrower than its widest figure: a figure wider than 60 % — «≈ 50 000 000 ֏» in a large system font —
    takes the room from the day's words rather than standing past the column (round 3). */
+
 .day-total {
   flex: none;
   min-width: min-content;
   max-width: 60%;
+  margin-left: auto;
   font-weight: var(--weight-regular);
   font-variant-numeric: tabular-nums;
   text-align: right;

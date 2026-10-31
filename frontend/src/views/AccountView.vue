@@ -604,6 +604,8 @@ export default defineComponent({
 /* A column, not a grid: «≈» grows and goes by `AppReveal`, which takes a flex column's gap back with
    it — a grid's stays and jumped (MOL-151). */
 .balance {
+  /* The balance's figure fits its card (`--text-figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -626,7 +628,7 @@ export default defineComponent({
   @include display-type;
 
   margin: 0;
-  font-size: var(--text-figure);
+  font-size: var(--text-figure-fit);
   font-variant-numeric: tabular-nums;
   line-height: var(--leading-tight);
 

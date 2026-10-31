@@ -240,11 +240,18 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
+/* The figure goes under its words only where the two cannot stand side by side even with the words
+   broken (MOL-321): «4,80 ֏/₽» stood 5 px past a phone of 320 at 200 %. */
 .line {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-3);
+  column-gap: var(--space-3);
+
+  > :first-child {
+    flex: 1 1 min-content;
+  }
 }
 
 .label,

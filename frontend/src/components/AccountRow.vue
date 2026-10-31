@@ -62,6 +62,8 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .row {
+  /* It measures itself for the icon below (MOL-321). */
+  container-type: inline-size;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -120,8 +122,10 @@ export default defineComponent({
   color: var(--text-muted);
 }
 
+/* Breaks between its words, never inside one, where the row is short (MOL-321): «Получил на» held on
+   one line took the exchange's sheet 33 px past a phone at 200 %. */
 .label {
-  flex: none;
+  flex: 0 1 auto;
   color: var(--text-muted);
   font-size: var(--text-callout);
 }
@@ -154,5 +158,16 @@ export default defineComponent({
 
   font-size: var(--icon);
   color: var(--text-muted);
+}
+
+/* Narrower than this the wallet gives its place to the words (MOL-321): it only decorates, and at 200 %
+   «Account» of one word, the wallet and the chevron stood 23 px past the spending's sheet. In rem: from
+   some 160 % of the text on 320, never at 100 %. */
+$icon-beside: 10rem;
+
+@container (width < #{$icon-beside}) {
+  .icon {
+    display: none;
+  }
 }
 </style>

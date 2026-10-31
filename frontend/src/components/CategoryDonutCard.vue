@@ -233,12 +233,14 @@ export default defineComponent({
 }
 
 /* The ring and, in its middle, «0 ֏» of a month with nothing spent. */
+
+/* Never wider than the card: under the names at 200 % the ring of 6.75rem was 216 px in a card of 190. */
 .ring-box {
   display: grid;
   flex: none;
   place-items: center;
-  width: 6.75rem;
-  height: 6.75rem;
+  width: min(6.75rem, 100%);
+  aspect-ratio: 1;
 }
 
 .ring,
