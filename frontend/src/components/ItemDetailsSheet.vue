@@ -27,14 +27,7 @@
         @blur="leaveField('amount')"
       >
         <template #suffix>
-          <span class="currency">
-            <select v-model="currency" class="currency-select" :aria-label="t('item.currency')">
-              <option v-for="option in currencies" :key="option.value" :value="option.value">
-                {{ option.sign }}
-              </option>
-            </select>
-            <IconMenuDown class="currency-caret" aria-hidden="true" />
-          </span>
+          <CurrencySelect v-model="currency" :label="t('item.currency')" />
         </template>
       </AppField>
 
@@ -146,9 +139,8 @@ import IconArrowDown from '~icons/mdi/arrow-down'
 import IconBarcodeScan from '~icons/mdi/barcode-scan'
 import IconCheck from '~icons/mdi/check'
 import IconEqual from '~icons/mdi/equal'
-import IconMenuDown from '~icons/mdi/menu-down'
 import IconSwapHorizontal from '~icons/mdi/swap-horizontal'
-import { currencySchema, currencySign, formatEstimate, formatUnitPrice } from '@molvia/model'
+import { formatEstimate, formatUnitPrice } from '@molvia/model'
 import type {
   BaseUnit,
   CatalogueEntry,
@@ -160,6 +152,7 @@ import type {
 import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
+import CurrencySelect from '@/components/CurrencySelect.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
@@ -197,10 +190,10 @@ export default defineComponent({
   components: {
     AppButton,
     AppField,
+    CurrencySelect,
     AppReveal,
     BottomSheet,
     IconBarcodeScan,
-    IconMenuDown,
     IconSwapHorizontal,
     SegmentedControl,
   },
@@ -321,9 +314,6 @@ export default defineComponent({
     })
 
     const units = computed(() => UNITS.map((value) => ({ value, label: t(`item.unit_${value}`) })))
-    const currencies = computed(() =>
-      currencySchema.options.map((value) => ({ value, sign: currencySign(value, locale.value) })),
-    )
 
     const perUnit = computed(() => {
       const price = details.unitPrice.value
@@ -615,7 +605,6 @@ export default defineComponent({
       errors: details.errors,
       leaveField: details.leave,
       units,
-      currencies,
       perUnit,
       itemHint,
       alternativeHint,
@@ -655,39 +644,6 @@ export default defineComponent({
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
   gap: var(--space-3);
   align-items: start;
-}
-
-.currency {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.currency-select {
-  min-width: var(--touch-target);
-  min-height: var(--touch-target);
-  padding: 0 var(--space-4) 0 var(--space-1);
-  border: none;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  appearance: none;
-  cursor: pointer;
-
-  &:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-    border-radius: var(--radius-sm);
-  }
-}
-
-.currency-caret {
-  @include icon;
-
-  font-size: var(--icon);
-  position: absolute;
-  right: 0;
-  pointer-events: none;
 }
 
 .per-unit-box {

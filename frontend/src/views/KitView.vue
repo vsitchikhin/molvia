@@ -117,6 +117,12 @@
       >
         <template #suffix>{{ sign }}</template>
       </AppField>
+      <!-- The currency beside an amount, chosen by its sign (MOL-235). -->
+      <AppField v-model="price" :label="t('item.price')" kind="decimal" data-kit="currency">
+        <template #suffix>
+          <CurrencySelect v-model="kitCurrency" :label="t('item.currency')" />
+        </template>
+      </AppField>
       <AppField v-model="review" :label="t('verdict.review_label')" kind="multiline" />
       <AppField v-model="date" :label="t('dev.kit.date')" kind="date" readonly />
       <AppField v-model="city" :label="t('settings.city')" kind="select" :options="cities" />
@@ -759,6 +765,7 @@ import {
 } from '@molvia/model'
 import type {
   AccountOperationView,
+  Currency,
   MoneyMonthView,
   SpendingCategoryView,
   TripView,
@@ -792,6 +799,7 @@ import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import CategoryChips from '@/components/CategoryChips.vue'
 import CategoryPickerSheet from '@/components/CategoryPickerSheet.vue'
+import CurrencySelect from '@/components/CurrencySelect.vue'
 import DonutChart from '@/components/DonutChart.vue'
 import type { DonutData } from '@/components/DonutChart.vue'
 import ListRow from '@/components/ListRow.vue'
@@ -827,6 +835,7 @@ export default defineComponent({
     AppButton,
     AppCard,
     AppField,
+    CurrencySelect,
     AppNote,
     AppScreen,
     AppSwitch,
@@ -1308,6 +1317,7 @@ export default defineComponent({
       quantity: ref('1'),
       price: ref('57о'),
       entry: ref(''),
+      kitCurrency: ref<Currency>('AMD'),
       entryBad: ref(''),
       entryLong: ref('1 250 300,50'),
       review: ref(''),

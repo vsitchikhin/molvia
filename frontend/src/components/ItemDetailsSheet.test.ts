@@ -260,7 +260,7 @@ describe('ItemDetailsSheet', () => {
       name === 'radio:l'
         ? view.get('input[type="radio"][value="l"]')
         : name === 'select'
-          ? view.get('select.currency-select')
+          ? view.get('.currency-select select')
           : button(view, name)
     ).element as HTMLElement
     held.focus()
