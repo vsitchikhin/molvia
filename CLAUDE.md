@@ -565,6 +565,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   narrower than 22rem stands its amount under the words. **A search is `SearchField`** (MOL-177): a
   combobox gives it its role and keys, its rows are `ListRow as="li"` with no hover; a second search
   field fails ESLint.
+- **The amount typed is `AppField size="entry"`, a currency beside it `CurrencySelect`, a checkbox
+  `AppCheckbox`** (MOL-235): a static `inputmode="decimal"`, `type="checkbox"` or a `<select>` outside the kit
+  fails ESLint; a field's classes are the kit's own words (`app-field`).
 - **Every screen has four states — loading, empty, error, offline — drawn by `ScreenSkeleton` and
   `ScreenState` only** (MOL-19): offline is never red, and offline or error is decided after the
   failure; polite states speak through the one live region in `App.vue`. **Empty is one quiet

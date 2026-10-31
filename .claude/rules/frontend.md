@@ -525,6 +525,31 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the combobox had kept that itself, and `ListRow` had lost it for a chosen row with a meta (MOL-175).
   `e2e/kit-rows` holds the pill, its one height of 46 with or without the scanner, the active option's weight
   and meta, a chosen row's meta, and an option's whole name at 390 and 320, in both engines.
+- **The amount typed, the currency beside it and the checkbox are the kit's** (MOL-235, Ф-12). The spending,
+  the check and the transfer had each drawn the large amount anew — a well of 72, Entry 40, the sign 32 — with
+  three looks of the focus (a 2 `accent` ring inside, the same with a halo, none of the kit's), an error with
+  words or none, and a sign `aria-hidden`, so a screen reader never heard the currency; the price of a purchase
+  and the sum of a receipt the same select of signs with 30 lines of styles each; the consent the browser's own
+  box. **The amount is `AppField size="entry"`** (owner's В-1 «а»): the same field drawn large — its label, its
+  error, `aria-invalid`, `aria-describedby` and read-only are the field's, the sign in its `#suffix`, read after
+  the value — not a component of its own, which would be a second source of truth about a field. **Its label may
+  be the sheet's question** (`question`, В-2 «а»): «Сколько на счёте сейчас?» of the check at 17/600 in `text`,
+  as 116 v2 draws it. **The error of every field stands after an 18 alert** (В-3 «а», DESIGN.md): two copies had
+  it and the kit had not, so an error was told by colour alone on every other form. **The field's classes are the
+  kit's words** (`app-field`, `app-field-entry`): a root carries the scope of the screen it stands in, and a
+  sheet's `.field` — its column of a label and a field — doubled the space under the label of every field of the
+  kit in it (the transfer's fee and day, a receipt's line) — the class of MOL-199's `nav-field`. **The currency is
+  `CurrencySelect`** in the field's tail (Р-2): the field's focus around it and its own ring in it, so the keyboard
+  tells the currency from the figure. **The checkbox is `AppCheckbox`** (В-4 «а»), a native checkbox the kit
+  draws, by the grammar of `AppSwitch`: off a square edged in `graphic`, on `accent-solid` with a ✓, not now
+  `inactive` — `aria-disabled`, focusable, a tap, a tap on its words and Space put back (`e2e/kit-inactive` in
+  both engines) — and the focus a field's, on the row. **A copy is refused by ESLint**: a static
+  `inputmode="decimal"` anywhere (`AppField` binds its own), `<input type="checkbox">` outside `AppSwitch` and
+  `AppCheckbox`, a `<select>` outside `AppField` and `CurrencySelect` — every `<select>` there is; one option of
+  the rule a file, so each file of the kit is refused the others' (`src/eslint-kit-fields.test.ts`). Closes
+  carelessness, not intent: a bound `:type` passes. `inputmode="decimal"` stays on the `<input>`, where the
+  keyboard's remembered height reads it (MOL-151). **Not here:** the currency as a field of its own
+  (`kind="select"`) or as segments (the spending) — other forms, not copies.
 - **An operation is one row, `OperationRow`, and it knows no operation** (MOL-176, Ф-12). «Траты» drew
   `SpendingRow`, an account's journal, «не попали» and a check drew an `OperationRow` bound to
   `AccountOperationView`, and the two parted on everything seen: the chevron on purchases alone or on
